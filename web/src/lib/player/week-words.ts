@@ -2,8 +2,9 @@
  * week ahead's box row and cell, the verb and the basis lines. Pure, so the tests read what the card
  * prints; live.ts reads the answer and builds the links. */
 import type { components } from '#lib/api/types.ts';
-import { memberZone, weekdayTime } from '#lib/format/clock.ts';
-import { lineState, pastKickoff, toPlay } from '../league/box/kickoff.ts';
+import { memberZone, weekdayName, weekdayTime } from '#lib/format/clock.ts';
+import { lineState, lineupOpen, pastKickoff, toPlay } from '../league/box/kickoff.ts';
+import { signed } from '#lib/format/number.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
 import {
 	playerRestWords,
@@ -39,7 +40,9 @@ import {
 	CARD,
 	NONE,
 	printTenth,
+	publishedOn,
 	withTile,
+	type BasisTile,
 	type CardHead,
 	type CardTile,
 	type RestParts
@@ -52,6 +55,7 @@ const TENTHS = 10;
 type Schemas = components['schemas'];
 export type PlayerWeek = Schemas['PlayerWeek'];
 export type PlayerVerbKind = Schemas['PlayerVerb']['kind'];
+type AfterBye = Schemas['PlayerAfterBye'];
 
 /** The player the card reads, as his page names him. */
 export interface CardPlayer {
@@ -91,9 +95,14 @@ export interface LiveCard {
 	 * the API names no game that week, so the head never shows the build's week over the read's. */
 	head: CardHead;
 	tiles: CardTile[];
+	/** The in-season row under the tiles, vs Avg filled from the read (Lane 100). */
+	basisTiles: BasisTile[];
 	cell: NextCell | null;
 	next: LogNext | null;
 	verb: CardVerb | null;
+	/** His lineup verb was held back because the week's lineup can no longer be set: Compare is the
+	 * card's verb (Lane 100, B64). */
+	compareLeads: boolean;
 	basis: string[];
 	/** The week's projection as the card prints it, which the week-ahead read is held to (Lane 66v). */
 	projection: CardProjection;
@@ -279,7 +288,62 @@ function projTile(week: PlayerWeek): CardTile {
 	};
 }
 
+/** His next game after the bye as the tiles name it: "Wk 7 vs GB". */
+function afterByeWhere(after: AfterBye): string {
+	const { facts } = after.line;
+	return `${weekHead(after.week)} ${facts.home === false ? 'at' : 'vs'} ${facts.opponent ?? NONE}`;
+}
+
+/** On his bye the opponent tile reads his next game's (Lane 100, B30): no tile of the bye week holds
+ * a figure. */
+function afterByeOppTile(after: AfterBye, position: string): CardTile {
+	const { opp_rank: rank, facts } = after.line;
+	const where = afterByeWhere(after);
+	if (rank === null)
+		return {
+			key: 'opp',
+			label: CARD.opp,
+			value: NONE,
+			caption: `${where}, ${CARD.notRanked}`,
+			tone: null
+		};
+	const of = facts.allowed_to_position?.of ?? null;
+	return {
+		key: 'opp',
+		label: CARD.opp,
+		value: oppRankWord(rank),
+		caption: oppCaption(where, rank, of, position),
+		tone: easeOf(rank, of)
+	};
+}
+
+/** On his bye the change's tile gives his next game's Proj (Lane 100, B30), or the day it is first
+ * published while it is not in. */
+function afterByeProjTile(
+	after: AfterBye,
+	scoring: Schemas['ProjectionScoring'],
+	zone: string
+): CardTile {
+	const value = after.line.week_projection;
+	const arrives = after.projection_arrives_at;
+	const pending = arrives === null ? CARD.projNotIn : publishedOn(weekdayName(arrives, zone));
+	return {
+		key: 'delta',
+		label: `${weekHead(after.week)} ${CARD.proj}`,
+		value: value === null ? NONE : printTenth(value),
+		caption: value === null ? pending : SCORING_WORDS[scoring.format],
+		tone: 'quiet'
+	};
+}
+
+/** His next game after the bye, when the read is on his bye and carries one. */
+function afterByeOf(week: PlayerWeek): AfterBye | null {
+	return week.line.facts.bye ? (week.after_bye ?? null) : null;
+}
+
 function oppTile(week: PlayerWeek, position: string): CardTile {
+	const after = afterByeOf(week);
+	if (after !== null) return afterByeOppTile(after, position);
 	const { opp_rank: rank, facts } = week.line;
 	const opponent = facts.opponent ?? '';
 	if (rank === null) {
@@ -335,6 +399,8 @@ function deltaCaption(week: PlayerWeek, zone: string): string {
 }
 
 function deltaTile(week: PlayerWeek, zone: string, now: number): CardTile {
+	const after = afterByeOf(week);
+	if (after !== null) return afterByeProjTile(after, week.projection_scoring, zone);
 	const ahead = toPlay(week.line.facts, now) || week.line.facts.bye;
 	return {
 		key: 'delta',
@@ -461,10 +527,37 @@ export interface LiveInput {
 	rest: RestParts | null;
 	/** The tier box the read was asked for, null when the page shows none. */
 	tier?: TierAsk | null;
+	/** The in-season row under the tiles as built (Lane 100), empty preseason. */
+	basisTiles?: readonly BasisTile[];
+	/** Each week's last kickoff on the run's schedule, the moment its lineup can no longer be set. */
+	lastKickoffs?: Readonly<Record<number, string>>;
 	screenHref: ScreenHref;
 	zone?: string;
 	/** The time the card is drawn at, in ms: a game kicked off by then says no facts read. */
 	now: number;
+}
+
+/** The verb fits the moment (Lane 100, B64): his lineup's verbs only while the week's lineup can
+ * still be set, by its last kickoff on the run's schedule (a week the schedule does not hold keeps
+ * them); the others always. */
+export function verbFits(
+	verb: NonNullable<PlayerWeek['verb']>,
+	lastKickoff: string | null,
+	now: number
+): boolean {
+	const lineup = verb.kind === 'start' || verb.kind === 'lineup';
+	return !lineup || lastKickoff === null || lineupOpen(lastKickoff, now);
+}
+
+/** His rest of season a game against his Avg once the read gives both in the tile's scoring (Lane
+ * 100, B51): the gap of two printed tenths, taken in whole tenths so no new rounding shows. */
+function vsAvgTile(week: PlayerWeek, rest: RestParts | null, built: BasisTile): BasisTile {
+	const perGame = week.line.rest_of_season_per_game;
+	const avg = week.line.season_avg;
+	const same = week.projection_scoring.format === rest?.scoring;
+	if (!same || perGame === null || avg === null) return built;
+	const tenths = Math.round(perGame * TENTHS) - Math.round(avg * TENTHS);
+	return { ...built, value: signed(tenths / TENTHS) };
 }
 
 /** The card once the week is read. */
@@ -477,6 +570,8 @@ export function liveCard({
 	games,
 	rest,
 	tier = null,
+	basisTiles = [],
+	lastKickoffs = {},
 	screenHref,
 	zone = memberZone(),
 	now
@@ -496,18 +591,24 @@ export function liveCard({
 		deltaTile(week, zone, now)
 	].reduce<CardTile[]>((all, tile) => withTile(all, tile), [...tiles]);
 	const { cell, next } = nextOf(week, zone, now);
+	const leagueVerb = league !== null && week.verb !== null ? week.verb : null;
+	const held = leagueVerb !== null && !verbFits(leagueVerb, lastKickoffs[week.week] ?? null, now);
 	const verb =
-		league !== null && week.verb !== null
-			? verbOf(heldVerb(week.verb, week.line.facts, now), league, player, screenHref)
-			: null;
+		league === null || leagueVerb === null || held
+			? null
+			: verbOf(heldVerb(leagueVerb, week.line.facts, now), league, player, screenHref);
 	return {
 		week: week.week,
 		head: headOf(week, zone, now),
 		tiles: updated,
+		basisTiles: basisTiles.map((tile) =>
+			tile.key === 'vsAvg' ? vsAvgTile(week, rest, tile) : tile
+		),
 		cell,
 		next,
 		verb,
-		basis: liveBasis(week, verb !== null, zone, now),
+		compareLeads: held,
+		basis: liveBasis(week, leagueVerb !== null, zone, now),
 		rest: restAtClock,
 		formats: formatsOf(week, restAtClock),
 		tier: tierOf(week, restAtClock, tier),

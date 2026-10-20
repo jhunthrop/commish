@@ -54,6 +54,12 @@ export function toPlay(game: LineGame, now: number): boolean {
 	return lineState(game, now) === 'upcoming';
 }
 
+/** A week's lineup can still be set at the page's clock (Lane 100, B64): its last game is still to
+ * kick off, by gameHead. */
+export function lineupOpen(lastKickoff: string, now: number): boolean {
+	return gameHead({ state: 'upcoming', next: lastKickoff }, now).state === 'upcoming';
+}
+
 /** Past its kickoff at the page's clock, by lineState: no platform takes a move on him. */
 export function pastKickoff(game: LineGame, now: number): boolean {
 	const state = lineState(game, now);

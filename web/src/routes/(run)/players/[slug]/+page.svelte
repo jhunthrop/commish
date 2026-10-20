@@ -117,6 +117,8 @@
 				games: page.card.games,
 				rest,
 				tier: { label: scoring, season, single: page.tier.mates.length === 1 },
+				basisTiles: lead.basisTiles,
+				lastKickoffs: page.lastKickoffs,
 				screenHref: module.screenHrefFor(at),
 				// The page's clock: the card is drawn at the moment its week is read.
 				now: Date.now()
@@ -272,6 +274,8 @@
 			cell={live?.cell ?? null}
 			verb={live?.verb ?? null}
 			{tiles}
+			basisTiles={live?.basisTiles ?? lead.basisTiles}
+			compareLeads={live?.compareLeads ?? false}
 			{comparing}
 			oncompare={toggleCompare}
 		>
@@ -345,7 +349,11 @@
 						{#if weekRead.body !== null}<Capsule body={weekRead.body} pulls={[]} />{/if}
 					</section>
 				{/if}
-				{#if page.capsule}
+				<!-- In season the read is one paragraph, the week's (Lane 100, B44): the season read and its
+				     drafted-for numbers are the draft's, shown before the first kickoff only. -->
+				{#if page.underway}
+					{#if !weekRead}<p class="unwritten">{CARD.readNotYet}</p>{/if}
+				{:else if page.capsule}
 					{#if page.card.readStamp}<p class="stamp">{page.card.readStamp}</p>{/if}
 					<Capsule body={page.capsule.body} pulls={readPulls} />
 				{:else}
@@ -354,12 +362,9 @@
 				{/if}
 			</article>
 			<aside class="side">
-				{#if page.underway}
-					<section class="why" aria-label={CARD.whyTitle}>
-						<h3><Label>{CARD.whyTitle}</Label></h3>
-					</section>
-				{/if}
-				<div aria-label="His tier">
+				<div aria-label={page.underway ? CARD.whyRest : 'His tier'}>
+					<!-- In season the tier box is why his rest-of-season figure sits where it does (Lane 100, B30). -->
+					{#if page.underway}<h3 class="why"><Label>{CARD.whyRest}</Label></h3>{/if}
 					{#if page.heldTier !== null}
 						<PanelHead title="Tier" />
 						<Footnote>{page.heldTier}</Footnote>
@@ -487,18 +492,9 @@
 		gap: var(--s-4);
 	}
 
-	/* The slot the weekly model's why fills once a round of it passes its test. */
+	/* The tier box's title in season: what the box holds. */
 	.why {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-2);
-		padding: var(--s-3) var(--s-4);
-		border: 1px dashed var(--line-strong);
-		border-radius: var(--r-md);
-	}
-
-	.why h3 {
-		margin: 0;
+		margin: 0 0 var(--s-2);
 		line-height: 1;
 	}
 

@@ -22,8 +22,8 @@ import type { CaptureStamp } from '#lib/format/designation.ts';
 import { playerStatusWords, type PlayerStatusWords } from '#lib/run/status-view.ts';
 import { builtSaying, captureStamp } from '../statuses.ts';
 import { seasonView, type KickoffOf, type SeasonView } from './player-season.ts';
-import { cardBuild, restParts, restTile, type CardBuild } from './player-card.ts';
-import type { CardTile, RestParts } from '#lib/player/card.ts';
+import { basisTiles, cardBuild, restParts, restTile, type CardBuild } from './player-card.ts';
+import type { BasisTile, CardTile, RestParts } from '#lib/player/card.ts';
 import {
 	adp,
 	board,
@@ -72,6 +72,8 @@ export interface FormatLine {
 	/** The card's rest-of-season tile in this format, and the parts the week's read words it from. */
 	restTile: CardTile;
 	restParts: RestParts | null;
+	/** The in-season row under the tiles in this format (Lane 100), empty preseason. */
+	basisTiles: BasisTile[];
 }
 
 export interface PlayerPage {
@@ -115,8 +117,13 @@ export interface PlayerPage {
 	/** The default format's rest-of-season tile and its parts, as its line carries them. */
 	restTile: CardTile;
 	restParts: RestParts | null;
+	/** The default format's in-season row under the tiles, as its line carries it. */
+	basisTiles: BasisTile[];
 	/** The week-ahead read (Lane 72), null until the nightly writes his. */
 	weekRead: WeekRead | null;
+	/** Each week's last kickoff on the run's schedule, after which its lineup can no longer be set
+	 * (Lane 100, B64). */
+	lastKickoffs: Record<number, string>;
 }
 
 export async function playerEntries(): Promise<{ slug: string }[]> {
@@ -130,7 +137,10 @@ async function linesFor(
 	numbers: Readonly<Record<string, PlayerFormat>>,
 	sources: readonly AdpSource[],
 	season: { year: number; underway: boolean; heldOut: boolean },
-	tileOf: (format: Format, numbers: PlayerFormat) => { tile: CardTile; parts: RestParts | null }
+	tileOf: (
+		format: Format,
+		numbers: PlayerFormat
+	) => { tile: CardTile; parts: RestParts | null; basis: BasisTile[] }
 ): Promise<FormatLine[]> {
 	const reach = await seasonReach();
 	const ranked = formats.flatMap((format) => {
@@ -145,14 +155,16 @@ async function linesFor(
 				.map((source) => `${source.drafts}, ${windowLabel(source.window)}`);
 			const boardSize = (await board(line.format.id)).rows.length;
 			const words = lineWords({ ...line, rest }, adpSources, boardSize, season);
+			const tiles = tileOf(line.format, line.numbers);
 			return {
 				...line,
 				rest,
 				words,
 				adpSources,
 				boardSize,
-				restTile: tileOf(line.format, line.numbers).tile,
-				restParts: tileOf(line.format, line.numbers).parts
+				restTile: tiles.tile,
+				restParts: tiles.parts,
+				basisTiles: tiles.basis
 			};
 		})
 	);
@@ -212,6 +224,19 @@ function clubNameOf(list: readonly Club[], team: string): string {
 	return `${club.city} ${club.nickname}`;
 }
 
+/** Each week's last kickoff across the run's schedule. */
+async function lastKickoffsOf(): Promise<Record<number, string>> {
+	const last: Record<number, string> = {};
+	for (const slate of (await schedule()).slates) {
+		for (const game of slate.games) {
+			const held = last[game.week];
+			if (held === undefined || Date.parse(game.kickoff) > Date.parse(held))
+				last[game.week] = game.kickoff;
+		}
+	}
+	return last;
+}
+
 /** His club's game in each week, from the run's schedule: its kickoff and its state at the run. */
 async function kickoffsOf(team: string): Promise<KickoffOf> {
 	const slate = (await schedule()).slates.find((candidate) => candidate.abbr === team);
@@ -224,15 +249,17 @@ async function kickoffsOf(team: string): Promise<KickoffOf> {
 
 export async function playerPage(slug: string, now: number): Promise<PlayerPage> {
 	const entry = await entryBySlug(slug);
-	const [loaded, run, sources, kickoffOf, underway, capture, clubList] = await Promise.all([
-		player(entry.id),
-		manifest(),
-		adp(),
-		kickoffsOf(entry.team),
-		seasonUnderway(),
-		designations(),
-		clubs()
-	]);
+	const [loaded, run, sources, kickoffOf, underway, capture, clubList, lastKickoffs] =
+		await Promise.all([
+			player(entry.id),
+			manifest(),
+			adp(),
+			kickoffsOf(entry.team),
+			seasonUnderway(),
+			designations(),
+			clubs(),
+			lastKickoffsOf()
+		]);
 	const listed = capture?.players[entry.id];
 	const lines = await linesFor(
 		run.formats,
@@ -245,7 +272,8 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		},
 		(format, numbers) => ({
 			tile: restTile(format, numbers, loaded.position, run.season, listed),
-			parts: restParts(format, numbers, loaded.position, listed)
+			parts: restParts(format, numbers, loaded.position, listed),
+			basis: basisTiles(format, numbers, run.season, loaded.season.games)
 		})
 	);
 	const [lead] = lines;
@@ -291,6 +319,8 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		card: cardBuild(loaded.season, loaded.capsule),
 		restTile: lead.restTile,
 		restParts: lead.restParts,
-		weekRead: loaded.weekRead ?? null
+		basisTiles: lead.basisTiles,
+		weekRead: loaded.weekRead ?? null,
+		lastKickoffs
 	};
 }

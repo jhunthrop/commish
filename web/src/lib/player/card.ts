@@ -3,6 +3,7 @@
  * Last before the week is read), and the week's read (live.ts) words what the API holds. */
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
+import { plural } from '#lib/format/number.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
 
 /** A tile's tone: the accent for this week's projection, the ease of his opponent, quiet for the
@@ -10,6 +11,17 @@ import type { BoardFormat } from '#lib/sheet/model.ts';
 export type TileTone = 'lead' | 'easy' | 'hard' | 'even' | 'quiet' | null;
 
 export type TileKey = 'proj' | 'rest' | 'opp' | 'avg' | 'last' | 'delta';
+
+/** The in-season row under the tiles (Lane 100): the preseason figures the order starts from, and
+ * his rest of season a game against his Avg. */
+export type BasisKey = 'preseason' | 'pace' | 'vsAvg';
+
+export interface BasisTile {
+	key: BasisKey;
+	label: string;
+	value: string;
+	caption: string;
+}
 
 export interface CardTile {
 	key: TileKey;
@@ -79,12 +91,19 @@ export const CARD = {
 	delta: 'Δ Proj',
 	compare: 'Compare',
 	week: 'Week',
-	/** The read's stamp, after its day: the writer reads from his facts through the last full
-	 * season until the in-season read is written. */
+	/** The season read's stamp, after its day: the page shows that read only before the season's
+	 * first kickoff, when it was written from his facts through the last full season (Lane 100, B29). */
 	writtenFrom: 'from his facts through last season',
-	/** The slot the weekly model's why fills once a round of it passes its test: its title alone
-	 * until then (review M9). */
-	whyTitle: "Why this week's Proj",
+	/** The tier box in season, titled by what it holds (Lane 100, B30). */
+	whyRest: 'Why his rest-of-season figure',
+	/** In season, the read's place while no week read stands for him (Lane 100, B44). */
+	readNotYet: 'Our read for his next game is not written yet.',
+	/** The in-season row under the tiles (Lane 100, B17 and B51). */
+	preseason: 'Preseason',
+	preseasonPace: 'Preseason pace',
+	vsAvg: 'vs Avg',
+	paceCaption: 'a game, the pace our figure starts from',
+	vsAvgCaption: 'rest of season a game against his Avg',
 	/** A "--" says why on its tile (review M4). */
 	byeWeek: 'Bye this week',
 	projNotIn: "This week's projection is not in yet",
@@ -104,6 +123,17 @@ export const CARD = {
 
 /** The tiles in the card's order. */
 export const TILE_ORDER: readonly TileKey[] = ['proj', 'rest', 'opp', 'avg', 'last', 'delta'];
+
+/** Why his figure a game sits where it does against his Avg, from the order's stored basis: the
+ * preseason pace a game it starts from, weighed against the games he has played (Lane 100, B51). */
+export function vsAvgReason(games: number): string {
+	return `our figure weighs his ${plural(games, 'game')} against his preseason pace`;
+}
+
+/** The Proj of the week after his bye while it is not in: the day it is first published. */
+export function publishedOn(day: string): string {
+	return `Published ${day}`;
+}
 
 /** A tile replaced by its key, the rest kept. */
 export function withTile(tiles: readonly CardTile[], next: CardTile): CardTile[] {

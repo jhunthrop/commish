@@ -2,7 +2,7 @@
 // takes its place, so no week shows two states at once. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { stillToPlay, type AheadRow, type LogNext } from './game-log.ts';
+import { projShown, stillToPlay, type AheadRow, type LogNext } from './game-log.ts';
 
 const ahead: AheadRow[] = [
 	{ week: 6, opponent: 'at LV', bye: false, day: 'Kicked off' },
@@ -26,4 +26,11 @@ void test("the run's weeks still to play until the read, then the read's week in
 	);
 	// A read for a week the run has not reached leaves the run's weeks as they are.
 	assert.deepEqual(stillToPlay(ahead, { ...next, week: 5 }), ahead);
+});
+
+void test('the projection column shows only once a week holds one (Lane 100, B30)', () => {
+	assert.equal(projShown('--', null, '--'), false);
+	assert.equal(projShown('--', { ...next, proj: '--' }, '--'), false);
+	assert.equal(projShown('--', { ...next, proj: '18.4' }, '--'), true);
+	assert.equal(projShown('21.0', null, '--'), true);
 });
