@@ -27,8 +27,7 @@ const OWN_WORDS = /\bover repl\b/i;
 const GAIN_BASIS = /^points over replacement in each lineup, weeks? \d+/;
 const CARD_GAINS = /[+−]\d+\.\d a week for your lineup, [+−]\d+\.\d for theirs/;
 const NEED = /^Fills your empty \S+ (this week|in week \d+|while \S+ sits on bye)\.$/;
-const KEEP_RULE =
-	'A player we rank first at his position goes only for';
+const KEEP_RULE = 'A player we rank first at his position goes only for';
 
 const web = process.argv[2] ?? 'http://localhost:4173';
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
