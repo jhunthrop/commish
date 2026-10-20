@@ -143,6 +143,10 @@ type FullLeague struct {
 	// FinalScoringPeriod is status.finalScoringPeriod, the season's last
 	// scoring period, 0 when ESPN does not say.
 	FinalScoringPeriod int
+	// FinalRoundWeeks is how many scoring periods the matchup period
+	// holding FinalScoringPeriod spans (scheduleSettings.matchupPeriods):
+	// 2 for a two-week championship, 0 when ESPN does not say.
+	FinalRoundWeeks int
 	// PlayoffTeams is scheduleSettings.playoffTeamCount, 0 when unset.
 	PlayoffTeams int
 }
@@ -529,7 +533,7 @@ func checkFull(w wireFull) (FullLeague, error) {
 		MatchupPeriod: w.Status.CurrentMatchupPeriod, Size: w.Settings.Size, Items: scoring.Items,
 		Members: map[string]string{}, LineupSlotCount: map[int]int{}, Acquisition: acquisitionOf(w.Settings.AcquisitionSettings),
 		DraftAt: draftDate(w.Settings.DraftSettings.Date), PlayoffStartWeek: playoffStart(w), PlayoffTeams: playoffTeams(w.Settings.ScheduleSettings.PlayoffTeamCount),
-		FinalScoringPeriod: period(w.Status.FinalScoringPeriod),
+		FinalScoringPeriod: period(w.Status.FinalScoringPeriod), FinalRoundWeeks: finalRoundWeeks(w),
 	}
 	if d := w.DraftDetail; d != nil {
 		l.Draft = &DraftState{Drafted: d.Drafted, InProgress: d.InProgress}

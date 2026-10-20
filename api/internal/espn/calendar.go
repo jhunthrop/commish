@@ -57,3 +57,21 @@ func playoffStart(w wireFull) int {
 	length := max(s.MatchupPeriodLength, 1)
 	return period(s.MatchupPeriodCount*length + 1)
 }
+
+// finalRoundWeeks is how many scoring periods the league's last matchup
+// period spans: the matchup period whose list (matchupPeriods) holds the
+// season's final scoring period. 0 when ESPN lists none that holds it.
+func finalRoundWeeks(w wireFull) int {
+	final := period(w.Status.FinalScoringPeriod)
+	if final == 0 {
+		return 0
+	}
+	for _, periods := range w.Settings.ScheduleSettings.MatchupPeriods {
+		for _, p := range periods {
+			if p == final {
+				return len(periods)
+			}
+		}
+	}
+	return 0
+}

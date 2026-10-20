@@ -25,6 +25,9 @@ type Terms struct {
 	// PlayoffFirst and PlayoffLast are the playoffs' first and last week.
 	PlayoffFirst int `json:"playoff_first,omitempty"`
 	PlayoffLast  int `json:"playoff_last,omitempty"`
+	// FinalWeeks is how many weeks the championship round runs: 2 for a
+	// two-week final, 1 for one week, 0 when the host does not say.
+	FinalWeeks int `json:"final_weeks,omitempty"`
 }
 
 // sleeperAvatars is where Sleeper serves a member's avatar by its id.
@@ -56,8 +59,18 @@ func sleeperTerms(l sleeper.League) Terms {
 	}
 	if l.PlayoffWeekStart > 0 && l.PlayoffTeams > 0 {
 		t.PlayoffLast = l.PlayoffWeekStart + sleeperPlayoffWeeks(playoffRounds(l.PlayoffTeams), l.PlayoffRoundType) - 1
+		t.FinalWeeks = sleeperFinalWeeks(l.PlayoffRoundType)
 	}
 	return t
+}
+
+// sleeperFinalWeeks is the weeks Sleeper's championship round runs: two
+// under a two-week final or two weeks every round, else one.
+func sleeperFinalWeeks(roundType int) int {
+	if roundType == roundsTwoWeekFinal || roundType == roundsTwoWeeksEvery {
+		return 2
+	}
+	return 1
 }
 
 // Sleeper's playoff round types (settings.playoff_round_type).
@@ -95,7 +108,7 @@ func espnTerms(l espn.FullLeague) Terms {
 		t.Waivers, t.Budget = WaiversBudget, l.Acquisition.Total
 	}
 	if l.PlayoffStartWeek > 0 && l.FinalScoringPeriod >= l.PlayoffStartWeek {
-		t.PlayoffLast = l.FinalScoringPeriod
+		t.PlayoffLast, t.FinalWeeks = l.FinalScoringPeriod, l.FinalRoundWeeks
 	}
 	return t
 }

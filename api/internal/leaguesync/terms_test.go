@@ -57,7 +57,7 @@ func TestRecordedSleeperStandingsAndTerms(t *testing.T) {
 	if bids == 0 {
 		t.Error("no claim kept its bid")
 	}
-	want := Terms{Waivers: WaiversBudget, Budget: 1000, PlayoffTeams: 6, PlayoffFirst: 15, PlayoffLast: 17}
+	want := Terms{Waivers: WaiversBudget, Budget: 1000, PlayoffTeams: 6, PlayoffFirst: 15, PlayoffLast: 17, FinalWeeks: 1}
 	if snap.Terms != want {
 		t.Errorf("terms %+v, want %+v", snap.Terms, want)
 	}
@@ -95,8 +95,16 @@ func TestPlayoffWeeks(t *testing.T) {
 		t.Errorf("an unstated league's terms %+v", got)
 	}
 	unset := sleeperTerms(sleeper.League{WaiverType: -1})
-	if unset.Waivers != "" || unset.PlayoffLast != 0 {
+	if unset.Waivers != "" || unset.PlayoffLast != 0 || unset.FinalWeeks != 0 {
 		t.Errorf("an unset Sleeper league's terms %+v", unset)
+	}
+	// The championship's own length (Lane 96, B25): two weeks under a
+	// two-week final or two weeks a round.
+	for roundType, want := range map[int]int{0: 1, 1: 2, 2: 2} {
+		got := sleeperTerms(sleeper.League{PlayoffTeams: 6, PlayoffWeekStart: 15, PlayoffRoundType: roundType})
+		if got.FinalWeeks != want {
+			t.Errorf("round type %d: a %d-week final, want %d", roundType, got.FinalWeeks, want)
+		}
 	}
 }
 
@@ -123,6 +131,11 @@ func TestESPNStandingsAndTerms(t *testing.T) {
 	}
 	if url := hostSettingsURL(snap.Ref); url != "https://fantasy.espn.com/football/league/settings?leagueId=48153503" {
 		t.Errorf("settings url %q", url)
+	}
+	two := l
+	two.PlayoffStartWeek, two.FinalScoringPeriod, two.FinalRoundWeeks = 15, 18, 2
+	if got := espnSnapshot(two, time.Now()).Terms; got.PlayoffLast != 18 || got.FinalWeeks != 2 {
+		t.Errorf("a two-week final through week 18: %+v", got)
 	}
 	l.Acquisition = espn.Acquisition{}
 	if got := espnSnapshot(l, time.Now()); got.Teams[0].BudgetLeft != nil || got.Terms.Waivers != WaiversOrder {

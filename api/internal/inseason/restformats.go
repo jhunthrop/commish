@@ -57,7 +57,7 @@ func liveRunBoards(ctx context.Context, src BoardSource, games []boards.TeamWeek
 		if err != nil {
 			return nil, fmt.Errorf("inseason: the %s board: %w", f.Format, err)
 		}
-		rest := RestAt(games, b.FromWeek, b.Refreshed, now)
+		rest := RestAt(games, b.FromWeek, b.Refreshed, now, StandardHorizon)
 		live, err := LiveBoard(b, rest)
 		if err != nil {
 			return nil, fmt.Errorf("inseason: the %s board at the read's clock: %w", f.Format, err)
