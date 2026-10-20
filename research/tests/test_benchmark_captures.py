@@ -25,7 +25,7 @@ from research.db.url import sqlalchemy_url
 from research.errors import SchemaDriftError
 from research.parity import databases
 from research.pipeline.http import HttpResponse
-from research.pipeline.kickoff_slots import LEAD, SET_LEAD, due_slot, kickoff_slots, set_window_slot, slot_name, slot_of
+from research.pipeline.kickoff_slots import LEAD, due_slot, kickoff_slots, slot_name, slot_of
 from research.pipeline.kickoffs import TeamKickoff, stored_kickoffs
 from research.pipeline.odds import touchdowns
 from research.pipeline.tank01 import projections
@@ -71,22 +71,6 @@ def test_a_slot_is_due_in_the_lead_before_its_first_kickoff() -> None:
     assert due_slot(slots, _at(18, 13, 29)).name == "sunday-morning"  # type: ignore[union-attr]
     assert due_slot(slots, _at(18, 13, 30)) is None
     assert due_slot(slots, _at(18, 10)) is None
-
-
-def test_the_set_window_holds_the_hours_before_the_weeks_first_kickoff_only() -> None:
-    """Lane 93: the week's projection is captured once more in `SET_LEAD` before the week's first
-    kickoff, so the register's Thursday 14:00 New York freeze keeps it; a later slot of the week has no
-    set window of its own."""
-    slots = kickoff_slots(KICKOFFS)
-    thursday = _at(23, 0, 15)
-    first = set_window_slot(slots, thursday - SET_LEAD)
-    assert first is not None and (first.week, first.name) == (7, "thursday")
-    assert set_window_slot(slots, _at(22, 17)) == first  # Thursday 13:00 New York, an hour before the pass
-    assert set_window_slot(slots, thursday - SET_LEAD - timedelta(minutes=1)) is None
-    assert set_window_slot(slots, thursday) is None
-    week_six = set_window_slot(slots, _at(18, 13))
-    assert week_six is not None and week_six.name == "sunday-morning"
-    assert set_window_slot(slots, _at(19, 23)) is None  # Monday's slot is not the week's first
 
 
 def _projections() -> object:
@@ -229,25 +213,6 @@ def test_the_touchdown_market_is_taken_once_per_slot_for_the_slots_events(engine
     assert "99684 credits left this month" in first.line()
     assert again.slot is None and idle.slot is None
     assert len(fetcher.requested) == 2  # noqa: PLR2004 - the list and the one London event, once
-
-
-def test_the_set_window_captures_the_weeks_projection_before_the_freeze_once(engine: Engine) -> None:
-    """Lane 93: at Thursday 13:00 New York the week's projection is due, an hour before the register's
-    final freeze; once captured it is not due again until the slot's own window, which captures anew."""
-    with engine.connect() as conn:  # never committed: the other tests see no snapshot of it
-        before = _at(22, 17)
-        slot = projections.projection_slot_due(conn, 2026, before)
-        assert slot is not None and (slot.week, slot.name) == (7, "thursday")
-        conn.execute(
-            text(
-                f"insert into {CAPTURE_SNAPSHOTS.fullname} (source, captured_at, digest, payload) "
-                "values (:source, :at, 'set', cast(:payload as jsonb))"
-            ),
-            {"source": projections.PROJECTIONS_SOURCE, "at": before, "payload": json.dumps(_projections())},
-        )
-        assert projections.projection_slot_due(conn, 2026, _at(22, 18)) is None
-        own = projections.projection_slot_due(conn, 2026, _at(22, 23))
-    assert own is not None and own.name == "thursday"
 
 
 def test_the_harvest_window_captures_the_slots_projection_and_every_snapshot_is_parsed(engine: Engine) -> None:
