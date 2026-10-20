@@ -3545,6 +3545,13 @@ components:
       description: >-
         a game's state, one rule for every screen: upcoming before its kickoff, kicked_off from its kickoff until its
         final is in, final once the store holds its result or a stat line from either side
+    WeekDoneState:
+      type: string
+      enum: [locked, final]
+      description: >-
+        the matchup's state once the member's starters have all played: final when the matchup's game is final by the
+        one game-state rule (every starter on both sides final), or the member has no opponent this week; locked while
+        any starter on either side still has a game to play, nothing left to set
     GameTotal:
       type: object
       description: >-
@@ -3894,9 +3901,14 @@ components:
           type: string
           nullable: true
           description: >-
-            the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is
-            over."): no change is left to make, so the screen says it in place of the changes and the verb;
-            null while any starter's game is still to come or under way, or absent from an older answer
+            the sentence once every starter of the member's with a game this week has it final, a bye starter aside
+            ("Every starter of yours has played, so nothing is left to set."): it says the lineup, never the week, and
+            stands in place of the changes and the verb; null while any starter's game is still to come or under way,
+            or absent from an older answer
+        week_done_state:
+          allOf: [{ $ref: "#/components/schemas/WeekDoneState" }]
+          nullable: true
+          description: present whenever week_done is, null otherwise or absent from an older answer
     BoxStarter:
       type: object
       required: [slot, line]
@@ -4111,8 +4123,12 @@ components:
           type: string
           nullable: true
           description: >-
-            the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter's game is final, which
-            the front door says in place of the changes and the verb; null before, or absent from an older answer
+            the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter of the member's has played,
+            which the front door says in place of the changes and the verb; null before, or absent from an older answer
+        week_done_state:
+          allOf: [{ $ref: "#/components/schemas/WeekDoneState" }]
+          nullable: true
+          description: the Lineup's own week_done_state, present whenever week_done is, null otherwise or absent from an older answer
     WeekSwap:
       type: object
       required: [slot, in, out]

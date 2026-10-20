@@ -1518,6 +1518,24 @@ func (e WaiverMovesClaim) Valid() bool {
 	}
 }
 
+// Defines values for WeekDoneState.
+const (
+	WeekDoneStateFinal  WeekDoneState = "final"
+	WeekDoneStateLocked WeekDoneState = "locked"
+)
+
+// Valid indicates whether the value is a known member of the WeekDoneState enum.
+func (e WeekDoneState) Valid() bool {
+	switch e {
+	case WeekDoneStateFinal:
+		return true
+	case WeekDoneStateLocked:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WeekOrderAdvicePosition.
 const (
 	WeekOrderAdvicePositionDEF WeekOrderAdvicePosition = "DEF"
@@ -2821,8 +2839,11 @@ type LineupAdvice struct {
 	UncountedRules []string `json:"uncounted_rules"`
 	Week           int      `json:"week"`
 
-	// WeekDone the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is over."): no change is left to make, so the screen says it in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer
+	// WeekDone the sentence once every starter of the member's with a game this week has it final, a bye starter aside ("Every starter of yours has played, so nothing is left to set."): it says the lineup, never the week, and stands in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer
 	WeekDone *string `json:"week_done,omitempty"`
+
+	// WeekDoneState present whenever week_done is, null otherwise or absent from an older answer
+	WeekDoneState *WeekDoneState `json:"week_done_state,omitempty"`
 }
 
 // LineupAdviceEmptySlots defines model for LineupAdvice.EmptySlots.
@@ -3319,7 +3340,7 @@ type PlayerLine struct {
 	// PositionRank his place at his position in our order
 	PositionRank *int `json:"position_rank"`
 
-	// ProjectionDelta week_projection's change since the week's snapshot before the newest, to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
+	// ProjectionDelta week_projection's change since the week's snapshot before the one it is read from (the newest, or once his game has kicked off the one as of kickoff), to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
 	ProjectionDelta *float64 `json:"projection_delta"`
 
 	// RestOfSeasonPerGame his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club had still to play at the run (the games not yet kicked off, from the board's first week through week 17, byes out; the same as his rest-of-season points now over his club's games left now), as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
@@ -3331,7 +3352,7 @@ type PlayerLine struct {
 	// Slug his page on the site (/players/{slug}): set for a quarterback, running back, receiver or tight end our order ranks whose name no other player in our directory shares, null otherwise (a kicker or defense has no page) (a shared name's page is named by the run, which the API does not read)
 	Slug *string `json:"slug"`
 
-	// WeekProjection his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
+	// WeekProjection his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when) while his game is still to come; once it has kicked off, the newest captured at or before his kickoff (the earliest stored when none was), so a game under way or final keeps its projection as of kickoff. Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
 	WeekProjection *float64 `json:"week_projection"`
 }
 
@@ -4330,6 +4351,9 @@ type WeekBug struct {
 	Teams []LeagueTeam `json:"teams"`
 }
 
+// WeekDoneState the matchup's state once the member's starters have all played: final when the matchup's game is final by the one game-state rule (every starter on both sides final), or the member has no opponent this week; locked while any starter on either side still has a game to play, nothing left to set
+type WeekDoneState string
+
 // WeekFacts one player's week; a fact we do not hold is null, never zero
 type WeekFacts struct {
 	AllowedToPosition *PointsAllowed     `json:"allowed_to_position"`
@@ -4417,8 +4441,11 @@ type WeekLineup struct {
 	// Swaps each change, in the league's slot order
 	Swaps []WeekSwap `json:"swaps"`
 
-	// WeekDone the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter's game is final, which the front door says in place of the changes and the verb; null before, or absent from an older answer
+	// WeekDone the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter of the member's has played, which the front door says in place of the changes and the verb; null before, or absent from an older answer
 	WeekDone *string `json:"week_done,omitempty"`
+
+	// WeekDoneState the Lineup's own week_done_state, present whenever week_done is, null otherwise or absent from an older answer
+	WeekDoneState *WeekDoneState `json:"week_done_state,omitempty"`
 }
 
 // WeekOrderAdvice defines model for WeekOrderAdvice.

@@ -14,7 +14,8 @@ import type {
 	LineupAdvice,
 	MatchupBox,
 	PlayerLine,
-	Scoreboard
+	Scoreboard,
+	WeekDoneState
 } from '../../src/lib/league/inseason/api.ts';
 import { advise } from './advise.ts';
 import { FIXTURE_SUNDAY_READ } from './clock.ts';
@@ -66,19 +67,31 @@ function lineAt(line: PlayerLine, moment: Moment): PlayerLine {
 	};
 }
 
-/** The API's sentence once every starter's game is final (inseason words.go WeekDoneWords), null
- * while any is still to come or under way. */
+/** The API's sentence once every starter of the member's has played (inseason words.go
+ * WeekDoneWords), null while any is still to come or under way. */
+export const WEEK_DONE = 'Every starter of yours has played, so nothing is left to set.';
+
 function weekDone(lineup: LineupAdvice, moment: Moment): string | null {
 	const games = lineup.slots.filter(({ ours }) => !ours.facts.bye && ours.facts.kickoff !== null);
 	if (games.length === 0 || !games.every(({ ours }) => moment.final(ours))) return null;
-	return `Every starter's game is final, so week ${String(lineup.week)} is over.`;
+	return WEEK_DONE;
+}
+
+/** The member's matchup once their starters have all played, as the API says it (inseason advice.go
+ * weekDoneState, Lane 91): final when the scoreboard's game is or the member has no opponent, locked
+ * while any starter on either side still has a game to play. */
+export function weekDoneState(scoreboard: Scoreboard, me: number): WeekDoneState {
+	const mine = scoreboard.games.find((g) => g.sides[0]?.roster_id === me);
+	if (mine === undefined || mine.sides.length < 2) return 'final';
+	return mine.state === 'final' ? 'final' : 'locked';
 }
 
 /** The Lineup at the moment: the roster advised again as the engine would then (advise.ts, engine.go
  * Lineup), every kicked-off player locked where the host has him, then each line with his points so
- * far. */
-function lineupAt(lineup: LineupAdvice, moment: Moment): LineupAdvice {
+ * far; the matchup's state beside the sentence once every starter has played. */
+function lineupAt(lineup: LineupAdvice, moment: Moment, state: WeekDoneState): LineupAdvice {
 	const advised = advise(lineup, (line) => kickedOffAt(line, moment.now));
+	const done = weekDone(advised, moment);
 	return {
 		...advised,
 		slots: advised.slots.map((s) => ({
@@ -87,7 +100,8 @@ function lineupAt(lineup: LineupAdvice, moment: Moment): LineupAdvice {
 			host: s.host === null ? null : lineAt(s.host, moment)
 		})),
 		bench: advised.bench.map((l) => lineAt(l, moment)),
-		week_done: weekDone(advised, moment)
+		week_done: done,
+		week_done_state: done === null ? null : state
 	};
 }
 
@@ -139,7 +153,11 @@ function weekOf(
 					: { ...week, mine: side(week.mine), opponent: week.opponent && side(week.opponent) }
 		},
 		lineup: lineupWithFinal(
-			{ ...lineupAt(lineup, moment), player_points: true, team_points: total.get(sync.me) ?? null },
+			{
+				...lineupAt(lineup, moment, weekDoneState(scoreboard, sync.me)),
+				player_points: true,
+				team_points: total.get(sync.me) ?? null
+			},
 			moment
 		),
 		matchup: {
@@ -180,9 +198,10 @@ export function afterSundayOf(
 	recorded: Omit<Recorded, 'scoreboardLive'>,
 	week: RecordedWeek,
 	now: number,
-	readAt: string
+	readAt: string,
+	late?: ReadonlySet<string>
 ): Week & { scoreboard: Scoreboard } {
-	const moment: Moment = { now, final: (line) => stateAt(line.facts, now) === 'final' };
+	const moment: Moment = { now, final: (line) => stateAt(line.facts, now, late) === 'final' };
 	const scoreboard = scoreboardAt(week, { ...moment, scored: true }, readAt);
 	return { ...weekOf(recorded, scoreboard, moment), scoreboard };
 }

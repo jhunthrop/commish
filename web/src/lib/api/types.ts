@@ -2924,6 +2924,11 @@ export interface components {
 		 * @enum {string}
 		 */
 		GameState: 'upcoming' | 'kicked_off' | 'final';
+		/**
+		 * @description the matchup's state once the member's starters have all played: final when the matchup's game is final by the one game-state rule (every starter on both sides final), or the member has no opponent this week; locked while any starter on either side still has a game to play, nothing left to set
+		 * @enum {string}
+		 */
+		WeekDoneState: 'locked' | 'final';
 		/** @description the game's expected score, the consensus of the hourly capture's newest read before kickoff; a read more than six hours before kickoff (or before now) gives way to the game table's newest weekly read, with its own read time */
 		GameTotal: {
 			/**
@@ -3027,12 +3032,12 @@ export interface components {
 			rest_of_season_per_game: number | null;
 			/**
 			 * Format: double
-			 * @description his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
+			 * @description his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when) while his game is still to come; once it has kicked off, the newest captured at or before his kickoff (the earliest stored when none was), so a game under way or final keeps its projection as of kickoff. Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
 			 */
 			week_projection: number | null;
 			/**
 			 * Format: double
-			 * @description week_projection's change since the week's snapshot before the newest, to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
+			 * @description week_projection's change since the week's snapshot before the one it is read from (the newest, or once his game has kicked off the one as of kickoff), to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
 			 */
 			projection_delta: number | null;
 			/** @description this week's opponent's rank in points allowed a game to his position this season under the league's scoring, 1 allowed the fewest (facts.allowed_to_position.rank, of its .of); null on a bye or before the season ranks it */
@@ -3194,8 +3199,10 @@ export interface components {
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
 			host_note: string | null;
 			moves: components['schemas']['LineupMoves'];
-			/** @description the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is over."): no change is left to make, so the screen says it in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer */
+			/** @description the sentence once every starter of the member's with a game this week has it final, a bye starter aside ("Every starter of yours has played, so nothing is left to set."): it says the lineup, never the week, and stands in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer */
 			week_done?: string | null;
+			/** @description present whenever week_done is, null otherwise or absent from an older answer */
+			week_done_state?: components['schemas']['WeekDoneState'] | null;
 		};
 		BoxStarter: {
 			/** @enum {string} */
@@ -3349,8 +3356,10 @@ export interface components {
 			gain: number | null;
 			/** @description each change, in the league's slot order */
 			swaps: components['schemas']['WeekSwap'][];
-			/** @description the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter's game is final, which the front door says in place of the changes and the verb; null before, or absent from an older answer */
+			/** @description the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter of the member's has played, which the front door says in place of the changes and the verb; null before, or absent from an older answer */
 			week_done?: string | null;
+			/** @description the Lineup's own week_done_state, present whenever week_done is, null otherwise or absent from an older answer */
+			week_done_state?: components['schemas']['WeekDoneState'] | null;
 		};
 		WeekSwap: {
 			/** @enum {string} */

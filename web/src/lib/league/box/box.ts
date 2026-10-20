@@ -66,6 +66,9 @@ export const BOX = {
 	reserve: 'Injured reserve',
 	bye: 'Bye',
 	final: GAME_STATE_WORDS.final,
+	/** The Lineup once every starter of the member's has played and the matchup still plays (Lane 91):
+	 * nothing is left to set, and the week is not over. */
+	locked: 'Locked',
 	/** A game past its kickoff whose final is not in yet (Lane 80). */
 	kickedOff: GAME_STATE_WORDS.kicked_off,
 	/** A number not held yet: before kickoff, or with no projection. */

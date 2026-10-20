@@ -68,8 +68,10 @@
 	/** The answer with no change on a row whose game has kicked off or is final (Lane 85): every word,
 	 * the verb and the move read it. */
 	const advice = $derived(heldLineup(answer, now));
-	/** The API's sentence once every starter's game is final: no change and no verb is left. */
+	/** The API's sentence once every starter of the member's has played: no change and no verb is
+	 * left. Its state says Locked while the matchup still plays, Final once it is (Lane 91). */
 	const done = $derived(advice.week_done ?? null);
+	const doneState = $derived(advice.week_done_state ?? null);
 	const box = $derived(lineupBox(advice, memberZone(), now));
 	// Your sheet's tags mark your rows once the sheet is in (review L7).
 	onMount(() => void lazySheet.load());
@@ -146,7 +148,7 @@
 	expanded={onHost ? step.kind !== 'closed' : undefined}
 >
 	{#snippet summary()}
-		<LineupStrip week={advice.week} {box} {done} />
+		<LineupStrip week={advice.week} {box} {done} {doneState} />
 	{/snippet}
 	{#snippet verbFoot()}
 		{#if done !== null}{:else if isSet}
