@@ -1518,6 +1518,24 @@ func (e WaiverMovesClaim) Valid() bool {
 	}
 }
 
+// Defines values for WeekDoneState.
+const (
+	WeekDoneStateFinal  WeekDoneState = "final"
+	WeekDoneStateLocked WeekDoneState = "locked"
+)
+
+// Valid indicates whether the value is a known member of the WeekDoneState enum.
+func (e WeekDoneState) Valid() bool {
+	switch e {
+	case WeekDoneStateFinal:
+		return true
+	case WeekDoneStateLocked:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WeekOrderAdvicePosition.
 const (
 	WeekOrderAdvicePositionDEF WeekOrderAdvicePosition = "DEF"
@@ -2818,8 +2836,11 @@ type LineupAdvice struct {
 	UncountedRules []string `json:"uncounted_rules"`
 	Week           int      `json:"week"`
 
-	// WeekDone the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is over."): no change is left to make, so the screen says it in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer
+	// WeekDone the sentence once every starter of the member's with a game this week has it final, a bye starter aside ("Every starter of yours has played, so nothing is left to set."): it says the lineup, never the week, and stands in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer
 	WeekDone *string `json:"week_done,omitempty"`
+
+	// WeekDoneState present whenever week_done is, null otherwise or absent from an older answer
+	WeekDoneState *WeekDoneState `json:"week_done_state,omitempty"`
 }
 
 // LineupAdviceEmptySlots defines model for LineupAdvice.EmptySlots.
@@ -4334,6 +4355,9 @@ type WeekBug struct {
 	Teams []LeagueTeam `json:"teams"`
 }
 
+// WeekDoneState the matchup's state once the member's starters have all played: final when the matchup's game is final by the one game-state rule (every starter on both sides final), or the member has no opponent this week; locked while any starter on either side still has a game to play, nothing left to set
+type WeekDoneState string
+
 // WeekFacts one player's week; a fact we do not hold is null, never zero
 type WeekFacts struct {
 	AllowedToPosition *PointsAllowed     `json:"allowed_to_position"`
@@ -4424,8 +4448,11 @@ type WeekLineup struct {
 	// Swaps each change, in the league's slot order
 	Swaps []WeekSwap `json:"swaps"`
 
-	// WeekDone the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter's game is final, which the front door says in place of the changes and the verb; null before, or absent from an older answer
+	// WeekDone the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter of the member's has played, which the front door says in place of the changes and the verb; null before, or absent from an older answer
 	WeekDone *string `json:"week_done,omitempty"`
+
+	// WeekDoneState the Lineup's own week_done_state, present whenever week_done is, null otherwise or absent from an older answer
+	WeekDoneState *WeekDoneState `json:"week_done_state,omitempty"`
 }
 
 // WeekOrderAdvice defines model for WeekOrderAdvice.

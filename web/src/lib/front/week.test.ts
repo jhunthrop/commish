@@ -2,6 +2,7 @@
 // the basis, each word from the API's answer alone. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { WEEK_DONE } from '../../../scripts/inseason-fixture/sunday.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { components } from '#lib/api/types.ts';
 import {
@@ -350,8 +351,13 @@ void test('the copy guard: no em-dash, semicolon, platform word or betting word 
 });
 
 void test('a finished week on the front door reads Final with the API sentence and no verb (Lane 85)', () => {
-	const done = "Every starter's game is final, so week 6 is over.";
-	const view = frontLeague({ ...SUCK, lineup: { ...LINEUP, week_done: done } }, href, NOW, ZONE);
+	const done = WEEK_DONE;
+	const view = frontLeague(
+		{ ...SUCK, lineup: { ...LINEUP, week_done: done, week_done_state: 'final' } },
+		href,
+		NOW,
+		ZONE
+	);
 	assert.ok(view.nudge);
 	assert.equal(view.nudge.title, 'Final');
 	assert.equal(view.nudge.done, done);
@@ -360,4 +366,25 @@ void test('a finished week on the front door reads Final with the API sentence a
 	assert.deepEqual(view.nudge.swaps, []);
 	assert.equal(view.changes, 'Final');
 	assert.equal(frontLeague(SUCK, href, NOW, ZONE).nudge?.done, null);
+});
+
+void test('the front door says Locked, never Final, while the matchup still plays (Lane 91)', () => {
+	const locked = frontLeague(
+		{ ...SUCK, lineup: { ...LINEUP, week_done: WEEK_DONE, week_done_state: 'locked' } },
+		href,
+		NOW,
+		ZONE
+	);
+	assert.equal(locked.nudge?.title, 'Locked');
+	assert.equal(locked.nudge.done, WEEK_DONE);
+	assert.equal(locked.nudge.verb, null);
+	assert.equal(locked.changes, 'Locked');
+	// The previous API's answer, the sentence with no state, reads Final as it did.
+	const previous = frontLeague(
+		{ ...SUCK, lineup: { ...LINEUP, week_done: WEEK_DONE } },
+		href,
+		NOW,
+		ZONE
+	);
+	assert.equal(previous.nudge?.title, 'Final');
 });

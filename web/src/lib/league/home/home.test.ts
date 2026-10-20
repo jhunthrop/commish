@@ -6,7 +6,9 @@ import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { LeagueMove, LeagueTeam, LeagueTerms } from '../api.ts';
 import type { LineupAdvice, PlayerLine, Scoreboard } from '../inseason/api.ts';
+import { WEEK_DONE } from '../../../../scripts/inseason-fixture/sunday.ts';
 import { KICKOFF } from '../box/kickoff.ts';
+import { changesTitle } from '../box/lineup.ts';
 import {
 	HOME,
 	bugsOf,
@@ -482,11 +484,12 @@ void test('the lineup card draws no change on a played week and says it is over'
 	const saturday = lineupSummary(recorded, ZONE, SATURDAY);
 	assert.ok(saturday.box.swaps.length > 0);
 	assert.equal(saturday.done, null);
-	const done = "Every starter's game is final, so week 6 is over.";
+	const done = WEEK_DONE;
 	const tuesday = lineupSummary(
 		{
 			...recorded,
 			week_done: done,
+			week_done_state: 'locked',
 			slots: recorded.slots.map((s) => ({
 				...s,
 				ours: final(s.ours),
@@ -500,6 +503,10 @@ void test('the lineup card draws no change on a played week and says it is over'
 	assert.equal(tuesday.box.swaps.length, 0);
 	assert.ok(tuesday.box.starters.every((s) => s.move === null));
 	assert.equal(tuesday.done, done);
+	// The matchup still plays: the card says Locked, its sentence the API's (Lane 91).
+	assert.equal(tuesday.doneState, 'locked');
+	assert.equal(changesTitle(0, tuesday.done, tuesday.doneState), 'Locked');
+	assert.equal(saturday.doneState, null);
 });
 
 void test('a scoreboard past a kickoff and a lineup read that lags it agree: no move on him', () => {

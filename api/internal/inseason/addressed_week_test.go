@@ -122,7 +122,7 @@ func TestAddressedWeekTurnsOnKickoff(t *testing.T) {
 	if got := addressedWeek(final, 18, func(week int) bool { return week <= 18 }); got != 18 {
 		t.Errorf("the season's last week turned to %d", got)
 	}
-	if weekDone(final, 6) == nil || weekDone([]apitypes.LineupSlot{state(apitypes.GameStateKickedOff)}, 6) != nil {
+	if weekDone(final) == nil || weekDone([]apitypes.LineupSlot{state(apitypes.GameStateKickedOff)}) != nil {
 		t.Error("the Lineup's sentence waits on final, the same starters the turn reads")
 	}
 }

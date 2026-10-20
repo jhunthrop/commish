@@ -581,18 +581,44 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	for _, i := range bench {
 		out.Bench = append(out.Bench, people[i].line)
 	}
-	out.WeekDone = weekDone(out.Slots, out.Week)
+	out.WeekDone = weekDone(out.Slots)
+	if out.WeekDone != nil {
+		state := a.weekDoneState()
+		out.WeekDoneState = &state
+	}
 	return out, true
 }
 
-// weekDone is the week's sentence once every starter with a game has it
+// weekDoneState is the member's matchup once their starters have all
+// played (Lane 91): final when the scoreboard's game is (every starter on
+// both sides final by gameStateAt, the bug's own count), or when the
+// member has no opponent this week; locked while any starter on either
+// side still has a game to play.
+func (a *advisor) weekDoneState() apitypes.WeekDoneState {
+	if mine := a.side(a.Me); mine == nil || mine.Game == 0 {
+		return apitypes.WeekDoneStateFinal
+	}
+	for _, sides := range a.pairings() {
+		if sides[0].RosterID != a.Me || sides[0].Game == 0 {
+			continue
+		}
+		if a.scoreboardGame(sides).State != apitypes.ScoreboardGameStateFinal {
+			return apitypes.WeekDoneStateLocked
+		}
+		return apitypes.WeekDoneStateFinal
+	}
+	return apitypes.WeekDoneStateFinal
+}
+
+// weekDone is the Lineup's sentence once every starter with a game has it
 // final by the one state (gameStateAt), a bye starter aside; nil while
 // any is still to come or under way, or with no starter who has a game.
-func weekDone(slots []apitypes.LineupSlot, week int) *string {
+// It says the lineup, never the week (Lane 91): the matchup may still play.
+func weekDone(slots []apitypes.LineupSlot) *string {
 	if !everyStarterPast(slots, apitypes.GameStateFinal) {
 		return nil
 	}
-	words := WeekDoneWords(week)
+	words := WeekDoneWords()
 	return &words
 }
 
