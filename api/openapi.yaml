@@ -4909,7 +4909,7 @@ components:
           items: { $ref: "#/components/schemas/LeagueRecordWeek" }
     LeagueRecordWeek:
       type: object
-      required: [week, benchmark, ours, theirs]
+      required: [week, benchmark, ours, theirs, margin]
       properties:
         week: { type: integer }
         benchmark:
@@ -4920,6 +4920,7 @@ components:
             week's published projection picks, where the read carried no ESPN projection
         ours: { type: number, format: double, description: "our picks' points, to the tenth, as the league scores" }
         theirs: { type: number, format: double, description: "the benchmark lineup's points, to the tenth, as the league scores" }
+        margin: { type: number, format: double, description: "ours less theirs, to the tenth" }
     LeagueShape:
       type: object
       description: the league's starting lineup by our slots, and its bench

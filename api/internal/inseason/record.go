@@ -37,7 +37,7 @@ func (s *Service) leagueRecord(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, wk := range weeks {
 			out.Weeks = append(out.Weeks, apitypes.LeagueRecordWeek{
-				Week: wk.Week, Benchmark: apitypes.LeagueRecordWeekBenchmark(wk.Benchmark), Ours: wk.Ours, Theirs: wk.Theirs,
+				Week: wk.Week, Benchmark: apitypes.LeagueRecordWeekBenchmark(wk.Benchmark), Ours: wk.Ours, Theirs: wk.Theirs, Margin: wk.Margin,
 			})
 		}
 	}

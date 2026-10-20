@@ -1141,3 +1141,40 @@ pre-absence share the next week. 2.2 was written for players who were away. The 
    and the omission is counted per season.
 2. The results keep reporting, per season, the returning teammates and how many of them carried no Out
    or Doubtful filing during the absence, before and after this repair.
+
+### Amendment 4, 2026-10-19, before week 7 is set: the record's order and its yardsticks
+
+Recorded by Lane 93 on the coordinator's rulings for the sense-check backlog (B04, B18, B37), before
+the week 7 order is set. It changes no model, input, fit, gate, threshold or seed of this round and
+touches no graded week: weeks 1, 2 and 6 keep their freezes and grades as stored, and weeks 3 to 5
+(no freeze before their kickoffs) are never back-filled.
+
+1. **The order graded is the order the site ships.** Section 3.3 and the season register
+   (`register_freeze_rows`) froze the preseason board (`commish_board_v9_ppr_12`) every week, while
+   every screen showed the published run's rest-of-season order. From the first freeze after this
+   amendment the freeze also keeps that order, `commish_ros_shipped_ppr_12`: the published run's PPR
+   board as `published_boards` held it at the freeze (published at or before it, through the
+   crosswalk), its rest-of-season points as the stance, its rank as both ranks, and the published run
+   as the maker. The preseason board is still frozen beside it. The record grades a week through the
+   shipped order where its freeze kept it, else the preseason board, and names which, with the
+   order's refresh.
+2. **One set time a week.** The in-season pass freezes the coming week on its first pass after the
+   previous week's first kickoff, as before, and again on the pass inside the twelve hours before the
+   week's first kickoff (the Thursday 14:00 Eastern pass for a Thursday night game). The later freeze
+   supersedes the early one by a new freeze instant, under the register's own rule (rows never
+   update; the latest freeze before kickoff is graded). A week with no pass in that window (a
+   Thanksgiving or a Saturday-first week) keeps its early freeze.
+3. **The yardsticks.** ADP stays the comparison on the draft board only; in season the record grades
+   our order beside ADP (weeks 1 to 2, the only weeks graded before this amendment, against ADP alone)
+   and, from the first week a freeze keeps it, the week's published projection (`published_points`,
+   the newest snapshot read at or before the freeze). For a member's own ESPN league the API keeps
+   ESPN's own projection for every rostered player, in the league's scoring, read before the order is
+   set (`app.espn_week_reads`, read Thursday 13:30 Eastern), and his points after the week is graded;
+   the member's league record compares the lineup our set order picks from the member's roster with
+   the lineup ESPN's projection picks from the same roster, both scored as the league scores, kickers
+   and defenses out of both. This is a shown comparison, never one of 3.3's "leads" claims.
+4. **What this amendment found and did not change.** The week's published projection is captured
+   only in the two hours before each kickoff slot (`pipeline/kickoff_slots.py`), after every freeze,
+   so no freeze to date has kept it (weeks 2 to 5 have no rows; week 6's first landed after its
+   Thursday kickoff). Until a capture runs before the set time (the harvest lane, B68), the freeze
+   keeps `published_points` NULL and the record does not draw it.

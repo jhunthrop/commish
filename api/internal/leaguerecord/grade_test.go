@@ -72,7 +72,7 @@ var byes = map[string]int{"MIN": 7, "KC": 10}
 // end, the kicker and the other team's quarterback start for neither.
 func TestGradeScoresOurPicksAgainstESPNsProjectedLineup(t *testing.T) {
 	got := Grade([]boards.SetOrder{order(&gradedAt)}, reads(), 3, espnShape, byes)
-	want := []Week{{Week: 7, Benchmark: BenchmarkESPN, Ours: 97, Theirs: 70}}
+	want := []Week{{Week: 7, Benchmark: BenchmarkESPN, Ours: 97, Theirs: 70, Margin: 27}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}

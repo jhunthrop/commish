@@ -2610,6 +2610,9 @@ type LeagueRecordWeek struct {
 	// Benchmark the lineup ours is graded against: espn, the lineup ESPN's own projection picks; published, the lineup the week's published projection picks, where the read carried no ESPN projection
 	Benchmark LeagueRecordWeekBenchmark `json:"benchmark"`
 
+	// Margin ours less theirs, to the tenth
+	Margin float64 `json:"margin"`
+
 	// Ours our picks' points, to the tenth, as the league scores
 	Ours float64 `json:"ours"`
 

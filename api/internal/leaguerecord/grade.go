@@ -29,6 +29,8 @@ type Week struct {
 	Benchmark string
 	Ours      float64
 	Theirs    float64
+	// Margin is ours less theirs, to the tenth, so the page prints it as given.
+	Margin float64
 }
 
 // Grade is every week the register has graded whose roster was read
@@ -55,9 +57,9 @@ func Grade(orders []boards.SetOrder, rows []Row, team int, shape leaguesync.Shap
 		if stance == nil {
 			continue
 		}
-		ours := Scored(Lineup(cands, shape, ByRank(order.Rank)), actual)
-		theirs := Scored(Lineup(cands, shape, stance), actual)
-		out = append(out, Week{Week: order.Week, Benchmark: benchmark, Ours: tenth.Round(ours), Theirs: tenth.Round(theirs)})
+		ours := tenth.Round(Scored(Lineup(cands, shape, ByRank(order.Rank)), actual))
+		theirs := tenth.Round(Scored(Lineup(cands, shape, stance), actual))
+		out = append(out, Week{Week: order.Week, Benchmark: benchmark, Ours: ours, Theirs: theirs, Margin: tenth.Round(ours - theirs)})
 	}
 	return out
 }
