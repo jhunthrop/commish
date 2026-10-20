@@ -19,7 +19,7 @@ GCLOUD="${GCLOUD:-gcloud}"
 # schedule, and a date no schedule places fails the pass (research/inseason/season_of.py), so an
 # offseason firing would only be a failure email.
 SCHEDULE=(
-  "research-nightly|0 5 * * *|Etc/UTC|nightly|The nightly run (research.nightly run), 05:00 UTC"
+  "research-nightly|30 5 * * *|Etc/UTC|nightly|The nightly run (research.nightly run), 05:30 UTC, after the 00:00 ET capture pass in standard time too"
   "research-nightly-publish|0 * * * *|Etc/UTC|nightly-publish|The run made public an hour after it passed, and the web build dispatched"
   "research-season-week-tue|0 8 * 1,2,9-12 2|America/New_York|inseason|The register's weekly pass, Tuesday 08:00 ET"
   "research-season-week-wed|0 18 * 1,2,9-12 3|America/New_York|inseason|The register's weekly pass, Wednesday 18:00 ET"
