@@ -2493,6 +2493,12 @@ type InjuryDesignation struct {
 	// AsOf the stamp of the injury read that lists it, or of the host read for the host's own IR mark
 	AsOf time.Time `json:"as_of"`
 
+	// CarriedOver on a page addressing the week after the platform's (Lane 95): a week's designation listed no later than his club's last game, or undated, so still listed but from before that game; the site says it with its listing date ("Out, listed Oct 12"); absent otherwise
+	CarriedOver *bool `json:"carried_over,omitempty"`
+
+	// Listed when the provider first listed him under this status, any status (the run's start); null when the read could not date it; absent from an older answer
+	Listed *time.Time `json:"listed,omitempty"`
+
 	// Since when his unbroken run under a season-long status began, the first capture that lists it (boards.WithSince, the nightly's designations.json since); null for a week's designation, the host's own IR mark, or a run older than the captures read. The site's status chip says it ("IR since Sep 28") and keeps the read for the basis
 	Since  *time.Time        `json:"since,omitempty"`
 	Status DesignationStatus `json:"status"`

@@ -221,28 +221,30 @@ func TestActionScreensKeepAWeekToCome(t *testing.T) {
 	}
 }
 
-// A starter's designation listed before his week 6 game is spent on
-// Monday night: the front door's facts are week 7's, and only a listing
-// after that game is one of them. Sunday morning the same listing is the
-// week's fact.
-func TestFrontDoorDropsASpentListing(t *testing.T) {
+// A designation the provider still lists is never hidden (the
+// coordinator's ruling on Lane 95): on Monday night a starter's Out listed
+// before his week 6 game, or undated, is still the front door's fact and
+// still on his Waivers row, marked carried over with its listing date; one
+// listed after the game is fresh. Sunday morning the Friday listing is the
+// week's own.
+func TestFrontDoorKeepsACarriedOverListing(t *testing.T) {
 	friday := time.Date(2026, 10, 16, 16, 0, 0, 0, east)
 	mondayEvening := time.Date(2026, 10, 19, 19, 0, 0, 0, east)
 	for _, tc := range []struct {
-		name   string
-		now    time.Time
-		listed time.Time
-		week   int
-		chip   bool
+		name    string
+		now     time.Time
+		listed  *time.Time
+		week    int
+		carried bool
 	}{
-		{"Sunday morning, listed Friday", sundayMorning, friday, 6, true},
-		{"Monday night, listed Friday", mondayNight, friday, 7, false},
-		{"Monday night, listed after his game", mondayNight, mondayEvening, 7, true},
+		{"Sunday morning, listed Friday", sundayMorning, &friday, 6, false},
+		{"Monday night, listed Friday", mondayNight, &friday, 7, true},
+		{"Monday night, undated", mondayNight, nil, 7, true},
+		{"Monday night, listed after his game", mondayNight, &mondayEvening, 7, false},
 	} {
 		f, data := turnFixture(t, tc.now)
 		boardID := playingStarter(t, f, data)
-		listed := tc.listed
-		data.Designations = map[string]boards.Designation{boardID: {Code: "O", AsOf: mondayEvening, Listed: &listed}}
+		data.Designations = map[string]boards.Designation{boardID: {Code: "O", AsOf: mondayEvening, Listed: tc.listed}}
 		s := fixtureService(t, f.league, data, &fakeHolds{})
 		s.Facts = weekFacts{data: data, byWeek: map[int]boards.WeekProjection{6: everyoneProjected(f)}}
 		s.Now = func() time.Time { return tc.now }
@@ -260,13 +262,40 @@ func TestFrontDoorDropsASpentListing(t *testing.T) {
 		if got.Week != 6 || got.ChipsWeek == nil || *got.ChipsWeek != tc.week {
 			t.Fatalf("%s: week %d chips for %v, want 6 and %d", tc.name, got.Week, got.ChipsWeek, tc.week)
 		}
-		status := false
+		var status *apitypes.InjuryDesignation
 		for _, c := range got.Chips {
-			status = status || c.Kind == apitypes.RosterChipKindStatus
+			if c.Kind == apitypes.RosterChipKindStatus {
+				status = c.Line.Facts.Designation
+			}
 		}
-		if status != tc.chip {
-			t.Errorf("%s: status chip %v, want %v (%+v)", tc.name, status, tc.chip, got.Chips)
+		if status == nil || status.Status != apitypes.DesignationStatus(boards.StatusOut) {
+			t.Fatalf("%s: no Out chip (%+v), want the listing kept", tc.name, got.Chips)
 		}
+		if carried(*status) != tc.carried || (tc.listed != nil) != (status.Listed != nil) {
+			t.Errorf("%s: carried %v listed %v, want %v with its date", tc.name, carried(*status), status.Listed, tc.carried)
+		}
+		w := decode[apitypes.WaiverAdvice](t, s, "waivers")
+		kept := false
+		for _, l := range w.Roster {
+			kept = kept || (l.Player.BoardId != nil && *l.Player.BoardId == boardID && l.Facts.Designation != nil)
+		}
+		if !kept {
+			t.Errorf("%s: his Waivers row lost the listing", tc.name)
+		}
+	}
+}
+
+// A fresh listing outranks one carried over on the strip; between two of a
+// kind the newer stamp leads.
+func TestStripRanksAFreshListingFirst(t *testing.T) {
+	yes := true
+	old := apitypes.InjuryDesignation{AsOf: kickLate, CarriedOver: &yes}
+	fresh := apitypes.InjuryDesignation{AsOf: kickSun}
+	if !listedBefore(old, fresh) || listedBefore(fresh, old) {
+		t.Fatal("a carried-over listing ranks above a fresh one")
+	}
+	if !listedBefore(fresh, apitypes.InjuryDesignation{AsOf: kickLate}) {
+		t.Fatal("the newer of two fresh listings does not lead")
 	}
 }
 

@@ -181,14 +181,14 @@ func hasGames(games []boards.TeamWeek, week int) bool {
 }
 
 // turnTo is the advisor for another week of the same read (Lane 95): that
-// week's facts (games, kickoffs, byes) with the designations spent on a game
-// already played dropped (Season.WithoutSpent), and that week's published
+// week's facts (games, kickoffs, byes) with the designations carried over
+// from a game already played marked so (Season.Turned), and that week's published
 // projection. The rest of season, the holds and the read stay; the trade
 // search is the new advisor's own.
 func (a *advisor) turnTo(week int, projection boards.WeekProjection) *advisor {
 	out := *a
 	out.week, out.projection = week, projection
-	out.season = NewSeason(a.data, RulesOf(rulesOf(a.settings.Scoring)), week, a.now).WithoutSpent()
+	out.season = NewSeason(a.data, RulesOf(rulesOf(a.settings.Scoring)), week, a.now).Turned()
 	out.finds, out.foundHere, out.searchErr = nil, nil, nil
 	return &out
 }
@@ -423,7 +423,11 @@ func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
 		out.GameState = &state
 	}
 	if d := f.Designation; d != nil {
-		out.Designation = &apitypes.InjuryDesignation{Status: apitypes.DesignationStatus(d.Status), AsOf: d.AsOf, Since: d.Since}
+		out.Designation = &apitypes.InjuryDesignation{Status: apitypes.DesignationStatus(d.Status), AsOf: d.AsOf, Since: d.Since, Listed: d.Listed}
+		if d.CarriedOver {
+			carried := true
+			out.Designation.CarriedOver = &carried
+		}
 	}
 	for _, g := range f.LastGames {
 		out.LastGames = append(out.LastGames, apitypes.GamePoints{Week: g.Week, Points: roundTenth(g.Points)})
@@ -760,7 +764,10 @@ func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.Waive
 		out.Rows = append(out.Rows, row)
 	}
 	if order == seasonOrder {
-		return inSeasonOrder(out, shown), true
+		// The rule says the week the page addresses (Lane 95), the turned one too.
+		out = inSeasonOrder(out, shown)
+		out.Basis = SeasonOrderWords(a.week)
+		return out, true
 	}
 	if out.ProjectionReadAt == nil {
 		// No published projection for the week yet (Lane 95): no Proj to
@@ -803,7 +810,7 @@ func (a *advisor) waiverPage(run waiverRun) apitypes.WaiverAdvice {
 	h := a.header()
 	un := UncountedOf(a.settings, a.season.Carries)
 	forWeek := h.forWeek
-	out := apitypes.WaiverAdvice{Week: h.week, ForWeek: &forWeek, ProjectionArrivesAt: a.projectionArrivesAt(), Basis: WaiversBasis, PickupOrder: weekOrder,
+	out := apitypes.WaiverAdvice{Week: h.week, ForWeek: &forWeek, ProjectionArrivesAt: a.projectionArrivesAt(), Basis: WaiversBasisFor(a.week, a.week != a.Snap.Week), PickupOrder: weekOrder,
 		SeasonBasis: withPerGame(a.Board, WaiverSeasonBasis(a.basis, a.weeks), run.mine, run.pool),
 		BasisNote:   un.Note, BasisNoteLink: un.Link, OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt,
 		ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),

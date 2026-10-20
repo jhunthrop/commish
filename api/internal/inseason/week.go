@@ -298,7 +298,8 @@ func rosterChips(lineup apitypes.LineupAdvice, pickups []apitypes.WaiverRow) []a
 }
 
 // newestDesignation is the starter as set whose designation is the
-// newest, nil when none carries one.
+// newest, a fresh listing ranked above one carried over from a game already
+// played (Lane 95), nil when none carries one.
 func newestDesignation(slots []apitypes.LineupSlot) *apitypes.PlayerLine {
 	var out *apitypes.PlayerLine
 	for _, slot := range slots {
@@ -306,12 +307,24 @@ func newestDesignation(slots []apitypes.LineupSlot) *apitypes.PlayerLine {
 		if line == nil || line.Facts.Designation == nil {
 			continue
 		}
-		if out == nil || line.Facts.Designation.AsOf.After(out.Facts.Designation.AsOf) {
+		if out == nil || listedBefore(*out.Facts.Designation, *line.Facts.Designation) {
 			out = line
 		}
 	}
 	return out
 }
+
+// listedBefore reports whether designation a ranks below b on the strip:
+// carried over where b is fresh, else the older stamp.
+func listedBefore(a, b apitypes.InjuryDesignation) bool {
+	if ca, cb := carried(a), carried(b); ca != cb {
+		return ca
+	}
+	return b.AsOf.After(a.AsOf)
+}
+
+// carried is a designation the turned Season carries over (Lane 95).
+func carried(d apitypes.InjuryDesignation) bool { return d.CarriedOver != nil && *d.CarriedOver }
 
 // byeStarter is a starter as set on bye whose spot no one on the roster
 // can play this week (the Lineup's no_one_can_play), nil when every bye has

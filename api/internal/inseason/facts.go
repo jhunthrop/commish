@@ -58,6 +58,14 @@ type Designation struct {
 	// Since is when his run under a season-long status began
 	// (boards.WithSince), nil for a week's designation or the host's mark.
 	Since *time.Time
+	// Listed is when the provider first listed him under it (the run's
+	// start, boards.WithSince), nil when the read could not date it.
+	Listed *time.Time
+	// CarriedOver is a week's designation on a turned Season (Lane 95) the
+	// provider listed no later than his club's last kickoff before the week,
+	// or did not date: still listed, so still shown and still his tier, but
+	// said with its listing date and ranked below a fresh one on the strip.
+	CarriedOver bool
 }
 
 // Facts is one player's week (spec §3, WeekFacts). A fact we do not hold
@@ -132,10 +140,10 @@ type Season struct {
 	gameFacts    map[boards.ClubWeek]boards.GameFact
 	// lastKickoff is each club's last kickoff before the week.
 	lastKickoff map[string]time.Time
-	// dropSpent is a Season for the week after the one the clock is in
-	// (Lane 95, WithoutSpent): a week's designation listed before his club's
-	// last game was about that game, so it is no fact of this week.
-	dropSpent bool
+	// turned is a Season for the week after the one the clock is in (Lane
+	// 95, Turned): a week's designation listed before his club's last game
+	// is marked carried over, never dropped.
+	turned bool
 }
 
 // NewSeason indexes the data for the league's rules, the week and now.
@@ -328,35 +336,34 @@ func (s *Season) For(p Player) Facts {
 	return f
 }
 
-// WithoutSpent is the Season with every spent designation dropped: for the
-// week after the one whose games the member's lineup has played (Lane 95),
-// a week's designation (questionable, doubtful, out) counts only when the
-// provider listed it after his club's last kickoff before the week, so it is
-// about this week's game; a season-long one stands. A listing with no date
-// (Listed nil) is no newer than that game.
-func (s *Season) WithoutSpent() *Season {
+// Turned is the Season for the week after the one whose games the member's
+// lineup has played (Lane 95). A designation the provider still lists is
+// never hidden (coordinator's ruling): a week's designation (questionable,
+// doubtful, out) listed no later than his club's last kickoff before the
+// week, or with no date, is marked CarriedOver and keeps its tier.
+func (s *Season) Turned() *Season {
 	out := *s
-	out.dropSpent = true
+	out.turned = true
 	return &out
 }
 
-// spent reports whether a designation was about a game already played:
-// on a WithoutSpent Season, a week's designation listed no later than his
-// club's last kickoff before the week.
-func (s *Season) spent(d boards.Designation, team string) bool {
-	if !s.dropSpent || d.SeasonLong() {
+// carriedOver reports whether a designation is a week's that a turned
+// Season carries over from a game already played: listed no later than his
+// club's last kickoff before the week, or undated.
+func (s *Season) carriedOver(d boards.Designation, team string) bool {
+	if !s.turned || d.SeasonLong() {
 		return false
 	}
 	last, played := s.lastKickoff[team]
-	return played && (d.Listed == nil || !d.Listed.After(last))
+	return d.Listed == nil || (played && !d.Listed.After(last))
 }
 
 // designation is the newest capture's designation for him, else the
 // host's IR mark at the read.
 func (s *Season) designation(p Player) *Designation {
-	if d, ok := s.designations[p.BoardID]; ok && p.BoardID != "" && !s.spent(d, p.Team) {
+	if d, ok := s.designations[p.BoardID]; ok && p.BoardID != "" {
 		if status := boards.StatusOf(d.Code); status != "" {
-			return &Designation{Status: status, AsOf: d.AsOf, Since: d.Since}
+			return &Designation{Status: status, AsOf: d.AsOf, Since: d.Since, Listed: d.Listed, CarriedOver: s.carriedOver(d, p.Team)}
 		}
 	}
 	if p.HostIR {
