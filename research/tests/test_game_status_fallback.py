@@ -28,6 +28,7 @@ from research.pipeline.tank01.game_status import (
     FALLBACK_AFTER,
     FALLBACK_CAP,
     GIVE_UP_AFTER,
+    REFUSAL_CAP,
     STATUS_SOURCE,
     capture_game_status,
     lagging_games,
@@ -174,13 +175,14 @@ class _Client:
 
     def __init__(self, box_scores: Mapping[str, object]) -> None:
         self.box_scores = box_scores
+        self.week: object = WEEK_BODY
         self.calls: list[tuple[str, dict[str, str]]] = []
 
     def get(self, path: str, query: dict[str, str] | None = None) -> object:
         asked = dict(query or {})
         self.calls.append((path, asked))
         if path == Paths.GAMES_FOR_WEEK:
-            return WEEK_BODY
+            return self.week
         assert path == Paths.BOX_SCORE
         answer = self.box_scores[asked["gameID"]]
         if isinstance(answer, Exception):
@@ -322,3 +324,99 @@ def test_an_absent_game_whose_answer_fails_gets_no_status(engine: Engine) -> Non
         result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(5))
         assert result.failed and f"{WSH_SF} absent from the week feed" in result.line
         assert "SF" not in _statuses(conn, PASS_AT)
+
+
+_REFUSED_BODY: Final = {"gameID": WSH_SF, "home": "SF", "away": "WSH"}
+_FINAL: Final = {"gameStatus": "Final", "gameStatusCode": "2"}
+# The late game final, so over the hours these passes span only the Monday night game waits.
+_LATE_GAME_FINAL: Final = [{**g, **_FINAL} if g["gameID"] == "20261019_LAR@SEA" else g for g in WEEK_BODY]
+
+
+def _refusing(cls: type[_Client] = _Client) -> _Client:
+    client = cls({WSH_SF: _REFUSED_BODY})
+    client.week = _LATE_GAME_FINAL
+    return client
+
+
+def _box_calls(client: _Client) -> int:
+    return sum(1 for path, _ in client.calls if path == Paths.BOX_SCORE)
+
+
+def test_a_box_score_refused_three_times_alike_is_not_asked_again_and_still_fails(engine: Engine) -> None:
+    client = _refusing()
+    passes = [PASS_AT + timedelta(hours=hour) for hour in range(REFUSAL_CAP + 2)]
+    with engine.begin() as conn:
+        _seed(conn)
+        results = [capture_game_status(conn, cast(Tank01Client, client), SEASON, at, FixedBudget(5)) for at in passes]
+        assert _kept(conn, BOX_SCORE_SOURCE) == REFUSAL_CAP
+    assert REFUSAL_CAP == 3 and _box_calls(client) == REFUSAL_CAP  # noqa: PLR2004 - the ruling says three
+    for asked in results[:REFUSAL_CAP]:
+        assert asked.failed and asked.requests == WEEK_AND_ONE_BOX_SCORE
+        assert f"FAILED, {WSH_SF} box score refused: it is not that game with a status" in asked.line
+    for waiting in results[REFUSAL_CAP:]:
+        assert waiting.failed and waiting.requests == WEEK_FEED_ONLY
+        assert waiting.line == (
+            f"week 6, 6 clubs read, 4 final, 1 request; FAILED, {WSH_SF} box score refused 3 times, waiting on the final"
+        )
+
+
+def test_a_refusal_that_changes_is_asked_again(engine: Engine) -> None:
+    class _Changing(_Client):
+        def get(self, path: str, query: dict[str, str] | None = None) -> object:
+            answer = super().get(path, query)
+            return {**_REFUSED_BODY, "pass": len(self.calls)} if path == Paths.BOX_SCORE else answer
+
+    client = _refusing(_Changing)
+    with engine.begin() as conn:
+        _seed(conn)
+        for hour in range(REFUSAL_CAP + 1):
+            capture_game_status(
+                conn, cast(Tank01Client, client), SEASON, PASS_AT + timedelta(hours=hour), FixedBudget(5)
+            )
+    assert _box_calls(client) == REFUSAL_CAP + 1
+
+
+def test_a_capped_game_ends_when_its_final_comes_another_way(engine: Engine) -> None:
+    client = _refusing()
+    with engine.begin() as conn:
+        _seed(conn)
+        for hour in range(REFUSAL_CAP):
+            capture_game_status(
+                conn, cast(Tank01Client, client), SEASON, PASS_AT + timedelta(hours=hour), FixedBudget(5)
+            )
+        client.week = [{**g, **_FINAL} for g in WEEK_BODY]
+        at = PASS_AT + timedelta(hours=REFUSAL_CAP)
+        result = capture_game_status(conn, cast(Tank01Client, client), SEASON, at, FixedBudget(5))
+        assert not result.failed and result.line == "week 6, 6 clubs read, 6 final, 1 request"
+        assert _statuses(conn, at)["SF"] == FINAL
+
+
+MOVED_FROM: Final = "20261018_WSH@SF"  # the id the stored schedule kept when the game moved a day
+
+
+def test_a_stored_game_whose_clubs_the_answer_carries_under_a_new_id_is_superseded(engine: Engine) -> None:
+    client = _Client({WSH_SF: _as_wsh_sf({"gameStatus": "Completed", "gameStatusCode": "2"})})
+    with engine.begin() as conn:
+        _seed(conn)
+        _seed_schedule(conn)
+        conn.execute(PROVIDER_GAMES.update().where(PROVIDER_GAMES.c.game_id == WSH_SF).values(game_id=MOVED_FROM))
+        result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(5))
+        assert (result.requests, result.failed) == (WEEK_AND_ONE_BOX_SCORE, False)
+        assert result.line == (
+            f"week 6, 6 clubs read, 4 final, 2 requests; {MOVED_FROM} superseded by {WSH_SF}; {WSH_SF} box score final"
+        )
+        # Never asked by its dead id.
+        assert [q["gameID"] for path, q in client.calls if path == Paths.BOX_SCORE] == [WSH_SF]
+
+
+def test_one_club_in_the_answer_under_another_id_supersedes_the_stored_game(engine: Engine) -> None:
+    """A stored game is superseded when either club appears: here the stored row names a home club the
+    answer does not carry, its away club playing in the answer's game."""
+    client = _Client({WSH_SF: _as_wsh_sf({"gameStatus": "Completed", "gameStatusCode": "2"})})
+    stale = {"game_id": "20261018_WSH@ARI", "season": SEASON, "week": WEEK, "home_team": "ARI",
+             "away_team": "WSH", "status": "scheduled"}  # fmt: skip
+    with engine.begin() as conn:
+        _seed(conn)
+        conn.execute(insert(PROVIDER_GAMES), [stale])
+        result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(5))
+        assert f"20261018_WSH@ARI superseded by {WSH_SF}" in result.line and "absent" not in result.line
