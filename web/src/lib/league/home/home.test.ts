@@ -258,10 +258,13 @@ void test('a live bug says its read beside the score, short, and nothing before 
 });
 
 void test('the standings Proj is a team’s projected final once its week has started', () => {
-	const live = projections(board('playing'));
+	const live = projections(board('playing'), SATURDAY);
 	assert.equal(live.get(1), 70.4);
 	assert.equal(live.get(2), null);
-	assert.equal(projections(board('upcoming')).get(1), 87);
+	assert.equal(projections(board('upcoming'), SATURDAY).get(1), 87);
+	// A read that lags the page's clock (upcoming, its kickoff past) reads as the bug does, kicked off,
+	// never the pre-game Proj (round 2, gameHead at the page's clock).
+	assert.equal(projections(board('upcoming'), MONDAY).get(1), null);
 	assert.equal(projectedFinalOf(board('playing'), 1), 70.4);
 	assert.equal(projectedFinalOf(board('upcoming'), 1), null);
 	assert.equal(projectedFinalOf(null, 1), null);
@@ -275,10 +278,15 @@ void test('the standings carry each team’s projection and sort by a column, be
 	];
 	const rows = standingsRows(
 		{ teams, me: 3 },
-		projections({
-			...board('upcoming'),
-			games: [{ state: 'upcoming', next_kickoff: null, sides: [side(1, 0, 101), side(3, 0, 120)] }]
-		})
+		projections(
+			{
+				...board('upcoming'),
+				games: [
+					{ state: 'upcoming', next_kickoff: null, sides: [side(1, 0, 101), side(3, 0, 120)] }
+				]
+			},
+			SATURDAY
+		)
 	);
 	assert.deepEqual(
 		rows.map((r) => [r.rank, r.me, r.proj]),

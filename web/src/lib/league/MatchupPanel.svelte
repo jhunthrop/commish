@@ -146,6 +146,7 @@
 			host={sync.host}
 			projection={box ? { readAt: box.projection_read_at, scoring: box.projection_scoring } : null}
 			{lines}
+			noFinal={[mine, theirs].some((s) => s !== null && s.totals.live && s.totals.final === null)}
 			lineup={null}
 			now={now.getTime()}
 		/>

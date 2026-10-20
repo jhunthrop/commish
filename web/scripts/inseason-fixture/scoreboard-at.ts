@@ -133,20 +133,27 @@ function toPlayOf(k: Kicks, state: ScoreboardGame['state']): string | null {
 	return null;
 }
 
-/** A side's projected final (projfinal.go projectedFinal): its points so far plus the Proj, as
- * printed, of each starter still to play, an out starter counting nothing; null before the game has
- * kicked off (started), with no points, or while a starter still to play has no Proj. */
+/** A side's projected final (projfinal.go projectedFinal): its points so far, plus for each starter
+ * in play the rest of his Proj (max(0, Proj - his points), none without his points), plus the Proj of
+ * each starter still to play, each as printed, an out starter counting nothing; null before the game
+ * has kicked off (started), with no points, or while a starter still to play has no Proj. */
 export function projectedFinalOf(
 	points: number | null,
 	lines: readonly PlayerLine[],
-	now: number,
-	started: boolean
+	moment: Pick<Moment, 'now' | 'final'>,
+	started: boolean,
+	pointsOf: (line: PlayerLine) => number | null = (line) => line.facts.points_this_week
 ): number | null {
 	if (points === null || !started) return null;
 	let sum = points;
 	for (const line of lines) {
-		if (line.facts.bye || line.facts.kickoff === null || kickedOffAt(line, now) || sitsOut(line))
+		if (line.facts.bye || line.facts.kickoff === null || sitsOut(line)) continue;
+		if (kickedOffAt(line, moment.now)) {
+			const pts = pointsOf(line);
+			if (!moment.final(line) && pts !== null && line.week_projection !== null)
+				sum += Math.max(0, tenth(line.week_projection) - pts);
 			continue;
+		}
 		if (line.week_projection === null) return null;
 		sum += tenth(line.week_projection);
 	}
@@ -233,7 +240,12 @@ export function scoreboardAt(recorded: Recorded, moment: Moment, readAt: string)
 			to_play: toPlayOf(game, state),
 			sides: sides.map(({ kicks: own, lines, ...side }) => ({
 				...side,
-				projected_final: projectedFinalOf(side.points, lines, moment.now, started),
+				// Each starter's points as the stand-in scores them (its scored share).
+				projected_final: projectedFinalOf(side.points, lines, moment, started, (l) =>
+					moment.scored && l.week_projection !== null
+						? roundTenth(l.week_projection * SCORED_SHARE)
+						: null
+				),
 				to_play: toPlayOf(own, state)
 			}))
 		};

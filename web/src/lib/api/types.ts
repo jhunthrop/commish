@@ -3158,7 +3158,7 @@ export interface components {
 			team_points: number | null;
 			/**
 			 * Format: double
-			 * @description the lineup's projected final by the score bug's one rule over the lineup as the platform holds it (the score bug's figure for the member): team_points plus the Proj of its starters still to play, an out starter counting nothing; null while team_points is, while a starter still to play has no Proj, or absent from an older answer
+			 * @description the lineup's projected final by the score bug's one rule over the lineup as the platform holds it (the score bug's figure for the member): team_points plus the rest of the Proj of its starters in play and the Proj of its starters still to play, an out starter counting nothing; null while team_points is, while a starter still to play has no Proj, or absent from an older answer
 			 */
 			projected_final?: number | null;
 			projection_scoring: components['schemas']['ProjectionScoring'];
@@ -3226,7 +3226,7 @@ export interface components {
 			to_play?: string | null;
 			/**
 			 * Format: double
-			 * @description the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far plus the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, or absent from an older answer
+			 * @description the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far, the rest of the Proj of its starters in play and the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, or absent from an older answer
 			 */
 			projected_final?: number | null;
 			/** @description the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents) */
@@ -3263,7 +3263,7 @@ export interface components {
 			to_play?: string | null;
 			/**
 			 * Format: double
-			 * @description the side's projected final once any starter of the game has kicked off: points (the platform's score so far) plus the week projection, as printed to the tenth, of each starter still to play, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, or absent from an older answer
+			 * @description the side's projected final once any starter of the game has kicked off: points (the platform's score so far), plus for each starter in play the rest of his week projection (max(0, Proj - his points so far), nothing where the platform gives no player's points), plus the week projection of each starter still to play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, or absent from an older answer
 			 */
 			projected_final?: number | null;
 		};

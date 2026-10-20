@@ -6,7 +6,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { MatchupSide } from '../api.ts';
 import type { PlayerLine, WeekFacts } from '../inseason/api.ts';
-import { AS_OF_KICKOFF, PROJ_FINAL_PART, basisText, boxBasisParts, projPart } from './basis.ts';
+import {
+	AS_OF_KICKOFF,
+	NO_PROJ_FINAL_PART,
+	PROJ_FINAL_PART,
+	basisText,
+	boxBasisParts,
+	projFinalWords,
+	projPart
+} from './basis.ts';
 import { BOX } from './box.ts';
 import { bugFigures, matchupStarted, sideBox } from './matchup.ts';
 
@@ -148,4 +156,30 @@ void test('the basis says once that a game past kickoff keeps its Proj, and what
 		),
 		/kickoff/
 	);
+});
+
+void test('Proj final says the rest of a starter in play, and once why a figure is --', () => {
+	assert.equal(
+		PROJ_FINAL_PART,
+		'Proj final adds the Pts so far, the rest of his Proj for a starter in play, and the Proj of the starters still to play.'
+	);
+	assert.equal(NO_PROJ_FINAL_PART, 'No Proj final while a starter still to play has no Proj.');
+	assert.equal(projFinalWords(false, true), '');
+	assert.equal(projFinalWords(true, false), PROJ_FINAL_PART);
+	assert.equal(projFinalWords(true, true), `${PROJ_FINAL_PART} ${NO_PROJ_FINAL_PART}`);
+	const facts = {
+		projection: null,
+		lines: [mccaffrey],
+		byPlayer: true,
+		teamTotal: true,
+		host: 'espn' as const,
+		lineup: null
+	};
+	const clock = { zone: ZONE, zoned: false };
+	assert.ok(
+		basisText(boxBasisParts({ ...facts, noFinal: true }, clock, MONDAY_NIGHT)).includes(
+			NO_PROJ_FINAL_PART
+		)
+	);
+	assert.ok(!basisText(boxBasisParts(facts, clock, MONDAY_NIGHT)).includes(NO_PROJ_FINAL_PART));
 });

@@ -40,6 +40,7 @@
 	import {
 		HOME,
 		bugsOf,
+		bugsMissFinal,
 		projectedFinalOf,
 		feedRows,
 		lineupSummary,
@@ -270,7 +271,7 @@
 				})
 			: []
 	);
-	const rows = $derived(sync ? standingsRows(sync, projections(scoreboard)) : []);
+	const rows = $derived(sync ? standingsRows(sync, projections(scoreboard, now.getTime())) : []);
 	const summary = $derived(
 		advice && sync
 			? lineupSummary(
@@ -297,7 +298,8 @@
 								scoreboard.projection_scoring,
 								advice?.player_points ?? false,
 								memberZone(),
-								bugs.some((b) => b.state !== 'upcoming')
+								bugs.some((b) => b.state !== 'upcoming'),
+								bugsMissFinal(bugs)
 							)
 						: null,
 					// The season panel names the zone once, so the read's time does not repeat it.

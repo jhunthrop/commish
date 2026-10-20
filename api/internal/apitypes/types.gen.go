@@ -2811,7 +2811,7 @@ type LineupAdvice struct {
 	// PlayerPoints the host gives each player's points (Sleeper, MFL, ESPN); false where it gives each team's total alone (Yahoo, FFPC) or its read carried no player's, so a player's points_this_week stay null and the team's total is team_points
 	PlayerPoints bool `json:"player_points"`
 
-	// ProjectedFinal the lineup's projected final by the score bug's one rule over the lineup as the platform holds it (the score bug's figure for the member): team_points plus the Proj of its starters still to play, an out starter counting nothing; null while team_points is, while a starter still to play has no Proj, or absent from an older answer
+	// ProjectedFinal the lineup's projected final by the score bug's one rule over the lineup as the platform holds it (the score bug's figure for the member): team_points plus the rest of the Proj of its starters in play and the Proj of its starters still to play, an out starter counting nothing; null while team_points is, while a starter still to play has no Proj, or absent from an older answer
 	ProjectedFinal *float64 `json:"projected_final,omitempty"`
 
 	// ProjectionPreviousReadAt when the snapshot before it was captured, the read projection_delta counts from; null with none
@@ -2999,7 +2999,7 @@ type MatchupBoxSide struct {
 	// PlayerPoints the host gives each player's points for this side; false where it gives the side's total alone
 	PlayerPoints bool `json:"player_points"`
 
-	// ProjectedFinal the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far plus the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, or absent from an older answer
+	// ProjectedFinal the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far, the rest of the Proj of its starters in play and the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, or absent from an older answer
 	ProjectedFinal *float64 `json:"projected_final,omitempty"`
 	RosterId       int      `json:"roster_id"`
 
@@ -3788,7 +3788,7 @@ type ScoreboardSide struct {
 	// PointsRead false when the host's score could not be read; points then says nothing
 	PointsRead bool `json:"points_read"`
 
-	// ProjectedFinal the side's projected final once any starter of the game has kicked off: points (the platform's score so far) plus the week projection, as printed to the tenth, of each starter still to play, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, or absent from an older answer
+	// ProjectedFinal the side's projected final once any starter of the game has kicked off: points (the platform's score so far), plus for each starter in play the rest of his week projection (max(0, Proj - his points so far), nothing where the platform gives no player's points), plus the week projection of each starter still to play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, or absent from an older answer
 	ProjectedFinal *float64 `json:"projected_final,omitempty"`
 
 	// Projection the side's starters' week projections summed, each as printed to the tenth, a starter with none counting nothing; null when no starter has one

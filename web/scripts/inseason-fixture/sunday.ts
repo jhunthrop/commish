@@ -180,8 +180,8 @@ function weekOf(
 				bench: s.bench.map((l) => lineAt(l, moment)),
 				projected_final: projectedFinalOf(
 					total.get(s.roster_id) ?? null,
-					s.starters.map((st) => st.line),
-					moment.now,
+					s.starters.map((st) => lineAt(st.line, moment)),
+					moment,
 					started
 				)
 			}))
@@ -196,7 +196,7 @@ function lineupWithFinal(lineup: LineupAdvice, moment: Moment): LineupAdvice {
 		const line = s.changed ? s.host : s.ours;
 		return line === null ? [] : [line];
 	});
-	const final = projectedFinalOf(lineup.team_points, set, moment.now, anyKickedAt(set, moment.now));
+	const final = projectedFinalOf(lineup.team_points, set, moment, anyKickedAt(set, moment.now));
 	return { ...lineup, projected_final: final };
 }
 

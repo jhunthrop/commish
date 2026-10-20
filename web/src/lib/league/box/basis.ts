@@ -41,8 +41,18 @@ export interface ProjFacts {
 /** What a game past kickoff keeps (Lane 92, B27), the end of the Proj sentence. */
 export const AS_OF_KICKOFF = 'as of kickoff for a game under way or final';
 
-/** What Proj final is (Lane 92, B22), said once where a game has kicked off. */
-export const PROJ_FINAL_PART = `${BOX.projFinal} adds the ${BOX.pts} so far and the ${BOX.proj} of the starters still to play.`;
+/** What Proj final is (Lane 92, B22, round 2), said once where a game has kicked off. */
+export const PROJ_FINAL_PART = `${BOX.projFinal} adds the ${BOX.pts} so far, the rest of his ${BOX.proj} for a starter in play, and the ${BOX.proj} of the starters still to play.`;
+
+/** Why a Proj final is drawn "--" (round 2), said once where one is. */
+export const NO_PROJ_FINAL_PART = `No ${BOX.projFinal} while a starter still to play has no ${BOX.proj}.`;
+
+/** The Proj final's sentences: what it is once a game has kicked off, and why one is "--" where one
+ * is; empty before kickoff. */
+export function projFinalWords(started: boolean, missing: boolean): string {
+	if (!started) return '';
+	return missing ? `${PROJ_FINAL_PART} ${NO_PROJ_FINAL_PART}` : PROJ_FINAL_PART;
+}
 
 /** Any row's game past its kickoff at the page's clock, by the one rule (kickoff.ts). */
 export function anyKicked(lines: readonly PlayerLine[], now: number): boolean {
@@ -170,6 +180,8 @@ export interface BoxBasisFacts {
 	byPlayer: boolean;
 	/** The platform sends the side's own total, which the Matchup's Team row prints (team_total). */
 	teamTotal: boolean;
+	/** A Team row draws its Proj final "--" (no figure from the API while the game is live). */
+	noFinal?: boolean;
 	host: LeagueHost;
 	/** The Lineup's: the read the change counts from, the API's count of the rules our stats lack,
 	 * and its link; null on the Matchup, which draws no evidence columns. */
@@ -190,7 +202,7 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 		? said(projPart({ ...facts.projection, defense, league: true, kicked }, clock))
 		: [];
 	// What the Team row's small figure is once a game has kicked off (Lane 92, B22).
-	const final = kicked ? said(PROJ_FINAL_PART) : [];
+	const final = said(projFinalWords(kicked, facts.noFinal === true));
 	const { lineup } = facts;
 	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.
 	const team = lineup === null && facts.teamTotal ? 'platform' : 'rows';

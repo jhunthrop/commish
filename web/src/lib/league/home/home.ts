@@ -15,7 +15,7 @@ import type {
 } from '../inseason/api.ts';
 import { hostWords } from '../names.ts';
 import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
-import { AS_OF_KICKOFF, PROJ_FINAL_PART } from '../box/basis.ts';
+import { AS_OF_KICKOFF, projFinalWords } from '../box/basis.ts';
 
 type ScoreboardGame = Scoreboard['games'][number];
 type ScoringRules = components['schemas']['ScoringRules'];
@@ -230,20 +230,25 @@ export function bugsOf(
 }
 
 /** Each team's projection this week, by roster, from the scoreboard: its projected final once its game
- * has started (equal to its Pts once final, Lane 92 B22; none where the API gives none), its Proj
- * before. */
-export function projections(board: Scoreboard | null): ReadonlyMap<number, number | null> {
+ * has started by the bug's own rule at the page's clock (gameHead, round 2; equal to its Pts once
+ * final, Lane 92 B22; none where the API gives none), its Proj before. */
+export function projections(
+	board: Scoreboard | null,
+	now: number
+): ReadonlyMap<number, number | null> {
 	return new Map(
-		(board?.games ?? []).flatMap((g) =>
-			g.sides.map(
-				(s) =>
-					[
-						s.roster_id,
-						g.state === 'upcoming' ? s.projection : (s.projected_final ?? null)
-					] as const
-			)
-		)
+		(board?.games ?? []).flatMap((g) => {
+			const upcoming = gameHead({ state: g.state, next: g.next_kickoff }, now).state === 'upcoming';
+			return g.sides.map(
+				(s) => [s.roster_id, upcoming ? s.projection : (s.projected_final ?? null)] as const
+			);
+		})
 	);
+}
+
+/** Whether a started bug draws a Proj final "--": the basis then says why (round 2). */
+export function bugsMissFinal(bugs: readonly Bug[]): boolean {
+	return bugs.some((b) => b.state !== 'upcoming' && b.sides.some((s) => s.small === BOX.none));
 }
 
 // ---- the drafter's lineup
@@ -717,7 +722,9 @@ export function teamBasis(
 	byPlayer: boolean,
 	zone: string = memberZone(),
 	/** A game of the week has kicked off: Proj final is on the board (Lane 92). */
-	started = false
+	started = false,
+	/** A bug draws a Proj final "--" (round 2). */
+	missing = false
 ): string {
 	const platform = hostWords(host);
 	const team = byPlayer ? ", and your lineup's Team adds its rows" : '';
@@ -730,6 +737,7 @@ export function teamBasis(
 		readAt === null
 			? 'not in yet for this week'
 			: `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
-	const final = started ? ` ${PROJ_FINAL_PART}` : '';
+	const words = projFinalWords(started, missing);
+	const final = words === '' ? '' : ` ${words}`;
 	return `A team's ${BOX.proj} adds its starters' published projections in ${format}, ${whose}, ${when}${started ? `, ${AS_OF_KICKOFF}` : ''}. ${BOX.pts} are ${platform}'s so far${team}.${final}`;
 }
