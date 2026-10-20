@@ -15,6 +15,8 @@ This week's rulings and the Lane 72 review's, each a rule the validator reads:
   noun, a rank's "of 32"); week numbers, the season and clock times are exempt (M1).
 - A rank in our order says which order it is: "in our preseason order" or "in our rest-of-season order" (M2).
 - The season is named at most once; weeks after it are "week 5" (the coordinator's ruling on L5).
+- An injury report named by its day is the one the sheet names, the game status report the clubs had issued
+  by the write (`week.report_day`); never a day no report came out (Lane 96, B16).
 - Three to five sentences.
 
 Each violation names its sentence in the writer's form (`the sentence "..."`), so a correction hands it
@@ -29,6 +31,7 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.page_figures import page_tenth
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
+from research.capsules.week.report_day import report_words
 from research.capsules.week.sheet import WeekSheet, points_text
 from research.capsules.week.start_advice import start_advice_in
 
@@ -308,6 +311,32 @@ def _order_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
     ]
 
 
+_REPORT_DAY: Final = re.compile(
+    r"\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?:'|\u2019)s\s+(?:injury\s+|game status\s+)?report\b"
+)
+
+
+def _report_day_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
+    """A report named by its day is the one the sheet names (Lane 96, B16): never a day no report was
+    issued on by the write."""
+    named = report_words(sheet.status.seen_at(sheet.written_at), sheet.game, sheet.season)
+    issued = _REPORT_DAY.match(named)
+    # Before the report, the facts name the one to come ("before Friday's game status report"): a read may too.
+    coming = None if issued is not None else _REPORT_DAY.search(named)
+    out: list[str] = []
+    for s in sentences:
+        for found in _REPORT_DAY.finditer(s):
+            ahead = coming is not None and found.group(1) == coming.group(1) and s[: found.start()].endswith("before ")
+            if not ahead and (issued is None or found.group(1) != issued.group(1)):
+                remedy = (
+                    f'Name it as the facts do: "{named}".'
+                    if issued is not None
+                    else f'No game status report is out for his game yet. Say "{named}".'
+                )
+                out.append(_sentence_violation(f"names {found.group(0)}, a report the facts do not name", s, remedy))
+    return out
+
+
 def _season_violation(text: str, season: int) -> list[str]:
     count = len(re.findall(rf"\b{season}\b", text))
     if count <= 1:
@@ -341,6 +370,7 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *_cannot_start_violations(sentences, sheet, call),
         *_unit_violations(sentences, sheet.season),
         *_order_violations(sentences, sheet),
+        *_report_day_violations(sentences, sheet),
         *_season_violation(text, sheet.season),
         *_wait_violation(text, sheet, call),
         *_code_violations(sentences),

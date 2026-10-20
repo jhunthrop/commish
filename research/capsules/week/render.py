@@ -1,7 +1,8 @@
 """THE SHEET THE WRITER READS, and the facts block a page shows when the writer could not serve him.
 
 One fact to a line, each with the read it came from ("as of Monday 9:03 pm Central"), so the writer and
-a reviewer see how old each fact is; the injury report is named by its day ("on Monday's report"). His
+a reviewer see how old each fact is; the injury report is named by the day the clubs issued it ("on
+Friday's report", `week.report_day`), never by the day we read the list. His
 place on our board names which order it is, and the words a read must say it in ("in our preseason
 order", "in our rest-of-season order"). Every figure prints as the player card prints it (`page_figures`:
 the tenth, the game's expected points in half points), so a figure the read quotes is the page's, word for
@@ -15,9 +16,9 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.render_depth import slot_word
 from research.capsules.render_season import week_list
 from research.capsules.render_words import IN_OUR_RECORDS, ordinal, signed, week_of
+from research.capsules.week.report_day import report_words
 from research.capsules.week.sheet import (
     CANNOT_PLAY,
-    CENTRAL,
     STATUS_WORDS,
     WeekGame,
     WeekSheet,
@@ -35,11 +36,6 @@ _ROOF_WORDS: Final = {
 
 def _as_of(at: datetime | None) -> str:
     return "" if at is None else f" (as of {central_day_and_time(at)} Central)"
-
-
-def report_day(at: datetime) -> str:
-    """The injury report by its day in Central time: "Monday's report"."""
-    return f"{at.astimezone(CENTRAL).strftime('%A')}'s report"
 
 
 def _club(code: str) -> str:
@@ -69,8 +65,7 @@ def _game_line(sheet: WeekSheet) -> str:
 
 def _status_line(sheet: WeekSheet) -> str:
     status, this_week = sheet.status.status, week_of(sheet.week, sheet.season)
-    at = sheet.status.captured_at
-    report = "the latest report" if at is None else report_day(at)
+    report = report_words(sheet.status.seen_at(sheet.written_at), sheet.game, sheet.season)
     if status is None:
         return f"Injury report: no designation for him on {report}."
     word = STATUS_WORDS.get(status, status)

@@ -363,8 +363,8 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
     stamp = _lines_stamp(conn, season, as_of)
     blocks = _blocks(context, players)
     read = read_statuses(conn, as_of)
-    at = None if read is None else read.read_at
-    statuses = {s.facts.identity.id: Status(status_word(read, s.facts.identity.id), at) for s in subjects}
+    at, checked = (None, None) if read is None else (read.read_at, read.checked_at)
+    statuses = {s.facts.identity.id: Status(status_word(read, s.facts.identity.id), at, checked) for s in subjects}
     return WeekFacts(
         as_of,
         season,
