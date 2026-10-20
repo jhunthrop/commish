@@ -13,7 +13,7 @@
 // SET=standin on Monday and Tuesday also shoots the fixture league's screens (Lane 85): the League
 // page's score bugs never say "Next kickoff" for a game past its kickoff (Final or Kicked off, a time
 // only for Monday night's still to come), the Lineup offers no move on a player whose game has kicked
-// off and on Tuesday says the week is over with no verb, Waivers and Trades draw no "Proj
+// off and on Tuesday says every starter has played with no verb, Waivers and Trades draw no "Proj
 // this week" on Tuesday, the Matchup's bug says Final on Tuesday, and each basis says when the stats
 // land.
 // Every screen: the basis says when Final and the stats land while a row waits on either, never claims
@@ -33,6 +33,7 @@ import { BASIS_BUDGET, WEATHER_FIGURE, basisLines, figureSentenceFaults } from '
 import { copyFault, watchData } from './copy-scan.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { seasonOrderWords } from './inseason-fixture/waivers-at.ts';
+import { WEEK_DONE } from './inseason-fixture/sunday.ts';
 import { SEASON } from '../src/lib/league/box/season.ts';
 import { BOX } from '../src/lib/league/box/box.ts';
 import { shortName } from '../src/lib/league/box/waivers.ts';
@@ -319,7 +320,6 @@ interface LeagueScreen {
 const LEAGUE = `/league/${FIXTURE_IDS.league}`;
 /** The Lineup's players whose games are still to come on Monday: Monday night's. */
 const MONDAY_NIGHT_MOVES = ['Kirk'];
-const WEEK_DONE = "Every starter's game is final, so week 6 is over.";
 
 async function checkBugs(page: Page, at: string): Promise<void> {
 	const bugs = await page.locator('main .bug').evaluateAll((els) =>
@@ -348,9 +348,9 @@ async function checkLineup(page: Page, at: string): Promise<void> {
 	if (day === 'tuesday') {
 		if ((await page.locator('main .swaps li').count()) > 0)
 			fault(at, 'a change or an empty spot named on a finished week');
-		if (!text.includes(WEEK_DONE)) fault(at, 'the finished week is not said');
+		if (!text.includes(WEEK_DONE)) fault(at, 'every starter played is not said');
 		if (verb > 0) fault(at, 'a verb on a finished week');
-	} else if (text.includes(WEEK_DONE)) fault(at, 'the week is said over on Monday');
+	} else if (text.includes(WEEK_DONE)) fault(at, 'every starter is said played on Monday');
 }
 
 async function checkNoWeekFigure(page: Page, at: string, words: string): Promise<void> {

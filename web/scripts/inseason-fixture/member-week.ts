@@ -39,8 +39,10 @@ function summary(lineup: LineupAdvice): Schemas['WeekLineup'] {
 		as_set: set,
 		gain: projection === null || set === null ? null : tenth(projection - set),
 		swaps,
-		// The Lineup's own sentence once the week is over (inseason week.go lineupSummary).
-		week_done: lineup.week_done ?? null
+		// The Lineup's own sentence and state once every starter has played (inseason week.go
+		// lineupSummary).
+		week_done: lineup.week_done ?? null,
+		week_done_state: lineup.week_done_state ?? null
 	};
 }
 
