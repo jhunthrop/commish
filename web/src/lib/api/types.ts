@@ -3106,6 +3106,23 @@ export interface components {
 			tier?: components['schemas']['RestOfSeasonTier'] | null;
 			/** @description the week his rest of season starts from: his club's first game still to play at the read's clock (not yet kicked off, through week 17); null off the rest-of-season order, without a projection or with no game left. Absent from a read older than the field */
 			rest_from_week?: number | null;
+			/** @description on his bye in week (line.facts.bye), his club's next game in the same scoring as line (Lane 100, B30): the card's Opp rank and Proj tiles read it, as no tile of the bye week holds a figure; null off a bye or with no game left, absent from an older answer */
+			after_bye?: components['schemas']['PlayerAfterBye'] | null;
+		};
+		PlayerAfterBye: {
+			/** @description the week of his club's next game after the bye */
+			week: number;
+			line: components['schemas']['PlayerLine'];
+			/**
+			 * Format: date-time
+			 * @description when that week's published projection was captured, null with none stored
+			 */
+			projection_read_at: string | null;
+			/**
+			 * Format: date-time
+			 * @description when that week's published projection is first captured (its first kickoff less the capture's lead), set only while none is read for it; null otherwise
+			 */
+			projection_arrives_at: string | null;
 		};
 		RestOfSeasonFigure: {
 			format: components['schemas']['BoardFormat'];
