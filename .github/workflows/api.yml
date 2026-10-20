@@ -182,7 +182,7 @@ jobs:
         # Scheduler's (see the lane report).
       - name: Point the api's jobs at the new image
         run: |
-          for job in billing-reconcile renewal-reminders sweep ffpc-refresh re-encrypt-host-connections; do
+          for job in billing-reconcile renewal-reminders sweep ffpc-refresh espn-week-reads re-encrypt-host-connections; do
             gcloud run jobs deploy "api-$job" --image "$IMAGE" --region "$REGION" \
               --command /api --args "$job" --service-account "$RUNTIME_SA" \
               --set-cloudsql-instances "$CLOUDSQL_INSTANCE" \

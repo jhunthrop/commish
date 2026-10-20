@@ -396,6 +396,26 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/leagues/attached/{id}/record': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		/** Our record in the member's own league (Lane 93): the league's lineup, which the record page counts starters in, and each week the register has graded whose roster ESPN was read for before our order was set, with the points the lineup our set order picks from the member's roster scored against the points of the lineup ESPN's own projection picks from the same roster (or, where that read carries no ESPN projection, the week's published projection), both scored as the league scores. Reads the league as the sync route does. */
+		get: operations['leagueRecord'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/leagues/attached/{id}/waivers': {
 		parameters: {
 			query?: {
@@ -3920,6 +3940,27 @@ export interface components {
 			first: number;
 			last: number;
 		};
+		/** @description our record in the member's own league (Lane 93) */
+		LeagueRecord: {
+			host: components['schemas']['LeagueHost'];
+			/** @description the league's teams, the count each starting slot is multiplied by */
+			teams: number;
+			lineup: components['schemas']['LeagueShape'];
+			/** @description the graded weeks, in week order; empty on a platform whose week reads are not kept (every platform but ESPN) and before the first graded week whose roster was read before our order was set */
+			weeks: components['schemas']['LeagueRecordWeek'][];
+		};
+		LeagueRecordWeek: {
+			week: number;
+			/**
+			 * @description the lineup ours is graded against: espn, the lineup ESPN's own projection picks; published, the lineup the week's published projection picks, where the read carried no ESPN projection
+			 * @enum {string}
+			 */
+			benchmark: 'espn' | 'published';
+			/** @description our picks' points, to the tenth, as the league scores */
+			ours: number;
+			/** @description the benchmark lineup's points, to the tenth, as the league scores */
+			theirs: number;
+		};
 		/** @description the league's starting lineup by our slots, and its bench */
 		LeagueShape: {
 			qb: number;
@@ -4292,6 +4333,15 @@ export interface components {
 			content: {
 				'application/json': components['schemas']['Envelope'] & {
 					data?: components['schemas']['Scoreboard'];
+				};
+			};
+		};
+		/** @description our record in the member's own league */
+		LeagueRecordResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['LeagueRecord'];
 				};
 			};
 		};
@@ -4902,6 +4952,23 @@ export interface operations {
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 			422: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	leagueRecord: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['LeagueRecordResponse'];
+			404: components['responses']['ErrorResponse'];
 			502: components['responses']['ErrorResponse'];
 		};
 	};

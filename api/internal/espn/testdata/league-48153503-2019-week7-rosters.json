@@ -1,0 +1,1525 @@
+{
+ "id": 48153503,
+ "seasonId": 2019,
+ "scoringPeriodId": 7,
+ "teams": [
+  {
+   "id": 1,
+   "roster": {
+    "entries": [
+     {
+      "playerId": 3116593,
+      "lineupSlotId": 2,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 3116593,
+        "fullName": "Dalvin Cook",
+        "defaultPositionId": 2,
+        "proTeamId": 16,
+        "injuryStatus": "ACTIVE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 20.93043486
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 263.20710355
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 19.59853093
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 28.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 13.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 285.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 16733,
+      "lineupSlotId": 20,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 16733,
+        "fullName": "Odell Beckham Jr.",
+        "defaultPositionId": 3,
+        "proTeamId": 5,
+        "injuryStatus": "QUESTIONABLE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 14.09146702
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 274.72172766
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 12.8397896
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 17.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 196.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 16731,
+      "lineupSlotId": 4,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 16731,
+        "fullName": "Brandin Cooks",
+        "defaultPositionId": 3,
+        "proTeamId": 14,
+        "injuryStatus": "ACTIVE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 9.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 12.02279571
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 5.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 234.06181314
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 10.4635677
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 8.86424592
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 110.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 3116165,
+      "lineupSlotId": 20,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 3116165,
+        "fullName": "Chris Godwin",
+        "defaultPositionId": 3,
+        "proTeamId": 27,
+        "injuryStatus": "QUESTIONABLE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 15.60952081
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 206.91928032
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 26.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 278.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 2573079,
+      "lineupSlotId": 0,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 2573079,
+        "fullName": "Carson Wentz",
+        "defaultPositionId": 1,
+        "proTeamId": 21,
+        "injuryStatus": "QUESTIONABLE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 15.79231219
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 7.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 302.78992641
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 17.46519645
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 20.61126454
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 21.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 268.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 4048244,
+      "lineupSlotId": 20,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 4048244,
+        "fullName": "Alexander Mattison",
+        "defaultPositionId": 2,
+        "proTeamId": 16,
+        "injuryStatus": "ACTIVE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 3.66144354
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 50.40021133
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 4.54250354
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 1.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 4.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 60.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": -16029,
+      "lineupSlotId": 20,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": -16029,
+        "fullName": "Panthers D/ST",
+        "defaultPositionId": 16,
+        "proTeamId": 29,
+        "injuryStatus": "",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 7.55822085
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 106.45975978
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 21.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 24.51879889
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 96.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 8479,
+      "lineupSlotId": 23,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 8479,
+        "fullName": "Frank Gore",
+        "defaultPositionId": 2,
+        "proTeamId": 2,
+        "injuryStatus": "ACTIVE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 7.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 108.62068667
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 12.69272274
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 1.70235738
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 85.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 11122,
+      "lineupSlotId": 17,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 11122,
+        "fullName": "Matt Prater",
+        "defaultPositionId": 5,
+        "proTeamId": 8,
+        "injuryStatus": "ACTIVE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 6.5369777
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 124.91092161
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 9.13528332
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 7.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 6.91331395
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 21.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 128.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 4039359,
+      "lineupSlotId": 20,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 4039359,
+        "fullName": "Darrell Henderson Jr.",
+        "defaultPositionId": 2,
+        "proTeamId": 14,
+        "injuryStatus": "QUESTIONABLE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 4.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 6.74627449
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 4.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 93.68667807
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 4.05777256
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 17.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 2579604,
+      "lineupSlotId": 23,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 2579604,
+        "fullName": "Phillip Dorsett II",
+        "defaultPositionId": 3,
+        "proTeamId": 17,
+        "injuryStatus": "ACTIVE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 22.34962194
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 10.75450242
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 1.11578468
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 13.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 96.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": -16010,
+      "lineupSlotId": 16,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": -16010,
+        "fullName": "Titans D/ST",
+        "defaultPositionId": 16,
+        "proTeamId": 10,
+        "injuryStatus": "",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 6.70080238
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 4.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 104.92890918
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 5.8639614
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 3.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 29.52142667
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 129.0
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": 2,
+   "roster": {
+    "entries": [
+     {
+      "playerId": 15795,
+      "lineupSlotId": 4,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 15795,
+        "fullName": "DeAndre Hopkins",
+        "defaultPositionId": 3,
+        "proTeamId": 34,
+        "injuryStatus": "QUESTIONABLE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 17.5956515
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 26.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 16.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 297.04895858
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 15.91485135
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 267.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 4047365,
+      "lineupSlotId": 23,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 4047365,
+        "fullName": "Josh Jacobs",
+        "defaultPositionId": 2,
+        "proTeamId": 13,
+        "injuryStatus": "QUESTIONABLE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 234.90035839
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 12.16100196
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 17.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 188.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 17359,
+      "lineupSlotId": 2,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 17359,
+        "fullName": "Damien Williams",
+        "defaultPositionId": 2,
+        "proTeamId": 12,
+        "injuryStatus": "ACTIVE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 15.63869955
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 8.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 172.88574035
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 7.11858913
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 2.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 12.77365201
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 133.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 12514,
+      "lineupSlotId": 20,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 12514,
+        "fullName": "LeSean McCoy",
+        "defaultPositionId": 2,
+        "proTeamId": 12,
+        "injuryStatus": "ACTIVE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 6.94120598
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 6.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 115.88262531
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 10.96192411
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 9.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 4.8981841
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 110.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": -16024,
+      "lineupSlotId": 16,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": -16024,
+        "fullName": "Chargers D/ST",
+        "defaultPositionId": 16,
+        "proTeamId": 24,
+        "injuryStatus": "",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 7.45100126
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 102.06396622
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 6.81797883
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 4.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 34.73295737
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 2.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 79.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 2971573,
+      "lineupSlotId": 17,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 2971573,
+        "fullName": "Ka'imi Fairbairn",
+        "defaultPositionId": 5,
+        "proTeamId": 34,
+        "injuryStatus": "ACTIVE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 6.81104533
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 12.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 5.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 138.8341625
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 6.59045572
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 7.22802166
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 105.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 3121422,
+      "lineupSlotId": 23,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 3121422,
+        "fullName": "Terry McLaurin",
+        "defaultPositionId": 3,
+        "proTeamId": 28,
+        "injuryStatus": "QUESTIONABLE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 13.14340687
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 123.87750468
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 12.20537461
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 2.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 27.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 189.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 13994,
+      "lineupSlotId": 20,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 13994,
+        "fullName": "Cam Newton",
+        "defaultPositionId": 1,
+        "proTeamId": 29,
+        "injuryStatus": "QUESTIONABLE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 314.78946403
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 17.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 4047650,
+      "lineupSlotId": 20,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 4047650,
+        "fullName": "DK Metcalf",
+        "defaultPositionId": 3,
+        "proTeamId": 26,
+        "injuryStatus": "ACTIVE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 8.94565446
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 7.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 140.32168115
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 9.28906255
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 9.76206781
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 10.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 180.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 3119195,
+      "lineupSlotId": 20,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 3119195,
+        "fullName": "Chase Edmonds",
+        "defaultPositionId": 2,
+        "proTeamId": 22,
+        "injuryStatus": "ACTIVE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 5.62917091
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 35.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 67.35045239
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 5.61506086
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 14.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 76.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 3116642,
+      "lineupSlotId": 20,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 3116642,
+        "fullName": "Reggie Bonnafon",
+        "defaultPositionId": 2,
+        "proTeamId": 29,
+        "injuryStatus": "ACTIVE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 0.66560311
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 20.71446447
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 0.37013938
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 24.0
+         }
+        ]
+       }
+      }
+     },
+     {
+      "playerId": 2578570,
+      "lineupSlotId": 0,
+      "injuryStatus": "NORMAL",
+      "playerPoolEntry": {
+       "player": {
+        "id": 2578570,
+        "fullName": "Jacoby Brissett",
+        "defaultPositionId": 1,
+        "proTeamId": 11,
+        "injuryStatus": "ACTIVE",
+        "stats": [
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 6,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 0.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 0,
+          "statSplitTypeId": 1,
+          "appliedTotal": 27.0
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 0,
+          "appliedTotal": 268.54001438
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 7,
+          "statSourceId": 1,
+          "statSplitTypeId": 1,
+          "appliedTotal": 16.21803881
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 1,
+          "statSplitTypeId": 2,
+          "appliedTotal": 16.81251642
+         },
+         {
+          "seasonId": 2019,
+          "scoringPeriodId": 0,
+          "statSourceId": 0,
+          "statSplitTypeId": 0,
+          "appliedTotal": 209.0
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  }
+ ]
+}

@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
@@ -238,3 +239,10 @@ var (
 	// ErrSeatByName is a host that cannot find a seat by username.
 	ErrSeatByName = errors.New("leaguesync: host has no usernames")
 )
+
+// API is the lineup as the contract names it (LeagueShape).
+func (s Shape) API() apitypes.LeagueShape {
+	return apitypes.LeagueShape{
+		Qb: s.QB, Rb: s.RB, Wr: s.WR, Te: s.TE, Flex: s.Flex, SuperFlex: s.SuperFlex, K: s.K, Def: s.DEF, Bench: s.Bench,
+	}
+}
