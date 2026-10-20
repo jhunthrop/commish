@@ -17,6 +17,7 @@ from research.model.ros import ship
 from research.model.ros.__main__ import JUDGMENT_RECORDS
 from research.model.ros.judge import RoundFit
 from research.model.ros.live import FIRST_MODEL_WEEK, SeasonPlayer
+from research.model.ros.model import LAST_FANTASY_WEEK
 from research.model.ros.payload import ARTIFACT_NAME, priors_from
 from research.model.ros.raw_line import RawLine
 from research.model.ros.ship import SHIPPED_ROUND, fit_and_publish
@@ -25,6 +26,7 @@ from research.nightly.build.ros import RosSetup, ros_boards
 from research.nightly.config import RUN_FORMATS
 from research.nightly.reads.board import FormatBoard, StoredBoard, StoredRow, board_entries
 from research.nightly.reads.schedule import ClubWeek, Game, GameState, game_states
+from research.season import REGULAR_SEASON_WEEKS
 
 _RECORD = JUDGMENT_RECORDS[SHIPPED_ROUND]
 _JUDGED: dict[str, Any] = json.loads(_RECORD.read_text())["priors"]
@@ -144,12 +146,32 @@ def test_a_missing_or_unread_input_keeps_every_board_preseason_and_says_which(se
     assert (result.boards, result.basis, result.status) == (boards, None, reason)
 
 
-def test_after_the_last_ranked_week_the_board_reverts_to_preseason() -> None:
+def test_a_week_18_run_ranks_week_18_alone() -> None:
+    """Lane 96 (review H1): once week 17 is over the board ranks the week left, one club game at each
+    player's rate, never the preseason order, and his points for it are his one more game's."""
     boards = _boards()
     instant = KICKOFF + timedelta(weeks=17) - timedelta(hours=1)
     result = ros_boards(boards, _context(17), instant, _states(instant), SETUP)
-    assert result.boards == boards
-    assert result.status == "preseason: week 18 is past week 17, the last the model ranks"
+    assert result.basis is not None and result.basis.from_week == REGULAR_SEASON_WEEKS
+    for board in result.boards:
+        for entry in board.entries:
+            row = entry.row
+            assert row.from_week == REGULAR_SEASON_WEEKS
+            assert 0 < row.expected_games <= 1 and row.projected > 0
+            assert row.game_points is not None and row.game_points > 0
+
+
+def test_every_row_carries_its_points_for_one_more_game() -> None:
+    """Before week 18, each in-season row carries his points for one more club game after week 17, his
+    rate a game times his play rate (Lane 96): what a league whose title week is 18 values that week at."""
+    result = ros_boards(_boards(), _context(LINES_THROUGH), FIRST_WEEK_INSTANT, _states(FIRST_WEEK_INSTANT), SETUP)
+    assert result.basis is not None
+    games = LAST_FANTASY_WEEK - result.basis.from_week + 1
+    for board in result.boards:
+        for entry in board.entries:
+            row = entry.row
+            # No missed run: each counted game is worth what one more is, so the total is that times them.
+            assert row.game_points == pytest.approx(row.projected / games)
 
 
 def test_each_row_carries_the_preseason_pace_the_model_starts_him_from() -> None:

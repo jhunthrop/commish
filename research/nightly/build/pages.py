@@ -184,6 +184,9 @@ def numbers_of(entry: BoardEntry, adp: float | None, tier_drop: float | None) ->
             "preseasonPerGame": None if before is None else tenth_or_none(row.preseason_per_game),
             # The week his rest of season starts from: his club's first game still to play (Lane 86).
             "restFromWeek": row.from_week,
+            # One more club game at his rate (Lane 96): a league whose title week is past the run's last
+            # week values it (the API's LiveBoard).
+            "gamePoints": tenth_or_none(row.game_points),
         }
     return numbers
 

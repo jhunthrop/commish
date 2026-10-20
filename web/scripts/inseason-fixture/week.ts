@@ -9,32 +9,78 @@ const TENTH = 10;
 
 /** The last week the rest-of-season order covers (the API's LastFantasyWeek). */
 export const LAST_FANTASY_WEEK = 17;
+/** The last week any league's order values (horizon.go MaxWeek). */
+const LAST_REGULAR_WEEK = 18;
 
-/** The weeks the rest-of-season order covers from a week: a week's figure is over them. */
-export const weeksCovered = (week: number): number => Math.max(1, LAST_FANTASY_WEEK - week + 1);
+/** The last week a league's order values and its championship's weeks (the API's horizon.go
+ * Horizon, Lane 96): its platform's last playoff week, the run's week 17 when it states none. */
+export interface Horizon {
+	last: number;
+	/** 2 for a two-week final, else 1, 0 when the platform does not say. */
+	finalWeeks: number;
+}
 
-/** What a Gain is, in the API's words (words.go gainWords). */
-export function gainWords(whose: string, weeks: number): string {
-	const from = LAST_FANTASY_WEEK - Math.max(1, weeks) + 1;
+/** The run's own horizon (horizon.go StandardHorizon). */
+export const STANDARD_HORIZON: Horizon = { last: LAST_FANTASY_WEEK, finalWeeks: 0 };
+
+const TWO_WEEK_FINAL = 2;
+
+/** The horizon a shot names (FIXTURE_TITLE_WEEK="18:2", the last week and the final's weeks), the
+ * run's without one: the recorded league's playoffs end in week 17. */
+export function titleWeekHorizon(spec: string | undefined): Horizon {
+	if (spec === undefined || spec === '') return STANDARD_HORIZON;
+	const match = /^(\d{1,2}):([12])$/.exec(spec);
+	const last = Number(match?.[1]);
+	if (match === null || last < 1 || last > LAST_REGULAR_WEEK) {
+		throw new Error(`FIXTURE_TITLE_WEEK "${spec}" is not "<last week>:<final weeks>", as "18:2".`);
+	}
+	return { last, finalWeeks: Number(match[2]) };
+}
+
+/** ", the championship over weeks 17 and 18" once a two-week final sits inside the span from
+ * `from` (horizon.go finalWords), else nothing. */
+export function finalWords(h: Horizon, from: number): string {
+	if (h.finalWeeks !== TWO_WEEK_FINAL || h.last - 1 < from) return '';
+	return `, the championship over weeks ${String(h.last - 1)} and ${String(h.last)}`;
+}
+
+/** " Week 18 counts at each player's rate a game. Our model runs through week 17." where the span runs past
+ * the run's last week from a week the model counts (horizon.go rateWords), else nothing. */
+export function rateWords(h: Horizon, from: number): string {
+	if (h.last <= LAST_FANTASY_WEEK || from > LAST_FANTASY_WEEK) return '';
+	const weeks =
+		h.last - LAST_FANTASY_WEEK > 1
+			? `Weeks ${String(LAST_FANTASY_WEEK + 1)} to ${String(h.last)} count`
+			: `Week ${String(h.last)} counts`;
+	return ` ${weeks} at each player's rate a game. Our model runs through week ${String(LAST_FANTASY_WEEK)}.`;
+}
+
+/** The weeks the rest-of-season order covers from a week through the horizon: a week's figure is
+ * over them. */
+export const weeksCovered = (week: number, h: Horizon): number => Math.max(1, h.last - week + 1);
+
+/** What a Gain is, in the API's words (words.go gainWords, weekSpan). */
+export function gainWords(whose: string, weeks: number, h: Horizon): string {
+	const from = h.last - Math.max(1, weeks) + 1;
 	const span =
-		from === LAST_FANTASY_WEEK
-			? `week ${String(LAST_FANTASY_WEEK)}`
-			: `weeks ${String(from)} to ${String(LAST_FANTASY_WEEK)}`;
-	return `Gain is ${whose} change in points over replacement a week, ${span}.`;
+		from === h.last
+			? `week ${String(h.last)}`
+			: `weeks ${String(from)} to ${String(h.last)}${finalWords(h, from)}`;
+	return `Gain is ${whose} change in points over replacement a week, ${span}.${rateWords(h, from)}`;
 }
 
 /** The finder's basis in the API's words (words.go TradesBasis), the one copy build.ts and
  * project.ts both write. */
-export function tradesBasis(weeks: number): string {
-	return `Each team's best trade both lineups gain by, yours first. The other team decides. ${gainWords("a lineup's", weeks)}`;
+export function tradesBasis(weeks: number, h: Horizon): string {
+	return `Each team's best trade both lineups gain by, yours first. The other team decides. ${gainWords("a lineup's", weeks, h)}`;
 }
 
 /** The figure a game in the API's words (pergame.go PerGameBasis). */
 export const PER_GAME_BASIS = "A game is our order's points a game.";
 
 /** The Waivers screen's Gain then the figure a game (words.go WaiverSeasonBasis, withPerGame). */
-export function waiverSeasonBasis(weeks: number): string {
-	return `${gainWords("your lineup's", weeks)} ${PER_GAME_BASIS}`;
+export function waiverSeasonBasis(weeks: number, h: Horizon): string {
+	return `${gainWords("your lineup's", weeks, h)} ${PER_GAME_BASIS}`;
 }
 
 /** The builder's own line in the API's words (words.go TradeCheckBasis). */

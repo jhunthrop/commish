@@ -84,10 +84,10 @@ func TestTheMembersDropLeavesTheWeekFigure(t *testing.T) {
 // The finder's basis keeps the board's own words for what the gains are on
 // (review M2): the preseason number never names the rest of the season.
 func TestTradesBasisSaysItsOrder(t *testing.T) {
-	if rest := TradesBasis(RestOfSeason, 12); !strings.Contains(rest, "weeks 6 to 17.") {
+	if rest := TradesBasis(RestOfSeason, 12, StandardHorizon); !strings.Contains(rest, "weeks 6 to 17.") {
 		t.Fatalf("rest of season: %q", rest)
 	}
-	pre := TradesBasis(Preseason, 17)
+	pre := TradesBasis(Preseason, 17, StandardHorizon)
 	if !strings.HasSuffix(pre, "on our preseason number.") || strings.Contains(pre, "rest of the season") || strings.Contains(pre, "rest-of-season") {
 		t.Fatalf("preseason: %q", pre)
 	}

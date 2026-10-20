@@ -1,7 +1,8 @@
 """THE SHEET THE WRITER READS, and the facts block a page shows when the writer could not serve him.
 
 One fact to a line, each with the read it came from ("as of Monday 9:03 pm Central"), so the writer and
-a reviewer see how old each fact is; the injury report is named by its day ("on Monday's report"). His
+a reviewer see how old each fact is; the injury report is named by the day the clubs issued it ("on
+Friday's report", `week.report_day`), never by the day we read the list. His
 place on our board names which order it is, and the words a read must say it in ("in our preseason
 order", "in our rest-of-season order"). Every figure prints as the player card prints it (`page_figures`:
 the tenth, the game's expected points in half points), so a figure the read quotes is the page's, word for
@@ -16,9 +17,9 @@ from research.capsules.render_depth import slot_word
 from research.capsules.render_season import week_list
 from research.capsules.render_words import IN_OUR_RECORDS, ordinal, signed, week_of
 from research.capsules.week.cells import named_chance
+from research.capsules.week.report_day import report_words
 from research.capsules.week.sheet import (
     CANNOT_PLAY,
-    CENTRAL,
     STATUS_WORDS,
     WeekGame,
     WeekSheet,
@@ -37,11 +38,6 @@ _ROOF_WORDS: Final = {
 
 def _as_of(at: datetime | None) -> str:
     return "" if at is None else f" (as of {central_day_and_time(at)} Central)"
-
-
-def report_day(at: datetime) -> str:
-    """The injury report by its day in Central time: "Monday's report"."""
-    return f"{at.astimezone(CENTRAL).strftime('%A')}'s report"
 
 
 def _club(code: str) -> str:
@@ -71,8 +67,7 @@ def _game_line(sheet: WeekSheet) -> str:
 
 def _status_line(sheet: WeekSheet) -> str:
     status, this_week = sheet.status.status, week_of(sheet.week, sheet.season)
-    at = sheet.status.captured_at
-    report = "the latest report" if at is None else report_day(at)
+    report = report_words(sheet.status, sheet.written_at, sheet.game)
     if status is None:
         return f"Injury report: no designation for him on {report}."
     word = STATUS_WORDS.get(status, status)
@@ -189,10 +184,14 @@ def _board_line(sheet: WeekSheet) -> str | None:
     say = f'Any sentence with this rank says it is "in {b.order_words}".'
     if b.rest_of_season and b.from_week is not None:
         points = "" if b.points is None else f"{points_text(b.points)} PPR points, "
-        return (
-            f"Our rest-of-season order, {week_of(b.from_week, sheet.season)} to "
-            f"{week_of(LAST_FANTASY_WEEK, sheet.season)}{_as_of(b.published_at)}: {points}{place}. {say}"
+        # A week 18 board ranks week 18 alone (Lane 96): its span is that one week.
+        last = max(LAST_FANTASY_WEEK, b.from_week)
+        span = (
+            week_of(last, sheet.season)
+            if b.from_week == last
+            else f"{week_of(b.from_week, sheet.season)} to {week_of(last, sheet.season)}"
         )
+        return f"Our rest-of-season order, {span}{_as_of(b.published_at)}: {points}{place}. {say}"
     return f"Our preseason order, set before the season{_as_of(b.published_at)}: {place}. {say}"
 
 

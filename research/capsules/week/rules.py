@@ -15,6 +15,8 @@ This week's rulings and the Lane 72 review's, each a rule the validator reads:
   noun, a rank's "of 32"); week numbers, the season and clock times are exempt (M1).
 - A rank in our order says which order it is: "in our preseason order" or "in our rest-of-season order" (M2).
 - The season is named at most once; weeks after it are "week 5" (the coordinator's ruling on L5).
+- An injury report named by its day is the one the sheet names, the game status report the clubs had issued
+  by the write (`week.report_day`); never a day no report came out (Lane 96, B16).
 - Every figure is one the page draws as a cell, as the cell prints it (`cells`), and a read states at most
   `MAX_FIGURES` of them: the cells carry his numbers, the read says what they cannot (Lane 100, B17, B44).
 - One paragraph, three to five sentences.
@@ -32,6 +34,7 @@ from research.capsules.page_figures import page_tenth
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
 from research.capsules.week.cells import cell_figures, misnamed
+from research.capsules.week.report_day import report_words
 from research.capsules.week.sheet import WeekSheet, points_text
 from research.capsules.week.start_advice import start_advice_in
 
@@ -378,6 +381,46 @@ def _order_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
     ]
 
 
+# A report or a list named by its day (review L1): "Friday's report", "the Tuesday report", "Tuesday's
+# practice report", "Sunday's injury list".
+_REPORT_DAY: Final = re.compile(
+    r"\b(?:the\s+)?(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?:(?:'|\u2019)s)?\s+"
+    r"(?:injury\s+|practice\s+|game status\s+)?(?:report|list)\b",
+    re.IGNORECASE,
+)
+
+
+# The words between a day and its report that name no other report (review R1-L2): "Friday's injury
+# report" is the sheet's "Friday's report".
+_KIND: Final = re.compile(r"\s(?:injury|practice|game status)\s")
+
+
+def _named(text: str) -> set[str]:
+    """Each report or list named by its day, as one phrase: lower case, no leading "the", no kind word."""
+    return {
+        _KIND.sub(" ", m.group(0).lower().replace("\u2019", "'").removeprefix("the "))
+        for m in _REPORT_DAY.finditer(text)
+    }
+
+
+def _report_day_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
+    """A report or a list named by its day is one the sheet's own words name (Lane 96, B16 and review
+    L1): never a day no report was issued on by the write."""
+    named = report_words(sheet.status, sheet.written_at, sheet.game)
+    allowed = _named(named)
+    out: list[str] = []
+    for s in sentences:
+        for found in _REPORT_DAY.finditer(s):
+            if _named(found.group(0)) <= allowed:
+                continue
+            out.append(
+                _sentence_violation(
+                    f"names {found.group(0)}, a report the facts do not name", s, f'Name it as the facts do: "{named}".'
+                )
+            )
+    return out
+
+
 def _season_violation(text: str, season: int) -> list[str]:
     count = len(re.findall(rf"\b{season}\b", text))
     if count <= 1:
@@ -414,6 +457,7 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *_cell_violations(sentences, sheet),
         *_misnamed_violations(sentences, sheet),
         *_order_violations(sentences, sheet),
+        *_report_day_violations(sentences, sheet),
         *_season_violation(text, sheet.season),
         *_wait_violation(text, sheet, call),
         *_code_violations(sentences),

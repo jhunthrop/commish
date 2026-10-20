@@ -8,7 +8,9 @@ cell among them), so each is now the guard's case: refused by name, and the writ
 recorded answers falls to its facts block. A read the rules take is shown on each sheet by a hand-written
 read (`HAND_WRITTEN`, written for this test and never a recording), through the writer's own path.
 
-The guards that stand for the recorded reads: the published projection named as published and never as
+Lane 96 (B16) refuses each recording's "Tuesday's report" too, no report having been issued by the write; the
+hand-written reads name the list as the sheet does, "the Tuesday-night list". The guards that stand for the
+recorded reads: the published projection named as published and never as
 ours; no betting, trading or provider word, no rival product and no tip; the bye read says he does not play
 and recommends nothing for the week; no sentence sits on two of the reads; every fact was stamped at or
 before the write; and the caption is the page's."""
@@ -48,20 +50,20 @@ _ALL_READS: Final = ("Puka Nacua", _LAMB)
 # A read for each sheet the rules take, hand-written for this test (never a recording), and its call.
 HAND_WRITTEN: Final[dict[str, tuple[str, str]]] = {
     "Puka Nacua": (
-        "Puka Nacua carries no designation on Tuesday's report and tops the Rams' receiver depth chart for week 6 "
+        "Puka Nacua carries no designation on the Tuesday-night list and tops the Rams' receiver depth chart for week 6 "
         "of 2026, at home against the Cardinals. Arizona ranks 28th of 32 against receivers, and the game is "
         "indoors under a fixed roof. The published projection has him at 23 points. Start him.",
         "start",
     ),
     "Jahmyr Gibbs": (
         "The Lions are off in week 6 of 2026, so Gibbs does not play and scores nothing this week. There is no "
-        "designation for him on Tuesday's report, and he still leads the Detroit backfield ahead of Sione Vaki. "
+        "designation for him on the Tuesday-night list, and he still leads the Detroit backfield ahead of Sione Vaki. "
         "Keep him on your roster, fill his spot with a back who plays, and he is back for week 7 at home against "
         "Green Bay.",
         "sit",
     ),
     _LAMB: (
-        "CeeDee Lamb is Questionable on Tuesday's report, so his Sunday night in Green Bay is not settled yet. "
+        "CeeDee Lamb is Questionable on the Tuesday-night list, so his Sunday night in Green Bay is not settled yet. "
         "The published projection has him at 19.5 points in PPR scoring for week 6 of 2026. Green Bay sits 15th "
         "of 32 against receivers, and he leads the Dallas depth chart ahead of George Pickens. Wait on his status "
         "before the 7:20 pm Central kickoff, and if he's cleared, he's in your lineup.",
@@ -129,6 +131,8 @@ def test_under_lane_100_every_recorded_read_is_refused_by_name(name: str) -> Non
     assert any("40-80 word band" in v for v in violations), violations
     assert any(f"state at most {MAX_FIGURES}" in v for v in violations), violations
     assert any("draws in no cell" in v for v in violations), violations
+    # Lane 96 (B16): each names "Tuesday's report", where no game status report was issued by the write.
+    assert any("names Tuesday's report, a report the facts do not name" in v for v in violations), violations
 
 
 @pytest.mark.parametrize("name", _ALL_READS)

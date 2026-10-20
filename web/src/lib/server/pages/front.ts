@@ -16,8 +16,7 @@ import { boardStatuses, type BoardStatuses } from '../statuses.ts';
 import { unplayedWeeks } from './record.ts';
 import { adp, board, clubByes, defaultFormat, designations, manifest, record } from '../run.ts';
 
-/** How many of the board's top rows the front door shows. */
-const TOP_ROWS = 10;
+import { STRIP_POOL, STRIP_ROWS } from '#lib/front/live-board.ts';
 
 export interface FrontPage extends BoardStatuses {
 	format: Format;
@@ -26,6 +25,9 @@ export interface FrontPage extends BoardStatuses {
 	restFrom: string | null;
 	/** Each with his season figures once the season is underway. */
 	rows: BoardRowView[];
+	/** The run's top STRIP_POOL rows, the strip's first among them: a signed-in member's strip draws
+	 * the API's live order from them (front/live-board.ts, Lane 96). */
+	pool: BoardRowView[];
 	/** The strip's basis, said once under its head (Lane 66n). */
 	basis: BasisPart[];
 	/** The season is underway: the rows carry this season's GP and A game. */
@@ -59,13 +61,15 @@ export async function frontPage(now: number): Promise<FrontPage> {
 	]);
 	// A player on a season-long list is never in the top as if he plays (Lane 63): the strip is the
 	// board's own order, which puts him below the available players at his position.
-	const top = withStatuses(loaded.rows, capture).slice(0, TOP_ROWS);
-	const { rows, reach } = await boardSeason(format, top);
+	const top = withStatuses(loaded.rows, capture).slice(0, STRIP_POOL);
+	const { rows: pool, reach } = await boardSeason(format, top);
+	const rows = pool.slice(0, STRIP_ROWS);
 	const showsGap = rowFraming(format).compare && carriesGap(rows);
 	return {
 		format,
 		restFrom: boardRestFrom(format),
 		rows,
+		pool,
 		basis: boardBasis({
 			format,
 			season: run.season,
@@ -87,6 +91,6 @@ export async function frontPage(now: number): Promise<FrontPage> {
 			scale: kept.scale
 		},
 		// The rows' statuses as the board's, drawn with the shared pill (review finding 7).
-		...boardStatuses(rows, capture, format, now)
+		...boardStatuses(pool, capture, format, now)
 	};
 }

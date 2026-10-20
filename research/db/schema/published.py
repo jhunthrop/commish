@@ -52,6 +52,9 @@ PUBLISHED_BOARDS: Final = Table(
     Column("status", Text),
     Column("status_since", DateTime(True)),
     Column("status_source", Text),
+    # His points for one more club game after the counted ones (revision 0015, Lane 96; declared last, where the migration appends it): the week a
+    # league's title week runs past the run's last; NULL preseason and on a run older than the column.
+    Column("game_points", Double(53)),
     one_of("format", PUBLISHED_FORMATS, "published_boards_format_ck"),
     one_of("order_basis", ORDER_BASES, "published_boards_order_basis_ck"),
     CheckConstraint("rank >= 1 AND position_rank >= 1", name="published_boards_rank_ck"),

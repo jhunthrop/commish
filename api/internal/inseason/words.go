@@ -315,22 +315,24 @@ func uncountedRulesAt(s apitypes.LeagueSettings, carried func(string) bool, posi
 // lineup, a week, averaged over the weeks the order covers, named by
 // number from the run's first week to the last (Lane 85 fix round 2, M-C),
 // so the span stays true once a week is over and before the run rolls.
-func gainWords(whose string, b OrderBasis, weeks int) string {
+func gainWords(whose string, b OrderBasis, weeks int, h Horizon) string {
 	if b != RestOfSeason {
 		over := fmt.Sprintf("over the season's %s on our preseason number", weekCount(weeks))
 		return fmt.Sprintf("Gain is %s change in points over replacement a week, %s.", whose, over)
 	}
-	return fmt.Sprintf("Gain is %s change in points over replacement a week, %s.", whose, weekSpan(weeks))
+	from := h.Last - max(1, weeks) + 1
+	return fmt.Sprintf("Gain is %s change in points over replacement a week, %s.%s", whose, weekSpan(weeks, h), h.rateWords(from))
 }
 
-// weekSpan is the weeks the order covers by number: "weeks 6 to 17",
-// "week 17".
-func weekSpan(weeks int) string {
-	from := LastWeek - max(1, weeks) + 1
-	if from == LastWeek {
-		return fmt.Sprintf("week %d", LastWeek)
+// weekSpan is the weeks the order covers by number, through the league's
+// horizon (Lane 96): "weeks 6 to 17", "week 17", "weeks 7 to 18, the
+// championship over weeks 17 and 18".
+func weekSpan(weeks int, h Horizon) string {
+	from := h.Last - max(1, weeks) + 1
+	if from == h.Last {
+		return fmt.Sprintf("week %d", h.Last)
 	}
-	return fmt.Sprintf("weeks %d to %d", from, LastWeek)
+	return fmt.Sprintf("weeks %d to %d%s", from, h.Last, h.finalWords(from))
 }
 
 // LineupBasis is the start and sit page's advice rule (§4.4, Lane 66e),
@@ -396,8 +398,8 @@ func UnprojectedOrderWords(week int) string {
 
 // WaiverSeasonBasis is what a waiver Gain is, the head the card and the
 // drop panel print (Lane 66u).
-func WaiverSeasonBasis(b OrderBasis, weeks int) string {
-	return gainWords("your lineup's", b, weeks)
+func WaiverSeasonBasis(b OrderBasis, weeks int, h Horizon) string {
+	return gainWords("your lineup's", b, weeks, h)
 }
 
 // OnlyCloseCalls is a team's line when every trade found with it is a
@@ -412,8 +414,8 @@ const TradeCheckBasis = "The scoreboard is each lineup before and after the trad
 
 // TradesBasis is the trade finder's (§6.3): which trades it lists, yours
 // first, who decides, and what a Gain is.
-func TradesBasis(b OrderBasis, weeks int) string {
-	return "Each team's best trade both lineups gain by, yours first. The other team decides. " + gainWords("a lineup's", b, weeks)
+func TradesBasis(b OrderBasis, weeks int, h Horizon) string {
+	return "Each team's best trade both lineups gain by, yours first. The other team decides. " + gainWords("a lineup's", b, weeks, h)
 }
 
 // formatNames is a scoring preset as a sentence names a league.
@@ -453,10 +455,13 @@ func restFromWords(r RestFrom) string {
 // OrderScreenBasis is the Rest of season and Players screens' line
 // (Lane 66j, 66t): what the order ranks by, from which week's games
 // (Lane 86), and the league its points over replacement are for, said once.
-func OrderScreenBasis(b OrderBasis, from RestFrom, league string) string {
+// The rest of season runs through the league's horizon (Lane 96), its
+// two-week final named.
+func OrderScreenBasis(b OrderBasis, from RestFrom, league string, h Horizon) string {
 	if b != RestOfSeason || from.Week < 1 {
 		return fmt.Sprintf("Our preseason order: All ranks by Over repl., his season less a free pickup's in %s.", league)
 	}
-	return fmt.Sprintf("Our rest-of-season order %s. A position ranks by %s through week %d, byes out, "+
-		"All by Over repl., his points less a free pickup's in %s.", restFromWords(from), figurewords.Table.Projected, LastWeek, league)
+	return fmt.Sprintf("Our rest-of-season order %s. A position ranks by %s through week %d%s, byes out, "+
+		"All by Over repl., his points less a free pickup's in %s.%s", restFromWords(from), figurewords.Table.Projected, h.Last,
+		h.finalWords(from.Week), league, h.rateWords(from.Week))
 }

@@ -20,10 +20,13 @@ import (
 
 // RestNow is the rest of season at a read's clock.
 type RestNow struct {
-	// Left is each club's games left at the read's clock, and Run
-	// each club's at the run's instant, both from the run's first week
-	// through LastWeek.
-	Left, Run map[string]int
+	// Left is each club's games left at the read's clock through the
+	// horizon's last week, and Run each club's at the run's instant
+	// through the run's own last week (RunThrough), both from the run's
+	// first week. Within is Left's games through the run's last week and
+	// After its games past it (Lane 96): the run's points cover the first,
+	// each player's points for one more game value the second.
+	Left, Run, Within, After map[string]int
 	// FromWeek is the earliest week with a game still to play, 0 with none.
 	FromWeek int
 	// Partial is set while a game of FromWeek has kicked off: the week's
@@ -36,13 +39,13 @@ type RestNow struct {
 // still to play, 0 with none left.
 func (r RestNow) From(team string) int { return r.from[team] }
 
-// weeksToPlay is each club's weeks from first through LastWeek whose game
-// is still upcoming at at, in order: the one rule the order, the player
-// read and their words count the rest of season by.
-func weeksToPlay(games []boards.TeamWeek, first int, at time.Time) map[string][]int {
+// weeksToPlay is each club's weeks from first through last whose game is
+// still upcoming at at, in order: the one rule the order, the player read
+// and their words count the rest of season by.
+func weeksToPlay(games []boards.TeamWeek, first, last int, at time.Time) map[string][]int {
 	out := map[string][]int{}
 	for _, g := range games {
-		if g.Week >= first && g.Week <= LastWeek && gameStateAt(g, at) == apitypes.GameStateUpcoming {
+		if g.Week >= first && g.Week <= last && gameStateAt(g, at) == apitypes.GameStateUpcoming {
 			out[g.Team] = append(out[g.Team], g.Week)
 		}
 	}
@@ -72,11 +75,26 @@ func counts(weeks map[string][]int) map[string]int {
 	return out
 }
 
-// RestAt is the rest of season at now for a run made at run whose points
-// cover its first week (published_boards.from_week) on.
-func RestAt(games []boards.TeamWeek, first int, run, now time.Time) RestNow {
-	left := weeksToPlay(games, first, now)
-	rest := RestNow{Left: counts(left), Run: counts(weeksToPlay(beforeFinals(games), first, run)), from: map[string]int{}}
+// RunThrough is the last week a run's points count from its first week:
+// LastWeek, or once the season is past it the run's own first week (a
+// week 18 run ranks week 18, research.model.ros.live counted_through).
+func RunThrough(first int) int { return max(LastWeek, first) }
+
+// RestAt is the rest of season at now through h's last week, for a run
+// made at run whose points cover its first week (published_boards.from_week)
+// through RunThrough.
+func RestAt(games []boards.TeamWeek, first int, run, now time.Time, h Horizon) RestNow {
+	runLast := RunThrough(first)
+	left := weeksToPlay(games, first, h.Last, now)
+	rest := RestNow{Left: counts(left), Run: counts(weeksToPlay(beforeFinals(games), first, runLast, run)),
+		Within: counts(weeksToPlay(games, first, min(h.Last, runLast), now)), After: map[string]int{}, from: map[string]int{}}
+	for team, weeks := range left {
+		for _, w := range weeks {
+			if w > runLast {
+				rest.After[team]++
+			}
+		}
+	}
 	for team, weeks := range left {
 		rest.from[team] = weeks[0]
 		if rest.FromWeek == 0 || weeks[0] < rest.FromWeek {
@@ -93,21 +111,25 @@ func RestAt(games []boards.TeamWeek, first int, run, now time.Time) RestNow {
 
 // LiveBoard is the board at rest's clock: on a rest-of-season order that
 // says its first week, each player's points over his club's games still
-// to play now (the run's points a game times them), valued again, and the
-// first week the earliest with a game left (the run's while none is
-// known). Any other board is returned
-// as it is.
+// to play now through the horizon, valued again, and the first week the
+// earliest with a game left (the run's while none is known). Any other
+// board is returned as it is.
+//
+// The games through the run's last week are the run's points a game times
+// them; the games past it (a title week 18 against the run's 17, Lane 96
+// review H1) his points for one more game times them, whether or not his
+// club had a game left at the run. A run older than game_points values
+// every game left at the run's points a game, and a club with none left
+// at the run keeps the run's points.
 func LiveBoard(b boards.Board, rest RestNow) (boards.Board, error) {
 	if !carriesPerGame(b) {
 		return b, nil
 	}
 	points := map[string]float64{}
 	for _, p := range b.Raw.Players {
-		run := rest.Run[p.Team]
-		if p.Points == nil || run == 0 {
-			continue
+		if v, ok := livePoints(p, rest); ok {
+			points[p.ID] = v
 		}
-		points[p.ID] = *p.Points * float64(rest.Left[p.Team]) / float64(run)
 	}
 	live, err := b.Rescaled(points)
 	if err != nil {
@@ -118,4 +140,24 @@ func LiveBoard(b boards.Board, rest RestNow) (boards.Board, error) {
 		live.FromWeek = rest.FromWeek
 	}
 	return live, nil
+}
+
+// livePoints is one player's points at rest's clock, false to keep the
+// run's (LiveBoard).
+func livePoints(p boards.Player, rest RestNow) (float64, bool) {
+	if p.Points == nil {
+		return 0, false
+	}
+	run := rest.Run[p.Team]
+	if p.GamePoints == nil {
+		if run == 0 {
+			return 0, false
+		}
+		return *p.Points * float64(rest.Left[p.Team]) / float64(run), true
+	}
+	within := 0.0
+	if run > 0 {
+		within = *p.Points * float64(rest.Within[p.Team]) / float64(run)
+	}
+	return within + *p.GamePoints*float64(rest.After[p.Team]), true
 }

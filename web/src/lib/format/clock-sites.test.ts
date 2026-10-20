@@ -38,6 +38,10 @@ const ALLOWED: Readonly<Record<string, Site>> = {
 		why: "a screen's clock, set at each read"
 	},
 	'src/lib/front/FrontWeek.svelte': { reads: 1, why: "the front door's week, drawn once" },
+	'src/routes/(run)/+page.svelte': {
+		reads: 1,
+		why: "the front door strip's live order, its clock set when the API's answer lands (Lane 96)"
+	},
 	'src/lib/account/AccountPage.svelte': {
 		reads: 1,
 		why: 'whether a bought pass has arrived, asked once a poll'
