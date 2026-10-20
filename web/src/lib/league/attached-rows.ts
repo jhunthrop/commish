@@ -2,10 +2,9 @@
  * team and platform, record and place, where it is in its season, and its last read, all from GET
  * /leagues/attached. Pure, tested in attached-rows.test.ts. */
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
-import { ordinal } from '#lib/format/number.ts';
 import { readWords } from '#lib/hosts/platform-rows.ts';
 import type { AttachedLeague } from './api.ts';
-import { recordWords } from './model.ts';
+import { placeWords, recordWords } from './model.ts';
 import { hostWords } from './names.ts';
 import { phaseWord } from './phase-words.ts';
 
@@ -48,7 +47,7 @@ export function attachedRow(league: AttachedLeague, now: Date, zone?: string): A
 		name: league.name,
 		team: [league.team_name, `on ${hostWords(league.host)}`].filter((p) => p !== '').join(', '),
 		record: s ? recordWords(s) : EMPTY_FIGURE,
-		place: s ? `${ordinal(s.place)} of ${String(s.teams)}` : '',
+		place: s ? placeWords(s.place, s.teams) : '',
 		season: seasonWords(league, now, zone),
 		read: readWords(league.last_read_at, now)
 	};

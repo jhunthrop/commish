@@ -35,3 +35,10 @@ export const WEEK = {
 	reading: "Reading this week's rows",
 	needsScript: "This week's rows need JavaScript."
 } as const;
+
+/** Each in-season page's purpose, one sentence under its head (Lane 104, B40): Players is every
+ * player our order covers, Rest of season the same order in your league's view. */
+export const PAGE_PURPOSE = {
+	players: 'Every QB, RB, WR and TE in our order, to look up and to compare.',
+	rest: "Our order in your league's view: who holds each player, the free agents, and this week's kickers and defenses."
+} as const;

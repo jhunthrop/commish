@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import {
 	ADVISOR_VERB,
 	FOLLOW_FOR,
+	DRAFT_TOOLS,
 	NEXT_DRAFT,
 	SHEET_LINK,
 	NEXT_DRAFT_ROWS,
@@ -79,7 +80,15 @@ void test('the offseason names where the team finished, and the next draft', () 
 	for (const line of [ADVISOR_VERB, MOCK_VERB, SHEET_LINK]) clean(line);
 });
 
-void test('the account keeps the next draft a tap away in season', () => {
+void test('in season the account says its draft tools in one line', () => {
+	assert.equal(
+		`${DRAFT_TOOLS.lead} ${DRAFT_TOOLS.mock}${DRAFT_TOOLS.joint}${DRAFT_TOOLS.sheet}`,
+		'Draft tools: mock draft, cheat sheet'
+	);
+	for (const line of Object.values(DRAFT_TOOLS)) clean(line);
+});
+
+void test('out of season the account keeps the next draft a tap away', () => {
 	assert.deepEqual(
 		NEXT_DRAFT_ROWS.map((row) => row.lead),
 		['Mock draft', 'Cheat sheet']

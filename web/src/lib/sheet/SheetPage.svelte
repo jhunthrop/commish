@@ -91,7 +91,13 @@
 
 	const visible = $derived(rows.filter(shows));
 	const status = $derived(
-		statusWords({ status: store.status, problem: store.problem, savedAt: store.savedAt })
+		statusWords({
+			status: store.status,
+			problem: store.problem,
+			changedAt: store.changedAt,
+			answeredAt: store.answeredAt,
+			players: rows.length
+		})
 	);
 
 	async function startFromBoard(): Promise<void> {
@@ -198,8 +204,9 @@
 				<p>
 					{FORMAT_LABELS[format]}
 					{#if store.loaded}
-						· {plural(rows.length, 'player')} ·
-						<span aria-live="polite">{status}</span>
+						· {plural(rows.length, 'player')}<span aria-live="polite"
+							>{status === null ? '' : ` · ${status}`}</span
+						>
 					{/if}
 				</p>
 			</div>

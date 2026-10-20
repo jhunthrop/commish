@@ -10,6 +10,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import type OrderScreenComponent from '#lib/order/OrderScreen.svelte';
+	import { PAGE_PURPOSE } from '#lib/order/words.ts';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
 
@@ -35,7 +36,7 @@
 			title="Players"
 			lead={Order === null
 				? `Every player on our ${data.format.label} board · by position · our rank overall at the right`
-				: 'Every QB, RB, WR and TE in our order'}
+				: PAGE_PURPOSE.players}
 		>
 			{#snippet actions()}
 				<Quiet href={links.clubs()} size="sm">Clubs</Quiet>
