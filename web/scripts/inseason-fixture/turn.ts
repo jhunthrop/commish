@@ -124,7 +124,9 @@ export function turnedTrades(trades: TradeAdvice): TradeAdvice {
 				get: row.get.map(turnedLine),
 				drop: row.drop && turnedLine(row.drop),
 				my_proj_change: null,
-				their_proj_change: null
+				their_proj_change: null,
+				// The need stamped is week 6's lineup's; the stand-in keeps none for week 7 (Lane 103).
+				need: null
 			}))
 		}))
 	};

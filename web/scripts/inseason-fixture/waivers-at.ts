@@ -8,7 +8,7 @@
 import type { TradeAdvice, WaiverAdvice, WaiverRow } from '../../src/lib/league/inseason/api.ts';
 import { stateAt } from './game-state.ts';
 import { roundTenth } from './tenths.ts';
-import { tradesBasis, waiverSeasonBasis, weeksCovered, type Horizon } from './week.ts';
+import { tradesBases, waiverSeasonBasis, weeksCovered, type Horizon } from './week.ts';
 
 /** The basis once a pickup's game has kicked off (words.go SeasonOrderWords). */
 export function seasonOrderWords(week: number): string {
@@ -81,5 +81,5 @@ export function waiversAtClock(
 
 /** The trade answer at `now`, its Gain over the weeks from `fromWeek` through the league's horizon. */
 export function tradesAtClock(trades: TradeAdvice, fromWeek: number, h: Horizon): TradeAdvice {
-	return { ...trades, basis: tradesBasis(weeksCovered(fromWeek, h), h) };
+	return { ...trades, ...tradesBases(weeksCovered(fromWeek, h), h) };
 }

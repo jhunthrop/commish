@@ -306,6 +306,7 @@
 			{now}
 			weekShown={weekProjected(advice)}
 			weekHead={weekHeadFor(advice)}
+			gainBasis={advice.gain_basis ?? null}
 		/>
 	</div>
 	<BasisBlock parts={basis} id={BASIS_ID} />

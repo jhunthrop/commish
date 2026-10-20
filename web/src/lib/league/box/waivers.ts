@@ -35,7 +35,7 @@ import {
 	type BoxRow
 } from './box.ts';
 import { addressedWeek, arrivesPart } from './next-week.ts';
-import { SEASON, WAIVER_GAIN } from './season.ts';
+import { GAIN_A_WEEK, SEASON } from './season.ts';
 
 /** Every word the Waivers strip, table and drop panel print, in one place for the copy guard. */
 export const WAIVERS = {
@@ -47,7 +47,7 @@ export const WAIVERS = {
 	find: 'Find a player',
 	noneFound: 'No player free to add by that name.',
 	/** The card's rest-of-season gain and the drop panel's head over it. */
-	gain: WAIVER_GAIN,
+	gain: GAIN_A_WEEK,
 	thisWeek: 'Proj this week',
 	copied: 'Copied',
 	copyFailed: 'This browser would not copy his name.',

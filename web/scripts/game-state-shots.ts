@@ -36,6 +36,7 @@ import { seasonOrderWords } from './inseason-fixture/waivers-at.ts';
 import { WEEK_DONE } from './inseason-fixture/sunday.ts';
 import { SEASON } from '../src/lib/league/box/season.ts';
 import { BOX } from '../src/lib/league/box/box.ts';
+import { TRADES } from '../src/lib/league/box/trades.ts';
 import { shortName } from '../src/lib/league/box/waivers.ts';
 import {
 	FIXTURE_MONDAY_CLOCK,
@@ -442,7 +443,7 @@ const LEAGUE_SCREENS: readonly LeagueScreen[] = [
 		name: 'trades',
 		path: `${LEAGUE}/trades`,
 		ready: 'worth proposing',
-		check: (page, at) => checkNoWeekFigure(page, at, 'Proj for you this week')
+		check: (page, at) => checkNoWeekFigure(page, at, TRADES.projForYou)
 	}
 ];
 

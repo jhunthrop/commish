@@ -7,6 +7,7 @@ import { basisText, KICKED_OFF_PART } from './basis.ts';
 import type { PlayerLine, TradeAdvice, TradeCheck, TradeRow, TradeTeam } from '../inseason/api.ts';
 import {
 	bugFigures,
+	cardMark,
 	checkRoom,
 	copiedTrade,
 	finderRows,
@@ -138,6 +139,16 @@ void test('the strip names at most two trades the other team gains from, never a
 	assert.deepEqual(worthProposing([team(9, 'Close', [row(0.7, 0.2)])]), []);
 });
 
+void test('the best of the strip says Best in words, every card drawing its verb the same', () => {
+	const worth = worthProposing(teams);
+	assert.deepEqual(
+		worth.map((_, i) => cardMark(i, worth.length)),
+		['Best', null]
+	);
+	// A strip of one has nothing to be best among.
+	assert.equal(cardMark(0, 1), null);
+});
+
 void test('a trade reads by last names, its gains and week signed, its room by name', () => {
 	const best = row(5.7, 0.7);
 	assert.equal(
@@ -169,14 +180,14 @@ void test('a trade reads by last names, its gains and week signed, its room by n
 });
 
 void test("a trade's week reads from the API's two changes, on the card and atop an opened trade", () => {
-	assert.equal(weekLine(row(5.7, 0.7)), '+7.3 Proj for you this week, +2.5 for them');
+	assert.equal(weekLine(row(5.7, 0.7)), '+7.3 Proj this week for your lineup, +2.5 for theirs');
 	assert.equal(
 		weekLine(row(4.6, 0.5, { my_proj_change: 10.9, their_proj_change: -5.6 })),
-		'+10.9 Proj for you this week, −5.6 for them'
+		'+10.9 Proj this week for your lineup, −5.6 for theirs'
 	);
 	assert.equal(
 		weekLine(row(1, 1, { my_proj_change: 0.02, their_proj_change: 0 })),
-		'0.0 Proj for you this week, 0.0 for them'
+		'0.0 Proj this week for your lineup, 0.0 for theirs'
 	);
 	assert.equal(weekLine(row(1, 1, { my_proj_change: null, their_proj_change: null })), null);
 });

@@ -11,9 +11,6 @@ export const SEASON = {
 	gain: 'Gain'
 } as const;
 
-/** Trades' head over each side's gain: over replacement a week, shortened as the order's Over repl. head
- * is so the group's head keeps to one line at a desk. */
-export const TRADE_GAIN = `${SEASON.gain}, over repl. a week`;
-
-/** The Waivers card's and drop panel's gain: a week. */
-export const WAIVER_GAIN = `${SEASON.gain} a week`;
+/** A gain's head on both screens, the Trades groups' and the Waivers card's and drop panel's: a week.
+ * What it is in (points over replacement, the weeks) is said once beside it (Lane 103, B42). */
+export const GAIN_A_WEEK = `${SEASON.gain} a week`;
