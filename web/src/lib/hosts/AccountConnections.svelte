@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { links } from '#lib/site/links.ts';
-	import { leagueApi } from '#lib/league/api.ts';
+	import type { AttachedList } from '#lib/league/attached-list.svelte.ts';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
@@ -23,7 +23,6 @@
 	import {
 		PLATFORM_WORDS,
 		leaguesByPlatform,
-		type LeaguesByPlatform,
 		platformRows,
 		type Platform,
 		type PlatformRow
@@ -51,21 +50,25 @@
 	/** Yahoo's return to this page, said once. */
 	const returned = yahooOutcome(page.url.searchParams);
 
-	/** The account's leagues by platform, from the list the Leagues attached table reads too, so a
-	 * row's count and last read are that table's; null when the list could not be read, and each row
-	 * then says only when it was connected and its connection's own read. */
-	let leagues = $state<LeaguesByPlatform | null>(null);
+	interface Props {
+		/** The account's leagues, read once by the Account room for this table and the Leagues
+		 * attached table both, so a Detach there moves a row's count here (Lane 94 fix round 2). */
+		list: AttachedList;
+	}
+
+	let { list }: Props = $props();
+
+	/** The account's still-followed leagues by platform, the Leagues attached table's own list; null
+	 * until it lands or when it could not be read, and each row then says only when it was connected
+	 * and its connection's own read. */
+	const leagues = $derived(list.live === null ? null : leaguesByPlatform(list.live));
 
 	function load(): void {
-		const listed = leagueApi
-			.attached()
-			.then(leaguesByPlatform)
-			.catch(() => null);
-		Promise.all([hostsApi.connections(), listed])
-			.then(([answer, mine]) => {
+		hostsApi
+			.connections()
+			.then((answer) => {
 				readAt = new Date();
 				hosts = answer;
-				leagues = mine;
 				failed = false;
 			})
 			.catch(() => (failed = true));
@@ -73,7 +76,10 @@
 
 	onMount(load);
 
-	const rows = $derived(hosts && readAt ? platformRows(hosts, readAt, leagues) : []);
+	/** The rows' clock: the league list's, once it is read, so a row's last read and its leagues' in the
+	 * table under it are said against one instant; the connections' read before. */
+	const clock = $derived(list.live === null ? readAt : new Date(list.readAt));
+	const rows = $derived(hosts && clock ? platformRows(hosts, clock, leagues) : []);
 
 	/** What disconnecting deleted, said once it went through. */
 	const GONE: Readonly<Record<ConnectedHost, string>> = {
@@ -272,23 +278,24 @@
 		max-width: 110ch;
 	}
 
-	/* The columns share the table by proportion, the Connection column (no width of its own) taking
-	 * what is left, about a third: fixed pixel widths left it 40 px beside the account's rail at 1280
-	 * (Lane 94 review HIGH-1). Its line wraps within it. */
+	/* The Platform column is its longest name, MyFantasyLeague, kept on one line; the others share the
+	 * table by proportion, the Connection column (no width of its own) taking what is left: fixed pixel
+	 * widths left it 40 px beside the account's rail at 1280 (Lane 94 review HIGH-1). Its line wraps
+	 * within it. */
 	.c-name {
-		width: 14%;
+		width: 9.5rem;
 	}
 
 	.c-wr {
-		width: 21%;
+		width: 18%;
 	}
 
 	.c-read {
-		width: 11%;
+		width: 9%;
 	}
 
 	.c-act {
-		width: 23%;
+		width: 25%;
 	}
 
 	.note-cell {
@@ -298,6 +305,7 @@
 	.name {
 		font-weight: 600;
 		text-align: left;
+		white-space: nowrap;
 	}
 
 	.wcell {

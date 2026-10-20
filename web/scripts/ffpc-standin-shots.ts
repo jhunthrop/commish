@@ -115,6 +115,19 @@ for (const width of WIDTHS) {
 		const head = await account.locator('.platforms thead th').nth(1).boundingBox();
 		if (head === null || head.width < CONNECTION_MIN_PX)
 			fault(`account ${String(width)}`, `Connection column ${String(head?.width ?? 0)} px`);
+		// Every platform's name sits on one line inside its own cell, never into Connection's.
+		const spill = await account.locator('.platforms tbody th.name').evaluateAll((cells) =>
+			cells.flatMap((cell) => {
+				const range = document.createRange();
+				range.selectNodeContents(cell);
+				const text = range.getBoundingClientRect();
+				const box = cell.getBoundingClientRect();
+				const lines = range.getClientRects().length;
+				return text.right > box.right || lines > 1 ? [cell.textContent.trim()] : [];
+			})
+		);
+		if (spill.length > 0)
+			fault(`account ${String(width)}`, `names past their cell: ${spill.join(', ')}`);
 		// Every row's verb sits whole inside the table.
 		const table = await account.locator('.platforms table').boundingBox();
 		for (const verb of await account

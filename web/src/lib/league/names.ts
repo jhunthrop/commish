@@ -19,10 +19,20 @@ export function hostWords(host: LeagueHost): string {
 	return HOST_WORDS[host];
 }
 
-/** Whose rules a page's figures are nearest: "nearest FFPC's rules", or "nearest your rules" with
- * no platform named (Lane 94 fix round 1). */
+/** The platforms whose leagues score by the platform's own fixed rules, not a commissioner's: FFPC's
+ * contests. Only these are credited with a league's rules (Lane 94 fix round 2). */
+const PLATFORM_FIXES_RULES: ReadonlySet<LeagueHost> = new Set(['ffpc']);
+
+/** Who sets a league's rules, as a sentence names them: "FFPC" where the platform fixes them, else
+ * "your league" (its commissioner), never "Sleeper". */
+export function rulesOwner(host?: LeagueHost): string {
+	return host !== undefined && PLATFORM_FIXES_RULES.has(host) ? hostWords(host) : 'your league';
+}
+
+/** Whose rules a page's figures are nearest: "nearest FFPC's rules", "nearest your league's
+ * rules" on every other platform and with none named (Lane 94 fix rounds 1 and 2). */
 export function nearestRules(host?: LeagueHost): string {
-	return host === undefined ? 'nearest your rules' : `nearest ${hostWords(host)}'s rules`;
+	return `nearest ${rulesOwner(host)}'s rules`;
 }
 
 /** A followed league's own name, or its host's when the read has none yet. */

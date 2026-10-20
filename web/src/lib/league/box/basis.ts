@@ -4,11 +4,12 @@
  * game, the rules our stats lack) with these and hides the ones about columns its phone does not
  * draw (BasisPart.phone). Pure, tested in basis.test.ts. */
 import { weekdayTime, zoneWord } from '#lib/format/clock.ts';
+import { sentenceStart } from '#lib/format/sentence.ts';
 import { lineState, toPlay } from './kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { LeagueHost } from '../api.ts';
 import type { PlayerLine, ProjectionScoring } from '../inseason/api.ts';
-import { hostWords, nearestRules } from '../names.ts';
+import { hostWords, nearestRules, rulesOwner } from '../names.ts';
 import { BOX, FORMAT_WORDS, expectedWords, factsReadAt, weatherCell } from './box.ts';
 
 export type { BasisPart };
@@ -39,12 +40,11 @@ export interface ProjFacts {
 }
 
 /** The tight end's extra a catch the league's rules add, its own sentence (Lane 94 fix round 1: said
- * beside "nearest", never as the only difference): "FFPC adds 0.5 a catch for TEs.", null without
- * one. */
+ * beside "nearest", never as the only difference), credited to whoever sets the rules: "FFPC adds 0.5
+ * a catch for TEs.", "Your league adds 0.5 a catch for TEs.", null without one. */
 export function teBonusSentence(bonus: number | undefined, host?: LeagueHost): string | null {
 	if (bonus === undefined) return null;
-	const who = host === undefined ? 'Your league' : hostWords(host);
-	return `${who} adds ${String(bonus)} a catch for TEs.`;
+	return `${sentenceStart(rulesOwner(host))} adds ${String(bonus)} a catch for TEs.`;
 }
 
 /** The figures' scoring against the league's: its own, or the column shown nearest its rules

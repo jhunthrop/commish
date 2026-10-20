@@ -78,6 +78,11 @@ void test('a TE premium league on the PPR board says it in plain words, and wher
 		link: { words: "Set up your league's exact rules to rank by them.", savedLeague: null }
 	});
 	assert.equal(contextNote(te, 'ppr', false)?.link, null);
+	// A Sleeper league's rules are its commissioner's (Lane 94 fix round 2).
+	assert.equal(
+		contextNote({ ...te, host: 'sleeper' }, 'ppr', true)?.text,
+		"Your league gives tight ends extra points per catch. This board is PPR, nearest your league's rules."
+	);
 });
 
 void test('a format the run does not carry says so and names what the page is in', () => {
