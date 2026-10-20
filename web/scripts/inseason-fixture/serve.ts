@@ -45,7 +45,7 @@ import { CLAIM_FORM_WORDS, HOLD_MS, HOST_ID, espnMoves } from './espn-moves.ts';
 import { weekOrderAnswer, weekPosition, type WeekOrderStates } from './week-order-serve.ts';
 import { tradeChecker } from './trade-check.ts';
 import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
-import { finalWords, titleWeekHorizon } from './week.ts';
+import { finalWords, rateWords, titleWeekHorizon } from './week.ts';
 import { lineupSpent, TURNED_WEEK, turnedLineup, turnedTrades, turnedWaivers } from './turn.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
@@ -507,10 +507,15 @@ function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
 		// A league's order runs to its last week (words.go OrderScreenBasis, Lane 96); the read with no
 		// league keeps the run's.
 		basis: league
-			? live.basis.replace(
-					/through week \d+, byes out/,
-					`through week ${String(HORIZON.last)}${finalWords(HORIZON, live.from_week ?? ORDER_FROM_WEEK)}, byes out`
-				)
+			? live.basis
+					.replace(
+						/through week \d+, byes out/,
+						`through week ${String(HORIZON.last)}${finalWords(HORIZON, live.from_week ?? ORDER_FROM_WEEK)}, byes out`
+					)
+					.replace(
+						/in your league\./,
+						`in your league.${rateWords(HORIZON, live.from_week ?? ORDER_FROM_WEEK)}`
+					)
 			: live.basis,
 		read_at: league ? readAt() : null,
 		moves: league ? order.moves : null,

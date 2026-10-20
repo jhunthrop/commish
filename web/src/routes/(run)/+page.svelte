@@ -21,6 +21,18 @@
 	import { boardColumns } from '#lib/ui/board-columns.ts';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { RECORD_WORDS } from '#lib/run/record.ts';
+	import { memberZone } from '#lib/format/clock.ts';
+	import {
+		BUILD_ZONE,
+		STRIP_ROWS,
+		liveBasis,
+		liveLeadPart,
+		liveStrip,
+		runStampPart,
+		shapeWords
+	} from '#lib/front/live-board.ts';
+	import type { BasisPart } from '#lib/run/board-basis.ts';
+	import type { BoardRowView } from '#lib/run/schema.ts';
 	import { RAIL_OF_WORD_SET, railInSeason, type WordSet } from '#lib/ui/nav.ts';
 	import type { Component } from 'svelte';
 	import type { PageProps } from './$types';
@@ -59,7 +71,53 @@
 			}
 		);
 	});
-	const words = $derived(sayBoard(page, live));
+	const words = $derived(sayBoard({ ...page, rows: page.pool }, live));
+
+	/** One board for a signed-in member (Lane 96): the strip prints the API's live order, the one
+	 * Players and Rest of 2026 read at the same clock, for the followed league's shape or for 12 teams.
+	 * A reader signed out, or whose read fails, keeps the run's figures with the run's time. */
+	let zone = $state(BUILD_ZONE);
+	onMount(() => {
+		zone = memberZone();
+	});
+	const runStamp = $derived(
+		format.refreshedAt === undefined ? null : runStampPart(format.refreshedAt, zone)
+	);
+	let liveRead = $state<{ rows: BoardRowView[]; basis: BasisPart[] } | null>(null);
+	$effect(() => {
+		const league = siteContext.league;
+		if (!siteContext.signedIn || format.rosFromWeek === undefined) {
+			liveRead = null;
+			return;
+		}
+		const teams = league?.standing?.teams ?? format.teams;
+		let stale = false;
+		void import('#lib/order/api.ts')
+			.then(({ orderApi }) =>
+				orderApi.read(league?.id ?? null, {
+					position: null,
+					q: null,
+					roster: null,
+					limit: STRIP_ROWS
+				})
+			)
+			.then((answer) => {
+				if (stale) return;
+				const rows = liveStrip(page.pool, answer, teams);
+				const lead = liveLeadPart(answer, shapeWords(teams, league !== null), Date.now(), zone);
+				liveRead = rows === null ? null : { rows, basis: liveBasis(page.basis, lead) };
+			})
+			.catch(() => {
+				if (!stale) liveRead = null;
+			});
+		return () => {
+			stale = true;
+		};
+	});
+	const stripRows = $derived(liveRead?.rows ?? page.rows);
+	const stripBasis = $derived(
+		liveRead?.basis ?? (runStamp === null ? page.basis : [...page.basis, runStamp])
+	);
 
 	/** A member who follows a league is sent back to the one selected in the shell; anyone
 	 * else to follow one. */
@@ -137,10 +195,10 @@
 					aside="{page.rows.length} of {page.boardSize}"
 					level={2}
 				/>
-				<BasisLine parts={page.basis} tail={words?.capture ?? null} />
+				<BasisLine parts={stripBasis} tail={words?.capture ?? null} />
 				<div class="rows">
 					<BoardTable {columns} label="The top of our {format.label} board">
-						{#each page.rows as player, i (player.id)}
+						{#each stripRows as player, i (player.id)}
 							<Row
 								{player}
 								href={links.player(player.slug)}

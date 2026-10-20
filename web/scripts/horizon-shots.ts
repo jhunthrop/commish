@@ -3,7 +3,9 @@
 // the run's week 17, dark at 1280 and 390, against
 // the fixture API serving the recorded league as one whose playoffs run to week 18 with a two-week
 // final (FIXTURE_TITLE_WEEK=18:2) on the fixture week's clock. It asserts each screen prints the
-// span through week 18 and names the final, and exits non-zero when one does not.
+// span through week 18 and names the championship, and exits non-zero when one does not. The figures
+// are the fixture's stand-ins through week 17 under the week 18 words (review L4): the Go engine tests
+// (horizon_test.go, week18_test.go) check the figures, these shots the words.
 //
 //   node scripts/horizon-shots.ts [web origin] [out dir]
 // with the site built on the Saturday run (inseason-fixture/saturday-run.ts) against PUBLIC_API_URL naming the fixture API (API_ORIGIN, default
@@ -26,7 +28,7 @@ const HEIGHT = { desk: 900, phone: 844 } as const;
 const READY_TIMEOUT_MS = 30_000;
 const SETTLE_MS = 300;
 /** The words every screen's basis carries through week 18. */
-const FINAL = 'the final over weeks 17 and 18';
+const FINAL = 'the championship over weeks 17 and 18';
 const id = FIXTURE_IDS.league;
 const SCREENS = [
 	{ name: 'rest', path: '/board/ppr-12/rb', said: `through week 18, ${FINAL}` },

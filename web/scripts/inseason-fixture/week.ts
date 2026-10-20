@@ -37,11 +37,22 @@ export function titleWeekHorizon(spec: string | undefined): Horizon {
 	return { last, finalWeeks: Number(match[2]) };
 }
 
-/** ", the final over weeks 17 and 18" once a two-week final sits inside the span from `from`
- * (horizon.go finalWords), else nothing. */
+/** ", the championship over weeks 17 and 18" once a two-week final sits inside the span from
+ * `from` (horizon.go finalWords), else nothing. */
 export function finalWords(h: Horizon, from: number): string {
 	if (h.finalWeeks !== TWO_WEEK_FINAL || h.last - 1 < from) return '';
-	return `, the final over weeks ${String(h.last - 1)} and ${String(h.last)}`;
+	return `, the championship over weeks ${String(h.last - 1)} and ${String(h.last)}`;
+}
+
+/** " Week 18 counts at his rate a game; our model runs through week 17." where the span runs past
+ * the run's last week from a week the model counts (horizon.go rateWords), else nothing. */
+export function rateWords(h: Horizon, from: number): string {
+	if (h.last <= LAST_FANTASY_WEEK || from > LAST_FANTASY_WEEK) return '';
+	const weeks =
+		h.last - LAST_FANTASY_WEEK > 1
+			? `Weeks ${String(LAST_FANTASY_WEEK + 1)} to ${String(h.last)} count`
+			: `Week ${String(h.last)} counts`;
+	return ` ${weeks} at his rate a game; our model runs through week ${String(LAST_FANTASY_WEEK)}.`;
 }
 
 /** The weeks the rest-of-season order covers from a week through the horizon: a week's figure is
@@ -55,7 +66,7 @@ export function gainWords(whose: string, weeks: number, h: Horizon): string {
 		from === h.last
 			? `week ${String(h.last)}`
 			: `weeks ${String(from)} to ${String(h.last)}${finalWords(h, from)}`;
-	return `Gain is ${whose} change in points over replacement a week, ${span}.`;
+	return `Gain is ${whose} change in points over replacement a week, ${span}.${rateWords(h, from)}`;
 }
 
 /** The finder's basis in the API's words (words.go TradesBasis), the one copy build.ts and
