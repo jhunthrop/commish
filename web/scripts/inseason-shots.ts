@@ -1315,7 +1315,7 @@ for (const theme of THEMES) {
 }
 
 /** The league page in each season phase (spec 2026-10-16 §3), the follow page a rail item opens
- * with no league, and the account's Next draft rows in season, in both themes at both widths. */
+ * with no league, and the account's draft tools line in season, in both themes at both widths. */
 const STATES = [
 	{
 		name: 'league-pre-draft',
@@ -1334,7 +1334,7 @@ const STATES = [
 		path: '/league/new?screen=start',
 		ready: 'to see your lineup each week'
 	},
-	{ name: 'account-next-draft', path: '/account', ready: 'Next draft' }
+	{ name: 'account-draft-tools', path: '/account', ready: 'Draft tools:' }
 ] as const;
 for (const theme of THEMES) {
 	for (const width of SHOT_WIDTHS) {

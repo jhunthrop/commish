@@ -4,7 +4,9 @@
 // clock. It asserts the standings say FFPC's seeding under the table and draw no cut by record, the
 // Lineup's basis says the PPR column nearest FFPC's rules with FFPC's tight end extra beside it, and
 // the Account room's platforms say one state word each, what each connection is connected to, and no
-// internal field. Exits non-zero on any fault.
+// internal field, and each Last read ("4 minutes ago") on one line at a desk and two at most in a hand
+// (B71), and the Connection column at 200 px or more at every desk width, 1200 among them. Exits
+// non-zero on any fault.
 //
 //   FIXTURE_CLOCK=2026-10-17T17:00:00.000Z PORT=8799 node scripts/inseason-fixture/serve.ts
 //   node scripts/ffpc-standin-shots.ts [web origin] [out dir]
@@ -16,10 +18,14 @@ import { copyFault, watchData } from './copy-scan.ts';
 import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 
-const WIDTHS = [1440, 1280, 390] as const;
+/** 1200 is inside the band above the site's 1180 fold where the Account side once squeezed the
+ * Platforms table's Connection column to 119 px (Lane 105 fix round 1). */
+const WIDTHS = [1440, 1280, 1200, 390] as const;
 /** The Connection column's least width at a desk, where its line wraps within it (fix round 1). */
 const CONNECTION_MIN_PX = 200;
 const DESK = 900;
+/** The most lines a Last read cell may take: one at a desk, two in a hand (B71). */
+const READ_LINES = { desk: 1, hand: 2 } as const;
 const VIEWPORT_HEIGHT = 900;
 const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
@@ -141,6 +147,20 @@ for (const width of WIDTHS) {
 				);
 		}
 	}
+	// Each Last read in as few lines as B71 rules, counted from the rendered text's line boxes.
+	const readLines = await account.locator('.platforms tbody td.read').evaluateAll((cells) =>
+		cells.map((cell) => {
+			const range = document.createRange();
+			range.selectNodeContents(cell);
+			const tops = new Set(
+				[...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))
+			);
+			return { text: cell.textContent.trim(), lines: tops.size };
+		})
+	);
+	const most = width > DESK ? READ_LINES.desk : READ_LINES.hand;
+	for (const cell of readLines.filter((c) => c.lines > most))
+		fault(`account ${String(width)}`, `Last read "${cell.text}" on ${String(cell.lines)} lines`);
 	// One time a row: the ESPN row's last read is its leagues' newest, as the leagues table says it.
 	const bare = (r: string | null): string => (r ?? '').replace('Last read', '').trim();
 	const espnRead = bare(

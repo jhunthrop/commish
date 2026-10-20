@@ -278,12 +278,13 @@
 		max-width: 110ch;
 	}
 
-	/* The Platform column is its longest name, MyFantasyLeague, kept on one line; the others share the
-	 * table by proportion, the Connection column (no width of its own) taking what is left: fixed pixel
-	 * widths left it 40 px beside the account's rail at 1280 (Lane 94 review HIGH-1). Its line wraps
-	 * within it. */
+	/* The Platform column is its longest name, MyFantasyLeague, kept on one line; the Last read column
+	 * is "59 minutes ago" on one line and the verb column its widest verb, "Follow a Sleeper league",
+	 * whole (B71: a share of the table left "4 minutes ago" on three lines at 1280). Lineups from here
+	 * shares the table by proportion and Connection (no width of its own) takes what is left, its line
+	 * wrapping within it: fixed widths everywhere left it 40 px at 1280 (Lane 94 review HIGH-1). */
 	.c-name {
-		width: 9.5rem;
+		width: 8rem;
 	}
 
 	.c-wr {
@@ -291,11 +292,15 @@
 	}
 
 	.c-read {
-		width: 9%;
+		width: 6.5rem;
 	}
 
 	.c-act {
-		width: 25%;
+		width: 11rem;
+	}
+
+	.read {
+		white-space: nowrap;
 	}
 
 	.note-cell {

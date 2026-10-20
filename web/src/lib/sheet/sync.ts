@@ -8,7 +8,8 @@
  * - On a browser's first sign-in, a sheet it holds is created on the account as a new sheet and
  *   followed. It is never merged into another account sheet. A browser holding nothing it ever
  *   edited opens the account's most recently changed sheet, which loses nothing because there is
- *   nothing here to merge.
+ *   nothing here to merge. With no account sheet either it follows none and writes nothing: an
+ *   empty sheet is never saved on a visit (B52), and the first edit creates the account's sheet.
  * - A followed sheet in another format than this browser's edited copy is an error the page shows,
  *   not a merge.
  *
@@ -82,6 +83,12 @@ export function syncedFrom(remote: RemoteSheet, stored: StoredSheet): StoredShee
 const holdsSomething = (stored: StoredSheet): boolean =>
 	stored.dirty || stored.sheet.rows.length > 0;
 
+/** Whether a reconcile of this copy may write to the account: an unsaved edit or a shelved sheet.
+ * Without one it only reads (write() skips a sheet the account already holds). */
+export function writesOnReconcile(stored: StoredSheet): boolean {
+	return stored.dirty || stored.shelf.length > 0;
+}
+
 interface Followed {
 	remote: RemoteSheet;
 	/** Made from this browser's copy just now, so the two already agree. */
@@ -89,11 +96,13 @@ interface Followed {
 	notices: string[];
 }
 
+/** The account sheet this browser follows, or null when it holds nothing and the account has no
+ * sheet, so nothing is created for a visit. */
 async function followed(
 	api: SheetsApi,
 	stored: StoredSheet,
 	sheets: readonly SheetSummary[]
-): Promise<Followed> {
+): Promise<Followed | null> {
 	const following = stored.sync
 		? sheets.find((sheet) => sheet.id === stored.sync?.sheetId)
 		: undefined;
@@ -112,9 +121,9 @@ async function followed(
 			'The sheet this browser followed was deleted on another device, so this one was saved as a new sheet'
 		);
 	}
-	const latest = sheets[0];
-	if (!holdsSomething(stored) && latest) {
-		return { remote: await api.get(latest.id), created: false, notices };
+	if (!holdsSomething(stored)) {
+		const latest = sheets[0];
+		return latest ? { remote: await api.get(latest.id), created: false, notices } : null;
 	}
 	return { remote: await api.create(stored.sheet), created: true, notices };
 }
@@ -169,10 +178,29 @@ async function uploadShelf(
 	return { stored: { ...stored, shelf: left }, notices };
 }
 
+/** A browser holding nothing, and an account with no sheet: only the shelf goes up, and a mark for
+ * a sheet deleted since is let go, so the first edit creates a sheet rather than mourn one. */
+async function unfollowed(
+	api: SheetsApi,
+	account: Account,
+	stored: StoredSheet,
+	sheets: readonly SheetSummary[]
+): Promise<Synced> {
+	const shelf = await uploadShelf(api, { ...stored, sync: null, base: null });
+	return {
+		account,
+		stored: shelf.stored,
+		sheets: stored.shelf.length > 0 ? await api.list() : sheets,
+		notices: shelf.notices
+	};
+}
+
 async function reconcileOnce(api: SheetsApi, stored: StoredSheet): Promise<Synced> {
 	const account = await api.me();
 	const sheets = await api.list();
-	const { remote, created, notices } = await followed(api, stored, sheets);
+	const follow = await followed(api, stored, sheets);
+	if (follow === null) return unfollowed(api, account, stored, sheets);
+	const { remote, created, notices } = follow;
 	const settled = created ? { sheet: remote.sheet, notices: [] } : settle(stored, remote);
 	const written = created ? remote : await write(api, remote, settled.sheet);
 	// The shelf goes last, so a failure above never leaves a shelved sheet created twice.
