@@ -8,7 +8,7 @@
 import type { TradeAdvice, WaiverAdvice, WaiverRow } from '../../src/lib/league/inseason/api.ts';
 import { stateAt } from './game-state.ts';
 import { roundTenth } from './tenths.ts';
-import { tradesBasis, waiverSeasonBasis, weeksCovered } from './week.ts';
+import { tradesBasis, waiverSeasonBasis, weeksCovered, type Horizon } from './week.ts';
 
 /** The basis once a pickup's game has kicked off (words.go SeasonOrderWords). */
 export function seasonOrderWords(week: number): string {
@@ -65,15 +65,21 @@ function inSeasonOrder(waivers: WaiverAdvice, now: number): WaiverAdvice {
 	};
 }
 
-/** The waiver answer at `now`, the order counting from `fromWeek`: the season Gain order once any row
- * the page shows, the table's or the strip's, is past its kickoff; the week's answer otherwise. */
-export function waiversAtClock(waivers: WaiverAdvice, now: number, fromWeek: number): WaiverAdvice {
-	const restated = { ...waivers, season_basis: waiverSeasonBasis(weeksCovered(fromWeek)) };
+/** The waiver answer at `now`, the order counting from `fromWeek` through the league's horizon: the
+ * season Gain order once any row the page shows, the table's or the strip's, is past its kickoff; the
+ * week's answer otherwise. */
+export function waiversAtClock(
+	waivers: WaiverAdvice,
+	now: number,
+	fromWeek: number,
+	h: Horizon
+): WaiverAdvice {
+	const restated = { ...waivers, season_basis: waiverSeasonBasis(weeksCovered(fromWeek, h), h) };
 	const locked = [...waivers.rows, ...waivers.pickups].some((r) => rowPastKickoff(r, now));
 	return locked ? inSeasonOrder(restated, now) : restated;
 }
 
-/** The trade answer at `now`, its Gain over the weeks from `fromWeek`. */
-export function tradesAtClock(trades: TradeAdvice, fromWeek: number): TradeAdvice {
-	return { ...trades, basis: tradesBasis(weeksCovered(fromWeek)) };
+/** The trade answer at `now`, its Gain over the weeks from `fromWeek` through the league's horizon. */
+export function tradesAtClock(trades: TradeAdvice, fromWeek: number, h: Horizon): TradeAdvice {
+	return { ...trades, basis: tradesBasis(weeksCovered(fromWeek, h), h) };
 }

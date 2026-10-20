@@ -43,11 +43,16 @@ import { CLAIM_FORM_WORDS, HOLD_MS, HOST_ID, espnMoves } from './espn-moves.ts';
 import { weekOrderAnswer, weekPosition, type WeekOrderStates } from './week-order-serve.ts';
 import { tradeChecker } from './trade-check.ts';
 import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
+import { finalWords, titleWeekHorizon } from './week.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 /** The fixture's clock: the real one, or the shots' week clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z,
  * clock.ts FIXTURE_WEEK_CLOCK), so every read stamp agrees with the browser's. */
 const now = fixtureClock(process.env[FIXTURE_CLOCK_VARIABLE]);
+/** The league's horizon (horizon.go HorizonOf, Lane 96): the recorded league's playoffs end in week 17,
+ * the run's own; FIXTURE_TITLE_WEEK=18:2 serves it as a league whose playoffs run to week 18 with a
+ * two-week final, its terms and every Gain and order sentence through it. */
+const HORIZON = titleWeekHorizon(process.env.FIXTURE_TITLE_WEEK);
 const DATA = new URL('./data/', import.meta.url);
 const {
 	league: LEAGUE,
@@ -85,18 +90,39 @@ async function load<T>(name: string): Promise<T> {
 
 /** Lane 72's recorded week sheets, the player card's line for those players (player-week.ts). */
 const { players: sheets } = await load<{ players: Record<string, Sheet> }>('week-sheets');
-const [sync, lineup, waivers, trades, gameWeek, matchupBox, scoreboardLive, order, weekOrders] =
-	await Promise.all([
-		load<LeagueSync>('sync'),
-		load<LineupAdvice>('lineup'),
-		load<WaiverAdvice>('waivers'),
-		load<TradeAdvice>('trades'),
-		load<GameWeek>('games'),
-		load<MatchupBox>('matchup'),
-		load<Scoreboard>('scoreboard-live'),
-		load<OrderAdvice>('order'),
-		load<WeekOrderStates>('week-order')
-	]);
+const [
+	recordedSync,
+	lineup,
+	waivers,
+	trades,
+	gameWeek,
+	matchupBox,
+	scoreboardLive,
+	order,
+	weekOrders
+] = await Promise.all([
+	load<LeagueSync>('sync'),
+	load<LineupAdvice>('lineup'),
+	load<WaiverAdvice>('waivers'),
+	load<TradeAdvice>('trades'),
+	load<GameWeek>('games'),
+	load<MatchupBox>('matchup'),
+	load<Scoreboard>('scoreboard-live'),
+	load<OrderAdvice>('order'),
+	load<WeekOrderStates>('week-order')
+]);
+/** The league read with its playoffs through the horizon's last week. */
+const sync: LeagueSync =
+	recordedSync.terms.playoff_weeks === null ||
+	recordedSync.terms.playoff_weeks.last === HORIZON.last
+		? recordedSync
+		: {
+				...recordedSync,
+				terms: {
+					...recordedSync.terms,
+					playoff_weeks: { ...recordedSync.terms.playoff_weeks, last: HORIZON.last }
+				}
+			};
 
 /** The recorded week the scoreboard is restated from at the fixture's clock (scoreboard-at.ts). */
 const recordedWeek = {
@@ -273,7 +299,7 @@ function send(
 /** The order's first week at the fixture's clock (rest-now.ts, Lane 86): the Gain words count from it. */
 const fromWeekNow = (): number => orderAtClock(order, now()).from_week ?? ORDER_FROM_WEEK;
 /** The waiver answer as the API gives it at the fixture's clock (waivers-at.ts). */
-const waiversNow = (): WaiverAdvice => waiversAtClock(waivers, now(), fromWeekNow());
+const waiversNow = (): WaiverAdvice => waiversAtClock(waivers, now(), fromWeekNow(), HORIZON);
 
 function waiversAt(position: string | null): WaiverAdvice {
 	const answer = waiversNow();
@@ -285,7 +311,7 @@ function waiversAt(position: string | null): WaiverAdvice {
 
 /** The trades holding one player, by his board id, every team kept. */
 function tradesHolding(player: string | null): TradeAdvice {
-	const answer = tradesAtClock(trades, fromWeekNow());
+	const answer = tradesAtClock(trades, fromWeekNow(), HORIZON);
 	if (player === null) return answer;
 	const holds = (side: { player: { board_id: string | null } }[]): boolean =>
 		side.some((line) => line.player.board_id === player);
@@ -434,6 +460,14 @@ function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
 		.map((row) => (league ? row : { ...row, roster: null, move: null }));
 	return {
 		...live,
+		// A league's order runs to its last week (words.go OrderScreenBasis, Lane 96); the read with no
+		// league keeps the run's.
+		basis: league
+			? live.basis.replace(
+					/through week \d+, byes out/,
+					`through week ${String(HORIZON.last)}${finalWords(HORIZON, live.from_week ?? ORDER_FROM_WEEK)}, byes out`
+				)
+			: live.basis,
 		read_at: league ? readAt() : null,
 		moves: league ? order.moves : null,
 		rank_by: position === null ? 'points_over_replacement' : 'rest_of_season_points',
