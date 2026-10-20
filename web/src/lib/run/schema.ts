@@ -297,6 +297,16 @@ export const recordLineSchema = z.object({
 	oursOnPublished: scoreSchema.nullable()
 });
 
+/** One graded player of a week as the record counts a league's own starters from (Lane 93). */
+const place = z.number().int().min(1);
+export const placedPlayerSchema = z.object({
+	position,
+	ours: place.nullable(),
+	adp: place.nullable(),
+	published: place.nullable(),
+	finish: place
+});
+
 /** Where a week of the season stands in the record. Every week of the season is listed, so a week
  * the run failed to freeze shows as a hole rather than going missing.
  *   graded    frozen before its first kickoff and graded against the games
@@ -325,7 +335,16 @@ export const recordWeekSchema = z
 		lines: z.array(recordLineSchema),
 		/** Why a missed week was not frozen, one sentence the page prints: "Our nightly run failed that
 		 * week." Present only for a missed week. */
-		note: phrase.optional()
+		note: phrase.optional(),
+		/** When the graded order was last refreshed before the week was set (Lane 93): the preseason
+		 * board's stamp, or the rest-of-season order's refresh. Absent on a run before Lane 93. */
+		orderAsOf: isoTime.optional(),
+		/** A frozen week waiting on its stats: the earliest instant the weekly pass grades it. */
+		gradesFrom: isoTime.optional(),
+		/** A graded week's players, for counting the starters a league's own lineup calls right (Lane
+		 * 93): each order's place among the week's graded players (null where it has no stance on him)
+		 * and his place in the finish, in the finish's order. Absent before Lane 93. */
+		players: z.array(placedPlayerSchema).optional()
 	})
 	.superRefine((week, ctx) => {
 		const froze = week.status === 'graded' || week.status === 'frozen';
@@ -556,6 +575,7 @@ export type Adp = z.infer<typeof adpSchema>;
 export type Score = z.infer<typeof scoreSchema>;
 export type RecordLine = z.infer<typeof recordLineSchema>;
 export type RecordWeek = z.infer<typeof recordWeekSchema>;
+export type PlacedPlayer = z.infer<typeof placedPlayerSchema>;
 export type RecordWeekStatus = z.infer<typeof recordWeekStatus>;
 export type RunRecord = z.infer<typeof recordSchema>;
 export type IndexEntry = z.infer<typeof indexEntrySchema>;

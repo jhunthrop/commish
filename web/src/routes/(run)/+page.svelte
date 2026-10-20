@@ -20,6 +20,7 @@
 	import Row from '#lib/ui/Row.svelte';
 	import { boardColumns } from '#lib/ui/board-columns.ts';
 	import Verb from '#lib/ui/Verb.svelte';
+	import { RECORD_WORDS } from '#lib/run/record.ts';
 	import { RAIL_OF_WORD_SET, railInSeason, type WordSet } from '#lib/ui/nav.ts';
 	import type { Component } from 'svelte';
 	import type { PageProps } from './$types';
@@ -40,6 +41,7 @@
 			range: false,
 			gap: page.gap,
 			season: page.underway,
+			restOfSeason: page.restFrom !== null,
 			action: true
 		})
 	);
@@ -164,7 +166,19 @@
 			<aside class="side" aria-label="Our record">
 				<Panel>
 					<PanelHead title="Our record" aside={page.record.season.toString()} />
-					<Figure value={headline.value} size="lg" caption={headline.caption} />
+					{#if headline.standing}<p class="standing">{headline.standing}</p>{/if}
+					<div class="figures">
+						<Figure value={headline.value} size="lg" caption={headline.caption} />
+						{#if headline.starters}
+							<Figure
+								value={headline.starters.value}
+								size="lg"
+								caption="{RECORD_WORDS.frontStarters}. {headline.starters.caption}."
+							/>
+						{/if}
+					</div>
+					{#if headline.graded}<p class="record-note">{page.record.scale}</p>{/if}
+					{#if headline.gaps}<p class="record-note">{headline.gaps}</p>{/if}
 					<div class="more">
 						<Quiet href={links.record()} size="sm">How the board has done</Quiet>
 					</div>
@@ -205,6 +219,29 @@
 		flex-wrap: wrap;
 		gap: var(--s-3);
 		margin-top: var(--s-3);
+	}
+
+	/* The record card: order matched and starters right side by side, then its two notes (Lane 93). */
+	.figures {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: var(--s-3);
+	}
+
+	.standing {
+		margin: 0 0 var(--s-2);
+		font-size: var(--t-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--accent-text);
+	}
+
+	.record-note {
+		margin: var(--s-2) 0 0;
+		font-size: var(--t-xs);
+		line-height: 1.45;
+		color: var(--ink-2);
 	}
 
 	@media (max-width: 1180px) {

@@ -9,21 +9,32 @@
 		RECORD_FIGURES,
 		allLine,
 		chartSeries,
+		chartWeeks,
 		figureWords,
+		gapWords,
 		gradedOrders,
 		publishedBeside,
 		publishedDrawn,
-		ORDER_WORDS,
 		recordBasis,
 		recordHeadline,
 		recordLead,
 		recordSources,
 		recordStatusSpans,
-		scaleWords,
 		scoreOf,
+		standingWords,
 		weekLines,
+		weekOrderWords,
 		type RecordFigure
 	} from '#lib/run/record.ts';
+	import {
+		countable,
+		inLineup,
+		leagueBasis,
+		lineupOf,
+		weekSentence,
+		type LeagueRecord,
+		type PlayersByWeek
+	} from '#lib/run/record-league.ts';
 	import type { RecordLine } from '#lib/run/schema.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import Figure from '#lib/ui/Figure.svelte';
@@ -34,15 +45,42 @@
 
 	let { data }: PageProps = $props();
 
-	const record = $derived(data.page.record);
+	/** The run's record as written: the page's figures until a selected league counts its own. */
+	const runRecord = $derived(data.page.record);
 	const scoring = $derived(data.page.format.label);
+
+	/** A selected league's record and the run's graded players (Lane 93), read once it is selected:
+	 * starters right in the league's own lineup, and its own benchmark's weeks. */
+	let leagueRecord = $state<LeagueRecord | null>(null);
+	let players = $state<PlayersByWeek>({});
+	const leagueId = $derived(siteContext.league?.id ?? null);
+	$effect(() => {
+		const id = leagueId;
+		leagueRecord = null;
+		if (id === null) return;
+		void import('#lib/run/record-league-api.ts').then(async (api) => {
+			const [read, placed] = await Promise.all([api.readLeagueRecord(id), api.readRecordPlayers()]);
+			if (leagueId !== id) return;
+			players = placed;
+			leagueRecord = read;
+		});
+	});
+	const counted = $derived(leagueRecord !== null && countable(runRecord, players));
+	const record = $derived(
+		leagueRecord !== null && counted
+			? inLineup(runRecord, players, lineupOf(leagueRecord))
+			: runRecord
+	);
+	const leagueWeeks = $derived(leagueRecord?.weeks ?? []);
 	/** The record is graded in one scoring: with a league selected, the page says the league's too. */
 	const note = $derived.by(() => {
 		const { league, notes } = siteContext;
 		if (league === null || notes === null) return null;
 		return `${notes.leagueScores(league)} Our record is graded in ${scoring}.`;
 	});
-	const headline = $derived(recordHeadline(record));
+	const headline = $derived(recordHeadline(record, data.page.unplayed));
+	const standing = $derived(standingWords(record));
+	const gaps = $derived(gapWords(record, data.page.unplayed));
 
 	/** The figure heads, from the run's own words. */
 	const FIGURE_HEADS = $derived<Record<RecordFigure, string>>({
@@ -67,13 +105,6 @@
 	const rows = $derived(weekLines(record.weeks, data.page.unplayed));
 	const series = $derived(chartSeries(record, position));
 	const graded = $derived(record.weeks.filter((week) => week.status === 'graded'));
-	const span = $derived(
-		graded.length === 0
-			? ''
-			: graded.length === 1
-				? `Week ${String(graded[0]?.week)}`
-				: `Weeks ${String(graded[0]?.week)} to ${String(graded.at(-1)?.week)}`
-	);
 
 	const capitalized = (words: string): string =>
 		`${words.charAt(0).toUpperCase()}${words.slice(1)}`;
@@ -81,7 +112,11 @@
 	/** The orders drawn: Published only once a graded week carries it (the honest empty state). */
 	const sources = $derived(recordSources(record));
 	const showPublished = $derived(publishedDrawn(record));
-	const basis = $derived(recordBasis(record).map((text) => ({ text, phone: true })));
+	const basis = $derived(
+		recordBasis(record, leagueRecord === null ? null : leagueBasis(leagueRecord, counted)).map(
+			(text) => ({ text, phone: true })
+		)
+	);
 
 	const spans = $derived(recordStatusSpans(sources.length));
 </script>
@@ -107,9 +142,9 @@
 		<ContextNote {note} />
 
 		{#if toDateAll}
-			<section class="bug" aria-label="{span} to date">
+			<section class="bug" aria-label={standing ?? RECORD_BOX.toDate}>
 				<div class="head">
-					<span class="span">{span}, {RECORD_BOX.toDate.toLowerCase()}</span>
+					<span class="span">{standing}</span>
 					<h2>{gradedOrders(record)}</h2>
 				</div>
 				<div class="tiles">
@@ -128,12 +163,13 @@
 						</div>
 					{/each}
 				</div>
-				<p class="scale">{scaleWords(record)}</p>
+				{#if gaps}<p class="scale">{gaps}</p>{/if}
 				{#if record.honest}<p class="honest">{record.honest}</p>{/if}
 			</section>
 		{:else}
 			<Panel padding="md">
 				<Figure value={headline.value} size="xl" caption={headline.caption} />
+				{#if gaps}<p class="scale">{gaps}</p>{/if}
 			</Panel>
 		{/if}
 
@@ -186,7 +222,7 @@
 					{#if row.week !== null && row.week.status === 'graded'}
 						<tr>
 							<td class="wk"
-								>{row.lead}{#if row.week.order}<span class="ord">{ORDER_WORDS[row.week.order]}</span
+								>{row.lead}{#if row.week.order}<span class="ord">{weekOrderWords(row.week)}</span
 									>{/if}</td
 							>
 							<td class="n plc">{line?.ours.graded ?? RECORD_BOX.none}</td>
@@ -196,8 +232,7 @@
 					{:else}
 						<tr class="quiet" class:live={row.week !== null}>
 							<td class="wk"
-								>{row.lead}{#if row.week?.order}<span class="ord"
-										>{ORDER_WORDS[row.week.order]}</span
+								>{row.lead}{#if row.week?.order}<span class="ord">{weekOrderWords(row.week)}</span
 									>{/if}</td
 							>
 							<!-- One status cell per width, each spanning the columns that width draws; the
@@ -210,7 +245,7 @@
 				{#if toDate}
 					<tr class="totals">
 						<td class="wk">{RECORD_BOX.toDate}</td>
-						<td class="n plc">{toDate.ours.graded}</td>
+						<td class="n plc">{RECORD_BOX.distinct(toDate.ours.graded)}</td>
 						{@render cells(toDate)}
 						<td class="st"></td>
 					</tr>
@@ -219,10 +254,19 @@
 		</table>
 
 		{#if graded.length > 0}
-			<RecordChart {series} weeks={record.weeks.length} />
+			<RecordChart {series} weeks={chartWeeks(record)} />
 		{/if}
 
-		<!-- One paragraph; the bug says the scale and the two decimals once (Lane 66t). -->
+		{#if leagueWeeks.length > 0}
+			<section class="league" aria-label={RECORD_BOX.league}>
+				<h2 class="league-head">{RECORD_BOX.league}</h2>
+				<ul>
+					{#each leagueWeeks as week (week.week)}<li>{weekSentence(week)}</li>{/each}
+				</ul>
+			</section>
+		{/if}
+
+		<!-- One paragraph: each measure defined once, in a player's words (Lane 93). -->
 		<BasisBlock parts={basis} />
 	</main>
 </SiteShell>
@@ -319,6 +363,34 @@
 		font-size: var(--t-sm);
 		line-height: 1.45;
 		color: var(--ink-2);
+	}
+
+	/* A league's own weeks: one sentence each, under the chart (Lane 93). */
+	.league {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
+	}
+
+	.league-head {
+		margin: 0;
+		font-family: var(--font-ui);
+		font-size: var(--t-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--ink-3);
+	}
+
+	.league ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-1);
+		font-size: var(--t-sm);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.honest {

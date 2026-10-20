@@ -28,6 +28,7 @@ type OrderAdvice = components['schemas']['OrderAdvice'];
 type OrderRow = components['schemas']['OrderRow'];
 import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import { FIXTURE_IDS } from './ids.ts';
+import { leagueRecordAnswer } from './record.ts';
 import { playerWeek, type Sheet } from './player-week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 import { ESPN_STAND_IN_NAME, espnMatchup, espnSync } from './espn-sync.ts';
@@ -394,6 +395,8 @@ async function bodyOf(req: IncomingMessage): Promise<unknown> {
 }
 const SYNC = /^\/leagues\/attached\/([^/]+)\/(sync|refresh)$/;
 const LEAGUE_ORDER = /^\/leagues\/attached\/([^/]+)\/order$/;
+/** The record in a league (Lane 93, record.ts). */
+const LEAGUE_RECORD = /^\/leagues\/attached\/([^/]+)\/record$/;
 /** The kickers' and defenses' week (Lane 66w), in a league and with none. */
 const LEAGUE_WEEK_ORDER = /^\/leagues\/attached\/([^/]+)\/order\/week$/;
 const WEEK_POSITION_WORDS = 'Pick a position: K or DEF';
@@ -614,6 +617,11 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const league =
 			id === null ? null : { espn: ESPN_MOVES.has(id), moves: waivers.moves, readAt: readAt() };
 		send(req, res, HTTP.ok, weekOrderAnswer(weekOrders, position, league, now()));
+		return;
+	}
+	const leagueRecord = LEAGUE_RECORD.exec(url.pathname);
+	if (leagueRecord) {
+		send(req, res, HTTP.ok, leagueRecordAnswer(ESPN_MOVES.has(leagueRecord[1] ?? '')));
 		return;
 	}
 	if (LEAGUE_ORDER.test(url.pathname)) {

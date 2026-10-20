@@ -3956,10 +3956,21 @@ export interface components {
 			 * @enum {string}
 			 */
 			benchmark: 'espn' | 'published';
-			/** @description our picks' points, to the tenth, as the league scores */
+			/**
+			 * Format: double
+			 * @description our picks' points, to the tenth, as the league scores
+			 */
 			ours: number;
-			/** @description the benchmark lineup's points, to the tenth, as the league scores */
+			/**
+			 * Format: double
+			 * @description the benchmark lineup's points, to the tenth, as the league scores
+			 */
 			theirs: number;
+			/**
+			 * Format: double
+			 * @description ours less theirs, to the tenth
+			 */
+			margin: number;
 		};
 		/** @description the league's starting lineup by our slots, and its bench */
 		LeagueShape: {

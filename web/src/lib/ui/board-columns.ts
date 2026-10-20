@@ -114,6 +114,8 @@ export interface ColumnView {
 	action: boolean;
 	/** Kickers and defenses alone, in draft order: their place and ADP, no figures of ours. */
 	draftOrder?: boolean;
+	/** The board ranks the rest of the season (Lane 93): the in-season board, which draws no ADP. */
+	restOfSeason?: boolean;
 }
 
 export interface BoardColumns {
@@ -139,7 +141,8 @@ function viewKeys(view: ColumnView): ColumnKey[] {
 		vor: true,
 		order: false,
 		range: view.range,
-		adp: view.order === 'board',
+		// ADP is a draft-board column (Lane 93, B04): the rest-of-season board, in season, draws none.
+		adp: view.order === 'board' && view.restOfSeason !== true,
 		ourRank: view.order === 'adp',
 		gap: view.gap,
 		gp: view.season,

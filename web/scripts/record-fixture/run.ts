@@ -12,12 +12,15 @@
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { manifestSchema, recordSchema, RUN_PATHS } from '../../src/lib/run/schema.ts';
 
-const RECORD_SHOTS_RUN = '2026-10-21T12-live-shape';
+/** `live` (Lane 93) shoots the record as the nightly writes it from the dev store on Monday night of
+ * week 6 (record-live.json): weeks 1 and 2 graded with their players, 3 to 5 not set, 6 waiting. */
+const LIVE = process.argv[2] === 'live';
+const RECORD_SHOTS_RUN = LIVE ? '2026-10-21T12-live-week6' : '2026-10-21T12-live-shape';
 const SOURCE_RUN = new URL(
 	'../../../research/nightly/contract/fixture/runs/2026-10-21T12-ros/',
 	import.meta.url
 );
-const RECORD_FIXTURE = new URL('record.json', import.meta.url);
+const RECORD_FIXTURE = new URL(LIVE ? 'record-live.json' : 'record.json', import.meta.url);
 const OUT = new URL(`../../.runs/runs/${RECORD_SHOTS_RUN}/`, import.meta.url);
 
 async function json(url: URL): Promise<unknown> {

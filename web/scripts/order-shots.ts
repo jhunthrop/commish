@@ -23,12 +23,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
 import { locationFor, parseBaseUrl, parseRunId } from '../src/lib/run/config.ts';
-import {
-	RATE_PLACES_WORDS,
-	RECORD_BOX,
-	publishedDrawn,
-	recordBasis
-} from '../src/lib/run/record.ts';
+import { RECORD_BOX, publishedDrawn, recordBasis } from '../src/lib/run/record.ts';
 import { RUN_PATHS, recordSchema, type RunRecord } from '../src/lib/run/schema.ts';
 import { openRun } from '../src/lib/run/source.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
@@ -257,8 +252,9 @@ async function recordFaults(page: Page, width: number): Promise<string[]> {
 		if (on !== drawn) said.push(`record: Published ${part} ${on ? 'drawn' : 'missing'}`);
 	}
 	if (seen.honest === '' && RECORD.honest !== null) said.push('record: no honest sentence');
-	// The graded record says the run's scale and the two decimals once (Lane 66t review 1).
-	for (const once of [RECORD.scale, RATE_PLACES_WORDS]) {
+	// The record defines order matched once, in its basis, and says nothing of decimals (Lane 93).
+	if (seen.main.includes('Rates print')) said.push('record: the decimals sentence is drawn');
+	for (const once of [RECORD.scale]) {
 		const n = seen.main.split(once).length - 1;
 		if (n !== 1) said.push(`record: "${once}" said ${String(n)} times`);
 	}

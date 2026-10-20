@@ -5,8 +5,13 @@ import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import {
 	HELD_OUT_METHOD,
-	RATE_PLACES_WORDS,
+	RECORD_WORDS,
 	chartSeries,
+	chartWeeks,
+	gapWords,
+	standingWords,
+	weekLines,
+	weekOrderWords,
 	chartTicks,
 	publishedDrawn,
 	recordBasis,
@@ -16,7 +21,6 @@ import {
 	RECORD_BEFORE,
 	RECORD_FIGURES,
 	recordStatusSpans,
-	scaleWords,
 	figureWords,
 	gradedOrders,
 	printPlaces,
@@ -85,44 +89,113 @@ void test('Published is drawn only once a graded week carries it (the honest emp
 	assert.equal(chartSeries(withPublished, 'All').published?.length, 1);
 });
 
-void test('the lead names only the orders drawn', () => {
+void test('the lead names only the orders drawn, and says we set the order', () => {
 	assert.equal(
 		recordLead(beforePublished, 'PPR'),
-		'How the order we froze each week called its games, beside ADP, graded in PPR'
+		"How the order we set before each week's kickoff called its games, beside ADP, graded in PPR"
 	);
 	assert.equal(
 		recordLead(withPublished, 'PPR'),
-		'How the order we froze each week called its games, beside ADP and a published projection, graded in PPR'
+		"How the order we set before each week's kickoff called its games, beside ADP and the week's published projection, graded in PPR"
 	);
 });
 
-void test('Published says when it starts until it is drawn, from publishedFromWeek', () => {
+void test('Published names the week it starts in a sentence (B04)', () => {
+	const from7 = "From week 7 each week is also graded against the week's published projection.";
+	assert.equal(publishedWords(beforePublished), from7);
+	const upcoming = record({ weeks: [gradedWeek(1, false), week(2, null, 'upcoming')] });
 	assert.equal(
-		publishedWords(beforePublished),
-		"Published, one provider's weekly projection, starts with week 7."
+		publishedWords(upcoming),
+		"From week 2 each week is also graded against the week's published projection."
 	);
-	assert.equal(
-		publishedWords(record({})),
-		"Published, one provider's weekly projection, starts once our register keeps it."
-	);
+	assert.equal(publishedWords(record({})), null);
 	assert.equal(
 		publishedWords(withPublished),
-		"Published is one provider's weekly projection, from week 7."
+		"From week 7 each week is also graded against the week's published projection (Published)."
 	);
 });
 
-void test('the basis is the run method, the season-long rule, the starters and Published, no capture', () => {
+void test('the basis defines each measure once and a league replaces the starters sentence', () => {
 	const run = { ...beforePublished, startersBasis: 'Starters right counts the top 12 QBs.' };
+	const published = "From week 7 each week is also graded against the week's published projection.";
 	assert.deepEqual(recordBasis(run), [
 		run.method,
 		HELD_OUT_METHOD,
+		run.scale,
+		RECORD_WORDS.placesOff,
 		'Starters right counts the top 12 QBs.',
-		"Published, one provider's weekly projection, starts with week 7."
+		published
 	]);
-	assert.equal(recordBasis(record({})).length, 3, 'no starters sentence before a grade');
-	assert.match(HELD_OUT_METHOD, /graded where the board froze\.$/u);
-	for (const sentence of [...recordBasis(beforePublished), ...recordBasis(withPublished)])
+	const league = { starters: 'In your lineup.', benchmark: 'ESPN too.' };
+	assert.deepEqual(recordBasis(run, league).slice(-3), ['In your lineup.', published, 'ESPN too.']);
+	assert.equal(recordBasis(record({})).length, 4, 'no starters or Published sentence with no week');
+	assert.match(HELD_OUT_METHOD, /graded where the order was set\.$/u);
+	for (const sentence of [...recordBasis(beforePublished), ...recordBasis(withPublished)]) {
 		assert.doesNotMatch(sentence, bannedPattern());
+		assert.doesNotMatch(sentence, /Rates print|froze|freeze/u);
+	}
+});
+
+const missedWeek = (n: number): RecordWeek => ({
+	...week(n, null, 'missed'),
+	note: 'Our order was not set before kickoff that week.'
+});
+const waitingWeek: RecordWeek = {
+	...week(6, 'preseason', 'frozen'),
+	frozenAt: '2026-10-13T07:34:34.762Z',
+	gradesFrom: '2026-10-21T12:15:00.000Z'
+};
+/** Monday night of week 6 (B03): weeks 1 and 2 graded, 3 to 5 missed, 6 set and waiting. */
+const mondayNight = record({
+	weeks: [
+		gradedWeek(1, false),
+		gradedWeek(2, false),
+		missedWeek(3),
+		missedWeek(4),
+		missedWeek(5),
+		waitingWeek
+	],
+	toDate: [line(false)]
+});
+
+void test('the headline says how many played weeks are graded and why the rest are not (B03)', () => {
+	const missed = 'Weeks 3 to 5 were not set before kickoff, so they cannot be graded.';
+	assert.equal(standingWords(mondayNight), 'Graded 2 of 5 weeks played');
+	assert.equal(gapWords(mondayNight), `${missed} Week 6 grades Wednesday when the stats land.`);
+	assert.equal(gapWords(mondayNight, [6]), missed);
+	const headline = recordHeadline(mondayNight);
+	assert.equal(headline.standing, 'Graded 2 of 5 weeks played');
+	assert.deepEqual(headline.starters, { value: '50 of 84', caption: 'ADP 50 of 84' });
+	assert.equal(standingWords(record({})), null);
+});
+
+void test('every week says set, then graded, in one order (B37)', () => {
+	assert.deepEqual(
+		weekLines(mondayNight.weeks).map((l) => `${l.lead}: ${l.text}`),
+		[
+			'Week 1: set Tue Sep 8, graded Wed Oct 14',
+			'Week 2: set Tue Sep 8, graded Wed Oct 14',
+			'Weeks 3 to 5: our order was not set before kickoff, so they cannot be graded',
+			'Week 6: set Tue Oct 13, grades Wed Oct 21 when the stats land'
+		]
+	);
+	assert.equal(weekLines([waitingWeek], [6])[0]?.text, 'set Tue Oct 13, not played yet');
+	const ahead: RecordWeek = { ...week(7, null, 'upcoming'), frozenAt: '2026-10-23T00:15:00.000Z' };
+	assert.equal(weekLines([ahead])[0]?.text, 'set before kickoff Thu Oct 22');
+});
+
+void test('a week names the order it graded with its refresh (B18)', () => {
+	const shipped: RecordWeek = {
+		...week(7, 'rest_of_season', 'graded'),
+		orderAsOf: '2026-10-22T09:00:00.000Z'
+	};
+	assert.equal(weekOrderWords(shipped), 'Our rest-of-season order, refreshed Oct 22');
+	assert.equal(weekOrderWords(week(1, 'preseason', 'graded')), 'Our preseason order');
+	assert.equal(weekOrderWords(week(3, null, 'missed')), null);
+});
+
+void test('the chart draws the graded weeks alone (B45)', () => {
+	assert.deepEqual(chartWeeks(mondayNight), [1, 2]);
 });
 
 void test('the chart axis prints as the rates print, 0.00 to 1.00, and reaches a week below zero', () => {
@@ -150,7 +223,7 @@ void test('the bug names the orders the graded weeks graded', () => {
 	);
 });
 
-void test('a rate in [0, 1] prints two decimals as given, and the headline says so once with its scale (ruling R2, Lane 66t)', () => {
+void test('a rate in [0, 1] prints two decimals as given, with no word about decimals (ruling R2, Lane 93)', () => {
 	const score = { graded: 10, agreement: 0.48, placesOff: 43, starters: 50, startersOf: 84 };
 	const graded = record({
 		weeks: [week(1, 'preseason', 'graded')],
@@ -167,14 +240,8 @@ void test('a rate in [0, 1] prints two decimals as given, and the headline says 
 	const headline = recordHeadline(graded);
 	assert.equal(headline.value, '0.48');
 	assert.ok(headline.caption.includes('ADP 0.37 on the same players'), headline.caption);
-	assert.ok(headline.caption.endsWith(RATE_PLACES_WORDS), headline.caption);
-	assert.equal(headline.caption.split(RATE_PLACES_WORDS).length, 2, 'said once');
+	assert.doesNotMatch(headline.caption, /decimals/u);
 	assert.equal(printPlaces(0.483, 2), '0.483', 'never rounded again');
-	// The graded page says the scale and the two decimals once, under the bug's tiles (Lane 66t).
-	assert.equal(
-		scaleWords(graded),
-		"Order matched: 1.00 is a perfect match of the week's finishing order, 0.00 is none. Rates print to two decimals."
-	);
 });
 
 void test('a figure prints as the run gives it', () => {

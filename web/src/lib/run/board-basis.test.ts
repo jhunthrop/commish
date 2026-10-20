@@ -50,6 +50,8 @@ void test('a rest-of-season board names the week and the refresh, and no gap', (
 		/the rest of the 2026 season from week 6, by points over replacement for 12 teams, refreshed October 14\./
 	);
 	assert.doesNotMatch(rest, /Gap, drafters/);
+	// It draws no ADP column (Lane 93), so it names no drafts.
+	assert.doesNotMatch(rest, /ADP from/);
 });
 
 void test('the season columns name another scoring, and nothing before the first kickoff', () => {
