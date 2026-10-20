@@ -76,6 +76,96 @@ func TestStandingNamesTheOtherSideOnceOneHasNobodyLeft(t *testing.T) {
 	}
 }
 
+// The leader's QB or D/ST still to score can lose points (coordinator
+// ruling, fix round 1): behind by less than DecidedMargin the trailing
+// side with nobody left is not decided; from it on it is. A leader with
+// neither left is decided at any margin.
+func TestDecidedWaitsOnALeadersDefenseUnderTheMargin(t *testing.T) {
+	for _, c := range []struct {
+		mine    float64
+		decided bool
+	}{{30.1, false}, {30, true}} {
+		f, projection := liveFixture(t)
+		namedOpponents(&f)
+		finishTeam(&f, "CIN", "CLE")
+		f.league.Snap.Matchups[0].Points = c.mine
+		words, decided := standingOfBox(t, matchupOf(t, liveService(t, f, projection)))
+		if decided != c.decided {
+			t.Errorf("behind 40 at %v, the Cowboys D/ST to play: %q decided %v, want %v", c.mine, words, decided, c.decided)
+		}
+	}
+	// The member leads by 0.4 and has only a back left; the opponent is done.
+	f, projection := liveFixture(t)
+	finishTeam(&f, "DAL", "DEN")
+	for i, g := range f.data.Games {
+		if g.Week == 6 && (g.Team == "DAL" || g.Team == "DEN") {
+			f.data.Games[i].Kickoff = liveSunday.Add(-4 * time.Hour)
+		}
+	}
+	f.league.Snap.Matchups[0].Points = 40.4
+	if _, decided := standingOfBox(t, matchupOf(t, liveService(t, f, projection))); !decided {
+		t.Error("a 0.4 lead with only a back left against nobody is not decided")
+	}
+}
+
+// Behind with a starter in play against a side with nobody left is never
+// decided, and an all-play week or no game has no standing.
+func TestStandingBehindWithOneLeftAndWithoutAGame(t *testing.T) {
+	f, projection := liveFixture(t)
+	finishTeam(&f, "DAL", "DEN")
+	for i, g := range f.data.Games {
+		if g.Week == 6 && (g.Team == "DAL" || g.Team == "DEN") {
+			f.data.Games[i].Kickoff = liveSunday.Add(-4 * time.Hour)
+		}
+	}
+	f.league.Snap.Matchups[0].Points = 30
+	if words, decided := standingOfBox(t, matchupOf(t, liveService(t, f, projection))); decided {
+		t.Errorf("behind with a back in play: %q decided", words)
+	}
+	alone, projection := liveFixture(t)
+	alone.league.Snap.Matchups[0].Game = 0
+	if box := matchupOf(t, liveService(t, alone, projection)); box.Standing != nil || box.Decided != nil {
+		t.Errorf("no game this week: %v %v", box.Standing, box.Decided)
+	}
+}
+
+// Once every bench player who could take a spot has kicked off, the spot
+// the fill could not fill is held, never "no one on your roster can play"
+// (fix round 1, HIGH-3): the Flex starter on bye keeps it without a mark
+// while the miss line names who could have played there. A spot no one
+// able to play is eligible for (the defense on bye, no other defense)
+// keeps its mark.
+func TestHeldSpotIsNotNoOneCanPlay(t *testing.T) {
+	f, projection := missFixture(t)
+	for i := range f.raw.Players {
+		if f.raw.Players[i].ID == "p007" {
+			f.raw.Players[i].Team = "TEN"
+		}
+	}
+	lineup := lineupOf(t, liveService(t, f, projection))
+	var flex, def *apitypes.LineupSlot
+	for i, s := range lineup.Slots {
+		switch s.Slot {
+		case apitypes.LineupSlotSlotFLEX:
+			flex = &lineup.Slots[i]
+		case apitypes.LineupSlotSlotDEF:
+			def = &lineup.Slots[i]
+		}
+	}
+	if flex == nil || !flex.Ours.Facts.Bye {
+		t.Fatalf("the Flex starter is not on bye: %+v", flex)
+	}
+	if flex.NoOneCanPlay {
+		t.Error("the Flex is marked no one can play with every bench receiver past kickoff")
+	}
+	if def == nil || !def.NoOneCanPlay {
+		t.Error("the defense on bye with no other defense lost its mark")
+	}
+	if lineup.Missed == nil || !strings.Contains(*lineup.Missed, "was on bye in your Flex") {
+		t.Errorf("missed %v", lineup.Missed)
+	}
+}
+
 // The other side done while the member's still plays: the member's own
 // starter named, and the opponent behind with nobody left is decided.
 func TestStandingNamesTheMembersOwnWhenTheyHaveNobodyLeft(t *testing.T) {
@@ -198,9 +288,10 @@ func TestMissLineOnceTheWeekIsFinal(t *testing.T) {
 			t.Errorf("%s changed on a final week", s.Slot)
 		}
 	}
+	// Three slots missed: the two that cost the most named (RB 8.7, then TE
+	// 3.7 before Flex 3.7 in slot order), the third counted (fix round 1).
 	want := "Player 002, Out, scored 0.0 in your RB while Player 011 scored 8.7 on your bench. " +
-		"Player 006 scored 5.0 in your TE while Player 013 scored 8.7 on your bench. " +
-		"Player 007 scored 5.0 in your Flex while Player 012 scored 8.7 on your bench. " +
+		"Player 006 scored 5.0 in your TE while Player 013 scored 8.7 on your bench, and one more. " +
 		"Our lineup would have scored 56.1."
 	if lineup.Missed == nil || *lineup.Missed != want {
 		t.Fatalf("missed %v\nwant %q", lineup.Missed, want)

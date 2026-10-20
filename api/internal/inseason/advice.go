@@ -550,7 +550,7 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	for i, p := range people {
 		cands[i] = p.cand
 	}
-	rows := Lineup(a.config, cands, team.Starters)
+	rows := heldNotIdle(Lineup(a.config, cands, team.Starters), cands)
 	mySide := a.side(a.Me)
 	h := a.header()
 	// The rows end on the week's projection (Lane 66d), so the basis says
@@ -607,6 +607,40 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	set := setStarters(out.Slots)
 	out.ProjectedFinal = projectedFinal(out.TeamPoints, set, anyStarted(set))
 	return out, true
+}
+
+// heldNotIdle is the Lineup's rows with a spot the fill left to the
+// member's player un-marked where a bench player who can play this week
+// would take it but his game has kicked off (fix round 1, HIGH-3): no one
+// is left to move in, and the strip says nothing of it, never that no one
+// on the roster can play (Lane 85's held rows). A spot no player able to
+// play is eligible for keeps its mark.
+func heldNotIdle(rows []Row, cands []Candidate) []Row {
+	placed := map[int]bool{}
+	for _, r := range rows {
+		if r.Ours >= 0 {
+			placed[r.Ours] = true
+		}
+	}
+	out := make([]Row, len(rows))
+	for i, r := range rows {
+		out[i] = r
+		if r.NoOneCanPlay && r.Ours >= 0 && lockedCandidate(r.Slot, cands, placed) {
+			out[i].NoOneCanPlay = false
+		}
+	}
+	return out
+}
+
+// lockedCandidate reports a player outside the lineup who can play this
+// week and whom the slot takes, his game past kickoff.
+func lockedCandidate(slot Slot, cands []Candidate, placed map[int]bool) bool {
+	for p, c := range cands {
+		if !placed[p] && c.Locked && c.Tier == Available && slot.accepts(c.Position) {
+			return true
+		}
+	}
+	return false
 }
 
 // setStarters is the lineup as the platform holds it, its points the

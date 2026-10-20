@@ -2880,7 +2880,7 @@ type LineupAdvice struct {
 	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
 	HostNote *string `json:"host_note"`
 
-	// Missed the miss line once the lineup as set on the platform has kicked off where it differs from our pick (the highest Proj at each slot after designations and byes, as of each kickoff, no player held): each such slot once both its players have kicked off, "DJ Moore, Out, scored 0.0 in your Flex while Josh Downs scored 8.7 on your bench.", then once every starter of both lineups is final "Our lineup would have scored 85.5."; null where the two agree, before such a slot has kicked off, where the platform gives no player's points, or absent from an older answer
+	// Missed the miss line once the lineup as set on the platform has kicked off where it differs from our pick (the highest Proj at each slot after designations and byes, as of each kickoff, no player held): each such slot once both its players have kicked off, "DJ Moore, Out, scored 0.0 in your Flex while Josh Downs scored 8.7 on your bench.", the two that cost the most named and the rest counted (", and one more."), then once every starter of both lineups is final "Our lineup would have scored 85.5."; null where the two agree, before such a slot has kicked off, where the platform gives no player's points, or absent from an older answer
 	Missed *string     `json:"missed,omitempty"`
 	Moves  LineupMoves `json:"moves"`
 
@@ -3056,7 +3056,7 @@ type MFLConnectInput struct {
 
 // MatchupBox defines model for MatchupBox.
 type MatchupBox struct {
-	// Decided while the game plays, the side behind has nobody left to score: the bug says Decided in place of the game's state; present whenever standing is, absent from an older answer
+	// Decided while the game plays, the side behind has nobody left to score and the leader cannot fall back to it (no QB or D/ST of the leader's still to score, or a lead of 10 points or more): the bug says Decided in place of the game's state; present whenever standing is, absent from an older answer
 	Decided *bool `json:"decided,omitempty"`
 
 	// ProjectionReadAt when the week's published projection the rows' week_projection read was captured, null with none

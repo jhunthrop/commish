@@ -3230,7 +3230,7 @@ export interface components {
 			week_done?: string | null;
 			/** @description present whenever week_done is, null otherwise or absent from an older answer */
 			week_done_state?: components['schemas']['WeekDoneState'] | null;
-			/** @description the miss line once the lineup as set on the platform has kicked off where it differs from our pick (the highest Proj at each slot after designations and byes, as of each kickoff, no player held): each such slot once both its players have kicked off, "DJ Moore, Out, scored 0.0 in your Flex while Josh Downs scored 8.7 on your bench.", then once every starter of both lineups is final "Our lineup would have scored 85.5."; null where the two agree, before such a slot has kicked off, where the platform gives no player's points, or absent from an older answer */
+			/** @description the miss line once the lineup as set on the platform has kicked off where it differs from our pick (the highest Proj at each slot after designations and byes, as of each kickoff, no player held): each such slot once both its players have kicked off, "DJ Moore, Out, scored 0.0 in your Flex while Josh Downs scored 8.7 on your bench.", the two that cost the most named and the rest counted (", and one more."), then once every starter of both lineups is final "Our lineup would have scored 85.5."; null where the two agree, before such a slot has kicked off, where the platform gives no player's points, or absent from an older answer */
 			missed?: string | null;
 		};
 		BoxStarter: {
@@ -3438,7 +3438,7 @@ export interface components {
 			sides: components['schemas']['MatchupBoxSide'][];
 			/** @description where the member stands, said under the score bug's two scores from their side: while the game plays the margin and who is left ("Up 3.2, 2 of yours and 1 of theirs to play", "Down 14.1 with nobody left, McCaffrey and Kittle playing for them"), once final the result ("Won by 6.4", "Lost by 30.4", "Tied"); null before the first kickoff, without an opponent, with either score unread, where the platform shows us no starters for a side, or absent from an older answer */
 			standing?: string | null;
-			/** @description while the game plays, the side behind has nobody left to score: the bug says Decided in place of the game's state; present whenever standing is, absent from an older answer */
+			/** @description while the game plays, the side behind has nobody left to score and the leader cannot fall back to it (no QB or D/ST of the leader's still to score, or a lead of 10 points or more): the bug says Decided in place of the game's state; present whenever standing is, absent from an older answer */
 			decided?: boolean | null;
 		};
 		/** @description the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the bench, never one who cannot play this week (Lane 66f's Beats column); or the open spot he fills, a starting spot no player of the member's can play this week */

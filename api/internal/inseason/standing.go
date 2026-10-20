@@ -37,10 +37,22 @@ func stateOfStart(f apitypes.WeekFacts) startState {
 }
 
 // sideLeft is a side's starters who can still score, by second mention:
-// those in play and those still to come.
+// those in play and those still to come, and how many of them are a QB or
+// a D/ST, whose points can still fall (an interception, a fumble, points
+// allowed).
 type sideLeft struct {
 	playing, coming []string
+	canFall         int
 }
+
+// fallsPositions are the positions whose points can fall while they play.
+var fallsPositions = map[string]bool{"QB": true, "DEF": true}
+
+// DecidedMargin is the lead no QB or D/ST still to score can undo: a
+// trailing side with nobody left is decided against a leader still
+// playing one only from this far behind (coordinator ruling, Lane 99 fix
+// round 1).
+const DecidedMargin = 10.0
 
 func (s sideLeft) count() int { return len(s.playing) + len(s.coming) }
 
@@ -48,11 +60,15 @@ func (s sideLeft) count() int { return len(s.playing) + len(s.coming) }
 func leftOf(starters []apitypes.PlayerLine) sideLeft {
 	var out sideLeft
 	for _, l := range starters {
-		switch stateOfStart(l.Facts) {
+		state := stateOfStart(l.Facts)
+		switch state {
 		case inPlay:
 			out.playing = append(out.playing, secondMention(l.Player.Name))
 		case stillToCome:
 			out.coming = append(out.coming, secondMention(l.Player.Name))
+		}
+		if (state == inPlay || state == stillToCome) && fallsPositions[l.Player.Position] {
+			out.canFall++
 		}
 	}
 	return out
@@ -70,7 +86,8 @@ type Standing struct {
 // first kickoff, without an opponent, with either score unread or with a
 // side whose starters the platform does not show us (FFPC's opponents);
 // while it plays the margin and who is left on each side; once final the
-// result.
+// result. The margin is rounded to the tenth the bug prints before its
+// sign is read, so a lead under 0.05 reads Tied and is never decided.
 func standingOf(state apitypes.ScoreboardGameState, sides []*leaguesync.Side, starters [][]apitypes.PlayerLine) (Standing, bool) {
 	if state == apitypes.ScoreboardGameStateUpcoming || len(sides) != 2 || len(starters) != 2 {
 		return Standing{}, false
@@ -84,8 +101,15 @@ func standingOf(state apitypes.ScoreboardGameState, sides []*leaguesync.Side, st
 		return Standing{Words: ResultWords(margin)}, true
 	}
 	ours, others := leftOf(starters[0]), leftOf(starters[1])
-	decided := (margin < 0 && ours.count() == 0) || (margin > 0 && others.count() == 0)
+	decided := (margin < 0 && settled(ours, others, -margin)) || (margin > 0 && settled(others, ours, margin))
 	return Standing{Words: StandingWords(margin, ours, others), Decided: decided}, true
+}
+
+// settled is a game whose trailing side has nobody left and whose leader
+// cannot fall back to it: no QB or D/ST of the leader's still to score,
+// or a lead of DecidedMargin or more.
+func settled(trailing, leader sideLeft, lead float64) bool {
+	return trailing.count() == 0 && (leader.canFall == 0 || lead >= DecidedMargin)
 }
 
 // standingFields is the standing as the matchup answer carries it.

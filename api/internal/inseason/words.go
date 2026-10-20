@@ -562,6 +562,14 @@ func scoredVerb(state apitypes.GameState) string {
 	return "has"
 }
 
+// moreWords is the slots past the named ones: "one more", "2 more".
+func moreWords(n int) string {
+	if n == 1 {
+		return "one more"
+	}
+	return fmt.Sprintf("%d more", n)
+}
+
 // missSlot is a slot as the miss line names it, unnumbered as the
 // Lineup's rows print it: "RB", "Flex", "D/ST".
 func missSlot(t draft.SlotType) string {
@@ -595,16 +603,21 @@ func missPick(name, verb string, pts float64) string {
 	return fmt.Sprintf("%s %s %s on your bench", name, verb, points(pts))
 }
 
-// MissWords is the Lineup's miss line (Lane 99, B11): each slot the set
-// lineup missed our pick at, its two halves joined ("DJ Moore, Out, scored
-// 0.0 in your Flex while Josh Downs scored 8.7 on your bench.", the
-// ruling's semicolon a "while": the site never prints one), then once
+// MissWords is the Lineup's miss line (Lane 99, B11): each named slot the
+// set lineup missed our pick at, its two halves joined ("DJ Moore, Out,
+// scored 0.0 in your Flex while Josh Downs scored 8.7 on your bench.", the
+// ruling's semicolon a "while": the site never prints one), the slots past
+// those counted on the last (", and one more.", fix round 1), then once
 // every slot is final what our lineup would have scored ("Our lineup would
 // have scored 85.5.").
-func MissWords(misses [][2]string, ours *float64) string {
+func MissWords(misses [][2]string, more int, ours *float64) string {
 	parts := make([]string, 0, len(misses)+1)
-	for _, m := range misses {
-		parts = append(parts, m[0]+" while "+m[1]+".")
+	for i, m := range misses {
+		end := "."
+		if i == len(misses)-1 && more > 0 {
+			end = ", and " + moreWords(more) + "."
+		}
+		parts = append(parts, m[0]+" while "+m[1]+end)
 	}
 	if ours != nil {
 		parts = append(parts, fmt.Sprintf("Our lineup would have scored %s.", points(*ours)))

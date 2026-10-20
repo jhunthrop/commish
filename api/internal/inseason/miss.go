@@ -1,6 +1,8 @@
 package inseason
 
 import (
+	"sort"
+
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/draft"
 )
@@ -24,7 +26,7 @@ func missedLine(config []draft.SlotConfig, people []person, starters []string, p
 		cands[i] = p.cand
 		cands[i].Locked = false
 	}
-	var misses [][2]string
+	var misses []miss
 	// The total is said once every starter of both lineups is final with
 	// his points read.
 	ours, final := 0.0, true
@@ -46,13 +48,31 @@ func missedLine(config []draft.SlotConfig, people []person, starters []string, p
 	if len(misses) == 0 {
 		return nil
 	}
+	// The slots that cost the most are named, the rest counted (fix round 1,
+	// MEDIUM-1): the strip's line stays short on a phone.
+	sort.SliceStable(misses, func(i, j int) bool { return misses[i].cost > misses[j].cost })
+	named := make([][2]string, 0, missesNamed)
+	for _, m := range misses[:min(len(misses), missesNamed)] {
+		named = append(named, m.halves)
+	}
 	var total *float64
 	if final {
 		t := roundTenth(ours)
 		total = &t
 	}
-	words := MissWords(misses, total)
+	words := MissWords(named, len(misses)-len(named), total)
 	return &words
+}
+
+// missesNamed is how many missed slots the line names before it counts
+// the rest.
+const missesNamed = 2
+
+// miss is one slot the set lineup missed our pick at: its two halves, and
+// what it cost, our pick's points less the set starter's.
+type miss struct {
+	halves [2]string
+	cost   float64
 }
 
 // picked is one starter of our pick: his points so far (0 on a bye or
@@ -89,34 +109,36 @@ func finalOrBye(f apitypes.WeekFacts) bool {
 // missAt is one differing slot's two halves, past once both players have
 // kicked off (or the set one is on bye or the spot is empty); not ok where
 // a player past kickoff has no points read.
-func missAt(people []person, r Row, slot string) ([2]string, bool, bool) {
+func missAt(people []person, r Row, slot string) (miss, bool, bool) {
 	ours := people[r.Ours].line
 	if !kickedOff(ours.Facts) {
-		return [2]string{}, false, true
+		return miss{}, false, true
 	}
 	if ours.Facts.PointsThisWeek == nil {
-		return [2]string{}, false, false
+		return miss{}, false, false
 	}
-	pick := missPick(ours.Player.Name, scoredVerb(*ours.Facts.GameState), *ours.Facts.PointsThisWeek)
+	scored := *ours.Facts.PointsThisWeek
+	pick := missPick(ours.Player.Name, scoredVerb(*ours.Facts.GameState), scored)
 	if r.Host < 0 {
-		return [2]string{missSet("", "", "", 0, slot, false), pick}, true, true
+		return miss{halves: [2]string{missSet("", "", "", 0, slot, false), pick}, cost: scored}, true, true
 	}
 	set := people[r.Host].line
 	if set.Facts.Bye {
-		return [2]string{missSet(set.Player.Name, "", "", 0, slot, true), pick}, true, true
+		return miss{halves: [2]string{missSet(set.Player.Name, "", "", 0, slot, true), pick}, cost: scored}, true, true
 	}
 	if !kickedOff(set.Facts) {
-		return [2]string{}, false, true
+		return miss{}, false, true
 	}
 	if set.Facts.PointsThisWeek == nil {
-		return [2]string{}, false, false
+		return miss{}, false, false
 	}
 	mark := ""
 	if d := set.Facts.Designation; d != nil {
 		mark = designationMark(d.Status)
 	}
-	half := missSet(set.Player.Name, mark, scoredVerb(*set.Facts.GameState), *set.Facts.PointsThisWeek, slot, false)
-	return [2]string{half, pick}, true, true
+	got := *set.Facts.PointsThisWeek
+	half := missSet(set.Player.Name, mark, scoredVerb(*set.Facts.GameState), got, slot, false)
+	return miss{halves: [2]string{half, pick}, cost: scored - got}, true, true
 }
 
 // kickedOff is a game past its kickoff by the one state (gameStateAt).
