@@ -58,6 +58,9 @@
 		onopen?: (anyOpen: boolean) => void;
 		/** The instant the answer was read, in ms: the page's clock the rows draw at. */
 		now: number;
+		/** Whether the week's Proj group is drawn: not while the week the page addresses has no
+		 * published projection read, whose columns would be "--" in every row (Lane 95). */
+		weekShown?: boolean;
 	}
 
 	let {
@@ -72,10 +75,12 @@
 		build,
 		builderId,
 		now,
+		weekShown = true,
 		onopen = () => undefined
 	}: Props = $props();
 
-	const COLUMNS = 9;
+	/** The table's columns, the week's two among them only where they are drawn. */
+	const COLUMNS = $derived(weekShown ? 9 : 7);
 	const zone = memberZone();
 	const opened = new SvelteSet<string>();
 	let said = $state<Readonly<Record<string, CopiedTrade>>>({});
@@ -96,6 +101,7 @@
 		{ by: 'weekMine', desk: TRADES.you, phone: TRADES.you, first: true },
 		{ by: 'weekTheirs', desk: TRADES.them, phone: TRADES.them }
 	];
+	const shownHeads = $derived(heads.filter((head) => weekShown || !head.by.startsWith('week')));
 </script>
 
 {#snippet players(side: readonly PlayerLine[])}
@@ -133,15 +139,17 @@
 		<col class="c-with" />
 		<col class="c-g" />
 		<col class="c-g" />
-		<col class="c-w" />
-		<col class="c-w" />
+		{#if weekShown}
+			<col class="c-w" />
+			<col class="c-w" />
+		{/if}
 		<col class="c-room" />
 	</colgroup>
 	<thead>
 		<tr class="groups">
 			<td colspan="4"></td>
 			<th colspan="2" scope="colgroup" class="gh first">{TRADES.gainHead}</th>
-			<th colspan="2" scope="colgroup" class="gh first">{TRADES.weekHead}</th>
+			{#if weekShown}<th colspan="2" scope="colgroup" class="gh first">{TRADES.weekHead}</th>{/if}
 			<td></td>
 		</tr>
 		<tr class="cols">
@@ -149,7 +157,7 @@
 			<th class="give" scope="col">{TRADES.give}</th>
 			<th class="get" scope="col">{TRADES.get}</th>
 			<th class="with" scope="col">{TRADES.with}</th>
-			{#each heads as head (head.by)}
+			{#each shownHeads as head (head.by)}
 				<th
 					class="n fig"
 					class:first={head.first}
@@ -206,12 +214,15 @@
 				<td class="n g {toneOf(entry.row.their_gain)}" class:sorted={sort === 'theirs'}
 					>{gainWord(entry.row.their_gain)}</td
 				>
-				<td class="n w first {toneOf(entry.row.my_proj_change)}" class:sorted={sort === 'weekMine'}
-					>{weekWord(entry.row.my_proj_change)}</td
-				>
-				<td class="n w {toneOf(entry.row.their_proj_change)}" class:sorted={sort === 'weekTheirs'}
-					>{weekWord(entry.row.their_proj_change)}</td
-				>
+				{#if weekShown}
+					<td
+						class="n w first {toneOf(entry.row.my_proj_change)}"
+						class:sorted={sort === 'weekMine'}>{weekWord(entry.row.my_proj_change)}</td
+					>
+					<td class="n w {toneOf(entry.row.their_proj_change)}" class:sorted={sort === 'weekTheirs'}
+						>{weekWord(entry.row.their_proj_change)}</td
+					>
+				{/if}
 				<td class="room"
 					><span class:wraps={entry.row.drop_reason !== null}>{room.yours}</span><span
 						>{room.theirs}</span

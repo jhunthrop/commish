@@ -83,6 +83,9 @@ export interface WeekReads {
 	waivers: WaiverAdvice;
 	scoreboard: Scoreboard;
 	readAt: string;
+	/** The week the roster facts turn to once the lineup has played its week (Lane 95, week.go
+	 * acts), with the lineup for it; absent while they are the league's week. */
+	turned?: { week: number; lineup: LineupAdvice };
 }
 
 /** One league in season, its week from the reads. */
@@ -114,7 +117,8 @@ export function inSeason(id: string, reads: WeekReads, now: number): WeekLeague 
 		projection_scoring: scoreboard.projection_scoring,
 		bug: game ? { game, teams, first: firstToPlay(lineup, now) } : null,
 		lineup: summary(lineup),
-		chips: chips(lineup, waivers),
+		chips_week: reads.turned?.week ?? scoreboard.week,
+		chips: chips(reads.turned?.lineup ?? lineup, waivers),
 		problem: null
 	};
 }

@@ -356,6 +356,29 @@ void test('closed, the basis names the finder columns only: who decides, Gain, P
 	assert.doesNotMatch(basisText(opened), /defenses/);
 });
 
+void test("before the week's projection is read: no week columns to say, the day it arrives (Lane 95)", () => {
+	const ahead = {
+		...advice,
+		week: 6,
+		for_week: 7,
+		projection_read_at: null,
+		projection_arrives_at: '2026-10-22T22:15:00.000Z'
+	};
+	const parts = tradeBasis(
+		ahead,
+		'sleeper',
+		[line('Cam Skattebo')],
+		'none',
+		TRADE_LINKS,
+		TRADE_CLOCK,
+		NOW_66T
+	);
+	assert.equal(
+		basisText(parts),
+		`${advice.basis} Week 7 projections arrive Thursday. Room is who a roster drops to take two for one. How the order has done`
+	);
+});
+
 void test("a trade opened or the builder open adds the players' columns, each once", () => {
 	const parts = tradeBasis(
 		advice,

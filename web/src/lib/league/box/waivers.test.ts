@@ -334,6 +334,20 @@ const BASIS = {
 const RULES = '/league/1#uncounted';
 const CLOCK = { zone: ZONE, zoned: false };
 
+void test("before the addressed week's projection is read the basis says the day it arrives (Lane 95)", () => {
+	const ahead = {
+		...BASIS,
+		week: 6,
+		for_week: 7,
+		projection_read_at: null,
+		projection_previous_read_at: null,
+		projection_arrives_at: '2026-10-22T22:15:00.000Z'
+	};
+	const text = basisText(waiverBasis(ahead, [saints], RULES, CLOCK, NOW));
+	assert.match(text, /Week 7 projections arrive Thursday\./);
+	assert.doesNotMatch(text, /published projection/);
+});
+
 void test('the basis is one paragraph, the pickup rule first, each column it draws said once (Lane 66t)', () => {
 	const parts = waiverBasis(
 		{ ...BASIS, pickups: advice.pickups },

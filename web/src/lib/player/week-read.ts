@@ -19,6 +19,12 @@ export interface ShownRead {
 	caption: string;
 }
 
+/** The read's section as the page names it: the week it was written for, never "the week ahead",
+ * which a week already played is not (Lane 95, B16). */
+export function weekReadLabel(read: Pick<WeekRead, 'week'>): string {
+	return `Our read for week ${String(read.week)}`;
+}
+
 /** The read as the page shows it beside the card's live projection (null until the card has read). */
 export function shownWeekRead(read: WeekRead, card: CardProjection | null): ShownRead {
 	const built = { body: read.body, caption: read.caption };

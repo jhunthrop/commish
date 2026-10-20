@@ -24,6 +24,7 @@ import {
 	type Clock
 } from './basis.ts';
 import { BOX, boxNumber, boxRow, positionWord, type BoxRow } from './box.ts';
+import { addressedWeek, arrivesPart } from './next-week.ts';
 import { SEASON, WAIVER_GAIN } from './season.ts';
 
 /** Every word the Waivers strip, table and drop panel print, in one place for the copy guard. */
@@ -468,22 +469,33 @@ export function waiverBasis(
 		| 'projection_previous_read_at'
 		| 'projection_scoring'
 	> &
-		Partial<Pick<WaiverAdvice, 'pickups'>>,
+		Partial<Pick<WaiverAdvice, 'pickups' | 'week' | 'for_week' | 'projection_arrives_at'>>,
 	lines: readonly PlayerLine[],
 	rulesHref: string,
 	clock: Clock,
 	now: number
 ): BasisPart[] {
 	const defense = lines.some((l) => l.player.position === 'DEF');
-	const proj = projPart(
-		{
-			readAt: advice.projection_read_at,
-			scoring: advice.projection_scoring,
-			defense,
-			league: true
-		},
-		clock
-	);
+	// Before the week's projection is read, the day it arrives in its place (Lane 95).
+	const arrives =
+		advice.week === undefined
+			? null
+			: arrivesPart(
+					advice,
+					addressedWeek({ week: advice.week, for_week: advice.for_week }),
+					clock.zone
+				);
+	const proj =
+		arrives ??
+		projPart(
+			{
+				readAt: advice.projection_read_at,
+				scoring: advice.projection_scoring,
+				defense,
+				league: true
+			},
+			clock
+		);
 	return [
 		// The order's rule, the API's: the week's, or the season Gain once a pickup's game kicked off.
 		...said(advice.basis),

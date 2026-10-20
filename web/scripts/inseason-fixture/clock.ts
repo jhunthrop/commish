@@ -25,6 +25,11 @@ export const FIXTURE_SUNDAY_CLOCK = '2026-10-18T18:56:00.000Z';
  * stats not in yet, Monday night's ahead. */
 export const FIXTURE_MONDAY_CLOCK = '2026-10-19T16:00:00.000Z';
 
+/** Monday Oct 19 2026, 11:00 pm Central (Lane 95): Monday night's game under way, so every starter of
+ * the member's has kicked off or is final and the action screens address week 7, whose published
+ * projection is not read until its Thursday slot. */
+export const FIXTURE_MONDAY_NIGHT_CLOCK = '2026-10-20T04:00:00.000Z';
+
 /** Tuesday Oct 20 2026, noon Central (Lane 80): every week 6 game final, Monday night's included. */
 export const FIXTURE_TUESDAY_CLOCK = '2026-10-20T17:00:00.000Z';
 

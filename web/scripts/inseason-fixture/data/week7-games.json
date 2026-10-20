@@ -1,0 +1,175 @@
+{
+	"_source": "research.provider_games, season 2026 week 7, read from the dev database 2026-10-19 (Lane 95)",
+	"season": 2026,
+	"week": 7,
+	"games": [
+		{
+			"team": "CHI",
+			"opponent": "NE",
+			"home": true,
+			"kickoff": "2026-10-23T00:15:00.000Z"
+		},
+		{
+			"team": "NE",
+			"opponent": "CHI",
+			"home": false,
+			"kickoff": "2026-10-23T00:15:00.000Z"
+		},
+		{
+			"team": "ATL",
+			"opponent": "SF",
+			"home": true,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "SF",
+			"opponent": "ATL",
+			"home": false,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "TEN",
+			"opponent": "CLE",
+			"home": true,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "CLE",
+			"opponent": "TEN",
+			"home": false,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "BAL",
+			"opponent": "CIN",
+			"home": true,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "CIN",
+			"opponent": "BAL",
+			"home": false,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "MIN",
+			"opponent": "IND",
+			"home": true,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "IND",
+			"opponent": "MIN",
+			"home": false,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "CAR",
+			"opponent": "TB",
+			"home": true,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "TB",
+			"opponent": "CAR",
+			"home": false,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "NYJ",
+			"opponent": "MIA",
+			"home": true,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "MIA",
+			"opponent": "NYJ",
+			"home": false,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "HOU",
+			"opponent": "NYG",
+			"home": true,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "NYG",
+			"opponent": "HOU",
+			"home": false,
+			"kickoff": "2026-10-25T17:00:00.000Z"
+		},
+		{
+			"team": "ARI",
+			"opponent": "DEN",
+			"home": true,
+			"kickoff": "2026-10-25T20:05:00.000Z"
+		},
+		{
+			"team": "DEN",
+			"opponent": "ARI",
+			"home": false,
+			"kickoff": "2026-10-25T20:05:00.000Z"
+		},
+		{
+			"team": "LV",
+			"opponent": "LAR",
+			"home": true,
+			"kickoff": "2026-10-25T20:25:00.000Z"
+		},
+		{
+			"team": "LAR",
+			"opponent": "LV",
+			"home": false,
+			"kickoff": "2026-10-25T20:25:00.000Z"
+		},
+		{
+			"team": "DET",
+			"opponent": "GB",
+			"home": true,
+			"kickoff": "2026-10-25T20:25:00.000Z"
+		},
+		{
+			"team": "GB",
+			"opponent": "DET",
+			"home": false,
+			"kickoff": "2026-10-25T20:25:00.000Z"
+		},
+		{
+			"team": "SEA",
+			"opponent": "KC",
+			"home": true,
+			"kickoff": "2026-10-26T00:20:00.000Z"
+		},
+		{
+			"team": "KC",
+			"opponent": "SEA",
+			"home": false,
+			"kickoff": "2026-10-26T00:20:00.000Z"
+		},
+		{
+			"team": "NO",
+			"opponent": "PIT",
+			"home": true,
+			"kickoff": "2026-10-25T13:30:00.000Z"
+		},
+		{
+			"team": "PIT",
+			"opponent": "NO",
+			"home": false,
+			"kickoff": "2026-10-25T13:30:00.000Z"
+		},
+		{
+			"team": "PHI",
+			"opponent": "DAL",
+			"home": true,
+			"kickoff": "2026-10-27T00:15:00.000Z"
+		},
+		{
+			"team": "DAL",
+			"opponent": "PHI",
+			"home": false,
+			"kickoff": "2026-10-27T00:15:00.000Z"
+		}
+	]
+}

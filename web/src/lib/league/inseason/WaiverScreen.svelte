@@ -10,6 +10,7 @@
 	import type { LeagueHost } from '../api.ts';
 	import { positionWord } from '../box/box.ts';
 	import PickupStrip from '../box/PickupStrip.svelte';
+	import { addressedWeek } from '../box/next-week.ts';
 	import WaiverTable from '../box/WaiverTable.svelte';
 	import {
 		addVerbWords,
@@ -373,7 +374,7 @@
 >
 	{#snippet summary()}
 		<PickupStrip
-			week={advice.week}
+			week={addressedWeek(advice)}
 			{cards}
 			sum={advice}
 			chosen={card?.key ?? null}

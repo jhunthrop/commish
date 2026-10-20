@@ -10,6 +10,7 @@
 	import { links } from '#lib/site/links.ts';
 	import type { LeagueHost } from '../api.ts';
 	import TradeFinder from '../box/TradeFinder.svelte';
+	import { addressedWeek, weekProjected } from '../box/next-week.ts';
 	import TradeStrip from '../box/TradeStrip.svelte';
 	import {
 		copiedTrade,
@@ -234,7 +235,7 @@
 	{#snippet summary()}
 		{#if !none && worth.length > 0}
 			<TradeStrip
-				week={advice.week}
+				week={addressedWeek(advice)}
 				rows={worth}
 				{host}
 				moves={advice.moves}
@@ -302,6 +303,7 @@
 			builderId={BUILDER_ID}
 			onopen={(open: boolean) => (anyOpen = open)}
 			{now}
+			weekShown={weekProjected(advice)}
 		/>
 	</div>
 	<BasisBlock parts={basis} id={BASIS_ID} />
