@@ -12,7 +12,7 @@
 	}
 
 	let { totals, size = 'md' }: Props = $props();
-	const live = $derived(totals.final !== null);
+	const live = $derived(totals.live);
 </script>
 
 <td class="n proj {size}" class:live
@@ -63,6 +63,7 @@
 
 	small {
 		display: block;
+		white-space: nowrap;
 		font-family: var(--font-ui);
 		font-size: var(--t-xs);
 		font-weight: 600;
@@ -82,6 +83,13 @@
 
 		.proj.live {
 			font-size: var(--t-md);
+		}
+
+		/* The caption takes two lines in the narrow column, so it never runs across the divider into
+		   the Pts (fix round 1). */
+		small {
+			white-space: normal;
+			letter-spacing: 0.02em;
 		}
 
 		/* The board's own divider between the Team row's two figures, so 101.6 and -- read as two

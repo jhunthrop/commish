@@ -187,9 +187,12 @@ const NO_EVIDENCE: RowEvidence = {
 export interface BoxTotals {
 	proj: number | null;
 	pts: number | null;
-	/** The team's projected final once a starter has kicked off (the API's projected_final, Lane 92):
-	 * then Pts is the row's big figure and this the small one; null before, when Proj is the big one. */
+	/** The team's projected final once its game has kicked off (the API's projected_final, Lane 92),
+	 * null when the API gives none (a starter still to play with no Proj, fix round 1). */
 	final: number | null;
+	/** The game has kicked off: Pts is the row's big figure and the projected final the small one;
+	 * before it the Proj is the big one. */
+	live: boolean;
 	/** Beside Totals: before the week's projection lands, that it has not; once it has, how many
 	 * playing starters have a Proj when one lacks it. Null when there is nothing to say. */
 	note: string | null;

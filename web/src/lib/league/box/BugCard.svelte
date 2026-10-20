@@ -31,14 +31,16 @@
 				></span>{/if}{bug.head}</span
 		>
 		<span class="sw" class:read={bug.state === 'kicked_off'}>{bug.words}</span>
-		<span class="n">{bug.columns.small}</span>
+		<span class="n sm">{bug.columns.small}</span>
 		<span class="n">{bug.columns.big}</span>
 	</span>
 	{#each bug.sides as side (side.rosterId)}
 		<span class="bt {side.stands}" class:me={side.me}>
 			<TeamAvatar name={side.name} size={avatar} me={side.me} board src={side.avatar} />
-			<span class="nm">{side.name}</span>
-			<span class="tp">{side.toPlay}</span>
+			<span class="who"
+				><span class="nm">{side.name}</span>{#if side.toPlay}<span class="tp">{side.toPlay}</span
+					>{/if}</span
+			>
 			<span class="rec">{side.record}</span>
 			<span class="proj">{side.small}</span>
 			<span class="pts">{side.big}</span>
@@ -86,13 +88,13 @@
 	.bh,
 	.bt {
 		display: grid;
-		grid-template-columns: 26px minmax(0, 1fr) auto auto 52px 60px;
+		grid-template-columns: 26px minmax(0, 1fr) auto 64px 60px;
 		align-items: center;
 		column-gap: var(--s-2);
 	}
 
 	.bh {
-		grid-template-columns: auto minmax(0, 1fr) 52px 60px;
+		grid-template-columns: auto minmax(0, 1fr) 64px 60px;
 		min-height: 24px;
 		font-size: var(--t-xs);
 		color: var(--scoreboard-ink-2);
@@ -134,10 +136,18 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	/* Where a side's starters stand while the game is under way: "2 playing", "3 to play". */
+	/* The name, and under it while the game is under way where the side's starters stand ("2 playing",
+	   "3 to play"): its own line, so the count never takes the name's room or sits against the record. */
+	.who {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
 	.tp {
 		font-size: var(--t-xs);
 		font-weight: 600;
+		line-height: 1.2;
 		color: var(--scoreboard-num);
 		white-space: nowrap;
 	}
@@ -221,13 +231,13 @@
 	}
 
 	.lg .bh {
-		grid-template-columns: auto minmax(0, 1fr) 72px 84px;
+		grid-template-columns: auto minmax(0, 1fr) 84px 84px;
 		min-height: 28px;
 		font-size: var(--t-sm);
 	}
 
 	.lg .bt {
-		grid-template-columns: 34px minmax(0, 1fr) auto auto 72px 84px;
+		grid-template-columns: 34px minmax(0, 1fr) auto 84px 84px;
 		min-height: 50px;
 	}
 
@@ -246,12 +256,12 @@
 	@media (max-width: 760px) {
 		.bh,
 		.bt {
-			grid-template-columns: 26px minmax(0, 1fr) auto auto 40px 48px;
+			grid-template-columns: 26px minmax(0, 1fr) auto 44px 48px;
 			column-gap: 6px;
 		}
 
 		.bh {
-			grid-template-columns: auto minmax(0, 1fr) 40px 48px;
+			grid-template-columns: auto minmax(0, 1fr) 44px 48px;
 		}
 
 		.pts {
@@ -262,13 +272,26 @@
 			font-size: var(--t-md);
 		}
 
+		/* A team name is never cut on a phone: it takes a second line. */
+		.nm {
+			white-space: normal;
+			overflow-wrap: anywhere;
+			line-height: 1.15;
+		}
+
+		/* "Proj final" over two lines beside "Pts", so the two heads read as two. */
+		.bh .sm {
+			white-space: normal;
+			line-height: 1.05;
+		}
+
 		.lg .bh {
 			grid-template-columns: auto minmax(0, 1fr) 54px 62px;
 			font-size: var(--t-xs);
 		}
 
 		.lg .bt {
-			grid-template-columns: 34px minmax(0, 1fr) auto auto 54px 62px;
+			grid-template-columns: 34px minmax(0, 1fr) auto 54px 62px;
 			min-height: 42px;
 		}
 

@@ -51,8 +51,16 @@ const SCREENS = [
 		path: `/league/${league}/matchup`,
 		must: [BOX.projFinal, READ_CELL, AS_OF_KICKOFF, PROJ_FINAL_PART]
 	},
-	{ name: 'players', path: '/players', must: ['Wk 6 is Pts once final, Proj before.'] },
-	{ name: 'rest', path: '/board/ppr-12/rb', must: ['Wk 6 is Pts once final, Proj before.'] }
+	{
+		name: 'players',
+		path: '/players',
+		must: ['Wk 6 is Pts once final, -- until his stats land, Proj before.']
+	},
+	{
+		name: 'rest',
+		path: '/board/ppr-12/rb',
+		must: ['Wk 6 is Pts once final, -- until his stats land, Proj before.']
+	}
 ] as const;
 
 await requireFixtureClock(API_ORIGIN, FIXTURE_LIVE_CLOCK);

@@ -106,9 +106,10 @@ export function weekFigure(line: OrderRow['line'], now: number): number | null {
 	return facts.last_games.find((g) => g.week === facts.week)?.points ?? null;
 }
 
-/** The week column's key, said once (Lane 92, B36, B50): it is Pts once final and Proj before. */
+/** The week column's key, said once (Lane 92, B36, B50): Pts once final, "--" until they land, Proj
+ * before. */
 export function weekColumnPart(week: number): string {
-	return `${weekHead(week)} is ${BOX.pts} once final, ${BOX.proj} before.`;
+	return `${weekHead(week)} is ${BOX.pts} once final, ${BOX.none} until his stats land, ${BOX.proj} before.`;
 }
 
 /** The roster filter a chip asks the API for (review 66j H5): null for everyone. */

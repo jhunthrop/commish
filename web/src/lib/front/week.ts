@@ -216,7 +216,7 @@ export function nudgeOf(league: WeekLeague, href: ScreenHref): FrontNudge | null
 		title: changesTitle(changes, done, lineup.week_done_state ?? null),
 		sum: stripSum(
 			{
-				totals: { proj: lineup.projection, pts: null, final: null, note: null },
+				totals: { proj: lineup.projection, pts: null, final: null, live: false, note: null },
 				asSet: lineup.as_set,
 				gain: lineup.gain,
 				swaps

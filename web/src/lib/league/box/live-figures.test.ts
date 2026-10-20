@@ -89,8 +89,8 @@ void test('from the first kickoff the bug’s big figure is Pts, the projected f
 		bigLabel: BOX.pts,
 		small: 'Proj final 98.5'
 	});
-	// A side none of whose starters has kicked off yet: its final is its Proj.
-	assert.equal(bugFigures({ pts: null, proj: 96, final: null }, true).small, 'Proj final 96.0');
+	// The API gives no projected final (a starter still to play with no Proj): never the Proj in its place.
+	assert.equal(bugFigures({ pts: null, proj: 96, final: null }, true).small, 'Proj final --');
 	// Before the first kickoff the Proj is the big figure, nothing under it.
 	assert.deepEqual(bugFigures({ pts: null, proj: 96, final: null }, false), {
 		big: '96.0',
@@ -115,9 +115,10 @@ void test('a side’s Team row takes the API’s projected final, its Proj in a 
 	const live = sideBox(SIDE, { ...box, projected_final: 98.5 }, read, ZONE);
 	assert.equal(live.totals.final, 98.5);
 	assert.equal(live.totals.pts, 90.9);
-	// An older API answer with no projected final: the Proj stands in once the game has started.
-	assert.equal(sideBox(SIDE, box, read, ZONE).totals.final, 41.9);
-	assert.equal(sideBox(SIDE, box, { ...read, started: false }, ZONE).totals.final, null);
+	assert.equal(live.totals.live, true);
+	// No projected final from the API: none drawn, the Pts still the big figure once started.
+	assert.equal(sideBox(SIDE, box, read, ZONE).totals.final, null);
+	assert.equal(sideBox(SIDE, box, { ...read, started: false }, ZONE).totals.live, false);
 });
 
 void test('the basis says once that a game past kickoff keeps its Proj, and what Proj final is', () => {

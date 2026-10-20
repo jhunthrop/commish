@@ -76,5 +76,5 @@ void test('before the final the week column is his Proj, in play or still to com
 });
 
 void test('the week column is keyed once by its week, never called Proj', () => {
-	assert.equal(weekColumnPart(6), 'Wk 6 is Pts once final, Proj before.');
+	assert.equal(weekColumnPart(6), 'Wk 6 is Pts once final, -- until his stats land, Proj before.');
 });

@@ -62,6 +62,11 @@
 		});
 	}
 
+	/** A side's count while the game is under way, the API's (MatchupBoxSide.to_play, fix round 1). */
+	function countOf(rosterId: number): string {
+		return started ? (box?.sides.find((b) => b.roster_id === rosterId)?.to_play ?? '') : '';
+	}
+
 	const mine = $derived(matchup ? boxOf(matchup.mine) : null);
 	const theirs = $derived(matchup?.opponent ? boxOf(matchup.opponent) : null);
 	const lines = $derived([...(mine?.lines ?? []), ...(theirs?.lines ?? [])]);
@@ -92,14 +97,16 @@
 				name: teamName(sync, matchup.mine.roster_id),
 				pts: mine.totals.pts,
 				proj: mine.totals.proj,
-				final: mine.totals.final
+				final: mine.totals.final,
+				toPlay: countOf(matchup.mine.roster_id)
 			}}
 			opponent={matchup.opponent && theirs
 				? {
 						name: teamName(sync, matchup.opponent.roster_id),
 						pts: theirs.totals.pts,
 						proj: theirs.totals.proj,
-						final: theirs.totals.final
+						final: theirs.totals.final,
+						toPlay: countOf(matchup.opponent.roster_id)
 					}
 				: null}
 			{kickoff}

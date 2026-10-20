@@ -30,7 +30,11 @@
 	{@const f = bugFigures(s, started)}
 	<div class="sd" class:me>
 		<span class="avatar"><TeamAvatar name={s.name} size={44} {me} board /></span>
-		<span class="nm"><small>{me ? BOX.you : BOX.opponent}</small><b>{s.name}</b></span>
+		<span class="nm"
+			><small>{me ? BOX.you : BOX.opponent}</small><b>{s.name}</b>{#if s.toPlay}<span class="tp"
+					>{s.toPlay}</span
+				>{/if}</span
+		>
 		<span class="sc">
 			<b class="big" aria-label="{f.bigLabel} {f.big}">{f.big}</b>
 			{#if f.small}<small>{f.small}</small>{/if}
@@ -101,6 +105,13 @@
 		font-size: var(--t-lg);
 		font-weight: 700;
 		overflow-wrap: anywhere;
+	}
+
+	/* Where the side's starters stand while the game is under way, under its name (fix round 1). */
+	.nm .tp {
+		font-size: var(--t-xs);
+		font-weight: 600;
+		color: var(--scoreboard-num);
 	}
 
 	.sc {

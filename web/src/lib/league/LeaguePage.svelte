@@ -273,7 +273,13 @@
 	const rows = $derived(sync ? standingsRows(sync, projections(scoreboard)) : []);
 	const summary = $derived(
 		advice && sync
-			? lineupSummary(advice, memberZone(), now.getTime(), projectedFinalOf(scoreboard, sync.me))
+			? lineupSummary(
+					advice,
+					memberZone(),
+					now.getTime(),
+					projectedFinalOf(scoreboard, sync.me),
+					bugs.some((b) => b.mine && b.state !== 'upcoming')
+				)
 			: null
 	);
 	const moves = $derived(sync ? feedRows(sync) : []);

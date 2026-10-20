@@ -191,7 +191,7 @@ void test('the basis says each column once: the order, Wk 6, Opp rank, the rules
 	// 92, B36, B50); the Proj it shows before then is the week's published projection.
 	assert.match(
 		signedOut,
-		/Wk 6 is Pts once final, Proj before\. Proj is this week's published projection in PPR, read Fri 9:00 pm Central\./
+		/Wk 6 is Pts once final, -- until his stats land, Proj before\. Proj is this week's published projection in PPR, read Fri 9:00 pm Central\./
 	);
 	assert.doesNotMatch(signedOut, /your rules|Roster is|leave out/);
 	const parts = orderBasis(

@@ -113,8 +113,8 @@ function kicks(lines: readonly PlayerLine[], moment: Moment): Kicks {
 			else out.inPlay++;
 			continue;
 		}
-		if (sits) out.done++;
-		else out.toCome++;
+		// Out with his game still to come: still to play (fix round 1, HIGH-2).
+		out.toCome++;
 		if (out.next === null || at < Date.parse(out.next)) out.next = facts.kickoff;
 	}
 	return out;
@@ -134,25 +134,39 @@ function toPlayOf(k: Kicks, state: ScoreboardGame['state']): string | null {
 }
 
 /** A side's projected final (projfinal.go projectedFinal): its points so far plus the Proj, as
- * printed, of each starter still to play, an out starter counting nothing; null before any of them
- * has kicked off or with no points. */
+ * printed, of each starter still to play, an out starter counting nothing; null before the game has
+ * kicked off (started), with no points, or while a starter still to play has no Proj. */
 export function projectedFinalOf(
 	points: number | null,
 	lines: readonly PlayerLine[],
-	now: number
+	now: number,
+	started: boolean
 ): number | null {
-	if (points === null) return null;
-	let started = false;
+	if (points === null || !started) return null;
 	let sum = points;
 	for (const line of lines) {
-		if (line.facts.bye || line.facts.kickoff === null) continue;
-		if (kickedOffAt(line, now)) {
-			started = true;
+		if (line.facts.bye || line.facts.kickoff === null || kickedOffAt(line, now) || sitsOut(line))
 			continue;
-		}
-		if (!sitsOut(line) && line.week_projection !== null) sum += tenth(line.week_projection);
+		if (line.week_projection === null) return null;
+		sum += tenth(line.week_projection);
 	}
-	return started ? tenth(sum) : null;
+	return tenth(sum);
+}
+
+/** Each side's count by its starters' lines while the game is playing (matchup.go, the score bug's
+ * rule), null otherwise. */
+export function countsOf(
+	sides: readonly (readonly PlayerLine[])[],
+	moment: Pick<Moment, 'now' | 'final'>
+): (string | null)[] {
+	const m = { ...moment, scored: false };
+	const state = stateOf(kicks(sides.flat(), m));
+	return sides.map((lines) => toPlayOf(kicks(lines, m), state));
+}
+
+/** Whether any of the lines has kicked off at `now`. */
+export function anyKickedAt(lines: readonly PlayerLine[], now: number): boolean {
+	return lines.some((l) => kickedOffAt(l, now));
 }
 
 /** Whether a line has kicked off at `now`: the stand-in's scored share counts from then. */
@@ -206,17 +220,22 @@ export function scoreboardAt(recorded: Recorded, moment: Moment, readAt: string)
 				starters: m.starters.filter((id) => id !== '0').length,
 				played: kicks(lines, moment).kicked,
 				kicks: kicks(lines, moment),
-				projected_final: projectedFinalOf(points, lines, moment.now)
+				lines
 			};
 		});
 		const game = kicks(all, moment);
 		const state = stateOf(game);
+		const started = game.kicked > 0;
 		// The API's counts (scoreboard.go toPlay): the game's pooled, each side's own (Lane 92).
 		return {
 			state,
 			next_kickoff: game.next,
 			to_play: toPlayOf(game, state),
-			sides: sides.map(({ kicks: own, ...side }) => ({ ...side, to_play: toPlayOf(own, state) }))
+			sides: sides.map(({ kicks: own, lines, ...side }) => ({
+				...side,
+				projected_final: projectedFinalOf(side.points, lines, moment.now, started),
+				to_play: toPlayOf(own, state)
+			}))
 		};
 	});
 	return {

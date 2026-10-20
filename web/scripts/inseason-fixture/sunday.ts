@@ -22,6 +22,8 @@ import { FIXTURE_SUNDAY_READ } from './clock.ts';
 import { stateAt } from './game-state.ts';
 import {
 	kickedOffAt,
+	anyKickedAt,
+	countsOf,
 	projectedFinalOf,
 	scoreboardAt,
 	SCORED_SHARE,
@@ -144,6 +146,15 @@ function weekOf(
 		})
 	});
 	const week = sync.matchup;
+	// The game has kicked off once any starter of either side has (projfinal.go, Matchup).
+	const started = anyKickedAt(
+		matchup.sides.flatMap((s) => s.starters.map((st) => st.line)),
+		moment.now
+	);
+	const counts = countsOf(
+		matchup.sides.map((s) => s.starters.map((st) => lineAt(st.line, moment))),
+		moment
+	);
 	return {
 		sync: {
 			...sync,
@@ -162,26 +173,30 @@ function weekOf(
 		),
 		matchup: {
 			...matchup,
-			sides: matchup.sides.map((s) => ({
+			sides: matchup.sides.map((s, i) => ({
 				...s,
+				to_play: counts[i] ?? null,
 				starters: s.starters.map((st) => ({ ...st, line: lineAt(st.line, moment) })),
 				bench: s.bench.map((l) => lineAt(l, moment)),
 				projected_final: projectedFinalOf(
 					total.get(s.roster_id) ?? null,
 					s.starters.map((st) => st.line),
-					moment.now
+					moment.now,
+					started
 				)
 			}))
 		}
 	};
 }
 
-/** The Lineup's projected final (advice.go): team_points plus the Proj of the starters the advice sets
- * still to play, a spot no one can play left out. */
+/** The Lineup's projected final (advice.go setStarters): team_points plus the Proj of the lineup as
+ * the platform holds it still to play, the score bug's figure for the member. */
 function lineupWithFinal(lineup: LineupAdvice, moment: Moment): LineupAdvice {
-	const advised = lineup.slots.filter((s) => !s.no_one_can_play).map((s) => s.ours);
-	const final =
-		lineup.team_points === null ? null : projectedFinalOf(lineup.team_points, advised, moment.now);
+	const set = lineup.slots.flatMap((s) => {
+		const line = s.changed ? s.host : s.ours;
+		return line === null ? [] : [line];
+	});
+	const final = projectedFinalOf(lineup.team_points, set, moment.now, anyKickedAt(set, moment.now));
 	return { ...lineup, projected_final: final };
 }
 

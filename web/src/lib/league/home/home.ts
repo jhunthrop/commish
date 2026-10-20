@@ -50,6 +50,10 @@ export const HOME = {
 	pointsAllowed: "A defense's points allowed",
 	yardsAllowed: "A defense's yards allowed",
 	nextKickoff: KICKOFF.next,
+	/** A read's age as the live score's cell says it (agoCell). */
+	justNow: 'just now',
+	minAgo: 'min ago',
+	hrAgo: 'hr ago',
 	final: KICKOFF.final,
 	/** The Settings card listing the scoring rules our stats lack (Lane 66t), which the in-season bases
 	 * count and link to. */
@@ -107,9 +111,10 @@ export interface BugRead {
 
 /** A read's age as a cell says it, short: "just now", "1 min ago", "2 hr ago". */
 export function agoCell(seconds: number): string {
-	if (seconds < MINUTE_SECONDS) return 'just now';
-	if (seconds < HOUR_SECONDS) return `${String(Math.floor(seconds / MINUTE_SECONDS))} min ago`;
-	return `${String(Math.floor(seconds / HOUR_SECONDS))} hr ago`;
+	if (seconds < MINUTE_SECONDS) return HOME.justNow;
+	if (seconds < HOUR_SECONDS)
+		return `${String(Math.floor(seconds / MINUTE_SECONDS))} ${HOME.minAgo}`;
+	return `${String(Math.floor(seconds / HOUR_SECONDS))} ${HOME.hrAgo}`;
 }
 
 const MINUTE_SECONDS = 60;
@@ -180,7 +185,7 @@ function sideFigures(
 ): Pick<BugSide, 'small' | 'big'> {
 	const proj = side.projection === null ? BOX.none : fixed(side.projection, 1);
 	if (!started) return { small: '', big: proj };
-	const final = side.projected_final ?? side.projection;
+	const final = side.projected_final ?? null;
 	return {
 		small: final === null ? BOX.none : fixed(final, 1),
 		big: side.points_read ? fixed(side.points, 1) : BOX.none
@@ -224,12 +229,19 @@ export function bugsOf(
 	});
 }
 
-/** Each team's projection this week, by roster, from the scoreboard: its projected final once its week
- * has started (equal to its Pts once final, Lane 92 B22), its Proj before. */
+/** Each team's projection this week, by roster, from the scoreboard: its projected final once its game
+ * has started (equal to its Pts once final, Lane 92 B22; none where the API gives none), its Proj
+ * before. */
 export function projections(board: Scoreboard | null): ReadonlyMap<number, number | null> {
 	return new Map(
 		(board?.games ?? []).flatMap((g) =>
-			g.sides.map((s) => [s.roster_id, s.projected_final ?? s.projection] as const)
+			g.sides.map(
+				(s) =>
+					[
+						s.roster_id,
+						g.state === 'upcoming' ? s.projection : (s.projected_final ?? null)
+					] as const
+			)
 		)
 	);
 }
@@ -267,7 +279,9 @@ export function lineupSummary(
 	advice: LineupAdvice,
 	zone: string,
 	now: number,
-	final: number | null = null
+	final: number | null = null,
+	/** The member's game has kicked off (its score bug's state). */
+	live = false
 ): LineupSummary {
 	// No change is drawn on a row whose game has kicked off or is final (Lane 85).
 	const box = lineupBox(heldLineup(advice, now), zone, now);
@@ -290,6 +304,7 @@ export function lineupSummary(
 			proj: box.asSet,
 			pts: totalsPts(rows, advice.player_points, advice.team_points),
 			final,
+			live,
 			note: null
 		},
 		benchWords,
