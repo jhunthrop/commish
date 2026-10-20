@@ -4278,7 +4278,7 @@ type TradeRow struct {
 	// MyProjChange this week's Proj total of the drafter's lineup with the trade less without it, each lineup set as the Lineup screen sets it (Lane 66g), one decimal; null when the week has no published projection read
 	MyProjChange *float64 `json:"my_proj_change"`
 
-	// Need the trade's sentence when it fills a starting spot of the drafter's lineup for the week the page addresses that no one of his who can play fills, leaving no other spot empty ("Fills your empty WR2 while Gibbs sits on bye.", Lane 103); null for none, absent from an older answer
+	// Need the trade's sentence when the need is why it is listed (Lane 103): it sends out a player we rank first at his position for under 1.0 a week and fills a starting spot of the drafter's lineup for the week the page addresses that no one of his who can play fills, leaving no other spot empty ("Fills your empty WR2 while Gibbs sits on bye."); null on every other row, absent from an older answer
 	Need *string `json:"need,omitempty"`
 
 	// TheirGain the same to theirs

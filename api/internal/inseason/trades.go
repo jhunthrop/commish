@@ -283,16 +283,29 @@ func Kept(c Candidate) bool { return c.Rank == 1 }
 // KeepGain a week or more as the page prints it, or fills a need.
 // mine is the member's squad's players, give's indexes into it.
 func proposable(tr Trade, mine []Candidate) bool {
-	if roundTenth(tr.MyGain) >= KeepGain || tr.Need >= 0 {
-		return true
-	}
+	return !givesKept(tr, mine) || earnsKeep(tr) || tr.Need >= 0
+}
+
+// needSaid is whether a row names the need it fills (Lane 103 fix round
+// 1, HIGH-1): only where the need is why the rule lists it, a kept player
+// given for under KeepGain a week. Every other row lists on its gains.
+func needSaid(tr Trade, mine []Candidate) bool {
+	return tr.Need >= 0 && givesKept(tr, mine) && !earnsKeep(tr)
+}
+
+// givesKept is whether the member gives a player our order keeps.
+func givesKept(tr Trade, mine []Candidate) bool {
 	for _, g := range tr.Give {
 		if Kept(mine[g]) {
-			return false
+			return true
 		}
 	}
-	return true
+	return false
 }
+
+// earnsKeep is whether the trade gains the member KeepGain a week or
+// more as the page prints it.
+func earnsKeep(tr Trade) bool { return roundTenth(tr.MyGain) >= KeepGain }
 
 // mine and theirs are each side's change from the member giving give and
 // getting get: the one reckoning the finder and the builder share.

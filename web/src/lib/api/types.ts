@@ -3738,7 +3738,7 @@ export interface components {
 			 * @description the same for theirs
 			 */
 			their_proj_change: number | null;
-			/** @description the trade's sentence when it fills a starting spot of the drafter's lineup for the week the page addresses that no one of his who can play fills, leaving no other spot empty ("Fills your empty WR2 while Gibbs sits on bye.", Lane 103); null for none, absent from an older answer */
+			/** @description the trade's sentence when the need is why it is listed (Lane 103): it sends out a player we rank first at his position for under 1.0 a week and fills a starting spot of the drafter's lineup for the week the page addresses that no one of his who can play fills, leaving no other spot empty ("Fills your empty WR2 while Gibbs sits on bye."); null on every other row, absent from an older answer */
 			need?: string | null;
 		};
 		TradeTeam: {

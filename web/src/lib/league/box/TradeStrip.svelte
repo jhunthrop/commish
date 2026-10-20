@@ -70,10 +70,12 @@
 					><b>{shortSide(entry.row.give)}</b> for <b>{shortSide(entry.row.get)}</b></span
 				>
 				<span class="gains"
-					><em class="mine">{gainWord(entry.row.my_gain)}</em>
-					{TRADES.aWeekForYou},
-					<em>{gainWord(entry.row.their_gain)}</em>
-					{TRADES.forTheirs}</span
+					><span class="side"
+						><em class="mine">{gainWord(entry.row.my_gain)}</em>
+						{TRADES.aWeekForYou},</span
+					>
+					<span class="side"><em>{gainWord(entry.row.their_gain)}</em> {TRADES.forTheirs}</span
+					></span
 				>
 				{#if entry.row.need}<span class="need">{entry.row.need}</span>{/if}
 				{#if week}<span class="week">{week}</span>{/if}
@@ -196,6 +198,11 @@
 		font-size: var(--t-sm);
 		color: var(--ink-2);
 		font-variant-numeric: tabular-nums;
+	}
+
+	/* Each side's figure keeps its words on its line (Lane 103 fix round 1, LOW-2). */
+	.gains .side {
+		white-space: nowrap;
 	}
 
 	em {
