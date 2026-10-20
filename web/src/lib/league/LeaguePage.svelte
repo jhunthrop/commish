@@ -23,7 +23,6 @@
 	import { sheetTags } from './sheet-tags.ts';
 	import { followSwitch } from './follow-switch.svelte.ts';
 	import SeasonPanel from './SeasonPanel.svelte';
-	import { MOCK_VERB } from '#lib/ui/nav.ts';
 	import { SETTINGS_VIEW, tabHref } from './inseason/tabs.ts';
 	import { inSeasonApi, type LineupAdvice, type Scoreboard } from './inseason/api.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
@@ -56,6 +55,7 @@
 		hostWords,
 		myPlace,
 		myTeam,
+		placeWords,
 		READING_NOW,
 		readLine,
 		readNowWords,
@@ -286,7 +286,8 @@
 	const moves = $derived(sync ? feedRows(sync) : []);
 	const lineupHref = $derived(tabHref('start', id));
 	/** What every number on the in-season page is, said once and at most five lines: the standings,
-	 * a team's projection and points, the game facts. */
+	 * a team's projection and points, the game facts. A feed the platform gives us none of is not
+	 * drawn, so the basis says nothing of it (Lane 104, B54). */
 	const weekBasis = $derived(
 		sync
 			? [
@@ -310,8 +311,7 @@
 								now.getTime(),
 								'full'
 							)
-						: null,
-					sync.moves_read ? null : movesBasis(sync.host)
+						: null
 				].filter((line): line is string => line !== null)
 			: []
 	);
@@ -342,10 +342,7 @@
 					standard points.
 				{/if}
 			</Footnote>
-			{#if playing}
-				<!-- Before the draft and after the season the season panel carries the verb. -->
-				<Quiet href={links.mockLeague(league.settings_league_id)} size="sm">{MOCK_VERB}</Quiet>
-			{/if}
+			<!-- Before the draft and after the season the season panel carries the verb. -->
 		{:else if league.settings_note}
 			<Footnote>{league.settings_note}</Footnote>
 		{/if}
@@ -406,7 +403,7 @@
 					<DisplayTitle size="page" wrap>{sync.name || `Your ${platform} league`}</DisplayTitle>
 					<p class="sub">
 						{#if team}
-							{team.name}, {recordWords(team)}, {myPlace(sync)} of {sync.teams.length}.
+							{team.name}, {recordWords(team)}, {placeWords(myPlace(sync), sync.teams.length)}.
 						{/if}
 						<span class="read" role="status">{readLine(sync, now)}</span>
 					</p>
@@ -476,10 +473,11 @@
 						{/if}
 					</div>
 					{#if sync.moves_read}<MovesFeed rows={moves} none={HOME.noMoves} />{/if}
+					<!-- In season the page carries no draft plumbing: the mock draft lives under Account and
+					     the rail's Mock draft (Lane 104, B54). -->
 					<div class="basis">
 						{#each weekBasis as line (line)}<p>{line}</p>{/each}
 					</div>
-					{@render footnotes(sync)}
 				{:else if board}
 					<SeasonPanel
 						{phase}

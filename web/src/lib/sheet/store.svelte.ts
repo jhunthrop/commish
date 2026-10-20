@@ -27,8 +27,8 @@ import {
 import { queueSeed } from './queue.ts';
 import { sheetsApi, type Account, type SheetSummary, type SheetsApi } from './remote.ts';
 import { EMPTY_STORED, SHELF_LIMIT, readStored, writeStored, type StoredSheet } from './storage.ts';
-import { awaitsAccount, unreachedStatus, type SyncStatus } from './status.ts';
-import { isOffline, keepEdits, push, reconcile, syncedFrom } from './sync.ts';
+import { awaitsAccount, reconcilingStatus, unreachedStatus, type SyncStatus } from './status.ts';
+import { isOffline, keepEdits, push, reconcile, syncedFrom, writesOnReconcile } from './sync.ts';
 import { moveTierStart, removeTierAt, startTierAt } from './tiers.ts';
 
 /** How long after the last edit a save goes out: a drag or a burst of typing is one save. */
@@ -68,8 +68,8 @@ export class SheetStore {
 	account = $state.raw<Account | null>(null);
 	sheets = $state.raw<readonly SheetSummary[]>([]);
 	status = $state<SyncStatus>('local');
-	/** When the account last answered a save, for the status line. */
-	savedAt = $state.raw<Date | null>(null);
+	/** The instant the account last answered a sync, the clock the status line's day is said on. */
+	answeredAt = $state.raw<Date | null>(null);
 	/** The API's sentence for the last save that failed. */
 	problem = $state<string | null>(null);
 	canUndo = $state(false);
@@ -80,6 +80,9 @@ export class SheetStore {
 	notices = $state.raw<readonly string[]>([]);
 
 	sheet = $derived(this.stored.sheet);
+	/** When the account's copy last changed (its updated_at), the sheet's one changed date: a
+	 * visit that writes nothing leaves it where it was (B52). */
+	changedAt = $derived(this.stored.sync?.updatedAt ?? null);
 	ids: ReadonlySet<string> = $derived(new SvelteSet(this.stored.sheet.rows.map((row) => row.id)));
 	signedIn = $derived(this.account !== null);
 
@@ -357,7 +360,7 @@ export class SheetStore {
 
 	#saved(): void {
 		this.status = 'saved';
-		this.savedAt = this.#deps.now();
+		this.answeredAt = this.#deps.now();
 	}
 
 	#schedule(): void {
@@ -389,7 +392,7 @@ export class SheetStore {
 	}
 
 	async #reconcileStep(): Promise<void> {
-		this.status = this.signedIn ? 'saving' : 'checking';
+		this.status = reconcilingStatus(this.status, this.signedIn, writesOnReconcile(this.stored));
 		const edits = this.#edits;
 		const started = this.stored.sheet;
 		const outcome = await reconcile(this.#deps.api, this.stored);

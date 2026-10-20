@@ -127,7 +127,19 @@ async function checkWords(
 	if (name === 'board') {
 		const words = boardWords(rail, { ...COVER, label: 'PPR', position: null }, following);
 		expect(where, 'bar', bar, words.bar);
-		expect(where, 'verb', await text(page, 'header.top .tail a.action'), PAGE_VERBS[words.verb]);
+		if (words.verb === null) {
+			// No verb on the board once a league is selected (Lane 104, B60).
+			const shown = await page.evaluate(
+				() =>
+					[...document.querySelectorAll('header.top .tail a.action')].filter((node) => {
+						const set = node.closest('[data-words]');
+						return set === null || getComputedStyle(set).display !== 'none';
+					}).length
+			);
+			if (shown > 0) failures.push(`${where}: the board draws a verb with a league selected`);
+		} else {
+			expect(where, 'verb', await text(page, 'header.top .tail a.action'), PAGE_VERBS[words.verb]);
+		}
 	}
 	if (name === 'account') {
 		expect(where, 'heading', await text(page, 'main h2'), signedOutTitle(railInSeason(rail)));

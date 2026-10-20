@@ -23,7 +23,7 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
-	import { NEXT_DRAFT, NEXT_DRAFT_ROWS } from '#lib/league/phase-words.ts';
+	import { DRAFT_TOOLS, NEXT_DRAFT, NEXT_DRAFT_ROWS } from '#lib/league/phase-words.ts';
 	import { railInSeason } from '#lib/ui/nav.ts';
 	import {
 		accountApi,
@@ -49,7 +49,14 @@
 	import { CONNECT, keeps, memberHosts, signedOutTitle } from './keeps.ts';
 	import { accountLinks } from './links.ts';
 	import { hasFeature } from './features.ts';
-	import { boughtMembership, displayName, mockLine, planWords, sheetLine } from './words.ts';
+	import {
+		boughtMembership,
+		displayName,
+		draftToolsRecede,
+		mockLine,
+		planWords,
+		sheetLine
+	} from './words.ts';
 
 	/** Your account: who you are, your sheets and mocks, your pass or membership with its one-click
 	 * cancel, and sign out. Signed out, the sign-in verb and what an account keeps. The shell is
@@ -337,25 +344,36 @@
 						</div>
 					</section>
 
-					<section aria-label={NEXT_DRAFT}>
-						<div class="sec-h"><h2>{NEXT_DRAFT}</h2></div>
-						{#if sheets.length > 0}
-							<LineList label="Your sheets" lines={sheetLines(sheets)} />
-						{/if}
-						{#if mocks.length > 0}
-							<LineList label="Your mock drafts" lines={mockLines(mocks)} />
-						{/if}
-						<div class="kv">
-							{#each NEXT_DRAFT_ROWS as row, i (row.lead)}
-								<div class="kvr">
-									<span class="st"><b>{row.lead}</b><span>{row.text}</span></span>
-									<Quiet size="sm" href={i === 0 ? sectionHref('mock') : accountLinks.sheet()}
-										>{row.verb}</Quiet
-									>
-								</div>
-							{/each}
-						</div>
-					</section>
+					{#if draftToolsRecede(account.season)}
+						<section aria-label={DRAFT_TOOLS.label}>
+							<p class="tools">
+								<b>{DRAFT_TOOLS.lead}</b>
+								<a href={sectionHref('mock')}>{DRAFT_TOOLS.mock}</a>{DRAFT_TOOLS.joint}<a
+									href={accountLinks.sheet()}>{DRAFT_TOOLS.sheet}</a
+								>
+							</p>
+						</section>
+					{:else}
+						<section aria-label={NEXT_DRAFT}>
+							<div class="sec-h"><h2>{NEXT_DRAFT}</h2></div>
+							{#if sheets.length > 0}
+								<LineList label="Your sheets" lines={sheetLines(sheets)} />
+							{/if}
+							{#if mocks.length > 0}
+								<LineList label="Your mock drafts" lines={mockLines(mocks)} />
+							{/if}
+							<div class="kv">
+								{#each NEXT_DRAFT_ROWS as row, i (row.lead)}
+									<div class="kvr">
+										<span class="st"><b>{row.lead}</b><span>{row.text}</span></span>
+										<Quiet size="sm" href={i === 0 ? sectionHref('mock') : accountLinks.sheet()}
+											>{row.verb}</Quiet
+										>
+									</div>
+								{/each}
+							</div>
+						</section>
+					{/if}
 
 					<AccountDevices />
 				</aside>
@@ -574,6 +592,28 @@
 		flex: 1;
 	}
 
+	/* The draft tools in season: one line, each tool's words its link. */
+	.tools {
+		margin: 0;
+		padding: var(--s-3);
+		border: 1px solid var(--line);
+		border-radius: var(--r-md);
+		background: var(--surface);
+		font-size: var(--t-sm);
+		color: var(--ink-2);
+	}
+
+	.tools b {
+		font-weight: 600;
+		color: var(--ink);
+	}
+
+	.tools a {
+		color: var(--ink);
+		text-decoration: underline;
+		text-underline-offset: 3px;
+	}
+
 	.arrival {
 		margin: 0;
 		font-size: var(--t-md);
@@ -585,7 +625,10 @@
 		font-size: var(--t-sm);
 	}
 
-	@media (max-width: 1180px) {
+	/* The side folds under the lists below 1280, not at the site's 1180: the Platforms table needs a
+	 * 744 px column for its Connection column to keep 200 px beside whole names, verbs and one-line
+	 * last reads, and beside the 380 px side it had 119 px at 1181 (Lane 105 fix round 1). */
+	@media (max-width: 1279px) {
 		.grid {
 			grid-template-columns: minmax(0, 1fr);
 		}

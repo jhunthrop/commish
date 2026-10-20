@@ -1500,6 +1500,30 @@ func (e SiteSeasonPhase) Valid() bool {
 	}
 }
 
+// Defines values for Tiebreak.
+const (
+	TiebreakDivisionRecord Tiebreak = "division_record"
+	TiebreakHeadToHead     Tiebreak = "head_to_head"
+	TiebreakPointsAgainst  Tiebreak = "points_against"
+	TiebreakPointsFor      Tiebreak = "points_for"
+)
+
+// Valid indicates whether the value is a known member of the Tiebreak enum.
+func (e Tiebreak) Valid() bool {
+	switch e {
+	case TiebreakDivisionRecord:
+		return true
+	case TiebreakHeadToHead:
+		return true
+	case TiebreakPointsAgainst:
+		return true
+	case TiebreakPointsFor:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TradeMovesPropose.
 const (
 	TradeMovesProposeAvailable   TradeMovesPropose = "available"
@@ -1548,6 +1572,24 @@ func (e WaiverMovesClaim) Valid() bool {
 	case WaiverMovesClaimAvailable:
 		return true
 	case WaiverMovesClaimUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WaiverOrder.
+const (
+	WaiverOrderInverseStandings WaiverOrder = "inverse_standings"
+	WaiverOrderRolling          WaiverOrder = "rolling"
+)
+
+// Valid indicates whether the value is a known member of the WaiverOrder enum.
+func (e WaiverOrder) Valid() bool {
+	switch e {
+	case WaiverOrderInverseStandings:
+		return true
+	case WaiverOrderRolling:
 		return true
 	default:
 		return false
@@ -2841,8 +2883,14 @@ type LeagueTerms struct {
 	// ScoringUnstated the ScoringRules keys the platform does not state, which scoring holds at our standard figure; the settings print no figure for them, never ours as the league's
 	ScoringUnstated []string `json:"scoring_unstated"`
 
+	// Tiebreak the rule the host breaks a tie in the standings by (ESPN's playoff seeding tiebreaker); absent where the host does not say, and from an API before Lane 104
+	Tiebreak *Tiebreak `json:"tiebreak,omitempty"`
+
 	// WaiverBudget each team's season budget
 	WaiverBudget *int `json:"waiver_budget"`
+
+	// WaiverOrder how an order league's waiver order moves; absent in a budget league, where the host does not say, and from an API before Lane 104
+	WaiverOrder *WaiverOrder `json:"waiver_order,omitempty"`
 
 	// Waivers claims carry a bid from a season budget, or run in a waiver order; null where the host does not say
 	Waivers *LeagueTermsWaivers `json:"waivers"`
@@ -4116,6 +4164,9 @@ type StatusRead struct {
 	Source string `json:"source"`
 }
 
+// Tiebreak the rule a tie on record in the standings is broken by
+type Tiebreak string
+
 // TierMate defines model for TierMate.
 type TierMate struct {
 	BoardId string `json:"board_id"`
@@ -4442,6 +4493,9 @@ type WaiverMoves struct {
 
 // WaiverMovesClaim available when a claim can be made on the host from our screen (the host has a write path, its claim switch is on for the account and the account's connection agreed to the moves); unavailable when the verb is the host's page
 type WaiverMovesClaim string
+
+// WaiverOrder rolling, a successful claim sends the team to the back of the order; inverse_standings, the order resets each week, the last place first
+type WaiverOrder string
 
 // WaiverRow defines model for WaiverRow.
 type WaiverRow struct {

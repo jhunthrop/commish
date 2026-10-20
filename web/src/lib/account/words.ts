@@ -3,6 +3,7 @@ import { dateLabel, dayLabel, dayYearLabel } from '#lib/format/date.ts';
 import { freeLine } from '#lib/pass/words.ts';
 import { plural } from '#lib/format/number.ts';
 import { FORMAT_LABELS } from '#lib/sheet/format.ts';
+import { railInSeason, railKey, railPhase } from '#lib/ui/nav.ts';
 import type { Account, AccountGroupPass, AccountMock, AccountSheet } from './account-api.ts';
 
 /** The name we greet you by: your name, else your handle, else your email. */
@@ -100,6 +101,13 @@ export function planWords(account: Account): PlanWords {
 		};
 	}
 	return { title: 'Free', line: freeLine(), action: null };
+}
+
+/** Whether the account's draft prep recedes to one line (B52): from the season's first kickoff to
+ * its last game, the Super Bowl, by the rail's own rule (railInSeason) over the site season the API
+ * reads at its own clock (/me's season), so it returns only at the offseason and the preseason. */
+export function draftToolsRecede(season: Pick<Account['season'], 'phase'>): boolean {
+	return railInSeason(railKey(railPhase(null, season.phase)));
 }
 
 /** "PPR · 42 players · changed Oct 12". */

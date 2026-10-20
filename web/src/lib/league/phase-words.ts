@@ -10,11 +10,10 @@ import {
 	timeOfDay,
 	weekdayTime
 } from '#lib/format/clock.ts';
-import { ordinal } from '#lib/format/number.ts';
 import type { ContextLeague } from '#lib/context/words.ts';
 import { MOCK_VERB, type LeagueScreen } from '#lib/ui/nav.ts';
 import type { LeagueStanding } from './api.ts';
-import { recordWords } from './model.ts';
+import { placeWords, recordWords } from './model.ts';
 
 /** The follow page's line above the form, naming the screen the rail item leads to once a league
  * is followed. */
@@ -36,8 +35,8 @@ export const NEXT_DRAFT = 'Next draft';
 export const ADVISOR_VERB = 'Open the Advisor';
 /** The cheat sheet's way in beside it. */
 export const SHEET_LINK = 'Cheat sheet';
-/** The account page's Next draft rows in season, where the draft prep has left the rail: each
- * page by its rail word, a line, and its verb. */
+/** The account page's Next draft rows out of season: each page by its rail word, a line, and its
+ * verb. */
 export const NEXT_DRAFT_ROWS = [
 	{
 		lead: 'Mock draft',
@@ -50,6 +49,16 @@ export const NEXT_DRAFT_ROWS = [
 		verb: 'Open your sheet'
 	}
 ] as const;
+
+/** The account page's draft prep in season (B52): from the season's first kickoff to its last game
+ * the Next draft block recedes to this one line, each tool's words opening it. */
+export const DRAFT_TOOLS = {
+	label: 'Draft tools',
+	lead: 'Draft tools:',
+	mock: 'mock draft',
+	joint: ', ',
+	sheet: 'cheat sheet'
+} as const;
 
 const DAY_MS = 86_400_000;
 /** A draft this many days off is named by its weekday, further off by its date. */
@@ -105,5 +114,5 @@ export function draftLine(draftAt: string | null, now: Date, zone: string = memb
  * the last read has no standing. */
 export function finalStanding(team: string, standing: LeagueStanding | null): string {
 	if (standing === null || team === '') return 'Your season is over.';
-	return `${team} finished ${ordinal(standing.place)} of ${String(standing.teams)} at ${recordWords(standing)}.`;
+	return `${team} finished ${placeWords(standing.place, standing.teams)} at ${recordWords(standing)}.`;
 }
