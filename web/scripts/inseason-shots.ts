@@ -152,6 +152,7 @@ const EVIDENCE_CELL = /^(\d+(st|nd|rd|th)|\d+\.\d|[+−]\d+\.\d|--)$/;
 const LINEUP_HEADS = [
 	'Slot',
 	'Player',
+	'Our rank',
 	'Game',
 	'Proj',
 	'Pts',
@@ -161,9 +162,9 @@ const LINEUP_HEADS = [
 	'Δ Proj',
 	'Why'
 ];
-const PHONE_HEADS = ['Slot', 'Player', 'Proj', 'Pts', 'Why'];
+const PHONE_HEADS = ['Slot', 'Player', 'Our rank', 'Proj', 'Pts', 'Why'];
 /** Below 900 px the evidence folds under the name. */
-const FOLDED_HEADS = ['Slot', 'Player', 'Game', 'Proj', 'Pts', 'Why'];
+const FOLDED_HEADS = ['Slot', 'Player', 'Our rank', 'Game', 'Proj', 'Pts', 'Why'];
 const EVIDENCE_FOLDS_AT = 900;
 /** The Waivers table's heads at the desk, folded below 900 px, and on a phone (Lane 66f). */
 const WAIVER_HEADS = [
@@ -209,7 +210,8 @@ async function boxFacts(page: Page): Promise<{
 			// A head the phone folds away keeps its place at no width: only the drawn heads count.
 			heads: [...(box[0]?.querySelectorAll('thead tr.cols th') ?? [])]
 				.filter((th) => th.getBoundingClientRect().width > 1)
-				.map((th) => (th as HTMLElement).innerText.trim()),
+				// A head's key under it (Opp rank's "1st fewest allowed", Lane 99) is not its name.
+				.map((th) => ((th as HTMLElement).innerText.trim().split('\n')[0] ?? '').trim()),
 			numbers: rows.flatMap((tr) =>
 				[...tr.querySelectorAll('td.proj, td.pts')].map((td) =>
 					(td as HTMLElement).innerText.trim()
@@ -225,17 +227,25 @@ async function boxFacts(page: Page): Promise<{
 					: []
 			),
 			perGame: rows.some((tr) => /\d a game/.test(tr.textContent)),
-			defenseRows: rows.filter((tr) => tr.querySelector('.club') && !tr.querySelector('.club .pos'))
-				.length,
-			defenseMarks: rows.filter(
-				(tr) =>
-					tr.querySelector('.club') &&
-					!tr.querySelector('.club .pos') &&
-					tr.querySelector('img[alt$=" defense"]')
-			).length,
-			// The position pill and the shared status chip beside it (StatusChip, Lane 66n).
+			// A defense row: its Our rank cell says D/ST (Lane 99), or with no such cell no position pill
+			// under the name.
+			defenseRows: rows.filter((tr) => {
+				const rank = tr.querySelector('td.rank');
+				return rank
+					? rank.getAttribute('data-position') === 'D/ST'
+					: tr.querySelector('.club') && !tr.querySelector('.club .pos');
+			}).length,
+			defenseMarks: rows.filter((tr) => {
+				const rank = tr.querySelector('td.rank');
+				const defense = rank
+					? rank.getAttribute('data-position') === 'D/ST'
+					: tr.querySelector('.club') && !tr.querySelector('.club .pos');
+				return defense && tr.querySelector('img[alt$=" defense"]');
+			}).length,
+			// The position pill (under the name, or under Our rank, Lane 99) and the shared status chip
+			// beside the club (StatusChip, Lane 66n).
 			statuses: rows.flatMap((tr) =>
-				[...tr.querySelectorAll('.club .pos, .club .status-chip')].map((el) =>
+				[...tr.querySelectorAll('.club .pos, td.rank .pos, .club .status-chip')].map((el) =>
 					el.textContent.trim()
 				)
 			),
@@ -415,8 +425,8 @@ for (const { name, path, ready: text } of PAGES) {
 							: LINEUP_HEADS;
 				const boxHeads =
 					width <= PHONE.width
-						? ['Slot', 'Player', 'Proj', 'Pts']
-						: ['Slot', 'Player', 'Game', 'Proj', 'Pts'];
+						? ['Slot', 'Player', 'Our rank', 'Proj', 'Pts']
+						: ['Slot', 'Player', 'Our rank', 'Game', 'Proj', 'Pts'];
 				const heads = name === 'start' ? lineupHeads : boxHeads;
 				for (const word of await bannedSaid(page)) missing.push(`${at} says ${word}`);
 				// Sleeper adds its players' points: the bug and Totals one figure, the rows' sum (ruling (a)).
@@ -450,7 +460,8 @@ for (const { name, path, ready: text } of PAGES) {
 				const wantsIR = name === 'start';
 				if (
 					!box.statuses.includes('Questionable') ||
-					(wantsIR && !box.statuses.some((s) => s.endsWith(' IR')))
+					// A season-long list is his status chip ("IR since Sep 22"), never his rank (Lane 99).
+					(wantsIR && !box.statuses.some((s) => /^IR\b/.test(s)))
 				)
 					missing.push(
 						`${at} the status pills: ${box.statuses.filter((s) => !/ \d+$/.test(s)).join(', ')}`
@@ -1041,12 +1052,15 @@ async function lineupFaults(page: Page): Promise<string[]> {
 		faults.push(`the no one can play chips: ${seen.idleChips.join(', ')}`);
 	if (!seen.firstChipIdle) faults.push('the no one can play chip is not first');
 	if (seen.idleRows !== 1) faults.push(`${String(seen.idleRows)} rows marked no one can play`);
-	if ((seen.text.match(/Opp rank is points allowed to his position/g) ?? []).length !== 1)
+	// Our rank and Opp rank share one sentence on the Lineup (Lane 99 fix round 1).
+	if ((seen.text.match(/Opp rank the points allowed to it, 1st fewest/g) ?? []).length !== 1)
 		faults.push('the evidence basis not said once');
 	if (!/Δ Proj is its change since \w{3} \d+:\d\d [ap]m\./.test(seen.text) && seen.wide)
 		faults.push('the change basis');
 	if (!seen.text.includes('Which five')) faults.push('no link to the rules our stats lack');
-	if (!seen.text.includes('We start the highest Proj at each slot'))
+	// The rule for our pick is said under the rows at a desk; the phone's strip says whose lineup it
+	// is (Lane 99 fix round 1).
+	if (seen.wide && !seen.text.includes('Our pick starts the highest Proj at each slot.'))
 		faults.push('the advice basis');
 	// The line under the copy verb is the API's reason: only that it names the platform is checked, so
 	// a change in the API's words changes nothing here (review H1).

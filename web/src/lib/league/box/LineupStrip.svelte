@@ -1,15 +1,21 @@
 <script lang="ts">
 	import { links } from '#lib/site/links.ts';
-	import { changesTitle, LINEUP, stripSum, type LineupBox } from './lineup.ts';
+	import { changesTitle, LINEUP, lineupSum, type LineupBox } from './lineup.ts';
 	import MoveMark from './MoveMark.svelte';
+	import type { LeagueHost } from '../api.ts';
 	import type { WeekDoneState } from '../inseason/api.ts';
 
 	/** The Lineup's decision as a strip (Lane 66e): the board week, the count of changes, each swap as
-	 * a chip ("QB, Williams in, Stroud out"), and what they add to the lineup as it is set now. The
-	 * screen's one verb sits beside it. Past weeks live on Our record. */
+	 * a chip ("QB, Williams in, Stroud out"), and what they add to the lineup as the platform has it
+	 * set now, the platform named ("as set on ESPN", Lane 99 B11); once the set lineup has kicked off
+	 * where it differs from our pick, the API's miss line across the strip. The screen's one verb sits
+	 * beside it. Past weeks of our order live on Our record. */
 	interface Props {
 		week: number;
 		box: LineupBox;
+		host: LeagueHost;
+		/** The API's miss line (LineupAdvice.missed), null where the set lineup has not missed our pick. */
+		missed?: string | null;
 		/** The API's sentence once every starter of the member's has played, said in the sum's place
 		 * (Lane 85). */
 		done?: string | null;
@@ -17,8 +23,8 @@
 		doneState?: WeekDoneState | null;
 	}
 
-	let { week, box, done = null, doneState = null }: Props = $props();
-	const sum = $derived(stripSum(box, done));
+	let { week, box, host, missed = null, done = null, doneState = null }: Props = $props();
+	const sum = $derived(lineupSum(box, host, done));
 </script>
 
 <div class="strip">
@@ -44,13 +50,13 @@
 		</ul>
 	{/if}
 	<div class="sum">
-		{#if done !== null}<span class="words done">{done}</span>{:else if sum}<b class="figure"
-				>{sum.figure}</b
-			><span class="words"
+		{#if sum}<b class="figure">{sum.figure}</b><span class="words"
 				>{sum.words}{#if sum.gain}, <em>{sum.gain}</em>{/if}</span
 			>{/if}
+		{#if done !== null}<span class="words done">{done}</span>{/if}
 		<a class="past" href={links.record()}>{LINEUP.pastWeeks}</a>
 	</div>
+	{#if missed}<p class="missed">{missed}</p>{/if}
 </div>
 
 <style>
@@ -177,6 +183,18 @@
 	.past {
 		font-size: var(--t-xs);
 		color: var(--ink-3);
+	}
+
+	/* Where the set lineup missed our pick, across the strip under its figures (Lane 99, B11). */
+	.missed {
+		flex-basis: 100%;
+		order: 4;
+		margin: 0;
+		padding-top: var(--s-2);
+		border-top: 1px solid var(--line);
+		font-size: var(--t-sm);
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
 	}
 
 	@media (max-width: 760px) {
