@@ -224,7 +224,7 @@
 				/>
 				<Part
 					name="The tier chip"
-					about="The All view's tier, on the same step of the one ink ramp as its strip. Tier 1 is the full ink; tiers past the seventh share the lightest step, the number keeping them apart."
+					about="The All view's tier, on the same step of the one ink ramp as its strip. Tier 1 is the full ink. Tiers past the seventh share the lightest step."
 				>
 					{#snippet show()}
 						{#each [1, 2, 3, 4, 5, 6, 7, 8, 14] as tier (tier)}<TierChip {tier} />{/each}
