@@ -20,13 +20,13 @@ from research.capsules.render_words import week_of
 from research.capsules.rule_notes import RuleNote
 from research.capsules.validate import word_count
 from research.capsules.week.render import render_week_sheet
-from research.capsules.week.rules import MAX_SENTENCES, MIN_SENTENCES, shown_week_words
+from research.capsules.week.rules import MAX_FIGURES, MAX_SENTENCES, MIN_SENTENCES, shown_week_words
 from research.capsules.week.sheet import PROJECTION_BASIS, WeekSheet
 from research.capsules.week.validate import WEEK_BAND
 
 _LOW, _HIGH = WEEK_BAND
-# The words to aim at (the coordinator's ruling: 80, never more than 100).
-TARGET_WORDS: Final = 80
+# The words to aim at, under the cap of 80 (Lane 100, B44).
+TARGET_WORDS: Final = 65
 _NUMBER_RULE: Final = {
     "published": (
         "- The week's number is the published projection: a projection published for the week, never ours. Name "
@@ -60,7 +60,8 @@ def _quoted(words: Sequence[str]) -> str:
 WEEK_RULES: Final = f"""You write the week-ahead read on one player's page for a fantasy football manager setting his lineup for the week in front of him. You sound like a sharp analyst talking to a friend in the same league: direct, specific, opinionated, never a lab report and never a style guide.
 
 THE READ
-- {MIN_SENTENCES} to {MAX_SENTENCES} short sentences, about {TARGET_WORDS} words in all and never more than {_HIGH}: count them before you answer. One paragraph, about the week the facts name and nothing else. Pick the two or three facts that decide his week (his game, his status, the published projection and what moved it, the matchup, the weather, his role) and build on those. Leave the rest unquoted.
+- {MIN_SENTENCES} to {MAX_SENTENCES} short sentences, about {TARGET_WORDS} words in all and never more than {_HIGH}: count them before you answer. One paragraph, about the week the facts name and nothing else.
+- The read sits under his player card, whose cells already print his numbers: the published projection and its change, the opponent's rank, his points a game, each game's points, his rest-of-season points, the expected score and the weather. Say what those cells cannot: why his week looks the way it does (his status, his role, the matchup, the weather) and what a manager who has him does this week. Never retell the cells: quote at most {MAX_FIGURES} figures in all.
 - Open on the fact that matters most for him this week. Never open with a set-up phrase, a greeting, a question, or his name followed by a verdict. Name him in the read.
 - Every read on this site is written from facts like these, and no sentence may sit on two players' pages, even with the names and numbers swapped: build each sentence your own way for this player, never a sentence shape that would fit another player.
 - End on what a manager who has him does this week, in his own terms: start him, sit him, keep him on the bench, find a fill-in for the week.
@@ -72,7 +73,7 @@ THE NUMBER
 - His place in our order says which order it is: "in our preseason order" or "in our rest-of-season order", as the facts name it.
 
 NUMBERS, TIME AND WORDS
-- Use ONLY the numbers and names in the facts. Never invent a stat, an injury, a teammate or any figure. Quote a number as the facts give it, or as a plain rounding of it, never a figure you worked out.
+- Use ONLY the numbers and names in the facts. Never invent a stat, an injury, a teammate or any figure. Quote a number exactly as the facts give it, never a rounding of it and never a figure you worked out. Every figure in the facts is one the page prints as a cell: name it the way the cell does ("242.5 PPR points for the rest of the season", "30.7 PPR points a game this season", "the published projection has him at 18.4 points").
 - Every figure carries its unit right after it: "32 points", "19.5 points", "25.9 PPR points a game", "28th of 32 against receivers", "61 degrees", "14 mph", "a 30% chance". Never a bare figure, never "32 to 19.5".
 - A rank against his position reads as the facts give it, 1st allowed the fewest, said the way a person would, never a code.
 - Name the season once, with the first week you name ("week 6 of 2026"), and every week after it without the year ("week 5", "week 7"). Never the year twice. "This week" is fine. Never a date or the name of a month. A week still to play is only looked ahead to.

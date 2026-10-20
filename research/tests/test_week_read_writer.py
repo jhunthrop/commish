@@ -85,7 +85,8 @@ def test_the_prompt_states_the_week_the_kickoff_and_that_the_number_is_published
     user = week_prompt(starter(), ())
     assert "week 6 of 2026" in user and "Sunday 3:05 pm Central" in user and "18.4 points" in user
     assert "published projection" in WEEK_RULES and "never ours" in WEEK_RULES
-    assert "about 80 words" in WEEK_RULES and "never more than 100" in WEEK_RULES
+    assert "about 65 words" in WEEK_RULES and "never more than 80" in WEEK_RULES
+    assert "quote at most 3 figures" in WEEK_RULES and "Never retell the cells" in WEEK_RULES
     assert '"in our preseason order" or "in our rest-of-season order"' in WEEK_RULES
     assert '"call"' in WEEK_RULES and '"hold" means no change' in WEEK_RULES and 'calls itself "hold"' in WEEK_RULES
     for word in ("odds", "underdog", "favoured", "line", "spread", "bet", "the books"):
@@ -115,21 +116,23 @@ def test_a_long_read_is_told_its_count_and_the_cut() -> None:
     gateway = _StubGateway([_answer(long_read), _answer(STARTER_READ)])
     assert write_week_read(starter(), gateway).source == "llm"  # type: ignore[arg-type]
     correction = gateway.asked[1][-1]["content"]
-    assert f"It is {words} words, {words - 100} over the 100-word cap. Cut about {words - 80} words" in correction
+    assert f"It is {words} words, {words - 80} over the 80-word cap. Cut about {words - 65} words" in correction
     assert length_move(80) is None
 
 
-def test_a_read_asked_shorter_may_run_ten_percent_over_the_cap() -> None:
-    """The season read's ruling, for the week read too: the recorded run's Lamb landed at 108 words."""
+def test_a_read_asked_shorter_still_holds_to_the_cap() -> None:
+    """Lane 100 (B44): the cap is 80 words with no overrun, even for a read already asked to be shorter (the
+    season read's 10% allowance does not carry over)."""
     extra = (
-        " Davante Adams is listed second behind him, and his 25.9 PPR points a game over 3 games came with 4"
-        " touchdowns, the kind of steady work that keeps him first on the Rams depth chart for now."
+        " Davante Adams is listed second behind him, the kind of steady pecking order that keeps the targets"
+        " flowing his way for now, and nothing in the facts says that changes."
     )
     longer = STARTER_READ.replace(" Start him with confidence.", extra + " Start him with confidence.")
-    assert 100 < len(longer.split()) <= 110  # noqa: PLR2004 - over the cap, inside its 10%
-    gateway = _StubGateway([_answer(" ".join([STARTER_READ, STARTER_READ])), _answer(longer)])
-    result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
-    assert result.source == "llm" and result.text == longer, result.attempts
+    assert 80 < len(longer.split()) <= 88  # noqa: PLR2004 - over the cap, inside the old 10%
+    script = [_answer(" ".join([STARTER_READ, STARTER_READ])), _answer(longer), _answer(STARTER_READ)]
+    result = write_week_read(starter(), _StubGateway(script))  # type: ignore[arg-type]
+    assert result.source == "llm" and result.text == STARTER_READ, result.attempts
+    assert any("Word count" in v for v in result.attempts[1].violations), result.attempts[1]
 
 
 def test_a_broken_rule_is_handed_back_with_its_sentence_and_the_rewrite_lands() -> None:

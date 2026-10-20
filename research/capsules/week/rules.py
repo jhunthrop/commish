@@ -15,7 +15,9 @@ This week's rulings and the Lane 72 review's, each a rule the validator reads:
   noun, a rank's "of 32"); week numbers, the season and clock times are exempt (M1).
 - A rank in our order says which order it is: "in our preseason order" or "in our rest-of-season order" (M2).
 - The season is named at most once; weeks after it are "week 5" (the coordinator's ruling on L5).
-- Three to five sentences.
+- Every figure is one the page draws as a cell, as the cell prints it (`cells`), and a read states at most
+  `MAX_FIGURES` of them: the cells carry his numbers, the read says what they cannot (Lane 100, B17, B44).
+- One paragraph, three to five sentences.
 
 Each violation names its sentence in the writer's form (`the sentence "..."`), so a correction hands it
 back word for word (`rule_notes`).
@@ -29,11 +31,14 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.page_figures import page_tenth
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
+from research.capsules.week.cells import cell_figures
 from research.capsules.week.sheet import WeekSheet, points_text
 from research.capsules.week.start_advice import start_advice_in
 
 MIN_SENTENCES: Final = 3
 MAX_SENTENCES: Final = 5
+# The figures a read states at most (Lane 100, B44): the cells above it carry his numbers.
+MAX_FIGURES: Final = 3
 # The writer's own call for its read, one word (H2): what it tells a manager who has him to do this week.
 START: Final = "start"
 CALLS: Final = (START, "sit", "hold", "none")
@@ -151,6 +156,47 @@ def _unit_violations(sentences: Sequence[str], season: int) -> list[str]:
                 )
             )
     return out
+
+
+def stated_figures(sentence: str, season: int) -> list[tuple[str, float]]:
+    """The figures a sentence states, (as written, value): a rank's "of 32" belongs to its rank."""
+    return [
+        (raw, value)
+        for raw, value, start, _ in figures_of(sentence, season)
+        if not _ORDINAL_OF_BEFORE.search(sentence[:start])
+    ]
+
+
+def _cell_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
+    """A figure the page draws in no cell, and more figures than the read may state (Lane 100)."""
+    cells = cell_figures(sheet)
+    out = []
+    for s in sentences:
+        off = [raw for raw, value in stated_figures(s, sheet.season) if page_tenth(value) not in cells]
+        if off:
+            quoted = ", ".join(f'"{raw}"' for raw in off)
+            out.append(
+                _sentence_violation(
+                    f"states {quoted}, a figure the page draws in no cell",
+                    s,
+                    "Quote only a figure the page prints as a cell (the published projection and its change, the "
+                    "opponent's rank, his points a game, a game's points, his rest-of-season points, the expected "
+                    "score, the kickoff weather), named as the cell names it, or say it in words.",
+                )
+            )
+    count = sum(len(stated_figures(s, sheet.season)) for s in sentences)
+    if count > MAX_FIGURES:
+        out.append(
+            f"The read states {count} figures. The cells above it carry his numbers: state at most {MAX_FIGURES}, "
+            "and say in words what the cells cannot, why his figure is what it is and what to do this week."
+        )
+    return out
+
+
+def _paragraph_violation(text: str) -> list[str]:
+    if "\n" not in text.strip():
+        return []
+    return ["The read runs to more than one paragraph. Write it as one paragraph."]
 
 
 def _published_figures(sheet: WeekSheet) -> set[float]:
@@ -334,12 +380,14 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
     """Every week rule `text` breaks for `sheet`, given the writer's `call` for it; empty is clean."""
     sentences = split_sentences(text.strip())
     return [
+        *_paragraph_violation(text),
         *_count_violation(sentences),
         *_call_violation(call),
         *_word_violations(sentences),
         *_projection_violations(sentences, sheet),
         *_cannot_start_violations(sentences, sheet, call),
         *_unit_violations(sentences, sheet.season),
+        *_cell_violations(sentences, sheet),
         *_order_violations(sentences, sheet),
         *_season_violation(text, sheet.season),
         *_wait_violation(text, sheet, call),

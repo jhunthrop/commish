@@ -32,7 +32,7 @@ from research.capsules.week.judge import (
 from research.capsules.week.prompt import WEEK_RULES, parse_week_answer, week_correction, week_prompt
 from research.capsules.week.render import render_week_facts_block
 from research.capsules.week.sheet import WeekSheet
-from research.capsules.week.validate import WEEK_BAND, validate_week_read
+from research.capsules.week.validate import validate_week_read
 
 # A draft and three corrections, the judge's call among them for a player who may not be started: a week
 # read is short, and a fourth failure is a facts block, retried on the cadence's terms. The season read's ceiling is six for two reads and a narrative.
@@ -118,7 +118,6 @@ def write_week_read(
     usage: Usage | None = None
     attempts: list[WeekAttempt] = []
     asks = _Asks()
-    asked_shorter = False
     user = week_prompt(sheet, avoid)
     while asks.left:
         asks.made += 1
@@ -133,8 +132,7 @@ def write_week_read(
         usage = add_usage(usage, completion.usage)
         answer = parse_week_answer(completion.content)
         text = answer.read or ""
-        result = validate_week_read(text, sheet, taken, answer.call, asked_shorter=asked_shorter)
-        asked_shorter = asked_shorter or (result.band_failure is not None and result.band_failure.words > WEEK_BAND[1])
+        result = validate_week_read(text, sheet, taken, answer.call)
         violations = result.violations
         if result.ok and not sheet.may_start:
             if not asks.left:
