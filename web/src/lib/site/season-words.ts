@@ -3,7 +3,7 @@
  * is the trust loop, so it is the verb, and the board is the rest of the season under the rail's
  * own word; before the draft and after the season the draft words stay. A heading names the rest of
  * the season only where the run's board ranks it. Pure, so every sentence is tested. */
-import { MOCK_VERB, RAIL_ITEMS, railInSeason, type RailKey } from '#lib/ui/nav.ts';
+import { MOCK_VERB, RAIL_ITEMS, REST_OF_SEASON, railInSeason, type RailKey } from '#lib/ui/nav.ts';
 
 /** A page's verbs, each by what it does: the page maps each to its link. */
 export type PageVerb = 'follow' | 'open_league' | 'mock' | 'sheet';
@@ -15,8 +15,8 @@ export const PAGE_VERBS: Readonly<Record<PageVerb, string>> = {
 	sheet: 'Build your cheat sheet'
 };
 
-/** The board's rail word in season, the rail item's own label. */
-const REST_WORD = railWord('rest');
+/** The board's word in season, the bar's and the rail's with no league selected. */
+const REST_WORD = REST_OF_SEASON;
 /** The board's name before the draft and after the season. */
 const BOARD_WORD = railWord('board');
 
@@ -76,8 +76,9 @@ export interface BoardWords {
 	title: string;
 	/** The board's own heading. */
 	heading: string;
-	/** The one solid verb in the bar. */
-	verb: PageVerb;
+	/** The one solid verb in the bar; none in season with a league selected, which the page already
+	 * is (Lane 104, B60). */
+	verb: PageVerb | null;
 }
 
 export function boardWords(
@@ -98,6 +99,6 @@ export function boardWords(
 		bar: position === null ? noun : named(position),
 		title: named(position === null ? board.label : `${position} ${board.label}`),
 		heading: ranksRest ? `Rest of ${season}` : `${season} ${BOARD_WORD}`,
-		verb: inSeason ? leagueVerb(following) : 'mock'
+		verb: inSeason ? (following ? null : 'follow') : 'mock'
 	};
 }

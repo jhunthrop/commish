@@ -34,7 +34,7 @@
 	import type OrderScreenComponent from '#lib/order/OrderScreen.svelte';
 	import type WeekScreenComponent from '#lib/order/WeekScreen.svelte';
 	import { weekPositionOf, weekReadKey } from '#lib/order/week-head.ts';
-	import { ORDER, WEEK } from '#lib/order/words.ts';
+	import { ORDER, PAGE_PURPOSE, WEEK } from '#lib/order/words.ts';
 	import type { BasisPart } from '#lib/run/board-basis.ts';
 	import type { RulesLeftOut } from '#lib/order/week.ts';
 
@@ -196,6 +196,8 @@
 	/** The space before the rules' link. */
 	const GAP = ' ';
 	const said = $derived(weekPosition !== null && weekSaid?.key === weekKey ? weekSaid : null);
+	/** The in-season screens (the order, or a kickers' or defenses' week) take the page's width. */
+	const ordered = $derived(inSeason || weekPosition !== null);
 </script>
 
 {#snippet row(player: BoardRowView, i: number)}
@@ -216,20 +218,26 @@
 	</Row>
 {/snippet}
 
-<main class="board" class:ordered={inSeason || weekPosition !== null}>
+{#snippet leagueNote()}
+	<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
+{/snippet}
+
+<main class="board" class:ordered>
 	<!-- The league's line sits by the switch, not under the caption: atop the side column on a desk,
-	     first under the bar elsewhere. -->
-	<div class="league-line">
-		<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
-	</div>
+	     first under the bar elsewhere. In season the page has no side column, so the line sits in
+	     the page's header under its purpose (Lane 104, B63). -->
+	{#if !ordered}
+		<div class="league-line">{@render leagueNote()}</div>
+	{/if}
 	<div class="content">
 		<div class="lead">
-			<PageHead title={said?.heading ?? heading}>
+			<PageHead title={said?.heading ?? heading} lead={ordered ? PAGE_PURPOSE.rest : undefined}>
 				{#snippet actions()}
 					<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
 					<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>
 				{/snippet}
 			</PageHead>
+			{#if ordered}{@render leagueNote()}{/if}
 			{#if weekPosition !== null}
 				{#if said}
 					{@const rules = said.rules}

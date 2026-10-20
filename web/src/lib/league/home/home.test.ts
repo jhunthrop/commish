@@ -474,6 +474,43 @@ void test('the settings hold all 42 rules in the setup page’s groups and the t
 		[{ label: 'Teams', value: '10' }],
 		'a platform that says nothing shows nothing'
 	);
+	assert.deepEqual(
+		termsView(
+			{ ...TERMS, waivers: 'order', waiver_order: 'rolling', tiebreak: 'head_to_head' },
+			12
+		).slice(1, 3),
+		[
+			{ label: 'Waivers', value: 'Waiver order, rolling' },
+			{ label: 'Tiebreak', value: 'Head to head' }
+		],
+		"an order league's settings name how the order moves and the tiebreak"
+	);
+});
+
+void test('the standings basis names the tiebreak and the waiver type the settings give (Lane 104)', () => {
+	const order = { waivers: 'order', waiver_budget: null } as const;
+	assert.equal(
+		standingsBasis('espn', { ...order, tiebreak: 'head_to_head', waiver_order: 'rolling' }),
+		"Standings follow ESPN's record, then head to head. PF and PA are points for and against, Streak the current run, Waiver the place in ESPN's order (rolling, 1st picks first)."
+	);
+	assert.equal(
+		standingsBasis('sleeper', {
+			...order,
+			tiebreak: 'points_for',
+			waiver_order: 'inverse_standings'
+		}),
+		"Standings follow Sleeper's record, then points for. PF and PA are points for and against, Streak the current run, Waiver the place in Sleeper's order (inverse standings, 1st picks first)."
+	);
+	// The snapshot carries neither, or the API is from before Lane 104.
+	assert.equal(
+		standingsBasis('espn', order),
+		"Standings follow ESPN's record, then points for, as ESPN lists them. PF and PA are points for and against, Streak the current run, Waiver the place in ESPN's order (1st picks first)."
+	);
+	// A budget league says the budget left whatever the order type.
+	assert.match(
+		standingsBasis('espn', { waivers: 'budget', waiver_budget: 100, waiver_order: 'rolling' }),
+		/FAAB the budget left of \$100\.$/
+	);
 });
 
 /** The site's copy guard. */
@@ -538,7 +575,7 @@ void test('copy guard: every League page word is fantasy words, with no dash or 
 	}
 	assert.equal(
 		standingsBasis('sleeper', TERMS),
-		"Standings follow Sleeper's record, then points for. PF and PA are points for and against, Streak the current run, FAAB the budget left of $1,000."
+		"Standings follow Sleeper's record, then points for, as Sleeper lists them. PF and PA are points for and against, Streak the current run, FAAB the budget left of $1,000."
 	);
 	assert.equal(
 		teamBasis(

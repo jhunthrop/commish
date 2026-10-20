@@ -53,6 +53,12 @@ export interface RailItem {
 
 export const HOME_HREF = '/';
 
+/** The board's name once the league plays: the bar's word and the rail's with no league selected. */
+export const REST_OF_SEASON = 'Rest of season';
+/** The rail's item for the board with a league selected, apart from Players (Lane 104, B40): our
+ * order in your league's view. */
+export const REST_IN_YOUR_LEAGUE = `${REST_OF_SEASON}, your league`;
+
 /** Where a mock draft starts: the room's setup. */
 const MOCK_SETUP = '/mock/new';
 /** The verb to a mock draft, wherever a page offers one: the season's pages and the league's. */
@@ -135,7 +141,7 @@ export const RAIL_ITEMS: readonly RailItem[] = [
 	screenItem('waivers', 'Waivers', 'waivers'),
 	screenItem('trades', 'Trades', 'trades'),
 	// The season's rail with no league selected puts the board after League (rail-order.ts, Lane 83).
-	{ ...BOARD, key: 'rest_first', label: 'Rest of season' },
+	{ ...BOARD, key: 'rest_first', label: REST_OF_SEASON },
 	{ ...ADVISOR, key: 'advisor_first' },
 	BOARD,
 	{
@@ -157,7 +163,7 @@ export const RAIL_ITEMS: readonly RailItem[] = [
 	},
 	{ ...MOCK, key: 'mock_late' },
 	ADVISOR,
-	{ ...BOARD, key: 'rest', label: 'Rest of season' },
+	{ ...BOARD, key: 'rest', label: REST_IN_YOUR_LEAGUE },
 	{
 		key: 'record',
 		section: 'record',

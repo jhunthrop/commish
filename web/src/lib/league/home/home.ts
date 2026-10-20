@@ -19,6 +19,11 @@ import { AS_OF_KICKOFF, projFinalWords, teBonusSentence } from '../box/basis.ts'
 
 type ScoreboardGame = Scoreboard['games'][number];
 type ScoringRules = components['schemas']['ScoringRules'];
+type Tiebreak = components['schemas']['Tiebreak'];
+type WaiverOrder = components['schemas']['WaiverOrder'];
+
+/** The terms' fields an API before Lane 104 does not send, read as unsaid when absent. */
+type TermsLane104 = Pick<LeagueTerms, 'tiebreak' | 'waiver_order'>;
 
 /** Every word the League page prints that is not a team's or a player's, for the copy guard. */
 export const HOME = {
@@ -34,6 +39,10 @@ export const HOME = {
 	streak: 'Streak',
 	budget: 'FAAB',
 	order: 'Waiver',
+	/** The waiver order's head of the line: the first in it picks first (Lane 104, B55). */
+	firstPicks: '1st picks first',
+	waiverOrder: 'Waiver order',
+	tiebreak: 'Tiebreak',
 	yourLineup: 'Your lineup',
 	setYourLineup: 'Set your lineup',
 	openLineup: 'Open Lineup',
@@ -60,6 +69,20 @@ export const HOME = {
 	uncounted: 'Not in Avg and Last',
 	uncountedLine: "Our stats lack these rules of yours, so a player's Avg and Last leave them out."
 } as const;
+
+/** The rule a tie on record is broken by, as the standings' basis says it (Lane 104, B48). */
+export const TIEBREAK_WORDS: Readonly<Record<Tiebreak, string>> = {
+	head_to_head: 'head to head',
+	points_for: 'points for',
+	points_against: 'points against',
+	division_record: 'division record'
+};
+
+/** How an order league's waiver order moves (Lane 104, B55). */
+export const WAIVER_ORDER_WORDS: Readonly<Record<WaiverOrder, string>> = {
+	rolling: 'rolling',
+	inverse_standings: 'inverse standings'
+};
 
 // ---- the scoreboard
 
@@ -709,7 +732,15 @@ export function termsView(terms: LeagueTerms, teams: number): { label: string; v
 				: `, $${terms.waiver_budget.toLocaleString('en-US')} a season`;
 		out.push({ label: 'Waivers', value: `${HOME.budget}${budget}` });
 	} else if (terms.waivers === 'order') {
-		out.push({ label: 'Waivers', value: 'Waiver order' });
+		const order = orderType(terms);
+		out.push({
+			label: 'Waivers',
+			value: order === null ? HOME.waiverOrder : `${HOME.waiverOrder}, ${order}`
+		});
+	}
+	const tiebreak = terms.tiebreak;
+	if (tiebreak !== undefined) {
+		out.push({ label: HOME.tiebreak, value: sentenceCase(TIEBREAK_WORDS[tiebreak]) });
 	}
 	const field = playoffField(terms);
 	if (field !== null) {
@@ -738,19 +769,51 @@ export function settingsLink(host: LeagueHost): string {
 
 // ---- the basis, at most five lines
 
-/** What the standings' numbers are, said once: the order, PF and PA, the streak, the waiver column. */
+/** How the league's order moves in words, null where the platform does not say (or an API before
+ * Lane 104 sends nothing). */
+function orderType(terms: TermsLane104): string | null {
+	return terms.waiver_order === undefined ? null : WAIVER_ORDER_WORDS[terms.waiver_order];
+}
+
+/** A word table's lower-case phrase as a cell's value: "Head to head". */
+function sentenceCase(words: string): string {
+	return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** The standings' order after the record (Lane 104, B48): the tiebreak the platform's settings give,
+ * else points for as the platform lists the teams. */
+function tiebreakWords(platform: string, terms: TermsLane104): string {
+	return terms.tiebreak === undefined
+		? `then points for, as ${platform} lists them`
+		: `then ${TIEBREAK_WORDS[terms.tiebreak]}`;
+}
+
+/** The waiver column's basis: the budget left in a budget league, the place in the order otherwise
+ * with how the order moves and who picks first (Lane 104, B55), nothing where the platform says
+ * neither. */
+function waiverBasis(
+	platform: string,
+	terms: Pick<LeagueTerms, 'waivers' | 'waiver_budget'> & TermsLane104
+): string {
+	if (terms.waivers === 'budget') {
+		const of =
+			terms.waiver_budget === null ? '' : ` of $${terms.waiver_budget.toLocaleString('en-US')}`;
+		return `, ${HOME.budget} the budget left${of}`;
+	}
+	if (terms.waivers !== 'order') return '';
+	const order = orderType(terms);
+	const how = order === null ? HOME.firstPicks : `${order}, ${HOME.firstPicks}`;
+	return `, ${HOME.order} the place in ${platform}'s order (${how})`;
+}
+
+/** What the standings' numbers are, said once: the order and its tiebreak, PF and PA, the streak,
+ * the waiver column. */
 export function standingsBasis(
 	host: LeagueHost,
-	terms: Pick<LeagueTerms, 'waivers' | 'waiver_budget'>
+	terms: Pick<LeagueTerms, 'waivers' | 'waiver_budget'> & TermsLane104
 ): string {
 	const platform = hostWords(host);
-	const waiver =
-		terms.waivers === 'budget'
-			? `, ${HOME.budget} the budget left${terms.waiver_budget === null ? '' : ` of $${terms.waiver_budget.toLocaleString('en-US')}`}`
-			: terms.waivers === 'order'
-				? `, ${HOME.order} the place in ${platform}'s order`
-				: '';
-	return `Standings follow ${platform}'s record, then points for. ${HOME.pointsFor} and ${HOME.pointsAgainst} are points for and against, ${HOME.streak} the current run${waiver}.`;
+	return `Standings follow ${platform}'s record, ${tiebreakWords(platform, terms)}. ${HOME.pointsFor} and ${HOME.pointsAgainst} are points for and against, ${HOME.streak} the current run${waiverBasis(platform, terms)}.`;
 }
 
 /** What a team's Proj and Pts are on the scoreboard and in the standings. */
