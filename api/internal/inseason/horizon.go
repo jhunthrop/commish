@@ -67,7 +67,7 @@ func (h Horizon) finalWords(from int) string {
 
 // rateWords is the sentence said once where the span runs past the run's
 // last week from a week the model counts (Lane 96 review M2): "Week 18
-// counts at his rate a game; our model runs through week 17." Empty
+// counts at each player's rate a game. Our model runs through week 17." Empty
 // otherwise.
 func (h Horizon) rateWords(from int) string {
 	if h.Last <= LastWeek || from > LastWeek {
@@ -77,5 +77,5 @@ func (h Horizon) rateWords(from int) string {
 	if h.Last-LastWeek > 1 {
 		weeks = fmt.Sprintf("Weeks %d to %d count", LastWeek+1, h.Last)
 	}
-	return fmt.Sprintf(" %s at his rate a game; our model runs through week %d.", weeks, LastWeek)
+	return fmt.Sprintf(" %s at each player's rate a game. Our model runs through week %d.", weeks, LastWeek)
 }
