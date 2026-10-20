@@ -259,8 +259,8 @@ func lineupSummary(lineup apitypes.LineupAdvice) apitypes.WeekLineup {
 		set = append(set, asSet(slot))
 	}
 	out.Changes = len(out.Swaps)
-	// The Lineup's own sentence once the week is over, one source for both screens.
-	out.WeekDone = lineup.WeekDone
+	// The Lineup's own sentence and state once every starter has played, one source for both screens.
+	out.WeekDone, out.WeekDoneState = lineup.WeekDone, lineup.WeekDoneState
 	out.Projection, out.AsSet = printedSum(ours), printedSum(set)
 	if out.Projection != nil && out.AsSet != nil {
 		gain := roundTenth(*out.Projection - *out.AsSet)
