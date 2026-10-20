@@ -446,19 +446,23 @@ def test_a_changed_projection_is_kept_each_day_and_another_weeks_read_never_coun
     assert (parsed.snapshots, kept) == (3, 2)
 
 
-# "Not published yet" is the provider saying so: a 404, an `error` envelope, or the week with its player
-# map present and empty. An empty body, a missing player map or any other shape is drift: stored and refused.
+# On the daily read, "not published yet" is a 404, an `error` envelope, an entirely empty body, or the
+# week with its player map present and empty: never stored, so nothing can poison a later pass. Drift is
+# a non-empty payload without the player map, or one that is not an object: stored and refused.
 _UNPUBLISHED_ANSWERS: Final = [
     pytest.param((404, {"statusCode": 404}), id="404"),
     pytest.param((200, {"statusCode": 200, "error": "No projections for week 7"}), id="error-envelope"),
+    pytest.param((200, {"statusCode": 200, "body": {}}), id="empty-object"),
+    pytest.param((200, {"statusCode": 200, "body": []}), id="empty-list"),
+    pytest.param((200, {"statusCode": 200, "body": ""}), id="empty-string"),
     pytest.param((200, {"statusCode": 200, "body": {"season": "2026", "week": "7", "playerProjections": {}}}), id="empty-map"),
     pytest.param((200, {"statusCode": 200, "body": {"season": "2026", "week": "7", "playerProjections": []}}), id="empty-list-map"),
 ]  # fmt: skip
 _DRIFT_ANSWERS: Final = [
     pytest.param({"season": "2026", "week": "7", "projections": {}}, id="missing-map"),
-    pytest.param({}, id="empty-object"),
-    pytest.param([], id="empty-list"),
-    pytest.param("", id="empty-string"),
+    pytest.param({"season": "2026", "week": "7"}, id="no-map-key"),
+    pytest.param(["not", "an", "object"], id="non-object-list"),
+    pytest.param("not an object", id="non-object-string"),
 ]
 _EMPTY_BODIES: Final = [pytest.param({}, id="{}"), pytest.param([], id="[]"), pytest.param("", id='""')]
 

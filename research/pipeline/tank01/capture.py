@@ -248,15 +248,15 @@ def _screen(feed: CaptureFeed, answer: object) -> tuple[Status, str] | None:
 def _projection_screen(read: ProjectionRead) -> Callable[[object], tuple[Status, str] | None]:
     """The week ahead's not-yet-published answer is its own outcome, logged and retried the next hour,
     never a failure. A slot's, two hours before kickoff, is a failure, and so is a slot's empty body;
-    neither is stored, so the slot reads again in its window. Every other answer (the week ahead's empty
-    body among them) is stored, and the parser refuses drift."""
+    neither is stored, so the slot reads again in its window. The week ahead's empty body is not yet
+    published either. Every other answer is stored, and the parser refuses drift."""
 
     def screen(answer: object) -> tuple[Status, str] | None:
         kind = projection_answer(answer)
         if kind is None:
             return None
         if read.ahead:
-            return ("unpublished", f"week {read.week} not published yet") if kind == "unpublished" else None
+            return "unpublished", f"week {read.week} not published yet"
         if isinstance(answer, Tank01Error):
             return None
         said = "no players" if kind == "unpublished" else "an empty body"
