@@ -242,6 +242,20 @@ export function statusOf(
 	};
 }
 
+/** His status as a row draws it at the page's clock (Lane 104, B57): Questionable and Doubtful are
+ * words about a game still to come, so once his game has kicked off they drop, and the platform's
+ * injured reserve, if any, is what stays; Out and a season-long list stay whatever the clock. */
+export function rowStatus(
+	designation: WeekFacts['designation'],
+	hostIR: boolean,
+	toCome: boolean,
+	zone: string = memberZone()
+): StatusView | null {
+	const status = statusOf(designation, hostIR, zone);
+	if (status === null || status.sits || toCome) return status;
+	return statusOf(null, hostIR, zone);
+}
+
 /** A row as an injured reserve row draws it (Lane 98, B34): no game, expected score or weather and no
  * Opp rank (his matchup is not his), and in the IR slot no points and no Proj, a figure he will not
  * score (review L2); null keeps the row whole. */
@@ -341,7 +355,7 @@ export function boxRow(
 		club: player.team,
 		position: positionWord(player.position),
 		pill: pillOf(player.position, ranked ? line.position_rank : null),
-		status: statusOf(facts.designation, player.injured_reserve, zone),
+		status: rowStatus(facts.designation, player.injured_reserve, ahead, zone),
 		reserve: onReserve(line),
 		game: gameOf(facts, zone, now),
 		expected: ahead ? expectedWords(facts) : null,
