@@ -95,7 +95,7 @@ async function leagueHome(page: Page, at: string, platform: string): Promise<voi
 	if (platform === 'ESPN') {
 		expect(
 			basis.includes('then points for, as ESPN lists them') &&
-				basis.includes("Waiver the place in ESPN's order (inverse standings, 1st picks first)"),
+				basis.includes("Waiver the place in ESPN's order (reverse standings, 1st picks first)"),
 			`${at}: the ESPN basis does not name the tiebreak and the order: "${basis}"`
 		);
 	}

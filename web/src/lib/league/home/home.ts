@@ -81,7 +81,7 @@ export const TIEBREAK_WORDS: Readonly<Record<Tiebreak, string>> = {
 /** How an order league's waiver order moves (Lane 104, B55). */
 export const WAIVER_ORDER_WORDS: Readonly<Record<WaiverOrder, string>> = {
 	rolling: 'rolling',
-	inverse_standings: 'inverse standings'
+	inverse_standings: 'reverse standings'
 };
 
 // ---- the scoreboard

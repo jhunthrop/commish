@@ -499,7 +499,7 @@ void test('the standings basis names the tiebreak and the waiver type the settin
 			tiebreak: 'points_for',
 			waiver_order: 'inverse_standings'
 		}),
-		"Standings follow Sleeper's record, then points for. PF and PA are points for and against, Streak the current run, Waiver the place in Sleeper's order (inverse standings, 1st picks first)."
+		"Standings follow Sleeper's record, then points for. PF and PA are points for and against, Streak the current run, Waiver the place in Sleeper's order (reverse standings, 1st picks first)."
 	);
 	// The snapshot carries neither, or the API is from before Lane 104.
 	assert.equal(

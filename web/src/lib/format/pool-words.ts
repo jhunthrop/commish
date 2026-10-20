@@ -8,7 +8,7 @@ import { count, plural } from './number.ts';
 
 export const POOL = {
 	ranked: 'ranked',
-	rosters: 'on rosters',
+	rosters: 'on NFL rosters',
 	board: 'on our board',
 	boardWithMarket: 'on our board with kickers and defenses',
 	room: 'left to draft'
@@ -16,7 +16,7 @@ export const POOL = {
 
 export type Pool = keyof typeof POOL;
 
-/** "619 ranked", "1,365 on rosters", "619 on our board", "665 on our board with kickers and
+/** "619 ranked", "1,365 on NFL rosters", "619 on our board", "665 on our board with kickers and
  * defenses", "1,413 left to draft". */
 export function poolCount(players: number, pool: Pool): string {
 	return `${count(players)} ${POOL[pool]}`;
@@ -31,7 +31,7 @@ export function boardPoolCount(rows: readonly { draftOrder?: boolean }[]): strin
 	);
 }
 
-/** The order's hits: its pool with no filter set ("1,365 on rosters"), the matches with a search, a
+/** The order's hits: its pool with no filter set ("1,365 on NFL rosters"), the matches with a search, a
  * position or a roster filter ("12 matches"), which are no longer the pool. */
 export function hitsWords(total: number, filtered: boolean): string {
 	return filtered ? plural(total, 'match', 'matches') : poolCount(total, 'rosters');
