@@ -44,7 +44,7 @@ export function finalWords(h: Horizon, from: number): string {
 	return `, the championship over weeks ${String(h.last - 1)} and ${String(h.last)}`;
 }
 
-/** " Week 18 counts at his rate a game; our model runs through week 17." where the span runs past
+/** " Week 18 counts at each player's rate a game. Our model runs through week 17." where the span runs past
  * the run's last week from a week the model counts (horizon.go rateWords), else nothing. */
 export function rateWords(h: Horizon, from: number): string {
 	if (h.last <= LAST_FANTASY_WEEK || from > LAST_FANTASY_WEEK) return '';
@@ -52,7 +52,7 @@ export function rateWords(h: Horizon, from: number): string {
 		h.last - LAST_FANTASY_WEEK > 1
 			? `Weeks ${String(LAST_FANTASY_WEEK + 1)} to ${String(h.last)} count`
 			: `Week ${String(h.last)} counts`;
-	return ` ${weeks} at his rate a game; our model runs through week ${String(LAST_FANTASY_WEEK)}.`;
+	return ` ${weeks} at each player's rate a game. Our model runs through week ${String(LAST_FANTASY_WEEK)}.`;
 }
 
 /** The weeks the rest-of-season order covers from a week through the horizon: a week's figure is

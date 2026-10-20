@@ -25,14 +25,16 @@
 	import {
 		BUILD_ZONE,
 		STRIP_ROWS,
+		answerReadAt,
 		liveBasis,
 		liveLeadPart,
 		liveStrip,
 		runStampPart,
-		shapeWords
+		shapeWords,
+		stripHead,
+		type StripRow
 	} from '#lib/front/live-board.ts';
 	import type { BasisPart } from '#lib/run/board-basis.ts';
-	import type { BoardRowView } from '#lib/run/schema.ts';
 	import { RAIL_OF_WORD_SET, railInSeason, type WordSet } from '#lib/ui/nav.ts';
 	import type { Component } from 'svelte';
 	import type { PageProps } from './$types';
@@ -83,7 +85,7 @@
 	const runStamp = $derived(
 		format.refreshedAt === undefined ? null : runStampPart(format.refreshedAt, zone)
 	);
-	let liveRead = $state<{ rows: BoardRowView[]; basis: BasisPart[] } | null>(null);
+	let liveRead = $state<{ rows: StripRow[]; basis: BasisPart[]; head: string } | null>(null);
 	$effect(() => {
 		const league = siteContext.league;
 		if (!siteContext.signedIn || format.rosFromWeek === undefined) {
@@ -104,8 +106,16 @@
 			.then((answer) => {
 				if (stale) return;
 				const rows = liveStrip(page.pool, answer, teams);
-				const lead = liveLeadPart(answer, shapeWords(teams, league !== null), Date.now(), zone);
-				liveRead = rows === null ? null : { rows, basis: liveBasis(page.basis, lead) };
+				const readAt = answerReadAt(answer, Date.now());
+				const lead = liveLeadPart(answer, shapeWords(teams, league !== null), readAt, zone);
+				liveRead =
+					rows === null
+						? null
+						: {
+								rows,
+								basis: liveBasis(page.basis, lead),
+								head: stripHead(format.label, answer.projection_scoring)
+							};
 			})
 			.catch(() => {
 				if (!stale) liveRead = null;
@@ -114,7 +124,8 @@
 			stale = true;
 		};
 	});
-	const stripRows = $derived(liveRead?.rows ?? page.rows);
+	const stripRows = $derived<StripRow[]>(liveRead?.rows ?? page.rows);
+	const stripTitle = $derived(liveRead?.head ?? stripHead(format.label, null));
 	const stripBasis = $derived(
 		liveRead?.basis ?? (runStamp === null ? page.basis : [...page.basis, runStamp])
 	);
@@ -190,14 +201,10 @@
 
 		<div class="body">
 			<section class="top" aria-label="The top of the board">
-				<PanelHead
-					title="The top of our {format.label} board"
-					aside="{page.rows.length} of {page.boardSize}"
-					level={2}
-				/>
+				<PanelHead title={stripTitle} aside="{page.rows.length} of {page.boardSize}" level={2} />
 				<BasisLine parts={stripBasis} tail={words?.capture ?? null} />
 				<div class="rows">
-					<BoardTable {columns} label="The top of our {format.label} board">
+					<BoardTable {columns} label={stripTitle}>
 						{#each stripRows as player, i (player.id)}
 							<Row
 								{player}
@@ -209,6 +216,7 @@
 								season={player.season}
 								framing={page.framing}
 								status={words?.rows[player.id] ?? null}
+								untiered={player.untiered === true}
 							>
 								{#snippet action()}<RowSheetMark {player} />{/snippet}
 							</Row>

@@ -3,10 +3,12 @@
 // front door's strip finds every player the API ranks first. Written to
 // web/.runs/runs/2026-10-15T13-oneboard (never committed); the stand-in's latest.json is left as is.
 // STAND-INS, named here and in the report: the strip's rows are order.json's, at the figures it
-// stores (its Projected before Thursday's game, its Over repl. as stored); the fixture API on the
-// Saturday clock takes Thursday's game out of its Projected (rest-now.ts), so a signed-in reader's
-// strip and the signed-out one differ by that game, as the API's live board and the run do. The
-// board's other rows are the stand-in's preseason figures, which no shot prints.
+// stores (its Projected before Thursday's game, its Over repl. as stored), and its first player whose
+// club played Thursday (THURSDAY_PLAYER, review R1-L3) sits tenth on the run with his Thursday game
+// counted and the tenth row's Over repl.; the fixture API on the Saturday clock takes Thursday's game
+// out and ranks him where order.json does, so a signed-in reader's strip and the signed-out one differ
+// by that game, as the API's live board and the run do. Every round is the run's rule, his place over
+// the teams. The board's other rows are the stand-in's preseason figures, which no shot prints.
 //
 //   node scripts/inseason-fixture/one-board-run.ts
 // then build with PUBLIC_RUN_ID=2026-10-15T13-oneboard PUBLIC_RUN_BASE_URL=.runs and start the
@@ -20,6 +22,11 @@ const RUN_AT = '2026-10-15T13:50:00.000Z';
 const FIRST_WEEK = 6;
 const LINES_THROUGH = 5;
 const FORMAT = 'ppr-12';
+const TEAMS = 12;
+/** The run's place for the Thursday player: the strip's last row. */
+const THURSDAY_PLACE = 9;
+/** Before the fixture week's Thursday game ends: a kickoff before this is Thursday's. */
+const THURSDAY_ENDS = '2026-10-16T12:00:00.000Z';
 const RUNS = new URL('../../.runs/runs/', import.meta.url);
 const OUT = new URL(`${ONE_BOARD_RUN_ID}/`, RUNS);
 
@@ -28,7 +35,11 @@ interface OrderRow {
 	rank: number;
 	rest_of_season_points: number | null;
 	points_over_replacement: number | null;
-	line: { player: { board_id: string | null } };
+	line: {
+		player: { board_id: string | null };
+		rest_of_season_per_game: number | null;
+		facts: { kickoff: string | null };
+	};
 }
 
 const readJson = async (url: URL): Promise<Json> => JSON.parse(await readFile(url, 'utf8')) as Json;
@@ -43,6 +54,7 @@ const board = await readJson(boardUrl);
 const rows = board.rows as Json[];
 const byId = new Map(rows.map((row) => [String(row.id), row]));
 const led: Json[] = [];
+let thursday: Json | null = null;
 for (const row of order.rows) {
 	const id = row.line.player.board_id;
 	const stored = id === null ? undefined : byId.get(id);
@@ -53,9 +65,13 @@ for (const row of order.rows) {
 	) {
 		continue;
 	}
-	led.push({
+	const kickoff = row.line.facts.kickoff;
+	const perGame = row.line.rest_of_season_per_game;
+	const played = kickoff !== null && kickoff < THURSDAY_ENDS && perGame !== null;
+	const numbers = {
 		...stored,
-		projected: row.rest_of_season_points,
+		// The run, made before Thursday's game, counts it.
+		projected: played ? row.rest_of_season_points + perGame : row.rest_of_season_points,
 		vor: row.points_over_replacement,
 		floor: null,
 		median: null,
@@ -63,8 +79,14 @@ for (const row of order.rows) {
 		preseasonRank: stored.ourRank,
 		preseasonPoints: stored.projected,
 		restFromWeek: FIRST_WEEK
-	});
+	};
+	if (played && thursday === null && row.rank > THURSDAY_PLACE + 1) thursday = numbers;
+	else led.push(numbers);
 	byId.delete(id ?? '');
+}
+if (thursday !== null) {
+	const tenth = led[THURSDAY_PLACE];
+	led.splice(THURSDAY_PLACE, 0, { ...thursday, vor: tenth?.vor ?? thursday.vor });
 }
 // The rest keep their stand-in figures, each with his preseason place, as an in-season row carries it.
 const rest = rows
@@ -75,7 +97,11 @@ const rest = rows
 		preseasonPoints: row.projected,
 		restFromWeek: FIRST_WEEK
 	}));
-board.rows = [...led, ...rest].map((row, i) => ({ ...row, ourRank: i + 1 }));
+board.rows = [...led, ...rest].map((row, i) => ({
+	...row,
+	ourRank: i + 1,
+	vorRound: Math.ceil((i + 1) / TEAMS)
+}));
 await writeFile(boardUrl, JSON.stringify(board));
 
 // Each player page's PPR numbers in season: his preseason place beside them, as the board's rows.

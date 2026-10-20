@@ -9,11 +9,13 @@ import type { components } from '#lib/api/types.ts';
 import type { BoardRowView } from '#lib/run/schema.ts';
 import {
 	STRIP_ROWS,
+	answerReadAt,
 	liveBasis,
 	liveLeadPart,
 	liveStrip,
 	runStampPart,
-	shapeWords
+	shapeWords,
+	stripHead
 } from './live-board.ts';
 
 type OrderAdvice = components['schemas']['OrderAdvice'];
@@ -129,12 +131,65 @@ void test("a signed-in member's strip is the API's order at the clock, to its te
 	assert.ok(rows.every((r) => r.gap === null && r.tier === 1 && r.vorRound === 1));
 });
 
-void test('a strip the run did not carry, or a figure the answer lacks, keeps the run strip', () => {
-	const stranger = {
+void test("a player the run's rows do not hold is drawn from the answer's own line (review R1-M1)", () => {
+	// A two-quarterback league's live top ten holds quarterbacks far down the one-quarterback board.
+	const qb = liveRow('allen', 1, 280.4, 160.2);
+	const rows = liveStrip(POOL, { ...ANSWER, rows: [qb, ...ANSWER.rows.slice(0, 3)] }, 12, 4);
+	assert.ok(rows !== null);
+	const first = rows[0];
+	assert.ok(first !== undefined);
+	assert.deepEqual(
+		[first.id, first.slug, first.ourRank, first.projected, first.vor, first.untiered],
+		['allen', 'allen', 1, 280.4, 160.2, true]
+	);
+	// No run tier, ADP or season columns for him: they are the run's.
+	assert.equal(first.adp, null);
+	assert.equal(first.season, undefined);
+	assert.deepEqual(
+		rows.slice(1).map((r) => r.untiered),
+		[undefined, undefined, undefined]
+	);
+	// A line with no page to link keeps the run strip.
+	const pageless = { ...qb, line: { ...qb.line, slug: null } };
+	assert.equal(
+		liveStrip(POOL, { ...ANSWER, rows: [pageless, ...ANSWER.rows.slice(0, 3)] }, 12, 4),
+		null
+	);
+});
+
+void test("the live Avg is the answer's, in the league's scoring, beside the run's games", () => {
+	const seasoned = POOL.map((r) => ({ ...r, season: { games: 5, pointsPerGame: 30.7 } }));
+	const half = {
 		...ANSWER,
-		rows: [...ANSWER.rows.slice(0, 3), liveRow('kamara', 4, 100, 4.3)]
+		rows: ANSWER.rows.map((r) => ({ ...r, line: { ...r.line, season_avg: 26.1 } }))
 	};
-	assert.equal(liveStrip(POOL, stranger, 12, 4), null);
+	const rows = liveStrip(seasoned, half, 12, 4);
+	assert.ok(rows !== null);
+	assert.ok(rows.every((r) => r.season?.games === 5 && r.season.pointsPerGame === 26.1));
+});
+
+void test("the strip's head names the scoring its figures are in (review R1-M2)", () => {
+	assert.equal(stripHead('PPR', null), 'The top of our PPR board');
+	assert.equal(stripHead('PPR', { format: 'ppr', league_own: true }), 'The top of our PPR board');
+	assert.equal(
+		stripHead('PPR', { format: 'half_ppr', league_own: false }),
+		'The top of our board, half PPR nearest your rules'
+	);
+	assert.equal(
+		stripHead('PPR', { format: 'ppr', league_own: false }),
+		'The top of our board, PPR nearest your rules'
+	);
+});
+
+void test("the lead's read time is the answer's read, else the page's clock as it landed (review R1-L4)", () => {
+	assert.equal(
+		answerReadAt({ read_at: '2026-10-20T00:21:00.000Z' }, READ_AT),
+		Date.parse('2026-10-20T00:21:00.000Z')
+	);
+	assert.equal(answerReadAt({ read_at: null }, READ_AT), READ_AT);
+});
+
+void test('a figure the answer lacks, or a short answer, keeps the run strip', () => {
 	const unvalued = {
 		...ANSWER,
 		rows: ANSWER.rows.map((r, i) => (i === 0 ? { ...r, points_over_replacement: null } : r))
