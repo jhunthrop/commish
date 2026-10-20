@@ -311,29 +311,34 @@ def _order_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
     ]
 
 
+# A report or a list named by its day (review L1): "Friday's report", "the Tuesday report", "Tuesday's
+# practice report", "Sunday's injury list".
 _REPORT_DAY: Final = re.compile(
-    r"\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?:'|\u2019)s\s+(?:injury\s+|game status\s+)?report\b"
+    r"\b(?:the\s+)?(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?:(?:'|\u2019)s)?\s+"
+    r"(?:injury\s+|practice\s+|game status\s+)?(?:report|list)\b",
+    re.IGNORECASE,
 )
 
 
+def _named(text: str) -> set[str]:
+    return {m.group(0).lower().replace("\u2019", "'").removeprefix("the ") for m in _REPORT_DAY.finditer(text)}
+
+
 def _report_day_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
-    """A report named by its day is the one the sheet names (Lane 96, B16): never a day no report was
-    issued on by the write."""
-    named = report_words(sheet.status.seen_at(sheet.written_at), sheet.game, sheet.season)
-    issued = _REPORT_DAY.match(named)
-    # Before the report, the facts name the one to come ("before Friday's game status report"): a read may too.
-    coming = None if issued is not None else _REPORT_DAY.search(named)
+    """A report or a list named by its day is one the sheet's own words name (Lane 96, B16 and review
+    L1): never a day no report was issued on by the write."""
+    named = report_words(sheet.status, sheet.written_at, sheet.game)
+    allowed = _named(named)
     out: list[str] = []
     for s in sentences:
         for found in _REPORT_DAY.finditer(s):
-            ahead = coming is not None and found.group(1) == coming.group(1) and s[: found.start()].endswith("before ")
-            if not ahead and (issued is None or found.group(1) != issued.group(1)):
-                remedy = (
-                    f'Name it as the facts do: "{named}".'
-                    if issued is not None
-                    else f'No game status report is out for his game yet. Say "{named}".'
+            if _named(found.group(0)) <= allowed:
+                continue
+            out.append(
+                _sentence_violation(
+                    f"names {found.group(0)}, a report the facts do not name", s, f'Name it as the facts do: "{named}".'
                 )
-                out.append(_sentence_violation(f"names {found.group(0)}, a report the facts do not name", s, remedy))
+            )
     return out
 
 

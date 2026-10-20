@@ -48,8 +48,8 @@ _STALE_REPORT: Final = "Tuesday's report"
 
 
 def _corrected(read: str) -> str:
-    """A recorded read with its report named as the list read Tuesday, the one change the report rule asks."""
-    return read.replace(_STALE_REPORT, "the Tuesday list")
+    """A recorded read with its report named as the list as of Tuesday, the one change the report rule asks."""
+    return read.replace(_STALE_REPORT, "the Tuesday-night list")
 
 
 class _Replay:
@@ -105,7 +105,7 @@ def test_the_fixture_is_a_starter_a_questionable_player_and_a_player_on_bye() ->
 def test_the_writer_refuses_a_recorded_read_naming_a_report_not_yet_issued(name: str) -> None:
     sheet, player = _sheet(name)
     assert _STALE_REPORT in player["read"]
-    assert "before Friday's game status report" in render_week_sheet(sheet)
+    assert "game status report on Friday" in render_week_sheet(sheet)
     # Each refusal asks again, past the answers recorded when the first took: the recording, replayed over.
     gateway = _Replay(player["answers"] * 4)
     result = write_week_read(sheet, gateway, tuple(player["avoid"]), frozenset(player["taken"]))  # type: ignore[arg-type]

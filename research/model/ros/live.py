@@ -35,6 +35,7 @@ from research.model.ros.model import (
 )
 from research.model.ros.payload import ARTIFACT_NAME, priors_from
 from research.model.weekly.round.scoring import SKILL_POSITIONS
+from research.season import REGULAR_SEASON_WEEKS
 
 ARTIFACT_VERSION: Final = 1
 # The first week the model's board is served. The preregistration named week 7 (the preseason board
@@ -110,6 +111,12 @@ class Window:
     through: int
 
 
+def counted_through(window: Window) -> int:
+    """The last week a rest of season counts: week 17, the last fantasy week, or once the season is past it
+    the window's own first week (Lane 96: a week 18 board ranks week 18, never nothing)."""
+    return max(LAST_FANTASY_WEEK, window.from_week)
+
+
 def window_of(pending_weeks: Sequence[int], through: int) -> Window | str:
     """The window, or why the board stays preseason. `pending_weeks` are the weeks with a game still
     to kick off at the run instant (from the stored schedule); `through` the last week whose games
@@ -119,8 +126,8 @@ def window_of(pending_weeks: Sequence[int], through: int) -> Window | str:
     from_week = min(pending_weeks)
     if from_week < FIRST_MODEL_WEEK:
         return f"week {from_week} is before the switch week ({FIRST_MODEL_WEEK})"
-    if from_week > LAST_FANTASY_WEEK:
-        return f"week {from_week} is past week {LAST_FANTASY_WEEK}, the last the model ranks"
+    if from_week > REGULAR_SEASON_WEEKS:
+        return f"week {from_week} is past week {REGULAR_SEASON_WEEKS}, the regular season's last"
     if through < 1:
         return "the store holds no week of this season's lines"
     return Window(from_week, min(through, from_week - 1))
@@ -216,6 +223,6 @@ def player_to_date(
         who.position,
         tuple(sorted(w for w in weeks if w <= window.through)),
         tuple(played),
-        tuple(sorted(w for w in slates.to_play.get(club, ()) if window.from_week <= w <= LAST_FANTASY_WEEK)),
+        tuple(sorted(w for w in slates.to_play.get(club, ()) if window.from_week <= w <= counted_through(window))),
         stale,
     )

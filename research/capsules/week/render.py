@@ -65,7 +65,7 @@ def _game_line(sheet: WeekSheet) -> str:
 
 def _status_line(sheet: WeekSheet) -> str:
     status, this_week = sheet.status.status, week_of(sheet.week, sheet.season)
-    report = report_words(sheet.status.seen_at(sheet.written_at), sheet.game, sheet.season)
+    report = report_words(sheet.status, sheet.written_at, sheet.game)
     if status is None:
         return f"Injury report: no designation for him on {report}."
     word = STATUS_WORDS.get(status, status)
@@ -186,10 +186,14 @@ def _board_line(sheet: WeekSheet) -> str | None:
     say = f'Any sentence with this rank says it is "in {b.order_words}".'
     if b.rest_of_season and b.from_week is not None:
         points = "" if b.points is None else f"{points_text(b.points)} PPR points, "
-        return (
-            f"Our rest-of-season order, {week_of(b.from_week, sheet.season)} to "
-            f"{week_of(LAST_FANTASY_WEEK, sheet.season)}{_as_of(b.published_at)}: {points}{place}. {say}"
+        # A week 18 board ranks week 18 alone (Lane 96): its span is that one week.
+        last = max(LAST_FANTASY_WEEK, b.from_week)
+        span = (
+            week_of(last, sheet.season)
+            if b.from_week == last
+            else f"{week_of(b.from_week, sheet.season)} to {week_of(last, sheet.season)}"
         )
+        return f"Our rest-of-season order, {span}{_as_of(b.published_at)}: {points}{place}. {say}"
     return f"Our preseason order, set before the season{_as_of(b.published_at)}: {place}. {say}"
 
 

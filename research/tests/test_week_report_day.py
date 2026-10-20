@@ -41,14 +41,24 @@ def test_the_game_status_report_is_two_days_before_and_the_day_before_a_thursday
 
 def test_a_status_seen_after_the_report_names_its_day() -> None:
     friday_evening = datetime(2026, 10, 16, 21, 0, tzinfo=UTC)
-    assert report_words(friday_evening, WeekGame(6, "ARI", True, KICKOFF), 2026) == "Friday's report"
+    game = WeekGame(6, "ARI", True, KICKOFF)
+    assert report_words(Status(None, friday_evening), SUNDAY_NIGHTLY, game) == "Friday's report"
+
+
+def test_a_list_changed_the_day_after_the_report_says_so() -> None:
+    """Review M3: a Saturday downgrade is not Friday's report."""
+    saturday = datetime(2026, 10, 17, 18, 0, tzinfo=UTC)
+    game = WeekGame(6, "ARI", True, KICKOFF)
+    assert report_words(Status("out", saturday), SUNDAY_NIGHTLY, game) == "Friday's report, updated Saturday"
+    sheet = replace(starter(), written_at=SUNDAY_NIGHTLY, status=Status("out", saturday))
+    assert "Out on Friday's report, updated Saturday" in render_week_sheet(sheet)
+    said = "Puka Nacua is Out on Friday's report, updated Saturday. Sit him. The Rams play at home."
+    assert not [v for v in week_rule_violations(said, sheet, "sit") if "report the facts" in v]
 
 
 def test_a_status_seen_before_the_report_names_the_list_and_the_report_to_come() -> None:
-    words = report_words(SATURDAY_LIST, GIBBS_NEXT, 2026)
-    assert (
-        words == "the injury list read Saturday 11:00 pm Central, before Friday's game status report for week 7 of 2026"
-    )
+    words = report_words(Status(None, SATURDAY_LIST), SUNDAY_NIGHTLY, GIBBS_NEXT)
+    assert words == "the injury list as of Saturday 11:00 pm Central, before week 7's game status report on Friday"
 
 
 def test_the_last_check_of_the_list_counts_once_it_came_by_the_write() -> None:
@@ -65,7 +75,9 @@ def test_the_gibbs_sheet_never_names_a_sunday_report() -> None:
     sheet = replace(on_bye(), written_at=SUNDAY_NIGHTLY, game=GIBBS_NEXT, status=Status(None, SATURDAY_LIST))
     text = render_week_sheet(sheet)
     assert "Sunday's report" not in text
-    assert "no designation for him on the injury list read Saturday 11:00 pm Central" in text
+    assert "no designation for him on the injury list as of Saturday 11:00 pm Central" in text
+    # The words name no season (review L2): a read that quotes them has named it already.
+    assert "game status report on Friday." in text
 
 
 def test_a_read_naming_a_report_the_facts_do_not_is_refused() -> None:
@@ -75,8 +87,17 @@ def test_a_read_naming_a_report_the_facts_do_not_is_refused() -> None:
         "He carries no designation on Sunday's report. Keep him on your roster for week 7."
     )
     found = [v for v in week_rule_violations(read, sheet, "sit") if "Sunday's report" in v]
-    assert len(found) == 1 and "No game status report is out" in found[0]
-    ahead = read.replace("on Sunday's report", "with the week 7 list read before Friday's game status report")
+    assert len(found) == 1 and "before week 7's game status report on Friday" in found[0]
+    # Review L1: a report or list named by its day in any form is held to the sheet's.
+    for other in ("on the Tuesday report", "on Tuesday's practice report", "on Sunday's injury list"):
+        assert [
+            v
+            for v in week_rule_violations(read.replace("on Sunday's report", other), sheet, "sit")
+            if "report the facts" in v
+        ]
+    ahead = read.replace(
+        "on Sunday's report", "on the injury list as of Saturday night, before week 7's game status report on Friday"
+    )
     assert not [v for v in week_rule_violations(ahead, sheet, "sit") if "report the facts do not name" in v]
 
 
