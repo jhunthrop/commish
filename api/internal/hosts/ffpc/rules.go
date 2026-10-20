@@ -29,12 +29,73 @@ type Rules struct {
 	// Duration row ("League Playoffs Weeks 13-14", else the week after
 	// "Regular season Weeks 1-12"), 0 when the row does not say.
 	PlayoffStartWeek int `json:"playoff_start_week,omitempty"`
+	// PlayoffLastWeek is the league playoffs' last week from the same row
+	// ("League Playoffs Weeks 13-14"), 0 when the row gives no range.
+	PlayoffLastWeek int `json:"playoff_last_week,omitempty"`
+	// HeadToHead says the Format (Regular Season) row states H2H matchups.
+	HeadToHead bool `json:"head_to_head,omitempty"`
+	// Seeds is how the rules seed the league playoffs, seed by seed
+	// (SeedRecord or SeedPoints), from the "Seed 1) Team with best regular
+	// season Record" lines; none when the page states no seeding.
+	Seeds []string `json:"seeds,omitempty"`
 }
+
+// How a playoff seed is earned, as the rules state it.
+const (
+	SeedRecord = "record"
+	SeedPoints = "points"
+)
 
 var (
 	playoffWeeks = regexp.MustCompile(`(?i)playoffs? weeks? ([0-9]{1,2})`)
 	regularWeeks = regexp.MustCompile(`(?i)regular season weeks? [0-9]{1,2}-([0-9]{1,2})`)
+	playoffSpan  = regexp.MustCompile(`(?i)league playoffs? weeks? ([0-9]{1,2})-([0-9]{1,2})`)
+	seedLine     = regexp.MustCompile(`Seed ([0-9]{1,2})\)`)
 )
+
+// seedsOf reads the seeding lines of a rules cell: each "Seed N)" and
+// the words up to the next, by record or by points, in seed order. A
+// line that says neither, or seeds out of order, reads as no seeding.
+func seedsOf(cell string) []string {
+	at := seedLine.FindAllStringSubmatchIndex(cell, -1)
+	var out []string
+	for i, m := range at {
+		n, _ := strconv.Atoi(cell[m[2]:m[3]])
+		end := len(cell)
+		if i+1 < len(at) {
+			end = at[i+1][0]
+		}
+		words := strings.ToLower(cell[m[1]:end])
+		switch {
+		case n != i+1:
+			return nil
+		case strings.Contains(words, "record"):
+			out = append(out, SeedRecord)
+		case strings.Contains(words, "point"):
+			out = append(out, SeedPoints)
+		default:
+			return nil
+		}
+	}
+	return out
+}
+
+// headToHead reports a regular season line that states H2H matchups
+// ("H2H matchups" under "Format (Regular Season):"); the championship
+// round's "No H2H matchups, total points only" is another section.
+func headToHead(section, value string) bool {
+	v := strings.ToLower(value)
+	return strings.HasPrefix(section, "format (regular season)") && strings.Contains(v, "h2h") && !strings.Contains(v, "no h2h")
+}
+
+// playoffEnd reads the Duration row's last league playoff week.
+func playoffEnd(duration string) int {
+	if m := playoffSpan.FindStringSubmatch(duration); m != nil {
+		n, _ := strconv.Atoi(m[2])
+		return boundedWeek(n)
+	}
+	return 0
+}
 
 // playoffStart reads the Duration row's first playoff week.
 func playoffStart(duration string) int {
@@ -94,12 +155,22 @@ func ParseRules(page []byte) (Rules, error) {
 	}
 	r := Rules{Scoring: map[string]float64{}}
 	found := false
+	// A row with no label continues the labelled row above it.
+	section := ""
 	for _, tr := range all(doc, tag("tr")) {
 		row := cells(tr)
 		if len(row) < 2 {
 			continue
 		}
-		found = ruleRow(&r, strings.ToLower(text(row[0])), text(row[1])) || found
+		label, value := strings.ToLower(text(row[0])), text(row[1])
+		if label != "" {
+			section = label
+		}
+		found = ruleRow(&r, label, value) || found
+		r.HeadToHead = r.HeadToHead || headToHead(section, value)
+		if seeds := seedsOf(value); len(seeds) > 0 && len(r.Seeds) == 0 {
+			r.Seeds = seeds
+		}
 	}
 	for _, a := range all(doc, tag("a")) {
 		if href := strings.TrimSpace(attr(a, "href")); officialRef.MatchString(href) {
@@ -134,7 +205,7 @@ func ruleRow(r *Rules, label, value string) bool {
 	case strings.HasPrefix(label, "starting lineup"):
 		r.Lineup, r.HasLineup = lineupOf(value), true
 	case strings.HasPrefix(label, "duration"):
-		r.PlayoffStartWeek = playoffStart(value)
+		r.PlayoffStartWeek, r.PlayoffLastWeek = playoffStart(value), playoffEnd(value)
 	default:
 		return false
 	}

@@ -14,6 +14,7 @@ import {
 	extraWords,
 	feedRows,
 	playoffRule,
+	seedingWords,
 	projections,
 	recordCell,
 	ruleFigure,
@@ -279,6 +280,39 @@ void test('the playoff rule sits under the last playoff spot with its weeks', ()
 	});
 	assert.equal(playoffRule({ playoff_teams: null, playoff_weeks: null }, 10), null);
 	assert.equal(playoffRule({ playoff_teams: 12, playoff_weeks: null }, 12), null);
+});
+
+void test("FFPC's seeding, on record and on points in turn, is said under the standings with no cut (Lane 94, B21)", () => {
+	const ffpc = {
+		...TERMS,
+		playoff_teams: null,
+		playoff_weeks: { first: 13, last: 14 },
+		playoff_seeds: ['record', 'points', 'record', 'points'] as const
+	};
+	const words = seedingWords({ ...ffpc, playoff_seeds: [...ffpc.playoff_seeds] }, 'ffpc');
+	assert.equal(
+		words,
+		'FFPC seeds 4 for the playoffs, weeks 13 to 14: 1 and 3 on record, 2 and 4 on points.'
+	);
+	assert.doesNotMatch(words, bannedPattern());
+	assert.equal(playoffRule(ffpc, 12), null);
+	assert.deepEqual(termsView({ ...ffpc, playoff_seeds: [...ffpc.playoff_seeds] }, 12).at(-1), {
+		label: 'Playoffs',
+		value: '4 teams, weeks 13 to 14'
+	});
+	// A field seeded on record alone is the cut; an API before Lane 94 sends no seeds.
+	assert.equal(seedingWords({ ...TERMS, playoff_seeds: ['record', 'record'] }, 'ffpc'), null);
+	assert.equal(seedingWords(TERMS, 'espn'), null);
+	assert.equal(
+		teamBasis(
+			'ffpc',
+			'2026-10-17T02:00:00.000Z',
+			{ format: 'ppr', league_own: false, te_bonus: 0.5 },
+			false,
+			ZONE
+		),
+		"A team's Proj adds its starters' published projections in PPR, FFPC adds 0.5 a catch for TEs, read Fri 9:00 pm Central. Pts are FFPC's so far."
+	);
 });
 
 const player = (

@@ -365,6 +365,50 @@ func TestFFPCReadsOnlyAsItsOwnMember(t *testing.T) {
 	}
 }
 
+// The front door's week reads an FFPC league as the member who attached
+// it, with their own sign-in (Lane 94, B10): never as no one, which asked
+// a signed-in member to connect FFPC. Its last read is the league's kept
+// read, the time the league page says, not the attach's.
+func TestFFPCWeekReadsAsItsMember(t *testing.T) {
+	rig, alice, _ := newFFPCRig(t)
+	ctx := context.Background()
+	rig.attach(t, alice)
+	rig.clock.now = rig.clock.now.Add(2 * time.Hour)
+	list, err := rig.svc.Week(ctx, alice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("%d leagues", len(list))
+	}
+	got := list[0]
+	if got.Problem != "" || got.Followed == nil {
+		t.Fatalf("the front door's read: problem %q, followed %v", got.Problem, got.Followed != nil)
+	}
+	if got.Followed.Snap.Ref.As != alice {
+		t.Fatalf("read as %s, want alice", got.Followed.Snap.Ref.As)
+	}
+	for _, read := range rig.members.reads {
+		if read.as != alice {
+			t.Fatalf("a read as %s for alice's league", read.as)
+		}
+	}
+	// A background read keeps a newer read of the league: every screen
+	// naming it says that read's time.
+	kept := got.Followed.Snap
+	kept.ReadAt = rig.clock.now
+	if stored, err := rig.store.PutSnapshot(ctx, kept); err != nil || !stored {
+		t.Fatalf("keep the read: %v %v", stored, err)
+	}
+	attached, err := rig.store.Attached(ctx, alice)
+	if err != nil || len(attached) != 1 {
+		t.Fatalf("attached %v %v", attached, err)
+	}
+	if a := attached[0]; a.LastReadAt == nil || !a.LastReadAt.Equal(rig.clock.now) {
+		t.Fatalf("the league's last read %v, want the kept read at %v", a.LastReadAt, rig.clock.now)
+	}
+}
+
 // A member whose attachment has no read of their own and no FFPC
 // connection (an attachment that rode another member's sign-in before
 // 00023) is told to connect FFPC, and no one else's sign-in is tried.
@@ -385,7 +429,7 @@ func TestFFPCMemberWithNoConnectionIsToldToConnect(t *testing.T) {
 	}
 	w := httptest.NewRecorder()
 	if !writeMemberError(w, httptest.NewRequest(http.MethodGet, "/", nil), HostFFPC, ErrNotConnected) ||
-		!strings.Contains(w.Body.String(), "Connect FFPC to keep this league in sync.") {
+		!strings.Contains(w.Body.String(), "Sign in to FFPC to keep this league in sync.") {
 		t.Fatalf("the words: %s", w.Body.String())
 	}
 	for _, read := range rig.members.reads {

@@ -49,7 +49,7 @@ func TestStandings(t *testing.T) {
 	}
 	top := list[0]
 	if top.TeamID != 3 || top.Name != "5 - Diron Talbert" || top.Wins != 4 || top.Losses != 1 || top.Ties != 0 ||
-		!top.HasRecord || top.PointsFor != 748.50 || top.PointsAgainst != 655.25 {
+		!top.HasRecord || top.PointsFor != 748.50 || top.PointsAgainst != 655.25 || !top.HasAgainst || top.Streak != "W4" {
 		t.Fatalf("first %+v", top)
 	}
 	ids := map[int]bool{}
@@ -241,6 +241,16 @@ func TestRulesAndScoring(t *testing.T) {
 		if other.PlayoffStartWeek != want {
 			t.Errorf("duration %q: playoffs from %d, want %d", value, other.PlayoffStartWeek, want)
 		}
+	}
+	if r.PlayoffLastWeek != 14 {
+		t.Fatalf("the Duration row says League Playoffs Weeks 13-14, read the last as %d", r.PlayoffLastWeek)
+	}
+	if !r.HeadToHead {
+		t.Fatal("the Format (Regular Season) row says H2H matchups")
+	}
+	wantSeeds := []string{SeedRecord, SeedPoints, SeedRecord, SeedPoints}
+	if !slices.Equal(r.Seeds, wantSeeds) {
+		t.Fatalf("seeds %v, want %v", r.Seeds, wantSeeds)
 	}
 	if r.OfficialRules != "https://myffpc.com/cms/public/play/big-gorilla-official-rules" {
 		t.Fatalf("official rules %q", r.OfficialRules)

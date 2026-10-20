@@ -7,6 +7,7 @@ import type { components } from '#lib/api/types.ts';
 import {
 	PLATFORMS,
 	PLATFORM_WORDS,
+	leagueCounts,
 	platformRows,
 	readWords,
 	type PlatformRow
@@ -41,7 +42,10 @@ void test('every platform has its row, in the table order, Sleeper as a fixed fa
 	const espn = rowOf(rows, 'espn');
 	const sleeper = rowOf(rows, 'sleeper');
 	assert.equal(sleeper.note, 'Followed by league id, nothing to connect');
-	assert.deepEqual([sleeper.state, sleeper.line], ['No sign-in', 'Leagues read in public']);
+	assert.deepEqual(
+		[sleeper.state, sleeper.line, sleeper.dot],
+		['Not followed', 'Leagues read in public', 'off']
+	);
 	assert.equal(sleeper.verb?.kind, 'follow');
 	assert.equal(espn.state, PLATFORM_WORDS.notOpen);
 	assert.equal(espn.verb, null);
@@ -81,7 +85,7 @@ void test('a connection reads its state, consent, writes and last read from the 
 		[espn.state, espn.line, espn.writes, espn.read, espn.verb?.words],
 		[
 			'Connected',
-			'Since Oct 3, consent version 3',
+			'Since Oct 3, no league followed',
 			{ on: false, words: 'Lineups on ESPN are not open to your account yet.' },
 			'6 minutes ago',
 			'Disconnect'
@@ -97,6 +101,33 @@ void test('a connection reads its state, consent, writes and last read from the 
 		[ffpc.dot, ffpc.state, ffpc.read, ffpc.verb],
 		['bad', 'Signed out by FFPC', 'Oct 12', { kind: 'again', words: 'Sign in to FFPC again' }]
 	);
+});
+
+void test('one state word a platform, each connection saying what it is connected to (Lane 94, B10 B59)', () => {
+	const rows = platformRows(
+		{
+			enabled: ['espn', 'yahoo', 'ffpc'],
+			connections: [
+				conn({ host: 'espn', proven: false, connected_at: '2026-10-19T12:00:00.000Z' }),
+				conn({ host: 'yahoo', connected_at: '2026-10-19T12:00:00.000Z', last_read_at: null }),
+				conn({ host: 'ffpc', connected_at: '2026-10-13T12:00:00.000Z' })
+			]
+		},
+		NOW,
+		leagueCounts([{ host: 'espn' }, { host: 'ffpc' }, { host: 'ffpc' }, { host: 'sleeper' }])
+	);
+	const said = (key: PlatformRow['key']): [string, string] => {
+		const row = rowOf(rows, key);
+		return [row.state, row.line];
+	};
+	assert.deepEqual(said('espn'), ['Connected', 'Since Oct 19, 1 league followed']);
+	assert.deepEqual(said('yahoo'), ['Connected', 'Since Oct 19, no league followed']);
+	assert.deepEqual(said('ffpc'), ['Signed in', 'Since Oct 13, 2 leagues followed']);
+	assert.deepEqual(said('sleeper'), ['Followed', '1 league followed']);
+	assert.deepEqual(said('mfl'), ['Not yet open', 'Connecting opens here soon']);
+	for (const row of rows) {
+		assert.doesNotMatch(`${row.state} ${row.line}`, /consent|checked/, row.key);
+	}
 });
 
 void test('a read never made says so', () => {

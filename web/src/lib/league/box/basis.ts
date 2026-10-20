@@ -34,16 +34,26 @@ export interface ProjFacts {
 	league: boolean;
 	/** The column's head: Proj on a box score, Wk 6 where the season's Projected sits beside it. */
 	head?: string;
+	/** The league's platform, named where its rules add what the column does not carry. */
+	host?: LeagueHost;
 }
 
-/** "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm." */
+/** The figures' scoring against the league's: its own, the nearest column, or the column shown
+ * with the tight end's extra a catch the league adds (Lane 94, B26: never "PPR" for FFPC's rules). */
+function whoseScoring(proj: ProjFacts, format: string): string {
+	if (!proj.league) return ` in ${format}`;
+	if (proj.scoring.league_own) return ' on your rules';
+	const bonus = proj.scoring.te_bonus;
+	if (bonus === undefined) return `, ${format} nearest your rules`;
+	const who = proj.host === undefined ? 'your league' : hostWords(proj.host);
+	return `, ${format} shown, ${who} adds ${String(bonus)} a catch for TEs`;
+}
+
+/** "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm.", or for
+ * FFPC's rules "..., PPR shown, FFPC adds 0.5 a catch for TEs, read Mon 6:00 pm." */
 export function projPart(proj: ProjFacts, clock: Clock): string {
 	const format = FORMAT_WORDS[proj.scoring.format];
-	const whose = !proj.league
-		? ` in ${format}`
-		: proj.scoring.league_own
-			? ' on your rules'
-			: `, ${format} nearest your rules`;
+	const whose = whoseScoring(proj, format);
 	const defenses = proj.defense ? ', defenses on default scoring' : '';
 	const when = proj.readAt === null ? 'not in yet' : `read ${stamp(proj.readAt, clock)}`;
 	return `${proj.head ?? BOX.proj} is this week's published projection${whose}${defenses}, ${when}.`;
@@ -172,7 +182,7 @@ export interface BoxBasisFacts {
 export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): BasisPart[] {
 	const defense = facts.lines.some((l) => l.player.position === 'DEF');
 	const proj = facts.projection
-		? said(projPart({ ...facts.projection, defense, league: true }, clock))
+		? said(projPart({ ...facts.projection, defense, league: true, host: facts.host }, clock))
 		: [];
 	const { lineup } = facts;
 	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.

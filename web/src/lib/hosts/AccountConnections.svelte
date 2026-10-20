@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { links } from '#lib/site/links.ts';
+	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
@@ -18,9 +19,10 @@
 		type HostConnected,
 		type HostConnections
 	} from './api.ts';
-	import { ESPN_CONSENT, MFL_CONSENT } from './connection-words.ts';
+	import { ESPN_CONSENT, MFL_CONSENT, againWords, keepReadingVerb } from './connection-words.ts';
 	import {
 		PLATFORM_WORDS,
+		leagueCounts,
 		platformRows,
 		type Platform,
 		type PlatformRow
@@ -61,7 +63,9 @@
 
 	onMount(load);
 
-	const rows = $derived(hosts && readAt ? platformRows(hosts, readAt) : []);
+	/** Each platform's leagues, from the shell's list, so a connection says what it is connected to. */
+	const counts = $derived(leagueCounts(siteContext.leagues));
+	const rows = $derived(hosts && readAt ? platformRows(hosts, readAt, counts) : []);
 
 	/** What disconnecting deleted, said once it went through. */
 	const GONE: Readonly<Record<ConnectedHost, string>> = {
@@ -202,8 +206,8 @@
 			<div class="form">
 				<ESPNConnect
 					label={rows.find((r) => r.key === 'espn')?.verb?.kind === 'again'
-						? 'Connect ESPN again'
-						: 'Connect ESPN'}
+						? againWords('espn')
+						: keepReadingVerb('espn')}
 					onconnected={connected}
 				/>
 			</div>
@@ -211,15 +215,15 @@
 			<div class="form">
 				<MFLConnect
 					label={rows.find((r) => r.key === 'mfl')?.verb?.kind === 'again'
-						? 'Connect MyFantasyLeague again'
-						: 'Connect MyFantasyLeague'}
+						? againWords('mfl')
+						: keepReadingVerb('mfl')}
 					onconnected={() => connected()}
 				/>
 			</div>
 		{:else if form === 'ffpc'}
 			<div class="form"><FFPCSignIn onconnected={load} /></div>
 		{:else if form === 'yahoo'}
-			<div class="form"><YahooConnect label="Connect Yahoo again" /></div>
+			<div class="form"><YahooConnect label={againWords('yahoo')} /></div>
 		{/if}
 		{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 		{#if keeps.length > 0}
