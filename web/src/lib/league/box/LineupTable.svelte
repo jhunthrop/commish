@@ -167,7 +167,7 @@
 	}
 
 	.cols .rank {
-		width: 80px;
+		width: 64px;
 	}
 
 	.cols .game {

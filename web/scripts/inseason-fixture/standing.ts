@@ -27,16 +27,25 @@ function secondMention(name: string): string {
 interface Left {
 	playing: string[];
 	coming: string[];
+	/** Of them, a QB or D/ST, whose points can still fall (standing.go canFall). */
+	canFall: number;
 }
+
+/** The lead a leader's QB or D/ST still to score cannot undo (standing.go DecidedMargin). */
+const DECIDED_MARGIN = 10;
+const FALLS = new Set(['QB', 'DEF']);
 
 /** A side's starters who can still score (standing.go leftOf). */
 function leftOf(lines: readonly PlayerLine[], moment: StandingMoment): Left {
-	const out: Left = { playing: [], coming: [] };
+	const out: Left = { playing: [], coming: [], canFall: 0 };
 	for (const line of lines) {
 		if (line.facts.bye || line.facts.kickoff === null || moment.final(line)) continue;
 		const name = secondMention(line.player.name);
-		if (!kickedOffAt(line, moment.now)) out.coming.push(name);
-		else if (!sitsOut(line)) out.playing.push(name);
+		const coming = !kickedOffAt(line, moment.now);
+		if (!coming && sitsOut(line)) continue;
+		if (coming) out.coming.push(name);
+		else out.playing.push(name);
+		if (FALLS.has(line.player.position)) out.canFall++;
 	}
 	return out;
 }
@@ -94,7 +103,10 @@ export function standingOf(
 	if (count(ours) === 0 && count(others) === 0)
 		return { standing: resultWords(margin), decided: false };
 	const lead = leadWords(margin);
-	const decided = (margin < 0 && count(ours) === 0) || (margin > 0 && count(others) === 0);
+	const settled = (trailing: Left, leader: Left, lead: number): boolean =>
+		count(trailing) === 0 && (leader.canFall === 0 || lead >= DECIDED_MARGIN);
+	const decided =
+		(margin < 0 && settled(ours, others, -margin)) || (margin > 0 && settled(others, ours, margin));
 	if (count(ours) === 0)
 		return { standing: `${lead} with nobody left, ${leftWords(others)} for them`, decided };
 	if (count(others) === 0)
@@ -104,6 +116,9 @@ export function standingOf(
 		decided
 	};
 }
+
+/** How many missed slots the line names before it counts the rest (miss.go missesNamed). */
+const MISSES_NAMED = 2;
 
 /** The slot as the miss line names it (words.go missSlot). */
 const MISS_SLOT: Readonly<Record<LineupSlot['slot'], string>> = {
@@ -134,7 +149,7 @@ const verbOf = (line: PlayerLine, moment: StandingMoment): string =>
  * moment with their points: each differing slot once both players have kicked off, then once every
  * starter of both lineups is final what our lineup would have scored. */
 export function missedOf(pick: LineupAdvice, moment: StandingMoment): string | null {
-	const misses: string[] = [];
+	const misses: { words: string; cost: number }[] = [];
 	let ours = 0;
 	let final = true;
 	const over = (l: PlayerLine): boolean =>
@@ -149,11 +164,14 @@ export function missedOf(pick: LineupAdvice, moment: StandingMoment): string | n
 		const half = `${slot.ours.player.name} ${verbOf(slot.ours, moment)} ${tenth(scored)} on your bench`;
 		const set = slot.host;
 		if (set === null) {
-			misses.push(`Your ${name} was empty while ${half}.`);
+			misses.push({ words: `Your ${name} was empty while ${half}`, cost: scored });
 			continue;
 		}
 		if (set.facts.bye) {
-			misses.push(`${set.player.name} was on bye in your ${name} while ${half}.`);
+			misses.push({
+				words: `${set.player.name} was on bye in your ${name} while ${half}`,
+				cost: scored
+			});
 			continue;
 		}
 		if (!kickedOffAt(set, moment.now)) continue;
@@ -162,9 +180,19 @@ export function missedOf(pick: LineupAdvice, moment: StandingMoment): string | n
 		const status = set.facts.designation?.status;
 		const who =
 			status === undefined ? set.player.name : `${set.player.name}, ${MARKS[status] ?? ''},`;
-		misses.push(`${who} ${verbOf(set, moment)} ${tenth(pts)} in your ${name} while ${half}.`);
+		misses.push({
+			words: `${who} ${verbOf(set, moment)} ${tenth(pts)} in your ${name} while ${half}`,
+			cost: scored - pts
+		});
 	}
 	if (misses.length === 0) return null;
 	const total = final ? [`Our lineup would have scored ${tenth(ours)}.`] : [];
-	return [...misses, ...total].join(' ');
+	// The two slots that cost the most named, the rest counted (miss.go missesNamed).
+	const named = [...misses].sort((a, b) => b.cost - a.cost).slice(0, MISSES_NAMED);
+	const more = misses.length - named.length;
+	const said = named.map((m, i) => {
+		if (i < named.length - 1 || more === 0) return `${m.words}.`;
+		return `${m.words}, and ${more === 1 ? 'one' : String(more)} more.`;
+	});
+	return [...said, ...total].join(' ');
 }

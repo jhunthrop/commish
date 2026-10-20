@@ -1,19 +1,21 @@
-// Screenshots of the ESPN fixture league's Matchup and Lineup (Lane 99), at 1280 and 390, light at a
-// desk and dark in a hand, on whichever of three clocks the fixture API runs: the week before its
+// Screenshots of the ESPN fixture league's Matchup and Lineup (Lane 99), at 1440 and 1280 light at a
+// desk and 390 dark in a hand, on whichever of three clocks the fixture API runs: the week before its
 // kickoffs (FIXTURE_WEEK_CLOCK), Monday night with the Monday game under way (FIXTURE_LIVE_CLOCK) and
 // the Tuesday after (FIXTURE_TUESDAY_CLOCK). It asserts both tables head the position chip Our rank and
 // say what it is in the basis; the Lineup strip names whose lineup its figure is, its link says where
 // it goes, its rule for our pick is said under the rows and never above them, and the Opp rank's key
 // sits under its head with no colour on a game played; from the first kickoff the Matchup bug prints
-// the API's standing line and the Lineup strip the API's miss line, never before it. Exits non-zero on
-// any fault.
+// the API's standing line and the Lineup strip the API's miss line, never before it. It prints each
+// basis's rendered lines and holds them to five at a desk and eight on a phone (BASIS_BUDGET), and at
+// a desk every name in the Matchup's boxes keeps to one line (fix round 1). Exits non-zero on any
+// fault.
 //
 //   node scripts/standing-shots.ts [web origin] [out dir]
 // with the site built against PUBLIC_API_URL at the fixture API (API_ORIGIN, default
 // http://localhost:8999), and the fixture API running there on one of the three clocks.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
-import { RANK_PART } from '../src/lib/league/box/basis.ts';
+import { PICK_PART, RANK_OPP_PART, RANK_PART } from '../src/lib/league/box/basis.ts';
 import { BOX } from '../src/lib/league/box/box.ts';
 import { LINEUP } from '../src/lib/league/box/lineup.ts';
 import type { LineupAdvice, MatchupBox } from '../src/lib/league/inseason/api.ts';
@@ -26,11 +28,13 @@ import {
 	installFixtureApiClock
 } from './inseason-fixture/clock.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
+import { BASIS_BUDGET, basisLines } from './basis-lines.ts';
 
 const web = process.argv[2] ?? 'http://localhost:4199';
 const out = new URL(process.argv[3] ?? '../screenshots/standing/', import.meta.url);
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8999').origin;
 const SHOTS: readonly (readonly ['dark' | 'light', number])[] = [
+	['light', 1440],
 	['light', 1280],
 	['dark', 390]
 ];
@@ -40,7 +44,8 @@ const PHONE_HEIGHT = 844;
 const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const league = FIXTURE_IDS.espnDone;
-const RULE = 'We start the highest Proj at each slot';
+/** The desk's budget at every desk width (BASIS_BUDGET names 1440). */
+const DESK_BUDGET = 5;
 
 const MOMENTS: Readonly<Record<string, string>> = {
 	[FIXTURE_WEEK_CLOCK]: 'week',
@@ -65,6 +70,7 @@ const lineup = await apiAnswer<LineupAdvice>('lineup');
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 const faults: string[] = [];
+const counts: string[] = [];
 
 async function context(theme: string, width: number): Promise<BrowserContext> {
 	const phone = width <= PHONE_MAX;
@@ -137,8 +143,12 @@ async function lineupScreen(page: Page, at: string, width: number): Promise<void
 		`${at}: the rule for our pick above the rows`
 	);
 	const basis = await page.locator('[data-basis]').last().innerText();
-	expect(basis.startsWith(RULE), `${at}: the basis does not open with the rule for our pick`);
-	expect(basis.includes(RANK_PART), `${at}: the basis does not say what Our rank is`);
+	if (width > PHONE_MAX)
+		expect(
+			basis.startsWith(PICK_PART),
+			`${at}: the basis does not open with the rule for our pick`
+		);
+	expect(basis.includes(RANK_OPP_PART), `${at}: the basis does not say what Our rank is`);
 	const missed = await texts(page, 'div.strip .missed');
 	expect(
 		(missed[0] ?? null) === (lineup.missed ?? null),
@@ -163,6 +173,16 @@ for (const [theme, width] of SHOTS) {
 		await settle(page);
 		if (name === 'matchup') await matchup(page, at);
 		else await lineupScreen(page, at, width);
+		const lines = await basisLines(page);
+		const budget = width > PHONE_MAX ? DESK_BUDGET : (BASIS_BUDGET[width] ?? DESK_BUDGET);
+		counts.push(`${at}: basis ${String(lines)} lines (of ${String(budget)})`);
+		expect(lines <= budget, `${at}: basis ${String(lines)} lines, over ${String(budget)}`);
+		if (name === 'matchup' && width > PHONE_MAX) {
+			const wrapped = await page.$$eval('table.box .nm a, table.box .nm b', (names) =>
+				names.filter((n) => n.getClientRects().length > 1).map((n) => n.textContent)
+			);
+			expect(wrapped.length === 0, `${at}: names on two lines: ${wrapped.join(', ')}`);
+		}
 		const wide = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
 		expect(!wide, `${at}: scrolls sideways`);
 		await page.screenshot({
@@ -174,7 +194,7 @@ for (const [theme, width] of SHOTS) {
 }
 await browser.close();
 if (faults.length > 0) {
-	process.stderr.write(`${faults.join('\n')}\n`);
+	process.stderr.write(`${[...counts, ...faults].join('\n')}\n`);
 	process.exit(1);
 }
-process.stdout.write(`Standing shots (${moment}) in ${out.pathname}\n`);
+process.stdout.write(`${counts.join('\n')}\nStanding shots (${moment}) in ${out.pathname}\n`);

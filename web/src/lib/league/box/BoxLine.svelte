@@ -2,7 +2,6 @@
 	import type { Snippet } from 'svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
-	import { pillRank } from '#lib/run/held-places.ts';
 	import {
 		BOX,
 		boxNumber,
@@ -171,13 +170,13 @@
 		>
 	</td>
 	{#if rankCell}
+		<!-- His place in our order alone: unranked (or a defense) is "--", and a season-long list's
+		     word stays in his status chip, never here (fix round 1, MEDIUM-2). -->
 		<td class="rank"
-			>{#if row.pill}<PositionPill
+			>{#if row.pill && row.pill.rank !== null}<PositionPill
 					position={row.pill.position}
-					rank={row.pill.rank === null
-						? (row.status?.rank ?? undefined)
-						: pillRank(row.status, row.pill.rank)}
-				/>{/if}</td
+					rank={row.pill.rank}
+				/>{:else}<span class="none">{BOX.none}</span>{/if}</td
 		>
 	{/if}
 	{#if !compact}<td class="game"><BoxGame {row} {clears} /></td>{/if}
@@ -301,6 +300,12 @@
 		height: 22px;
 		padding: 0 6px;
 		border-radius: var(--r-sm);
+	}
+
+	/* A rank drawn without its colour sits flush, so its comma on the phone's line follows it. */
+	.rk.even {
+		padding: 0;
+		min-width: 0;
 	}
 
 	.rk.easy {
@@ -544,6 +549,10 @@
 			min-width: 0;
 			padding: 0 3px;
 			font-weight: 700;
+		}
+
+		.phone-ev .rk.even {
+			padding: 0;
 		}
 	}
 </style>

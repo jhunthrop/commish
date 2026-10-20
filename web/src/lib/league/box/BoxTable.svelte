@@ -176,8 +176,9 @@
 		width: 48px;
 	}
 
+	/* Sized to the chip ("WR 149"), so the player keeps the room for his name. */
 	.cols .rank {
-		width: 64px;
+		width: 52px;
 	}
 
 	/* Narrow enough beside the Our rank column that two boxes side by side keep a name on a line. */
@@ -235,6 +236,21 @@
 		color: var(--ink-3);
 		background: var(--bg);
 		border-bottom: 1px solid var(--line);
+	}
+
+	/* At a desk a name keeps to one line (fix round 1, HIGH-2): the box is two side by side. */
+	@media (min-width: 761px) {
+		.box :global(.nm) {
+			white-space: nowrap;
+		}
+
+		/* The game cell gives way first: its kickoff and facts wrap before a name would. */
+		.box :global(.opp),
+		.box :global(.facts) {
+			flex-wrap: wrap;
+			white-space: normal;
+			column-gap: 4px;
+		}
 	}
 
 	@media (max-width: 760px) {

@@ -21,7 +21,7 @@
 		started: boolean;
 		/** "ESPN 1 min ago" beside a live score, null before kickoff and once final. */
 		read: string | null;
-		/** "Down 14.1 with nobody left; they have McCaffrey and Kittle playing", the API's, null before
+		/** "Down 14.1 with nobody left, McCaffrey and Kittle playing for them", the API's, null before
 		 * kickoff or without one. */
 		standing?: string | null;
 	}

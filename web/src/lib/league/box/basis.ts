@@ -44,8 +44,10 @@ export interface ProjFacts {
 /** What a game past kickoff keeps (Lane 92, B27), the end of the Proj sentence. */
 export const AS_OF_KICKOFF = 'as of kickoff for a game under way or final';
 
-/** What Proj final is (Lane 92, B22, round 2), said once where a game has kicked off. */
-export const PROJ_FINAL_PART = `${BOX.projFinal} adds the ${BOX.pts} so far and the ${BOX.proj} of the starters still to play, and a starter in play adds the rest of his ${BOX.proj}.`;
+/** What Proj final is (Lane 92, B22, round 2), said once where a game has kicked off: a starter to
+ * play has his whole Proj left, one in play the rest of it, one done none (Lane 99 fix round 1 said it
+ * in one clause, so the phone's basis keeps to eight lines). */
+export const PROJ_FINAL_PART = `${BOX.projFinal} adds the ${BOX.pts} and the ${BOX.proj} each starter has left.`;
 
 /** Why a Proj final is drawn "--" (round 2), said once where one is. */
 export const NO_PROJ_FINAL_PART = `No ${BOX.projFinal} while a starter still to play has no ${BOX.proj}.`;
@@ -119,9 +121,16 @@ export function gamePart(
 
 export const OPP_PART = `${BOX.oppRank} is points allowed to his position, 1st fewest.`;
 
+/** Our rank and Opp rank in one sentence where both are drawn (the Lineup, Lane 99 fix round 1). */
+export const RANK_OPP_PART = `${BOX.ourRank} is his place at his position in our order, ${BOX.oppRank} the points allowed to it, 1st fewest.`;
+
 /** What the position chip under the Our rank head is (Lane 99, B24), one sentence for the Matchup and
- * the Lineup. */
-export const RANK_PART = `${BOX.ourRank} is his place at his position in our rest-of-season order.`;
+ * the Lineup (fix round 1: short, so the phone's basis keeps to eight lines). */
+export const RANK_PART = `${BOX.ourRank} is his place at his position in our order.`;
+
+/** The rule our pick follows, said under the Lineup's rows (Lane 99, B11; fix round 1 shortened it
+ * to one clause beside the Our rank sentence). */
+export const PICK_PART = `Our pick starts the highest ${BOX.proj} at each slot.`;
 
 /** When a game's final and its stats land (Lane 80), short enough for a phone's basis: the hourly
  * capture reads the game's status while any game of the week waits on its final, so it turns Final at
@@ -207,11 +216,12 @@ export interface BoxBasisFacts {
 	/** A Team row draws its Proj final "--" (no figure from the API while the game is live). */
 	noFinal?: boolean;
 	host: LeagueHost;
-	/** The Lineup's: the API's rule for our pick (LineupAdvice.basis, said first: Lane 99, B11 moved
-	 * it under the rows), the read the change counts from, the API's count of the rules our stats
-	 * lack, and its link; null on the Matchup, which draws no evidence columns. */
+	/** The Lineup's: whether its strip already says whose lineup it is ("as set on ESPN"; the rule for
+	 * our pick is then said at a desk alone, Lane 99 fix round 1), the read the change counts from,
+	 * the API's count of the rules our stats lack, and its link; null on the Matchup, which draws no
+	 * evidence columns. */
 	lineup: {
-		rule: string;
+		asSetShown: boolean;
 		previousReadAt: string | null;
 		note: { basis_note: string; basis_note_link: string };
 		rulesHref: string;
@@ -247,7 +257,7 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 			...said(waiting)
 		];
 	return [
-		...said(lineup.rule),
+		...said(PICK_PART, !lineup.asSetShown),
 		...proj,
 		...final,
 		...said(deltaPart(lineup.previousReadAt, clock), false),
@@ -256,8 +266,7 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 		// cells and sentence: the Final sentence is said at a desk while any row still draws them, and
 		// on the phone too once none does (Lane 85 fix round 2, the coordinator's ruling on brief item 4).
 		...said(waiting, !drawsFacts(facts.lines, now)),
-		...said(RANK_PART),
-		...said(OPP_PART),
+		...said(RANK_OPP_PART),
 		...pts,
 		...uncountedParts(lineup.note, lineup.rulesHref)
 	];
