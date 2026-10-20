@@ -59,7 +59,7 @@ void test('a visit with nothing here and no sheet on the account creates nothing
 	const outcome = await reconcile(api, EMPTY_STORED);
 	assert.equal(outcome.kind, 'synced');
 	assert.deepEqual(writes, []);
-	if (outcome.kind === 'synced') assert.equal(outcome.stored.sync, null);
+	assert.equal(outcome.stored.sync, null);
 });
 
 void test('a visit to an empty sheet on the account follows it and writes nothing', async () => {
@@ -67,7 +67,6 @@ void test('a visit to an empty sheet on the account follows it and writes nothin
 	const { api, writes } = fakeApi([remote]);
 	const first = await reconcile(api, EMPTY_STORED);
 	assert.equal(first.kind, 'synced');
-	if (first.kind !== 'synced') return;
 	assert.deepEqual(first.stored.sync, { sheetId: 'mine', updatedAt: CHANGED });
 	const again = await reconcile(api, first.stored);
 	assert.deepEqual(writes, []);
