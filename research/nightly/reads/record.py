@@ -21,16 +21,17 @@ from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
+from research.inseason.season_week import GRADE_AFTER, last_kickoffs_by_week
 from research.model.backtest import Observation, mean_or_none, spearman, sum_left
 from research.model.reads.teams import kickoff_instants_by_week
-from research.model.register.freeze import SERVED_SOURCE
+from research.model.register.freeze import SERVED_SOURCE, SHIPPED_SOURCE
 from research.model.register.grade import average_outcome_ranks, ordinal_ranks
 from research.season import REGULAR_SEASON_WEEKS
 
 # The one sentence a missed week prints. The 2026 misses (weeks 3 to 5) were the old weekly register
 # job failing on every pass, not a nightly run (phase D review L1); from cutover a missed freeze fails
 # the in-season job (`inseason`) and alerts.
-MISSED_NOTE: Final = "Our weekly freeze failed that week."
+MISSED_NOTE: Final = "Our order was not set before kickoff that week."
 RECORD_POSITIONS: Final = ("QB", "RB", "WR", "TE", "K", "DST")
 ALL: Final = "All"
 # The coordinator's ruling of 2026-10-17 (Lane 66j): "Order matched" names the rank correlation, its
@@ -45,8 +46,10 @@ _STARTER_WORDS: Final = {"QB": "QBs", "RB": "RBs", "WR": "WRs", "TE": "TEs", "K"
 AGREEMENT_PLACES: Final = 2
 PLACES_OFF_PLACES: Final = 1
 # The agreement's scale, its ends in the form the page prints the rate (ruling R2, Lane 78): 1.00 and 0.00.
+# Lane 93 (B04): the measure named and its whole range said, below 0.00 included, in a player's words.
 SCALE: Final = (
-    f"{1:.{AGREEMENT_PLACES}f} is a perfect match of the week's finishing order, {0:.{AGREEMENT_PLACES}f} is none."
+    f"Order matched is how closely an order ranked the players as they finished the week: "
+    f"{1:.{AGREEMENT_PLACES}f} is the same order, {0:.{AGREEMENT_PLACES}f} no closer than chance, below it the reverse."
 )
 
 
@@ -60,12 +63,14 @@ def printed(value: float | None, places: int) -> float | None:
 
 
 # The order each tracked board is (the record names it on every frozen week, review 66j M7): the served
-# board is our preseason order; a rest-of-season freeze would name its own source here.
-ORDER_OF_SOURCE: Final = {SERVED_SOURCE: "preseason"}
-# Graded against the preseason board in season too: freezing and grading the rest-of-season board is
-# a later lane's (the coordinator's ruling of 2026-10-14), so the line says which board it grades.
+# board is our preseason order, the shipped board the rest-of-season order every screen shows (Lane 93).
+ORDER_OF_SOURCE: Final = {SERVED_SOURCE: "preseason", SHIPPED_SOURCE: "rest_of_season"}
+# The boards a week's record may grade, the shipped one first: a freeze that kept it grades the order
+# the site showed; a freeze before it (weeks 1, 2 and 6 of 2026) grades the preseason board it kept.
+GRADED_SOURCES: Final = (SHIPPED_SOURCE, SERVED_SOURCE)
+# The record's method in a player's words (Lane 93, B03): we set the order, never "froze" it.
 _METHOD: Final = (
-    "Each week our preseason board froze before the first kickoff and was graded on its players' points, "
+    "Each week we set our order before the first kickoff and graded it on its players' points, "
     "{benchmarks} on the same players."
 )
 
@@ -106,6 +111,11 @@ class Week:
     lines: tuple[Line, ...]
     # The order the week's freeze graded ("preseason" or "rest_of_season"), None for a week with no freeze.
     order: str | None = None
+    # A frozen week waiting on its stats: the earliest instant the in-season pass grades it (its last
+    # kickoff plus `GRADE_AFTER`), None when no kickoff is on file and for every other status.
+    grades_from: datetime | None = None
+    # A graded week's players as the page counts a league's own starters from (Lane 93), else empty.
+    placed: tuple["Placed", ...] = ()
 
 
 # (player, the order's stance or None where it has none, his points, his position)
@@ -183,16 +193,57 @@ def week_lines(rows: Sequence[Mapping[str, Any]]) -> tuple[Line, ...]:
     return tuple(lines)
 
 
+@dataclass(frozen=True, slots=True)
+class Placed:
+    """One graded player of a week as the record page reads him to count the starters a league's own
+    lineup calls right (Lane 93, ruling 4): his position, each order's place among the week's graded
+    players (the fill rule's ordinal ranks, None where the order has no stance on him) and his place
+    in the finish, ties by id, the same orders `_starters` counts by."""
+
+    position: str
+    ours: int | None
+    adp: int | None
+    published: int | None
+    finish: int
+
+
+def placed_players(rows: Sequence[Mapping[str, Any]]) -> tuple[Placed, ...]:
+    """The week's graded players on the All line's population (every frozen player with an ADP and a
+    stat line), in the finish's order."""
+    both = [row for row in rows if row["adp"] is not None]
+    finished = sorted(both, key=lambda row: (-row["actual_points"], row["player_id"]))
+
+    def places(stance: str) -> dict[str, int]:
+        listed = [(pid, held) for pid, held, _, _ in _entries(both, stance) if held is not None]
+        return ordinal_ranks(listed)
+
+    ours, adp, published = places("board_points"), places("adp"), places("published_points")
+    return tuple(
+        Placed(
+            row["position"],
+            ours.get(row["player_id"]),
+            adp.get(row["player_id"]),
+            published.get(row["player_id"]),
+            place,
+        )
+        for place, row in enumerate(finished, start=1)
+    )
+
+
 def starters_basis(to_date_lines: Sequence[Line]) -> str | None:
-    """What the starters figure counts, from the positions the record graded (review 66j M8, Lane 66t):
-    "Starters right counts the week's top 12 QBs, 24 RBs, 36 WRs and 12 TEs it also put there." None
-    before any week is graded."""
+    """What the starters figure counts, from the positions the record graded (review 66j M8, Lane 66t),
+    naming the lineup it counts (Lane 93: a page opened from a league counts the league's own): "Starters
+    right counts a standard 12-team lineup, the week's top 12 QBs, 24 RBs, 36 WRs and 12 TEs, and how
+    many of them the order also put there." None before any week is graded."""
     graded = {line.position for line in to_date_lines if line.position != ALL and line.ours.starters_of > 0}
     counts = [f"{n * LEAGUE_TEAMS} {_STARTER_WORDS[p]}" for p, n in STARTERS_A_TEAM.items() if p in graded]
     if not counts:
         return None
     listed = counts[0] if len(counts) == 1 else f"{', '.join(counts[:-1])} and {counts[-1]}"
-    return f"Starters right counts the week's top {listed} it also put there."
+    return (
+        f"Starters right counts a standard {LEAGUE_TEAMS}-team lineup, the week's top {listed}, "
+        "and how many of them the order also put there."
+    )
 
 
 def method(to_date_lines: Sequence[Line]) -> str:
@@ -256,7 +307,7 @@ def _trails(ours: Score, theirs: Score, name: str) -> list[str]:
         out.append(f"{name} put a typical player closer to his finish, {its:.1f} places off against our {mine:.1f}")
     if theirs.starters > ours.starters and theirs.starters_of == ours.starters_of:
         out.append(
-            f"{name} had more of the week's starters right, {theirs.starters} of {theirs.starters_of} against our {ours.starters}"
+            f"{name} had more of the week's starters right in the standard lineup, {theirs.starters} of {theirs.starters_of} against our {ours.starters}"
         )
     return out
 
@@ -292,8 +343,24 @@ where g.season = :s and g.week = :w and g.frozen_at = :f and g.board_source = :s
 """
 
 
-def _frozen_week(conn: Connection, season: int, week: int, frozen_at: datetime) -> tuple[Week, list[Mapping[str, Any]]]:
-    params = {"s": season, "w": week, "f": frozen_at, "source": SERVED_SOURCE}
+def order_source(conn: Connection, season: int, week: int, frozen_at: datetime) -> str:
+    """The board a freeze's record grades: the order the site shipped where the freeze kept it, else
+    the preseason board every freeze keeps (`GRADED_SOURCES`)."""
+    shipped = conn.execute(
+        text(
+            "select exists (select 1 from research.register_freeze_rows "
+            "where season = :s and week = :w and frozen_at = :f and board_source = :source)"
+        ),
+        {"s": season, "w": week, "f": frozen_at, "source": SHIPPED_SOURCE},
+    ).scalar_one()
+    return SHIPPED_SOURCE if shipped else SERVED_SOURCE
+
+
+def _frozen_week(
+    conn: Connection, season: int, week: int, frozen_at: datetime, grades_from: datetime | None
+) -> tuple[Week, list[Mapping[str, Any]]]:
+    source = order_source(conn, season, week, frozen_at)
+    params = {"s": season, "w": week, "f": frozen_at, "source": source}
     rows: list[Mapping[str, Any]] = [row._asdict() for row in conn.execute(text(_GRADED), params)]
     board_as_of = conn.execute(
         text(
@@ -304,8 +371,21 @@ def _frozen_week(conn: Connection, season: int, week: int, frozen_at: datetime) 
     ).scalar_one()
     graded_at = max((row["graded_at"] for row in rows), default=None)
     status = "frozen" if graded_at is None else "graded"
-    order = ORDER_OF_SOURCE[SERVED_SOURCE]
-    return Week(week, status, frozen_at, board_as_of, graded_at, len(rows), week_lines(rows), order), rows
+    waits = grades_from if status == "frozen" else None
+    placed = placed_players(rows) if status == "graded" else ()
+    built = Week(
+        week,
+        status,
+        frozen_at,
+        board_as_of,
+        graded_at,
+        len(rows),
+        week_lines(rows),
+        ORDER_OF_SOURCE[source],
+        waits,
+        placed,
+    )
+    return built, rows
 
 
 def read_record(
@@ -317,13 +397,15 @@ def read_record(
         int(row.week): row.frozen_at for row in conn.execute(text(_FREEZES), {"s": season, "source": SERVED_SOURCE})
     }
     kickoffs = kickoff_instants_by_week(conn, season)
+    ends = last_kickoffs_by_week(conn, season)
     last = max([REGULAR_SEASON_WEEKS, *freezes])
     weeks: list[Week] = []
     rows_by_week: dict[int, list[Mapping[str, Any]]] = {}
     for week in range(1, last + 1):
         kickoff = kickoffs.get(week)
         if week in freezes:
-            built, rows = _frozen_week(conn, season, week, freezes[week])
+            grades_from = None if week not in ends else ends[week] + GRADE_AFTER
+            built, rows = _frozen_week(conn, season, week, freezes[week], grades_from)
             weeks.append(built)
             rows_by_week[week] = rows
         elif kickoff is not None and kickoff <= as_of:
@@ -334,14 +416,14 @@ def read_record(
 
 
 def published_from(conn: Connection, season: int) -> int | None:
-    """The first week whose freeze of the served board keeps the published projection for any player
+    """The first week whose freeze of a graded board keeps the published projection for any player
     (review 66j L11), None while none does."""
     week = conn.execute(
         text(
             "select min(week) from research.register_freeze_rows "
-            "where season = :s and board_source = :source and published_points is not null"
+            "where season = :s and board_source = any(:sources) and published_points is not null"
         ),
-        {"s": season, "source": SERVED_SOURCE},
+        {"s": season, "sources": list(GRADED_SOURCES)},
     ).scalar_one()
     return None if week is None else int(week)
 

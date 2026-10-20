@@ -35,3 +35,8 @@ export function firstSentence(text: string): string {
 export function midSentence(label: string): string {
 	return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
 }
+
+/** Words opening a sentence: their first letter raised ("your league" to "Your league"). */
+export function sentenceStart(words: string): string {
+	return words.charAt(0).toUpperCase() + words.slice(1);
+}

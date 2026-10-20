@@ -44,6 +44,9 @@ void test('a club page drops the bye, a position view the tier chip, a rest-of-s
 	assert.ok(!boardColumns({ ...ALL, tier: false }).keys.includes('tier'));
 	assert.ok(!boardColumns({ ...ALL, gap: false }).keys.includes('gap'));
 	assert.ok(!boardColumns({ ...ALL, season: false }).keys.includes('avg'));
+	// ADP is a draft-board column (Lane 93): the in-season, rest-of-season board draws none.
+	assert.ok(boardColumns(ALL).keys.includes('adp'));
+	assert.ok(!boardColumns({ ...ALL, restOfSeason: true }).keys.includes('adp'));
 });
 
 void test('the phone keeps the face, the player, Projected, Over repl and Gap', () => {

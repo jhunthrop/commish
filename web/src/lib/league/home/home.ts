@@ -13,8 +13,9 @@ import type {
 	Scoreboard,
 	WeekDoneState
 } from '../inseason/api.ts';
-import { hostWords } from '../names.ts';
+import { hostWords, nearestRules } from '../names.ts';
 import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
+import { AS_OF_KICKOFF, projFinalWords, teBonusSentence } from '../box/basis.ts';
 
 type ScoreboardGame = Scoreboard['games'][number];
 type ScoringRules = components['schemas']['ScoringRules'];
@@ -49,6 +50,10 @@ export const HOME = {
 	pointsAllowed: "A defense's points allowed",
 	yardsAllowed: "A defense's yards allowed",
 	nextKickoff: KICKOFF.next,
+	/** A read's age as the live score's cell says it (agoCell). */
+	justNow: 'just now',
+	minAgo: 'min ago',
+	hrAgo: 'hr ago',
 	final: KICKOFF.final,
 	/** The Settings card listing the scoring rules our stats lack (Lane 66t), which the in-season bases
 	 * count and link to. */
@@ -58,19 +63,29 @@ export const HOME = {
 
 // ---- the scoreboard
 
-/** One side of a score bug: the team, its record, its projection and its points so far, and how it
- * reads against the other side once the game has started. */
+/** One side of a score bug: the team, its record, its two figures and, while the game is under way,
+ * where its starters stand; how it reads against the other side once the game has started. */
 export interface BugSide {
 	rosterId: number;
 	name: string;
 	record: string;
 	avatar: string | null;
 	me: boolean;
-	proj: string;
-	pts: string;
+	/** The small figure: once the game has started its projected final, before it nothing. */
+	small: string;
+	/** The big figure (Lane 92, B22): its Proj before the first kickoff, its Pts from it. */
+	big: string;
+	/** "3 to play", "2 playing" while the game is under way (the API's to_play), else empty. */
+	toPlay: string;
 	/** Once the game has started: ahead (drawn bright), behind (muted) or level. Before kickoff,
 	 * level, both sides drawn alike. */
 	stands: 'ahead' | 'behind' | 'level';
+}
+
+/** The bug's two figure heads: before kickoff the Proj alone, from it Proj final and Pts. */
+export interface BugColumns {
+	small: string;
+	big: string;
 }
 
 export interface Bug {
@@ -81,9 +96,42 @@ export interface Bug {
 	state: GameHead['state'];
 	/** "Sun 12:00 pm" before kickoff, "Kicked off", "Final". */
 	head: string;
-	/** "Next kickoff", "6 of 20 starters to play", or nothing. */
+	/** "Next kickoff" before it; while under way the read beside the live score ("ESPN 1 min ago");
+	 * else nothing. */
 	words: string;
+	columns: BugColumns;
 	sides: BugSide[];
+}
+
+/** The read a live bug says beside its score: the platform and when the league was read. */
+export interface BugRead {
+	host: LeagueHost;
+	readAt: string;
+}
+
+/** A read's age as a cell says it, short: "just now", "1 min ago", "2 hr ago". */
+export function agoCell(seconds: number): string {
+	if (seconds < MINUTE_SECONDS) return HOME.justNow;
+	if (seconds < HOUR_SECONDS)
+		return `${String(Math.floor(seconds / MINUTE_SECONDS))} ${HOME.minAgo}`;
+	return `${String(Math.floor(seconds / HOUR_SECONDS))} ${HOME.hrAgo}`;
+}
+
+const MINUTE_SECONDS = 60;
+const HOUR_SECONDS = 3600;
+const MS = 1000;
+
+/** The live score's read as one cell (Lane 92, B06): "ESPN 1 min ago". */
+export function readCell(read: BugRead, now: number): string {
+	const seconds = Math.max(0, (now - Date.parse(read.readAt)) / MS);
+	return `${hostWords(read.host)} ${agoCell(seconds)}`;
+}
+
+/** The figure heads by the game's head: Proj before the first kickoff, Proj final and Pts from it. */
+export function bugColumns(state: GameHead['state']): BugColumns {
+	return state === 'upcoming'
+		? { small: '', big: BOX.proj }
+		: { small: BOX.projFinal, big: BOX.pts };
 }
 
 /** A team's record as the standings print it: "5-0-0". */
@@ -110,15 +158,18 @@ function standsOf(
 	return side.points > other.points ? 'ahead' : 'behind';
 }
 
-/** The state's words at the bug's head: the API's count of the starters still to play while its game
- * is under way (to_play, words.go ToPlayWords, a bye starter left out), never one made here. */
-function bugHead(game: ScoreboardGame, head: GameHead, zone: string): Pick<Bug, 'head' | 'words'> {
+/** The state's words at the bug's head: the next kickoff before the game, the read beside the live
+ * score while it is under way (each side counts its own starters, BugSide.toPlay), nothing once it is
+ * final. */
+function bugHead(
+	head: GameHead,
+	zone: string,
+	read: BugRead | null,
+	now: number
+): Pick<Bug, 'head' | 'words'> {
 	if (head.state === 'final') return { head: KICKOFF.final, words: '' };
 	if (head.state === 'kicked_off') {
-		return {
-			head: KICKOFF.kickedOff,
-			words: game.state === 'playing' ? (game.to_play ?? '') : ''
-		};
+		return { head: KICKOFF.kickedOff, words: read === null ? '' : readCell(read, now) };
 	}
 	return {
 		head: head.next === null ? '' : weekdayTime(head.next, zone),
@@ -126,13 +177,29 @@ function bugHead(game: ScoreboardGame, head: GameHead, zone: string): Pick<Bug, 
 	};
 }
 
+/** A side's figures (Lane 92, B22): before kickoff its Proj is the big figure; from the first kickoff
+ * its Pts are, with its projected final (the API's, else its Proj) small beside them. */
+function sideFigures(
+	side: ScoreboardGame['sides'][number],
+	started: boolean
+): Pick<BugSide, 'small' | 'big'> {
+	const proj = side.projection === null ? BOX.none : fixed(side.projection, 1);
+	if (!started) return { small: '', big: proj };
+	const final = side.projected_final ?? null;
+	return {
+		small: final === null ? BOX.none : fixed(final, 1),
+		big: side.points_read ? fixed(side.points, 1) : BOX.none
+	};
+}
+
 /** Every game of the week as a score bug, the drafter's first, each read at `now`, the page's clock
- * in ms. */
+ * in ms; read is the league's last read, said beside a live score. */
 export function bugsOf(
 	board: Pick<Scoreboard, 'games'>,
 	sync: Pick<LeagueSync, 'teams' | 'me'>,
 	now: number,
-	zone: string = memberZone()
+	zone: string = memberZone(),
+	read: BugRead | null = null
 ): Bug[] {
 	const teams = new Map(sync.teams.map((t) => [t.roster_id, t] as const));
 	return board.games.map((game, i) => {
@@ -143,7 +210,8 @@ export function bugsOf(
 			key: `${String(i)}-${game.sides.map((s) => String(s.roster_id)).join('-')}`,
 			mine,
 			state: head.state,
-			...bugHead(game, head, zone),
+			...bugHead(head, zone, read, now),
+			columns: bugColumns(head.state),
 			sides: game.sides.map((side) => {
 				const team = teams.get(side.roster_id);
 				return {
@@ -152,8 +220,8 @@ export function bugsOf(
 					record: bugRecord(team),
 					avatar: team?.avatar ?? null,
 					me: side.roster_id === sync.me,
-					proj: side.projection === null ? BOX.none : fixed(side.projection, 1),
-					pts: started && side.points_read ? fixed(side.points, 1) : BOX.none,
+					...sideFigures(side, started),
+					toPlay: head.state === 'kicked_off' ? (side.to_play ?? '') : '',
 					stands: standsOf(game, side, started)
 				};
 			})
@@ -161,11 +229,26 @@ export function bugsOf(
 	});
 }
 
-/** Each team's projection this week, by roster, from the scoreboard. */
-export function projections(board: Scoreboard | null): ReadonlyMap<number, number | null> {
+/** Each team's projection this week, by roster, from the scoreboard: its projected final once its game
+ * has started by the bug's own rule at the page's clock (gameHead, round 2; equal to its Pts once
+ * final, Lane 92 B22; none where the API gives none), its Proj before. */
+export function projections(
+	board: Scoreboard | null,
+	now: number
+): ReadonlyMap<number, number | null> {
 	return new Map(
-		(board?.games ?? []).flatMap((g) => g.sides.map((s) => [s.roster_id, s.projection] as const))
+		(board?.games ?? []).flatMap((g) => {
+			const upcoming = gameHead({ state: g.state, next: g.next_kickoff }, now).state === 'upcoming';
+			return g.sides.map(
+				(s) => [s.roster_id, upcoming ? s.projection : (s.projected_final ?? null)] as const
+			);
+		})
 	);
+}
+
+/** Whether a started bug draws a Proj final "--": the basis then says why (round 2). */
+export function bugsMissFinal(bugs: readonly Bug[]): boolean {
+	return bugs.some((b) => b.state !== 'upcoming' && b.sides.some((s) => s.small === BOX.none));
 }
 
 // ---- the drafter's lineup
@@ -184,9 +267,27 @@ export interface LineupSummary {
 	doneState: WeekDoneState | null;
 }
 
+/** A team's projected final from the scoreboard (the API's, Lane 92), null before its week has
+ * started or with no scoreboard. */
+export function projectedFinalOf(board: Scoreboard | null, rosterId: number): number | null {
+	for (const game of board?.games ?? []) {
+		const side = game.sides.find((s) => s.roster_id === rosterId);
+		if (side) return side.projected_final ?? null;
+	}
+	return null;
+}
+
 /** The lineup as set from the Lineup's answer: each slot's player on the platform, in the league's
- * slots; every other active player is the bench, injured reserve counted apart. */
-export function lineupSummary(advice: LineupAdvice, zone: string, now: number): LineupSummary {
+ * slots; every other active player is the bench, injured reserve counted apart. Its Team row's
+ * projected final is the score bug's (final, the lineup as set). */
+export function lineupSummary(
+	advice: LineupAdvice,
+	zone: string,
+	now: number,
+	final: number | null = null,
+	/** The member's game has kicked off (its score bug's state). */
+	live = false
+): LineupSummary {
 	// No change is drawn on a row whose game has kicked off or is final (Lane 85).
 	const box = lineupBox(heldLineup(advice, now), zone, now);
 	const starters = advice.slots.flatMap((slot): BoxStarter[] =>
@@ -207,6 +308,8 @@ export function lineupSummary(advice: LineupAdvice, zone: string, now: number): 
 		totals: {
 			proj: box.asSet,
 			pts: totalsPts(rows, advice.player_points, advice.team_points),
+			final,
+			live,
 			note: null
 		},
 		benchWords,
@@ -312,6 +415,45 @@ export function playoffRule(
 		after: n,
 		words: weeks === '' ? `${top} make the playoffs` : `${top}, playoffs${weeks.slice(1)}`
 	};
+}
+
+type Seed = NonNullable<LeagueTerms['playoff_seeds']>[number];
+
+/** The platform's seeds, none where it states none (an API before Lane 94 sends none). */
+function seedsOf(terms: Pick<LeagueTerms, 'playoff_seeds'>): readonly Seed[] {
+	return terms.playoff_seeds ?? [];
+}
+
+/** Seed numbers in a sentence: "1", "1 and 3", "1, 3 and 5". */
+function seedNumbers(seeds: readonly number[]): string {
+	const words = seeds.map(String);
+	const last = words.pop() ?? '';
+	return words.length === 0 ? last : `${words.join(', ')} and ${last}`;
+}
+
+const SEED_WORDS: Readonly<Record<Seed, string>> = { record: 'on record', points: 'on points' };
+
+/** How the platform seeds its playoffs where it states it seed by seed and not on record alone
+ * (FFPC, Lane 94 B21), printed under the standings in place of a cut no row sits at: "FFPC seeds 4
+ * for the playoffs, weeks 13 to 14: 1 and 3 on record, 2 and 4 on points." Null otherwise; a field
+ * seeded on record alone is the cut under the standings. */
+export function seedingWords(
+	terms: Pick<LeagueTerms, 'playoff_seeds' | 'playoff_weeks'>,
+	host: LeagueHost
+): string | null {
+	const seeds = seedsOf(terms);
+	if (!seeds.includes('points')) return null;
+	const by = (['record', 'points'] as const).flatMap((kind) => {
+		const numbers = seeds.flatMap((s, i) => (s === kind ? [i + 1] : []));
+		return numbers.length === 0 ? [] : [`${seedNumbers(numbers)} ${SEED_WORDS[kind]}`];
+	});
+	return `${hostWords(host)} seeds ${String(seeds.length)} for the playoffs${weeksWords(terms.playoff_weeks)}: ${by.join(', ')}.`;
+}
+
+/** The playoffs' field: the platform's count, else its seeds. */
+function playoffField(terms: Pick<LeagueTerms, 'playoff_teams' | 'playoff_seeds'>): number | null {
+	const seeds = seedsOf(terms).length;
+	return terms.playoff_teams ?? (seeds > 0 ? seeds : null);
 }
 
 /** The playoffs' weeks after a comma: ", weeks 15 to 17", ", week 16", or nothing unsaid. */
@@ -569,10 +711,11 @@ export function termsView(terms: LeagueTerms, teams: number): { label: string; v
 	} else if (terms.waivers === 'order') {
 		out.push({ label: 'Waivers', value: 'Waiver order' });
 	}
-	if (terms.playoff_teams !== null) {
+	const field = playoffField(terms);
+	if (field !== null) {
 		out.push({
 			label: 'Playoffs',
-			value: `${String(terms.playoff_teams)} teams${weeksWords(terms.playoff_weeks)}`
+			value: `${String(field)} teams${weeksWords(terms.playoff_weeks)}`
 		});
 	}
 	return out;
@@ -617,18 +760,28 @@ export function teamBasis(
 	scoring: ProjectionScoring,
 	/** The lineup's rows carry each player's points (player_points), so its Team adds them. */
 	byPlayer: boolean,
-	zone: string = memberZone()
+	zone: string = memberZone(),
+	/** A game of the week has kicked off: Proj final is on the board (Lane 92). */
+	started = false,
+	/** A bug draws a Proj final "--" (round 2). */
+	missing = false
 ): string {
 	const platform = hostWords(host);
 	const team = byPlayer ? ", and your lineup's Team adds its rows" : '';
 	const format =
 		scoring.format === 'half_ppr' ? 'half-PPR' : scoring.format === 'ppr' ? 'PPR' : 'standard';
+	const bonus = scoring.league_own ? null : teBonusSentence(scoring.te_bonus, host);
 	const whose = scoring.league_own
-		? "this league's own"
-		: "the closest match to this league's rules";
+		? ` in ${format}, this league's own`
+		: bonus === null
+			? ` in ${format}, the closest match to this league's rules`
+			: `, ${format} shown, ${nearestRules(host)}`;
 	const when =
 		readAt === null
 			? 'not in yet for this week'
 			: `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
-	return `A team's ${BOX.proj} adds its starters' published projections in ${format}, ${whose}, ${when}. ${BOX.pts} are ${platform}'s so far${team}.`;
+	const words = projFinalWords(started, missing);
+	const final = words === '' ? '' : ` ${words}`;
+	const extra = bonus === null ? '' : ` ${bonus}`;
+	return `A team's ${BOX.proj} adds its starters' published projections${whose}, ${when}${started ? `, ${AS_OF_KICKOFF}` : ''}.${extra} ${BOX.pts} are ${platform}'s so far${team}.${final}`;
 }

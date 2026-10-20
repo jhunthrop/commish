@@ -40,6 +40,7 @@
 		type Arrival
 	} from './arrival.ts';
 	import AccountLeagues from '#lib/league/AccountLeagues.svelte';
+	import { AttachedList } from '#lib/league/attached-list.svelte.ts';
 	import AccountConnections from '#lib/hosts/AccountConnections.svelte';
 	import AccountDevices from '#lib/hosts/AccountDevices.svelte';
 	import GroupPasses from './GroupPasses.svelte';
@@ -98,6 +99,10 @@
 		arrival = { kind: 'slow', bought };
 	}
 
+	/** The account's attached leagues, read once for the Platforms and Leagues attached tables both
+	 * (Lane 94 fix round 2), in the browser alone: the shell is prerendered. */
+	const attached = new AttachedList();
+
 	onMount(() => {
 		// Back from signing in on a content page: the store reads the account and keeps the league
 		// line's hint, then the reader goes on to the page they left, which paints with its room.
@@ -113,6 +118,7 @@
 		}
 		void load().then(() => {
 			if (view?.kind === 'signed-out') void readOpenHosts();
+			if (view?.kind === 'signed-in') void attached.load();
 			return awaitArrival();
 		});
 		const again = (): void => void load();
@@ -253,8 +259,8 @@
 
 			<div class="grid">
 				<div class="lists">
-					<AccountConnections />
-					<AccountLeagues features={account.features} />
+					<AccountConnections list={attached} />
+					<AccountLeagues features={account.features} list={attached} />
 					{#if groupPasses.length > 0}
 						<GroupPasses
 							passes={groupPasses}

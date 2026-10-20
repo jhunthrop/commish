@@ -44,8 +44,11 @@ type Attached struct {
 // name and team from the last read. With no read kept, the name is the
 // saved league's the attach made, so a league is never nameless.
 func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, error) {
+	// The last read is the league's, the kept read's time where one is kept
+	// (the background reads keep it fresh), so every screen naming the
+	// league says one time; the link's own touch only where none is kept.
 	rows, err := s.Pool.Query(ctx, `select l.id, l.account_id, l.league_id, l.host, l.host_league_id, l.host_season,
-		l.roster_id, l.attached_at, l.last_read_at,
+		l.roster_id, l.attached_at, greatest(l.last_read_at, sn.read_at), coalesce(l.host_team_key, ''), l.read_as_member,
 		coalesce((sn.snapshot->>'season')::int, l.host_season), coalesce(nullif(sn.snapshot->>'name', ''), saved.name, ''),
 		coalesce((select t->>'name' from jsonb_array_elements(sn.snapshot->'teams') t
 			where (t->>'roster_id')::int = l.roster_id limit 1), ''),
@@ -80,11 +83,18 @@ func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, 
 func scanAttached(r pgx.CollectableRow) (Attached, error) {
 	var a Attached
 	var teams, saved, rules, calendar []byte
+	var member bool
 	err := r.Scan(&a.ID, &a.AccountID, &a.LeagueID, &a.Ref.Host, &a.Ref.LeagueID, &a.Ref.Season, &a.RosterID,
-		&a.AttachedAt, &a.LastReadAt, &a.Season, &a.Name, &a.TeamName, &teams, &saved, &rules, &a.SuperFlex,
+		&a.AttachedAt, &a.LastReadAt, &a.TeamKey, &member, &a.Season, &a.Name, &a.TeamName, &teams, &saved, &rules, &a.SuperFlex,
 		&a.Read, &a.Status, &a.Week, &calendar)
 	if err != nil {
 		return a, err
+	}
+	if member {
+		// A league attached as a member is read as that account, as scanLink
+		// reads it: the front door's read of an FFPC or Yahoo league goes
+		// with the member's own sign-in, never as no one (Lane 94, B10).
+		a.Ref.As = a.AccountID
 	}
 	for _, field := range []struct {
 		raw  []byte

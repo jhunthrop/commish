@@ -26,8 +26,12 @@ import (
 // waits on runs at most ReadTimeout.
 const (
 	MinUpstreamGap = time.Minute
-	RefreshFloor   = 10 * time.Second
-	ReadTimeout    = 30 * time.Second
+	// LiveWait is how long a view waits for a fresh read while a game is
+	// live (Lane 92 fix round 1): past it the view answers the kept read
+	// with its own read time, and the read lands for the next view.
+	LiveWait     = 3 * time.Second
+	RefreshFloor = 10 * time.Second
+	ReadTimeout  = 30 * time.Second
 	// idleAfter drops a league no viewer has asked about in this long.
 	idleAfter = ViewWindow
 )
@@ -68,6 +72,15 @@ type Poller struct {
 	// the work done for the read before stands. It runs on the storing
 	// goroutine and must return at once.
 	Landed func(Snapshot)
+	// Live reports a game of the season under way (Lane 92, B06): then a
+	// read older than MinUpstreamGap waits up to LiveWait for the fresh one
+	// rather than answer the last read at once while one goes upstream
+	// behind it, so a screen shows the fresh score unless the platform is
+	// slow, and then the kept one with its read time. Nil is never live.
+	Live func(ctx context.Context, season int) bool
+	// After is the live wait's timer (poll.Poller.After), time.After when
+	// nil: a test's fake clock gives its own.
+	After func(time.Duration) <-chan time.Time
 
 	once  sync.Once
 	inner *poll.Poller[Snapshot]
@@ -77,6 +90,7 @@ func (p *Poller) shared() *poll.Poller[Snapshot] {
 	p.once.Do(func() {
 		p.inner = &poll.Poller[Snapshot]{
 			Now: p.Now, Store: snapshots{store: p.Store, landed: p.landed}, Log: p.Log, Idle: idleAfter, Timeout: ReadTimeout,
+			Bound: LiveWait, After: p.After,
 		}
 	})
 	return p.inner
@@ -89,9 +103,15 @@ func (p *Poller) Upstream() int64 { return p.shared().Upstream() }
 // of it costs the host nothing new.
 func (p *Poller) Holds(ref Ref) bool { return p.shared().Holds(ref.Key()) }
 
-// Read is the league as of at most MinUpstreamGap ago.
+// Read is the league as of at most MinUpstreamGap ago: past the minute
+// the last read, with one going upstream behind it, except while a game
+// is live, when the view waits up to LiveWait for that read (Live).
 func (p *Poller) Read(ctx context.Context, ref Ref) (Read, error) {
-	return p.read(ctx, ref, MinUpstreamGap, poll.Revalidate)
+	mode := poll.Revalidate
+	if p.Live != nil && p.Live(ctx, ref.Season) {
+		mode = poll.Bounded
+	}
+	return p.read(ctx, ref, MinUpstreamGap, mode)
 }
 
 // Refresh is the league read again now, waiting for the host, unless a

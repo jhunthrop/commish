@@ -13,6 +13,7 @@ import type { BoardRowView, Format } from '#lib/run/schema.ts';
 import type { RangeScale } from '#lib/types/player.ts';
 import { boardSeason } from '../board-season.ts';
 import { boardStatuses, type BoardStatuses } from '../statuses.ts';
+import { unplayedWeeks } from './record.ts';
 import { adp, board, clubByes, defaultFormat, designations, manifest, record } from '../run.ts';
 
 /** How many of the board's top rows the front door shows. */
@@ -41,8 +42,9 @@ export interface FrontPage extends BoardStatuses {
 	boardSize: number;
 	/** That count with its pool named, as the strip's link says it: "619 on our board". */
 	boardCount: string;
-	/** The record's one number and its caption, the only part of the record the front door prints. */
-	record: RecordHeadline & { season: number };
+	/** The record's headline, the only part of the record the front door prints, with the measure's
+	 * definition (Lane 93: starters right and the graded count beside the figure). */
+	record: RecordHeadline & { season: number; scale: string };
 }
 
 export async function frontPage(now: number): Promise<FrontPage> {
@@ -79,7 +81,11 @@ export async function frontPage(now: number): Promise<FrontPage> {
 		framing: rowFraming(format),
 		boardSize: loaded.rows.length,
 		boardCount: poolCount(loaded.rows.length, 'board'),
-		record: { ...recordHeadline(kept), season: kept.season },
+		record: {
+			...recordHeadline(kept, await unplayedWeeks(kept)),
+			season: kept.season,
+			scale: kept.scale
+		},
 		// The rows' statuses as the board's, drawn with the shared pill (review finding 7).
 		...boardStatuses(rows, capture, format, now)
 	};

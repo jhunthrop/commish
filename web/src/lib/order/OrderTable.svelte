@@ -105,7 +105,7 @@
 				</td>
 				{#if marked}<td class="roster">{@render mark(row, 'md')}</td>{/if}
 				<td class="game"><BoxGame row={row.box} /></td>
-				<td class="n proj">{boxNumber(row.box.proj)}</td>
+				<td class="n proj">{boxNumber(row.week)}</td>
 				{#each figures as f, i (f)}
 					<td class="n {i === 0 ? 'key' : 'ev fig'}">{boxNumber(row.figures[f])}</td>
 				{/each}

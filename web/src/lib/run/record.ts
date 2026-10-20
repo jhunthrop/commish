@@ -1,7 +1,10 @@
 /** The record in the words a page prints: its one big number and each week as a person says it.
- * The record page and the front door both read these, so the headline is said one way. */
+ * The record page and the front door both read these, so the headline is said one way. Lane 93: we
+ * "set" the order before kickoff (never "froze" it), the headline says how many played weeks are
+ * graded beside the figure and why the rest are not, and the measures are defined once, in a
+ * player's words, in the basis. */
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
-import { dayLabel, weekdayLabel } from '#lib/format/date.ts';
+import { dayLabel, weekdayLabel, weekdayWord } from '#lib/format/date.ts';
 import { plural } from '#lib/format/number.ts';
 import type { RecordLine, RecordWeek, RunRecord, Score } from './schema.ts';
 
@@ -11,6 +14,13 @@ export interface RecordHeadline {
 	caption: string;
 	/** True once a week is graded and the number is our agreement with the finish. */
 	graded: boolean;
+	/** Starters right beside it once graded, ours then ADP's (Lane 93, B03: never only the figure we
+	 * lead on): "100 of 168", "ADP 104 of 168". Null before a week is graded. */
+	starters: { value: string; caption: string } | null;
+	/** "Graded 2 of 5 weeks played", once a week is played. */
+	standing: string | null;
+	/** Why the played weeks not graded are not, in plain words, empty when every one is. */
+	gaps: string;
 }
 
 /** A phrase with its first letter capital. */
@@ -27,11 +37,6 @@ function gradedWeeks(record: RunRecord): RecordWeek[] {
 	return record.weeks.filter((week) => week.status === 'graded');
 }
 
-/** Weeks whose board froze, graded or still waiting on the stats. */
-function frozenWeeks(record: RunRecord): RecordWeek[] {
-	return record.weeks.filter((week) => week.status === 'graded' || week.status === 'frozen');
-}
-
 /** "weeks 1 to 3", "week 1". */
 function weekSpan(weeks: readonly RecordWeek[]): string {
 	const first = weeks.at(0)?.week;
@@ -45,55 +50,132 @@ export function rankAgreement(record: RunRecord): string {
 	return record.statistic.agreement;
 }
 
-/** A rate (order matched) prints the run's two decimals, the one figure not to a tenth (ruling R2),
- * said once with the run's scale (scaleWords). */
+/** A rate (order matched) prints the run's two decimals, the one figure not to a tenth (ruling R2). */
 export const RATE_PLACES = 2;
-export const RATE_PLACES_WORDS = 'Rates print to two decimals.';
 
-/** The rank agreement's scale and its two decimals, said once on a page that prints the figure: the
- * graded record's line under its tiles (Lane 66t), named by its head. */
-export function scaleWords(record: RunRecord): string {
-	return `${capitalized(rankAgreement(record))}: ${record.scale} ${RATE_PLACES_WORDS}`;
+/** The record's words, in one place for the copy guard (Lane 93). */
+export const RECORD_WORDS = {
+	/** Places off in a player's words, said once in the basis (B04). */
+	placesOff:
+		'Places off is the average number of places a player finished from where the order put him, lower is better.',
+	/** The weeks no order was set for: never graded after the fact (B03). */
+	missedOne: (week: string) => `${week} was not set before kickoff, so it cannot be graded.`,
+	missedMany: (weeks: string) => `${weeks} were not set before kickoff, so they cannot be graded.`,
+	/** A set week whose games are played and whose stats have not landed. */
+	waiting: (week: string, day: string | null) =>
+		day === null
+			? `${week} grades when the stats land.`
+			: `${week} grades ${day} when the stats land.`,
+	standing: (graded: number, played: number) =>
+		`Graded ${String(graded)} of ${plural(played, 'week')} played`,
+	noneSet: 'weeks graded. Our first order is set before the first kickoff',
+	ofSet: (frozen: number) => `of ${plural(frozen, 'week')} set graded`,
+	/** The front card's second figure (B03). */
+	frontStarters: (adp: string) => `Starters right, ours over the same weeks. ${adp}.`
+} as const;
+
+/** The played weeks and how many of them are graded: a week is played once its stats are in or its
+ * kickoff passed with no order set; a set week waiting on its stats is said on its own (gapWords). */
+export function gradedOfPlayed(record: RunRecord): { graded: number; played: number } {
+	const graded = gradedWeeks(record).length;
+	const missed = record.weeks.filter((week) => week.status === 'missed').length;
+	return { graded, played: graded + missed };
 }
 
-/** Graded: our rank agreement with the finish over every graded week, its scale, the span and the
- * players it counts, and ADP's beside it. Not yet: how many of the frozen weeks are graded. */
-export function recordHeadline(record: RunRecord): RecordHeadline {
+/** "Graded 2 of 5 weeks played", null before any week is played. */
+export function standingWords(record: RunRecord): string | null {
+	const { graded, played } = gradedOfPlayed(record);
+	return played === 0 ? null : RECORD_WORDS.standing(graded, played);
+}
+
+/** Every run of weeks with the same status, in order. */
+function runsOf(weeks: readonly RecordWeek[]): RecordWeek[][] {
+	const runs: RecordWeek[][] = [];
+	for (const week of weeks) {
+		const last = runs.at(-1);
+		if (last !== undefined && joins(last, week)) runs[runs.length - 1] = [...last, week];
+		else runs.push([week]);
+	}
+	return runs;
+}
+
+/** Why the played weeks not graded are not: "Weeks 3 to 5 were not set before kickoff, so they
+ * cannot be graded. Week 6 grades Wednesday when the stats land." `unplayed` names the set weeks not
+ * played yet, which wait on nothing. */
+export function gapWords(record: RunRecord, unplayed: readonly number[] = []): string {
+	const missed = runsOf(record.weeks)
+		.filter((run) => run[0]?.status === 'missed')
+		.map((run) =>
+			run.length === 1 ? RECORD_WORDS.missedOne(lead(run)) : RECORD_WORDS.missedMany(lead(run))
+		);
+	const waiting = record.weeks
+		.filter((week) => week.status === 'frozen' && !unplayed.includes(week.week))
+		.map((week) =>
+			RECORD_WORDS.waiting(
+				lead([week]),
+				week.gradesFrom === undefined ? null : weekdayWord(week.gradesFrom)
+			)
+		);
+	return [...missed, ...waiting].join(' ');
+}
+
+/** Starters right to date beside the headline: ours, and ADP's on the same players. */
+function startersBeside(line: RecordLine): RecordHeadline['starters'] {
+	if (line.ours.startersOf === 0) return null;
+	return {
+		value: figureWords(line.ours, 'starters'),
+		caption: `${RECORD_BOX.adp} ${figureWords(line.adp, 'starters')}`
+	};
+}
+
+/** Graded: our rank agreement with the finish over every graded week, the span and the players it
+ * counts, ADP's beside it, starters right beside both, and how many played weeks are graded. Not yet:
+ * how many of the set weeks are graded. */
+export function recordHeadline(
+	record: RunRecord,
+	unplayed: readonly number[] = []
+): RecordHeadline {
 	const graded = gradedWeeks(record);
 	const overall = allLine(record.toDate);
 	const agreement = overall?.ours.agreement;
+	const standing = standingWords(record);
+	const gaps = gapWords(record, unplayed);
 	if (overall && agreement !== null && agreement !== undefined && graded.length > 0) {
 		const adp = overall.adp.agreement;
 		const adpPart =
 			adp === null ? '' : `. ADP ${printPlaces(adp, RATE_PLACES)} on the same players`;
 		return {
 			value: printPlaces(agreement, RATE_PLACES),
-			caption: `${capitalized(rankAgreement(record))}, ours over ${weekSpan(graded)} and ${plural(overall.ours.graded, 'player')}${adpPart}. ${record.scale} ${RATE_PLACES_WORDS}`,
-			graded: true
+			caption: `${capitalized(rankAgreement(record))}, ours over ${weekSpan(graded)} and ${plural(overall.ours.graded, 'player')}${adpPart}.`,
+			graded: true,
+			starters: startersBeside(overall),
+			standing,
+			gaps
 		};
 	}
-	const frozen = frozenWeeks(record).length;
+	const set = record.weeks.filter((w) => w.status === 'graded' || w.status === 'frozen').length;
 	return {
 		value: String(graded.length),
-		caption:
-			frozen === 0
-				? 'weeks graded. The first board freezes before its first kickoff'
-				: `of ${plural(frozen, 'frozen week')} graded`,
-		graded: false
+		caption: set === 0 ? RECORD_WORDS.noneSet : RECORD_WORDS.ofSet(set),
+		graded: false,
+		starters: null,
+		standing,
+		gaps
 	};
 }
 
 /** A time the schema guarantees for the status, read without a fallback that could print. */
 function stamp(iso: string | null, week: RecordWeek): string {
 	if (iso === null) throw new Error(`Week ${String(week.week)} is ${week.status} with no date.`);
-	return dayLabel(iso);
+	return weekdayLabel(iso);
 }
 
 /** One line of the week list: a week, or a run of missed or upcoming weeks said once. */
 export interface WeekLine {
 	/** "Week 1", "Weeks 3 to 5". */
 	lead: string;
-	/** "frozen Sep 8, graded Oct 14", "not frozen because our weekly freeze failed, so not graded", "next freeze Thu Oct 22". */
+	/** "set Tue Sep 8, graded Wed Oct 14", "our order was not set before kickoff, so it cannot be
+	 * graded", "set before kickoff Thu Oct 22": set first, then graded, one order every week (B37). */
 	text: string;
 	/** The week a graded or frozen line speaks for, so a page can add its figures. Null for a run. */
 	week: RecordWeek | null;
@@ -101,36 +183,39 @@ export interface WeekLine {
 
 /** "Week 1", "Weeks 3 to 5". */
 function lead(weeks: readonly RecordWeek[]): string {
-	const span = weekSpan(weeks);
-	return `${span.charAt(0).toUpperCase()}${span.slice(1)}`;
+	return capitalized(weekSpan(weeks));
 }
 
-/** A graded or frozen week as a person says it: "frozen Sep 8, graded Oct 14", "frozen Oct 13, not
- * played yet" before its first kickoff, "frozen Oct 13, waiting on the stats" after it. */
+/** A set week as a person says it: "set Tue Sep 8, graded Wed Oct 14", "set Thu Oct 22, not played
+ * yet" before its first kickoff, "set Tue Oct 13, grades Wed Oct 21 when the stats land" after it. */
 function frozenWords(week: RecordWeek, unplayed: readonly number[]): string {
-	const frozen = `frozen ${stamp(week.frozenAt, week)}`;
-	if (week.status === 'graded') return `${frozen}, graded ${stamp(week.gradedAt, week)}`;
-	return unplayed.includes(week.week)
-		? `${frozen}, not played yet`
-		: `${frozen}, waiting on the stats`;
+	const set = `set ${stamp(week.frozenAt, week)}`;
+	if (week.status === 'graded') return `${set}, graded ${stamp(week.gradedAt, week)}`;
+	if (unplayed.includes(week.week)) return `${set}, not played yet`;
+	return week.gradesFrom === undefined
+		? `${set}, grades when the stats land`
+		: `${set}, grades ${weekdayLabel(week.gradesFrom)} when the stats land`;
 }
 
-/** A missed week's reason as a clause: the run's note ("Our weekly freeze failed that week.") with its
- * capital, its full stop and its "that week" dropped, "our weekly freeze failed". The run must say
- * why a week was missed: the record never hides a gap. */
+/** A missed week's reason as a clause: the run's note ("Our order was not set before kickoff that
+ * week.") with its full stop and its "that week" dropped. The run must say why a week was missed: the
+ * record never hides a gap. */
 function reason(week: RecordWeek): string {
 	if (week.note === undefined) throw new Error(`Week ${String(week.week)} is missed with no note.`);
 	const clause = week.note.replace(/\.$/, '').replace(/ that week$/, '');
 	return `${clause.charAt(0).toLowerCase()}${clause.slice(1)}`;
 }
 
-/** A run of weeks said once: missed ones with why, or what is left with the next freeze from the
- * schedule. */
-function runWords(first: RecordWeek): string {
-	if (first.status === 'missed') return `not frozen because ${reason(first)}, so not graded`;
+/** A run of weeks said once: missed ones with why, or what is left with the day the next order is
+ * set by, from the schedule. */
+function runWords(run: readonly RecordWeek[]): string {
+	const [first] = run;
+	if (first === undefined) throw new Error('A run of weeks is never empty.');
+	if (first.status === 'missed')
+		return `${reason(first)}, so ${run.length === 1 ? 'it' : 'they'} cannot be graded`;
 	return first.frozenAt === null
-		? 'the first board freezes before its first kickoff'
-		: `next freeze ${weekdayLabel(first.frozenAt)}`;
+		? 'our first order is set before its first kickoff'
+		: `set before kickoff ${weekdayLabel(first.frozenAt)}`;
 }
 
 /** Whether a week joins the run before it: the same status, missed or upcoming, and for missed weeks
@@ -142,26 +227,20 @@ function joins(run: readonly RecordWeek[] | undefined, week: RecordWeek): boolea
 	return week.status === 'upcoming';
 }
 
-/** The season week by week, each run of missed weeks one line ("Weeks 3 to 5, not frozen because our
- * weekly freeze failed, so not graded") and every week still to come one line ("Weeks 7 to 18, next
- * freeze Thu Oct 22"), so the list says what happened and what is next rather than logging each
- * week alike. `unplayed` names the frozen weeks whose first kickoff is still ahead of the run. */
+/** The season week by week, each run of missed weeks one line ("Weeks 3 to 5, our order was not set
+ * before kickoff, so they cannot be graded") and every week still to come one line ("Weeks 7 to 18,
+ * set before kickoff Thu Oct 22"), so the list says what happened and what is next rather than logging
+ * each week alike. `unplayed` names the set weeks whose first kickoff is still ahead of the run. */
 export function weekLines(
 	weeks: readonly RecordWeek[],
 	unplayed: readonly number[] = []
 ): WeekLine[] {
-	const runs: RecordWeek[][] = [];
-	for (const week of weeks) {
-		const last = runs.at(-1);
-		if (last !== undefined && joins(last, week)) runs[runs.length - 1] = [...last, week];
-		else runs.push([week]);
-	}
-	return runs.map((run) => {
+	return runsOf(weeks).map((run) => {
 		const [first] = run;
 		if (first === undefined) throw new Error('A run of weeks is never empty.');
 		const grouped = first.status === 'missed' || first.status === 'upcoming';
 		return grouped
-			? { lead: lead(run), text: runWords(first), week: null }
+			? { lead: lead(run), text: runWords(run), week: null }
 			: { lead: lead(run), text: frozenWords(first, unplayed), week: first };
 	});
 }
@@ -177,14 +256,20 @@ export type RecordFigure = (typeof RECORD_FIGURES)[number];
 /** The record box score's words, in one place for the copy guard. */
 export const RECORD_BOX = {
 	week: 'Week',
-	players: 'Players',
+	players: 'Players graded',
+	/** The to-date row's player count: every player any graded week counted, once (B04). */
+	distinct: (n: number) => `${String(n)} distinct`,
 	status: 'Status',
 	ours: 'Ours',
 	adp: 'ADP',
 	published: 'Published',
 	toDate: 'To date',
 	none: EMPTY_FIGURE,
-	chart: 'Order matched by week'
+	chart: 'Order matched by week',
+	/** The league's own weeks, our picks from the member's roster against its benchmark's (ruling 6). */
+	league: 'Your lineup, our picks',
+	/** "2 weeks graded", beside the chart's head (B45). */
+	chartWeeks: (n: number) => `${plural(n, 'week')} graded`
 } as const;
 
 /** A fixed column of the week table, beside the lead Week column and the figures: its head, its
@@ -279,32 +364,53 @@ export function recordSources(record: RunRecord): readonly RecordSource[] {
 
 /** The page's lead, naming only the orders drawn. */
 export function recordLead(record: RunRecord, scoring: string): string {
-	const beside = publishedDrawn(record) ? 'ADP and a published projection' : 'ADP';
-	return `How the order we froze each week called its games, beside ${beside}, graded in ${scoring}`;
+	const beside = publishedDrawn(record) ? "ADP and the week's published projection" : 'ADP';
+	return `How the order we set before each week's kickoff called its games, beside ${beside}, graded in ${scoring}`;
 }
 
-/** The published projection's basis from the week the register first keeps it: when it starts until a
- * graded week carries it, and from which week it counts once drawn. */
+/** The first week the published projection is graded from: the register's first week that kept it,
+ * null while no set order has (review M3). */
+export function publishedFrom(record: RunRecord): number | null {
+	return record.publishedFromWeek;
+}
+
+/** The published projection's basis (B04, review M3): the week it starts, named only once a set order
+ * has kept it, "From week 7 each week is also graded against the week's published projection."; before
+ * that a promise with no week in it, never one renewed each week. */
 export function publishedWords(record: RunRecord): string {
-	const from = record.publishedFromWeek;
-	if (from !== null && publishedDrawn(record))
-		return `Published is one provider's weekly projection, from week ${String(from)}.`;
-	return from === null
-		? "Published, one provider's weekly projection, starts once our register keeps it."
-		: `Published, one provider's weekly projection, starts with week ${String(from)}.`;
+	const from = publishedFrom(record);
+	if (from === null)
+		return "Each week will also be graded against the week's published projection from the first week our order is set with it.";
+	const named = publishedDrawn(record) ? ' (Published)' : '';
+	return `From week ${String(from)} each week is also graded against the week's published projection${named}.`;
 }
 
 /** A frozen board grades a player moved to a season-long list where it froze (the record's held-out
  * rule): no figure on the record reads the hourly capture, so its read time is not said here. */
 export const HELD_OUT_METHOD =
-	'A player moved to a season-long list is graded where the board froze.';
+	'A player moved to a season-long list is graded where the order was set.';
 
-/** The record's basis, one paragraph's sentences: the run's method, the season-long rule, what the
- * starters figure counts (once a week is graded) and Published's start. */
-export function recordBasis(record: RunRecord): string[] {
-	return [record.method, HELD_OUT_METHOD, record.startersBasis, publishedWords(record)].filter(
-		(text): text is string => text !== null && text !== ''
-	);
+/** What a page opened from a league says in the record's basis in place of the run's own: what the
+ * starters figure counts in the league's lineup, and the league's own benchmark. */
+export interface LeagueBasis {
+	starters: string | null;
+	benchmark: string | null;
+}
+
+/** The record's basis, one paragraph's sentences: the run's method, the season-long rule, each
+ * measure in a player's words (order matched, places off, starters right in the lineup it counts),
+ * and the published projection's start. A league's own sentences replace the starters one and follow
+ * the published one. */
+export function recordBasis(record: RunRecord, league: LeagueBasis | null = null): string[] {
+	return [
+		record.method,
+		HELD_OUT_METHOD,
+		record.scale,
+		RECORD_WORDS.placesOff,
+		league?.starters ?? record.startersBasis,
+		publishedWords(record),
+		league?.benchmark ?? null
+	].filter((text): text is string => text !== null && text !== '');
 }
 
 /** The order a week graded, in the record's words (review 66j M7). */
@@ -313,7 +419,18 @@ export const ORDER_WORDS: Readonly<Record<NonNullable<RecordWeek['order']>, stri
 	rest_of_season: 'Our rest-of-season order'
 };
 
-/** The orders the graded weeks graded, said once: "Our preseason order, weeks 1 to 2". */
+/** The order a week graded with its refresh, as every screen names it (B18): "Our rest-of-season
+ * order, refreshed Oct 22", "Our preseason order". */
+export function weekOrderWords(week: RecordWeek): string | null {
+	if (week.order === null) return null;
+	const named = ORDER_WORDS[week.order];
+	return week.order === 'rest_of_season' && week.orderAsOf !== undefined
+		? `${named}, refreshed ${dayLabel(week.orderAsOf)}`
+		: named;
+}
+
+/** The orders the graded weeks graded, said once: "Our preseason order, then our rest-of-season
+ * order". */
 export function gradedOrders(record: RunRecord): string {
 	const graded = gradedWeeks(record);
 	const orders = [...new Set(graded.map((w) => w.order).filter((o) => o !== null))];
@@ -335,7 +452,7 @@ export type ChartSeries = Partial<Record<RecordSource, ChartPoint[]>>;
  * orders the record draws. */
 export function chartSeries(record: RunRecord, position: RecordLine['position']): ChartSeries {
 	const sources = recordSources(record);
-	const graded = record.weeks.filter((week) => week.status === 'graded');
+	const graded = gradedWeeks(record);
 	return Object.fromEntries(
 		sources.map((source) => [
 			source,
@@ -348,6 +465,11 @@ export function chartSeries(record: RunRecord, position: RecordLine['position'])
 			})
 		])
 	);
+}
+
+/** The chart's axis: the graded weeks alone, in order (B45), never the season's empty weeks. */
+export function chartWeeks(record: RunRecord): number[] {
+	return gradedWeeks(record).map((week) => week.week);
 }
 
 /** The chart's axis steps, a quarter apart. */

@@ -2,6 +2,7 @@ package leaguesync
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -58,7 +59,7 @@ func TestRecordedSleeperStandingsAndTerms(t *testing.T) {
 		t.Error("no claim kept its bid")
 	}
 	want := Terms{Waivers: WaiversBudget, Budget: 1000, PlayoffTeams: 6, PlayoffFirst: 15, PlayoffLast: 17, FinalWeeks: 1}
-	if snap.Terms != want {
+	if !reflect.DeepEqual(snap.Terms, want) {
 		t.Errorf("terms %+v, want %+v", snap.Terms, want)
 	}
 	got := terms(snap)
@@ -126,7 +127,7 @@ func TestESPNStandingsAndTerms(t *testing.T) {
 		t.Errorf("team %+v", team)
 	}
 	want := Terms{Waivers: WaiversBudget, Budget: 500, PlayoffTeams: 4, PlayoffFirst: 15, PlayoffLast: 17}
-	if snap.Terms != want {
+	if !reflect.DeepEqual(snap.Terms, want) {
 		t.Errorf("terms %+v, want %+v", snap.Terms, want)
 	}
 	if url := hostSettingsURL(snap.Ref); url != "https://fantasy.espn.com/football/league/settings?leagueId=48153503" {

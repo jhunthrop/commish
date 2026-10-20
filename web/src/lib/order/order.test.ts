@@ -187,12 +187,13 @@ void test('the basis says each column once: the order, Wk 6, Opp rank, the rules
 	const LEAGUE = { host: 'sleeper' as const, rulesHref: '/league/1#uncounted' };
 	const signedOut = basisText(orderBasis(advice([row('A')], { basis_note: '' }), null, ZONE, NOW));
 	assert.ok(signedOut.startsWith('Our rest-of-season order from week 7.'));
-	// The order holds the week's projection beside the season's, so its head names the API's week.
+	// The week column is headed by the API's week and keyed once as Pts once final, Proj before (Lane
+	// 92, B36, B50); the Proj it shows before then is the week's published projection.
 	assert.match(
 		signedOut,
-		/Wk 6 is this week's published projection in PPR, read Fri 9:00 pm Central\./
+		/Wk 6 is Pts once final, -- until his stats land, Proj before\. Proj is this week's published projection in PPR, read Fri 9:00 pm Central\./
 	);
-	assert.doesNotMatch(signedOut, /Proj is|your rules|Roster is|leave out/);
+	assert.doesNotMatch(signedOut, /your rules|Roster is|leave out/);
 	const parts = orderBasis(
 		advice([row('A')], {
 			read_at: READ,

@@ -8,12 +8,12 @@
 		type RecordSource
 	} from '#lib/run/record.ts';
 
-	/** Order matched by week (Lane 66j): one line per order drawn over the season's weeks, the graded
-	 * weeks drawn, each line named at its end. The table above holds every figure; this draws them. */
+	/** Order matched by week (Lane 66j): one line per order drawn over the graded weeks alone (Lane 93,
+	 * B45: never an empty season axis), each line named at its end. The table above holds every figure. */
 	interface Props {
 		series: ChartSeries;
-		/** The season's last week, the axis's end. */
-		weeks: number;
+		/** The graded weeks, in order: the axis, one step each. */
+		weeks: readonly number[];
 	}
 
 	let { series, weeks }: Props = $props();
@@ -23,6 +23,8 @@
 	/** The drawing's height, the svg's own, so the first paint and the measured redraw stand the same. */
 	const HEIGHT = 230;
 	const PAD = { left: 44, right: 72, top: 14, bottom: 28 };
+	/** The first graded week stands this far right of the axis, clear of its labels. */
+	const LEAD_IN = 16;
 	/** The drawing is sized to its column (Lane 82), so a phone's labels print at their own size. */
 	let figure = $state<HTMLElement | null>(null);
 	let measured = $state(0);
@@ -48,8 +50,13 @@
 		published: RECORD_BOX.published
 	};
 
-	const x = (week: number): number =>
-		PAD.left + ((week - 1) * (width - PAD.left - PAD.right)) / Math.max(1, weeks - 1);
+	/** The widest step between two graded weeks: two weeks stand a step apart, not the page apart. */
+	const STEP = 96;
+	const step = $derived(
+		Math.min(STEP, (width - PAD.left - PAD.right - LEAD_IN) / Math.max(1, weeks.length - 1))
+	);
+	/** A week's place on the axis: its place among the graded weeks, a step each from the left. */
+	const x = (week: number): number => PAD.left + LEAD_IN + Math.max(0, weeks.indexOf(week)) * step;
 	const y = (value: number): number =>
 		PAD.top + (1 - (value - bottom) / (top - bottom)) * (HEIGHT - PAD.top - PAD.bottom);
 
@@ -77,7 +84,7 @@
 <svelte:window onresize={measure} />
 
 <figure class="chart" bind:this={figure}>
-	<figcaption>{RECORD_BOX.chart}</figcaption>
+	<figcaption>{RECORD_BOX.chart}, {RECORD_BOX.chartWeeks(weeks.length)}</figcaption>
 	<svg viewBox="0 0 {width} {HEIGHT}" height={HEIGHT} role="img" aria-label={RECORD_BOX.chart}>
 		{#each ticks as tick (tick.value)}
 			<line
@@ -90,7 +97,7 @@
 			<text class="axis" x={PAD.left - 8} y={y(tick.value) + 4} text-anchor="end">{tick.label}</text
 			>
 		{/each}
-		{#each Array.from({ length: weeks }, (_, i) => i + 1) as week (week)}
+		{#each weeks as week (week)}
 			<text class="axis" x={x(week)} y={HEIGHT - 8} text-anchor="middle">{week}</text>
 		{/each}
 		{#each drawn as line (line.source)}

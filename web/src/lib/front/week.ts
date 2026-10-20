@@ -16,6 +16,7 @@ import {
 	type Swap
 } from '#lib/league/box/lineup.ts';
 import { bugsOf, type Bug } from '#lib/league/home/home.ts';
+import { AS_OF_KICKOFF, projFinalWords } from '#lib/league/box/basis.ts';
 import { carriedMark, NEXT_WEEK } from '#lib/league/box/next-week.ts';
 import { agoWords } from '#lib/league/model.ts';
 import { hostWords } from '#lib/league/names.ts';
@@ -240,7 +241,7 @@ export function nudgeOf(league: WeekLeague, href: ScreenHref): FrontNudge | null
 		title: changesTitle(changes, done, lineup.week_done_state ?? null),
 		sum: stripSum(
 			{
-				totals: { proj: lineup.projection, pts: null, note: null },
+				totals: { proj: lineup.projection, pts: null, final: null, live: false, note: null },
 				asSet: lineup.as_set,
 				gain: lineup.gain,
 				swaps
@@ -273,7 +274,13 @@ export function frontLeague(
 		bug:
 			bug === null || me === undefined
 				? null
-				: (bugsOf({ games: [bug.game] }, { teams: bug.teams, me }, now.getTime(), zone)[0] ?? null),
+				: (bugsOf(
+						{ games: [bug.game] },
+						{ teams: bug.teams, me },
+						now.getTime(),
+						zone,
+						league.read_at === null ? null : { host: league.host, readAt: league.read_at }
+					)[0] ?? null),
 		first: bug === null ? null : firstOf(bug.first, zone, now),
 		nudge: nudgeOf(league, href),
 		chips: chipsOf(league, href, zone, now),
@@ -308,7 +315,11 @@ export function readWords(league: WeekLeague, now: Date): string | null {
 export function weekBasis(
 	league: WeekLeague,
 	others: boolean,
-	zone: string = memberZone()
+	zone: string = memberZone(),
+	/** The lead league's game has kicked off: Proj final is on its bug (Lane 92). */
+	started = false,
+	/** Its bug draws a Proj final "--" (round 2). */
+	missing = false
 ): string[] {
 	const platform = hostWords(league.host);
 	const lines = [
@@ -327,7 +338,7 @@ export function weekBasis(
 				? `The strip's gain is what the changes add, and a pickup's is the ${BOX.proj} he adds this week.`
 				: `The strip's gain is what the changes add. ${FRONT.turnedPickup(turned)}`;
 		lines.push(
-			`${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}, ${when}. ${pickup}`
+			`${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}, ${when}${started ? `, ${AS_OF_KICKOFF}` : ''}. ${pickup}${started ? ` ${projFinalWords(true, missing)}` : ''}`
 		);
 	}
 	return lines;

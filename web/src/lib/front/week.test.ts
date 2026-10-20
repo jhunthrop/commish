@@ -180,11 +180,12 @@ void test('the bug is the API game with both teams, mine first, and who plays fi
 	assert.equal(view.platform, 'Sleeper');
 	assert.ok(view.bug);
 	assert.equal(view.bug.head, 'Sun 8:30 am');
+	// Before kickoff the Proj is the big figure (Lane 92, B22).
 	assert.deepEqual(
-		view.bug.sides.map((s) => [s.name, s.record, s.proj, s.pts, s.me]),
+		view.bug.sides.map((s) => [s.name, s.record, s.small, s.big, s.me]),
 		[
-			['McConkey Kong Country', '1-4', '74.7', '--', true],
-			['thatmattkelley', '1-4', '98.4', '--', false]
+			['McConkey Kong Country', '1-4', '', '74.7', true],
+			['thatmattkelley', '1-4', '', '98.4', false]
 		]
 	);
 	assert.equal(view.first?.words, 'Meyers plays first, vs HOU');

@@ -323,12 +323,17 @@ func (a *advisor) boardPerson(p boards.Player, hosts map[string]string) person {
 	id := p.ID
 	hostID, rostered := hosts[p.ID]
 	lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(p), BoardId: &id, Name: p.Name, Position: string(p.Position), Team: p.Team}
-	if rostered {
-		lp = a.Player(hostID)
-	} else {
-		hostID = p.ID
+	if !rostered {
+		return a.build(p.ID, lp, nil)
 	}
-	return a.build(hostID, lp, nil)
+	// His roster's side, so a game under way or final carries the
+	// platform's points for him (Lane 92, B36: the week column prints them
+	// once final).
+	var side *leaguesync.Side
+	if holder, held := a.HeldBy[p.ID]; held {
+		side = a.side(holder)
+	}
+	return a.build(hostID, a.Player(hostID), side)
 }
 
 // leagueOrder is GET /leagues/attached/{id}/order. The verb for a free

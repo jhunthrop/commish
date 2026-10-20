@@ -46,9 +46,9 @@ const ALLOWED: Readonly<Record<string, Site>> = {
 		reads: 1,
 		why: "the Platforms table's clock, set at each read, after a connect or a disconnect too"
 	},
-	'src/lib/league/AccountLeagues.svelte': {
+	'src/lib/league/attached-list.svelte.ts': {
 		reads: 1,
-		why: "the account's leagues' clock, set when the list is read"
+		why: "the account's leagues' clock, set when the list is read, for both Account tables"
 	},
 	'src/lib/league/inseason/WaiverScreen.svelte': {
 		reads: 1,

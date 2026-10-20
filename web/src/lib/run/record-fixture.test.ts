@@ -42,12 +42,12 @@ void test('its dates agree with the run it is shot in: frozen by it, week 7 froz
 	}
 });
 
-void test('its basis names ADP alone and says when Published starts', () => {
+void test('its basis names ADP alone and says the week Published starts', () => {
 	const said = recordBasis(fixture).join(' ');
 	assert.ok(said.includes('ADP on the same players.'), said);
 	assert.ok(!said.includes('ADP and Published'), said);
 	assert.ok(
-		said.endsWith("Published, one provider's weekly projection, starts with week 7."),
+		said.endsWith("From week 7 each week is also graded against the week's published projection."),
 		said
 	);
 	assert.ok(!said.includes('capture'), said);

@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { BOX, boxNumber } from './box.ts';
+	import { BOX } from './box.ts';
 	import { askedPlayer, markAsked } from './asked.ts';
 	import BoxLine from './BoxLine.svelte';
+	import TeamFigures from './TeamFigures.svelte';
 	import { BENCH_ANCHOR, LINEUP, type LineupBox, type LineupRow } from './lineup.ts';
 
 	/** The Lineup screen's one table (Lane 66e): the lineup the advice sets, Totals lit like the score
@@ -101,8 +102,7 @@
 						>{box.totals.note}</span
 					>{/if}</td
 			>
-			<td class="n proj">{boxNumber(box.totals.proj)}</td>
-			<td class="n pts">{boxNumber(box.totals.pts)}</td>
+			<TeamFigures totals={box.totals} size="lg" />
 			<td class="rest" colspan={COLUMNS - 5}></td>
 		</tr>
 	</tbody>
@@ -262,18 +262,6 @@
 		color: var(--scoreboard-ink-2);
 	}
 
-	.totals .proj {
-		font-size: var(--t-2xl);
-		font-weight: 800;
-		color: var(--scoreboard-num);
-	}
-
-	.totals .pts {
-		font-size: var(--t-xl);
-		font-weight: 700;
-		color: var(--scoreboard-ink-2);
-	}
-
 	.sect th {
 		height: 32px;
 		padding-left: var(--s-3);
@@ -327,18 +315,6 @@
 
 		.whyline td + td {
 			padding-left: var(--s-2);
-		}
-
-		.totals .proj {
-			font-size: var(--t-xl);
-		}
-
-		/* The board's own divider between the Team row's two figures, so 101.6 and -- read as two
-		   columns (Lane 83). */
-		.totals .pts {
-			padding-left: var(--s-2);
-			border-left: 1px solid var(--scoreboard-line);
-			font-size: var(--t-md);
 		}
 	}
 

@@ -7,6 +7,7 @@ import type { components } from '#lib/api/types.ts';
 import {
 	PLATFORMS,
 	PLATFORM_WORDS,
+	leaguesByPlatform,
 	platformRows,
 	readWords,
 	type PlatformRow
@@ -41,13 +42,16 @@ void test('every platform has its row, in the table order, Sleeper as a fixed fa
 	const espn = rowOf(rows, 'espn');
 	const sleeper = rowOf(rows, 'sleeper');
 	assert.equal(sleeper.note, 'Followed by league id, nothing to connect');
-	assert.deepEqual([sleeper.state, sleeper.line], ['No sign-in', 'Leagues read in public']);
+	assert.deepEqual(
+		[sleeper.state, sleeper.line, sleeper.dot],
+		['Not followed', 'Leagues read in public', 'off']
+	);
 	assert.equal(sleeper.verb?.kind, 'follow');
 	assert.equal(espn.state, PLATFORM_WORDS.notOpen);
 	assert.equal(espn.verb, null);
 });
 
-void test('a connection reads its state, consent, writes and last read from the API', () => {
+void test('a connection reads its state, writes and, with the league list unread, its own last read from the API', () => {
 	const rows = platformRows(
 		{
 			enabled: ['espn', 'yahoo', 'mfl', 'ffpc'],
@@ -71,7 +75,8 @@ void test('a connection reads its state, consent, writes and last read from the 
 				})
 			]
 		},
-		NOW
+		NOW,
+		null
 	);
 	const espn = rowOf(rows, 'espn');
 	const yahoo = rowOf(rows, 'yahoo');
@@ -81,7 +86,7 @@ void test('a connection reads its state, consent, writes and last read from the 
 		[espn.state, espn.line, espn.writes, espn.read, espn.verb?.words],
 		[
 			'Connected',
-			'Since Oct 3, consent version 3',
+			'Since Oct 3',
 			{ on: false, words: 'Lineups on ESPN are not open to your account yet.' },
 			'6 minutes ago',
 			'Disconnect'
@@ -96,6 +101,44 @@ void test('a connection reads its state, consent, writes and last read from the 
 	assert.deepEqual(
 		[ffpc.dot, ffpc.state, ffpc.read, ffpc.verb],
 		['bad', 'Signed out by FFPC', 'Oct 12', { kind: 'again', words: 'Sign in to FFPC again' }]
+	);
+});
+
+void test('one state word a platform, each connection saying what it is connected to (Lane 94, B10 B59)', () => {
+	const rows = platformRows(
+		{
+			enabled: ['espn', 'yahoo', 'ffpc'],
+			connections: [
+				conn({ host: 'espn', proven: false, connected_at: '2026-10-19T12:00:00.000Z' }),
+				conn({ host: 'yahoo', connected_at: '2026-10-19T12:00:00.000Z', last_read_at: null }),
+				conn({ host: 'ffpc', connected_at: '2026-10-13T12:00:00.000Z' })
+			]
+		},
+		NOW,
+		leaguesByPlatform([
+			{ host: 'espn', last_read_at: '2026-10-17T15:08:00.000Z' },
+			{ host: 'ffpc', last_read_at: '2026-10-17T11:00:00.000Z' },
+			{ host: 'ffpc', last_read_at: '2026-10-17T15:10:00.000Z' },
+			{ host: 'sleeper', last_read_at: null }
+		])
+	);
+	const said = (key: PlatformRow['key']): [string, string] => {
+		const row = rowOf(rows, key);
+		return [row.state, row.line];
+	};
+	assert.deepEqual(said('espn'), ['Connected', 'Since Oct 19, 1 league followed']);
+	assert.deepEqual(said('yahoo'), ['Connected', 'Since Oct 19, no league followed']);
+	assert.deepEqual(said('ffpc'), ['Signed in', 'Since Oct 13, 2 leagues followed']);
+	assert.deepEqual(said('sleeper'), ['Followed', '1 league followed']);
+	assert.deepEqual(said('mfl'), ['Not yet open', 'Connecting opens here soon']);
+	for (const row of rows) {
+		assert.doesNotMatch(`${row.state} ${row.line}`, /consent|checked/, row.key);
+	}
+	// One time a row, its leagues' newest read, the time the leagues table says (fix round 1): the
+	// connection's own read (6 minutes ago in conn) is never said beside them.
+	assert.deepEqual(
+		[rowOf(rows, 'espn').read, rowOf(rows, 'ffpc').read, rowOf(rows, 'yahoo').read],
+		['4 minutes ago', '2 minutes ago', '--']
 	);
 });
 
@@ -119,6 +162,6 @@ void test('a re-read after a disconnect draws at its own instant: a 30-minute-ol
 		enabled: ['espn' as const],
 		connections: [conn({ host: 'espn', last_read_at: '2026-10-17T15:30:00.000Z' })]
 	};
-	assert.equal(rowOf(platformRows(hosts, reread), 'espn').read, '30 minutes ago');
-	assert.equal(rowOf(platformRows(hosts, opened), 'espn').read, 'just now');
+	assert.equal(rowOf(platformRows(hosts, reread, null), 'espn').read, '30 minutes ago');
+	assert.equal(rowOf(platformRows(hosts, opened, null), 'espn').read, 'just now');
 });

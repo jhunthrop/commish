@@ -27,6 +27,10 @@ const (
 	// Revalidate answers a key read before at once with that read while
 	// one read goes upstream behind it; a key never read still waits.
 	Revalidate
+	// Bounded has a key read before wait at most Poller.Bound for the read
+	// upstream, then answer the kept read with its own read time while the
+	// read still lands for the next viewer; a key never read still waits.
+	Bounded
 )
 
 // Store keeps the last good read per key, so it survives a restart. Nil
@@ -90,6 +94,11 @@ type Poller[S any] struct {
 	// Without it the read is cancelled, and an abandoned read leaves no
 	// trace: no error recorded, no gap held.
 	Outlive bool
+	// Bound is how long a Bounded viewer waits for the read upstream.
+	Bound time.Duration
+	// After is the Bounded viewer's timer, time.After when nil (a test's
+	// fake clock gives its own).
+	After func(time.Duration) <-chan time.Time
 
 	mu       sync.Mutex
 	entries  map[string]*entry[S]
@@ -177,9 +186,20 @@ func (p *Poller[S]) Read(ctx context.Context, key string, gap time.Duration, mod
 		return e.answer(now, gap)
 	}
 	f.waiters++
+	var bound <-chan time.Time
+	if e.has && mode == Bounded {
+		bound = p.after(p.Bound)
+	}
 	e.mu.Unlock()
 	select {
 	case <-f.done:
+	case <-bound:
+		// The read is slow: this viewer takes the kept read and leaves the
+		// read running, never abandoned, so it lands for the next.
+		e.mu.Lock()
+		f.waiters--
+		defer e.mu.Unlock()
+		return e.answer(p.Now(), gap)
 	case <-ctx.Done():
 		e.mu.Lock()
 		f.waiters--
@@ -194,6 +214,14 @@ func (p *Poller[S]) Read(ctx context.Context, key string, gap time.Duration, mod
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.answer(p.Now(), gap)
+}
+
+// after is the Bounded viewer's timer.
+func (p *Poller[S]) after(d time.Duration) <-chan time.Time {
+	if p.After != nil {
+		return p.After(d)
+	}
+	return time.After(d)
 }
 
 // start sends one read upstream, with e locked.

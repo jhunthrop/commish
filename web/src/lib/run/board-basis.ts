@@ -73,7 +73,10 @@ export function boardBasis(facts: BasisFacts): BasisPart[] {
 					...(facts.position
 						? [{ text: `Tiers are drawn within ${facts.position}.`, phone: true }]
 						: []),
-					{ text: `ADP from ${drafts}.`, phone: true }
+					// The rest-of-season board draws no ADP column (Lane 93), so its basis names no drafts.
+					...(format.rosFromWeek === undefined
+						? [{ text: `ADP from ${drafts}.`, phone: true }]
+						: [])
 				];
 	if (facts.gap) parts.push({ text: GAP_WORDS, phone: true, topic: 'gap' });
 	if (facts.reach !== null) parts.push({ text: seasonColumns(format, facts.reach), phone: false });

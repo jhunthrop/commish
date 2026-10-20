@@ -2,10 +2,12 @@ package leaguesync
 
 import (
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/espn"
+	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
 	"github.com/jhunthrop/commish/api/internal/scoring"
 	"github.com/jhunthrop/commish/api/internal/sleeper"
 )
@@ -28,7 +30,17 @@ type Terms struct {
 	// FinalWeeks is how many weeks the championship round runs: 2 for a
 	// two-week final, 1 for one week, 0 when the host does not say.
 	FinalWeeks int `json:"final_weeks,omitempty"`
+	// Seeds is how the host's rules seed the playoffs, seed by seed
+	// (SeedRecord or SeedPoints); none where the host states no seeding.
+	Seeds []string `json:"seeds,omitempty"`
 }
+
+// How a playoff seed is earned, as the contract (LeagueTerms.playoff_seeds)
+// spells it.
+const (
+	SeedRecord = string(apitypes.LeagueTermsPlayoffSeedsRecord)
+	SeedPoints = string(apitypes.LeagueTermsPlayoffSeedsPoints)
+)
 
 // sleeperAvatars is where Sleeper serves a member's avatar by its id.
 const sleeperAvatars = "https://sleepercdn.com/avatars/thumbs/"
@@ -118,10 +130,7 @@ func terms(snap Snapshot) apitypes.LeagueTerms {
 	t := snap.Terms
 	out := apitypes.LeagueTerms{
 		PlayoffTeams: positive(t.PlayoffTeams), WaiverBudget: positive(t.Budget),
-		Roster: apitypes.LeagueShape{
-			Qb: snap.Shape.QB, Rb: snap.Shape.RB, Wr: snap.Shape.WR, Te: snap.Shape.TE, Flex: snap.Shape.Flex,
-			SuperFlex: snap.Shape.SuperFlex, K: snap.Shape.K, Def: snap.Shape.DEF, Bench: snap.Shape.Bench,
-		},
+		Roster:       snap.Shape.API(),
 		ScoringExtra: scoringExtra(snap.Scoring), ScoringUnstated: unstated(snap.Scoring.Defaulted),
 		HostSettingsUrl: orNil(hostSettingsURL(snap.Ref)),
 	}
@@ -135,7 +144,38 @@ func terms(snap Snapshot) apitypes.LeagueTerms {
 	if rules, err := scoring.FromMap(snap.Scoring.Rules); err == nil {
 		out.Scoring = &rules
 	}
+	if len(t.Seeds) > 0 {
+		seeds := make([]apitypes.LeagueTermsPlayoffSeeds, len(t.Seeds))
+		for i, s := range t.Seeds {
+			seeds[i] = apitypes.LeagueTermsPlayoffSeeds(s)
+		}
+		out.PlayoffSeeds = &seeds
+	}
 	return out
+}
+
+// ffpcTerms is the rules page's playoffs: as many teams as it seeds, in
+// the league playoffs' weeks, each seed by record or points as it states.
+// Its blind bidding is not read here.
+func ffpcTerms(r ffpc.Rules) Terms {
+	t := Terms{PlayoffFirst: r.PlayoffStartWeek, PlayoffLast: r.PlayoffLastWeek}
+	for _, s := range r.Seeds {
+		switch s {
+		case ffpc.SeedRecord:
+			t.Seeds = append(t.Seeds, SeedRecord)
+		case ffpc.SeedPoints:
+			t.Seeds = append(t.Seeds, SeedPoints)
+		default:
+			return Terms{PlayoffFirst: t.PlayoffFirst, PlayoffLast: t.PlayoffLast}
+		}
+	}
+	// playoff_teams draws a cut under that many teams by record: a field
+	// seeded partly on points says its count by its seeds alone, so a web
+	// that reads only playoff_teams never draws a cut FFPC does not make.
+	if !slices.ContainsFunc(t.Seeds, func(s string) bool { return s != SeedRecord }) {
+		t.PlayoffTeams = len(t.Seeds)
+	}
+	return t
 }
 
 // unstated is the rule keys a read's scoring held at the standard figure,

@@ -48,6 +48,9 @@ func jobTable() map[string]job {
 		// ffpc-refresh runs hourly and in bursts: every FFPC attachment read
 		// as its own connected member (ffpcjob.go).
 		"ffpc-refresh": runFFPCRefresh,
+		// espn-week-reads runs Wednesday evening and Thursday afternoon: every
+		// attached ESPN league's projection and points (espnweekjob.go).
+		"espn-week-reads": runESPNWeekReads,
 		// re-encrypt-host-connections runs by hand during a key rotation:
 		// every connection's data key re-wrapped under the current key.
 		"re-encrypt-host-connections": runRekey,

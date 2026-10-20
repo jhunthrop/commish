@@ -720,6 +720,42 @@ func (e LeaguePhase) Valid() bool {
 	}
 }
 
+// Defines values for LeagueRecordWeekBenchmark.
+const (
+	LeagueRecordWeekBenchmarkEspn      LeagueRecordWeekBenchmark = "espn"
+	LeagueRecordWeekBenchmarkPublished LeagueRecordWeekBenchmark = "published"
+)
+
+// Valid indicates whether the value is a known member of the LeagueRecordWeekBenchmark enum.
+func (e LeagueRecordWeekBenchmark) Valid() bool {
+	switch e {
+	case LeagueRecordWeekBenchmarkEspn:
+		return true
+	case LeagueRecordWeekBenchmarkPublished:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LeagueTermsPlayoffSeeds.
+const (
+	LeagueTermsPlayoffSeedsPoints LeagueTermsPlayoffSeeds = "points"
+	LeagueTermsPlayoffSeedsRecord LeagueTermsPlayoffSeeds = "record"
+)
+
+// Valid indicates whether the value is a known member of the LeagueTermsPlayoffSeeds enum.
+func (e LeagueTermsPlayoffSeeds) Valid() bool {
+	switch e {
+	case LeagueTermsPlayoffSeedsPoints:
+		return true
+	case LeagueTermsPlayoffSeedsRecord:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LeagueTermsWaivers.
 const (
 	LeagueTermsWaiversBudget LeagueTermsWaivers = "budget"
@@ -2596,6 +2632,40 @@ type LeaguePlayer struct {
 	Team           string `json:"team"`
 }
 
+// LeagueRecord our record in the member's own league (Lane 93)
+type LeagueRecord struct {
+	// Host the host a league runs on, named as a mechanism
+	Host LeagueHost `json:"host"`
+
+	// Lineup the league's starting lineup by our slots, and its bench
+	Lineup LeagueShape `json:"lineup"`
+
+	// Teams the league's teams, the count each starting slot is multiplied by
+	Teams int `json:"teams"`
+
+	// Weeks the graded weeks, in week order; empty on a platform whose week reads are not kept (every platform but ESPN) and before the first graded week whose roster was read before our order was set
+	Weeks []LeagueRecordWeek `json:"weeks"`
+}
+
+// LeagueRecordWeek defines model for LeagueRecordWeek.
+type LeagueRecordWeek struct {
+	// Benchmark the lineup ours is graded against: espn, the lineup ESPN's own projection picks; published, the lineup the week's published projection picks, where the read carried no ESPN projection
+	Benchmark LeagueRecordWeekBenchmark `json:"benchmark"`
+
+	// Margin ours less theirs, to the tenth
+	Margin float64 `json:"margin"`
+
+	// Ours our picks' points, to the tenth, as the league scores
+	Ours float64 `json:"ours"`
+
+	// Theirs the benchmark lineup's points, to the tenth, as the league scores
+	Theirs float64 `json:"theirs"`
+	Week   int     `json:"week"`
+}
+
+// LeagueRecordWeekBenchmark the lineup ours is graded against: espn, the lineup ESPN's own projection picks; published, the lineup the week's published projection picks, where the read carried no ESPN projection
+type LeagueRecordWeekBenchmark string
+
 // LeagueSettings defines model for LeagueSettings.
 type LeagueSettings struct {
 	BotStyle BotStyle `json:"bot_style"`
@@ -2750,6 +2820,9 @@ type LeagueTerms struct {
 	// HostSettingsUrl the host's page for the league's settings
 	HostSettingsUrl *string `json:"host_settings_url"`
 
+	// PlayoffSeeds how the host's rules seed the playoffs, seed by seed (FFPC's "Seed 1) Team with best regular season Record, Seed 2) Team with highest point total"); absent or empty where the host states no seeding
+	PlayoffSeeds *[]LeagueTermsPlayoffSeeds `json:"playoff_seeds,omitempty"`
+
 	// PlayoffTeams the teams that make the playoffs
 	PlayoffTeams *int `json:"playoff_teams"`
 
@@ -2774,6 +2847,9 @@ type LeagueTerms struct {
 	// Waivers claims carry a bid from a season budget, or run in a waiver order; null where the host does not say
 	Waivers *LeagueTermsWaivers `json:"waivers"`
 }
+
+// LeagueTermsPlayoffSeeds defines model for LeagueTerms.PlayoffSeeds.
+type LeagueTermsPlayoffSeeds string
 
 // LeagueTermsWaivers claims carry a bid from a season budget, or run in a waiver order; null where the host does not say
 type LeagueTermsWaivers string
@@ -2810,6 +2886,9 @@ type LineupAdvice struct {
 
 	// PlayerPoints the host gives each player's points (Sleeper, MFL, ESPN); false where it gives each team's total alone (Yahoo, FFPC) or its read carried no player's, so a player's points_this_week stay null and the team's total is team_points
 	PlayerPoints bool `json:"player_points"`
+
+	// ProjectedFinal the lineup's projected final by the score bug's one rule over the lineup as the platform holds it (the score bug's figure for the member): team_points plus the rest of the Proj of its starters in play and the Proj of its starters still to play, an out starter counting nothing; null while team_points is, while a starter still to play has no Proj, or absent from an older answer
+	ProjectedFinal *float64 `json:"projected_final,omitempty"`
 
 	// ProjectionPreviousReadAt when the snapshot before it was captured, the read projection_delta counts from; null with none
 	ProjectionPreviousReadAt *time.Time `json:"projection_previous_read_at"`
@@ -2995,13 +3074,19 @@ type MatchupBoxSide struct {
 
 	// PlayerPoints the host gives each player's points for this side; false where it gives the side's total alone
 	PlayerPoints bool `json:"player_points"`
-	RosterId     int  `json:"roster_id"`
+
+	// ProjectedFinal the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far, the rest of the Proj of its starters in play and the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, or absent from an older answer
+	ProjectedFinal *float64 `json:"projected_final,omitempty"`
+	RosterId       int      `json:"roster_id"`
 
 	// Starters the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents)
 	Starters []BoxStarter `json:"starters"`
 
 	// TeamTotal the platform sends the side's own total (ESPN, Yahoo, FFPC), so the score and the Totals row print it; false where it sends each player's points alone (Sleeper, MFL), so both print the rows' sum
 	TeamTotal bool `json:"team_total"`
+
+	// ToPlay where the side's starters stand while the game is playing, by the score bug's rule (ScoreboardSide.to_play): "3 to play", "2 playing", never a zero; null otherwise, or absent from an older answer
+	ToPlay *string `json:"to_play,omitempty"`
 }
 
 // MatchupSide defines model for MatchupSide.
@@ -3340,7 +3425,7 @@ type PlayerLine struct {
 	// PositionRank his place at his position in our order
 	PositionRank *int `json:"position_rank"`
 
-	// ProjectionDelta week_projection's change since the week's snapshot before the newest, to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
+	// ProjectionDelta week_projection's change since the week's snapshot before the one it is read from (the newest, or once his game has kicked off the one as of kickoff), to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
 	ProjectionDelta *float64 `json:"projection_delta"`
 
 	// RestOfSeasonPerGame his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club had still to play at the run (the games not yet kicked off, from the board's first week through week 17, byes out; the same as his rest-of-season points now over his club's games left now), as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
@@ -3352,7 +3437,7 @@ type PlayerLine struct {
 	// Slug his page on the site (/players/{slug}): set for a quarterback, running back, receiver or tight end our order ranks whose name no other player in our directory shares, null otherwise (a kicker or defense has no page) (a shared name's page is named by the run, which the API does not read)
 	Slug *string `json:"slug"`
 
-	// WeekProjection his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
+	// WeekProjection his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when) while his game is still to come; once it has kicked off, the newest captured at or before his kickoff (null when none was), so a game under way or final keeps its projection as of kickoff. Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
 	WeekProjection *float64 `json:"week_projection"`
 }
 
@@ -3442,6 +3527,9 @@ type ProjectionScoring struct {
 
 	// LeagueOwn the league scores exactly as format
 	LeagueOwn bool `json:"league_own"`
+
+	// TeBonus the extra points the league's rules give a tight end's catch over format (FFPC's 0.5), which the published projection does not carry; absent where the league gives none
+	TeBonus *float64 `json:"te_bonus,omitempty"`
 }
 
 // ProjectionScoringFormat defines model for ProjectionScoring.Format.
@@ -3761,7 +3849,7 @@ type ScoreboardGame struct {
 	// State upcoming before any starter's game kicks off, final once every starter's game is over, playing between
 	State ScoreboardGameState `json:"state"`
 
-	// ToPlay while the game is playing, how many of both sides' starters with a game this week are still to play ("5 of 18 starters to play"): a starter on bye, or with no game held, is neither to play nor played and leaves the count; null otherwise, or absent from an older answer
+	// ToPlay while the game is playing, how many of both sides' starters with a game this week are still to play ("5 to play", or "2 playing" once none is still to come), never a zero; an out starter is done once his game has kicked off, a starter on bye or with no game held leaves the count; null otherwise, or absent from an older answer. Each side's own count is its to_play
 	ToPlay *string `json:"to_play,omitempty"`
 }
 
@@ -3779,12 +3867,18 @@ type ScoreboardSide struct {
 	// PointsRead false when the host's score could not be read; points then says nothing
 	PointsRead bool `json:"points_read"`
 
+	// ProjectedFinal the side's projected final once any starter of the game has kicked off: points (the platform's score so far), plus for each starter in play the rest of his week projection (max(0, Proj - his points so far), nothing where the platform gives no player's points), plus the week projection of each starter still to play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, or absent from an older answer
+	ProjectedFinal *float64 `json:"projected_final,omitempty"`
+
 	// Projection the side's starters' week projections summed, each as printed to the tenth, a starter with none counting nothing; null when no starter has one
 	Projection *float64 `json:"projection"`
 	RosterId   int      `json:"roster_id"`
 
 	// Starters the starters the host lists for the side
 	Starters int `json:"starters"`
+
+	// ToPlay while the game is playing, where the side's starters stand, never a zero: "3 to play" while any starter with a game is still to come (an out starter whose game is still to come counts), "2 playing" once none is and some are in play; null once every starter is final, on bye or out of a game under way, before kickoff, or absent from an older answer
+	ToPlay *string `json:"to_play,omitempty"`
 }
 
 // Scoring exactly one of preset and custom. custom needs the custom_scoring feature.
@@ -4642,6 +4736,16 @@ type HostMovesResponse struct {
 	Meta      *PageMeta  `json:"meta,omitempty"`
 	Ok        bool       `json:"ok"`
 	RequestId string     `json:"request_id"`
+}
+
+// LeagueRecordResponse defines model for LeagueRecordResponse.
+type LeagueRecordResponse struct {
+	// Data our record in the member's own league (Lane 93)
+	Data      LeagueRecord `json:"data"`
+	Error     *ErrorBody   `json:"error"`
+	Meta      *PageMeta    `json:"meta,omitempty"`
+	Ok        bool         `json:"ok"`
+	RequestId string       `json:"request_id"`
 }
 
 // LeagueResponse defines model for LeagueResponse.

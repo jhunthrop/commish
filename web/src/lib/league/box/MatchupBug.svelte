@@ -1,14 +1,15 @@
 <script lang="ts">
-	import { BOX, boxNumber } from './box.ts';
+	import { BOX } from './box.ts';
+	import { bugFigures, type BugTotals } from './matchup.ts';
 	import TeamAvatar from './TeamAvatar.svelte';
 
-	/** The matchup's score bug (Lane 66d): both teams with their avatars and their points so far on
-	 * the lit board, each with its projection under, the week and the next kickoff between them. The
-	 * drafter's side in the accent. A side we hold no opponent for is left out. */
-	interface Side {
+	/** The matchup's score bug (Lane 66d): both teams with their avatars on the lit board, each with
+	 * its big figure and its small one under (Lane 92: before the first kickoff its Proj, from it its
+	 * Pts with its projected final under), the week, the game's state and the read beside the live
+	 * score between them. The drafter's side in the accent. A side we hold no opponent for is left
+	 * out. */
+	interface Side extends BugTotals {
 		name: string;
-		pts: number | null;
-		proj: number | null;
 	}
 
 	interface Props {
@@ -16,18 +17,27 @@
 		mine: Side;
 		opponent: Side | null;
 		kickoff: { head: string; words: string } | null;
+		/** The game has kicked off: the Pts are the big figures. */
+		started: boolean;
+		/** "ESPN 1 min ago" beside a live score, null before kickoff and once final. */
+		read: string | null;
 	}
 
-	let { week, mine, opponent, kickoff }: Props = $props();
+	let { week, mine, opponent, kickoff, started, read }: Props = $props();
 </script>
 
 {#snippet side(s: Side, me: boolean)}
+	{@const f = bugFigures(s, started)}
 	<div class="sd" class:me>
 		<span class="avatar"><TeamAvatar name={s.name} size={44} {me} board /></span>
-		<span class="nm"><small>{me ? BOX.you : BOX.opponent}</small><b>{s.name}</b></span>
+		<span class="nm"
+			><small>{me ? BOX.you : BOX.opponent}</small><b>{s.name}</b>{#if s.toPlay}<span class="tp"
+					>{s.toPlay}</span
+				>{/if}</span
+		>
 		<span class="sc">
-			<b class="big" aria-label="{BOX.pts} {boxNumber(s.pts)}">{boxNumber(s.pts)}</b>
-			<small>{BOX.proj} {boxNumber(s.proj)}</small>
+			<b class="big" aria-label="{f.bigLabel} {f.big}">{f.big}</b>
+			{#if f.small}<small>{f.small}</small>{/if}
 		</span>
 	</div>
 {/snippet}
@@ -37,6 +47,7 @@
 	<div class="mid">
 		<small>Week {week}</small>
 		{#if kickoff}<b>{kickoff.head}</b><span>{kickoff.words}</span>{/if}
+		{#if read}<span class="read">{read}</span>{/if}
 	</div>
 	{#if opponent}{@render side(opponent, false)}{/if}
 </section>
@@ -96,6 +107,13 @@
 		overflow-wrap: anywhere;
 	}
 
+	/* Where the side's starters stand while the game is under way, under its name (fix round 1). */
+	.nm .tp {
+		font-size: var(--t-xs);
+		font-weight: 600;
+		color: var(--scoreboard-num);
+	}
+
 	.sc {
 		display: flex;
 		flex-direction: column;
@@ -152,6 +170,12 @@
 		font-size: var(--t-sm);
 		color: var(--scoreboard-ink-2);
 		white-space: nowrap;
+	}
+
+	/* The read beside the live score: a cell, lit, not the grey line under the league's name. */
+	.mid .read {
+		color: var(--scoreboard-ink);
+		font-variant-numeric: tabular-nums;
 	}
 
 	@media (max-width: 760px) {

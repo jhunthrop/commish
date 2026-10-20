@@ -63,6 +63,9 @@ type fakeESPN struct {
 	private                    map[string]bool
 	// unanswered is a league whose public check ESPN does not answer.
 	unanswered map[string]bool
+	// weeks counts the period reads; refuseWeeks refuses their cookies.
+	weeks       int
+	refuseWeeks bool
 }
 
 func (f *fakeESPN) MyLeagues(_ context.Context, c espn.Cookies, season int) ([]espn.MyLeague, error) {
@@ -92,6 +95,14 @@ func (f *fakeESPN) Read(_ context.Context, id string, _ int, c *espn.Cookies) (e
 		return espn.FullLeague{}, espn.ErrSignedOut
 	}
 	return espn.FullLeague{ID: id}, nil
+}
+
+func (f *fakeESPN) ReadWeek(_ context.Context, id string, season, period int, c *espn.Cookies) (espn.WeekRead, error) {
+	f.weeks++
+	if c == nil || c.S2 != goodS2 || f.refuseWeeks || !f.listed(id) {
+		return espn.WeekRead{}, espn.ErrSignedOut
+	}
+	return espn.WeekRead{Season: season, Period: period}, nil
 }
 
 func (f *fakeESPN) Public(_ context.Context, id string, _ int) (bool, error) {
@@ -500,6 +511,35 @@ func TestReadLeagueNotTheirsKeepsTheConnection(t *testing.T) {
 		t.Fatalf("a league not theirs: %v, signed out %v", err, r.store.signedOut)
 	}
 	if _, err := r.member.ReadLeague(context.Background(), r.me, agbo, 2026); err != nil {
+		t.Fatalf("their league: %v", err)
+	}
+}
+
+// ReadWeek reads a period of the league with the member's kept cookies;
+// cookies ESPN refuses mark the connection for a reconnect (Lane 93).
+func TestReadWeekUsesTheKeptCookies(t *testing.T) {
+	r := setup(t)
+	call(t, r.s.connect, r.me, goodPair)
+	got, err := r.member.ReadWeek(context.Background(), r.me, agbo, 2026, 7)
+	if err != nil || got.Period != 7 || r.client.weeks != 1 {
+		t.Fatalf("%+v %v, %d week reads", got, err, r.client.weeks)
+	}
+	r.client.refuseWeeks = true
+	if _, err := r.member.ReadWeek(context.Background(), r.me, agbo, 2026, 7); !errors.Is(err, ErrReconnect) || !r.store.signedOut {
+		t.Fatalf("refused cookies: %v, signed out %v", err, r.store.signedOut)
+	}
+}
+
+// A week read of a league the member is not in (left, or removed) is that
+// league's refusal: the connection is kept, as ReadLeague keeps it (Lane 93
+// review H1).
+func TestReadWeekNotTheirsKeepsTheConnection(t *testing.T) {
+	r := setup(t)
+	call(t, r.s.connect, r.me, goodPair)
+	if _, err := r.member.ReadWeek(context.Background(), r.me, "999", 2026, 7); !errors.Is(err, espn.ErrPrivate) || r.store.signedOut {
+		t.Fatalf("a league not theirs: %v, signed out %v", err, r.store.signedOut)
+	}
+	if _, err := r.member.ReadWeek(context.Background(), r.me, agbo, 2026, 7); err != nil {
 		t.Fatalf("their league: %v", err)
 	}
 }
