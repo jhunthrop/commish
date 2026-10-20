@@ -9,22 +9,29 @@
 		dropLead,
 		dropTitle,
 		beatsWord,
+		gainGroups,
 		gainWord,
+		HEAD_SEPARATOR,
 		sameWeekGain,
 		WAIVERS,
 		type DropRow,
+		type HeadBasisPart,
 		type PoolRow,
 		type Sort,
 		type SortKey
 	} from './waivers.ts';
 
 	/** The Waivers table (Lane 66f): the players free to add in the Lineup's columns (player, game,
-	 * Proj, Opp rank, Avg, Last, Δ Proj), then Rest of season and Beats, and an Add on each row. Every
-	 * head sorts. Add opens the players of the member's he could replace under his row, in the same
-	 * columns, the advice's drop first, with the screen's verb for the pair. */
+	 * Proj, Opp rank, Avg, Last, Δ Proj), then Rest of season and Beats, and an Add on each row, the
+	 * columns' basis in one line under the heads, the rows that gain first and the rest under one
+	 * divider, quiet (Lane 98). Every head sorts, within each group. Add opens the players of the
+	 * member's he could replace under his row, in the same columns, the advice's drop first, with the
+	 * screen's verb for the pair. */
 	interface Props {
 		label: string;
 		rows: readonly PoolRow[];
+		/** The line under the heads (headBasis). */
+		heads: readonly HeadBasisPart[];
 		sort: Sort;
 		onsort: (key: SortKey) => void;
 		/** The row whose drops are open, null for none. */
@@ -46,6 +53,7 @@
 	let {
 		label,
 		rows,
+		heads,
 		sort,
 		onsort,
 		open,
@@ -76,6 +84,7 @@
 	];
 	const shownHeads = $derived(HEADS.filter((head) => projected || !PROJ_KEYS.has(head.key)));
 	const week = $derived(sameWeekGain(drops));
+	const groups = $derived(gainGroups(rows));
 
 	/** The arrow keys move the drop chosen through the group, its focus with it (review 66f L11). */
 	const NEXT = new Set(['ArrowDown', 'ArrowRight']);
@@ -99,6 +108,110 @@
 	<td class="n rest">{boxNumber(value)}</td>
 {/snippet}
 
+{#snippet entryRows(entry: PoolRow)}
+	{@const isOpen = open === entry.key}
+	{@const quiet = !entry.gains}
+	<tbody>
+		<BoxLine
+			phoneFacts={false}
+			row={entry.row}
+			slotCell={false}
+			ptsCell={false}
+			evidence
+			marked={entry.named}
+			clears={entry.clears}
+			phoneMore="{WAIVERS.rest} {boxNumber(entry.rest)}"
+			projCells={projected}
+		>
+			{#snippet tail()}
+				{@render restCell(entry.rest)}
+				<td class="n beats" class:loud={!quiet && entry.beats.gain > 0}>
+					<span class="bt"
+						>{#if entry.beats.who}<span class="who"
+								><b>{entry.beats.who.name}</b><span
+									>{entry.beats.who.starter ? WAIVERS.starter : WAIVERS.bench}</span
+								></span
+							>{/if}<span class="gain" class:quiet>{beatsWord(entry.beats)}</span></span
+					>
+				</td>
+				<td class="act"
+					><button
+						type="button"
+						class="add"
+						class:quiet
+						class:on={isOpen}
+						aria-expanded={isOpen}
+						aria-controls="drops-{entry.key}"
+						aria-label="{isOpen ? WAIVERS.close : LINES.add} {entry.row.name}"
+						onclick={() => ontoggle(entry)}
+						><Icon name={isOpen ? 'chevron' : 'plus'} size={14} /><span>{LINES.add}</span></button
+					></td
+				>
+			{/snippet}
+		</BoxLine>
+	</tbody>
+	{#if isOpen}
+		<tbody class="panel" id="drops-{entry.key}">
+			<tr class="dsect">
+				<td colspan={LEAD_COLUMNS}
+					><b id="drops-title-{entry.key}">{dropTitle(entry.row.name)}</b><span class="lead"
+						>{dropLead(week)}</span
+					></td
+				>
+				<td class="dhead" colspan={COLUMNS - LEAD_COLUMNS}>{WAIVERS.gain}</td>
+			</tr>
+		</tbody>
+		<!-- ARIA in HTML allows any role on a tbody: the drop rows are one radio group with arrow keys
+		     (review 66f L11), kept in the table so their columns stay the table's. -->
+		<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
+		<tbody class="panel" role="radiogroup" aria-labelledby="drops-title-{entry.key}">
+			{#each drops as drop, i (drop.key)}
+				{@const on = chosen === drop.key}
+				<BoxLine
+					phoneFacts={false}
+					row={drop.row}
+					slotCell={false}
+					ptsCell={false}
+					evidence
+					nested
+					marked={on}
+					phoneMore="{WAIVERS.rest} {boxNumber(drop.rest)}"
+					projCells={projected}
+					reserve={drop.row.reserve && drop.starter === null ? 'bench' : null}
+				>
+					{#snippet tail()}
+						{@render restCell(drop.rest)}
+						<td class="n beats"
+							>{#if drop.starter}<span class="dmark"><StatusChip status={drop.starter} /></span
+								>{/if}<span class="dgain" class:up={drop.gain > 0} class:down={drop.gain < 0}
+								>{gainWord(drop.gain)}</span
+							>{#if week === null && drop.weekGain !== null}<span class="dweek"
+									>{gainWord(drop.weekGain)} {BOX.proj}</span
+								>{/if}</td
+						>
+						<td class="act"
+							><button
+								type="button"
+								role="radio"
+								class="radio"
+								class:on
+								aria-checked={on}
+								tabindex={on ? 0 : -1}
+								aria-label="Drop {drop.row.name}"
+								onclick={() => onchoose(drop)}
+								onkeydown={(event) => step(event, i)}
+							></button></td
+						>
+					{/snippet}
+				</BoxLine>
+			{/each}
+		</tbody>
+		<tbody class="panel">
+			<tr class="dgo"><td colspan={COLUMNS}>{@render go()}</td></tr>
+		</tbody>
+	{/if}
+{/snippet}
+
 <table class="pool" aria-label={label}>
 	<thead>
 		<tr class="cols">
@@ -117,114 +230,28 @@
 			{/each}
 			<th class="act" scope="col"><span class="vh">{LINES.add}</span></th>
 		</tr>
-	</thead>
-	{#each rows as entry (entry.key)}
-		{@const isOpen = open === entry.key}
-		<tbody>
-			<BoxLine
-				phoneFacts={false}
-				row={entry.row}
-				slotCell={false}
-				ptsCell={false}
-				evidence
-				marked={entry.named}
-				clears={entry.clears}
-				phoneMore="{WAIVERS.rest} {boxNumber(entry.rest)}"
-				projCells={projected}
+		<!-- The columns' basis, said once under their heads (Lane 98, B35). -->
+		<tr class="heads-basis">
+			<td colspan={COLUMNS}
+				>{#each heads as part, i (part.head)}{#if i > 0}{HEAD_SEPARATOR}{/if}<b>{part.head}</b>
+					{part.words}{/each}.</td
 			>
-				{#snippet tail()}
-					{@render restCell(entry.rest)}
-					<td class="n beats" class:starter={entry.beats?.who?.starter === true}>
-						{#if entry.beats}
-							<span class="bt"
-								>{#if entry.beats.who}<span class="who"
-										><b>{entry.beats.who.name}</b><span
-											>{entry.beats.who.starter ? WAIVERS.starter : WAIVERS.bench}</span
-										></span
-									>{:else if entry.row.game === 'bye'}<span class="none">{BOX.bye}</span>{/if}<span
-									class="gain"
-									class:held={entry.beats.gain === null}>{beatsWord(entry.beats)}</span
-								></span
-							>
-						{:else}<span class="none">{entry.row.game === 'bye' ? BOX.bye : BOX.none}</span>{/if}
-					</td>
-					<td class="act"
-						><button
-							type="button"
-							class="add"
-							class:on={isOpen}
-							aria-expanded={isOpen}
-							aria-controls="drops-{entry.key}"
-							aria-label="{isOpen ? WAIVERS.close : LINES.add} {entry.row.name}"
-							onclick={() => ontoggle(entry)}
-							><Icon name={isOpen ? 'chevron' : 'plus'} size={14} /><span>{LINES.add}</span></button
-						></td
-					>
-				{/snippet}
-			</BoxLine>
-		</tbody>
-		{#if isOpen}
-			<tbody class="panel" id="drops-{entry.key}">
-				<tr class="dsect">
-					<td colspan={LEAD_COLUMNS}
-						><b id="drops-title-{entry.key}">{dropTitle(entry.row.name)}</b><span class="lead"
-							>{dropLead(week)}</span
-						></td
-					>
-					<td class="dhead" colspan={COLUMNS - LEAD_COLUMNS}>{WAIVERS.gain}</td>
-				</tr>
-			</tbody>
-			<!-- ARIA in HTML allows any role on a tbody: the drop rows are one radio group with arrow keys
-			     (review 66f L11), kept in the table so their columns stay the table's. -->
-			<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
-			<tbody class="panel" role="radiogroup" aria-labelledby="drops-title-{entry.key}">
-				{#each drops as drop, i (drop.key)}
-					{@const on = chosen === drop.key}
-					<BoxLine
-						phoneFacts={false}
-						row={drop.row}
-						slotCell={false}
-						ptsCell={false}
-						evidence
-						nested
-						marked={on}
-						phoneMore="{WAIVERS.rest} {boxNumber(drop.rest)}"
-						projCells={projected}
-					>
-						{#snippet tail()}
-							{@render restCell(drop.rest)}
-							<td class="n beats"
-								>{#if drop.starter}<span class="dmark"><StatusChip status={drop.starter} /></span
-									>{/if}<span class="dgain" class:up={drop.gain > 0} class:down={drop.gain < 0}
-									>{gainWord(drop.gain)}</span
-								>{#if week === null && drop.weekGain !== null}<span class="dweek"
-										>{gainWord(drop.weekGain)} {BOX.proj}</span
-									>{/if}</td
-							>
-							<td class="act"
-								><button
-									type="button"
-									role="radio"
-									class="radio"
-									class:on
-									aria-checked={on}
-									tabindex={on ? 0 : -1}
-									aria-label="Drop {drop.row.name}"
-									onclick={() => onchoose(drop)}
-									onkeydown={(event) => step(event, i)}
-								></button></td
-							>
-						{/snippet}
-					</BoxLine>
-				{/each}
-			</tbody>
-			<tbody class="panel">
-				<tr class="dgo"><td colspan={COLUMNS}>{@render go()}</td></tr>
-			</tbody>
-		{/if}
-	{:else}
-		<tbody><tr><td class="empty" colspan={COLUMNS}>{empty}</td></tr></tbody>
+		</tr>
+	</thead>
+	{#each groups.gaining as entry (entry.key)}
+		{@render entryRows(entry)}
 	{/each}
+	{#if groups.rest.length > 0}
+		<tbody>
+			<tr class="divider"><th colspan={COLUMNS} scope="rowgroup">{WAIVERS.noGain}</th></tr>
+		</tbody>
+		{#each groups.rest as entry (entry.key)}
+			{@render entryRows(entry)}
+		{/each}
+	{/if}
+	{#if rows.length === 0}
+		<tbody><tr><td class="empty" colspan={COLUMNS}>{empty}</td></tr></tbody>
+	{/if}
 </table>
 
 <style>
@@ -391,18 +418,51 @@
 		color: var(--ink-2);
 	}
 
-	.starter .gain {
+	/* A row that gains: its Gain the loud cell, in the gain ink; a zero never is (B13). */
+	.loud .gain {
 		font-size: var(--t-xl);
 		color: var(--gain-ink);
 	}
 
-	/* A week gain withheld past kickoff is no gain: drawn as an empty figure, never in the gain ink. */
-	.starter .gain.held {
+	.loud .who b {
+		color: var(--ink);
+	}
+
+	.gain.quiet {
+		font-size: var(--t-sm);
+		font-weight: 600;
 		color: var(--ink-3);
 	}
 
-	.starter .who b {
-		color: var(--ink);
+	/* The columns' basis under the heads, one line at a desk (B35). */
+	.heads-basis td {
+		padding: 4px var(--s-2) 6px;
+		background: var(--bg);
+		border-bottom: 1px solid var(--line);
+		font-size: var(--t-xs);
+		line-height: 1.35;
+		color: var(--ink-3);
+	}
+
+	.heads-basis b {
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--ink-2);
+	}
+
+	/* The rows with no gain over the roster, under one divider (B13). */
+	.divider th {
+		padding: var(--s-3) var(--s-2) var(--s-1);
+		background: var(--bg);
+		border-top: 2px solid var(--line-strong);
+		border-bottom: 1px solid var(--line);
+		font-size: var(--t-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--ink-3);
+		text-align: left;
 	}
 
 	.none {
@@ -429,6 +489,12 @@
 		font-size: var(--t-sm);
 		font-weight: 600;
 		cursor: pointer;
+	}
+
+	.add.quiet {
+		border-color: var(--line);
+		color: var(--ink-3);
+		font-weight: 500;
 	}
 
 	.add.on {
@@ -589,9 +655,13 @@
 		}
 
 		.gain,
-		.starter .gain {
+		.loud .gain {
 			min-width: 0;
 			font-size: var(--t-md);
+		}
+
+		.gain.quiet {
+			font-size: var(--t-sm);
 		}
 
 		.add {

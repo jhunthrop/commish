@@ -15,20 +15,22 @@ const MaxPickups = 3
 // weekLineup is the lineup the advice sets this week (Lineup, the Lineup
 // screen's rule) from the roster: its Proj as the screen prints and sums
 // it, who starts by roster index, the slot each starter fills, and the
-// slots no one who can play fills.
+// slots no one who can play fills, and each row's slot.
 type weekLineup struct {
 	proj   float64
 	starts []bool
 	slotOf map[int]int
 	idle   []bool
+	slots  []Slot
 }
 
 // weekOf sets the week's lineup for roster with the host's starters, as
 // the Lineup screen does. A spot no one who can play fills counts 0.
 func weekOf(config []draft.SlotConfig, roster []Candidate, hostStarters []string) weekLineup {
 	rows := Lineup(config, roster, hostStarters)
-	out := weekLineup{starts: make([]bool, len(roster)), slotOf: map[int]int{}, idle: make([]bool, len(rows))}
+	out := weekLineup{starts: make([]bool, len(roster)), slotOf: map[int]int{}, idle: make([]bool, len(rows)), slots: make([]Slot, len(rows))}
 	for i, r := range rows {
+		out.slots[i] = r.Slot
 		if r.Ours < 0 || r.NoOneCanPlay {
 			out.idle[i] = true
 			continue
@@ -268,6 +270,8 @@ func cardRows(w *Writer, config []draft.SlotConfig, hostStarters []string, mine,
 		move := remap(m, mine, cum)
 		row := waiverRow(w, week, cum, pool[m.Add], move, clears)
 		row.Pickup = true
+		// The banner's move names the player it drops (B14).
+		row.Beats = dropBeats(row)
 		out = append(out, row)
 		cum = afterCard(cum, move.Drop, pool[m.Add])
 	}

@@ -75,7 +75,8 @@ func TestLaterCardsAreMeasuredAfterTheEarlierOnes(t *testing.T) {
 	if len(second.Drops) != 1 || second.Drops[0].HostId != "wr5" || fv(second.Drops[0].WeekGain) != 0.5 {
 		t.Fatalf("the second card's drops %+v, want wr5 alone at +0.5 after the first card", second.Drops)
 	}
-	if second.Beats == nil || second.Beats.HostId != "wr3" || fv(second.Beats.Gain) != 0.5 {
+	// A card's Beats names the player its move drops, at its week gain (Lane 98, B14).
+	if second.Beats == nil || second.Beats.HostId != "wr5" || fv(second.Beats.Gain) != 0.5 {
 		t.Fatalf("the second card's beats %+v", second.Beats)
 	}
 }
@@ -112,7 +113,8 @@ func TestTheStripOnTheRecordedLeague(t *testing.T) {
 			t.Fatalf("card %d is no pickup: %+v", i, p)
 		}
 		var keys []string
-		if p.Beats != nil && !p.Beats.OpenSpot {
+		// A card's Beats names its own drop (Lane 98): that player counts once.
+		if p.Beats != nil && !p.Beats.OpenSpot && (p.Drop == nil || p.Beats.HostId != p.Drop.Player.HostId) {
 			keys = append(keys, p.Beats.HostId)
 		}
 		if p.Drop != nil {

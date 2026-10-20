@@ -31,7 +31,14 @@ import {
 	WAIVERS,
 	waiverBasis,
 	withDrop,
-	beatsWord
+	beatsWord,
+	dropWhy,
+	dropWhyWords,
+	gainGroups,
+	HEAD_BASIS,
+	headBasis,
+	headBasisText,
+	seasonBasisWords
 } from './waivers.ts';
 
 const ZONE = 'America/Chicago';
@@ -195,18 +202,19 @@ void test('the table tints only what the strip names: a starter he tops off the 
 	assert.deepEqual(tinted, ['Kenny Gainwell', 'Chiefs D/ST']);
 	const kicker = rows.find((r) => r.row.name === 'Harrison Mevis');
 	assert.equal(kicker?.named, false);
-	assert.ok(kicker.beats);
-	assert.equal(kicker.beats.who?.starter, true);
-	assert.equal(rows.find((r) => r.row.name === 'Daniel Jones')?.beats?.who?.name, 'Stroud');
+	// A row with no gain over the roster names no one, whomever the API tops (Lane 98, B13).
+	assert.equal(kicker.gains, false);
+	assert.equal(kicker.beats.who, null);
+	assert.equal(rows.find((r) => r.row.name === 'Daniel Jones')?.beats.who?.name, 'Stroud');
 	assert.equal(rows.find((r) => r.row.name === 'Kaytron Allen')?.clears, 'Clears Wed');
 	assert.equal(rows[0]?.rest, 11.8);
 });
 
-void test('the default sort is Beats: a starter topped first by the gain, then the bench, no one last', () => {
+void test('the default sort is Beats by the season Gain, ties in the answer order (Lane 98)', () => {
 	const rows = sortRows(poolRows(advice, ZONE, NOW), DEFAULT_SORT);
 	assert.deepEqual(
 		rows.map((r) => r.row.name),
-		['Kenny Gainwell', 'Chiefs D/ST', 'Harrison Mevis', 'Daniel Jones', 'Kaytron Allen']
+		['Daniel Jones', 'Kenny Gainwell', 'Kaytron Allen', 'Chiefs D/ST', 'Harrison Mevis']
 	);
 	const byProj = sortRows(poolRows(advice, ZONE, NOW), { key: 'proj', down: true });
 	assert.equal(byProj[0]?.row.name, 'Daniel Jones');
@@ -264,9 +272,10 @@ void test("the verbs name the member's platform, and the copy says where he goes
 	});
 	assert.equal(copiedWords('sleeper', 'Gainwell', false).page, "Sleeper's waiver page");
 	const rows = poolRows(advice, ZONE, NOW);
+	// The count is the rows that gain, those over the divider (Lane 98, B13).
 	assert.equal(countWords(rows, 'espn'), '5 free agents we rank on ESPN, 4 beat a player of yours');
 	assert.equal(
-		countWords(rows.slice(3, 4), 'sleeper'),
+		countWords(rows.slice(2, 3), 'sleeper'),
 		'1 free agent we rank on Sleeper, 0 beat a player of yours'
 	);
 	assert.equal(clearsWords(null), null);
@@ -285,7 +294,9 @@ void test('copy guard: every Waivers line is fantasy words, with no dash, semico
 		copiedWords('espn', 'Gainwell', true).said,
 		copiedWords('espn', 'Gainwell', false).said,
 		countWords(poolRows(advice, ZONE, NOW), 'espn'),
-		basisText(waiverBasis(BASIS, [gainwell.add, saints], RULES, CLOCK, NOW))
+		basisText(waiverBasis(BASIS, [gainwell.add, saints], RULES, CLOCK, NOW)),
+		headBasisText(headBasis(BASIS.projection_previous_read_at, true, CLOCK)),
+		stripDecision([{ add: 'Otton', drop: 'Mason', dropWhy: WAIVERS.irBench }])
 	];
 	// The guard reads the facts-read sentence too.
 	assert.ok(lines.some((said) => said.includes(FACTS_SENTENCE)));
@@ -298,18 +309,16 @@ void test('Beats prints the open spot only when the API says it: an empty Beats 
 		beats: { host_id: '', name: '', starter: true, gain: 4.8, open_spot: true },
 		week_gain: 4.8
 	});
-	const [only] = poolRows({ pickup_order: 'week', rows: [taylor], pickups: [taylor] }, ZONE, NOW);
+	const [only] = poolRows({ rows: [taylor], pickups: [taylor] }, ZONE, NOW);
 	assert.deepEqual(only?.beats, {
 		who: { name: 'Open spot', starter: true },
-		gain: 4.8,
-		unit: 'week'
+		gain: 1.2,
+		gains: true
 	});
-	// A flex start that tops no one at his own position is no open spot.
+	// A flex start that tops no one at his own position is no open spot: he beats nobody, so the cell
+	// says no one (B14).
 	const flex = row(line('Theo Johnson', 'WR', 10.8), { beats: null, starts: true, week_gain: 0.3 });
-	assert.equal(
-		poolRows({ pickup_order: 'week', rows: [flex], pickups: [] }, ZONE, NOW)[0]?.beats,
-		null
-	);
+	assert.equal(poolRows({ rows: [flex], pickups: [] }, ZONE, NOW)[0]?.beats.who, null);
 });
 
 void test('a card says a last name in full when another player on screen shares it', () => {
@@ -357,13 +366,14 @@ void test('the basis is one paragraph, the pickup rule first, each column it dra
 		CLOCK,
 		NOW
 	);
+	// A game's sentence and Δ Proj's are the line under the heads, so the footer says neither (B35).
 	assert.equal(
 		basisText(parts),
-		`${BASIS.basis} ${WAIVERS.dropRule} ${BASIS.season_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. ${FACTS_SENTENCE} Opp rank is points allowed to his position, 1st fewest. ${BASIS.basis_note} Which five`
+		`${BASIS.basis} ${WAIVERS.dropRule} Gain is your lineup's change in points over replacement a week, weeks 6 to 17. Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. ${FACTS_SENTENCE} Opp rank is points allowed to his position, 1st fewest. ${BASIS.basis_note} Which five`
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),
-		[WAIVERS.dropRule, 'Δ Proj is its change since Thu 9:00 pm.', FACTS_SENTENCE]
+		[WAIVERS.dropRule, FACTS_SENTENCE]
 	);
 	assert.equal(parts.at(-1)?.href, RULES);
 	// Beats and Open spot say themselves in their cells, so the basis says nothing of them.
@@ -383,11 +393,7 @@ void test('a narrowed read draws at its own instant: past his kickoff his game f
 	// The page read the pool Friday evening; the member narrowed to his position 30 minutes after his
 	// kickoff. At the page's clock his expected score would stand; at the narrowed read's it is gone.
 	const total = { game_total: { points: 44.5, team_points: 23, read_at: FACTS_READ } };
-	const pool = {
-		pickup_order: 'week' as const,
-		rows: [row(line('Mason Taylor', 'TE', 4.77, 5.3, total))],
-		pickups: []
-	};
+	const pool = { rows: [row(line('Mason Taylor', 'TE', 4.77, 5.3, total))], pickups: [] };
 	const narrowedAt = Date.parse('2026-10-18T17:30:00.000Z');
 	assert.equal(poolRows(pool, ZONE, NOW)[0]?.row.expected, '23 to 21.5');
 	assert.equal(poolRows(pool, ZONE, narrowedAt)[0]?.row.expected, null);
@@ -428,9 +434,10 @@ void test('in the API season order the web prints it: the season Gain in Beats, 
 	const pool = poolRows(tuesday, ZONE, NOW);
 	const top = pool[0];
 	assert.ok(top?.beats);
-	assert.deepEqual(top.beats, { who: { name: 'Vidal', starter: true }, gain: 1.2, unit: 'season' });
+	assert.deepEqual(top.beats, { who: { name: 'Vidal', starter: true }, gain: 1.2, gains: true });
 	assert.equal(beatsWord(top.beats), '+1.2 Gain');
-	assert.equal(beatsWord({ gain: 6.7, unit: 'week' }), '+6.7');
+	// A zero is never the loud "0.0 Gain" (B13).
+	assert.equal(beatsWord({ gain: 0, gains: false }), '0.0');
 	assert.deepEqual(
 		sortRows(pool, DEFAULT_SORT).map((r) => r.row.name),
 		['Kenny Gainwell', 'Chiefs D/ST', 'Harrison Mevis', 'Daniel Jones', 'Kaytron Allen']
@@ -489,15 +496,95 @@ void test('in season order the table prints the API rows in its order, the strip
 	assert.equal(printed[0]?.key, pickupCards(answer)[0]?.key);
 	assert.equal(printed[0]?.named, true);
 	assert.ok(printed.every((r) => r.source.week_gain === null));
-	// The sorted column draws its own key on every row, one tops no one or is on a bye (review M-I).
+	// The sorted column draws its own key on every row, one tops no one or is on a bye (review M-I);
+	// a row with no gain draws it bare and quiet (B13).
 	assert.deepEqual(
-		printed.map((r) => (r.beats === null ? null : beatsWord(r.beats))),
-		['+2.1 Gain', '+1.5 Gain', '+1.2 Gain', '+0.3 Gain', '−0.3 Gain']
+		printed.map((r) => beatsWord(r.beats)),
+		['+2.1 Gain', '+1.5 Gain', '+1.2 Gain', '+0.3 Gain', '−0.3']
 	);
 	const first = printed[0];
-	assert.ok(first.beats);
+	assert.ok(first);
 	assert.equal(first.beats.who, null);
-	// The week order keeps the Beats sort: a starter topped first.
-	const week = sortRows(poolRows(advice, ZONE, NOW), DEFAULT_SORT);
-	assert.equal(week[0]?.row.name, 'Kenny Gainwell');
+	assert.equal(first.row.game, 'bye');
+});
+
+void test('the rows that gain sit over one divider, the rest under it, each group in the sort (B13)', () => {
+	const rows = poolRows(
+		{ rows: [mevis, { ...jones, gain: 0 }, gainwell, { ...allen, gain: 0.04 }], pickups: [] },
+		ZONE,
+		NOW
+	);
+	const { gaining, rest } = gainGroups(rows);
+	assert.deepEqual(
+		gaining.map((r) => r.row.name),
+		['Kenny Gainwell']
+	);
+	// A gain the page prints as 0.0 is no gain.
+	assert.deepEqual(
+		rest.map((r) => r.row.name),
+		['Harrison Mevis', 'Daniel Jones', 'Kaytron Allen']
+	);
+	// A card of the strip is offered whatever its season Gain (a week pickup keeps Gain at zero).
+	const card = { ...gainwell, gain: 0 };
+	assert.equal(poolRows({ rows: [card], pickups: [card] }, ZONE, NOW)[0]?.gains, true);
+});
+
+/** Jordan Mason on injured reserve on the member's bench, the card's drop (B34). */
+const mason = {
+	...line('Jordan Mason', 'RB', null, 4),
+	facts: facts({
+		designation: { status: 'injured_reserve', as_of: FACTS_READ, since: '2026-09-22T12:00:00.000Z' }
+	})
+};
+
+void test('a card whose drop is on injured reserve on the bench says so (B34)', () => {
+	const otton = row(line('Cade Otton', 'TE', 7.7, 9.1), {
+		drop: mason,
+		gain: 2,
+		beats: {
+			host_id: 'Jordan Mason',
+			name: 'Jordan Mason',
+			starter: false,
+			gain: null,
+			open_spot: false
+		},
+		drops: [{ host_id: 'Jordan Mason', gain: 2, week_gain: null, starts_this_week: false }]
+	});
+	const [card] = pickupCards({ rows: [otton], pickups: [otton], roster: [mason, lemon] });
+	assert.ok(card);
+	assert.equal(card.dropWhy, 'IR, on your bench');
+	assert.equal(stripDecision([card]), 'One pickup. Add Otton, drop Mason (IR, on your bench).');
+	assert.equal(dropWhyWords(null), null);
+	// Beats names the drop, on the bench, at the row's season Gain (B14).
+	const [shown] = poolRows({ rows: [otton], pickups: [otton] }, ZONE, NOW);
+	assert.deepEqual(shown?.beats, { who: { name: 'Mason', starter: false }, gain: 2, gains: true });
+	// The platform's own IR mark counts; a drop this week's lineup starts, or one not on IR, says nothing.
+	const marked = { ...lemon, player: { ...lemon.player, injured_reserve: true } };
+	assert.equal(dropWhy({ drop: marked, drops: [] }), WAIVERS.irBench);
+	assert.equal(
+		dropWhy({
+			drop: mason,
+			drops: [{ host_id: 'Jordan Mason', gain: 1, week_gain: null, starts_this_week: true }]
+		}),
+		null
+	);
+	assert.equal(dropWhy({ drop: lemon, drops: [] }), null);
+	assert.equal(dropWhy({ drop: null, drops: [] }), null);
+});
+
+void test('the line under the heads says each column once, Δ Proj only while it is drawn (B35)', () => {
+	assert.equal(
+		headBasisText(headBasis(BASIS.projection_previous_read_at, true, CLOCK)),
+		`A game ${HEAD_BASIS.rest}, Avg his season average, Δ Proj his Proj's change since Thu 9:00 pm, Beats the player he would replace.`
+	);
+	assert.equal(
+		headBasisText(headBasis(BASIS.projection_previous_read_at, false, CLOCK)),
+		'A game is our rest-of-season points a game, Avg his season average, Beats the player he would replace.'
+	);
+	assert.equal(headBasis(null, true, CLOCK).length, 3);
+	assert.equal(
+		seasonBasisWords(BASIS.season_basis),
+		"Gain is your lineup's change in points over replacement a week, weeks 6 to 17."
+	);
+	assert.equal(seasonBasisWords('Gain is a week.'), 'Gain is a week.');
 });

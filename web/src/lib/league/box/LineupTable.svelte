@@ -109,7 +109,14 @@
 	<tbody>
 		<tr class="sect" id={BENCH_ANCHOR}><th colspan={COLUMNS} scope="rowgroup">{BOX.bench}</th></tr>
 		{#each box.bench as entry (entry.row.key)}
-			<BoxLine row={entry.row} tags={tagsOf(entry.row.boardId)} bench evidence move={entry.move} />
+			<BoxLine
+				row={entry.row}
+				tags={tagsOf(entry.row.boardId)}
+				bench
+				evidence
+				move={entry.move}
+				reserve={entry.row.reserve ? 'bench' : null}
+			/>
 		{:else}
 			<tr><td class="empty" colspan={COLUMNS}>{noBench}</td></tr>
 		{/each}
@@ -118,7 +125,7 @@
 		<tbody>
 			<tr class="sect"><th colspan={COLUMNS} scope="rowgroup">{BOX.reserve}</th></tr>
 			{#each box.reserve as row (row.key)}
-				<BoxLine {row} tags={tagsOf(row.boardId)} bench evidence />
+				<BoxLine {row} tags={tagsOf(row.boardId)} bench evidence reserve="slot" />
 			{/each}
 		</tbody>
 	{/if}

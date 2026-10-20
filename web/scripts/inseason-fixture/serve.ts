@@ -46,6 +46,13 @@ import { weekOrderAnswer, weekPosition, type WeekOrderStates } from './week-orde
 import { tradeChecker } from './trade-check.ts';
 import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
 import { lineupSpent, TURNED_WEEK, turnedLineup, turnedTrades, turnedWaivers } from './turn.ts';
+import {
+	irDropLineup,
+	irDropWaivers,
+	listedOnly,
+	restatedBeats,
+	IR_DROP_VARIABLE
+} from './waiver-beats.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 /** The fixture's clock: the real one, or the shots' week clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z,
@@ -88,18 +95,32 @@ async function load<T>(name: string): Promise<T> {
 
 /** Lane 72's recorded week sheets, the player card's line for those players (player-week.ts). */
 const { players: sheets } = await load<{ players: Record<string, Sheet> }>('week-sheets');
-const [sync, lineup, waivers, trades, gameWeek, matchupBox, scoreboardLive, order, weekOrders] =
-	await Promise.all([
-		load<LeagueSync>('sync'),
-		load<LineupAdvice>('lineup'),
-		load<WaiverAdvice>('waivers'),
-		load<TradeAdvice>('trades'),
-		load<GameWeek>('games'),
-		load<MatchupBox>('matchup'),
-		load<Scoreboard>('scoreboard-live'),
-		load<OrderAdvice>('order'),
-		load<WeekOrderStates>('week-order')
-	]);
+const [
+	sync,
+	lineupRead,
+	waiversRead,
+	trades,
+	gameWeek,
+	matchupBox,
+	scoreboardLive,
+	order,
+	weekOrders
+] = await Promise.all([
+	load<LeagueSync>('sync'),
+	load<LineupAdvice>('lineup'),
+	load<WaiverAdvice>('waivers'),
+	load<TradeAdvice>('trades'),
+	load<GameWeek>('games'),
+	load<MatchupBox>('matchup'),
+	load<Scoreboard>('scoreboard-live'),
+	load<OrderAdvice>('order'),
+	load<WeekOrderStates>('week-order')
+]);
+/** The sense check's case on the fixture when asked (waiver-beats.ts, Lane 98). */
+const irDrop = process.env[IR_DROP_VARIABLE] === '1';
+const lineup = irDrop ? irDropLineup(lineupRead) : lineupRead;
+/** The adds the API lists (waiver-beats.ts listedAdd), before any order is taken over them. */
+const waivers = listedOnly(irDrop ? irDropWaivers(waiversRead) : waiversRead);
 
 /** The recorded week the scoreboard is restated from at the fixture's clock (scoreboard-at.ts). */
 const recordedWeek = {
@@ -296,9 +317,11 @@ const waiversNow = (): WaiverAdvice => {
 	const answer = waiversAtClock(waivers, now(), fromWeekNow());
 	// Turned, the week 7 rows are ordered from the stored answer (its moves to make intact), with
 	// the Gain sentence at the clock.
-	return turnedNow()
+	const ordered = turnedNow()
 		? turnedWaivers({ ...waivers, season_basis: answer.season_basis }, now())
 		: answer;
+	// Beats as the API names them in that order (waiver-beats.ts, Lane 98).
+	return restatedBeats(ordered, lineupNow());
 };
 
 function waiversAt(position: string | null): WaiverAdvice {

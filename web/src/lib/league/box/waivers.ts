@@ -1,9 +1,10 @@
 /** The Waivers screen as a pickup table (Lane 66f): the Lineup table turned outward. A strip names
  * the pickups worth making as cards (the add, the drop, this week's Proj gain and the rest of the
  * season's), each with the platform's verb; the table lists the players free to add in the Lineup's
- * columns, then the two only we give (A game, and Beats: the member's player he tops with the
- * gain); an add opens the players he could replace in the same columns, the advice's drop first.
- * Pure, tested in waivers.test.ts. */
+ * columns, then the two only we give (A game, and Beats: the player his move replaces with the
+ * season Gain), the rows that gain first and the rest under one divider (Lane 98); an add opens the
+ * players he could replace in the same columns, the advice's drop first. Pure, tested in
+ * waivers.test.ts. */
 import { lastName } from '#lib/format/draft.ts';
 import { fixed, signed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
@@ -14,17 +15,17 @@ import { LINES } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import {
 	anyKicked,
-	deltaPart,
 	gamePart,
 	kickedOffPartAt,
 	OPP_PART,
 	projPart,
 	said,
+	stamp,
 	uncountedParts,
 	type BasisPart,
 	type Clock
 } from './basis.ts';
-import { BOX, boxNumber, boxRow, positionWord, type BoxRow } from './box.ts';
+import { BOX, boxNumber, boxRow, onReserve, positionWord, type BoxRow } from './box.ts';
 import { addressedWeek, arrivesPart } from './next-week.ts';
 import { SEASON, WAIVER_GAIN } from './season.ts';
 
@@ -47,7 +48,20 @@ export const WAIVERS = {
 	openSpot: 'Open spot',
 	/** Why a card's drop is the one it names (review L-C). */
 	dropRule: 'Its drop costs least.',
-	clears: 'Clears'
+	clears: 'Clears',
+	/** The divider over the rows that add nothing to the lineup (Lane 98, B13). */
+	noGain: 'No gain over your roster',
+	/** Why a card's drop is the one it names, where he is on injured reserve on the bench (B34). */
+	irBench: 'IR, on your bench'
+} as const;
+
+/** The columns' basis, once under their heads (Lane 98, B35): each head with what it is. */
+export const HEAD_BASIS = {
+	rest: 'is our rest-of-season points a game',
+	avg: 'his season average',
+	/** "his Proj's change since Sunday 2 pm". */
+	delta: (since: string): string => `his ${BOX.proj}'s change since ${since}`,
+	beats: 'the player he would replace'
 } as const;
 
 /** A name's second mention: "Gainwell", a defense by its club ("Chiefs" from "Chiefs D/ST"). */
@@ -55,15 +69,16 @@ export function shortName(name: string): string {
 	return lastName(name.replace(/\s+D\/ST$/, ''));
 }
 
-/** Whom an add beats, as the Beats cell prints it. */
+/** Whom an add beats, as the Beats cell prints it (Lane 98, B14). */
 export interface BeatsCell {
-	/** The member's player he tops, or the open spot he fills; null where he tops no one, the season
-	 * Gain order's cell drawing its figure alone (review M-I). */
+	/** The player his move replaces (the API's: the offered move's drop, else the weakest starter he
+	 * would displace), or the open spot he fills; null where he beats nobody, and on a row that gains
+	 * nothing ("if he beats nobody, say nothing"). */
 	who: { name: string; starter: boolean } | null;
-	/** The week gain, or the season Gain while the pickups go in that order (unit 'season', review
-	 * M-A: the sorted column draws its own key, on every row). */
-	gain: number | null;
-	unit: 'week' | 'season';
+	/** The season Gain, the column's key on every row in either order (review M-A). */
+	gain: number;
+	/** The row adds to the lineup: its Gain is drawn loud, the rest quiet (B13). */
+	gains: boolean;
 }
 
 /** One player free to add, as the table draws him. */
@@ -72,15 +87,16 @@ export interface PoolRow {
 	row: BoxRow;
 	/** His rest-of-season points a game, null without one. */
 	rest: number | null;
-	beats: BeatsCell | null;
+	beats: BeatsCell;
 	/** The strip names him: his row is tinted, and only his (Lane 66f, persona M1). */
 	named: boolean;
 	/** "Clears Wed": the day a claim on him clears, where the platform says it; else null. */
 	clears: string | null;
-	/** The Beats sort's figure: in the week order a starter topped first, then the week gain, null with
-	 * no one beaten; in the API's season Gain order the row's season Gain, every row, so the default
-	 * sort keeps the API's order (review M-H). */
-	order: number | null;
+	/** The Beats sort's figure: the row's season Gain, so the default sort keeps the API's order among
+	 * the rows that gain (review M-H). */
+	order: number;
+	/** The row is offered as a pickup: a Gain above zero, or a card of the strip (B13). */
+	gains: boolean;
 	source: WaiverRow;
 }
 
@@ -90,6 +106,8 @@ export interface PickupCard {
 	slot: string;
 	add: string;
 	drop: string | null;
+	/** Why the drop is the one named where it says itself: "IR, on your bench" (B34); else null. */
+	dropWhy: string | null;
 	/** This week's Proj gain, null once the add's or the drop's game has kicked off: the move is for
 	 * next week then (Lane 85). */
 	weekGain: number | null;
@@ -127,64 +145,70 @@ export function clearsWords(day: string | null): string | null {
 	return Number.isNaN(at.getTime()) ? null : `${WAIVERS.clears} ${WEEKDAY.format(at)}`;
 }
 
-/** Whom an add beats, as the API says it: his player, or the open spot he fills (a starting spot no
- * one of the member's can play this week), and by how much this week. In the API's season Gain order
- * (its one pickup rule, Lane 85) every row's cell draws its season Gain, the key the column sorts by,
- * whomever he tops or none (review M-I). Nothing is inferred or re-ordered here (review 66f M3). */
-function beatsOf(source: WaiverRow, order: WaiverAdvice['pickup_order']): BeatsCell | null {
+/** Whether a gain is one the page prints above zero. */
+function positive(gain: number): boolean {
+	return Number(fixed(gain, 1)) > 0;
+}
+
+/** Whom an add beats, as the API names him (the offered move's drop, else the weakest starter he would
+ * displace, or the open spot he fills), with the row's season Gain in either order: one key for the
+ * column, never "Bye" in place of a name (B14). A row that gains nothing names no one. Nothing is
+ * inferred or re-ordered here (review 66f M3). */
+function beatsOf(source: WaiverRow, gains: boolean): BeatsCell {
 	const { beats } = source;
 	const who =
-		beats === null
+		beats === null || !gains
 			? null
 			: {
 					name: beats.open_spot ? WAIVERS.openSpot : shortName(beats.name),
 					starter: beats.starter
 				};
-	if (order === 'season_gain') return { who, gain: source.gain, unit: 'season' };
-	return beats === null ? null : { who, gain: beats.gain, unit: 'week' };
+	return { who, gain: source.gain, gains };
 }
 
-/** The Beats cell's figure: "+6.7" this week, "+0.3 Gain" in season order. */
-export function beatsWord(beats: Pick<BeatsCell, 'gain' | 'unit'>): string {
-	if (beats.gain === null) return BOX.none;
-	return beats.unit === 'season' ? `${gainWord(beats.gain)} ${SEASON.gain}` : gainWord(beats.gain);
-}
-
-/** The Beats sort's figure for a row (PoolRow.order). */
-function beatsOrder(
-	source: WaiverRow,
-	beats: BeatsCell | null,
-	order: WaiverAdvice['pickup_order']
-): number | null {
-	// The API's season Gain order is printed as sent: no starter first, no empty Beats last.
-	if (order === 'season_gain') return source.gain;
-	const gain = beats?.gain ?? null;
-	if (gain === null) return null;
-	// A starter topped (or an open spot filled) outranks any bench gain.
-	return (beats?.who?.starter === true ? STARTER_RANK : 0) + gain;
+/** The Beats cell's figure: "+0.3 Gain" on a row that gains, the bare "0.0" on one that does not, so a
+ * zero is never the loud cell (B13). */
+export function beatsWord(beats: Pick<BeatsCell, 'gain' | 'gains'>): string {
+	return beats.gains ? `${gainWord(beats.gain)} ${SEASON.gain}` : gainWord(beats.gain);
 }
 
 /** The table's rows from the answer: every add, whom he beats, the strip's tint on the ones it names. */
 export function poolRows(
-	advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'pickup_order'>,
+	advice: Pick<WaiverAdvice, 'rows' | 'pickups'>,
 	zone: string,
 	now: number
 ): PoolRow[] {
 	const named = new Set(advice.pickups.map(addKey));
 	return advice.rows.map((source) => {
 		const key = addKey(source);
-		const beats = beatsOf(source, advice.pickup_order);
+		const gains = positive(source.gain) || named.has(key);
 		return {
 			key,
 			row: { ...boxRow(source.add, '', zone, false, now), key },
 			rest: source.add.rest_of_season_per_game,
-			beats,
+			beats: beatsOf(source, gains),
 			named: named.has(key),
 			clears: clearsWords(source.clears),
-			order: beatsOrder(source, beats, advice.pickup_order),
+			order: source.gain,
+			gains,
 			source
 		};
 	});
+}
+
+/** The table's two groups (B13): the rows offered as pickups, then those with no gain over the roster
+ * under one divider, each in the order given. */
+export function gainGroups(rows: readonly PoolRow[]): { gaining: PoolRow[]; rest: PoolRow[] } {
+	return { gaining: rows.filter((r) => r.gains), rest: rows.filter((r) => !r.gains) };
+}
+
+/** "IR, on your bench" for a card whose drop is on injured reserve and on the bench this week (B34);
+ * else null. */
+export function dropWhy(source: Pick<WaiverRow, 'drop' | 'drops'>): string | null {
+	const { drop } = source;
+	if (drop === null || !onReserve(drop)) return null;
+	const starts = source.drops.some((d) => d.host_id === drop.player.host_id && d.starts_this_week);
+	return starts ? null : WAIVERS.irBench;
 }
 
 /** A name as a card or the pair line says it: the last name, or the whole name when another player
@@ -213,6 +237,7 @@ export function pickupCards(
 		slot: positionWord(source.add.player.position),
 		add: cardName(source.add.player.name, names),
 		drop: source.drop ? cardName(source.drop.player.name, names) : null,
+		dropWhy: dropWhy(source),
 		weekGain: source.week_gain,
 		gain: source.gain,
 		source
@@ -228,9 +253,20 @@ export function pickupsTitle(n: number): string {
 }
 
 /** The strip's sentence for a screen reader: "Two pickups. Add Gainwell, drop Lemon. Add Chiefs,
- * drop Saints." */
-export function stripDecision(cards: readonly Pick<PickupCard, 'add' | 'drop'>[]): string {
-	return [pickupsTitle(cards.length), ...cards.map(moveWords)].join('. ') + '.';
+ * drop Saints (IR, on your bench)." */
+export function stripDecision(
+	cards: readonly (Pick<PickupCard, 'add' | 'drop'> & Partial<Pick<PickupCard, 'dropWhy'>>)[]
+): string {
+	const said = cards.map((c) => {
+		const why = dropWhyWords(c.dropWhy ?? null);
+		return why === null ? moveWords(c) : `${moveWords(c)} ${why}`;
+	});
+	return [pickupsTitle(cards.length), ...said].join('. ') + '.';
+}
+
+/** "(IR, on your bench)" after a card's move, null without a reason to say. */
+export function dropWhyWords(why: string | null): string | null {
+	return why === null ? null : `(${why})`;
 }
 
 /** "Add Gainwell, drop Lemon", or "Add Gainwell" into an open spot. */
@@ -348,12 +384,8 @@ export interface Sort {
 	down: boolean;
 }
 
-/** The table's default: Beats, a starter he tops first, then by the gain; the API's own order in its
- * season Gain order (beatsOrder). */
+/** The table's default: Beats, by the season Gain, the API's own order among the rows that gain. */
 export const DEFAULT_SORT: Sort = { key: 'beats', down: true };
-
-/** What a starter topped adds to the Beats sort, above any bench gain. */
-const STARTER_RANK = 1000;
 
 /** A row's value for a column, null when not held (always last, whichever way). */
 function valueOf(r: PoolRow, key: SortKey): number | string | null {
@@ -440,14 +472,55 @@ export function copiedWords(host: LeagueHost, name: string, copied: boolean): Co
 }
 
 /** What the table holds (review 66f M4): "60 free agents we rank on Sleeper, 5 beat a player of
- * yours", the open spots not counted as players. */
-export function countWords(
-	rows: readonly Pick<PoolRow, 'beats' | 'source'>[],
-	host: LeagueHost
-): string {
+ * yours", the five the rows that gain, those over the divider (Lane 98, B13). */
+export function countWords(rows: readonly Pick<PoolRow, 'gains'>[], host: LeagueHost): string {
 	const n = rows.length;
-	const beating = rows.filter((r) => r.source.beats !== null && !r.source.beats.open_spot).length;
+	const beating = rows.filter((r) => r.gains).length;
 	return `${String(n)} free ${n === 1 ? 'agent' : 'agents'} we rank on ${hostWords(host)}, ${String(beating)} ${beating === 1 ? 'beats' : 'beat'} a player of yours`;
+}
+
+/** One head of the line under the column heads (B35): the head as it prints, then what it is. */
+export interface HeadBasisPart {
+	head: string;
+	words: string;
+}
+
+/** The line under the column heads (Lane 98, B35), said there once: "A game is our rest-of-season
+ * points a game, Avg his season average, Δ Proj his Proj's change since Sun 2:00 pm, Beats the player
+ * he would replace." Δ Proj only while the column is drawn and there is a read before to count from. */
+export function headBasis(
+	previousReadAt: string | null,
+	projected: boolean,
+	clock: Clock
+): HeadBasisPart[] {
+	const delta =
+		projected && previousReadAt !== null
+			? [{ head: BOX.delta, words: HEAD_BASIS.delta(stamp(previousReadAt, clock)) }]
+			: [];
+	return [
+		{ head: WAIVERS.rest, words: HEAD_BASIS.rest },
+		{ head: BOX.avg, words: HEAD_BASIS.avg },
+		...delta,
+		{ head: WAIVERS.beats, words: HEAD_BASIS.beats }
+	];
+}
+
+/** Between the heads' parts: a comma, the site's copy carrying no semicolon. */
+export const HEAD_SEPARATOR = ', ';
+
+/** The line under the heads as one sentence reads, for the copy guard and a screen reader. */
+export function headBasisText(parts: readonly HeadBasisPart[]): string {
+	return `${parts.map((p) => `${p.head} ${p.words}`).join(HEAD_SEPARATOR)}.`;
+}
+
+/** The API's season basis without its sentence for the A game head, which the line under the heads
+ * says (B35: the basis said once). */
+export function seasonBasisWords(seasonBasis: string): string {
+	const head = `${WAIVERS.rest} is `;
+	return seasonBasis
+		.split(/(?<=\.)\s+/)
+		.filter((sentence) => !sentence.startsWith(head))
+		.join(' ');
 }
 
 /** Whether the basis says why a card's drop is the one named: a card names one under the week's rule
@@ -507,9 +580,9 @@ export function waiverBasis(
 		// Why a card's drop is the one it names, after the week's rule about a pickup and only where a
 		// card names one; at a desk only, the phone's eight lines cannot hold it (review L-C, L-G).
 		...said(dropsSaid(advice.pickups ?? []) ? WAIVERS.dropRule : null, false),
-		...said(advice.season_basis),
+		// A game's sentence and Δ Proj's are the line under the heads (headBasis, B35).
+		...said(seasonBasisWords(advice.season_basis)),
 		...said(proj),
-		...said(deltaPart(advice.projection_previous_read_at, clock), false),
 		// The phone's rows draw no expected score or weather (BoxLine phoneFacts): no read to say there.
 		...said(gamePart(lines, clock, now, 'full'), false),
 		...said(kickedOffPartAt(lines, now)),

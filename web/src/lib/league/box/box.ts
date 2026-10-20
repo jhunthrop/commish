@@ -65,6 +65,8 @@ export const BOX = {
 	totals: 'Team',
 	bench: 'Bench',
 	reserve: 'Injured reserve',
+	/** A bench row on injured reserve, in place of his game: why he is a drop (Lane 98, B34). */
+	irBench: 'IR-eligible, taking a bench spot',
 	bye: 'Bye',
 	final: GAME_STATE_WORDS.final,
 	/** The Lineup once every starter of the member's has played and the matchup still plays (Lane 91):
@@ -149,6 +151,9 @@ export interface BoxRow {
 	/** His status as Lane 63's pill draws it: the week's designation, or a season-long list's word in
 	 * place of his rank. */
 	status: StatusView | null;
+	/** He carries an injured reserve tag (the report's or the platform's own): a bench row says why
+	 * he is a drop, an IR row draws no matchup (Lane 98, B34). */
+	reserve: boolean;
 	/** His game, "bye" on a bye week, null when we hold none. */
 	game: BoxGame | 'bye' | null;
 	/** "20 to 22.5": the expected score with his club's first, null once kicked off or without it. */
@@ -230,6 +235,25 @@ export function statusOf(
 	};
 }
 
+/** A row as an injured reserve row draws it (Lane 98, B34): no game, expected score or weather and no
+ * Opp rank (his matchup is not his), and in the IR slot no points; null keeps the row whole. */
+export function reserveRow(row: BoxRow, reserve: 'bench' | 'slot' | null): BoxRow {
+	if (reserve === null) return row;
+	return {
+		...row,
+		game: null,
+		expected: null,
+		weather: null,
+		pts: reserve === 'slot' ? null : row.pts,
+		evidence: { ...row.evidence, oppRank: null, oppOf: null }
+	};
+}
+
+/** Whether he carries an injured reserve tag: the report lists him so, or the platform marks him. */
+export function onReserve(line: Pick<PlayerLine, 'player' | 'facts'>): boolean {
+	return line.player.injured_reserve || line.facts.designation?.status === 'injured_reserve';
+}
+
 /** His position pill: the board's position (a defense has none, the club mark names it). */
 function pillOf(position: string, rank: number | null): BoxRow['pill'] {
 	const known = POSITIONS.find((p) => p === position);
@@ -308,6 +332,7 @@ export function boxRow(
 		position: positionWord(player.position),
 		pill: pillOf(player.position, ranked ? line.position_rank : null),
 		status: statusOf(facts.designation, player.injured_reserve, zone),
+		reserve: onReserve(line),
 		game: gameOf(facts, zone, now),
 		expected: ahead ? expectedWords(facts) : null,
 		weather: ahead ? weatherCell(facts) : null,
@@ -372,6 +397,7 @@ export function hostRow(player: LeaguePlayer, slot: string, pts: number | null):
 		position: positionWord(player.position),
 		pill: pillOf(player.position, null),
 		status: statusOf(null, player.injured_reserve),
+		reserve: player.injured_reserve,
 		game: null,
 		expected: null,
 		weather: null,

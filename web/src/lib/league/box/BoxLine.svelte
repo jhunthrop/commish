@@ -7,6 +7,7 @@
 		deltaWord,
 		easeOf,
 		oppRankWord,
+		reserveRow,
 		type BoxPick,
 		type BoxRow
 	} from './box.ts';
@@ -66,6 +67,9 @@
 		/** Whether the row draws Proj and its change: not on a page whose week has no published
 		 * projection read yet (Lane 95), whose cells would all be "--". */
 		projCells?: boolean;
+		/** A player on injured reserve (Lane 98, B34): on the bench his game cell says why he is a drop,
+		 * in the IR slot it is empty; neither draws his matchup (Opp rank), the slot no points. */
+		reserve?: 'bench' | 'slot' | null;
 	}
 
 	let {
@@ -89,10 +93,14 @@
 		shortOnPhone = false,
 		phoneFacts = true,
 		phoneOpp = true,
-		projCells = true
+		projCells = true,
+		reserve = null
 	}: Props = $props();
+	/** The row as drawn: an IR row without its matchup (reserveRow). */
+	const drawn = $derived(reserveRow(row, reserve));
+	const note = $derived(reserve === 'bench' ? BOX.irBench : null);
 	const picked = $derived(pick?.state === 'on');
-	const rank = $derived(row.evidence.oppRank);
+	const rank = $derived(drawn.evidence.oppRank);
 	/** The phone's evidence line's own words and separator, so the template adds no space. */
 	const oppLead = `${BOX.opp} `;
 	const SEPARATOR = ', ';
@@ -100,8 +108,8 @@
 	 * figure, so a line breaks only at a separator and never between "Last" and its figure or inside
 	 * "--" (Lane 83 review 2). */
 	const seasonPairs = $derived([
-		`${BOX.avg} ${boxNumber(row.evidence.avg)}`,
-		`${BOX.last} ${boxNumber(row.evidence.last)}`,
+		`${BOX.avg} ${boxNumber(drawn.evidence.avg)}`,
+		`${BOX.last} ${boxNumber(drawn.evidence.last)}`,
 		...(phoneMore === null ? [] : [phoneMore])
 	]);
 </script>
@@ -158,27 +166,28 @@
 		>
 	{/if}
 	<td class="player">
-		<BoxPlayer {row} {tags} {shortOnPhone} {compact} {clears} {phoneFacts}
+		<BoxPlayer row={drawn} {tags} {shortOnPhone} {compact} {clears} {phoneFacts} {note}
 			>{#if evidence}{@render seasonLine()}{/if}</BoxPlayer
 		>
 	</td>
-	{#if !compact}<td class="game"><BoxGame {row} {clears} /></td>{/if}
-	{#if projCells}<td class="n proj">{boxNumber(row.proj)}</td>{/if}
-	{#if ptsCell && !compact}<td class="n pts" class:none={row.pts === null}>{boxNumber(row.pts)}</td
+	{#if !compact}<td class="game"><BoxGame row={drawn} {clears} {note} /></td>{/if}
+	{#if projCells}<td class="n proj">{boxNumber(drawn.proj)}</td>{/if}
+	{#if ptsCell && !compact}<td class="n pts" class:none={drawn.pts === null}
+			>{boxNumber(drawn.pts)}</td
 		>{/if}
 	{#if evidence}
 		<td class="n ev first"
-			>{#if rank !== null}<span class="rk {easeOf(rank, row.evidence.oppOf)}"
+			>{#if rank !== null}<span class="rk {easeOf(rank, drawn.evidence.oppOf)}"
 					>{oppRankWord(rank)}</span
 				>{:else}<span class="none">{BOX.none}</span>{/if}</td
 		>
-		<td class="n ev">{boxNumber(row.evidence.avg)}</td>
-		<td class="n ev">{boxNumber(row.evidence.last)}</td>
+		<td class="n ev">{boxNumber(drawn.evidence.avg)}</td>
+		<td class="n ev">{boxNumber(drawn.evidence.last)}</td>
 	{/if}
 	{#if season}
-		<td class="n season">{boxNumber(row.evidence.season)}</td>
+		<td class="n season">{boxNumber(drawn.evidence.season)}</td>
 	{:else if evidence}
-		{#if projCells}<td class="n ev delta">{deltaWord(row.evidence.delta)}</td>{/if}
+		{#if projCells}<td class="n ev delta">{deltaWord(drawn.evidence.delta)}</td>{/if}
 		{#if tail}{@render tail()}{:else}
 			<td class="op"
 				>{#if why}<button

@@ -1,7 +1,14 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type { WaiverAdvice } from '../inseason/api.ts';
-	import { cardGains, moveWords, pickupsTitle, pickupSum, type PickupCard } from './waivers.ts';
+	import {
+		cardGains,
+		dropWhyWords,
+		moveWords,
+		pickupsTitle,
+		pickupSum,
+		type PickupCard
+	} from './waivers.ts';
 
 	/** The Waivers decision as a strip (Lane 66f): the board week, the count of pickups worth making
 	 * and what they add to the lineup the advice sets, then a card for each (his slot, the move, this
@@ -43,9 +50,11 @@
 					<button type="button" class="pick" aria-pressed={on} onclick={() => onchoose(card)}>
 						<span class="slot">{card.slot}</span>
 						<span class="text"
-							><span class="move"><b>{moveWords(card)}</b></span><span class="gains"
-								>{cardGains(card)}</span
-							></span
+							><span class="move"
+								><b>{moveWords(card)}</b>{#if card.dropWhy}{' '}<span class="why"
+										>{dropWhyWords(card.dropWhy)}</span
+									>{/if}</span
+							><span class="gains">{cardGains(card)}</span></span
 						>
 					</button>
 					<span class="verb">{@render verb(card, on)}</span>
@@ -187,6 +196,12 @@
 		font-size: var(--t-md);
 		font-weight: 700;
 		color: var(--ink);
+	}
+
+	/* Why the drop is the one named (B34), quieter than the move. */
+	.move .why {
+		font-size: var(--t-sm);
+		color: var(--ink-2);
 	}
 
 	.gains {
