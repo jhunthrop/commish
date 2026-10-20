@@ -258,7 +258,8 @@ func (s *Service) Warm(ctx context.Context, ref leaguesync.Ref) {
 		if l.League.Saved == nil || l.League.Snap.Week == 0 {
 			continue
 		}
-		a, err := s.leagueAdvisor(ctx, l.League, l.Account, ctx)
+		// The Trades screen's week, so the warmed search is the one it reads.
+		a, err := s.leagueAdvisor(ctx, l.League, l.Account, ctx, actionWeek)
 		if err != nil {
 			s.Log.Warn("inseason: warm the trade search", "league", ref.Key(), "err", err)
 			continue

@@ -13,6 +13,7 @@ import {
 	nudgeOf,
 	rosterAside,
 	readWords,
+	turnedWeek,
 	weekBasis,
 	type ScreenHref,
 	type WeekLeague
@@ -228,7 +229,7 @@ void test('each chip names the fact and opens the screen that acts on it', () =>
 			[
 				'Questionable',
 				'Rome Odunze',
-				'WR, CHI, a starter. Listed Fri 4:00 pm',
+				'WR, CHI, a starter. Read Fri 4:00 pm',
 				'Lineup',
 				'/league/suck/start'
 			],
@@ -252,6 +253,29 @@ void test('each chip names the fact and opens the screen that acts on it', () =>
 	assert.deepEqual(
 		starterBye.map((c) => [c.line, c.go]),
 		[['TE, DET, a starter on bye', 'Lineup']]
+	);
+});
+
+void test("once the lineup has played its week the chips are the next week's, and say so (Lane 95)", () => {
+	const turned = { ...SUCK, chips_week: 7 };
+	assert.equal(turnedWeek(turned), 7);
+	assert.equal(turnedWeek({ ...SUCK, chips_week: 6 }), null);
+	// An answer from before the field reads as the league's week.
+	assert.equal(turnedWeek(SUCK), null);
+	assert.equal(frontLeague(turned, href, NOW, ZONE).chipsWeek, 7);
+	assert.equal(rosterAside(2, 7), 'Two facts for week 7. Each opens the screen that acts on it.');
+	assert.match(
+		weekBasis(turned, false, ZONE)[1] ?? '',
+		/The roster facts are for week 7: a pickup goes by Gain/
+	);
+	assert.doesNotMatch(weekBasis(turned, false, ZONE)[1] ?? '', /he adds this week/);
+	assert.deepEqual(
+		chipsOf(turned, href, ZONE, NOW).map((c) => c.line),
+		[
+			'WR, CHI, a starter. Read Fri 4:00 pm',
+			'TE, DET. No TE of yours plays in week 7',
+			'WR, HOU. +1.8 Proj in week 7'
+		]
 	);
 });
 
@@ -319,9 +343,11 @@ void test('the roster head counts its chips, and each other league carries its c
 void test('the copy guard: no em-dash, semicolon, platform word or betting word in any line', () => {
 	const view = frontLeague(SUCK, href, NOW, ZONE);
 	const said = [
-		...Object.values(FRONT),
+		...Object.values(FRONT).filter((v) => typeof v === 'string'),
+		FRONT.turnedPickup(7),
 		...weekBasis(SUCK, true, ZONE),
 		rosterAside(2),
+		rosterAside(2, 7),
 		...view.chips.flatMap((c) => [c.label, c.line]),
 		view.first?.words ?? '',
 		view.nudge?.asSet ?? ''

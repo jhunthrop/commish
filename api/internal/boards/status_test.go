@@ -77,14 +77,14 @@ func TestOutForTheSeasonByTheNote(t *testing.T) {
 	}
 }
 
-// The codes a season-long status is listed under, for the run read.
-func TestSeasonLongCodes(t *testing.T) {
-	codes, statuses := seasonLongCodes()
-	if len(codes) != len(statuses) || len(codes) == 0 {
+// Every code the provider lists, beside its status, for the run read.
+func TestRunCodes(t *testing.T) {
+	codes, statuses := runCodes()
+	if len(codes) != len(statuses) || len(codes) != len(designationCodeTable()) {
 		t.Fatalf("codes %v statuses %v", codes, statuses)
 	}
 	for i, code := range codes {
-		if StatusOf(code) != statuses[i] || !SeasonLong(statuses[i], "") {
+		if StatusOf(code) != statuses[i] {
 			t.Errorf("%q lists %q", code, statuses[i])
 		}
 	}

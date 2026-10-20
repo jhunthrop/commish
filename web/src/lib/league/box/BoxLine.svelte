@@ -63,6 +63,9 @@
 		 * cannot hold its sentence: a figure drawn keeps its sentence, review H2). */
 		phoneOpp?: boolean;
 		shortOnPhone?: boolean;
+		/** Whether the row draws Proj and its change: not on a page whose week has no published
+		 * projection read yet (Lane 95), whose cells would all be "--". */
+		projCells?: boolean;
 	}
 
 	let {
@@ -85,7 +88,8 @@
 		pick = null,
 		shortOnPhone = false,
 		phoneFacts = true,
-		phoneOpp = true
+		phoneOpp = true,
+		projCells = true
 	}: Props = $props();
 	const picked = $derived(pick?.state === 'on');
 	const rank = $derived(row.evidence.oppRank);
@@ -159,7 +163,7 @@
 		>
 	</td>
 	{#if !compact}<td class="game"><BoxGame {row} {clears} /></td>{/if}
-	<td class="n proj">{boxNumber(row.proj)}</td>
+	{#if projCells}<td class="n proj">{boxNumber(row.proj)}</td>{/if}
 	{#if ptsCell && !compact}<td class="n pts" class:none={row.pts === null}>{boxNumber(row.pts)}</td
 		>{/if}
 	{#if evidence}
@@ -174,7 +178,7 @@
 	{#if season}
 		<td class="n season">{boxNumber(row.evidence.season)}</td>
 	{:else if evidence}
-		<td class="n ev delta">{deltaWord(row.evidence.delta)}</td>
+		{#if projCells}<td class="n ev delta">{deltaWord(row.evidence.delta)}</td>{/if}
 		{#if tail}{@render tail()}{:else}
 			<td class="op"
 				>{#if why}<button

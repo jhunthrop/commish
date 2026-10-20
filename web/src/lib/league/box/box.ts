@@ -22,6 +22,7 @@ import { GAME_STATE_WORDS, halves, PRECIPITATION_NAMED_FROM } from '#lib/format/
 import { fixed, ordinal, signed } from '#lib/format/number.ts';
 import { clubMark } from '#lib/ui/club-mark.ts';
 import { lineState, toPlay } from './kickoff.ts';
+import { carriedMark } from './next-week.ts';
 import type { LeaguePlayer } from '../api.ts';
 import type { LineupSlot, PlayerLine, ProjectionScoring, WeekFacts } from '../inseason/api.ts';
 
@@ -220,9 +221,10 @@ export function statusOf(
 	const seasonLong = SEASON_LONG.has(status);
 	return {
 		rank: seasonLong ? rankWord(status) : null,
+		// A listing carried over from a game already played says its date (Lane 95), never hidden.
 		mark: seasonLong
 			? seasonLongMark({ status, since: designation?.since ?? null }, zone)
-			: designationWord(status),
+			: (carriedMark(designation, zone) ?? designationWord(status)),
 		sits: sitsHim(status),
 		line: null
 	};

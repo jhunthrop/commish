@@ -59,14 +59,13 @@ func SeasonLong(status, note string) bool {
 	return false
 }
 
-// seasonLongCodes is every code a season-long status is listed under,
-// beside its status, in code order: the run read's mapping.
-func seasonLongCodes() (codes, statuses []string) {
+// runCodes is every code the provider lists, beside its status,
+// in code order: the run read's mapping (DesignationRuns dates a run under
+// any status, season-long or a week's).
+func runCodes() (codes, statuses []string) {
 	table := designationCodeTable()
-	for code, status := range table {
-		if SeasonLong(status, "") {
-			codes = append(codes, code)
-		}
+	for code := range table {
+		codes = append(codes, code)
 	}
 	sort.Strings(codes)
 	for _, code := range codes {

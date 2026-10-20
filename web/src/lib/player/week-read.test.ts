@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { WeekRead } from '../run/schema.ts';
-import { shownWeekRead } from './week-read.ts';
+import { shownWeekRead, weekReadLabel } from './week-read.ts';
 
 const MOVED = 'The published projection moved since this read was written.';
 const READ: WeekRead = {
@@ -17,6 +17,11 @@ const READ: WeekRead = {
 	movedCaption: MOVED
 };
 const ppr = (points: number | null) => ({ week: 7, scoring: 'ppr' as const, points });
+
+void test('the read is named by the week it was written for, never the week ahead (Lane 95)', () => {
+	assert.equal(weekReadLabel(READ), 'Our read for week 7');
+	assert.equal(weekReadLabel({ week: 6 }), 'Our read for week 6');
+});
 
 void test('the read stands while the card prints the projection it quotes', () => {
 	assert.deepEqual(shownWeekRead(READ, ppr(26.4)), { body: READ.body, caption: READ.caption });

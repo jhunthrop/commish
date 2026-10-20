@@ -17,6 +17,7 @@ import {
 } from '#lib/league/box/lineup.ts';
 import { bugsOf, type Bug } from '#lib/league/home/home.ts';
 import { AS_OF_KICKOFF, PROJ_FINAL_PART } from '#lib/league/box/basis.ts';
+import { carriedMark, NEXT_WEEK } from '#lib/league/box/next-week.ts';
 import { agoWords } from '#lib/league/model.ts';
 import { hostWords } from '#lib/league/names.ts';
 import { phaseWord } from '#lib/league/phase-words.ts';
@@ -46,7 +47,10 @@ export const FRONT = {
 	bye: 'Bye',
 	topPickup: 'Top pickup',
 	unread: 'Your leagues this week could not be read just now.',
-	tryAgain: 'Try again'
+	tryAgain: 'Try again',
+	/** The pickup's clause of the basis once the roster facts have turned (Lane 95 review MEDIUM-3). */
+	turnedPickup: (week: number): string =>
+		`The roster facts are for week ${String(week)}: a pickup goes by Gain until week ${String(week)}'s published projection is in, then by the ${BOX.proj} he adds.`
 } as const;
 
 /** A chip: a fact about the member's roster and the screen that acts on it. */
@@ -81,6 +85,9 @@ export interface FrontLeague {
 	id: string;
 	name: string;
 	platform: string;
+	/** The week the roster facts are for once they have turned to the week after the league's (the
+	 * API's chips_week, Lane 95), null while they are the league's week. */
+	chipsWeek: number | null;
 	/** "McConkey Kong Country, 1-4, 12th of 12". */
 	line: string;
 	bug: Bug | null;
@@ -102,9 +109,22 @@ export interface FrontLeague {
 const FACT_COUNTS = ['No facts', 'One fact', 'Two facts', 'Three facts'] as const;
 
 /** The roster head's aside, counting the chips: "Two facts this week. Each opens the screen that
- * acts on it." */
-export function rosterAside(chips: number): string {
-	return `${FACT_COUNTS[chips] ?? `${String(chips)} facts`} this week. ${FRONT.rosterAside}`;
+ * acts on it.", "Two facts for week 7." once they have turned to the week after (Lane 95). */
+export function rosterAside(chips: number, turned: number | null = null): string {
+	const when = turned === null ? NEXT_WEEK.thisWeek : NEXT_WEEK.forWeek(turned);
+	return `${FACT_COUNTS[chips] ?? `${String(chips)} facts`} ${when}. ${FRONT.rosterAside}`;
+}
+
+/** The week the chips address once it is past the league's (chips_week, Lane 95), else null; an
+ * answer from before the field reads as the league's week. */
+export function turnedWeek(league: Pick<WeekLeague, 'week' | 'chips_week'>): number | null {
+	const week = league.chips_week ?? league.week;
+	return week > league.week ? week : null;
+}
+
+/** "this week", or "in week 7" for chips that have turned to the week after. */
+function whenWords(turned: number | null): string {
+	return turned === null ? NEXT_WEEK.thisWeek : NEXT_WEEK.inWeek(turned);
 }
 
 /** A league's missing week in words, with its last read where it has one. */
@@ -145,28 +165,32 @@ function firstOf(lines: readonly PlayerLine[], zone: string, now: Date): FrontLe
 	return { rows, words: `${who} first${where}` };
 }
 
-/** A chip's words under the name: his position and club, then the fact. */
-function chipLine(chip: RosterChip, row: BoxRow, zone: string): string {
+/** A chip's words under the name: his position and club, then the fact. A designation's stamp is
+ * when we read the provider's list ("Read Mon 7:00 pm"), never when he was listed (Lane 95). */
+function chipLine(chip: RosterChip, row: BoxRow, zone: string, turned: number | null): string {
 	const who = `${row.position}, ${row.club}`;
 	const listed = chip.line.facts.designation;
+	const when = whenWords(turned);
 	switch (chip.kind) {
 		case 'status':
 			return listed
-				? `${who}, a starter. Listed ${weekdayTime(listed.as_of, zone)}`
+				? `${who}, a starter. Read ${weekdayTime(listed.as_of, zone)}`
 				: `${who}, a starter`;
 		case 'bye':
 			return chip.idle
-				? `${who}. No ${row.position} of yours plays this week`
+				? `${who}. No ${row.position} of yours plays ${when}`
 				: `${who}, a starter on bye`;
 		case 'pickup':
-			return chip.gain === null ? who : `${who}. +${fixed(chip.gain, 1)} ${BOX.proj} this week`;
+			return chip.gain === null ? who : `${who}. +${fixed(chip.gain, 1)} ${BOX.proj} ${when}`;
 	}
 }
 
-/** The chip's label: the designation, Bye or Top pickup. */
-function chipLabel(chip: RosterChip): string {
+/** The chip's label: the designation ("Out, listed Oct 12" once carried over from a game already
+ * played, Lane 95), Bye or Top pickup. */
+function chipLabel(chip: RosterChip, zone: string): string {
 	const listed = chip.line.facts.designation;
-	if (chip.kind === 'status' && listed) return designationWord(listed.status);
+	if (chip.kind === 'status' && listed)
+		return carriedMark(listed, zone) ?? designationWord(listed.status);
 	return chip.kind === 'bye' ? FRONT.bye : FRONT.topPickup;
 }
 
@@ -182,15 +206,16 @@ export function chipsOf(
 	zone: string,
 	now: Date
 ): FrontChip[] {
+	const turned = turnedWeek(league);
 	return league.chips.map((chip) => {
 		const row = boxRow(chip.line, '', zone, false, now.getTime());
 		const screen = chipScreen(chip);
 		return {
 			key: `${chip.kind}-${chip.line.player.host_id}`,
 			kind: chip.kind,
-			label: chipLabel(chip),
+			label: chipLabel(chip, zone),
 			row,
-			line: chipLine(chip, row, zone),
+			line: chipLine(chip, row, zone, turned),
 			go: screen === 'start' ? FRONT.lineup : FRONT.waivers,
 			href: href(screen, league.id)
 		};
@@ -244,6 +269,7 @@ export function frontLeague(
 		id: league.id,
 		name: league.name,
 		platform: hostWords(league.host),
+		chipsWeek: turnedWeek(league),
 		line: [league.team_name, standingWords(league.standing)].filter((p) => p !== '').join(', '),
 		bug:
 			bug === null || me === undefined
@@ -304,8 +330,13 @@ export function weekBasis(
 			league.projection_read_at === null
 				? 'not in yet'
 				: `read ${weekdayTime(league.projection_read_at, zone)} ${zoneWord(zone)}`;
+		const turned = turnedWeek(league);
+		const pickup =
+			turned === null
+				? `The strip's gain is what the changes add, and a pickup's is the ${BOX.proj} he adds this week.`
+				: `The strip's gain is what the changes add. ${FRONT.turnedPickup(turned)}`;
 		lines.push(
-			`${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}, ${when}${started ? `, ${AS_OF_KICKOFF}` : ''}. The strip's gain is what the changes add, and a pickup's is the ${BOX.proj} he adds this week.${started ? ` ${PROJ_FINAL_PART}` : ''}`
+			`${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}, ${when}${started ? `, ${AS_OF_KICKOFF}` : ''}. ${pickup}${started ? ` ${PROJ_FINAL_PART}` : ''}`
 		);
 	}
 	return lines;
