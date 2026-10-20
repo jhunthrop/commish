@@ -137,7 +137,7 @@ func scanBoardRow(rows pgx.Rows, stamp *boardStamp) (Player, string, error) {
 	var position string
 	var floor, median, ceiling *float64
 	if err := rows.Scan(&p.ID, &p.Name, &position, &p.Team, &p.Headshot, &p.ADP, &p.Points, &floor, &median, &ceiling,
-		&stamp.asOf, &stamp.order, &stamp.run, &stamp.fromWeek); err != nil {
+		&stamp.asOf, &stamp.order, &stamp.run, &stamp.fromWeek, &p.GamePoints); err != nil {
 		return Player{}, "", err
 	}
 	if floor != nil && median != nil && ceiling != nil {

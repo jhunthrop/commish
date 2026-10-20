@@ -43,12 +43,39 @@ func HorizonOf(t leaguesync.Terms) Horizon {
 	return Horizon{Last: t.PlayoffLast, FinalWeeks: t.FinalWeeks}
 }
 
+// Reaching is the horizon from a board's first week: never before it, so
+// a week 18 board read for a league that ends in week 17, or with no
+// league, still counts the week it ranks.
+func (h Horizon) Reaching(first int) Horizon {
+	if first > h.Last {
+		h.Last = first
+	}
+	return h
+}
+
 // finalWords is the clause naming a two-week championship inside the
-// span ", the final over weeks 17 and 18", empty for a one-week final or
-// one its platform does not state, or one that starts before from.
+// span ", the championship over weeks 17 and 18" (ESPN's word for the
+// last round; "final" is a game's state on the same screens), empty for a
+// one-week final or one its platform does not state, or one that starts
+// before from.
 func (h Horizon) finalWords(from int) string {
 	if h.FinalWeeks != twoWeekFinal || h.Last-1 < from {
 		return ""
 	}
-	return fmt.Sprintf(", the final over weeks %d and %d", h.Last-1, h.Last)
+	return fmt.Sprintf(", the championship over weeks %d and %d", h.Last-1, h.Last)
+}
+
+// rateWords is the sentence said once where the span runs past the run's
+// last week from a week the model counts (Lane 96 review M2): "Week 18
+// counts at his rate a game; our model runs through week 17." Empty
+// otherwise.
+func (h Horizon) rateWords(from int) string {
+	if h.Last <= LastWeek || from > LastWeek {
+		return ""
+	}
+	weeks := fmt.Sprintf("Week %d counts", h.Last)
+	if h.Last-LastWeek > 1 {
+		weeks = fmt.Sprintf("Weeks %d to %d count", LastWeek+1, h.Last)
+	}
+	return fmt.Sprintf(" %s at his rate a game; our model runs through week %d.", weeks, LastWeek)
 }

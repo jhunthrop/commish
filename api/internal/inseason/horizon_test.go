@@ -43,10 +43,10 @@ func TestTheSpanNamesTheTitleWeeks(t *testing.T) {
 		want  string
 	}{
 		{11, StandardHorizon, "weeks 7 to 17"},
-		{12, two, "weeks 7 to 18, the final over weeks 17 and 18"},
+		{12, two, "weeks 7 to 18, the championship over weeks 17 and 18"},
 		{12, Horizon{Last: 18, FinalWeeks: 1}, "weeks 7 to 18"},
 		{1, two, "week 18"},
-		{2, two, "weeks 17 to 18, the final over weeks 17 and 18"},
+		{2, two, "weeks 17 to 18, the championship over weeks 17 and 18"},
 	} {
 		if got := weekSpan(tc.weeks, tc.h); got != tc.want {
 			t.Errorf("%d weeks %+v: %q, want %q", tc.weeks, tc.h, got, tc.want)
@@ -93,7 +93,7 @@ func TestTheLeagueOrderValuesThroughItsTitleWeek(t *testing.T) {
 		}
 	}
 	order := title.Order(orderQuery{limit: DefaultOrderRows}, nil)
-	if !strings.Contains(order.Basis, "through week 18, the final over weeks 17 and 18, byes out") {
+	if !strings.Contains(order.Basis, "through week 18, the championship over weeks 17 and 18, byes out") {
 		t.Fatalf("order basis %q", order.Basis)
 	}
 	if got := a.Order(orderQuery{limit: DefaultOrderRows}, nil).Basis; !strings.Contains(got, "through week 17, byes out") {
@@ -103,7 +103,7 @@ func TestTheLeagueOrderValuesThroughItsTitleWeek(t *testing.T) {
 	if !ok {
 		t.Fatal("no trades answer")
 	}
-	if !strings.HasSuffix(trades.Basis, "weeks 7 to 18, the final over weeks 17 and 18.") {
+	if !strings.HasSuffix(trades.Basis, "weeks 7 to 18, the championship over weeks 17 and 18. Week 18 counts at his rate a game; our model runs through week 17.") {
 		t.Fatalf("trades basis %q", trades.Basis)
 	}
 }

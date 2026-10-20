@@ -140,7 +140,7 @@ func newAdvisor(l League, data Data, projection boards.WeekProjection, held map[
 		basis = Preseason
 	}
 	preset, _ := leaguesync.LeagueScoring(l.Saved, nil, false)
-	horizon := HorizonOf(l.Snap.Terms)
+	horizon := HorizonOf(l.Snap.Terms).Reaching(l.Board.FromWeek)
 	rest := RestAt(data.Games, l.Board.FromWeek, l.Board.Refreshed, now, horizon)
 	if l.Board, err = LiveBoard(l.Board, rest); err != nil {
 		return nil, fmt.Errorf("inseason: the board at the read's clock: %w", err)

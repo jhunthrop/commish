@@ -320,12 +320,13 @@ func gainWords(whose string, b OrderBasis, weeks int, h Horizon) string {
 		over := fmt.Sprintf("over the season's %s on our preseason number", weekCount(weeks))
 		return fmt.Sprintf("Gain is %s change in points over replacement a week, %s.", whose, over)
 	}
-	return fmt.Sprintf("Gain is %s change in points over replacement a week, %s.", whose, weekSpan(weeks, h))
+	from := h.Last - max(1, weeks) + 1
+	return fmt.Sprintf("Gain is %s change in points over replacement a week, %s.%s", whose, weekSpan(weeks, h), h.rateWords(from))
 }
 
 // weekSpan is the weeks the order covers by number, through the league's
 // horizon (Lane 96): "weeks 6 to 17", "week 17", "weeks 7 to 18, the
-// final over weeks 17 and 18".
+// championship over weeks 17 and 18".
 func weekSpan(weeks int, h Horizon) string {
 	from := h.Last - max(1, weeks) + 1
 	if from == h.Last {
@@ -461,6 +462,6 @@ func OrderScreenBasis(b OrderBasis, from RestFrom, league string, h Horizon) str
 		return fmt.Sprintf("Our preseason order: All ranks by Over repl., his season less a free pickup's in %s.", league)
 	}
 	return fmt.Sprintf("Our rest-of-season order %s. A position ranks by %s through week %d%s, byes out, "+
-		"All by Over repl., his points less a free pickup's in %s.", restFromWords(from), figurewords.Table.Projected, h.Last,
-		h.finalWords(from.Week), league)
+		"All by Over repl., his points less a free pickup's in %s.%s", restFromWords(from), figurewords.Table.Projected, h.Last,
+		h.finalWords(from.Week), league, h.rateWords(from.Week))
 }
