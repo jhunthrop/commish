@@ -174,6 +174,15 @@ def test_every_row_carries_its_points_for_one_more_game() -> None:
             assert row.game_points == pytest.approx(row.projected / games)
 
 
+def test_each_row_carries_the_preseason_pace_the_model_starts_him_from() -> None:
+    """Lane 100 (B17, B51): the raw line's points a game in the board's scoring, the prior the model
+    weighs his games against; none for a player off the preseason line."""
+    result = ros_boards(_boards(), _context(LINES_THROUGH), FIRST_WEEK_INSTANT, _states(FIRST_WEEK_INSTANT), SETUP)
+    for board in result.boards:
+        paces = {e.row.player_id: e.row.preseason_per_game for e in board.entries}
+        assert paces == {"p1": 16.0, "p2": 13.0, "p3": 10.0, "p9": None}
+
+
 def test_a_raw_line_without_a_scoring_keeps_that_format_preseason_alone() -> None:
     boards = _boards()
     result = ros_boards(

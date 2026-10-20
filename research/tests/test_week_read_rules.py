@@ -19,7 +19,7 @@ from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
 from research.capsules.week.render import render_week_facts_block, render_week_sheet
 from research.capsules.week.rules import WEEK_NEVER_WORDS, week_rule_violations
-from research.capsules.week.sheet import BoardPlace, DepthPlace, PublishedProjection, Status, WeekGame
+from research.capsules.week.sheet import BoardPlace, DepthPlace, PublishedProjection, Status, Weather, WeekGame
 from research.capsules.week.start_advice import start_advice_in
 from research.capsules.week.validate import sentence_shapes, validate_week_read, with_season
 from research.tests.week_read_fixtures import (
@@ -37,16 +37,14 @@ from research.tests.week_read_fixtures import (
 )
 
 STARTER_READ = (
-    "Puka Nacua gets Arizona at home in week 6 of 2026, and the Cardinals have allowed receivers 41.3 PPR points "
-    "a game, 26th of 32. The published projection has him at 18.4 points, up 0.5 points from the published "
-    "figure before it. The Rams are expected to score 32.5 points indoors, plenty of room for his 25.9 PPR "
-    "points a game. Start him with confidence."
+    "Puka Nacua gets Arizona at home in week 6 of 2026, and the Cardinals rank 26th of 32 against receivers. "
+    "The published projection has him at 18.4 points, up 0.5 points from the published figure before it. "
+    "The Rams play indoors, so nothing about the weather gets in his way. Start him with confidence."
 )
 BYE_READ = (
-    "Jahmyr Gibbs and the Lions are on their bye in week 6 of 2026, so he does not play and scores nothing "
-    "for you this week. Keep him on your roster through the off week, because his 21.3 PPR points a game over "
-    "5 games make him a weekly starter once Detroit plays again. Fill his spot with a back who has a game, and "
-    "bring Gibbs straight back for week 7 against Green Bay."
+    "Jahmyr Gibbs and the Lions are on their bye in week 6 of 2026, so he does not play this week. Keep him "
+    "on your roster, because his 21.3 PPR points a game over 5 games make him a weekly starter. Fill his spot "
+    "with a back who has a game, and bring Gibbs straight back for week 7 against Green Bay."
 )
 
 
@@ -102,10 +100,13 @@ def test_the_sheet_states_a_bye_and_a_status_that_keeps_him_out() -> None:
     assert "injured reserve" in out and "cannot play in week 6 of 2026" in out
 
 
-def test_the_questionable_sheet_names_the_designation_the_change_since_the_last_read_and_the_forecast() -> None:
+def test_the_questionable_sheet_names_the_designation_the_change_and_the_forecast() -> None:
     sheet = render_week_sheet(questionable())
     assert "Questionable on Friday's report" in sheet
-    assert "17 points" in sheet and "-1.8" in sheet
+    # The change is the card's Delta Proj cell; the figure before it and the change since our last read are
+    # in no cell, so the sheet holds neither (Lane 100, B17).
+    assert "-1.8" in sheet and "17 points" not in sheet and "since our last read" not in sheet.lower()
+    assert "18.7" not in sheet and "touchdowns" not in sheet
     assert "61 degrees" in sheet and "14 mph" in sheet and "30% chance of rain" in sheet
 
 
@@ -113,7 +114,7 @@ def test_the_facts_block_is_labelled_facts_and_no_sentence() -> None:
     lines = render_week_facts_block(starter()).splitlines()
     assert all(": " in line for line in lines)
     assert any(line.startswith("Published projection: 18.4 points") for line in lines)
-    assert any(line.startswith("In our rest-of-season order: 3 overall") for line in lines)
+    assert any(line == "In our rest-of-season order: WR2" for line in lines)
     assert not any(line.rstrip().endswith(".") for line in lines)
 
 
@@ -276,7 +277,7 @@ def test_a_rank_in_our_order_says_which_order() -> None:
 
 
 def test_the_season_is_named_once_and_weeks_after_it_go_bare() -> None:
-    twice = STARTER_READ.replace("plenty of room", "in week 6 of 2026, plenty of room")
+    twice = STARTER_READ.replace("so nothing about", "in week 6 of 2026, so nothing about")
     assert any("names the season 2 times" in v for v in week_rule_violations(twice, starter()))
     assert validate_week_read(BYE_READ, on_bye(), call="hold").ok
 
@@ -301,7 +302,7 @@ def test_a_read_runs_three_to_five_sentences(count: int) -> None:
 
 def test_a_sentence_shaped_like_one_on_another_page_is_refused() -> None:
     """The review's M4: the same skeleton with another name and other numbers is the same sentence."""
-    theirs = "The Bears are expected to score 25 points indoors, plenty of room for his 17.6 PPR points a game."
+    theirs = "The Bears play indoors, so nothing about the weather gets in his way."
     taken = frozenset(sentence_shapes(theirs))
     result = validate_week_read(STARTER_READ, starter(), taken, call="start")
     assert any("shaped like one another page carries" in v for v in result.violations), result.violations
@@ -312,8 +313,72 @@ def test_a_call_is_required() -> None:
 
 
 def test_a_number_the_sheet_never_printed_is_refused() -> None:
-    text = STARTER_READ.replace("41.3 PPR points", "44.7 PPR points")
-    assert any('"44.7"' in v for v in validate_week_read(text, starter(), call="start").violations)
+    text = STARTER_READ.replace("18.4 points", "18.7 points")
+    assert any('"18.7"' in v for v in validate_week_read(text, starter(), call="start").violations)
+
+
+def test_a_figure_the_page_draws_in_no_cell_is_refused() -> None:
+    """Lane 100 (B17): the read quotes only the page's cells. The points the opponent allows a game, a
+    full-season preseason figure and his touchdowns are on no cell, even when the facts once held them."""
+    sheet = starter()
+    allowed = sheet.allowed
+    assert allowed is not None
+    for figure in (f"{allowed.points_a_game:g}", "262.1", "9"):
+        text = STARTER_READ.replace("Start him with confidence.", f"He is at {figure} points on that count. Start him.")
+        hits = [v for v in week_rule_violations(text, sheet, "start") if "draws in no cell" in v]
+        assert hits and f'"{figure}"' in hits[0], (figure, hits)
+    # His points a game and the games behind it are the Avg cell's.
+    avg = STARTER_READ.replace("Start him with confidence.", "He brings 25.9 PPR points a game. Start him.")
+    assert not [v for v in week_rule_violations(avg, sheet, "start") if "draws in no cell" in v]
+
+
+def test_a_cells_figure_named_as_another_cell_is_refused() -> None:
+    """Lane 100 review M1: a game's 37.7 said as his points a game, where his Avg is 25.9; his rest-of-season
+    figure named as such passes, another figure under that name does not."""
+    sheet = starter()
+    wrong = STARTER_READ.replace("Start him with confidence.", "He scores 37.7 PPR points a game. Start him.")
+    assert any("as his points a game (Avg)" in v for v in week_rule_violations(wrong, sheet, "start"))
+    right = STARTER_READ.replace("Start him with confidence.", "He scores 25.9 PPR points a game. Start him.")
+    assert not any("a cell that prints another figure" in v for v in week_rule_violations(right, sheet, "start"))
+    board = sheet.board
+    assert board is not None and board.points is not None
+    rest = f"{board.points:g} PPR points for the rest of the season"
+    named = STARTER_READ.replace("Start him with confidence.", f"He holds {rest}. Start him.")
+    assert not any("a cell that prints another figure" in v for v in week_rule_violations(named, sheet, "start"))
+    off = named.replace(f"{board.points:g} PPR", "25.9 PPR")
+    assert any("as his rest-of-season points" in v for v in week_rule_violations(off, sheet, "start"))
+
+
+def test_the_sheet_prints_a_chance_of_rain_only_as_the_cell_names_it() -> None:
+    """Lane 100 review M2 and LOW-2: below 20% the cell names no chance, so the sheet prints none; the
+    weather rounds as the page's Math.round does (60.5 is 61)."""
+    low = replace(questionable(), weather=Weather("outdoors", 60.5, 14.0, 10.0, "rain", FIGURES))
+    text = render_week_sheet(low)
+    assert "chance of rain" not in text and "61 degrees" in text
+    assert "a 30% chance of rain" in render_week_sheet(questionable())
+
+
+def test_a_read_states_at_most_three_figures_and_one_paragraph() -> None:
+    """Lane 100 (B44): the cells carry his numbers; the read says what they cannot, in one paragraph."""
+    four = STARTER_READ.replace(
+        "Start him with confidence.",
+        "He brings 25.9 PPR points a game, and the Rams are expected to score 32.5 points.",
+    )
+    assert any("states 4 figures" in v for v in week_rule_violations(four, starter(), "start"))
+    split = STARTER_READ.replace(" The Rams play", "\n\nThe Rams play")
+    assert any("more than one paragraph" in v for v in week_rule_violations(split, starter(), "start"))
+
+
+def test_the_cap_is_eighty_words_with_no_overrun() -> None:
+    """Lane 100 (B44): at most 80 words, whatever the read was asked before."""
+    padded = STARTER_READ.replace(
+        "Start him with confidence.",
+        "He has been the steadiest part of a passing game that runs through him on every down that matters, "
+        "and nothing in the facts says that changes now that the Rams are at home. Start him.",
+    )
+    assert len(padded.split()) > 80  # noqa: PLR2004 - the cap
+    result = validate_week_read(padded, starter(), call="start")
+    assert result.band_failure is not None and not result.ok
 
 
 def test_the_in_season_season_read_refuses_the_draft_time_sentence() -> None:

@@ -3401,6 +3401,20 @@ type PlanFeatures struct {
 	Membership []Feature `json:"membership"`
 }
 
+// PlayerAfterBye defines model for PlayerAfterBye.
+type PlayerAfterBye struct {
+	Line PlayerLine `json:"line"`
+
+	// ProjectionArrivesAt when that week's published projection is first captured (its first kickoff less the capture's lead), set only while none is read for it; null otherwise
+	ProjectionArrivesAt *time.Time `json:"projection_arrives_at"`
+
+	// ProjectionReadAt when that week's published projection was captured, null with none stored
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// Week the week of his club's next game after the bye
+	Week int `json:"week"`
+}
+
 // PlayerLine defines model for PlayerLine.
 type PlayerLine struct {
 	// Facts one player's week; a fact we do not hold is null, never zero
@@ -3464,7 +3478,9 @@ type PlayerVerbKind string
 
 // PlayerWeek defines model for PlayerWeek.
 type PlayerWeek struct {
-	Line PlayerLine `json:"line"`
+	// AfterBye on his bye in week (line.facts.bye), his club's next game in the same scoring as line (Lane 100, B30): the card's Opp rank and Proj tiles read it, as no tile of the bye week holds a figure; null off a bye or with no game left, absent from an older answer
+	AfterBye *PlayerAfterBye `json:"after_bye,omitempty"`
+	Line     PlayerLine      `json:"line"`
 
 	// ProjectionPreviousReadAt when the snapshot projection_delta is measured from was captured, null with none
 	ProjectionPreviousReadAt *time.Time `json:"projection_previous_read_at"`

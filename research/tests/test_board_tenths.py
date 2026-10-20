@@ -111,3 +111,23 @@ def test_an_in_season_row_says_the_week_his_rest_of_season_starts_from() -> None
     assert (written["p1"]["restFromWeek"], written["p2"]["restFromWeek"]) == (7, None)
     preseason = FormatBoard(PPR, board.stored, board_entries(rows, PPR))
     assert "restFromWeek" not in board_json(preseason, people, {})["rows"][0]
+
+
+def test_an_in_season_row_carries_the_preseason_pace_with_his_preseason_figures() -> None:
+    """Lane 100 (B17, B51): beside his preseason figure, the pace a game the order starts him from, to a
+    tenth; null for a player the preseason board did not rank, and no field preseason."""
+    rows = [
+        replace(_row("p1", 120.0, 0.0), preseason_per_game=17.46),
+        replace(_row("p2", 90.0, 0.0), preseason_per_game=9.0),
+    ]
+    before = {e.row.universe_id: e for e in board_entries(rows, PPR)}
+    entries = tuple(
+        replace(e, in_season=True, preseason=before[e.row.universe_id] if e.row.player_id == "p1" else None)
+        for e in board_entries(rows, PPR)
+    )
+    board = FormatBoard(PPR, StoredBoard(PPR.board_source, AS_OF, "research@test", None), entries)
+    people = {p.id: p for p in identities([board])}
+    written = {r["id"]: r for r in board_json(board, people, {})["rows"]}
+    assert (written["p1"]["preseasonPerGame"], written["p2"]["preseasonPerGame"]) == (17.5, None)
+    preseason = FormatBoard(PPR, board.stored, board_entries(rows, PPR))
+    assert "preseasonPerGame" not in board_json(preseason, people, {})["rows"][0]

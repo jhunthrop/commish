@@ -4,12 +4,22 @@ import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { KICKED_OFF_PART } from '../league/box/basis.ts';
 import type { WeekFacts } from '../league/inseason/api.ts';
-import { CARD, NONE, printTenth, unreadBasis, type CardTile } from './card.ts';
+import {
+	CARD,
+	NONE,
+	printTenth,
+	publishedOn,
+	unreadBasis,
+	vsAvgReason,
+	type BasisTile,
+	type CardTile
+} from './card.ts';
 import {
 	compareSay,
 	liveCard,
 	oppCaption,
 	verbOf,
+	verbFits,
 	heldVerb,
 	type PlayerWeek,
 	type ScreenHref
@@ -499,6 +509,169 @@ void test("with a league the verb is the league screens', the platform named", (
 	assert.match(basis[1] ?? '', /your scoring/);
 });
 
+/** Week 6's last kickoff on the run's schedule, the Monday night game. */
+const LAST_KICKOFF = '2026-10-20T00:15:00.000Z';
+const ON_BYE = facts({
+	opponent: null,
+	home: null,
+	kickoff: null,
+	bye: true,
+	allowed_to_position: null
+});
+const NEXT_GAME = facts({
+	week: 7,
+	opponent: 'GB',
+	home: true,
+	kickoff: '2026-10-25T17:00:00.000Z',
+	allowed_to_position: { points_a_game: 24.1, rank: 12, of: 32, position: 'RB' }
+});
+const byeWeek = (projection: number | null, arrives: string | null): PlayerWeek =>
+	week(
+		{
+			projection_read_at: null,
+			projection_previous_read_at: null,
+			after_bye: {
+				week: 7,
+				line: { ...week().line, week_projection: projection, opp_rank: 12, facts: NEXT_GAME },
+				projection_read_at: projection === null ? null : READ,
+				projection_arrives_at: arrives
+			}
+		},
+		{ week_projection: null, projection_delta: null, opp_rank: null, facts: ON_BYE }
+	);
+const RB = { ...PLAYER, name: 'Jahmyr Gibbs', team: 'DET', position: 'RB' };
+
+void test('on his bye the Opp rank and change tiles read his next game (Lane 100, B30)', () => {
+	const at = (w: PlayerWeek) =>
+		liveCard({
+			week: w,
+			player: RB,
+			league: null,
+			tiles: BUILT,
+			opponents: {},
+			games: 5,
+			rest: REST,
+			screenHref: href,
+			zone: ZONE,
+			now: NOW
+		});
+	const pending = at(byeWeek(null, '2026-10-22T22:15:00.000Z')).tiles;
+	assert.deepEqual(
+		[tile(pending, 'opp').value, tile(pending, 'opp').caption],
+		['12th', 'Wk 7 vs GB, in the middle for running backs']
+	);
+	assert.deepEqual(
+		[tile(pending, 'delta').label, tile(pending, 'delta').value, tile(pending, 'delta').caption],
+		['Wk 7 Proj', NONE, publishedOn('Thursday')]
+	);
+	assert.equal(tile(pending, 'proj').caption, CARD.byeWeek);
+	// Its capture time passed with none read: the tile's own words, never this week's (fix round 1, LOW-1).
+	assert.equal(tile(at(byeWeek(null, null)).tiles, 'delta').caption, CARD.nextProjNotIn);
+	const read = at(byeWeek(18.4, null)).tiles;
+	assert.deepEqual([tile(read, 'delta').value, tile(read, 'delta').caption], ['18.4', 'PPR']);
+	// A bye with no game read after it keeps the bye week's words.
+	const none = at(
+		week({}, { week_projection: null, projection_delta: null, opp_rank: null, facts: ON_BYE })
+	).tiles;
+	assert.deepEqual([tile(none, 'opp').value, tile(none, 'opp').caption], [NONE, 'Bye']);
+	assert.equal(tile(none, 'delta').label, CARD.delta);
+});
+
+void test("the lineup verb fits the moment: once the week's last game kicks off, Compare leads (Lane 100, B64)", () => {
+	const lineup = { kind: 'lineup' as const, holder: null, host_url: null, note: null };
+	const kickoff = Date.parse(LAST_KICKOFF);
+	assert.ok(verbFits(lineup, LAST_KICKOFF, kickoff - 1));
+	assert.ok(!verbFits(lineup, LAST_KICKOFF, kickoff));
+	assert.ok(!verbFits({ ...lineup, kind: 'start' }, LAST_KICKOFF, kickoff));
+	assert.ok(verbFits({ ...lineup, kind: 'trade' }, LAST_KICKOFF, kickoff));
+	assert.ok(verbFits(lineup, null, kickoff));
+	const at = (now: number) =>
+		liveCard({
+			week: week({ verb: lineup }),
+			player: PLAYER,
+			league: LEAGUE,
+			tiles: BUILT,
+			opponents: {},
+			games: 3,
+			rest: REST,
+			screenHref: href,
+			zone: ZONE,
+			now,
+			lastKickoffs: { 6: LAST_KICKOFF }
+		});
+	const open = at(NOW);
+	assert.deepEqual([open.verb?.label, open.compareLeads], [CARD.openLineup, false]);
+	const past = at(kickoff + 60_000);
+	assert.deepEqual([past.verb, past.compareLeads], [null, true]);
+	// The basis still names the league's scoring: the read is the league's.
+	assert.match(past.basis[1] ?? '', /your scoring/);
+});
+
+void test('signed out in season Compare leads, and preseason the sheet add stays (fix round 1, M3)', () => {
+	assert.equal(card(week()).compareLeads, true);
+	const preseason = liveCard({
+		week: week(),
+		player: PLAYER,
+		league: null,
+		tiles: BUILT,
+		opponents: {},
+		games: 3,
+		rest: null,
+		screenHref: href,
+		zone: ZONE,
+		now: NOW
+	});
+	assert.equal(preseason.compareLeads, false);
+});
+
+void test('vs Avg is his rest of season a game less his Avg, from the two printed tenths (Lane 100, B51)', () => {
+	const built: BasisTile[] = [
+		{
+			key: 'preseason',
+			label: CARD.preseason,
+			value: '262.1',
+			caption: 'PPR points for 2026, the full season',
+			reason: null
+		},
+		{
+			key: 'vsAvg',
+			label: CARD.vsAvg,
+			value: NONE,
+			caption: CARD.vsAvgCaption,
+			reason: vsAvgReason(5)
+		}
+	];
+	const at = (perGame: number | null, format: 'ppr' | 'half_ppr' = 'ppr') =>
+		liveCard({
+			week: week(
+				{ projection_scoring: { format, league_own: false } },
+				{ rest_of_season_per_game: perGame, season_avg: 30.7 }
+			),
+			player: PLAYER,
+			league: null,
+			tiles: BUILT,
+			opponents: {},
+			games: 5,
+			rest: REST,
+			screenHref: href,
+			zone: ZONE,
+			now: NOW,
+			basisTiles: built
+		}).basisTiles;
+	const filled = at(22.0);
+	assert.equal(filled.find((t) => t.key === 'vsAvg')?.value, '\u22128.7');
+	assert.equal(
+		filled.find((t) => t.key === 'vsAvg')?.caption,
+		'22.0 a game from week 6 against his 30.7: our figure weighs his 5 games against his preseason pace'
+	);
+	// "--" stands with the plain caption: no reason beside a figure not drawn (fix round 1, M4).
+	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.caption, CARD.vsAvgCaption);
+	assert.equal(filled.find((t) => t.key === 'preseason')?.value, '262.1');
+	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.value, NONE);
+	// In another scoring than the tile's the figure a game is not the tile's: no gap is drawn.
+	assert.equal(at(22.0, 'half_ppr').find((t) => t.key === 'vsAvg')?.value, NONE);
+});
+
 /** The site's copy guard, with the card's own words: "tip" (the copy rules' no-tips ruling). */
 const BANNED = bannedPattern(/\btips?\b/);
 
@@ -512,7 +685,15 @@ void test('copy guard: no card word uses a betting or trading word, the word hos
 		...live.basis,
 		live.verb?.label ?? '',
 		live.verb?.note ?? '',
-		CARD.whyTitle,
+		CARD.whyRest,
+		CARD.readNotYet,
+		CARD.preseason,
+		CARD.preseasonPace,
+		CARD.vsAvg,
+		CARD.paceCaption,
+		CARD.vsAvgCaption,
+		vsAvgReason(5),
+		publishedOn('Thursday'),
 		CARD.writtenFrom,
 		CARD.startHim,
 		CARD.openLineup,

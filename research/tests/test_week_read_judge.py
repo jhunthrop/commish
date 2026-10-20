@@ -15,6 +15,7 @@ from research.capsules.gateway import Completion
 from research.capsules.gateway_ledger import Usage
 from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.week import rules
+from research.capsules.week import validate as week_validate
 from research.capsules.week.judge import QUESTION, judge_messages, says_start
 from research.capsules.week.prompt import answer_json
 from research.capsules.week.write import MAX_CALLS_PER_READ, write_week_read
@@ -25,9 +26,19 @@ _JUDGE = Path(__file__).parent / "testdata" / "week_reads" / "judge.json"
 _USAGE = Usage(300, 1, 301, 0.00005)
 
 
+# The honest bye read the judge was recorded against (fix round 2), from before Lane 100 cut the read to 80
+# words: the recording is the judge's verdict on this text, so its cases read it as recorded.
+RECORDED_BYE_READ = (
+    "Jahmyr Gibbs and the Lions are on their bye in week 6 of 2026, so he does not play and scores nothing "
+    "for you this week. Keep him on your roster through the off week, because his 21.3 PPR points a game over "
+    "5 games make him a weekly starter once Detroit plays again. Fill his spot with a back who has a game, and "
+    "bring Gibbs straight back for week 7 against Green Bay."
+)
+
+
 def judged_text(phrase: str) -> str:
-    """An honest bye read for Jahmyr Gibbs with one start phrasing appended (the season named once)."""
-    return f"{BYE_READ} {phrase.replace(' in week 7 of 2026', ' in week 7')}"
+    """The recorded honest bye read with one start phrasing appended (the season named once)."""
+    return f"{RECORDED_BYE_READ} {phrase.replace(' in week 7 of 2026', ' in week 7')}"
 
 
 class _Script:
@@ -123,8 +134,10 @@ def test_the_recorded_judge_said_yes_to_every_this_week_start_phrasing_and_no_to
 def test_the_judge_refuses_each_phrasing_with_the_list_switched_off(
     phrase: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The writer's own path, the list never firing: the recorded verdict alone refuses the read."""
+    """The writer's own path, the list never firing: the recorded verdict alone refuses the read. The
+    recorded text runs past Lane 100's cap of 80 words, so the cap is lifted here as the list is."""
     monkeypatch.setattr(rules, "start_advice_in", lambda sentence, name: None)
+    monkeypatch.setattr(week_validate, "WEEK_BAND", (40, 100))
     verdict = next(v for v in _verdicts() if v["phrase"] == phrase)
     text = judged_text(phrase)
     assert verdict["text"] == text

@@ -1,16 +1,23 @@
 """Lane 72's recorded fixture run, replayed: three players from the scratch copy of the store in week 6 of
-2026 (a starter, a Questionable player and a player on bye), each written by the writer's own path
-against the gateway's recorded answers, in order. No live call is made here.
+2026 (a starter, a Questionable player and a player on bye), with the gateway's recorded answers. No live
+call is made here.
 
-The guards: every read lands written in the calls it took live; it names the published projection as
-published wherever there is one and never as ours; it carries no betting, trading or provider word, no
-rival product and no tip; the bye read says he does not play and recommends nothing for the week; no
-sentence sits on two of the reads; every fact was stamped at or before the write; and the caption is the
-page's."""
+Lane 100 (B17, B44) holds the read to one paragraph of at most 80 words that quotes only the page's cells,
+at most three of them. Every recorded read is longer and retells the cells (a figure the page draws in no
+cell among them), so each is now the guard's case: refused by name, and the writer replayed against the
+recorded answers falls to its facts block. A read the rules take is shown on each sheet by a hand-written
+read (`HAND_WRITTEN`, written for this test and never a recording), through the writer's own path.
+
+Lane 96 (B16) refuses each recording's "Tuesday's report" too, no report having been issued by the write; the
+hand-written reads name the list as the sheet does, "the Tuesday-night list". The guards that stand for the
+recorded reads: the published projection named as published and never as
+ours; no betting, trading or provider word, no rival product and no tip; the bye read says he does not play
+and recommends nothing for the week; no sentence sits on two of the reads; every fact was stamped at or
+before the write; and the caption is the page's."""
 
 import copy
 import json
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Final, Self
@@ -20,13 +27,13 @@ import pytest
 from research.capsules.gateway import Completion
 from research.capsules.gateway_ledger import Usage
 from research.capsules.page_figures import FIGURE_OFF_PAGE
+from research.capsules.sentences import split_sentences
 from research.capsules.throttle_waits import AskWaits, RunWaits
-from research.capsules.validate import overrun_cap
 from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
-from research.capsules.week.prompt import parse_week_answer
+from research.capsules.week.prompt import answer_json, parse_week_answer
 from research.capsules.week.render import render_week_sheet
-from research.capsules.week.rules import CALLS, WEEK_NEVER_WORDS, week_rule_violations
+from research.capsules.week.rules import CALLS, MAX_FIGURES, WEEK_NEVER_WORDS, stated_figures, week_rule_violations
 from research.capsules.week.sheet import WeekSheet, week_name_ledger
 from research.capsules.week.validate import WEEK_BAND, sentence_shapes, validate_week_read
 from research.capsules.week.write import write_week_read
@@ -36,20 +43,33 @@ _FIXTURE = Path(__file__).parent / "testdata" / "week_reads" / "recorded.json"
 _RECORDED: list[dict[str, Any]] = json.loads(_FIXTURE.read_text())["players"]
 _NAMES = [p["sheet"]["name"] for p in _RECORDED]
 # Lane 66v: CeeDee Lamb's recorded read quotes the published projection as 19.4, the old sheet's toFixed of
-# 19.45, where the card prints 19.5 (the API's cents then tenth). The figure guard now refuses it, so his
-# recording is the guard's case and no longer one the writer reproduces.
-_REFUSED: Final = "CeeDee Lamb"
-_STANDING = [name for name in _NAMES if name != _REFUSED]
-# Lane 96 (B16): every recorded read names "Tuesday's report", the day the list was read, where no game status
-# report had been issued for the week's game by the write (the sheet's list stood from Tuesday, Friday's report
-# was still to come). The report rule now refuses each recording, so the writer no longer reproduces any; the
-# rest of every guard is kept on the recording with the report named as the list it was.
-_STALE_REPORT: Final = "Tuesday's report"
-
-
-def _corrected(read: str) -> str:
-    """A recorded read with its report named as the list as of Tuesday, the one change the report rule asks."""
-    return read.replace(_STALE_REPORT, "the Tuesday-night list")
+# 19.45, where the card prints 19.5 (the API's cents then tenth).
+_LAMB: Final = "CeeDee Lamb"
+# The recordings whose every answer is a writer's read (Gibbs's include the judge's), replayed whole.
+_ALL_READS: Final = ("Puka Nacua", _LAMB)
+# A read for each sheet the rules take, hand-written for this test (never a recording), and its call.
+HAND_WRITTEN: Final[dict[str, tuple[str, str]]] = {
+    "Puka Nacua": (
+        "Puka Nacua carries no designation on the Tuesday-night list and tops the Rams' receiver depth chart for week 6 "
+        "of 2026, at home against the Cardinals. Arizona ranks 28th of 32 against receivers, and the game is "
+        "indoors under a fixed roof. The published projection has him at 23 points. Start him.",
+        "start",
+    ),
+    "Jahmyr Gibbs": (
+        "The Lions are off in week 6 of 2026, so Gibbs does not play and scores nothing this week. There is no "
+        "designation for him on the Tuesday-night list, and he still leads the Detroit backfield ahead of Sione Vaki. "
+        "Keep him on your roster, fill his spot with a back who plays, and he is back for week 7 at home against "
+        "Green Bay.",
+        "sit",
+    ),
+    _LAMB: (
+        "CeeDee Lamb is Questionable on the Tuesday-night list, so his Sunday night in Green Bay is not settled yet. "
+        "The published projection has him at 19.5 points in PPR scoring for week 6 of 2026. Green Bay sits 15th "
+        "of 32 against receivers, and he leads the Dallas depth chart ahead of George Pickens. Wait on his status "
+        "before the 7:20 pm Central kickoff, and if he's cleared, he's in your lineup.",
+        "hold",
+    ),
+}
 
 
 class _Replay:
@@ -57,7 +77,7 @@ class _Replay:
 
     model = "zai/glm-5.3-flash"
 
-    def __init__(self, answers: list[dict[str, Any]]) -> None:
+    def __init__(self, answers: Sequence[dict[str, Any]]) -> None:
         self.answers: Iterator[dict[str, Any]] = iter(answers)
         self.calls = 0
         self.waits = RunWaits()
@@ -102,63 +122,89 @@ def test_the_fixture_is_a_starter_a_questionable_player_and_a_player_on_bye() ->
 
 
 @pytest.mark.parametrize("name", _NAMES)
-def test_the_writer_refuses_a_recorded_read_naming_a_report_not_yet_issued(name: str) -> None:
+def test_under_lane_100_every_recorded_read_is_refused_by_name(name: str) -> None:
+    """Each recording runs past 80 words and states more figures than the read may (B44), and each quotes
+    a figure the page draws in no cell (B17): the opponent's points allowed, his touchdowns, a projection
+    the card does not print."""
     sheet, player = _sheet(name)
-    assert _STALE_REPORT in player["read"]
-    assert "game status report on Friday" in render_week_sheet(sheet)
-    # Each refusal asks again, past the answers recorded when the first took: the recording, replayed over.
-    gateway = _Replay(player["answers"] * 4)
+    violations = validate_week_read(player["read"], sheet, frozenset(player["taken"]), _call(player)).violations
+    assert any("40-80 word band" in v for v in violations), violations
+    assert any(f"state at most {MAX_FIGURES}" in v for v in violations), violations
+    assert any("draws in no cell" in v for v in violations), violations
+    # Lane 96 (B16): each names "Tuesday's report", where no game status report was issued by the write.
+    assert any("names Tuesday's report, a report the facts do not name" in v for v in violations), violations
+
+
+@pytest.mark.parametrize("name", _ALL_READS)
+def test_replayed_against_its_recording_the_writer_falls_to_the_facts_block(name: str) -> None:
+    """The writer's own path on the recorded answers: every draft is handed back, and after its four asks
+    (the calls the recording took live) the read is his facts block."""
+    sheet, player = _sheet(name)
+    gateway = _Replay(player["answers"])
     result = write_week_read(sheet, gateway, tuple(player["avoid"]), frozenset(player["taken"]))  # type: ignore[arg-type]
-    assert result.source == "facts"
-    refused = [v for attempt in result.attempts for v in attempt.violations]
-    assert any(f"names {_STALE_REPORT}, a report the facts do not name" in v for v in refused), refused
+    assert result.source == "facts" and result.calls == player["calls"]
+    assert result.fallback is not None and result.fallback.startswith("failed validation")
+    assert all(attempt.violations for attempt in result.attempts)
 
 
-@pytest.mark.parametrize("name", _STANDING)
-def test_the_recorded_read_keeps_every_guard(name: str) -> None:
+@pytest.mark.parametrize("name", _NAMES)
+def test_the_recorded_read_keeps_the_guards_that_stand(name: str) -> None:
     sheet, player = _sheet(name)
-    read = _corrected(player["read"])
-    assert _call(player) in CALLS and (_call(player) != "start" or sheet.may_start)
-    # A read asked for a shorter version may run 10% over the cap (the season read's ruling).
-    shorter = player["calls"] > 1
-    assert validate_week_read(read, sheet, frozenset(player["taken"]), _call(player), asked_shorter=shorter).ok
+    read = player["read"]
     assert gate_hits(read, week_name_ledger(sheet)) == []
     assert not any(rule.pattern.search(read) for rule in WEEK_NEVER_WORDS)
-    assert week_rule_violations(read, sheet, _call(player)) == []
-    assert len(read.split()) <= overrun_cap(WEEK_BAND[1])
     if sheet.projection is not None and not sheet.bye:
         assert "published" in read.lower()
     assert "our projection" not in read.lower() and "our number" not in read.lower()
     assert all(datetime.fromisoformat(stamp) <= sheet.written_at for stamp in sheet.stamps().values())
 
 
+@pytest.mark.parametrize("name", _NAMES)
+def test_a_hand_written_read_of_each_sheet_is_one_the_rules_take(name: str) -> None:
+    """One paragraph, at most 80 words, only the cells' figures and at most three, through the writer's own
+    path in one call (and the judge's no for a player who may not be started)."""
+    sheet, player = _sheet(name)
+    read, call = HAND_WRITTEN[name]
+    taken = frozenset(player["taken"])
+    result = validate_week_read(read, sheet, taken, call)
+    assert result.ok, result.violations
+    assert len(read.split()) <= WEEK_BAND[1] and "\n" not in read
+    assert sum(len(stated_figures(s, sheet.season)) for s in split_sentences(read)) <= MAX_FIGURES
+    answers = [{"content": answer_json(read, call), "usage": None, "provider": "replay"}]
+    if not sheet.may_start:
+        answers.append({"content": "no", "usage": None, "provider": "replay"})
+    written = write_week_read(sheet, _Replay(answers), tuple(player["avoid"]), taken)  # type: ignore[arg-type]
+    assert (written.source, written.text, written.call, written.calls) == ("llm", read, call, len(answers))
+    assert written.call in CALLS and (written.call != "start" or sheet.may_start)
+
+
 def test_a_recorded_figure_the_card_does_not_print_is_refused() -> None:
-    sheet, player = _sheet(_REFUSED)
+    sheet, player = _sheet(_LAMB)
     assert "19.5 points in PPR scoring" in render_week_sheet(sheet)
-    result = validate_week_read(player["read"], sheet, frozenset(player["taken"]), _call(player), asked_shorter=True)
-    assert not result.ok
-    assert result.violations[0].startswith(f'{FIGURE_OFF_PAGE}: "19.4", where the sheet prints 19.5')
+    result = validate_week_read(player["read"], sheet, frozenset(player["taken"]), _call(player))
+    assert any(v.startswith(f'{FIGURE_OFF_PAGE}: "19.4", where the sheet prints 19.5') for v in result.violations)
 
 
 def test_the_cards_figure_on_a_tie_is_the_published_projection_the_rules_ask_for() -> None:
     """Lamb's 19.45 prints 19.5 on the card: the read saying 19.5 names the published projection with its
-    figure, and passes every rule."""
-    sheet, player = _sheet(_REFUSED)
-    read = _corrected(player["read"]).replace("19.4", "19.5")
-    assert week_rule_violations(read, sheet, _call(player)) == []
-    result = validate_week_read(read, sheet, frozenset(player["taken"]), _call(player), asked_shorter=True)
-    assert result.ok, result.violations
+    figure, and no rule about the published projection is left broken."""
+    sheet, player = _sheet(_LAMB)
+    read = player["read"].replace("19.4", "19.5")
+    left = week_rule_violations(read, sheet, _call(player))
+    said = ("on the published projection", "names the published projection", "without saying it is published")
+    assert not any(words in v for v in left for words in said), left
 
 
 def test_the_bye_read_says_he_does_not_play_and_recommends_nothing_for_the_week() -> None:
     sheet = next(sheet_from_json(p["sheet"]) for p in _RECORDED if p["sheet"]["bye"])
-    read = next(p["read"] for p in _RECORDED if p["sheet"]["bye"])
-    assert "doesn't play" in read or "does not play" in read or "bye" in read
-    assert not any("recommends" in v for v in week_rule_violations(read, sheet, "hold"))
+    for read in (next(p["read"] for p in _RECORDED if p["sheet"]["bye"]), HAND_WRITTEN["Jahmyr Gibbs"][0]):
+        assert "doesn't play" in read or "does not play" in read or "bye" in read
+        assert not any("recommends" in v for v in week_rule_violations(read, sheet, "hold"))
 
 
-def test_no_sentence_shape_sits_on_two_of_the_reads() -> None:
-    held = [set(sentence_shapes(p["read"])) for p in _RECORDED]
+@pytest.mark.parametrize("reads", [[p["read"] for p in _RECORDED], [read for read, _ in HAND_WRITTEN.values()]])
+def test_no_sentence_shape_sits_on_two_of_the_reads(reads: list[str]) -> None:
+    held = [set(sentence_shapes(read)) for read in reads]
     for i, mine in enumerate(held):
         for theirs in held[i + 1 :]:
             assert not (mine & theirs)

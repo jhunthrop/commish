@@ -53,7 +53,7 @@ from research.capsules.week.store import (
     stored_week_reads,
     upsert_week_read,
 )
-from research.capsules.week.write import MAX_CALLS_PER_READ, MAX_TOKENS, WeekReadResult, write_week_read
+from research.capsules.week.write import MAX_ASKS_PER_READ, MAX_TOKENS, WeekReadResult, write_week_read
 from research.nightly.capsule_step import checked_price
 from research.nightly.steps import StepRecord
 from research.nightly.week_read_demotion import demote_shared, read_shapes
@@ -69,7 +69,7 @@ PAGES_PER_NIGHT: Final = 700
 # THE DOLLARS (the coordinator's M3), from fix round 2's recordings (the fixture run, 11 calls; the 50-player
 # sample, 27 live calls over 8 reads; the judge, 16 calls): a read averages $0.0016 to $0.0019, the judge's
 # call $0.00006 (one of the read's four, on the 152 of 536 sheets that may not start him), the dearest call
-# $0.00065, so a read's worst case (4 calls) is $0.0026 and a full week turnover of 536 reads about $0.95 on
+# $0.00065, so a read's worst case (4 calls) is $0.0026 (5 with Lane 100's overrun retry, $0.0033) and a full week turnover of 536 reads about $0.95 on
 # average and $1.39 at worst: the night holds $1.40. An hourly pass writes only the reads a status moved (a
 # projection move waits for the nightly, Lane 66v): $0.05 a pass, and $0.60 across a Central day's passes
 # (the capture runs 18 times). A day of week reads is at most $2.00, beside the capsule night's ruled bound of about $4.15.
@@ -129,7 +129,7 @@ def worst_read_usd(price: ModelPrice) -> float:
     """A read's worst case in dollars: every ask at the heaviest prompt and the whole completion allowance."""
     per_in = (price.input_usd_per_million or 0.0) / 1_000_000
     per_out = (price.output_usd_per_million or 0.0) / 1_000_000
-    return MAX_CALLS_PER_READ * (WORST_PROMPT_TOKENS * per_in + MAX_TOKENS * per_out)
+    return MAX_ASKS_PER_READ * (WORST_PROMPT_TOKENS * per_in + MAX_TOKENS * per_out)
 
 
 def step_budget(price: ModelPrice, usd: float) -> RunBudget:

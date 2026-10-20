@@ -203,15 +203,21 @@ func (a *advisor) turnTo(week int, projection boards.WeekProjection) *advisor {
 const ProjectionCaptureLead = 2 * time.Hour
 
 // projectionArrivesAt is when the addressed week's published projection is
-// first captured, its first kickoff less ProjectionCaptureLead; nil once one
-// is read, or when that moment has passed or the week holds no game.
+// first captured (projectionArrivesFor).
 func (a *advisor) projectionArrivesAt() *time.Time {
-	if !a.projection.ReadAt.IsZero() {
+	return projectionArrivesFor(a.data.Games, a.week, a.projection, a.now)
+}
+
+// projectionArrivesFor is when week's published projection is first
+// captured, its first kickoff less ProjectionCaptureLead; nil once one is
+// read, or when that moment has passed or the week holds no game.
+func projectionArrivesFor(games []boards.TeamWeek, week int, projection boards.WeekProjection, now time.Time) *time.Time {
+	if !projection.ReadAt.IsZero() {
 		return nil
 	}
 	var first time.Time
-	for _, g := range a.data.Games {
-		if g.Week == a.week && (first.IsZero() || g.Kickoff.Before(first)) {
+	for _, g := range games {
+		if g.Week == week && (first.IsZero() || g.Kickoff.Before(first)) {
 			first = g.Kickoff
 		}
 	}
@@ -219,7 +225,7 @@ func (a *advisor) projectionArrivesAt() *time.Time {
 		return nil
 	}
 	at := first.Add(-ProjectionCaptureLead)
-	if !at.After(a.now) {
+	if !at.After(now) {
 		return nil
 	}
 	return &at
