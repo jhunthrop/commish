@@ -187,6 +187,19 @@ def map_games(body: object, week: int) -> list[GameSummary]:
     return games
 
 
+def map_box_score_game(body: object, week: int) -> GameSummary | None:
+    """`/getNFLBoxScore`'s own game (Lane 101): its id, clubs and status read as `map_games` reads a week's
+    games, `gameStatusCode` first and the words by prefix. None for an answer that is not one game or
+    carries no status at all (no code and no words), which the week's read would take as under way: the
+    caller refuses it instead."""
+    if not isinstance(body, dict):
+        return None
+    if text(body.get("gameStatusCode")) == "" and text(body.get("gameStatus")) == "":
+        return None
+    games = map_games([body], week)
+    return games[0] if games else None
+
+
 def _empty(player_id: str, week: int) -> dict[str, float]:
     return dict.fromkeys(STAT_LINE_COLUMNS, 0.0)
 

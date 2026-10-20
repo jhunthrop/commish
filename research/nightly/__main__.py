@@ -14,7 +14,7 @@ statuses the site prints (development).
 player's read that is due now; with `--hourly`, the hourly pass the in-season capture job runs after
 its status capture (only a status or projection that moved, under the hourly dollar budget).
 
-`run` writes one run under a new run id (05:00 UTC); `publish` makes the newest passed run public
+`run` writes one run under a new run id (05:30 UTC); `publish` makes the newest passed run public
 once its early-access hour is over, dispatches the web build of it (every hour), and
 keeps `research.published_boards` equal to the public run's boards, the table the API reads, and
 writes the newest injury capture beside the run and into that table, dispatching the build again when
