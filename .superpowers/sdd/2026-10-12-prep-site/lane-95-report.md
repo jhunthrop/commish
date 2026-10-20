@@ -63,3 +63,36 @@ Not readable from data here: production is off-limits, and dev (5432) and every 
 - api `make check-gen` exit 0
 - api `CI=true TEST_DATABASE_URL=.../lane95_test go test -race -count=1 -p 1 ./...` exit 0
 - `week-turn-shots.ts` CLOCK=monday-night exit 0, CLOCK=saturday exit 0
+
+## Fix round 1 (review `reviews/lane-95-review.md`)
+
+Commits: c5c9fbf7 fix(api), a0c7f1e6 fix(web) (shots re-taken in it).
+
+**HIGH-1, designations never hidden (DONE).** `Season.WithoutSpent`/`spent` are gone; `Season.Turned` keeps every listing and marks a week's designation `CarriedOver` when it is listed no later than his club's last kickoff before the week, or undated (a failed dating read now marks, never blanks). `Tier()` stays the provider's status, so a listed-Out player is Out on the turned Waivers and Trades. Wire: additive optional `InjuryDesignation.listed` (the run's start, any status) and `carried_over`. The web says it wherever a status is drawn (`box.ts statusOf`, the front chip's label): "Out, listed Oct 12", or "Out, as of Oct 19" when undated (`next-week.ts carriedMark`). The strip ranks a fresh listing above a carried-over one (`week.go listedBefore`) and keeps both. Tests rewritten to the ruling: `TestFrontDoorKeepsACarriedOverListing` (Friday, undated, after-game, Sunday; the Waivers row keeps the listing), `TestStripRanksAFreshListingFirst`, `spent_test.go TestTurnedSeasonKeepsEveryListing` (kept, carried over, tier Doubtful, season-long never carried).
+
+**MEDIUM-1, Waivers Proj columns (DONE).** `WaiverTable` takes `projected` (`weekProjected`), dropping PROJ and Δ PROJ heads and cells (`BoxLine projCells`, rows and drop panel) until the week's projection is read, as Trades does. "Week 7 projections expected Thursday." sits over the table on both widths, and the basis no longer repeats a Proj sentence. Beats and the count untouched. Shots re-taken: `monday-night/` and `saturday/`, 1280 and 390; the script now asserts the Proj columns gone (Monday night) or drawn (Saturday) and the carried-over chip's date.
+
+**MEDIUM-2 (DONE, worded).** The line says "expected" ("Week 7 projections expected Thursday."), the capture's rule rather than a promise. Gating it on the B68 harvest is left to that lane.
+
+**MEDIUM-3 (DONE).** Once `chips_week` is past `week` the front door basis says "The roster facts are for week 7: a pickup goes by Gain until week 7's published projection is in, then by the Proj he adds." (`FRONT.turnedPickup`).
+
+**LOW-1 (DONE, partly).** The kicked-off season order says the addressed week (`SeasonOrderWords(a.week)`); the pickup rule on a turned page says "A pickup starts in week 7 on Proj ..." (`WaiversBasisFor`); Trades' group head reads "Week 7, Proj" on a turned page (`weekHeadFor`). Left: `projPart`'s "this week's published projection" in basis.ts, which is Lane 92's Proj/Pts words; on a turned page with week 7's projection read it would still say "this week's".
+
+**LOW-2 (DONE, partly).** Added `TestProjectionArrivesAtTheWeeksFirstSlot` (a Saturday-first week says Saturday's slot) and `TestUnprojectedOwnWeekTakesTheSeasonOrder` (the platform's own week with no projection read: season order, at most one pickup, rows marked to match). The bye-only roster stays a unit test (`TestAddressedWeekTurnsOnKickoff` "no starter with a game"): `everyStarterPast` is the whole rule and the engine path adds nothing for it.
+
+**LOW-3 (DONE).** The turned words live in `next-week.ts NEXT_WEEK` (this week, for week N, in week N, Week N, expected, listed, as of) and `FRONT.turnedPickup`; `week.ts` reads them.
+
+### Gates (fix round 1)
+- web `npm run check` exit 0
+- web `npm run lint` exit 0
+- web `npm run standin && PUBLIC_RUN_ID=latest PUBLIC_RUN_BASE_URL=.runs npm run build` exit 0
+- web `npm test` exit 0 (687 pass, 0 fail)
+- web `node scripts/script-bytes.ts` exit 0 (player page 71,052 B gz of 73,728)
+- api `gofmt -l` empty (exit 0)
+- api `go vet ./...` exit 0
+- api `go build ./...` exit 0
+- api `make check-gen` exit 0
+- api `CI=true TEST_DATABASE_URL=.../lane95_test go test -race -count=1 -p 1 ./...` exit 0
+- `week-turn-shots.ts` CLOCK=monday-night exit 0, CLOCK=saturday exit 0
+
+Deploy pair unchanged in kind: `listed` and `carried_over` are optional; the previous web ignores them and draws the plain word, the new web without them draws the plain word.
