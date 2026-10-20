@@ -270,3 +270,14 @@ export function restAtClock(
 		}
 	};
 }
+
+/** His rest-of-season points a game at `now` in PPR, the API's rule (pergame.go RestOfSeasonPerGame):
+ * his points now over his club's games left now; null with none left or off the run's order. */
+export function restPerGameAtClock(id: string, now: number): number | null {
+	const row = runRead?.formats.find((f) => f.format === 'ppr')?.rows.get(id);
+	if (row === undefined || runRead === null) return null;
+	const slate = runRead.run.slates.find((s) => s.abbr === row.team);
+	const live = rowAtClock(row, now);
+	const left = slate === undefined ? 0 : weeksToPlay(slate, runRead.run.fromWeek, now).length;
+	return live === null || left === 0 ? null : roundTenth(live.points / left);
+}

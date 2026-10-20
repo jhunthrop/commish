@@ -452,18 +452,13 @@
 			border-top: 0;
 		}
 
-		/* On a phone the row under the tiles stacks, its captions read in full. */
-		.basis {
-			grid-template-columns: minmax(0, 1fr);
-		}
-
+		/* On a phone the row under the tiles keeps its three across, as the tiles above it do. */
 		.basis .tile {
-			border-left: 0;
-			border-top: 1px solid var(--line);
+			border-top: 0;
 		}
 
 		.basis .tile:first-child {
-			border-top: 0;
+			border-left: 0;
 		}
 
 		.v {

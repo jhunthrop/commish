@@ -16,9 +16,40 @@ import type {
 import type { components } from '../../src/lib/api/types.ts';
 import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import { inTenths } from './tenths.ts';
+import { TURNED_WEEK, WEEK7_PROJECTION_ARRIVES, turnedLine } from './turn.ts';
 
 type PlayerWeek = components['schemas']['PlayerWeek'];
 type PlayerVerb = components['schemas']['PlayerVerb'];
+type AfterBye = components['schemas']['PlayerAfterBye'];
+
+/** STAND-IN (Lane 100): the fixture holds no week 7 allowances, so the next opponent's rank against
+ * his position after a bye is this one, named in the lane's report. */
+const AFTER_BYE_RANK = 12;
+const RANKED_CLUBS = 32;
+
+/** His club's next game after a bye in week 6, as the API's after_bye gives it (Lane 100, B30): his
+ * week 7 line (data/week7-games.json), no published projection until its Thursday slot. */
+function afterByeOf(line: PlayerLine): AfterBye | null {
+	if (!line.facts.bye) return null;
+	const next = turnedLine(line);
+	if (next.facts.bye) return null;
+	const allowed = {
+		points_a_game: 0,
+		rank: AFTER_BYE_RANK,
+		of: RANKED_CLUBS,
+		position: line.player.position
+	};
+	return {
+		week: TURNED_WEEK,
+		line: {
+			...next,
+			opp_rank: AFTER_BYE_RANK,
+			facts: { ...next.facts, allowed_to_position: allowed }
+		},
+		projection_read_at: null,
+		projection_arrives_at: WEEK7_PROJECTION_ARRIVES
+	};
+}
 
 /** A recorded week sheet's figures (data/week-sheets.json, Lane 72's three). */
 export interface Sheet {
@@ -141,9 +172,11 @@ export function playerWeek(
 	const line = linesOf(r).find((l) => l.player.board_id === id);
 	const team = line?.player.team ?? at?.team;
 	if (team === undefined) return null;
+	const read = inTenths(line ?? built(r, id, team, at?.position ?? ''));
 	return {
 		week: r.lineup.week,
-		line: inTenths(line ?? built(r, id, team, at?.position ?? '')),
+		line: read,
+		after_bye: afterByeOf(read),
 		projection_scoring: r.lineup.projection_scoring,
 		projection_read_at: r.lineup.projection_read_at,
 		projection_previous_read_at: r.lineup.projection_previous_read_at,

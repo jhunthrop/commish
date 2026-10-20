@@ -40,7 +40,14 @@ import { inSeason, noWeek } from './member-week.ts';
 import { inTenths } from './tenths.ts';
 import { FIXTURE_CLOCK_VARIABLE, FIXTURE_MONDAY_CLOCK, fixtureClock } from './clock.ts';
 import { stamped, stateAt } from './game-state.ts';
-import { ORDER_FROM_WEEK, orderAtClock, restAtClock, runIndex, tierAskOf } from './rest-now.ts';
+import {
+	ORDER_FROM_WEEK,
+	orderAtClock,
+	restAtClock,
+	restPerGameAtClock,
+	runIndex,
+	tierAskOf
+} from './rest-now.ts';
 import { CLAIM_FORM_WORDS, HOLD_MS, HOST_ID, espnMoves } from './espn-moves.ts';
 import { weekOrderAnswer, weekPosition, type WeekOrderStates } from './week-order-serve.ts';
 import { tradeChecker } from './trade-check.ts';
@@ -48,6 +55,23 @@ import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
 import { lineupSpent, TURNED_WEEK, turnedLineup, turnedTrades, turnedWaivers } from './turn.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
+
+type PlayerWeekAnswer = components['schemas']['PlayerWeek'];
+
+/** His week with his rest of season at the clock, and his figure a game where the line lacks one (the
+ * API's per-game rule, Lane 100's vs Avg). */
+function withRestAtClock(
+	week: PlayerWeekAnswer,
+	id: string,
+	params: URLSearchParams
+): PlayerWeekAnswer {
+	const perGame = week.line.rest_of_season_per_game ?? restPerGameAtClock(id, now());
+	return {
+		...week,
+		line: { ...week.line, rest_of_season_per_game: perGame },
+		...restAtClock(id, now(), tierAskOf(params))
+	};
+}
 /** The fixture's clock: the real one, or the shots' week clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z,
  * clock.ts FIXTURE_WEEK_CLOCK), so every read stamp agrees with the browser's. */
 const now = fixtureClock(process.env[FIXTURE_CLOCK_VARIABLE]);
@@ -699,8 +723,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const id = publicPlayer[1] ?? '';
 		const week = playerWeek(recorded, id, runIndex.get(id) ?? null, false);
 		if (week === null) send(req, res, HTTP.notFound, 'Nothing here by that id', 'not_found');
-		else
-			send(req, res, HTTP.ok, { ...week, ...restAtClock(id, now(), tierAskOf(url.searchParams)) });
+		else send(req, res, HTTP.ok, withRestAtClock(week, id, url.searchParams));
 		return;
 	}
 	const leaguePlayer = LEAGUE_PLAYER.exec(url.pathname);
@@ -718,8 +741,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			ESPN_MOVES.has(leaguePlayer[1] ?? '')
 		);
 		if (week === null) send(req, res, HTTP.notFound, 'Nothing here by that id', 'not_found');
-		else
-			send(req, res, HTTP.ok, { ...week, ...restAtClock(id, now(), tierAskOf(url.searchParams)) });
+		else send(req, res, HTTP.ok, withRestAtClock(week, id, url.searchParams));
 		return;
 	}
 	const inSeason = IN_SEASON.exec(url.pathname);

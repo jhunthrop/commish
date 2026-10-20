@@ -461,7 +461,8 @@ export function liveBasis(week: PlayerWeek, league: boolean, zone: string, now: 
 			},
 			clock
 		),
-		deltaPart(week.projection_previous_read_at, clock)
+		// On his bye the change's tile gives his next week's Proj: no change is shown to name.
+		afterByeOf(week) === null ? deltaPart(week.projection_previous_read_at, clock) : null
 	]
 		.filter((said) => said !== null)
 		.join(' ');
