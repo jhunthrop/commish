@@ -7,7 +7,7 @@
 		{
 			"state": "playing",
 			"next_kickoff": "2026-10-18T20:05:00.000Z",
-			"to_play": "5 of 16 starters to play",
+			"to_play": "5 to play",
 			"sides": [
 				{
 					"roster_id": 1,
@@ -15,7 +15,9 @@
 					"points_read": true,
 					"projection": 74.7,
 					"starters": 10,
-					"played": 4
+					"played": 4,
+					"projected_final": 73.2,
+					"to_play": "3 to play"
 				},
 				{
 					"roster_id": 7,
@@ -23,14 +25,16 @@
 					"points_read": true,
 					"projection": 98.4,
 					"starters": 10,
-					"played": 7
+					"played": 7,
+					"projected_final": 97.3,
+					"to_play": "2 to play"
 				}
 			]
 		},
 		{
 			"state": "playing",
 			"next_kickoff": "2026-10-19T00:20:00.000Z",
-			"to_play": "3 of 6 starters to play",
+			"to_play": "3 to play",
 			"sides": [
 				{
 					"roster_id": 2,
@@ -38,7 +42,9 @@
 					"points_read": true,
 					"projection": 28.1,
 					"starters": 10,
-					"played": 2
+					"played": 2,
+					"projected_final": 25.5,
+					"to_play": "1 to play"
 				},
 				{
 					"roster_id": 6,
@@ -46,14 +52,16 @@
 					"points_read": true,
 					"projection": 20,
 					"starters": 10,
-					"played": 1
+					"played": 1,
+					"projected_final": null,
+					"to_play": "2 to play"
 				}
 			]
 		},
 		{
 			"state": "playing",
 			"next_kickoff": "2026-10-18T20:05:00.000Z",
-			"to_play": "3 of 6 starters to play",
+			"to_play": "3 to play",
 			"sides": [
 				{
 					"roster_id": 3,
@@ -61,7 +69,9 @@
 					"points_read": true,
 					"projection": 29,
 					"starters": 10,
-					"played": 2
+					"played": 2,
+					"projected_final": 27.7,
+					"to_play": "1 to play"
 				},
 				{
 					"roster_id": 9,
@@ -69,14 +79,16 @@
 					"points_read": true,
 					"projection": 36.5,
 					"starters": 10,
-					"played": 1
+					"played": 1,
+					"projected_final": 36.5,
+					"to_play": "2 to play"
 				}
 			]
 		},
 		{
 			"state": "playing",
 			"next_kickoff": "2026-10-18T20:25:00.000Z",
-			"to_play": "1 of 7 starters to play",
+			"to_play": "1 to play",
 			"sides": [
 				{
 					"roster_id": 4,
@@ -84,7 +96,9 @@
 					"points_read": true,
 					"projection": 39.1,
 					"starters": 10,
-					"played": 3
+					"played": 3,
+					"projected_final": 37.3,
+					"to_play": "2 playing"
 				},
 				{
 					"roster_id": 8,
@@ -92,14 +106,16 @@
 					"points_read": true,
 					"projection": 53.9,
 					"starters": 10,
-					"played": 3
+					"played": 3,
+					"projected_final": 50.2,
+					"to_play": "1 to play"
 				}
 			]
 		},
 		{
 			"state": "playing",
 			"next_kickoff": "2026-10-20T00:15:00.000Z",
-			"to_play": "1 of 5 starters to play",
+			"to_play": "1 to play",
 			"sides": [
 				{
 					"roster_id": 5,
@@ -107,7 +123,9 @@
 					"points_read": true,
 					"projection": 28.4,
 					"starters": 10,
-					"played": 3
+					"played": 3,
+					"projected_final": 26.1,
+					"to_play": "1 playing"
 				},
 				{
 					"roster_id": 10,
@@ -115,14 +133,16 @@
 					"points_read": true,
 					"projection": 22.3,
 					"starters": 10,
-					"played": 1
+					"played": 1,
+					"projected_final": 22.3,
+					"to_play": "1 to play"
 				}
 			]
 		},
 		{
 			"state": "playing",
 			"next_kickoff": "2026-10-20T00:15:00.000Z",
-			"to_play": "1 of 5 starters to play",
+			"to_play": "1 to play",
 			"sides": [
 				{
 					"roster_id": 11,
@@ -130,7 +150,9 @@
 					"points_read": true,
 					"projection": 19.7,
 					"starters": 10,
-					"played": 2
+					"played": 2,
+					"projected_final": 19.7,
+					"to_play": "2 playing"
 				},
 				{
 					"roster_id": 12,
@@ -138,7 +160,9 @@
 					"points_read": true,
 					"projection": 21.8,
 					"starters": 10,
-					"played": 2
+					"played": 2,
+					"projected_final": 21.8,
+					"to_play": "1 to play"
 				}
 			]
 		}

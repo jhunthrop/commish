@@ -54,7 +54,7 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
   | `research-season-week-tue` | `0 8 * 1,2,9-12 2` | America/New_York | `inseason` |
   | `research-season-week-wed` | `0 18 * 1,2,9-12 3` | America/New_York | `inseason` |
   | `research-season-week-thu` | `0 14 * 1,2,9-12 4` | America/New_York | `inseason` |
-  | `research-capture-harvest` | `0 2,7-23 * * *` | America/New_York | `inseason-capture` |
+  | `research-capture-harvest` | `0 2,6-23 * * *` | America/New_York | `inseason-capture` |
 
   `research-nightly-publish` runs every hour because the in-season runs go public after noon UTC, and the web backstop (`web.yml`, 30 past every hour) rebuilds within the hour at any hour. A run made live by hand (`gh workflow run web.yml -f runId=<id>`) must also move `runs/latest.json`, or the next push to main rebuilds the old run.
 

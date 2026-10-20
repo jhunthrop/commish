@@ -14,8 +14,10 @@ calls an hour), so a game is final the hour after it ends.
 for every week nflverse has published: the operator's one-shot for weeks played before the steps
 existed. Idempotent (a re-run writes nothing new), no register trail, each feed's counts printed.
 
-`capture-harvest` also takes, in a kickoff slot's window, the slot week's Tank01 projection, the
-anytime-touchdown market (the weekly round 4's two benchmarks, `pipeline/kickoff_slots.py`) and the
+`capture-harvest` also takes the week ahead's Tank01 projection once a day, on the first pass at or
+after 06:00 Eastern from the day after the previous week's last kickoff until the week's first
+(Lane 97, `pipeline/tank01/projections.py` `daily_capture_due`), and, in a kickoff slot's window, the
+slot week's projection, the anytime-touchdown market (the weekly round 4's two benchmarks, `pipeline/kickoff_slots.py`) and the
 season's dated depth charts again. Last, after the status capture, the hourly week-ahead reads pass
 (Lane 72, `nightly/week_reads.py`): the reads whose status the hour moved (a projection move is the nightly's),
 under the hourly dollar budget; advisory, its own line, never the job's verdict.

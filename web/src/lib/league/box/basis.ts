@@ -5,7 +5,7 @@
  * draw (BasisPart.phone). Pure, tested in basis.test.ts. */
 import { weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { sentenceStart } from '#lib/format/sentence.ts';
-import { lineState, toPlay } from './kickoff.ts';
+import { lineState, pastKickoff, toPlay } from './kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { LeagueHost } from '../api.ts';
 import type { PlayerLine, ProjectionScoring } from '../inseason/api.ts';
@@ -35,8 +35,31 @@ export interface ProjFacts {
 	league: boolean;
 	/** The column's head: Proj on a box score, Wk 6 where the season's Projected sits beside it. */
 	head?: string;
+	/** A row's game has kicked off, so the sentence says its Proj is as of kickoff (Lane 92, B27). */
+	kicked?: boolean;
 	/** The league's platform, named where its rules add what the column does not carry. */
 	host?: LeagueHost;
+}
+
+/** What a game past kickoff keeps (Lane 92, B27), the end of the Proj sentence. */
+export const AS_OF_KICKOFF = 'as of kickoff for a game under way or final';
+
+/** What Proj final is (Lane 92, B22, round 2), said once where a game has kicked off. */
+export const PROJ_FINAL_PART = `${BOX.projFinal} adds the ${BOX.pts} so far and the ${BOX.proj} of the starters still to play, and a starter in play adds the rest of his ${BOX.proj}.`;
+
+/** Why a Proj final is drawn "--" (round 2), said once where one is. */
+export const NO_PROJ_FINAL_PART = `No ${BOX.projFinal} while a starter still to play has no ${BOX.proj}.`;
+
+/** The Proj final's sentences: what it is once a game has kicked off, and why one is "--" where one
+ * is; empty before kickoff. */
+export function projFinalWords(started: boolean, missing: boolean): string {
+	if (!started) return '';
+	return missing ? `${PROJ_FINAL_PART} ${NO_PROJ_FINAL_PART}` : PROJ_FINAL_PART;
+}
+
+/** Any row's game past its kickoff at the page's clock, by the one rule (kickoff.ts). */
+export function anyKicked(lines: readonly PlayerLine[], now: number): boolean {
+	return lines.some(({ facts }) => pastKickoff(facts, now));
 }
 
 /** The tight end's extra a catch the league's rules add, its own sentence (Lane 94 fix round 1: said
@@ -64,8 +87,9 @@ export function projPart(proj: ProjFacts, clock: Clock): string {
 	const whose = whoseScoring(proj, format);
 	const defenses = proj.defense ? ', defenses on default scoring' : '';
 	const when = proj.readAt === null ? 'not in yet' : `read ${stamp(proj.readAt, clock)}`;
+	const kicked = proj.kicked === true ? `, ${AS_OF_KICKOFF}` : '';
 	const bonus = proj.league ? teBonusSentence(proj.scoring.te_bonus, proj.host) : null;
-	const said = `${proj.head ?? BOX.proj} is this week's published projection${whose}${defenses}, ${when}.`;
+	const said = `${proj.head ?? BOX.proj} is this week's published projection${whose}${defenses}, ${when}${kicked}.`;
 	return bonus === null ? said : `${said} ${bonus}`;
 }
 
@@ -176,6 +200,8 @@ export interface BoxBasisFacts {
 	byPlayer: boolean;
 	/** The platform sends the side's own total, which the Matchup's Team row prints (team_total). */
 	teamTotal: boolean;
+	/** A Team row draws its Proj final "--" (no figure from the API while the game is live). */
+	noFinal?: boolean;
 	host: LeagueHost;
 	/** The Lineup's: the read the change counts from, the API's count of the rules our stats lack,
 	 * and its link; null on the Matchup, which draws no evidence columns. */
@@ -191,9 +217,14 @@ export interface BoxBasisFacts {
  * Proj, Pts and the Game cell, the columns it draws. */
 export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): BasisPart[] {
 	const defense = facts.lines.some((l) => l.player.position === 'DEF');
+	const kicked = anyKicked(facts.lines, now);
 	const proj = facts.projection
-		? said(projPart({ ...facts.projection, defense, league: true, host: facts.host }, clock))
+		? said(
+				projPart({ ...facts.projection, defense, league: true, kicked, host: facts.host }, clock)
+			)
 		: [];
+	// What the Team row's small figure is once a game has kicked off (Lane 92, B22).
+	const final = said(projFinalWords(kicked, facts.noFinal === true));
 	const { lineup } = facts;
 	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.
 	const team = lineup === null && facts.teamTotal ? 'platform' : 'rows';
@@ -201,9 +232,16 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	// When a row's Final and its stats land, said while one waits on either (Lane 85).
 	const waiting = kickedOffPartAt(facts.lines, now);
 	if (lineup === null)
-		return [...proj, ...pts, ...said(gamePart(facts.lines, clock, now, 'full')), ...said(waiting)];
+		return [
+			...proj,
+			...final,
+			...pts,
+			...said(gamePart(facts.lines, clock, now, 'full')),
+			...said(waiting)
+		];
 	return [
 		...proj,
+		...final,
 		...said(deltaPart(lineup.previousReadAt, clock), false),
 		...said(gamePart(facts.lines, clock, now, 'full')),
 		// On the Lineup phone the expected score and weather are the decision's facts and keep their

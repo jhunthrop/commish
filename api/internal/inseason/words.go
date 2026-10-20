@@ -346,10 +346,17 @@ func LineupBasis(b OrderBasis) string {
 }
 
 // ToPlayWords is a score bug's count while its game is under way (Lane
-// 85 fix round, M3): the starters with a game this week still to play, of
-// all who have one. A starter on bye is neither.
-func ToPlayWords(toPlay, withGame int) string {
-	return fmt.Sprintf("%d of %d starters to play", toPlay, withGame)
+// 92, B02), never a zero: "3 to play" while any starter with a game is
+// still to come, "2 playing" once none is and some are in play, empty once
+// every one is done (the card is final). A starter on bye is neither.
+func ToPlayWords(toPlay, playing int) string {
+	switch {
+	case toPlay > 0:
+		return fmt.Sprintf("%d to play", toPlay)
+	case playing > 0:
+		return fmt.Sprintf("%d playing", playing)
+	}
+	return ""
 }
 
 // WeekDoneWords is the Lineup's sentence once every starter of the

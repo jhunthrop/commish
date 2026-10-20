@@ -8,8 +8,10 @@ What they record depends on when they run (`research/JOBS.md`, `research-ts/src/
   America/New_York: the freeze must land before Thursday's first kickoff, with the props it was
   measured against, which a 05:00 UTC nightly cannot promise.
 - `capture-harvest`, the provider capture (injuries, news, depth charts, inactives, game lines) into
-  the append-only archive, hourly 07:00 to 23:00 plus 02:00 America/New_York, because game-day
-  inactives and injury moves reach the archive only if something captures them within the hour.
+  the append-only archive, hourly 06:00 to 23:00 plus 02:00 America/New_York, because game-day
+  inactives and injury moves reach the archive only if something captures them within the hour. From
+  the day after a week's last game, the first pass at or after 06:00 each day also reads the week
+  ahead's published projection (Lane 97), so Thursday's 14:00 freeze has that morning's.
 
 Each invocation is one pass; Cloud Scheduler owns the cadence (`infra/README.md`). They replace the
 Vercel cron's `season-week` and `capture-harvest` jobs.

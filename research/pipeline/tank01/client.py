@@ -49,10 +49,14 @@ FailureKind = Literal["unauthorized", "forbidden", "rate_limited", "upstream", "
 
 
 class Tank01Error(ResearchError):
-    def __init__(self, kind: FailureKind, path: str, message: str) -> None:
+    """A provider failure: its kind, the path, and the HTTP status it came with (an `error` envelope
+    is a refusal sent with 200), None when there was no answer to read one from."""
+
+    def __init__(self, kind: FailureKind, path: str, message: str, status: int | None = None) -> None:
         super().__init__(message)
         self.kind: FailureKind = kind
         self.path = path
+        self.status = status
 
 
 def _sleep(seconds: float) -> None:
@@ -88,13 +92,17 @@ class Tank01Client:
 
 def _assert_status(response: HttpResponse, path: str) -> None:
     if response.status == HTTPStatus.UNAUTHORIZED:
-        raise Tank01Error("unauthorized", path, f"Tank01 rejected the API key. Check {API_KEY_ENV}.")
+        raise Tank01Error("unauthorized", path, f"Tank01 rejected the API key. Check {API_KEY_ENV}.", response.status)
     if response.status == HTTPStatus.FORBIDDEN:
-        raise Tank01Error("forbidden", path, "This RapidAPI key is not subscribed to the Tank01 NFL API.")
+        raise Tank01Error(
+            "forbidden", path, "This RapidAPI key is not subscribed to the Tank01 NFL API.", response.status
+        )
     if response.status == HTTPStatus.TOO_MANY_REQUESTS:
-        raise Tank01Error("rate_limited", path, "Tank01 request quota exhausted. Back off and retry later.")
+        raise Tank01Error(
+            "rate_limited", path, "Tank01 request quota exhausted. Back off and retry later.", response.status
+        )
     if not response.ok:
-        raise Tank01Error("upstream", path, f"Tank01 returned HTTP {response.status} for {path}.")
+        raise Tank01Error("upstream", path, f"Tank01 returned HTTP {response.status} for {path}.", response.status)
 
 
 def _envelope_body(response: HttpResponse, path: str) -> object:
@@ -109,7 +117,7 @@ def _envelope_body(response: HttpResponse, path: str) -> object:
         raise Tank01Error("malformed", path, f"Tank01 returned a non-JSON body for {path}.")
     error = parsed.get("error")
     if isinstance(error, str) and error != "":
-        raise Tank01Error("upstream", path, f"Tank01 refused {path}: {error}")
+        raise Tank01Error("upstream", path, f"Tank01 refused {path}: {error}", response.status)
     if "body" not in parsed:
         raise Tank01Error("malformed", path, f"Tank01 returned no body for {path}.")
     body: object = parsed["body"]

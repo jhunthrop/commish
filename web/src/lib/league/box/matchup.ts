@@ -6,6 +6,8 @@ import { gameHead, KICKOFF, linesRead } from './kickoff.ts';
 import type { MatchupSide } from '../api.ts';
 import type { MatchupBoxSide, PlayerLine } from '../inseason/api.ts';
 import {
+	BOX,
+	boxNumber,
 	boxRow,
 	hostRow,
 	positionWord,
@@ -38,6 +40,37 @@ export interface SideRead {
 	landed: boolean;
 	week: number;
 	now: number;
+	/** The game has kicked off (matchupStarted): the Team row's Pts are its big figure. */
+	started: boolean;
+}
+
+/** A side's figures as its score bug prints them. */
+export interface BugTotals {
+	pts: number | null;
+	proj: number | null;
+	final: number | null;
+	/** Where the side's starters stand while the game is under way (the API's to_play), else empty. */
+	toPlay: string;
+}
+
+/** A matchup side's two figures (Lane 92, B22): before the first kickoff its Proj big and nothing
+ * under; from it its Pts big with "Proj final" under, "--" where the API gives none. */
+export function bugFigures(
+	s: Pick<BugTotals, 'pts' | 'proj' | 'final'>,
+	started: boolean
+): { big: string; bigLabel: string; small: string } {
+	if (!started) return { big: boxNumber(s.proj), bigLabel: BOX.proj, small: '' };
+	return {
+		big: boxNumber(s.pts),
+		bigLabel: BOX.pts,
+		small: `${BOX.projFinal} ${boxNumber(s.final)}`
+	};
+}
+
+/** Whether any starter's game has kicked off at the page's clock, by the one rule (kickoff.ts). */
+export function matchupStarted(lines: readonly PlayerLine[], now: number): boolean {
+	const games = lines.flatMap(({ facts }) => (facts.bye || facts.kickoff === null ? [] : [facts]));
+	return games.length > 0 && gameHead(linesRead(games, now), now).state !== 'upcoming';
 }
 
 /** A side's score, the one figure the score bug and the Matchup's Totals row both print (ruling (a),
@@ -71,6 +104,8 @@ export function sideBox(
 			totals: {
 				proj: projTotal(rows),
 				pts: sideScore(rows, box, read.hostTotal),
+				final: box.projected_final ?? null,
+				live: read.started,
 				note: totalsNote(rows, read.landed, read.week)
 			},
 			lines: [...box.starters.map((s) => s.line), ...box.bench],
@@ -85,7 +120,13 @@ export function sideBox(
 	return {
 		starters,
 		bench: [],
-		totals: { proj: null, pts: sideScore(rows, side, read.hostTotal), note: null },
+		totals: {
+			proj: null,
+			pts: sideScore(rows, side, read.hostTotal),
+			final: null,
+			live: read.started,
+			note: null
+		},
 		lines: [],
 		byPlayer: side.player_points,
 		teamTotal: side.team_total

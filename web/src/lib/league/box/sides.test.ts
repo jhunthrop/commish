@@ -61,7 +61,7 @@ const bench = line('Jordan Addison', 'WR', 'MIN', null, { bye: true, opponent: n
 /** A side before kickoff with the week's projection in. */
 /** The fixture week's clock, Saturday noon Central: every Sunday game is still to be played. */
 const NOW = Date.parse(FIXTURE_WEEK_CLOCK);
-const NOT_STARTED = { hostTotal: null, landed: true, week: 6, now: NOW };
+const NOT_STARTED = { hostTotal: null, landed: true, week: 6, now: NOW, started: false };
 
 void test("a side's box is the API's rows in their slots, its projection summed", () => {
 	const side: MatchupSide = {
@@ -271,7 +271,7 @@ function bothScreens(
 			],
 			bench: []
 		},
-		{ hostTotal, landed: true, week: 6, now: NOW },
+		{ hostTotal, landed: true, week: 6, now: NOW, started: false },
 		ZONE
 	);
 	const unchanged = (s: LineupSlot['slot'], l: PlayerLine) => ({
