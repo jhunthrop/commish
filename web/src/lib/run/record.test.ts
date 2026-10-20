@@ -100,15 +100,14 @@ void test('the lead names only the orders drawn, and says we set the order', () 
 	);
 });
 
-void test('Published names the week it starts in a sentence (B04)', () => {
+void test('Published names the week it starts only once a set order kept it (B04, review M3)', () => {
 	const from7 = "From week 7 each week is also graded against the week's published projection.";
 	assert.equal(publishedWords(beforePublished), from7);
+	const promise =
+		"Each week will also be graded against the week's published projection from the first week our order is set with it.";
 	const upcoming = record({ weeks: [gradedWeek(1, false), week(2, null, 'upcoming')] });
-	assert.equal(
-		publishedWords(upcoming),
-		"From week 2 each week is also graded against the week's published projection."
-	);
-	assert.equal(publishedWords(record({})), null);
+	assert.equal(publishedWords(upcoming), promise, 'never the next week, renewed each week');
+	assert.equal(publishedWords(record({})), promise);
 	assert.equal(
 		publishedWords(withPublished),
 		"From week 7 each week is also graded against the week's published projection (Published)."
@@ -128,7 +127,7 @@ void test('the basis defines each measure once and a league replaces the starter
 	]);
 	const league = { starters: 'In your lineup.', benchmark: 'ESPN too.' };
 	assert.deepEqual(recordBasis(run, league).slice(-3), ['In your lineup.', published, 'ESPN too.']);
-	assert.equal(recordBasis(record({})).length, 4, 'no starters or Published sentence with no week');
+	assert.equal(recordBasis(record({})).length, 5, 'no starters sentence with no week graded');
 	assert.match(HELD_OUT_METHOD, /graded where the order was set\.$/u);
 	for (const sentence of [...recordBasis(beforePublished), ...recordBasis(withPublished)]) {
 		assert.doesNotMatch(sentence, bannedPattern());

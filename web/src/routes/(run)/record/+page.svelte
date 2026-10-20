@@ -27,10 +27,10 @@
 		type RecordFigure
 	} from '#lib/run/record.ts';
 	import {
-		countable,
-		inLineup,
+		honestWords,
+		pageLineup,
 		leagueBasis,
-		lineupOf,
+		shownRecord,
 		weekSentence,
 		type LeagueRecord,
 		type PlayersByWeek
@@ -58,19 +58,17 @@
 		const id = leagueId;
 		leagueRecord = null;
 		if (id === null) return;
-		void import('#lib/run/record-league-api.ts').then(async (api) => {
+		void import('#lib/league/record-api.ts').then(async (api) => {
 			const [read, placed] = await Promise.all([api.readLeagueRecord(id), api.readRecordPlayers()]);
 			if (leagueId !== id) return;
 			players = placed;
 			leagueRecord = read;
 		});
 	});
-	const counted = $derived(leagueRecord !== null && countable(runRecord, players));
-	const record = $derived(
-		leagueRecord !== null && counted
-			? inLineup(runRecord, players, lineupOf(leagueRecord))
-			: runRecord
-	);
+	/** The one lineup every starters figure and sentence on the page reads (fix round 1). */
+	const lineup = $derived(pageLineup(runRecord, leagueRecord, players));
+	const record = $derived(shownRecord(runRecord, players, lineup));
+	const honest = $derived(honestWords(runRecord, record, lineup));
 	const leagueWeeks = $derived(leagueRecord?.weeks ?? []);
 	/** The record is graded in one scoring: with a league selected, the page says the league's too. */
 	const note = $derived.by(() => {
@@ -113,7 +111,7 @@
 	const sources = $derived(recordSources(record));
 	const showPublished = $derived(publishedDrawn(record));
 	const basis = $derived(
-		recordBasis(record, leagueRecord === null ? null : leagueBasis(leagueRecord, counted)).map(
+		recordBasis(record, leagueRecord === null ? null : leagueBasis(leagueRecord, lineup)).map(
 			(text) => ({ text, phone: true })
 		)
 	);
@@ -164,7 +162,7 @@
 					{/each}
 				</div>
 				{#if gaps}<p class="scale">{gaps}</p>{/if}
-				{#if record.honest}<p class="honest">{record.honest}</p>{/if}
+				{#if honest}<p class="honest">{honest}</p>{/if}
 			</section>
 		{:else}
 			<Panel padding="md">

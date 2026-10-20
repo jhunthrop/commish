@@ -6,6 +6,7 @@ import { fixed, plural } from '#lib/format/number.ts';
 import { listWords } from '#lib/format/list.ts';
 import type { components } from '#lib/api/types.ts';
 import {
+	STANDARD_LINEUP,
 	lineupFor,
 	playersOf,
 	startersRight,
@@ -80,6 +81,8 @@ function toDateIn(record: RunRecord, weeks: RunRecord['weeks']): RecordLine[] {
 				},
 				{ right: 0, of: 0 }
 			);
+		const again = (score: Score | null, pick: (l: RecordLine) => Score | null): Score | null =>
+			score === null ? null : recounted(score, sum(pick));
 		return {
 			...line,
 			ours: recounted(
@@ -90,15 +93,64 @@ function toDateIn(record: RunRecord, weeks: RunRecord['weeks']): RecordLine[] {
 				line.adp,
 				sum((l) => l.adp)
 			),
-			published:
-				line.published === null
-					? null
-					: recounted(
-							line.published,
-							sum((l) => l.published)
-						)
+			published: again(line.published, (l) => l.published),
+			// Ours over the weeks that graded the published projection, beside it (review 66j N1).
+			oursOnPublished: again(line.oursOnPublished, (l) => (l.published === null ? null : l.ours))
 		};
 	});
+}
+
+/** The lineup a page counts starters right in (Lane 93 fix round 1): the league's own once its
+ * record and the run's graded players are read, else the run's standard one. The tiles, the table,
+ * the basis and the honest sentence all read this one answer. */
+export interface PageLineup {
+	lineup: StartingLineup;
+	/** True when it is the league's own. */
+	league: boolean;
+}
+
+export function pageLineup(
+	record: RunRecord,
+	league: LeagueRecord | null,
+	players: PlayersByWeek
+): PageLineup {
+	return league !== null && countable(record, players)
+		? { lineup: lineupOf(league), league: true }
+		: { lineup: STANDARD_LINEUP, league: false };
+}
+
+/** The record as the page shows it in its lineup: the run's own in the standard one. */
+export function shownRecord(
+	record: RunRecord,
+	players: PlayersByWeek,
+	shown: PageLineup
+): RunRecord {
+	return shown.league ? inLineup(record, players, shown.lineup) : record;
+}
+
+/** The starters clause the honest sentence says when a benchmark had more starters right than ours,
+ * on the same starters; null when ours had as many. */
+function startersClause(name: string, ours: Score | null, theirs: Score | null): string | null {
+	if (ours === null || theirs === null) return null;
+	if (theirs.starters <= ours.starters || theirs.startersOf !== ours.startersOf) return null;
+	return `${name} had more of the week's starters right, ${String(theirs.starters)} of ${String(theirs.startersOf)} against our ${String(ours.starters)}.`;
+}
+
+/** The honest sentence in the page's lineup: the run's own in the standard lineup; in a league's,
+ * the run's clauses on order matched and places off, and the starters clauses said again from the
+ * league's counts, so the sentence and the tiles above it never disagree. */
+export function honestWords(run: RunRecord, shown: RunRecord, lineup: PageLineup): string | null {
+	if (!lineup.league) return run.honest;
+	const kept = (run.honest ?? '')
+		.split(/(?<=\.)\s+/u)
+		.filter((sentence) => sentence !== '' && !sentence.includes('starters right'));
+	const all = shown.toDate.find((line) => line.position === 'All');
+	const starters = [
+		startersClause('ADP', all?.ours ?? null, all?.adp ?? null),
+		startersClause('The published projection', all?.oursOnPublished ?? null, all?.published ?? null)
+	].filter((clause): clause is string => clause !== null);
+	const said = [...kept, ...starters];
+	return said.length === 0 ? null : said.join(' ');
 }
 
 /** The record with every graded line's starters counted in the league's lineup, the season to date
@@ -135,10 +187,14 @@ export function lineupWords(lineup: StartingLineup): string {
 
 /** The league's own basis sentences: what starters right counts in its lineup, and its own benchmark
  * on an ESPN league. */
-export function leagueBasis(record: LeagueRecord, counted: boolean): LeagueBasis {
-	const lineup = lineupOf(record);
-	const starters = counted
-		? `Starters right counts your league's lineup, ${lineupWords(lineup)} in ${plural(lineup.teams, 'team')}, and how many of the week's starters there the order also put there. Kickers and defenses are not graded.`
+export function leagueBasis(record: LeagueRecord, shown: PageLineup): LeagueBasis {
+	const { lineup } = shown;
+	const unGraded =
+		lineup.k + lineup.def > 0
+			? ' Its kickers and defenses are not counted: the record grades neither in season.'
+			: '';
+	const starters = shown.league
+		? `Starters right counts your league's lineup, ${lineupWords(lineup)} across ${plural(lineup.teams, 'team')}, and how many of the week's starters there the order also put there.${unGraded}`
 		: null;
 	const benchmark =
 		record.host === 'espn'

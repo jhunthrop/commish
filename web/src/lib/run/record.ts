@@ -71,7 +71,7 @@ export const RECORD_WORDS = {
 	noneSet: 'weeks graded. Our first order is set before the first kickoff',
 	ofSet: (frozen: number) => `of ${plural(frozen, 'week')} set graded`,
 	/** The front card's second figure (B03). */
-	frontStarters: 'Starters right, ours over the same weeks'
+	frontStarters: (adp: string) => `Starters right, ours over the same weeks. ${adp}.`
 } as const;
 
 /** The played weeks and how many of them are graded: a week is played once its stats are in or its
@@ -369,20 +369,18 @@ export function recordLead(record: RunRecord, scoring: string): string {
 }
 
 /** The first week the published projection is graded from: the register's first week that kept it,
- * else the next week to be set, null when no week is left to set. */
+ * null while no set order has (review M3). */
 export function publishedFrom(record: RunRecord): number | null {
-	return (
-		record.publishedFromWeek ??
-		record.weeks.find((week) => week.status === 'upcoming')?.week ??
-		null
-	);
+	return record.publishedFromWeek;
 }
 
-/** The published projection's basis, naming the week it starts (B04): "From week 7 each week is also
- * graded against the week's published projection." */
-export function publishedWords(record: RunRecord): string | null {
+/** The published projection's basis (B04, review M3): the week it starts, named only once a set order
+ * has kept it, "From week 7 each week is also graded against the week's published projection."; before
+ * that a promise with no week in it, never one renewed each week. */
+export function publishedWords(record: RunRecord): string {
 	const from = publishedFrom(record);
-	if (from === null) return null;
+	if (from === null)
+		return "Each week will also be graded against the week's published projection from the first week our order is set with it.";
 	const named = publishedDrawn(record) ? ' (Published)' : '';
 	return `From week ${String(from)} each week is also graded against the week's published projection${named}.`;
 }

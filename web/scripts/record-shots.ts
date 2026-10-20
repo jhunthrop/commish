@@ -62,7 +62,11 @@ async function record(who: Who, width: number): Promise<void> {
 	has(main, 'Weeks 3 to 5 were not set before kickoff, so they cannot be graded.', where);
 	has(main, 'Week 6 grades Wednesday when the stats land.', where);
 	has(main, 'Places off is the average number of places', where);
-	has(main, 'From week 7 each week is also graded', where);
+	has(
+		main,
+		"Each week will also be graded against the week's published projection from the first week",
+		where
+	);
 	lacks(main, /Rates print|froze|freeze|one provider/u, where);
 	if (width > PHONE_MAX) {
 		has(main, 'Set Tue Sep 8, graded Tue Oct 13', where);
@@ -73,8 +77,16 @@ async function record(who: Who, width: number): Promise<void> {
 	const axis = await page.locator('main .chart text.axis').allTextContents();
 	if (axis.includes('18')) faults.push(`${where}: the chart draws an 18-week axis`);
 	if (who === 'signed-out') has(main, 'Starters right counts a standard 12-team lineup', where);
-	else
-		has(main, "Starters right counts your league's lineup, QB, 2 RB, 2 WR, TE and a flex", where);
+	else {
+		// Fix round 1: every starters figure and sentence on a league page reads the league's lineup.
+		has(
+			main,
+			"Starters right counts your league's lineup, QB, 2 RB, 2 WR, TE and a flex across 12 teams",
+			where
+		);
+		has(main, "ADP had more of the week's starters right, 107 of 168 against our 101.", where);
+		lacks(main, /standard lineup|standard 12-team/u, where);
+	}
 	if (who === 'espn') {
 		has(
 			main,

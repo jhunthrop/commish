@@ -4,8 +4,8 @@
 import { PUBLIC_API_URL } from '$app/env/public';
 import { resolve } from '$app/paths';
 import { apiClient } from '#lib/api/client.ts';
-import { placedPlayerSchema } from './schema.ts';
-import type { LeagueRecord, PlayersByWeek } from './record-league.ts';
+import { placedPlayerSchema } from '#lib/run/schema.ts';
+import type { LeagueRecord, PlayersByWeek } from '#lib/run/record-league.ts';
 import { z } from 'zod';
 
 const client = apiClient(PUBLIC_API_URL);

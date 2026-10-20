@@ -173,7 +173,7 @@
 							<Figure
 								value={headline.starters.value}
 								size="lg"
-								caption="{RECORD_WORDS.frontStarters}. {headline.starters.caption}."
+								caption={RECORD_WORDS.frontStarters(headline.starters.caption)}
 							/>
 						{/if}
 					</div>
