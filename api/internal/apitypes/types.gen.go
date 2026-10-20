@@ -720,6 +720,24 @@ func (e LeaguePhase) Valid() bool {
 	}
 }
 
+// Defines values for LeagueTermsPlayoffSeeds.
+const (
+	LeagueTermsPlayoffSeedsPoints LeagueTermsPlayoffSeeds = "points"
+	LeagueTermsPlayoffSeedsRecord LeagueTermsPlayoffSeeds = "record"
+)
+
+// Valid indicates whether the value is a known member of the LeagueTermsPlayoffSeeds enum.
+func (e LeagueTermsPlayoffSeeds) Valid() bool {
+	switch e {
+	case LeagueTermsPlayoffSeedsPoints:
+		return true
+	case LeagueTermsPlayoffSeedsRecord:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LeagueTermsWaivers.
 const (
 	LeagueTermsWaiversBudget LeagueTermsWaivers = "budget"
@@ -2750,6 +2768,9 @@ type LeagueTerms struct {
 	// HostSettingsUrl the host's page for the league's settings
 	HostSettingsUrl *string `json:"host_settings_url"`
 
+	// PlayoffSeeds how the host's rules seed the playoffs, seed by seed (FFPC's "Seed 1) Team with best regular season Record, Seed 2) Team with highest point total"); absent or empty where the host states no seeding
+	PlayoffSeeds *[]LeagueTermsPlayoffSeeds `json:"playoff_seeds,omitempty"`
+
 	// PlayoffTeams the teams that make the playoffs
 	PlayoffTeams *int `json:"playoff_teams"`
 
@@ -2774,6 +2795,9 @@ type LeagueTerms struct {
 	// Waivers claims carry a bid from a season budget, or run in a waiver order; null where the host does not say
 	Waivers *LeagueTermsWaivers `json:"waivers"`
 }
+
+// LeagueTermsPlayoffSeeds defines model for LeagueTerms.PlayoffSeeds.
+type LeagueTermsPlayoffSeeds string
 
 // LeagueTermsWaivers claims carry a bid from a season budget, or run in a waiver order; null where the host does not say
 type LeagueTermsWaivers string
@@ -3451,6 +3475,9 @@ type ProjectionScoring struct {
 
 	// LeagueOwn the league scores exactly as format
 	LeagueOwn bool `json:"league_own"`
+
+	// TeBonus the extra points the league's rules give a tight end's catch over format (FFPC's 0.5), which the published projection does not carry; absent where the league gives none
+	TeBonus *float64 `json:"te_bonus,omitempty"`
 }
 
 // ProjectionScoringFormat defines model for ProjectionScoring.Format.

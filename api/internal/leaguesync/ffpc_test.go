@@ -57,6 +57,37 @@ func fixtureLeagueRead(t *testing.T) ffpc.League {
 	return l
 }
 
+// The standings are FFPC's own page (Lane 94, B21): the member's 2-3 is
+// FFPC's record, never another league's, with FFPC's points against and
+// streak; and the rules' four seeds, by record and points in turn, are
+// the playoffs' terms, weeks 13 to 14, with no cut by record alone.
+func TestFFPCStandingsAndPlayoffsAsFFPCStatesThem(t *testing.T) {
+	snap := ffpcSnapshot(fixtureLeagueRead(t), time.Date(2026, 10, 13, 14, 0, 0, 0, time.UTC), 6)
+	me, ok := snap.TeamByRoster(11)
+	if !ok || me.Wins != 2 || me.Losses != 3 || me.PointsFor != 598.7 || me.PointsAgainst == nil || *me.PointsAgainst != 784.9 || me.Streak != "W1" {
+		t.Fatalf("my standing %+v", me)
+	}
+	top, _ := snap.TeamByRoster(3)
+	if top.Wins != 4 || top.Streak != "W4" || top.PointsAgainst == nil || *top.PointsAgainst != 655.25 {
+		t.Fatalf("the leader %+v", top)
+	}
+	got := terms(snap)
+	seeds := []apitypes.LeagueTermsPlayoffSeeds{"record", "points", "record", "points"}
+	if got.PlayoffSeeds == nil || !slices.Equal(*got.PlayoffSeeds, seeds) {
+		t.Fatalf("seeds %v", got.PlayoffSeeds)
+	}
+	if got.PlayoffWeeks == nil || got.PlayoffWeeks.First != 13 || got.PlayoffWeeks.Last != 14 {
+		t.Fatalf("playoff weeks %+v", got.PlayoffWeeks)
+	}
+	if got.PlayoffTeams != nil {
+		t.Fatalf("a field seeded on points too draws no cut by record, got %d teams", *got.PlayoffTeams)
+	}
+	allRecord := ffpcTerms(ffpc.Rules{PlayoffStartWeek: 15, PlayoffLastWeek: 17, Seeds: []string{ffpc.SeedRecord, ffpc.SeedRecord}})
+	if allRecord.PlayoffTeams != 2 || len(allRecord.Seeds) != 2 {
+		t.Fatalf("a field seeded on record alone %+v", allRecord)
+	}
+}
+
 func TestFFPCSnapshotFromTheFixtures(t *testing.T) {
 	now := time.Date(2026, 10, 13, 14, 0, 0, 0, time.UTC)
 	snap := ffpcSnapshot(fixtureLeagueRead(t), now, 6)

@@ -59,6 +59,9 @@ func TestProjectionScoringSaysWhoseScoringItIs(t *testing.T) {
 	custom := func(r apitypes.ScoringRules) apitypes.Scoring { return apitypes.Scoring{Custom: &r} }
 	sixPoint := scoring.PresetRules(apitypes.ScoringPresetHalfPpr)
 	sixPoint.PointsPerPassingTouchdown = 6
+	tePremium := scoring.PresetRules(apitypes.ScoringPresetPpr)
+	tePremium.TeReceptionBonus = 0.5
+	half := 0.5
 	cases := []struct {
 		name    string
 		scoring apitypes.Scoring
@@ -70,11 +73,22 @@ func TestProjectionScoringSaysWhoseScoringItIs(t *testing.T) {
 		{"a tight end premium", preset(apitypes.ScoringPresetTePremium), apitypes.ProjectionScoring{Format: apitypes.ProjectionScoringFormatPpr, LeagueOwn: false}},
 		{"rules equal to PPR", custom(scoring.PresetRules(apitypes.ScoringPresetPpr)), apitypes.ProjectionScoring{Format: apitypes.ProjectionScoringFormatPpr, LeagueOwn: true}},
 		{"six-point passing, half a catch", custom(sixPoint), apitypes.ProjectionScoring{Format: apitypes.ProjectionScoringFormatHalfPpr, LeagueOwn: false}},
+		// FFPC's rules: PPR with half a point more a tight end's catch, said beside the PPR column.
+		{"PPR and a tight end's half point", custom(tePremium), apitypes.ProjectionScoring{Format: apitypes.ProjectionScoringFormatPpr, LeagueOwn: false, TeBonus: &half}},
+	}
+	same := func(a, b apitypes.ProjectionScoring) bool {
+		bonus := func(p *float64) float64 {
+			if p == nil {
+				return -1
+			}
+			return *p
+		}
+		return a.Format == b.Format && a.LeagueOwn == b.LeagueOwn && bonus(a.TeBonus) == bonus(b.TeBonus)
 	}
 	for _, c := range cases {
 		settings := apitypes.LeagueSettings{Scoring: c.scoring}
 		like, _ := leaguesync.LeagueScoring(&settings, nil, false)
-		if got := projectionScoring(settings, like); got != c.want {
+		if got := projectionScoring(settings, like); !same(got, c.want) {
 			t.Errorf("%s: %+v, want %+v", c.name, got, c.want)
 		}
 	}

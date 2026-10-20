@@ -462,7 +462,7 @@
 						/>
 					{/if}
 					<div class="split" class:alone={summary === null}>
-						<Standings {rows} terms={sync.terms} projected={scoreboard !== null} />
+						<Standings {rows} terms={sync.terms} host={sync.host} projected={scoreboard !== null} />
 						{#if summary && team}
 							<LineupSummary
 								team={team.name}
@@ -491,7 +491,7 @@
 							: sectionHref('mock')}
 						{now}
 					/>
-					<Standings {rows} terms={sync.terms} projected={false} />
+					<Standings {rows} terms={sync.terms} host={sync.host} projected={false} />
 					{#if boardBasis}<p class="basis-line">{boardBasis}</p>{/if}
 					<div class="grid">
 						{#if drafted}

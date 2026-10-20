@@ -4,11 +4,12 @@
  * game, the rules our stats lack) with these and hides the ones about columns its phone does not
  * draw (BasisPart.phone). Pure, tested in basis.test.ts. */
 import { weekdayTime, zoneWord } from '#lib/format/clock.ts';
+import { sentenceStart } from '#lib/format/sentence.ts';
 import { lineState, pastKickoff, toPlay } from './kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { LeagueHost } from '../api.ts';
 import type { PlayerLine, ProjectionScoring } from '../inseason/api.ts';
-import { hostWords } from '../names.ts';
+import { hostWords, nearestRules, rulesOwner } from '../names.ts';
 import { BOX, FORMAT_WORDS, expectedWords, factsReadAt, weatherCell } from './box.ts';
 
 export type { BasisPart };
@@ -36,13 +37,15 @@ export interface ProjFacts {
 	head?: string;
 	/** A row's game has kicked off, so the sentence says its Proj is as of kickoff (Lane 92, B27). */
 	kicked?: boolean;
+	/** The league's platform, named where its rules add what the column does not carry. */
+	host?: LeagueHost;
 }
 
 /** What a game past kickoff keeps (Lane 92, B27), the end of the Proj sentence. */
 export const AS_OF_KICKOFF = 'as of kickoff for a game under way or final';
 
 /** What Proj final is (Lane 92, B22, round 2), said once where a game has kicked off. */
-export const PROJ_FINAL_PART = `${BOX.projFinal} adds the ${BOX.pts} so far, the rest of his ${BOX.proj} for a starter in play, and the ${BOX.proj} of the starters still to play.`;
+export const PROJ_FINAL_PART = `${BOX.projFinal} adds the ${BOX.pts} so far and the ${BOX.proj} of the starters still to play, and a starter in play adds the rest of his ${BOX.proj}.`;
 
 /** Why a Proj final is drawn "--" (round 2), said once where one is. */
 export const NO_PROJ_FINAL_PART = `No ${BOX.projFinal} while a starter still to play has no ${BOX.proj}.`;
@@ -59,18 +62,35 @@ export function anyKicked(lines: readonly PlayerLine[], now: number): boolean {
 	return lines.some(({ facts }) => pastKickoff(facts, now));
 }
 
-/** "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm." */
+/** The tight end's extra a catch the league's rules add, its own sentence (Lane 94 fix round 1: said
+ * beside "nearest", never as the only difference), credited to whoever sets the rules: "FFPC adds 0.5
+ * a catch for TEs.", "Your league adds 0.5 a catch for TEs.", null without one. */
+export function teBonusSentence(bonus: number | undefined, host?: LeagueHost): string | null {
+	if (bonus === undefined) return null;
+	return `${sentenceStart(rulesOwner(host))} adds ${String(bonus)} a catch for TEs.`;
+}
+
+/** The figures' scoring against the league's: its own, or the column shown nearest its rules
+ * (Lane 94 ruling: "PPR shown, nearest FFPC's rules" where the rules add a tight end's extra). */
+function whoseScoring(proj: ProjFacts, format: string): string {
+	if (!proj.league) return ` in ${format}`;
+	if (proj.scoring.league_own) return ' on your rules';
+	if (proj.scoring.te_bonus === undefined) return `, ${format} nearest your rules`;
+	return `, ${format} shown, ${nearestRules(proj.host)}`;
+}
+
+/** "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm.", or for
+ * FFPC's rules "..., PPR shown, nearest FFPC's rules, read Mon 6:00 pm. FFPC adds 0.5 a catch for
+ * TEs." */
 export function projPart(proj: ProjFacts, clock: Clock): string {
 	const format = FORMAT_WORDS[proj.scoring.format];
-	const whose = !proj.league
-		? ` in ${format}`
-		: proj.scoring.league_own
-			? ' on your rules'
-			: `, ${format} nearest your rules`;
+	const whose = whoseScoring(proj, format);
 	const defenses = proj.defense ? ', defenses on default scoring' : '';
 	const when = proj.readAt === null ? 'not in yet' : `read ${stamp(proj.readAt, clock)}`;
 	const kicked = proj.kicked === true ? `, ${AS_OF_KICKOFF}` : '';
-	return `${proj.head ?? BOX.proj} is this week's published projection${whose}${defenses}, ${when}${kicked}.`;
+	const bonus = proj.league ? teBonusSentence(proj.scoring.te_bonus, proj.host) : null;
+	const said = `${proj.head ?? BOX.proj} is this week's published projection${whose}${defenses}, ${when}${kicked}.`;
+	return bonus === null ? said : `${said} ${bonus}`;
 }
 
 /** "Δ Proj is its change since Thu 9:00 pm.", null without a read before. */
@@ -199,7 +219,9 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	const defense = facts.lines.some((l) => l.player.position === 'DEF');
 	const kicked = anyKicked(facts.lines, now);
 	const proj = facts.projection
-		? said(projPart({ ...facts.projection, defense, league: true, kicked }, clock))
+		? said(
+				projPart({ ...facts.projection, defense, league: true, kicked, host: facts.host }, clock)
+			)
 		: [];
 	// What the Team row's small figure is once a game has kicked off (Lane 92, B22).
 	const final = said(projFinalWords(kicked, facts.noFinal === true));

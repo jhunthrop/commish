@@ -21,7 +21,19 @@ func projectionScoring(saved apitypes.LeagueSettings, like apitypes.ScoringPrese
 	case apitypes.ScoringPresetStandard:
 		format = apitypes.ProjectionScoringFormatStandard
 	}
-	return apitypes.ProjectionScoring{Format: format, LeagueOwn: ownScoring(saved.Scoring, like)}
+	return apitypes.ProjectionScoring{Format: format, LeagueOwn: ownScoring(saved.Scoring, like), TeBonus: teBonus(saved.Scoring)}
+}
+
+// teBonus is the extra a tight end's catch scores in the league's own
+// rules (FFPC's 0.5), which no published column carries, so a screen
+// says it beside the column (Lane 94, B26); nil where the rules give
+// none or the league has no rules of its own.
+func teBonus(s apitypes.Scoring) *float64 {
+	if s.Custom == nil || s.Custom.TeReceptionBonus <= 0 {
+		return nil
+	}
+	bonus := s.Custom.TeReceptionBonus
+	return &bonus
 }
 
 // ownScoring is whether a league scores exactly as the preset it is read

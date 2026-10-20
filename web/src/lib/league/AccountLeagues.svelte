@@ -8,6 +8,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { ApiError, leagueApi, type AttachedLeague } from './api.ts';
+	import type { AttachedList } from './attached-list.svelte.ts';
 	import { followedCount, followingWords } from './follow-many.ts';
 	import { followedName } from './model.ts';
 	import { ATTACHED_WORDS, attachedRow } from './attached-rows.ts';
@@ -16,22 +17,22 @@
 	interface Props {
 		/** What the account may use (/me, Can): many_leagues follows more than one league. */
 		features: readonly Feature[];
+		/** The account's leagues, read once by the Account room for this table and the Platforms
+		 * table both (Lane 94 fix round 2). */
+		list: AttachedList;
 	}
 
-	let { features }: Props = $props();
+	let { features, list }: Props = $props();
 
 	/** The account's leagues on other hosts, each with a quiet way to stop following it and, for a
-	 * few seconds after, to take that back. It reads its own list, so the account page's other reads
-	 * never wait on it. A detached league keeps its saved settings either way. */
-	let leagues = $state<AttachedLeague[] | null>(null);
-	/** The list's clock: the instant it was read, set with the list, so each last read is said against
-	 * it. No row draws before the list lands. */
-	let now = $state(new Date(0));
-	let failed = $state(false);
+	 * few seconds after, to take that back. A detached league keeps its saved settings either way.
+	 * No row draws before the list lands; each last read is said against the list's own clock. */
+	const leagues = $derived(list.leagues);
+	const now = $derived(new Date(list.readAt));
+	const failed = $derived(list.failed);
+	const detached = $derived(new Set(list.detached));
 	let busy = $state<string | null>(null);
 	let problem = $state<string | null>(null);
-	/** Leagues detached a moment ago, still on the list with their undo. */
-	let detached = $state<ReadonlySet<string>>(new Set());
 
 	/** How many leagues were just followed, when the attach page sent the reader here to see them. */
 	let followed = $state<number | null>(null);
@@ -45,18 +46,7 @@
 	onMount(() => {
 		// Read in the browser only: the account page's shell is prerendered.
 		followed = followedCount(new URL(window.location.href).searchParams);
-		leagueApi
-			.attached()
-			.then((list) => {
-				now = new Date();
-				leagues = list;
-			})
-			.catch(() => (failed = true));
 	});
-
-	function without(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
-		return new Set([...set].filter((x) => x !== id));
-	}
 
 	async function act(id: string, step: () => Promise<void>): Promise<void> {
 		busy = id;
@@ -73,20 +63,16 @@
 	function detach(league: AttachedLeague): Promise<void> {
 		return act(league.id, async () => {
 			await leagueApi.detach(league.id);
-			detached = new Set([...detached, league.id]);
+			list.markDetached(league.id);
 			void siteContext.refresh();
-			setTimeout(() => {
-				if (!detached.has(league.id)) return;
-				detached = without(detached, league.id);
-				leagues = (leagues ?? []).filter((l) => l.id !== league.id);
-			}, UNDO_MS);
+			setTimeout(() => list.drop(league.id), UNDO_MS);
 		});
 	}
 
 	function undo(league: AttachedLeague): Promise<void> {
 		return act(league.id, async () => {
 			await leagueApi.restore(league.id);
-			detached = without(detached, league.id);
+			list.unmarkDetached(league.id);
 			void siteContext.refresh();
 		});
 	}
