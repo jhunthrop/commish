@@ -3980,6 +3980,13 @@ components:
       properties:
         format: { type: string, enum: [ppr, half_ppr, standard] }
         league_own: { type: boolean, description: the league scores exactly as format, every rule alike }
+        te_bonus:
+          type: number
+          format: double
+          description: >-
+            the extra points the league's rules give a tight end's catch over format (FFPC's 0.5), which the
+            published projection does not carry; absent where the league gives none
+
     ScoreboardSide:
       type: object
       required: [roster_id, points, points_read, projection, starters, played]
@@ -4947,6 +4954,12 @@ components:
             settings print no figure for them, never ours as the league's
           items: { type: string }
         host_settings_url: { type: string, nullable: true, description: the host's page for the league's settings, null where we know none }
+        playoff_seeds:
+          type: array
+          description: >-
+            how the host's rules seed the playoffs, seed by seed (FFPC's "Seed 1) Team with best regular season
+            Record, Seed 2) Team with highest point total"); absent or empty where the host states no seeding
+          items: { type: string, enum: [record, points] }
     PlayoffWeeks:
       type: object
       description: the playoffs' first and last week

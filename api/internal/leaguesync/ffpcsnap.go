@@ -42,6 +42,12 @@ func ffpcSnapshot(l ffpc.League, now time.Time, week int) Snapshot {
 		t := team(s.TeamID)
 		t.Name, t.Owner = s.Name, owners[s.Name]
 		t.Wins, t.Losses, t.Ties, t.PointsFor = s.Wins, s.Losses, s.Ties, round2(s.PointsFor)
+		// The standings page's own PA and streak, where it prints them.
+		if s.HasAgainst {
+			against := round2(s.PointsAgainst)
+			t.PointsAgainst = &against
+		}
+		t.Streak = s.Streak
 	}
 	for _, r := range l.Rosters {
 		t := team(r.TeamID)
@@ -87,6 +93,7 @@ func ffpcSnapshot(l ffpc.League, now time.Time, week int) Snapshot {
 		snap.Scoring = ffpcScoring(*l.Rules)
 		snap.Shape = ffpcShape(*l.Rules, len(snap.Teams))
 		snap.Calendar.PlayoffStartWeek = l.Rules.PlayoffStartWeek
+		snap.Terms = ffpcTerms(*l.Rules)
 	}
 	// The league pages do not state the draft (its board does, read by
 	// FFPC.draftStatus): until it is read, anyone rostered has drafted.

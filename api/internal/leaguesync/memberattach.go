@@ -46,6 +46,8 @@ func wordsFor(host string) memberWords {
 	}
 	if host == HostFFPC {
 		w.attachFirst = "Connect FFPC first. Sign in to FFPC above."
+		// FFPC is signed in to, never connected (Lane 94, the one state word).
+		w.noReader = "Sign in to FFPC to keep this league in sync."
 		w.again = "FFPC signed you out. Sign in to FFPC again to keep reading your league."
 	}
 	return w

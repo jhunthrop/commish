@@ -13,8 +13,9 @@ import type {
 	Scoreboard,
 	WeekDoneState
 } from '../inseason/api.ts';
-import { hostWords } from '../names.ts';
+import { hostWords, nearestRules } from '../names.ts';
 import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
+import { teBonusSentence } from '../box/basis.ts';
 
 type ScoreboardGame = Scoreboard['games'][number];
 type ScoringRules = components['schemas']['ScoringRules'];
@@ -314,6 +315,45 @@ export function playoffRule(
 	};
 }
 
+type Seed = NonNullable<LeagueTerms['playoff_seeds']>[number];
+
+/** The platform's seeds, none where it states none (an API before Lane 94 sends none). */
+function seedsOf(terms: Pick<LeagueTerms, 'playoff_seeds'>): readonly Seed[] {
+	return terms.playoff_seeds ?? [];
+}
+
+/** Seed numbers in a sentence: "1", "1 and 3", "1, 3 and 5". */
+function seedNumbers(seeds: readonly number[]): string {
+	const words = seeds.map(String);
+	const last = words.pop() ?? '';
+	return words.length === 0 ? last : `${words.join(', ')} and ${last}`;
+}
+
+const SEED_WORDS: Readonly<Record<Seed, string>> = { record: 'on record', points: 'on points' };
+
+/** How the platform seeds its playoffs where it states it seed by seed and not on record alone
+ * (FFPC, Lane 94 B21), printed under the standings in place of a cut no row sits at: "FFPC seeds 4
+ * for the playoffs, weeks 13 to 14: 1 and 3 on record, 2 and 4 on points." Null otherwise; a field
+ * seeded on record alone is the cut under the standings. */
+export function seedingWords(
+	terms: Pick<LeagueTerms, 'playoff_seeds' | 'playoff_weeks'>,
+	host: LeagueHost
+): string | null {
+	const seeds = seedsOf(terms);
+	if (!seeds.includes('points')) return null;
+	const by = (['record', 'points'] as const).flatMap((kind) => {
+		const numbers = seeds.flatMap((s, i) => (s === kind ? [i + 1] : []));
+		return numbers.length === 0 ? [] : [`${seedNumbers(numbers)} ${SEED_WORDS[kind]}`];
+	});
+	return `${hostWords(host)} seeds ${String(seeds.length)} for the playoffs${weeksWords(terms.playoff_weeks)}: ${by.join(', ')}.`;
+}
+
+/** The playoffs' field: the platform's count, else its seeds. */
+function playoffField(terms: Pick<LeagueTerms, 'playoff_teams' | 'playoff_seeds'>): number | null {
+	const seeds = seedsOf(terms).length;
+	return terms.playoff_teams ?? (seeds > 0 ? seeds : null);
+}
+
 /** The playoffs' weeks after a comma: ", weeks 15 to 17", ", week 16", or nothing unsaid. */
 function weeksWords(w: LeagueTerms['playoff_weeks']): string {
 	if (w === null) return '';
@@ -569,10 +609,11 @@ export function termsView(terms: LeagueTerms, teams: number): { label: string; v
 	} else if (terms.waivers === 'order') {
 		out.push({ label: 'Waivers', value: 'Waiver order' });
 	}
-	if (terms.playoff_teams !== null) {
+	const field = playoffField(terms);
+	if (field !== null) {
 		out.push({
 			label: 'Playoffs',
-			value: `${String(terms.playoff_teams)} teams${weeksWords(terms.playoff_weeks)}`
+			value: `${String(field)} teams${weeksWords(terms.playoff_weeks)}`
 		});
 	}
 	return out;
@@ -623,12 +664,16 @@ export function teamBasis(
 	const team = byPlayer ? ", and your lineup's Team adds its rows" : '';
 	const format =
 		scoring.format === 'half_ppr' ? 'half-PPR' : scoring.format === 'ppr' ? 'PPR' : 'standard';
+	const bonus = scoring.league_own ? null : teBonusSentence(scoring.te_bonus, host);
 	const whose = scoring.league_own
-		? "this league's own"
-		: "the closest match to this league's rules";
+		? ` in ${format}, this league's own`
+		: bonus === null
+			? ` in ${format}, the closest match to this league's rules`
+			: `, ${format} shown, ${nearestRules(host)}`;
 	const when =
 		readAt === null
 			? 'not in yet for this week'
 			: `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
-	return `A team's ${BOX.proj} adds its starters' published projections in ${format}, ${whose}, ${when}. ${BOX.pts} are ${platform}'s so far${team}.`;
+	const extra = bonus === null ? '' : ` ${bonus}`;
+	return `A team's ${BOX.proj} adds its starters' published projections${whose}, ${when}.${extra} ${BOX.pts} are ${platform}'s so far${team}.`;
 }

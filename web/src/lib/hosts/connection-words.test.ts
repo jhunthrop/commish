@@ -26,7 +26,7 @@ void test('a proven ESPN session reads connected', () => {
 	assert.equal(statusWords(c), 'Connected');
 });
 
-void test('an ESPN session kept with only public leagues says it is not yet checked', () => {
+void test('an ESPN session kept with only public leagues reads connected, no internal check on the screen (Lane 94, B28)', () => {
 	const c = {
 		host: 'espn',
 		status: 'connected',
@@ -37,7 +37,7 @@ void test('an ESPN session kept with only public leagues says it is not yet chec
 		writes_on: false,
 		writes_reason: null
 	} as const;
-	assert.equal(statusWords(c), 'Connected, not yet checked against a private league');
+	assert.equal(statusWords(c), 'Connected');
 });
 
 void test('a signed out session says whether ESPN ever accepted it', () => {

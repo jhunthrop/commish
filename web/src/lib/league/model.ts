@@ -18,6 +18,7 @@ import type {
 	RosterSpot
 } from './api.ts';
 import type { components } from '#lib/api/types.ts';
+import { keepReadingVerb } from '#lib/hosts/connection-words.ts';
 import { SCORING_WORDS, hostWords } from './names.ts';
 
 export { followedName, hostWords } from './names.ts';
@@ -74,7 +75,7 @@ export function readLine(sync: ReadState, now: Date): string {
 	const read = readAgoLine(sync.host, sync.read_at, now);
 	const last = `This is our last read, ${agoWords(age)}.`;
 	if (sync.host_signed_out) {
-		return `Connect ${host} to keep this league in sync. ${last}`;
+		return `${keepReadingVerb(sync.host)} to keep this league in sync. ${last}`;
 	}
 	if (sync.host_failed) return `${host} is not answering. ${last}`;
 	if (sync.host_stale_seconds > 0) return `${read} Reading again.`;

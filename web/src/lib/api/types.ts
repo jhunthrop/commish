@@ -3248,6 +3248,11 @@ export interface components {
 			format: 'ppr' | 'half_ppr' | 'standard';
 			/** @description the league scores exactly as format */
 			league_own: boolean;
+			/**
+			 * Format: double
+			 * @description the extra points the league's rules give a tight end's catch over format (FFPC's 0.5), which the published projection does not carry; absent where the league gives none
+			 */
+			te_bonus?: number;
 		};
 		ScoreboardSide: {
 			roster_id: number;
@@ -3968,6 +3973,8 @@ export interface components {
 			scoring_unstated: string[];
 			/** @description the host's page for the league's settings */
 			host_settings_url: string | null;
+			/** @description how the host's rules seed the playoffs, seed by seed (FFPC's "Seed 1) Team with best regular season Record, Seed 2) Team with highest point total"); absent or empty where the host states no seeding */
+			playoff_seeds?: ('record' | 'points')[];
 		};
 		/** @description the playoffs' first and last week */
 		PlayoffWeeks: {
