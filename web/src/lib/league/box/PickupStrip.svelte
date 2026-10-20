@@ -51,7 +51,7 @@
 						<span class="slot">{card.slot}</span>
 						<span class="text"
 							><span class="move"
-								><b>{moveWords(card)}</b>{#if card.dropWhy}{' '}<span class="why"
+								><b>{moveWords(card)}</b>{#if card.dropWhy}<span class="why"
 										>{dropWhyWords(card.dropWhy)}</span
 									>{/if}</span
 							><span class="gains">{cardGains(card)}</span></span
@@ -200,6 +200,7 @@
 
 	/* Why the drop is the one named (B34), quieter than the move. */
 	.move .why {
+		margin-left: 0.3em;
 		font-size: var(--t-sm);
 		color: var(--ink-2);
 	}
