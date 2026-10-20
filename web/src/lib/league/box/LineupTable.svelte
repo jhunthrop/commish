@@ -325,12 +325,12 @@
 		}
 
 		.cols .slot {
-			width: 46px;
+			width: 42px;
 		}
 
-		/* Its head on two lines, so the player keeps the room for his name. */
+		/* Its head on two lines, so the player keeps the room for his name (Lane 99). */
 		.cols .rank {
-			width: 52px;
+			width: 50px;
 			white-space: normal;
 			line-height: 1.1;
 		}

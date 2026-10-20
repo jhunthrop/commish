@@ -172,7 +172,7 @@
 	{#if rankCell}
 		<!-- His place in our order alone: unranked (or a defense) is "--", and a season-long list's
 		     word stays in his status chip, never here (fix round 1, MEDIUM-2). -->
-		<td class="rank"
+		<td class="rank" data-position={row.position}
 			>{#if row.pill && row.pill.rank !== null}<PositionPill
 					position={row.pill.position}
 					rank={row.pill.rank}
@@ -502,6 +502,16 @@
 		.proj,
 		.pts {
 			font-size: var(--t-md);
+		}
+
+		/* The chip keeps its own width and gives the player the rest (Lane 99): the rank cell's own
+		   padding is the gap after the name. */
+		.rank {
+			padding-inline: 2px;
+		}
+
+		.player:has(+ .rank) {
+			padding-right: 2px;
 		}
 
 		.op {
