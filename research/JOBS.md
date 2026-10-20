@@ -34,9 +34,16 @@ reads the week ahead's projection once a day (Lane 97, `pipeline/tank01/projecti
 kickoffs, never the calendar; its read is due from 06:00 Eastern on the day after the previous week's
 last kickoff (at most six days before its own first kickoff's day) until that first kickoff, on the
 first pass at or after 06:00 each day, and never in a pass that takes a slot's read. A read equal to
-the newest stored snapshot writes none and the earlier snapshot stands; a failed read is retried the
-next hour. One provider request a day: three a week for a Thursday week (Tuesday, Wednesday,
-Thursday), at most seven for a week after a long gap.
+the newest stored snapshot writes none and the earlier snapshot stands. A week the provider has not
+published yet (a 404, an `error` envelope, an empty body, or the week with no player entries) is
+logged as `tank01_projections: unpublished, ... week N not published yet`, stores nothing, counts as
+no read and never fails the pass, so the next hour reads again; any other failed read is the pass's
+failure and is retried the next hour. A slot's read treats an unpublished week as a failure. A slot
+whose read matched the morning's snapshot (unchanged) counts as read and is not repeated. One
+provider request a day: three a week for a Thursday week (Tuesday, Wednesday, Thursday), at most
+seven for a week after a long gap, plus one a day for each hour the week is not yet published.
+`depth-chart-check` is the round 4 stamp check (it writes nothing; its recorded run is the
+coordinator's).
 
 The order of a Thursday's passes, all America/New_York (Lane 93 sets the register's order on the
 Thursday pass, in the 12 hours before the first kickoff):
@@ -45,10 +52,11 @@ Thursday pass, in the 12 hours before the first kickoff):
    06:00 reads already stand), parsed into `tank01_projection_rows` in the same execution.
 2. 14:00 `inseason` (`season-week`): the freeze sets the week's order and keeps `published_points`
    from the newest projection snapshot captured at or before 14:00, that morning's or an earlier
-   day's (`model/register/freeze.py` `week_published_points`).
+   day's (`model/register/freeze.py` `week_published_points`). The capture also fires at 14:00, so
+   the freeze is certain to see the reads up to the 13:00 pass; a 14:00 read (only if every earlier
+   one found the week unpublished) may or may not land before it.
 3. 19:00 `inseason-capture`: the first pass inside the Thursday slot's two hours (18:15 to 20:15 for
-   a 20:15 kickoff) reads the slot's projection; it is after the freeze and never changes it. `depth-chart-check` is the
-round 4 stamp check (it writes nothing; its recorded run is the coordinator's).
+   a 20:15 kickoff) reads the slot's projection; it is after the freeze and never changes it.
 
 `research.pipeline history` re-creates the seasons the store lost (an operator command, run once
 per store; `pipeline/history.py`).

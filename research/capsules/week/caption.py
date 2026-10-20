@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 from research.capsules.week.sheet import central_day_and_time
 
 EASTERN: Final = ZoneInfo("America/New_York")
-# The hourly capture's hours, Eastern (`research-capture-harvest`, "0 2,7-23 * * *" America/New_York): the
+# The hourly capture's hours, Eastern (`research-capture-harvest`, "0 2,6-23 * * *" America/New_York): the
 # hourly week-reads pass runs at the end of each.
 HOURLY_PASS_HOURS_ET: Final = (2, *range(6, 24))
 

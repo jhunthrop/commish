@@ -354,9 +354,11 @@ def test_a_week_with_no_week_before_it_opens_six_days_before_its_first_kickoff_d
 
 @dataclass
 class Tank01Fetcher:
-    """Every harvest feed answers an empty body; the projections feed answers the week asked for."""
+    """Every harvest feed answers an empty body; the projections feed answers the week asked for, or
+    `answer` (an HTTP status and the whole response) while one is set."""
 
     weeks: list[str] = field(default_factory=list)
+    answer: tuple[int, object] | None = None
 
     def get(self, url: str, headers: Mapping[str, str] | None = None) -> HttpResponse:
         path, _, query = url.partition("?")
@@ -364,6 +366,8 @@ class Tank01Fetcher:
         if path.endswith(Paths.PROJECTIONS):
             week = parse_qs(query)["week"][0]
             self.weeks.append(week)
+            if self.answer is not None:
+                return HttpResponse(self.answer[0], json.dumps(self.answer[1]).encode(), {})
             payload = _projections()
             assert isinstance(payload, dict)
             body = {**payload, "week": week}
@@ -406,7 +410,7 @@ def test_the_harvest_reads_the_week_ahead_once_a_day_and_an_unchanged_read_keeps
     # Wednesday's and Thursday's reads equal Tuesday's: no new snapshot, Tuesday's stands at its captured_at.
     assert week_rows == [_eastern(20, 6)]
     assert parsed.snapshots == 1
-    assert thursday_slot == 7  # noqa: PLR2004 - Thursday's slot reads the week again in its window
+    assert thursday_slot == projections.ProjectionRead(7, ahead=False)  # the slot reads the week in its window
 
 
 def test_a_changed_projection_is_kept_each_day_and_another_weeks_read_never_counts(engine: Engine) -> None:
@@ -437,5 +441,91 @@ def test_a_changed_projection_is_kept_each_day_and_another_weeks_read_never_coun
             )
         ).scalar_one()
         conn.rollback()
-    assert (after_another_week, after_its_read, next_day) == (7, None, 7)
+    ahead = projections.ProjectionRead(7, ahead=True)
+    assert (after_another_week, after_its_read, next_day) == (ahead, None, ahead)
     assert (parsed.snapshots, kept) == (3, 2)
+
+
+_NO_PLAYERS: Final = {"season": "2026", "week": "7", "playerProjections": {}}
+_UNPUBLISHED_ANSWERS: Final = [
+    pytest.param((404, {"statusCode": 404}), id="404"),
+    pytest.param((200, {"statusCode": 200, "error": "No projections for week 7"}), id="error-envelope"),
+    pytest.param((200, {"statusCode": 200, "body": {}}), id="empty-object"),
+    pytest.param((200, {"statusCode": 200, "body": []}), id="empty-list"),
+    pytest.param((200, {"statusCode": 200, "body": ""}), id="empty-string"),
+    pytest.param((200, {"statusCode": 200, "body": _NO_PLAYERS}), id="no-players"),
+]
+
+
+def _count(conn: Connection, table: Any) -> int:
+    query = select(func.count()).select_from(table).where(table.c.source == projections.PROJECTIONS_SOURCE)
+    return int(conn.execute(query).scalar_one())
+
+
+@pytest.mark.parametrize("answer", _UNPUBLISHED_ANSWERS)
+def test_a_week_ahead_not_published_yet_is_no_failure_no_snapshot_and_no_read(
+    engine: Engine, answer: tuple[int, object]
+) -> None:
+    fetcher = Tank01Fetcher(answer=answer)
+    client = Tank01Client(fetcher, "key")
+    with engine.connect() as conn:
+        _clear_projection_reads(conn)
+        tuesday = run_capture_harvest(conn, client, _eastern(20, 6), 2026)
+        stored, checked = _count(conn, CAPTURE_SNAPSHOTS), _count(conn, CAPTURE_CHECKS)
+        fetcher.answer = None  # published by the next hour
+        next_hour = run_capture_harvest(conn, client, _eastern(20, 7), 2026)
+        parsed = projections.parse_stored_projections(conn)
+        conn.rollback()
+    (outcome,) = [f for f in tuesday.feeds if f.source == projections.PROJECTIONS_SOURCE]
+    assert (outcome.status, outcome.reason) == ("unpublished", "week 7 not published yet")
+    assert not [f for f in tuesday.feeds if f.status == "failed"]  # the pass's verdict: no failure
+    assert (stored, checked) == (0, 0)
+    assert fetcher.weeks == ["7", "7"]  # the next hour tries again
+    (published,) = [f for f in next_hour.feeds if f.source == projections.PROJECTIONS_SOURCE]
+    assert published.status == "captured"
+    assert (parsed.snapshots, parsed.refused) == (1, ())
+
+
+def test_a_published_week_ahead_is_stored_and_content_the_parser_refuses_is_an_error() -> None:
+    assert not projections.projection_unpublished(_projections())
+    broken = _projections()
+    assert isinstance(broken, dict)
+    broken["playerProjections"]["8439"]["team"] = ""
+    assert not projections.projection_unpublished(broken)
+    with pytest.raises(SchemaDriftError):
+        projections.parse_projection_snapshot(broken, 1, _at(20, 10))
+
+
+def test_a_slot_week_not_published_two_hours_before_kickoff_fails_loudly(engine: Engine) -> None:
+    fetcher = Tank01Fetcher(answer=(404, {"statusCode": 404}))
+    with engine.connect() as conn:
+        _clear_projection_reads(conn)
+        result = run_capture_harvest(conn, Tank01Client(fetcher, "key"), _eastern(22, 19), 2026)
+        conn.rollback()
+    (outcome,) = [f for f in result.feeds if f.source == projections.PROJECTIONS_SOURCE]
+    assert outcome.status == "failed"
+
+
+def test_a_slot_read_unchanged_since_the_mornings_read_is_not_repeated(engine: Engine) -> None:
+    fetcher = Tank01Fetcher()
+    client = Tank01Client(fetcher, "key")
+    with engine.connect() as conn:
+        _clear_projection_reads(conn)
+        for at in (_eastern(22, 6), _eastern(22, 19), _eastern(22, 20)):
+            run_capture_harvest(conn, client, at, 2026)
+        conn.rollback()
+    assert fetcher.weeks == ["7", "7"]  # Thursday 06:00, then 19:00 (unchanged); 20:00 reads nothing
+
+
+def test_a_stored_payload_with_no_player_entries_is_never_reparsed(engine: Engine) -> None:
+    insert_snapshot = text(
+        f"insert into {CAPTURE_SNAPSHOTS.fullname} (source, captured_at, digest, payload) "
+        "values (:source, :at, 'empty', cast(:payload as jsonb))"
+    )
+    row = {"source": projections.PROJECTIONS_SOURCE, "at": _at(20, 10), "payload": json.dumps(_NO_PLAYERS)}
+    with engine.connect() as conn:
+        _clear_projection_reads(conn)
+        conn.execute(insert_snapshot, row)
+        report = projections.parse_stored_projections(conn)
+        conn.rollback()
+    assert (report.snapshots, report.rows, report.refused) == (0, 0, ())

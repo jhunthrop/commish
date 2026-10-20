@@ -31,6 +31,7 @@ week's published projection and never names the provider (Lane 66d).
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from http import HTTPStatus
 from typing import Final
 from zoneinfo import ZoneInfo
 
@@ -42,6 +43,7 @@ from research.pipeline.jscompat import js_is_finite, js_number
 from research.pipeline.kickoff_slots import Slot, due_slot, kickoff_slots
 from research.pipeline.kickoffs import TeamKickoff, stored_kickoffs, week_bounds
 from research.pipeline.observations import insert_ignoring_conflicts
+from research.pipeline.tank01.client import Tank01Error
 
 PROJECTIONS_SOURCE: Final = "tank01_projections"
 _POINTS: Final = (("ppr_points", "PPR"), ("half_points", "halfPPR"), ("standard_points", "standard"))
@@ -147,7 +149,8 @@ def parse_projection_snapshot(payload: object, snapshot: int, captured_at: datet
 # kept): parsing it again inserts only the rows it lacks.
 _UNPARSED: Final = text(
     f"select s.id, s.captured_at, s.payload from {CAPTURE_SNAPSHOTS.fullname} s "
-    "where s.source = :source and (not exists "
+    "where s.source = :source and not (coalesce(s.payload -> 'playerProjections', '{}'::jsonb) = '{}'::jsonb "
+    "and coalesce(s.payload -> 'teamDefenseProjections', '{}'::jsonb) = '{}'::jsonb) and (not exists "
     f"(select 1 from {TANK01_PROJECTION_ROWS.fullname} r where r.snapshot_id = s.id) "
     "or (jsonb_typeof(s.payload -> 'teamDefenseProjections') = 'object' "
     "and s.payload -> 'teamDefenseProjections' <> '{}'::jsonb and not exists "
@@ -187,19 +190,33 @@ def parse_stored_projections(conn: Connection) -> ParseReport:
 _CAPTURED_SINCE: Final = text(
     f"select exists (select 1 from {CAPTURE_SNAPSHOTS.fullname} where source = :source and captured_at >= :since)"
 )
+# Read since an instant: the feed was read since then (captured or unchanged, `capture_checks`) and the
+# newest stored snapshot is the week's, so a read of another week never counts.
+_READ_SINCE: Final = text(
+    f"select exists (select 1 from {CAPTURE_CHECKS.fullname} where source = :source and checked_at >= :since) "
+    f"and coalesce((select payload ->> 'week' from {CAPTURE_SNAPSHOTS.fullname} where source = :source "
+    "order by captured_at desc, id desc limit 1) = :week, false)"
+)
+
+
+def _read_since(conn: Connection, week: int, since: datetime) -> bool:
+    params = {"source": PROJECTIONS_SOURCE, "since": since, "week": str(week)}
+    return bool(conn.execute(_READ_SINCE, params).scalar_one())
 
 
 def projection_slot_due(conn: Connection, season: int, now: datetime) -> Slot | None:
-    """The kickoff slot whose window holds `now`, unless a projections snapshot already stands in it."""
+    """The kickoff slot whose window holds `now`, unless its projection was already read in it."""
     return _slot_due(conn, stored_kickoffs(conn, season), now)
 
 
 def _slot_due(conn: Connection, kickoffs: Sequence[TeamKickoff], now: datetime) -> Slot | None:
+    """A snapshot captured in the window, or a read in it that matched the newest stored snapshot of the
+    slot's week (unchanged since the morning's daily read), is the slot's read."""
     slot = due_slot(kickoff_slots(kickoffs), now)
     if slot is None:
         return None
     captured = conn.execute(_CAPTURED_SINCE, {"source": PROJECTIONS_SOURCE, "since": slot.opens}).scalar_one()
-    return None if captured else slot
+    return None if captured or _read_since(conn, slot.week, slot.opens) else slot
 
 
 # The daily read of the week ahead: from 06:00 Eastern, so it stands before the register's Thursday
@@ -242,24 +259,35 @@ def daily_capture_due(kickoffs: Sequence[TeamKickoff], now: datetime) -> DailyCa
     return DailyCapture(week, today) if now >= max(_daily_open(opens_on), today) else None
 
 
-# Read today: the feed was read since 06:00 Eastern (captured or unchanged, `capture_checks`) and the
-# newest stored snapshot is the week ahead's, so a read of another week never counts as today's.
-_READ_SINCE: Final = text(
-    f"select exists (select 1 from {CAPTURE_CHECKS.fullname} where source = :source and checked_at >= :since) "
-    f"and coalesce((select payload ->> 'week' from {CAPTURE_SNAPSHOTS.fullname} where source = :source "
-    "order by captured_at desc, id desc limit 1) = :week, false)"
-)
+@dataclass(frozen=True, slots=True)
+class ProjectionRead:
+    """The week a harvest pass reads, and whether it is the week ahead's daily read (whose
+    not-yet-published answer is no failure) rather than a slot's (where it is one)."""
+
+    week: int
+    ahead: bool
 
 
-def projection_week_due(conn: Connection, season: int, now: datetime) -> int | None:
+def projection_week_due(conn: Connection, season: int, now: datetime) -> ProjectionRead | None:
     """The week whose projection this harvest pass reads, if any: the kickoff slot's week in its window
-    not yet captured, else the week ahead once a day."""
+    not yet read, else the week ahead once a day."""
     kickoffs = stored_kickoffs(conn, season)
     slot = _slot_due(conn, kickoffs, now)
     if slot is not None:
-        return slot.week
+        return ProjectionRead(slot.week, ahead=False)
     daily = daily_capture_due(kickoffs, now)
-    if daily is None:
+    if daily is None or _read_since(conn, daily.week, daily.since):
         return None
-    params = {"source": PROJECTIONS_SOURCE, "since": daily.since, "week": str(daily.week)}
-    return None if conn.execute(_READ_SINCE, params).scalar_one() else daily.week
+    return ProjectionRead(daily.week, ahead=True)
+
+
+def projection_unpublished(answer: object) -> bool:
+    """Whether the provider's answer for a week ahead says it has not published that week yet: a 404 or
+    an `error` envelope (a `Tank01Error`), an empty body (`{}`, `[]`, `""`, null), or the week with no
+    player entries. Content the strict parser refuses is not this: it is stored and refused as any
+    snapshot is."""
+    if isinstance(answer, Tank01Error):
+        return answer.kind == "upstream" and answer.status in (HTTPStatus.NOT_FOUND, HTTPStatus.OK)
+    if answer is None or (isinstance(answer, str | list | dict) and len(answer) == 0):
+        return True
+    return isinstance(answer, dict) and "week" in answer and answer.get("playerProjections") in (None, "", [], {})
