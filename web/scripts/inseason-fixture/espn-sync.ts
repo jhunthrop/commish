@@ -48,6 +48,9 @@ export function espnSync(sync: LeagueSync): LeagueSync {
 		terms: {
 			...sync.terms,
 			waivers: 'order',
+			// The last in the standings first, as waiverOrderReset true reads (Lane 104). No tiebreak,
+			// as a read without playoffSeedingRule, so the basis says ESPN lists ties on points for.
+			waiver_order: 'inverse_standings',
 			waiver_budget: null,
 			// The recorded league's own unstated rule stays unstated, with ESPN's two beside it.
 			scoring_unstated: [...sync.terms.scoring_unstated, ...UNSTATED],

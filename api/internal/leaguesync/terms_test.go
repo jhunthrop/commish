@@ -139,7 +139,43 @@ func TestESPNStandingsAndTerms(t *testing.T) {
 		t.Errorf("a two-week final through week 18: %+v", got)
 	}
 	l.Acquisition = espn.Acquisition{}
-	if got := espnSnapshot(l, time.Now()); got.Teams[0].BudgetLeft != nil || got.Terms.Waivers != WaiversOrder {
-		t.Errorf("an order league: budget %v, waivers %q", got.Teams[0].BudgetLeft, got.Terms.Waivers)
+	if got := espnSnapshot(l, time.Now()); got.Teams[0].BudgetLeft != nil || got.Terms.Waivers != WaiversOrder ||
+		got.Terms.WaiverOrder != "" || got.Terms.Tiebreak != "" {
+		t.Errorf("an order league stating no order type nor tiebreak: budget %v, terms %+v", got.Teams[0].BudgetLeft, got.Terms)
+	}
+}
+
+// ESPN's waiverOrderReset names how an order league's order moves and its
+// playoffSeedingRule the standings' tie rule (Lane 104, B48 and B55); a
+// budget league has no order type, and a rule we do not know states none.
+func TestESPNWaiverOrderAndTiebreak(t *testing.T) {
+	reset, rolling := true, false
+	cases := []struct {
+		name        string
+		acquisition espn.Acquisition
+		rule        string
+		order, tie  string
+	}{
+		{"rolling, points for", espn.Acquisition{OrderReset: &rolling}, "TOTAL_POINTS_SCORED", OrderRolling, TiebreakPointsFor},
+		{"inverse standings, head to head", espn.Acquisition{OrderReset: &reset}, "H2H_RECORD", OrderInverseStandings, TiebreakHeadToHead},
+		{"division record", espn.Acquisition{}, "INTRA_DIVISION_RECORD", "", TiebreakDivisionRecord},
+		{"points against", espn.Acquisition{}, "TOTAL_POINTS_AGAINST", "", TiebreakPointsAgainst},
+		{"a budget league, an unknown rule", espn.Acquisition{Budget: true, Total: 100, OrderReset: &rolling}, "RAW_STAT", "", ""},
+	}
+	for _, c := range cases {
+		got := espnTerms(espn.FullLeague{Acquisition: c.acquisition, SeedingTiebreak: c.rule})
+		if got.WaiverOrder != c.order || got.Tiebreak != c.tie {
+			t.Errorf("%s: order %q, tiebreak %q; want %q, %q", c.name, got.WaiverOrder, got.Tiebreak, c.order, c.tie)
+		}
+		view := terms(Snapshot{Terms: got})
+		if (view.WaiverOrder == nil) != (c.order == "") || (view.Tiebreak == nil) != (c.tie == "") {
+			t.Errorf("%s: the contract's order %v, tiebreak %v", c.name, view.WaiverOrder, view.Tiebreak)
+		}
+	}
+	if got := sleeperTerms(sleeper.League{WaiverType: sleeper.WaiverRolling}); got.WaiverOrder != OrderRolling {
+		t.Errorf("Sleeper rolling waivers: %+v", got)
+	}
+	if got := sleeperTerms(sleeper.League{WaiverType: sleeper.WaiverReverse}); got.WaiverOrder != OrderInverseStandings {
+		t.Errorf("Sleeper reverse standings waivers: %+v", got)
 	}
 }

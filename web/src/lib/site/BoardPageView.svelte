@@ -24,9 +24,10 @@
 
 	const leagueId = $derived(siteContext.league?.id ?? null);
 	/** The bar takes the rail's word for the board and leaves the format to the league switch beside
-	 * it; the document names it. In season the one verb follows your league (season-words.ts). Both
-	 * sets of words are in the HTML and the root's rail shows one (Phased.svelte), so the bar is right
-	 * on the first frame; the document's title follows the rail once the script runs. */
+	 * it; the document names it. In season the one verb follows your league (season-words.ts), and
+	 * there is none once a league is selected (Lane 104, B60). Both sets of words are in the HTML and
+	 * the root's rail shows one (Phased.svelte), so the bar is right on the first frame; the
+	 * document's title follows the rail once the script runs. */
 	const wordsAt = (rail: RailKey): BoardWords => {
 		const board = { ...page.format, season: run.season, position: page.position };
 		// In season the kickers' and defenses' tabs are this week's (Lane 66w).
@@ -54,7 +55,7 @@
 		<Phased>
 			{#snippet children(set: WordSet)}
 				{@const verb = wordsOf(set).verb}
-				<Verb href={verbHref(verb, leagueId)}>{PAGE_VERBS[verb]}</Verb>
+				{#if verb !== null}<Verb href={verbHref(verb, leagueId)}>{PAGE_VERBS[verb]}</Verb>{/if}
 			{/snippet}
 		</Phased>
 	{/snippet}

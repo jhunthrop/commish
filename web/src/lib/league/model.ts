@@ -2,7 +2,7 @@
  * record, a move in words, and the drafter's roster and the pool as board players. Pure functions
  * over the API's answer. */
 import { FIGURE } from '#lib/format/figure-words.ts';
-import { fixed, plural, signed } from '#lib/format/number.ts';
+import { fixed, ordinal, plural, signed } from '#lib/format/number.ts';
 import { midSentence } from '#lib/format/sentence.ts';
 import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
 import type { IndexSeason } from '#lib/run/schema.ts';
@@ -106,13 +106,18 @@ export function recordWords(team: Pick<LeagueTeam, 'wins' | 'losses' | 'ties'>):
 	return team.ties > 0 ? `${base}-${String(team.ties)}` : base;
 }
 
-/** Where the drafter stands in a followed league: "2-3, 9 of 12", empty before a read. */
-export function standingWords(league: Pick<AttachedLeague, 'standing'>): string {
-	const s = league.standing;
-	return s ? `${recordWords(s)}, ${String(s.place)} of ${String(s.teams)}` : '';
+/** A team's place in its league, the one form every screen prints (Lane 104, B61): "8th of 12". */
+export function placeWords(place: number, teams: number): string {
+	return `${ordinal(place)} of ${String(teams)}`;
 }
 
-/** A followed league's line under its name, so two alike names part: "My Ball Zach Ertz, 2-3, 9
+/** Where the drafter stands in a followed league: "2-3, 9th of 12", empty before a read. */
+export function standingWords(league: Pick<AttachedLeague, 'standing'>): string {
+	const s = league.standing;
+	return s ? `${recordWords(s)}, ${placeWords(s.place, s.teams)}` : '';
+}
+
+/** A followed league's line under its name, so two alike names part: "My Ball Zach Ertz, 2-3, 9th
  * of 12, on FFPC". */
 export function followedLine(league: AttachedLeague): string {
 	const parts = [league.team_name, standingWords(league)].filter((p) => p !== '');

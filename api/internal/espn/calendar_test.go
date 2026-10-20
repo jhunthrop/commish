@@ -93,3 +93,21 @@ func TestFinalRoundWeeks(t *testing.T) {
 		t.Fatalf("no final period read as a %d-week final", none.FinalRoundWeeks)
 	}
 }
+
+// The recorded league's settings carry the standings' tie rule
+// (scheduleSettings.playoffSeedingRule, TOTAL_POINTS_SCORED) and how its
+// waiver order moves (acquisitionSettings.waiverOrderReset, true); a read
+// with neither states neither (Lane 104, B48 and B55).
+func TestTiebreakAndWaiverOrderFromTheRecordedLeague(t *testing.T) {
+	l := readLeagueFixture(t, "league-48153503-2019-full.json", 2019, nil)
+	if l.SeedingTiebreak != "TOTAL_POINTS_SCORED" || l.Acquisition.OrderReset == nil || !*l.Acquisition.OrderReset {
+		t.Fatalf("tiebreak %q, order reset %v", l.SeedingTiebreak, l.Acquisition.OrderReset)
+	}
+	bare := readLeagueFixture(t, "league-48153503-2019-full.json", 2019, func(s string) string {
+		s = strings.Replace(s, `"playoffSeedingRule": "TOTAL_POINTS_SCORED",`, ``, 1)
+		return strings.Replace(s, `"waiverOrderReset": true,`, ``, 1)
+	})
+	if bare.SeedingTiebreak != "" || bare.Acquisition.OrderReset != nil {
+		t.Fatalf("an unstated tiebreak %q, order reset %v", bare.SeedingTiebreak, bare.Acquisition.OrderReset)
+	}
+}

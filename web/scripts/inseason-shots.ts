@@ -1416,6 +1416,8 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 			),
 			feed: document.querySelector('main table.feed') !== null,
 			nobody: (document.querySelector('main')?.textContent ?? '').includes('Nobody in your league'),
+			// In season the page carries no mock-draft plumbing (Lane 104, B54).
+			mock: /mock draft/i.test(document.querySelector('main')?.textContent ?? ''),
 			// The recorded league's name anywhere on the page, the switch included.
 			recordedName: document.body.textContent.includes('S.U.C.K.'),
 			bids: [...document.querySelectorAll('main table.feed td.det')].filter((td) =>
@@ -1458,11 +1460,16 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 		faults.push(`bench link ${seen.bench.join(' ')}`);
 	if (lp.moves && (!seen.feed || seen.bids === 0)) faults.push('no moves with a bid');
 	if (!lp.moves && seen.feed) faults.push('a moves feed where the platform gives none');
-	if (!lp.moves && !seen.basisText.includes(`${lp.platform} gives no move history to us.`))
-		faults.push('the basis does not say the moves are not read');
+	// No apology for a feed that is not drawn (Lane 104, B54).
+	if (seen.basisText.includes('gives no move history'))
+		faults.push('the basis apologises for the moves it does not draw');
+	if (seen.mock) faults.push('the in-season page offers mock-draft plumbing');
 	if (!lp.moves && seen.nobody) faults.push('says nobody moved where moves are not read');
-	if (!seen.basisText.startsWith(`Standings follow ${lp.platform}'s record, then points for.`))
+	// The tiebreak the settings give, else points for as the platform lists the teams (B48).
+	if (!seen.basisText.startsWith(`Standings follow ${lp.platform}'s record, then `))
 		faults.push(`basis "${seen.basisText.slice(0, 60)}"`);
+	if (lp.waiver === 'Waiver' && !seen.basisText.includes('1st picks first'))
+		faults.push('the waiver order does not say who picks first');
 	const most = width === PHONE.width ? MAX_BASIS_LINES_PHONE : MAX_BASIS_LINES;
 	if (seen.basisLines === 0 || seen.basisLines > most)
 		faults.push(`the basis draws ${String(seen.basisLines)} lines, at most ${String(most)}`);

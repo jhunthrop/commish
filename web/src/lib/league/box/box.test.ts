@@ -218,6 +218,29 @@ void test('a row carries the projection, not the points a game, and no facts onc
 	assert.equal(kicked.pts, 12.3);
 });
 
+void test('Questionable and Doubtful draw only before his game, Out and IR whatever the clock (Lane 104, B57)', () => {
+	const asOf = '2026-10-16T21:00:00.000Z';
+	const played = { kickoff: '2026-10-17T01:59:00.000Z', state: 'final' as const };
+	const tagged = (status: 'questionable' | 'doubtful' | 'out', facts = {}, ir = false) =>
+		boxRow(
+			line(
+				{ player: player({ injured_reserve: ir }) },
+				{ ...facts, designation: { status, as_of: asOf } }
+			),
+			'WR',
+			ZONE,
+			false,
+			NOW
+		).status?.mark ?? null;
+	assert.equal(tagged('questionable'), 'Questionable');
+	assert.equal(tagged('doubtful'), 'Doubtful');
+	assert.equal(tagged('questionable', played), null);
+	assert.equal(tagged('doubtful', played), null);
+	assert.equal(tagged('out', played), 'Out');
+	// A Questionable word gone, the platform's injured reserve is what the row still says.
+	assert.equal(tagged('questionable', played, true), 'IR');
+});
+
 void test("a defense's face is its club's mark, said in words", () => {
 	const defense = boxRow(
 		line({

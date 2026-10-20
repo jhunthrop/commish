@@ -39,11 +39,11 @@ const TABLE: Readonly<Record<LeaguePhase, { phone: string[]; wide: string[] }>> 
 	},
 	in_season: {
 		phone: ['League', 'Lineup', 'Matchup', 'Waivers', 'Trades'],
-		wide: ['Players', 'Rest of season', 'Our record']
+		wide: ['Players', 'Rest of season, your league', 'Our record']
 	},
 	playoffs: {
 		phone: ['League', 'Lineup', 'Matchup', 'Trades', 'Players'],
-		wide: ['Rest of season', 'Our record']
+		wide: ['Rest of season, your league', 'Our record']
 	},
 	offseason: {
 		phone: ['Board', 'Players', 'Mock draft', 'Cheat sheet', 'Advisor'],
@@ -141,7 +141,7 @@ void test("the in-season items open the selected league's screens, else the foll
 	assert.equal(href('Trades', null), `/league/new?${SCREEN_PARAM}=trades`);
 	// The rest keep their pages, a league or none.
 	assert.equal(href('Players', id), '/players');
-	assert.equal(href('Rest of season', id), '/board');
+	assert.equal(href('Rest of season, your league', id), '/board');
 });
 
 void test('a page lights the item that owns it, a league page the item it names', () => {

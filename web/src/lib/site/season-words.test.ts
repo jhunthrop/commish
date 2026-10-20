@@ -12,7 +12,7 @@ import {
 	type RailKey
 } from '#lib/ui/nav.ts';
 import { BANNED_MARKS } from '#lib/format/copy-guard.ts';
-import { railOfKey } from '#lib/ui/rail-order.ts';
+import { RAIL_WITHOUT_LEAGUE, railOfKey } from '#lib/ui/rail-order.ts';
 import { PAGE_VERBS, boardWords, frontWords } from './season-words.ts';
 
 const IN_SEASON: readonly RailKey[] = ['in_season', 'playoffs', 'playoffs_waivers'];
@@ -81,17 +81,24 @@ for (const rail of BEFORE_OR_AFTER) {
 }
 
 void test('the board in season takes the rail word for its bar, and the rest of the season for its heading', () => {
-	const rest = railOfKey('in_season').find((item) => item.key === 'rest')?.label;
+	// The rail's item with no league selected is the bar's word; with one it names your league.
+	const rest = RAIL_WITHOUT_LEAGUE.find((item) => item.key === 'rest_first')?.label;
 	const words = boardWords('in_season', { ...REST, position: null }, false);
 	assert.equal(words.bar, rest);
 	assert.equal(words.bar, 'Rest of season');
+	assert.equal(
+		railOfKey('in_season').find((item) => item.key === 'rest')?.label,
+		'Rest of season, your league'
+	);
 	assert.equal(words.heading, 'Rest of 2026');
 	assert.equal(words.title, 'PPR rest of season');
 	assert.equal(words.verb, 'follow');
 	const wr = boardWords('playoffs', { ...REST, position: 'WR' }, true);
 	assert.equal(wr.bar, 'WR rest of season');
 	assert.equal(wr.title, 'WR PPR rest of season');
-	assert.equal(wr.verb, 'open_league');
+	// No "Open your league" on a page the selected league already is (Lane 104, B60).
+	assert.equal(wr.verb, null);
+	assert.equal(boardWords('in_season', { ...PRESEASON, position: null }, true).verb, null);
 });
 
 void test('the board before the draft and after the season keeps its name and the mock draft', () => {

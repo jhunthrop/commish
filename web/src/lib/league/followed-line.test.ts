@@ -23,7 +23,7 @@ const league: AttachedLeague = {
 };
 
 void test('a read league says the team, its record and place, and the host', () => {
-	assert.equal(followedLine(league), 'My Ball Zach Ertz, 2-3, 11 of 12, on FFPC');
+	assert.equal(followedLine(league), 'My Ball Zach Ertz, 2-3, 11th of 12, on FFPC');
 });
 
 void test('an unread league says only what it has', () => {

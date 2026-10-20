@@ -4017,7 +4017,21 @@ export interface components {
 			host_settings_url: string | null;
 			/** @description how the host's rules seed the playoffs, seed by seed (FFPC's "Seed 1) Team with best regular season Record, Seed 2) Team with highest point total"); absent or empty where the host states no seeding */
 			playoff_seeds?: ('record' | 'points')[];
+			/** @description how an order league's waiver order moves; absent in a budget league, where the host does not say, and from an API before Lane 104 */
+			waiver_order?: components['schemas']['WaiverOrder'];
+			/** @description the rule the host breaks a tie in the standings by (ESPN's playoff seeding tiebreaker); absent where the host does not say, and from an API before Lane 104 */
+			tiebreak?: components['schemas']['Tiebreak'];
 		};
+		/**
+		 * @description rolling, a successful claim sends the team to the back of the order; inverse_standings, the order resets each week, the last place first
+		 * @enum {string}
+		 */
+		WaiverOrder: 'rolling' | 'inverse_standings';
+		/**
+		 * @description the rule a tie on record in the standings is broken by
+		 * @enum {string}
+		 */
+		Tiebreak: 'head_to_head' | 'points_for' | 'points_against' | 'division_record';
 		/** @description the playoffs' first and last week */
 		PlayoffWeeks: {
 			first: number;

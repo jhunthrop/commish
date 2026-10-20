@@ -10,11 +10,10 @@ import {
 	timeOfDay,
 	weekdayTime
 } from '#lib/format/clock.ts';
-import { ordinal } from '#lib/format/number.ts';
 import type { ContextLeague } from '#lib/context/words.ts';
 import { MOCK_VERB, type LeagueScreen } from '#lib/ui/nav.ts';
 import type { LeagueStanding } from './api.ts';
-import { recordWords } from './model.ts';
+import { placeWords, recordWords } from './model.ts';
 
 /** The follow page's line above the form, naming the screen the rail item leads to once a league
  * is followed. */
@@ -115,5 +114,5 @@ export function draftLine(draftAt: string | null, now: Date, zone: string = memb
  * the last read has no standing. */
 export function finalStanding(team: string, standing: LeagueStanding | null): string {
 	if (standing === null || team === '') return 'Your season is over.';
-	return `${team} finished ${ordinal(standing.place)} of ${String(standing.teams)} at ${recordWords(standing)}.`;
+	return `${team} finished ${placeWords(standing.place, standing.teams)} at ${recordWords(standing)}.`;
 }
