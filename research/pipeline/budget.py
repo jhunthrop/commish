@@ -38,6 +38,10 @@ class FixedBudget:
             return Reservation(False, f"requested {count} request(s) exceeds this run's budget of {self.limit}")
         return Reservation(True)
 
+    def after(self, spent: int) -> "FixedBudget":
+        """What is left of this run's ceiling once `spent` requests are made: a new budget, never below 0."""
+        return FixedBudget(max(self.limit - spent, 0))
+
 
 @dataclass(frozen=True)
 class UnmeteredBudget:
