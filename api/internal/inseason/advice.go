@@ -59,6 +59,12 @@ type advisor struct {
 	projection boards.WeekProjection
 	preset     apitypes.ScoringPreset
 	now        time.Time
+	// week is the week the advisor's facts and projection are for: the
+	// league's (Snap.Week), or the week after on an action screen once the
+	// member's lineup has played its week (Lane 95, turnTo).
+	week int
+	// data is the season's facts the Season indexes, kept for turnTo.
+	data Data
 	// finds is the league read's trades with each team, searched once per
 	// read across requests (Service.findsFor); nil searches for this
 	// advisor alone, once (found).
@@ -137,8 +143,83 @@ func newAdvisor(l League, data Data, projection boards.WeekProjection, held map[
 		return nil, fmt.Errorf("inseason: the board at the read's clock: %w", err)
 	}
 	return &advisor{rest: rest, League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, firstWeek(l)), pages: newPages(l.Board.Raw), now: now,
-		gamesLeft: rest.Left, projection: projection, preset: preset,
+		gamesLeft: rest.Left, projection: projection, preset: preset, week: l.Snap.Week, data: data,
 		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
+}
+
+// addressedWeek is the week an action screen addresses (Lane 95): the first
+// week the member can still act on, from the member's lineup at the read's
+// clock. Once every starter of the member's with a game has kicked off or is
+// final by the one game state (gameStateAt, the facts weekDone reads), byes
+// aside, the lineup's week is spent and the screens turn to the next one the
+// schedule holds; a member with no team in the read stays on the week.
+func (a *advisor) addressedWeek() int {
+	lineup, ok := a.Lineup()
+	if !ok {
+		return a.week
+	}
+	return addressedWeek(lineup.Slots, a.week, func(week int) bool { return hasGames(a.data.Games, week) })
+}
+
+// addressedWeek is week, or the week after once every starter with a game
+// has kicked off or is final, when scheduled says that week holds games.
+func addressedWeek(slots []apitypes.LineupSlot, week int, scheduled func(week int) bool) int {
+	if everyStarterPast(slots, apitypes.GameStateKickedOff) && scheduled(week+1) {
+		return week + 1
+	}
+	return week
+}
+
+// hasGames reports whether the schedule holds a game in the week.
+func hasGames(games []boards.TeamWeek, week int) bool {
+	for _, g := range games {
+		if g.Week == week {
+			return true
+		}
+	}
+	return false
+}
+
+// turnTo is the advisor for another week of the same read (Lane 95): that
+// week's facts (games, kickoffs, byes) with the designations carried over
+// from a game already played marked so (Season.Turned), and that week's published
+// projection. The rest of season, the holds and the read stay; the trade
+// search is the new advisor's own.
+func (a *advisor) turnTo(week int, projection boards.WeekProjection) *advisor {
+	out := *a
+	out.week, out.projection = week, projection
+	out.season = NewSeason(a.data, RulesOf(rulesOf(a.settings.Scoring)), week, a.now).Turned()
+	out.finds, out.foundHere, out.searchErr = nil, nil, nil
+	return &out
+}
+
+// ProjectionCaptureLead is how long before a kickoff slot's first game the
+// harvest captures the week's published projection (research
+// pipeline/kickoff_slots.py LEAD, the capture's own rule): a week's first
+// projection is read in the window before its first kickoff.
+const ProjectionCaptureLead = 2 * time.Hour
+
+// projectionArrivesAt is when the addressed week's published projection is
+// first captured, its first kickoff less ProjectionCaptureLead; nil once one
+// is read, or when that moment has passed or the week holds no game.
+func (a *advisor) projectionArrivesAt() *time.Time {
+	if !a.projection.ReadAt.IsZero() {
+		return nil
+	}
+	var first time.Time
+	for _, g := range a.data.Games {
+		if g.Week == a.week && (first.IsZero() || g.Kickoff.Before(first)) {
+			first = g.Kickoff
+		}
+	}
+	if first.IsZero() {
+		return nil
+	}
+	at := first.Add(-ProjectionCaptureLead)
+	if !at.After(a.now) {
+		return nil
+	}
+	return &at
 }
 
 // firstWeek is the first week the order's figures cover: the published
@@ -342,7 +423,11 @@ func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
 		out.GameState = &state
 	}
 	if d := f.Designation; d != nil {
-		out.Designation = &apitypes.InjuryDesignation{Status: apitypes.DesignationStatus(d.Status), AsOf: d.AsOf, Since: d.Since}
+		out.Designation = &apitypes.InjuryDesignation{Status: apitypes.DesignationStatus(d.Status), AsOf: d.AsOf, Since: d.Since, Listed: d.Listed}
+		if d.CarriedOver {
+			carried := true
+			out.Designation.CarriedOver = &carried
+		}
 	}
 	for _, g := range f.LastGames {
 		out.LastGames = append(out.LastGames, apitypes.GamePoints{Week: g.Week, Points: roundTenth(g.Points)})
@@ -421,16 +506,18 @@ func rosterSpots(config []draft.SlotConfig) int {
 	return n
 }
 
-// header is what every page carries: the week, the order and the reads.
+// header is what every page carries: the platform's week, the week the
+// page addresses (forWeek, Lane 95), the order and the reads.
 type header struct {
 	week      int
+	forWeek   int
 	basis     apitypes.OrderBasis
 	refreshed time.Time
 	readAt    time.Time
 }
 
 func (a *advisor) header() header {
-	return header{week: a.Snap.Week, basis: apitypes.OrderBasis(a.basis), refreshed: a.Board.Refreshed, readAt: a.Snap.ReadAt}
+	return header{week: a.Snap.Week, forWeek: a.week, basis: apitypes.OrderBasis(a.basis), refreshed: a.Board.Refreshed, readAt: a.Snap.ReadAt}
 }
 
 // host is the host's page for a verb on the member's team, and the note
@@ -498,30 +585,72 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	for _, i := range bench {
 		out.Bench = append(out.Bench, people[i].line)
 	}
-	out.WeekDone = weekDone(out.Slots, out.Week)
+	out.WeekDone = weekDone(out.Slots)
+	if out.WeekDone != nil {
+		state := a.weekDoneState()
+		out.WeekDoneState = &state
+	}
 	return out, true
 }
 
-// weekDone is the week's sentence once every starter with a game has it
+// weekDoneState is the member's matchup once their starters have all
+// played (Lane 91): final when the scoreboard's game is (every starter on
+// both sides final by gameStateAt, the bug's own count), or when the
+// member has no opponent this week; locked while any starter on either
+// side still has a game to play.
+func (a *advisor) weekDoneState() apitypes.WeekDoneState {
+	if mine := a.side(a.Me); mine == nil || mine.Game == 0 {
+		return apitypes.WeekDoneStateFinal
+	}
+	for _, sides := range a.pairings() {
+		if sides[0].RosterID != a.Me || sides[0].Game == 0 {
+			continue
+		}
+		if a.scoreboardGame(sides).State != apitypes.ScoreboardGameStateFinal {
+			return apitypes.WeekDoneStateLocked
+		}
+		return apitypes.WeekDoneStateFinal
+	}
+	return apitypes.WeekDoneStateFinal
+}
+
+// weekDone is the Lineup's sentence once every starter with a game has it
 // final by the one state (gameStateAt), a bye starter aside; nil while
 // any is still to come or under way, or with no starter who has a game.
-func weekDone(slots []apitypes.LineupSlot, week int) *string {
+// It says the lineup, never the week (Lane 91): the matchup may still play.
+func weekDone(slots []apitypes.LineupSlot) *string {
+	if !everyStarterPast(slots, apitypes.GameStateFinal) {
+		return nil
+	}
+	words := WeekDoneWords()
+	return &words
+}
+
+// everyStarterPast reports whether every starter with a game this week, a
+// bye starter aside, has his game at least at state by the one game state
+// (gameStateAt): kicked off (kicked off or final) or final. False with no
+// starter who has a game. weekDone and addressedWeek read it (Lane 95), so
+// the Lineup's sentence and the action screens' week turn on the same facts.
+func everyStarterPast(slots []apitypes.LineupSlot, state apitypes.GameState) bool {
 	games := 0
 	for _, s := range slots {
 		f := s.Ours.Facts
 		if f.Bye || f.Kickoff == nil {
 			continue
 		}
-		if f.GameState == nil || *f.GameState != apitypes.GameStateFinal {
-			return nil
+		if f.GameState == nil || !atLeast(*f.GameState, state) {
+			return false
 		}
 		games++
 	}
-	if games == 0 {
-		return nil
-	}
-	words := WeekDoneWords(week)
-	return &words
+	return games > 0
+}
+
+// atLeast reports whether a game at got has reached want: final is past
+// kicked off, kicked off past upcoming.
+func atLeast(got, want apitypes.GameState) bool {
+	order := map[apitypes.GameState]int{apitypes.GameStateUpcoming: 0, apitypes.GameStateKickedOff: 1, apitypes.GameStateFinal: 2}
+	return order[got] >= order[want]
 }
 
 // starts reports whether the league starts a position in any slot.
@@ -635,7 +764,17 @@ func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.Waive
 		out.Rows = append(out.Rows, row)
 	}
 	if order == seasonOrder {
-		return inSeasonOrder(out, shown), true
+		// The rule says the week the page addresses (Lane 95), the turned one too.
+		out = inSeasonOrder(out, shown)
+		out.Basis = SeasonOrderWords(a.week)
+		return out, true
+	}
+	if out.ProjectionReadAt == nil {
+		// No published projection for the week yet (Lane 95): no Proj to
+		// order the week by, so the page takes the season Gain order.
+		out = inSeasonOrder(out, shown)
+		out.Basis = UnprojectedOrderWords(a.week)
+		return out, true
 	}
 	out.Pickups = run.strip(strip)
 	if out.ProjectionReadAt != nil {
@@ -670,7 +809,8 @@ func (a *advisor) pageOrder(run waiverRun, position draft.Position, asked string
 func (a *advisor) waiverPage(run waiverRun) apitypes.WaiverAdvice {
 	h := a.header()
 	un := UncountedOf(a.settings, a.season.Carries)
-	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis, PickupOrder: weekOrder,
+	forWeek := h.forWeek
+	out := apitypes.WaiverAdvice{Week: h.week, ForWeek: &forWeek, ProjectionArrivesAt: a.projectionArrivesAt(), Basis: WaiversBasisFor(a.week, a.week != a.Snap.Week), PickupOrder: weekOrder,
 		SeasonBasis: withPerGame(a.Board, WaiverSeasonBasis(a.basis, a.weeks), run.mine, run.pool),
 		BasisNote:   un.Note, BasisNoteLink: un.Link, OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt,
 		ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
@@ -756,7 +896,8 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	squad := a.squad(team, mine, true)
 	h := a.header()
 	un := UncountedOf(a.settings, a.season.Carries)
-	out := apitypes.TradeAdvice{Week: h.week, BasisNote: un.Note, BasisNoteLink: un.Link, OrderBasis: h.basis, Refreshed: h.refreshed,
+	forWeek := h.forWeek
+	out := apitypes.TradeAdvice{Week: h.week, ForWeek: &forWeek, ProjectionArrivesAt: a.projectionArrivesAt(), BasisNote: un.Note, BasisNoteLink: un.Link, OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine), Moves: TradeMoves(a.Snap.Ref.Host),
 		ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: a.givesPlayerPoints(a.side(a.Me))}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)

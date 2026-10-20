@@ -31,8 +31,29 @@ const STATUSES = (
 	}
 ).rows;
 
-/** When the capture first held a final for a club's game at that kickoff, null before. */
-function finalAt(team: string | null | undefined, kickoff: string): number | null {
+/** The environment variable naming clubs whose final the capture has not held yet (Lane 91), comma
+ * separated, both clubs of a game: `FIXTURE_LATE_FINAL=LV,BUF` keeps that game kicked off at any
+ * clock, so the member's starters can all be final while the opponent's still plays. */
+export const FIXTURE_LATE_FINAL_VARIABLE = 'FIXTURE_LATE_FINAL';
+
+/** The clubs a `FIXTURE_LATE_FINAL` value names. */
+export function lateFinals(value: string | undefined): ReadonlySet<string> {
+	return new Set(
+		(value ?? '').split(',').flatMap((club) => (club.trim() === '' ? [] : [club.trim()]))
+	);
+}
+
+/** The fixture API's late finals, from its environment: none unless a shot asks. */
+const LATE_FINALS = lateFinals(process.env[FIXTURE_LATE_FINAL_VARIABLE]);
+
+/** When the capture first held a final for a club's game at that kickoff, null before or for a club
+ * whose final is late. */
+function finalAt(
+	team: string | null | undefined,
+	kickoff: string,
+	late: ReadonlySet<string>
+): number | null {
+	if (team != null && late.has(team)) return null;
 	const row = STATUSES.find((r) => r.team === team && r.kickoff === kickoff);
 	return row === undefined ? null : Date.parse(row.as_of);
 }
@@ -41,37 +62,51 @@ function isGame(value: Record<string, unknown>): value is Record<string, unknown
 	return typeof value.played === 'boolean' && 'kickoff' in value;
 }
 
-/** The API's rule at `now`: final by the stored answer or the capture's status for either club. */
-export function stateAt(game: Game, now: number): State | null {
+/** The API's rule at `now`: final by the stored answer or the capture's status for either club, the
+ * `late` clubs' status not held yet. */
+export function stateAt(
+	game: Game,
+	now: number,
+	late: ReadonlySet<string> = LATE_FINALS
+): State | null {
 	if (game.bye === true || game.kickoff === null) return null;
-	const final = [finalAt(game.team, game.kickoff), finalAt(game.opponent, game.kickoff)].some(
-		(at) => at !== null && at <= now
-	);
+	const final = [
+		finalAt(game.team, game.kickoff, late),
+		finalAt(game.opponent, game.kickoff, late)
+	].some((at) => at !== null && at <= now);
 	if (game.played || final) return 'final';
 	return now >= Date.parse(game.kickoff) ? 'kicked_off' : 'upcoming';
 }
 
-function sectionOf(facts: Game, now: number): 'to_play' | 'kicked_off' | 'bye' {
+function sectionOf(
+	facts: Game,
+	now: number,
+	late: ReadonlySet<string>
+): 'to_play' | 'kicked_off' | 'bye' {
 	if (facts.bye === true) return 'bye';
-	return stateAt(facts, now) === 'upcoming' ? 'to_play' : 'kicked_off';
+	return stateAt(facts, now, late) === 'upcoming' ? 'to_play' : 'kicked_off';
 }
 
 /** The answer with every game stamped at `now`: a new value, the stored one left as it was. */
-export function stamped(body: unknown, now: number): unknown {
-	if (Array.isArray(body)) return body.map((item) => stamped(item, now));
+export function stamped(
+	body: unknown,
+	now: number,
+	late: ReadonlySet<string> = LATE_FINALS
+): unknown {
+	if (Array.isArray(body)) return body.map((item) => stamped(item, now, late));
 	if (body === null || typeof body !== 'object') return body;
 	const entries = Object.entries(body as Record<string, unknown>).map(
-		([key, value]) => [key, stamped(value, now)] as const
+		([key, value]) => [key, stamped(value, now, late)] as const
 	);
 	const out: Record<string, unknown> = Object.fromEntries(entries);
 	if (isGame(out)) {
-		const state = stateAt(out, now);
+		const state = stateAt(out, now, late);
 		out.game_state = state;
 		out.played = state === 'final';
 	}
 	const line = out.line as { facts?: unknown } | undefined;
 	if (typeof out.section === 'string' && line?.facts && typeof line.facts === 'object') {
-		out.section = sectionOf(line.facts as Game, now);
+		out.section = sectionOf(line.facts as Game, now, late);
 	}
 	return out;
 }

@@ -37,7 +37,7 @@ func (r *countingReads) Designations(context.Context) (map[string]boards.Designa
 
 var captureAt = time.Date(2026, 10, 15, 11, 0, 0, 0, time.UTC)
 
-func (r *countingReads) SeasonRuns(_ context.Context, newest time.Time) (map[boards.RunKey]time.Time, error) {
+func (r *countingReads) DesignationRuns(_ context.Context, newest time.Time) (map[boards.RunKey]time.Time, error) {
 	r.runs.Add(1)
 	if r.failRuns {
 		return nil, errors.New("runs down")

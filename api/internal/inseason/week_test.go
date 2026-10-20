@@ -273,14 +273,16 @@ func TestWeekRouteWithNothingWired(t *testing.T) {
 	}
 }
 
-// The front door's nudge says the Lineup's own sentence once the week is
-// over (Lane 85 fix round, M1), none before.
+// The front door's nudge says the Lineup's own sentence and its state
+// once every starter has played (Lane 85 fix round, M1; Lane 91), none
+// before.
 func TestLineupSummaryCarriesTheWeekDone(t *testing.T) {
-	done := WeekDoneWords(6)
-	if got := lineupSummary(apitypes.LineupAdvice{Slots: weekSlots(), WeekDone: &done}); got.WeekDone == nil || *got.WeekDone != done {
-		t.Fatalf("week done %v", got.WeekDone)
+	done, locked := WeekDoneWords(), apitypes.WeekDoneStateLocked
+	got := lineupSummary(apitypes.LineupAdvice{Slots: weekSlots(), WeekDone: &done, WeekDoneState: &locked})
+	if got.WeekDone == nil || *got.WeekDone != done || got.WeekDoneState == nil || *got.WeekDoneState != locked {
+		t.Fatalf("week done %v, state %v", got.WeekDone, got.WeekDoneState)
 	}
-	if got := lineupSummary(apitypes.LineupAdvice{Slots: weekSlots()}); got.WeekDone != nil {
-		t.Errorf("week done before the week is over: %q", *got.WeekDone)
+	if got := lineupSummary(apitypes.LineupAdvice{Slots: weekSlots()}); got.WeekDone != nil || got.WeekDoneState != nil {
+		t.Errorf("week done before every starter has played: %v %v", got.WeekDone, got.WeekDoneState)
 	}
 }

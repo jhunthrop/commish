@@ -33,6 +33,7 @@ import {
 } from './basis.ts';
 import { BOX } from './box.ts';
 import { locked } from './lineup.ts';
+import { addressedWeek, arrivesPart, NEXT_WEEK, turnedPage, weekProjected } from './next-week.ts';
 import { SEASON, TRADE_GAIN } from './season.ts';
 
 /** Every word the trade table prints that is not a player's or a team's, for the copy guard. */
@@ -170,6 +171,13 @@ export function weekLine(
 function countsThisWeek(row: Pick<TradeRow, 'give' | 'get' | 'drop'>, now: number): boolean {
 	const moved = [...row.give, ...row.get, ...(row.drop ? [row.drop] : [])];
 	return !moved.some((l) => locked(l, now));
+}
+
+/** The finder's week group head: "This week, Proj", "Week 7, Proj" on a turned page (Lane 95). */
+export function weekHeadFor(advice: { week: number; for_week?: number }): string {
+	return turnedPage(advice)
+		? `${NEXT_WEEK.week(addressedWeek(advice))}, ${BOX.proj}`
+		: TRADES.weekHead;
 }
 
 /** A trade with no change this week once a player it moves has kicked off or is final (Lane 85): the
@@ -397,8 +405,11 @@ export function fromWords(team: string, mine: boolean): string {
 	return mine ? `From ${team}, you` : `From ${team}`;
 }
 
+/** What the finder's Room column is. */
+const ROOM_PART = `${TRADES.room} is who a roster drops to take two for one.`;
+
 /** What the finder's two desk columns are: the week's change and Room. */
-const WEEK_ROOM = `${TRADES.weekShort} is each lineup's ${BOX.proj} with the trade less without it, set as Lineup sets it. ${TRADES.room} is who a roster drops to take two for one.`;
+const WEEK_ROOM = `${TRADES.weekShort} is each lineup's ${BOX.proj} with the trade less without it, set as Lineup sets it. ${ROOM_PART}`;
 
 /** The trade screen's basis, one paragraph under the rows (Lane 66t): who decides and what Gain is
  * (the API's), Proj, and at a desk the week's change and Room, then How the order has done. With a
@@ -415,7 +426,8 @@ export function tradeBasis(
 		| 'projection_read_at'
 		| 'projection_scoring'
 		| 'player_points'
-	>,
+	> &
+		Partial<Pick<TradeAdvice, 'week' | 'for_week' | 'projection_arrives_at'>>,
 	host: LeagueHost,
 	lines: readonly PlayerLine[],
 	opened: 'none' | 'trade' | 'builder',
@@ -426,16 +438,26 @@ export function tradeBasis(
 	// The builder's boxes draw a defense; a trade never holds one (Lane 66g).
 	const defense = opened === 'builder' && lines.some((l) => l.player.position === 'DEF');
 	const waiting = kickedOffPartAt(lines, now);
+	// Before the week's projection is read, the day it arrives in its place (Lane 95).
+	const arrives =
+		advice.week === undefined
+			? null
+			: arrivesPart(
+					advice,
+					addressedWeek({ week: advice.week, for_week: advice.for_week }),
+					clock.zone
+				);
 	const proj = said(
-		projPart(
-			{
-				readAt: advice.projection_read_at,
-				scoring: advice.projection_scoring,
-				defense,
-				league: true
-			},
-			clock
-		)
+		arrives ??
+			projPart(
+				{
+					readAt: advice.projection_read_at,
+					scoring: advice.projection_scoring,
+					defense,
+					league: true
+				},
+				clock
+			)
 	);
 	const players =
 		opened !== 'none'
@@ -454,7 +476,8 @@ export function tradeBasis(
 		...proj,
 		...said(waiting),
 		...players,
-		...said(WEEK_ROOM, false),
+		// The week's group is drawn only once its projection is read (weekProjected, TradeFinder).
+		...said(weekProjected(advice) ? WEEK_ROOM : ROOM_PART, false),
 		{ text: LINES.orderRecord, phone: true, href: hrefs.record }
 	];
 }

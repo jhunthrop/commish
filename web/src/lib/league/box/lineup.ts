@@ -7,7 +7,7 @@ import { lastName } from '#lib/format/draft.ts';
 import { designationWord } from '#lib/format/designation.ts';
 import { fixed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
-import type { LineupAdvice, LineupSlot, PlayerLine } from '../inseason/api.ts';
+import type { LineupAdvice, LineupSlot, PlayerLine, WeekDoneState } from '../inseason/api.ts';
 import { pastKickoff } from './kickoff.ts';
 import { hostWords } from '../names.ts';
 import { satIds } from '../inseason/words.ts';
@@ -91,10 +91,16 @@ export function shortName(name: string): string {
 
 const NUMBER_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
 
-/** "Three changes", "One change", "12 changes", or "Your lineup is set"; "Final" once the API says
- * the week is over (its week_done sentence, said beside it). */
-export function changesTitle(n: number, done: string | null = null): string {
-	if (done !== null) return BOX.final;
+/** "Three changes", "One change", "12 changes", or "Your lineup is set"; once the API says every
+ * starter of the member's has played (its week_done sentence, said beside it), "Locked" while the
+ * matchup still plays and "Final" once it is final (Lane 91). An answer with the sentence and no
+ * state, from the previous API, says "Final" as it did. */
+export function changesTitle(
+	n: number,
+	done: string | null = null,
+	state: WeekDoneState | null = null
+): string {
+	if (done !== null) return state === 'locked' ? BOX.locked : BOX.final;
 	if (n === 0) return LINEUP.set;
 	const word = NUMBER_WORDS[n] ?? String(n);
 	return `${word} ${n === 1 ? 'change' : 'changes'}`;
@@ -112,7 +118,7 @@ export function stripSum(
 	box: Pick<LineupBox, 'totals' | 'asSet' | 'gain' | 'swaps'>,
 	done: string | null = null
 ): StripSum | null {
-	// A finished week has no Proj left to add: the API's sentence stands in the sum's place.
+	// Every starter played leaves no Proj to add: the API's sentence stands in the sum's place.
 	if (box.totals.proj === null || done !== null) return null;
 	const figure = boxNumber(box.totals.proj);
 	if (box.swaps.length === 0) return { figure, words: `${BOX.proj} as set`, gain: null };

@@ -12,7 +12,7 @@
 	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
 	import { CARD, unreadBasis, type CardTile } from '#lib/player/card.ts';
 	import type { CardLeague, LiveCard, RestParts } from '#lib/player/week-words.ts';
-	import { shownWeekRead } from '#lib/player/week-read.ts';
+	import { shownWeekRead, weekReadLabel } from '#lib/player/week-read.ts';
 	import { cliffAt, lineFiguresAt, matesAt } from '#lib/player/live-figures.ts';
 	import PlayerCard from '#lib/player/PlayerCard.svelte';
 	import type PlayerCompare from '#lib/player/PlayerCompare.svelte';
@@ -337,7 +337,10 @@
 			<article class="read">
 				<h3><Label>Our read</Label></h3>
 				{#if weekRead}
-					<section class="week-read" aria-label="The week ahead">
+					<section
+						class="week-read"
+						aria-label={page.weekRead ? weekReadLabel(page.weekRead) : null}
+					>
 						<p class="stamp">{weekRead.caption}</p>
 						{#if weekRead.body !== null}<Capsule body={weekRead.body} pulls={[]} />{/if}
 					</section>

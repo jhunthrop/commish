@@ -2,6 +2,7 @@
 	import { links } from '#lib/site/links.ts';
 	import { changesTitle, LINEUP, stripSum, type LineupBox } from './lineup.ts';
 	import MoveMark from './MoveMark.svelte';
+	import type { WeekDoneState } from '../inseason/api.ts';
 
 	/** The Lineup's decision as a strip (Lane 66e): the board week, the count of changes, each swap as
 	 * a chip ("QB, Williams in, Stroud out"), and what they add to the lineup as it is set now. The
@@ -9,20 +10,23 @@
 	interface Props {
 		week: number;
 		box: LineupBox;
-		/** The API's sentence once every starter's game is final, said in the sum's place (Lane 85). */
+		/** The API's sentence once every starter of the member's has played, said in the sum's place
+		 * (Lane 85). */
 		done?: string | null;
+		/** Locked while the matchup still plays, final once it is (Lane 91). */
+		doneState?: WeekDoneState | null;
 	}
 
-	let { week, box, done = null }: Props = $props();
+	let { week, box, done = null, doneState = null }: Props = $props();
 	const sum = $derived(stripSum(box, done));
 </script>
 
 <div class="strip">
 	<div class="head">
 		<span class="wk">Week {week}</span>
-		<span class="title">{changesTitle(box.swaps.length, done)}</span>
+		<span class="title">{changesTitle(box.swaps.length, done, doneState)}</span>
 	</div>
-	<!-- A finished week has nothing left to fill or change: no chip (Lane 85). -->
+	<!-- Every starter played leaves nothing to fill or change: no chip (Lane 85). -->
 	{#if done === null && (box.swaps.length > 0 || box.idle.length > 0)}
 		<ul class="swaps">
 			<!-- The spots no one can play first, so a phone shows them before the swaps (review N4). -->

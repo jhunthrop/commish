@@ -81,7 +81,7 @@ func TestALandedReadWarmsTheTradeSearch(t *testing.T) {
 	if n := s.searches.Load(); n != 2 {
 		t.Fatalf("a refreshed order searched %d times in all, want 2", n)
 	}
-	a, err := s.leagueAdvisor(context.Background(), changed, signedIn, context.Background())
+	a, err := s.leagueAdvisor(context.Background(), changed, signedIn, context.Background(), actionWeek)
 	if err != nil {
 		t.Fatal(err)
 	}

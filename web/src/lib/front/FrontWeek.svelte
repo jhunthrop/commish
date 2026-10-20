@@ -156,7 +156,7 @@
 			<section aria-label={FRONT.yourRoster}>
 				<div class="sec-h">
 					<h3>{FRONT.yourRoster}</h3>
-					<span>{rosterAside(view.chips.length)}</span>
+					<span>{rosterAside(view.chips.length, view.chipsWeek)}</span>
 				</div>
 				<ul class="chips">
 					{#each view.chips as chip (chip.key)}

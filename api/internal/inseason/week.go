@@ -136,12 +136,22 @@ func (s *Service) weekLeague(ctx context.Context, wl WeekLeague, held map[string
 	out.Bug = a.weekBug(lineup)
 	summary := lineupSummary(lineup)
 	out.Lineup = &summary
+	// The roster's facts are the action screens' (Lane 95): once the
+	// member's lineup has played its week, next week's.
+	acts := s.addressed(ctx, a)
+	chipsWeek := acts.week
+	out.ChipsWeek = &chipsWeek
+	if acts != a {
+		if lineup, ok = acts.Lineup(); !ok {
+			return problem(noTeamWords)
+		}
+	}
 	var pickups []apitypes.WaiverRow
 	if wl.WaiversOpen {
 		// The full waiver page's strip by its one pickup rule: Pickups builds the
 		// whole page (its rows and their sentences) to read it, a cost each front
 		// door read with waivers open pays (review L-J).
-		pickups, _ = a.Pickups()
+		pickups, _ = acts.Pickups()
 	}
 	out.Chips = rosterChips(lineup, pickups)
 	return out
@@ -259,8 +269,8 @@ func lineupSummary(lineup apitypes.LineupAdvice) apitypes.WeekLineup {
 		set = append(set, asSet(slot))
 	}
 	out.Changes = len(out.Swaps)
-	// The Lineup's own sentence once the week is over, one source for both screens.
-	out.WeekDone = lineup.WeekDone
+	// The Lineup's own sentence and state once every starter has played, one source for both screens.
+	out.WeekDone, out.WeekDoneState = lineup.WeekDone, lineup.WeekDoneState
 	out.Projection, out.AsSet = printedSum(ours), printedSum(set)
 	if out.Projection != nil && out.AsSet != nil {
 		gain := roundTenth(*out.Projection - *out.AsSet)
@@ -288,7 +298,8 @@ func rosterChips(lineup apitypes.LineupAdvice, pickups []apitypes.WaiverRow) []a
 }
 
 // newestDesignation is the starter as set whose designation is the
-// newest, nil when none carries one.
+// newest, a fresh listing ranked above one carried over from a game already
+// played (Lane 95), nil when none carries one.
 func newestDesignation(slots []apitypes.LineupSlot) *apitypes.PlayerLine {
 	var out *apitypes.PlayerLine
 	for _, slot := range slots {
@@ -296,12 +307,24 @@ func newestDesignation(slots []apitypes.LineupSlot) *apitypes.PlayerLine {
 		if line == nil || line.Facts.Designation == nil {
 			continue
 		}
-		if out == nil || line.Facts.Designation.AsOf.After(out.Facts.Designation.AsOf) {
+		if out == nil || listedBefore(*out.Facts.Designation, *line.Facts.Designation) {
 			out = line
 		}
 	}
 	return out
 }
+
+// listedBefore reports whether designation a ranks below b on the strip:
+// carried over where b is fresh, else the older stamp.
+func listedBefore(a, b apitypes.InjuryDesignation) bool {
+	if ca, cb := carried(a), carried(b); ca != cb {
+		return ca
+	}
+	return b.AsOf.After(a.AsOf)
+}
+
+// carried is a designation the turned Season carries over (Lane 95).
+func carried(d apitypes.InjuryDesignation) bool { return d.CarriedOver != nil && *d.CarriedOver }
 
 // byeStarter is a starter as set on bye whose spot no one on the roster
 // can play this week (the Lineup's no_one_can_play), nil when every bye has

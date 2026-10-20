@@ -37,7 +37,7 @@
 	</div>
 	<div class="decide" class:set={changes === 0}>
 		<div class="what">
-			<b>{changesTitle(changes, summary.done)}</b>
+			<b>{changesTitle(changes, summary.done, summary.doneState)}</b>
 			{#if summary.done !== null}<span>{summary.done}</span>{:else if sum}<span
 					>{sum.figure}
 					{sum.words}{#if sum.gain}, <em>{sum.gain}</em>{/if}</span
