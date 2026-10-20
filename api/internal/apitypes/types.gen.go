@@ -2493,6 +2493,12 @@ type InjuryDesignation struct {
 	// AsOf the stamp of the injury read that lists it, or of the host read for the host's own IR mark
 	AsOf time.Time `json:"as_of"`
 
+	// CarriedOver on a page addressing the week after the platform's (Lane 95): a week's designation listed no later than his club's last game, or undated, so still listed but from before that game; the site says it with its listing date ("Out, listed Oct 12"); absent otherwise
+	CarriedOver *bool `json:"carried_over,omitempty"`
+
+	// Listed when the provider first listed him under this status, any status (the run's start); null when the read could not date it; absent from an older answer
+	Listed *time.Time `json:"listed,omitempty"`
+
 	// Since when his unbroken run under a season-long status began, the first capture that lists it (boards.WithSince, the nightly's designations.json since); null for a week's designation, the host's own IR mark, or a run older than the captures read. The site's status chip says it ("IR since Sep 28") and keeps the read for the basis
 	Since  *time.Time        `json:"since,omitempty"`
 	Status DesignationStatus `json:"status"`
@@ -4010,6 +4016,9 @@ type TradeAdvice struct {
 	// CheckBasis the trade builder's own line under its scoreboard, shown before its first answer (TradeCheck.basis says the same)
 	CheckBasis string `json:"check_basis"`
 
+	// ForWeek the week the page addresses (Lane 95): week, or the week after once every starter of the member's with a game has kicked off or is final; the rows' facts and Proj changes are that week's; absent from an older answer
+	ForWeek *int `json:"for_week,omitempty"`
+
 	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
 	HostNote *string `json:"host_note"`
 
@@ -4026,6 +4035,9 @@ type TradeAdvice struct {
 	// PlayerPoints as LineupAdvice's: the platform gives each player's points
 	PlayerPoints bool `json:"player_points"`
 
+	// ProjectionArrivesAt when for_week's published projection is first captured (its first kickoff less the capture's lead), set only while none is read for it; null otherwise, absent from an older answer
+	ProjectionArrivesAt *time.Time `json:"projection_arrives_at,omitempty"`
+
 	// ProjectionReadAt when the week's published projection behind week_projection and each proj change was captured, null with none
 	ProjectionReadAt *time.Time `json:"projection_read_at"`
 
@@ -4039,7 +4051,9 @@ type TradeAdvice struct {
 
 	// Teams every other team
 	Teams []TradeTeam `json:"teams"`
-	Week  int         `json:"week"`
+
+	// Week the platform's current week
+	Week int `json:"week"`
 }
 
 // TradeCheck defines model for TradeCheck.
@@ -4198,6 +4212,9 @@ type WaiverAdvice struct {
 	// BasisNoteLink the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
 	BasisNoteLink string `json:"basis_note_link"`
 
+	// ForWeek the week the page addresses (Lane 95): week, or the week after once every starter of the member's with a game has kicked off or is final; the rows' facts, Proj and pickups are that week's; absent from an older answer
+	ForWeek *int `json:"for_week,omitempty"`
+
 	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
 	HostNote *string `json:"host_note"`
 
@@ -4211,7 +4228,7 @@ type WaiverAdvice struct {
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
 
-	// PickupOrder the order the page's rows and strip are in, decided over the full page's rows and the answer's own by each row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the strip the first row worth making); a page narrowed to one position or focused on a player takes season_gain whenever the full page does
+	// PickupOrder the order the page's rows and strip are in, decided over the full page's rows and the answer's own by each row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the strip the first row worth making); a page narrowed to one position or focused on a player takes season_gain whenever the full page does; season_gain too while for_week's published projection is not read (Lane 95), there being no Proj to order the week by
 	PickupOrder WaiverAdvicePickupOrder `json:"pickup_order"`
 
 	// Pickups the pickups worth making, chosen as a set from every add we rank, at most 3: each measured against the lineup with the ones before it made, kept only while he still starts and raises the Proj, no two taking the same player of the member's (topped or dropped); each one's week_gain is his over the ones before (the strip's cards); empty when no pickup beats the roster
@@ -4219,6 +4236,9 @@ type WaiverAdvice struct {
 
 	// PickupsProj this week's Proj of the lineup the advice sets with every pickup made, one decimal; lineup_proj with none; null before the week's projection is read
 	PickupsProj *float64 `json:"pickups_proj"`
+
+	// ProjectionArrivesAt when for_week's published projection is first captured (its first kickoff less the capture's lead), set only while none is read for it; null otherwise, absent from an older answer
+	ProjectionArrivesAt *time.Time `json:"projection_arrives_at,omitempty"`
 
 	// ProjectionPreviousReadAt when the snapshot before it was captured, the read projection_delta counts from; null with none
 	ProjectionPreviousReadAt *time.Time `json:"projection_previous_read_at"`
@@ -4239,10 +4259,12 @@ type WaiverAdvice struct {
 
 	// SeasonBasis what the Rest of season column and a gain over the rest of the season are, said once under the rows
 	SeasonBasis string `json:"season_basis"`
-	Week        int    `json:"week"`
+
+	// Week the platform's current week, the week a claim names
+	Week int `json:"week"`
 }
 
-// WaiverAdvicePickupOrder the order the page's rows and strip are in, decided over the full page's rows and the answer's own by each row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the strip the first row worth making); a page narrowed to one position or focused on a player takes season_gain whenever the full page does
+// WaiverAdvicePickupOrder the order the page's rows and strip are in, decided over the full page's rows and the answer's own by each row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the strip the first row worth making); a page narrowed to one position or focused on a player takes season_gain whenever the full page does; season_gain too while for_week's published projection is not read (Lane 95), there being no Proj to order the week by
 type WaiverAdvicePickupOrder string
 
 // WaiverBeats the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the bench, never one who cannot play this week (Lane 66f's Beats column); or the open spot he fills, a starting spot no player of the member's can play this week
@@ -4378,6 +4400,9 @@ type WeekLeague struct {
 
 	// Chips at most three facts about the member's roster, in this order where each holds: a starter's designation, a starter on bye, the top pickup
 	Chips []RosterChip `json:"chips"`
+
+	// ChipsWeek the week the chips address (Lane 95, the action screens' week): week, or the week after once every starter of the member's with a game has kicked off or is final; absent from an older answer
+	ChipsWeek *int `json:"chips_week,omitempty"`
 
 	// Host the host a league runs on, named as a mechanism
 	Host LeagueHost `json:"host"`
