@@ -42,11 +42,13 @@ from research.tests.test_week_read_rules import STARTER_READ
 from research.tests.week_read_fixtures import WRITTEN_AT, questionable, starter
 
 _DATABASE = "parity_test_week_reads"
+# Lane 100 (B17, B44): the read quotes only the page's cells, at most three figures. The points the Bears allow
+# a game are on no cell, and the change is the card's Delta Proj, named as its change from the figure before.
 _QUESTIONABLE_READ = (
     "Bijan Robinson is Questionable on Friday's report, so whether he plays in week 6 of 2026 against Chicago is "
-    "not settled until Sunday. The published projection has him at 15.2 points, down 1.8 points since our last "
-    "read. The Bears allow running backs 18.7 PPR points a game, 9th of 32, and the Falcons are expected to "
-    "score 25 points. If he is active, Bijan Robinson stays in your lineup over a lesser back."
+    "not settled until Sunday. The published projection has him at 15.2 points, down 1.8 points from the "
+    "published figure before it. The Bears rank 9th of 32 against running backs, and the Falcons are expected "
+    "to score 25 points. If he is active, Bijan Robinson stays in your lineup over a lesser back."
 )
 _SHARED = "The Rams lean on him every single week."
 _THIS_WEEK, _NEXT_WEEK = 6, 7
