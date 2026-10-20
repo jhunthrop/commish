@@ -285,7 +285,7 @@ function recordVariants(): readonly (readonly [string, RunRecord])[] {
 	const worst: RunRecord = {
 		...drawn,
 		startersBasis:
-			"Starters right counts the week's top 12 QBs, 24 RBs, 36 WRs, 12 TEs, 12 kickers and 12 defenses it also put there."
+			"Starters right counts a standard 12-team lineup, the week's top 12 QBs, 24 RBs, 36 WRs, 12 TEs, 12 kickers and 12 defenses, and how many of them the order also put there."
 	};
 	return [
 		['record published', drawn],

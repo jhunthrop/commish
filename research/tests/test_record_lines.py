@@ -136,7 +136,9 @@ def test_the_starters_basis_names_only_the_positions_graded() -> None:
     rows = _quarterbacks(ours_right=True, published=False)
     weeks = [Week(1, "graded", None, None, None, _QUARTERBACKS, week_lines(rows), "preseason")]
     said = starters_basis(to_date(weeks, {1: rows}))
-    assert said == ("Starters right counts the week's top 12 QBs it also put there.")
+    assert said == (
+        "Starters right counts a standard 12-team lineup, the week's top 12 QBs, and how many of them the order also put there."
+    )
     assert starters_basis(()) is None
 
 
@@ -159,7 +161,7 @@ def test_honest_line_names_each_benchmark_ahead_of_ours() -> None:
     weeks = [Week(1, "graded", None, None, None, _QUARTERBACKS, week_lines(rows))]
     sentence = honest_line(to_date(weeks, {1: rows}))
     assert sentence is not None
-    assert "ADP had more of the week's starters right, 12 of 12 against our 10." in sentence
+    assert "ADP had more of the week's starters right in the standard lineup, 12 of 12 against our 10." in sentence
     assert "The published projection" in sentence
     words = set(re.findall(r"[a-z']+", sentence.lower()))
     assert not words & {"odds", "line", "spread", "bet", "market", "favoured", "underdog"}
@@ -241,7 +243,9 @@ def test_the_scale_prints_its_ends_as_the_page_prints_the_rate() -> None:
     in that form, 1.00 and 0.00, never 1.0 and 0 (Lane 78)."""
     ends = re.findall(r"-?\d+(?:\.\d+)?", SCALE)
     assert ends == [f"{1:.{AGREEMENT_PLACES}f}", f"{0:.{AGREEMENT_PLACES}f}"], SCALE
-    assert SCALE == "1.00 is a perfect match of the week's finishing order, 0.00 is none."
+    assert SCALE == (
+        "Order matched is how closely an order ranked the players as they finished the week: 1.00 is the same order, 0.00 no closer than chance, below it the reverse."
+    )
 
 
 def test_the_method_names_only_the_orders_the_record_draws() -> None:
@@ -249,11 +253,11 @@ def test_the_method_names_only_the_orders_the_record_draws() -> None:
     before = _quarterbacks(ours_right=True, published=False)
     weeks = [Week(1, "graded", None, None, None, _QUARTERBACKS, week_lines(before), "preseason")]
     assert method(to_date(weeks, {1: before})) == (
-        "Each week our preseason board froze before the first kickoff and was graded on its players' points, "
+        "Each week we set our order before the first kickoff and graded it on its players' points, "
         "ADP on the same players."
     )
     assert method(_two_weeks(before, _quarterbacks(ours_right=True, published=True))) == (
-        "Each week our preseason board froze before the first kickoff and was graded on its players' points, "
+        "Each week we set our order before the first kickoff and graded it on its players' points, "
         "ADP and Published on the same players."
     )
     assert method(()).endswith("ADP on the same players.")

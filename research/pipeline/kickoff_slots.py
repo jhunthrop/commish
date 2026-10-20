@@ -82,3 +82,30 @@ def slot_of(slots: Sequence[Slot], instant: datetime) -> Slot | None:
 def due_slot(slots: Sequence[Slot], now: datetime) -> Slot | None:
     """The slot whose capture window holds `now`, if any."""
     return next((s for s in slots if s.opens <= now < s.first_kickoff), None)
+
+
+# The register sets each week's order on its final pass before the week's first kickoff (Thursday
+# 14:00 Eastern, `research.inseason.season_week.FINAL_FREEZE_BEFORE`). The week's projection is
+# captured once more in this lead before that kickoff, so the freeze keeps the week's published
+# projection (Lane 93): for a Thursday night game the window opens at 12:15 and the 13:00 Eastern
+# harvest takes it, an hour before the pass. The slot captures are untouched: the newest projection
+# before each kickoff slot is still the slot's own.
+SET_LEAD: Final = timedelta(hours=8)
+
+
+def set_window_slot(slots: Sequence[Slot], now: datetime) -> Slot | None:
+    """The first slot of the week whose set window holds `now`: within `SET_LEAD` of the week's first
+    kickoff and before it. None outside every such window."""
+    firsts: dict[tuple[int, int], Slot] = {}
+    for slot in slots:
+        held = firsts.get((slot.season, slot.week))
+        if held is None or slot.first_kickoff < held.first_kickoff:
+            firsts[(slot.season, slot.week)] = slot
+    return next(
+        (
+            s
+            for s in sorted(firsts.values(), key=lambda s: s.first_kickoff)
+            if s.first_kickoff - SET_LEAD <= now < s.first_kickoff
+        ),
+        None,
+    )

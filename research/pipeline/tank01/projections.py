@@ -26,7 +26,7 @@ from sqlalchemy import Connection, text
 from research.db.schema import CAPTURE_SNAPSHOTS, TANK01_PROJECTION_ROWS
 from research.errors import SchemaDriftError
 from research.pipeline.jscompat import js_is_finite, js_number
-from research.pipeline.kickoff_slots import Slot, due_slot, kickoff_slots
+from research.pipeline.kickoff_slots import SET_LEAD, Slot, due_slot, kickoff_slots, set_window_slot
 from research.pipeline.kickoffs import stored_kickoffs
 from research.pipeline.observations import insert_ignoring_conflicts
 
@@ -176,10 +176,19 @@ _CAPTURED_SINCE: Final = text(
 )
 
 
+def _uncaptured_since(conn: Connection, since: datetime) -> bool:
+    return not conn.execute(_CAPTURED_SINCE, {"source": PROJECTIONS_SOURCE, "since": since}).scalar_one()
+
+
 def projection_slot_due(conn: Connection, season: int, now: datetime) -> Slot | None:
-    """The kickoff slot whose window holds `now`, unless a projections snapshot already stands in it."""
-    slot = due_slot(kickoff_slots(stored_kickoffs(conn, season)), now)
-    if slot is None:
+    """The kickoff slot whose window holds `now`, unless a projections snapshot already stands in it;
+    else the week's first slot while its set window holds `now` (Lane 93, `SET_LEAD`), unless one
+    stands in that window, so the register's final freeze keeps the week's projection."""
+    slots = kickoff_slots(stored_kickoffs(conn, season))
+    slot = due_slot(slots, now)
+    if slot is not None:
+        return slot if _uncaptured_since(conn, slot.opens) else None
+    first = set_window_slot(slots, now)
+    if first is None:
         return None
-    captured = conn.execute(_CAPTURED_SINCE, {"source": PROJECTIONS_SOURCE, "since": slot.opens}).scalar_one()
-    return None if captured else slot
+    return first if _uncaptured_since(conn, first.first_kickoff - SET_LEAD) else None
