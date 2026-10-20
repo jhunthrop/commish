@@ -21,6 +21,7 @@ from research.capsules.generate import BUDGET_SPENT, THROTTLED, ask, gateway_fai
 from research.capsules.page_figures import fallback_violation
 from research.capsules.rule_notes import notes_of
 from research.capsules.store import WRITTEN_SOURCE
+from research.capsules.validate import ValidationResult
 from research.capsules.week.judge import (
     JUDGE_MAX_TOKENS,
     JUDGE_MIN_WORDS,
@@ -32,11 +33,15 @@ from research.capsules.week.judge import (
 from research.capsules.week.prompt import WEEK_RULES, parse_week_answer, week_correction, week_prompt
 from research.capsules.week.render import render_week_facts_block
 from research.capsules.week.sheet import WeekSheet
-from research.capsules.week.validate import validate_week_read
+from research.capsules.week.validate import WEEK_BAND, validate_week_read
 
 # A draft and three corrections, the judge's call among them for a player who may not be started: a week
 # read is short, and a fourth failure is a facts block, retried on the cadence's terms. The season read's ceiling is six for two reads and a narrative.
 MAX_CALLS_PER_READ: Final = 4
+# Lane 100: a read whose last draft within the ceiling broke only the 80-word cap is asked once more, its
+# overrun named, before it falls to the facts block. The run's budget counts it in a read's worst case.
+OVERRUN_RETRIES: Final = 1
+MAX_ASKS_PER_READ: Final = MAX_CALLS_PER_READ + OVERRUN_RETRIES
 # A five-sentence read and its call run about 180 tokens; the cap leaves room and never cuts an honest read.
 MAX_TOKENS: Final = 600
 
@@ -82,14 +87,22 @@ def _gateway_why(error: GenerationError) -> str:
 
 
 class _Asks:
-    """The read's asks so far, the writer's and the judge's together, within `MAX_CALLS_PER_READ`."""
+    """The read's asks so far, the writer's and the judge's together, within `MAX_CALLS_PER_READ` and the
+    overrun's one more (`OVERRUN_RETRIES`) once granted."""
 
     def __init__(self) -> None:
         self.made = 0
+        self.extra = 0
 
     @property
     def left(self) -> bool:
-        return self.made < MAX_CALLS_PER_READ
+        return self.made < MAX_CALLS_PER_READ + self.extra
+
+    def grant_overrun(self, result: ValidationResult) -> None:
+        """One more ask, once, when the ceiling is reached and the draft broke the word cap alone."""
+        over = result.band_failure is not None and result.band_failure.words > WEEK_BAND[1]
+        if not self.left and self.extra < OVERRUN_RETRIES and over and len(result.violations) == 1:
+            self.extra += 1
 
 
 def _judged_start(sheet: WeekSheet, text: str, judge: GatewayClient) -> tuple[bool, Usage | None]:
@@ -133,6 +146,7 @@ def write_week_read(
         answer = parse_week_answer(completion.content)
         text = answer.read or ""
         result = validate_week_read(text, sheet, taken, answer.call)
+        asks.grant_overrun(result)
         violations = result.violations
         if result.ok and not sheet.may_start:
             if not asks.left:

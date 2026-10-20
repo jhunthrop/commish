@@ -31,7 +31,7 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.page_figures import page_tenth
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
-from research.capsules.week.cells import cell_figures
+from research.capsules.week.cells import cell_figures, misnamed
 from research.capsules.week.sheet import WeekSheet, points_text
 from research.capsules.week.start_advice import start_advice_in
 
@@ -160,11 +160,35 @@ def _unit_violations(sentences: Sequence[str], season: int) -> list[str]:
 
 def stated_figures(sentence: str, season: int) -> list[tuple[str, float]]:
     """The figures a sentence states, (as written, value): a rank's "of 32" belongs to its rank."""
+    return [(raw, value) for raw, value, _ in _stated(sentence, season)]
+
+
+def _stated(sentence: str, season: int) -> list[tuple[str, float, str]]:
+    """Each stated figure with the text after it, where its name is."""
     return [
-        (raw, value)
-        for raw, value, start, _ in figures_of(sentence, season)
+        (raw, value, sentence[end:])
+        for raw, value, start, end in figures_of(sentence, season)
         if not _ORDINAL_OF_BEFORE.search(sentence[:start])
     ]
+
+
+def _misnamed_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
+    """A cell's figure named as another cell (Lane 100 review M1): "37.7 PPR points a game" where his Avg
+    is 25.9 and 37.7 is a game's."""
+    out = []
+    for s in sentences:
+        for raw, value, after in _stated(s, sheet.season):
+            cell = misnamed(after, page_tenth(value), sheet)
+            if cell is not None:
+                out.append(
+                    _sentence_violation(
+                        f'names "{raw}" as {cell}, a cell that prints another figure',
+                        s,
+                        "Name each figure as its cell does: his points a game are his Avg, a game's points are "
+                        "that game's.",
+                    )
+                )
+    return out
 
 
 def _cell_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
@@ -388,6 +412,7 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *_cannot_start_violations(sentences, sheet, call),
         *_unit_violations(sentences, sheet.season),
         *_cell_violations(sentences, sheet),
+        *_misnamed_violations(sentences, sheet),
         *_order_violations(sentences, sheet),
         *_season_violation(text, sheet.season),
         *_wait_violation(text, sheet, call),

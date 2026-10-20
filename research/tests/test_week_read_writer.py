@@ -85,7 +85,8 @@ def test_the_prompt_states_the_week_the_kickoff_and_that_the_number_is_published
     user = week_prompt(starter(), ())
     assert "week 6 of 2026" in user and "Sunday 3:05 pm Central" in user and "18.4 points" in user
     assert "published projection" in WEEK_RULES and "never ours" in WEEK_RULES
-    assert "about 65 words" in WEEK_RULES and "never more than 80" in WEEK_RULES
+    assert "about 60 words" in WEEK_RULES and "never more than 80" in WEEK_RULES
+    assert "Pick the two or three facts that decide his week" in WEEK_RULES
     assert "quote at most 3 figures" in WEEK_RULES and "Never retell the cells" in WEEK_RULES
     assert '"in our preseason order" or "in our rest-of-season order"' in WEEK_RULES
     assert '"call"' in WEEK_RULES and '"hold" means no change' in WEEK_RULES and 'calls itself "hold"' in WEEK_RULES
@@ -116,7 +117,7 @@ def test_a_long_read_is_told_its_count_and_the_cut() -> None:
     gateway = _StubGateway([_answer(long_read), _answer(STARTER_READ)])
     assert write_week_read(starter(), gateway).source == "llm"  # type: ignore[arg-type]
     correction = gateway.asked[1][-1]["content"]
-    assert f"It is {words} words, {words - 80} over the 80-word cap. Cut about {words - 65} words" in correction
+    assert f"It is {words} words, {words - 80} over the 80-word cap. Cut about {words - 60} words" in correction
     assert length_move(80) is None
 
 
@@ -133,6 +134,38 @@ def test_a_read_asked_shorter_still_holds_to_the_cap() -> None:
     result = write_week_read(starter(), _StubGateway(script))  # type: ignore[arg-type]
     assert result.source == "llm" and result.text == STARTER_READ, result.attempts
     assert any("Word count" in v for v in result.attempts[1].violations), result.attempts[1]
+
+
+def _over_the_cap() -> str:
+    """The starter read with a sentence of plain words before its call, no figure among them: 89 words."""
+    extra = (
+        " Davante Adams is listed second behind him, the kind of steady pecking order that keeps the targets"
+        " flowing his way for now, and nothing in the facts says that changes in this game at home."
+    )
+    return STARTER_READ.replace(" Start him with confidence.", extra + " Start him with confidence.")
+
+
+def test_a_last_draft_over_the_cap_alone_is_asked_once_more_with_its_overrun_named() -> None:
+    """Lane 100: the fourth draft broke only the 80-word cap, so the writer asks a fifth time, the overrun
+    counted for it, and that read lands."""
+    long_read = _over_the_cap()
+    assert len(long_read.split()) > 80  # noqa: PLR2004 - the cap
+    gateway = _StubGateway([*[_answer(long_read)] * MAX_CALLS_PER_READ, _answer(STARTER_READ)])
+    result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
+    assert (result.source, result.text, result.calls) == ("llm", STARTER_READ, MAX_CALLS_PER_READ + 1)
+    assert "over the 80-word cap" in gateway.asked[-1][-1]["content"]
+
+
+def test_the_overrun_retry_is_one_and_only_for_the_cap() -> None:
+    """A fifth draft still over falls to the facts block; a last draft that broke another rule gets no retry."""
+    long_read = _over_the_cap()
+    gateway = _StubGateway([_answer(long_read)] * (MAX_CALLS_PER_READ + 2))
+    result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
+    assert result.source == "facts" and result.calls == MAX_CALLS_PER_READ + 1
+    broken = f"{long_read.removesuffix(' Start him with confidence.')} It is a safe bet he scores."
+    gateway = _StubGateway([_answer(broken)] * (MAX_CALLS_PER_READ + 2))
+    result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
+    assert result.source == "facts" and result.calls == MAX_CALLS_PER_READ
 
 
 def test_a_broken_rule_is_handed_back_with_its_sentence_and_the_rewrite_lands() -> None:
@@ -183,7 +216,8 @@ def test_the_step_holds_a_dollar_budget_under_the_nightly_bound() -> None:
     """The review's M3: the pass's own hard stop, its worst read, and a day of week reads beside $4.15."""
     budget = step_budget(_PRICE, NIGHTLY_BUDGET_USD)
     assert budget.max_usd == NIGHTLY_BUDGET_USD and budget.price == _PRICE
-    assert worst_read_usd(_PRICE) == pytest.approx(4 * (3700 * 0.15 + 600 * 0.50) / 1_000_000)
+    # Four asks and Lane 100's one overrun retry.
+    assert worst_read_usd(_PRICE) == pytest.approx(5 * (3700 * 0.15 + 600 * 0.50) / 1_000_000)
     assert step_budget(ModelPrice("m", None, None, "unread", None), HOURLY_BUDGET_USD).max_calls == int(0.05 / 0.00065)
     assert pytest.approx(2.00) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
 

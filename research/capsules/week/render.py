@@ -15,6 +15,7 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.render_depth import slot_word
 from research.capsules.render_season import week_list
 from research.capsules.render_words import IN_OUR_RECORDS, ordinal, signed, week_of
+from research.capsules.week.cells import named_chance
 from research.capsules.week.sheet import (
     CANNOT_PLAY,
     CENTRAL,
@@ -24,6 +25,7 @@ from research.capsules.week.sheet import (
     central_day_and_time,
     points_text,
 )
+from research.model.jsmath import js_round
 from research.pipeline.jscompat import js_string
 
 LAST_FANTASY_WEEK: Final = 17
@@ -116,12 +118,13 @@ def _weather_line(sheet: WeekSheet) -> str | None:
     roofed = None if w.roof is None else _ROOF_WORDS.get(w.roof)
     if roofed is not None:
         return f"Venue: {roofed}{_as_of(w.roof_read_at)}."
+    # Each figure as the weather cell prints it (`Math.round`), the chance only from the share it names one
+    # at (Lane 100 review M2, LOW-2).
+    chance = named_chance(w)
     parts = [
-        f"{js_string(round(w.temperature_f))} degrees" if w.temperature_f is not None else None,
-        f"wind {js_string(round(w.wind_mph))} mph" if w.wind_mph is not None else None,
-        f"a {js_string(round(w.precipitation_chance))}% chance of {w.precipitation_kind or 'rain'}"
-        if w.precipitation_chance is not None and w.precipitation_kind not in (None, "none")
-        else None,
+        f"{js_string(js_round(w.temperature_f))} degrees" if w.temperature_f is not None else None,
+        f"wind {js_string(js_round(w.wind_mph))} mph" if w.wind_mph is not None else None,
+        None if chance is None else f"a {js_string(chance)}% chance of {w.precipitation_kind or 'rain'}",
     ]
     said = [part for part in parts if part is not None]
     if not said:

@@ -25,8 +25,9 @@ from research.capsules.week.sheet import PROJECTION_BASIS, WeekSheet
 from research.capsules.week.validate import WEEK_BAND
 
 _LOW, _HIGH = WEEK_BAND
-# The words to aim at, under the cap of 80 (Lane 100, B44).
-TARGET_WORDS: Final = 65
+# The words to aim at, well under the cap of 80 (Lane 100, B44): the recorded model ran 91 to 104 words
+# against a target of 80.
+TARGET_WORDS: Final = 60
 _NUMBER_RULE: Final = {
     "published": (
         "- The week's number is the published projection: a projection published for the week, never ours. Name "
@@ -60,7 +61,7 @@ def _quoted(words: Sequence[str]) -> str:
 WEEK_RULES: Final = f"""You write the week-ahead read on one player's page for a fantasy football manager setting his lineup for the week in front of him. You sound like a sharp analyst talking to a friend in the same league: direct, specific, opinionated, never a lab report and never a style guide.
 
 THE READ
-- {MIN_SENTENCES} to {MAX_SENTENCES} short sentences, about {TARGET_WORDS} words in all and never more than {_HIGH}: count them before you answer. One paragraph, about the week the facts name and nothing else.
+- {MIN_SENTENCES} to {MAX_SENTENCES} short sentences, about {TARGET_WORDS} words in all and never more than {_HIGH}: count them before you answer. One paragraph, about the week the facts name and nothing else. Pick the two or three facts that decide his week (his game, his status, the published projection, the matchup, the weather, his role) and build on those. Leave the rest unquoted.
 - The read sits under his player card, whose cells already print his numbers: the published projection and its change, the opponent's rank, his points a game, each game's points, his rest-of-season points, the expected score and the weather. Say what those cells cannot: why his week looks the way it does (his status, his role, the matchup, the weather) and what a manager who has him does this week. Never retell the cells: quote at most {MAX_FIGURES} figures in all.
 - Open on the fact that matters most for him this week. Never open with a set-up phrase, a greeting, a question, or his name followed by a verdict. Name him in the read.
 - Every read on this site is written from facts like these, and no sentence may sit on two players' pages, even with the names and numbers swapped: build each sentence your own way for this player, never a sentence shape that would fit another player.

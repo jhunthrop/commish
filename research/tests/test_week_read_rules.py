@@ -19,7 +19,7 @@ from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
 from research.capsules.week.render import render_week_facts_block, render_week_sheet
 from research.capsules.week.rules import WEEK_NEVER_WORDS, week_rule_violations
-from research.capsules.week.sheet import BoardPlace, DepthPlace, PublishedProjection, Status, WeekGame
+from research.capsules.week.sheet import BoardPlace, DepthPlace, PublishedProjection, Status, Weather, WeekGame
 from research.capsules.week.start_advice import start_advice_in
 from research.capsules.week.validate import sentence_shapes, validate_week_read, with_season
 from research.tests.week_read_fixtures import (
@@ -330,6 +330,32 @@ def test_a_figure_the_page_draws_in_no_cell_is_refused() -> None:
     # His points a game and the games behind it are the Avg cell's.
     avg = STARTER_READ.replace("Start him with confidence.", "He brings 25.9 PPR points a game. Start him.")
     assert not [v for v in week_rule_violations(avg, sheet, "start") if "draws in no cell" in v]
+
+
+def test_a_cells_figure_named_as_another_cell_is_refused() -> None:
+    """Lane 100 review M1: a game's 37.7 said as his points a game, where his Avg is 25.9; his rest-of-season
+    figure named as such passes, another figure under that name does not."""
+    sheet = starter()
+    wrong = STARTER_READ.replace("Start him with confidence.", "He scores 37.7 PPR points a game. Start him.")
+    assert any("as his points a game (Avg)" in v for v in week_rule_violations(wrong, sheet, "start"))
+    right = STARTER_READ.replace("Start him with confidence.", "He scores 25.9 PPR points a game. Start him.")
+    assert not any("a cell that prints another figure" in v for v in week_rule_violations(right, sheet, "start"))
+    board = sheet.board
+    assert board is not None and board.points is not None
+    rest = f"{board.points:g} PPR points for the rest of the season"
+    named = STARTER_READ.replace("Start him with confidence.", f"He holds {rest}. Start him.")
+    assert not any("a cell that prints another figure" in v for v in week_rule_violations(named, sheet, "start"))
+    off = named.replace(f"{board.points:g} PPR", "25.9 PPR")
+    assert any("as his rest-of-season points" in v for v in week_rule_violations(off, sheet, "start"))
+
+
+def test_the_sheet_prints_a_chance_of_rain_only_as_the_cell_names_it() -> None:
+    """Lane 100 review M2 and LOW-2: below 20% the cell names no chance, so the sheet prints none; the
+    weather rounds as the page's Math.round does (60.5 is 61)."""
+    low = replace(questionable(), weather=Weather("outdoors", 60.5, 14.0, 10.0, "rain", FIGURES))
+    text = render_week_sheet(low)
+    assert "chance of rain" not in text and "61 degrees" in text
+    assert "a 30% chance of rain" in render_week_sheet(questionable())
 
 
 def test_a_read_states_at_most_three_figures_and_one_paragraph() -> None:
