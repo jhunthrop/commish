@@ -320,8 +320,17 @@ _REPORT_DAY: Final = re.compile(
 )
 
 
+# The words between a day and its report that name no other report (review R1-L2): "Friday's injury
+# report" is the sheet's "Friday's report".
+_KIND: Final = re.compile(r"\s(?:injury|practice|game status)\s")
+
+
 def _named(text: str) -> set[str]:
-    return {m.group(0).lower().replace("\u2019", "'").removeprefix("the ") for m in _REPORT_DAY.finditer(text)}
+    """Each report or list named by its day, as one phrase: lower case, no leading "the", no kind word."""
+    return {
+        _KIND.sub(" ", m.group(0).lower().replace("\u2019", "'").removeprefix("the "))
+        for m in _REPORT_DAY.finditer(text)
+    }
 
 
 def _report_day_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:

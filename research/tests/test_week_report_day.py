@@ -105,6 +105,12 @@ def test_a_read_naming_the_issued_report_passes_and_another_day_does_not() -> No
     sheet = starter()
     good = "He has no designation on Friday's report. Start him. The Rams play at home."
     bad = good.replace("Friday's", "Tuesday's")
+    # Review R1-L2: the report's kind word names no other report.
+    injury = good.replace("Friday's report", "Friday's injury report")
+    assert not [v for v in week_rule_violations(injury, sheet, "start") if "report the facts" in v]
+    assert [
+        v for v in week_rule_violations(injury.replace("Friday", "Tuesday"), sheet, "start") if "report the facts" in v
+    ]
     assert not [v for v in week_rule_violations(good, sheet, "start") if "report the facts" in v]
     assert [v for v in week_rule_violations(bad, sheet, "start") if "Tuesday's report" in v]
 
