@@ -45,11 +45,13 @@ MODEL_NAME: Final = "commish_ros_v3"
 @dataclass(frozen=True, slots=True)
 class RestFigures:
     """One player's rest of season: points by scoring, expected games, and the week it starts from
-    (his club's first game still to play, None with none left)."""
+    (his club's first game still to play, None with none left); and by scoring the preseason pace a
+    game the model starts him from (Lane 100), None for a player the preseason line does not hold."""
 
     projected: Mapping[str, float]
     expected_games: float
     from_week: int | None
+    preseason_per_game: Mapping[str, float] | None = None
 
 
 Projections = Mapping[str, RestFigures]
@@ -182,7 +184,8 @@ def _projections(
         projection = project(player, ready.priors)
         club = club_at(who, ready.window)
         start = first_week_to_play(states, club) if player.remaining_weeks else None
-        found[row.universe_id] = RestFigures(projection.projected, projection.expected_games, start)
+        pace = None if stale is None or stale.per_game is None else dict(stale.per_game)
+        found[row.universe_id] = RestFigures(projection.projected, projection.expected_games, start, pace)
     return found  # fmt: skip
 
 
@@ -197,6 +200,7 @@ def _reranked(board: FormatBoard, extra: Sequence[StoredRow], found: Projections
             projected=found[row.universe_id].projected[board.format.scoring],
             expected_games=found[row.universe_id].expected_games,
             from_week=found[row.universe_id].from_week,
+            preseason_per_game=_pace(found[row.universe_id], board.format.scoring),
             floor=None,
             median=None,
             ceiling=None,
@@ -205,6 +209,11 @@ def _reranked(board: FormatBoard, extra: Sequence[StoredRow], found: Projections
     ]
     preseason |= {row.universe_id: None for row in extra}
     return replace(board, entries=board_entries(rows, board.format, preseason))
+
+
+def _pace(figures: RestFigures, scoring: str) -> float | None:
+    """The preseason pace a game the model starts him from in `scoring`, None when it holds none."""
+    return None if figures.preseason_per_game is None else figures.preseason_per_game.get(scoring)
 
 
 def carried(raw: RawLine) -> frozenset[str]:

@@ -179,6 +179,9 @@ def numbers_of(entry: BoardEntry, adp: float | None, tier_drop: float | None) ->
         numbers |= {
             "preseasonRank": None if before is None else before.our_rank,
             "preseasonPoints": None if before is None else tenth(before.row.projected),
+            # The preseason pace a game the order starts his figure from (Lane 100), with his preseason
+            # figures only.
+            "preseasonPerGame": None if before is None else tenth_or_none(row.preseason_per_game),
             # The week his rest of season starts from: his club's first game still to play (Lane 86).
             "restFromWeek": row.from_week,
         }
