@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { BOX, boxNumber, type BoxRow, type BoxStarter, type BoxTotals } from './box.ts';
+	import { BOX, type BoxRow, type BoxStarter, type BoxTotals } from './box.ts';
 	import BoxLine from './BoxLine.svelte';
 	import TeamFigures from './TeamFigures.svelte';
 	import TeamAvatar from './TeamAvatar.svelte';

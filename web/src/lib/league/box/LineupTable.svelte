@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { BOX, boxNumber } from './box.ts';
+	import { BOX } from './box.ts';
 	import { askedPlayer, markAsked } from './asked.ts';
 	import BoxLine from './BoxLine.svelte';
 	import TeamFigures from './TeamFigures.svelte';

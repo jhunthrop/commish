@@ -63,8 +63,13 @@
 	{read}
 	reserve={RESERVE_ROWS}
 >
-	{#snippet children(week: Week, _host: LeagueHost, clock: number)}
-		<MatchupPanel sync={week.sync} box={week.box} now={new Date(week.read_at)} {clock} />
+	{#snippet children(week: Week, host: LeagueHost, clock: number)}
+		<MatchupPanel
+			sync={week.sync}
+			box={week.box}
+			now={new Date(week.read_at)}
+			live={{ host, clock }}
+		/>
 		{#if week.sync.matchup === null && basis !== ''}<p class="basis">{basis}</p>{/if}
 	{/snippet}
 </InSeasonPage>

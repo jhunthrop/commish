@@ -7,7 +7,7 @@
 	import { KICKOFF } from './box/kickoff.ts';
 	import { matchupStarted, nextKickoff, sideBox, type SideBox } from './box/matchup.ts';
 	import { readCell } from './home/home.ts';
-	import type { LeagueSync, MatchupSide } from './api.ts';
+	import type { LeagueHost, LeagueSync, MatchupSide } from './api.ts';
 	import type { MatchupBox } from './inseason/api.ts';
 	import { hostWords, matchupGap, scoreGap, scoreUnread, teamName } from './model.ts';
 
@@ -23,11 +23,12 @@
 		box: MatchupBox | null;
 		/** The clock the page's read line uses. */
 		now: Date;
-		/** The page's own clock in ms, ticking: the read beside the live score is aged by it. */
-		clock?: number;
+		/** The platform the page's head names and the page's own clock in ms, ticking: the read beside
+		 * the live score names the one and is aged by the other. */
+		live?: { host: LeagueHost; clock: number };
 	}
 
-	let { sync, box, now, clock = now.getTime() }: Props = $props();
+	let { sync, box, now, live }: Props = $props();
 
 	const matchup = $derived(sync.matchup);
 
@@ -68,7 +69,10 @@
 	/** The read beside the live score (Lane 92, B06), while the game is under way. */
 	const read = $derived(
 		started && kickoff?.head !== KICKOFF.final
-			? readCell({ host: sync.host, readAt: sync.read_at }, clock)
+			? readCell(
+					{ host: live?.host ?? sync.host, readAt: sync.read_at },
+					live?.clock ?? now.getTime()
+				)
 			: null
 	);
 	/** FFPC is read as one member, so the API keeps only the viewer's own starters. */
