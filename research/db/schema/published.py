@@ -46,15 +46,15 @@ PUBLISHED_BOARDS: Final = Table(
     # The run's rosFromWeek in season (revision 0007): the weeks a figure covers run from it to week 17;
     # NULL for a preseason row.
     Column("from_week", Integer),
-    # His points for one more club game after the counted ones (revision 0015, Lane 96): the week a
-    # league's title week runs past the run's last; NULL preseason and on a run older than the column.
-    Column("game_points", Double(53)),
     # His designation on the newest hourly capture (revision 0008, Lane 63), NULL when it does not list
     # him; the first capture of his unbroken run under a season-long status, NULL for a week's
     # designation and for a run older than the captures read; the capture's feed.
     Column("status", Text),
     Column("status_since", DateTime(True)),
     Column("status_source", Text),
+    # His points for one more club game after the counted ones (revision 0015, Lane 96; declared last, where the migration appends it): the week a
+    # league's title week runs past the run's last; NULL preseason and on a run older than the column.
+    Column("game_points", Double(53)),
     one_of("format", PUBLISHED_FORMATS, "published_boards_format_ck"),
     one_of("order_basis", ORDER_BASES, "published_boards_order_basis_ck"),
     CheckConstraint("rank >= 1 AND position_rank >= 1", name="published_boards_rank_ck"),
