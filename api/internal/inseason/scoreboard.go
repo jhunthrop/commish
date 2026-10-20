@@ -61,30 +61,23 @@ type kickoffs struct {
 	next                                *time.Time
 }
 
-// add counts one starter's game by its state (gameStateAt, carried on his
-// facts), so the bug and his row never disagree on a kickoff. A starter
-// out (a designation that keeps him out) is done once his game has kicked
-// off: he scores nothing more (Lane 92, B02). Before kickoff his game is
-// still to come, as the platform keeps the matchup in progress: he can
-// still be swapped out (fix round 1, HIGH-2).
+// add counts one starter's game by its state (stateOfStart, from
+// gameStateAt carried on his facts), so the bug and his row never disagree
+// on a kickoff; a done starter has kicked off.
 func (k *kickoffs) add(f apitypes.WeekFacts) {
-	if f.Bye || f.Kickoff == nil || f.GameState == nil {
+	state := stateOfStart(f)
+	if state == noGame {
 		return
 	}
 	k.games++
-	out := sitsOut(f)
-	switch *f.GameState {
-	case apitypes.GameStateFinal:
+	switch state {
+	case done:
 		k.kicked++
 		k.done++
 		return
-	case apitypes.GameStateKickedOff:
+	case inPlay:
 		k.kicked++
-		if out {
-			k.done++
-		} else {
-			k.inPlay++
-		}
+		k.inPlay++
 		return
 	}
 	k.toCome++

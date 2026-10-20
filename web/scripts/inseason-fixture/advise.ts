@@ -81,14 +81,25 @@ export function advise(advice: LineupAdvice, locked: Locked = () => false): Line
 		);
 		if (at >= 0) placed[at] = l;
 	}
-	// A spot no one who can play fills keeps the member's player there, marked (keepWhereNoOneCanPlay).
+	// A spot no one who can play fills keeps the member's player there, marked (keepWhereNoOneCanPlay),
+	// unless a player who can play this week would take it but has kicked off: the spot is held, no
+	// mark (advice.go heldNotIdle, Lane 99 fix round 1).
 	const idle = new Set<string>();
+	const lockedOut = (kind: LineupSlot['slot']): boolean =>
+		pool.some(
+			(l) =>
+				tierOf(l) === 0 &&
+				locked(l) &&
+				!chosen.has(l.player.host_id) &&
+				!hostAt.some((h) => h?.player.host_id === l.player.host_id) &&
+				accepts(kind, l.player.position)
+		);
 	placed.forEach((p, i) => {
 		const h = hostAt[i];
 		if (p === null && h && !chosen.has(h.player.host_id)) {
 			placed[i] = h;
 			chosen.add(h.player.host_id);
-			idle.add(h.player.host_id);
+			if (!lockedOut(kinds[i] ?? 'FLEX')) idle.add(h.player.host_id);
 		}
 	});
 	// Then any member's starter left over, into any empty spot that takes him (review N1).

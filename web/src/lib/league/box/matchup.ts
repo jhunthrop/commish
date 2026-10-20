@@ -4,7 +4,7 @@
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 import { gameHead, KICKOFF, linesRead } from './kickoff.ts';
 import type { MatchupSide } from '../api.ts';
-import type { MatchupBoxSide, PlayerLine } from '../inseason/api.ts';
+import type { MatchupBox, MatchupBoxSide, PlayerLine } from '../inseason/api.ts';
 import {
 	BOX,
 	boxNumber,
@@ -131,6 +131,27 @@ export function sideBox(
 		byPlayer: side.player_points,
 		teamTotal: side.team_total
 	};
+}
+
+/** The score bug's middle once the API says the game is decided (MatchupBox.decided, Lane 99 B31):
+ * "Decided" in place of the state word while the game plays, the kickoff's words left out; as it was
+ * before kickoff, once final, or from an answer without it. */
+export function decidedHead(
+	kickoff: { head: string; words: string } | null,
+	decided: boolean,
+	started: boolean
+): { head: string; words: string } | null {
+	if (kickoff === null || !decided || !started || kickoff.head === KICKOFF.final) return kickoff;
+	return { head: KICKOFF.decided, words: '' };
+}
+
+/** The line under the bug's two scores (MatchupBox.standing, Lane 99 B31): the API's, from the first
+ * kickoff at the page's clock; null before it or from an answer without one. */
+export function standingLine(
+	box: Pick<MatchupBox, 'standing'> | null,
+	started: boolean
+): string | null {
+	return started ? (box?.standing ?? null) : null;
 }
 
 /** The score bug's middle by the one rule the League page's bugs read (kickoff.ts): "First kickoff"

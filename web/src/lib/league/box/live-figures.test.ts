@@ -159,10 +159,7 @@ void test('the basis says once that a game past kickoff keeps its Proj, and what
 });
 
 void test('Proj final says the rest of a starter in play, and once why a figure is --', () => {
-	assert.equal(
-		PROJ_FINAL_PART,
-		'Proj final adds the Pts so far and the Proj of the starters still to play, and a starter in play adds the rest of his Proj.'
-	);
+	assert.equal(PROJ_FINAL_PART, 'Proj final adds the Pts and the Proj each starter has left.');
 	assert.equal(NO_PROJ_FINAL_PART, 'No Proj final while a starter still to play has no Proj.');
 	assert.equal(projFinalWords(false, true), '');
 	assert.equal(projFinalWords(true, false), PROJ_FINAL_PART);

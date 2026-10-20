@@ -5,8 +5,8 @@
 	import TeamFigures from './TeamFigures.svelte';
 	import TeamAvatar from './TeamAvatar.svelte';
 
-	/** One team's box score (Lane 66d): its name with its avatar over the columns (slot, player, game,
-	 * this week's projection, points so far), its starters, a totals row lit like the score bug, and
+	/** One team's box score (Lane 66d): its name with its avatar over the columns (slot, player, our
+	 * rank, game, this week's projection, points so far), its starters, a totals row lit like the score bug, and
 	 * its bench below in the same columns (the Matchup's two boxes; the Lineup's table is
 	 * LineupTable). */
 	interface Props {
@@ -26,6 +26,9 @@
 		noBench?: string | null;
 		/** Your sheet's tags on a player, by board id: the drafter's own box only. */
 		tagsOf?: (boardId: string | null) => readonly string[];
+		/** The position chip in its own column under the Our rank head, its sentence in the screen's
+		 * basis (the Matchup, Lane 99 B24); the League page's lineup keeps it under the name. */
+		ranked?: boolean;
 	}
 
 	let {
@@ -38,13 +41,23 @@
 		aside,
 		avatar = true,
 		noBench = null,
-		tagsOf = () => []
+		tagsOf = () => [],
+		ranked = false
 	}: Props = $props();
 
-	const COLUMNS = 5;
+	const COLUMNS = $derived(ranked ? 6 : 5);
 </script>
 
 <table class="box" class:mine aria-label={team}>
+	<!-- The phone's fixed layout reads its widths here: the team's name heads the box in one cell. -->
+	<colgroup>
+		<col class="c-slot" />
+		<col />
+		{#if ranked}<col class="c-rank" />{/if}
+		<col class="c-game" />
+		<col class="c-n" />
+		<col class="c-n" />
+	</colgroup>
 	<thead>
 		<tr class="team">
 			<th colspan={COLUMNS}>
@@ -59,6 +72,7 @@
 		<tr class="cols">
 			<th class="slot" scope="col">{BOX.slot}</th>
 			<th scope="col">{BOX.player}</th>
+			{#if ranked}<th class="rank" scope="col">{BOX.ourRank}</th>{/if}
 			<th class="game" scope="col">{BOX.game}</th>
 			<th class="n" scope="col">{BOX.proj}</th>
 			<th class="n" scope="col">{BOX.pts}</th>
@@ -69,10 +83,10 @@
 			<tr><td class="empty" colspan={COLUMNS}>{empty}</td></tr>
 		{/if}
 		{#each starters as entry (entry.row.key)}
-			<BoxLine row={entry.row} tags={tagsOf(entry.row.boardId)} />
+			<BoxLine row={entry.row} tags={tagsOf(entry.row.boardId)} rankCell={ranked} />
 		{/each}
 		<tr class="totals">
-			<td colspan="3"
+			<td colspan={COLUMNS - 2}
 				><span class="tl">{BOX.totals}</span>{#if totals.note}<span class="tsub">{totals.note}</span
 					>{/if}</td
 			>
@@ -83,7 +97,7 @@
 		<tbody>
 			<tr class="bhead"><th colspan={COLUMNS} scope="rowgroup">{BOX.bench}</th></tr>
 			{#each bench as row (row.key)}
-				<BoxLine {row} tags={tagsOf(row.boardId)} bench />
+				<BoxLine {row} tags={tagsOf(row.boardId)} bench rankCell={ranked} />
 			{:else}
 				<tr><td class="empty" colspan={COLUMNS}>{noBench}</td></tr>
 			{/each}
@@ -155,14 +169,21 @@
 		letter-spacing: var(--track-label);
 		color: var(--ink-3);
 		border-bottom: 1px solid var(--line);
+		white-space: nowrap;
 	}
 
 	.cols .slot {
 		width: 48px;
 	}
 
+	/* Sized to the chip ("WR 149"), so the player keeps the room for his name. */
+	.cols .rank {
+		width: 52px;
+	}
+
+	/* Narrow enough beside the Our rank column that two boxes side by side keep a name on a line. */
 	.cols .game {
-		width: 186px;
+		width: 140px;
 	}
 
 	.cols .n {
@@ -217,7 +238,44 @@
 		border-bottom: 1px solid var(--line);
 	}
 
+	/* At a desk a name keeps to one line (fix round 1, HIGH-2): the box is two side by side. */
+	@media (min-width: 761px) {
+		.box :global(.nm) {
+			white-space: nowrap;
+		}
+
+		/* The game cell gives way first: its kickoff and facts wrap before a name would. */
+		.box :global(.opp),
+		.box :global(.facts) {
+			flex-wrap: wrap;
+			white-space: normal;
+			column-gap: 4px;
+		}
+	}
+
 	@media (max-width: 760px) {
+		/* Fixed on a phone: the heads set each column, the player takes the rest, so no long name
+		   widens the box past the screen beside the Our rank column (Lane 99). */
+		.box {
+			table-layout: fixed;
+		}
+
+		.c-slot {
+			width: 38px;
+		}
+
+		.c-rank {
+			width: 52px;
+		}
+
+		.c-game {
+			width: 0;
+		}
+
+		.c-n {
+			width: 50px;
+		}
+
 		/* The game folds under the name on a phone: its column keeps its place in the table, at no
 		   width, so every row's cells and the header's spans still line up. */
 		.cols .game {
@@ -228,6 +286,13 @@
 
 		.cols .slot {
 			width: 38px;
+		}
+
+		/* Its head on two lines, so the player keeps the room for his name. */
+		.cols .rank {
+			width: 52px;
+			white-space: normal;
+			line-height: 1.1;
 		}
 
 		.cols .n {

@@ -11,7 +11,10 @@ export const KICKOFF = {
 	next: 'Next kickoff',
 	first: 'First kickoff',
 	kickedOff: GAME_STATE_WORDS.kicked_off,
-	final: GAME_STATE_WORDS.final
+	final: GAME_STATE_WORDS.final,
+	/** The Matchup bug's state while the side behind has nobody left to score (the API's decided,
+	 * Lane 99 B31). */
+	decided: 'Decided'
 } as const;
 
 /** A game's state as the API reads it: the scoreboard's, or one gathered from its starters' lines. */
