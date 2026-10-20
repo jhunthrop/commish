@@ -180,6 +180,7 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 			teamTotal: false,
 			host: 'sleeper',
 			lineup: {
+				rule: 'We start the highest Proj at each slot after designations and byes, our order breaking ties.',
 				previousReadAt: BEFORE,
 				note: {
 					basis_note: 'Avg and Last miss five of your rules our stats lack.',
@@ -193,7 +194,7 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 	);
 	assert.equal(
 		basisText(parts),
-		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. Avg and Last miss five of your rules our stats lack. Which five"
+		"We start the highest Proj at each slot after designations and byes, our order breaking ties. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Our rank is his place at his position in our rest-of-season order. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. Avg and Last miss five of your rules our stats lack. Which five"
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),
@@ -216,7 +217,7 @@ void test('the Matchup key says Proj, Pts and Game, the columns it draws', () =>
 	);
 	assert.equal(
 		basisText(parts),
-		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Pts are ESPN's team points, none by player. Game is each club's expected points, his first, and weather, read Fri 4:01 pm."
+		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Our rank is his place at his position in our rest-of-season order. Pts are ESPN's team points, none by player. Game is each club's expected points, his first, and weather, read Fri 4:01 pm."
 	);
 });
 
@@ -233,6 +234,7 @@ void test('the Lineup and the Matchup say when Final and the stats land while a 
 					host: 'sleeper',
 					lineup: lineup
 						? {
+								rule: '',
 								previousReadAt: null,
 								note: { basis_note: '', basis_note_link: '' },
 								rulesHref: '/league/1#uncounted'
@@ -257,6 +259,7 @@ void test('the Lineup and the Matchup say when Final and the stats land while a 
 void test('the Lineup phone keeps its fact cells; the Final sentence waits for the desk while they show', () => {
 	const waiting = line({ kickoff: '2026-10-18T17:00:00.000Z', played: true, game_state: 'final' });
 	const lineup = {
+		rule: '',
 		previousReadAt: null,
 		note: { basis_note: '', basis_note_link: '' },
 		rulesHref: '/league/1#uncounted'

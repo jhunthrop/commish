@@ -54,6 +54,10 @@ export const BOX = {
 	projFinal: 'Proj final',
 	/** The Lineup's evidence columns (Lane 66e). */
 	oppRank: 'Opp rank',
+	/** Under the Opp rank head, its key (Lane 99, B56). */
+	oppRankKey: '1st fewest allowed',
+	/** The head over his position chip, our rest-of-season positional rank (Lane 99, B24). */
+	ourRank: 'Our rank',
 	avg: FIGURE.avg,
 	last: 'Last',
 	delta: 'Δ Proj',
@@ -158,6 +162,9 @@ export interface BoxRow {
 	proj: number | null;
 	/** His points so far, null until his game has kicked off. */
 	pts: number | null;
+	/** His game is still to come at the page's clock (kickoff.ts toPlay): the Opp rank's colour draws
+	 * only then (Lane 99, B56). */
+	toCome: boolean;
 	/** The season's figures the Lineup shows beside his projection (Lane 66e). */
 	evidence: RowEvidence;
 }
@@ -285,8 +292,9 @@ function faceOf(player: LeaguePlayer, headshot: string | null): BoxRow['face'] {
 	return { src: headshot, mark: false, alt: '' };
 }
 
-/** A box row from the API's line for him. ranked draws his rest-of-season rank in his pill; the
- * Lineup leaves it out, since that screen gives the rank no basis (Lane 66e). */
+/** A box row from the API's line for him. ranked draws his rest-of-season rank in his pill, under
+ * the Our rank head with its sentence in the basis (Lane 99, B24); the Waivers and Trades rows leave
+ * it out. */
 export function boxRow(
 	line: PlayerLine,
 	slot: string,
@@ -313,6 +321,7 @@ export function boxRow(
 		weather: ahead ? weatherCell(facts) : null,
 		proj: line.week_projection,
 		pts: facts.points_this_week,
+		toCome: ahead,
 		evidence: evidenceOf(line)
 	};
 }
@@ -377,24 +386,32 @@ export function hostRow(player: LeaguePlayer, slot: string, pts: number | null):
 		weather: null,
 		proj: null,
 		pts,
+		toCome: false,
 		evidence: NO_EVIDENCE
 	};
 }
 
-/** The note beside Totals (review L2, N5): "No projection yet for week 6" before the week's
- * projection lands, "7 of 8 starters with a Proj" once it has when a playing starter lacks one,
- * else null. */
+/** How many starters without a Proj the note names before it counts them. */
+const NAMED_WITHOUT_PROJ = 2;
+
+/** The note beside Totals (review L2, N5; Lane 99, B49): "No projection yet for week 6" before the
+ * week's projection lands; once it has, the playing starters without a Proj by name, "DJ Moore had
+ * no Proj" once their games have kicked off ("has" while one is still to come), "3 starters had no
+ * Proj" past two; else null. */
 export function totalsNote(
-	rows: readonly Pick<BoxRow, 'proj' | 'game'>[],
+	rows: readonly Pick<BoxRow, 'proj' | 'game' | 'name' | 'toCome'>[],
 	landed: boolean,
 	week: number
 ): string | null {
 	if (!landed) return `No projection yet for week ${String(week)}`;
-	const playing = rows.filter((r) => r.game !== 'bye');
-	const held = playing.filter((r) => r.proj !== null).length;
-	return held === playing.length
-		? null
-		: `${String(held)} of ${String(playing.length)} starters with a ${BOX.proj}`;
+	const lacking = rows.filter((r) => r.game !== 'bye' && r.proj === null);
+	if (lacking.length === 0) return null;
+	const verb = lacking.some((r) => r.toCome) ? 'has' : 'had';
+	const who =
+		lacking.length > NAMED_WITHOUT_PROJ
+			? `${String(lacking.length)} starters`
+			: lacking.map((r) => r.name).join(' and ');
+	return `${who} ${verb} no ${BOX.proj}`;
 }
 
 /** An API figure the API has already rounded to a tenth (Lane 66k: rounded once, in Go), printed as

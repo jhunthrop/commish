@@ -142,13 +142,20 @@
 	{verb}
 	{footSays}
 	href={advice.host_lineup_url}
-	basis={advice.basis}
+	basis={null}
 	onverb={onHost ? () => void open() : () => void copyLineup()}
 	controls={onHost ? MOVE_ID : undefined}
 	expanded={onHost ? step.kind !== 'closed' : undefined}
 >
 	{#snippet summary()}
-		<LineupStrip week={advice.week} {box} {done} {doneState} />
+		<LineupStrip
+			week={advice.week}
+			{box}
+			{host}
+			missed={advice.missed ?? null}
+			{done}
+			{doneState}
+		/>
 	{/snippet}
 	{#snippet verbFoot()}
 		{#if done !== null}{:else if isSet}
@@ -192,7 +199,12 @@
 		teamTotal={false}
 		{host}
 		projection={{ readAt: advice.projection_read_at, scoring: advice.projection_scoring }}
-		lineup={{ previousReadAt: advice.projection_previous_read_at, note: advice, rulesHref }}
+		lineup={{
+			rule: advice.basis,
+			previousReadAt: advice.projection_previous_read_at,
+			note: advice,
+			rulesHref
+		}}
 		lines={shown}
 		noFinal={box.totals.live && box.totals.final === null}
 		{now}

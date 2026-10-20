@@ -6,6 +6,7 @@
 	import NameWords from '#lib/ui/NameWords.svelte';
 	import TagChip from '#lib/ui/TagChip.svelte';
 	import { tagMarks } from '#lib/sheet/tags.ts';
+	import StatusChip from '#lib/ui/StatusChip.svelte';
 	import StatusPill from '#lib/ui/StatusPill.svelte';
 	import { HELD } from '../inseason/words.ts';
 	import { initialName, type BoxRow } from './box.ts';
@@ -30,6 +31,9 @@
 		compact?: boolean;
 		/** "Clears Wed" in the folded game, where the platform says it (Lane 66f). */
 		clears?: string | null;
+		/** His position chip is drawn in its own cell under the Our rank head (BoxLine rankCell, Lane 99
+		 * B24): the club line keeps his status alone. */
+		rankApart?: boolean;
 		/** Drawn on the club line after the pill. */
 		after?: Snippet;
 		/** The screen's own line under the name, as the phone and narrow screens fold it. */
@@ -43,6 +47,7 @@
 		compact = false,
 		phoneFacts = true,
 		clears = null,
+		rankApart = false,
 		after,
 		children
 	}: Props = $props();
@@ -69,7 +74,9 @@
 			{/if}
 		</span>
 		<span class="club"
-			><span>{row.club}</span>{#if row.pill}<StatusPill
+			><span>{row.club}</span>{#if rankApart}{#if row.status}<StatusChip
+						status={row.status}
+					/>{/if}{:else if row.pill}<StatusPill
 					position={row.pill.position}
 					positionRank={row.pill.rank ?? undefined}
 					status={row.status}

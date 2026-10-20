@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import Icon from '#lib/ui/Icon.svelte';
+	import PositionPill from '#lib/ui/PositionPill.svelte';
+	import { pillRank } from '#lib/run/held-places.ts';
 	import {
 		BOX,
 		boxNumber,
@@ -66,6 +68,9 @@
 		/** Whether the row draws Proj and its change: not on a page whose week has no published
 		 * projection read yet (Lane 95), whose cells would all be "--". */
 		projCells?: boolean;
+		/** His position chip in its own cell after the player, under the Our rank head (the Matchup and
+		 * the Lineup, Lane 99 B24). */
+		rankCell?: boolean;
 	}
 
 	let {
@@ -89,10 +94,14 @@
 		shortOnPhone = false,
 		phoneFacts = true,
 		phoneOpp = true,
-		projCells = true
+		projCells = true,
+		rankCell = false
 	}: Props = $props();
 	const picked = $derived(pick?.state === 'on');
 	const rank = $derived(row.evidence.oppRank);
+	/** The Opp rank's colour, while his game is still to come (Lane 99, B56): on a game played it is
+	 * decoration. */
+	const ease = $derived(rank !== null && row.toCome ? easeOf(rank, row.evidence.oppOf) : 'even');
 	/** The phone's evidence line's own words and separator, so the template adds no space. */
 	const oppLead = `${BOX.opp} `;
 	const SEPARATOR = ', ';
@@ -110,8 +119,7 @@
 	<!-- The separators are expressions, so the template's own line breaks add no space (review L7). -->
 	<span class="phone-ev"
 		>{#if rank !== null && phoneOpp}<span class="pair"
-				>{oppLead}<span class="rk {easeOf(rank, row.evidence.oppOf)}">{oppRankWord(rank)}</span
-				></span
+				>{oppLead}<span class="rk {ease}">{oppRankWord(rank)}</span></span
 			>{SEPARATOR}{/if}{#each seasonPairs as pair, i (i)}{#if i > 0}{SEPARATOR}{/if}<span
 				class="pair">{pair}</span
 			>{/each}</span
@@ -158,19 +166,29 @@
 		>
 	{/if}
 	<td class="player">
-		<BoxPlayer {row} {tags} {shortOnPhone} {compact} {clears} {phoneFacts}
+		<BoxPlayer {row} {tags} {shortOnPhone} {compact} {clears} {phoneFacts} rankApart={rankCell}
 			>{#if evidence}{@render seasonLine()}{/if}</BoxPlayer
 		>
 	</td>
+	{#if rankCell}
+		<td class="rank"
+			>{#if row.pill}<PositionPill
+					position={row.pill.position}
+					rank={row.pill.rank === null
+						? (row.status?.rank ?? undefined)
+						: pillRank(row.status, row.pill.rank)}
+				/>{/if}</td
+		>
+	{/if}
 	{#if !compact}<td class="game"><BoxGame {row} {clears} /></td>{/if}
 	{#if projCells}<td class="n proj">{boxNumber(row.proj)}</td>{/if}
 	{#if ptsCell && !compact}<td class="n pts" class:none={row.pts === null}>{boxNumber(row.pts)}</td
 		>{/if}
 	{#if evidence}
 		<td class="n ev first"
-			>{#if rank !== null}<span class="rk {easeOf(rank, row.evidence.oppOf)}"
-					>{oppRankWord(rank)}</span
-				>{:else}<span class="none">{BOX.none}</span>{/if}</td
+			>{#if rank !== null}<span class="rk {ease}">{oppRankWord(rank)}</span>{:else}<span
+					class="none">{BOX.none}</span
+				>{/if}</td
 		>
 		<td class="n ev">{boxNumber(row.evidence.avg)}</td>
 		<td class="n ev">{boxNumber(row.evidence.last)}</td>
@@ -339,6 +357,10 @@
 
 	.game {
 		font-size: var(--t-sm);
+	}
+
+	.rank {
+		white-space: nowrap;
 	}
 
 	.n {
