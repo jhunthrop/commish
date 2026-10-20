@@ -602,6 +602,8 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 		state := a.weekDoneState()
 		out.WeekDoneState = &state
 	}
+	// Where the lineup as set missed our pick, once it has kicked off (Lane 99, B11).
+	out.Missed = missedLine(a.config, people, team.Starters, out.PlayerPoints)
 	set := setStarters(out.Slots)
 	out.ProjectedFinal = projectedFinal(out.TeamPoints, set, anyStarted(set))
 	return out, true

@@ -460,3 +460,154 @@ func OrderScreenBasis(b OrderBasis, from RestFrom, league string) string {
 	return fmt.Sprintf("Our rest-of-season order %s. A position ranks by %s through week %d, byes out, "+
 		"All by Over repl., his points less a free pickup's in %s.", restFromWords(from), figurewords.Table.Projected, LastWeek, league)
 }
+
+// secondMention is a name as a sentence names him again: his last name, a
+// defense by its club ("Texans" from "Texans D/ST").
+func secondMention(full string) string {
+	return lastName(strings.TrimSuffix(strings.TrimSpace(full), " D/ST"))
+}
+
+// namedAtMost is how many starters a standing names before it counts them.
+const namedAtMost = 3
+
+// leadWords is the member's margin: "Up 3.2", "Down 14.1", "Tied".
+func leadWords(margin float64) string {
+	switch {
+	case margin > 0:
+		return "Up " + points(margin)
+	case margin < 0:
+		return "Down " + points(-margin)
+	}
+	return "Tied"
+}
+
+// ResultWords is a final game's result for the member: "Won by 6.4",
+// "Lost by 30.4", "Tied".
+func ResultWords(margin float64) string {
+	switch {
+	case margin > 0:
+		return "Won by " + points(margin)
+	case margin < 0:
+		return "Lost by " + points(-margin)
+	}
+	return "Tied"
+}
+
+// leftWords is who a side still has: "McCaffrey and Kittle playing",
+// "Kittle to play", "McCaffrey playing and Kittle to play", or past three
+// names their count, "4 to play".
+func leftWords(s sideLeft) string {
+	if s.count() > namedAtMost {
+		return fmt.Sprintf("%d to play", s.count())
+	}
+	var parts []string
+	if len(s.playing) > 0 {
+		parts = append(parts, joinNames(s.playing)+" playing")
+	}
+	if len(s.coming) > 0 {
+		parts = append(parts, joinNames(s.coming)+" to play")
+	}
+	return strings.Join(parts, " and ")
+}
+
+// joinNames is "Kittle", "McCaffrey and Kittle", "Hall, Pitts and Kittle".
+func joinNames(names []string) string {
+	if len(names) < 2 {
+		return strings.Join(names, "")
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+}
+
+// StandingWords is the member's game while it plays (Lane 99, B31), from
+// their side: "Up 3.2, 2 of yours and 1 of theirs to play", or with
+// nobody of one side's left the other side's starters named, "Down 14.1
+// with nobody left, McCaffrey and Kittle playing for them", "Up 6.0, they
+// have nobody left, Kittle to play for you". The site never prints a
+// semicolon (banned-words.json marks), so the ruling's is a comma.
+func StandingWords(margin float64, mine, theirs sideLeft) string {
+	lead := leadWords(margin)
+	switch {
+	case mine.count() == 0 && theirs.count() == 0:
+		return lead
+	case mine.count() == 0:
+		return fmt.Sprintf("%s with nobody left, %s for them", lead, leftWords(theirs))
+	case theirs.count() == 0:
+		return fmt.Sprintf("%s, they have nobody left, %s for you", lead, leftWords(mine))
+	}
+	return fmt.Sprintf("%s, %d of yours and %d of theirs to play", lead, mine.count(), theirs.count())
+}
+
+// designationMark is a designation inside the miss line, after the name:
+// "Out", "Doubtful", "on injured reserve".
+func designationMark(status apitypes.DesignationStatus) string {
+	switch status {
+	case apitypes.DesignationStatusQuestionable:
+		return "Questionable"
+	case apitypes.DesignationStatusDoubtful:
+		return "Doubtful"
+	case apitypes.DesignationStatusOut:
+		return "Out"
+	case apitypes.DesignationStatusSuspended:
+		return "Suspended"
+	}
+	return statusWords(string(status))
+}
+
+// scoredVerb is what a player in the miss line did: "scored" once his
+// game is final, "has" while it plays.
+func scoredVerb(state apitypes.GameState) string {
+	if state == apitypes.GameStateFinal {
+		return "scored"
+	}
+	return "has"
+}
+
+// missSlot is a slot as the miss line names it, unnumbered as the
+// Lineup's rows print it: "RB", "Flex", "D/ST".
+func missSlot(t draft.SlotType) string {
+	if t == draft.SlotDEF {
+		return "D/ST"
+	}
+	if name, ok := slotNames[t]; ok {
+		return name
+	}
+	return string(t)
+}
+
+// missSet is the set starter's half of a miss (Lane 99, B11): "DJ Moore,
+// Out, scored 0.0 in your Flex", "Jahmyr Gibbs was on bye in your RB", or
+// with the spot empty on the platform "Your Flex was empty".
+func missSet(name, mark, verb string, pts float64, slot string, bye bool) string {
+	switch {
+	case name == "":
+		return fmt.Sprintf("Your %s was empty", slot)
+	case bye:
+		return fmt.Sprintf("%s was on bye in your %s", name, slot)
+	}
+	if mark != "" {
+		name += ", " + mark + ","
+	}
+	return fmt.Sprintf("%s %s %s in your %s", name, verb, points(pts), slot)
+}
+
+// missPick is our pick's half: "Josh Downs scored 8.7 on your bench".
+func missPick(name, verb string, pts float64) string {
+	return fmt.Sprintf("%s %s %s on your bench", name, verb, points(pts))
+}
+
+// MissWords is the Lineup's miss line (Lane 99, B11): each slot the set
+// lineup missed our pick at, its two halves joined ("DJ Moore, Out, scored
+// 0.0 in your Flex while Josh Downs scored 8.7 on your bench.", the
+// ruling's semicolon a "while": the site never prints one), then once
+// every slot is final what our lineup would have scored ("Our lineup would
+// have scored 85.5.").
+func MissWords(misses [][2]string, ours *float64) string {
+	parts := make([]string, 0, len(misses)+1)
+	for _, m := range misses {
+		parts = append(parts, m[0]+" while "+m[1]+".")
+	}
+	if ours != nil {
+		parts = append(parts, fmt.Sprintf("Our lineup would have scored %s.", points(*ours)))
+	}
+	return strings.Join(parts, " ")
+}
