@@ -33,6 +33,13 @@ is refused: kept, its game left at the week's status, and the pass's line FAILED
 fails its parse. The fallback's calls count against the pass's budget, not against HOURLY_CAP, which is
 the week feed's.
 
+A REFUSAL THAT REPEATS (Lane 107, B76). A game whose newest REFUSAL_CAP kept box scores (the answers that
+name it) are one refused answer is not asked again: the pass names it once, "refused 3 times, waiting on
+the final", and still fails its line, until the final is held another way or GIVE_UP_AFTER has passed.
+A GAME THAT MOVED (Lane 107, B77). The game id carries its date, so a game moved to another day (a week
+18 Saturday game, a postponement) leaves its old row in the stored schedule; a stored game whose club the
+answer carries under another id is never absent, only named in the line as superseded by that id.
+
 A FINAL IS HELD by the one rule, the `club_week_finals` view (revision 0014): the weekly result, a
 Tank01 final, or a line with the club, which the API's week facts and the run's states read too."""
 
@@ -72,6 +79,9 @@ FALLBACK_CAP: Final = 2
 # A game with no final this long after its kickoff stops being asked about (Lane 84 review): past the
 # weekly stats of Tuesday or Wednesday evening, its final will not come from the hourly status.
 GIVE_UP_AFTER: Final = timedelta(days=4)
+# A box score refused this many times with one answer (the same digest) is not asked again (B76): the
+# line still fails each pass, naming it, until the final comes another way or GIVE_UP_AFTER passes.
+REFUSAL_CAP: Final = 3
 _HOUR: Final = timedelta(hours=1)
 # The status pass's advisory lock (pg_advisory_xact_lock), released with its transaction.
 _LOCK_KEY: Final = 80_0001
@@ -161,16 +171,36 @@ def lagging_games(
     return [game for _, game in sorted(waiting, key=lambda pair: (pair[0], pair[1].game_id))]
 
 
-def absent_games(conn: Connection, season: int, week: int, answered: Sequence[GameSummary]) -> list[GameSummary]:
-    """The stored schedule's games of the week the answer leaves out, as not yet final (MEDIUM-2)."""
+@dataclass(frozen=True)
+class Absence:
+    """The stored schedule's games of the week the answer leaves out, as not yet final (MEDIUM-2), and
+    the stored games it supersedes (B77): a game whose club the answer carries under another id, the
+    date in its id moved (a week 18 Saturday game, a postponement), each with that new id."""
+
+    games: list[GameSummary]
+    superseded: list[tuple[str, str]]
+
+
+def absent_games(conn: Connection, season: int, week: int, answered: Sequence[GameSummary]) -> Absence:
+    """A stored game the answer leaves out is absent, unless either of its clubs appears in the answer
+    under any id: then it is superseded by that game, and never asked about by its dead id (B77)."""
     t = PROVIDER_GAMES
     query = select(t.c.game_id, t.c.home_team, t.c.away_team).where(t.c.season == season, t.c.week == week)
     ids = {game.game_id for game in answered}
-    return [
-        GameSummary(str(r.game_id), week, "scheduled", str(r.home_team), str(r.away_team), "", "")
-        for r in conn.execute(query.order_by(t.c.game_id))
-        if r.game_id not in ids
-    ]
+    by_club = {
+        source_team_code(club): game.game_id for game in answered for club in (game.home_nfl_team, game.away_nfl_team)
+    }
+    games: list[GameSummary] = []
+    superseded: list[tuple[str, str]] = []
+    for r in conn.execute(query.order_by(t.c.game_id)):
+        if r.game_id in ids:
+            continue
+        new_id = by_club.get(source_team_code(str(r.home_team))) or by_club.get(source_team_code(str(r.away_team)))
+        if new_id is not None:
+            superseded.append((str(r.game_id), new_id))
+        else:
+            games.append(GameSummary(str(r.game_id), week, "scheduled", str(r.home_team), str(r.away_team), "", ""))
+    return Absence(games, superseded)
 
 
 @dataclass(frozen=True)
@@ -207,6 +237,27 @@ def _ask_box_score(
     if read is None or read.game_id != game.game_id:
         return None, f"FAILED, {game.game_id} box score refused: it is not that game with a status"
     return read.status, f"{game.game_id} box score {_STATUS_WORDS[read.status]}"
+
+
+# A game's newest kept box scores: an answer is the game's when it names the game (`gameID`).
+_GAME_BOX_SCORES: Final = text(
+    f"select digest, payload from {CAPTURE_SNAPSHOTS.fullname} "
+    "where source = :source and payload ->> 'gameID' = :game order by captured_at desc, id desc limit :cap"
+)
+
+
+def refused_out(conn: Connection, game: GameSummary, week: int) -> bool:
+    """The game's newest REFUSAL_CAP kept box scores are one answer (the same digest) and the mapper
+    refuses it: the provider has said the same unreadable thing that many times (B76)."""
+    params = {"source": BOX_SCORE_SOURCE, "game": game.game_id, "cap": REFUSAL_CAP}
+    kept = conn.execute(_GAME_BOX_SCORES, params).all()
+    if len(kept) < REFUSAL_CAP or len({row.digest for row in kept}) != 1:
+        return False
+    return map_box_score_game(kept[0].payload, week) is None
+
+
+def _refused_note(game: GameSummary) -> str:
+    return f"FAILED, {game.game_id} box score refused {REFUSAL_CAP} times, waiting on the final"
 
 
 def to_ask(lagging: Sequence[GameSummary], budget: FixedBudget) -> list[GameSummary]:
@@ -252,16 +303,20 @@ def capture_game_status(
     _store(conn, SNAPSHOT_SOURCE, body, now)
     games = map_games(body, week)
     absent = absent_games(conn, season, week, games)
-    lagging = lagging_games([*games, *absent], kickoffs, held, week, now)
-    asked = to_ask(lagging, budget.after(1))
+    lagging = lagging_games([*games, *absent.games], kickoffs, held, week, now)
+    capped = [game for game in lagging if refused_out(conn, game, week)]
+    askable = [game for game in lagging if game not in capped]
+    asked = to_ask(askable, budget.after(1))
     fallback = _fallback(conn, client, asked, week, now)
-    answered = [game for game in absent if game.game_id in fallback.statuses]
+    answered = [game for game in absent.games if game.game_id in fallback.statuses]
     read = [replace(game, status=fallback.statuses.get(game.game_id, game.status)) for game in [*games, *answered]]
-    missing = [f"{game.game_id} absent from the week feed" for game in lagging if game in absent]
+    superseded = [f"{old} superseded by {new}" for old, new in absent.superseded]
+    missing = [f"{game.game_id} absent from the week feed" for game in lagging if game in absent.games]
     rows = status_observations(read, season, week, now)
     written = record_team_observations(conn, rows)
     finals = sum(1 for row in rows if row.value == FINAL_VALUE)
     requests = 1 + fallback.requests
     head = f"week {week}, {len(rows)} clubs read, {finals} final, {requests} request{'' if requests == 1 else 's'}"
-    unasked = [f"{left} lagging, not asked this pass"] if (left := len(lagging) - len(asked)) else []
-    return StatusResult(requests, written, "; ".join([head, *missing, *fallback.notes, *unasked]), fallback.failed)
+    unasked = [f"{left} lagging, not asked this pass"] if (left := len(askable) - len(asked)) else []
+    notes = [*superseded, *missing, *fallback.notes, *map(_refused_note, capped), *unasked]
+    return StatusResult(requests, written, "; ".join([head, *notes]), fallback.failed or bool(capped))
