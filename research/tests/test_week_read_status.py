@@ -38,7 +38,7 @@ def test_the_page_and_the_web_read_the_same_status_for_every_player_of_a_board()
     ("after", "due"),
     [
         (datetime(2026, 10, 17, 2, 0, tzinfo=UTC), datetime(2026, 10, 17, 3, 0, tzinfo=UTC)),  # Fri 10 pm ET: 11 pm ET
-        (datetime(2026, 10, 17, 6, 30, tzinfo=UTC), datetime(2026, 10, 17, 11, 0, tzinfo=UTC)),  # 2:30 am ET: 7 am ET
+        (datetime(2026, 10, 17, 6, 30, tzinfo=UTC), datetime(2026, 10, 17, 10, 0, tzinfo=UTC)),  # 2:30 am ET: 6 am ET
         (datetime(2026, 10, 17, 14, 0, tzinfo=UTC), datetime(2026, 10, 17, 15, 0, tzinfo=UTC)),  # on the hour: the next
     ],
 )

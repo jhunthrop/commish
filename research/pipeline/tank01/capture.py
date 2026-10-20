@@ -27,13 +27,18 @@ from research.db.schema import CAPTURE_CHECKS, CAPTURE_SNAPSHOTS, PROVIDER_GAMES
 from research.pipeline.budget import FixedBudget, RequestBudget
 from research.pipeline.jscompat import js_iso, js_json_stringify, js_object_keys
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
-from research.pipeline.tank01.client import Paths, Tank01Client
+from research.pipeline.tank01.client import Paths, Tank01Client, Tank01Error
 from research.pipeline.tank01.mapping import ADP_TYPE
-from research.pipeline.tank01.projections import PROJECTIONS_SOURCE, projection_slot_due
+from research.pipeline.tank01.projections import (
+    PROJECTIONS_SOURCE,
+    ProjectionRead,
+    projection_answer,
+    projection_week_due,
+)
 from research.pipeline.tolerated import TOLERATED_FAILURES
 
 Cadence = Literal["daily", "game-day", "game-week", "weekly"]
-Status = Literal["captured", "unchanged", "fresh", "off-cadence", "budget-refused", "failed"]
+Status = Literal["captured", "unchanged", "fresh", "off-cadence", "budget-refused", "unpublished", "failed"]
 
 _GAME_DAYS_UTC: Final = (0, 1, 4, 5, 6)  # JavaScript's getUTCDay: Sunday 0, Monday 1, Thursday to Saturday.
 CAPTURE_HARVEST_REQUEST_BUDGET: Final = 10
@@ -64,6 +69,10 @@ class CaptureFeed:
     source: str
     cadence: Cadence
     requests: Callable[[CaptureContext], list[CaptureRequest]]
+    # For a feed whose answer is judged before it is stored (the weekly projection): given the answer (a
+    # body, or the provider's failure), the outcome it is instead of a capture, with its reason, else
+    # None. Such an answer is stored nowhere and records no check, so it is never a read.
+    screen: Callable[[object], tuple[Status, str] | None] | None = None
 
 
 CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
@@ -217,6 +226,8 @@ def _capture_feed(
         with conn.begin_nested():
             bodies = [client.get(r.path, r.query) for r in requests]
             payload: object = bodies[0] if len(bodies) == 1 else bodies
+            if (screened := _screen(feed, payload)) is not None:
+                return FeedOutcome(feed.source, screened[0], len(requests), screened[1])
             digest = digest_of(payload)
             if digest == _latest_digest(conn, feed.source):
                 return FeedOutcome(feed.source, "unchanged", len(requests))
@@ -224,7 +235,34 @@ def _capture_feed(
             conn.execute(_INSERT, row)
             return FeedOutcome(feed.source, "captured", len(requests))
     except TOLERATED_FAILURES as error:
-        return FeedOutcome(feed.source, "failed", len(requests), str(error))
+        screened = _screen(feed, error)
+        failed: tuple[Status, str] = ("failed", str(error))
+        status, reason = failed if screened is None else screened
+        return FeedOutcome(feed.source, status, len(requests), reason)
+
+
+def _screen(feed: CaptureFeed, answer: object) -> tuple[Status, str] | None:
+    return None if feed.screen is None else feed.screen(answer)
+
+
+def _projection_screen(read: ProjectionRead) -> Callable[[object], tuple[Status, str] | None]:
+    """The week ahead's not-yet-published answer is its own outcome, logged and retried the next hour,
+    never a failure. A slot's, two hours before kickoff, is a failure, and so is a slot's empty body;
+    neither is stored, so the slot reads again in its window. The week ahead's empty body is not yet
+    published either. Every other answer is stored, and the parser refuses drift."""
+
+    def screen(answer: object) -> tuple[Status, str] | None:
+        kind = projection_answer(answer)
+        if kind is None:
+            return None
+        if read.ahead:
+            return "unpublished", f"week {read.week} not published yet"
+        if isinstance(answer, Tank01Error):
+            return None
+        said = "no players" if kind == "unpublished" else "an empty body"
+        return "failed", f"week {read.week} answered {said} two hours before its kickoff"
+
+    return screen
 
 
 def capture_once(
@@ -269,19 +307,28 @@ def current_nfl_week(conn: Connection, season: int) -> int:
     return 1 if week is None else int(week)
 
 
-def slot_projection_feed(week: int) -> CaptureFeed:
-    """The weekly projection of the kickoff slot's own week (`projections`)."""
-    return CaptureFeed(PROJECTIONS_SOURCE, "daily", lambda _c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(week)})])
+def week_projection_feed(read: ProjectionRead) -> CaptureFeed:
+    """The weekly projection of one week: a kickoff slot's own, or the week ahead's daily read, whose
+    not-yet-published answer is logged and retried the next hour, never a failure (`projections`)."""
+    return CaptureFeed(
+        PROJECTIONS_SOURCE,
+        "daily",
+        lambda _c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(read.week)})],
+        _projection_screen(read),
+    )
 
 
 def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: datetime, season: int) -> CaptureResult:
-    """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys; in a
-    kickoff slot's window not yet captured, the slot week's projection as a sixth. The lines feed takes
-    one request per game day left in the week (at most five, a holiday week). Parsing the stored
-    projections is the caller's next transaction (`projections.parse_stored_projections`), so a refused
-    snapshot never rolls back what this pass captured."""
-    slot = projection_slot_due(conn, season, fired_at)
-    feeds = [*harvest_feeds(), *([] if slot is None else [slot_projection_feed(slot.week)])]
+    """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys; as a
+    sixth, one week's projection when one is due (`projections.projection_week_due`: a kickoff slot's
+    week in its window not yet captured, else the week ahead's first read of the day from 06:00
+    Eastern, never both in one pass). The lines feed takes one request per game day left in the
+    week, so a pass is at most ten requests: four single feeds, the projection, and a holiday week's
+    five game days. Parsing the stored projections is the caller's next transaction
+    (`projections.parse_stored_projections`), so a refused snapshot never rolls back what this pass
+    captured."""
+    read = projection_week_due(conn, season, fired_at)
+    feeds = [*harvest_feeds(), *([] if read is None else [week_projection_feed(read)])]
     capture = CapturePass(
         fired_at,
         season,
