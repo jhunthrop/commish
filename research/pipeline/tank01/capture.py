@@ -29,7 +29,7 @@ from research.pipeline.jscompat import js_iso, js_json_stringify, js_object_keys
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
 from research.pipeline.tank01.client import Paths, Tank01Client
 from research.pipeline.tank01.mapping import ADP_TYPE
-from research.pipeline.tank01.projections import PROJECTIONS_SOURCE, projection_slot_due
+from research.pipeline.tank01.projections import PROJECTIONS_SOURCE, projection_week_due
 from research.pipeline.tolerated import TOLERATED_FAILURES
 
 Cadence = Literal["daily", "game-day", "game-week", "weekly"]
@@ -269,19 +269,22 @@ def current_nfl_week(conn: Connection, season: int) -> int:
     return 1 if week is None else int(week)
 
 
-def slot_projection_feed(week: int) -> CaptureFeed:
-    """The weekly projection of the kickoff slot's own week (`projections`)."""
+def week_projection_feed(week: int) -> CaptureFeed:
+    """The weekly projection of one week: a kickoff slot's own, or the week ahead's daily read (`projections`)."""
     return CaptureFeed(PROJECTIONS_SOURCE, "daily", lambda _c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(week)})])
 
 
 def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: datetime, season: int) -> CaptureResult:
-    """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys; in a
-    kickoff slot's window not yet captured, the slot week's projection as a sixth. The lines feed takes
-    one request per game day left in the week (at most five, a holiday week). Parsing the stored
-    projections is the caller's next transaction (`projections.parse_stored_projections`), so a refused
-    snapshot never rolls back what this pass captured."""
-    slot = projection_slot_due(conn, season, fired_at)
-    feeds = [*harvest_feeds(), *([] if slot is None else [slot_projection_feed(slot.week)])]
+    """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys; as a
+    sixth, one week's projection when one is due (`projections.projection_week_due`: a kickoff slot's
+    week in its window not yet captured, else the week ahead's first read of the day from 06:00
+    Eastern, never both in one pass). The lines feed takes one request per game day left in the
+    week, so a pass is at most ten requests: four single feeds, the projection, and a holiday week's
+    five game days. Parsing the stored projections is the caller's next transaction
+    (`projections.parse_stored_projections`), so a refused snapshot never rolls back what this pass
+    captured."""
+    week = projection_week_due(conn, season, fired_at)
+    feeds = [*harvest_feeds(), *([] if week is None else [week_projection_feed(week)])]
     capture = CapturePass(
         fired_at,
         season,

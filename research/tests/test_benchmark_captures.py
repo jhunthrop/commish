@@ -10,12 +10,15 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Final
+from urllib.parse import parse_qs
+from zoneinfo import ZoneInfo
 
 import pytest
-from sqlalchemy import Engine, func, insert, select, text
+from sqlalchemy import Connection, Engine, delete, func, insert, select, text
 
 from research.db.engine import make_engine
 from research.db.schema import (
+    CAPTURE_CHECKS,
     CAPTURE_SNAPSHOTS,
     PLAYER_TD_PROP_OBSERVATIONS,
     TANK01_PROJECTION_ROWS,
@@ -29,6 +32,8 @@ from research.pipeline.kickoff_slots import LEAD, due_slot, kickoff_slots, slot_
 from research.pipeline.kickoffs import TeamKickoff, stored_kickoffs
 from research.pipeline.odds import touchdowns
 from research.pipeline.tank01 import projections
+from research.pipeline.tank01.capture import FeedOutcome, record_checks, run_capture_harvest
+from research.pipeline.tank01.client import Paths, Tank01Client
 
 TESTDATA: Final = Path(__file__).resolve().parent / "testdata"
 _EVENT: Final = "57418b2cf5aca558b3c98eafac1e264a"
@@ -308,3 +313,129 @@ def test_a_rescheduled_game_takes_its_latest_recorded_kickoff(engine: Engine) ->
             {"at": _at(18, 20, 25)},
         )
     assert chicago == [_at(18, 20, 25)]
+
+
+# The week ahead's daily read (Lane 97, B68). Week 6's last game is Monday 20:15 New York (Tuesday
+# 00:15 UTC), week 7's first is Thursday 20:15 New York; New York is four hours behind UTC in October.
+def _eastern(day: int, hour: int, minute: int = 0) -> datetime:
+    return datetime(2026, 10, day, hour, minute, tzinfo=ZoneInfo("America/New_York"))
+
+
+def test_the_week_ahead_is_read_once_a_day_from_tuesday_until_its_first_kickoff() -> None:
+    due = projections.daily_capture_due
+    assert due(KICKOFFS, _eastern(20, 5, 59)) is None  # Tuesday before 06:00
+    assert due(KICKOFFS, _eastern(20, 6)) == projections.DailyCapture(7, _eastern(20, 6))
+    assert due(KICKOFFS, _eastern(21, 23)) == projections.DailyCapture(7, _eastern(21, 6))
+    assert due(KICKOFFS, _eastern(22, 6)) == projections.DailyCapture(7, _eastern(22, 6))
+    assert due(KICKOFFS, _eastern(22, 20, 14)) == projections.DailyCapture(7, _eastern(22, 6))
+    assert due(KICKOFFS, _eastern(22, 20, 15)) is None  # the week's first kickoff: the slots take over
+    assert due(KICKOFFS, _eastern(19, 10)) is None  # Monday: week 6 is under way
+    assert due(KICKOFFS, _eastern(19, 21)) is None  # after Monday's kickoff, still Monday
+    assert due([], _eastern(20, 6)) is None
+
+
+def test_a_week_without_a_thursday_game_is_read_from_tuesday_to_its_first_game() -> None:
+    sunday_first = [*(k for k in KICKOFFS if k.week == 6), TeamKickoff(2026, 7, "PIT", _eastern(25, 13))]  # noqa: PLR2004
+    due = projections.daily_capture_due
+    assert due(sunday_first, _eastern(20, 6)) == projections.DailyCapture(7, _eastern(20, 6))
+    assert due(sunday_first, _eastern(23, 9)) == projections.DailyCapture(7, _eastern(23, 6))
+    assert due(sunday_first, _eastern(25, 12)) == projections.DailyCapture(7, _eastern(25, 6))
+    assert due(sunday_first, _eastern(25, 13)) is None
+
+
+def test_a_week_with_no_week_before_it_opens_six_days_before_its_first_kickoff_day() -> None:
+    opener = [TeamKickoff(2026, 1, "SEA", datetime(2026, 9, 10, 20, 20, tzinfo=ZoneInfo("America/New_York")))]
+    due = projections.daily_capture_due
+    friday = datetime(2026, 9, 4, 6, tzinfo=ZoneInfo("America/New_York"))
+    assert due(opener, friday - timedelta(minutes=1)) is None
+    assert due(opener, friday) == projections.DailyCapture(1, friday)
+    assert due(opener, datetime(2026, 8, 1, 12, tzinfo=UTC)) is None  # the offseason reads nothing
+
+
+@dataclass
+class Tank01Fetcher:
+    """Every harvest feed answers an empty body; the projections feed answers the week asked for."""
+
+    weeks: list[str] = field(default_factory=list)
+
+    def get(self, url: str, headers: Mapping[str, str] | None = None) -> HttpResponse:
+        path, _, query = url.partition("?")
+        body: object = []
+        if path.endswith(Paths.PROJECTIONS):
+            week = parse_qs(query)["week"][0]
+            self.weeks.append(week)
+            payload = _projections()
+            assert isinstance(payload, dict)
+            body = {**payload, "week": week}
+        return HttpResponse(200, json.dumps({"statusCode": 200, "body": body}).encode(), {})
+
+    def stream(self, url: str, headers: Mapping[str, str] | None = None) -> tuple[int, Iterator[bytes]]:
+        raise AssertionError("never streams")
+
+
+def _clear_projection_reads(conn: Connection) -> None:
+    conn.execute(delete(TANK01_PROJECTION_ROWS))
+    conn.execute(delete(CAPTURE_SNAPSHOTS).where(CAPTURE_SNAPSHOTS.c.source == projections.PROJECTIONS_SOURCE))
+    conn.execute(delete(CAPTURE_CHECKS))
+
+
+def test_the_harvest_reads_the_week_ahead_once_a_day_and_an_unchanged_read_keeps_the_earlier(engine: Engine) -> None:
+    fetcher = Tank01Fetcher()
+    client = Tank01Client(fetcher, "key")
+    passes = [_eastern(20, 2), _eastern(20, 6), _eastern(20, 7), _eastern(21, 6), _eastern(21, 7), _eastern(22, 6)]
+    with engine.connect() as conn:
+        _clear_projection_reads(conn)
+        asked = []
+        for at in passes:
+            before = len(fetcher.weeks)
+            run_capture_harvest(conn, client, at, 2026)
+            asked.append(fetcher.weeks[before:])
+        thursday_slot = projections.projection_week_due(conn, 2026, _eastern(22, 19))
+        parsed = projections.parse_stored_projections(conn)
+        week_rows = (
+            conn.execute(
+                select(TANK01_PROJECTION_ROWS.c.captured_at)
+                .where(TANK01_PROJECTION_ROWS.c.week == 7)  # noqa: PLR2004 - week 7
+                .distinct()
+            )
+            .scalars()
+            .all()
+        )
+        conn.rollback()
+    assert asked == [[], ["7"], [], ["7"], [], ["7"]]
+    # Wednesday's and Thursday's reads equal Tuesday's: no new snapshot, Tuesday's stands at its captured_at.
+    assert week_rows == [_eastern(20, 6)]
+    assert parsed.snapshots == 1
+    assert thursday_slot == 7  # noqa: PLR2004 - Thursday's slot reads the week again in its window
+
+
+def test_a_changed_projection_is_kept_each_day_and_another_weeks_read_never_counts(engine: Engine) -> None:
+    insert_snapshot = text(
+        f"insert into {CAPTURE_SNAPSHOTS.fullname} (source, captured_at, digest, payload) "
+        "values (:source, :at, :digest, cast(:payload as jsonb))"
+    )
+    payload = _projections()
+    assert isinstance(payload, dict)
+
+    def read(conn: Connection, at: datetime, week: str) -> None:
+        row = {"source": projections.PROJECTIONS_SOURCE, "at": at, "digest": f"{week}-{at.isoformat()}"}
+        conn.execute(insert_snapshot, {**row, "payload": json.dumps({**payload, "week": week})})
+        record_checks(conn, [FeedOutcome(projections.PROJECTIONS_SOURCE, "captured", 1)], at)
+
+    with engine.connect() as conn:
+        _clear_projection_reads(conn)
+        read(conn, _eastern(20, 6, 30), "6")  # a week 6 read after 06:00 (an operator's full pass)
+        after_another_week = projections.projection_week_due(conn, 2026, _eastern(20, 7))
+        read(conn, _eastern(20, 7), "7")
+        after_its_read = projections.projection_week_due(conn, 2026, _eastern(20, 8))
+        next_day = projections.projection_week_due(conn, 2026, _eastern(21, 6))
+        read(conn, _eastern(21, 6), "7")
+        parsed = projections.parse_stored_projections(conn)
+        kept = conn.execute(
+            select(func.count(func.distinct(TANK01_PROJECTION_ROWS.c.captured_at))).where(
+                TANK01_PROJECTION_ROWS.c.week == 7  # noqa: PLR2004 - week 7
+            )
+        ).scalar_one()
+        conn.rollback()
+    assert (after_another_week, after_its_read, next_day) == (7, None, 7)
+    assert (parsed.snapshots, kept) == (3, 2)

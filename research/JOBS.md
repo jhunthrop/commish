@@ -17,7 +17,7 @@ created paused until cutover). Every invocation is one pass; the scheduler owns 
 | `nightly` | `research.nightly run`: ingest (capture harvest, ADP in four formats, pre-kickoff props, win totals), fit check, capsules, the run to R2, the gates, the headshots | 05:00 UTC | `adp-snapshot`, `props-preseason-snapshot`, `win-totals`, `capsule-sweep`, the board's nightly check |
 | `nightly-publish` | `research.nightly publish`: the passed run public an hour after it passed, the web build dispatched, and `published_boards` set to the public run's boards (the API's read of the site's order); the newest injury capture written beside the run (`designations.json`) and into the table, the build dispatched again when the run's players on a season-long list move (Lane 63) | hourly, all day | nothing (new: early access, spec §4) |
 | `inseason` | `research.inseason --task season-week`: stats (nflverse `stats_player`), the season's play-by-play and charted feeds (FTN charting, Next Gen Stats, PFR advanced stats; `inseason/usage_steps.py`), opponent ratings, the game table, kicking and team-defense weeks and their stat lines, props, grade, freeze, scoreboard | Tue 08:00, Wed 18:00, Thu 14:00 America/New_York, September through February; the season is the one the stored schedule places today, and a date none places fails the pass | `season-week` |
-| `inseason-capture` | `research.inseason --task capture-harvest`, and while a kicked-off game has no final one `getNFLGamesForWeek` call for the games' statuses (Lane 80, at most two an hour, about 390 a season with the 9:30 ET and late Saturday windows) | hourly 07:00-23:00 and 02:00 America/New_York | `capture-harvest` |
+| `inseason-capture` | `research.inseason --task capture-harvest`, and while a kicked-off game has no final one `getNFLGamesForWeek` call for the games' statuses (Lane 80, at most two an hour, about 390 a season with the 9:30 ET and late Saturday windows) | hourly 06:00-23:00 and 02:00 America/New_York | `capture-harvest` |
 
 The round 4 history (Lane 66b) is four operator commands, each idempotent and run once per store for
 2016 on: `pbp-plays` (nflverse's plays into `nflverse_pbp_plays`), `depth-chart-weeks` (the weekly
@@ -28,7 +28,26 @@ The live season keeps them current through the weekly pass (`play-by-play` write
 `depth-charts` step adds the season's newer dated snapshots) and the hourly `inseason-capture`, which
 in each kickoff slot's two hours takes Tank01's projection for the slot's week, the anytime-touchdown
 market from the us, us2 and eu books (three credits an event), and the depth charts again, then parses
-every stored projection snapshot in a transaction of its own (`pipeline/kickoff_slots.py`). `depth-chart-check` is the
+every stored projection snapshot in a transaction of its own (`pipeline/kickoff_slots.py`). It also
+reads the week ahead's projection once a day (Lane 97, `pipeline/tank01/projections.py`
+`daily_capture_due`): the week ahead is the first week with a game still to come, from the stored
+kickoffs, never the calendar; its read is due from 06:00 Eastern on the day after the previous week's
+last kickoff (at most six days before its own first kickoff's day) until that first kickoff, on the
+first pass at or after 06:00 each day, and never in a pass that takes a slot's read. A read equal to
+the newest stored snapshot writes none and the earlier snapshot stands; a failed read is retried the
+next hour. One provider request a day: three a week for a Thursday week (Tuesday, Wednesday,
+Thursday), at most seven for a week after a long gap.
+
+The order of a Thursday's passes, all America/New_York (Lane 93 sets the register's order on the
+Thursday pass, in the 12 hours before the first kickoff):
+
+1. 06:00 `inseason-capture`: the day's read of the week ahead's projection (Tuesday's and Wednesday's
+   06:00 reads already stand), parsed into `tank01_projection_rows` in the same execution.
+2. 14:00 `inseason` (`season-week`): the freeze sets the week's order and keeps `published_points`
+   from the newest projection snapshot captured at or before 14:00, that morning's or an earlier
+   day's (`model/register/freeze.py` `week_published_points`).
+3. 19:00 `inseason-capture`: the first pass inside the Thursday slot's two hours (18:15 to 20:15 for
+   a 20:15 kickoff) reads the slot's projection; it is after the freeze and never changes it. `depth-chart-check` is the
 round 4 stamp check (it writes nothing; its recorded run is the coordinator's).
 
 `research.pipeline history` re-creates the seasons the store lost (an operator command, run once
@@ -68,7 +87,7 @@ write of a new season starts it clean.
 | `season-week` step `props-snapshot` | same | The Odds API props into `player_prop_observations` | `pipeline.odds.ingest.run_odds_snapshot` (phase A, parity `odds-snapshot-and-resolve`) |
 | `season-week` steps `grade`, `freeze`, `scoreboard` | same | the register (`register_freeze_rows`, `register_grade_rows`) | `research.model` (phase B, register parity) |
 | `season-week` steps `peek-facts`, `peek-documents` | same | the old app's peek tables | not carried: the research schema has no peek tables (README) |
-| `capture-harvest` | 02:00 and hourly 07:00-23:00 ET | five Tank01 feeds into `capture_snapshots`, the game lines feed asking for every game day left in the week (Lane 66a) | `pipeline.tank01.capture.run_capture_harvest` (phase A, parity `tank01-capture-harvest`) |
+| `capture-harvest` | 02:00 and hourly 06:00-23:00 ET | five Tank01 feeds into `capture_snapshots`, the game lines feed asking for every game day left in the week (Lane 66a) | `pipeline.tank01.capture.run_capture_harvest` (phase A, parity `tank01-capture-harvest`) |
 | `capture-harvest` (after the feeds) | same | the hour's game figures from the newest odds capture into the `tank01_lines` team-week source, stamped at the pass, then the weather service's kickoff forecasts for the games from the Tuesday of their week into the `nws_forecast` team-week source (one grid read per venue an hour, the cell cached in `nws_grid_points`) | new in Python (Lane 66a): `pipeline.tank01.lines.lines_after_harvest`, `pipeline.nws.forecast.run_forecast_pass` (the round 4 preregistration, section 2.5) |
 | `adp-snapshot` | 03:00 ET nightly | Fantasy Football Calculator ADP, three formats, into `adp_snapshots` | `pipeline.preseason.boards.ingest_adp_snapshot` (phase A, parity `adp-snapshot`) |
 | `props-preseason-snapshot` | 03:30 ET daily, self-disabled after the season's first kickoff | the props snapshot, then name resolution into `props_player_map` | `pipeline.odds.ingest.run_props_preseason_snapshot` (phase A, parity `props-preseason-job`) |

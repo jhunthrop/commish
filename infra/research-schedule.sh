@@ -24,7 +24,7 @@ SCHEDULE=(
   "research-season-week-tue|0 8 * 1,2,9-12 2|America/New_York|inseason|The register's weekly pass, Tuesday 08:00 ET"
   "research-season-week-wed|0 18 * 1,2,9-12 3|America/New_York|inseason|The register's weekly pass, Wednesday 18:00 ET"
   "research-season-week-thu|0 14 * 1,2,9-12 4|America/New_York|inseason|The register's weekly pass and freeze, Thursday 14:00 ET"
-  "research-capture-harvest|0 2,7-23 * * *|America/New_York|inseason-capture|The hourly provider capture, 07:00-23:00 and 02:00 ET"
+  "research-capture-harvest|0 2,6-23 * * *|America/New_York|inseason-capture|The hourly provider capture, 06:00-23:00 and 02:00 ET"
 )
 
 target_uri() {
