@@ -352,7 +352,7 @@
 	</footer>
 {/snippet}
 
-<Shell title="League" active="league">
+<Shell title="League" active="league" league={id}>
 	{#if failure === 'signed-out'}
 		<div class="pad">
 			<EmptyState

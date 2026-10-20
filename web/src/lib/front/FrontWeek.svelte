@@ -17,6 +17,7 @@
 		FRONT,
 		frontLeague,
 		leadOf,
+		liveLeadOf,
 		readWords,
 		rosterAside,
 		weekBasis,
@@ -27,7 +28,9 @@
 
 	/** The front door in season for a member with a league (Lane 66k): the chosen league's score bug,
 	 * its lineup's changes as the one verb, its three roster facts as chips that open the screen that
-	 * acts on each, then every other league's bug. One read, GET /me/week; the page reads nothing else
+	 * acts on each, then every other league's bug. When another league's game is live and the chosen
+	 * one's is not, that league's card leads, headed Live now, and the chosen league follows in full
+	 * (B38): the choice is the member's, never this page's. One read, GET /me/week; the page reads nothing else
 	 * of the season. A read that fails says so, with the way to read again. */
 	interface Props {
 		/** The league the shell has chosen, null for none. */
@@ -54,9 +57,13 @@
 	const now = new Date();
 	const lead = $derived(week ? leadOf(week.leagues, chosen) : null);
 	const view = $derived(lead ? frontLeague(lead, href, now) : null);
+	const liveLeague = $derived(week ? liveLeadOf(week.leagues, lead, now) : null);
+	const live = $derived(liveLeague ? frontLeague(liveLeague, href, now) : null);
 	const others = $derived(
 		week && lead
-			? week.leagues.filter((l) => l.id !== lead.id).map((l) => frontLeague(l, href, now))
+			? week.leagues
+					.filter((l) => l.id !== lead.id && l.id !== liveLeague?.id)
+					.map((l) => frontLeague(l, href, now))
 			: []
 	);
 	const read_ = $derived(lead ? readWords(lead, now) : null);
@@ -64,7 +71,7 @@
 		lead && view?.bug
 			? weekBasis(
 					lead,
-					others.length > 0,
+					others.length > 0 || live !== null,
 					memberZone(),
 					view.bug.state !== 'upcoming',
 					bugsMissFinal([view.bug])
@@ -101,6 +108,19 @@
 	{:else if week === null}
 		<div class="reserve" aria-hidden="true"></div>
 	{:else if view}
+		{#if live?.bug}
+			<div class="band live">
+				<BugCard
+					bug={live.bug}
+					href={live.matchupHref}
+					size="lg"
+					flag={FRONT.liveNow}
+					label="{live.name}, {live.platform}"
+				>
+					{#snippet foot()}<span class="open">{FRONT.matchup}</span>{/snippet}
+				</BugCard>
+			</div>
+		{/if}
 		<div class="title">
 			<h2>{view.name}</h2>
 			<p class="lede">

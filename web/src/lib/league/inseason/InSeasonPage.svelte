@@ -156,7 +156,7 @@
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
-<Shell title={SCREEN_TITLES[screen]} active={screenSection(screen)}>
+<Shell title={SCREEN_TITLES[screen]} active={screenSection(screen)} league={id}>
 	{#if signedOut}
 		<div class="pad">
 			<EmptyState title={signInTitle(screen)} line={LINES.signInLine}>

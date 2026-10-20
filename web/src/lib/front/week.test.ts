@@ -9,7 +9,9 @@ import {
 	FRONT,
 	chipsOf,
 	frontLeague,
+	gameLive,
 	leadOf,
+	liveLeadOf,
 	nudgeOf,
 	rosterAside,
 	readWords,
@@ -174,6 +176,41 @@ void test('the lead league is the chosen one, else the first with a week', () =>
 	assert.equal(leadOf([], null), null);
 });
 
+void test('a live league leads ahead of the chosen one only while the chosen one is not live (B38)', () => {
+	// Monday 7:25 pm Central: the chosen league's week is final, another's game is under way.
+	const monday = new Date('2026-10-20T00:25:00.000Z');
+	const bug = SUCK.bug;
+	assert.ok(bug !== null);
+	const game = (state: 'upcoming' | 'playing' | 'final', next: string | null) => ({
+		...bug,
+		game: { ...bug.game, state, next_kickoff: next }
+	});
+	const chosen: WeekLeague = { ...SUCK, id: 'chosen', bug: game('final', null) };
+	const live: WeekLeague = { ...SUCK, id: 'espn', host: 'espn', bug: game('playing', null) };
+	const idle: WeekLeague = { ...SUCK, id: 'ffpc', bug: null };
+	const leagues = [idle, chosen, live];
+	const lead = leadOf(leagues, 'chosen');
+	// The chosen league stays the lead: the page never changes the member's choice.
+	assert.equal(lead?.id, 'chosen');
+	assert.equal(gameLive(live, monday), true);
+	assert.equal(gameLive(chosen, monday), false);
+	assert.equal(gameLive(idle, monday), false);
+	assert.equal(liveLeadOf(leagues, lead, monday)?.id, 'espn');
+	// The chosen league live too: it leads alone.
+	assert.equal(liveLeadOf(leagues, live, monday), null);
+	// Upcoming by the API, but its kickoff past at the page's clock: kicked off, by gameHead's rule.
+	const lagging: WeekLeague = {
+		...live,
+		bug: game('upcoming', '2026-10-20T00:15:00.000Z')
+	};
+	assert.equal(liveLeadOf([chosen, lagging], chosen, monday)?.id, 'espn');
+	const before: WeekLeague = { ...live, bug: game('upcoming', '2026-10-20T01:15:00.000Z') };
+	assert.equal(liveLeadOf([chosen, before], chosen, monday), null);
+	assert.equal(liveLeadOf([chosen, { ...live, bug: game('final', null) }], chosen, monday), null);
+	assert.equal(liveLeadOf([], null, monday), null);
+	assert.equal(FRONT.liveNow, 'Live now');
+});
+
 void test('the bug is the API game with both teams, mine first, and who plays first', () => {
 	const view = frontLeague(SUCK, href, NOW, ZONE);
 	assert.equal(view.line, 'McConkey Kong Country, 1-4, 12th of 12');
@@ -327,6 +364,12 @@ void test('the basis says whose figures, what Proj is and when it was read, once
 		/PPR scoring, the closest to this league's rules, read Fri 9:00 pm Central\./
 	);
 	assert.equal(weekBasis({ ...SUCK, projection_scoring: null }, true, ZONE).length, 1);
+	// No unnamed "strip" (B39): Gain is named as the changes' figure, a pickup's said after it.
+	assert.match(
+		basis[1] ?? '',
+		/ Gain is what the changes add\. A pickup's gain is the Proj he adds this week\.$/
+	);
+	assert.doesNotMatch(basis.join(' '), /strip/i);
 });
 
 void test('the roster head counts its chips, and each other league carries its changes', () => {

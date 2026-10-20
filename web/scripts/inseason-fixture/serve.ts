@@ -250,6 +250,39 @@ const afterSunday = (): boolean => now() >= AFTER_SUNDAY;
 /** The API's sentence for an FFPC read FFPC signed out of (leaguesync HostProblemWords). */
 const FFPC_AGAIN = 'FFPC signed you out. Sign in to FFPC again to keep reading your league.';
 
+/** FIXTURE_LEAD_FINAL=1 (Lane 102, B38): the Sleeper league's game read final, every starter's
+ * points his last, while the ESPN stand-in's Monday night game is still under way, so the front door
+ * leads with the live league's card ahead of the selected one. A stand-in of the sense check's
+ * Monday night, never the recorded week. */
+const leadFinal = process.env.FIXTURE_LEAD_FINAL === '1';
+
+/** A league's game as final: no starter to play, each side's projected final its points. */
+function finalGame(
+	league: components['schemas']['WeekLeague']
+): components['schemas']['WeekLeague'] {
+	if (league.bug === null) return league;
+	const game = league.bug.game;
+	return {
+		...league,
+		bug: {
+			...league.bug,
+			first: [],
+			game: {
+				...game,
+				state: 'final',
+				next_kickoff: null,
+				to_play: null,
+				sides: game.sides.map((side) => ({
+					...side,
+					played: side.starters,
+					to_play: null,
+					projected_final: side.points
+				}))
+			}
+		}
+	};
+}
+
 /** GET /me/week: every league the front door shows, the Sleeper league first. */
 function memberWeek(): components['schemas']['MemberWeek'] {
 	const at = readAt();
@@ -265,19 +298,24 @@ function memberWeek(): components['schemas']['MemberWeek'] {
 		team_name: contextBase.team_name,
 		standing: contextBase.standing
 	};
+	const lead = (
+		league: components['schemas']['WeekLeague']
+	): components['schemas']['WeekLeague'] => (leadFinal ? finalGame(league) : league);
 	return {
 		leagues: [
-			inSeason(
-				LEAGUE,
-				{
-					...sleeperWeek,
-					waivers: waiversNow(),
-					readAt: at,
-					...(turnedNow()
-						? { turned: { week: TURNED_WEEK, lineup: turnedLineup(lineupNow()) } }
-						: {})
-				},
-				when
+			lead(
+				inSeason(
+					LEAGUE,
+					{
+						...sleeperWeek,
+						waivers: waiversNow(),
+						readAt: at,
+						...(turnedNow()
+							? { turned: { week: TURNED_WEEK, lineup: turnedLineup(lineupNow()) } }
+							: {})
+					},
+					when
+				)
 			),
 			inSeason(ESPN_DONE, { ...espnWeek, waivers: espnWaivers(null), readAt: at }, when),
 			noWeek(

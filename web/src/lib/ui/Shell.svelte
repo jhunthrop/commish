@@ -31,16 +31,19 @@
 		 * theme switch lives in the account room at every width, so the bar holds only the league
 		 * switch, the account, the verb and search. */
 		tail?: Snippet;
+		/** The league a league's page is for: the rail's league screens open its pages, while the switch
+		 * keeps the selected league (B38). Left out, they open the selected league's. */
+		league?: string;
 		children: Snippet;
 	}
 
-	let { title, stamp, active, search, tail, children }: Props = $props();
+	let { title, stamp, active, search, tail, league, children }: Props = $props();
 
 	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
 	// The site's context: the session's copy at once, then /me. The rail's Board (/board, which
 	// names no format) opens in the context's format by itself (follow.svelte.ts).
 	onMount(() => void siteContext.load());
-	const leagueId = $derived(siteContext.league?.id ?? null);
+	const leagueId = $derived(league ?? siteContext.league?.id ?? null);
 	/** The phone bar's rows from the parts this page passes (bar-rows.ts): with none, the one row led by
 	 * the site mark, the way home; the bottom bar keeps its five, so the mark takes no tab. */
 	const rows = $derived(barRows({ stamp, tail, search }));

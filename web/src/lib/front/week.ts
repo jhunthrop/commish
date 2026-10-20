@@ -17,6 +17,7 @@ import {
 } from '#lib/league/box/lineup.ts';
 import { bugsOf, type Bug } from '#lib/league/home/home.ts';
 import { AS_OF_KICKOFF, projFinalWords } from '#lib/league/box/basis.ts';
+import { gameHead } from '#lib/league/box/kickoff.ts';
 import { carriedMark, NEXT_WEEK } from '#lib/league/box/next-week.ts';
 import { agoWords } from '#lib/league/model.ts';
 import { hostWords } from '#lib/league/names.ts';
@@ -46,6 +47,12 @@ export const FRONT = {
 	waivers: 'Waivers',
 	bye: 'Bye',
 	topPickup: 'Top pickup',
+	/** The head of a live league's card that leads in place of the selected one's (B38). */
+	liveNow: 'Live now',
+	/** What the changes' figure is, said once in the basis (B39). */
+	gain: 'Gain is what the changes add.',
+	/** A pickup's figure while the roster facts are the league's week (B39). */
+	pickupGain: `A pickup's gain is the ${BOX.proj} he adds this week.`,
 	unread: 'Your leagues this week could not be read just now.',
 	tryAgain: 'Try again',
 	/** The pickup's clause of the basis once the roster facts have turned (Lane 95 review MEDIUM-3). */
@@ -303,6 +310,28 @@ export function leadOf(leagues: readonly WeekLeague[], chosen: string | null): W
 	);
 }
 
+/** A league's game is live at the page's clock (B38): by the bug's one rule (gameHead), a starter of
+ * either side has kicked off and not every starter's game is final. */
+export function gameLive(league: Pick<WeekLeague, 'bug'>, now: Date): boolean {
+	const game = league.bug?.game;
+	if (game === undefined) return false;
+	return (
+		gameHead({ state: game.state, next: game.next_kickoff }, now.getTime()).state === 'kicked_off'
+	);
+}
+
+/** The league whose live card leads the front door ahead of the lead one (B38): the first other
+ * league, in the account's order, with a live game while the lead league has none; null otherwise.
+ * The lead league stays the member's choice and follows in full. */
+export function liveLeadOf(
+	leagues: readonly WeekLeague[],
+	lead: WeekLeague | null,
+	now: Date
+): WeekLeague | null {
+	if (lead === null || gameLive(lead, now)) return null;
+	return leagues.find((l) => l.id !== lead.id && gameLive(l, now)) ?? null;
+}
+
 /** "Read from Sleeper 4 minutes ago.", from a league's read; null when it was never read. */
 export function readWords(league: WeekLeague, now: Date): string | null {
 	if (league.read_at === null) return null;
@@ -311,7 +340,7 @@ export function readWords(league: WeekLeague, now: Date): string | null {
 }
 
 /** The band's basis, said once for the league it leads with: whose record and points, what Proj is
- * and when it was read, and what the strip's and a pickup's figures are. */
+ * and when it was read, and what the changes' and a pickup's figures are. */
 export function weekBasis(
 	league: WeekLeague,
 	others: boolean,
@@ -335,8 +364,8 @@ export function weekBasis(
 		const turned = turnedWeek(league);
 		const pickup =
 			turned === null
-				? `The strip's gain is what the changes add, and a pickup's is the ${BOX.proj} he adds this week.`
-				: `The strip's gain is what the changes add. ${FRONT.turnedPickup(turned)}`;
+				? `${FRONT.gain} ${FRONT.pickupGain}`
+				: `${FRONT.gain} ${FRONT.turnedPickup(turned)}`;
 		lines.push(
 			`${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}, ${when}${started ? `, ${AS_OF_KICKOFF}` : ''}. ${pickup}${started ? ` ${projFinalWords(true, missing)}` : ''}`
 		);
