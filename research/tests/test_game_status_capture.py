@@ -28,6 +28,7 @@ from research.pipeline.tank01.game_status import (
     pending_week,
     status_observations,
 )
+from research.pipeline.tank01.mapping import map_games
 
 SUNDAY: Final = datetime(2026, 10, 18, 17, tzinfo=UTC)
 THURSDAY: Final = datetime(2026, 10, 16, 0, 15, tzinfo=UTC)
@@ -97,9 +98,10 @@ BODY: Final = [
 
 def test_each_club_gets_its_games_status_in_the_stores_codes() -> None:
     at = SUNDAY + timedelta(hours=4)
-    rows = {(r.team, r.value) for r in status_observations(BODY, 2026, 6, at)}
+    observed = status_observations(map_games(BODY, 6), 2026, 6, at)
+    rows = {(r.team, r.value) for r in observed}
     assert rows == {("MIA", 2.0), ("BUF", 2.0), ("SEA", 1.0), ("LA", 1.0), ("DAL", 0.0), ("WAS", 0.0)}
-    assert all(r.as_of == at and r.source == STATUS_SOURCE for r in status_observations(BODY, 2026, 6, at))
+    assert all(r.as_of == at and r.source == STATUS_SOURCE for r in observed)
 
 
 class _Client:
