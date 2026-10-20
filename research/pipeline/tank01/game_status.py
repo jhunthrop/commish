@@ -21,8 +21,10 @@ that never gets a final (a cancellation, or a missed weekly result) is asked abo
 18 calls a day, until the next week kicks off or GIVE_UP_AFTER has passed, so never into the offseason.
 
 A WEEK FEED THAT LAGS (Lane 101, B75). The week's feed has said Scheduled hours after a Monday night game
-ended. So in the same pass, a game the week's answer still has scheduled or under way FALLBACK_AFTER or
-more past its stored kickoff, with no final held, is asked about on its own: Tank01's box score for that
+ended. So in the same pass, a game the week's answer still has scheduled or under way FALLBACK_AFTER
+(3 h 30 m) or more past its stored kickoff, with no final held, is asked about on its own, and so is a
+game of the stored schedule (`provider_games`) the answer leaves out, named in the line as absent from
+the week feed and written only from its own answer: Tank01's box score for that
 game (`getNFLBoxScore`, whose answer carries the game's `gameStatusCode` and `gameStatus` as the week's
 does), at most FALLBACK_CAP a pass, the longest waiting first, on what is left of the pass's request
 budget. Each answer is kept verbatim under its own source (BOX_SCORE_SOURCE) and read through the same
@@ -42,7 +44,7 @@ from typing import Final
 import httpx
 from sqlalchemy import Connection, func, select, text
 
-from research.db.schema import CAPTURE_SNAPSHOTS, CLUB_WEEK_FINALS
+from research.db.schema import CAPTURE_SNAPSHOTS, CLUB_WEEK_FINALS, PROVIDER_GAMES
 from research.errors import ResearchError
 from research.pipeline.budget import FixedBudget
 from research.pipeline.jscompat import js_json_stringify
@@ -61,9 +63,10 @@ STATUS_METRIC: Final = "game_status"
 STATUS_VALUES: Final[dict[GameStatus, float]] = {"scheduled": 0.0, "in_progress": 1.0, "final": 2.0}
 FINAL_VALUE: Final = STATUS_VALUES["final"]
 HOURLY_CAP: Final = 2
-# A game the week's feed still has scheduled or under way this long past its kickoff is asked about on its
-# own (Lane 101): every game is over by then, overtime and a long delay included.
-FALLBACK_AFTER: Final = timedelta(hours=4)
+# A game the week's feed still has scheduled or under way, or leaves out, this long past its kickoff is
+# asked about on its own (Lane 101). 3 h 30 m (fix round 1), so the 00:00 ET pass reaches an 8:15 pm ET
+# kickoff (3 h 45 m old then) before the 05:00 UTC nightly; a game still going is written as under way.
+FALLBACK_AFTER: Final = timedelta(hours=3, minutes=30)
 # At most this many per-game calls a pass (the games in that state on a game night, B75).
 FALLBACK_CAP: Final = 2
 # A game with no final this long after its kickoff stops being asked about (Lane 84 review): past the
@@ -158,6 +161,18 @@ def lagging_games(
     return [game for _, game in sorted(waiting, key=lambda pair: (pair[0], pair[1].game_id))]
 
 
+def absent_games(conn: Connection, season: int, week: int, answered: Sequence[GameSummary]) -> list[GameSummary]:
+    """The stored schedule's games of the week the answer leaves out, as not yet final (MEDIUM-2)."""
+    t = PROVIDER_GAMES
+    query = select(t.c.game_id, t.c.home_team, t.c.away_team).where(t.c.season == season, t.c.week == week)
+    ids = {game.game_id for game in answered}
+    return [
+        GameSummary(str(r.game_id), week, "scheduled", str(r.home_team), str(r.away_team), "", "")
+        for r in conn.execute(query.order_by(t.c.game_id))
+        if r.game_id not in ids
+    ]
+
+
 @dataclass(frozen=True)
 class _Fallback:
     """One pass's per-game answers: the statuses they gave, their requests, what they said."""
@@ -236,14 +251,17 @@ def capture_game_status(
     body = client.get(Paths.GAMES_FOR_WEEK, {"week": str(week), "season": str(season), "seasonType": SEASON_TYPE})
     _store(conn, SNAPSHOT_SOURCE, body, now)
     games = map_games(body, week)
-    lagging = lagging_games(games, kickoffs, held, week, now)
+    absent = absent_games(conn, season, week, games)
+    lagging = lagging_games([*games, *absent], kickoffs, held, week, now)
     asked = to_ask(lagging, budget.after(1))
     fallback = _fallback(conn, client, asked, week, now)
-    read = [replace(game, status=fallback.statuses.get(game.game_id, game.status)) for game in games]
+    answered = [game for game in absent if game.game_id in fallback.statuses]
+    read = [replace(game, status=fallback.statuses.get(game.game_id, game.status)) for game in [*games, *answered]]
+    missing = [f"{game.game_id} absent from the week feed" for game in lagging if game in absent]
     rows = status_observations(read, season, week, now)
     written = record_team_observations(conn, rows)
     finals = sum(1 for row in rows if row.value == FINAL_VALUE)
     requests = 1 + fallback.requests
     head = f"week {week}, {len(rows)} clubs read, {finals} final, {requests} request{'' if requests == 1 else 's'}"
     unasked = [f"{left} lagging, not asked this pass"] if (left := len(lagging) - len(asked)) else []
-    return StatusResult(requests, written, "; ".join([head, *fallback.notes, *unasked]), fallback.failed)
+    return StatusResult(requests, written, "; ".join([head, *missing, *fallback.notes, *unasked]), fallback.failed)

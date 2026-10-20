@@ -1,4 +1,4 @@
-"""A week feed that lags (Lane 101, B75): a game the week's answer still has scheduled or under way four hours
+"""A week feed that lags (Lane 101, B75): a game the week's answer still has scheduled or under way, or leaves out, 3 h 30 m
 past its kickoff is asked about on its own, its box score kept under its own source and read through the
 same mapper, at most two a pass on what the pass's budget leaves; a refused answer fails the line.
 
@@ -15,7 +15,7 @@ import pytest
 from sqlalchemy import Connection, Engine, func, insert, select
 
 from research.db.engine import make_engine
-from research.db.schema import CAPTURE_SNAPSHOTS, TEAM_WEEK_OBSERVATIONS
+from research.db.schema import CAPTURE_SNAPSHOTS, PROVIDER_GAMES, TEAM_WEEK_OBSERVATIONS
 from research.db.url import sqlalchemy_url
 from research.parity import databases
 from research.parity.replay import FIXTURES_ROOT
@@ -39,7 +39,7 @@ WEEK: Final = 6
 SEASON: Final = 2026
 SUNDAY_LATE: Final = datetime(2026, 10, 18, 17, 0, tzinfo=UTC)  # PIT@TB
 MONDAY_NIGHT: Final = datetime(2026, 10, 20, 0, 15, tzinfo=UTC)  # WSH@SF, 8:15 pm Eastern
-LATE_KICK: Final = datetime(2026, 10, 20, 3, 30, tzinfo=UTC)  # LAR@SEA, under four hours old at both passes
+LATE_KICK: Final = datetime(2026, 10, 20, 4, 0, tzinfo=UTC)  # LAR@SEA, under 3 h 30 m old at both passes
 PASS_AT: Final = datetime(2026, 10, 20, 6, 0, tzinfo=UTC)  # the 02:00 ET pass of B75
 WEEK_FEED_ONLY: Final = 1
 WEEK_AND_ONE_BOX_SCORE: Final = 2
@@ -47,6 +47,7 @@ FINAL: Final = 2.0
 UNDER_WAY: Final = 1.0
 SCHEDULED: Final = 0.0
 WSH_SF: Final = "20261019_WSH@SF"
+MIDNIGHT_ET_PASS: Final = datetime(2026, 10, 20, 4, 0, tzinfo=UTC)
 
 
 def _k(team: str, at: datetime) -> TeamKickoff:
@@ -131,16 +132,19 @@ def _games(at_status: Mapping[str, str] | None = None) -> list[GameSummary]:
     return map_games(body, WEEK)
 
 
-def test_only_a_game_four_hours_past_its_kickoff_still_open_in_the_feed_lags() -> None:
+def test_only_a_game_three_and_a_half_hours_past_its_kickoff_still_open_in_the_feed_lags() -> None:
+    assert timedelta(hours=3, minutes=30) == FALLBACK_AFTER
     lagging = lagging_games(_games(), KICKOFFS, frozenset(), WEEK, PASS_AT)
-    # PIT@TB is final in the feed; LAR@SEA kicked off two and a half hours ago.
+    # PIT@TB is final in the feed; LAR@SEA kicked off two hours ago.
     assert [g.game_id for g in lagging] == [WSH_SF]
-    # One minute short of four hours: not yet.
-    assert (
-        lagging_games(_games(), KICKOFFS, frozenset(), WEEK, MONDAY_NIGHT + FALLBACK_AFTER - timedelta(minutes=1)) == []
-    )
-    # Exactly four hours: asked.
-    assert len(lagging_games(_games(), KICKOFFS, frozenset(), WEEK, MONDAY_NIGHT + FALLBACK_AFTER)) == 1
+    # 3 h 29 m: not yet.
+    at_3h29 = MONDAY_NIGHT + timedelta(hours=3, minutes=29)
+    assert lagging_games(_games(), KICKOFFS, frozenset(), WEEK, at_3h29) == []
+    # 3 h 30 m: asked.
+    at_3h30 = MONDAY_NIGHT + timedelta(hours=3, minutes=30)
+    assert len(lagging_games(_games(), KICKOFFS, frozenset(), WEEK, at_3h30)) == 1
+    # The 00:00 ET pass (04:00Z) reaches the 8:15 pm ET kickoff before the 05:00Z nightly.
+    assert [g.game_id for g in lagging_games(_games(), KICKOFFS, frozenset(), WEEK, MIDNIGHT_ET_PASS)] == [WSH_SF]
 
 
 def test_a_held_final_a_missing_kickoff_or_a_given_up_game_never_lags() -> None:
@@ -276,3 +280,45 @@ def test_a_spent_budget_asks_the_week_alone_and_says_so(engine: Engine) -> None:
         assert (result.requests, result.failed) == (WEEK_FEED_ONLY, False)
         assert result.line == "week 6, 6 clubs read, 2 final, 1 request; 1 lagging, not asked this pass"
         assert [path for path, _ in client.calls] == [Paths.GAMES_FOR_WEEK]
+
+
+class _WeekWithout(_Client):
+    """The week's answer with the Monday night game left out."""
+
+    def get(self, path: str, query: dict[str, str] | None = None) -> object:
+        if path == Paths.GAMES_FOR_WEEK:
+            self.calls.append((path, dict(query or {})))
+            return [g for g in WEEK_BODY if g["gameID"] != WSH_SF]
+        return super().get(path, query)
+
+
+def _seed_schedule(conn: Connection) -> None:
+    rows = [
+        {"game_id": str(g["gameID"]), "season": SEASON, "week": WEEK, "home_team": str(g["home"]),
+         "away_team": str(g["away"]), "status": "scheduled"}
+        for g in WEEK_BODY
+    ]  # fmt: skip
+    conn.execute(insert(PROVIDER_GAMES), rows)
+
+
+def test_a_game_absent_from_the_week_feed_is_named_and_asked_about(engine: Engine) -> None:
+    client = _WeekWithout({WSH_SF: _as_wsh_sf({"gameStatus": "Completed", "gameStatusCode": "2"})})
+    with engine.begin() as conn:
+        _seed(conn)
+        _seed_schedule(conn)
+        result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(5))
+        assert (result.requests, result.failed) == (WEEK_AND_ONE_BOX_SCORE, False)
+        assert result.line == (
+            f"week 6, 6 clubs read, 4 final, 2 requests; {WSH_SF} absent from the week feed; {WSH_SF} box score final"
+        )
+        assert _statuses(conn, PASS_AT)["SF"] == FINAL and _statuses(conn, PASS_AT)["WAS"] == FINAL
+
+
+def test_an_absent_game_whose_answer_fails_gets_no_status(engine: Engine) -> None:
+    client = _WeekWithout({WSH_SF: {"gameID": WSH_SF, "home": "SF", "away": "WSH"}})
+    with engine.begin() as conn:
+        _seed(conn)
+        _seed_schedule(conn)
+        result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(5))
+        assert result.failed and f"{WSH_SF} absent from the week feed" in result.line
+        assert "SF" not in _statuses(conn, PASS_AT)

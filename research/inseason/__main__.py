@@ -8,7 +8,7 @@
 `tank01_lines` and the weather service's kickoff forecasts into `nws_forecast` (Lane 66a). While a game
 of the current week that kicked off has no final, up to four days past its kickoff (Lane 84), it asks
 Tank01's week of games once for their statuses (Lane 80, `pipeline/tank01/game_status.py`, at most two
-calls an hour), and a game that answer still has open four hours past its kickoff by its own box score
+calls an hour), and a game that answer still has open, or leaves out, 3 h 30 m past its kickoff by its own box score
 (Lane 101, at most two a pass), so a game is final the hour after it ends.
 
 `usage-backfill` runs the weekly pass's usage steps alone (play-by-play and the three charted feeds)
