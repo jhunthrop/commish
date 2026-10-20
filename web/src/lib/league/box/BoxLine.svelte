@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import Icon from '#lib/ui/Icon.svelte';
+	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import {
 		BOX,
 		boxNumber,
@@ -67,6 +68,9 @@
 		/** Whether the row draws Proj and its change: not on a page whose week has no published
 		 * projection read yet (Lane 95), whose cells would all be "--". */
 		projCells?: boolean;
+		/** His position chip in its own cell after the player, under the Our rank head (the Matchup and
+		 * the Lineup, Lane 99 B24). */
+		rankCell?: boolean;
 		/** A player on injured reserve (Lane 98, B34): on the bench his game cell says why he is a drop,
 		 * in the IR slot it is empty; neither draws his matchup (Opp rank), the slot no points. */
 		reserve?: 'bench' | 'slot' | null;
@@ -94,6 +98,7 @@
 		phoneFacts = true,
 		phoneOpp = true,
 		projCells = true,
+		rankCell = false,
 		reserve = null
 	}: Props = $props();
 	/** The row as drawn: an IR row without its matchup (reserveRow). */
@@ -101,6 +106,11 @@
 	const note = $derived(reserve === 'bench' ? BOX.irBench : null);
 	const picked = $derived(pick?.state === 'on');
 	const rank = $derived(drawn.evidence.oppRank);
+	/** The Opp rank's colour, while his game is still to come (Lane 99, B56): on a game played it is
+	 * decoration. */
+	const ease = $derived(
+		rank !== null && drawn.toCome ? easeOf(rank, drawn.evidence.oppOf) : 'even'
+	);
 	/** The phone's evidence line's own words and separator, so the template adds no space. */
 	const oppLead = `${BOX.opp} `;
 	const SEPARATOR = ', ';
@@ -118,8 +128,7 @@
 	<!-- The separators are expressions, so the template's own line breaks add no space (review L7). -->
 	<span class="phone-ev"
 		>{#if rank !== null && phoneOpp}<span class="pair"
-				>{oppLead}<span class="rk {easeOf(rank, row.evidence.oppOf)}">{oppRankWord(rank)}</span
-				></span
+				>{oppLead}<span class="rk {ease}">{oppRankWord(rank)}</span></span
 			>{SEPARATOR}{/if}{#each seasonPairs as pair, i (i)}{#if i > 0}{SEPARATOR}{/if}<span
 				class="pair">{pair}</span
 			>{/each}</span
@@ -166,10 +175,29 @@
 		>
 	{/if}
 	<td class="player">
-		<BoxPlayer row={drawn} {tags} {shortOnPhone} {compact} {clears} {phoneFacts} {note}
+		<BoxPlayer
+			row={drawn}
+			{tags}
+			{shortOnPhone}
+			{compact}
+			{clears}
+			{phoneFacts}
+			{note}
+			rankApart={rankCell}
 			>{#if evidence}{@render seasonLine()}{/if}</BoxPlayer
 		>
 	</td>
+	{#if rankCell}
+		<!-- His place in our order alone: unranked (or a defense) is "--", and a season-long list's
+		     word stays in his status chip, never here (fix round 1, MEDIUM-2); an injured reserve row
+		     leaves it empty (Lane 98's IR rows). -->
+		<td class="rank" data-position={drawn.position}
+			>{#if reserve !== null}{:else if drawn.pill && drawn.pill.rank !== null}<PositionPill
+					position={drawn.pill.position}
+					rank={drawn.pill.rank}
+				/>{:else}<span class="none">{BOX.none}</span>{/if}</td
+		>
+	{/if}
 	{#if !compact}<td class="game"><BoxGame row={drawn} {clears} {note} /></td>{/if}
 	{#if projCells}<td class="n proj">{boxNumber(drawn.proj)}</td>{/if}
 	{#if ptsCell && !compact}<td class="n pts" class:none={drawn.pts === null}
@@ -177,9 +205,9 @@
 		>{/if}
 	{#if evidence}
 		<td class="n ev first"
-			>{#if rank !== null}<span class="rk {easeOf(rank, drawn.evidence.oppOf)}"
-					>{oppRankWord(rank)}</span
-				>{:else}<span class="none">{BOX.none}</span>{/if}</td
+			>{#if rank !== null}<span class="rk {ease}">{oppRankWord(rank)}</span>{:else}<span
+					class="none">{BOX.none}</span
+				>{/if}</td
 		>
 		<td class="n ev">{boxNumber(drawn.evidence.avg)}</td>
 		<td class="n ev">{boxNumber(drawn.evidence.last)}</td>
@@ -294,6 +322,12 @@
 		border-radius: var(--r-sm);
 	}
 
+	/* A rank drawn without its colour sits flush, so its comma on the phone's line follows it. */
+	.rk.even {
+		padding: 0;
+		min-width: 0;
+	}
+
 	.rk.easy {
 		background: var(--gain-bg);
 		color: var(--gain-ink);
@@ -348,6 +382,10 @@
 
 	.game {
 		font-size: var(--t-sm);
+	}
+
+	.rank {
+		white-space: nowrap;
 	}
 
 	.n {
@@ -486,6 +524,16 @@
 			font-size: var(--t-md);
 		}
 
+		/* The chip keeps its own width and gives the player the rest (Lane 99): the rank cell's own
+		   padding is the gap after the name. */
+		.rank {
+			padding-inline: 2px;
+		}
+
+		.player:has(+ .rank) {
+			padding-right: 2px;
+		}
+
 		.op {
 			width: 34px;
 			padding: 0 2px;
@@ -531,6 +579,10 @@
 			min-width: 0;
 			padding: 0 3px;
 			font-weight: 700;
+		}
+
+		.phone-ev .rk.even {
+			padding: 0;
 		}
 	}
 </style>

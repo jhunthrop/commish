@@ -14,6 +14,7 @@ import {
 	setOnWords,
 	LINEUP,
 	lineupBox,
+	lineupSum,
 	lineupText,
 	stripSum,
 	whyLine,
@@ -150,6 +151,32 @@ void test('moves are marked: in on the lineup, Sit on the bench, the reserve apa
 			['RB', 'Vidal', 'Gibbs']
 		]
 	);
+});
+
+void test('the Lineup strip names whose lineup its figure is, and once played gives its points (Lane 99, B11)', () => {
+	const box = lineupBox(advice, ZONE, NOW);
+	assert.deepEqual(lineupSum(box, 'espn', null), {
+		figure: '34.1',
+		words: 'Proj with them, 29.6 as set on ESPN',
+		gain: '+4.5'
+	});
+	const set = lineupBox({ ...advice, slots: [slot('RB', irving, irving, false)] }, ZONE, NOW);
+	assert.equal(lineupSum(set, 'espn', null)?.words, 'Proj as set on ESPN');
+	const played = { ...box, totals: { ...box.totals, pts: 76.8 } };
+	assert.deepEqual(lineupSum(played, 'espn', WEEK_DONE), {
+		figure: '76.8',
+		words: 'Pts as set on ESPN',
+		gain: null
+	});
+	assert.equal(lineupSum(box, 'espn', WEEK_DONE), null, 'no points read, no figure');
+	assert.equal(LINEUP.pastWeeks, 'Past weeks of our order, on Our record');
+});
+
+void test("the Lineup's rows carry our rank in their chip, as the Matchup's do (Lane 99, B24)", () => {
+	const box = lineupBox(advice, ZONE, NOW);
+	for (const row of [...box.starters.map((s) => s.row), ...box.bench.map((b) => b.row)]) {
+		if (row.pill !== null) assert.equal(row.pill.rank, 7, row.name);
+	}
 });
 
 void test('the gain compares the advice with the lineup as the platform has it set now', () => {

@@ -29,6 +29,7 @@ import {
 	SCORED_SHARE,
 	type Recorded as RecordedWeek
 } from './scoreboard-at.ts';
+import { missedOf, standingOf } from './standing.ts';
 import { roundTenth } from './tenths.ts';
 
 export { SCORED_SHARE };
@@ -94,6 +95,19 @@ export function weekDoneState(scoreboard: Scoreboard, me: number): WeekDoneState
 function lineupAt(lineup: LineupAdvice, moment: Moment, state: WeekDoneState): LineupAdvice {
 	const advised = advise(lineup, (line) => kickedOffAt(line, moment.now));
 	const done = weekDone(advised, moment);
+	// Our pick with no player held, against the lineup as set (miss.go, Lane 99).
+	const pick = advise(lineup);
+	const missed = missedOf(
+		{
+			...pick,
+			slots: pick.slots.map((s) => ({
+				...s,
+				ours: lineAt(s.ours, moment),
+				host: s.host === null ? null : lineAt(s.host, moment)
+			}))
+		},
+		moment
+	);
 	return {
 		...advised,
 		slots: advised.slots.map((s) => ({
@@ -103,7 +117,8 @@ function lineupAt(lineup: LineupAdvice, moment: Moment, state: WeekDoneState): L
 		})),
 		bench: advised.bench.map((l) => lineAt(l, moment)),
 		week_done: done,
-		week_done_state: done === null ? null : state
+		week_done_state: done === null ? null : state,
+		missed
 	};
 }
 
@@ -173,6 +188,14 @@ function weekOf(
 		),
 		matchup: {
 			...matchup,
+			// Where the member stands under the bug's scores (standing.go, Lane 99).
+			...(standingOf(
+				matchup.sides.map((s) => ({
+					points: total.get(s.roster_id) ?? null,
+					lines: s.starters.map((st) => lineAt(st.line, moment))
+				})),
+				moment
+			) ?? { standing: null, decided: null }),
 			sides: matchup.sides.map((s, i) => ({
 				...s,
 				to_play: counts[i] ?? null,

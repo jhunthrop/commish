@@ -8,8 +8,9 @@
 	import { BENCH_ANCHOR, LINEUP, type LineupBox, type LineupRow } from './lineup.ts';
 
 	/** The Lineup screen's one table (Lane 66e): the lineup the advice sets, Totals lit like the score
-	 * bug, the bench and the injured reserve, each row in the same columns (slot, player, game, Proj,
-	 * Pts, then Opp rank, Avg, Last and the projection's change). A row the advice moves in carries an
+	 * bug, the bench and the injured reserve, each row in the same columns (slot, player, our rank,
+	 * game, Proj, Pts, then Opp rank with its key under its head, Avg, Last and the projection's
+	 * change). A row the advice moves in carries an
 	 * arrow, a tint and a button that opens its one evidence line; a starter it sits carries the arrow
 	 * down on the bench. */
 	interface Props {
@@ -23,7 +24,7 @@
 
 	let { label, box, tagsOf = () => [], noBench }: Props = $props();
 
-	const COLUMNS = 10;
+	const COLUMNS = 11;
 	const opened = new SvelteSet<string>();
 
 	// The League page's bench count links here: the table is read after the page opens, so the
@@ -61,10 +62,11 @@
 		<tr class="cols">
 			<th class="slot" scope="col">{BOX.slot}</th>
 			<th scope="col">{BOX.player}</th>
+			<th class="rank" scope="col">{BOX.ourRank}</th>
 			<th class="game" scope="col">{BOX.game}</th>
 			<th class="n num" scope="col">{BOX.proj}</th>
 			<th class="n num pts" scope="col">{BOX.pts}</th>
-			<th class="n ev first" scope="col">{BOX.oppRank}</th>
+			<th class="n ev first" scope="col">{BOX.oppRank}<span class="key">{BOX.oppRankKey}</span></th>
 			<th class="n ev" scope="col">{BOX.avg}</th>
 			<th class="n ev" scope="col">{BOX.last}</th>
 			<th class="n ev delta" scope="col">{BOX.delta}</th>
@@ -78,6 +80,7 @@
 				row={entry.row}
 				tags={tagsOf(entry.row.boardId)}
 				evidence
+				rankCell
 				move={entry.move}
 				{why}
 				idle={entry.idle}
@@ -90,20 +93,20 @@
 			<!-- A spot empty on the platform that no one who can play fills (review N2). -->
 			<tr class="nobody">
 				<td class="slot-word">{slot}</td>
-				<td colspan="2">{LINEUP.noOneHere}</td>
+				<td colspan="3">{LINEUP.noOneHere}</td>
 				<td class="n">{BOX.none}</td>
 				<td class="n">{BOX.none}</td>
-				<td colspan={COLUMNS - 5}></td>
+				<td colspan={COLUMNS - 6}></td>
 			</tr>
 		{/each}
 		<tr class="totals">
-			<td colspan="3"
+			<td colspan="4"
 				><span class="tl">{BOX.totals}</span>{#if box.totals.note}<span class="tsub"
 						>{box.totals.note}</span
 					>{/if}</td
 			>
 			<TeamFigures totals={box.totals} size="lg" />
-			<td class="rest" colspan={COLUMNS - 5}></td>
+			<td class="rest" colspan={COLUMNS - 6}></td>
 		</tr>
 	</tbody>
 	<tbody>
@@ -114,6 +117,7 @@
 				tags={tagsOf(entry.row.boardId)}
 				bench
 				evidence
+				rankCell
 				move={entry.move}
 				reserve={entry.row.reserve ? 'bench' : null}
 			/>
@@ -125,7 +129,7 @@
 		<tbody>
 			<tr class="sect"><th colspan={COLUMNS} scope="rowgroup">{BOX.reserve}</th></tr>
 			{#each box.reserve as row (row.key)}
-				<BoxLine {row} tags={tagsOf(row.boardId)} bench evidence reserve="slot" />
+				<BoxLine {row} tags={tagsOf(row.boardId)} bench evidence rankCell reserve="slot" />
 			{/each}
 		</tbody>
 	{/if}
@@ -163,8 +167,27 @@
 		width: 68px;
 	}
 
+	.cols .rank {
+		width: 64px;
+	}
+
 	.cols .game {
 		width: 200px;
+	}
+
+	/* The Opp rank's key under its head (Lane 99, B56). */
+	.cols .key {
+		display: block;
+		font-size: 10px;
+		font-weight: 500;
+		text-transform: none;
+		letter-spacing: 0;
+	}
+
+	.cols .ev.first {
+		height: 40px;
+		vertical-align: bottom;
+		padding-bottom: 5px;
 	}
 
 	.cols .num {
@@ -303,7 +326,14 @@
 		}
 
 		.cols .slot {
-			width: 46px;
+			width: 42px;
+		}
+
+		/* Its head on two lines, so the player keeps the room for his name (Lane 99). */
+		.cols .rank {
+			width: 50px;
+			white-space: normal;
+			line-height: 1.1;
 		}
 
 		/* Wide enough for the Team row's 101.6 at its size with the cell's padding (Lane 83). */
@@ -326,6 +356,10 @@
 	}
 
 	@media (max-width: 900px) {
+		.cols .key {
+			display: none;
+		}
+
 		.cols .ev,
 		.cols .ev.first,
 		.cols .delta {
