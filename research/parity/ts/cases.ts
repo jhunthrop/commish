@@ -24,7 +24,7 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { players } from "@research-ts/db/schema";
 import { captureOnce } from "@research-ts/projections/capture";
-import { NFL_TEAM_ABBREVIATIONS } from "@research-ts/projections/capture-feeds";
+import { CAPTURE_FEEDS, NFL_TEAM_ABBREVIATIONS } from "@research-ts/projections/capture-feeds";
 import { seedTeamDefenseUniverse } from "@research-ts/projections/crosswalk";
 import { harvestCaptures } from "@research-ts/projections/harvest";
 import { ingestAdpSnapshot } from "@research-ts/projections/market/adp-snapshot";
@@ -39,6 +39,7 @@ import {
 } from "@research-ts/projections/nflverse/ingest";
 import { ingestInjuries } from "@research-ts/projections/nflverse/injuries";
 import { resolveAllPropNames } from "@research-ts/projections/odds/player-map";
+import { refreshClubsFromLatestList } from "@research-ts/projections/player-clubs";
 import { snapshotPreseasonProps } from "@research-ts/projections/odds/preseason-snapshot";
 import { ingestWeek1Rosters } from "@research-ts/projections/preseason/ingest";
 import { realIngestStats, realSnapshotProps } from "@research-ts/projections/season-week/deps";
@@ -77,6 +78,43 @@ const UNMETERED = { reserveBackfill: async () => ({ granted: true }) } as unknow
 function tank01Provider(lastWeekOfSeason?: number): StatsProvider {
   const provider = createTank01StatsProvider({ apiKey: "replay", season: 2026 });
   return lastWeekOfSeason === undefined ? provider : { ...provider, lastWeekOfSeason };
+}
+
+/** The stale roster `tank01-capture-harvest` seeds before every pass (`parity/cases/capture.py`). */
+const CLUB_SEED = "research/parity/fixtures/tank01-player-list-earlier/seed_players.json";
+
+interface SeedPlayer {
+  readonly id: string;
+  readonly name: string;
+  readonly position: "QB" | "RB" | "WR" | "TE" | "K" | "DEF";
+  readonly team: string;
+}
+
+async function seedClubRoster({ db }: TsCaseContext): Promise<void> {
+  const rows = JSON.parse(readFileSync(join(process.cwd(), CLUB_SEED), "utf8")) as readonly SeedPlayer[];
+  await db
+    .insert(players)
+    .values(rows.map((r) => ({ id: r.id, name: r.name, position: r.position, nflTeam: r.team })))
+    .onConflictDoNothing({ target: players.id });
+}
+
+/** The player list's day read (`capture_return_dates` in the Python, past its once-a-day gate), then its
+ *  clubs (Lane 122): the oracle captures the list as its full pass does and applies the newest stored one. */
+async function readPlayerList(db: TsCaseContext["db"], firedAt: Date): Promise<void> {
+  await captureOnce({
+    db,
+    client: createTank01Client({ apiKey: "replay" }),
+    clock: { now: () => firedAt.toISOString() },
+    budget: { reserve: async () => ({ granted: true }) },
+    season: 2026,
+    week: 1,
+    teams: NFL_TEAM_ABBREVIATIONS,
+    isFresh: async () => false,
+    markFresh: async () => {},
+    feeds: CAPTURE_FEEDS.filter((feed) => feed.source === "tank01_player_list"),
+  });
+  const refresh = await refreshClubsFromLatestList(db);
+  if (!refresh.applied) throw new Error(`the recorded player list moved ${refresh.changes.length} clubs, past the ceiling`);
 }
 
 /** `seedPlayers` refuses a database it cannot verify is disposable; the parity scratch database is. */
@@ -171,11 +209,15 @@ export const TS_CASES: Readonly<Record<string, TsCase>> = {
       markFresh: async () => {},
     });
   },
-  // The in-season capture task, fired twice an hour apart on the same recordings.
-  "tank01-capture-harvest": async ({ db, now }) => {
+  // The in-season capture task, fired twice an hour apart on the same recordings, each fire followed by the
+  // player list's read and its clubs onto the seeded roster (Lane 122).
+  "tank01-capture-harvest": async (ctx) => {
+    const { db, now } = ctx;
+    await seedClubRoster(ctx);
     const later = new Date(now.getTime() + 3_600_000);
     for (const firedAt of [now, later]) {
       await harvestCaptures(db, { now: () => firedAt.toISOString() }, { firedAt: firedAt.toISOString() }, { apiKey: "replay" });
+      await readPlayerList(db, firedAt);
     }
   },
   "preseason-2025": async (ctx) => {

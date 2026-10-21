@@ -1,0 +1,38 @@
+[
+  {
+    "id": "4037235",
+    "name": "Greg Dortch",
+    "position": "WR",
+    "team": "DET"
+  },
+  {
+    "id": "4433970",
+    "name": "J.J. McCarthy",
+    "position": "QB",
+    "team": "MIN"
+  },
+  {
+    "id": "3918298",
+    "name": "Josh Allen",
+    "position": "QB",
+    "team": "BUF"
+  },
+  {
+    "id": "4872957",
+    "name": "Raylen Sharpe",
+    "position": "WR",
+    "team": "MIA"
+  },
+  {
+    "id": "parity-off-list",
+    "name": "Off The List",
+    "position": "RB",
+    "team": "KC"
+  },
+  {
+    "id": "DST-BUF",
+    "name": "Buffalo Bills",
+    "position": "DEF",
+    "team": "BUF"
+  }
+]

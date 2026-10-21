@@ -105,9 +105,10 @@ def test_the_list_is_read_once_an_eastern_day_from_six(engine: Engine) -> None:
         wednesday = _read(conn, fetcher, _eastern(21, 6))
         stored = _stored(conn)
     assert early is None and again is None and late is None
-    assert tuesday == FeedOutcome(PLAYER_LIST_SOURCE, "captured", 1)
+    # The store holds no players, so the read changes no club (Lane 122, `test_player_clubs.py`).
+    assert tuesday == FeedOutcome(PLAYER_LIST_SOURCE, "captured", 1, note="0 clubs changed")
     # The same list the next day is that day's read, and the earlier snapshot stands.
-    assert wednesday == FeedOutcome(PLAYER_LIST_SOURCE, "unchanged", 1)
+    assert wednesday == FeedOutcome(PLAYER_LIST_SOURCE, "unchanged", 1, note="0 clubs changed")
     assert stored == 1
     assert len(fetcher.asked) == 2  # noqa: PLR2004 - Tuesday's and Wednesday's
 
