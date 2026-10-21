@@ -9,11 +9,14 @@
 		pickupSum,
 		type PickupCard
 	} from './waivers.ts';
+	import { stripLead, stripMark } from './strip.ts';
 
 	/** The Waivers decision as a strip (Lane 66f): the board week, the count of pickups worth making
 	 * and what they add to the lineup the advice sets, then a card for each (his slot, the move, this
 	 * week's Proj gain and the rest of the season's) with its own verb. On a phone the cards scroll on
-	 * one line and the chosen card's verb is the screen's pinned one. */
+	 * one line and the chosen card's verb is the screen's pinned one. The strips' one rule (strip.ts,
+	 * Lane 115, B87): the first card, the best, draws its verb solid and says Best, every other card
+	 * the same words quiet. */
 	interface Props {
 		week: number;
 		cards: readonly PickupCard[];
@@ -22,7 +25,7 @@
 		/** The card the pinned verb acts on. */
 		chosen: string | null;
 		onchoose: (card: PickupCard) => void;
-		/** A card's verb, drawn on a wide screen. */
+		/** A card's verb, drawn on a wide screen, and whether the card leads the strip (its verb solid). */
 		verb: Snippet<[PickupCard, boolean]>;
 		/** The line under the cards: why the verb opens the platform, or what it just did. */
 		foot?: Snippet;
@@ -44,20 +47,20 @@
 	</div>
 	{#if cards.length > 0}
 		<ul class="pickups">
-			{#each cards as card (card.key)}
+			{#each cards as card, index (card.key)}
 				{@const on = chosen === card.key}
+				{@const mark = stripMark(index, cards.length)}
 				<li class="pickup" class:on>
 					<button type="button" class="pick" aria-pressed={on} onclick={() => onchoose(card)}>
 						<span class="slot">{card.slot}</span>
 						<span class="text"
 							><span class="move"
-								><b>{moveWords(card)}</b>{#if card.dropWhy}<span class="why"
-										>{dropWhyWords(card.dropWhy)}</span
-									>{/if}</span
+								>{#if mark}<span class="mark">{mark}</span>{/if}<b>{moveWords(card)}</b
+								>{#if card.dropWhy}<span class="why">{dropWhyWords(card.dropWhy)}</span>{/if}</span
 							><span class="gains">{cardGains(card)}</span></span
 						>
 					</button>
-					<span class="verb">{@render verb(card, on)}</span>
+					<span class="verb">{@render verb(card, stripLead(index))}</span>
 				</li>
 			{/each}
 		</ul>
@@ -196,6 +199,16 @@
 		font-size: var(--t-md);
 		font-weight: 700;
 		color: var(--ink);
+	}
+
+	/* "Best" over the strip's first card of more than one, as the Trades strip says it (B87). */
+	.mark {
+		margin-right: 0.5em;
+		font-size: var(--t-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--accent-text);
 	}
 
 	/* Why the drop is the one named (B34), quieter than the move. */

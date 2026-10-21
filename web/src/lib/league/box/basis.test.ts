@@ -7,7 +7,9 @@ import type { PlayerLine, WeekFacts } from '../inseason/api.ts';
 import {
 	basisText,
 	boxBasisParts,
+	drawnText,
 	deltaPart,
+	deskOrPhone,
 	finalsPartAt,
 	finalsParts,
 	FOR_ROSTERED,
@@ -15,12 +17,17 @@ import {
 	KICKED_OFF_PART,
 	kickedOffPartAt,
 	liveFinalsPart,
+	NO_PROJ_FINAL_PART,
 	OPP_PART,
 	platformFinalsPart,
+	PROJ_FINAL_PART,
 	RANK_OPP_PART,
+	RANK_OPP_PHONE,
 	projPart,
 	ptsPart,
+	ptsPhonePart,
 	uncountedPart,
+	UNCOUNTED,
 	type Clock
 } from './basis.ts';
 
@@ -137,18 +144,34 @@ void test('Pts says whether the platform gives each player his points or each te
 });
 
 void test('the uncounted rules are the API sentence naming them, with no link (Lane 111, B33)', () => {
+	// An answer before Lane 115 carries no names: its sentence is printed as sent.
 	assert.deepEqual(
-		uncountedPart({
-			basis_note: 'Our stats omit two-point, missed kick, fumble recovery and safety.'
-		}),
-		[
-			{
-				text: 'Our stats omit two-point, missed kick, fumble recovery and safety.',
-				phone: true
-			}
-		]
+		uncountedPart(
+			{ basis_note: 'Our stats omit two-point, missed kick, fumble recovery and safety.' },
+			[]
+		),
+		[{ text: 'Our stats omit two-point, missed kick, fumble recovery and safety.', phone: true }]
 	);
-	assert.deepEqual(uncountedPart({ basis_note: '' }), []);
+	assert.deepEqual(uncountedPart({ basis_note: '' }, []), []);
+	assert.deepEqual(uncountedPart({ basis_note: '', basis_note_list: '' }, []), []);
+});
+
+void test("with no row on the platform's points, Avg and Last are said to be our stats (Lane 115, B92)", () => {
+	const advice = {
+		basis_note: 'Our stats omit two-point and safety.',
+		basis_note_list: 'two-point and safety'
+	};
+	assert.deepEqual(uncountedPart(advice, [line()]), [
+		{ text: 'Avg and Last are our stats, which omit two-point and safety.', phone: true }
+	]);
+	const counted = line({ last_games: [{ week: 6, points: 30.4, source: 'platform' }] });
+	assert.deepEqual(uncountedPart(advice, [line(), counted]), [
+		{ text: 'Our stats omit two-point and safety.', phone: true }
+	]);
+	assert.equal(
+		UNCOUNTED.ours('a, b, c, d and two more'),
+		'Avg and Last are our stats, which omit a, b, c, d and two more.'
+	);
 });
 
 void test('a block reads as one paragraph: a link that more words follow closes its sentence', () => {
@@ -192,7 +215,6 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 			teamTotal: false,
 			host: 'sleeper',
 			lineup: {
-				asSetShown: true,
 				previousReadAt: BEFORE,
 				note: {
 					basis_note: 'Our stats omit two-point, missed kick, fumble recovery and safety.'
@@ -203,13 +225,45 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 		NOW
 	);
 	assert.equal(
-		basisText(parts),
+		drawnText(parts, 'desk'),
 		"Our pick starts the highest Proj at each slot. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Our rank is his place at his position in our order, Opp rank the points allowed to it, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. Our stats omit two-point, missed kick, fumble recovery and safety."
 	);
-	assert.deepEqual(
-		parts.filter((p) => !p.phone).map((p) => p.text),
-		['Our pick starts the highest Proj at each slot.', 'Δ Proj is its change since Thu 9:00 pm.']
+	// The phone's eight lines (Lane 115, B83): the pick rule in one clause with what Proj is, Our rank
+	// and Pts in fewer words, no Δ Proj (a desk column).
+	assert.equal(
+		drawnText(parts, 'phone'),
+		"Our pick is each slot's highest Proj, this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Our rank is his place at his position, Opp the points allowed to it, 1st fewest. Pts are Sleeper's points so far. Our stats omit two-point, missed kick, fumble recovery and safety."
 	);
+});
+
+void test("the phone Lineup leaves the defenses' scoring and why a Proj final is -- to the desk (Lane 115, B83)", () => {
+	const defense = { ...line(), player: { position: 'DEF' } } as unknown as PlayerLine;
+	const kicked = line({ kickoff: '2026-10-16T00:15:00.000Z', game_state: 'kicked_off' });
+	const parts = boxBasisParts(
+		{
+			projection: { readAt: READ, scoring: CLOSEST },
+			lines: [defense, kicked],
+			byPlayer: true,
+			teamTotal: false,
+			noFinal: true,
+			host: 'sleeper',
+			lineup: { previousReadAt: null, note: { basis_note: '' } }
+		},
+		CENTRAL,
+		NOW
+	);
+	const desk = drawnText(parts, 'desk');
+	const phone = drawnText(parts, 'phone');
+	assert.ok(
+		desk.includes('defenses on default scoring') && desk.includes(NO_PROJ_FINAL_PART),
+		desk
+	);
+	assert.ok(
+		!phone.includes('defenses on default scoring') && !phone.includes(NO_PROJ_FINAL_PART),
+		phone
+	);
+	assert.ok(phone.startsWith("Our pick is each slot's highest Proj,"), phone);
+	assert.ok(phone.includes(PROJ_FINAL_PART), phone);
 });
 
 void test('the Matchup key says Proj, Pts and Game, the columns it draws', () => {
@@ -244,7 +298,6 @@ void test('the Lineup and the Matchup say when Final and the stats land while a 
 					host: 'sleeper',
 					lineup: lineup
 						? {
-								asSetShown: false,
 								previousReadAt: null,
 								note: { basis_note: '' }
 							}
@@ -268,7 +321,6 @@ void test('the Lineup and the Matchup say when Final and the stats land while a 
 void test('the Lineup phone keeps its fact cells; the Final sentence waits for the desk while they show', () => {
 	const waiting = line({ kickoff: '2026-10-18T17:00:00.000Z', played: true, game_state: 'final' });
 	const lineup = {
-		asSetShown: false,
 		previousReadAt: null,
 		note: { basis_note: '' }
 	};
@@ -288,7 +340,7 @@ void test('the Lineup phone keeps its fact cells; the Final sentence waits for t
 	// A row still to play draws its expected score: its sentence on the phone, the Final one at a desk.
 	const sunday = at([waiting, line()]);
 	const phone = sunday.filter((p) => p.phone).map((p) => p.text);
-	assert.ok(phone.includes(RANK_OPP_PART));
+	assert.ok(phone.includes(RANK_OPP_PHONE));
 	assert.ok(phone.some((t) => t.startsWith("Game is each club's expected points")));
 	assert.ok(!phone.includes(KICKED_OFF_PART));
 	assert.ok(sunday.some((p) => p.text === KICKED_OFF_PART && !p.phone));
@@ -433,7 +485,6 @@ void test('a box score says the platform sentence at a desk and its short form o
 			teamTotal: false,
 			host: 'sleeper',
 			lineup: {
-				asSetShown: true,
 				previousReadAt: null,
 				note: { basis_note: 'Our stats omit two-point and safety.' }
 			}
@@ -470,5 +521,15 @@ void test("a page turned past the platform's week says the platform sentence on 
 			text: "Avg and Last count week 6's finals from Sleeper's points for rostered players, our stats by Wednesday.",
 			phone: true
 		}
+	]);
+});
+
+void test("the phone's Pts sentence leaves what Team adds to the desk (Lane 115, B83)", () => {
+	assert.equal(ptsPhonePart(true, 'sleeper'), "Pts are Sleeper's points so far.");
+	assert.equal(ptsPhonePart(false, 'yahoo'), "Pts are Yahoo's team points alone.");
+	assert.deepEqual(deskOrPhone('A.', 'A.'), [{ text: 'A.', phone: true }]);
+	assert.deepEqual(deskOrPhone('A longer.', 'A.'), [
+		{ text: 'A longer.', phone: false },
+		{ text: 'A.', phone: true, desk: false }
 	]);
 });

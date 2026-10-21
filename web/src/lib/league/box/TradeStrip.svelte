@@ -1,12 +1,12 @@
 <script lang="ts">
-	import Quiet from '#lib/ui/Quiet.svelte';
+	import StripAction from '#lib/ui/StripAction.svelte';
 	import type { LeagueHost } from '../api.ts';
 	import type { TradeMoves } from '../inseason/api.ts';
 	import { hostTab } from '../inseason/attach.ts';
+	import { stripLead, stripMark } from './strip.ts';
 	import TeamAvatar from './TeamAvatar.svelte';
 	import TradeCopied from './TradeCopied.svelte';
 	import {
-		cardMark,
 		gainWord,
 		proposeVerb,
 		roomWords,
@@ -21,10 +21,10 @@
 	/** The Trades screen's decision as a strip (Lane 66g): the week, how many trades are worth
 	 * proposing, and each as a card naming the other team, both sides, both gains over the rest of
 	 * the season and the drop, with its one verb: Propose on the platform where it takes a proposal
-	 * from here, else Open the platform's trades, which copies the offer and opens its page. One verb
-	 * draws one way on every card (Lane 103, B65), quiet, so two cards never spend two oranges: the first
-	 * card, the best trade, says Best in words instead. A trade that fills an empty spot in the
-	 * member's lineup says so under its gains (B43). */
+	 * from here, else Open the platform's trades, which copies the offer and opens its page. The strips'
+	 * one rule (strip.ts, Lane 115, B87): the first card, the best trade, draws its verb solid and says
+	 * Best, every other card the same words quiet. A trade that fills an empty spot in the member's
+	 * lineup says so under its gains (B43). */
 	interface Props {
 		week: number;
 		rows: readonly FinderRow[];
@@ -58,7 +58,7 @@
 			{@const room = roomWords(entry.row)}
 			{@const line = said[entry.key]}
 			{@const week = weekLine(entry.row)}
-			{@const mark = cardMark(index, rows.length)}
+			{@const mark = stripMark(index, rows.length)}
 			<li class="card">
 				<span class="with"
 					>{#if mark}<span class="mark">{mark}</span>{/if}<TeamAvatar
@@ -82,11 +82,12 @@
 				{#if entry.row.drop}<span class="drop">{room.yours}</span>{/if}
 				{#if entry.row.drop_reason}<span class="drop">{entry.row.drop_reason}</span>{/if}
 				<span class="act" {@attach hostTab(href)}>
-					<Quiet
+					<StripAction
+						lead={stripLead(index)}
 						size="sm"
 						href={href === '' ? undefined : href}
 						disabled={href === ''}
-						onclick={() => void press(entry)}>{verb}</Quiet
+						onclick={() => void press(entry)}>{verb}</StripAction
 					>
 				</span>
 				{#if line}<span class="said"><TradeCopied {line} {href} /></span>{/if}

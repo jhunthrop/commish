@@ -200,6 +200,9 @@ async function openShelf(page: Page, by: 'pointer' | 'event' = 'pointer'): Promi
 
 const cardOf = (page: Page): string | null => new URL(page.url()).searchParams.get(SHELF_PARAM);
 
+/** A rank the rest-of-season caption names: "QB12 in our order". */
+const CAPTION_RANK = /[A-Z]{1,3}(\d+) in our order/;
+
 /** The rank the first row draws, its digits alone, null when it draws none (Waivers, Trades). */
 async function rowRank(page: Page): Promise<string | null> {
 	const row = opener(page).locator('xpath=ancestor::tr[1]');
@@ -221,6 +224,20 @@ async function check(
 	// One player, one rank (fix round 1, HIGH-1): the card's pill says the row's.
 	const pill = (await shelf(page).locator('.pos').first().innerText()).replace(/\D/g, '');
 	if (rank !== null && pill !== rank) fault(`the row ranks him ${rank}, the card ${pill}`);
+	// The rest-of-season tile's caption, rewritten to the row's rank (shelf.ts rankedTiles), names the
+	// pill's rank or none, never the build's beside it (Lane 115, B93).
+	const restLabel = new RegExp(`^(${CARD.rest}|${CARD.projected})$`);
+	const caption = await shelf(page)
+		.locator('.tile')
+		.filter({ has: page.locator('.lb', { hasText: restLabel }) })
+		.locator('.cap')
+		.first()
+		.innerText()
+		.catch(() => '');
+	const named = CAPTION_RANK.exec(caption)?.[1] ?? null;
+	if (caption === '') fault('no rest-of-season caption');
+	else if (named !== (pill === '' ? null : pill))
+		fault(`the caption "${caption}" names rank ${named ?? 'none'}, the pill ${pill || 'none'}`);
 	const slug = cardOf(page);
 	if (slug === null) fault(`the address has no ?${SHELF_PARAM}=`);
 	const box = await shelf(page).boundingBox();

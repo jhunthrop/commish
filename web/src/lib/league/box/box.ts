@@ -150,8 +150,10 @@ export interface BoxRow {
 	club: string;
 	position: string;
 	/** His position pill (Lane 63's StatusPill): his position on our order with his rank there, null
-	 * for a defense, which the club mark names. */
-	pill: { position: Position; rank: number | null } | null;
+	 * for a defense, which the club mark names. ranked: the screen draws his rank (the Lineup and the
+	 * Matchup), so a null rank is his, said as none (Lane 115, B93); false where the screen leaves
+	 * every rank out (Waivers, Trades). */
+	pill: { position: Position; rank: number | null; ranked: boolean } | null;
 	/** His status as Lane 63's pill draws it: the week's designation, or a season-long list's word in
 	 * place of his rank. */
 	status: StatusView | null;
@@ -281,9 +283,9 @@ export function onReserve(line: Pick<PlayerLine, 'player' | 'facts'>): boolean {
 }
 
 /** His position pill: the board's position (a defense has none, the club mark names it). */
-function pillOf(position: string, rank: number | null): BoxRow['pill'] {
+function pillOf(position: string, rank: number | null, ranked: boolean): BoxRow['pill'] {
 	const known = POSITIONS.find((p) => p === position);
-	return known === undefined ? null : { position: known, rank };
+	return known === undefined ? null : { position: known, rank: ranked ? rank : null, ranked };
 }
 
 /** "20 to 22.5": his club's expected points, then its opponent's, null without the figures. */
@@ -357,7 +359,7 @@ export function boxRow(
 		face: faceOf(player, line.headshot),
 		club: player.team,
 		position: positionWord(player.position),
-		pill: pillOf(player.position, ranked ? line.position_rank : null),
+		pill: pillOf(player.position, line.position_rank, ranked),
 		status: rowStatus(facts.designation, player.injured_reserve, ahead, zone),
 		reserve: onReserve(line),
 		game: gameOf(facts, zone, now),
@@ -424,7 +426,7 @@ export function hostRow(player: LeaguePlayer, slot: string, pts: number | null):
 		face: faceOf(player, null),
 		club: player.team,
 		position: positionWord(player.position),
-		pill: pillOf(player.position, null),
+		pill: pillOf(player.position, null, false),
 		status: statusOf(null, player.injured_reserve),
 		reserve: player.injured_reserve,
 		game: null,

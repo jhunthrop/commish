@@ -380,8 +380,8 @@
 	>
 {/snippet}
 
-{#snippet cardVerb(c: PickupCard, on: boolean)}
-	<StripAction lead={on} size="sm" onclick={() => act(c.source)}>{verbWords(c.source)}</StripAction>
+{#snippet cardVerb(c: PickupCard, lead: boolean)}
+	<StripAction {lead} size="sm" onclick={() => act(c.source)}>{verbWords(c.source)}</StripAction>
 {/snippet}
 
 {#snippet go()}

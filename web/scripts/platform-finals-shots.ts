@@ -1,5 +1,6 @@
 // Screenshots of what Avg and Last count through week 6's weekend (Lane 111, B23, B33, B70), dark at
-// 1280 and 390, on one of the fixture's clocks (inseason-fixture/clock.ts):
+// 1280 and 390 (THEMES=both adds light), on one of the fixture's clocks (inseason-fixture/clock.ts):
+//   saturday   the fixture week's Saturday, Thursday's game played: Avg and Last are our stats;
 //   sunday     Sunday morning, every Sunday game to come: Avg and Last are our stats, nothing said;
 //   monday     Monday night, Sunday final and the Monday game under way: a Sunday starter's Avg, Last
 //              and GP count the platform's points, and the basis says so (merged with when Final
@@ -11,22 +12,28 @@
 // Thursday. Every screen with Avg and Last names the rules our stats omit with no link to follow and
 // says what Avg and Last count at both widths (fix round 1, HIGH-1), keeps its basis within five
 // rendered lines at 1280 and eight at 390 (basis-lines.ts), and passes the copy guard (copy-scan.ts).
+// Lane 115: the rules our stats omit are framed by the clock (B92: "Avg and Last are our stats, which
+// omit ..." where no row counts the platform's points, "Our stats omit ..." where one does), the
+// league's order's phone names rostered players' finals, the Lineup states its pick rule at both
+// widths (B83), and on a phone every Lineup and Matchup name keeps one line (B83, B90).
 // Exits non-zero on any fault.
 //
-//   CLOCK=sunday|monday|tuesday|wednesday|thursday node scripts/platform-finals-shots.ts [web origin] [out dir]
+//   CLOCK=saturday|sunday|monday|tuesday|wednesday|thursday [THEMES=both] node scripts/platform-finals-shots.ts [web origin] [out dir]
 // with the site built against PUBLIC_API_URL at the fixture API (API_ORIGIN), started on the clock.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
-import { STATS_BY_WEDNESDAY } from '../src/lib/league/box/basis.ts';
+import { STATS_BY_WEDNESDAY, UNCOUNTED } from '../src/lib/league/box/basis.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { basisLines } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
+import { STRIP } from '../src/lib/league/box/strip.ts';
 import {
 	FIXTURE_MONDAY_NIGHT_CLOCK,
 	FIXTURE_STATS_CLOCK,
 	FIXTURE_SUNDAY_MORNING_CLOCK,
 	FIXTURE_TUESDAY_CLOCK,
 	FIXTURE_WEEK7_READ_CLOCK,
+	FIXTURE_WEEK_CLOCK,
 	fixtureApiClock,
 	installFixtureClock
 } from './inseason-fixture/clock.ts';
@@ -34,6 +41,7 @@ import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { LEAGUE_RULES_NOTE } from './inseason-fixture/week.ts';
 
 const CLOCKS = {
+	saturday: FIXTURE_WEEK_CLOCK,
 	sunday: FIXTURE_SUNDAY_MORNING_CLOCK,
 	monday: FIXTURE_MONDAY_NIGHT_CLOCK,
 	tuesday: FIXTURE_TUESDAY_CLOCK,
@@ -47,6 +55,8 @@ const web = process.argv[2] ?? 'http://localhost:4196';
 const out = new URL(process.argv[3] ?? `../screenshots/platform-finals/${day}/`, import.meta.url);
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
 const WIDTHS = [1280, 390] as const;
+const THEMES: readonly ('dark' | 'light')[] =
+	process.env.THEMES === 'both' ? ['dark', 'light'] : ['dark'];
 /** The most rendered lines a basis may draw at each width (Lane 108: eight on a phone). */
 const MOST_LINES: Readonly<Record<(typeof WIDTHS)[number], number>> = { 1280: 5, 390: 8 };
 const VIEWPORT_HEIGHT = 900;
@@ -61,7 +71,7 @@ const PLAYERS_READY = 'Our rest-of-season order';
 /** What the basis says while a row counts the platform's points (basis.ts finalsPartAt, and on a
  * phone phoneFinalsPart, fix round 1). */
 const PLATFORM_SAID =
-	/count (this week's|week \d+'s) finals from Sleeper's points|then count Sleeper's points|count Sleeper's finals/;
+	/count (this week's|week \d+'s) finals from Sleeper's points|then count Sleeper's points|count (rostered players' Sleeper|Sleeper's) finals/;
 /** Waivers' sentence: its rows are free agents, on our stats (fix round 1, MEDIUM-3). */
 const FREE_AGENTS_SAID = /Free agents' Avg and Last are our stats, week \d+'s by Wednesday\./;
 const WEEK7_PROJ = "Proj is week 7's published projection";
@@ -87,6 +97,7 @@ function leagueScreens(platform: boolean): Screen[] {
 }
 
 const SCREENS: Readonly<Record<Day, readonly Screen[]>> = {
+	saturday: leagueScreens(false),
 	sunday: leagueScreens(false),
 	monday: leagueScreens(true),
 	tuesday: leagueScreens(true),
@@ -105,17 +116,17 @@ const browser = await chromium.launch();
 const faults: string[] = [];
 const measures: string[] = [];
 
-async function context(width: number): Promise<BrowserContext> {
+async function context(width: number, theme: 'dark' | 'light'): Promise<BrowserContext> {
 	const ctx = await browser.newContext({
 		viewport: { width, height: VIEWPORT_HEIGHT },
-		colorScheme: 'dark'
+		colorScheme: theme
 	});
 	watchData(ctx);
 	await installFixtureClock(ctx, clock);
 	await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
-		[THEME_STORAGE_KEY, 'dark'] as const
+		[THEME_STORAGE_KEY, theme] as const
 	);
 	return ctx;
 }
@@ -169,36 +180,104 @@ function check(
 		faults.push(`${at}: a link to the rules: ${basis.links.join(', ')}`);
 	if (day === 'thursday' && !basis.text.includes(WEEK7_PROJ))
 		faults.push(`${at}: the turned Proj does not name week 7`);
+	// The rules our stats omit, framed by the clock (Lane 115, B92): Waivers' free agents beside a
+	// drop on the platform's points say the stats' sentence too.
+	if (!['trades', 'matchup'].includes(screen.name)) {
+		const counted = screen.platform === true;
+		const frame = counted ? STATS_OMIT : OURS_OMIT;
+		if (!frame.test(basis.text))
+			faults.push(`${at}: the rules our stats omit are not said as "${frame.source}"`);
+	}
+	if (screen.name === 'players' && width === 390 && screen.platform === true)
+		if (!basis.text.includes("rostered players' Sleeper finals"))
+			faults.push(`${at}: the order's phone does not say rostered players' finals`);
+	if (screen.name === 'lineup' && !PICK_SAID.test(basis.text))
+		faults.push(`${at}: the Lineup does not say its pick rule`);
 }
 
-for (const screen of SCREENS[day]) {
-	for (const width of WIDTHS) {
-		const ctx = await context(width);
-		const page = await ctx.newPage();
-		const at = `${day} ${screen.name} ${String(width)}`;
-		try {
-			await page.goto(`${web}${screen.path}`);
-			await ready(page, screen.ready);
-			const basis = await drawnBasis(page);
-			check(screen, width, basis, at);
-			const lines = await basisLines(page);
-			measures.push(`${at}: basis ${String(lines)} lines`);
-			if (lines === 0 || lines > MOST_LINES[width])
-				faults.push(`${at}: basis draws ${String(lines)} lines`);
-			const copy = await copyFault(page);
-			if (copy !== null) faults.push(`${at}: ${copy}`);
-			await page.screenshot({
-				path: new URL(`${screen.name}-${day}-${String(width)}.png`, out).pathname,
-				fullPage: true
-			});
-			process.stdout.write(`${at}: ${basis.text}\n`);
-		} catch (error) {
-			faults.push(`${at}: ${error instanceof Error ? error.message : String(error)}`);
-		} finally {
-			await ctx.close();
+/** The rules our stats omit in the stats' words, and in Avg and Last's where no row counts the
+ * platform's points (basis.ts UNCOUNTED). */
+const STATS_OMIT = new RegExp(escaped(UNCOUNTED.stats(LEAGUE_RULES_NOTE)));
+const OURS_OMIT = new RegExp(escaped(UNCOUNTED.ours(LEAGUE_RULES_NOTE)));
+
+function escaped(words: string): string {
+	return words.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+/** The Lineup's pick rule: the desk's sentence or the phone's clause (basis.ts, Lane 115, B83). */
+const PICK_SAID = /Our pick (starts the highest Proj at each slot|is each slot's highest Proj)/;
+
+/** Every name in a Lineup or Matchup row drawn on one line and whole (Lane 115, B83, B90): the names
+ * drawn taller than a line, and those whose whole form shows cut where the short one should stand. */
+async function wrappedNames(page: Page): Promise<string[]> {
+	return page.evaluate(() => {
+		const shown = [...document.querySelectorAll<HTMLElement>('main table .pl .nm')].filter(
+			(nm) => nm.getClientRects().length > 0
+		);
+		const tall = shown.filter((nm) => {
+			const line = parseFloat(getComputedStyle(nm).lineHeight);
+			return nm.getBoundingClientRect().height > line * 1.5;
+		});
+		const cut = shown.filter((nm) => {
+			const fit = nm.querySelector('.fit');
+			const full = nm.querySelector('.fit-full');
+			if (fit === null || full === null) return false;
+			const box = fit.getBoundingClientRect();
+			const drawn = full.getBoundingClientRect();
+			return drawn.top < box.bottom - 1 && drawn.right > box.right + 1;
+		});
+		return [...tall, ...cut].map((nm) => nm.innerText.trim());
+	});
+}
+
+/** The strips' one rule (Lane 115, B87): the first of more than one card says Best. */
+async function stripFaults(page: Page): Promise<string[]> {
+	const firsts = await page.evaluate(() =>
+		[...document.querySelectorAll('main [data-strip]')].map((strip) => {
+			const cards = [...strip.querySelectorAll('li')];
+			return {
+				count: cards.length,
+				mark: cards[0]?.querySelector('.mark')?.textContent.trim() ?? ''
+			};
+		})
+	);
+	return firsts
+		.filter((f) => f.count > 1 && f.mark.toLowerCase() !== STRIP.best.toLowerCase())
+		.map(() => 'the first card of the strip does not say Best');
+}
+
+for (const theme of THEMES)
+	for (const screen of SCREENS[day]) {
+		for (const width of WIDTHS) {
+			const ctx = await context(width, theme);
+			const page = await ctx.newPage();
+			const at = `${day} ${screen.name} ${theme} ${String(width)}`;
+			try {
+				await page.goto(`${web}${screen.path}`);
+				await ready(page, screen.ready);
+				const basis = await drawnBasis(page);
+				check(screen, width, basis, at);
+				const lines = await basisLines(page);
+				measures.push(`${at}: basis ${String(lines)} lines`);
+				if (lines === 0 || lines > MOST_LINES[width])
+					faults.push(`${at}: basis draws ${String(lines)} lines`);
+				const copy = await copyFault(page);
+				if (copy !== null) faults.push(`${at}: ${copy}`);
+				if (width === 390 && ['lineup', 'matchup'].includes(screen.name))
+					for (const name of await wrappedNames(page))
+						faults.push(`${at}: "${name}" takes two lines or is cut`);
+				for (const fault of await stripFaults(page)) faults.push(`${at}: ${fault}`);
+				await page.screenshot({
+					path: new URL(`${screen.name}-${day}-${theme}-${String(width)}.png`, out).pathname,
+					fullPage: true
+				});
+				process.stdout.write(`${at}: ${basis.text}\n`);
+			} catch (error) {
+				faults.push(`${at}: ${error instanceof Error ? error.message : String(error)}`);
+			} finally {
+				await ctx.close();
+			}
 		}
 	}
-}
 await browser.close();
 process.stdout.write(`${measures.join('\n')}\n`);
 if (faults.length > 0) {

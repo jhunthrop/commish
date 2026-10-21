@@ -24,6 +24,9 @@
 		tags?: readonly string[];
 		/** A narrow phone cell prints his short form, "A. Rodgers", never a cut surname (rereview N2). */
 		shortOnPhone?: boolean;
+		/** On a phone his name keeps one line: whole where it fits, else his short form, "J.
+		 * Croskey-Merritt", as the Beats cell names him (the Lineup and the Matchup, Lane 115, B83). */
+		fitOnPhone?: boolean;
 		/** The trade builder's rows (Lane 66g): the game under the name at every width, without facts. */
 		/** The phone's folded game line draws the expected score and weather (false on the Lineup,
 		 * Waivers and Trades, whose phone basis cannot hold their sentence beside the stats sentence:
@@ -47,6 +50,7 @@
 		row,
 		tags = [],
 		shortOnPhone = false,
+		fitOnPhone = false,
 		compact = false,
 		phoneFacts = true,
 		clears = null,
@@ -67,6 +71,11 @@
 {#snippet named()}
 	{#if shortOnPhone}<span class="full"><NameWords name={row.name} /></span><span class="short"
 			>{initialName(row.name)}</span
+		>{:else if fitOnPhone}<span class="fit"
+			><span class="fit-full"><NameWords name={row.name} /></span><span
+				class="fit-short"
+				aria-hidden="true">{initialName(row.name)}</span
+			></span
 		>{:else}<NameWords name={row.name} />{/if}
 {/snippet}
 
@@ -172,7 +181,8 @@
 		color: var(--ink-3);
 	}
 
-	.short {
+	.short,
+	.fit-short {
 		display: none;
 	}
 
@@ -205,6 +215,43 @@
 		.short {
 			display: inline;
 			white-space: nowrap;
+		}
+
+		/* One line for the name (B83): a box one line high, a 1px float first (a zero-width one lets a
+		   wider float stay beside it). The whole name floats beside it where it fits and the short
+		   form, a box as wide as the rest of the line, cannot sit beside it and drops out of sight
+		   below; where the whole name does not fit it drops below the first float out of sight and the
+		   short form takes the line. The browser measures the words, so no width is guessed; the
+		   link's name stays the whole name. */
+		.nm:has(.fit) a,
+		.nm:has(.fit) b {
+			min-width: 0;
+			max-width: 100%;
+		}
+
+		.fit {
+			display: block;
+			height: 1lh;
+			overflow: hidden;
+			white-space: nowrap;
+		}
+
+		.fit::before {
+			content: '';
+			float: left;
+			width: 1px;
+			height: 1lh;
+		}
+
+		.fit-full {
+			float: left;
+		}
+
+		.fit-short {
+			display: flow-root;
+			min-width: calc(100% - 1px);
+			overflow: hidden;
+			text-overflow: ellipsis;
 		}
 
 		.ppos {

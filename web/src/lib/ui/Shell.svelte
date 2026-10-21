@@ -31,8 +31,9 @@
 		 * theme switch lives in the account room at every width, so the bar holds only the league
 		 * switch, the account, the verb and search. */
 		tail?: Snippet;
-		/** The league a league's page is for: the rail's league screens open its pages, while the switch
-		 * keeps the selected league (B38). Left out, they open the selected league's. */
+		/** The league a league's page is for: the rail's league screens open its pages and the switch
+		 * names it, the selected league marked in its list (B38, Lane 115 B89). Left out, they open and
+		 * name the selected league's. */
 		league?: string;
 		children: Snippet;
 	}
@@ -100,7 +101,7 @@
 			<div class="tail">
 				{@render tail?.()}
 			</div>
-			<div class="league"><LeagueSwitch /></div>
+			<div class="league"><LeagueSwitch page={league} /></div>
 		</header>
 		{@render children()}
 	</div>

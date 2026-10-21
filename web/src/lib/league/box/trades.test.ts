@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { basisText, KICKED_OFF_PART } from './basis.ts';
+import { stripLead, stripMark } from './strip.ts';
 import type { PlayerLine, TradeAdvice, TradeCheck, TradeRow, TradeTeam } from '../inseason/api.ts';
 import {
 	bugFigures,
-	cardMark,
 	checkRoom,
 	copiedTrade,
 	finderRows,
@@ -139,14 +139,18 @@ void test('the strip names at most two trades the other team gains from, never a
 	assert.deepEqual(worthProposing([team(9, 'Close', [row(0.7, 0.2)])]), []);
 });
 
-void test('the best of the strip says Best in words, every card drawing its verb the same', () => {
+void test('the best of the strip says Best in words and leads, the rest quiet (Lane 115, B87)', () => {
 	const worth = worthProposing(teams);
 	assert.deepEqual(
-		worth.map((_, i) => cardMark(i, worth.length)),
+		worth.map((_, i) => stripMark(i, worth.length)),
 		['Best', null]
 	);
+	assert.deepEqual(
+		worth.map((_, i) => stripLead(i)),
+		[true, false]
+	);
 	// A strip of one has nothing to be best among.
-	assert.equal(cardMark(0, 1), null);
+	assert.equal(stripMark(0, 1), null);
 });
 
 void test('a trade reads by last names, its gains and week signed, its room by name', () => {

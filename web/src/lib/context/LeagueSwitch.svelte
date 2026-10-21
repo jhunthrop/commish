@@ -2,18 +2,27 @@
 	import type { Component } from 'svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 	import { siteContext } from './context.svelte.ts';
-	import { switchLabel } from './words.ts';
+	import { shownLeague, switchLabel } from './words.ts';
 
 	/** The shell's league switch, at the right of the top bar on every width (founder ruling
 	 * 2026-10-13): the selected league's name, or the format with none, opening the account's leagues,
-	 * the formats and the way to follow another, its last row. The switch is the one place a league
+	 * the formats and the way to follow another, its last row. On a league's page it names that
+	 * league, the selected one marked in the list (B89). The switch is the one place a league
 	 * is chosen (spec 2026-10-16 §2: the rail's Leagues is gone). The menu's
 	 * code arrives on the first intent to open it, closing included (LeagueMenu), so every page
 	 * carries only this button. */
 
+	interface Props {
+		/** The league whose page this is: the switch names it, the selected league marked in the list
+		 * (Lane 115, B89). Left out, the selected league's name. */
+		page?: string;
+	}
+
+	let { page }: Props = $props();
+
 	const MENU_ID = 'league-menu';
 
-	let Menu = $state<Component | null>(null);
+	let Menu = $state<Component<{ shown: string | null }> | null>(null);
 	let loading: Promise<void> | null = null;
 
 	function preload(): void {
@@ -22,7 +31,8 @@
 		});
 	}
 
-	const label = $derived(switchLabel(siteContext.league, siteContext.format));
+	const shown = $derived(shownLeague(page, siteContext.leagues, siteContext.league));
+	const label = $derived(switchLabel(shown, siteContext.format));
 </script>
 
 <span class="switch" data-opens-leagues>
@@ -44,7 +54,7 @@
 		<Icon name="chevron" size={16} />
 	</button>
 	<div class="pop" id={MENU_ID} hidden={!siteContext.open}>
-		{#if Menu}<Menu />{/if}
+		{#if Menu}<Menu shown={shown?.id ?? null} />{/if}
 	</div>
 </span>
 

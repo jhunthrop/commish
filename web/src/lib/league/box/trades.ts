@@ -21,9 +21,11 @@ import { tradeKey } from '../inseason/state.ts';
 import { LINES, verbWords } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import {
+	deskOrPhone,
 	gamePart,
 	finalsParts,
 	OPP_PART,
+	OPP_PHONE,
 	projPart,
 	ptsPart,
 	said,
@@ -76,9 +78,6 @@ export const TRADES = {
 	 * theirs", the week's change beside them in the same words (weekLine). */
 	aWeekForYou: 'a week for your lineup',
 	forTheirs: 'for theirs',
-	/** The strip's first card when it is the best of more than one (Lane 103, B65): the word says it,
-	 * every card's verb draws the same. */
-	bestCard: 'Best',
 	weekWord: 'Week',
 	/** The builder's scoreboard. */
 	yourSide: 'You',
@@ -152,12 +151,6 @@ export function worthProposing(teams: readonly TradeTeam[]): FinderRow[] {
 	return finderRows(teams, false)
 		.filter(({ row }) => !row.close_for_them && row.my_gain > 0)
 		.slice(0, STRIP_MOST);
-}
-
-/** The word over a strip card (Lane 103, B65): "Best" on the first of more than one, which
- * worthProposing puts first by your gain; null on every other card and on a strip of one. */
-export function cardMark(index: number, count: number): string | null {
-	return index === 0 && count > 1 ? TRADES.bestCard : null;
 }
 
 const COUNT_WORDS = ['No', 'One', 'Two'];
@@ -437,7 +430,7 @@ export function tradeBasis(
 		| 'projection_scoring'
 		| 'player_points'
 	> &
-		Partial<Pick<TradeAdvice, 'week' | 'for_week' | 'projection_arrives_at'>>,
+		Partial<Pick<TradeAdvice, 'week' | 'for_week' | 'projection_arrives_at' | 'basis_note_list'>>,
 	host: LeagueHost,
 	lines: readonly PlayerLine[],
 	opened: 'none' | 'trade' | 'builder',
@@ -447,7 +440,9 @@ export function tradeBasis(
 ): BasisPart[] {
 	// The builder's boxes draw a defense; a trade never holds one (Lane 66g).
 	const defense = opened === 'builder' && lines.some((l) => l.player.position === 'DEF');
-	const waiting = finalsParts(lines, now, host, 'rosters', true);
+	// An opened trade's or the builder's phone rows draw no Pts, so when a final lands is said at a desk
+	// there, the phone's eight lines kept for the rows' own figures (Lane 115).
+	const waiting = finalsParts(lines, now, host, 'rosters', opened === 'none');
 	// Before the week's projection is read, the day it arrives in its place (Lane 95).
 	const arrives =
 		advice.week === undefined
@@ -477,11 +472,11 @@ export function tradeBasis(
 		opened !== 'none'
 			? [
 					// The builder's phone rows draw no Opp rank (TradeBox), so its sentence is the desk's there.
-					...said(OPP_PART, opened !== 'builder'),
+					...(opened === 'builder' ? said(OPP_PART, false) : deskOrPhone(OPP_PART, OPP_PHONE)),
 					// The opened rows draw the Game cell's figures at a desk only (BoxLine phoneFacts).
 					...said(gamePart(lines, clock, now, 'full'), false),
 					...said(ptsPart(advice.player_points, host, 'rows'), false),
-					...uncountedPart(advice)
+					...uncountedPart(advice, lines)
 				]
 			: [];
 	return [

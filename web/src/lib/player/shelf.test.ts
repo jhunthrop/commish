@@ -403,4 +403,20 @@ void test("the rest-of-season tile names the row's rank, never the build's besid
 		'PPR points for 2026, QB31 in our order'
 	);
 	assert.deepEqual(rankedTiles(built, 'QB', 12, undefined), built);
+	// A row drawn unranked names no rank in the caption either (Lane 115, B93).
+	assert.equal(
+		rankedTiles(built, 'QB', 12, null).find((t) => t.key === 'rest')?.caption,
+		'PPR points for 2026'
+	);
+});
+
+void test("a Lineup or Matchup row drawn unranked shows no rank, never the build's (Lane 115, B93)", () => {
+	const dart = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'jaxson-dart');
+	assert.ok(dart.pill?.ranked === true);
+	const built = { position: 'QB' as const, rank: 12, status: null };
+	const unranked = { ...dart, pill: { position: 'QB' as const, rank: null, ranked: true } };
+	assert.equal(shelfHead({ row: unranked, note: null }, built).rank, null);
+	// A screen that draws no rank (Waivers, Trades) leaves the build's.
+	const waivers = { ...dart, pill: { position: 'QB' as const, rank: null, ranked: false } };
+	assert.equal(shelfHead({ row: waivers, note: null }, built).rank, 12);
 });
