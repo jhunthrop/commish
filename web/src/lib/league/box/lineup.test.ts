@@ -163,11 +163,15 @@ void test('the Lineup strip names whose lineup its figure is, and once played gi
 	const set = lineupBox({ ...advice, slots: [slot('RB', irving, irving, false)] }, ZONE, NOW);
 	assert.equal(lineupSum(set, 'espn', null)?.words, 'Proj as set on ESPN');
 	const played = { ...box, totals: { ...box.totals, pts: 76.8 } };
+	// Every starter final: the Pts with no Proj final beside them (Lane 118, B88).
 	assert.deepEqual(lineupSum(played, 'espn', WEEK_DONE), {
 		figure: '76.8',
 		words: 'Pts as set on ESPN',
-		gain: null
+		gain: null,
+		final: null
 	});
+	const playing = { ...played, playing: true, totals: { ...played.totals, final: 112.4 } };
+	assert.equal(lineupSum(playing, 'espn', WEEK_DONE)?.final, 'Proj final 112.4');
 	assert.equal(lineupSum(box, 'espn', WEEK_DONE), null, 'no points read, no figure');
 	assert.equal(LINEUP.pastWeeks, 'Past weeks of our order, on Our record');
 });

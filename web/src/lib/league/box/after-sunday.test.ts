@@ -7,7 +7,8 @@ import {
 	FIXTURE_MONDAY_CLOCK,
 	FIXTURE_MONDAY_NIGHT_CLOCK,
 	FIXTURE_STATS_CLOCK,
-	FIXTURE_TUESDAY_CLOCK
+	FIXTURE_TUESDAY_CLOCK,
+	FIXTURE_WEEK_CLOCK
 } from '../../../../scripts/inseason-fixture/clock.ts';
 import { lateFinals, stamped } from '../../../../scripts/inseason-fixture/game-state.ts';
 import { linesOf, recordedMatchups } from '../../../../scripts/inseason-fixture/scoreboard-at.ts';
@@ -29,7 +30,7 @@ import type {
 import { lineupSummary } from '../home/home.ts';
 import { BOX } from './box.ts';
 import { gameHead } from './kickoff.ts';
-import { changesTitle, heldLineup, locked } from './lineup.ts';
+import { changesTitle, heldLineup, lineupBox, lineupSum, locked } from './lineup.ts';
 import { sideScore } from './matchup.ts';
 
 const data = (name: string): unknown =>
@@ -145,6 +146,28 @@ void test("Monday night, the member's last starter in play: Locked from the last
 	);
 	const card = lineupSummary(night.lineup, ZONE, now);
 	assert.equal(changesTitle(0, card.done, card.doneState), BOX.locked);
+});
+
+void test('while a starter still plays the Lineup strip says Proj final beside the moving Pts, the Matchup figure (Lane 118, B88)', () => {
+	const now = Date.parse(FIXTURE_MONDAY_NIGHT_CLOCK);
+	const night = at(FIXTURE_MONDAY_NIGHT_CLOCK);
+	const box = lineupBox(night.lineup, ZONE, now);
+	assert.equal(box.playing, true);
+	const final = night.lineup.projected_final ?? null;
+	assert.ok(final !== null, 'the stand-in gives the lineup its projected final');
+	const sum = lineupSum(box, 'sleeper', night.lineup.week_done ?? null);
+	assert.ok(sum !== null);
+	assert.equal(sum.words, `${BOX.pts} as set on Sleeper`);
+	assert.equal(sum.final, `${BOX.projFinal} ${final.toFixed(1)}`);
+	// Every starter final on Tuesday: the Pts stand alone, nothing left to project.
+	const tuesday = at(FIXTURE_TUESDAY_CLOCK);
+	const done = lineupBox(tuesday.lineup, ZONE, Date.parse(FIXTURE_TUESDAY_CLOCK));
+	assert.equal(done.playing, false);
+	assert.equal(lineupSum(done, 'sleeper', tuesday.lineup.week_done ?? null)?.final ?? null, null);
+	// Saturday, before any kickoff: the Proj sum, no Proj final.
+	const saturday = lineupBox(lineup, ZONE, Date.parse(FIXTURE_WEEK_CLOCK));
+	assert.equal(saturday.playing, false);
+	assert.equal(lineupSum(saturday, 'sleeper', null)?.final ?? null, null);
 });
 
 void test('the scoreboard and the Matchup print one figure for each side, its rows added (review M2)', () => {
