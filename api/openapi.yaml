@@ -3952,6 +3952,13 @@ components:
             the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
             omit two-point and safety.", both missed kicks said as one missed kick), empty when they
             miss none
+        basis_note_list:
+          type: string
+          description: >-
+            the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
+            fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
+            counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
+            absent from an older answer
         basis_note_link:
           type: string
           description: >-
@@ -4433,6 +4440,13 @@ components:
             the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
             omit two-point and safety.", both missed kicks said as one missed kick), empty when they
             miss none
+        basis_note_list:
+          type: string
+          description: >-
+            the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
+            fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
+            counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
+            absent from an older answer
         basis_note_link:
           type: string
           description: >-
@@ -4524,6 +4538,13 @@ components:
             the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, named ("Our stats
             omit fumble recovery and safety.", the same for a reader with no league), empty
             when none
+        basis_note_list:
+          type: string
+          description: >-
+            the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
+            fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
+            counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
+            absent from an older answer
         basis_note_link:
           type: string
           description: >-
@@ -4619,6 +4640,13 @@ components:
             the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
             omit two-point and safety.", both missed kicks said as one missed kick), empty when they
             miss none
+        basis_note_list:
+          type: string
+          description: >-
+            the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
+            fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
+            counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
+            absent from an older answer
         basis_note_link:
           type: string
           description: >-
@@ -4968,6 +4996,13 @@ components:
             the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
             omit two-point and safety.", both missed kicks said as one missed kick), empty when they
             miss none
+        basis_note_list:
+          type: string
+          description: >-
+            the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
+            fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
+            counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
+            absent from an older answer
         basis_note_link:
           type: string
           description: >-
@@ -5079,6 +5114,13 @@ components:
             the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
             omit two-point and safety.", both missed kicks said as one missed kick), empty when they
             miss none
+        basis_note_list:
+          type: string
+          description: >-
+            the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
+            fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
+            counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
+            absent from an older answer
         basis_note_link:
           type: string
           description: >-

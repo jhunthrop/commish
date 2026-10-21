@@ -272,7 +272,17 @@ type Uncounted struct {
 	Note  string
 	Link  string
 	Rules []string
+	// Names is the rules as Note names them, at most four then "and two
+	// more" (Lane 115, B92), for the web to say in its own frame: "Avg
+	// and Last are our stats, which omit ..." where no row counts the
+	// platform's points.
+	Names string
 }
+
+// namedRulesMost is the most rules a basis names before it counts the rest
+// ("and two more"), so the sentence keeps to a phone's eight lines however
+// many rules a league scores (Lane 115, B92).
+const namedRulesMost = 4
 
 // UncountedOf is the league's uncounted rules. carried says whether any
 // line this season carries a metric (Season.Carries); nil carries none.
@@ -294,7 +304,8 @@ func uncountedOf(left []countable, linked bool) Uncounted {
 	for _, c := range left {
 		rules = append(rules, c.words)
 	}
-	out := Uncounted{Note: fmt.Sprintf("Our stats omit %s.", andList(basisNames(left))), Rules: rules}
+	names := andList(cappedNames(basisNames(left)))
+	out := Uncounted{Note: fmt.Sprintf("Our stats omit %s.", names), Rules: rules, Names: names}
 	if linked {
 		out.Link = "Which " + countWords(len(rules))
 	}
@@ -320,6 +331,16 @@ func basisNames(left []countable) []string {
 		}
 	}
 	return names
+}
+
+// cappedNames is the first namedRulesMost names and the rest counted,
+// "two more", where there are more.
+func cappedNames(names []string) []string {
+	if len(names) <= namedRulesMost {
+		return names
+	}
+	kept := append([]string{}, names[:namedRulesMost]...)
+	return append(kept, countWords(len(names)-namedRulesMost)+" more")
 }
 
 // missedKick reports whether the rule is a missed field goal or extra point.

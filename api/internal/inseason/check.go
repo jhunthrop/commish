@@ -82,7 +82,7 @@ func (a *advisor) CheckTrade(in apitypes.TradeCheckInput) (apitypes.TradeCheck, 
 	week := a.tradeWeek(team, other, mine, theirs, checked.Trade)
 	h := a.header()
 	un := UncountedOf(a.settings, a.season.Carries)
-	out := apitypes.TradeCheck{Week: h.week, Basis: TradeCheckBasis, BasisNote: un.Note, BasisNoteLink: un.Link,
+	out := apitypes.TradeCheck{Week: h.week, Basis: TradeCheckBasis, BasisNote: un.Note, BasisNoteLink: un.Link, BasisNoteList: &un.Names,
 		OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt, Trade: a.tradeRow(mine, theirs, checked.Trade, week),
 		Fills: apitypes.TradeFills{Yours: checked.Mine.Fills, Theirs: checked.Theirs.Fills,
 			YoursOpen: a.openLabel(checked.Mine), TheirsOpen: a.openLabel(checked.Theirs),
