@@ -32,7 +32,7 @@
 		overReplacementPart,
 		runStampPart,
 		shapeWords,
-		stripFooter,
+		stripBasisParts,
 		stripHead,
 		type StripRow
 	} from '#lib/front/live-board.ts';
@@ -91,7 +91,6 @@
 		rows: StripRow[];
 		basis: BasisPart[];
 		head: string;
-		footer: string[];
 	} | null>(null);
 	$effect(() => {
 		const league = siteContext.league;
@@ -120,9 +119,12 @@
 						? null
 						: {
 								rows,
-								basis: [...liveBasis(page.basis, lead), overReplacementPart(teams)],
-								head: stripHead(format.label, answer.projection_scoring),
-								footer: stripFooter(rows, format.label, answer.projection_scoring)
+								basis: [
+									...liveBasis(page.basis, lead),
+									overReplacementPart(teams),
+									...stripBasisParts(rows, format.label, answer.projection_scoring)
+								],
+								head: stripHead(format.label, answer.projection_scoring)
 							};
 			})
 			.catch(() => {
@@ -141,7 +143,6 @@
 			overReplacementPart(format.teams)
 		]
 	);
-	const stripNotes = $derived(liveRead?.footer ?? []);
 
 	/** A member who follows a league is sent back to the one selected in the shell; anyone
 	 * else to follow one. */
@@ -236,11 +237,6 @@
 						{/each}
 					</BoardTable>
 				</div>
-				{#if stripNotes.length > 0}
-					<div class="notes">
-						{#each stripNotes as note (note)}<p>{note}</p>{/each}
-					</div>
-				{/if}
 				<div class="more">
 					<Quiet href={links.board(format.id)}>All {page.boardCount}</Quiet>
 					<Quiet href={links.adp(format.id)}>ADP</Quiet>
@@ -309,12 +305,6 @@
 	}
 
 	/* The strip's footer: why a cell reads empty, which scoring Avg is in (B78). */
-	.notes p {
-		margin: 0;
-		font-size: var(--t-xs);
-		line-height: 1.45;
-		color: var(--ink-2);
-	}
 
 	.more {
 		display: flex;

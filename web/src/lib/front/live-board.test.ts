@@ -16,7 +16,7 @@ import {
 	overReplacementPart,
 	runStampPart,
 	shapeWords,
-	stripFooter,
+	stripBasisParts,
 	stripHead
 } from './live-board.ts';
 
@@ -150,11 +150,12 @@ void test("a player the run's rows do not hold is drawn from the answer's own li
 	const unplayed = { ...qb, line: { ...qb.line, season_avg: null } };
 	const none = liveStrip(POOL, { ...ANSWER, rows: [unplayed, ...ANSWER.rows.slice(0, 3)] }, 12, 4);
 	assert.equal(none?.[0]?.season, undefined);
-	// One footer sentence says why Tier and GP read empty, only when a built row is shown.
-	assert.deepEqual(stripFooter(rows, 'PPR', { format: 'ppr', league_own: true }), [
-		'Tier and GP come from our PPR board\'s top 40, so a player outside it reads "--".'
+	// One basis part says why Tier reads empty, only when a built row is shown, never per row (Lane
+	// 117): the run tiers him, and the page carries its top 40 alone.
+	assert.deepEqual(stripBasisParts(rows, 'PPR', { format: 'ppr', league_own: true }), [
+		{ text: 'Tier reads "--" for a player outside the top 40 of our PPR board.', phone: false }
 	]);
-	assert.deepEqual(stripFooter(rows.slice(1), 'PPR', { format: 'ppr', league_own: true }), []);
+	assert.deepEqual(stripBasisParts(rows.slice(1), 'PPR', { format: 'ppr', league_own: true }), []);
 	assert.deepEqual(
 		rows.slice(1).map((r) => r.untiered),
 		[undefined, undefined, undefined]
@@ -190,11 +191,12 @@ void test("the strip's head names the scoring its figures are in (review R1-M2)"
 		stripHead('PPR', { format: 'standard', league_own: true }),
 		'The top of our standard board'
 	);
-	// Avg is in the league's own scoring: the footer says so when the head names the nearest.
-	assert.deepEqual(stripFooter([], 'PPR', { format: 'half_ppr', league_own: false }), [
-		"Avg is in your league's own scoring."
+	// Avg is in the league's own scoring: the basis says so once when the head names the nearest.
+	assert.deepEqual(stripBasisParts([], 'PPR', { format: 'half_ppr', league_own: false }), [
+		{ text: "Avg in your league's scoring.", phone: false }
 	]);
-	assert.deepEqual(stripFooter([], 'PPR', null), []);
+	assert.deepEqual(stripBasisParts([], 'PPR', { format: 'half_ppr', league_own: true }), []);
+	assert.deepEqual(stripBasisParts([], 'PPR', null), []);
 	assert.equal(
 		stripHead('PPR', { format: 'half_ppr', league_own: false }),
 		'The top of our board, half PPR nearest your rules'
