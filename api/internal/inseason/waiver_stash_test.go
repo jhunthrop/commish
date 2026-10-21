@@ -197,6 +197,58 @@ func TestABackThisWeekFreeAgentIsListedOrStashedNeverHidden(t *testing.T) {
 	}
 }
 
+// The regular season's end where the platform states no playoffs' first
+// week (Lane 121, B99), through the engine on the fixed clock: an FFPC
+// or MyFantasyLeague league's playoff start where the read holds one
+// (the week after MyFantasyLeague's last regular week), else week 14,
+// taken and sent for the Stash line to say.
+func TestTheStashKeepsToTheLeaguesRegularSeasonOrWeek14Taken(t *testing.T) {
+	f, ids := stashFixture(t)
+	if stated := pickupPage(t, f, stashNow, ""); stated.RegularSeasonTaken != nil {
+		t.Errorf("taken %d where the terms state week 15's playoffs", *stated.RegularSeasonTaken)
+	}
+	f.league.Snap.Terms.PlayoffFirst, f.league.Snap.Terms.PlayoffLast = 0, 0
+	taken := pickupPage(t, f, stashNow, "")
+	if taken.RegularSeasonTaken == nil || *taken.RegularSeasonTaken != takenRegularLast {
+		t.Errorf("taken %v, want week 14", taken.RegularSeasonTaken)
+	}
+	if _, in := rowOf(*taken.Stash, ids[3]); in || taken.StashLate == nil || *taken.StashLate != 1 {
+		t.Errorf("the one back in week 16 is stashed or uncounted under a week 14 end: late %v", taken.StashLate)
+	}
+	f.league.Snap.Calendar.PlayoffStartWeek = 17
+	started := pickupPage(t, f, stashNow, "")
+	if started.RegularSeasonTaken != nil {
+		t.Errorf("taken %d where the league's playoff start says week 16", *started.RegularSeasonTaken)
+	}
+	if r, in := rowOf(*started.Stash, ids[3]); !in || r.Stash.BackWeek != 16 {
+		t.Error("the one back in week 16 is not stashed in a regular season through week 16")
+	}
+	if started.StashLate == nil || *started.StashLate != 0 {
+		t.Errorf("late %v, want none", started.StashLate)
+	}
+}
+
+func TestRegularSeasonLastReadsTermsThenPlayoffStartThenWeek14(t *testing.T) {
+	cases := []struct {
+		name                 string
+		terms, calendar, end int
+		want                 int
+		taken                bool
+	}{
+		{"the terms' first playoff week", 15, 16, 17, 14, false},
+		{"the playoff start where the terms say none", 0, 16, 17, 15, false},
+		{"a first week past the horizon is no end", 19, 0, 17, 14, true},
+		{"neither, week 14 taken", 0, 0, 17, 14, true},
+		{"week 1 states no regular season", 1, 0, 17, 14, true},
+	}
+	for _, c := range cases {
+		got, taken := regularSeasonLast(c.terms, c.calendar, c.end)
+		if got != c.want || taken != c.taken {
+			t.Errorf("%s: %d %v, want %d %v", c.name, got, taken, c.want, c.taken)
+		}
+	}
+}
+
 // A free agent the Stash group could hold (lane 98's not-listed rule) and
 // the listed rule beside it: an out whose dating is pending stays listed
 // (Lane 118, B94), as a questionable or carried-over one does.

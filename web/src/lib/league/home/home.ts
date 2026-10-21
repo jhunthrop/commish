@@ -338,6 +338,7 @@ export function lineupSummary(
 			pts: totalsPts(rows, advice.player_points, advice.team_points),
 			final,
 			live,
+			allFinal: box.totals.allFinal,
 			note: null
 		},
 		benchWords,

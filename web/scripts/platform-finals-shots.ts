@@ -16,6 +16,10 @@
 // omit ..." where no row counts the platform's points, "Our stats omit ..." where one does), the
 // league's order's phone names rostered players' finals, the Lineup states its pick rule at both
 // widths (B83), and on a phone every Lineup and Matchup name keeps one line (B83, B90).
+// Lane 121 (B99): the Team row's small cell on the Lineup, the Matchup and the league home reads
+// "Final" with the total once every starter is final, never "Proj final" on the clocks where every
+// week 6 game is (Tuesday, Wednesday), and never "Final" before any Sunday game is (Saturday, Sunday);
+// the league home is shot for it and its footer is not measured here.
 // Exits non-zero on any fault.
 //
 //   CLOCK=saturday|sunday|monday|tuesday|wednesday|thursday [THEMES=both] node scripts/platform-finals-shots.ts [web origin] [out dir]
@@ -27,6 +31,7 @@ import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { basisLines } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { STRIP } from '../src/lib/league/box/strip.ts';
+import { BOX } from '../src/lib/league/box/box.ts';
 import {
 	FIXTURE_MONDAY_NIGHT_CLOCK,
 	FIXTURE_STATS_CLOCK,
@@ -86,6 +91,8 @@ interface Screen {
 	/** What the shot opens first: a trade in the finder, or the builder, whose phone rows draw Avg
 	 * and Last (Lane 115 fix round 1, HIGH-1). */
 	open?: 'trade' | 'builder';
+	/** Shot for its Team row alone (the league home, Lane 121): no basis checked or measured. */
+	teamOnly?: boolean;
 }
 
 /** The opened trade's and the builder's words once drawn. */
@@ -113,8 +120,34 @@ function leagueScreens(platform: boolean): Screen[] {
 			platform,
 			open: 'builder'
 		},
-		{ name: 'players', path: PLAYERS, ready: PLAYERS_READY, platform }
+		{ name: 'players', path: PLAYERS, ready: PLAYERS_READY, platform },
+		{ name: 'home', path: LEAGUE, ready: BOX.totals, platform, teamOnly: true }
 	];
+}
+
+/** The clocks where every week 6 game is final (clock.ts), and those before any Sunday game is. */
+const ALL_FINAL: readonly Day[] = ['tuesday', 'wednesday'];
+const NONE_FINAL_SUNDAY: readonly Day[] = ['saturday', 'sunday'];
+
+/** The Team rows' small captions as drawn (TeamFigures, box.ts teamSmallFigure), and their faults on
+ * the clock (Lane 121, B99). */
+async function teamFaults(page: Page): Promise<{ captions: string[]; faults: string[] }> {
+	const captions = await page.evaluate(() =>
+		[...document.querySelectorAll<HTMLElement>('main tr.totals td.proj small')]
+			.filter((small) => small.getClientRects().length > 0)
+			.map((small) => (small.textContent ?? '').trim())
+	);
+	const said = (word: string): boolean =>
+		captions.some((c) => c.toLowerCase() === word.toLowerCase());
+	const faults = [
+		...(ALL_FINAL.includes(day) && said(BOX.projFinal)
+			? [`a Team row reads ${BOX.projFinal} with every week 6 game final`]
+			: []),
+		...(NONE_FINAL_SUNDAY.includes(day) && said(BOX.final)
+			? [`a Team row reads ${BOX.final} before Sunday's games`]
+			: [])
+	];
+	return { captions, faults };
 }
 
 const SCREENS: Readonly<Record<Day, readonly Screen[]>> = {
@@ -286,12 +319,19 @@ for (const theme of THEMES)
 					await page.getByRole('button', { name: 'Build a trade' }).click();
 					await ready(page, BUILDER_READY);
 				}
+				const team = await teamFaults(page);
+				measures.push(
+					`${at}: Team ${team.captions.length > 0 ? team.captions.join(', ') : 'none'}`
+				);
+				for (const fault of team.faults) faults.push(`${at}: ${fault}`);
 				const basis = await drawnBasis(page);
-				check(screen, width, basis, at);
-				const lines = await basisLines(page);
-				measures.push(`${at}: basis ${String(lines)} lines`);
-				if (lines === 0 || lines > MOST_LINES[width])
-					faults.push(`${at}: basis draws ${String(lines)} lines`);
+				if (screen.teamOnly !== true) {
+					check(screen, width, basis, at);
+					const lines = await basisLines(page);
+					measures.push(`${at}: basis ${String(lines)} lines`);
+					if (lines === 0 || lines > MOST_LINES[width])
+						faults.push(`${at}: basis draws ${String(lines)} lines`);
+				}
 				const copy = await copyFault(page);
 				if (copy !== null) faults.push(`${at}: ${copy}`);
 				if (width === 390 && ['lineup', 'matchup'].includes(screen.name))

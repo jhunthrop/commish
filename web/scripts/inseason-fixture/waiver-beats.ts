@@ -23,8 +23,19 @@ export const IR_DROP_VARIABLE = 'FIXTURE_IR_DROP';
 /** The environment variable that opens one injured reserve slot on the member's team (B79). */
 export const IR_SLOT_VARIABLE = 'FIXTURE_IR_SLOT';
 
+/** The environment variable that answers Waivers as for a league whose platform states neither its
+ * playoffs' first week nor a playoff start (Lane 121, B99): a STAND-IN, the recorded Sleeper league
+ * states both. */
+export const SEASON_TAKEN_VARIABLE = 'FIXTURE_SEASON_TAKEN';
+
 /** The recorded Sleeper league's last regular-season week: its playoffs start in week 15. */
 const LAST_REGULAR_WEEK = 14;
+
+/** The waiver answer as the API sends it for such a league: the regular season taken through week 14
+ * (waiver_stash.go takenRegularLast), the recorded league's own last regular week, so its rows stand. */
+export function seasonTakenWaivers(answer: WaiverAdvice): WaiverAdvice {
+	return { ...answer, regular_season_taken: LAST_REGULAR_WEEK };
+}
 
 /** The positions each starting slot takes (engine.go Slots). */
 const ACCEPTS: Readonly<Record<string, readonly string[]>> = {

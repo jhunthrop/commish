@@ -106,6 +106,11 @@ export function sideBox(
 				pts: sideScore(rows, box, read.hostTotal),
 				final: box.projected_final ?? null,
 				live: read.started,
+				allFinal:
+					linesRead(
+						box.starters.map((s) => s.line.facts),
+						read.now
+					).state === 'final',
 				note: totalsNote(rows, read.landed, read.week)
 			},
 			lines: [...box.starters.map((s) => s.line), ...box.bench],
@@ -125,6 +130,8 @@ export function sideBox(
 			pts: sideScore(rows, side, read.hostTotal),
 			final: null,
 			live: read.started,
+			// No line of the API's holds his game, so the one rule cannot call the side final.
+			allFinal: false,
 			note: null
 		},
 		lines: [],

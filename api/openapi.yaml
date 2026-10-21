@@ -3956,7 +3956,7 @@ components:
           type: string
           description: >-
             one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
-            fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
+            fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
         uncounted_rules:
@@ -4463,7 +4463,7 @@ components:
           type: string
           description: >-
             one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
-            fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
+            fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
@@ -4555,7 +4555,7 @@ components:
           type: string
           description: >-
             one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
-            fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
+            fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
         read_at:
@@ -4652,7 +4652,7 @@ components:
           type: string
           description: >-
             one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
-            fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
+            fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
@@ -4702,6 +4702,13 @@ components:
             the week the page addresses whose move gains is in rows instead; never among rows or pickups, never counted
             with the rows that gain; absent from an older answer
           items: { $ref: "#/components/schemas/WaiverRow" }
+        regular_season_taken:
+          type: integer
+          description: >-
+            the regular season's last week as taken where the league's platform states neither its playoffs' first
+            week nor a playoff start (Lane 121, B99): 14, the week the Stash group keeps returns to, for its line to
+            say "Regular season taken as weeks 1 to 14."; absent where the platform states it, and from an older
+            answer
         stash_late:
           type: integer
           description: >-
@@ -5022,7 +5029,7 @@ components:
           type: string
           description: >-
             one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
-            fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
+            fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
@@ -5134,7 +5141,7 @@ components:
           type: string
           description: >-
             one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
-            fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
+            fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
         order_basis: { $ref: "#/components/schemas/OrderBasis" }

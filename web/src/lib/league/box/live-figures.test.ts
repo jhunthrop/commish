@@ -15,7 +15,7 @@ import {
 	projFinalWords,
 	projPart
 } from './basis.ts';
-import { BOX } from './box.ts';
+import { BOX, teamSmallFigure } from './box.ts';
 import { bugFigures, matchupStarted, sideBox } from './matchup.ts';
 
 const ZONE = 'America/Chicago';
@@ -127,6 +127,44 @@ void test('a side’s Team row takes the API’s projected final, its Proj in a 
 	// No projected final from the API: none drawn, the Pts still the big figure once started.
 	assert.equal(sideBox(SIDE, box, read, ZONE).totals.final, null);
 	assert.equal(sideBox(SIDE, box, { ...read, started: false }, ZONE).totals.live, false);
+});
+
+void test('once every starter is final the Team row reads Final with the total, by the one rule', () => {
+	// Lane 121 (B99): the shared cell under the Proj column, on the Matchup, the league home and the Lineup.
+	const starters = [
+		{ slot: 'RB' as const, line: mccaffrey },
+		{ slot: 'RB' as const, line: walker }
+	];
+	const box = { roster_id: 2, player_points: true, team_total: true, starters, bench: [] };
+	const read = { hostTotal: 90.9, landed: true, week: 6, now: MONDAY_NIGHT, started: true };
+	const playing = sideBox(SIDE, { ...box, projected_final: 98.5 }, read, ZONE).totals;
+	assert.equal(playing.allFinal, false);
+	assert.deepEqual(teamSmallFigure(playing), { caption: BOX.projFinal, figure: 98.5 });
+	// Tuesday: McCaffrey's Monday game is final too, so the side is.
+	const tuesday = Date.parse('2026-10-20T17:00:00.000Z');
+	const finalLine = {
+		...mccaffrey,
+		facts: { ...mccaffrey.facts, game_state: 'final' as const, played: true }
+	};
+	const done = sideBox(
+		SIDE,
+		{
+			...box,
+			starters: [
+				{ slot: 'RB' as const, line: walker },
+				{ slot: 'RB' as const, line: finalLine }
+			],
+			projected_final: 90.9
+		},
+		{ ...read, now: tuesday },
+		ZONE
+	).totals;
+	assert.equal(done.allFinal, true);
+	assert.deepEqual(teamSmallFigure(done), { caption: BOX.final, figure: 90.9 });
+	// Before kickoff no small figure: the Proj is the big one.
+	assert.equal(teamSmallFigure({ ...done, live: false }), null);
+	// A side the API sent no box for holds no game to call final.
+	assert.equal(sideBox(SIDE, null, read, ZONE).totals.allFinal, false);
 });
 
 void test('the basis says once that a game past kickoff keeps its Proj, and what Proj final is', () => {

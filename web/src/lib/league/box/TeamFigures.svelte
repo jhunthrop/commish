@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { BOX, boxNumber, type BoxTotals } from './box.ts';
+	import { boxNumber, teamSmallFigure, type BoxTotals } from './box.ts';
 
 	/** The Team row's two figure cells, one rule for the Matchup's boxes, the Lineup and the League
 	 * page's lineup (Lane 92, B22): before the first kickoff the Proj is the big figure and the Pts
 	 * small; from it the Pts are big, with the projected final small under the Proj column, captioned
-	 * once. Drawn on the lit board the table's Team row is. */
+	 * once, and the team's total captioned Final once every starter is final (teamSmallFigure). Drawn
+	 * on the lit board the table's Team row is. */
 	interface Props {
 		totals: BoxTotals;
 		/** The big figure's size: the Lineup's own table draws it larger. */
@@ -13,10 +14,13 @@
 
 	let { totals, size = 'md' }: Props = $props();
 	const live = $derived(totals.live);
+	const small = $derived(teamSmallFigure(totals));
 </script>
 
 <td class="n proj {size}" class:live
-	>{#if live}<small>{BOX.projFinal}</small>{/if}{boxNumber(live ? totals.final : totals.proj)}</td
+	>{#if small !== null}<small>{small.caption}</small>{/if}{boxNumber(
+		small === null ? totals.proj : small.figure
+	)}</td
 >
 <td class="n pts {size}" class:live>{boxNumber(totals.pts)}</td>
 

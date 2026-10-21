@@ -28,7 +28,7 @@ import type {
 	WaiverAdvice
 } from '../inseason/api.ts';
 import { lineupSummary } from '../home/home.ts';
-import { BOX } from './box.ts';
+import { BOX, teamSmallFigure } from './box.ts';
 import { gameHead } from './kickoff.ts';
 import { changesTitle, heldLineup, lineupBox, lineupSum, locked } from './lineup.ts';
 import { sideScore } from './matchup.ts';
@@ -168,6 +168,31 @@ void test('while a starter still plays the Lineup strip says Proj final beside t
 	const saturday = lineupBox(lineup, ZONE, Date.parse(FIXTURE_WEEK_CLOCK));
 	assert.equal(saturday.playing, false);
 	assert.equal(lineupSum(saturday, 'sleeper', null)?.final ?? null, null);
+});
+
+void test("the Team row's small cell reads Proj final while a starter plays, Final with the total once all are (Lane 121, B99)", () => {
+	const night = at(FIXTURE_MONDAY_NIGHT_CLOCK);
+	const playing = lineupBox(night.lineup, ZONE, Date.parse(FIXTURE_MONDAY_NIGHT_CLOCK)).totals;
+	assert.equal(teamSmallFigure(playing)?.caption, BOX.projFinal);
+	const now = Date.parse(FIXTURE_TUESDAY_CLOCK);
+	const tuesday = at(FIXTURE_TUESDAY_CLOCK);
+	const box = lineupBox(tuesday.lineup, ZONE, now);
+	assert.equal(box.totals.allFinal, true);
+	assert.deepEqual(teamSmallFigure(box.totals), { caption: BOX.final, figure: box.totals.pts });
+	// The league home's lineup card draws the same cell, by the same rule.
+	const card = lineupSummary(
+		tuesday.lineup,
+		ZONE,
+		now,
+		tuesday.lineup.projected_final ?? null,
+		true
+	);
+	assert.deepEqual(teamSmallFigure(card.totals), { caption: BOX.final, figure: card.totals.pts });
+	// Saturday, before any kickoff: no small figure, the Proj is the big one.
+	assert.equal(
+		teamSmallFigure(lineupBox(lineup, ZONE, Date.parse(FIXTURE_WEEK_CLOCK)).totals),
+		null
+	);
 });
 
 void test('the scoreboard and the Matchup print one figure for each side, its rows added (review M2)', () => {

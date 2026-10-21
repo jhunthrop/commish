@@ -62,8 +62,10 @@ import {
 	irDropWaivers,
 	listedOnly,
 	restatedBeats,
+	seasonTakenWaivers,
 	IR_DROP_VARIABLE,
-	IR_SLOT_VARIABLE
+	IR_SLOT_VARIABLE,
+	SEASON_TAKEN_VARIABLE
 } from './waiver-beats.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
@@ -163,6 +165,8 @@ const sync: LeagueSync =
 			};
 /** The sense check's case on the fixture when asked (waiver-beats.ts, Lane 98). */
 const irDrop = process.env[IR_DROP_VARIABLE] === '1';
+/** Waivers as for a league that states no regular season's end, when asked (Lane 121, B99). */
+const seasonTaken = process.env[SEASON_TAKEN_VARIABLE] === '1';
 const lineup = irDrop ? irDropLineup(lineupRead) : lineupRead;
 /** The trades as the API's search lists them, each need named (trade-needs.ts, Lane 103). */
 const trades = proposedTrades(tradesRead, lineup);
@@ -451,7 +455,8 @@ const waiversNow = (): WaiverAdvice => {
 	// Beats as the API names them in that order (waiver-beats.ts, Lane 98), each starter's bye his
 	// bye in the week the page addresses (Lane 108, B81): week 7's once turned, so a starter whose
 	// club sits week 7 reads "Starter, bye" (Lane 115, B90).
-	return restatedBeats(ordered, turnedNow() ? turnedLineup(lineupNow()) : lineupNow());
+	const restated = restatedBeats(ordered, turnedNow() ? turnedLineup(lineupNow()) : lineupNow());
+	return seasonTaken ? seasonTakenWaivers(restated) : restated;
 };
 
 function waiversAt(position: string | null): WaiverAdvice {
