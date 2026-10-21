@@ -3255,7 +3255,7 @@
 				},
 				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429160.png",
 				"slug": "de-von-achane",
-				"position_rank": 38,
+				"position_rank": null,
 				"points_over_replacement": -1.9,
 				"rest_of_season_per_game": 15.3,
 				"held": false,
@@ -3265,7 +3265,11 @@
 					"home": null,
 					"kickoff": null,
 					"bye": true,
-					"designation": null,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-28T22:00:00.000Z"
+					},
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
@@ -3419,7 +3423,7 @@
 				},
 				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4362921.png",
 				"slug": "tyquan-thornton",
-				"position_rank": 52,
+				"position_rank": null,
 				"points_over_replacement": -2,
 				"rest_of_season_per_game": 5.6,
 				"held": false,
@@ -3429,7 +3433,11 @@
 					"home": true,
 					"kickoff": "2026-10-18T20:25:00.000Z",
 					"bye": false,
-					"designation": null,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-10-12T19:00:00.000Z"
+					},
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
@@ -3645,7 +3653,7 @@
 				},
 				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4239996.png",
 				"slug": "travis-etienne-jr",
-				"position_rank": 44,
+				"position_rank": null,
 				"points_over_replacement": -2.6,
 				"rest_of_season_per_game": 11.4,
 				"held": false,
@@ -3655,7 +3663,11 @@
 					"home": false,
 					"kickoff": "2026-10-18T17:00:00.000Z",
 					"bye": false,
-					"designation": null,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-10-01T22:00:00.000Z"
+					},
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
@@ -4147,7 +4159,7 @@
 				},
 				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429013.png",
 				"slug": "tank-bigsby",
-				"position_rank": 65,
+				"position_rank": null,
 				"points_over_replacement": -5.7,
 				"rest_of_season_per_game": 5.4,
 				"held": false,
@@ -4159,8 +4171,8 @@
 					"bye": false,
 					"designation": {
 						"status": "injured_reserve",
-						"as_of": "2026-10-16T21:00:00.000Z",
-						"since": "2026-09-28T16:00:00.000Z"
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-10-07T00:00:00.000Z"
 					},
 					"played": false,
 					"points_this_week": null,
@@ -4321,7 +4333,7 @@
 				},
 				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
 				"slug": "jaxson-dart",
-				"position_rank": 31,
+				"position_rank": null,
 				"points_over_replacement": -8.3,
 				"rest_of_season_per_game": 15.8,
 				"held": false,
@@ -4331,7 +4343,11 @@
 					"home": true,
 					"kickoff": "2026-10-18T17:00:00.000Z",
 					"bye": false,
-					"designation": null,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-24T22:00:00.000Z"
+					},
 					"played": false,
 					"points_this_week": null,
 					"last_games": [

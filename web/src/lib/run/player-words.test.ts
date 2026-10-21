@@ -6,8 +6,8 @@ import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import {
 	draftersWords,
-	HELD_TIER_WORDS,
 	formatTable,
+	heldTierWords,
 	lineWords,
 	restFigures,
 	type RestFigures
@@ -216,8 +216,13 @@ void test('a player on a season-long list is never given a rank as if he plays (
 	}
 });
 
-void test('a held player is placed in no tier: his aside says why (Lane 63, N1)', () => {
-	assert.match(HELD_TIER_WORDS, /^No tier while he is on a season-long list\./u);
-	assert.doesNotMatch(HELD_TIER_WORDS, /Tier \d|rank \d/u);
-	assert.doesNotMatch(HELD_TIER_WORDS, bannedPattern());
+void test('a held player is placed in no tier: his box names the list, not ranked (Lane 128)', () => {
+	assert.equal(heldTierWords('injured_reserve'), 'On IR, not ranked');
+	assert.equal(heldTierWords('pup'), 'On PUP, not ranked');
+	for (const status of ['injured_reserve', 'pup', 'nfi', 'suspended', 'out'] as const) {
+		const words = heldTierWords(status);
+		assert.match(words, /, not ranked$/u, status);
+		assert.doesNotMatch(words, /Tier \d|rank \d/u, status);
+		assert.doesNotMatch(words, bannedPattern(), status);
+	}
 });

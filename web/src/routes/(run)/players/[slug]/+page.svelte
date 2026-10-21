@@ -359,8 +359,7 @@
 					<!-- In season the tier box is why his rest-of-season figure sits where it does (Lane 100, B30). -->
 					{#if page.underway}<h3 class="why"><Label>{CARD.whyRest}</Label></h3>{/if}
 					{#if page.heldTier !== null}
-						<PanelHead title="Tier" />
-						<Footnote>{page.heldTier}</Footnote>
+						<PanelHead title={page.heldTier} />
 					{:else}
 						<TierMates
 							tier={page.tier.tier}

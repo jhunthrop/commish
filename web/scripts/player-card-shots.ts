@@ -17,10 +17,10 @@
 // fixture, PUBLIC_RUN_ID=2026-10-21T12-ros) and one signed-out page is shot with the tile held to
 // "Rest of season ... in our order"; that run predates the reads' stamps and the earlier seasons, so
 // those two are not asked of it. Otherwise the tile is held to "Projected".
-// A season-long player (De'Von Achane on injured reserve) needs the run's designations: after
-// `npm run standin`, `uv run python -m research.nightly mark --out ../web/.runs` (from research/,
-// RESEARCH_DATABASE_URL the dev store, read only) writes the newest capture beside it; his pill and
-// his rest tile are held to Lane 63's word.
+// A season-long player (De'Von Achane on injured reserve) reads the run's designations, which
+// `npm run standin` writes from the recorded capture (scripts/standin-designations.json, Lane 128):
+// the one run every shot script uses, nothing read from dev at shot time. His pill, his rest tile and
+// his tier box ("On IR, not ranked") are held to Lane 63's word.
 // Against the built site served by the Worker and the fixture API (scripts/inseason-fixture/serve.ts).
 //
 //   [ROS_FROM_WEEK=6] node scripts/player-card-shots.ts [web origin] [out dir]
@@ -32,6 +32,7 @@ import { readFace } from './read-face.ts';
 import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
 import { CARD } from '../src/lib/player/card.ts';
+import { heldTierWords } from '../src/lib/run/player-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
 
@@ -89,7 +90,7 @@ const SHOTS: readonly Shot[] = [
 		weekRead: 'shown'
 	},
 	{ name: 'trade', slug: 'puka-nacua', signedIn: true, verb: 'Trade for him', weekRead: 'shown' },
-	{ name: 'start', slug: 'jaxson-dart', signedIn: true, verb: 'Start him', weekRead: 'none' },
+	{ name: 'start', slug: 'patrick-mahomes', signedIn: true, verb: 'Start him', weekRead: 'none' },
 	{
 		name: 'waivers',
 		slug: 'xavier-hutchinson',
@@ -174,6 +175,8 @@ interface Card {
 	pill: string;
 	verbs: string[];
 	readText: string;
+	/** The side box's text: his tier mates, or a held player's "On IR, not ranked". */
+	tierBox: string;
 	basis: string[];
 	basisLines: number;
 	nextRow: string;
@@ -212,6 +215,7 @@ async function read(page: Page): Promise<Card> {
 				(el as HTMLElement).innerText.trim()
 			),
 			readText: document.querySelector<HTMLElement>('main .read')?.innerText ?? '',
+			tierBox: document.querySelector<HTMLElement>('main .side')?.innerText ?? '',
 			// In season the tier box is headed by why his rest-of-season figure sits there (CARD.whyRest,
 			// Lane 100, B30), and the read is the week's alone: the season read and its stamp are the
 			// draft's.
@@ -303,6 +307,10 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 			rest.includes(`${shot.held}, unranked while on a season-long list`) &&
 				!/\d+ in our order/.test(rest),
 			`${where}: the rest tile ranks a held player: "${rest}"`
+		);
+		check(
+			card.tierBox.includes(heldTierWords('injured_reserve')) && !/\bTier \d/.test(card.tierBox),
+			`${where}: the tier box places a held player: "${card.tierBox}"`
 		);
 	}
 	check(card.verbs.includes(shot.verb), `${where}: verbs ${card.verbs.join(', ')}`);

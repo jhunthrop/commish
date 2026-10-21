@@ -313,6 +313,14 @@ export function onReserve(line: Pick<PlayerLine, 'player' | 'facts'>): boolean {
 	return line.player.injured_reserve || line.facts.designation?.status === 'injured_reserve';
 }
 
+/** His rest-of-season rank as a row carries it: none while he is on a season-long list (Lane 128,
+ * B106), since the in-season order never ranks a player on injured reserve as playing (the 2026-10-16
+ * ruling); his status chip says the list, so the pill and the shelf show its word where the rank
+ * would be. */
+export function playingRank(rank: number | null, status: StatusView | null): number | null {
+	return (status?.rank ?? null) === null ? rank : null;
+}
+
 /** His position pill: the board's position (a defense has none, the club mark names it). */
 function pillOf(position: string, rank: number | null, ranked: boolean): BoxRow['pill'] {
 	const known = POSITIONS.find((p) => p === position);
@@ -391,6 +399,7 @@ export function boxRow(
 ): BoxRow {
 	const { facts, player } = line;
 	const ahead = toPlay(facts, now);
+	const status = rowStatus(facts.designation, player.injured_reserve, ahead, zone);
 	return {
 		key: player.host_id,
 		boardId: player.board_id,
@@ -401,8 +410,8 @@ export function boxRow(
 		face: faceOf(player, line.headshot),
 		club: player.team,
 		position: positionWord(player.position),
-		pill: pillOf(player.position, line.position_rank, ranked),
-		status: rowStatus(facts.designation, player.injured_reserve, ahead, zone),
+		pill: pillOf(player.position, playingRank(line.position_rank, status), ranked),
+		status,
 		reserve: onReserve(line),
 		game: gameOf(facts, player.team, zone, now),
 		expected: ahead ? expectedWords(facts) : null,

@@ -218,6 +218,30 @@ void test("a status is Lane 63's pill: the week's word, a season-long list's wor
 	});
 });
 
+void test('a row on a season-long list carries no rank, whatever the API sends (Lane 128, B106)', () => {
+	const asOf = '2026-10-14T02:03:35.613Z';
+	const ir = { status: 'injured_reserve', as_of: asOf, since: '2026-09-24T22:00:00.000Z' } as const;
+	const listed = boxRow(line({}, { designation: ir }), 'QB', ZONE, true, NOW);
+	assert.deepEqual(listed.pill, { position: 'QB', rank: null, ranked: true });
+	assert.equal(listed.status?.rank, 'IR');
+	// The platform's own IR mark is the same list.
+	const hostIr = boxRow(line({ player: player({ injured_reserve: true }) }), 'BN', ZONE, true, NOW);
+	assert.equal(hostIr.pill?.rank, null);
+	// A PUP or NFI list too; a week's designation keeps his rank.
+	const pup = boxRow(
+		line({}, { designation: { status: 'pup', as_of: asOf } }),
+		'QB',
+		ZONE,
+		true,
+		NOW
+	);
+	assert.equal(pup.pill?.rank, null);
+	for (const status of ['questionable', 'doubtful', 'out'] as const) {
+		const week = boxRow(line({}, { designation: { status, as_of: asOf } }), 'QB', ZONE, true, NOW);
+		assert.equal(week.pill?.rank, 7, status);
+	}
+});
+
 void test('a row carries the projection, not the points a game, and no facts once kicked off', () => {
 	const row = boxRow(line(), 'QB', ZONE, true, NOW);
 	assert.equal(row.proj, 19.44);

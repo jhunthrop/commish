@@ -12,7 +12,7 @@ import {
 import { stamped } from '../../../scripts/inseason-fixture/game-state.ts';
 import { inTenths } from '../../../scripts/inseason-fixture/tenths.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
-import { BOX, reserveRow, rowStatus, type BoxRow } from '#lib/league/box/box.ts';
+import { BOX, reserveRow, type BoxRow } from '#lib/league/box/box.ts';
 import { heldLineup, lineupBox, swapOf, swapWords } from '#lib/league/box/lineup.ts';
 import { addVerbWords, poolRows } from '#lib/league/box/waivers.ts';
 import type { LineupAdvice, WaiverAdvice } from '#lib/league/inseason/api.ts';
@@ -381,21 +381,43 @@ void test('the address field is its own, never the asked player', () => {
 });
 
 void test("the tapped row's facts stay over his page's build: its IR words and its rank", () => {
-	const dart = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'jaxson-dart');
-	assert.equal(dart.pill?.rank, 31);
-	// On the member's IR on the platform, drawn as the bench's IR row draws him (Lane 98).
-	const onIr = { ...reserveRow(dart, 'bench'), status: rowStatus(null, true, true, ZONE) };
-	assert.ok(onIr.status);
-	const built = { position: 'QB' as const, rank: 12, status: null };
-	const head = shelfHead({ row: onIr, note: BOX.irBench }, built);
-	assert.equal(head.rank, 31);
-	assert.equal(head.status, onIr.status);
-	assert.equal(head.note, 'IR-eligible, taking a bench spot');
+	const laporta = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'sam-laporta');
+	assert.equal(laporta.pill?.rank, 5);
+	const built = { position: 'TE' as const, rank: 12, status: null };
+	assert.equal(shelfHead({ row: laporta, note: null }, built).rank, 5);
 	// A tag the row drops once his game kicks off (Lane 104) stays dropped: the build's never returns.
-	const tagged = { position: 'QB' as const, rank: 12, status: onIr.status };
-	assert.equal(shelfHead({ row: dart, note: null }, tagged).status, dart.status);
+	const dart = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'jaxson-dart');
+	const tagged = { position: 'TE' as const, rank: 12, status: dart.status };
+	assert.equal(shelfHead({ row: laporta, note: null }, tagged).status, laporta.status);
 	// With no row (a shared link to a card the screen does not hold) the build's head stands.
-	assert.deepEqual(shelfHead(null, built), { position: 'QB', rank: 12, status: null, note: null });
+	assert.deepEqual(shelfHead(null, built), { position: 'TE', rank: 12, status: null, note: null });
+});
+
+void test('an IR row carries no rank: the shelf says the list where the rank would be (Lane 128)', () => {
+	// Jaxson Dart is on injured reserve on the capture the stand-in run is marked with, and the
+	// fixture league reads the same capture: his row draws no rest-of-season rank.
+	const dart = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'jaxson-dart');
+	assert.equal(dart.status?.rank, 'IR');
+	assert.equal(dart.status.mark, 'IR since Sep 24');
+	assert.deepEqual(dart.pill, { position: 'QB', rank: null, ranked: true });
+	const built = { position: 'QB' as const, rank: 31, status: null };
+	const head = shelfHead({ row: dart, note: null }, built);
+	assert.equal(head.rank, null, "the build's rank never returns");
+	assert.equal(head.status, dart.status);
+	// The rest-of-season tile names no rank beside the pill's IR.
+	const rest = rowTiles(dart, null).map((t) =>
+		t.key === 'rest' ? { ...t, caption: 'PPR points for 2026, QB31 in our order' } : t
+	);
+	const tiles = rankedTiles(rest, 'QB', 31, head.rank);
+	assert.equal(tiles.find((t) => t.key === 'rest')?.caption, 'PPR points for 2026');
+	// The platform's own IR spot (Tank Bigsby) carries none either.
+	const bigsby = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'tank-bigsby');
+	assert.equal(bigsby.pill?.rank, null);
+	assert.equal(bigsby.status?.rank, 'IR');
+	// The bench's IR row says why he is a drop, as Lane 98 draws it.
+	const onBench = shelfHead({ row: reserveRow(dart, 'bench'), note: BOX.irBench }, built);
+	assert.equal(onBench.note, 'IR-eligible, taking a bench spot');
+	assert.equal(onBench.rank, null);
 });
 
 void test("the Lineup's own verb closes onto his row, his swap under it", () => {
@@ -405,13 +427,15 @@ void test("the Lineup's own verb closes onto his row, his swap under it", () => 
 		ZONE,
 		now
 	);
-	const dart = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'jaxson-dart');
-	const swap = swapOf(box.swaps, dart);
+	const mahomes = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'patrick-mahomes');
+	const swap = swapOf(box.swaps, mahomes);
 	assert.ok(swap);
-	const verb = actOf(shelfVerb('lineup', dart.state, backToLineupOffer(NOTHING, swapWords(swap))));
+	const verb = actOf(
+		shelfVerb('lineup', mahomes.state, backToLineupOffer(NOTHING, swapWords(swap)))
+	);
 	assert.equal(verb.label, SHELF.backToLineup);
 	assert.notEqual(verb.label, CARD.openLineup);
-	assert.equal(verb.line, 'QB, Dart in, Rodgers out');
+	assert.equal(verb.line, 'QB, Mahomes in, Rodgers out');
 	// The bench player the swap sits carries the same line.
 	const rodgers = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'aaron-rodgers');
 	assert.equal(swapOf(box.swaps, rodgers), swap);
