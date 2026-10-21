@@ -166,7 +166,7 @@
 				<td class="act"
 					>{#if stashed?.verb === 'stash'}<button
 							type="button"
-							class="add quiet"
+							class="add quiet word"
 							aria-label="{STASH.verb} {entry.row.name}"
 							onclick={() => onstash(entry)}><span>{STASH.verb}</span></button
 						>{:else}<button
@@ -742,6 +742,21 @@
 
 		.add span {
 			display: none;
+		}
+
+		/* The Stash verb keeps its word: it has no icon to stand in for it (Lane 118, B79). */
+		.act:has(.add.word) {
+			padding: 0 2px;
+		}
+
+		.add.word {
+			width: auto;
+			padding: 0 3px;
+			font-size: var(--t-xs);
+		}
+
+		.add.word span {
+			display: inline;
 		}
 
 		.dsect td {
