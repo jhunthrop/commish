@@ -53,7 +53,7 @@ from research.capsules.week.store import (
     stored_week_reads,
     upsert_week_read,
 )
-from research.capsules.week.write import MAX_ASKS_PER_READ, MAX_TOKENS, WeekReadResult, write_week_read
+from research.capsules.week.write import MAX_TOKENS, WeekReadResult, write_week_read
 from research.nightly.capsule_step import checked_price
 from research.nightly.steps import StepRecord
 from research.nightly.week_read_demotion import demote_shared, read_shapes
@@ -81,6 +81,10 @@ HOURLY_DAY_USD: Final = 0.60
 # sheets of week 7 after the four-rule prompt: 8,506 prompt tokens at 17,643 characters, the fewest
 # characters a token 1.87 (the recordings of Lane 72 had peaked at 3,630).
 WORST_PROMPT_TOKENS: Final = 9_000
+# The asks the budget's check prices a read at before it starts (the coordinator's ruling, Lane 117 fix round
+# 2): three at the heaviest prompt. A read may make more (MAX_ASKS_PER_READ); the gateway's reservation is the
+# hard stop for those in flight.
+BUDGETED_CALLS_PER_READ: Final = 3
 # The fewest characters a prompt token took on that replay, for counting a built prompt (the tests).
 MIN_CHARS_PER_TOKEN: Final = 1.8
 # The recordings' dearest call, for a budget in calls when the price list cannot be read.
@@ -130,10 +134,11 @@ class WeekReadSpend:
 
 
 def worst_read_usd(price: ModelPrice) -> float:
-    """A read's worst case in dollars: every ask at the heaviest prompt and the whole completion allowance."""
+    """A read's worst case in dollars for the budget's check before it starts: `BUDGETED_CALLS_PER_READ` asks at
+    the heaviest prompt and the whole completion allowance."""
     per_in = (price.input_usd_per_million or 0.0) / 1_000_000
     per_out = (price.output_usd_per_million or 0.0) / 1_000_000
-    return MAX_ASKS_PER_READ * (WORST_PROMPT_TOKENS * per_in + MAX_TOKENS * per_out)
+    return BUDGETED_CALLS_PER_READ * (WORST_PROMPT_TOKENS * per_in + MAX_TOKENS * per_out)
 
 
 def step_budget(price: ModelPrice, usd: float) -> RunBudget:

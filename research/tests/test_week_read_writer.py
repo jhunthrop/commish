@@ -34,7 +34,7 @@ from research.capsules.week.prompt import (
 from research.capsules.week.sheet import Status
 from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.validate import validate_week_read
-from research.capsules.week.write import MAX_ASKS_PER_READ, MAX_CALLS_PER_READ, OVER_CAP_TWICE, write_week_read
+from research.capsules.week.write import MAX_ASKS_PER_READ, MAX_CALLS_PER_READ, OVER_CAP_FALL, write_week_read
 from research.nightly.week_read_demotion import shared_week_sentences, stored_facts_block, week_demotions
 from research.nightly.week_reads import (
     HOURLY_BUDGET_USD,
@@ -50,6 +50,7 @@ from research.tests.week_read_fixtures import REPORT, WRITTEN_AT, on_bye, questi
 
 _USAGE = Usage(2400, 150, 2550, 0.0004)
 _A_DRAFT_AND_ONE_MORE = 2
+_THREE_DRAFTS = 3
 _PRICE = ModelPrice("zai/glm-5.3-flash", 0.15, 0.50, "test", True)
 
 
@@ -136,14 +137,14 @@ def test_a_long_read_is_told_its_count_and_the_cut() -> None:
     gateway = _StubGateway([_answer(long_read), _answer(STARTER_READ)])
     assert write_week_read(starter(), gateway).source == "llm"  # type: ignore[arg-type]
     correction = gateway.asked[1][-1]["content"]
-    assert f"Your read ran {words} words, over the 80-word cap. Write it again at 60" in correction
+    assert f"Your read ran {words} words, over the 80-word cap. Write it again at 50 words" in correction
     assert length_move(80) is None
 
 
 def test_a_read_asked_shorter_still_holds_to_the_cap() -> None:
     """Lane 100 (B44): the cap is 80 words with no overrun, even for a read already asked to be shorter (the
-    season read's 10% allowance does not carry over); Lane 117 (B95): a second read over it is the facts
-    block, never trimmed to fit."""
+    season read's 10% allowance does not carry over); Lane 117 (B95, fix round 2): two reads over it are
+    handed back, and the third, within it, lands untrimmed."""
     extra = (
         " Davante Adams is listed second behind him, the kind of steady pecking order that keeps the targets"
         " flowing his way for now, and nothing in the facts says that changes."
@@ -152,7 +153,7 @@ def test_a_read_asked_shorter_still_holds_to_the_cap() -> None:
     assert 80 < len(longer.split()) <= 88  # noqa: PLR2004 - over the cap, inside the old 10%
     script = [_answer(" ".join([STARTER_READ, STARTER_READ])), _answer(longer), _answer(STARTER_READ)]
     result = write_week_read(starter(), _StubGateway(script))  # type: ignore[arg-type]
-    assert (result.source, result.calls, result.fallback) == ("facts", _A_DRAFT_AND_ONE_MORE, OVER_CAP_TWICE)
+    assert (result.source, result.text, result.calls) == ("llm", STARTER_READ, _THREE_DRAFTS)
     assert any("Word count" in v for v in result.attempts[1].violations), result.attempts[1]
 
 
@@ -182,13 +183,16 @@ def test_a_last_draft_over_the_cap_alone_is_asked_once_more_with_its_overrun_nam
 
 
 def test_the_overrun_retry_is_one_and_only_for_the_cap() -> None:
-    """Lane 117 (B95): a draft over the cap is handed back once with its count and the target; the second
-    over it is the facts block at once. A last draft that broke another rule gets no retry."""
+    """Lane 117 (B95, fix round 2): a draft over the cap is handed back twice, each naming its count, first at
+    50 words, then in four sentences of 45; the third over it is the facts block at once. A last draft that
+    broke another rule gets no retry."""
     long_read = _over_the_cap()
     gateway = _StubGateway([_answer(long_read)] * (MAX_CALLS_PER_READ + 2))
     result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
-    assert (result.source, result.calls, result.fallback) == ("facts", _A_DRAFT_AND_ONE_MORE, OVER_CAP_TWICE)
-    assert "Your read ran 89 words, over the 80-word cap. Write it again at 60" in gateway.asked[1][-1]["content"]
+    assert (result.source, result.calls, result.fallback) == ("facts", _THREE_DRAFTS, OVER_CAP_FALL)
+    assert "Your read ran 89 words, over the 80-word cap. Write it again at 50 words" in gateway.asked[1][-1]["content"]
+    second = "Your read ran 89 words, over the 80-word cap again. Write it again in four sentences, 45 words."
+    assert second in gateway.asked[2][-1]["content"]
     broken = f"{long_read.removesuffix(' Start him with confidence.')} It is a safe bet he scores."
     gateway = _StubGateway([_answer(_BROKEN)] * (MAX_CALLS_PER_READ - 1) + [_answer(broken)] * 3)
     result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
@@ -282,7 +286,8 @@ def test_the_step_holds_a_dollar_budget_under_the_nightly_bound() -> None:
     budget = step_budget(_PRICE, NIGHTLY_BUDGET_USD)
     assert budget.max_usd == NIGHTLY_BUDGET_USD and budget.price == _PRICE
     # Four asks, Lane 100's one overrun retry and the judge's ask that rides with it (Lane 117, B80).
-    assert worst_read_usd(_PRICE) == pytest.approx(6 * (9000 * 0.15 + 600 * 0.50) / 1_000_000)
+    # The budget's check prices a read at three asks at the heaviest prompt (Lane 117 fix round 2).
+    assert worst_read_usd(_PRICE) == pytest.approx(3 * (9000 * 0.15 + 600 * 0.50) / 1_000_000)
 
 
 def test_the_worst_prompt_bound_holds_the_heaviest_correction() -> None:

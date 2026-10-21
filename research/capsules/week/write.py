@@ -44,10 +44,10 @@ MAX_CALLS_PER_READ: Final = 4
 # budget counts both in a read's worst case.
 OVERRUN_RETRIES: Final = 1
 OVERRUN_JUDGE_ASKS: Final = 1
-# Lane 117 (B95): a draft over the cap is handed back once, its count and the target named
-# (`prompt.length_move`); a second draft over it is the facts block, never trimmed to fit.
-OVER_CAP_DRAFTS: Final = 2
-OVER_CAP_TWICE: Final = f"failed validation: the read ran over the {WEEK_BAND[1]}-word cap twice"
+# Lane 117 (B95, fix round 2): a draft over the cap is handed back up to twice, its count and a target named
+# each time (`prompt.length_move`); a third draft over it is the facts block, never trimmed to fit.
+OVER_CAP_DRAFTS: Final = 3
+OVER_CAP_FALL: Final = f"failed validation: the read ran over the {WEEK_BAND[1]}-word cap three times"
 MAX_ASKS_PER_READ: Final = MAX_CALLS_PER_READ + OVERRUN_RETRIES + OVERRUN_JUDGE_ASKS
 # A five-sentence read and its call run about 180 tokens; the cap leaves room and never cuts an honest read.
 MAX_TOKENS: Final = 600
@@ -119,7 +119,7 @@ class _Asks:
         return self.made < MAX_CALLS_PER_READ + self.extra + self.judge_extra
 
     def count_over(self, result: ValidationResult) -> bool:
-        """Counts a draft over the word cap; True once one is over it the second time (`OVER_CAP_DRAFTS`)."""
+        """Counts a draft over the word cap; True once one is over it the last time (`OVER_CAP_DRAFTS`)."""
         if _over_cap(result):
             self.over_cap += 1
         return self.over_cap >= OVER_CAP_DRAFTS
@@ -179,7 +179,7 @@ def write_week_read(
             attempts.append(WeekAttempt(text, answer.call, result.violations))
             # The fall names the guard a figure broke before the cap, as every fall does (fallback_violation).
             alone = len(result.violations) == 1
-            why = OVER_CAP_TWICE if alone else f"failed validation: {fallback_violation(result.violations)}"
+            why = OVER_CAP_FALL if alone else f"failed validation: {fallback_violation(result.violations)}"
             return _facts(sheet, usage, made(), attempts, why)
         asks.grant_overrun(result, judged=not sheet.may_start)
         violations = result.violations
@@ -201,7 +201,7 @@ def write_week_read(
             calls = made()
             return WeekReadResult(text, WRITTEN_SOURCE, answer.call, gateway.model, usage, calls, tuple(attempts), None)
         ledger = notes_of([(attempt.body, attempt.violations) for attempt in attempts])
-        user = week_correction(sheet, text, ledger, avoid)
+        user = week_correction(sheet, text, ledger, avoid, asks.over_cap - _over_cap(result))
     first = (
         fallback_violation(attempts[-1].violations) if attempts and attempts[-1].violations else "no answer was written"
     )

@@ -33,6 +33,9 @@ ASKED_WORDS: Final = (45, 70)
 # The shape that lands near the target: a writer told a sentence's length keeps to it better than one told a
 # total (the Lane 117 replay).
 SENTENCE_WORDS: Final = 15
+# The words the two retries over the cap ask for (the coordinator's ruling, Lane 117 fix round 2): the
+# writer runs long of any target it is given (a median of 86 words against 60 on production sheets).
+RETRY_WORDS: Final = (50, 45)
 _NUMBER_RULE: Final = {
     "published": (
         "- The week's number is the published projection: a projection published for the week, never ours. Name "
@@ -147,26 +150,34 @@ def week_prompt(sheet: WeekSheet, avoid: Sequence[str]) -> str:
     )
 
 
-def length_move(words: int) -> str | None:
+def length_move(words: int, over_before: int = 0) -> str | None:
     """What a read out of its band is told to do, counted for it (Lane 52's length correction): a writer told
     only the band kept a 137-word read at 137 words through three corrections in the recorded run. Over the
-    cap it names the count and the target (Lane 117, B95): a read over it twice is the facts block."""
+    cap it names the count and a target (Lane 117, B95, fix round 2): the first time 50 words, the second four
+    sentences of 45 words (`over_before` is how many drafts ran over it before this one); a third read over
+    it is the facts block."""
     if words > _HIGH:
+        if over_before == 0:
+            return (
+                f"Your read ran {words} words, over the {_HIGH}-word cap. Write it again at {RETRY_WORDS[0]} words: "
+                "drop the sentence that carries the least for this week, and shorten the others."
+            )
         return (
-            f"Your read ran {words} words, over the {_HIGH}-word cap. Write it again at {TARGET_WORDS}: four "
-            f"sentences of about {SENTENCE_WORDS} words each. Drop the sentence that carries the least for this "
-            "week, and shorten the others. A second read over the cap is not used."
+            f"Your read ran {words} words, over the {_HIGH}-word cap again. Write it again in four sentences, "
+            f"{RETRY_WORDS[1]} words. A third read over the cap is not used."
         )
     if words < _LOW:
         return f"It is {words} words, under the {_LOW}-word floor. Add one sentence of fact from the week's facts."
     return None
 
 
-def week_correction(sheet: WeekSheet, body: str, ledger: Sequence[RuleNote], avoid: Sequence[str]) -> str:
+def week_correction(
+    sheet: WeekSheet, body: str, ledger: Sequence[RuleNote], avoid: Sequence[str], over_before: int = 0
+) -> str:
     """A rewrite: the facts, the attempt, how far it is from its length, every rule broken so far with its
     sentence, the answer's shape."""
     lines = "\n".join(note.line() for note in ledger)
-    move = length_move(word_count(body))
+    move = length_move(word_count(body), over_before)
     return "\n\n".join(
         [
             f"Facts for the week:\n{render_week_sheet(sheet)}",
