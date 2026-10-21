@@ -7,6 +7,7 @@ import type { PlayerLine, WeekFacts } from '../league/inseason/api.ts';
 import type { OrderAdvice, OrderRow } from './api.ts';
 import { orderPath } from './path.ts';
 import { basisText, KICKED_OFF_PART } from '#lib/league/box/basis.ts';
+import { BOX } from '#lib/league/box/box.ts';
 import {
 	FIGURE_HEADS,
 	ORDER,
@@ -129,6 +130,35 @@ void test('a row prints the API figures as they come', () => {
 	assert.deepEqual(view.figures, { por: 41.3, total: 156.2, perGame: 14.2 });
 	assert.equal(view.box.proj, 16.4);
 	assert.equal(view.roster, null);
+});
+
+void test('a free agent on the Players list reads FA in the club cell and No club in the game cell (Lane 123)', () => {
+	// The API's answer for a player the daily list names with no club: "FA", no game, no bye, no Proj.
+	const noGame: WeekFacts = { ...facts, opponent: null, home: null, kickoff: null };
+	const freeAgent = line('Sharpe', 'WR', {
+		player: {
+			host_id: '',
+			board_id: 'b-Sharpe',
+			name: 'Sharpe',
+			position: 'WR',
+			team: 'FA',
+			injured_reserve: false
+		},
+		facts: noGame,
+		week_projection: null,
+		opp_rank: null,
+		rest_of_season_per_game: null
+	});
+	const view = orderView(row('Sharpe', { line: freeAgent }), ZONE, true, NOW);
+	assert.equal(view.box.club, 'FA');
+	assert.equal(view.box.game, 'no-club');
+	assert.equal(BOX.noClub, 'No club');
+	assert.equal(view.box.proj, null);
+	assert.equal(view.box.expected, null);
+	// Every other row keeps its club and its game.
+	const swift = orderView(row('Swift'), ZONE, true, NOW);
+	assert.equal(swift.box.club, 'CHI');
+	assert.deepEqual(swift.box.game, { where: 'at ATL', when: 'Sun 12:00 pm' });
 });
 
 void test('the big figure is the key the rank sorts on (review 66j H2)', () => {

@@ -34,8 +34,9 @@
 	interface Props {
 		/** A ranked player, or a kicker or a defense in draft order. */
 		player: BoardPlayer | DraftOrderPlayer;
-		/** The player's page. */
-		href: string;
+		/** The player's page, his club's for a kicker or a defense; null for a free agent's market row
+		 * (Lane 123), who has no club page. */
+		href: string | null;
 		/** The view's columns, the same object its BoardTable and RowHead draw. */
 		columns: BoardColumns;
 		/** The range scale every row in this view shares. */
@@ -121,7 +122,9 @@
 		/>{#if held}<held.Mark words={held.words} kind={held.kind} />{/if}</span
 	>
 	<span class="who {cell.player}">
-		<a class="name" {href}><NameWords name={player.name} /></a>
+		{#if href !== null}<a class="name" {href}><NameWords name={player.name} /></a>{:else}<span
+				class="name"><NameWords name={player.name} /></span
+			>{/if}
 		<span class="meta">
 			<StatusPill
 				position={player.position}

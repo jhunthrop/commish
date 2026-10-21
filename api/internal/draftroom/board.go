@@ -152,7 +152,7 @@ func poolGap(adp *float64, rank int, ranked bool) *float64 {
 // place on our board (boardRanks).
 func playerView(b boards.Board, p boards.Player, ranks map[string]int) apitypes.BoardPlayer {
 	v := apitypes.BoardPlayer{
-		Id: p.ID, Name: p.Name, Position: apitypes.PlayerPosition(p.Position), Team: p.Team, Headshot: p.Headshot,
+		Id: p.ID, Name: p.Name, Position: apitypes.PlayerPosition(p.Position), Team: boards.WireClub(p.Team), Headshot: p.Headshot,
 		Adp: tenthp(p.ADP), Points: tenthp(p.Points), PositionRank: b.PositionRanks[p.ID],
 	}
 	rank, ranked := ranks[p.ID]

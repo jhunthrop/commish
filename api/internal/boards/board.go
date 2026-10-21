@@ -14,6 +14,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/figurewords"
 )
 
 // Format is a stored scoring board.
@@ -84,6 +85,9 @@ type Player struct {
 	ID       string
 	Name     string
 	Position draft.Position
+	// Team is his club's code, "" for a free agent (Lane 123): no club,
+	// so no bye, no game and no opponent; WireClub is how an answer
+	// names it.
 	Team     string
 	Headshot string
 	// ADP is where drafters take him, nil when no source has him.
@@ -293,6 +297,17 @@ func (b Board) ADPs() map[string]float64 {
 		}
 	}
 	return out
+}
+
+// WireClub is a club as every answer carries it: his code, or for a free
+// agent (Team "", the store's NULL, Lane 123) the site's one word for the
+// cell (figurewords FreeAgentClub, "FA"). The wire's team stays a string,
+// so a web that predates the rule draws the cell and reads it as before.
+func WireClub(team string) string {
+	if team == "" {
+		return figurewords.Table.FreeAgentClub
+	}
+	return team
 }
 
 // Teams is NFL team by player.

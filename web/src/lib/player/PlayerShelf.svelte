@@ -9,6 +9,7 @@
 	import StatusPill from '#lib/ui/StatusPill.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { clubMark } from '#lib/ui/club-mark.ts';
+	import { isFreeAgent } from '#lib/format/clubs.ts';
 	import { builtTiles, cardSource, type CardData } from './card-source.ts';
 	import { CARD, unreadBasis } from './card.ts';
 	import CardNext from './CardNext.svelte';
@@ -136,7 +137,8 @@
 			<div class="id">
 				<h2>{name}</h2>
 				<div class="sub">
-					{#if built}
+					{#if built && isFreeAgent(built.team)}<span class="club">{built.team}</span>
+					{:else if built}
 						<a class="club" href={links.club(built.team)}
 							><img src={clubMark(built.team)} alt="" width="18" height="18" />{built.clubName}</a
 						>

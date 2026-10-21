@@ -56,7 +56,7 @@ func publicLine(d Data, projection boards.WeekProjection, b boards.Board, rest R
 	season := NewSeason(d, RulesOf(scoring.PresetRules(pprPreset)), week, now)
 	facts := season.For(Player{BoardID: boardID, Team: team, Position: position})
 	id := boardID
-	line := apitypes.PlayerLine{Player: apitypes.LeaguePlayer{BoardId: &id, Name: bp.Name, Position: string(position), Team: team},
+	line := apitypes.PlayerLine{Player: apitypes.LeaguePlayer{BoardId: &id, Name: bp.Name, Position: string(position), Team: boards.WireClub(team)},
 		Facts: wireFacts(facts, nil), RestOfSeasonPerGame: RestOfSeasonPerGame(b, bp, rest.Left)}
 	if rank, ok := b.PositionRanks[boardID]; ok && rank > 0 {
 		line.PositionRank = &rank
@@ -238,7 +238,7 @@ func (a *advisor) PlayerWeek(bp boards.Player) (apitypes.PlayerWeek, bool) {
 		out.Verb = &verb
 	default:
 		id := bp.ID
-		lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(bp), BoardId: &id, Name: bp.Name, Position: string(bp.Position), Team: bp.Team}
+		lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(bp), BoardId: &id, Name: bp.Name, Position: string(bp.Position), Team: boards.WireClub(bp.Team)}
 		out.Line = a.build(bp.ID, lp, nil).line
 		href, _ := a.host(WaiversPage)
 		verb := apitypes.PlayerVerb{Kind: apitypes.PlayerVerbKindWaivers}

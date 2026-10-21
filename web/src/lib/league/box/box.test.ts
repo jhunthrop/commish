@@ -14,6 +14,7 @@ import {
 	oppRankWord,
 	expectedWords,
 	gameOf,
+	heldGame,
 	hostRow,
 	positionWord,
 	totalsNote,
@@ -133,22 +134,29 @@ void test('the weather is a glyph and two or three words, the venue first', () =
 });
 
 void test('the game cell: the opponent and kickoff, Final once played, the bye', () => {
-	assert.deepEqual(gameOf(facts({ kickoff: SUNDAY_NOON }), ZONE, NOW), {
+	assert.deepEqual(gameOf(facts({ kickoff: SUNDAY_NOON }), 'ATL', ZONE, NOW), {
 		where: 'at ATL',
 		when: 'Sun 12:00 pm'
 	});
-	assert.deepEqual(gameOf(facts({ home: true, played: true }), ZONE, NOW), {
+	assert.deepEqual(gameOf(facts({ home: true, played: true }), 'ATL', ZONE, NOW), {
 		where: 'vs ATL',
 		when: 'Final'
 	});
-	assert.equal(gameOf(facts({ bye: true }), ZONE, NOW), 'bye');
-	assert.equal(gameOf(facts({ opponent: null }), ZONE, NOW), null);
+	assert.equal(gameOf(facts({ bye: true }), 'ATL', ZONE, NOW), 'bye');
+	assert.equal(gameOf(facts({ opponent: null }), 'ATL', ZONE, NOW), null);
+	// A free agent (Lane 123): his club cell is FA and his game cell says he has no club, never a
+	// game or a bye of a club he left.
+	assert.equal(gameOf(facts({ opponent: null }), 'FA', ZONE, NOW), 'no-club');
+	assert.equal(gameOf(facts({ kickoff: SUNDAY_NOON }), 'FA', ZONE, NOW), 'no-club');
+	assert.equal(heldGame('no-club'), null);
+	assert.equal(heldGame('bye'), null);
+	assert.equal(BOX.noClub, 'No club');
 });
 
 void test("a game kicked off with no final says so, by the API's state (Lane 80)", () => {
 	const monday = facts({ kickoff: SUNDAY_NOON, game_state: 'kicked_off' });
-	assert.deepEqual(gameOf(monday, ZONE, NOW), { where: 'at ATL', when: 'Kicked off' });
-	assert.deepEqual(gameOf(facts({ game_state: 'final', played: true }), ZONE, NOW), {
+	assert.deepEqual(gameOf(monday, 'ATL', ZONE, NOW), { where: 'at ATL', when: 'Kicked off' });
+	assert.deepEqual(gameOf(facts({ game_state: 'final', played: true }), 'ATL', ZONE, NOW), {
 		where: 'at ATL',
 		when: 'Final'
 	});

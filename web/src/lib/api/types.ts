@@ -2274,6 +2274,7 @@ export interface components {
 			id: string;
 			name: string;
 			position: components['schemas']['PlayerPosition'];
+			/** @description his club's code, "FA" for a free agent (no club: no bye, Lane 123) */
 			team: string;
 			headshot: string;
 			/**
@@ -2837,6 +2838,7 @@ export interface components {
 			board_id: string | null;
 			name: string;
 			position: string;
+			/** @description his club's code. On a row built from our board (the order, the card, a pickup) "FA" for a free agent (no club: no game, no bye, Lane 123); on a league roster row the platform's own */
 			team: string;
 			/** @description the host marks him injured reserve beside his name (FFPC's IR designation); a player on a roster's IR slot is said by the slot */
 			injured_reserve: boolean;

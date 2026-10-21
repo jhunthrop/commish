@@ -7,7 +7,15 @@ import type { components } from '#lib/api/types.ts';
 import { designationWord } from '#lib/format/designation.ts';
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { fixed, ordinal } from '#lib/format/number.ts';
-import { BOX, FORMAT_WORDS, boxRow, gameOf, slotWord, type BoxRow } from '#lib/league/box/box.ts';
+import {
+	BOX,
+	FORMAT_WORDS,
+	boxRow,
+	gameOf,
+	heldGame,
+	slotWord,
+	type BoxRow
+} from '#lib/league/box/box.ts';
 import {
 	changesTitle,
 	shortName,
@@ -169,8 +177,8 @@ function firstOf(lines: readonly PlayerLine[], zone: string, now: Date): FrontLe
 	const rows = lines.map((line) => boxRow(line, '', zone, false, now.getTime()));
 	const names = rows.map((r) => shortName(r.name));
 	const who = names.length === 1 ? `${names.join('')} plays` : `${names.join(' and ')} play`;
-	const game = gameOf(lead.facts, zone, now.getTime());
-	const where = game !== null && game !== 'bye' ? `, ${game.where}` : '';
+	const game = heldGame(gameOf(lead.facts, lead.player.team, zone, now.getTime()));
+	const where = game !== null ? `, ${game.where}` : '';
 	return { rows, words: `${who} first${where}` };
 }
 

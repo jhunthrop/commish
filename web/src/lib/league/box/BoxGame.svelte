@@ -22,6 +22,8 @@
 	<span class="note">{note}</span>
 {:else if row.game === 'bye'}
 	<span class="bye">{BOX.bye}</span>{#if clears}<span class="clears">{clears}</span>{/if}
+{:else if row.game === 'no-club'}
+	<span class="bye">{BOX.noClub}</span>
 {:else if row.game}
 	<span class="opp"
 		><b>{row.game.where}</b> <span>{row.game.when}</span>{#if clears}<span class="clears"

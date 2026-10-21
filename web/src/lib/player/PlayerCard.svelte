@@ -19,8 +19,9 @@
 		name: string;
 		headshot: string;
 		team: string;
-		/** His club's city and nickname, and its page. */
-		club: { name: string; href: string };
+		/** His club's city and nickname, and its page; null for a free agent (Lane 123), whose club cell
+		 * is team ("FA") with no mark and no page. */
+		club: { name: string; href: string } | null;
 		position: Position;
 		/** His designation as Lane 63 says it, null when the capture does not list him: the shared
 		 * pill draws it with his rank (IR for a season-long list). */
@@ -83,9 +84,9 @@
 		<div class="id">
 			<h2>{name}</h2>
 			<div class="sub">
-				<a class="club" href={club.href}
-					><img src={clubMark(team)} alt="" width="20" height="20" />{club.name}</a
-				>
+				{#if club}<a class="club" href={club.href}
+						><img src={clubMark(team)} alt="" width="20" height="20" />{club.name}</a
+					>{:else}<span class="club">{team}</span>{/if}
 				<StatusPill {position} {positionRank} {status} />
 			</div>
 			<p class="holder" class:room={holdRoom}>{holder ?? ''}</p>
@@ -164,7 +165,7 @@
 		text-decoration: none;
 	}
 
-	.club:hover {
+	a.club:hover {
 		color: var(--ink);
 	}
 

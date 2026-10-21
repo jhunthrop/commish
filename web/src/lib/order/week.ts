@@ -13,6 +13,7 @@ import {
 	boxRow,
 	factsReadAt,
 	FORMAT_WORDS,
+	heldGame,
 	oppRankWord,
 	positionWord,
 	type BoxRow
@@ -102,9 +103,7 @@ const SECTIONS: readonly WeekOrderRow['section'][] = ['to_play', 'kicked_off', '
 /** "Played Thursday" when every game kicked off is final, its days in kickoff order; else "Kicked
  * off", a game still under way among them. */
 function kickedOffHead(rows: readonly WeekView[], zone: string): string {
-	const final = rows.every(
-		(r) => r.box.game !== null && r.box.game !== 'bye' && r.box.game.when === BOX.final
-	);
+	const final = rows.every((r) => heldGame(r.box.game)?.when === BOX.final);
 	if (!final) return WEEK_TAB.kickedOff;
 	const kickoffs = rows.flatMap((r) => (r.kickoff === null ? [] : [r.kickoff]));
 	const days = [...new Set(kickoffs.map((at) => weekdayName(at, zone)))];

@@ -1893,7 +1893,9 @@ type BoardPlayer struct {
 
 	// Status his injury designation on the newest hourly capture (GET /boards/{format} only), absent when the capture does not list him
 	Status *BoardStatus `json:"status,omitempty"`
-	Team   string       `json:"team"`
+
+	// Team his club's code, "FA" for a free agent (no club: no bye, Lane 123)
+	Team string `json:"team"`
 
 	// Vor points over replacement for this league
 	Vor *float64 `json:"vor"`
@@ -2698,7 +2700,9 @@ type LeaguePlayer struct {
 	InjuredReserve bool   `json:"injured_reserve"`
 	Name           string `json:"name"`
 	Position       string `json:"position"`
-	Team           string `json:"team"`
+
+	// Team his club's code. On a row built from our board (the order, the card, a pickup) "FA" for a free agent (no club: no game, no bye, Lane 123); on a league roster row the platform's own
+	Team string `json:"team"`
 }
 
 // LeagueRanking the week's weekly record in the member's own league (Lane 114), present only where the benchmark is espn: our set order and ESPN's own projection, each graded on every rostered player with a stat line at quarterback, running back, receiver and tight end (none on a bye, out, suspended or on injured reserve at the read before our order was set) by what he scored as the league scores; absent from an answer before Lane 114

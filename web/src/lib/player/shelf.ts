@@ -3,7 +3,7 @@
  * that screen. Pure, so the tests read what the shelf prints: the row's own cells drawn as the card's
  * tiles at once, his Pts in place of Proj once his game has kicked off (the screen's one game-state
  * rule, kickoff.ts lineState as the row carries it), and the verb by the screen and his game. */
-import { BOX, deltaWord, easeOf, oppRankWord, type BoxRow } from '#lib/league/box/box.ts';
+import { BOX, deltaWord, easeOf, heldGame, oppRankWord, type BoxRow } from '#lib/league/box/box.ts';
 import type { StatusView } from '#lib/run/status-view.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { CardSource } from './card-source.ts';
@@ -145,12 +145,13 @@ export function gameTiles(
 }
 
 /** His game as the row's Game cell says it, the shelf's line under his name until the week is read:
- * null on a bye or without a game held. */
+ * null on a bye, for a free agent or without a game held. */
 export function rowNext(row: Pick<BoxRow, 'game' | 'expected' | 'weather'>): NextCell | null {
-	if (row.game === null || row.game === 'bye') return null;
+	const game = heldGame(row.game);
+	if (game === null) return null;
 	return {
-		where: row.game.where,
-		when: row.game.when,
+		where: game.where,
+		when: game.when,
 		expected: row.expected,
 		weather: row.weather
 	};

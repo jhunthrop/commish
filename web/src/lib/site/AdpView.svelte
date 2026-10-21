@@ -20,6 +20,7 @@
 	import RowSheetTags from './RowSheetTags.svelte';
 	import SiteShell from './SiteShell.svelte';
 	import { lazySheet } from './lazy-sheet.svelte.ts';
+	import { isFreeAgent } from '#lib/format/clubs.ts';
 	import { links } from './links.ts';
 
 	interface Props {
@@ -118,7 +119,7 @@
 					{@const face = player.face}
 					<Row
 						{player}
-						href={links.club(player.team)}
+						href={isFreeAgent(player.team) ? null : links.club(player.team)}
 						{columns}
 						{scale}
 						bye={page.byes[player.team] ?? null}
