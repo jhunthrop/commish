@@ -1,5 +1,5 @@
 {
-	"about": "Lane 114 fix round 1 (review M1): one week's players both the Python record read (research/nightly/reads/record.py score_entries, printed) and the API's league ranking (api/internal/leaguerecord/ranking.go rank, roundTo) grade, with the figures both must print. A player with no stat line (z_out) is graded by neither; c_tie and d_tie tie on points; e_noid has no ESPN projection (no ESPN id); f_unlisted is not on our order. The lineup is the standard 12-team one, no flex. The rounding cases are half-way values both must round away from zero on the shortest decimal form.",
+	"about": "Lane 114 fix round 1 (review M1): one week's players both the Python record read (research/nightly/reads/record.py score_entries, printed) and the API's league ranking (api/internal/leaguerecord/ranking.go rank, roundTo) grade, with the figures both must print. A player with no stat line (z_out) is graded by neither; c_tie and d_tie tie on points; i_espn_tie ties c_tie on ESPN's projection; e_noid has no ESPN projection (no ESPN id); f_unlisted is not on our order. The lineup is the standard 12-team one, no flex. The rounding cases are half-way values both must round away from zero on the shortest decimal form.",
 	"lineup": { "teams": 12, "qb": 1, "rb": 2, "wr": 3, "te": 1 },
 	"players": [
 		{ "id": "a_qb", "position": "QB", "ours": 1, "espn": 21.5, "actual": 24.1 },
@@ -10,12 +10,13 @@
 		{ "id": "f_unlisted", "position": "WR", "ours": null, "espn": 11.0, "actual": 3.1 },
 		{ "id": "g_wr", "position": "WR", "ours": 6, "espn": 14.2, "actual": 9.9 },
 		{ "id": "h_te", "position": "TE", "ours": 7, "espn": 9.0, "actual": 0.0 },
+		{ "id": "i_espn_tie", "position": "RB", "ours": 9, "espn": 15.0, "actual": 6.5 },
 		{ "id": "z_out", "position": "WR", "ours": 8, "espn": 12.0, "actual": null }
 	],
 	"expected": {
-		"players": 8,
-		"ours": { "agreement": 0.83, "placesOff": 1.0, "starters": 7, "startersOf": 8 },
-		"espn": { "agreement": 0.44, "placesOff": 1.8, "starters": 7, "startersOf": 8 }
+		"players": 9,
+		"ours": { "agreement": 0.85, "placesOff": 1.1, "starters": 8, "startersOf": 9 },
+		"espn": { "agreement": 0.48, "placesOff": 1.8, "starters": 8, "startersOf": 9 }
 	},
 	"rounding": [
 		{ "value": 0.285, "places": 2, "printed": 0.29 },

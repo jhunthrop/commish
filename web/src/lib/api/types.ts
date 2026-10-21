@@ -4087,7 +4087,7 @@ export interface components {
 			margin: number;
 			ranking?: components['schemas']['LeagueRanking'];
 		};
-		/** @description the week's weekly record in the member's own league (Lane 114), present only where the benchmark is espn: our set order and ESPN's own projection, each graded on every rostered player at quarterback, running back, receiver and tight end (none on a bye, out, suspended or on injured reserve at the read before our order was set) by what he scored as the league scores; absent from an answer before Lane 114 */
+		/** @description the week's weekly record in the member's own league (Lane 114), present only where the benchmark is espn: our set order and ESPN's own projection, each graded on every rostered player with a stat line at quarterback, running back, receiver and tight end (none on a bye, out, suspended or on injured reserve at the read before our order was set) by what he scored as the league scores; absent from an answer before Lane 114 */
 		LeagueRanking: {
 			/** @description the rostered players graded */
 			players: number;
