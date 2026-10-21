@@ -215,6 +215,12 @@
 			finalNone={[mine, theirs].some(
 				(s) => s !== null && s.totals.live && s.totals.allFinal && s.totals.pts === null
 			)}
+			bestLineup={theirs !== null &&
+				theirs.totals.live &&
+				!theirs.totals.allFinal &&
+				theirs.totals.final !== null &&
+				box?.sides.find((b) => b.roster_id === matchup.opponent?.roster_id)
+					?.projection_best_lineup === true}
 			lineup={null}
 			now={now.getTime()}
 		/>

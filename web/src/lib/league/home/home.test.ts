@@ -282,11 +282,11 @@ void test("a side reads Final once every one of its starters is, the Team row's 
 	assert.equal(bugsFinalNone([none]), true);
 });
 
-void test('a side FFPC lists no starters for is said once by its own sentence, never the starters key (Lane 125, B104)', () => {
+void test('a side FFPC lists no starters or roster for draws "--", said once by its own sentence, never the starters key (Lane 125, Lane 127 fix round 1)', () => {
 	const night = board('playing');
 	const game = night.games[0];
 	assert.ok(game);
-	// Both sides unlisted, as every other game of FFPC's scoreboard: no starters, no Proj final.
+	// Both sides unlisted with no roster: no starters, no Proj, no Proj final.
 	game.sides = game.sides.map((s, i) => ({
 		...s,
 		starters: 0,
@@ -302,9 +302,9 @@ void test('a side FFPC lists no starters for is said once by its own sentence, n
 			[true, true, `${BOX.final} 71.4`]
 		]
 	);
-	assert.deepEqual(unlistedDrawn(bugs), { bestLineup: false, noProj: false, noProjFinal: true });
-	// The "--" is the unlisted side's: the starters keys stay unsaid, the sides' own sentence says it,
-	// on the League page and the front door alike (Lane 127).
+	assert.deepEqual(unlistedDrawn(bugs), { bestLineup: false, noRoster: true });
+	// The "--" is the side's with no roster: the starters keys stay unsaid, its own sentence says it,
+	// on the League page and the front door alike.
 	assert.equal(bugsMissFinal(bugs), true);
 	assert.equal(bugsMissListedFinal(bugs), false);
 	assert.equal(bugsPlayingListed(bugs), false);
@@ -322,27 +322,21 @@ void test('a side FFPC lists no starters for is said once by its own sentence, n
 		false,
 		unlistedDrawn(bugs)
 	);
-	assert.match(said, / Teams FFPC sends no lineup for have no Proj final\.$/);
-	assert.doesNotMatch(said, /No Proj final while|Proj final adds/);
+	assert.match(said, / Teams FFPC sends no lineup or roster for read --\.$/);
+	assert.doesNotMatch(said, /No Proj final while|Proj final adds|have no Proj final/);
 	assert.doesNotMatch(said, BANNED);
 	assert.equal(said.split('FFPC sends no lineup').length, 2, 'said once');
-	// Before kickoff a side with no roster draws no Proj: that is what is said.
-	const none = { bestLineup: false, noProj: true, noProjFinal: false };
-	assert.match(
-		teamBasis('ffpc', read, scoring, false, ZONE, false, false, false, false, none),
-		/ Teams FFPC sends no lineup for have no Proj\.$/
-	);
 	// A board with every side listed says nothing of it.
 	assert.deepEqual(unlistedDrawn(bugsOf(board('playing'), SYNC, SATURDAY, ZONE)), {
 		bestLineup: false,
-		noProj: false,
-		noProjFinal: false
+		noRoster: false
 	});
 });
 
-void test("before Sunday a side FFPC sends no lineup for draws its roster's best lineup, said so once (Lane 127, B105)", () => {
+void test("a side FFPC sends no lineup for draws its roster's best lineup before and after kickoff, one sentence for both (Lane 127, fix round 1)", () => {
 	const scoring = { format: 'ppr', league_own: false, te_bonus: 0.5 } as const;
 	const read = '2026-10-17T02:00:00.000Z';
+	const best = / Proj for teams FFPC sends no lineup for is our best lineup from their rosters\./;
 	const friday = board('upcoming');
 	const game = friday.games[0];
 	assert.ok(game);
@@ -364,26 +358,42 @@ void test("before Sunday a side FFPC sends no lineup for draws its roster's best
 		]
 	);
 	const drawn = unlistedDrawn(bugs);
-	assert.deepEqual(drawn, { bestLineup: true, noProj: true, noProjFinal: false });
+	assert.deepEqual(drawn, { bestLineup: true, noRoster: true });
 	const said = teamBasis('ffpc', read, scoring, false, ZONE, false, false, false, false, drawn);
-	assert.match(
-		said,
-		/ Proj for teams FFPC sends no lineup for is our best lineup from their rosters\. Those FFPC sends no roster for have no Proj\.$/
-	);
+	assert.match(said, new RegExp(`${best.source}$`));
 	assert.doesNotMatch(said, /Proj final/);
 	assert.doesNotMatch(said, BANNED);
-	// Thursday's game under way beside the Sunday bugs: what each draws, the teams named once.
-	const both = teamBasis('ffpc', read, scoring, false, ZONE, true, false, false, false, {
-		bestLineup: true,
-		noProj: false,
-		noProjFinal: true
-	});
-	assert.match(
-		both,
-		/ Proj for teams FFPC sends no lineup for is our best lineup from their rosters\. Under way they have no Proj final\.$/
+	// Under way: its Proj final is the best lineup's too, the same sentence, the key for what it adds.
+	const night = board('playing');
+	const ng = night.games[0];
+	assert.ok(ng);
+	ng.sides = ng.sides.map((s) => ({
+		...s,
+		starters: 0,
+		projection: 88.4,
+		projected_final: 80.1,
+		projection_best_lineup: true,
+		schedule_state: 'kicked_off'
+	}));
+	const under = bugsOf(night, SYNC, SATURDAY, ZONE);
+	assert.equal(under[0]?.sides[0]?.small, '80.1');
+	assert.deepEqual(unlistedDrawn(under), { bestLineup: true, noRoster: false });
+	assert.equal(bugsPlayingListed(under), true);
+	const both = teamBasis(
+		'ffpc',
+		read,
+		scoring,
+		false,
+		ZONE,
+		true,
+		bugsMissListedFinal(under),
+		bugsPlayingListed(under),
+		false,
+		unlistedDrawn(under)
 	);
+	assert.match(both, new RegExp(`Proj final adds .*${best.source}$`));
 	assert.equal(both.split('sends no lineup').length, 2, 'the teams said once');
-	// An older answer sends no projection_best_lineup and no Proj: the Lane 125 sentence.
+	// An older answer sends no projection_best_lineup and no Proj: the teams with no roster's words.
 	const older = board('upcoming');
 	const og = older.games[0];
 	assert.ok(og);
@@ -395,8 +405,7 @@ void test("before Sunday a side FFPC sends no lineup for draws its roster's best
 	}));
 	assert.deepEqual(unlistedDrawn(bugsOf(older, SYNC, SATURDAY, ZONE)), {
 		bestLineup: false,
-		noProj: true,
-		noProjFinal: false
+		noRoster: true
 	});
 });
 

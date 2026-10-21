@@ -20,7 +20,7 @@ import {
 	leagueScoringWords,
 	finalNonePart,
 	NONE_UNLISTED,
-	projFinalWords,
+	projFinalPhone,
 	unlistedPart,
 	teBonusSentence,
 	type UnlistedDrawn
@@ -340,35 +340,44 @@ export function bugsMissFinal(bugs: readonly Bug[]): boolean {
 	);
 }
 
-/** The bugs with only the sides the platform lists starters for: a side it lists none for draws its
- * own figures, said by unlistedPart (Lane 125), never by the starters' keys. */
-function listedOnly(bugs: readonly Bug[]): Bug[] {
-	return bugs.map((b) => ({ ...b, sides: b.sides.filter((s) => !s.unlisted) }));
+/** The bugs with only the sides whose figures come from a lineup: the platform's, or our best lineup
+ * of the roster (Lane 127 fix round 1); a side with neither draws "--", said by unlistedPart (Lane
+ * 125), never by the starters' keys. */
+function lineupSidesOnly(bugs: readonly Bug[]): Bug[] {
+	return bugs.map((b) => ({ ...b, sides: b.sides.filter((s) => !s.unlisted || s.bestLineup) }));
 }
 
-/** Whether a side the platform lists starters for draws a Proj final "--" (bugsMissFinal), on the
- * League page and the front door alike. */
+/** Whether a side with a lineup draws a Proj final "--" (bugsMissFinal), on the League page and the
+ * front door alike. */
 export function bugsMissListedFinal(bugs: readonly Bug[]): boolean {
-	return bugsMissFinal(listedOnly(bugs));
+	return bugsMissFinal(lineupSidesOnly(bugs));
 }
 
-/** Whether a side the platform lists starters for still draws a Proj final (bugsPlaying): what it
- * adds is said only then (Lane 127: an unlisted side's "--" is unlistedPart's). */
+/** Whether a side with a lineup still draws a Proj final (bugsPlaying): what it adds is said only then
+ * (Lane 127: a "--" with no roster is unlistedPart's). */
 export function bugsPlayingListed(bugs: readonly Bug[]): boolean {
-	return bugsPlaying(listedOnly(bugs));
+	return bugsPlaying(lineupSidesOnly(bugs));
 }
 
-/** What the sides the platform lists no starters for draw (Lane 125, B104; Lane 127, B105), by the
- * bug's own state at the page's clock: before kickoff a Proj from the roster's best lineup or "--"
- * with no roster, once under way "--" under Proj final until the side is final. */
+/** The figure a side draws in its bug's state at the page's clock: its Proj before kickoff, its Proj
+ * final while it plays, null once it is final (its total, no projection). */
+function drawnFigure(state: Bug['state'], side: BugSide): string | null {
+	if (state === 'upcoming') return side.big;
+	return side.final ? null : side.small;
+}
+
+/** What the sides the platform lists no starters for draw (Lane 127 fix round 1), by each bug's state
+ * at the page's clock: a figure from our best lineup of the roster, or "--" with no roster. */
 export function unlistedDrawn(bugs: readonly Bug[]): UnlistedDrawn {
 	const drawn = bugs.flatMap((b) =>
-		b.sides.filter((s) => s.unlisted).map((s) => ({ upcoming: b.state === 'upcoming', s }))
+		b.sides
+			.filter((s) => s.unlisted)
+			.map((s) => ({ s, figure: drawnFigure(b.state, s) }))
+			.filter(({ figure }) => figure !== null)
 	);
 	return {
-		bestLineup: drawn.some(({ upcoming, s }) => upcoming && s.bestLineup && s.big !== BOX.none),
-		noProj: drawn.some(({ upcoming, s }) => upcoming && s.big === BOX.none),
-		noProjFinal: drawn.some(({ upcoming, s }) => !upcoming && !s.final && s.small === BOX.none)
+		bestLineup: drawn.some(({ s, figure }) => s.bestLineup && figure !== BOX.none),
+		noRoster: drawn.some(({ s, figure }) => !s.bestLineup && figure === BOX.none)
 	};
 }
 
@@ -944,8 +953,10 @@ export function teamBasis(
 		readAt === null
 			? 'not in yet for this week'
 			: `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
+	// The Proj final in one sentence, why a "--" is where one is, else what it adds (projFinalPhone):
+	// the FFPC home's eight phone lines hold the best lineup's sentence beside it (Lane 127 fix round 1).
 	const words = [
-		projFinalWords(projFinal, missing),
+		projFinalPhone(projFinal, missing),
 		finalNone ? finalNonePart(host) : '',
 		unlistedPart(host, unlisted)
 	]

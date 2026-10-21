@@ -179,7 +179,7 @@ async function otherBugs(
 }
 
 /** The home footer's words for the teams FFPC sends no lineup for (basis.ts unlistedPart). */
-const UNLISTED_NAMED = /teams FFPC sends no lineup for/gi;
+const UNLISTED_NAMED = /teams FFPC sends no lineup/gi;
 const NO_PROJ_FINAL_SAID = 'have no Proj final';
 
 /** How many times the footer names the teams FFPC sends no lineup for, and whether it says they have
@@ -200,8 +200,8 @@ function opponentFaults(small: string, at: string): string[] {
 	if (want.opponentFinal === null) return [];
 	if (want.opponentFinal)
 		return small.startsWith(BOX.projFinal) ? [`${at}: opponent "${small}"`] : [];
-	// Not final: "Proj final --" on the Matchup, "--" under the home's Proj final column.
-	return [PROJ_FINAL_NONE, BOX.none].includes(small) ? [] : [`${at}: opponent "${small}"`];
+	// Not final: his best lineup's Proj final (Lane 127 fix round 1), never "--": he has a roster.
+	return [PROJ_FINAL_NONE, BOX.none, ''].includes(small) ? [`${at}: opponent "${small}"`] : [];
 }
 
 for (const theme of THEMES)
@@ -242,6 +242,13 @@ for (const theme of THEMES)
 					faults.push(`${at}: head "${bug.head}", want "${want.head}"`);
 				if (bug !== null) faults.push(...opponentFaults(bug.opponent, at));
 				const lines = bug === null ? 1 : await basisLines(page);
+				// The Matchup says the opponent's best-lineup Proj final once while he plays (Lane 127).
+				if (screen.name === 'matchup') {
+					const said = await unlistedSaid(page, 'main [data-basis]');
+					const wantSaid = want.opponentFinal === false ? 1 : 0;
+					if (said.times !== wantSaid)
+						faults.push(`${at}: the Matchup names the unlisted teams ${String(said.times)} times`);
+				}
 				if (bug !== null)
 					footers.push(
 						`${at}: footer ${String(lines)} lines, head "${bug.head}", opponent "${bug.opponent}"`

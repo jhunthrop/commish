@@ -3190,9 +3190,12 @@ type MatchupBoxSide struct {
 	// PlayerPoints the host gives each player's points for this side; false where it gives the side's total alone
 	PlayerPoints bool `json:"player_points"`
 
-	// ProjectedFinal the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far, the rest of the Proj of its starters in play and the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, for a side the platform lists no starters for, or absent from an older answer
+	// ProjectedFinal the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far, the rest of the Proj of its starters in play and the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, for a side the platform lists no starters for and whose roster the read does not carry, or absent from an older answer. For a side listing no starters whose roster the read carries (projection_best_lineup), its score so far plus the Proj of our best lineup's players still to play, one in play or final adding nothing (Lane 127)
 	ProjectedFinal *float64 `json:"projected_final,omitempty"`
-	RosterId       int      `json:"roster_id"`
+
+	// ProjectionBestLineup true where projected_final is our best lineup's from the side's roster (Lane 127): a side the platform lists no starters for whose roster the league read carries. Absent otherwise and from an older answer
+	ProjectionBestLineup *bool `json:"projection_best_lineup,omitempty"`
+	RosterId             int   `json:"roster_id"`
 
 	// ScheduleState the side's state by the schedule, for a side the platform lists no starters for (FFPC's opponent view), whose state no starter's game can give (Lane 124, B102): its roster's games where the league read carries the roster, else every game of the week, each by gameStateAt; final once every one is final, kicked_off once one has kicked off, upcoming before. The game's state is final only once this is too. Absent for a side that lists starters, whose starters say it, and from an older answer, which reads the game's state
 	ScheduleState *GameState `json:"schedule_state,omitempty"`
@@ -4007,7 +4010,7 @@ type ScoreboardSide struct {
 	// PointsRead false when the host's score could not be read; points then says nothing
 	PointsRead bool `json:"points_read"`
 
-	// ProjectedFinal the side's projected final once any starter of the game has kicked off: points (the platform's score so far), plus for each starter in play the rest of his week projection (max(0, Proj - his points so far), nothing where the platform gives no player's points), plus the week projection of each starter still to play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, for a side the platform lists no starters for (FFPC's opponent view), or absent from an older answer
+	// ProjectedFinal the side's projected final once any starter of the game has kicked off: points (the platform's score so far), plus for each starter in play the rest of his week projection (max(0, Proj - his points so far), nothing where the platform gives no player's points), plus the week projection of each starter still to play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, for a side the platform lists no starters for (FFPC's opponent view) whose roster the read does not carry, or absent from an older answer. For a side whose projection is our best lineup (projection_best_lineup), once the game reads playing or final: its points plus the week projection of that lineup's players still to play, one in play or final adding nothing (Lane 127)
 	ProjectedFinal *float64 `json:"projected_final,omitempty"`
 
 	// Projection the side's starters' week projections summed, each as printed to the tenth, a starter with none counting nothing; null when no starter has one. For a side the platform lists no starters for whose roster the league read carries (FFPC's rosters page, projection_best_lineup), our best lineup from that roster this week under the league's slots (Lane 127, B105): the lineup rule's week fill, every player who can play this week, one whose game has kicked off included, summed the same way; null for such a side with no roster

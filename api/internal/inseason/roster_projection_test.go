@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
 )
@@ -54,7 +55,10 @@ const (
 // Proj from our best lineup of its roster, said so on the wire; one with
 // no roster read has none, and the member's side keeps its starters' sum.
 // Friday after Thursday's game, the CIN and CLE players locked, they still
-// count; the Proj final stays none for every unlisted side.
+// count. Team 3's CIN receiver (8) has played, so its game reads kicked off
+// and its Proj final is its 33 points plus the rest of the lineup, 81;
+// team 4 plays it with nobody yet played, 34 plus its 85 (Lane 127 fix
+// round 1). The rosterless teams have none.
 func TestAnFFPCSideWithNoStartersProjectsItsRostersBestLineup(t *testing.T) {
 	f := pairedFixture(t)
 	projection := weekProjection(f)
@@ -75,14 +79,14 @@ func TestAnFFPCSideWithNoStartersProjectsItsRostersBestLineup(t *testing.T) {
 	s := ffpcService(t, f, projection, ffpcFriday)
 	board := scoreboardOf(t, s)
 	for _, tc := range []struct {
-		roster int
-		want   *float64
+		roster     int
+		want, last *float64
 	}{
-		{3, ptr(bestWithTE)},
-		{4, ptr(bestWithoutTE)},
+		{3, ptr(bestWithTE), ptr(33 + bestWithTE - 8)},
+		{4, ptr(bestWithoutTE), ptr(34 + bestWithoutTE)},
 		// Rosterless (ffpcRosterless): no roster to draw a lineup from.
-		{7, nil},
-		{8, nil},
+		{7, nil, nil},
+		{8, nil, nil},
 	} {
 		_, side := sideOf(t, board, tc.roster)
 		if (side.Projection == nil) != (tc.want == nil) || (tc.want != nil && *side.Projection != *tc.want) {
@@ -92,8 +96,8 @@ func TestAnFFPCSideWithNoStartersProjectsItsRostersBestLineup(t *testing.T) {
 		if (side.ProjectionBestLineup != nil && *side.ProjectionBestLineup) != wantFlag {
 			t.Errorf("team %d projection_best_lineup %v, want %v", tc.roster, side.ProjectionBestLineup, wantFlag)
 		}
-		if side.ProjectedFinal != nil {
-			t.Errorf("team %d with no starters has a projected final %v", tc.roster, *side.ProjectedFinal)
+		if (side.ProjectedFinal == nil) != (tc.last == nil) || (tc.last != nil && *side.ProjectedFinal != *tc.last) {
+			t.Errorf("team %d Proj final %v, want %v", tc.roster, deref(side.ProjectedFinal), deref(tc.last))
 		}
 	}
 	if _, mine := sideOf(t, board, me); mine.ProjectionBestLineup != nil || mine.Projection == nil {
@@ -131,5 +135,48 @@ func TestTheBestLineupTakesTheBetterQuarterbackAndLeavesAnEmptySlotEmpty(t *test
 		if l.Player.Position == "QB" && (l.WeekProjection == nil || *l.WeekProjection != 25) {
 			t.Fatalf("the quarterback started %v, want the 25", deref(l.WeekProjection))
 		}
+	}
+}
+
+// Lane 127 fix round 1: a side listing no starters with a roster read has
+// a Proj final once its game reads kicked off, FFPC's points so far plus
+// the Proj of its best lineup's players still to play: of team 3's five
+// (QB on LV and RB on PHI final, RB on ARI in play, WRs on CLE and JAX to
+// come) only the two receivers' 5 and 6 count, so 33 + 11 = 44, on the
+// board; its Proj is all five's, 52. Team 7, with no roster, has neither.
+func TestARosterSidesProjectedFinalAddsOnlyThePlayersStillToPlay(t *testing.T) {
+	f := pairedFixture(t)
+	projection := weekProjection(f)
+	sunday := time.Date(2026, 10, 18, 14, 0, 0, 0, east)
+	for i := range f.data.Games {
+		g := &f.data.Games[i]
+		if g.Week != 6 {
+			continue
+		}
+		switch g.Team {
+		case "LV", "MIA", "NYJ", "PHI":
+			g.Kickoff, g.Final = sunday.Add(-5*time.Hour), true
+		case "ARI", "ATL":
+			g.Kickoff, g.Final = sunday.Add(-time.Hour), false
+		default:
+			g.Kickoff, g.Final = sunday.Add(2*time.Hour), false
+		}
+	}
+	ffpcBoard(&f)
+	team := &f.league.Snap.Teams[2]
+	team.Players, team.Reserve, team.Taxi = team.Players[:5], nil, nil
+	for i, proj := range []float64{20, 10, 11, 5, 6} {
+		projection.Players[fmt.Sprintf("p%03d", 30+i)] = boards.ProjectedPoints{PPR: proj, Half: proj, Standard: proj}
+	}
+	board := scoreboardOf(t, ffpcService(t, f, projection, sunday))
+	game, three := sideOf(t, board, 3)
+	if game.State != apitypes.ScoreboardGameStatePlaying {
+		t.Fatalf("team 3's game %s, want playing", game.State)
+	}
+	if deref(three.Projection) != 52.0 || deref(three.ProjectedFinal) != 44.0 {
+		t.Errorf("team 3 Proj %v Proj final %v, want 52 and 44", deref(three.Projection), deref(three.ProjectedFinal))
+	}
+	if _, seven := sideOf(t, board, 7); seven.Projection != nil || seven.ProjectedFinal != nil || seven.ProjectionBestLineup != nil {
+		t.Errorf("team 7 with no roster: Proj %v Proj final %v flag %v", deref(seven.Projection), deref(seven.ProjectedFinal), seven.ProjectionBestLineup)
 	}
 }

@@ -444,15 +444,22 @@ void test("the front door's FFPC bug says the opponent's figures as the home doe
 		friday ?? '',
 		/ Proj for teams FFPC sends no lineup for is our best lineup from their rosters\.$/
 	);
-	// Once kicked off his Proj final is "--": the home's sentence, never "No Proj final while".
+	// Once kicked off his Proj final is the best lineup's too: the same sentence (fix round 1).
 	const sunday = ffpc('playing', {
 		projection: 97.1,
+		projected_final: 91.3,
 		projection_best_lineup: true,
 		schedule_state: 'kicked_off'
 	});
-	assert.match(sunday ?? '', / Teams FFPC sends no lineup for have no Proj final\.$/);
-	assert.doesNotMatch(sunday ?? '', /No Proj final while/);
-	for (const said of [friday, sunday]) assert.doesNotMatch(said ?? '', bannedPattern());
+	assert.match(
+		sunday ?? '',
+		/ Proj for teams FFPC sends no lineup for is our best lineup from their rosters\.$/
+	);
+	// With no roster his "--" is said so, never by the starters' key.
+	const rosterless = ffpc('playing', { projection: null, schedule_state: 'kicked_off' });
+	assert.match(rosterless ?? '', / Teams FFPC sends no lineup or roster for read --\.$/);
+	assert.doesNotMatch(rosterless ?? '', /No Proj final while/);
+	for (const said of [friday, sunday, rosterless]) assert.doesNotMatch(said ?? '', bannedPattern());
 });
 
 void test('the roster head counts its chips, and each other league carries its changes', () => {

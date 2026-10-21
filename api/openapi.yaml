@@ -4062,7 +4062,15 @@ components:
           description: >-
             the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far,
             the rest of the Proj of its starters in play and the Proj of its starters still to play; null before the game's first kickoff, with the score unread,
-            while a starter still to play has no Proj, for a side the platform lists no starters for, or absent from an older answer
+            while a starter still to play has no Proj, for a side the platform lists no starters for and whose roster
+            the read does not carry, or absent from an older answer. For a side listing no starters whose roster the
+            read carries (projection_best_lineup), its score so far plus the Proj of our best lineup's players still
+            to play, one in play or final adding nothing (Lane 127)
+        projection_best_lineup:
+          type: boolean
+          description: >-
+            true where projected_final is our best lineup's from the side's roster (Lane 127): a side the platform
+            lists no starters for whose roster the league read carries. Absent otherwise and from an older answer
         starters:
           type: array
           description: >-
@@ -4156,7 +4164,10 @@ components:
             nothing where the platform gives no player's points), plus the week projection of each starter still to
             play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with
             the score unread, while a starter still to play has no week projection, for a side the platform lists no
-            starters for (FFPC's opponent view), or absent from an older answer
+            starters for (FFPC's opponent view) whose roster the read does not carry, or absent from an older answer.
+            For a side whose projection is our best lineup (projection_best_lineup), once the game reads playing or
+            final: its points plus the week projection of that lineup's players still to play, one in play or final
+            adding nothing (Lane 127)
     ScoreboardGame:
       type: object
       required: [state, next_kickoff, sides]

@@ -71,44 +71,25 @@ export function finalNonePart(host: LeagueHost): string {
 }
 
 /** What the teams a platform sends no lineup for draw on a board (every side of FFPC's scoreboard but
- * the member's, Lane 125, B104; Lane 127, B105), each said once where it is drawn. */
+ * the member's, Lane 125, B104; Lane 127, B105 and fix round 1), each said once where it is drawn. */
 export interface UnlistedDrawn {
-	/** A side's Proj is our best lineup from its roster (the API's projection_best_lineup). */
+	/** A side's Proj or Proj final is our best lineup's from its roster (projection_best_lineup). */
 	bestLineup: boolean;
-	/** A side draws "--" under Proj: the platform sends us no roster to draw a lineup from. */
-	noProj: boolean;
-	/** A side of a game under way draws "--" under Proj final, its Final by its clubs' games. */
-	noProjFinal: boolean;
+	/** A side draws "--" under Proj or Proj final: the platform sends us no roster for it either. */
+	noRoster: boolean;
 }
 
-export const NONE_UNLISTED: UnlistedDrawn = {
-	bestLineup: false,
-	noProj: false,
-	noProjFinal: false
-};
+export const NONE_UNLISTED: UnlistedDrawn = { bestLineup: false, noRoster: false };
 
-/** The words for the teams a platform sends no lineup for (Lane 125, B104; Lane 127, B105): each
- * figure they draw said once, never a Proj final's absence where a Proj is what is drawn. The first
- * sentence names the teams, the rest go on from it; empty with none drawn. */
+/** The words for the teams a platform sends no lineup for (Lane 127 fix round 1): one sentence covers
+ * their Proj and their Proj final alike, said once, the "--" of a team with no roster read beside it
+ * (the coordinator's ruling: one sentence); a board whose every such team draws "--" (no roster read,
+ * or an answer before Lane 127) says why. Empty with none drawn. */
 export function unlistedPart(host: LeagueHost, drawn: UnlistedDrawn): string {
 	const platform = hostWords(host);
-	const teams = `teams ${platform} sends no lineup for`;
-	const parts: string[] = [];
 	if (drawn.bestLineup)
-		parts.push(`${BOX.proj} for ${teams} is our best lineup from their rosters.`);
-	if (drawn.noProjFinal)
-		parts.push(
-			parts.length > 0
-				? `Under way they have no ${BOX.projFinal}.`
-				: `${sentenceStart(teams)} have no ${BOX.projFinal}.`
-		);
-	if (drawn.noProj)
-		parts.push(
-			parts.length > 0
-				? `Those ${platform} sends no roster for have no ${BOX.proj}.`
-				: `${sentenceStart(teams)} have no ${BOX.proj}.`
-		);
-	return parts.join(' ');
+		return `${BOX.proj} for teams ${platform} sends no lineup for is our best lineup from their rosters.`;
+	return drawn.noRoster ? `Teams ${platform} sends no lineup or roster for read ${BOX.none}.` : '';
 }
 
 /** The Proj final's sentences: what it is once a game has kicked off, and why one is "--" where one
@@ -499,6 +480,9 @@ export interface BoxBasisFacts {
 	allFinal?: boolean;
 	/** A Team row reads Final with no total (an FFPC opponent with no box, Lane 121 fix round 1). */
 	finalNone?: boolean;
+	/** A Team row draws its Proj final from our best lineup of its roster (an FFPC opponent, the
+	 * API's projection_best_lineup, Lane 127 fix round 1): said once, as the League page says it. */
+	bestLineup?: boolean;
 	host: LeagueHost;
 	/** The Lineup's: the read the change counts from, and the API's sentence naming the rules our
 	 * stats lack; null on the Matchup, which draws no evidence columns. */
@@ -527,7 +511,12 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	const projFinal = kicked && facts.allFinal !== true;
 	const final = [
 		...said(projFinalWords(projFinal, facts.noFinal === true)),
-		...said(facts.finalNone === true ? finalNonePart(facts.host) : null)
+		...said(facts.finalNone === true ? finalNonePart(facts.host) : null),
+		...said(
+			projFinal && facts.bestLineup === true
+				? unlistedPart(facts.host, { bestLineup: true, noRoster: false })
+				: null
+		)
 	];
 	const { lineup } = facts;
 	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.

@@ -6,13 +6,12 @@ import (
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
-// rosterProjection is the Proj of a side the platform lists no starters
-// for (every FFPC side but the member's) where the league read carries its
-// roster (FFPC's rosters page): our best lineup from that roster this
-// week, its starters' week projections summed as printed (Lane 127, B105).
-// ok is false for a side that lists starters and for one with no roster
-// read, whose Proj stays none.
-func (a *advisor) rosterProjection(s *leaguesync.Side) (*float64, bool) {
+// rosterLineup is our best lineup this week from the roster of a side the
+// platform lists no starters for (every FFPC side but the member's), where
+// the league read carries that roster (FFPC's rosters page; Lane 127,
+// B105). ok is false for a side that lists starters and for one with no
+// roster read: its Proj and Proj final stay none.
+func (a *advisor) rosterLineup(s *leaguesync.Side) ([]apitypes.PlayerLine, bool) {
 	if s == nil || len(s.Starters) > 0 {
 		return nil, false
 	}
@@ -24,7 +23,7 @@ func (a *advisor) rosterProjection(s *leaguesync.Side) (*float64, bool) {
 	if len(people) == 0 {
 		return nil, false
 	}
-	return printedLines(bestLineup(a.config, people)), true
+	return bestLineup(a.config, people), true
 }
 
 // bestLineup is the roster's best lineup this week under the league's
@@ -50,4 +49,30 @@ func bestLineup(config []draft.SlotConfig, people []person) []apitypes.PlayerLin
 		}
 	}
 	return out
+}
+
+// rosterProjectedFinal is the projected final of a side whose Proj is our
+// best lineup from its roster (Lane 127 fix round 1): the platform's team
+// points so far plus the week projection, as printed, of each player of
+// that lineup still to play; one in play or final adds nothing (his part
+// is in the points the platform gives), one out counts nothing. Nil
+// before the game has kicked off (the Proj is then the figure), with the
+// score unread, or while a player still to play has no Proj.
+func rosterProjectedFinal(points *float64, lineup []apitypes.PlayerLine, started bool) *float64 {
+	if points == nil || !started {
+		return nil
+	}
+	sum := *points
+	for _, l := range lineup {
+		f := l.Facts
+		if f.Bye || f.GameState == nil || *f.GameState != apitypes.GameStateUpcoming || sitsOut(f) {
+			continue
+		}
+		if l.WeekProjection == nil {
+			return nil
+		}
+		sum += roundTenth(*l.WeekProjection)
+	}
+	total := roundTenth(sum)
+	return &total
 }

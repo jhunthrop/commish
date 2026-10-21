@@ -54,6 +54,12 @@ func (a *advisor) Matchup() (apitypes.MatchupBox, bool) {
 	state, _ := gameState(game, unlisted)
 	for i := range out.Sides {
 		out.Sides[i].ProjectedFinal = projectedFinal(sidePoints(sides[i]), starters[i], started)
+		// A side listing no starters with a roster read: our best lineup's, by the bug's rule (Lane 127
+		// fix round 1).
+		if lineup, ok := a.rosterLineup(sides[i]); ok {
+			out.Sides[i].ProjectedFinal = rosterProjectedFinal(sidePoints(sides[i]), lineup, state != apitypes.ScoreboardGameStateUpcoming)
+			out.Sides[i].ProjectionBestLineup = &ok
+		}
 		// Each side's count by the score bug's rule (fix round 1, MEDIUM-3).
 		out.Sides[i].ToPlay = own[i].toPlay(state)
 		out.Sides[i].ScheduleState = scheduleStateOf(unlisted[i])

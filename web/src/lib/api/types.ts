@@ -3278,9 +3278,11 @@ export interface components {
 			schedule_state?: components['schemas']['GameState'];
 			/**
 			 * Format: double
-			 * @description the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far, the rest of the Proj of its starters in play and the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, for a side the platform lists no starters for, or absent from an older answer
+			 * @description the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far, the rest of the Proj of its starters in play and the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, for a side the platform lists no starters for and whose roster the read does not carry, or absent from an older answer. For a side listing no starters whose roster the read carries (projection_best_lineup), its score so far plus the Proj of our best lineup's players still to play, one in play or final adding nothing (Lane 127)
 			 */
 			projected_final?: number | null;
+			/** @description true where projected_final is our best lineup's from the side's roster (Lane 127): a side the platform lists no starters for whose roster the league read carries. Absent otherwise and from an older answer */
+			projection_best_lineup?: boolean;
 			/** @description the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents) */
 			starters: components['schemas']['BoxStarter'][];
 			/** @description the side's other active players, by our order (injured reserve and taxi spots left out) */
@@ -3328,7 +3330,7 @@ export interface components {
 			in_play?: number;
 			/**
 			 * Format: double
-			 * @description the side's projected final once any starter of the game has kicked off: points (the platform's score so far), plus for each starter in play the rest of his week projection (max(0, Proj - his points so far), nothing where the platform gives no player's points), plus the week projection of each starter still to play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, for a side the platform lists no starters for (FFPC's opponent view), or absent from an older answer
+			 * @description the side's projected final once any starter of the game has kicked off: points (the platform's score so far), plus for each starter in play the rest of his week projection (max(0, Proj - his points so far), nothing where the platform gives no player's points), plus the week projection of each starter still to play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, for a side the platform lists no starters for (FFPC's opponent view) whose roster the read does not carry, or absent from an older answer. For a side whose projection is our best lineup (projection_best_lineup), once the game reads playing or final: its points plus the week projection of that lineup's players still to play, one in play or final adding nothing (Lane 127)
 			 */
 			projected_final?: number | null;
 		};

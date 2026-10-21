@@ -171,13 +171,23 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 	// (Lane 124, B102); its Proj is our best lineup from its roster where the read carries one (Lane
 	// 127, B105).
 	unlisted := make([]*kickoffs, len(sides))
+	lineups := make([][]apitypes.PlayerLine, len(sides))
+	rostered := make([]bool, len(sides))
 	for i, s := range sides {
 		unlisted[i] = a.scheduleRead(s)
-		if proj, ok := a.rosterProjection(s); ok {
-			out.Sides[i].Projection, out.Sides[i].ProjectionBestLineup = proj, &ok
+		if lineup, ok := a.rosterLineup(s); ok {
+			lineups[i], rostered[i] = lineup, true
+			out.Sides[i].Projection, out.Sides[i].ProjectionBestLineup = printedLines(lineup), &ok
 		}
 	}
 	out.State, out.NextKickoff = gameState(game, unlisted)
+	// Such a side's projected final once the game reads kicked off by the bug's own rule (Lane 127
+	// fix round 1); a side with no roster read keeps none (Lane 125).
+	for i, s := range sides {
+		if rostered[i] {
+			out.Sides[i].ProjectedFinal = rosterProjectedFinal(sidePoints(s), lineups[i], out.State != apitypes.ScoreboardGameStateUpcoming)
+		}
+	}
 	// The pooled count stays for the web before Lane 92; each side says its own.
 	out.ToPlay = game.toPlay(out.State)
 	for i := range out.Sides {
