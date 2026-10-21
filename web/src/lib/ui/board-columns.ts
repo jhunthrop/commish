@@ -32,6 +32,8 @@ export interface ColumnHead {
 	text: string;
 	short?: string;
 	title?: string;
+	/** A second, quieter line under the head that says what it counts: Tier's "by position" (B47). */
+	note?: string;
 }
 
 /** Each column's head, said once over the rows (RowHead), each figure's unit never in the rows (Lane
@@ -41,10 +43,11 @@ export const COLUMN_HEADS: Readonly<Record<ColumnKey, ColumnHead>> = {
 	adpLead: { text: 'ADP' },
 	face: { text: '' },
 	player: { text: 'Player' },
-	tier: { text: 'Tier' },
+	tier: { text: 'Tier', note: 'by position' },
 	bye: { text: 'Bye' },
 	proj: { text: FIGURE.projected },
-	vor: { text: 'Over repl', title: 'Over replacement' },
+	// Said in full where the column has the room, the basis saying what it counts (B46).
+	vor: { text: 'Over replacement', short: 'Over repl', title: 'Over replacement' },
 	order: { text: 'Draft order' },
 	range: { text: 'Floor to ceiling' },
 	adp: { text: 'ADP' },
@@ -79,10 +82,10 @@ const WIDTHS: Readonly<Record<ColumnKey, Widths>> = {
 	adpLead: { desk: 52, lap: 48, tab: 44, phone: 40 },
 	face: { desk: 40, lap: 40, tab: 36, phone: 32 },
 	player: PLAYER_TRACK,
-	tier: { desk: 30, lap: 30, tab: null, phone: null },
+	tier: { desk: 64, lap: 64, tab: null, phone: null },
 	bye: { desk: 32, lap: 32, tab: 32, phone: null },
 	proj: { desk: 74, lap: 74, tab: 74, phone: 62 },
-	vor: { desk: 72, lap: 70, tab: 68, phone: 58 },
+	vor: { desk: 92, lap: 90, tab: 88, phone: 58 },
 	order: { desk: 88, lap: 80, tab: 72, phone: 64 },
 	range: { desk: 176, lap: null, tab: null, phone: null },
 	adp: { desk: 46, lap: 44, tab: 44, phone: null },

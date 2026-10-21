@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { fixed, plural } from '#lib/format/number.ts';
-	import { tierColor, type GroupName, type TierCliff } from './tier.ts';
+	import { tierColor, tierInk, type GroupName, type TierCliff } from './tier.ts';
 
 	interface Props {
 		tier: number;
@@ -23,7 +23,7 @@
 	let { tier, count, group, cliff, unit, id, tail }: Props = $props();
 </script>
 
-<div class="band" {id} style:--tier={tierColor(tier)}>
+<div class="band" {id} style:--tier={tierColor(tier)} style:--tier-ink={tierInk(tier)}>
 	<span class="strip">{tier}</span>
 	<span class="name"><b>Tier {tier}</b><span>{plural(count, group.one, group.many)}</span></span>
 	<span class="cliff">

@@ -54,9 +54,9 @@
 
 <DocSection
 	title="Nightly page parts"
-	sub="{page.name} from the {runStampText(
+	sub="{page.name}, {runStampText(
 		run
-	).toLowerCase()}, the parts the board, player, ADP, record, clubs and schedule pages are built from."
+	)}: the parts the board, player, ADP, record, clubs and schedule pages are built from."
 >
 	<Parts>
 		<Part

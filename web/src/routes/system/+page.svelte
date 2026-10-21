@@ -211,7 +211,7 @@
 			<Parts>
 				<Part
 					name="The strip"
-					about="Tier number on the tier's hue. Hot red at the top of a position, cold slate at the bottom. The number is printed, so hue is never the only channel."
+					about="Tier number on the tier's step of the one ink ramp: the full ink at the top of a position, a step toward the page for each tier after. The number is printed, so the shade is never the only channel."
 				/>
 				<Part name="The name and the count" about="How many players share the tier.">
 					{#snippet show()}<b>Tier {data.wrTier.tier}</b>
@@ -222,9 +222,12 @@
 					name="The drop label"
 					about="Projected PPR points from the last player in this tier to the first in the next. The reason tiers exist, printed."
 				/>
-				<Part name="The tier chip" about="The All view's tier, on the same hue as its strip.">
+				<Part
+					name="The tier chip"
+					about="The All view's tier, on the same step of the one ink ramp as its strip. Tier 1 is the full ink. Tiers past the seventh share the lightest step."
+				>
 					{#snippet show()}
-						{#each [1, 2, 3, 4, 5, 6, 7] as tier (tier)}<TierChip {tier} />{/each}
+						{#each [1, 2, 3, 4, 5, 6, 7, 8, 14] as tier (tier)}<TierChip {tier} />{/each}
 					{/snippet}
 				</Part>
 			</Parts>

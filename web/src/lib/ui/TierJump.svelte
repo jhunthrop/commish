@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { fixed, MINUS, plural } from '#lib/format/number.ts';
-	import { tierColor, type GroupName, type TierCliff } from './tier.ts';
+	import { tierColor, tierInk, type GroupName, type TierCliff } from './tier.ts';
 
 	interface TierLink {
 		tier: number;
@@ -22,7 +22,7 @@
 <ul>
 	{#each tiers as link (link.tier)}
 		<li>
-			<a href={link.href} style:--tier={tierColor(link.tier)}>
+			<a href={link.href} style:--tier={tierColor(link.tier)} style:--tier-ink={tierInk(link.tier)}>
 				<span class="n">{link.tier}</span>
 				<span>{plural(link.count, group.one, group.many)}</span>
 				<span class="d">{link.cliff ? `${MINUS}${fixed(link.cliff.drop)}` : ''}</span>

@@ -3931,6 +3931,9 @@ type ScoreboardGameState string
 
 // ScoreboardSide defines model for ScoreboardSide.
 type ScoreboardSide struct {
+	// InPlay the side's starters whose own game has kicked off and is not final at the read's clock (gameStateAt), an out starter not counted: 0 before kickoff, between games (a Thursday starter final, Sunday's still to come) and once every starter is final; absent from an older answer, which reads as none in play
+	InPlay *int `json:"in_play,omitempty"`
+
 	// Played those starters whose game has kicked off
 	Played int `json:"played"`
 

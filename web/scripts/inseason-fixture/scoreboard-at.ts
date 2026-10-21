@@ -246,7 +246,9 @@ export function scoreboardAt(recorded: Recorded, moment: Moment, readAt: string)
 						? roundTenth(l.week_projection * SCORED_SHARE)
 						: null
 				),
-				to_play: toPlayOf(own, state)
+				to_play: toPlayOf(own, state),
+				// The starters in play now (scoreboard.go inPlayCount, Lane 102).
+				in_play: own.inPlay
 			}))
 		};
 	});

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { dayLabel } from '#lib/format/date.ts';
+	import { offlineLead } from '#lib/site/offline-words.ts';
 	import { fixed } from '#lib/format/number.ts';
 	import Footnote from '#lib/ui/Footnote.svelte';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
@@ -14,11 +14,7 @@
 </svelte:head>
 
 <main class="offline">
-	<p class="lead">
-		You're offline, so this is the last board this device saved, from the run of {dayLabel(
-			data.runAt
-		)}.
-	</p>
+	<p class="lead">{offlineLead(data.runAt)}</p>
 	<Footnote>{data.basis}</Footnote>
 	<table class="board">
 		<caption>{data.format.label} board, top {data.rows.length}</caption>

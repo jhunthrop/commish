@@ -113,6 +113,13 @@ func (k kickoffs) toPlay(game apitypes.ScoreboardGameState) *string {
 	return &words
 }
 
+// inPlayCount is the starters whose own game is under way now (Lane 102,
+// B38): the front door's "Live now", never a starter final or still to come.
+func (k kickoffs) inPlayCount() *int {
+	n := k.inPlay
+	return &n
+}
+
 // sitsOut is a designation that keeps him out this week (out, injured
 // reserve, suspended, PUP, NFI), never questionable or doubtful: the web's
 // sitsHim.
@@ -152,6 +159,7 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 	out.ToPlay = game.toPlay(out.State)
 	for i := range out.Sides {
 		out.Sides[i].ToPlay = own[i].toPlay(out.State)
+		out.Sides[i].InPlay = own[i].inPlayCount()
 	}
 	return out
 }

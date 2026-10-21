@@ -4074,6 +4074,12 @@ components:
             with a game is still to come (an out starter whose game is still to come counts), "2 playing" once none
             is and some are in play; null once every starter is final, on bye or out of a game under way, before
             kickoff, or absent from an older answer
+        in_play:
+          type: integer
+          description: >-
+            the side's starters whose own game has kicked off and is not final at the read's clock (gameStateAt),
+            an out starter not counted: 0 before kickoff, between games (a Thursday starter final, Sunday's still
+            to come) and once every starter is final; absent from an older answer, which reads as none in play
         projected_final:
           type: number
           format: double

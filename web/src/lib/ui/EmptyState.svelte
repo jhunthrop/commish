@@ -4,7 +4,7 @@
 	/** What a view says when it has nothing to show: a format the run lacks, a player we could not
 	 * find, a list with nothing on it yet. One line in plain words and the ways forward. */
 	interface Props {
-		/** The headline, short: "Half PPR is not on this run". */
+		/** The headline, short: "Half PPR is not on our board yet". */
 		title: string;
 		/** One sentence saying what there is instead. */
 		line?: string;

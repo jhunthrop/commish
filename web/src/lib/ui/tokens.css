@@ -99,16 +99,24 @@
 	--status-ir-bg: #a3243a;
 	--status-ir-ink: #ffffff;
 
-	/* Tiers run hot to cold down the board. Each band's label carries the tier number
-     and the drop to the next tier, so the colour is never the only channel. */
-	--tier-1: #c62a47;
-	--tier-2: #b8287f;
-	--tier-3: #7a3cb0;
-	--tier-4: #3a55b4;
-	--tier-5: #0f6f99;
-	--tier-6: #0b7a68;
-	--tier-7: #5b5a65;
-	--tier-ink: #ffffff;
+	/* Tiers are one ink ramp (B47): tier 1 the full ink, each tier after it a step toward the page,
+	   never a hue, so no tier reads as a warning. Built from --ink and --bg, so each theme takes it from
+	   its own two. The first three carry --bg text, the rest --ink, each pair 4.5:1 or better in both
+	   themes; the label carries the tier number, so the shade is never the only channel. */
+	--tier-1: var(--ink);
+	--tier-2: color-mix(in srgb, var(--ink) 76%, var(--bg));
+	--tier-3: color-mix(in srgb, var(--ink) 62%, var(--bg));
+	--tier-4: color-mix(in srgb, var(--ink) 38%, var(--bg));
+	--tier-5: color-mix(in srgb, var(--ink) 28%, var(--bg));
+	--tier-6: color-mix(in srgb, var(--ink) 20%, var(--bg));
+	--tier-7: color-mix(in srgb, var(--ink) 14%, var(--bg));
+	--tier-ink-1: var(--bg);
+	--tier-ink-2: var(--bg);
+	--tier-ink-3: var(--bg);
+	--tier-ink-4: var(--ink);
+	--tier-ink-5: var(--ink);
+	--tier-ink-6: var(--ink);
+	--tier-ink-7: var(--ink);
 	--tier-wash: 9%; /* how much of the tier hue tints its band */
 
 	/* The scoreboard: a lit board on black in both themes. In Commish it carries the draft room's
@@ -168,14 +176,6 @@
 		--loss-ink: #ff8f9f;
 		--status-ir-bg: #ff8f9f;
 		--status-ir-ink: #1a0a0d;
-		--tier-1: #cf3350;
-		--tier-2: #c0338a;
-		--tier-3: #8d52cc;
-		--tier-4: #4b6ad6;
-		--tier-5: #12789f;
-		--tier-6: #0e8070;
-		--tier-7: #6c6b78;
-		--tier-ink: #ffffff;
 		--tier-wash: 16%;
 		--scoreboard: #000000;
 		--scoreboard-2: #15120f;
@@ -216,14 +216,6 @@
 	--loss-ink: #ff8f9f;
 	--status-ir-bg: #ff8f9f;
 	--status-ir-ink: #1a0a0d;
-	--tier-1: #cf3350;
-	--tier-2: #c0338a;
-	--tier-3: #8d52cc;
-	--tier-4: #4b6ad6;
-	--tier-5: #12789f;
-	--tier-6: #0e8070;
-	--tier-7: #6c6b78;
-	--tier-ink: #ffffff;
 	--tier-wash: 16%;
 	--scoreboard: #000000;
 	--scoreboard-2: #15120f;

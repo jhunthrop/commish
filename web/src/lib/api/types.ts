@@ -3305,6 +3305,8 @@ export interface components {
 			played: number;
 			/** @description while the game is playing, where the side's starters stand, never a zero: "3 to play" while any starter with a game is still to come (an out starter whose game is still to come counts), "2 playing" once none is and some are in play; null once every starter is final, on bye or out of a game under way, before kickoff, or absent from an older answer */
 			to_play?: string | null;
+			/** @description the side's starters whose own game has kicked off and is not final at the read's clock (gameStateAt), an out starter not counted: 0 before kickoff, between games (a Thursday starter final, Sunday's still to come) and once every starter is final; absent from an older answer, which reads as none in play */
+			in_play?: number;
 			/**
 			 * Format: double
 			 * @description the side's projected final once any starter of the game has kicked off: points (the platform's score so far), plus for each starter in play the rest of his week projection (max(0, Proj - his points so far), nothing where the platform gives no player's points), plus the week projection of each starter still to play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, or absent from an older answer
