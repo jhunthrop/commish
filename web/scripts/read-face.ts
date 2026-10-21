@@ -27,6 +27,8 @@ interface Faces {
 	bodySize: number;
 	/** Characters on each rendered line of the read, in order. */
 	lines: number[];
+	/** The UI face is loaded at the read's size, so the read renders in it and not a fallback. */
+	loaded: boolean;
 }
 
 export interface ReadFace {
@@ -51,6 +53,11 @@ export async function readFace(page: Page, root: string): Promise<ReadFace> {
 			document.body.appendChild(probe);
 			const bodySize = parseFloat(getComputedStyle(probe).fontSize);
 			probe.remove();
+			// A face of the family has loaded. document.fonts.check answered false on every shot,
+			// read set in Outfit or not, so the check reads the loaded faces themselves.
+			const loaded = [...document.fonts].some(
+				(f) => f.family.replace(/["']/g, '') === 'Outfit' && f.status === 'loaded'
+			);
 			const at = document.querySelector(scope);
 			const caption = at?.querySelector('.tile .cap') ?? null;
 			// Each character's line by its box's top, counted per line.
@@ -72,6 +79,7 @@ export async function readFace(page: Page, root: string): Promise<ReadFace> {
 				}
 			}
 			return {
+				loaded,
 				lines,
 				body: face(at?.querySelector('.prose.week p:not(.byline)') ?? null),
 				byline: face(at?.querySelector('.prose.week p.byline') ?? null),
@@ -102,6 +110,8 @@ export async function readFace(page: Page, root: string): Promise<ReadFace> {
 		faults.push(
 			`the byline is ${String(faces.byline.size)} px, the captions ${String(faces.caption)} px`
 		);
+	if (faces.body !== null && !faces.loaded)
+		faults.push('the UI face is not loaded: the read renders in a fallback');
 	const longest = Math.max(0, ...faces.lines);
 	if (longest > MOST_PER_LINE)
 		faults.push(

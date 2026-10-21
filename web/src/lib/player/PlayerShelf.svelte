@@ -163,7 +163,13 @@
 			<section class="read">
 				<h3><Label>{CARD.ourRead}</Label></h3>
 				{#if read}
-					<Capsule body={read.body} byline={read.caption} week pulls={[]} />
+					<Capsule
+						body={read.body}
+						byline={read.caption}
+						week
+						unwritten={CARD.readNotYet}
+						pulls={[]}
+					/>
 				{:else}
 					<p class="unwritten">{CARD.readNotYet}</p>
 				{/if}

@@ -334,7 +334,13 @@
 						class="week-read"
 						aria-label={page.weekRead ? weekReadLabel(page.weekRead) : null}
 					>
-						<Capsule body={weekRead.body} byline={weekRead.caption} week pulls={[]} />
+						<Capsule
+							body={weekRead.body}
+							byline={weekRead.caption}
+							week
+							unwritten={CARD.readNotYet}
+							pulls={[]}
+						/>
 					</section>
 				{/if}
 				<!-- In season the read is one paragraph, the week's (Lane 100, B44): the season read and its

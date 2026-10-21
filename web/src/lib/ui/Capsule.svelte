@@ -12,13 +12,15 @@
 		/** The week's read in season (Lane 126): a box-score paragraph in the UI face, its byline a
 		 * plain caption. Else the season read, in the reading serif. */
 		week?: boolean;
+		/** The line a withheld read (no body) shows at the read's size, its byline under it. */
+		unwritten?: string | null;
 		/** Numbers set beside the prose after the first paragraph, each naming its basis where it has
 		 * one (run/read-figures.ts): the prose's own, which the run checks appear in it word for word,
 		 * and in season the rest of it from the run. */
 		pulls: readonly ReadFigure[];
 	}
 
-	let { body, byline = null, week = false, pulls }: Props = $props();
+	let { body, byline = null, week = false, unwritten = null, pulls }: Props = $props();
 
 	const paragraphs = $derived(
 		(body ?? '')
@@ -35,7 +37,10 @@
 <!-- Borrowed from Scout, the season read only: the capsule is writing, so it is set in a reading
      serif. In season the week's read sits among the box score's tiles, so it takes the UI face. -->
 <div class="prose" class:week>
-	{#if byline}<p class="byline">{byline}</p>{/if}
+	{#if body === null && unwritten}
+		<p class="unwritten">{unwritten}</p>
+		{#if byline}<p class="byline under">{byline}</p>{/if}
+	{:else if byline}<p class="byline">{byline}</p>{/if}
 	{#if lead}<p class="lead">{lead}</p>{/if}
 	{#if pulls.length > 0}
 		<figure class="pulls">
@@ -65,7 +70,7 @@
 		margin: 0 0 var(--s-3);
 		font-style: italic;
 		font-size: var(--t-sm);
-		line-height: 1.4;
+		line-height: var(--lh-byline);
 		color: var(--ink-3);
 	}
 
@@ -89,6 +94,16 @@
 		font-style: normal;
 		font-size: var(--t-byline);
 		line-height: var(--lh-byline);
+	}
+
+	/* A withheld read: the not-written-yet line at the read's size, the run's words for why under it. */
+	.prose p.unwritten {
+		margin: 0 0 var(--s-1);
+		color: var(--ink-2);
+	}
+
+	.prose p.byline.under {
+		margin: 0;
 	}
 
 	p {

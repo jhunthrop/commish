@@ -187,7 +187,7 @@ interface Card {
 }
 
 async function read(page: Page): Promise<Card> {
-	return page.evaluate(() => {
+	return page.evaluate((whyRest) => {
 		const tiles = [...document.querySelectorAll('main .card .tile')];
 		const labels = tiles.map((t) => t.querySelector('.lb')?.textContent.trim() ?? '');
 		const pick = (sel: string): Record<string, string> =>
@@ -212,9 +212,12 @@ async function read(page: Page): Promise<Card> {
 				(el as HTMLElement).innerText.trim()
 			),
 			readText: document.querySelector<HTMLElement>('main .read')?.innerText ?? '',
-			// In season the tier box is titled by why his rest-of-season figure sits there (Lane 100, B30),
-			// and the read is the week's alone: the season read and its stamp are the draft's.
-			underway: document.querySelector('main .side h3.why') !== null,
+			// In season the tier box is headed by why his rest-of-season figure sits there (CARD.whyRest,
+			// Lane 100, B30), and the read is the week's alone: the season read and its stamp are the
+			// draft's.
+			underway: [...document.querySelectorAll('main h3')].some(
+				(h) => h.textContent.trim().toLowerCase() === whyRest.toLowerCase()
+			),
 			basis: basis.map((p) => p.innerText),
 			basisLines: lines,
 			nextRow: document.querySelector<HTMLElement>('main .season tr.next')?.innerText ?? '',
@@ -229,7 +232,7 @@ async function read(page: Page): Promise<Card> {
 			pinTop: pinned ? act.getBoundingClientRect().top : null,
 			tilesBottom: firstTiles ? firstTiles.getBoundingClientRect().top + 90 : null
 		};
-	});
+	}, CARD.whyRest);
 }
 
 async function openCompare(page: Page, name: string): Promise<void> {
