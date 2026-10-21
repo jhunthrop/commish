@@ -2677,6 +2677,30 @@ type LeaguePlayer struct {
 	Team           string `json:"team"`
 }
 
+// LeagueRanking the week's weekly record in the member's own league (Lane 114), present only where the benchmark is espn: our set order and ESPN's own projection, each graded on every rostered player at quarterback, running back, receiver and tight end (none on a bye, out, suspended or on injured reserve at the read before our order was set) by what he scored as the league scores; absent from an answer before Lane 114
+type LeagueRanking struct {
+	Espn LeagueRankingScore `json:"espn"`
+	Ours LeagueRankingScore `json:"ours"`
+
+	// Players the rostered players graded
+	Players int `json:"players"`
+}
+
+// LeagueRankingScore defines model for LeagueRankingScore.
+type LeagueRankingScore struct {
+	// Agreement order matched: Spearman's rank correlation with the week's points, to two places, null when the week cannot support one
+	Agreement *float64 `json:"agreement"`
+
+	// PlacesOff the mean distance in places between the order and the finish, to the tenth, null with no players
+	PlacesOff *float64 `json:"places_off"`
+
+	// Starters the starters the order called right in the league's lineup across its teams
+	Starters int `json:"starters"`
+
+	// StartersOf the starters the finish fills there
+	StartersOf int `json:"starters_of"`
+}
+
 // LeagueRecord our record in the member's own league (Lane 93)
 type LeagueRecord struct {
 	// Host the host a league runs on, named as a mechanism
@@ -2702,6 +2726,9 @@ type LeagueRecordWeek struct {
 
 	// Ours our picks' points, to the tenth, as the league scores
 	Ours float64 `json:"ours"`
+
+	// Ranking the week's weekly record in the member's own league (Lane 114), present only where the benchmark is espn: our set order and ESPN's own projection, each graded on every rostered player at quarterback, running back, receiver and tight end (none on a bye, out, suspended or on injured reserve at the read before our order was set) by what he scored as the league scores; absent from an answer before Lane 114
+	Ranking *LeagueRanking `json:"ranking,omitempty"`
 
 	// Theirs the benchmark lineup's points, to the tenth, as the league scores
 	Theirs float64 `json:"theirs"`

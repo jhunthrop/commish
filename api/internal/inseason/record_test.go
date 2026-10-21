@@ -60,3 +60,39 @@ func TestLeagueRecordWithNoGradingAnswersNoWeeks(t *testing.T) {
 		}
 	}
 }
+
+// Lane 114: a week graded against ESPN answers its weekly record in the
+// league, ours and ESPN's measures; a week without one answers none, so an
+// answer reads as it did before.
+func TestLeagueRecordAnswersTheWeeksRankingInTheLeague(t *testing.T) {
+	f := newFixture(t)
+	s := fixtureService(t, f.league, f.data, &fakeHolds{})
+	rho, off := 0.62, 19.4
+	ranking := &leaguerecord.Ranking{Players: 168, Ours: leaguerecord.Score{Agreement: &rho, PlacesOff: &off, Starters: 71, StartersOf: 108},
+		ESPN: leaguerecord.Score{Starters: 69, StartersOf: 108}}
+	s.Records = &fakeRecords{weeks: []leaguerecord.Week{
+		{Week: 7, Benchmark: leaguerecord.BenchmarkESPN, Ours: 97, Theirs: 70, Margin: 27, Ranking: ranking},
+		{Week: 8, Benchmark: leaguerecord.BenchmarkPublished, Ours: 90, Theirs: 91, Margin: -1},
+	}}
+	_, env := serve(t, s, leaguePath+"record")
+	var got apitypes.LeagueRecord
+	if err := json.Unmarshal(env.Data, &got); err != nil || len(got.Weeks) != 2 {
+		t.Fatalf("%+v %v", got, err)
+	}
+	r := got.Weeks[0].Ranking
+	if r == nil || r.Players != 168 || *r.Ours.Agreement != rho || r.Espn.Agreement != nil || r.Espn.Starters != 69 {
+		t.Errorf("ranking %+v", r)
+	}
+	if got.Weeks[1].Ranking != nil {
+		t.Errorf("a published-benchmark week answered a ranking %+v", got.Weeks[1].Ranking)
+	}
+	var raw struct {
+		Weeks []map[string]any `json:"weeks"`
+	}
+	if err := json.Unmarshal(env.Data, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := raw.Weeks[1]["ranking"]; ok {
+		t.Error("a week with no ranking carried the field")
+	}
+}

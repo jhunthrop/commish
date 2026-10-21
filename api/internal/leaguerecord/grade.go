@@ -31,6 +31,10 @@ type Week struct {
 	Theirs    float64
 	// Margin is ours less theirs, to the tenth, so the page prints it as given.
 	Margin float64
+	// Ranking is the week's weekly record in the league (Lane 114): our
+	// order and ESPN's projection graded on every rostered player, as the
+	// league scores; nil where the benchmark is not ESPN's.
+	Ranking *Ranking
 }
 
 // Grade is every week the register has graded whose roster was read
@@ -76,13 +80,25 @@ func weekOf(order boards.SetOrder, rows []Row, team int, shape leaguesync.Shape,
 		}
 	}
 	ours, theirs := tenth.Round(Scored(ourPicks, actual)), tenth.Round(Scored(theirPicks, actual))
-	return Week{Week: order.Week, Benchmark: benchmark, Ours: ours, Theirs: theirs, Margin: tenth.Round(ours - theirs)}, true
+	out := Week{Week: order.Week, Benchmark: benchmark, Ours: ours, Theirs: theirs, Margin: tenth.Round(ours - theirs)}
+	if benchmark == BenchmarkESPN {
+		league, _ := leagueAt(rows, order.Week, order.SetAt)
+		var graded []Candidate
+		for _, c := range candidates(league, order.Week, byes) {
+			if carried[c.ID] {
+				graded = append(graded, c)
+			}
+		}
+		ranking := rank(graded, order.Rank, projectedOf(league), actual, shape)
+		out.Ranking = &ranking
+	}
+	return out, true
 }
 
-// rosterAt is the team's rows on the newest read of the week asked for
-// the week itself and taken at or before the order was set, with ESPN's
-// projection for each; false with no such read.
-func rosterAt(rows []Row, week, team int, setAt time.Time) ([]Row, map[string]float64, bool) {
+// leagueAt is every team's rows on the newest read of the week asked for
+// the week itself and taken at or before the order was set; false with no
+// such read.
+func leagueAt(rows []Row, week int, setAt time.Time) ([]Row, bool) {
 	var newest time.Time
 	for _, r := range rows {
 		if r.Week == week && r.ReadPeriod == week && !r.ReadAt.After(setAt) && r.ReadAt.After(newest) {
@@ -90,19 +106,43 @@ func rosterAt(rows []Row, week, team int, setAt time.Time) ([]Row, map[string]fl
 		}
 	}
 	if newest.IsZero() {
+		return nil, false
+	}
+	var out []Row
+	for _, r := range rows {
+		if r.Week == week && r.ReadAt.Equal(newest) {
+			out = append(out, r)
+		}
+	}
+	return out, true
+}
+
+// projectedOf is ESPN's projection for each player of the rows that carry one.
+func projectedOf(rows []Row) map[string]float64 {
+	out := map[string]float64{}
+	for _, r := range rows {
+		if r.Projected != nil {
+			out[r.PlayerID] = *r.Projected
+		}
+	}
+	return out
+}
+
+// rosterAt is the team's rows on the newest read of the week asked for
+// the week itself and taken at or before the order was set, with ESPN's
+// projection for each; false with no such read.
+func rosterAt(rows []Row, week, team int, setAt time.Time) ([]Row, map[string]float64, bool) {
+	league, ok := leagueAt(rows, week, setAt)
+	if !ok {
 		return nil, nil, false
 	}
 	var roster []Row
-	projected := map[string]float64{}
-	for _, r := range rows {
-		if r.Week == week && r.ReadAt.Equal(newest) && r.TeamID == team {
+	for _, r := range league {
+		if r.TeamID == team {
 			roster = append(roster, r)
-			if r.Projected != nil {
-				projected[r.PlayerID] = *r.Projected
-			}
 		}
 	}
-	return roster, projected, len(roster) > 0
+	return roster, projectedOf(roster), len(roster) > 0
 }
 
 // pointsAfter is every player's points for the week on the newest read of
