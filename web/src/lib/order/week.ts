@@ -17,7 +17,7 @@ import {
 	positionWord,
 	type BoxRow
 } from '#lib/league/box/box.ts';
-import { kickedOffPartAt } from '#lib/league/box/basis.ts';
+import { finalsPartAt } from '#lib/league/box/basis.ts';
 import { lineState } from '#lib/league/box/kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { WeekOrderAdvice, WeekOrderRow } from './api.ts';
@@ -172,28 +172,10 @@ function orderSentence(advice: WeekOrderAdvice, reader: WeekReader, zone: string
 	return `${capital(many)} are in order of ${BOX.proj}, this week's published projection ${how}${when}, as we have no ${one} model of our own.`;
 }
 
-/** The rules Avg and Last leave out, said as a count with the way to the league's Settings, never a
- * list that grows with the league (the 66t ruling): null when none. */
-export interface RulesLeftOut {
-	text: string;
-	/** "Which two", to the league's Settings; null for a visitor, whose board has no settings page. */
-	link: { words: string; href: string } | null;
-}
-
-export function rulesLeftOut(
-	advice: Pick<WeekOrderAdvice, 'basis_note' | 'basis_note_link'>,
-	reader: WeekReader,
-	settingsHref: (league: string) => string
-): RulesLeftOut | null {
-	// The API's one sentence (inseason words.go uncountedOf), the reader's form its own.
-	if (advice.basis_note === '') return null;
-	return {
-		text: advice.basis_note,
-		link:
-			reader.league === null || advice.basis_note_link === ''
-				? null
-				: { words: advice.basis_note_link, href: settingsHref(reader.league.id) }
-	};
+/** The rules Avg and Last leave out, named inline in the API's one sentence (inseason words.go
+ * uncountedOf; Lane 111, B33), the reader's form its own: null when none. */
+export function rulesLeftOut(advice: Pick<WeekOrderAdvice, 'basis_note'>): string | null {
+	return advice.basis_note === '' ? null : advice.basis_note;
 }
 
 /** A row's section at the page's clock: a bye as the API says, else to play or kicked off by
@@ -239,9 +221,11 @@ export function weekBasis(
 		part(gameSentence(advice, zone, now), true),
 		// The section head says Kicked off on the phone too; when Final lands is said at a desk.
 		part(
-			kickedOffPartAt(
+			finalsPartAt(
 				advice.rows.map((row) => row.line),
-				now
+				now,
+				league?.host ?? null,
+				'pool'
 			),
 			false
 		),

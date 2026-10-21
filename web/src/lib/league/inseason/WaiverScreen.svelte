@@ -86,8 +86,6 @@
 		copy?: (text: string) => Promise<void>;
 		/** Opens the platform's page in a new tab. */
 		openPage?: (href: string) => void;
-		/** The league's Settings at the scoring rules our stats lack. */
-		rulesHref: string;
 		/** The instant the answer was read, in ms: the page's clock the rows and the basis draw at. */
 		now: number;
 	}
@@ -101,7 +99,6 @@
 		reread,
 		copy = (text) => navigator.clipboard.writeText(text),
 		openPage = (href) => void window.open(href, '_blank', 'noopener'),
-		rulesHref,
 		now: pageNow
 	}: Props = $props();
 
@@ -323,7 +320,6 @@
 		waiverBasis(
 			{ ...shown, pickups: advice.pickups },
 			lines,
-			rulesHref,
 			{ zone: memberZone(), zoned: false },
 			now
 		)

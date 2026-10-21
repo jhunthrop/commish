@@ -313,7 +313,6 @@ const advice: Pick<
 	| 'basis'
 	| 'per_game_basis'
 	| 'basis_note'
-	| 'basis_note_link'
 	| 'projection_read_at'
 	| 'projection_scoring'
 	| 'player_points'
@@ -321,8 +320,7 @@ const advice: Pick<
 	basis:
 		"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is a lineup's change in points over replacement a week, weeks 6 to 17.",
 	per_game_basis: "A game is our order's points a game.",
-	basis_note: 'Avg and Last miss five of your rules our stats lack.',
-	basis_note_link: 'Which five',
+	basis_note: 'Our stats omit two-point, missed kick, fumble recovery and safety.',
 	projection_read_at: '2026-10-17T02:00:00.000Z',
 	projection_scoring: { format: 'ppr', league_own: false },
 	player_points: true
@@ -330,7 +328,7 @@ const advice: Pick<
 const TRADE_CLOCK = { zone: 'America/Chicago', zoned: false };
 /** The fixture's projection read, before every game in the lines. */
 const NOW_66T = Date.parse('2026-10-17T02:00:00.000Z');
-const TRADE_LINKS = { rules: '/league/1#uncounted', record: '/record' };
+const TRADE_LINKS = { record: '/record' };
 const PROJ_SAID =
 	"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm.";
 const WEEK_ROOM =
@@ -402,11 +400,11 @@ void test("a trade opened or the builder open adds the players' columns, each on
 	);
 	assert.equal(
 		basisText(parts),
-		`${advice.basis} ${advice.per_game_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. ${advice.basis_note} Which five. ${WEEK_ROOM} How the order has done`
+		`${advice.basis} ${advice.per_game_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. ${advice.basis_note} ${WEEK_ROOM} How the order has done`
 	);
 	assert.deepEqual(
 		parts.filter((p) => p.href !== undefined).map((p) => p.href),
-		['/league/1#uncounted', '/record']
+		['/record']
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),

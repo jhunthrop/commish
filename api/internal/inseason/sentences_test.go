@@ -18,9 +18,9 @@ func pw(v float64) *float64 { return &v }
 
 func TestChangeSentences(t *testing.T) {
 	white := Line{Name: "Rachaad White", Position: draft.RB, Rank: 14, PerWeek: pw(3.1),
-		Facts: Facts{LastGames: []GamePoints{{5, 18.4}, {4, 11.2}}}}
+		Facts: Facts{LastGames: []GamePoints{{Week: 5, Points: 18.4}, {Week: 4, Points: 11.2}}}}
 	bigsby := Line{Name: "Tank Bigsby", Position: draft.RB, Rank: 31, PerWeek: pw(0.4),
-		Facts: Facts{LastGames: []GamePoints{{5, 6.0}, {4, 3.1}}}}
+		Facts: Facts{LastGames: []GamePoints{{Week: 5, Points: 6.0}, {Week: 4, Points: 3.1}}}}
 	cases := []struct {
 		name string
 		host *Line
@@ -49,8 +49,8 @@ func TestChangeSentences(t *testing.T) {
 		{"an empty spot", nil, Line{Name: "Rachaad White"}, "Your lineup has nobody in this spot, so Rachaad White starts."},
 		// M1: the fact under a change never argues against it.
 		{"his last games trail the player he replaces: the order alone",
-			&Line{Name: "Aaron Rodgers", Position: draft.QB, Rank: 12, Facts: Facts{LastGames: []GamePoints{{5, 25.0}, {4, 25.0}, {3, 26.7}}}},
-			Line{Name: "Patrick Mahomes", Position: draft.QB, Rank: 3, Facts: Facts{LastGames: []GamePoints{{5, 19.0}, {4, 18.9}, {3, 32.0}}}},
+			&Line{Name: "Aaron Rodgers", Position: draft.QB, Rank: 12, Facts: Facts{LastGames: []GamePoints{{Week: 5, Points: 25.0}, {Week: 4, Points: 25.0}, {Week: 3, Points: 26.7}}}},
+			Line{Name: "Patrick Mahomes", Position: draft.QB, Rank: 3, Facts: Facts{LastGames: []GamePoints{{Week: 5, Points: 19.0}, {Week: 4, Points: 18.9}, {Week: 3, Points: 32.0}}}},
 			"Mahomes is QB3 in our preseason order, Rodgers QB12."},
 		{"a defense that allows few points is never the reason to start against it", &bigsby, Line{Name: "Rachaad White", Position: draft.RB, Rank: 14,
 			Facts: Facts{Opponent: "BUF", Allowed: &Allowed{PointsAGame: 14.1, Rank: 4, Of: 32, Position: draft.RB}}},
@@ -174,8 +174,8 @@ func TestCopyGuard(t *testing.T) {
 			hosts = append(hosts, &Line{Name: "Tank Bigsby", Position: draft.RB, Facts: Facts{Designation: &Designation{Status: status, AsOf: thursday}}})
 		}
 		ours := []Line{
-			{Name: "Rachaad White", Position: draft.RB, Rank: 14, PerWeek: pw(2), Facts: Facts{LastGames: []GamePoints{{5, 18.4}, {4, 11.2}}}},
-			{Name: "Rachaad White", Position: draft.RB, Rank: 14, Facts: Facts{LastGames: []GamePoints{{5, 18.4}},
+			{Name: "Rachaad White", Position: draft.RB, Rank: 14, PerWeek: pw(2), Facts: Facts{LastGames: []GamePoints{{Week: 5, Points: 18.4}, {Week: 4, Points: 11.2}}}},
+			{Name: "Rachaad White", Position: draft.RB, Rank: 14, Facts: Facts{LastGames: []GamePoints{{Week: 5, Points: 18.4}},
 				Designation: &Designation{Status: boards.StatusQuestionable, AsOf: thursday}}},
 			{Name: "Rachaad White", Position: draft.RB, Facts: Facts{Opponent: "NYG", Allowed: &Allowed{3, 2, 32, draft.RB}}},
 		}

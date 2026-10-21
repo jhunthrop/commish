@@ -321,6 +321,24 @@ func (e Feature) Valid() bool {
 	}
 }
 
+// Defines values for GamePointsSource.
+const (
+	GamePointsSourcePlatform GamePointsSource = "platform"
+	GamePointsSourceStats    GamePointsSource = "stats"
+)
+
+// Valid indicates whether the value is a known member of the GamePointsSource enum.
+func (e GamePointsSource) Valid() bool {
+	switch e {
+	case GamePointsSourcePlatform:
+		return true
+	case GamePointsSourceStats:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GameRoofKind.
 const (
 	GameRoofKindDome        GameRoofKind = "dome"
@@ -2246,8 +2264,14 @@ type Feature string
 type GamePoints struct {
 	// Points his points that game under the league's scoring
 	Points float64 `json:"points"`
-	Week   int     `json:"week"`
+
+	// Source where the points come from (Lane 111, B23): our stats, or the league platform's points for him that week, read with the league, while the game is final and our stats for it have not landed (they replace it once they do). Absent from an older answer, which is our stats
+	Source *GamePointsSource `json:"source,omitempty"`
+	Week   int               `json:"week"`
 }
+
+// GamePointsSource where the points come from (Lane 111, B23): our stats, or the league platform's points for him that week, read with the league, while the game is final and our stats for it have not landed (they replace it once they do). Absent from an older answer, which is our stats
+type GamePointsSource string
 
 // GameRoof the venue as the stadium table confirms it: a dome takes no forecast, a venue abroad no weather term; null when the venue is not confirmed
 type GameRoof struct {
@@ -2940,10 +2964,10 @@ type LineupAdvice struct {
 	// Basis the honesty line: the lineup starts the highest week_projection at each slot after this week's designations and byes, the rest-of-season order breaking ties and standing in where a player has none
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
-	// BasisNoteLink the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
+	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
 	BasisNoteLink string `json:"basis_note_link"`
 
 	// Bench everyone else on the active roster, by the same keys (injured reserve and taxi spots left out)
@@ -3347,10 +3371,10 @@ type OrderAdvice struct {
 	// Basis what the order and its two figures are, said once under the rows
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
-	// BasisNoteLink the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
+	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
 	BasisNoteLink string `json:"basis_note_link"`
 
 	// FromWeek the first week the rest-of-season order covers at the read's clock: the earliest with a game still to play (Lane 86; a club whose game of it kicked off counts from its next week), null on the preseason order
@@ -3507,13 +3531,16 @@ type PlayerLine struct {
 	// Facts one player's week; a fact we do not hold is null, never zero
 	Facts WeekFacts `json:"facts"`
 
+	// GamesPlayed the completed games season_avg is over, a final game the platform's points count included (facts.last_games source platform, Lane 111); absent before his first game and from an older answer
+	GamesPlayed *int `json:"games_played,omitempty"`
+
 	// Headshot his face from our player directory, null without one
 	Headshot *string `json:"headshot"`
 
 	// Held the drafter tags him Hold on a sheet
 	Held bool `json:"held"`
 
-	// LastPoints his points in his last completed game under the league's scoring, to the tenth; null before his first game
+	// LastPoints his points in his last completed game under the league's scoring, to the tenth, the platform's points for a final game our stats have not landed (facts.last_games source); null before his first game
 	LastPoints *float64 `json:"last_points"`
 
 	// OppRank this week's opponent's rank in points allowed a game to his position this season under the league's scoring, 1 allowed the fewest (facts.allowed_to_position.rank, of its .of); null on a bye or before the season ranks it
@@ -3532,7 +3559,7 @@ type PlayerLine struct {
 	// RestOfSeasonPerGame his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club had still to play at the run (the games not yet kicked off, from the board's first week through week 17, byes out; the same as his rest-of-season points now over his club's games left now), as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
 	RestOfSeasonPerGame *float64 `json:"rest_of_season_per_game"`
 
-	// SeasonAvg his points a game over every completed game this season under the league's scoring, to the tenth; null before his first game
+	// SeasonAvg his points a game over every completed game this season under the league's scoring, to the tenth, a final game our stats have not landed counted on the platform's points (facts.last_games source); null before his first game
 	SeasonAvg *float64 `json:"season_avg"`
 
 	// Slug his page on the site (/players/{slug}): set for a quarterback, running back, receiver or tight end our order ranks whose name no other player in our directory shares, null otherwise (a kicker or defense has no page) (a shared name's page is named by the run, which the API does not read)
@@ -4210,10 +4237,10 @@ type TradeAdvice struct {
 	// Basis which trades are listed (a trade sending out the top player at his position in our order only when it gains the drafter's lineup 1.0 a week or more or fills an empty spot, Lane 103) and who decides
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
-	// BasisNoteLink the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
+	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
 	BasisNoteLink string `json:"basis_note_link"`
 
 	// CheckBasis the trade builder's own line under its scoreboard, shown before its first answer (TradeCheck.basis says the same)
@@ -4267,10 +4294,10 @@ type TradeCheck struct {
 	// Basis the honesty line beside the answer
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
-	// BasisNoteLink the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
+	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
 	BasisNoteLink string     `json:"basis_note_link"`
 	Fills         TradeFills `json:"fills"`
 
@@ -4415,10 +4442,10 @@ type WaiverAdvice struct {
 	// Basis the pickup rule, the basis's first line
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
-	// BasisNoteLink the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
+	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
 	BasisNoteLink string `json:"basis_note_link"`
 
 	// ForWeek the week the page addresses (Lane 95): week, or the week after once every starter of the member's with a game has kicked off or is final; the rows' facts, Proj and pickups are that week's; absent from an older answer
@@ -4678,10 +4705,10 @@ type WeekLineup struct {
 
 // WeekOrderAdvice defines model for WeekOrderAdvice.
 type WeekOrderAdvice struct {
-	// BasisNote the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, counted ("Avg and Last miss two of your rules our stats lack."; a reader with no league, "of the PPR rules"), empty when none
+	// BasisNote the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, named ("Our stats omit fumble recovery and safety.", the same for a reader with no league), empty when none
 	BasisNote string `json:"basis_note"`
 
-	// BasisNoteLink the words of basis_note's link to the league's Settings ("Which two"); empty with none or no league
+	// BasisNoteLink the words of the link to the league's Settings the web drew before Lane 111 ("Which two"), kept for that web through one deploy; the web no longer draws it. Empty with none or no league
 	BasisNoteLink string `json:"basis_note_link"`
 
 	// Moves the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league

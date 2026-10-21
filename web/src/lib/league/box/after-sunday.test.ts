@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import {
 	FIXTURE_MONDAY_CLOCK,
 	FIXTURE_MONDAY_NIGHT_CLOCK,
+	FIXTURE_STATS_CLOCK,
 	FIXTURE_TUESDAY_CLOCK
 } from '../../../../scripts/inseason-fixture/clock.ts';
 import { lateFinals, stamped } from '../../../../scripts/inseason-fixture/game-state.ts';
@@ -16,6 +17,7 @@ import {
 	WEEK_DONE_KICKED_OFF
 } from '../../../../scripts/inseason-fixture/sunday.ts';
 import { inTenths } from '../../../../scripts/inseason-fixture/tenths.ts';
+import { platformed, platformGames } from '../../../../scripts/inseason-fixture/platform-games.ts';
 import type { LeagueSync } from '../api.ts';
 import type {
 	LineupAdvice,
@@ -157,4 +159,46 @@ void test('the scoreboard and the Matchup print one figure for each side, its ro
 			assert.equal(bug?.points, team, `${clock} roster ${String(side.roster_id)}`);
 		}
 	}
+});
+
+void test("from Monday a Sunday starter's Avg, Last and GP count the platform's points (Lane 111, B23)", () => {
+	const before = [
+		...lineup.slots.flatMap((s) => (s.host ? [s.ours, s.host] : [s.ours])),
+		...lineup.bench
+	];
+	for (const clock of [FIXTURE_MONDAY_CLOCK, FIXTURE_TUESDAY_CLOCK]) {
+		const week = at(clock);
+		const shown = platformed(week.lineup, platformGames(sync.host, week, Date.parse(clock)));
+		const counted = shown.slots
+			.map((s) => s.ours)
+			.filter((l) => l.facts.last_games[0]?.source === 'platform');
+		assert.ok(counted.length > 0, `${clock}: no starter counts his Sunday final`);
+		for (const line of counted) {
+			const was = before.find((b) => b.player.host_id === line.player.host_id);
+			const newest = line.facts.last_games[0];
+			assert.ok(was && newest, line.player.name);
+			assert.equal(newest.week, line.facts.week);
+			assert.equal(line.last_points, newest.points);
+			assert.equal(line.games_played, (was.games_played ?? was.facts.last_games.length) + 1);
+		}
+		// Sunday morning nothing is final, so nothing is counted.
+		const saturday = platformGames(sync.host, { lineup, matchup }, Date.parse(clock));
+		assert.equal(saturday.size, 0);
+	}
+});
+
+void test('from Wednesday evening our stats hold the week, so no row is the platform points', () => {
+	const week = at(FIXTURE_STATS_CLOCK);
+	const shown = platformed(
+		week.lineup,
+		platformGames(sync.host, week, Date.parse(FIXTURE_STATS_CLOCK))
+	);
+	const newest = shown.slots.flatMap((s) => s.ours.facts.last_games.slice(0, 1));
+	assert.ok(newest.some((g) => g.week === sync.week && g.source === 'stats'));
+	assert.ok(newest.every((g) => g.source !== 'platform'));
+});
+
+void test("a Yahoo league's lines carry no platform points, so none is counted", () => {
+	const week = at(FIXTURE_MONDAY_CLOCK);
+	assert.equal(platformGames('yahoo', week, Date.parse(FIXTURE_MONDAY_CLOCK)).size, 0);
 });

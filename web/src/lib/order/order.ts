@@ -9,11 +9,11 @@ import type { LeagueHost } from '#lib/league/api.ts';
 import {
 	anyKicked,
 	gamePart,
-	kickedOffPartAt,
+	finalsParts,
 	OPP_PART,
 	projPart,
 	said,
-	uncountedParts,
+	uncountedPart,
 	type BasisPart
 } from '#lib/league/box/basis.ts';
 import { BOX, boxRow, type BoxRow } from '#lib/league/box/box.ts';
@@ -158,7 +158,7 @@ export function rosterBasis(host: LeagueHost, readAt: string, zone: string = mem
  * page names no zone elsewhere, so each time says it. */
 export function orderBasis(
 	advice: OrderAdvice,
-	league: { host: LeagueHost; rulesHref: string } | null,
+	league: { host: LeagueHost } | null,
 	zone: string,
 	now: number
 ): BasisPart[] {
@@ -181,10 +181,10 @@ export function orderBasis(
 		...said(weekColumnPart(advice.week)),
 		...said(proj),
 		...said(OPP_PART),
-		...(league === null ? [] : uncountedParts(advice, league.rulesHref)),
+		...(league === null ? [] : uncountedPart(advice)),
 		...said(gamePart(lines, clock, now, 'read'), false),
 		// Said on the phone too: the board has the room (review finding 6); K/DST keeps it to a desk.
-		...said(kickedOffPartAt(lines, now)),
+		...finalsParts(lines, now, league?.host ?? null, 'pool', true),
 		...(league !== null && advice.read_at !== null
 			? said(rosterBasis(league.host, advice.read_at, zone), false)
 			: [])

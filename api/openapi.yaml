@@ -3536,6 +3536,13 @@ components:
       properties:
         week: { type: integer }
         points: { type: number, format: double, description: his points that game under the league's scoring }
+        source:
+          type: string
+          enum: [stats, platform]
+          description: >-
+            where the points come from (Lane 111, B23): our stats, or the league platform's points for him that week, read
+            with the league, while the game is final and our stats for it have not landed (they replace it once they
+            do). Absent from an older answer, which is our stats
     PointsAllowed:
       type: object
       required: [points_a_game, rank, of, position]
@@ -3730,12 +3737,21 @@ components:
           type: number
           format: double
           nullable: true
-          description: his points a game over every completed game this season under the league's scoring, to the tenth; null before his first game
+          description: >-
+            his points a game over every completed game this season under the league's scoring, to the tenth, a final game
+            our stats have not landed counted on the platform's points (facts.last_games source); null before his first game
         last_points:
           type: number
           format: double
           nullable: true
-          description: his points in his last completed game under the league's scoring, to the tenth; null before his first game
+          description: >-
+            his points in his last completed game under the league's scoring, to the tenth, the platform's points for a
+            final game our stats have not landed (facts.last_games source); null before his first game
+        games_played:
+          type: integer
+          description: >-
+            the completed games season_avg is over, a final game the platform's points count included (facts.last_games
+            source platform, Lane 111); absent before his first game and from an older answer
         held: { type: boolean, description: the drafter tags him Hold on a sheet, so he is never a drop or a trade give }
         facts: { $ref: "#/components/schemas/WeekFacts" }
     PlayerWeek:
@@ -3933,11 +3949,15 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last
-            miss four of your rules our stats lack."), empty when they miss none
+            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
+            omit two-point and safety.", both missed kicks said as one missed kick), empty when they
+            miss none
         basis_note_link:
           type: string
-          description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
+          description: >-
+            the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"),
+            kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no
+            basis_note
         uncounted_rules:
           type: array
           items: { type: string }
@@ -4410,11 +4430,15 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last
-            miss four of your rules our stats lack."), empty when they miss none
+            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
+            omit two-point and safety.", both missed kicks said as one missed kick), empty when they
+            miss none
         basis_note_link:
           type: string
-          description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
+          description: >-
+            the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"),
+            kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no
+            basis_note
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time, description: when the order was made }
         from_week:
@@ -4497,12 +4521,14 @@ components:
         basis_note:
           type: string
           description: >-
-            the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, counted ("Avg and
-            Last miss two of your rules our stats lack."; a reader with no league, "of the PPR rules"), empty when
-            none
+            the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, named ("Our stats
+            omit fumble recovery and safety.", the same for a reader with no league), empty
+            when none
         basis_note_link:
           type: string
-          description: the words of basis_note's link to the league's Settings ("Which two"); empty with none or no league
+          description: >-
+            the words of the link to the league's Settings the web drew before Lane 111 ("Which two"), kept for that web
+            through one deploy; the web no longer draws it. Empty with none or no league
         read_at:
           type: string
           format: date-time
@@ -4590,11 +4616,15 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last
-            miss four of your rules our stats lack."), empty when they miss none
+            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
+            omit two-point and safety.", both missed kicks said as one missed kick), empty when they
+            miss none
         basis_note_link:
           type: string
-          description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
+          description: >-
+            the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"),
+            kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no
+            basis_note
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time }
         read_at: { type: string, format: date-time }
@@ -4935,11 +4965,15 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last
-            miss four of your rules our stats lack."), empty when they miss none
+            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
+            omit two-point and safety.", both missed kicks said as one missed kick), empty when they
+            miss none
         basis_note_link:
           type: string
-          description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
+          description: >-
+            the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"),
+            kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no
+            basis_note
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time }
         read_at: { type: string, format: date-time }
@@ -5042,11 +5076,15 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last
-            miss four of your rules our stats lack."), empty when they miss none
+            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
+            omit two-point and safety.", both missed kicks said as one missed kick), empty when they
+            miss none
         basis_note_link:
           type: string
-          description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
+          description: >-
+            the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"),
+            kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no
+            basis_note
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time }
         read_at: { type: string, format: date-time }

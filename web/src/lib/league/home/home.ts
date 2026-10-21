@@ -70,7 +70,7 @@ export const HOME = {
 	hrAgo: 'hr ago',
 	final: KICKOFF.final,
 	/** The Settings card listing the scoring rules our stats lack (Lane 66t), which the in-season bases
-	 * count and link to. */
+	 * name (Lane 111). */
 	uncounted: 'Not in Avg and Last',
 	uncountedLine: "Our stats lack these rules of yours, so a player's Avg and Last leave them out."
 } as const;

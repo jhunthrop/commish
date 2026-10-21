@@ -1,7 +1,7 @@
 {
 	"week": 6,
 	"basis": "Our rest-of-season order from week 6. A position ranks by Projected through week 17, byes out, All by Over repl., his points less a free pickup's in your league. A game is our order's points a game.",
-	"basis_note": "Avg and Last miss five of your rules our stats lack.",
+	"basis_note": "Our stats omit two-point, missed kick, fumble recovery and safety.",
 	"basis_note_link": "Which five",
 	"rank_by": "points_over_replacement",
 	"moves": {

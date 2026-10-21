@@ -46,12 +46,11 @@ import {
 import { BUILDER_LINE, basisLines, basisReport, figureSentenceFaults } from './basis-lines.ts';
 import { chromeFaults, chromeLine, chromeMeasures } from './chrome-measures.ts';
 import { pageFaults, pageLine, pageMeasures } from './page-measures.ts';
-import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
 import { BOX } from '../src/lib/league/box/box.ts';
 import { AS_OF_KICKOFF } from '../src/lib/league/box/basis.ts';
 import { HEAD_BASIS, WAIVERS } from '../src/lib/league/box/waivers.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
-import { PER_GAME_BASIS, WAIVERS_BASIS } from './inseason-fixture/week.ts';
+import { LEAGUE_RULES_NOTE, PER_GAME_BASIS, WAIVERS_BASIS } from './inseason-fixture/week.ts';
 
 const THEMES = ['light', 'dark'] as const;
 const SHOT_WIDTHS = new Set([1440, 390]);
@@ -352,7 +351,7 @@ async function tradeFaults(page: Page, width: number): Promise<string[]> {
 	if (!seen.basis.startsWith(TRADE_BASIS_FIRST)) faults.push(`basis opens ${seen.basis}`);
 	const all = seen.basis;
 	// Closed, no player's columns are drawn, so the basis says none of them (Lane 66t).
-	if (all.includes(PER_GAME_BASIS) || /Opp rank|Which five/.test(all))
+	if ([PER_GAME_BASIS, 'Opp rank', LEAGUE_RULES_NOTE].some((said) => all.includes(said)))
 		faults.push(`the closed basis names an opened column: ${all}`);
 	const proj = (all.match(PROJ_BASIS) ?? []).length;
 	if (proj !== 1) faults.push(`projection basis said ${String(proj)} times`);
@@ -709,37 +708,23 @@ await platformPass(
 	'yahoo'
 );
 
-/** "Which five" lands on the league's Settings with the rules our stats lack in view (Lane 66t review
- * 4): from Waivers on a phone, the card under the top bar, five rules listed. */
+/** The rules our stats lack are named in the Waivers basis on a phone, with no link to follow (Lane
+ * 111, B33: the "Which five" link went with the count). */
 {
 	const ctx = await context('dark', PHONE.width);
 	const page = await ctx.newPage();
 	await page.setViewportSize(PHONE);
 	await page.goto(`${web}/league/${id}/waivers`, { waitUntil: 'networkidle' });
 	await ready(page, 'Open Sleeper waivers');
-	await page.locator('main [data-basis] a', { hasText: 'Which five' }).click();
-	const card = page.locator(`#${UNCOUNTED_ANCHOR}`);
-	await card.waitFor({ timeout: READY_TIMEOUT_MS });
-	await page.waitForTimeout(400);
-	const landed = await page.evaluate((anchor: string) => {
-		const box = document.getElementById(anchor)?.getBoundingClientRect();
-		const bar = document.querySelector('header.top')?.getBoundingClientRect();
+	const named = await page.evaluate((note: string) => {
+		const blocks = [...document.querySelectorAll('main [data-basis]')];
 		return {
-			url: location.pathname + location.search + location.hash,
-			top: box?.top ?? -1,
-			bottom: box?.bottom ?? -1,
-			barBottom: bar?.bottom ?? 0,
-			rules: document.querySelectorAll(`#${anchor} li`).length
+			said: blocks.some((b) => b.textContent.includes(note)),
+			links: blocks.flatMap((b) => [...b.querySelectorAll('a')].map((a) => a.textContent))
 		};
-	}, UNCOUNTED_ANCHOR);
-	if (
-		!landed.url.endsWith(`?view=settings#${UNCOUNTED_ANCHOR}`) ||
-		landed.top < landed.barBottom - 1 ||
-		landed.top > PHONE.height ||
-		landed.rules !== 5
-	)
-		missing.push(`Which five lands ${JSON.stringify(landed)}`);
-	await page.screenshot({ path: file('which-five-landed-dark-390') });
+	}, LEAGUE_RULES_NOTE);
+	if (!named.said || named.links.some((words) => words.startsWith('Which')))
+		missing.push(`the rules our stats lack on the phone Waivers: ${JSON.stringify(named)}`);
 	await ctx.close();
 }
 
@@ -825,7 +810,7 @@ for (const theme of THEMES) {
 			missing.push(`trades opened ${theme} ${String(width)} week "${opened.week}"`);
 		// Opened, the basis adds the players' columns, each once, and stays in its budget (Lane 66t).
 		const openedBasis = (await page.locator('main [data-basis]').first().textContent()) ?? '';
-		if (!openedBasis.includes(PER_GAME_BASIS) || !openedBasis.includes('Which five'))
+		if (!openedBasis.includes(PER_GAME_BASIS) || !openedBasis.includes(LEAGUE_RULES_NOTE))
 			missing.push(`trades opened ${theme} ${String(width)} basis ${openedBasis}`);
 		const openedReport = basisReport('trades opened', width, await basisLines(page));
 		for (const fault of await figureSentenceFaults(page))
@@ -1020,7 +1005,7 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 	// Beats and Open spot say themselves in their cells (Lane 66t); Gain is said once in the basis,
 	// A game once in the line under the heads (Lane 98, B35), never in both.
 	if (/Beats is|Open spot is/.test(seen.basis)) faults.push('basis explains Beats');
-	if (!seen.basis.includes('Which five')) faults.push(`basis ${seen.basis}`);
+	if (!seen.basis.includes(LEAGUE_RULES_NOTE)) faults.push(`basis ${seen.basis}`);
 	if (seen.basis.includes(PER_GAME_BASIS)) faults.push('the basis says A game again');
 	if (!seen.headsLine.includes(`${WAIVERS.rest} ${HEAD_BASIS.rest}`))
 		faults.push(`line under the heads "${seen.headsLine}"`);
@@ -1090,7 +1075,7 @@ async function lineupFaults(page: Page): Promise<string[]> {
 		faults.push('the evidence basis not said once');
 	if (!/Δ Proj is its change since \w{3} \d+:\d\d [ap]m\./.test(seen.text) && seen.wide)
 		faults.push('the change basis');
-	if (!seen.text.includes('Which five')) faults.push('no link to the rules our stats lack');
+	if (!seen.text.includes(LEAGUE_RULES_NOTE)) faults.push('the rules our stats lack are not named');
 	// The rule for our pick is said under the rows at a desk; the phone's strip says whose lineup it
 	// is (Lane 99 fix round 1).
 	if (seen.wide && !seen.text.includes('Our pick starts the highest Proj at each slot.'))

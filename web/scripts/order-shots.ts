@@ -30,6 +30,7 @@ import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { basisLines, basisReport } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
+import { LEAGUE_RULES_NOTE } from './inseason-fixture/week.ts';
 import { pageFaults, pageLine, pageMeasures } from './page-measures.ts';
 
 const web = process.argv[2] ?? 'http://localhost:4196';
@@ -326,7 +327,7 @@ async function tapFaults(): Promise<string[]> {
 	const rest = SCREENS[0];
 	await open(page, rest);
 	const basis = (await page.locator('main [data-basis]').textContent()) ?? '';
-	if (!basis.includes("less a free pickup's in your league.") || !basis.includes('Which five'))
+	if (!basis.includes("less a free pickup's in your league.") || !basis.includes(LEAGUE_RULES_NOTE))
 		said.push('rest: the basis names no league or no rules our stats lack');
 	const before = await tableState(page);
 	await page.getByRole('link', { name: 'QB', exact: true }).first().click();

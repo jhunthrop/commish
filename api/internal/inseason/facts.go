@@ -2,6 +2,7 @@ package inseason
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"time"
 
@@ -36,9 +37,21 @@ type Data struct {
 }
 
 // GamePoints is one completed game's points under the league's scoring.
+// Platform says they are the league platform's points for him that week
+// (PlatformWeek), our stats for the game not landed yet.
 type GamePoints struct {
+	Week     int
+	Points   float64
+	Platform bool
+}
+
+// PlatformWeek is the league platform's points for each player it scored
+// in one week, by board id, as the league's read carries them (Lane 111,
+// B23): a final game whose stats have not landed counts on them, so Avg,
+// Last and GP catch up to the weekend before our stats land Wednesday.
+type PlatformWeek struct {
 	Week   int
-	Points float64
+	Points map[string]float64
 }
 
 // Allowed is the points a defense has allowed to a position this season
@@ -90,7 +103,9 @@ type Facts struct {
 	LastGames []GamePoints
 	// PerGame is his points a game over every completed game this season.
 	PerGame *float64
-	Allowed *Allowed
+	// GamesPlayed is the completed games PerGame is over.
+	GamesPlayed int
+	Allowed     *Allowed
 	// Game is his club's game facts this week, empty without a game.
 	Game boards.GameFact
 }
@@ -147,6 +162,9 @@ type Season struct {
 	// 95, Turned): a week's designation listed before his club's last game
 	// is marked carried over, never dropped.
 	turned bool
+	// platform is the league platform's points for its week (WithPlatform),
+	// empty with no league.
+	platform PlatformWeek
 	// weekEnds is each week's end, for the return week (weekEndsOf).
 	weekEnds []weekEnd
 }
@@ -327,19 +345,54 @@ func (s *Season) For(p Player) Facts {
 			f.Bye = s.weekHasGames && s.scheduled[p.Team]
 		}
 	}
-	games := s.points[p.BoardID]
+	games := s.gamesOf(p)
 	if len(games) > 0 {
 		total := 0.0
 		for _, g := range games {
 			total += g.Points
 		}
 		perGame := roundTenth(total / float64(len(games)))
-		f.PerGame = &perGame
+		f.PerGame, f.GamesPlayed = &perGame, len(games)
 	}
 	for i := len(games) - 1; i >= 0 && len(f.LastGames) < lastGamesShown; i-- {
 		f.LastGames = append(f.LastGames, games[i])
 	}
 	return f
+}
+
+// WithPlatform is the Season with the league platform's points for its
+// week (Lane 111, B23), the one rule every league screen's Avg, Last and
+// GP read (gamesOf).
+func (s *Season) WithPlatform(p PlatformWeek) *Season {
+	out := *s
+	out.platform = p
+	return &out
+}
+
+// gamesOf is his completed games, oldest first: our stats' lines, and the
+// platform's points for its week where his club's game that week is final
+// at the clock (gameStateAt) and no line of ours holds it yet. The
+// platform scores a player who sat as 0, as it scores one who played and
+// scored nothing, so 0 is no game: our stats tell the two apart Wednesday.
+func (s *Season) gamesOf(p Player) []GamePoints {
+	games := s.points[p.BoardID]
+	week := s.platform.Week
+	pts, scored := s.platform.Points[p.BoardID]
+	if !scored || pts == 0 || p.BoardID == "" || p.Team == "" {
+		return games
+	}
+	g, scheduled := s.games[teamWeek{week, p.Team}]
+	if !scheduled || gameStateAt(g, s.now) != apitypes.GameStateFinal {
+		return games
+	}
+	for _, held := range games {
+		if held.Week == week {
+			return games
+		}
+	}
+	out := append(slices.Clone(games), GamePoints{Week: week, Points: pts, Platform: true})
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Week < out[j].Week })
+	return out
 }
 
 // Turned is the Season for the week after the one whose games the member's

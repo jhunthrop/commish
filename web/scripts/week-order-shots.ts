@@ -17,7 +17,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
-import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import {
 	FIXTURE_CLOCK_VARIABLE,
@@ -234,7 +233,7 @@ async function check(
 			rows: table?.querySelectorAll('tbody tr:not(.sec)').length ?? 0,
 			mine: table?.querySelectorAll('tbody tr.mine').length ?? 0,
 			status: document.querySelector('main .status')?.textContent.trim() ?? '',
-			rules: basis?.textContent.match(/miss (\w+) of [^.]+\./)?.[0] ?? '',
+			rules: basis?.textContent.match(/Our stats omit [^.]+\./)?.[0] ?? '',
 			rulesLink: basis?.querySelector('a')?.getAttribute('href') ?? '',
 			glued: /[a-z]\.[A-Z]/.test(basis?.textContent ?? ''),
 			host: [...document.querySelectorAll('main p, main td, main th, main a, main button')]
@@ -267,14 +266,14 @@ async function check(
 		if (!seen.status.includes('is not in yet')) said.push(`${at}: no status line`);
 	}
 	if (!seen.sections.includes('Bye in week 6')) said.push(`${at}: no bye section`);
-	// The fixture's league leaves out two rules (week-order.ts), said as a count, never a list.
-	const whose = screen.member ? 'your' : 'the PPR';
-	if (seen.rules !== `miss two of ${whose} rules our stats lack.`)
+	// The fixture's league leaves out two rules a tab (week-order-serve.ts), named inline (Lane 111,
+	// B33): the kickers' as one missed kick, the defenses' both.
+	const named = screen.path.endsWith('/k') ? 'missed kick' : 'fumble recovery and safety';
+	if (seen.rules !== `Our stats omit ${named}.`)
 		said.push(`${at}: the rules left out read "${seen.rules}"`);
 	if (seen.glued) said.push(`${at}: two basis sentences run together`);
-	// Settings at the list of the rules (tabs.ts leagueSettingsHref, Lane 66t).
-	if (screen.member !== seen.rulesLink.endsWith(`?view=settings#${UNCOUNTED_ANCHOR}`))
-		said.push(`${at}: the rules link is "${seen.rulesLink}"`);
+	// No link to follow: the rules are named where they are said.
+	if (seen.rulesLink !== '') said.push(`${at}: the basis links to "${seen.rulesLink}"`);
 	if (screen.member) {
 		if (width > ROSTER_FROM && !seen.heads.includes('Roster')) said.push(`${at}: no Roster head`);
 		// The member holds two defenses in the recorded league and no kicker.

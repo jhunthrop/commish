@@ -22,12 +22,12 @@ import { LINES, verbWords } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import {
 	gamePart,
-	kickedOffPartAt,
+	finalsParts,
 	OPP_PART,
 	projPart,
 	ptsPart,
 	said,
-	uncountedParts,
+	uncountedPart,
 	type BasisPart,
 	type Clock
 } from './basis.ts';
@@ -433,7 +433,6 @@ export function tradeBasis(
 		| 'basis'
 		| 'per_game_basis'
 		| 'basis_note'
-		| 'basis_note_link'
 		| 'projection_read_at'
 		| 'projection_scoring'
 		| 'player_points'
@@ -442,13 +441,13 @@ export function tradeBasis(
 	host: LeagueHost,
 	lines: readonly PlayerLine[],
 	opened: 'none' | 'trade' | 'builder',
-	hrefs: { rules: string; record: string },
+	hrefs: { record: string },
 	clock: Clock,
 	now: number
 ): BasisPart[] {
 	// The builder's boxes draw a defense; a trade never holds one (Lane 66g).
 	const defense = opened === 'builder' && lines.some((l) => l.player.position === 'DEF');
-	const waiting = kickedOffPartAt(lines, now);
+	const waiting = finalsParts(lines, now, host, 'rosters', true);
 	// Before the week's projection is read, the day it arrives in its place (Lane 95).
 	const arrives =
 		advice.week === undefined
@@ -465,7 +464,11 @@ export function tradeBasis(
 					readAt: advice.projection_read_at,
 					scoring: advice.projection_scoring,
 					defense,
-					league: true
+					league: true,
+					// A page turned past the platform's week names the week (Lane 111, B70).
+					...(advice.week === undefined
+						? {}
+						: { weeks: { week: advice.week, for_week: advice.for_week } })
 				},
 				clock
 			)
@@ -478,14 +481,14 @@ export function tradeBasis(
 					// The opened rows draw the Game cell's figures at a desk only (BoxLine phoneFacts).
 					...said(gamePart(lines, clock, now, 'full'), false),
 					...said(ptsPart(advice.player_points, host, 'rows'), false),
-					...uncountedParts(advice, hrefs.rules)
+					...uncountedPart(advice)
 				]
 			: [];
 	return [
 		...said(advice.basis),
 		...(opened === 'none' ? [] : said(advice.per_game_basis)),
 		...proj,
-		...said(waiting),
+		...waiting,
 		...players,
 		// The week's group is drawn only once its projection is read (weekProjected, TradeFinder).
 		...said(weekProjected(advice) ? WEEK_ROOM : ROOM_PART, false),

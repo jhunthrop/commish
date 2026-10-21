@@ -61,8 +61,6 @@
 		check: (trade: TradeCheckInput) => Promise<TradeCheck>;
 		/** Puts the offer on the clipboard. */
 		copy?: (text: string) => Promise<void>;
-		/** The league's Settings at the scoring rules our stats lack. */
-		rulesHref: string;
 		/** The instant the answer was read, in ms: the page's clock the rows and the basis draw at. */
 		now: number;
 	}
@@ -74,7 +72,6 @@
 		narrow,
 		check,
 		copy = (text) => navigator.clipboard.writeText(text),
-		rulesHref,
 		now: pageNow
 	}: Props = $props();
 
@@ -167,7 +164,7 @@
 			host,
 			lines,
 			building !== null ? 'builder' : anyOpen ? 'trade' : 'none',
-			{ rules: rulesHref, record: links.record() },
+			{ record: links.record() },
 			{ zone: memberZone(), zoned: false },
 			now
 		)

@@ -1,7 +1,7 @@
 {
 	"week": 6,
 	"basis": "We start the highest Proj at each slot after designations and byes, our order breaking ties.",
-	"basis_note": "Avg and Last miss five of your rules our stats lack.",
+	"basis_note": "Our stats omit two-point, missed kick, fumble recovery and safety.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",
 	"read_at": "2026-10-14T19:05:38.329Z",

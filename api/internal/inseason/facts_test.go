@@ -69,7 +69,7 @@ func TestWeekFacts(t *testing.T) {
 	if mia.Opponent != "NE" || mia.Home == nil || !*mia.Home || !mia.Played || !mia.Locked || mia.Bye {
 		t.Fatalf("Miami's back %v", mia)
 	}
-	if len(mia.LastGames) != 3 || mia.LastGames[0] != (GamePoints{3, 5}) || mia.LastGames[2] != (GamePoints{1, 20}) {
+	if len(mia.LastGames) != 3 || mia.LastGames[0] != (GamePoints{Week: 3, Points: 5}) || mia.LastGames[2] != (GamePoints{Week: 1, Points: 20}) {
 		t.Fatalf("last games %v, want newest first", mia.LastGames)
 	}
 	if mia.PerGame == nil || *mia.PerGame != 11.7 {
@@ -177,7 +177,7 @@ func TestMixedKickerWeeks(t *testing.T) {
 	}}
 	s := NewSeason(data, RulesOf(scoring.Standard()), 3, saturday)
 	k := s.For(Player{BoardID: "mia-k", Team: "MIA", Position: draft.K})
-	if len(k.LastGames) != 1 || k.LastGames[0] != (GamePoints{1, 9}) || k.PerGame == nil || *k.PerGame != 9 {
+	if len(k.LastGames) != 1 || k.LastGames[0] != (GamePoints{Week: 1, Points: 9}) || k.PerGame == nil || *k.PerGame != 9 {
 		t.Fatalf("a kicker's real week alone: %v per game %v", k, k.PerGame)
 	}
 	if a, ok := s.allowed[teamPosition{"BUF", draft.K}]; !ok || a.PointsAGame != 9 || a.Rank != 1 || a.Of != 1 {
@@ -231,7 +231,7 @@ func TestKickerAndDefenseResults(t *testing.T) {
 	}}
 	real := NewSeason(data, RulesOf(scoring.Standard()), 3, saturday)
 	k := real.For(Player{BoardID: "mia-k", Team: "MIA", Position: draft.K})
-	if len(k.LastGames) != 2 || k.LastGames[0] != (GamePoints{2, 4}) || k.LastGames[1] != (GamePoints{1, 9}) || k.PerGame == nil || *k.PerGame != 6.5 {
+	if len(k.LastGames) != 2 || k.LastGames[0] != (GamePoints{Week: 2, Points: 4}) || k.LastGames[1] != (GamePoints{Week: 1, Points: 9}) || k.PerGame == nil || *k.PerGame != 6.5 {
 		t.Fatalf("a kicker's results: %v per game %v", k, k.PerGame)
 	}
 	// Buffalo allowed Miami's kicker 9 in week 1, the Jets 4 in week 2,

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { leagueSettingsHref } from '#lib/league/rules-link.ts';
 	import BasisBlock from '#lib/ui/BasisBlock.svelte';
 	import { onMount, untrack } from 'svelte';
 	import { hitsWords } from '#lib/format/pool-words.ts';
@@ -79,9 +78,7 @@
 			? []
 			: orderBasis(
 					advice,
-					mode === 'rest' && league !== null
-						? { host: league.host, rulesHref: leagueSettingsHref(league.id) }
-						: null,
+					mode === 'rest' && league !== null ? { host: league.host } : null,
 					memberZone(),
 					now
 				)
