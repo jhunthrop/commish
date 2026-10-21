@@ -93,9 +93,15 @@ def _capture_all(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
 
 
 CASES: tuple[Case, ...] = (
-    # B73 (Lane 107) departs from the oracle where this recording cannot show it: for a week not published
-    # yet the TypeScript full list stores the empty answer, the Python one screens it out and stores none.
-    # The recorded week-1 projections are published, so both store them; a mismatch on a recording of an
+    # B73 (Lane 107) departs from the oracle where this recording cannot show it. For a week not published
+    # yet the provider answers in one of two ways. An empty body or an empty player map: the TypeScript full
+    # list stores it as a snapshot, the Python one screens it out, stores none and reports the feed
+    # unpublished. A 404 or an error envelope: the TypeScript client throws (Tank01Error "upstream",
+    # research-ts/src/stats/tank01/client.ts), so its captureOnce reports the feed failed with that reason,
+    # stores nothing and leaves the feed unmarked so the next tick asks again; the Python one reports it
+    # unpublished and stores nothing. So on a 404 week `capture_snapshots` matches and only the feed's outcome
+    # differs (failed against unpublished); on an empty week the table differs too (Lane 118, B94). The
+    # recorded week-1 projections are published, so both store them; a mismatch on a recording of an
     # unpublished week is that intended departure, not a bug.
     Case(
         name="tank01-capture-all",
