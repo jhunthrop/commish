@@ -3955,7 +3955,7 @@ components:
         basis_note_list:
           type: string
           description: >-
-            the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
+            one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
             fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
@@ -4443,7 +4443,7 @@ components:
         basis_note_list:
           type: string
           description: >-
-            the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
+            one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
             fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
@@ -4541,7 +4541,7 @@ components:
         basis_note_list:
           type: string
           description: >-
-            the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
+            one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
             fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
@@ -4643,7 +4643,7 @@ components:
         basis_note_list:
           type: string
           description: >-
-            the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
+            one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
             fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
@@ -4999,7 +4999,7 @@ components:
         basis_note_list:
           type: string
           description: >-
-            the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
+            one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
             fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
@@ -5117,7 +5117,7 @@ components:
         basis_note_list:
           type: string
           description: >-
-            the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
+            one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick,
             fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer

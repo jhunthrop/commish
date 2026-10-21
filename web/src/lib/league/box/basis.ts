@@ -71,6 +71,13 @@ export function projFinalWords(started: boolean, missing: boolean): string {
 	return missing ? `${PROJ_FINAL_PART} ${NO_PROJ_FINAL_PART}` : PROJ_FINAL_PART;
 }
 
+/** projFinalWords in a phone's one sentence (Lane 115 fix round 1, MEDIUM-1): why the Proj final is
+ * "--" where it is, else what it adds. */
+export function projFinalPhone(started: boolean, missing: boolean): string {
+	if (!started) return '';
+	return missing ? NO_PROJ_FINAL_PART : PROJ_FINAL_PART;
+}
+
 /** Any row's game past its kickoff at the page's clock, by the one rule (kickoff.ts). */
 export function anyKicked(lines: readonly PlayerLine[], now: number): boolean {
 	return lines.some(({ facts }) => pastKickoff(facts, now));
@@ -99,17 +106,19 @@ function whoseScoring(proj: ProjFacts, format: string): string {
 }
 
 /** Which of the Proj sentence's clauses a width says (Lane 115): a phone leaves the defenses' scoring
- * to the desk, and the league's order's phone its scoring (its head says "Your league scores PPR.")
- * and what a started game's Proj is too. */
+ * to the desk, and the league's order's phone its scoring (its head says "Your league scores PPR."),
+ * its read time and what a started game's Proj is too, qualifications the desk says (fix round 1,
+ * MEDIUM-2: the "--" keeps its clause instead). */
 interface ProjSays {
 	defenses: boolean;
 	scoring: boolean;
 	kicked: boolean;
+	read: boolean;
 }
 
-const DESK_SAYS: ProjSays = { defenses: true, scoring: true, kicked: true };
-const PHONE_SAYS: ProjSays = { defenses: false, scoring: true, kicked: true };
-const ORDER_PHONE_SAYS: ProjSays = { defenses: false, scoring: false, kicked: false };
+const DESK_SAYS: ProjSays = { defenses: true, scoring: true, kicked: true, read: true };
+const PHONE_SAYS: ProjSays = { defenses: false, scoring: true, kicked: true, read: true };
+const ORDER_PHONE_SAYS: ProjSays = { defenses: false, scoring: false, kicked: false, read: false };
 
 /** What the projection is, the words after "Proj is": "this week's published projection, PPR nearest
  * your rules, defenses on default scoring, read Fri 9:00 pm, as of kickoff once started", "week 7's"
@@ -119,10 +128,11 @@ function projWhat(proj: ProjFacts, clock: Clock, says: ProjSays): string {
 	const whose = says.scoring ? whoseScoring(proj, format) : '';
 	const defenses = proj.defense && says.defenses ? ', defenses on default scoring' : '';
 	const when = proj.readAt === null ? 'not in yet' : `read ${stamp(proj.readAt, clock)}`;
+	const read = says.read ? `, ${when}` : '';
 	const kicked = proj.kicked === true && says.kicked ? `, ${AS_OF_KICKOFF}` : '';
 	const week =
 		proj.weeks === undefined ? THIS_WEEKS : weeksWord(addressedWeek(proj.weeks), proj.weeks.week);
-	return `${week} published projection${whose}${defenses}, ${when}${kicked}`;
+	return `${week} published projection${whose}${defenses}${read}${kicked}`;
 }
 
 /** The tight end's extra after a Proj sentence, where the league's rules add one. */
@@ -151,10 +161,11 @@ export function pickProjPart(proj: ProjFacts, clock: Clock): string {
 }
 
 /** The week column and what its Proj is in one sentence, the phone order's (Lane 115, B92): "Wk 6 is
- * Pts once final, else this week's published projection, read Fri 9:00 pm Central." The page's head
- * says its scoring; a started game's Proj is said at a desk. */
+ * Pts once final, -- until his stats land, else this week's published projection." Its "--" keeps its
+ * clause (fix round 1, MEDIUM-2); the page's head says its scoring, the desk its read time and a
+ * started game's Proj. */
 export function weekProjPart(head: string, proj: ProjFacts, clock: Clock): string {
-	return `${head} is ${BOX.pts} once final, else ${projWhat(proj, clock, ORDER_PHONE_SAYS)}.`;
+	return `${head} is ${BOX.pts} once final, ${BOX.none} until his stats land, else ${projWhat(proj, clock, ORDER_PHONE_SAYS)}.`;
 }
 
 /** A sentence a phone says shorter (Lane 111's phone-only parts): the desk's words at a desk, the
@@ -464,13 +475,16 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 			...waiting(true)
 		];
 	// The phone Lineup's eight lines (Lane 115, B83): the rule our pick follows said in one clause with
-	// what Proj is, the defenses' scoring, why a Proj final is "--", the order Our rank is in and what
-	// Team adds left to the desk.
+	// what Proj is, the defenses' scoring, the order Our rank is in and what Team adds left to the desk;
+	// a "--" Proj final says why in place of what it adds (fix round 1, MEDIUM-1).
 	return [
 		...(projFacts
 			? deskOrPhone(`${PICK_PART} ${projPart(projFacts, clock)}`, pickProjPart(projFacts, clock))
 			: said(PICK_PART)),
-		...deskOrPhone(projFinalWords(kicked, facts.noFinal === true), projFinalWords(kicked, false)),
+		...deskOrPhone(
+			projFinalWords(kicked, facts.noFinal === true),
+			projFinalPhone(kicked, facts.noFinal === true)
+		),
 		...said(deltaPart(lineup.previousReadAt, clock), false),
 		...said(gamePart(facts.lines, clock, now, 'full')),
 		// On the Lineup phone the expected score and weather are the decision's facts and keep their

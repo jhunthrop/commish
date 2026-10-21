@@ -83,7 +83,14 @@ interface Screen {
 	/** Whether the basis says the platform's points count on this clock; null, not checked (Trades,
 	 * whose closed basis draws no Avg or Last). */
 	platform: boolean | null;
+	/** What the shot opens first: a trade in the finder, or the builder, whose phone rows draw Avg
+	 * and Last (Lane 115 fix round 1, HIGH-1). */
+	open?: 'trade' | 'builder';
 }
+
+/** The opened trade's and the builder's words once drawn. */
+const OPENED_READY = 'Build from this';
+const BUILDER_READY = 'Pick one or two of your players and one or two of theirs.';
 
 /** The four league screens with Avg and Last, and the league's Players, on a clock. */
 function leagueScreens(platform: boolean): Screen[] {
@@ -92,6 +99,20 @@ function leagueScreens(platform: boolean): Screen[] {
 		{ name: 'matchup', path: `${LEAGUE}/matchup`, ready: 'Week 6', platform },
 		{ name: 'waivers', path: `${LEAGUE}/waivers`, ready: 'Open Sleeper waivers', platform },
 		{ name: 'trades', path: `${LEAGUE}/trades`, ready: 'worth proposing', platform: null },
+		{
+			name: 'trades-opened',
+			path: `${LEAGUE}/trades`,
+			ready: 'worth proposing',
+			platform,
+			open: 'trade'
+		},
+		{
+			name: 'trades-builder',
+			path: `${LEAGUE}/trades`,
+			ready: 'worth proposing',
+			platform,
+			open: 'builder'
+		},
 		{ name: 'players', path: PLAYERS, ready: PLAYERS_READY, platform }
 	];
 }
@@ -220,10 +241,13 @@ async function wrappedNames(page: Page): Promise<string[]> {
 		const cut = shown.filter((nm) => {
 			const fit = nm.querySelector('.fit');
 			const full = nm.querySelector('.fit-full');
-			if (fit === null || full === null) return false;
+			const short = nm.querySelector('.fit-short');
+			if (fit === null || full === null || short === null) return false;
 			const box = fit.getBoundingClientRect();
 			const drawn = full.getBoundingClientRect();
-			return drawn.top < box.bottom - 1 && drawn.right > box.right + 1;
+			const fullShown = drawn.top < box.bottom - 1;
+			// The whole name past the line, or the short form cut with an ellipsis (fix round 1, LOW-2).
+			return fullShown ? drawn.right > box.right + 1 : short.scrollWidth > short.clientWidth + 1;
 		});
 		return [...tall, ...cut].map((nm) => nm.innerText.trim());
 	});
@@ -254,6 +278,14 @@ for (const theme of THEMES)
 			try {
 				await page.goto(`${web}${screen.path}`);
 				await ready(page, screen.ready);
+				if (screen.open === 'trade') {
+					await page.locator('table.finder button.why').first().click();
+					await ready(page, OPENED_READY);
+				}
+				if (screen.open === 'builder') {
+					await page.getByRole('button', { name: 'Build a trade' }).click();
+					await ready(page, BUILDER_READY);
+				}
 				const basis = await drawnBasis(page);
 				check(screen, width, basis, at);
 				const lines = await basisLines(page);

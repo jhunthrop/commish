@@ -10,7 +10,7 @@
 	import StatusChip from '#lib/ui/StatusChip.svelte';
 	import StatusPill from '#lib/ui/StatusPill.svelte';
 	import { HELD } from '../inseason/words.ts';
-	import { initialName, type BoxRow } from './box.ts';
+	import { fitName, initialName, type BoxRow } from './box.ts';
 	import BoxGame from './BoxGame.svelte';
 
 	/** A box row's player cell (Lane 66d), shared by every box score: his face (a defense's club mark),
@@ -74,7 +74,7 @@
 		>{:else if fitOnPhone}<span class="fit"
 			><span class="fit-full"><NameWords name={row.name} /></span><span
 				class="fit-short"
-				aria-hidden="true">{initialName(row.name)}</span
+				aria-hidden="true">{fitName(row)}</span
 			></span
 		>{:else}<NameWords name={row.name} />{/if}
 {/snippet}

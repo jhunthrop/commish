@@ -24,6 +24,7 @@ import {
 	deskOrPhone,
 	gamePart,
 	finalsParts,
+	KICKED_OFF_PART,
 	OPP_PART,
 	OPP_PHONE,
 	projPart,
@@ -440,9 +441,12 @@ export function tradeBasis(
 ): BasisPart[] {
 	// The builder's boxes draw a defense; a trade never holds one (Lane 66g).
 	const defense = opened === 'builder' && lines.some((l) => l.player.position === 'DEF');
-	// An opened trade's or the builder's phone rows draw no Pts, so when a final lands is said at a desk
-	// there, the phone's eight lines kept for the rows' own figures (Lane 115).
-	const waiting = finalsParts(lines, now, host, 'rosters', opened === 'none');
+	// An opened trade's and the builder's phone rows draw Avg and Last, so the phone keeps the sentence
+	// saying what they count (Lane 115 fix round 1, HIGH-1); only the timing alone, about Final and
+	// the Pts those rows do not draw, goes to the desk there for the eight lines.
+	const waiting = finalsParts(lines, now, host, 'rosters', true).map((part) =>
+		opened !== 'none' && part.text === KICKED_OFF_PART ? { ...part, phone: false } : part
+	);
 	// Before the week's projection is read, the day it arrives in its place (Lane 95).
 	const arrives =
 		advice.week === undefined

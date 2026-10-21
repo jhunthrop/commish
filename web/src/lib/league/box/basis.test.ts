@@ -26,6 +26,8 @@ import {
 	projPart,
 	ptsPart,
 	ptsPhonePart,
+	projFinalPhone,
+	weekProjPart,
 	uncountedPart,
 	UNCOUNTED,
 	type Clock
@@ -236,7 +238,7 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 	);
 });
 
-void test("the phone Lineup leaves the defenses' scoring and why a Proj final is -- to the desk (Lane 115, B83)", () => {
+void test("the phone Lineup leaves the defenses' scoring to the desk and says why a Proj final is -- (Lane 115, B83, fix round 1)", () => {
 	const defense = { ...line(), player: { position: 'DEF' } } as unknown as PlayerLine;
 	const kicked = line({ kickoff: '2026-10-16T00:15:00.000Z', game_state: 'kicked_off' });
 	const parts = boxBasisParts(
@@ -258,12 +260,10 @@ void test("the phone Lineup leaves the defenses' scoring and why a Proj final is
 		desk.includes('defenses on default scoring') && desk.includes(NO_PROJ_FINAL_PART),
 		desk
 	);
-	assert.ok(
-		!phone.includes('defenses on default scoring') && !phone.includes(NO_PROJ_FINAL_PART),
-		phone
-	);
+	assert.ok(!phone.includes('defenses on default scoring'), phone);
 	assert.ok(phone.startsWith("Our pick is each slot's highest Proj,"), phone);
-	assert.ok(phone.includes(PROJ_FINAL_PART), phone);
+	// The "--" says why in place of what a Proj final adds (MEDIUM-1).
+	assert.ok(phone.includes(NO_PROJ_FINAL_PART) && !phone.includes(PROJ_FINAL_PART), phone);
 });
 
 void test('the Matchup key says Proj, Pts and Game, the columns it draws', () => {
@@ -532,4 +532,18 @@ void test("the phone's Pts sentence leaves what Team adds to the desk (Lane 115,
 		{ text: 'A longer.', phone: false },
 		{ text: 'A.', phone: true, desk: false }
 	]);
+});
+
+void test('the phone says why a "--" stands: a Proj final with none, a final game with no stats (Lane 115 fix round 1)', () => {
+	assert.equal(projFinalPhone(true, true), NO_PROJ_FINAL_PART);
+	assert.equal(projFinalPhone(true, false), PROJ_FINAL_PART);
+	assert.equal(projFinalPhone(false, true), '');
+	assert.equal(
+		weekProjPart(
+			'Wk 6',
+			{ readAt: READ, scoring: CLOSEST, defense: false, league: true, kicked: true },
+			NAMED
+		),
+		"Wk 6 is Pts once final, -- until his stats land, else this week's published projection."
+	);
 });

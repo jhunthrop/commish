@@ -111,6 +111,13 @@ export function initialName(name: string): string {
 	return first === last ? name.trim() : `${first.charAt(0)}. ${last}`;
 }
 
+/** A row's name in the one line a phone gives it where the whole does not fit (Lane 115, B83): a
+ * player's first initial and last name, a defense its club's nickname ("Vikings" from "Minnesota
+ * Vikings", fix round 1, LOW-1), never an initial before a city. */
+export function fitName(row: Pick<BoxRow, 'name' | 'face'>): string {
+	return row.face.mark ? lastName(row.name.replace(/\s+D\/ST$/, '')) : initialName(row.name);
+}
+
 /** The slot's label in a box. */
 export function slotWord(slot: BoxSlot): string {
 	return SLOT_WORDS[slot];
