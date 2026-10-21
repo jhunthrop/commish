@@ -20,6 +20,7 @@ from research.capsules.week.store import served_week_reads
 from research.errors import ResearchError
 from research.model.reads.teams import first_kickoff_for
 from research.nightly.build import pages, season
+from research.nightly.build.page_club import with_page_clubs
 from research.nightly.build.player_season import season_context
 from research.nightly.build.ros import MODEL_NAME as ROS_MODEL
 from research.nightly.build.ros import RosBasis, RosResult, RosSetup, ros_boards
@@ -190,6 +191,8 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     extra = () if ros is None else tuple(p.provider_id for p in ros.season_players)
     on_boards = {e.row.player_id for b in boards for e in b.entries}
     context = season_context(conn, PRODUCT_SEASON, sorted({*on_boards, *extra}), as_of, prior=True)
+    # Every row names the page's club (Lane 120), so the board, the page and the rest of season agree.
+    boards = tuple(with_page_clubs(board, context.clubs) for board in boards)
     games = schedule_read.slates_by_club(conn, PRODUCT_SEASON)
     states = _states(conn, games, as_of)
     rest = None if ros is None else ros_boards(boards, context, as_of, states, ros)

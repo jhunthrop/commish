@@ -144,3 +144,36 @@ void test("the weeks still to play name a game kicked off or final by the run's 
 		['Sun Oct 25', 'Sun Oct 25', 'Sun Oct 25']
 	);
 });
+
+void test('a week whose club the run cannot name says he did not play, never Bye (Lane 120)', () => {
+	const quiet = (week: number, opponent: string | null): GameLogRow => ({
+		...EMPTY,
+		snapShare: null,
+		points: null,
+		week,
+		opponent,
+		home: opponent === null ? null : false,
+		status: 'inactive'
+	});
+	const bye: GameLogRow = { ...quiet(3, null), status: 'bye' };
+	const season: PlayerSeason = {
+		season: 2026,
+		format: 'ppr-12',
+		weeks: 4,
+		through: 4,
+		games: 1,
+		pointsPerGame: 27.5,
+		totals: { ...EMPTY, snapShare: null, points: 27.5 },
+		log: [quiet(1, null), quiet(2, 'KC'), bye, played(4, 27.5)]
+	};
+	const view = seasonView(season, 'WR', [FORMAT], () => null);
+	assert.deepEqual(
+		view.rows.map((row) => [row.opponent, row.note, row.tone]),
+		[
+			['Did not play', '', 'quiet'],
+			['at KC', 'Did not play', 'quiet'],
+			['Bye', '', 'bye'],
+			['vs BUF', '', 'played']
+		]
+	);
+});

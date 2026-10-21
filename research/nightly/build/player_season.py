@@ -11,7 +11,9 @@ feed's own final flag where the stand-in estimated one):
 - A week is played when he has a stat line, or offensive snaps with no stats row (the weekly
   release carries only players who recorded a stat, so that is a game with no touches). With
   neither, the week is inactive once his club's game is in the records and upcoming before. A bye
-  is a week his club does not play.
+  is a week his club does not play. A week's club is the one his line that week was for, else the page
+  club (`page_club`, Lane 120); a mover's week with no line, up to his newest line, names no opponent
+  and is inactive.
 - The player-week feed lands in two ingests: the stat line (the scoring stats and completions) and
   the usage line (carries, targets, pass attempts and the team totals). Within a played week, a
   stat with no row is zero only when that week has his row from the same ingest and the store holds
@@ -21,7 +23,7 @@ feed's own final flag where the stand-in estimated one):
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Final
 
@@ -37,6 +39,7 @@ from research.model.domain import (
     compute_fantasy_points,
 )
 from research.model.jsmath import js_round
+from research.nightly.build.page_club import ClubCall, call_for, club_calls, read_roster, seeded_clubs
 from research.nightly.config import RunFormat
 from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.schedule import Game
@@ -221,6 +224,8 @@ class SeasonContext:
     store: SeasonStore
     # The seasons before, each one's store, for the page's earlier seasons (Lane 66h).
     prior: Mapping[int, SeasonStore]
+    # Each player's club as the page names it, by provider id (Lane 120, `page_club`).
+    clubs: Mapping[str, ClubCall] = field(default_factory=dict)
 
 
 def season_context(
@@ -233,26 +238,37 @@ def season_context(
     weeks = max(game.week for slate in games.values() for game in slate)
     store = read_season_store(conn, season, player_ids, as_of)
     byes = {club.abbr: club.bye for club in schedule_read.clubs_of(games)}
+    clubs = club_calls(seeded_clubs(conn, player_ids), read_roster(conn, as_of), store.teams, games)
     # The seasons before are the page's alone (Lane 66h): the writers' passes never read them (rereview N5).
     before = (
         {year: read_season_store(conn, year, player_ids, as_of) for year in range(season - PRIOR_SEASONS, season)}
         if prior
         else {}
     )
-    return SeasonContext(season, weeks, through_of(games, weeks, store), games, byes, store, before)
+    return SeasonContext(season, weeks, through_of(games, weeks, store), games, byes, store, before, clubs)
 
 
-def season_block(player_id: str, team: str, run_format: RunFormat, position: Position, context: SeasonContext) -> Json:
+def season_block(player_id: str, run_format: RunFormat, position: Position, context: SeasonContext) -> Json:
+    """His season in `run_format`: a week with his game line under the club it was for, a week without
+    one under the page club (`page_club`), or naming no opponent where the run cannot say which club he
+    was with."""
     scorer = Scorer(SCORING[run_format.scoring], position)
     store = context.store
     lines, snaps, teams = store.lines.get(player_id, {}), store.snaps.get(player_id, {}), store.teams.get(player_id, {})
+    call = call_for(context.clubs, player_id)
     log: list[Json] = []
     for week in range(1, context.weeks + 1):
-        club = teams.get(week, team)
-        game = next((g for g in context.games.get(club, ()) if g.week == week), None)
         found = lines.get(week, {})
         snapped = (snaps.get(week) or {}).get(_SNAPS, 0.0) > 0
         line = found if _has_ingest(found, usage=False) or snapped else None
+        club = teams.get(week) or call.club_in(week, context.through)
+        if club is None and line is None:
+            # No line, and a mover's week up to his newest line: no club the run can name.
+            log.append({**_empty(), "week": week, "opponent": None, "home": None, "status": "inactive"})
+            continue
+        # Snaps with no club line are his page club's game, as before the rule.
+        club = club or call.club
+        game = next((g for g in context.games.get(club, ()) if g.week == week), None)
         if game is None:
             if context.byes.get(club) != week or line is not None:
                 raise ValueError(f"{player_id} has no {club} game in week {week}, and it is not a clean bye")

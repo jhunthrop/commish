@@ -277,6 +277,7 @@
 					fill
 				/>{/snippet}
 		</PlayerCard>
+		{#if page.clubNote}<Footnote>{page.clubNote}</Footnote>{/if}
 		{#if statusNote}<Footnote>{statusNote}</Footnote>{/if}
 		<div class="league-lines">
 			<ContextNote note={note?.text ?? null} link={note?.link ?? null} />

@@ -178,12 +178,12 @@ def stale_prior(
 
 @dataclass(frozen=True, slots=True)
 class PlayerWeeks:
-    """What the season store says of one player: his club by week and each week's facts."""
+    """What the season store says of one player: his club at the run and each week's facts."""
 
     player_id: str
     position: Position
-    club: str  # the served board's club, when the season store has no week for him
-    clubs: Mapping[int, str]
+    # The club whose games are his rest of season: the page's (`nightly.build.page_club`, Lane 120).
+    club: str
     weeks: Mapping[int, WeekFacts]
 
 
@@ -193,12 +193,6 @@ class ClubSlates:
 
     weeks: Mapping[str, Sequence[int]]
     to_play: Mapping[str, Sequence[int]]
-
-
-def club_at(who: PlayerWeeks, window: Window) -> str:
-    """His club at the window: the season store's latest through `through`, else the served board's."""
-    known = [week for week in who.clubs if week <= window.through]
-    return who.clubs[max(known)] if known else who.club
 
 
 def player_to_date(
@@ -211,7 +205,7 @@ def player_to_date(
     """The model's input at the window: games through `through`, and his club's games still to play
     from `from_week` (`slates.to_play`, each club's weeks whose game has not kicked off, Lane 86): a game of
     the window's first week his club has already played is no game left."""
-    club = club_at(who, window)
+    club = who.club
     weeks = slates.weeks.get(club, ())
     played = []
     for week in sorted(w for w in who.weeks if w <= window.through):

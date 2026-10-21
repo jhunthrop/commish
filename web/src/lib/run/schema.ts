@@ -255,7 +255,14 @@ export const playerSchema = z.object({
 	season: seasonSchema,
 	/** His earlier seasons, newest first, in the season block's format (Lane 66h); absent on a run
 	 * from before the nightly wrote them. */
-	priorSeasons: z.array(priorSeasonSchema).optional()
+	priorSeasons: z.array(priorSeasonSchema).optional(),
+	/** The club his newest game line was for and its week, when it is not `team` (Lane 120): the
+	 * provider's list read after that game moved him. Null when it is his club; absent on a run from
+	 * before the nightly wrote it. */
+	lastGameClub: z
+		.object({ club, week: z.number().int().min(1) })
+		.nullable()
+		.optional()
 });
 
 export const adpSourceSchema = z.object({
