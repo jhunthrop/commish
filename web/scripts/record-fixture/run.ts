@@ -9,13 +9,23 @@
 //
 // Usage: node scripts/record-fixture/run.ts   writes web/.runs/runs/2026-10-21T12-live-shape/
 // then build with PUBLIC_RUN_BASE_URL=.runs PUBLIC_RUN_ID=2026-10-21T12-live-shape.
+//        node scripts/record-fixture/run.ts two [upcoming|graded]   (Lane 114, two.ts) writes
+// web/.runs/runs/2026-10-21T12-two-<mode>/: the live record with the draft and weekly records.
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { manifestSchema, recordSchema, RUN_PATHS } from '../../src/lib/run/schema.ts';
+import { withTwoRecords, type TwoMode } from './two.ts';
 
 /** `live` (Lane 93) shoots the record as the nightly writes it from the dev store on Monday night of
- * week 6 (record-live.json): weeks 1 and 2 graded with their players, 3 to 5 not set, 6 waiting. */
-const LIVE = process.argv[2] === 'live';
-const RECORD_SHOTS_RUN = LIVE ? '2026-10-21T12-live-week6' : '2026-10-21T12-live-shape';
+ * week 6 (record-live.json): weeks 1 and 2 graded with their players, 3 to 5 not set, 6 waiting.
+ * `two` (Lane 114) is the live record with its two records beside it. */
+const TWO = process.argv[2] === 'two';
+const TWO_MODE: TwoMode = process.argv[3] === 'graded' ? 'graded' : 'upcoming';
+const LIVE = process.argv[2] === 'live' || TWO;
+const RECORD_SHOTS_RUN = TWO
+	? `2026-10-21T12-two-${TWO_MODE}`
+	: LIVE
+		? '2026-10-21T12-live-week6'
+		: '2026-10-21T12-live-shape';
 const SOURCE_RUN = new URL(
 	'../../../research/nightly/contract/fixture/runs/2026-10-21T12-ros/',
 	import.meta.url
@@ -27,7 +37,8 @@ async function json(url: URL): Promise<unknown> {
 	return JSON.parse(await readFile(url, 'utf8')) as unknown;
 }
 
-const record = recordSchema.parse(await json(RECORD_FIXTURE));
+const live = recordSchema.parse(await json(RECORD_FIXTURE));
+const record = TWO ? recordSchema.parse(await withTwoRecords(live, TWO_MODE)) : live;
 const manifest = manifestSchema.parse(await json(new URL(RUN_PATHS.manifest, SOURCE_RUN)));
 const graded = record.weeks.flatMap((week) => (week.gradedAt === null ? [] : [week.gradedAt]));
 const sources = manifest.sources.map((source) =>

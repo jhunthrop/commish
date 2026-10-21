@@ -292,13 +292,19 @@ export const scoreSchema = z.object({
 export const recordLineSchema = z.object({
 	position: z.union([position, z.literal('All')]),
 	ours: scoreSchema,
-	adp: scoreSchema,
+	/** ADP on the same players; null on the weekly record (Lane 114), where ADP is no yardstick. */
+	adp: scoreSchema.nullable(),
 	/** The week's published projection on the same players where the freeze kept it (from
 	 * publishedFromWeek), null before it did. */
 	published: scoreSchema.nullable(),
 	/** The season to date only: ours over the weeks that graded the published projection, printed
 	 * beside it so the two compare like with like (review 66j N1); null on a week's line. */
-	oursOnPublished: scoreSchema.nullable()
+	oursOnPublished: scoreSchema.nullable(),
+	/** ESPN's own weekly projection on the same players where the freeze kept it (the weekly record,
+	 * Lane 114), null before it did and on every line before Lane 114. */
+	espn: scoreSchema.nullable().default(null),
+	/** The season to date only: ours over the weeks that graded ESPN's projection, beside it. */
+	oursOnEspn: scoreSchema.nullable().default(null)
 });
 
 /** One graded player of a week as the record counts a league's own starters from (Lane 93). */
@@ -308,6 +314,8 @@ export const placedPlayerSchema = z.object({
 	ours: place.nullable(),
 	adp: place.nullable(),
 	published: place.nullable(),
+	/** ESPN's place (the weekly record, Lane 114), null where it has no stance and before Lane 114. */
+	espn: place.nullable().default(null),
 	finish: place
 });
 
@@ -371,6 +379,65 @@ export const recordWeekSchema = z
 			fail('only a frozen week has players and lines.');
 	});
 
+/** The record's own fields both records share: the words its measures print in, and its weeks. */
+const recordWords = {
+	/** The statistics the record grades with, in words a drafter says with no gloss (Lane 66j): the
+	 * rank agreement as "order matched", the typical miss as "places off", the starters called right.
+	 * The page prints them as its column heads. */
+	statistic: z.object({ agreement: phrase, placesOff: phrase, starters: phrase }),
+	/** The agreement's scale, said once: "1.00 is a perfect match of the week's finishing order, 0.00 is none." */
+	scale: phrase,
+	/** What the starters figure counts, from the positions graded, said once; null before a week is graded. */
+	startersBasis: phrase.nullable(),
+	/** How the record is kept, as one sentence the page prints under the weeks. */
+	method: phrase,
+	/** The sentence the page prints when a yardstick called the graded weeks better than our order on
+	 * any figure, null when ours leads or ties on every one. */
+	honest: phrase.nullable()
+};
+
+/** The weekly record (Lane 114): our weekly rankings against the weekly experts, from the first week
+ * the order the site ships was set, in the record's own shape (lines carry ADP null). */
+export const weeklyRecordSchema = z.object({
+	/** The first week of weekly rankings: the first set with the shipped order, else the next to set. */
+	fromWeek: z.number().int().min(1),
+	...recordWords,
+	/** Every week from fromWeek to the end of the regular season, whatever its status. */
+	weeks: z.array(recordWeekSchema),
+	toDate: z.array(recordLineSchema)
+});
+
+/** One line of the draft record: a position (or All), ours and ADP on the same finishers. */
+export const draftLineSchema = z.object({
+	position: z.union([position, z.literal('All')]),
+	ours: scoreSchema,
+	adp: scoreSchema
+});
+
+/** The draft record (Lane 114): our draft board against ADP on the season's points so far. */
+export const draftRecordSchema = z.object({
+	/** When the board drafted from was set, before the season's first kickoff. */
+	setAt: isoTime,
+	/** The board's own stamp, when it was projected. */
+	boardAsOf: isoTime,
+	/** The last complete week counted, null before the first. */
+	throughWeek: z.number().int().min(1).nullable(),
+	/** What "top named" counts, said once; null before a week is counted. */
+	namedBasis: phrase.nullable(),
+	/** The sentence the page prints when ADP called the season so far better on any figure. */
+	honest: phrase.nullable(),
+	/** All first, then each position graded. */
+	lines: z.array(draftLineSchema),
+	/** Order matched, All positions, on the season's points through each counted week. */
+	progress: z.array(
+		z.object({
+			week: z.number().int().min(1),
+			ours: z.number().min(-1).max(1).nullable(),
+			adp: z.number().min(-1).max(1).nullable()
+		})
+	)
+});
+
 export const recordSchema = z.object({
 	season: z.number().int(),
 	/** The format every frozen board ranks in. */
@@ -394,7 +461,10 @@ export const recordSchema = z.object({
 	/** Every week of the season in order, whatever its status. */
 	weeks: z.array(recordWeekSchema),
 	/** Every graded week pooled, one line for all players and one per position. */
-	toDate: z.array(recordLineSchema)
+	toDate: z.array(recordLineSchema),
+	/** The two records (Lane 114), each named by what it grades; absent on a run before Lane 114. */
+	weekly: weeklyRecordSchema.optional(),
+	draft: draftRecordSchema.optional()
 });
 
 /** His season so far in two numbers, as his file's season block has them (players/<id>.json, scored
@@ -582,6 +652,9 @@ export type RecordWeek = z.infer<typeof recordWeekSchema>;
 export type PlacedPlayer = z.infer<typeof placedPlayerSchema>;
 export type RecordWeekStatus = z.infer<typeof recordWeekStatus>;
 export type RunRecord = z.infer<typeof recordSchema>;
+export type WeeklyRecord = z.infer<typeof weeklyRecordSchema>;
+export type DraftRecord = z.infer<typeof draftRecordSchema>;
+export type DraftLine = z.infer<typeof draftLineSchema>;
 export type IndexEntry = z.infer<typeof indexEntrySchema>;
 export type MarketEntry = z.infer<typeof marketEntrySchema>;
 export type IndexSeason = z.infer<typeof indexSeasonSchema>;

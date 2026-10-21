@@ -161,6 +161,13 @@ func TestServiceGradesAnESPNLeagueFromItsKeptReads(t *testing.T) {
 	svc := &Service{Store: store, Orders: fakeOrders{[]boards.SetOrder{order(&gradedAt)}}}
 	snap := leaguesync.Snapshot{Ref: leaguesync.Ref{Host: leaguesync.HostESPN, LeagueID: "1", Season: 2026}, Shape: espnShape}
 	got, err := svc.Weeks(ctx, snap, 3, byes)
+	// Lane 114: the week's ranking over the league's rostered players rides along.
+	if err == nil && (len(got) != 1 || got[0].Ranking == nil || got[0].Ranking.Players == 0) {
+		t.Fatalf("no ranking: %+v", got)
+	}
+	if err == nil {
+		got[0].Ranking = nil
+	}
 	want := []Week{{Week: 7, Benchmark: BenchmarkESPN, Ours: 97, Theirs: 70, Margin: 27}}
 	if err != nil || !reflect.DeepEqual(got, want) {
 		t.Fatalf("%+v %v", got, err)

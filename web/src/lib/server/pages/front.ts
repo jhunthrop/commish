@@ -8,6 +8,7 @@ import { boardBasis, type BasisPart } from '#lib/run/board-basis.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import { rangeScale } from '#lib/run/derive.ts';
 import { recordHeadline, type RecordHeadline } from '#lib/run/record.ts';
+import { frontRecord, type FrontRecord } from '#lib/run/records.ts';
 import { rowFraming, type RowFraming } from '#lib/run/row-framing.ts';
 import type { BoardRowView, Format } from '#lib/run/schema.ts';
 import type { RangeScale } from '#lib/types/player.ts';
@@ -47,6 +48,9 @@ export interface FrontPage extends BoardStatuses {
 	/** The record's headline, the only part of the record the front door prints, with the measure's
 	 * definition (Lane 93: starters right and the graded count beside the figure). */
 	record: RecordHeadline & { season: number; scale: string };
+	/** The card's record (Lane 114): the weekly record once a week of it is graded, else the draft
+	 * record, named either way; null on a run before Lane 114, which keeps the card above. */
+	front: FrontRecord | null;
 }
 
 export async function frontPage(now: number): Promise<FrontPage> {
@@ -90,6 +94,7 @@ export async function frontPage(now: number): Promise<FrontPage> {
 			season: kept.season,
 			scale: kept.scale
 		},
+		front: frontRecord(kept),
 		// The rows' statuses as the board's, drawn with the shared pill (review finding 7).
 		...boardStatuses(pool, capture, format, now)
 	};

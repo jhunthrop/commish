@@ -41,7 +41,7 @@ void test('with the standard lineup every graded line counts what the run counts
 				);
 				assert.deepEqual(
 					got,
-					{ right: line[source].starters, of: line[source].startersOf },
+					{ right: line[source]?.starters, of: line[source]?.startersOf },
 					`week ${String(week.week)} ${line.position} ${source}`
 				);
 			}
@@ -55,7 +55,7 @@ const player = (
 	position: PlacedPlayer['position'],
 	ours: number | null,
 	finish: number
-): PlacedPlayer => ({ position, ours, adp: null, published: null, finish });
+): PlacedPlayer => ({ position, ours, adp: null, published: null, espn: null, finish });
 
 void test("a league's flex is filled from the backs, receivers and tight ends left, each counted once", () => {
 	// One team: QB, 2 RB, 2 WR, TE and a flex. We called RB r3 at the flex; he finished second among

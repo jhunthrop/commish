@@ -24,7 +24,7 @@ import {
 	figureWords,
 	gradedOrders,
 	printPlaces,
-	publishedBeside,
+	besideOf,
 	publishedWords,
 	recordHeadline
 } from './record.ts';
@@ -61,7 +61,9 @@ const line = (published: boolean): RecordLine => ({
 	ours: SCORE,
 	adp: { ...SCORE, agreement: 0.41 },
 	published: published ? { ...SCORE, agreement: 0.55 } : null,
-	oursOnPublished: published ? SCORE : null
+	oursOnPublished: published ? SCORE : null,
+	espn: null,
+	oursOnEspn: null
 });
 const gradedWeek = (n: number, published: boolean): RecordWeek => ({
 	...week(n, 'preseason', 'graded'),
@@ -232,7 +234,9 @@ void test('a rate in [0, 1] prints two decimals as given, with no word about dec
 				ours: score,
 				adp: { ...score, agreement: 0.37 },
 				published: null,
-				oursOnPublished: null
+				oursOnPublished: null,
+				espn: null,
+				oursOnEspn: null
 			}
 		]
 	});
@@ -260,14 +264,18 @@ void test('the published figure to date stands beside ours over the weeks that g
 		ours: { ...score, agreement: 0.62 },
 		adp: score,
 		published: { ...score, agreement: 0.55 },
-		oursOnPublished: { ...score, agreement: 0.48 }
+		oursOnPublished: { ...score, agreement: 0.48 },
+		espn: { ...score, agreement: 0.58 },
+		oursOnEspn: { ...score, agreement: 0.6 }
 	};
-	assert.deepEqual(publishedBeside(line, 'agreement'), { published: '0.55', ours: 'Ours 0.48' });
-	assert.deepEqual(publishedBeside({ ...line, oursOnPublished: null }, 'agreement'), {
-		published: '0.55',
+	assert.deepEqual(besideOf(line, 'published', 'agreement'), { value: '0.55', ours: 'Ours 0.48' });
+	assert.deepEqual(besideOf(line, 'espn', 'agreement'), { value: '0.58', ours: 'Ours 0.60' });
+	assert.deepEqual(besideOf(line, 'adp', 'agreement'), { value: '0.50', ours: null });
+	assert.deepEqual(besideOf({ ...line, oursOnPublished: null }, 'published', 'agreement'), {
+		value: '0.55',
 		ours: null
 	});
-	assert.deepEqual(publishedBeside(undefined, 'agreement'), { published: '--', ours: null });
+	assert.deepEqual(besideOf(undefined, 'published', 'agreement'), { value: '--', ours: null });
 });
 
 void test('a row not graded spans the columns each width draws, so no track is left empty', () => {
@@ -275,7 +283,7 @@ void test('a row not graded spans the columns each width draws, so no track is l
 	assert.deepEqual(recordStatusSpans(2), { desk: 8, narrow: 2 });
 	assert.deepEqual(recordStatusSpans(3), { desk: 11, narrow: 3 });
 	const page = readFileSync(
-		new URL('../../routes/(run)/record/+page.svelte', import.meta.url),
+		new URL('../../routes/(run)/record/WeeklySection.svelte', import.meta.url),
 		'utf8'
 	);
 	assert.match(page, /class="st wide desk" colspan=\{spans\.desk\}/);
@@ -293,7 +301,7 @@ void test('the status spans come from the column lists the table draws, never a 
 		});
 	}
 	const page = readFileSync(
-		new URL('../../routes/(run)/record/+page.svelte', import.meta.url),
+		new URL('../../routes/(run)/record/WeeklySection.svelte', import.meta.url),
 		'utf8'
 	);
 	assert.match(page, /\{#each RECORD_BEFORE as column/);

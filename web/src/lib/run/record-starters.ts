@@ -35,8 +35,8 @@ export const STANDARD_LINEUP: StartingLineup = {
 	superFlex: 0
 };
 
-/** The order a starters count reads: ours, ADP's or the published projection's places. */
-export type PlacedSource = 'ours' | 'adp' | 'published';
+/** The order a starters count reads: ours, ADP's, ESPN's or the published projection's places. */
+export type PlacedSource = 'ours' | 'adp' | 'espn' | 'published';
 
 export interface StartersCount {
 	right: number;

@@ -1178,3 +1178,52 @@ touches no graded week: weeks 1, 2 and 6 keep their freezes and grades as stored
    so no freeze to date has kept it (weeks 2 to 5 have no rows; week 6's first landed after its
    Thursday kickoff). Until a capture runs before the set time (the harvest lane, B68), the freeze
    keeps `published_points` NULL and the record does not draw it.
+
+### Amendment 5, 2026-10-20, before week 7 is set: two records, and the weekly yardsticks
+
+Recorded by Lane 114 on the founder's ruling of 2026-10-21 ("grade our ADP as ADP and weekly rankings
+as weekly rankings, they're not the same thing"), before the week 7 order is set (Thursday 2026-10-22,
+14:00 Eastern). It changes no model, input, fit, gate, threshold or seed of this round and rewrites no
+graded figure: every stored freeze and grade stands as it is, and weeks 3 to 5 are never back-filled.
+It governs the record the site shows, which is a shown comparison and never one of 3.3's "leads"
+claims.
+
+1. **Two records, each named by what it grades.**
+   - *The draft record* grades the board a member drafted from, the season's first freeze of the served
+     board (`commish_board_v9_ppr_12`, set Tue 2026-09-08), against ADP as that freeze kept it, on each
+     player's season points to date (twelve-team PPR, the register's own scoring) over every complete
+     week (its last kickoff 36 hours behind the run, the rule the in-season pass grades a week by). The
+     players are the season's finishers both orders rank: frozen with an ADP, with a stat line in a
+     counted week, at QB, RB, WR and TE (the board's kickers and defenses follow the draft market's
+     order). The measures are the record's: order matched, places off, and "top named", the season's
+     top 12 QBs, 24 RBs, 36 WRs and 12 TEs so far that the order also put in its top 12, 24, 36 and 12.
+     Every measure is graded within a position (our board's order among the quarterbacks against the
+     season's quarterback finishers, ADP's likewise); the All line is the position lines combined,
+     weighted by players graded, never raw points pooled across positions. This is the only record
+     graded against ADP (`research/nightly/reads/draft_record.py`).
+   - *The weekly record* grades, from the first week a freeze kept the order the site ships
+     (`commish_ros_shipped_ppr_12`, week 7 on this schedule), that order on the week's points beside the
+     weekly yardsticks below, on the shipped order's frozen players with a stat line that week (no ADP
+     needed), every yardstick on the same rows under the fill rule. Weeks 1 to 6 shipped the draft board
+     and are graded only under the draft record; their stored weekly grades against ADP stay in the
+     register for the research record and are not served as weekly rankings
+     (`research/nightly/reads/weekly_record.py`).
+2. **The weekly yardsticks.**
+   - *ESPN's projection.* From the first freeze after this amendment the freeze keeps `espn_points`
+     (revision 0017): his PPR points on the newest read of ESPN's public weekly projection taken at or
+     before the freeze, through his ESPN id. The read is ESPN's public player pool on its PPR league
+     defaults (`kona_player_info`, `leaguedefaults/3`, no sign-in), the projected one-period split of the
+     week (`statSourceId` 1, `statSplitTypeId` 1), taken by the in-season pass on every pass before its
+     freeze step (`espn-projections`), so the Thursday 14:00 pass that sets the order keeps a read from
+     minutes before it. A failed read fails that step alone; the freeze then keeps the last read, or
+     none. For a member's own ESPN league the API grades the same comparison in the league's scoring
+     on the league's rostered players from `app.espn_week_reads` (Amendment 4, 3).
+   - *The week's published projection*, as Amendment 4 kept it (`published_points`).
+   - *Yahoo's projection is not graded.* Yahoo's Fantasy Sports API documents no player projection: its
+     player `stats` resource takes `type=week;week=N` and answers what a player scored, and the only
+     projected figure it documents is a team's `team_projected_points` on a matchup. Every Yahoo read
+     also needs a member's OAuth grant. No read keeps a Yahoo player projection, so none is graded; a
+     yardstick added later is a further amendment with its date and first week.
+   - *FantasyPros' weekly consensus* stays out until the founder clears its terms (3.3).
+3. **ADP.** ADP stays in every stored freeze row and the register's stored weekly grade for the research
+   record, and is graded on the draft record alone.

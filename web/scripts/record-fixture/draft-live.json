@@ -1,0 +1,121 @@
+{
+	"setAt": "2026-09-08T12:00:16.244Z",
+	"boardAsOf": "2026-09-07T21:57:33.121Z",
+	"throughWeek": 5,
+	"namedBasis": "Top named counts the season's top 12 QBs, 24 RBs, 36 WRs and 12 TEs so far, and how many of them the order also put in its top 12, 24, 36 and 12.",
+	"honest": "ADP named more of the season's top players so far, 60 of 84 against our 56.",
+	"lines": [
+		{
+			"position": "All",
+			"ours": {
+				"graded": 208,
+				"agreement": 0.55,
+				"placesOff": 12.9,
+				"starters": 56,
+				"startersOf": 84
+			},
+			"adp": {
+				"graded": 208,
+				"agreement": 0.55,
+				"placesOff": 12.9,
+				"starters": 60,
+				"startersOf": 84
+			}
+		},
+		{
+			"position": "QB",
+			"ours": {
+				"graded": 31,
+				"agreement": 0.29,
+				"placesOff": 8.8,
+				"starters": 6,
+				"startersOf": 12
+			},
+			"adp": {
+				"graded": 31,
+				"agreement": 0.39,
+				"placesOff": 8.2,
+				"starters": 8,
+				"startersOf": 12
+			}
+		},
+		{
+			"position": "RB",
+			"ours": {
+				"graded": 63,
+				"agreement": 0.66,
+				"placesOff": 11.3,
+				"starters": 18,
+				"startersOf": 24
+			},
+			"adp": {
+				"graded": 63,
+				"agreement": 0.69,
+				"placesOff": 11.0,
+				"starters": 20,
+				"startersOf": 24
+			}
+		},
+		{
+			"position": "WR",
+			"ours": {
+				"graded": 87,
+				"agreement": 0.59,
+				"placesOff": 17.5,
+				"starters": 24,
+				"startersOf": 36
+			},
+			"adp": {
+				"graded": 87,
+				"agreement": 0.58,
+				"placesOff": 18.0,
+				"starters": 25,
+				"startersOf": 36
+			}
+		},
+		{
+			"position": "TE",
+			"ours": {
+				"graded": 27,
+				"agreement": 0.47,
+				"placesOff": 6.2,
+				"starters": 8,
+				"startersOf": 12
+			},
+			"adp": {
+				"graded": 27,
+				"agreement": 0.36,
+				"placesOff": 6.7,
+				"starters": 7,
+				"startersOf": 12
+			}
+		}
+	],
+	"progress": [
+		{
+			"week": 1,
+			"ours": 0.44,
+			"adp": 0.45
+		},
+		{
+			"week": 2,
+			"ours": 0.52,
+			"adp": 0.52
+		},
+		{
+			"week": 3,
+			"ours": 0.55,
+			"adp": 0.55
+		},
+		{
+			"week": 4,
+			"ours": 0.54,
+			"adp": 0.54
+		},
+		{
+			"week": 5,
+			"ours": 0.55,
+			"adp": 0.55
+		}
+	]
+}

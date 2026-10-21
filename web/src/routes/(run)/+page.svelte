@@ -250,19 +250,29 @@
 			<aside class="side" aria-label="Our record">
 				<Panel>
 					<PanelHead title="Our record" aside={page.record.season.toString()} />
-					{#if headline.standing}<p class="standing">{headline.standing}</p>{/if}
-					<div class="figures">
-						<Figure value={headline.value} size="lg" caption={headline.caption} />
-						{#if headline.starters}
-							<Figure
-								value={headline.starters.value}
-								size="lg"
-								caption={RECORD_WORDS.frontStarters(headline.starters.caption)}
-							/>
-						{/if}
-					</div>
-					{#if headline.graded}<p class="record-note">{page.record.scale}</p>{/if}
-					{#if headline.gaps}<p class="record-note">{headline.gaps}</p>{/if}
+					{#if page.front}
+						<p class="standing">{page.front.name}</p>
+						<div class="figures">
+							<Figure value={page.front.value} size="lg" caption={page.front.caption} />
+						</div>
+						{#if page.front.second}<p class="record-note">{page.front.second}</p>{/if}
+						<p class="record-note">{page.front.scale}</p>
+						{#if page.front.note}<p class="record-note">{page.front.note}</p>{/if}
+					{:else}
+						{#if headline.standing}<p class="standing">{headline.standing}</p>{/if}
+						<div class="figures">
+							<Figure value={headline.value} size="lg" caption={headline.caption} />
+							{#if headline.starters}
+								<Figure
+									value={headline.starters.value}
+									size="lg"
+									caption={RECORD_WORDS.frontStarters(headline.starters.caption)}
+								/>
+							{/if}
+						</div>
+						{#if headline.graded}<p class="record-note">{page.record.scale}</p>{/if}
+						{#if headline.gaps}<p class="record-note">{headline.gaps}</p>{/if}
+					{/if}
 					<div class="more">
 						<Quiet href={links.record()} size="sm">How the board has done</Quiet>
 					</div>
