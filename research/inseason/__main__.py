@@ -9,7 +9,9 @@
 of the current week that kicked off has no final, up to four days past its kickoff (Lane 84), it asks
 Tank01's week of games once for their statuses (Lane 80, `pipeline/tank01/game_status.py`, at most two
 calls an hour), and a game that answer still has open, or leaves out, 3 h 30 m past its kickoff by its own box score
-(Lane 101, at most two a pass), so a game is final the hour after it ends.
+(Lane 101, at most two a pass), so a game is final the hour after it ends. Then, once an Eastern day from
+06:00, on what the pass left of its ten requests, the player list (Lane 110, B79), the one feed carrying
+each injured player's expected return (`injReturnDate`), which the API reads beside his designation.
 
 `usage-backfill` runs the weekly pass's usage steps alone (play-by-play and the three charted feeds)
 for every week nflverse has published: the operator's one-shot for weeks played before the steps
@@ -33,6 +35,7 @@ import logging
 import os
 import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Final
 
@@ -68,7 +71,12 @@ from research.pipeline.kickoffs import stored_kickoffs
 from research.pipeline.nws.client import NwsClient
 from research.pipeline.nws.forecast import FORECAST_SOURCE, run_forecast_pass
 from research.pipeline.odds.touchdowns import run_td_snapshot
-from research.pipeline.tank01.capture import CAPTURE_HARVEST_REQUEST_BUDGET, CaptureResult, run_capture_harvest
+from research.pipeline.tank01.capture import (
+    CAPTURE_HARVEST_REQUEST_BUDGET,
+    CaptureResult,
+    capture_return_dates,
+    run_capture_harvest,
+)
 from research.pipeline.tank01.client import API_KEY_ENV, DEFAULT_SEASON, SEASON_ENV, Tank01Client
 from research.pipeline.tank01.game_status import STATUS_SOURCE, capture_game_status
 from research.pipeline.tank01.lines import LINES_SOURCE, lines_after_harvest
@@ -209,7 +217,9 @@ def _capture_harvest(now: datetime) -> bool:
         facts_ok = _game_facts(engine, fetcher, result, now)
         # On what the harvest left of its request budget this pass (Lane 80).
         left = CAPTURE_HARVEST_REQUEST_BUDGET - sum(feed.requests for feed in result.feeds)
-        status_ok = _game_status(engine, Tank01Client(fetcher, key), now, season, FixedBudget(left))
+        status = _game_status(engine, Tank01Client(fetcher, key), now, season, FixedBudget(left))
+        # Last, on what the status left: the day's player list, for the return dates (Lane 110, B79).
+        returns_ok = _return_dates(engine, Tank01Client(fetcher, key), now, season, FixedBudget(left - status.requests))
     finally:
         fetcher.close()
         engine.dispose()
@@ -226,21 +236,42 @@ def _capture_harvest(now: datetime) -> bool:
     market = _touchdown_market(now, season)
     charts = _slot_depth_charts(now, season)
     _week_reads(now)
-    return not failed and facts_ok and status_ok and parsed and market and charts
+    return not failed and facts_ok and status.ok and returns_ok and parsed and market and charts
 
 
-def _game_status(engine: Engine, client: Tank01Client, now: datetime, season: int, budget: FixedBudget) -> bool:
+@dataclass(frozen=True)
+class _Status:
+    """The status step's verdict and the requests it made (the player list takes what is left)."""
+
+    ok: bool
+    requests: int
+
+
+def _game_status(engine: Engine, client: Tank01Client, now: datetime, season: int, budget: FixedBudget) -> _Status:
     """The games' statuses (Lane 80), in a transaction of their own so a refused read never rolls back
     the capture: its line names its requests, and a refusal by the hourly cap is not a failure. A
-    lagging game's refused or failed box score (Lane 101) fails the line; the week's read stands."""
+    lagging game's refused or failed box score (Lane 101) fails the line; the week's read stands. A
+    provider failure is counted as the week's one request, so the player list never spends it again."""
     try:
         with engine.begin() as conn:
             status = capture_game_status(conn, client, season, now, budget)
     except (ResearchError, httpx.HTTPError) as error:
         _line(f"  {STATUS_SOURCE}: FAILED, {error}")
-        return False
+        return _Status(False, min(budget.limit, 1))
     _line(f"  {STATUS_SOURCE}: {status.line}")
-    return not status.failed
+    return _Status(not status.failed, status.requests)
+
+
+def _return_dates(engine: Engine, client: Tank01Client, now: datetime, season: int, budget: FixedBudget) -> bool:
+    """The day's player list (Lane 110, B79) in a transaction of its own: its line when due, a failure
+    failing the job (the next hour asks again), a pass with no request left only named."""
+    with engine.begin() as conn:
+        outcome = capture_return_dates(conn, client, now, season, budget)
+    if outcome is None:
+        return True
+    reason = "" if outcome.reason is None else f", {outcome.reason}"
+    _line(f"  {outcome.source}: {outcome.status}, {outcome.requests} requests{reason}")
+    return outcome.status != "failed"
 
 
 def _week_reads(now: datetime) -> None:

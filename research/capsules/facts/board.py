@@ -15,6 +15,7 @@ from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
+from research.db.schema.provider import GAME_TO_PLAY
 from research.model.decide.roster import KDEF_DECISION
 from research.model.decide.slots import id_key
 from research.model.decide.value import (
@@ -113,7 +114,8 @@ def bye_weeks_by_team(conn: Connection, season: int) -> dict[str, int]:
     """`byeWeeksByTeam`: the one week in the fantasy regular season a team plays no game."""
     rows = conn.execute(
         text(
-            "select week, home_team, away_team from research.provider_games where season = :s and week between 1 and :last"
+            "select week, home_team, away_team from research.provider_games "
+            f"where season = :s and week between 1 and :last and {GAME_TO_PLAY}"
         ),
         {"s": season, "last": FANTASY_REGULAR_SEASON_WEEKS},
     )
