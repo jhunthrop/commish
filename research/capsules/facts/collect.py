@@ -158,8 +158,8 @@ class Population:
 
     positions: Mapping[str, Position]
     universe_ids: Mapping[str, str]
-    team_by_gsis: Mapping[str, str]
-    room_teams: Mapping[str, str] | None = None
+    team_by_gsis: Mapping[str, str | None]
+    room_teams: Mapping[str, str | None] | None = None
 
 
 def collect_color(
@@ -221,10 +221,8 @@ def collect_board_facts(conn: Connection, as_of: datetime, history: ReadThrough 
     board_positions = list(dict.fromkeys([*(row.position for row in rows), *market_order_positions_on_board(conn)]))
     positions = active_peers_for(conn, board_positions, PRODUCT_SEASON)
     universe_ids = universe_ids_for(conn, [row.player_id for row in rows])
-    # A free agent (no club, Lane 123) has no club's color to read.
-    team_by_gsis = {
-        universe_ids[row.player_id]: row.team for row in rows if row.player_id in universe_ids and row.team is not None
-    }
+    # A free agent (no club, Lane 123) is held as None: his own record, no club's facts (Lane 127, B103).
+    team_by_gsis = {universe_ids[row.player_id]: row.team for row in rows if row.player_id in universe_ids}
     color = collect_color(conn, Population(positions, universe_ids, team_by_gsis), as_of, history)
     injuries = injury_snapshot(conn, as_of)
     shared = SharedReads(
