@@ -80,9 +80,7 @@ func TestTheLeagueIsTheContext(t *testing.T) {
 	svc.Accounts = &account.Viewer{Entitlements: ents, Leagues: store, Now: time.Now}
 	accounts := &auth.Store{Pool: pool}
 	carol, dave := newAccount(t, accounts, "carol"), newAccount(t, accounts, "dave")
-	if err := ents.Grant(ctx, carol, entitlements.ProductMembership, 0, time.Now().AddDate(1, 0, 0), "test"); err != nil {
-		t.Fatal(err)
-	}
+	grantFrom(t, pool, carol, entitlements.ProductMembership, 0, svc.Now(), svc.Now().AddDate(1, 0, 0))
 	_, sleeperID, _ := attachAs(t, svc, carol, sleeperLink)
 	_, mflID, _ := attachAs(t, svc, carol, mflLink)
 	_, daveID, _ := attachAs(t, svc, dave, sleeperLink)

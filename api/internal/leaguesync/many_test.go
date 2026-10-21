@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -104,10 +103,7 @@ func TestAMembershipFollowsTwoLeagues(t *testing.T) {
 	ctx := context.Background()
 	svc := replayService(pool)
 	bob := newAccount(t, &auth.Store{Pool: pool}, "bob")
-	ents := &entitlements.Store{Pool: pool}
-	if err := ents.Grant(ctx, bob, entitlements.ProductMembership, 0, time.Now().AddDate(1, 0, 0), "test"); err != nil {
-		t.Fatal(err)
-	}
+	grantFrom(t, pool, bob, entitlements.ProductMembership, 0, svc.Now(), svc.Now().AddDate(1, 0, 0))
 	for _, link := range []string{sleeperLink, mflLink} {
 		if status, _, feature := attachAs(t, svc, bob, link); status != http.StatusCreated {
 			t.Fatalf("attach %s: %d %q", link, status, feature)
@@ -166,10 +162,7 @@ func TestImportScoring(t *testing.T) {
 	if status != http.StatusForbidden || e == nil || e.Feature == nil || *e.Feature != entitlements.CustomScoring {
 		t.Fatalf("without the pass: %d %+v", status, e)
 	}
-	ents := &entitlements.Store{Pool: pool}
-	if err := ents.Grant(context.Background(), alice, entitlements.ProductDraftPass, 2026, svc.Now().AddDate(0, 6, 0), "test"); err != nil {
-		t.Fatal(err)
-	}
+	grantFrom(t, pool, alice, entitlements.ProductDraftPass, 2026, svc.Now(), svc.Now().AddDate(0, 6, 0))
 	for _, c := range []struct{ host, link string }{{"sleeper", sleeperLink}, {"mfl", mflLink}} {
 		status, got, e := importAs(t, svc, alice, c.host, c.link)
 		if status != http.StatusOK || len(got.Applied) == 0 || len(got.Applied)+len(got.Defaulted) != len(scoring.Rules()) || got.Dropped == nil {

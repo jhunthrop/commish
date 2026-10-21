@@ -225,9 +225,7 @@ func TestAttachIsScopedToTheAccount(t *testing.T) {
 	}
 
 	// A second league needs many_leagues, so alice holds a Draft Pass for it.
-	if err := (&entitlements.Store{Pool: pool}).Grant(ctx, alice.ID, entitlements.ProductDraftPass, 2026, clock2027(), "test"); err != nil {
-		t.Fatal(err)
-	}
+	grantFrom(t, pool, alice.ID, entitlements.ProductDraftPass, 2026, svc.Now(), clock2027())
 	status, body = a.do(svc.attach, http.MethodPost, "/leagues/attach", apitypes.AttachInput{
 		Link: "https://www43.myfantasyleague.com/2026/home/" + ReplayMFLLeague, Me: apitypes.AttachSeat{Username: strp("alice")},
 	}, "")

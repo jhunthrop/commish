@@ -15,12 +15,9 @@ import (
 // A Draft Pass alone follows more than one league.
 func TestADraftPassFollowsTwoLeagues(t *testing.T) {
 	pool := dbtest.Pool(t)
-	ctx := context.Background()
 	svc := replayService(pool)
 	cara := newAccount(t, &auth.Store{Pool: pool}, "cara")
-	if err := (&entitlements.Store{Pool: pool}).Grant(ctx, cara, entitlements.ProductDraftPass, 2026, clock2027(), "test"); err != nil {
-		t.Fatal(err)
-	}
+	grantFrom(t, pool, cara, entitlements.ProductDraftPass, 2026, svc.Now(), clock2027())
 	for _, link := range []string{sleeperLink, mflLink} {
 		if status, _, feature := attachAs(t, svc, cara, link); status != http.StatusCreated {
 			t.Fatalf("attach %s: %d %q", link, status, feature)
