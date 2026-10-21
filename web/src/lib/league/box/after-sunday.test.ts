@@ -5,11 +5,16 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
 	FIXTURE_MONDAY_CLOCK,
+	FIXTURE_MONDAY_NIGHT_CLOCK,
 	FIXTURE_TUESDAY_CLOCK
 } from '../../../../scripts/inseason-fixture/clock.ts';
 import { lateFinals, stamped } from '../../../../scripts/inseason-fixture/game-state.ts';
 import { linesOf, recordedMatchups } from '../../../../scripts/inseason-fixture/scoreboard-at.ts';
-import { afterSundayOf, WEEK_DONE } from '../../../../scripts/inseason-fixture/sunday.ts';
+import {
+	afterSundayOf,
+	WEEK_DONE,
+	WEEK_DONE_KICKED_OFF
+} from '../../../../scripts/inseason-fixture/sunday.ts';
 import { inTenths } from '../../../../scripts/inseason-fixture/tenths.ts';
 import type { LeagueSync } from '../api.ts';
 import type {
@@ -117,6 +122,27 @@ void test("every starter of the member's final, the opponent's still playing: Lo
 	const monday = at(FIXTURE_MONDAY_CLOCK);
 	assert.equal(monday.lineup.week_done, null);
 	assert.equal(monday.lineup.week_done_state ?? null, null);
+});
+
+void test("Monday night, the member's last starter in play: Locked from the last kickoff, says kicked off (Lane 109)", () => {
+	const now = Date.parse(FIXTURE_MONDAY_NIGHT_CLOCK);
+	const night = at(FIXTURE_MONDAY_NIGHT_CLOCK);
+	const games = night.lineup.slots.filter(
+		(s) => !s.ours.facts.bye && s.ours.facts.kickoff !== null
+	);
+	assert.ok(games.every((s) => s.ours.facts.game_state !== 'upcoming'));
+	assert.ok(
+		games.some((s) => s.ours.facts.game_state === 'kicked_off'),
+		"a starter of the member's still in play"
+	);
+	assert.equal(night.lineup.week_done, WEEK_DONE_KICKED_OFF);
+	assert.equal(night.lineup.week_done_state, 'locked');
+	assert.ok(
+		night.lineup.slots.every((s) => !s.changed),
+		'nothing is left to set'
+	);
+	const card = lineupSummary(night.lineup, ZONE, now);
+	assert.equal(changesTitle(0, card.done, card.doneState), BOX.locked);
 });
 
 void test('the scoreboard and the Matchup print one figure for each side, its rows added (review M2)', () => {

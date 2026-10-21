@@ -22,22 +22,26 @@ func starterAt(state apitypes.GameState, bye bool) apitypes.LineupSlot {
 	return apitypes.LineupSlot{Ours: apitypes.PlayerLine{Facts: facts}}
 }
 
-// Every starter of the member's has played once every one's game is
-// final (Lane 85): one sentence from the API, a bye starter aside, none
-// while any starter's game is still to come or under way, none with no
-// starter who has a game. It says the lineup, never the week (Lane 91).
-func TestWeekDoneOnceEveryStartersGameIsFinal(t *testing.T) {
+// Nothing is left to set once every starter of the member's with a game
+// has kicked off (Lane 85, Lane 109): one sentence from the API from the
+// last kickoff, not the last final, a bye starter aside; it says "kicked
+// off" while any is still in play and "played" once every one is final;
+// none while any starter's game is still to come, none with no starter
+// who has a game. It says the lineup, never the week (Lane 91).
+func TestWeekDoneFromTheLastKickoff(t *testing.T) {
 	final, kicked, upcoming := apitypes.GameStateFinal, apitypes.GameStateKickedOff, apitypes.GameStateUpcoming
-	const said = "Every starter of yours has played, so nothing is left to set."
+	const played = "Every starter of yours has played, so nothing is left to set."
+	const kickedOff = "Every starter of yours has kicked off, so nothing is left to set."
 	cases := []struct {
 		name  string
 		slots []apitypes.LineupSlot
 		want  string
 	}{
-		{"every game final", []apitypes.LineupSlot{starterAt(final, false), starterAt(final, false)}, said},
-		{"a bye starter aside", []apitypes.LineupSlot{starterAt(final, false), starterAt("", true)}, said},
-		{"one kicked off", []apitypes.LineupSlot{starterAt(final, false), starterAt(kicked, false)}, ""},
-		{"one still to come", []apitypes.LineupSlot{starterAt(final, false), starterAt(upcoming, false)}, ""},
+		{"every game final", []apitypes.LineupSlot{starterAt(final, false), starterAt(final, false)}, played},
+		{"a bye starter aside", []apitypes.LineupSlot{starterAt(final, false), starterAt("", true)}, played},
+		{"the last one in play", []apitypes.LineupSlot{starterAt(final, false), starterAt(kicked, false)}, kickedOff},
+		{"every one in play, a bye aside", []apitypes.LineupSlot{starterAt(kicked, false), starterAt("", true)}, kickedOff},
+		{"one still to come", []apitypes.LineupSlot{starterAt(kicked, false), starterAt(upcoming, false)}, ""},
 		{"only byes", []apitypes.LineupSlot{starterAt("", true)}, ""},
 		{"no starter", nil, ""},
 	}
@@ -47,8 +51,8 @@ func TestWeekDoneOnceEveryStartersGameIsFinal(t *testing.T) {
 			t.Errorf("%s: %v, want %q", c.name, got, c.want)
 		}
 	}
-	if WeekDoneWords() != said {
-		t.Errorf("the words %q", WeekDoneWords())
+	if WeekDoneWords(true) != played || WeekDoneWords(false) != kickedOff {
+		t.Errorf("the words %q, %q", WeekDoneWords(true), WeekDoneWords(false))
 	}
 }
 
@@ -140,41 +144,60 @@ func lineupAnswer(t *testing.T, f fixture) apitypes.LineupAdvice {
 	return out
 }
 
-// A locked lineup is not a finished week (Lane 91): with every starter of
-// the member's final, the state is locked while any starter on the
-// opponent's side still has a game to play and final once both sides'
-// are, by the scoreboard's own count; a member with no opponent is final
-// on their own starters. A starter of theirs still to come: no sentence,
-// no state.
+// A locked lineup is not a finished week (Lane 91, Lane 109), through the
+// engine at the fixture's clock: with every starter of the member's past
+// kickoff the state is locked while any starter on either side is still
+// in play or to come and final once both sides' are final, by the
+// scoreboard's own count; a member with no opponent is final on their own
+// starters once all are final, locked while one is in play. The sentence
+// says "kicked off" while a starter of the member's is in play and
+// "played" once all are final. A starter of theirs still to come: no
+// sentence, no state.
 func TestWeekDoneStateIsTheMatchups(t *testing.T) {
+	played, kickedOff := WeekDoneWords(true), WeekDoneWords(false)
+	lastInPlay := func(f *fixture) {
+		one, _ := f.league.Snap.TeamByRoster(1)
+		last := f.league.Player(one.Starters[0]).Team
+		weekStates(f, everyClubBut(*f, last), map[string]bool{last: true})
+	}
+	alone := func(f *fixture) {
+		one, _ := f.league.Snap.TeamByRoster(1)
+		f.league.Snap.Matchups = []leaguesync.Side{{RosterID: 1, Game: 0, Starters: one.Starters}}
+	}
 	cases := []struct {
-		name string
-		set  func(f *fixture)
-		want apitypes.WeekDoneState
+		name  string
+		set   func(f *fixture)
+		words string
+		want  apitypes.WeekDoneState
 	}{
-		{"the opponent has one kicked off, one to come", func(f *fixture) {
+		{"the member's last starter in play", lastInPlay, kickedOff, apitypes.WeekDoneStateLocked},
+		{"the member's all final, the opponent's one in play, one to come", func(f *fixture) {
 			theirs := opponentOnly(*f)
 			if len(theirs) < 2 {
 				t.Fatalf("the fixture's opponent has %v apart", theirs)
 			}
 			// Every game final but the opponent's two apart: one under way, one to come.
 			weekStates(f, everyClubBut(*f, theirs[0], theirs[1]), map[string]bool{theirs[0]: true})
-		}, apitypes.WeekDoneStateLocked},
+		}, played, apitypes.WeekDoneStateLocked},
 		{"every starter on both sides final", func(f *fixture) {
 			weekStates(f, everyClubBut(*f), nil)
-		}, apitypes.WeekDoneStateFinal},
-		{"no opponent this week", func(f *fixture) {
+		}, played, apitypes.WeekDoneStateFinal},
+		{"no opponent this week, all final", func(f *fixture) {
 			one, _ := f.league.Snap.TeamByRoster(1)
 			weekStates(f, clubsOf(*f, one.Players), nil)
-			f.league.Snap.Matchups = []leaguesync.Side{{RosterID: 1, Game: 0, Starters: one.Starters}}
-		}, apitypes.WeekDoneStateFinal},
+			alone(f)
+		}, played, apitypes.WeekDoneStateFinal},
+		{"no opponent this week, the last one in play", func(f *fixture) {
+			lastInPlay(f)
+			alone(f)
+		}, kickedOff, apitypes.WeekDoneStateLocked},
 	}
 	for _, c := range cases {
 		f := pairedFixture(t)
 		c.set(&f)
 		got := lineupAnswer(t, f)
-		if got.WeekDone == nil || *got.WeekDone != WeekDoneWords() {
-			t.Fatalf("%s: week done %v", c.name, got.WeekDone)
+		if got.WeekDone == nil || *got.WeekDone != c.words {
+			t.Fatalf("%s: week done %v, want %q", c.name, got.WeekDone, c.words)
 		}
 		if got.WeekDoneState == nil {
 			t.Errorf("%s: no state, want %s", c.name, c.want)

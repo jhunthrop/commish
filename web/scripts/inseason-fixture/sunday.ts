@@ -7,8 +7,8 @@
 //     scoreboard-live.json by the same rules;
 //   - after the Sunday (afterSundayOf, on the Monday and Tuesday clocks): each game final by the API's
 //     rule at the fixture's clock (game-state.ts stateAt), the Lineup advised as the engine would with
-//     every kicked-off player locked, the scoreboard restated, and the finished week once every
-//     starter's game is final.
+//     every kicked-off player locked, the scoreboard restated, and the locked lineup once every
+//     starter's game has kicked off (Lane 109).
 import type { LeagueSync, MatchupSide } from '../../src/lib/league/api.ts';
 import type {
 	LineupAdvice,
@@ -70,29 +70,58 @@ function lineAt(line: PlayerLine, moment: Moment): PlayerLine {
 	};
 }
 
-/** The API's sentence once every starter of the member's has played (inseason words.go
- * WeekDoneWords), null while any is still to come or under way. */
+/** The API's sentence once every starter of the member's with a game is final (inseason words.go
+ * WeekDoneWords). */
 export const WEEK_DONE = 'Every starter of yours has played, so nothing is left to set.';
+/** The API's sentence once every one has kicked off and any is still in play (Lane 109). */
+export const WEEK_DONE_KICKED_OFF =
+	'Every starter of yours has kicked off, so nothing is left to set.';
 
-function weekDone(lineup: LineupAdvice, moment: Moment): string | null {
-	const games = lineup.slots.filter(({ ours }) => !ours.facts.bye && ours.facts.kickoff !== null);
-	if (games.length === 0 || !games.every(({ ours }) => moment.final(ours))) return null;
-	return WEEK_DONE;
+/** The starters with a game this week, a bye aside. */
+function startersWithGames(lineup: LineupAdvice): PlayerLine[] {
+	return lineup.slots.flatMap(({ ours }) =>
+		ours.facts.bye || ours.facts.kickoff === null ? [] : [ours]
+	);
 }
 
-/** The member's matchup once their starters have all played, as the API says it (inseason advice.go
- * weekDoneState, Lane 91): final when the scoreboard's game is or the member has no opponent, locked
- * while any starter on either side still has a game to play. */
-export function weekDoneState(scoreboard: Scoreboard, me: number): WeekDoneState {
+/** Whether every starter with a game has it final at the moment, false with none (advice.go
+ * everyStarterPast at final). */
+function everyStarterFinal(lineup: LineupAdvice, moment: Moment): boolean {
+	const games = startersWithGames(lineup);
+	return games.length > 0 && games.every((line) => moment.final(line));
+}
+
+/** The API's sentence from the last kickoff (advice.go weekDone, Lane 109): "kicked off" while any
+ * starter is in play, "played" once every one is final; null while any is still to come. */
+function weekDone(lineup: LineupAdvice, moment: Moment): string | null {
+	const games = startersWithGames(lineup);
+	if (games.length === 0 || !games.every((line) => kickedOffAt(line, moment.now))) return null;
+	return everyStarterFinal(lineup, moment) ? WEEK_DONE : WEEK_DONE_KICKED_OFF;
+}
+
+/** The member's matchup once their starters have all kicked off, as the API says it (inseason
+ * advice.go weekDoneState, Lane 91, Lane 109): final when the scoreboard's game is, or with no
+ * opponent once the member's own starters are all final; locked while any starter on either side is
+ * still in play or to come. */
+export function weekDoneState(
+	scoreboard: Scoreboard,
+	me: number,
+	everyFinal: boolean
+): WeekDoneState {
 	const mine = scoreboard.games.find((g) => g.sides[0]?.roster_id === me);
-	if (mine === undefined || mine.sides.length < 2) return 'final';
+	if (mine === undefined || mine.sides.length < 2) return everyFinal ? 'final' : 'locked';
 	return mine.state === 'final' ? 'final' : 'locked';
 }
 
 /** The Lineup at the moment: the roster advised again as the engine would then (advise.ts, engine.go
  * Lineup), every kicked-off player locked where the host has him, then each line with his points so
- * far; the matchup's state beside the sentence once every starter has played. */
-function lineupAt(lineup: LineupAdvice, moment: Moment, state: WeekDoneState): LineupAdvice {
+ * far; the matchup's state beside the sentence once every starter has kicked off. */
+function lineupAt(
+	lineup: LineupAdvice,
+	moment: Moment,
+	scoreboard: Scoreboard,
+	me: number
+): LineupAdvice {
 	const advised = advise(lineup, (line) => kickedOffAt(line, moment.now));
 	const done = weekDone(advised, moment);
 	// Our pick with no player held, against the lineup as set (miss.go, Lane 99).
@@ -117,7 +146,8 @@ function lineupAt(lineup: LineupAdvice, moment: Moment, state: WeekDoneState): L
 		})),
 		bench: advised.bench.map((l) => lineAt(l, moment)),
 		week_done: done,
-		week_done_state: done === null ? null : state,
+		week_done_state:
+			done === null ? null : weekDoneState(scoreboard, me, everyStarterFinal(advised, moment)),
 		missed
 	};
 }
@@ -180,7 +210,7 @@ function weekOf(
 		},
 		lineup: lineupWithFinal(
 			{
-				...lineupAt(lineup, moment, weekDoneState(scoreboard, sync.me)),
+				...lineupAt(lineup, moment, scoreboard, sync.me),
 				player_points: true,
 				team_points: total.get(sync.me) ?? null
 			},
