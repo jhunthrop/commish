@@ -275,3 +275,25 @@ def test_the_weekly_honest_line_says_where_espn_called_the_weeks_better() -> Non
     assert weekly_record.method(_FIRST_SHIPPED, []) == (
         "From week 7 we set our weekly rankings before each week's first kickoff and graded them on the week's points."
     )
+
+
+def test_the_draft_all_line_combines_the_positions_and_never_pools_raw_points() -> None:
+    """Review H1: quarterbacks out-project receivers on raw points, ADP's pick order does not. Within
+    each position ADP called the finish and our board reversed it, so the All line must say ADP led,
+    however our raw points line up across positions."""
+    board = [
+        {"player_id": "q1", "position": "QB", "board_points": 300.0, "adp": 20.0},
+        {"player_id": "q2", "position": "QB", "board_points": 290.0, "adp": 10.0},
+        {"player_id": "w1", "position": "WR", "board_points": 190.0, "adp": 1.0},
+        {"player_id": "w2", "position": "WR", "board_points": 200.0, "adp": 2.0},
+        {"player_id": "w3", "position": "WR", "board_points": 210.0, "adp": 3.0},
+    ]
+    totals = {"q1": 60.0, "q2": 90.0, "w1": 80.0, "w2": 70.0, "w3": 50.0}
+    every, *positions = draft_record.lines_for(board, totals)
+    assert [line.position for line in positions] == ["QB", "WR"]
+    assert all(line.ours.agreement == -1.0 and line.adp.agreement == 1.0 for line in positions)
+    assert (every.position, every.ours.graded) == ("All", len(board))
+    assert (every.ours.agreement, every.adp.agreement) == (-1.0, 1.0)
+    # Places off weighted by players graded: QB 1.0 over two players, WR 4/3 over three.
+    assert every.ours.places_off == pytest.approx((1.0 * 2 + (4 / 3) * 3) / len(board))
+    assert every.adp.places_off == 0.0

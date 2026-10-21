@@ -7,7 +7,8 @@ Create Date: 2026-10-20
 Lane 114 (the weekly record's yardsticks, Amendment 5 of the round 4 preregistration):
 - `espn_projection_rows`: ESPN's own weekly projection in PPR for every player its public player pool
   projects (ESPN's PPR league defaults, read with no sign-in), one row per player per read, append-only.
-  The in-season pass reads the coming week before it sets the order.
+  The in-season pass reads the coming week before it sets the order. The primary key (season, week,
+  read_at, espn_id) serves the freeze's newest-read lookup, so no other index.
 - `register_freeze_rows.espn_points`: his PPR points on the newest such read at or before the freeze,
   through `players.espn_id`, NULL where that read lists no row for him and on every freeze taken before
   this revision. Declared last and nullable, so a reader that predates it is unchanged.
@@ -39,9 +40,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("season", "week", "read_at", "espn_id"),
         schema=_SCHEMA,
     )
-    op.create_index(
-        "espn_projection_rows_week_idx", "espn_projection_rows", ["season", "week", "read_at"], schema=_SCHEMA
-    )
     op.add_column(
         "register_freeze_rows", sa.Column("espn_points", sa.Double(precision=53), nullable=True), schema=_SCHEMA
     )
@@ -49,5 +47,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column("register_freeze_rows", "espn_points", schema=_SCHEMA)
-    op.drop_index("espn_projection_rows_week_idx", table_name="espn_projection_rows", schema=_SCHEMA)
     op.drop_table("espn_projection_rows", schema=_SCHEMA)

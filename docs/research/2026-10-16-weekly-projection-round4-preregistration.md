@@ -1197,7 +1197,10 @@ claims.
      counted week, at QB, RB, WR and TE (the board's kickers and defenses follow the draft market's
      order). The measures are the record's: order matched, places off, and "top named", the season's
      top 12 QBs, 24 RBs, 36 WRs and 12 TEs so far that the order also put in its top 12, 24, 36 and 12.
-     This is the only record graded against ADP (`research/nightly/reads/draft_record.py`).
+     Every measure is graded within a position (our board's order among the quarterbacks against the
+     season's quarterback finishers, ADP's likewise); the All line is the position lines combined,
+     weighted by players graded, never raw points pooled across positions. This is the only record
+     graded against ADP (`research/nightly/reads/draft_record.py`).
    - *The weekly record* grades, from the first week a freeze kept the order the site ships
      (`commish_ros_shipped_ppr_12`, week 7 on this schedule), that order on the week's points beside the
      weekly yardsticks below, on the shipped order's frozen players with a stat line that week (no ADP

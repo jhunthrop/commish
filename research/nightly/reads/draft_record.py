@@ -7,7 +7,10 @@ graded on each player's season points to date (twelve-team PPR, the register's o
 in-season pass grades a week), refreshed each night with the weekly stats. This is the only record that
 grades against ADP.
 
-The players graded are the season's finishers both orders rank: frozen on the board, with an ADP, and
+Every measure is graded within a position (fix round 1): our board's order among the quarterbacks
+against the season's quarterback finishers, ADP's order among them likewise, and so on; the All line is
+the position lines combined, weighted by players graded (`combined`), never raw points pooled across
+positions. The players graded are the season's finishers both orders rank: frozen on the board, with an ADP, and
 with a stat line in a counted week, at quarterback, running back, receiver and tight end (the board's
 kickers and defenses follow the draft market's order, so grading them against it says nothing). The
 measures are the record's (`record.score_entries`): order matched, places off, and the season's top 12
@@ -130,15 +133,39 @@ def _entries(board: Sequence[Mapping[str, Any]], totals: Mapping[str, float], st
     return out
 
 
+def _weighted(values: Sequence[tuple[float | None, int]]) -> float | None:
+    """The mean of the figures held, each weighted by its players graded; None with none held."""
+    held = [(value, n) for value, n in values if value is not None and n > 0]
+    total = sum(n for _, n in held)
+    return None if total == 0 else sum(value * n for value, n in held) / total
+
+
+def combined(scores: Sequence[Score]) -> Score:
+    """Position lines combined into the All line (Lane 114 fix round 1, H1): order matched and places
+    off weighted by each position's players graded, top named summed. Never a grade of raw points pooled
+    across positions, which ranks a board's points against ADP's cross-position pick order."""
+    return Score(
+        sum(s.graded for s in scores),
+        _weighted([(s.agreement, s.graded) for s in scores]),
+        _weighted([(s.places_off, s.graded) for s in scores]),
+        sum(s.starters for s in scores),
+        sum(s.starters_of for s in scores),
+    )
+
+
 def lines_for(board: Sequence[Mapping[str, Any]], totals: Mapping[str, float]) -> tuple[DraftLine, ...]:
-    """All players, then each position present, both orders on the same finishers."""
+    """Each position graded on its own (our board's order among its players against their finish, ADP's
+    likewise), then All as those lines combined (`combined`), first."""
     lines = []
-    for position in (ALL, *DRAFT_POSITIONS):
-        subset = board if position == ALL else [row for row in board if row["position"] == position]
+    for position in DRAFT_POSITIONS:
+        subset = [row for row in board if row["position"] == position]
         ours, adp = _entries(subset, totals, "board_points"), _entries(subset, totals, "adp")
         if ours:
             lines.append(DraftLine(position, score_entries(ours), score_entries(adp)))
-    return tuple(lines)
+    if not lines:
+        return ()
+    every = DraftLine(ALL, combined([line.ours for line in lines]), combined([line.adp for line in lines]))
+    return (every, *lines)
 
 
 def read_draft(conn: Connection, season: int, as_of: datetime) -> DraftRecord | None:

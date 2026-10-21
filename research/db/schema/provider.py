@@ -234,7 +234,6 @@ ESPN_PROJECTION_ROWS: Final = Table(
     Column("espn_id", Text, primary_key=True),
     Column("ppr_points", Double(53), nullable=False),
     recorded_at(),
-    Index("espn_projection_rows_week_idx", "season", "week", "read_at"),
 )
 
 # The anytime-touchdown market (revision 0009): a Yes price, and a No price where the book quotes one,
