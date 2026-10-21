@@ -239,7 +239,7 @@ func TestBeatsReadsTheSeasonPlaceThroughTheEngine(t *testing.T) {
 	f := newFixture(t)
 	for _, now := range []time.Time{saturdayNoon, tuesdayNoon} {
 		out := pickupPage(t, f, now, "")
-		a, err := newAdvisor(f.league, f.data, everyoneProjected(f), nil, now)
+		a, err := newAdvisor(f.league, f.data, everyoneProjected(f), nil, now, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

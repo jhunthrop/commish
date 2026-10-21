@@ -30,7 +30,7 @@ func runESPNWeekReads(ctx context.Context, log *slog.Logger, cfg config.API, poo
 		return err
 	}
 	e := newESPNWiring(cfg, pool, ff, log)
-	board, closeBoard, err := draftroom.OpenBoards(pool, cfg.Board, time.Now)
+	board, closeBoard, err := draftroom.OpenBoards(pool, cfg.Board, time.Now, log)
 	if err != nil {
 		return err
 	}

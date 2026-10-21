@@ -1,6 +1,7 @@
 package draftroom
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,8 +13,8 @@ import (
 
 // OpenBoards is the rooms' board reader as configured: the research
 // tables through app's own pool, or through a pool of their own when
-// BOARD_DATABASE_URL names another database. close releases that pool.
-func OpenBoards(app *pgxpool.Pool, c config.Board, now func() time.Time) (*Boards, func(), error) {
+// BOARD_DATABASE_URL names another database. close releases that pool. log takes each board read's duration.
+func OpenBoards(app *pgxpool.Pool, c config.Board, now func() time.Time, log *slog.Logger) (*Boards, func(), error) {
 	pool, closeFn := app, func() {}
 	if c.DatabaseURL != "" {
 		own, err := db.Open(c.DatabaseURL)
@@ -27,5 +28,5 @@ func OpenBoards(app *pgxpool.Pool, c config.Board, now func() time.Time) (*Board
 		closeFn()
 		return nil, nil, err
 	}
-	return &Boards{Raw: &boards.Cache{Source: source, TTL: c.TTL, Now: now}, Schedule: source}, closeFn, nil
+	return &Boards{Raw: &boards.Cache{Source: source, TTL: c.TTL, Now: now, Log: log}, Schedule: source}, closeFn, nil
 }

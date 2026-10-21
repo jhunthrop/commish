@@ -126,7 +126,7 @@ func TestTheOrderAgreesRowByRowAfterTheRevalue(t *testing.T) {
 	f := restFixture(t)
 	f.league.Board.FromWeek, f.league.Board.Refreshed = 6, restRunInstant
 	sundayEvening := restSunday.Add(5 * time.Hour)
-	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, sundayEvening)
+	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, sundayEvening, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

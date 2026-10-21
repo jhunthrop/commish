@@ -221,7 +221,7 @@ func TestTheGainLineNamesTheWeeksAtTheClock(t *testing.T) {
 				f.data.Games[i].Final = c.final
 			}
 		}
-		a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, c.now)
+		a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, c.now, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

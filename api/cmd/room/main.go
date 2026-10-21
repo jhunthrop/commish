@@ -76,7 +76,7 @@ func run(ctx context.Context, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	draftBoards, closeBoards, err := draftroom.OpenBoards(pool, cfg.Board, time.Now)
+	draftBoards, closeBoards, err := draftroom.OpenBoards(pool, cfg.Board, time.Now, log)
 	if err != nil {
 		return err
 	}

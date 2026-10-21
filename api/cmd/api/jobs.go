@@ -192,7 +192,7 @@ func runGrant(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpo
 	switch entitlements.Product(args[1]) {
 	case entitlements.ProductDraftPass:
 		// The one sale-season rule, read from the schedule as checkout does.
-		draftBoards, closeBoards, openErr := draftroom.OpenBoards(pool, cfg.Board, time.Now)
+		draftBoards, closeBoards, openErr := draftroom.OpenBoards(pool, cfg.Board, time.Now, log)
 		if openErr != nil {
 			return openErr
 		}

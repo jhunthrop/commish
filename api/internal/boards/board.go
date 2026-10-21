@@ -200,6 +200,36 @@ func For(raw *Raw, teams int, slots []draft.SlotConfig) (Board, error) {
 	return b, nil
 }
 
+// Identity is what a board's figures follow from: its points (the Raw,
+// one pointer per load, so a new run is a new identity), the league it is
+// valued for and the order it says. Two boards of one identity are the
+// same board, so a figure built from one serves the other (Lane 112).
+type Identity struct {
+	raw       *Raw
+	teams     int
+	slots     string
+	rankedFor string
+	order     Order
+	refreshed int64
+	fromWeek  int
+}
+
+// Identity is the board's identity.
+func (b Board) Identity() Identity {
+	return Identity{raw: b.Raw, teams: b.teams, slots: SlotKey(b.slots), rankedFor: b.RankedFor, order: b.Order,
+		refreshed: b.Refreshed.UnixNano(), fromWeek: b.FromWeek}
+}
+
+// SlotKey is starting slots as one comparable string: each slot and its
+// count, in order.
+func SlotKey(slots []draft.SlotConfig) string {
+	var sb strings.Builder
+	for _, s := range slots {
+		fmt.Fprintf(&sb, "%s:%d;", s.Slot, s.Count)
+	}
+	return sb.String()
+}
+
 // Rescaled is the board with each player's points given by points (a
 // player it does not name keeps his), valued again for the same league:
 // a new Raw and a new Board, the receiver untouched. Order, Refreshed,

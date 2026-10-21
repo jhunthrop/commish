@@ -86,7 +86,7 @@ func TestAddressedWeekAtTheClock(t *testing.T) {
 		{"Thursday morning", thursdayMorning, 7},
 	} {
 		f, data := turnFixture(t, tc.now)
-		a, err := newAdvisor(f.league, data, boards.WeekProjection{}, nil, tc.now)
+		a, err := newAdvisor(f.league, data, boards.WeekProjection{}, nil, tc.now, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

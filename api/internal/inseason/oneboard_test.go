@@ -29,7 +29,7 @@ func TestEverySignedInScreenReadsTheBoardAtTheClock(t *testing.T) {
 		games = append(games, g)
 	}
 	f.data.Games = games
-	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, friday)
+	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, friday, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

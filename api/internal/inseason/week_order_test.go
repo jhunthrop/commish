@@ -70,7 +70,7 @@ func newWeekOrderFixture(t *testing.T) weekOrderFixture {
 
 func (f weekOrderFixture) advisor(t *testing.T, projection boards.WeekProjection, now time.Time) *advisor {
 	t.Helper()
-	a, err := newAdvisor(f.league, f.data, projection, nil, now)
+	a, err := newAdvisor(f.league, f.data, projection, nil, now, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

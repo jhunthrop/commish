@@ -26,7 +26,7 @@ func TestTheAnswersReadThePerPlatformRule(t *testing.T) {
 		want bool
 	}{{leaguesync.HostESPN, true}, {leaguesync.HostSleeper, true}, {leaguesync.HostYahoo, false}, {leaguesync.HostFFPC, false}} {
 		f := onHost(t, c.host)
-		a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, sundayAfternoon)
+		a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, sundayAfternoon, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

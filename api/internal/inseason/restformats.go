@@ -48,8 +48,9 @@ type liveFormat struct {
 }
 
 // liveRunBoards is every run format's board at now, the first PPR's (the
-// read with no league's board).
-func liveRunBoards(ctx context.Context, src BoardSource, games []boards.TeamWeek, now time.Time) ([]liveFormat, error) {
+// read with no league's board). lives keeps each across requests (nil
+// builds them afresh).
+func liveRunBoards(ctx context.Context, src BoardSource, games []boards.TeamWeek, now time.Time, lives *LiveBoards) ([]liveFormat, error) {
 	formats := RunFormats()
 	out := make([]liveFormat, 0, len(formats))
 	for _, f := range formats {
@@ -57,8 +58,7 @@ func liveRunBoards(ctx context.Context, src BoardSource, games []boards.TeamWeek
 		if err != nil {
 			return nil, fmt.Errorf("inseason: the %s board: %w", f.Format, err)
 		}
-		rest := RestAt(games, b.FromWeek, b.Refreshed, now, StandardHorizon.Reaching(b.FromWeek))
-		live, err := LiveBoard(b, rest)
+		live, rest, err := lives.At(b, games, StandardHorizon.Reaching(b.FromWeek), now)
 		if err != nil {
 			return nil, fmt.Errorf("inseason: the %s board at the read's clock: %w", f.Format, err)
 		}

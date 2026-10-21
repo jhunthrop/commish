@@ -112,7 +112,7 @@ func (s *Service) playerWeek(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := s.Now()
-	lives, err := liveRunBoards(ctx, s.Boards, data.Games, now)
+	lives, err := liveRunBoards(ctx, s.Boards, data.Games, now, s.Lives)
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "inseason: player week board", err)
 		return
@@ -145,7 +145,7 @@ func (s *Service) withRest(ctx context.Context, out *apitypes.PlayerWeek, bp boa
 	if err != nil {
 		return err
 	}
-	lives, err := liveRunBoards(ctx, s.Boards, data.Games, s.Now())
+	lives, err := liveRunBoards(ctx, s.Boards, data.Games, s.Now(), s.Lives)
 	if err != nil {
 		return err
 	}

@@ -114,7 +114,7 @@ func fixtureProjection(f fixture) boards.WeekProjection {
 // it naming the platform.
 func TestTradeAnswersCarryTheWeekAndTheTotals(t *testing.T) {
 	f := newFixture(t)
-	a, err := newAdvisor(f.league, f.data, fixtureProjection(f), nil, fixtureNow)
+	a, err := newAdvisor(f.league, f.data, fixtureProjection(f), nil, fixtureNow, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
