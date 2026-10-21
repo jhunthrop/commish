@@ -75,7 +75,7 @@ export function contextNote(
 	if (league.format !== figures) {
 		if (leagueBoardOnRun) return plain(`${scores} ${figuresAre}.`);
 		const lower = figuresAre.charAt(0).toLowerCase() + figuresAre.slice(1);
-		return plain(`${scores} This run has no ${figuresWords(league.format)} board, so ${lower}.`);
+		return plain(`${scores} We have no ${figuresWords(league.format)} board yet, so ${lower}.`);
 	}
 	if (league.scoring === 'te_premium') {
 		return exactNote(

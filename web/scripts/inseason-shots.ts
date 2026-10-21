@@ -283,9 +283,13 @@ const TRADES_FOLD_AT = 900;
 /** A gain or a week's change as its cell prints it. */
 const SIGNED = /^([+−]\d+\.\d|0\.0|--)$/;
 const TRADE_BASIS_FIRST =
-	"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is a lineup's change in points over replacement a week,";
+	"Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot.";
+/** What a Gain is, once under the finder's heads (Lane 103, B42). */
+const GAIN_BASIS = /^points over replacement in each lineup, weeks? \d+/;
+/** A card's gains in a player's words (Lane 103, B42). */
+const CARD_GAINS = /[+−]\d+\.\d a week for your lineup, [+−]\d+\.\d for theirs/;
 /** A trade's week in one line, from the API's two changes (review H2). */
-const WEEK_LINE = /[+−]?\d+\.\d Proj for you this week, [+−]?\d+\.\d for them/;
+const WEEK_LINE = /[+−]?\d+\.\d Proj this week for your lineup, [+−]?\d+\.\d for theirs/;
 
 /** What the Trades table draws wrong at a width: its heads, its cells, its strip and its basis. */
 async function tradeFaults(page: Page, width: number): Promise<string[]> {
@@ -307,6 +311,11 @@ async function tradeFaults(page: Page, width: number): Promise<string[]> {
 			rows: table?.querySelectorAll(':scope > tbody > tr.trade').length ?? 0,
 			basis: document.querySelector('main [data-basis]')?.textContent.trim() ?? '',
 			cards: [...document.querySelectorAll('main .card')].map((c) => (c as HTMLElement).innerText),
+			// Each card's verb as it draws (Lane 103, B65): one look for the one verb.
+			verbLooks: [...document.querySelectorAll('main .card .act .action')].map((a) => a.className),
+			gainBasis: [...(table?.querySelectorAll(':scope > thead tr.gain-basis td.gb') ?? [])]
+				.filter((td) => (td as HTMLElement).offsetParent !== null)
+				.map((td) => (td as HTMLElement).innerText.trim()),
 			// The member's drop as each row says it where it is drawn (review M3).
 			drops: [...(table?.querySelectorAll(':scope > tbody > tr.trade') ?? [])].filter((tr) =>
 				[...tr.querySelectorAll<HTMLElement>('td.room span, .drop-mid, .ph-with')].some(
@@ -330,13 +339,15 @@ async function tradeFaults(page: Page, width: number): Promise<string[]> {
 	if (seen.cards.length === 0 || seen.cards.length > 2)
 		faults.push(`${String(seen.cards.length)} cards`);
 	for (const card of seen.cards) {
-		if (
-			!card.includes(TRADE_VERB) ||
-			!/[+−]\d+\.\d Gain a week for you/.test(card) ||
-			!WEEK_LINE.test(card)
-		)
+		if (!card.includes(TRADE_VERB) || !CARD_GAINS.test(card) || !WEEK_LINE.test(card))
 			faults.push(`card ${card.replace(/\s+/g, ' ')}`);
 	}
+	if (new Set(seen.verbLooks).size > 1)
+		faults.push(`card verbs drawn ${String(new Set(seen.verbLooks).size)} ways`);
+	if (seen.cards.length > 1 && !/^Best\b/i.test(seen.cards[0] ?? ''))
+		faults.push('the first card does not say Best');
+	if (seen.gainBasis.length !== 1 || !GAIN_BASIS.test(seen.gainBasis[0] ?? ''))
+		faults.push(`gain basis ${seen.gainBasis.join(' | ')}`);
 	if (seen.drops === 0) faults.push('no row says the drop');
 	if (!seen.basis.startsWith(TRADE_BASIS_FIRST)) faults.push(`basis opens ${seen.basis}`);
 	const all = seen.basis;

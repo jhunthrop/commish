@@ -3305,6 +3305,8 @@ export interface components {
 			played: number;
 			/** @description while the game is playing, where the side's starters stand, never a zero: "3 to play" while any starter with a game is still to come (an out starter whose game is still to come counts), "2 playing" once none is and some are in play; null once every starter is final, on bye or out of a game under way, before kickoff, or absent from an older answer */
 			to_play?: string | null;
+			/** @description the side's starters whose own game has kicked off and is not final at the read's clock (gameStateAt), an out starter not counted: 0 before kickoff, between games (a Thursday starter final, Sunday's still to come) and once every starter is final; absent from an older answer, which reads as none in play */
+			in_play?: number;
 			/**
 			 * Format: double
 			 * @description the side's projected final once any starter of the game has kicked off: points (the platform's score so far), plus for each starter in play the rest of his week projection (max(0, Proj - his points so far), nothing where the platform gives no player's points), plus the week projection of each starter still to play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, or absent from an older answer
@@ -3742,6 +3744,8 @@ export interface components {
 			 * @description the same for theirs
 			 */
 			their_proj_change: number | null;
+			/** @description the trade's sentence when the need is why it is listed (Lane 103): it sends out a player we rank first at his position for under 1.0 a week and fills a starting spot of the drafter's lineup for the week the page addresses that no one of his who can play fills, leaving no other spot empty ("Fills your empty WR2 while Gibbs sits on bye."); null on every other row, absent from an older answer */
+			need?: string | null;
 		};
 		TradeTeam: {
 			roster_id: number;
@@ -3750,7 +3754,7 @@ export interface components {
 			record: components['schemas']['TradeRecord'];
 			/** @description every player on their active roster (injured reserve and taxi spots left out), by position then name: the builder's players on their side */
 			roster: components['schemas']['PlayerLine'][];
-			/** @description at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first */
+			/** @description at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first; a trade sending out the top player at his position in our order only when it gains the drafter's lineup 1.0 a week or more or fills a need (Lane 103) */
 			trades: components['schemas']['TradeRow'][];
 			/** @description one sentence when every trade found with this team is a close call for them, else null */
 			note: string | null;
@@ -3878,8 +3882,10 @@ export interface components {
 			check_basis: string;
 			/** @description what the opened rows' points a game is, said only while a trade is opened or the builder is open; empty when no player shown carries the figure */
 			per_game_basis: string;
-			/** @description which trades are listed, who decides and what a Gain is */
+			/** @description which trades are listed (a trade sending out the top player at his position in our order only when it gains the drafter's lineup 1.0 a week or more or fills an empty spot, Lane 103) and who decides */
 			basis: string;
+			/** @description the line under the finder's Gain head: whose points and the weeks a Gain is a week over ("points over replacement in each lineup, weeks 7 to 17", Lane 103); absent from an older answer */
+			gain_basis?: string;
 			/** @description every player on the drafter's active roster (injured reserve and taxi spots left out), by position then name: the picker's own players, a trade found or not */
 			roster: components['schemas']['PlayerLine'][];
 			/** @description the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none */

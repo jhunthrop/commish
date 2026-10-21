@@ -4,7 +4,7 @@
 	import type { PlayerRef } from '#lib/types/player.ts';
 	import PlayerLine from './PlayerLine.svelte';
 	import Figure from './Figure.svelte';
-	import { tierColor, type GroupName, type TierCliff } from './tier.ts';
+	import { tierColor, tierInk, type GroupName, type TierCliff } from './tier.ts';
 
 	interface Mate extends PlayerRef {
 		href: string;
@@ -35,7 +35,7 @@
 	);
 </script>
 
-<div class="mates" style:--tier={tierColor(tier)}>
+<div class="mates" style:--tier={tierColor(tier)} style:--tier-ink={tierInk(tier)}>
 	<div class="band">
 		<span class="strip">{tier}</span>
 		<span class="what"><b>Tier {tier} {group.many}</b><span>{drop}</span></span>

@@ -3931,6 +3931,9 @@ type ScoreboardGameState string
 
 // ScoreboardSide defines model for ScoreboardSide.
 type ScoreboardSide struct {
+	// InPlay the side's starters whose own game has kicked off and is not final at the read's clock (gameStateAt), an out starter not counted: 0 before kickoff, between games (a Thursday starter final, Sunday's still to come) and once every starter is final; absent from an older answer, which reads as none in play
+	InPlay *int `json:"in_play,omitempty"`
+
 	// Played those starters whose game has kicked off
 	Played int `json:"played"`
 
@@ -4174,7 +4177,7 @@ type TierMate struct {
 
 // TradeAdvice defines model for TradeAdvice.
 type TradeAdvice struct {
-	// Basis which trades are listed, who decides and what a Gain is
+	// Basis which trades are listed (a trade sending out the top player at his position in our order only when it gains the drafter's lineup 1.0 a week or more or fills an empty spot, Lane 103) and who decides
 	Basis string `json:"basis"`
 
 	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none
@@ -4188,6 +4191,9 @@ type TradeAdvice struct {
 
 	// ForWeek the week the page addresses (Lane 95): week, or the week after once every starter of the member's with a game has kicked off or is final; the rows' facts and Proj changes are that week's; absent from an older answer
 	ForWeek *int `json:"for_week,omitempty"`
+
+	// GainBasis the line under the finder's Gain head: whose points and the weeks a Gain is a week over ("points over replacement in each lineup, weeks 7 to 17", Lane 103); absent from an older answer
+	GainBasis *string `json:"gain_basis,omitempty"`
 
 	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
 	HostNote *string `json:"host_note"`
@@ -4326,6 +4332,9 @@ type TradeRow struct {
 	// MyProjChange this week's Proj total of the drafter's lineup with the trade less without it, each lineup set as the Lineup screen sets it (Lane 66g), one decimal; null when the week has no published projection read
 	MyProjChange *float64 `json:"my_proj_change"`
 
+	// Need the trade's sentence when the need is why it is listed (Lane 103): it sends out a player we rank first at his position for under 1.0 a week and fills a starting spot of the drafter's lineup for the week the page addresses that no one of his who can play fills, leaving no other spot empty ("Fills your empty WR2 while Gibbs sits on bye."); null on every other row, absent from an older answer
+	Need *string `json:"need,omitempty"`
+
 	// TheirGain the same to theirs
 	TheirGain float64 `json:"their_gain"`
 
@@ -4361,7 +4370,7 @@ type TradeTeam struct {
 	Roster   []PlayerLine `json:"roster"`
 	RosterId int          `json:"roster_id"`
 
-	// Trades at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first
+	// Trades at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first; a trade sending out the top player at his position in our order only when it gains the drafter's lineup 1.0 a week or more or fills a need (Lane 103)
 	Trades []TradeRow `json:"trades"`
 }
 

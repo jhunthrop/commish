@@ -291,7 +291,7 @@
 				<span class="pin-gains"
 					>{#if answer}<b>{gainWord(answer.trade.my_gain)}</b>
 						{TRADES.aWeekForYou}, {gainWord(answer.trade.their_gain)}
-						{TRADES.forThem}{:else}{sentence}{/if}</span
+						{TRADES.forTheirs}{:else}{sentence}{/if}</span
 				>
 				{@render action(false)}
 				{#if copied}<span class="pin-said"><TradeCopied line={copied} href={page} /></span>{/if}

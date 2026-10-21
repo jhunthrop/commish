@@ -40,7 +40,7 @@ export const FEATURE_WORDS: Readonly<Record<Feature, FeatureWords>> = {
 	},
 	early_run: {
 		lead: 'The nightly board an hour early',
-		text: "each night's run an hour before the public board"
+		text: "each night's board an hour before the public one"
 	},
 	start_sit: {
 		lead: 'Who to start this week',

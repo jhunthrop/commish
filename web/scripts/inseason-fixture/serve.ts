@@ -37,7 +37,7 @@ import { ffpcStandIn } from './ffpc.ts';
 import { afterSundayOf, SUNDAY, sundayOf } from './sunday.ts';
 import { linesOf, recordedMatchups, scoreboardAt } from './scoreboard-at.ts';
 import { inSeason, noWeek } from './member-week.ts';
-import { inTenths } from './tenths.ts';
+import { inTenths, roundTenth } from './tenths.ts';
 import { FIXTURE_CLOCK_VARIABLE, FIXTURE_MONDAY_CLOCK, fixtureClock } from './clock.ts';
 import { stamped, stateAt } from './game-state.ts';
 import {
@@ -51,6 +51,7 @@ import {
 import { CLAIM_FORM_WORDS, HOLD_MS, HOST_ID, espnMoves } from './espn-moves.ts';
 import { weekOrderAnswer, weekPosition, type WeekOrderStates } from './week-order-serve.ts';
 import { tradeChecker } from './trade-check.ts';
+import { proposedTrades } from './trade-needs.ts';
 import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
 import { finalWords, rateWords, titleWeekHorizon } from './week.ts';
 import { lineupSpent, TURNED_WEEK, turnedLineup, turnedTrades, turnedWaivers } from './turn.ts';
@@ -128,7 +129,7 @@ const [
 	recordedSync,
 	lineupRead,
 	waiversRead,
-	trades,
+	tradesRead,
 	gameWeek,
 	matchupBox,
 	scoreboardLive,
@@ -160,6 +161,8 @@ const sync: LeagueSync =
 /** The sense check's case on the fixture when asked (waiver-beats.ts, Lane 98). */
 const irDrop = process.env[IR_DROP_VARIABLE] === '1';
 const lineup = irDrop ? irDropLineup(lineupRead) : lineupRead;
+/** The trades as the API's search lists them, each need named (trade-needs.ts, Lane 103). */
+const trades = proposedTrades(tradesRead, lineup);
 /** The adds the API lists (waiver-beats.ts listedAdd), before any order is taken over them. */
 const waivers = listedOnly(irDrop ? irDropWaivers(waiversRead) : waiversRead);
 
@@ -250,6 +253,76 @@ const afterSunday = (): boolean => now() >= AFTER_SUNDAY;
 /** The API's sentence for an FFPC read FFPC signed out of (leaguesync HostProblemWords). */
 const FFPC_AGAIN = 'FFPC signed you out. Sign in to FFPC again to keep reading your league.';
 
+/** FIXTURE_LEAD_FINAL=1 (Lane 102, B38): the Sleeper league's game read final, every starter's
+ * points his last, while the ESPN stand-in's Monday night game is still under way, so the front door
+ * leads with the live league's card ahead of the selected one. A stand-in of the sense check's
+ * Monday night, never the recorded week. */
+const leadFinal = process.env.FIXTURE_LEAD_FINAL === '1';
+
+/** A league's game as final: no starter to play, each side's projected final its points. */
+function finalGame(
+	league: components['schemas']['WeekLeague']
+): components['schemas']['WeekLeague'] {
+	if (league.bug === null) return league;
+	const game = league.bug.game;
+	return {
+		...league,
+		bug: {
+			...league.bug,
+			first: [],
+			game: {
+				...game,
+				state: 'final',
+				next_kickoff: null,
+				to_play: null,
+				sides: game.sides.map((side) => ({
+					...side,
+					played: side.starters,
+					to_play: null,
+					in_play: 0,
+					projected_final: side.points
+				}))
+			}
+		}
+	};
+}
+
+/** The ESPN stand-in's opponent under FIXTURE_LEAD_FINAL (review LOW-5): its own name and score, so
+ * the live card and the selected league's never read as one game. A stand-in, named so. */
+const LIVE_RIVAL = { name: 'Office Rival (stand-in)', points: 12.4 };
+
+function ownOpponent(
+	league: components['schemas']['WeekLeague']
+): components['schemas']['WeekLeague'] {
+	const bug = league.bug;
+	const rival = bug?.game.sides[1];
+	if (bug === null || rival === undefined) return league;
+	return {
+		...league,
+		bug: {
+			...bug,
+			teams: bug.teams.map((team) =>
+				team.roster_id === rival.roster_id ? { ...team, name: LIVE_RIVAL.name } : team
+			),
+			game: {
+				...bug.game,
+				sides: bug.game.sides.map((side) =>
+					side.roster_id === rival.roster_id
+						? {
+								...side,
+								points: roundTenth(side.points + LIVE_RIVAL.points),
+								projected_final:
+									side.projected_final == null
+										? null
+										: roundTenth(side.projected_final + LIVE_RIVAL.points)
+							}
+						: side
+				)
+			}
+		}
+	};
+}
+
 /** GET /me/week: every league the front door shows, the Sleeper league first. */
 function memberWeek(): components['schemas']['MemberWeek'] {
 	const at = readAt();
@@ -265,21 +338,28 @@ function memberWeek(): components['schemas']['MemberWeek'] {
 		team_name: contextBase.team_name,
 		standing: contextBase.standing
 	};
+	const lead = (
+		league: components['schemas']['WeekLeague']
+	): components['schemas']['WeekLeague'] => (leadFinal ? finalGame(league) : league);
 	return {
 		leagues: [
-			inSeason(
-				LEAGUE,
-				{
-					...sleeperWeek,
-					waivers: waiversNow(),
-					readAt: at,
-					...(turnedNow()
-						? { turned: { week: TURNED_WEEK, lineup: turnedLineup(lineupNow()) } }
-						: {})
-				},
-				when
+			lead(
+				inSeason(
+					LEAGUE,
+					{
+						...sleeperWeek,
+						waivers: waiversNow(),
+						readAt: at,
+						...(turnedNow()
+							? { turned: { week: TURNED_WEEK, lineup: turnedLineup(lineupNow()) } }
+							: {})
+					},
+					when
+				)
 			),
-			inSeason(ESPN_DONE, { ...espnWeek, waivers: espnWaivers(null), readAt: at }, when),
+			((espn) => (leadFinal ? ownOpponent(espn) : espn))(
+				inSeason(ESPN_DONE, { ...espnWeek, waivers: espnWaivers(null), readAt: at }, when)
+			),
 			noWeek(
 				NO_TEAM,
 				{ ...base, name: 'Main Event (FFPC stand-in)', host: 'ffpc', phase: 'in_season' },

@@ -118,14 +118,18 @@ export function turnedTrades(trades: TradeAdvice): TradeAdvice {
 		teams: trades.teams.map((team) => ({
 			...team,
 			roster: team.roster.map(turnedLine),
-			trades: team.trades.map((row) => ({
-				...row,
-				give: row.give.map(turnedLine),
-				get: row.get.map(turnedLine),
-				drop: row.drop && turnedLine(row.drop),
-				my_proj_change: null,
-				their_proj_change: null
-			}))
+			// A row listed only for week 6's need (its need said) has none in week 7, whose lineup the
+			// stand-in does not set: the keep rule leaves it out (Lane 103 fix round 1, MEDIUM-1).
+			trades: team.trades
+				.filter((row) => (row.need ?? null) === null)
+				.map((row) => ({
+					...row,
+					give: row.give.map(turnedLine),
+					get: row.get.map(turnedLine),
+					drop: row.drop && turnedLine(row.drop),
+					my_proj_change: null,
+					their_proj_change: null
+				}))
 		}))
 	};
 }

@@ -15,7 +15,13 @@ export interface RunStamp {
 	formats: string[];
 }
 
-/** "Run of Oct 12", or "Stand-in run of Oct 12" before the first real run. */
+/** The stamp's words: "run" is our word, never the page's (B53). */
+export const STAMP_WORDS = {
+	updated: 'Updated',
+	standIn: 'Stand-in, updated'
+} as const;
+
+/** "Updated Oct 12", or "Stand-in, updated Oct 12" before the first real run. */
 export function runStampText(run: RunStamp): string {
-	return `${run.standIn ? 'Stand-in run' : 'Run'} of ${dayLabel(run.runAt)}`;
+	return `${run.standIn ? STAMP_WORDS.standIn : STAMP_WORDS.updated} ${dayLabel(run.runAt)}`;
 }

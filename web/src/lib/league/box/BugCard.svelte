@@ -16,15 +16,20 @@
 		size?: 'md' | 'lg';
 		/** The league's name above the head, where bugs of several leagues sit together. */
 		label?: string | null;
+		/** A word leading the label in the live colour: "Live now" on a live league's card that leads
+		 * the front door ahead of the selected one (B38). */
+		flag?: string | null;
 		foot?: Snippet;
 	}
 
-	let { bug, href, size = 'md', label = null, foot }: Props = $props();
+	let { bug, href, size = 'md', label = null, flag = null, foot }: Props = $props();
 	const avatar = $derived(size === 'lg' ? 34 : 26);
 </script>
 
 <a class="bug {size}" class:mine={bug.mine} {href}>
-	{#if label}<span class="lb">{label}</span>{/if}
+	{#if label}<span class="lb"
+			>{#if flag}<span class="flag">{flag}</span>{/if}{label}</span
+		>{/if}
 	<span class="bh">
 		<span class="st" class:live={bug.state === 'kicked_off'}
 			>{#if bug.state === 'kicked_off'}<span class="pulse" aria-hidden="true"
@@ -83,6 +88,14 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+
+	.flag {
+		margin-right: var(--s-2);
+		color: var(--scoreboard-num);
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
 	}
 
 	.bh,

@@ -69,10 +69,11 @@ class CaptureFeed:
     source: str
     cadence: Cadence
     requests: Callable[[CaptureContext], list[CaptureRequest]]
-    # For a feed whose answer is judged before it is stored (the weekly projection): given the answer (a
-    # body, or the provider's failure), the outcome it is instead of a capture, with its reason, else
-    # None. Such an answer is stored nowhere and records no check, so it is never a read.
-    screen: Callable[[object], tuple[Status, str] | None] | None = None
+    # For a feed whose answer is judged before it is stored (the weekly projection): given the pass's
+    # context and the answer (a body, or the provider's failure), the outcome it is instead of a capture,
+    # with its reason, else None. Such an answer is stored nowhere and records no check, so it is never
+    # a read.
+    screen: Callable[[CaptureContext, object], tuple[Status, str] | None] | None = None
 
 
 CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
@@ -91,7 +92,13 @@ CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
     ),
     CaptureFeed("tank01_dfs_salaries", "game-day", lambda c: [CaptureRequest(Paths.DFS, {"date": c.day})]),
     CaptureFeed("tank01_adp", "weekly", lambda _c: [CaptureRequest(Paths.ADP, {"adpType": ADP_TYPE})]),
-    CaptureFeed(PROJECTIONS_SOURCE, "daily", lambda c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(c.week)})]),
+    # The pass's own week, screened as the daily read is (B73): a week not published yet is never stored.
+    CaptureFeed(
+        PROJECTIONS_SOURCE,
+        "daily",
+        lambda c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(c.week)})],
+        lambda c, answer: screen_projection(ProjectionRead(c.week, ahead=True), answer),
+    ),
     CaptureFeed("tank01_injuries_by_date", "daily", lambda _c: [CaptureRequest(Paths.INJURIES_BY_DATE, {})]),
     CaptureFeed("tank01_inactives", "game-day", lambda c: [CaptureRequest(Paths.INACTIVES, {"week": str(c.week)})]),
     CaptureFeed("tank01_player_list", "weekly", lambda _c: [CaptureRequest(Paths.PLAYER_LIST, {})]),
@@ -226,7 +233,7 @@ def _capture_feed(
         with conn.begin_nested():
             bodies = [client.get(r.path, r.query) for r in requests]
             payload: object = bodies[0] if len(bodies) == 1 else bodies
-            if (screened := _screen(feed, payload)) is not None:
+            if (screened := _screen(feed, context, payload)) is not None:
                 return FeedOutcome(feed.source, screened[0], len(requests), screened[1])
             digest = digest_of(payload)
             if digest == _latest_digest(conn, feed.source):
@@ -235,34 +242,30 @@ def _capture_feed(
             conn.execute(_INSERT, row)
             return FeedOutcome(feed.source, "captured", len(requests))
     except TOLERATED_FAILURES as error:
-        screened = _screen(feed, error)
+        screened = _screen(feed, context, error)
         failed: tuple[Status, str] = ("failed", str(error))
         status, reason = failed if screened is None else screened
         return FeedOutcome(feed.source, status, len(requests), reason)
 
 
-def _screen(feed: CaptureFeed, answer: object) -> tuple[Status, str] | None:
-    return None if feed.screen is None else feed.screen(answer)
+def _screen(feed: CaptureFeed, context: CaptureContext, answer: object) -> tuple[Status, str] | None:
+    return None if feed.screen is None else feed.screen(context, answer)
 
 
-def _projection_screen(read: ProjectionRead) -> Callable[[object], tuple[Status, str] | None]:
+def screen_projection(read: ProjectionRead, answer: object) -> tuple[Status, str] | None:
     """The week ahead's not-yet-published answer is its own outcome, logged and retried the next hour,
     never a failure. A slot's, two hours before kickoff, is a failure, and so is a slot's empty body;
     neither is stored, so the slot reads again in its window. The week ahead's empty body is not yet
     published either. Every other answer is stored, and the parser refuses drift."""
-
-    def screen(answer: object) -> tuple[Status, str] | None:
-        kind = projection_answer(answer)
-        if kind is None:
-            return None
-        if read.ahead:
-            return "unpublished", f"week {read.week} not published yet"
-        if isinstance(answer, Tank01Error):
-            return None
-        said = "no players" if kind == "unpublished" else "an empty body"
-        return "failed", f"week {read.week} answered {said} two hours before its kickoff"
-
-    return screen
+    kind = projection_answer(answer)
+    if kind is None:
+        return None
+    if read.ahead:
+        return "unpublished", f"week {read.week} not published yet"
+    if isinstance(answer, Tank01Error):
+        return None
+    said = "no players" if kind == "unpublished" else "an empty body"
+    return "failed", f"week {read.week} answered {said} two hours before its kickoff"
 
 
 def capture_once(
@@ -314,7 +317,7 @@ def week_projection_feed(read: ProjectionRead) -> CaptureFeed:
         PROJECTIONS_SOURCE,
         "daily",
         lambda _c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(read.week)})],
-        _projection_screen(read),
+        lambda _c, answer: screen_projection(read, answer),
     )
 
 

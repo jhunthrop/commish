@@ -9,7 +9,9 @@ import {
 	FRONT,
 	chipsOf,
 	frontLeague,
+	gameLive,
 	leadOf,
+	liveLeadOf,
 	nudgeOf,
 	rosterAside,
 	readWords,
@@ -174,6 +176,68 @@ void test('the lead league is the chosen one, else the first with a week', () =>
 	assert.equal(leadOf([], null), null);
 });
 
+void test('a live league leads ahead of the chosen one only while a starter of its is in play (B38)', () => {
+	// Monday 7:25 pm Central: the chosen league's week is final, another's game is under way.
+	const monday = new Date('2026-10-20T00:25:00.000Z');
+	const bug = SUCK.bug;
+	assert.ok(bug !== null);
+	/** The game in a state, with each side's starters in play now (the API's in_play); undefined
+	 * leaves the field out, as an older answer does. */
+	const game = (
+		state: 'upcoming' | 'playing' | 'final',
+		next: string | null,
+		inPlay: readonly (number | undefined)[]
+	) => ({
+		...bug,
+		game: {
+			...bug.game,
+			state,
+			next_kickoff: next,
+			sides: bug.game.sides.map((side, i) => {
+				const count = inPlay[i];
+				return count === undefined ? side : { ...side, in_play: count };
+			})
+		}
+	});
+	const chosen: WeekLeague = { ...SUCK, id: 'chosen', bug: game('final', null, [0, 0]) };
+	const live: WeekLeague = {
+		...SUCK,
+		id: 'espn',
+		host: 'espn',
+		bug: game('playing', null, [0, 2])
+	};
+	const idle: WeekLeague = { ...SUCK, id: 'ffpc', bug: null };
+	const leagues = [idle, chosen, live];
+	const lead = leadOf(leagues, 'chosen');
+	// The chosen league stays the lead: the page never changes the member's choice.
+	assert.equal(lead?.id, 'chosen');
+	assert.equal(gameLive(live, monday), true);
+	assert.equal(gameLive(chosen, monday), false);
+	assert.equal(gameLive(idle, monday), false);
+	assert.equal(liveLeadOf(leagues, lead, monday)?.id, 'espn');
+	// The chosen league live too: it leads alone.
+	assert.equal(liveLeadOf(leagues, live, monday), null);
+	// Friday between games: playing by the API (Thursday's starter final), Sunday's still to come,
+	// nobody in play. Never Live now (fix round 1, HIGH-1).
+	const friday = new Date('2026-10-16T15:00:00.000Z');
+	const gap: WeekLeague = {
+		...live,
+		bug: game('playing', '2026-10-18T17:00:00.000Z', [0, 0])
+	};
+	assert.equal(gameLive(gap, friday), false);
+	assert.equal(liveLeadOf([chosen, gap], chosen, friday), null);
+	// An answer from before in_play reads as none in play.
+	const older: WeekLeague = { ...live, bug: game('playing', null, [undefined, undefined]) };
+	assert.equal(liveLeadOf([chosen, older], chosen, monday), null);
+	// Final at the page's clock, whatever the count: never live.
+	assert.equal(
+		liveLeadOf([chosen, { ...live, bug: game('final', null, [0, 2]) }], chosen, monday),
+		null
+	);
+	assert.equal(liveLeadOf([], null, monday), null);
+	assert.equal(FRONT.liveNow, 'Live now');
+});
+
 void test('the bug is the API game with both teams, mine first, and who plays first', () => {
 	const view = frontLeague(SUCK, href, NOW, ZONE);
 	assert.equal(view.line, 'McConkey Kong Country, 1-4, 12th of 12');
@@ -327,6 +391,12 @@ void test('the basis says whose figures, what Proj is and when it was read, once
 		/PPR scoring, the closest to this league's rules, read Fri 9:00 pm Central\./
 	);
 	assert.equal(weekBasis({ ...SUCK, projection_scoring: null }, true, ZONE).length, 1);
+	// No unnamed "strip" (B39): Gain is named as the changes' figure, a pickup's said after it.
+	assert.match(
+		basis[1] ?? '',
+		/ Gain is what the changes add\. A pickup's gain is the Proj he adds this week\.$/
+	);
+	assert.doesNotMatch(basis.join(' '), /strip/i);
 });
 
 void test('the roster head counts its chips, and each other league carries its changes', () => {
