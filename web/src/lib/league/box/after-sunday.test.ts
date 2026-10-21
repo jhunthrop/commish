@@ -35,6 +35,7 @@ import { gameHead, KICKOFF } from './kickoff.ts';
 import { changesTitle, heldLineup, lineupBox, lineupSum, locked } from './lineup.ts';
 import {
 	bugFigures,
+	decidedHead,
 	matchupFinal,
 	nextKickoff,
 	sideBox,
@@ -280,6 +281,8 @@ function ffpcScreens(clock: string, late?: ReadonlySet<string>) {
 	// FFPC's rosters page carries the opponent's roster: his box lists no starters, his players benched.
 	assert.equal(box.starters.length, 0);
 	assert.ok(box.bench.length > 0);
+	// No starter of his to count while the game plays.
+	assert.equal(box.to_play ?? null, null);
 	const lines = week.matchup.sides.flatMap((s) => s.starters.map((st) => st.line));
 	const unlisted = unlistedStates(week.matchup);
 	const headFinal = matchupFinal(lines, now, unlisted);
@@ -302,7 +305,10 @@ function ffpcScreens(clock: string, late?: ReadonlySet<string>) {
 		homeMineFinal: homeMine.final,
 		homeSmall: home.small,
 		missFinal: bugsMissFinal(bugs),
-		matchupHead: nextKickoff(lines, now, ZONE, unlisted)?.head ?? null,
+		// The bug's middle as the Matchup draws it, Decided where the API says so (it says none here).
+		matchupHead:
+			decidedHead(nextKickoff(lines, now, ZONE, unlisted), week.matchup.decided === true, true)
+				?.head ?? null,
 		headFinal,
 		teamFinal: team.allFinal,
 		teamSmall: bugFigures(team, true).small,

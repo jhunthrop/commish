@@ -79,7 +79,8 @@ function hiddenSide(side: ScoreboardSide, state: GameState): ScoreboardSide {
  * the opponent's starters unlisted on the Matchup and the member's scoreboard game. FFPC's rosters page
  * still carries the opponent's roster (ffpcsnap.go), so the Matchup's bench for him is every player he
  * has and his state the schedule's by their games at the moment (Lane 124, B102); the member's game is
- * final only once both sides are, and the Lineup's Locked or Final follows it. */
+ * final only once both sides are, and the Lineup's Locked or Final follows it. No standing or Decided:
+ * the API needs both sides' starters for them. */
 export function ffpcAfterSunday(
 	week: {
 		sync: LeagueSync;
@@ -130,6 +131,9 @@ export function ffpcAfterSunday(
 		},
 		matchup: {
 			...ffpc.matchup,
+			// The API says no standing with a side listing no starters (standing.go standingOf).
+			standing: null,
+			decided: null,
 			sides: ffpc.matchup.sides.map((s) =>
 				s.roster_id === me
 					? s
@@ -137,6 +141,8 @@ export function ffpcAfterSunday(
 							...s,
 							starters: [],
 							bench: roster(s),
+							// No starter of his to count (matchup.go toPlay over none).
+							to_play: null,
 							projected_final: null,
 							schedule_state: states.get(s.roster_id) ?? 'upcoming'
 						}
