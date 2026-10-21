@@ -39,9 +39,10 @@
 	import {
 		HOME,
 		bugsOf,
-		bugsMissFinal,
+		bugsMissListedFinal,
 		bugsPlaying,
 		bugsFinalNone,
+		bugsUnlisted,
 		projectedFinalOf,
 		feedRows,
 		lineupSummary,
@@ -298,9 +299,10 @@
 								advice?.player_points ?? false,
 								memberZone(),
 								bugs.some((b) => b.state !== 'upcoming'),
-								bugsMissFinal(bugs),
+								bugsMissListedFinal(bugs),
 								bugsPlaying(bugs),
-								bugsFinalNone(bugs)
+								bugsFinalNone(bugs),
+								bugsUnlisted(bugs)
 							)
 						: null,
 					// The season panel names the zone once, so the read's time does not repeat it.

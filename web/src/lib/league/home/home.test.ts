@@ -14,6 +14,8 @@ import {
 	HOME,
 	bugsFinalNone,
 	bugsMissFinal,
+	bugsMissListedFinal,
+	bugsUnlisted,
 	bugsOf,
 	bugsPlaying,
 	sideFinal,
@@ -277,6 +279,50 @@ void test("a side reads Final once every one of its starters is, the Team row's 
 	const [none] = bugsOf(unread, SYNC, SATURDAY, ZONE);
 	assert.ok(none);
 	assert.equal(bugsFinalNone([none]), true);
+});
+
+void test('a side FFPC lists no starters for is said once by its own sentence, never the starters key (Lane 125, B104)', () => {
+	const night = board('playing');
+	const game = night.games[0];
+	assert.ok(game);
+	// Both sides unlisted, as every other game of FFPC's scoreboard: no starters, no Proj final.
+	game.sides = game.sides.map((s, i) => ({
+		...s,
+		starters: 0,
+		projection: null,
+		projected_final: null,
+		schedule_state: i === 0 ? 'kicked_off' : 'final'
+	}));
+	const bugs = bugsOf(night, SYNC, SATURDAY, ZONE);
+	assert.deepEqual(
+		bugs[0]?.sides.map((s) => [s.unlisted, s.final, s.small]),
+		[
+			[true, false, BOX.none],
+			[true, true, `${BOX.final} 71.4`]
+		]
+	);
+	assert.equal(bugsUnlisted(bugs), true);
+	// The "--" is the unlisted side's: the starters key stays unsaid, the League page's own sentence
+	// says it (the front door's one bug keeps bugsMissFinal).
+	assert.equal(bugsMissFinal(bugs), true);
+	assert.equal(bugsMissListedFinal(bugs), false);
+	const scoring = { format: 'ppr', league_own: false, te_bonus: 0.5 } as const;
+	const read = '2026-10-17T02:00:00.000Z';
+	const said = teamBasis('ffpc', read, scoring, false, ZONE, true, false, true, false, true);
+	assert.match(
+		said,
+		/ Teams FFPC sends no lineup for have no Proj final and read Final by their clubs' schedules\.$/
+	);
+	assert.doesNotMatch(said, /No Proj final while/);
+	assert.doesNotMatch(said, BANNED);
+	assert.equal(said.split('FFPC sends no lineup').length, 2, 'said once');
+	// Before kickoff the side draws no Proj: that is what is said.
+	assert.match(
+		teamBasis('ffpc', read, scoring, false, ZONE, false, false, false, false, true),
+		/ Teams FFPC sends no lineup for have no Proj\.$/
+	);
+	// A board with every side listed says nothing of it.
+	assert.equal(bugsUnlisted(bugsOf(board('playing'), SYNC, SATURDAY, ZONE)), false);
 });
 
 void test('a kickoff before the page clock is never the next: the bug reads Kicked off', () => {
