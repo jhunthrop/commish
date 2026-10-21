@@ -90,20 +90,31 @@ const FIGURE_SENTENCES: readonly { figure: RegExp; sentence: string; what: strin
 	{ figure: WEATHER_FIGURE, sentence: 'weather', what: 'the weather' }
 ];
 
-/** Every figure the page's rows draw where it is shot has its sentence in the basis drawn there: a
- * phone basis may leave a sentence out only with its figure (review H2). */
+/** The line under a table's column heads that says what its columns are (Waivers, Lane 98, B35): a
+ * figure's sentence said there is said, and it is not the footer, so it is outside the budget. */
+export const HEADS_LINE = 'main tr.heads-basis';
+
+/** Every figure the page's rows draw where it is shot has its sentence in the basis or the line under
+ * the heads drawn there: a phone basis may leave a sentence out only with its figure (review H2). The
+ * heads line is read as written, its heads drawn in capitals by style alone. */
 export async function figureSentenceFaults(page: Page): Promise<string[]> {
-	const { rows, basis } = await page.evaluate((selector: string) => {
-		const shown = (el: Element): boolean => el.getClientRects().length > 0;
-		const rows = [...document.querySelectorAll('main table tbody tr')]
-			.filter(shown)
-			.map((tr) => (tr as HTMLElement).innerText)
-			.join('\n');
-		const basis = [...document.querySelectorAll(selector)]
-			.map((el) => (el as HTMLElement).innerText)
-			.join(' ');
-		return { rows, basis };
-	}, PAGE_BASIS);
+	const { rows, basis } = await page.evaluate(
+		([selector, heads]: readonly [string, string]) => {
+			const shown = (el: Element): boolean => el.getClientRects().length > 0;
+			const rows = [...document.querySelectorAll('main table tbody tr')]
+				.filter(shown)
+				.map((tr) => (tr as HTMLElement).innerText)
+				.join('\n');
+			const footer = [...document.querySelectorAll(selector)].map(
+				(el) => (el as HTMLElement).innerText
+			);
+			const headsLines = [...document.querySelectorAll(heads)]
+				.filter(shown)
+				.map((el) => el.textContent.replace(/\s+/g, ' '));
+			return { rows, basis: [...footer, ...headsLines].join(' ') };
+		},
+		[PAGE_BASIS, HEADS_LINE] as const
+	);
 	return FIGURE_SENTENCES.filter((f) => f.figure.test(rows) && !basis.includes(f.sentence)).map(
 		(f) => `draws ${f.what} with no sentence saying what it is`
 	);

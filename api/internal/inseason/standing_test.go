@@ -291,7 +291,7 @@ func TestMissLineOnceTheWeekIsFinal(t *testing.T) {
 	// Three slots missed: the two that cost the most named (RB 8.7, then TE
 	// 3.7 before Flex 3.7 in slot order), the third counted (fix round 1).
 	want := "Player 002, Out, scored 0.0 in your RB while Player 011 scored 8.7 on your bench. " +
-		"Player 006 scored 5.0 in your TE while Player 013 scored 8.7 on your bench, and one more. " +
+		"Player 006 scored 5.0 in your TE while Player 013 scored 8.7 on your bench, and one more slot. " +
 		"Our lineup would have scored 56.1."
 	if lineup.Missed == nil || *lineup.Missed != want {
 		t.Fatalf("missed %v\nwant %q", lineup.Missed, want)

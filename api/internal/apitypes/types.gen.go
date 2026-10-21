@@ -2928,7 +2928,7 @@ type LineupAdvice struct {
 	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
 	HostNote *string `json:"host_note"`
 
-	// Missed the miss line once the lineup as set on the platform has kicked off where it differs from our pick (the highest Proj at each slot after designations and byes, as of each kickoff, no player held): each such slot once both its players have kicked off, "DJ Moore, Out, scored 0.0 in your Flex while Josh Downs scored 8.7 on your bench.", the two that cost the most named and the rest counted (", and one more."), then once every starter of both lineups is final "Our lineup would have scored 85.5."; null where the two agree, before such a slot has kicked off, where the platform gives no player's points, or absent from an older answer
+	// Missed the miss line once the lineup as set on the platform has kicked off where it differs from our pick (the highest Proj at each slot after designations and byes, as of each kickoff, no player held): each such slot once both its players have kicked off, "DJ Moore, Out, scored 0.0 in your Flex while Josh Downs scored 8.7 on your bench.", the two that cost the most named and the rest counted (", and one more slot."), then once every starter of both lineups is final "Our lineup would have scored 85.5."; null where the two agree, before such a slot has kicked off, where the platform gives no player's points, or absent from an older answer
 	Missed *string     `json:"missed,omitempty"`
 	Moves  LineupMoves `json:"moves"`
 
@@ -4446,8 +4446,11 @@ type WaiverAdvice struct {
 // WaiverAdvicePickupOrder the order the page's rows and strip are in, decided over the full page's rows and the answer's own by each row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the strip the first row worth making); a page narrowed to one position or focused on a player takes season_gain whenever the full page does; season_gain too while for_week's published projection is not read (Lane 95), there being no Proj to order the week by
 type WaiverAdvicePickupOrder string
 
-// WaiverBeats the Beats column (Lane 98): for the move the strip offers, the player that move drops (starter whether this week's lineup starts him, gain the move's week_gain); for any other row, the player his move takes out of the rest-of-season lineup the row's gain is measured on (the same fill); or the open spot he fills, a slot that lineup leaves empty
+// WaiverBeats the Beats column (Lane 98): for the move the strip offers, the player that move drops (gain the move's week_gain); for any other row, the player his move takes out of the rest-of-season lineup the row's gain is measured on (the same fill); or the open spot he fills, a slot that lineup leaves empty. The player is labelled by his place in that rest-of-season lineup (Lane 108, B81)
 type WaiverBeats struct {
+	// Bye true when the player named is on his bye in the week the page addresses (line.facts.bye), so a starter reads "Starter, bye" (Lane 108, B81); absent otherwise or from an older answer
+	Bye *bool `json:"bye,omitempty"`
+
 	// Gain the offered move's week_gain, else his Proj less that player's where both have one, as the screen prints them (tenths); null while the pickups go in season Gain order (a pickup's game has kicked off), when no week figure counts
 	Gain *float64 `json:"gain"`
 
@@ -4460,7 +4463,7 @@ type WaiverBeats struct {
 	// OpenSpot he fills a slot the rest-of-season lineup leaves empty (host_id and name empty, gain null)
 	OpenSpot bool `json:"open_spot"`
 
-	// Starter the player named starts in the lineup the advice sets this week
+	// Starter the player named has a place in the rest-of-season lineup the row's gain is measured on (Lane 108, B81): the cell reads Starter, else Bench; whether he plays this week is the bye field's
 	Starter bool `json:"starter"`
 }
 

@@ -13,9 +13,14 @@ import type {
 	Scoreboard,
 	WeekDoneState
 } from '../inseason/api.ts';
-import { hostWords, nearestRules } from '../names.ts';
+import { hostWords } from '../names.ts';
 import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
-import { AS_OF_KICKOFF, projFinalWords, teBonusSentence } from '../box/basis.ts';
+import {
+	AS_OF_KICKOFF,
+	leagueScoringWords,
+	projFinalWords,
+	teBonusSentence
+} from '../box/basis.ts';
 
 type ScoreboardGame = Scoreboard['games'][number];
 type ScoringRules = components['schemas']['ScoringRules'];
@@ -816,7 +821,9 @@ export function standingsBasis(
 	return `Standings follow ${platform}'s record, ${tiebreakWords(platform, terms)}. ${HOME.pointsFor} and ${HOME.pointsAgainst} are points for and against, ${HOME.streak} the current run${waiverBasis(platform, terms)}.`;
 }
 
-/** What a team's Proj and Pts are on the scoreboard and in the standings. */
+/** What a team's Proj and Pts are on the scoreboard and in the standings, short enough that the
+ * page's basis keeps to eight lines on a phone (Lane 108, B82): the scoring in the words every
+ * league screen's Proj sentence uses (leagueScoringWords). */
 export function teamBasis(
 	host: LeagueHost,
 	readAt: string | null,
@@ -830,15 +837,9 @@ export function teamBasis(
 	missing = false
 ): string {
 	const platform = hostWords(host);
-	const team = byPlayer ? ", and your lineup's Team adds its rows" : '';
-	const format =
-		scoring.format === 'half_ppr' ? 'half-PPR' : scoring.format === 'ppr' ? 'PPR' : 'standard';
+	const team = byPlayer ? `, ${BOX.totals} adds the rows` : '';
 	const bonus = scoring.league_own ? null : teBonusSentence(scoring.te_bonus, host);
-	const whose = scoring.league_own
-		? ` in ${format}, this league's own`
-		: bonus === null
-			? ` in ${format}, the closest match to this league's rules`
-			: `, ${format} shown, ${nearestRules(host)}`;
+	const whose = leagueScoringWords(scoring, host);
 	const when =
 		readAt === null
 			? 'not in yet for this week'

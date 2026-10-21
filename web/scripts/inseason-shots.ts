@@ -47,6 +47,9 @@ import { BUILDER_LINE, basisLines, basisReport, figureSentenceFaults } from './b
 import { chromeFaults, chromeLine, chromeMeasures } from './chrome-measures.ts';
 import { pageFaults, pageLine, pageMeasures } from './page-measures.ts';
 import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
+import { BOX } from '../src/lib/league/box/box.ts';
+import { AS_OF_KICKOFF } from '../src/lib/league/box/basis.ts';
+import { HEAD_BASIS, WAIVERS } from '../src/lib/league/box/waivers.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { PER_GAME_BASIS, WAIVERS_BASIS } from './inseason-fixture/week.ts';
 
@@ -143,8 +146,11 @@ const PER_GAME_SCREENS = new Set<string>();
 /** The screens drawn as a box score (Lane 66d): columns, the week's projection and points so far,
  * the projection's basis said once, no points a game on a row. */
 const BOX_SCREENS = new Set(['start', 'matchup']);
-const PROJ_BASIS =
-	/Proj is this week's published projection(, (PPR|half-PPR|standard) nearest your rules| on your rules)(, defenses on default scoring)?, read \w{3} \d+:\d\d [ap]m\./g;
+/** The projection's sentence, said once; past a row's kickoff it adds AS_OF_KICKOFF (Lane 92, B27). */
+const PROJ_BASIS = new RegExp(
+	String.raw`Proj is this week's published projection(, (PPR|half-PPR|standard) nearest your rules| on your rules)(, defenses on default scoring)?, read \w{3} \d+:\d\d [ap]m(, ${AS_OF_KICKOFF})?\.`,
+	'g'
+);
 const BOX_NUMBER = /^(\d+\.\d|--)$/;
 /** The Lineup's evidence cells: an ordinal rank, a figure, a signed change, or --. */
 const EVIDENCE_CELL = /^(\d+(st|nd|rd|th)|\d+\.\d|[+−]\d+\.\d|--)$/;
@@ -555,13 +561,20 @@ interface PlatformScreen {
 }
 
 /** The Matchup's score bug and its Totals row print one figure, the side's score (ruling (a), Lane
- * 79): the drafter's side, bug against row. */
+ * 79): the drafter's side, bug against row. Before the first kickoff the bug's big figure is its
+ * Proj (Lane 92, B22), so the row's Proj is the one it matches; from kickoff its Pts. */
 async function bugAgainstTotals(page: Page): Promise<{ bug: string; row: string }> {
-	return page.evaluate(() => ({
-		bug: document.querySelector<HTMLElement>('main .bug .sd .big')?.innerText.trim() ?? '',
-		row:
-			document.querySelector<HTMLElement>('main table.box tr.totals td.pts')?.innerText.trim() ?? ''
-	}));
+	return page.evaluate((projLabel: string) => {
+		const big = document.querySelector<HTMLElement>('main .bug .sd .big');
+		const cell = big?.getAttribute('aria-label')?.startsWith(`${projLabel} `) ? 'proj' : 'pts';
+		return {
+			bug: big?.innerText.trim() ?? '',
+			row:
+				document
+					.querySelector<HTMLElement>(`main table.box tr.totals td.${cell}`)
+					?.innerText.trim() ?? ''
+		};
+	}, BOX.proj);
 }
 
 /** A platform's Matchup and Lineup in the dark at both widths (Lane 79): the Pts sentence once, the
@@ -969,7 +982,10 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 	const seen = await page.evaluate(() => {
 		const table = document.querySelector('main table.pool');
 		const text = (el: Element): string => (el as HTMLElement).innerText.trim();
-		const rows = [...(table?.querySelectorAll('tbody tr:not(.dsect):not(.dgo)') ?? [])];
+		// The player rows: not the drop panel, nor the no-gain divider (Lane 98).
+		const rows = [
+			...(table?.querySelectorAll('tbody tr:not(.dsect):not(.dgo):not(.divider)') ?? [])
+		];
 		return {
 			heads: [...(table?.querySelectorAll('thead th') ?? [])].map(text).filter((h) => h !== ''),
 			proj: rows.map((tr) => text(tr.querySelector('td.proj') ?? tr)),
@@ -978,6 +994,9 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 			cards: document.querySelectorAll('main .pickups .pickup').length,
 			count: document.querySelector('main .count')?.textContent ?? '',
 			basis: document.querySelector('main [data-basis]')?.textContent.trim() ?? '',
+			headsLine: (table?.querySelector('tr.heads-basis')?.textContent ?? '')
+				.replace(/\s+/g, ' ')
+				.trim(),
 			phoneRest: rows.some((tr) => /A game (\d+\.\d|--)/.test(text(tr)))
 		};
 	});
@@ -998,10 +1017,13 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 		!/^\d+ free agents? we rank on Sleeper, \d+ beats? a player of yours$/.test(seen.count)
 	)
 		faults.push(`count ${seen.count}`);
-	// Beats and Open spot say themselves in their cells (Lane 66t); Gain and A game are said once.
+	// Beats and Open spot say themselves in their cells (Lane 66t); Gain is said once in the basis,
+	// A game once in the line under the heads (Lane 98, B35), never in both.
 	if (/Beats is|Open spot is/.test(seen.basis)) faults.push('basis explains Beats');
-	if (!seen.basis.includes(PER_GAME_BASIS) || !seen.basis.includes('Which five'))
-		faults.push(`basis ${seen.basis}`);
+	if (!seen.basis.includes('Which five')) faults.push(`basis ${seen.basis}`);
+	if (seen.basis.includes(PER_GAME_BASIS)) faults.push('the basis says A game again');
+	if (!seen.headsLine.includes(`${WAIVERS.rest} ${HEAD_BASIS.rest}`))
+		faults.push(`line under the heads "${seen.headsLine}"`);
 	if (!seen.basis.startsWith(PICKUP_RULE)) faults.push(`basis first ${seen.basis}`);
 	for (const word of await bannedSaid(page)) faults.push(`says ${word}`);
 	return faults;
@@ -1429,8 +1451,9 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 			nobody: (document.querySelector('main')?.textContent ?? '').includes('Nobody in your league'),
 			// In season the page carries no mock-draft plumbing (Lane 104, B54).
 			mock: /mock draft/i.test(document.querySelector('main')?.textContent ?? ''),
-			// The recorded league's name anywhere on the page, the switch included.
-			recordedName: document.body.textContent.includes('S.U.C.K.'),
+			// The recorded league's name in the page's own content; the header's switch keeps the member's
+			// chosen league by Lane 102's rule (B38), so it is not read.
+			recordedName: (document.querySelector('main')?.textContent ?? '').includes('S.U.C.K.'),
 			bids: [...document.querySelectorAll('main table.feed td.det')].filter((td) =>
 				/^FAAB \$\d/.test(text(td))
 			).length,

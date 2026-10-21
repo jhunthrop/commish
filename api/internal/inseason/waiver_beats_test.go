@@ -169,3 +169,117 @@ func TestListedAddKeepsACarriedOverOut(t *testing.T) {
 		})
 	}
 }
+
+// Every drop a move could take carries his place in the rest-of-season
+// lineup the Gain is measured on (Lane 108, B81): the ten the fill starts
+// are season starters, the bench is not.
+func TestEveryDropCarriesItsSeasonLineupPlace(t *testing.T) {
+	squad := Squad{Players: pprRoster(), Held: map[string]bool{}}
+	starts := map[string]bool{}
+	for _, id := range pprHost() {
+		starts[id] = true
+	}
+	got := Waivers(twelveTeamPPR(t), SeasonGames, squad, []Candidate{player("fa", draft.RB, 10, 60)})[0]
+	if len(got.Drops) == 0 {
+		t.Fatal("no drops")
+	}
+	for _, d := range got.Drops {
+		id := squad.Players[d.At].ID
+		if d.SeasonStarter != starts[id] {
+			t.Errorf("%s: season starter %v, want %v", id, d.SeasonStarter, starts[id])
+		}
+	}
+	// The places the strip's Beats reads, by host id, are the same.
+	mine := make([]person, len(squad.Players))
+	for i, c := range squad.Players {
+		mine[i] = person{cand: c}
+	}
+	places := seasonPlacesOf([]Waiver{got}, mine)
+	for _, d := range got.Drops {
+		if id := squad.Players[d.At].ID; places[id] != starts[id] {
+			t.Errorf("%s: place %v, want %v", id, places[id], starts[id])
+		}
+	}
+}
+
+// The strip's Beats labels its drop by his rest-of-season place, never by
+// this week's lineup, and says his bye in the week addressed (Lane 108,
+// B81): a season starter on bye reads "Starter, bye", a bench player this
+// week's lineup starts reads "Bench".
+func TestTheOfferedDropIsLabelledByItsSeasonPlace(t *testing.T) {
+	cases := []struct {
+		name                         string
+		season, thisWeek, bye        bool
+		wantStarter, wantByeReported bool
+	}{
+		{"a season starter on bye this week", true, false, true, true, true},
+		{"a bench player this week's lineup starts", false, true, false, false, false},
+		{"a season starter playing this week", true, true, false, true, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			line := apitypes.PlayerLine{Player: apitypes.LeaguePlayer{HostId: "d1", Name: "Drop One"}}
+			line.Facts.Bye = tc.bye
+			row := apitypes.WaiverRow{Drop: &line, Drops: []apitypes.WaiverDrop{
+				{HostId: "d1", StartsThisWeek: tc.thisWeek},
+			}}
+			got := dropBeats(row, seasonPlaces{"d1": tc.season})
+			if got.Starter != tc.wantStarter || (got.Bye != nil) != tc.wantByeReported || (got.Bye != nil && !*got.Bye) {
+				t.Fatalf("starter %v bye %v, want %v %v", got.Starter, got.Bye, tc.wantStarter, tc.wantByeReported)
+			}
+		})
+	}
+}
+
+// Through the engine at the fixture's Saturday and Tuesday: each strip
+// card's Beats reads its drop's season place (from the engine's own
+// search, never the wire) and bye, and every other row's named player is
+// a season starter with his own bye (B81).
+func TestBeatsReadsTheSeasonPlaceThroughTheEngine(t *testing.T) {
+	f := newFixture(t)
+	for _, now := range []time.Time{saturdayNoon, tuesdayNoon} {
+		out := pickupPage(t, f, now, "")
+		a, err := newAdvisor(f.league, f.data, everyoneProjected(f), nil, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		run, ok := a.waiverRun("")
+		if !ok {
+			t.Fatal("no waiver run")
+		}
+		places := seasonPlacesOf(run.moves, run.mine)
+		roster := map[string]apitypes.PlayerLine{}
+		for _, l := range out.Roster {
+			roster[l.Player.HostId] = l
+		}
+		for _, c := range out.Pickups {
+			assertDropLabel(t, now, c, places)
+		}
+		for _, r := range out.Rows {
+			if r.Pickup || r.Beats == nil || r.Beats.OpenSpot {
+				continue
+			}
+			if !r.Beats.Starter {
+				t.Errorf("%s: %s names %s off the season lineup", now.Weekday(), r.Add.Player.Name, r.Beats.Name)
+			}
+			if line, ok := roster[r.Beats.HostId]; ok && (r.Beats.Bye != nil) != line.Facts.Bye {
+				t.Errorf("%s: %s's Beats bye %v, %s on bye %v", now.Weekday(), r.Add.Player.Name, r.Beats.Bye, r.Beats.Name, line.Facts.Bye)
+			}
+		}
+	}
+}
+
+// assertDropLabel is a card whose Beats reads its drop's season place and
+// bye.
+func assertDropLabel(t *testing.T, now time.Time, c apitypes.WaiverRow, places seasonPlaces) {
+	t.Helper()
+	if c.Drop == nil {
+		return
+	}
+	if place, ok := places[c.Drop.Player.HostId]; !ok || c.Beats.Starter != place {
+		t.Errorf("%s card: Beats starter %v, drop's season place %v (%v)", now.Weekday(), c.Beats.Starter, place, ok)
+	}
+	if (c.Beats.Bye != nil) != c.Drop.Facts.Bye {
+		t.Errorf("%s card: Beats bye %v, drop on bye %v", now.Weekday(), c.Beats.Bye, c.Drop.Facts.Bye)
+	}
+}

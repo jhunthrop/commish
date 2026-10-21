@@ -606,12 +606,13 @@ func scoredVerb(state apitypes.GameState) string {
 	return "has"
 }
 
-// moreWords is the slots past the named ones: "one more", "2 more".
+// moreWords is the slots past the named ones: "one more slot", "2 more
+// slots" (Lane 108, B83).
 func moreWords(n int) string {
 	if n == 1 {
-		return "one more"
+		return "one more slot"
 	}
-	return fmt.Sprintf("%d more", n)
+	return fmt.Sprintf("%d more slots", n)
 }
 
 // missSlot is a slot as the miss line names it, unnumbered as the
@@ -651,7 +652,8 @@ func missPick(name, verb string, pts float64) string {
 // set lineup missed our pick at, its two halves joined ("DJ Moore, Out,
 // scored 0.0 in your Flex while Josh Downs scored 8.7 on your bench.", the
 // ruling's semicolon a "while": the site never prints one), the slots past
-// those counted on the last (", and one more.", fix round 1), then once
+// those counted on the last (", and one more slot.", fix round 1, Lane
+// 108), then once
 // every slot is final what our lineup would have scored ("Our lineup would
 // have scored 85.5.").
 func MissWords(misses [][2]string, more int, ours *float64) string {

@@ -3987,7 +3987,7 @@ components:
             the miss line once the lineup as set on the platform has kicked off where it differs from our pick (the
             highest Proj at each slot after designations and byes, as of each kickoff, no player held): each such slot
             once both its players have kicked off, "DJ Moore, Out, scored 0.0 in your Flex while Josh Downs scored 8.7
-            on your bench.", the two that cost the most named and the rest counted (", and one more."), then once every starter of both lineups is final "Our lineup would have scored 85.5."; null
+            on your bench.", the two that cost the most named and the rest counted (", and one more slot."), then once every starter of both lineups is final "Our lineup would have scored 85.5."; null
             where the two agree, before such a slot has kicked off, where the platform gives no player's points, or
             absent from an older answer
     BoxStarter:
@@ -4304,10 +4304,10 @@ components:
     WaiverBeats:
       type: object
       description: >-
-        the Beats column (Lane 98): for the move the strip offers, the player that move drops (starter whether this
-        week's lineup starts him, gain the move's week_gain); for any other row, the player his move takes out of the
-        rest-of-season lineup the row's gain is measured on (the same fill); or the open spot he fills, a slot that
-        lineup leaves empty
+        the Beats column (Lane 98): for the move the strip offers, the player that move drops (gain the move's
+        week_gain); for any other row, the player his move takes out of the rest-of-season lineup the row's gain is
+        measured on (the same fill); or the open spot he fills, a slot that lineup leaves empty. The player is labelled
+        by his place in that rest-of-season lineup (Lane 108, B81)
       required: [host_id, name, starter, gain, open_spot]
       properties:
         open_spot:
@@ -4316,7 +4316,16 @@ components:
             he fills a slot the rest-of-season lineup leaves empty (host_id and name empty, gain null)
         host_id: { type: string, description: "the member's player's host id, a line in the answer's roster; empty for the open spot" }
         name: { type: string, description: empty for the open spot }
-        starter: { type: boolean, description: the player named starts in the lineup the advice sets this week }
+        starter:
+          type: boolean
+          description: >-
+            the player named has a place in the rest-of-season lineup the row's gain is measured on (Lane 108, B81):
+            the cell reads Starter, else Bench; whether he plays this week is the bye field's
+        bye:
+          type: boolean
+          description: >-
+            true when the player named is on his bye in the week the page addresses (line.facts.bye), so a starter
+            reads "Starter, bye" (Lane 108, B81); absent otherwise or from an older answer
         gain:
           type: number
           format: double

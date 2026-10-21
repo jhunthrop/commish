@@ -325,20 +325,21 @@
 			font-size: 0;
 		}
 
+		/* The row's other cells as narrow as their figures, so a name keeps one line (Lane 108, B83). */
 		.cols .slot {
-			width: 42px;
+			width: 36px;
 		}
 
-		/* Its head on two lines, so the player keeps the room for his name (Lane 99). */
+		/* Its head on two lines over the rank alone, his position beside his club (Lane 99, Lane 108). */
 		.cols .rank {
-			width: 50px;
+			width: 36px;
 			white-space: normal;
 			line-height: 1.1;
 		}
 
-		/* Wide enough for the Team row's 101.6 at its size with the cell's padding (Lane 83). */
+		/* Wide enough for the Team row's 101.6 at its phone size with the cell's padding (Lane 83). */
 		.cols .num {
-			width: 58px;
+			width: 50px;
 		}
 
 		/* Wide enough for a total such as 101.6 beside its Proj, with a gap between them (Lane 79 fix 9). */
@@ -347,7 +348,7 @@
 		}
 
 		.cols .op {
-			width: 34px;
+			width: 30px;
 		}
 
 		.whyline td + td {

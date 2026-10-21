@@ -54,6 +54,10 @@
 		after,
 		children
 	}: Props = $props();
+
+	/** A phone's face where the Our rank cell sits beside the name (Lane 108, B83): a little smaller,
+	 * so a name keeps one line. Matches the phone rule for the club mark below. */
+	const APART_PHONE_FACE = 28;
 </script>
 
 {#snippet named()}
@@ -62,11 +66,16 @@
 		>{:else}<NameWords name={row.name} />{/if}
 {/snippet}
 
-<span class="pl">
+<span class="pl" class:apart={rankApart}>
 	{#if row.face.mark && row.face.src !== null}
 		<ClubMark src={row.face.src} alt={row.face.alt} size={32} />
 	{:else}
-		<Face src={row.face.src} name={row.name} size={32} />
+		<Face
+			src={row.face.src}
+			name={row.name}
+			size={32}
+			phoneSize={rankApart ? APART_PHONE_FACE : undefined}
+		/>
 	{/if}
 	<span class="who">
 		<span class="nm">
@@ -77,9 +86,8 @@
 			{/if}
 		</span>
 		<span class="club"
-			><span>{row.club}</span>{#if rankApart}{#if row.status}<StatusChip
-						status={row.status}
-					/>{/if}{:else if row.pill}<StatusPill
+			><span>{row.club}</span>{#if rankApart}<span class="ppos">{row.position}</span
+				>{#if row.status}<StatusChip status={row.status} />{/if}{:else if row.pill}<StatusPill
 					position={row.pill.position}
 					positionRank={row.pill.rank ?? undefined}
 					status={row.status}
@@ -158,6 +166,14 @@
 		display: none;
 	}
 
+	/* His position beside the club where the Our rank cell prints the rank alone, a phone's (Lane 108,
+	   B83). */
+	.ppos {
+		display: none;
+		font-weight: 700;
+		color: var(--ink-2);
+	}
+
 	.phone-game {
 		display: none;
 	}
@@ -179,6 +195,20 @@
 		.short {
 			display: inline;
 			white-space: nowrap;
+		}
+
+		.ppos {
+			display: inline;
+		}
+
+		/* Beside the Our rank cell the face and its gap give the name a little room (B83). */
+		.pl.apart {
+			gap: 6px;
+		}
+
+		.pl.apart > :global(.mark) {
+			width: 28px;
+			height: 28px;
 		}
 
 		.phone-game {

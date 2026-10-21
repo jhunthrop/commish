@@ -57,6 +57,10 @@ type Drop struct {
 	At             int
 	Gain           float64
 	StartsThisWeek bool
+	// SeasonStarter is whether the rest-of-season lineup the Gain is
+	// measured on starts him before the add (Lane 108, B81): the strip's
+	// Beats cell labels its drop by it.
+	SeasonStarter bool
 }
 
 // Waivers is §5.2's gain for every pool candidate, a week's over the
@@ -126,7 +130,7 @@ func (w *waiverSearch) bestDrop(a int, c *Candidate) Waiver {
 		strength, filled := w.f.strength(after)
 		starts[d] = w.f.started(len(after) - 1)
 		gain := strength - w.base
-		drops = append(drops, Drop{At: d, Gain: gain, StartsThisWeek: w.drops.startsThisWeek(d)})
+		drops = append(drops, Drop{At: d, Gain: gain, StartsThisWeek: w.drops.startsThisWeek(d), SeasonStarter: w.baseStarts[d]})
 		if filled < w.baseFilled {
 			continue
 		}

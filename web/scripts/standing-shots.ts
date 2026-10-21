@@ -7,7 +7,8 @@
 // sits under its head with no colour on a game played; from the first kickoff the Matchup bug prints
 // the API's standing line and the Lineup strip the API's miss line, never before it. It prints each
 // basis's rendered lines and holds them to five at a desk and eight on a phone (BASIS_BUDGET), and at
-// a desk every name in the Matchup's boxes keeps to one line (fix round 1). Exits non-zero on any
+// a desk every name in the Matchup's boxes keeps to one line (fix round 1) and each box stays inside
+// its column (Lane 108 fix round 1). Exits non-zero on any
 // fault.
 //
 //   node scripts/standing-shots.ts [web origin] [out dir]
@@ -182,6 +183,28 @@ for (const [theme, width] of SHOTS) {
 				names.filter((n) => n.getClientRects().length > 1).map((n) => n.textContent)
 			);
 			expect(wrapped.length === 0, `${at}: names on two lines: ${wrapped.join(', ')}`);
+			// Each box stays inside its column of the two (Lane 108 fix round 1, HIGH-1): the page does
+			// not scroll sideways when a box overruns, so its edge is measured against its grid cell.
+			// Its column is half the pair's row less the gap; a box never reaches past it.
+			const over = await page.$$eval('main .boxes', (rows) =>
+				rows.flatMap((row) => {
+					const frame = row.getBoundingClientRect();
+					const cells = [...row.children];
+					const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+					const column = (frame.width - gap * (cells.length - 1)) / cells.length;
+					return cells.flatMap((cell, i) => {
+						const right = frame.left + column * (i + 1) + gap * i;
+						const edges = [cell, ...cell.querySelectorAll('table.box')].map(
+							(el) => el.getBoundingClientRect().right
+						);
+						const edge = Math.max(...edges);
+						return edge > right + 0.5
+							? [`${(edge - right).toFixed(0)} px (box ${String(i + 1)})`]
+							: [];
+					});
+				})
+			);
+			expect(over.length === 0, `${at}: a box runs past its column by ${over.join(', ')}`);
 		}
 		const wide = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
 		expect(!wide, `${at}: scrolls sideways`);
