@@ -11,7 +11,7 @@
 	import type { BoxRow } from '#lib/league/box/box.ts';
 	import { tabHref } from '#lib/league/inseason/tabs.ts';
 	import { memberZone } from '#lib/format/clock.ts';
-	import { bugsMissFinal } from '#lib/league/home/home.ts';
+	import { bugsMissFinal, bugsPlaying } from '#lib/league/home/home.ts';
 	import { weekApi } from './api.ts';
 	import {
 		FRONT,
@@ -73,7 +73,7 @@
 					lead,
 					others.length > 0 || live !== null,
 					memberZone(),
-					view.bug.state !== 'upcoming',
+					bugsPlaying([view.bug]),
 					bugsMissFinal([view.bug])
 				)
 			: []

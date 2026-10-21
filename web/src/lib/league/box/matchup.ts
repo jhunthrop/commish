@@ -15,6 +15,7 @@ import {
 	totalsNote,
 	totalsPts,
 	slotWord,
+	teamSmallFigure,
 	type BoxRow,
 	type BoxStarter,
 	type BoxTotals
@@ -49,21 +50,26 @@ export interface BugTotals {
 	pts: number | null;
 	proj: number | null;
 	final: number | null;
+	/** Every starter of the side's is final (BoxTotals.allFinal, Lane 121 B99). */
+	allFinal: boolean;
 	/** Where the side's starters stand while the game is under way (the API's to_play), else empty. */
 	toPlay: string;
 }
 
 /** A matchup side's two figures (Lane 92, B22): before the first kickoff its Proj big and nothing
- * under; from it its Pts big with "Proj final" under, "--" where the API gives none. */
+ * under; from it its Pts big with the Team row's small figure under (box.ts teamSmallFigure, one rule
+ * for both): "Proj final", "--" where the API gives none, and "Final" with the total once every
+ * starter is final (Lane 121, B99). */
 export function bugFigures(
-	s: Pick<BugTotals, 'pts' | 'proj' | 'final'>,
+	s: Pick<BugTotals, 'pts' | 'proj' | 'final' | 'allFinal'>,
 	started: boolean
 ): { big: string; bigLabel: string; small: string } {
-	if (!started) return { big: boxNumber(s.proj), bigLabel: BOX.proj, small: '' };
+	const small = teamSmallFigure({ ...s, live: started });
+	if (small === null) return { big: boxNumber(s.proj), bigLabel: BOX.proj, small: '' };
 	return {
 		big: boxNumber(s.pts),
 		bigLabel: BOX.pts,
-		small: `${BOX.projFinal} ${boxNumber(s.final)}`
+		small: `${small.caption} ${boxNumber(small.figure)}`
 	};
 }
 

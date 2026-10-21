@@ -17,7 +17,7 @@ import {
 	positionWord,
 	type BoxRow
 } from '#lib/league/box/box.ts';
-import { finalsPartAt } from '#lib/league/box/basis.ts';
+import { finalsPartAt, uncountedPart } from '#lib/league/box/basis.ts';
 import { lineState } from '#lib/league/box/kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { WeekOrderAdvice, WeekOrderRow } from './api.ts';
@@ -172,10 +172,18 @@ function orderSentence(advice: WeekOrderAdvice, reader: WeekReader, zone: string
 	return `${capital(many)} are in order of ${BOX.proj}, this week's published projection ${how}${when}, as we have no ${one} model of our own.`;
 }
 
-/** The rules Avg and Last leave out, named inline in the API's one sentence (inseason words.go
- * uncountedOf; Lane 111, B33), the reader's form its own: null when none. */
-export function rulesLeftOut(advice: Pick<WeekOrderAdvice, 'basis_note'>): string | null {
-	return advice.basis_note === '' ? null : advice.basis_note;
+/** The rules Avg and Last leave out (Lane 111, B33), in the one frame every league screen says them
+ * in (basis.ts uncountedPart, Lane 121 B97): "Avg and Last are our stats, which omit ..." where no row
+ * counts the platform's points, "Our stats omit ..." where a rostered player's final does; null when
+ * none. */
+export function rulesLeftOut(
+	advice: Pick<WeekOrderAdvice, 'basis_note' | 'basis_note_list' | 'rows'>
+): string | null {
+	const [part] = uncountedPart(
+		advice,
+		advice.rows.map((row) => row.line)
+	);
+	return part === undefined ? null : part.text;
 }
 
 /** A row's section at the page's clock: a bye as the API says, else to play or kicked off by

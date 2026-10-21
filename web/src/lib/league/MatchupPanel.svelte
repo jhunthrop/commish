@@ -137,6 +137,7 @@
 				pts: mine.totals.pts,
 				proj: mine.totals.proj,
 				final: mine.totals.final,
+				allFinal: mine.totals.allFinal,
 				toPlay: countOf(matchup.mine.roster_id)
 			}}
 			opponent={matchup.opponent && theirs
@@ -145,6 +146,7 @@
 						pts: theirs.totals.pts,
 						proj: theirs.totals.proj,
 						final: theirs.totals.final,
+						allFinal: theirs.totals.allFinal,
 						toPlay: countOf(matchup.opponent.roster_id)
 					}
 				: null}
@@ -189,6 +191,7 @@
 			projection={box ? { readAt: box.projection_read_at, scoring: box.projection_scoring } : null}
 			{lines}
 			noFinal={[mine, theirs].some((s) => s !== null && s.totals.live && s.totals.final === null)}
+			allFinal={[mine, theirs].every((s) => s === null || s.totals.allFinal)}
 			lineup={null}
 			now={now.getTime()}
 		/>

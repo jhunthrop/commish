@@ -155,11 +155,16 @@ export function readCell(read: BugRead, now: number): string {
 	return `${hostWords(read.host)} ${agoCell(seconds)}`;
 }
 
-/** The figure heads by the game's head: Proj before the first kickoff, Proj final and Pts from it. */
+/** The figure heads by the game's head: Proj before the first kickoff, Proj final and Pts from it,
+ * Final and Pts once the game is final (Lane 121, B99: the Team row's rule, box.ts teamSmallFigure). */
 export function bugColumns(state: GameHead['state']): BugColumns {
-	return state === 'upcoming'
-		? { small: '', big: BOX.proj }
-		: { small: BOX.projFinal, big: BOX.pts };
+	if (state === 'upcoming') return { small: '', big: BOX.proj };
+	return { small: state === 'final' ? BOX.final : BOX.projFinal, big: BOX.pts };
+}
+
+/** Whether a bug still draws a Proj final (a game under way): what the key explains (Lane 121, B99). */
+export function bugsPlaying(bugs: readonly Pick<Bug, 'state'>[]): boolean {
+	return bugs.some((b) => b.state === 'kicked_off');
 }
 
 /** A team's record as the standings print it: "5-0-0". */
@@ -209,15 +214,15 @@ function bugHead(
  * its Pts are, with its projected final (the API's, else its Proj) small beside them. */
 function sideFigures(
 	side: ScoreboardGame['sides'][number],
-	started: boolean
+	state: GameHead['state']
 ): Pick<BugSide, 'small' | 'big'> {
 	const proj = side.projection === null ? BOX.none : fixed(side.projection, 1);
-	if (!started) return { small: '', big: proj };
-	const final = side.projected_final ?? null;
-	return {
-		small: final === null ? BOX.none : fixed(final, 1),
-		big: side.points_read ? fixed(side.points, 1) : BOX.none
-	};
+	if (state === 'upcoming') return { small: '', big: proj };
+	const pts = side.points_read ? fixed(side.points, 1) : BOX.none;
+	// Once final the small figure is the side's total under Final (bugColumns), never a projection.
+	const final =
+		state === 'final' ? (side.points_read ? side.points : null) : (side.projected_final ?? null);
+	return { small: final === null ? BOX.none : fixed(final, 1), big: pts };
 }
 
 /** Every game of the week as a score bug, the drafter's first, each read at `now`, the page's clock
@@ -248,7 +253,7 @@ export function bugsOf(
 					record: bugRecord(team),
 					avatar: team?.avatar ?? null,
 					me: side.roster_id === sync.me,
-					...sideFigures(side, started),
+					...sideFigures(side, head.state),
 					toPlay: head.state === 'kicked_off' ? (side.to_play ?? '') : '',
 					stands: standsOf(game, side, started)
 				};
@@ -274,9 +279,10 @@ export function projections(
 	);
 }
 
-/** Whether a started bug draws a Proj final "--": the basis then says why (round 2). */
+/** Whether a bug under way draws a Proj final "--": the basis then says why (round 2). A final game's
+ * small figure is its total under Final (Lane 121, B99), which the key does not explain. */
 export function bugsMissFinal(bugs: readonly Bug[]): boolean {
-	return bugs.some((b) => b.state !== 'upcoming' && b.sides.some((s) => s.small === BOX.none));
+	return bugs.some((b) => b.state === 'kicked_off' && b.sides.some((s) => s.small === BOX.none));
 }
 
 // ---- the drafter's lineup

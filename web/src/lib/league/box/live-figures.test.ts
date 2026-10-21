@@ -92,15 +92,23 @@ const SIDE: MatchupSide = {
 };
 
 void test('from the first kickoff the bug’s big figure is Pts, the projected final under it', () => {
-	assert.deepEqual(bugFigures({ pts: 90.9, proj: 130.8, final: 98.5 }, true), {
+	assert.deepEqual(bugFigures({ pts: 90.9, proj: 130.8, final: 98.5, allFinal: false }, true), {
 		big: '90.9',
 		bigLabel: BOX.pts,
 		small: 'Proj final 98.5'
 	});
 	// The API gives no projected final (a starter still to play with no Proj): never the Proj in its place.
-	assert.equal(bugFigures({ pts: null, proj: 96, final: null }, true).small, 'Proj final --');
+	assert.equal(
+		bugFigures({ pts: null, proj: 96, final: null, allFinal: false }, true).small,
+		'Proj final --'
+	);
+	// Every starter final (Lane 121, B99): the bug says Final with the total, as the Team row does.
+	assert.equal(
+		bugFigures({ pts: 83.7, proj: 96, final: 83.7, allFinal: true }, true).small,
+		'Final 83.7'
+	);
 	// Before the first kickoff the Proj is the big figure, nothing under it.
-	assert.deepEqual(bugFigures({ pts: null, proj: 96, final: null }, false), {
+	assert.deepEqual(bugFigures({ pts: null, proj: 96, final: null, allFinal: false }, false), {
 		big: '96.0',
 		bigLabel: BOX.proj,
 		small: ''

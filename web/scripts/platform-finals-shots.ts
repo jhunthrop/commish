@@ -132,11 +132,20 @@ const NONE_FINAL_SUNDAY: readonly Day[] = ['saturday', 'sunday'];
 
 /** The Team rows' small captions as drawn (TeamFigures, box.ts teamSmallFigure), and their faults on
  * the clock (Lane 121, B99). */
-async function teamFaults(page: Page): Promise<{ captions: string[]; faults: string[] }> {
+async function teamFaults(
+	page: Page,
+	screen: Screen
+): Promise<{ captions: string[]; faults: string[] }> {
 	const captions = await page.evaluate(() =>
 		[...document.querySelectorAll<HTMLElement>('main tr.totals td.proj small')]
 			.filter((small) => small.getClientRects().length > 0)
 			.map((small) => small.textContent.trim())
+	);
+	// The score bugs and the footer follow the Team row (coordinator's ruling on Lane 121): with every
+	// week 6 game final, no "Proj final" anywhere on the Lineup, the Matchup or the league home.
+	const anywhere = await page.evaluate(
+		(word) => (document.querySelector('main')?.textContent ?? '').includes(word),
+		BOX.projFinal
 	);
 	const said = (word: string): boolean =>
 		captions.some((c) => c.toLowerCase() === word.toLowerCase());
@@ -146,6 +155,9 @@ async function teamFaults(page: Page): Promise<{ captions: string[]; faults: str
 			: []),
 		...(NONE_FINAL_SUNDAY.includes(day) && said(BOX.final)
 			? [`a Team row reads ${BOX.final} before Sunday's games`]
+			: []),
+		...(ALL_FINAL.includes(day) && ['lineup', 'matchup', 'home'].includes(screen.name) && anywhere
+			? [`the page says ${BOX.projFinal} with every week 6 game final`]
 			: [])
 	];
 	return { captions, faults };
@@ -320,7 +332,7 @@ for (const theme of THEMES)
 					await page.getByRole('button', { name: 'Build a trade' }).click();
 					await ready(page, BUILDER_READY);
 				}
-				const team = await teamFaults(page);
+				const team = await teamFaults(page, screen);
 				measures.push(
 					`${at}: Team ${team.captions.length > 0 ? team.captions.join(', ') : 'none'}`
 				);

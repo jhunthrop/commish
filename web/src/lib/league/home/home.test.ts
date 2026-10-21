@@ -12,7 +12,9 @@ import { BOX } from '../box/box.ts';
 import { changesTitle } from '../box/lineup.ts';
 import {
 	HOME,
+	bugsMissFinal,
 	bugsOf,
+	bugsPlaying,
 	projectedFinalOf,
 	readCell,
 	lineupSummary,
@@ -184,13 +186,27 @@ void test('once a game has started the side ahead is bright and the side behind 
 				['71.4', 'ahead']
 			]
 		);
-		// From the first kickoff the Pts are big, the projected final small (its Proj with none).
-		assert.deepEqual(bug.columns, { small: BOX.projFinal, big: BOX.pts });
-		assert.deepEqual(
-			bug.sides.map((s) => s.small),
-			['70.4', '--']
-		);
 	}
+	// From the first kickoff the Pts are big, the projected final small ("--" with none).
+	const [under] = bugsOf(board('playing'), SYNC, SATURDAY, ZONE);
+	assert.ok(under);
+	assert.deepEqual(under.columns, { small: BOX.projFinal, big: BOX.pts });
+	assert.deepEqual(
+		under.sides.map((s) => s.small),
+		['70.4', '--']
+	);
+	// Once final (Lane 121, B99), the Team row's rule: Final over each side's total, never a projection.
+	const [done] = bugsOf(board('final'), SYNC, SATURDAY, ZONE);
+	assert.ok(done);
+	assert.deepEqual(done.columns, { small: BOX.final, big: BOX.pts });
+	assert.deepEqual(
+		done.sides.map((s) => s.small),
+		['62.1', '71.4']
+	);
+	// The key explains Proj final only while a game still plays.
+	assert.equal(bugsPlaying([{ state: 'kicked_off' }, { state: 'final' }]), true);
+	assert.equal(bugsPlaying([{ state: 'final' }, { state: 'upcoming' }]), false);
+	assert.equal(bugsMissFinal([done]), false);
 	const [playing] = bugsOf(board('playing'), SYNC, SATURDAY, ZONE);
 	assert.ok(playing);
 	assert.equal(playing.head, KICKOFF.kickedOff);

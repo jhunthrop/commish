@@ -40,6 +40,7 @@
 		HOME,
 		bugsOf,
 		bugsMissFinal,
+		bugsPlaying,
 		projectedFinalOf,
 		feedRows,
 		lineupSummary,
@@ -295,7 +296,7 @@
 								scoreboard.projection_scoring,
 								advice?.player_points ?? false,
 								memberZone(),
-								bugs.some((b) => b.state !== 'upcoming'),
+								bugsPlaying(bugs),
 								bugsMissFinal(bugs)
 							)
 						: null,

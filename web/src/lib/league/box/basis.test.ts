@@ -266,6 +266,33 @@ void test("the phone Lineup leaves the defenses' scoring to the desk and says wh
 	assert.ok(phone.includes(NO_PROJ_FINAL_PART) && !phone.includes(PROJ_FINAL_PART), phone);
 });
 
+void test('the Matchup and Lineup keys explain Proj final only while a starter still plays (Lane 121, B99)', () => {
+	const played = line({ kickoff: '2026-10-16T00:15:00.000Z', played: true, game_state: 'final' });
+	const key = (allFinal: boolean | undefined, lineup: boolean): string =>
+		basisText(
+			boxBasisParts(
+				{
+					projection: { readAt: READ, scoring: CLOSEST },
+					lines: [played],
+					byPlayer: true,
+					teamTotal: false,
+					host: 'sleeper',
+					...(allFinal === undefined ? {} : { allFinal }),
+					lineup: lineup ? { previousReadAt: null, note: { basis_note: '' } } : null
+				},
+				CENTRAL,
+				NOW
+			)
+		);
+	for (const lineup of [false, true]) {
+		assert.ok(key(false, lineup).includes(PROJ_FINAL_PART));
+		// The previous caller sends no allFinal: as before.
+		assert.ok(key(undefined, lineup).includes(PROJ_FINAL_PART));
+		// Every Team row reads Final: nothing to explain.
+		assert.ok(!key(true, lineup).includes(PROJ_FINAL_PART), key(true, lineup));
+	}
+});
+
 void test('the Matchup key says Proj, Pts and Game, the columns it draws', () => {
 	const parts = boxBasisParts(
 		{

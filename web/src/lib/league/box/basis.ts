@@ -436,6 +436,9 @@ export interface BoxBasisFacts {
 	teamTotal: boolean;
 	/** A Team row draws its Proj final "--" (no figure from the API while the game is live). */
 	noFinal?: boolean;
+	/** Every Team row reads Final (BoxTotals.allFinal, Lane 121 B99): no Proj final is drawn, so the
+	 * key says nothing of it. Absent, as before. */
+	allFinal?: boolean;
 	host: LeagueHost;
 	/** The Lineup's: the read the change counts from, and the API's sentence naming the rules our
 	 * stats lack; null on the Matchup, which draws no evidence columns. */
@@ -455,8 +458,10 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 		? { ...facts.projection, defense, league: true, kicked, host: facts.host }
 		: null;
 	const proj = projFacts ? said(projPart(projFacts, clock)) : [];
-	// What the Team row's small figure is once a game has kicked off (Lane 92, B22).
-	const final = said(projFinalWords(kicked, facts.noFinal === true));
+	// What the Team row's small figure is while a starter still plays (Lane 92, B22; once every one is
+	// final the row reads Final, Lane 121 B99, and needs no key).
+	const projFinal = kicked && facts.allFinal !== true;
+	const final = said(projFinalWords(projFinal, facts.noFinal === true));
 	const { lineup } = facts;
 	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.
 	const team = lineup === null && facts.teamTotal ? 'platform' : 'rows';
@@ -482,8 +487,8 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 			? deskOrPhone(`${PICK_PART} ${projPart(projFacts, clock)}`, pickProjPart(projFacts, clock))
 			: said(PICK_PART)),
 		...deskOrPhone(
-			projFinalWords(kicked, facts.noFinal === true),
-			projFinalPhone(kicked, facts.noFinal === true)
+			projFinalWords(projFinal, facts.noFinal === true),
+			projFinalPhone(projFinal, facts.noFinal === true)
 		),
 		...said(deltaPart(lineup.previousReadAt, clock), false),
 		...said(gamePart(facts.lines, clock, now, 'full')),
