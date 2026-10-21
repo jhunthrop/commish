@@ -121,7 +121,6 @@ export function tradeChecker({
 			week: trades.week,
 			basis: checkBasis,
 			basis_note: trades.basis_note,
-			basis_note_link: trades.basis_note_link,
 			order_basis: trades.order_basis,
 			refreshed: trades.refreshed,
 			read_at: readAt(),

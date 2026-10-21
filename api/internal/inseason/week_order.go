@@ -62,10 +62,10 @@ func sectionOf(f Facts) apitypes.WeekOrderRowSection {
 func (a *advisor) WeekOrder(position draft.Position, marks bool) apitypes.WeekOrderAdvice {
 	scoring := projectionScoring(a.settings, a.preset)
 	// The tab's own rules (Lane 66w), said in the one sentence (Lane 66t): a reader with no league is
-	// told the board's scoring and has no Settings to open.
-	un := uncountedOf(uncountedRulesAt(a.settings, a.season.Carries, position), marks)
+	// told the board's scoring.
+	un := uncountedOf(uncountedRulesAt(a.settings, a.season.Carries, position))
 	out := apitypes.WeekOrderAdvice{Week: a.Snap.Week, Position: apitypes.WeekOrderAdvicePosition(position),
-		BasisNote: un.Note, BasisNoteLink: un.Link, BasisNoteList: &un.Names, ProjectionReadAt: a.projectionReadAt(),
+		BasisNote: un.Note, BasisNoteList: &un.Names, ProjectionReadAt: a.projectionReadAt(),
 		ProjectionScoring: scoring, Rows: []apitypes.WeekOrderRow{}}
 	var hosts map[string]string
 	if marks {

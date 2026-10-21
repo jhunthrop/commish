@@ -3224,8 +3224,6 @@ export interface components {
 			basis_note: string;
 			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
-			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
-			basis_note_link: string;
 			/** @description the rules basis_note counts, in words ("two-point conversions"), for the league's Settings to list; empty when it counts none */
 			uncounted_rules: string[];
 			order_basis: components['schemas']['OrderBasis'];
@@ -3544,8 +3542,6 @@ export interface components {
 			basis_note: string;
 			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
-			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
-			basis_note_link: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/**
 			 * Format: date-time
@@ -3608,8 +3604,6 @@ export interface components {
 			basis_note: string;
 			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
-			/** @description the words of the link to the league's Settings the web drew before Lane 111 ("Which two"), kept for that web through one deploy; the web no longer draws it. Empty with none or no league */
-			basis_note_link: string;
 			/**
 			 * Format: date-time
 			 * @description when the league was read from its platform, null without a league
@@ -3675,8 +3669,6 @@ export interface components {
 			basis_note: string;
 			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
-			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
-			basis_note_link: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
 			refreshed: string;
@@ -3907,8 +3899,6 @@ export interface components {
 			basis_note: string;
 			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
-			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
-			basis_note_link: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
 			refreshed: string;
@@ -3995,8 +3985,6 @@ export interface components {
 			basis_note: string;
 			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
-			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
-			basis_note_link: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
 			refreshed: string;

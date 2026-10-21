@@ -80,7 +80,6 @@ const advice = (rows: OrderRow[], over: Partial<OrderAdvice> = {}): OrderAdvice 
 	week: 6,
 	basis: 'Our rest-of-season order from week 7.',
 	basis_note: '',
-	basis_note_link: '',
 	order_basis: 'rest_of_season',
 	refreshed: READ,
 	from_week: 7,

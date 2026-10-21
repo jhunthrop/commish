@@ -159,7 +159,7 @@ func TestCopyGuard(t *testing.T) {
 	plain.Scoring = apitypes.Scoring{Custom: &none}
 	for _, b := range []OrderBasis{Preseason, RestOfSeason} {
 		for _, s := range []string{LineupBasis(b), WaiversBasis, WaiverSeasonBasis(b, SeasonGames, StandardHorizon), PerGameBasis(), TradesBasis(b, SeasonGames, StandardHorizon),
-			TradeCheckBasis, UncountedOf(settings, nil).Note, UncountedOf(settings, nil).Link,
+			TradeCheckBasis, UncountedOf(settings, nil).Note,
 			OrderScreenBasis(b, RestFrom{Week: 6}, OrderLeague(false, settings, apitypes.ProjectionScoringFormatHalfPpr), StandardHorizon), OnlyCloseCalls} {
 			guard(t, s)
 		}
