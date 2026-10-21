@@ -24,6 +24,9 @@ const WIDTHS = [1440, 1280, 1200, 390] as const;
 /** The Connection column's least width at a desk, where its line wraps within it (fix round 1). */
 const CONNECTION_MIN_PX = 200;
 const DESK = 900;
+/** The most lines a league's name takes in Leagues attached at a desk (Lane 117, B84). */
+const NAME_LINES_DESK = 2;
+type Theme = 'light' | 'dark';
 /** The most lines a Last read cell may take: one at a desk, two in a hand (B71). */
 const READ_LINES = { desk: 1, hand: 2 } as const;
 const VIEWPORT_HEIGHT = 900;
@@ -49,10 +52,15 @@ const fault = (where: string, what: string): void => {
 
 const browser = await chromium.launch();
 
-async function open(width: number, path: string, text: string): Promise<Page> {
+async function open(
+	width: number,
+	path: string,
+	text: string,
+	theme: Theme = 'light'
+): Promise<Page> {
 	const ctx = await browser.newContext({
 		viewport: { width, height: VIEWPORT_HEIGHT },
-		colorScheme: 'light'
+		colorScheme: theme
 	});
 	watchData(ctx);
 	await installFixtureApiClock(ctx, API_ORIGIN);
@@ -61,7 +69,7 @@ async function open(width: number, path: string, text: string): Promise<Page> {
 	);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
-		[THEME_STORAGE_KEY, 'light'] as const
+		[THEME_STORAGE_KEY, theme] as const
 	);
 	const page = await ctx.newPage();
 	await page.goto(`${web}${path}`, { waitUntil: 'networkidle' });
@@ -171,7 +179,22 @@ for (const width of WIDTHS) {
 	);
 	if (!leagueReads.includes(espnRead))
 		fault(`account ${String(width)}`, `ESPN read "${espnRead}" is no league's`);
+	// Each league's name in two lines at most at a desk, the whole name on its title (B84).
+	if (width > DESK) {
+		const names = await account.locator('#your-leagues tbody th .name').evaluateAll((cells) =>
+			cells.map((cell) => ({
+				text: cell.getAttribute('title') ?? '',
+				lines: Math.round(
+					cell.getBoundingClientRect().height / parseFloat(getComputedStyle(cell).lineHeight)
+				)
+			}))
+		);
+		for (const name of names.filter((n) => n.lines > NAME_LINES_DESK || n.text === ''))
+			fault(`account ${String(width)}`, `league "${name.text}" on ${String(name.lines)} lines`);
+	}
 	await shoot(account, 'account-platforms', width);
+	const dark = await open(width, '/account', 'Platforms', 'dark');
+	await shoot(dark, 'account-platforms-dark', width);
 }
 await browser.close();
 

@@ -625,10 +625,12 @@
 		font-size: var(--t-sm);
 	}
 
-	/* The side folds under the lists below 1280, not at the site's 1180: the Platforms table needs a
+	/* The side folds under the lists below 1440, not at the site's 1180: the Platforms table needs a
 	 * 744 px column for its Connection column to keep 200 px beside whole names, verbs and one-line
-	 * last reads, and beside the 380 px side it had 119 px at 1181 (Lane 105 fix round 1). */
-	@media (max-width: 1279px) {
+	 * last reads (Lane 105 fix round 1), and the Leagues attached table's League column, beside its
+	 * four set columns, held a long league name on five lines at 1280 (Lane 117, B84). At 1280 the page
+	 * is the 1200 layout. */
+	@media (max-width: 1439px) {
 		.grid {
 			grid-template-columns: minmax(0, 1fr);
 		}
