@@ -7,7 +7,7 @@
 // add on Waivers, Compare on Players), the copy passes the one guard (copy-scan.ts), nothing scrolls
 // sideways, Escape closes it and gives the focus back to the name, the back button closes it, a reload
 // reopens it and the close button then clears the address. A player with a written read, opened from
-// the address on Players, shows the read in the UI face at the box score's size (Lane 126). It prints each screen's script on load,
+// the address on Players, shows the read in the UI face at the rows' body size (Lane 126). It prints each screen's script on load,
 // gzipped, before any tap (the shelf's script waits for the first). Exits non-zero on any fault.
 //
 //   [BYTES_ONLY=1] node scripts/shelf-shots.ts [web origin] [out dir]
@@ -351,7 +351,7 @@ for (const screen of shotScreens) {
 	}
 }
 // A player with a written week read (the stand-in run's, scripts/standin-week-reads.json), opened from
-// the address on Players: the read is drawn, in the UI face at the box score's size (Lane 126).
+// the address on Players: the read is drawn, in the UI face at the rows' body size (Lane 126).
 const READ_SLUG = 'puka-nacua';
 const playersScreen = SCREENS.find((s) => s.name === 'players');
 if (!process.env.BYTES_ONLY && playersScreen !== undefined) {

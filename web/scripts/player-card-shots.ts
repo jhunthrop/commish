@@ -6,11 +6,11 @@
 // what it shows:
 //   the six tiles, each "--" with its reason on the tile, Opp rank's direction in words, the shared
 //   status pill, the verb and Compare, the week read's caption (or its withheld caption alone), the
-//   season read's stamp, the week ahead's row, the earlier seasons collapsed, the basis in at most five
-//   rendered lines at 1440 and eight at 390, the page's copy passing the one guard (betting and
-//   trading words, "host", a dash or a semicolon; the names the run and the API handed it skipped,
-//   copy-scan.ts), nothing scrolling sideways, and on a phone the pinned verb clearing the first
-//   tiles.
+//   season read's stamp (before the first kickoff only), the week ahead's row, the earlier seasons
+//   collapsed, the week read in the UI face (read-face.ts), the basis in at most five rendered lines
+//   at 1440 and eight at 390, the page's copy passing the one guard (betting and trading words,
+//   "host", a dash or a semicolon; the names the run and the API handed it skipped, copy-scan.ts),
+//   nothing scrolling sideways, and on a phone the pinned verb clearing the first tiles.
 // The Rest of season tile shows on a run that ranks the rest of the season: set ROS_FROM_WEEK to its
 // first week (the site built from the nightly's contract fixture run, research/nightly/contract/
 // fixture, PUBLIC_RUN_ID=2026-10-21T12-ros) and one signed-out page is shot with the tile held to
@@ -168,6 +168,8 @@ interface Card {
 	labels: string[];
 	values: Record<string, string>;
 	captions: Record<string, string>;
+	/** The page is past the first kickoff: the season read is not drawn. */
+	underway: boolean;
 	pill: string;
 	verbs: string[];
 	readText: string;
@@ -209,6 +211,9 @@ async function read(page: Page): Promise<Card> {
 				(el as HTMLElement).innerText.trim()
 			),
 			readText: document.querySelector<HTMLElement>('main .read')?.innerText ?? '',
+			// In season the tier box is titled by why his rest-of-season figure sits there (Lane 100, B30),
+			// and the read is the week's alone: the season read and its stamp are the draft's.
+			underway: document.querySelector('main .side h3.why') !== null,
 			basis: basis.map((p) => p.innerText),
 			basisLines: lines,
 			nextRow: document.querySelector<HTMLElement>('main .season tr.next')?.innerText ?? '',
@@ -240,13 +245,19 @@ async function openCompare(page: Page, name: string): Promise<void> {
 }
 
 const WEEK_TILE = new RegExp(`^${FIGURE.week}( \\d+)?$`);
+/** The tile after a bye: his next game's Proj, "Wk 7 Proj". */
+const AFTER_BYE_TILE = new RegExp(`^${FIGURE.week} \\d+ ${CARD.proj}$`);
 
 /** The tiles, each "--" with its reason, and rest of season's label as the run covers it. */
 function checkTiles(card: Card, where: string): void {
 	const rest = ROS_FROM_WEEK === undefined ? PROJECTED : REST;
 	// The week tile is headed by its week beside the season's Projected ("Wk 6", the ruling).
 	const [weekTile = '', ...others] = card.labels;
-	const want = [rest, 'Opp rank', 'Avg', 'Last', 'Δ Proj'];
+	// On his bye the change's tile gives his next game's Proj instead (Lane 100, B30).
+	const bye = card.captions[weekTile] === CARD.byeWeek;
+	const [last = ''] = others.slice(-1);
+	const change = bye && AFTER_BYE_TILE.test(last) ? last : CARD.delta;
+	const want = [rest, 'Opp rank', 'Avg', 'Last', change];
 	// One week per card (the sweep's M6): the head names the week tile's week, and a bye says so in
 	// the head as the tile does.
 	const weekOf = (text: string): string => /\d+/u.exec(text)?.[0] ?? '';
@@ -294,7 +305,7 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 	check(card.verbs.includes('Compare'), `${where}: no Compare`);
 	check(WEEK_READ.test(card.readText) === (shot.weekRead === 'shown'), `${where}: the week read`);
 	check(card.readText.includes(WITHHELD) === (shot.weekRead === 'withheld'), `${where}: withheld`);
-	if (!ROS && !card.readText.includes('Our written read of him is not ready'))
+	if (!ROS && !card.underway && !card.readText.includes('Our written read of him is not ready'))
 		check(
 			/Written \w{3} \d{1,2}, from his facts through last season/.test(card.readText),
 			`${where}: the season read's stamp`

@@ -69,7 +69,7 @@
 		color: var(--ink-3);
 	}
 
-	/* The week's read in season: the UI face at the box score's body size, its byline a caption like
+	/* The week's read in season: the UI face at the rows' body size (--t-md), its byline a caption like
 	   the tiles'. Its selectors outrank the phone's sizes below, so it holds at every width. */
 	.prose.week {
 		font-family: var(--font-ui);
