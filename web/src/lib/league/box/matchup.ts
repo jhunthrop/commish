@@ -43,6 +43,9 @@ export interface SideRead {
 	now: number;
 	/** The game has kicked off (matchupStarted): the Team row's Pts are its big figure. */
 	started: boolean;
+	/** The bug's head is Final by the lines the screen holds (matchupFinal): a side with no box, whose
+	 * starters no line shows, reads Final under it (Lane 121 fix round 1). */
+	headFinal?: boolean;
 }
 
 /** A side's figures as its score bug prints them. */
@@ -71,6 +74,13 @@ export function bugFigures(
 		bigLabel: BOX.pts,
 		small: `${small.caption} ${boxNumber(small.figure)}`
 	};
+}
+
+/** Whether every starter's game is final at the page's clock, by the one rule (kickoff.ts): the bug's
+ * Final head over the lines it reads. */
+export function matchupFinal(lines: readonly PlayerLine[], now: number): boolean {
+	const games = lines.flatMap(({ facts }) => (facts.bye || facts.kickoff === null ? [] : [facts]));
+	return games.length > 0 && linesRead(games, now).state === 'final';
 }
 
 /** Whether any starter's game has kicked off at the page's clock, by the one rule (kickoff.ts). */
@@ -136,8 +146,9 @@ export function sideBox(
 			pts: sideScore(rows, side, read.hostTotal),
 			final: null,
 			live: read.started,
-			// No line of the API's holds his game, so the one rule cannot call the side final.
-			allFinal: false,
+			// No line of the API's holds its starters' games: it follows the bug's head, so it never
+			// reads Proj final under a Final head (fix round 1, HIGH-1).
+			allFinal: read.headFinal === true,
 			note: null
 		},
 		lines: [],

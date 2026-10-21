@@ -53,12 +53,12 @@ func (a *advisor) pairings() [][]*leaguesync.Side {
 }
 
 // kickoffs is one game's starters' kickoffs: how many have kicked off,
-// how many are done (final, or out of a game under way), how
-// many are in play and still to come, how many have a game, and the next
-// to come.
+// how many are done (final, or out of a game under way), how many games
+// are final, how many are in play and still to come, how many have a
+// game, and the next to come.
 type kickoffs struct {
-	kicked, done, inPlay, toCome, games int
-	next                                *time.Time
+	kicked, done, finals, inPlay, toCome, games int
+	next                                        *time.Time
 }
 
 // add counts one starter's game by its state (stateOfStart, from
@@ -70,6 +70,9 @@ func (k *kickoffs) add(f apitypes.WeekFacts) {
 		return
 	}
 	k.games++
+	if *f.GameState == apitypes.GameStateFinal {
+		k.finals++
+	}
 	switch state {
 	case done:
 		k.kicked++
@@ -111,6 +114,16 @@ func (k kickoffs) toPlay(game apitypes.ScoreboardGameState) *string {
 		return nil
 	}
 	return &words
+}
+
+// startersFinal is whether every one of these starters with a game has
+// a final game (Lane 121, B99): the side's figure reads Final with its
+// total, the web's one predicate (box.ts teamSmallFigure). Empty slots,
+// byes and starters with no game held do not count; none with a game is
+// not final.
+func (k kickoffs) startersFinal() *bool {
+	final := k.games > 0 && k.finals == k.games
+	return &final
 }
 
 // inPlayCount is the starters whose own game is under way now (Lane 102,
@@ -160,6 +173,7 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 	for i := range out.Sides {
 		out.Sides[i].ToPlay = own[i].toPlay(out.State)
 		out.Sides[i].InPlay = own[i].inPlayCount()
+		out.Sides[i].StartersFinal = own[i].startersFinal()
 	}
 	return out
 }

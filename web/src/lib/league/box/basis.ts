@@ -64,6 +64,12 @@ export const PROJ_FINAL_PART = `${BOX.projFinal} adds the ${BOX.pts} and the ${B
 /** Why a Proj final is drawn "--" (round 2), said once where one is. */
 export const NO_PROJ_FINAL_PART = `No ${BOX.projFinal} while a starter still to play has no ${BOX.proj}.`;
 
+/** Why a side's Final reads "--" (Lane 121 fix round 1): its platform sends us no score for it (an
+ * FFPC opponent the read holds no box for, a score unread). Said once where one is. */
+export function finalNonePart(host: LeagueHost): string {
+	return `A ${BOX.final} of ${BOX.none} is a score ${hostWords(host)} does not send us.`;
+}
+
 /** The Proj final's sentences: what it is once a game has kicked off, and why one is "--" where one
  * is; empty before kickoff. */
 export function projFinalWords(started: boolean, missing: boolean): string {
@@ -439,6 +445,8 @@ export interface BoxBasisFacts {
 	/** Every Team row reads Final (BoxTotals.allFinal, Lane 121 B99): no Proj final is drawn, so the
 	 * key says nothing of it. Absent, as before. */
 	allFinal?: boolean;
+	/** A Team row reads Final with no total (an FFPC opponent with no box, Lane 121 fix round 1). */
+	finalNone?: boolean;
 	host: LeagueHost;
 	/** The Lineup's: the read the change counts from, and the API's sentence naming the rules our
 	 * stats lack; null on the Matchup, which draws no evidence columns. */
@@ -461,7 +469,10 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	// What the Team row's small figure is while a starter still plays (Lane 92, B22; once every one is
 	// final the row reads Final, Lane 121 B99, and needs no key).
 	const projFinal = kicked && facts.allFinal !== true;
-	const final = said(projFinalWords(projFinal, facts.noFinal === true));
+	const final = [
+		...said(projFinalWords(projFinal, facts.noFinal === true)),
+		...said(facts.finalNone === true ? finalNonePart(facts.host) : null)
+	];
 	const { lineup } = facts;
 	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.
 	const team = lineup === null && facts.teamTotal ? 'platform' : 'rows';

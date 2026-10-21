@@ -160,7 +160,66 @@ async function teamFaults(
 			? [`the page says ${BOX.projFinal} with every week 6 game final`]
 			: [])
 	];
-	return { captions, faults };
+	return { captions, faults: [...faults, ...(await sideFaults(page, screen))] };
+}
+
+/** Each side's Final as a screen's score bugs draw it, by team name (Lane 121 fix round 1, HIGH-1):
+ * the Matchup bug's small line, the home bugs' small cell or their column head. */
+async function bugFinals(page: Page, screen: Screen): Promise<Map<string, boolean>> {
+	const word = BOX.final.toLowerCase();
+	const pairs = await page.evaluate(
+		({ name, final }) => {
+			const text = (el: Element | null): string => (el?.textContent ?? '').trim().toLowerCase();
+			if (name === 'matchup')
+				return [...document.querySelectorAll('main .bug .sd')].map((sd) => {
+					const small = text(sd.querySelector('.sc small'));
+					return [text(sd.querySelector('.nm b')), small.startsWith(`${final} `)] as const;
+				});
+			return [...document.querySelectorAll('main a.bug')].flatMap((bug) => {
+				const head = text(bug.querySelector('.bh .n.sm')) === final;
+				return [...bug.querySelectorAll('.bt')].map(
+					(bt) =>
+						[
+							text(bt.querySelector('.nm')),
+							head || text(bt.querySelector('.proj')).startsWith(`${final} `)
+						] as const
+				);
+			});
+		},
+		{ name: screen.name, final: word }
+	);
+	return new Map(pairs);
+}
+
+/** The Matchup's bug agrees with its Team rows side by side, and across screens the Matchup and the
+ * home call each side Final alike at the same width and theme (kept in `finalsSeen`). */
+const finalsSeen = new Map<string, Map<string, boolean>>();
+async function sideFaults(page: Page, screen: Screen): Promise<string[]> {
+	if (!['matchup', 'home'].includes(screen.name)) return [];
+	const finals = await bugFinals(page, screen);
+	const out: string[] = [];
+	if (screen.name === 'matchup') {
+		const rows = await page.evaluate(() =>
+			[...document.querySelectorAll<HTMLElement>('main tr.totals td.proj small')]
+				.filter((small) => small.getClientRects().length > 0)
+				.map((small) => small.textContent.trim().toLowerCase())
+		);
+		const bugs = [...finals.values()];
+		rows.forEach((row, i) => {
+			const bug = bugs[i];
+			if (bug !== undefined && bug !== (row === BOX.final.toLowerCase()))
+				out.push(`the Matchup bug and Team row ${String(i + 1)} disagree on Final ("${row}")`);
+		});
+	}
+	for (const [team, final] of finals) {
+		const seen = finalsSeen.get(team) ?? new Map<string, boolean>();
+		for (const [where, other] of seen)
+			if (where !== screen.name && other !== final)
+				out.push(`${team} reads ${final ? 'Final' : 'Proj final'} here, the other on the ${where}`);
+		seen.set(screen.name, final);
+		finalsSeen.set(team, seen);
+	}
+	return out;
 }
 
 const SCREENS: Readonly<Record<Day, readonly Screen[]>> = {
@@ -333,6 +392,9 @@ for (const theme of THEMES)
 					await ready(page, BUILDER_READY);
 				}
 				const team = await teamFaults(page, screen);
+				measures.push(
+					`${at}: bug Final ${[...(await bugFinals(page, screen)).entries()].map(([n, f]) => `${n}=${String(f)}`).join(', ')}`
+				);
 				measures.push(
 					`${at}: Team ${team.captions.length > 0 ? team.captions.join(', ') : 'none'}`
 				);

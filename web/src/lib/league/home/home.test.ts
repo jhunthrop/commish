@@ -12,9 +12,11 @@ import { BOX } from '../box/box.ts';
 import { changesTitle } from '../box/lineup.ts';
 import {
 	HOME,
+	bugsFinalNone,
 	bugsMissFinal,
 	bugsOf,
 	bugsPlaying,
+	sideFinal,
 	projectedFinalOf,
 	readCell,
 	lineupSummary,
@@ -203,10 +205,11 @@ void test('once a game has started the side ahead is bright and the side behind 
 		done.sides.map((s) => s.small),
 		['62.1', '71.4']
 	);
-	// The key explains Proj final only while a game still plays.
-	assert.equal(bugsPlaying([{ state: 'kicked_off' }, { state: 'final' }]), true);
-	assert.equal(bugsPlaying([{ state: 'final' }, { state: 'upcoming' }]), false);
+	// The key explains Proj final only while a side still plays.
+	assert.equal(bugsPlaying([under, done]), true);
+	assert.equal(bugsPlaying([done]), false);
 	assert.equal(bugsMissFinal([done]), false);
+	assert.equal(bugsFinalNone([done]), false);
 	const [playing] = bugsOf(board('playing'), SYNC, SATURDAY, ZONE);
 	assert.ok(playing);
 	assert.equal(playing.head, KICKOFF.kickedOff);
@@ -237,6 +240,39 @@ void test('once a game has started the side ahead is bright and the side behind 
 			['--', 'level']
 		]
 	);
+});
+
+void test("a side reads Final once every one of its starters is, the Team row's predicate (Lane 121 fix round 1, HIGH-1)", () => {
+	// Monday night: the opponent's starters are all final, the member's last still plays.
+	const night = board('playing');
+	const game = night.games[0];
+	assert.ok(game);
+	game.sides = game.sides.map((s, i) => ({ ...s, starters_final: i === 1 }));
+	const [bug] = bugsOf(night, SYNC, SATURDAY, ZONE);
+	assert.ok(bug);
+	assert.deepEqual(
+		bug.sides.map((s) => s.final),
+		[false, true]
+	);
+	// The column still says Proj final for the member's side; the done side says its own Final.
+	assert.equal(bug.columns.small, BOX.projFinal);
+	assert.deepEqual(
+		bug.sides.map((s) => s.small),
+		['70.4', `${BOX.final} 71.4`]
+	);
+	assert.equal(bugsPlaying([bug]), true);
+	// An older answer with no starters_final reads the game's state.
+	assert.equal(sideFinal({}, 'final'), true);
+	assert.equal(sideFinal({}, 'kicked_off'), false);
+	assert.equal(sideFinal({ starters_final: true }, 'upcoming'), false);
+	// A final side whose score is unread reads Final --, and the key says why.
+	const unread = board('final');
+	const side = unread.games[0]?.sides[1];
+	assert.ok(side);
+	side.points_read = false;
+	const [none] = bugsOf(unread, SYNC, SATURDAY, ZONE);
+	assert.ok(none);
+	assert.equal(bugsFinalNone([none]), true);
 });
 
 void test('a kickoff before the page clock is never the next: the bug reads Kicked off', () => {

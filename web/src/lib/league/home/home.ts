@@ -18,6 +18,7 @@ import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
 import {
 	AS_OF_KICKOFF,
 	leagueScoringWords,
+	finalNonePart,
 	projFinalWords,
 	teBonusSentence
 } from '../box/basis.ts';
@@ -99,8 +100,13 @@ export interface BugSide {
 	record: string;
 	avatar: string | null;
 	me: boolean;
-	/** The small figure: once the game has started its projected final, before it nothing. */
+	/** The small figure: once the game has started its projected final, before it nothing; once
+	 * every one of its starters is final its total (Lane 121, B99), "Final 83.7" where the column's
+	 * head still says Proj final for the other side. */
 	small: string;
+	/** Every one of the side's starters with a game is final (the API's starters_final, else the
+	 * game's state): its figure reads Final, the Team row's and the Matchup bug's one predicate. */
+	final: boolean;
 	/** The big figure (Lane 92, B22): its Proj before the first kickoff, its Pts from it. */
 	big: string;
 	/** "3 to play", "2 playing" while the game is under way (the API's to_play), else empty. */
@@ -155,16 +161,41 @@ export function readCell(read: BugRead, now: number): string {
 	return `${hostWords(read.host)} ${agoCell(seconds)}`;
 }
 
-/** The figure heads by the game's head: Proj before the first kickoff, Proj final and Pts from it,
- * Final and Pts once the game is final (Lane 121, B99: the Team row's rule, box.ts teamSmallFigure). */
-export function bugColumns(state: GameHead['state']): BugColumns {
+/** The figure heads by the game's head and its sides (Lane 121 fix round 1, HIGH-1): Proj before the
+ * first kickoff; from it Proj final and Pts; Final and Pts once every side is final, by the side's
+ * own predicate (sideFinal), the one the Team row and the Matchup bug read. */
+export function bugColumns(
+	state: GameHead['state'],
+	sides: readonly Pick<BugSide, 'final'>[]
+): BugColumns {
 	if (state === 'upcoming') return { small: '', big: BOX.proj };
-	return { small: state === 'final' ? BOX.final : BOX.projFinal, big: BOX.pts };
+	const allFinal = sides.length > 0 && sides.every((s) => s.final);
+	return { small: allFinal ? BOX.final : BOX.projFinal, big: BOX.pts };
 }
 
-/** Whether a bug still draws a Proj final (a game under way): what the key explains (Lane 121, B99). */
-export function bugsPlaying(bugs: readonly Pick<Bug, 'state'>[]): boolean {
-	return bugs.some((b) => b.state === 'kicked_off');
+/** A side's Final (Lane 121 fix round 1, HIGH-1): every one of its starters with a game is final, the
+ * API's starters_final; an older answer reads the game's state. Never before the first kickoff. */
+export function sideFinal(
+	side: Pick<ScoreboardGame['sides'][number], 'starters_final'>,
+	state: GameHead['state']
+): boolean {
+	if (state === 'upcoming') return false;
+	return side.starters_final ?? state === 'final';
+}
+
+/** Whether a bug still draws a Proj final (a side of a started game not final): what the key
+ * explains (Lane 121, B99). */
+export function bugsPlaying(
+	bugs: readonly { state: Bug['state']; sides: readonly Pick<BugSide, 'final'>[] }[]
+): boolean {
+	return bugs.some((b) => b.state !== 'upcoming' && b.sides.some((s) => !s.final));
+}
+
+/** Whether a final side draws "--" for its total, the platform's score unread: the key says why. */
+export function bugsFinalNone(
+	bugs: readonly { sides: readonly Pick<BugSide, 'final' | 'small'>[] }[]
+): boolean {
+	return bugs.some((b) => b.sides.some((s) => s.final && s.small.endsWith(BOX.none)));
 }
 
 /** A team's record as the standings print it: "5-0-0". */
@@ -214,15 +245,20 @@ function bugHead(
  * its Pts are, with its projected final (the API's, else its Proj) small beside them. */
 function sideFigures(
 	side: ScoreboardGame['sides'][number],
-	state: GameHead['state']
+	state: GameHead['state'],
+	final: boolean,
+	/** The column's head says Final (every side final): the cell needs no word of its own. */
+	headFinal: boolean
 ): Pick<BugSide, 'small' | 'big'> {
 	const proj = side.projection === null ? BOX.none : fixed(side.projection, 1);
 	if (state === 'upcoming') return { small: '', big: proj };
 	const pts = side.points_read ? fixed(side.points, 1) : BOX.none;
-	// Once final the small figure is the side's total under Final (bugColumns), never a projection.
-	const final =
-		state === 'final' ? (side.points_read ? side.points : null) : (side.projected_final ?? null);
-	return { small: final === null ? BOX.none : fixed(final, 1), big: pts };
+	if (!final) {
+		const projected = side.projected_final ?? null;
+		return { small: projected === null ? BOX.none : fixed(projected, 1), big: pts };
+	}
+	// Final: the side's total, never a projection, said Final where the head says Proj final.
+	return { small: headFinal ? pts : `${BOX.final} ${pts}`, big: pts };
 }
 
 /** Every game of the week as a score bug, the drafter's first, each read at `now`, the page's clock
@@ -239,21 +275,25 @@ export function bugsOf(
 		const mine = game.sides.some((s) => s.roster_id === sync.me);
 		const head = gameHead({ state: game.state, next: game.next_kickoff }, now);
 		const started = head.state !== 'upcoming';
+		const finals = game.sides.map((side) => ({ final: sideFinal(side, head.state) }));
+		const columns = bugColumns(head.state, finals);
 		return {
 			key: `${String(i)}-${game.sides.map((s) => String(s.roster_id)).join('-')}`,
 			mine,
 			state: head.state,
 			...bugHead(head, zone, read, now),
-			columns: bugColumns(head.state),
-			sides: game.sides.map((side) => {
+			columns,
+			sides: game.sides.map((side, s) => {
 				const team = teams.get(side.roster_id);
+				const final = finals[s]?.final === true;
 				return {
 					rosterId: side.roster_id,
 					name: team?.name ?? `Team ${String(side.roster_id)}`,
 					record: bugRecord(team),
 					avatar: team?.avatar ?? null,
 					me: side.roster_id === sync.me,
-					...sideFigures(side, head.state),
+					final,
+					...sideFigures(side, head.state, final, columns.small === BOX.final),
 					toPlay: head.state === 'kicked_off' ? (side.to_play ?? '') : '',
 					stands: standsOf(game, side, started)
 				};
@@ -279,10 +319,12 @@ export function projections(
 	);
 }
 
-/** Whether a bug under way draws a Proj final "--": the basis then says why (round 2). A final game's
- * small figure is its total under Final (Lane 121, B99), which the key does not explain. */
+/** Whether a side not final draws a Proj final "--": the basis then says why (round 2). A final side's
+ * small figure is its total (Lane 121, B99), said by bugsFinalNone. */
 export function bugsMissFinal(bugs: readonly Bug[]): boolean {
-	return bugs.some((b) => b.state === 'kicked_off' && b.sides.some((s) => s.small === BOX.none));
+	return bugs.some(
+		(b) => b.state !== 'upcoming' && b.sides.some((s) => !s.final && s.small === BOX.none)
+	);
 }
 
 // ---- the drafter's lineup
@@ -841,7 +883,11 @@ export function teamBasis(
 	/** A game of the week has kicked off: Proj final is on the board (Lane 92). */
 	started = false,
 	/** A bug draws a Proj final "--" (round 2). */
-	missing = false
+	missing = false,
+	/** A side still draws a Proj final (bugsPlaying, Lane 121): what it is is said. */
+	projFinal = started,
+	/** A final side draws "--" for its total (bugsFinalNone): why is said. */
+	finalNone = false
 ): string {
 	const platform = hostWords(host);
 	const team = byPlayer ? `, ${BOX.totals} adds the rows` : '';
@@ -851,7 +897,9 @@ export function teamBasis(
 		readAt === null
 			? 'not in yet for this week'
 			: `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
-	const words = projFinalWords(started, missing);
+	const words = [projFinalWords(projFinal, missing), finalNone ? finalNonePart(host) : '']
+		.filter((w) => w !== '')
+		.join(' ');
 	const final = words === '' ? '' : ` ${words}`;
 	const extra = bonus === null ? '' : ` ${bonus}`;
 	return `A team's ${BOX.proj} adds its starters' published projections${whose}, ${when}${started ? `, ${AS_OF_KICKOFF}` : ''}.${extra} ${BOX.pts} are ${platform}'s so far${team}.${final}`;

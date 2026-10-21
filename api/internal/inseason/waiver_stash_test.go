@@ -230,19 +230,20 @@ func TestTheStashKeepsToTheLeaguesRegularSeasonOrWeek14Taken(t *testing.T) {
 
 func TestRegularSeasonLastReadsTermsThenPlayoffStartThenWeek14(t *testing.T) {
 	cases := []struct {
-		name                 string
-		terms, calendar, end int
-		want                 int
-		taken                bool
+		name                         string
+		terms, calendar, stated, end int
+		want                         int
+		taken                        bool
 	}{
-		{"the terms' first playoff week", 15, 16, 17, 14, false},
-		{"the playoff start where the terms say none", 0, 16, 17, 15, false},
-		{"a first week past the horizon is no end", 19, 0, 17, 14, true},
-		{"neither, week 14 taken", 0, 0, 17, 14, true},
-		{"week 1 states no regular season", 1, 0, 17, 14, true},
+		{"the terms' first playoff week", 15, 16, 0, 17, 14, false},
+		{"the playoff start where the terms say none", 0, 16, 0, 17, 15, false},
+		{"a first week past the horizon is no end", 19, 0, 0, 17, 14, true},
+		{"neither, week 14 taken", 0, 0, 0, 17, 14, true},
+		{"week 1 states no regular season", 1, 0, 0, 17, 14, true},
+		{"MyFantasyLeague's whole season, no playoffs", 0, 0, 17, 17, 17, false},
 	}
 	for _, c := range cases {
-		got, taken := regularSeasonLast(c.terms, c.calendar, c.end)
+		got, taken := regularSeasonLast(c.terms, c.calendar, c.stated, c.end)
 		if got != c.want || taken != c.taken {
 			t.Errorf("%s: %d %v, want %d %v", c.name, got, taken, c.want, c.taken)
 		}

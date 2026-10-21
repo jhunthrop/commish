@@ -41,6 +41,7 @@
 		bugsOf,
 		bugsMissFinal,
 		bugsPlaying,
+		bugsFinalNone,
 		projectedFinalOf,
 		feedRows,
 		lineupSummary,
@@ -296,8 +297,10 @@
 								scoreboard.projection_scoring,
 								advice?.player_points ?? false,
 								memberZone(),
+								bugs.some((b) => b.state !== 'upcoming'),
+								bugsMissFinal(bugs),
 								bugsPlaying(bugs),
-								bugsMissFinal(bugs)
+								bugsFinalNone(bugs)
 							)
 						: null,
 					// The season panel names the zone once, so the read's time does not repeat it.

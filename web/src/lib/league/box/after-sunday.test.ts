@@ -27,11 +27,11 @@ import type {
 	TradeAdvice,
 	WaiverAdvice
 } from '../inseason/api.ts';
-import { lineupSummary } from '../home/home.ts';
+import { bugsOf, lineupSummary, type Bug, type BugSide } from '../home/home.ts';
 import { BOX, teamSmallFigure } from './box.ts';
 import { gameHead } from './kickoff.ts';
 import { changesTitle, heldLineup, lineupBox, lineupSum, locked } from './lineup.ts';
-import { sideScore } from './matchup.ts';
+import { bugFigures, sideBox, sideScore } from './matchup.ts';
 
 const data = (name: string): unknown =>
 	inTenths(
@@ -193,6 +193,45 @@ void test("the Team row's small cell reads Proj final while a starter plays, Fin
 		teamSmallFigure(lineupBox(lineup, ZONE, Date.parse(FIXTURE_WEEK_CLOCK)).totals),
 		null
 	);
+});
+
+void test("Monday night: one predicate for a side's Final on the Matchup, the home bug and the Team row (Lane 121 fix round 1, HIGH-1)", () => {
+	const now = Date.parse(FIXTURE_MONDAY_NIGHT_CLOCK);
+	const night = at(FIXTURE_MONDAY_NIGHT_CLOCK);
+	const bugs: Bug[] = bugsOf(night.scoreboard, night.sync, now, ZONE);
+	const [bug] = bugs;
+	assert.ok(bug);
+	const read = { hostTotal: null, landed: true, week: night.matchup.week, now, started: true };
+	const said = new Map<number, string>();
+	for (const box of night.matchup.sides) {
+		const side =
+			night.sync.matchup?.mine.roster_id === box.roster_id
+				? night.sync.matchup.mine
+				: night.sync.matchup?.opponent;
+		assert.ok(side);
+		const team = sideBox(side, box, read, ZONE).totals;
+		const home: BugSide | undefined = bug.sides.find((s) => s.rosterId === box.roster_id);
+		assert.ok(home);
+		// The Team row, the Matchup bug and the home bug call the side final alike.
+		assert.equal(team.allFinal, home.final, `roster ${String(box.roster_id)}`);
+		const matchupBug = bugFigures(team, true).small;
+		said.set(box.roster_id, matchupBug);
+		assert.equal(matchupBug.startsWith(BOX.final), home.final);
+		const drawn: boolean =
+			bug.columns.small === BOX.final ? true : home.small.startsWith(BOX.final);
+		assert.equal(drawn, home.final);
+	}
+	// The fixture's Monday night holds one side done and one still playing: both forms are drawn.
+	assert.deepEqual([...said.values()].map((s) => s.startsWith(BOX.final)).sort(), [false, true]);
+	// An FFPC opponent with no box under a Final head reads Final --, never Proj final --.
+	const opponent = night.sync.matchup?.opponent;
+	assert.ok(opponent);
+	const ffpc = sideBox(opponent, null, { ...read, headFinal: true }, ZONE).totals;
+	assert.equal(bugFigures({ ...ffpc, pts: null }, true).small, `${BOX.final} ${BOX.none}`);
+	assert.deepEqual(teamSmallFigure({ ...ffpc, pts: null }), { caption: BOX.final, figure: null });
+	// Under a head still in play it follows the head: Proj final.
+	const live = sideBox(opponent, null, { ...read, headFinal: false }, ZONE).totals;
+	assert.equal(teamSmallFigure(live)?.caption, BOX.projFinal);
 });
 
 void test('the scoreboard and the Matchup print one figure for each side, its rows added (review M2)', () => {

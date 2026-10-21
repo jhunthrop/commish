@@ -7,6 +7,7 @@
 	import { KICKOFF } from './box/kickoff.ts';
 	import {
 		decidedHead,
+		matchupFinal,
 		matchupStarted,
 		nextKickoff,
 		sideBox,
@@ -65,6 +66,15 @@
 		)
 	);
 
+	/** Every starter the screen holds a line for is final (Lane 121 fix round 1): a side with no box
+	 * follows it. */
+	const headFinal = $derived(
+		matchupFinal(
+			(box?.sides ?? []).flatMap((s) => s.starters.map((st) => st.line)),
+			now.getTime()
+		)
+	);
+
 	function boxOf(s: MatchupSide): SideBox {
 		const answered = box?.sides.find((b) => b.roster_id === s.roster_id) ?? null;
 		return sideBox(s, answered, {
@@ -72,7 +82,8 @@
 			landed: box?.projection_read_at != null,
 			week: matchup?.week ?? sync.week,
 			now: now.getTime(),
-			started
+			started,
+			headFinal
 		});
 	}
 
@@ -192,6 +203,9 @@
 			{lines}
 			noFinal={[mine, theirs].some((s) => s !== null && s.totals.live && s.totals.final === null)}
 			allFinal={[mine, theirs].every((s) => s === null || s.totals.allFinal)}
+			finalNone={[mine, theirs].some(
+				(s) => s !== null && s.totals.live && s.totals.allFinal && s.totals.pts === null
+			)}
 			lineup={null}
 			now={now.getTime()}
 		/>

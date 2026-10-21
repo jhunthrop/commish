@@ -86,6 +86,8 @@ interface Kicks {
 	kicked: number;
 	/** Final, or out (a designation that keeps him out) however his game stands (Lane 92). */
 	done: number;
+	/** Final at the moment (moment.final), the side's Final when every game is (Lane 121). */
+	finals: number;
 	inPlay: number;
 	toCome: number;
 	games: number;
@@ -99,13 +101,14 @@ export function sitsOut(line: PlayerLine): boolean {
 }
 
 function kicks(lines: readonly PlayerLine[], moment: Moment): Kicks {
-	const out: Kicks = { kicked: 0, done: 0, inPlay: 0, toCome: 0, games: 0, next: null };
+	const out: Kicks = { kicked: 0, done: 0, finals: 0, inPlay: 0, toCome: 0, games: 0, next: null };
 	for (const line of lines) {
 		const { facts } = line;
 		if (facts.bye || facts.kickoff === null) continue;
 		out.games++;
 		const at = Date.parse(facts.kickoff);
 		const final = moment.final(line);
+		if (final) out.finals++;
 		const sits = sitsOut(line);
 		if (final || at <= moment.now) {
 			out.kicked++;
@@ -248,7 +251,9 @@ export function scoreboardAt(recorded: Recorded, moment: Moment, readAt: string)
 				),
 				to_play: toPlayOf(own, state),
 				// The starters in play now (scoreboard.go inPlayCount, Lane 102).
-				in_play: own.inPlay
+				in_play: own.inPlay,
+				// Every starter with a game final (scoreboard.go startersFinal, Lane 121 fix round 1).
+				starters_final: own.games > 0 && own.finals === own.games
 			}))
 		};
 	});

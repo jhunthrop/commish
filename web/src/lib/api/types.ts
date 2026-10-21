@@ -3295,6 +3295,8 @@ export interface components {
 			te_bonus?: number;
 		};
 		ScoreboardSide: {
+			/** @description every one of the side's starters with a game this week has a final game at the read's clock (gameStateAt), empty slots, byes and starters with no game held not counting, false with none (Lane 121, B99): the side's figure reads Final with its total; absent from an older answer, which reads the game's state */
+			starters_final?: boolean;
 			roster_id: number;
 			/**
 			 * Format: double

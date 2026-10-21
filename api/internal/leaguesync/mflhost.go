@@ -132,6 +132,9 @@ func (m *MFL) Read(ctx context.Context, ref Ref) (Snapshot, error) {
 	}
 	// MyFantasyLeague states nothing on when its waivers close.
 	snap.Calendar.PlayoffStartWeek, snap.Calendar.WaiversUnstated = mflPlayoffStart(league), true
+	if snap.Calendar.PlayoffStartWeek == 0 {
+		snap.Calendar.RegularSeasonLast = league.LastRegularSeasonWeek
+	}
 	snap.Status, snap.Calendar.DraftUnstated = m.draftStatus(ctx, ref, snap.Week)
 	if snap.Calendar.DraftUnstated {
 		snap.Calendar.DraftReadBy = ReadByWeek

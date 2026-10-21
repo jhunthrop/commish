@@ -358,7 +358,9 @@ export function weekBasis(
 	/** The lead league's game has kicked off: Proj final is on its bug (Lane 92). */
 	started = false,
 	/** Its bug draws a Proj final "--" (round 2). */
-	missing = false
+	missing = false,
+	/** A side of its bug still draws a Proj final (bugsPlaying, Lane 121). */
+	projFinal = started
 ): string[] {
 	const platform = hostWords(league.host);
 	const lines = [
@@ -377,7 +379,7 @@ export function weekBasis(
 				? `${FRONT.gain} ${FRONT.pickupGain}`
 				: `${FRONT.gain} ${FRONT.turnedPickup(turned)}`;
 		lines.push(
-			`${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}, ${when}${started ? `, ${AS_OF_KICKOFF}` : ''}. ${pickup}${started ? ` ${projFinalWords(true, missing)}` : ''}`
+			`${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}, ${when}${started ? `, ${AS_OF_KICKOFF}` : ''}. ${pickup}${projFinal ? ` ${projFinalWords(true, missing)}` : ''}`
 		);
 	}
 	return lines;

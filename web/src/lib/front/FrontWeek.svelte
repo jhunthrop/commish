@@ -73,8 +73,9 @@
 					lead,
 					others.length > 0 || live !== null,
 					memberZone(),
-					bugsPlaying([view.bug]),
-					bugsMissFinal([view.bug])
+					view.bug.state !== 'upcoming',
+					bugsMissFinal([view.bug]),
+					bugsPlaying([view.bug])
 				)
 			: []
 	);

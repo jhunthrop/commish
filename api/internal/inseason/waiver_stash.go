@@ -77,18 +77,25 @@ const takenRegularLast = 14
 // B99): the week before its first playoff week as the league's terms
 // state it (Sleeper's, ESPN's and FFPC's rules page), else before the
 // league's playoff start (MyFantasyLeague's week after its last regular
-// week), else takenRegularLast, taken true.
+// week), else the last regular week a league with no playoffs states
+// (MyFantasyLeague's whole season, fix round 1 LOW-3), else
+// takenRegularLast, taken true.
 func (a *advisor) lastRegularWeek() (last int, taken bool) {
-	return regularSeasonLast(a.Snap.Terms.PlayoffFirst, a.Snap.Calendar.PlayoffStartWeek, a.horizon.Last)
+	c := a.Snap.Calendar
+	return regularSeasonLast(a.Snap.Terms.PlayoffFirst, c.PlayoffStartWeek, c.RegularSeasonLast, a.horizon.Last)
 }
 
 // regularSeasonLast is the week before the first of the stated playoff
-// starts inside the season's horizon, else takenRegularLast, taken.
-func regularSeasonLast(termsFirst, calendarFirst, horizon int) (int, bool) {
+// starts inside the season's horizon, else a stated last regular week
+// inside it, else takenRegularLast, taken.
+func regularSeasonLast(termsFirst, calendarFirst, statedLast, horizon int) (int, bool) {
 	for _, first := range []int{termsFirst, calendarFirst} {
 		if first > 1 && first-1 <= horizon {
 			return first - 1, false
 		}
+	}
+	if statedLast > 0 && statedLast <= horizon {
+		return statedLast, false
 	}
 	return min(takenRegularLast, horizon), true
 }

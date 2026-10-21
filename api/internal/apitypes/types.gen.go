@@ -4010,6 +4010,9 @@ type ScoreboardSide struct {
 	// Starters the starters the host lists for the side
 	Starters int `json:"starters"`
 
+	// StartersFinal every one of the side's starters with a game this week has a final game at the read's clock (gameStateAt), empty slots, byes and starters with no game held not counting, false with none (Lane 121, B99): the side's figure reads Final with its total; absent from an older answer, which reads the game's state
+	StartersFinal *bool `json:"starters_final,omitempty"`
+
 	// ToPlay while the game is playing, where the side's starters stand, never a zero: "3 to play" while any starter with a game is still to come (an out starter whose game is still to come counts), "2 playing" once none is and some are in play; null once every starter is final, on bye or out of a game under way, before kickoff, or absent from an older answer
 	ToPlay *string `json:"to_play,omitempty"`
 }
