@@ -14,9 +14,12 @@
 		series: ChartSeries;
 		/** The graded weeks, in order: the axis, one step each. */
 		weeks: readonly number[];
+		/** The chart's head; the weekly chart's "Order matched by week, 2 weeks graded" when absent. */
+		caption?: string;
 	}
 
-	let { series, weeks }: Props = $props();
+	let { series, weeks, caption }: Props = $props();
+	const head = $derived(caption ?? `${RECORD_BOX.chart}, ${RECORD_BOX.chartWeeks(weeks.length)}`);
 
 	/** The drawing's width before the page has laid out, and its widest: a wide screen's column. */
 	const WIDE = 860;
@@ -47,6 +50,7 @@
 	const NAMES: Record<RecordSource, string> = {
 		ours: RECORD_BOX.ours,
 		adp: RECORD_BOX.adp,
+		espn: RECORD_BOX.espn,
 		published: RECORD_BOX.published
 	};
 
@@ -84,8 +88,8 @@
 <svelte:window onresize={measure} />
 
 <figure class="chart" bind:this={figure}>
-	<figcaption>{RECORD_BOX.chart}, {RECORD_BOX.chartWeeks(weeks.length)}</figcaption>
-	<svg viewBox="0 0 {width} {HEIGHT}" height={HEIGHT} role="img" aria-label={RECORD_BOX.chart}>
+	<figcaption>{head}</figcaption>
+	<svg viewBox="0 0 {width} {HEIGHT}" height={HEIGHT} role="img" aria-label={head}>
 		{#each ticks as tick (tick.value)}
 			<line
 				class="grid"
@@ -173,6 +177,16 @@
 	.adp circle,
 	.adp text {
 		fill: var(--ink-3);
+	}
+
+	.espn path {
+		stroke: var(--ink-2);
+		stroke-dasharray: 2 3;
+	}
+
+	.espn circle,
+	.espn text {
+		fill: var(--ink-2);
 	}
 
 	.published path {
