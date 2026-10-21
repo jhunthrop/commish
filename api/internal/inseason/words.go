@@ -182,14 +182,25 @@ const (
 )
 
 // countable is a rule a stat line may carry no metric for (score.go):
-// the league's points for it as the basis weighs them, its words, the
-// spot it scores and the metrics that count it.
+// the league's points for it as the basis weighs them, its words on the
+// league's Settings list, its name in a basis sentence (Lane 111, B33:
+// "Avg and Last miss your two-point and safety rules."), the spot it
+// scores and the metrics that count it.
 type countable struct {
 	points  float64
 	words   string
+	name    string
 	spot    spot
 	metrics []string
 }
+
+// The basis names of the two missed kicks, said as one where both are
+// left out, so the sentence keeps to Lane 108's phone budget.
+const (
+	missedFieldGoalName = "missed field goal"
+	missedExtraName     = "missed extra point"
+	missedKickName      = "missed kick"
+)
 
 // countables is the league's rules points so far count only where a
 // season's line carries their metric.
@@ -204,15 +215,15 @@ func countables(r apitypes.ScoringRules) []countable {
 	}
 	longer := math.Abs(r.PointsPerFieldGoal4049-r.PointsPerFieldGoal) + math.Abs(r.PointsPerFieldGoal50Plus-r.PointsPerFieldGoal)
 	return []countable{
-		{r.PointsPerTwoPointConversion, "two-point conversions", anySpot, []string{"two_point_conversions"}},
-		{longer, "field goals of 40 yards or more", kickerSpot, []string{metricFieldGoals40To49, metricFieldGoals50To59, metricFieldGoals60Up}},
-		{r.PointsPerFieldGoalMissed, "missed field goals", kickerSpot, []string{"field_goals_missed"}},
-		{r.PointsPerExtraPointMissed, "missed extra points", kickerSpot, []string{"extra_points_missed"}},
-		{r.PointsPerReturnTouchdown, "a player's kick and punt return touchdowns", anySpot, []string{"kick_return_touchdowns", "punt_return_touchdowns"}},
-		{r.PointsPerDefensiveFumbleRecovery, "fumble recoveries", defenseSpot, []string{"defensive_fumbles_recovered"}},
-		{r.PointsPerSafety, "safeties", defenseSpot, []string{"safeties"}},
-		{tierPoints(scoring.PointsAllowedTiers()), "a defense's points allowed", defenseSpot, []string{metricPointsAllowed}},
-		{tierPoints(scoring.YardsAllowedTiers()), "a defense's yards allowed", defenseSpot, []string{metricYardsAllowed}},
+		{r.PointsPerTwoPointConversion, "two-point conversions", "two-point", anySpot, []string{"two_point_conversions"}},
+		{longer, "field goals of 40 yards or more", "long field goal", kickerSpot, []string{metricFieldGoals40To49, metricFieldGoals50To59, metricFieldGoals60Up}},
+		{r.PointsPerFieldGoalMissed, "missed field goals", missedFieldGoalName, kickerSpot, []string{"field_goals_missed"}},
+		{r.PointsPerExtraPointMissed, "missed extra points", missedExtraName, kickerSpot, []string{"extra_points_missed"}},
+		{r.PointsPerReturnTouchdown, "a player's kick and punt return touchdowns", "return touchdown", anySpot, []string{"kick_return_touchdowns", "punt_return_touchdowns"}},
+		{r.PointsPerDefensiveFumbleRecovery, "fumble recoveries", "fumble recovery", defenseSpot, []string{"defensive_fumbles_recovered"}},
+		{r.PointsPerSafety, "safeties", "safety", defenseSpot, []string{"safeties"}},
+		{tierPoints(scoring.PointsAllowedTiers()), "a defense's points allowed", "points allowed", defenseSpot, []string{metricPointsAllowed}},
+		{tierPoints(scoring.YardsAllowedTiers()), "a defense's yards allowed", "yards allowed", defenseSpot, []string{metricYardsAllowed}},
 	}
 }
 
@@ -251,9 +262,11 @@ func countWords(n int) string {
 }
 
 // Uncounted is the league's rules a season's lines carry no metric for,
-// so Avg and Last leave them out (Lane 66t): Note counts them for a
-// screen's basis, Link is the words of its link to the league's Settings,
-// where Rules lists them. Note and Link are empty, Rules too, when the
+// so Avg and Last leave them out (Lane 66t): Note names them for a
+// screen's basis (Lane 111, B33), Rules lists them in the league's
+// Settings words. Link is the words of the link to that list the web drew
+// before Lane 111 ("Which two"), kept for the web of the deploy before;
+// the web no longer draws it. Note and Link are empty, Rules too, when the
 // league scores none of them or every one is counted.
 type Uncounted struct {
 	Note  string
@@ -267,37 +280,79 @@ func UncountedOf(s apitypes.LeagueSettings, carried func(string) bool) Uncounted
 	return uncountedOf(uncountedRules(s, carried), "your", true)
 }
 
-// uncountedOf counts rules in the one sentence every basis prints, whose
-// rules they are ("your", or a reader's stand-in "the PPR"), and the
-// link's words where there is a Settings to open (linked).
-func uncountedOf(rules []string, whose string, linked bool) Uncounted {
-	if len(rules) == 0 {
+// uncountedOf names the rules in the one sentence every basis prints,
+// whose rules they are ("your", or a reader's stand-in "the PPR"), and
+// the old web's link words where there is a Settings to open (linked).
+func uncountedOf(left []countable, whose string, linked bool) Uncounted {
+	if len(left) == 0 {
 		return Uncounted{Rules: []string{}}
 	}
-	n := countWords(len(rules))
-	out := Uncounted{Note: fmt.Sprintf("Avg and Last miss %s of %s rules our stats lack.", n, whose), Rules: rules}
+	rules := make([]string, 0, len(left))
+	for _, c := range left {
+		rules = append(rules, c.words)
+	}
+	names := basisNames(left)
+	kind := "rules"
+	if len(names) == 1 {
+		kind = "rule"
+	}
+	out := Uncounted{Note: fmt.Sprintf("Avg and Last miss %s %s %s.", whose, andList(names), kind), Rules: rules}
 	if linked {
-		out.Link = "Which " + n
+		out.Link = "Which " + countWords(len(rules))
 	}
 	return out
 }
 
-// uncountedRules is the league's rules points so far leave out, in
-// words: each one the league scores at a spot it starts and no line this
-// season carries.
-func uncountedRules(s apitypes.LeagueSettings, carried func(string) bool) []string {
+// basisNames is the rules' names as a basis says them, the two missed
+// kicks said once, as a missed kick, where both are left out.
+func basisNames(left []countable) []string {
+	kicks := 0
+	for _, c := range left {
+		if missedKick(c) {
+			kicks++
+		}
+	}
+	names := make([]string, 0, len(left))
+	for _, c := range left {
+		switch {
+		case kicks < 2 || !missedKick(c):
+			names = append(names, c.name)
+		case c.name == missedFieldGoalName:
+			names = append(names, missedKickName)
+		}
+	}
+	return names
+}
+
+// missedKick reports whether the rule is a missed field goal or extra point.
+func missedKick(c countable) bool {
+	return c.name == missedFieldGoalName || c.name == missedExtraName
+}
+
+// andList is names joined as a sentence says them: "a", "a and b",
+// "a, b and c".
+func andList(names []string) string {
+	if len(names) < 2 {
+		return strings.Join(names, "")
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+}
+
+// uncountedRules is the league's rules points so far leave out: each one
+// the league scores at a spot it starts and no line this season carries.
+func uncountedRules(s apitypes.LeagueSettings, carried func(string) bool) []countable {
 	return uncountedWhere(s, carried, func(spot) bool { return true })
 }
 
 // uncountedWhere is the rules left out at the spots keep admits.
-func uncountedWhere(s apitypes.LeagueSettings, carried func(string) bool, keep func(spot) bool) []string {
-	var named []string
+func uncountedWhere(s apitypes.LeagueSettings, carried func(string) bool, keep func(spot) bool) []countable {
+	var left []countable
 	for _, c := range countables(rulesOf(s.Scoring)) {
 		if keep(c.spot) && c.points != 0 && c.starts(s) && !c.counted(carried) {
-			named = append(named, c.words)
+			left = append(left, c)
 		}
 	}
-	return named
+	return left
 }
 
 // tabSpots is the spot each week tab's rows score at (Lane 66w rereview
@@ -306,7 +361,7 @@ func uncountedWhere(s apitypes.LeagueSettings, carried func(string) bool, keep f
 var tabSpots = map[draft.Position]spot{draft.K: kickerSpot, draft.DEF: defenseSpot}
 
 // uncountedRulesAt is uncountedRules for one week tab's position.
-func uncountedRulesAt(s apitypes.LeagueSettings, carried func(string) bool, position draft.Position) []string {
+func uncountedRulesAt(s apitypes.LeagueSettings, carried func(string) bool, position draft.Position) []countable {
 	want, ok := tabSpots[position]
 	return uncountedWhere(s, carried, func(at spot) bool { return ok && at == want })
 }

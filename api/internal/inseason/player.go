@@ -75,6 +75,7 @@ func publicLine(d Data, projection boards.WeekProjection, b boards.Board, rest R
 		}
 	}
 	line.OppRank, line.SeasonAvg, line.LastPoints = evidence(facts)
+	line.GamesPlayed = gamesPlayed(facts)
 	return line
 }
 

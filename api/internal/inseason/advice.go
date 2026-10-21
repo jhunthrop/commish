@@ -67,6 +67,9 @@ type advisor struct {
 	week int
 	// data is the season's facts the Season indexes, kept for turnTo.
 	data Data
+	// platform is the league platform's points for its week (Lane 111),
+	// kept for turnTo.
+	platform PlatformWeek
 	// finds is the league read's trades with each team, searched once per
 	// read across requests (Service.findsFor); nil searches for this
 	// advisor alone, once (found).
@@ -140,14 +143,39 @@ func newAdvisor(l League, data Data, projection boards.WeekProjection, held map[
 		basis = Preseason
 	}
 	preset, _ := leaguesync.LeagueScoring(l.Saved, nil, false)
+	platform := platformWeekOf(l)
 	horizon := HorizonOf(l.Snap.Terms).Reaching(l.Board.FromWeek)
 	rest := RestAt(data.Games, l.Board.FromWeek, l.Board.Refreshed, now, horizon)
 	if l.Board, err = LiveBoard(l.Board, rest); err != nil {
 		return nil, fmt.Errorf("inseason: the board at the read's clock: %w", err)
 	}
 	return &advisor{rest: rest, League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, horizon: horizon, weeks: WeeksCovered(basis, firstWeek(l), horizon), pages: newPages(l.Board.Raw), now: now,
-		gamesLeft: rest.Left, projection: projection, preset: preset, week: l.Snap.Week, data: data,
-		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
+		gamesLeft: rest.Left, projection: projection, preset: preset, week: l.Snap.Week, data: data, platform: platform,
+		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now).WithPlatform(platform)}, nil
+}
+
+// platformWeekOf is the league platform's points for its week, by board
+// id, from every side of the read the one per-platform rule says carries
+// each player's points (leaguesync GivesPlayerPoints): what a final game
+// whose stats have not landed counts on (Season.gamesOf, Lane 111). A
+// player with no board id is left out.
+func platformWeekOf(l League) PlatformWeek {
+	out := PlatformWeek{Week: l.Snap.Week, Points: map[string]float64{}}
+	if l.Player == nil {
+		return out
+	}
+	for i := range l.Snap.Matchups {
+		side := &l.Snap.Matchups[i]
+		if !leaguesync.GivesPlayerPoints(l.Snap.Ref.Host, side) || side.PointsUnread {
+			continue
+		}
+		for hostID, pts := range side.PlayerPoints {
+			if id := l.Player(hostID).BoardId; id != nil && *id != "" {
+				out.Points[*id] = pts
+			}
+		}
+	}
+	return out
 }
 
 // addressedWeek is the week an action screen addresses (Lane 95): the first
@@ -192,7 +220,7 @@ func hasGames(games []boards.TeamWeek, week int) bool {
 func (a *advisor) turnTo(week int, projection boards.WeekProjection) *advisor {
 	out := *a
 	out.week, out.projection = week, projection
-	out.season = NewSeason(a.data, RulesOf(rulesOf(a.settings.Scoring)), week, a.now).Turned()
+	out.season = NewSeason(a.data, RulesOf(rulesOf(a.settings.Scoring)), week, a.now).Turned().WithPlatform(a.platform)
 	out.finds, out.foundHere, out.searchErr = nil, nil, nil
 	return &out
 }
@@ -300,6 +328,7 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 		words.Proj = &proj
 	}
 	line.OppRank, line.SeasonAvg, line.LastPoints = evidence(facts)
+	line.GamesPlayed = gamesPlayed(facts)
 	if placed {
 		// A kicker or defense has no page, so no link (founder ruling 2026-10-17).
 		if cardPositions[position] {
@@ -368,6 +397,15 @@ func evidence(f Facts) (oppRank *int, seasonAvg, lastPoints *float64) {
 		lastPoints = &last
 	}
 	return oppRank, seasonAvg, lastPoints
+}
+
+// gamesPlayed is the games his Avg is over, nil before his first.
+func gamesPlayed(f Facts) *int {
+	if f.GamesPlayed == 0 {
+		return nil
+	}
+	n := f.GamesPlayed
+	return &n
 }
 
 // projectionPreviousReadAt is when the snapshot before the week's newest
@@ -452,7 +490,7 @@ func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
 		}
 	}
 	for _, g := range f.LastGames {
-		out.LastGames = append(out.LastGames, apitypes.GamePoints{Week: g.Week, Points: roundTenth(g.Points)})
+		out.LastGames = append(out.LastGames, apitypes.GamePoints{Week: g.Week, Points: roundTenth(g.Points), Source: sourceOf(g)})
 	}
 	if al := f.Allowed; al != nil {
 		out.AllowedToPosition = &apitypes.PointsAllowed{PointsAGame: al.PointsAGame, Rank: al.Rank, Of: al.Of, Position: string(al.Position)}
@@ -460,6 +498,15 @@ func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
 	c := conditionsOf(f.Game)
 	out.GameTotal, out.Spread, out.Roof, out.Weather = c.total, c.spread, c.roof, c.weather
 	return out
+}
+
+// sourceOf is where a game's points come from on the wire (Lane 111).
+func sourceOf(g GamePoints) *apitypes.GamePointsSource {
+	source := apitypes.GamePointsSourceStats
+	if g.Platform {
+		source = apitypes.GamePointsSourcePlatform
+	}
+	return &source
 }
 
 // reserve is the team's players in the host's injured reserve spots, in
