@@ -77,8 +77,8 @@ func warmService(t *testing.T, reads *fixtureReads, log *slog.Logger) (*Service,
 	return s, f, builds
 }
 
-// The warm at start fills the season's reads, the week's projection and
-// the next week's, and builds the run's board at the clock, so the first
+// The warm at start fills the season's reads, the projections of the week
+// before, the week and the week after, and builds the run's board at the clock, so the first
 // request reads none of them again (Lane 112 ruling 1).
 func TestTheWarmAtStartFillsBeforeTheFirstRequest(t *testing.T) {
 	reads := &fixtureReads{}
@@ -89,8 +89,8 @@ func TestTheWarmAtStartFillsBeforeTheFirstRequest(t *testing.T) {
 		t.Fatalf("no warm line: %s", logged.String())
 	}
 	week := nextWeek(f.data.Games)
-	for _, w := range []int{week, week + 1} {
-		if _, ok := reads.weeks.Load(w); !ok && (w == week || hasGames(f.data.Games, w)) {
+	for _, w := range []int{week - 1, week, week + 1} {
+		if _, ok := reads.weeks.Load(w); !ok && hasGames(f.data.Games, w) {
 			t.Fatalf("week %d's projection not read at start", w)
 		}
 	}

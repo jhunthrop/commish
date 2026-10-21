@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/boards"
+	"github.com/jhunthrop/commish/api/internal/draft"
 )
 
 // gatedReads answers each projection read with its own number, holding
@@ -100,7 +101,7 @@ func TestCacheServesTheKeptValueDuringARefresh(t *testing.T) {
 		}
 	}
 	close(gate)
-	c.refreshes.Wait()
+	c.Drain()
 	if n := reads.n.Load(); n != 2 {
 		t.Fatalf("%d reads, want the fill and one refresh", n)
 	}
@@ -162,82 +163,111 @@ func TestCacheStartsOneFillAndOneRefresh(t *testing.T) {
 		}
 	}
 	close(gate)
-	c.refreshes.Wait()
+	c.Drain()
 	if n := reads.n.Load(); n != 2 {
 		t.Fatalf("two requests past the TTL started %d refreshes", n-1)
 	}
 }
 
-// movingCaptures is a capture store whose newest capture moves on, its
-// runs read held while a gate is set.
+// movingCaptures is a capture store whose newest capture moves on: each
+// capture lists p2 at its code, and his run under it starts at that
+// capture unless it goes on from the one before. Its runs read is held
+// while a gate is set.
 type movingCaptures struct {
 	countingReads
 	mu     sync.Mutex
 	newest time.Time
-	gate   chan struct{}
+	code   string
+	// started is when each status's run began.
+	started map[string]time.Time
+	gate    chan struct{}
+}
+
+func (r *movingCaptures) capture(at time.Time, code string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.newest, r.code = at, code
+	if r.started == nil {
+		r.started = map[string]time.Time{}
+	}
+	if _, ok := r.started[boards.StatusOf(code)]; !ok {
+		r.started[boards.StatusOf(code)] = at
+	}
 }
 
 func (r *movingCaptures) Designations(context.Context) (map[string]boards.Designation, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return map[string]boards.Designation{"p2": {Code: "IR", AsOf: r.newest}}, nil
+	return map[string]boards.Designation{"p2": {Code: r.code, AsOf: r.newest}}, nil
 }
 
-func (r *movingCaptures) DesignationRuns(_ context.Context, newest time.Time) (map[boards.RunKey]time.Time, error) {
+func (r *movingCaptures) DesignationRuns(context.Context, time.Time) (map[boards.RunKey]time.Time, error) {
 	r.mu.Lock()
-	gate := r.gate
+	gate, status, start := r.gate, boards.StatusOf(r.code), r.started[boards.StatusOf(r.code)]
 	r.mu.Unlock()
 	if gate != nil {
 		<-gate
 	}
 	r.runs.Add(1)
-	return map[boards.RunKey]time.Time{{PlayerID: "p2", Status: boards.StatusInjuredReserve}: newest.Add(-time.Hour)}, nil
+	return map[boards.RunKey]time.Time{{PlayerID: "p2", Status: status}: start}, nil
 }
 
-// An hourly capture never makes a request wait on its dating: the newer
-// capture is dated by the runs kept while its own are read behind, then
-// by its own.
-func TestCacheDatesANewerCaptureByTheKeptRuns(t *testing.T) {
-	reads := &movingCaptures{newest: captureAt}
-	clock := &lockedClock{now: captureAt.Add(time.Minute)}
+// A status new this hour is never served without its date (Lane 112 fix
+// round 1, HIGH-1). Friday's 16:00 capture rules p2 Out, Questionable at
+// 15:00; while its dating is read behind, every request answers the 15:00
+// pair (Questionable, dated), at once, and from the moment it lands the
+// 16:00 pair (Out, listed at 16:00). On the week the turned page reads,
+// past his club's last game, neither is ever carried over.
+func TestANewStatusIsNeverServedUndated(t *testing.T) {
+	friday := time.Date(2026, 10, 23, 15, 0, 0, 0, time.UTC)
+	reads := &movingCaptures{}
+	reads.capture(friday, "Q")
+	clock := &lockedClock{now: friday.Add(time.Minute)}
 	c := &Cache{Reads: reads, Now: clock.Now}
 	ctx := context.Background()
-	if d, err := c.DatedDesignations(ctx); err != nil || !d["p2"].Since.Equal(captureAt.Add(-time.Hour)) {
-		t.Fatalf("first read %+v %v", d, err)
+	games := []boards.TeamWeek{
+		{Team: "BUF", Week: 7, Kickoff: friday.Add(-5 * 24 * time.Hour), Final: true},
+		{Team: "BUF", Week: 8, Kickoff: friday.Add(2 * 24 * time.Hour)},
 	}
+	p2 := Player{BoardID: "p2", Team: "BUF", Position: draft.WR}
+	served := func(d map[string]boards.Designation) *Designation {
+		return NewSeason(Data{Designations: d, Games: games}, Rules{}, 8, clock.Now()).Turned().designation(p2)
+	}
+	if d, err := c.DatedDesignations(ctx); err != nil || served(d).CarriedOver || served(d).Status != boards.StatusQuestionable {
+		t.Fatalf("15:00: %+v %v", served(d), err)
+	}
+	reads.capture(friday.Add(time.Hour), "O")
 	reads.mu.Lock()
-	reads.newest, reads.gate = captureAt.Add(time.Hour), make(chan struct{})
+	reads.gate = make(chan struct{})
 	gate := reads.gate
 	reads.mu.Unlock()
-	clock.add(CaptureTTL + time.Second)
-	// The capture's own refresh lands first, behind its kept read.
-	if _, err := c.Designations(ctx); err != nil {
-		t.Fatal(err)
-	}
-	c.refreshes.Wait()
-	done := make(chan map[string]boards.Designation, 1)
-	go func() {
-		d, _ := c.DatedDesignations(ctx)
-		done <- d
-	}()
-	select {
-	case d := <-done:
-		if since := d["p2"].Since; since == nil || !since.Equal(captureAt.Add(-time.Hour)) {
-			t.Fatalf("the newer capture dated %+v, want the kept run's start", d["p2"])
+	clock.add(time.Hour)
+	for i := 0; i < 3; i++ {
+		done := make(chan map[string]boards.Designation, 1)
+		go func() {
+			d, _ := c.DatedDesignations(ctx)
+			done <- d
+		}()
+		select {
+		case d := <-done:
+			if got := served(d); got == nil || got.CarriedOver || got.Listed == nil || got.Status != boards.StatusQuestionable {
+				t.Fatalf("while 16:00 is dated: %+v, want the 15:00 pair", got)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("a request waited on the new capture's dating")
 		}
-	case <-time.After(time.Second):
-		t.Fatal("the newer capture waited on its runs")
 	}
 	close(gate)
-	c.refreshes.Wait()
+	c.Drain()
 	d, err := c.DatedDesignations(ctx)
-	if err != nil || !d["p2"].Since.Equal(captureAt) || reads.runs.Load() != 2 {
-		t.Fatalf("after its runs landed %+v %v, %d runs reads", d["p2"], err, reads.runs.Load())
+	got := served(d)
+	if err != nil || got.Status != boards.StatusOut || got.CarriedOver || got.Listed == nil || !got.Listed.Equal(friday.Add(time.Hour)) {
+		t.Fatalf("after 16:00 is dated: %+v %v", got, err)
 	}
 }
 
-// A refresh that fails keeps the value it was refreshing, and the next
-// read past the TTL tries again.
+// A refresh that fails keeps the value it was refreshing; the next read
+// past the TTL tries again once RetryAfter has passed, not before.
 func TestCacheKeepsTheValueWhenARefreshFails(t *testing.T) {
 	reads := &countingReads{}
 	clock := &lockedClock{now: behindNoon}
@@ -252,12 +282,49 @@ func TestCacheKeepsTheValueWhenARefreshFails(t *testing.T) {
 	if err != nil || len(d.Lines) != 1 {
 		t.Fatalf("past the TTL with the store down: %+v %v", d, err)
 	}
-	c.refreshes.Wait()
+	c.Drain()
 	if _, err := c.Data(ctx, 2026); err != nil {
 		t.Fatal(err)
 	}
-	c.refreshes.Wait()
+	c.Drain()
+	if n := reads.lines.Load(); n != 2 {
+		t.Fatalf("%d line reads inside RetryAfter, want the fill and one refresh", n)
+	}
+	clock.add(RetryAfter)
+	if _, err := c.Data(ctx, 2026); err != nil {
+		t.Fatal(err)
+	}
+	c.Drain()
 	if n := reads.lines.Load(); n != 3 {
-		t.Fatalf("%d line reads, want the fill and two refresh attempts", n)
+		t.Fatalf("%d line reads past RetryAfter, want a second refresh", n)
+	}
+}
+
+// A refresh runs on the server's context, not the request's: a request
+// that has ended does not stop it, and the server's shutdown does.
+func TestARefreshRunsOnTheServersContext(t *testing.T) {
+	server, shutdown := context.WithCancel(context.Background())
+	c := &Cache{Reads: &blockingReads{}, Now: time.Now, Context: server, Timeout: time.Minute}
+	c.entries = map[string]entry{"lines/2026": {value: []boards.StatLine{{PlayerID: "p1"}}, at: time.Now().Add(-SeasonTTL - time.Second)}}
+	request, done := context.WithCancel(context.Background())
+	if _, err := c.Data(request, 2026); err != nil {
+		t.Fatal(err)
+	}
+	done()
+	stopped := make(chan struct{})
+	go func() {
+		c.Drain()
+		close(stopped)
+	}()
+	select {
+	case <-stopped:
+		t.Fatal("the refresh stopped with the request")
+	case <-time.After(50 * time.Millisecond):
+	}
+	shutdown()
+	select {
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("shutdown did not stop the refresh")
 	}
 }

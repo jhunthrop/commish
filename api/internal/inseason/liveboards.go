@@ -71,15 +71,19 @@ func (c *LiveBoards) At(b boards.Board, games []boards.TeamWeek, h Horizon, now 
 var errUnbuilt = errors.New("inseason: the board at the read's clock was not built")
 
 // build runs the key's build for every request waiting on it and logs how
-// long it took. A build that fails is forgotten, so the next request
-// builds again.
+// long it took. A build that fails, or panics, is forgotten, so the next
+// request builds again.
 func (c *LiveBoards) build(key liveKey, build *liveBuild, b boards.Board, games []boards.TeamWeek, h Horizon, now time.Time) {
 	start := time.Now()
 	build.err = errUnbuilt
-	defer close(build.done)
+	defer func() {
+		if build.err != nil {
+			c.forget(key, build)
+		}
+		close(build.done)
+	}()
 	build.board, build.rest, build.err = buildLive(b, games, h, now)
 	if build.err != nil {
-		c.forget(key, build)
 		return
 	}
 	if c.Log != nil {

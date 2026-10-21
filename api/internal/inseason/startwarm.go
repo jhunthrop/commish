@@ -34,19 +34,27 @@ func (s *Service) WarmAtStart(ctx context.Context, bound time.Duration) {
 }
 
 // warmSeason fills the board season's facts (stat lines, games, game
-// facts, the designations), the published projection of the week of the
-// next game to play and of the week after when the schedule holds it, and
-// builds every run format's board at the clock once: the reads the
-// league screens, the order and the player page start from.
+// facts, the dated designations), the published projection of the week of
+// the next game to play, of the week before it (a platform's week can
+// still be the one just played) and of the week after, each where the
+// schedule holds it, and builds every run format's board at the clock
+// once: the reads the league screens, the order and the player page start
+// from.
+//
+// The boards built here serve only the warm's own minute (LiveBoards holds
+// one minute, and a build costs well under a millisecond); what the build
+// leaves behind for the first requests is the board loads and the valued
+// boards (draftroom.Boards), the reads that cost.
 func (s *Service) warmSeason(ctx context.Context) error {
 	data, err := s.Facts.Data(ctx, s.Season)
 	if err != nil {
 		return fmt.Errorf("facts: %w", err)
 	}
-	week := nextWeek(data.Games)
-	s.projection(ctx, s.Season, week)
-	if hasGames(data.Games, week+1) {
-		s.projection(ctx, s.Season, week+1)
+	next := nextWeek(data.Games)
+	for _, week := range []int{next - 1, next, next + 1} {
+		if hasGames(data.Games, week) {
+			s.projection(ctx, s.Season, week)
+		}
 	}
 	if _, err := liveRunBoards(ctx, s.Boards, data.Games, s.Now(), s.Lives); err != nil {
 		return fmt.Errorf("boards: %w", err)

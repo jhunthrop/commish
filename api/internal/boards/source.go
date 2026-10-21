@@ -211,6 +211,9 @@ type Cache struct {
 	Source Source
 	TTL    time.Duration
 	Now    func() time.Time
+	// Log takes each read's duration (Lane 112): a version check that kept
+	// the board, or a full load; nil discards them.
+	Log *slog.Logger
 
 	mu      sync.Mutex
 	entries map[Format]cached
@@ -240,18 +243,29 @@ func (c *Cache) Load(ctx context.Context, f Format) (*Raw, error) {
 	// The version is read before the board: a change between the two
 	// leaves an older version beside a newer board, which costs the next
 	// check a reload, never a stale board kept.
+	start := time.Now()
 	version := c.version(ctx, f)
 	if raw, ok := c.unmoved(f, version); ok {
+		c.logRead(f, "version", start)
 		return raw, nil
 	}
 	raw, err := c.Source.Load(ctx, f)
 	if err != nil {
 		return nil, err
 	}
+	c.logRead(f, "load", start)
 	c.mu.Lock()
 	c.entries[f] = cached{raw: raw, at: c.Now(), version: version}
 	c.mu.Unlock()
 	return raw, nil
+}
+
+// logRead logs a read that went to the store and how long it took: kind
+// is "version" for a check that kept the board, "load" for a full read.
+func (c *Cache) logRead(f Format, kind string, start time.Time) {
+	if c.Log != nil {
+		c.Log.Info("boards: board read", "format", f, "kind", kind, "ms", time.Since(start).Milliseconds())
+	}
 }
 
 // version is the Source's version of f, "" when it names none or cannot

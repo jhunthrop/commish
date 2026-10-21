@@ -18,6 +18,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	nethttp "net/http"
 	"os"
 	"runtime"
@@ -84,7 +85,7 @@ func run(dbURL string, slot, viewers, seconds int, advisorURL string) error {
 	}
 	defer pool.Close()
 	ctx := context.Background()
-	boardSource, _, err := draftroom.OpenBoards(pool, config.Board{Schema: "research", Season: 2026, SourcePrefix: "commish_board_v9", TTL: time.Hour}, time.Now)
+	boardSource, _, err := draftroom.OpenBoards(pool, config.Board{Schema: "research", Season: 2026, SourcePrefix: "commish_board_v9", TTL: time.Hour}, time.Now, slog.Default())
 	if err != nil {
 		return err
 	}

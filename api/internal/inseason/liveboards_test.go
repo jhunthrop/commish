@@ -5,12 +5,14 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/boards"
+	"github.com/jhunthrop/commish/api/internal/draft"
 )
 
 func livePointsOf(t *testing.T, b boards.Board, id string) float64 {
@@ -137,6 +139,50 @@ func TestLiveBoardsHoldOneMinute(t *testing.T) {
 	defer c.mu.Unlock()
 	if len(c.kept) != 1 {
 		t.Fatalf("%d boards kept, want the minute's one", len(c.kept))
+	}
+}
+
+// A build that panics is forgotten, so the minute's next request builds
+// again rather than reading the failed build (review LOW-1).
+func TestLiveBoardsForgetAPanickedBuild(t *testing.T) {
+	c := &LiveBoards{}
+	broken := boards.Board{Order: boards.OrderRestOfSeason, FromWeek: 6}
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("a board with no points built")
+			}
+		}()
+		_, _, _ = c.At(broken, restWeekSix(true, false), StandardHorizon, restSunday)
+	}()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.kept) != 0 {
+		t.Fatalf("%d builds kept after a panic", len(c.kept))
+	}
+}
+
+// BenchmarkLiveBoardBuild is one build of a 1,500-player rest-of-season
+// board at the read's clock (the report's 0.34 ms).
+func BenchmarkLiveBoardBuild(b *testing.B) {
+	positions := []draft.Position{draft.QB, draft.RB, draft.WR, draft.TE}
+	teams := []string{"MIA", "NE", "TB", "DET"}
+	players := make([]boards.Player, 1500)
+	for i := range players {
+		points, perGame := 200.0-float64(i)/10, 12.0
+		players[i] = boards.Player{ID: strconv.Itoa(i), Position: positions[i%4], Team: teams[i%4], Points: &points, GamePoints: &perGame}
+	}
+	raw := &boards.Raw{Format: boards.PPR, Season: 2026, Order: boards.OrderRestOfSeason, FromWeek: 6, AsOf: restRunInstant, Players: players}
+	board, err := boards.For(raw, 12, twelveTeamPPR(b))
+	if err != nil {
+		b.Fatal(err)
+	}
+	games, at := restWeekSix(true, false), restSunday.Add(5*time.Hour)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, _, err := (*LiveBoards)(nil).At(board, games, StandardHorizon, at); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
