@@ -310,7 +310,9 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 		Locked: facts.Locked, InjuredReserve: facts.InjuredReserve()}
 	line := apitypes.PlayerLine{Player: lp, Held: boardID != "" && a.held[boardID], Facts: wireFacts(facts, thisWeek(a.Snap.Ref.Host, side, id, facts))}
 	words := Line{Name: lp.Name, Position: position, Rank: c.Rank, Facts: facts}
-	if c.Rank > 0 {
+	// A player on a season-long list is not ranked as playing: his line
+	// draws no rank (Lane 128), while the engine still orders him by it.
+	if c.Rank > 0 && !facts.SeasonLong() {
 		rank := c.Rank
 		line.PositionRank = &rank
 	}

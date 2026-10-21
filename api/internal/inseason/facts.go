@@ -141,6 +141,14 @@ func (f Facts) InjuredReserve() bool {
 	return f.Designation != nil && f.Designation.Status == boards.StatusInjuredReserve
 }
 
+// SeasonLong is a player on a season-long list (injured reserve, PUP,
+// NFI, suspended; the host's IR mark is injured reserve): the in-season
+// order never ranks him as playing (the 2026-10-16 ruling), so his line
+// carries no rest-of-season rank (Lane 128, B106).
+func (f Facts) SeasonLong() bool {
+	return f.Designation != nil && boards.SeasonLong(f.Designation.Status, "")
+}
+
 type teamWeek struct {
 	week int
 	team string

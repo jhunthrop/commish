@@ -3557,7 +3557,7 @@ type PlayerLine struct {
 	// PointsOverReplacement points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over its own first week, the league's when the run does not say, through the league's last playoff week as its platform states it, week 17 when it states none), as the basis says; null without a projection
 	PointsOverReplacement *float64 `json:"points_over_replacement"`
 
-	// PositionRank his place at his position in our order
+	// PositionRank his place at his position in our order, null when unranked and for a player on a season-long list (injured reserve, PUP, NFI, suspended, the platform's IR mark included), whom the in-season order never ranks as playing
 	PositionRank *int `json:"position_rank"`
 
 	// ProjectionDelta week_projection's change since the week's snapshot before the one it is read from (the newest, or once his game has kicked off the one as of kickoff), to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null

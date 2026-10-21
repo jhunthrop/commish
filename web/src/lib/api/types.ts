@@ -3054,7 +3054,7 @@ export interface components {
 			headshot: string | null;
 			/** @description his page on the site (/players/{slug}): set for a quarterback, running back, receiver or tight end our order ranks whose name no other player in our directory shares, null otherwise (a kicker or defense has no page) (a shared name's page is named by the run, which the API does not read) */
 			slug: string | null;
-			/** @description his place at his position in our order */
+			/** @description his place at his position in our order, null when unranked and for a player on a season-long list (injured reserve, PUP, NFI, suspended, the platform's IR mark included), whom the in-season order never ranks as playing */
 			position_rank: number | null;
 			/**
 			 * Format: double
