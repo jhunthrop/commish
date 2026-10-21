@@ -1,5 +1,6 @@
-"""A freeze keeps the week's published projection beside each row (Lane 66j, revision 0013): his PPR
-points on the snapshot read at the freeze, None where it lists no row for him."""
+"""A freeze keeps the week's yardsticks beside each row: the published projection (Lane 66j, revision
+0013) and ESPN's own projection (Lane 114, revision 0017), his PPR points on the read at the freeze,
+None where it lists no row for him."""
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -9,6 +10,7 @@ from research.model.register import freeze
 
 _AT = datetime(2026, 10, 22, 12, 0, tzinfo=UTC)
 _POINTS = 14.25
+_ESPN = 12.5
 
 
 def _entry(player_id: str) -> SimpleNamespace:
@@ -23,14 +25,17 @@ def _entry(player_id: str) -> SimpleNamespace:
     )
 
 
-def test_a_freeze_row_carries_his_published_points_or_none() -> None:
-    published = {"listed": _POINTS}
-    listed = freeze._freeze_row(2026, 7, _AT, _entry("listed"), {}, {}, {}, published)
-    absent = freeze._freeze_row(2026, 7, _AT, _entry("absent"), {}, {}, {}, published)
-    assert listed["published_points"] == _POINTS
-    assert absent["published_points"] is None
+def test_a_freeze_row_carries_each_yardstick_or_none() -> None:
+    kept = freeze.Yardsticks({"listed": _POINTS}, {"listed": _ESPN})
+    listed = freeze._freeze_row(2026, 7, _AT, _entry("listed"), {}, {}, {}, kept)
+    absent = freeze._freeze_row(2026, 7, _AT, _entry("absent"), {}, {}, {}, kept)
+    assert (listed["published_points"], listed["espn_points"]) == (_POINTS, _ESPN)
+    assert (absent["published_points"], absent["espn_points"]) == (None, None)
 
 
-def test_the_schema_and_the_insert_name_the_column() -> None:
-    assert "published_points" in REGISTER_FREEZE_ROWS.c
-    assert REGISTER_FREEZE_ROWS.c.published_points.nullable
+def test_the_schema_and_the_insert_name_the_columns() -> None:
+    for column in ("published_points", "espn_points"):
+        assert column in REGISTER_FREEZE_ROWS.c
+        assert REGISTER_FREEZE_ROWS.c[column].nullable
+    # Declared last (Lane 114): a reader that predates the column is unchanged.
+    assert list(REGISTER_FREEZE_ROWS.c.keys())[-1] == "espn_points"

@@ -221,6 +221,22 @@ TANK01_PROJECTION_ROWS: Final = Table(
     Index("tank01_projection_rows_week_idx", "season", "week", "captured_at"),
 )
 
+# ESPN's own weekly projection in PPR, one row per player of one read (revision 0017, Lane 114): the
+# public player pool's projection for the week (ESPN's PPR league defaults, no sign-in), read by the
+# in-season pass before it sets the week's order. A benchmark the record grades beside ours, never an
+# input. Append-only: each read keeps its instant, so the newest read at or before a freeze is its stance.
+ESPN_PROJECTION_ROWS: Final = Table(
+    "espn_projection_rows",
+    METADATA,
+    Column("season", Integer, primary_key=True),
+    Column("week", Integer, primary_key=True),
+    Column("read_at", DateTime(True), primary_key=True),
+    Column("espn_id", Text, primary_key=True),
+    Column("ppr_points", Double(53), nullable=False),
+    recorded_at(),
+    Index("espn_projection_rows_week_idx", "season", "week", "read_at"),
+)
+
 # The anytime-touchdown market (revision 0009): a Yes price, and a No price where the book quotes one,
 # which `player_prop_observations` (point and under price NOT NULL) cannot hold. Append-only like it:
 # one event fetched twice keeps both. The market benchmark only, never an input, never on the site.

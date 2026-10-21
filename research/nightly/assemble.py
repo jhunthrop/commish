@@ -25,8 +25,10 @@ from research.nightly.build.ros import MODEL_NAME as ROS_MODEL
 from research.nightly.build.ros import RosBasis, RosResult, RosSetup, ros_boards
 from research.nightly.config import PAGE_FORMAT, RUN_FORMATS, RunFormat
 from research.nightly.designations import read_statuses, status_word
+from research.nightly.reads import draft_record as draft_read
 from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
+from research.nightly.reads import weekly_record as weekly_read
 from research.nightly.reads.adp import AdpCapture, adp_cutoff, latest_capture
 from research.nightly.reads.board import FormatBoard, format_board
 from research.nightly.reads.market import market_order, market_players
@@ -117,6 +119,8 @@ def _record(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> tuple[Jso
         record_read.to_date(weeks, rows_by_week),
         frozen_by,
         published_from=record_read.published_from(conn, PRODUCT_SEASON),
+        weekly=weekly_read.read_weekly(conn, PRODUCT_SEASON, as_of)[0],
+        draft=draft_read.read_draft(conn, PRODUCT_SEASON, as_of),
     )
     frozen = [w for w in weeks if w.status in {"frozen", "graded"}]
     if not frozen:

@@ -344,6 +344,11 @@ _ENTRIES: Final = (
                     (),
                     "no legacy freeze kept the week's published projection (revision 0013)",
                 ),
+                "espn_points": Derived(
+                    "NULL::double precision",
+                    (),
+                    "no legacy freeze kept ESPN's weekly projection (revision 0017)",
+                ),
             }
         ),
         dropped=_surrogate(),
@@ -387,6 +392,7 @@ NEW_IN_RESEARCH: Final[Mapping[str, str]] = MappingProxyType(
         "nflverse_depth_chart_weeks": "nflverse's weekly depth charts (revision 0009); legacy held week 1 only",
         "game_weather": "the recorded kickoff weather with each value's source (revision 0009)",
         "tank01_projection_rows": "Tank01's weekly projection parsed per player (revision 0009), a benchmark",
+        "espn_projection_rows": "ESPN's public weekly projection per player (revision 0017), a yardstick, append-only",
         "player_td_prop_observations": "the anytime-touchdown market (revision 0009), a benchmark",
         "capture_checks": "each capture feed's last successful check (revision 0008), rewritten by every capture pass",
         "register_weekly_rows": "the weekly number frozen per game before its kickoff (revision 0011), append-only",
