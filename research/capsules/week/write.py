@@ -38,16 +38,16 @@ from research.capsules.week.validate import WEEK_BAND, validate_week_read
 # A draft and three corrections, the judge's call among them for a player who may not be started: a week
 # read is short, and a fourth failure is a facts block, retried on the cadence's terms. The season read's ceiling is six for two reads and a narrative.
 MAX_CALLS_PER_READ: Final = 4
-# Lane 100: a read whose last draft within the ceiling broke only the 80-word cap is asked once more, its
+# Lane 100: a read whose last draft within the ceiling broke only the word cap is asked once more, its
 # overrun named, before it falls to the facts block. For a player who may not be started (a bye, Out) the
 # retry carries the judge's ask with it, as a playing player's read needs none (Lane 117, B80). The run's
 # budget counts both in a read's worst case.
 OVERRUN_RETRIES: Final = 1
 OVERRUN_JUDGE_ASKS: Final = 1
-# Lane 117 (B95, fix round 2): a draft over the cap is handed back up to twice, its count and a target named
-# each time (`prompt.length_move`); a third draft over it is the facts block, never trimmed to fit.
-OVER_CAP_DRAFTS: Final = 3
-OVER_CAP_FALL: Final = f"failed validation: the read ran over the {WEEK_BAND[1]}-word cap three times"
+# Lane 117 (B95, fix round 3): a draft over the cap is handed back once, its count and the target named
+# (`prompt.length_move`); a second draft over it is the facts block, never trimmed to fit.
+OVER_CAP_DRAFTS: Final = 2
+OVER_CAP_FALL: Final = f"failed validation: the read ran over the {WEEK_BAND[1]}-word cap twice"
 MAX_ASKS_PER_READ: Final = MAX_CALLS_PER_READ + OVERRUN_RETRIES + OVERRUN_JUDGE_ASKS
 # A five-sentence read and its call run about 180 tokens; the cap leaves room and never cuts an honest read.
 MAX_TOKENS: Final = 600
@@ -201,7 +201,7 @@ def write_week_read(
             calls = made()
             return WeekReadResult(text, WRITTEN_SOURCE, answer.call, gateway.model, usage, calls, tuple(attempts), None)
         ledger = notes_of([(attempt.body, attempt.violations) for attempt in attempts])
-        user = week_correction(sheet, text, ledger, avoid, asks.over_cap - _over_cap(result))
+        user = week_correction(sheet, text, ledger, avoid)
     first = (
         fallback_violation(attempts[-1].violations) if attempts and attempts[-1].violations else "no answer was written"
     )

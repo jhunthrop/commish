@@ -456,14 +456,16 @@ def test_a_read_states_at_most_three_figures_and_one_paragraph() -> None:
     assert any("more than one paragraph" in v for v in week_rule_violations(split, starter(), "start"))
 
 
-def test_the_cap_is_eighty_words_with_no_overrun() -> None:
-    """Lane 100 (B44): at most 80 words, whatever the read was asked before."""
+def test_the_cap_is_ninety_five_words_with_no_overrun() -> None:
+    """Lane 100 (B44), the cap 95 since Lane 117 fix round 3: at most 95 words, whatever the read was asked
+    before."""
     padded = STARTER_READ.replace(
         "Start him with confidence.",
         "He has been the steadiest part of a passing game that runs through him on every down that matters, "
-        "and nothing in the facts says that changes now that the Rams are at home. Start him.",
+        "and nothing in the facts says that changes now that the Rams are at home. The rest of the room "
+        "behind him has not moved in weeks, and the plays still run his way. Start him.",
     )
-    assert len(padded.split()) > 80  # noqa: PLR2004 - the cap
+    assert len(padded.split()) > 95  # noqa: PLR2004 - the cap
     result = validate_week_read(padded, starter(), call="start")
     assert result.band_failure is not None and not result.ok
 

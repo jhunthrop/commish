@@ -82,9 +82,9 @@ HOURLY_DAY_USD: Final = 0.60
 # characters a token 1.87 (the recordings of Lane 72 had peaked at 3,630).
 WORST_PROMPT_TOKENS: Final = 9_000
 # The asks the budget's check prices a read at before it starts (the coordinator's ruling, Lane 117 fix round
-# 2): three at the heaviest prompt. A read may make more (MAX_ASKS_PER_READ); the gateway's reservation is the
+# 3): two at the heaviest prompt, a draft and its one retry. A read may make more (MAX_ASKS_PER_READ); the gateway's reservation is the
 # hard stop for those in flight.
-BUDGETED_CALLS_PER_READ: Final = 3
+BUDGETED_CALLS_PER_READ: Final = 2
 # The fewest characters a prompt token took on that replay, for counting a built prompt (the tests).
 MIN_CHARS_PER_TOKEN: Final = 1.8
 # The recordings' dearest call, for a budget in calls when the price list cannot be read.

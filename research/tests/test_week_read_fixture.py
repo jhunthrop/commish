@@ -123,12 +123,12 @@ def test_the_fixture_is_a_starter_a_questionable_player_and_a_player_on_bye() ->
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_under_lane_100_every_recorded_read_is_refused_by_name(name: str) -> None:
-    """Each recording runs past 80 words and states more figures than the read may (B44), and each quotes
-    a figure the page draws in no cell (B17): the opponent's points allowed, his touchdowns, a projection
-    the card does not print."""
+    """Each recording states more figures than the read may (B44), and each quotes a figure the page draws
+    in no cell (B17): the opponent's points allowed, his touchdowns, a projection the card does not print.
+    Each also runs past the cap of 95 words (Lane 117 fix round 3), counted as the validator counts."""
     sheet, player = _sheet(name)
     violations = validate_week_read(player["read"], sheet, frozenset(player["taken"]), _call(player)).violations
-    assert any("40-80 word band" in v for v in violations), violations
+    assert any("40-95 word band" in v for v in violations), violations
     assert any(f"state at most {MAX_FIGURES}" in v for v in violations), violations
     assert any("draws in no cell" in v for v in violations), violations
     # Lane 96 (B16): each names "Tuesday's report", where no game status report was issued by the write.

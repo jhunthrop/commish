@@ -24,8 +24,10 @@ from research.capsules.week.render import render_week_sheet
 from research.capsules.week.rules import week_rule_violations
 from research.capsules.week.sheet import WeekSheet, week_name_ledger
 
-# The read's words: one paragraph of three to five short sentences, never more than 80 (Lane 100, B44).
-WEEK_BAND: Final = (40, 80)
+# The read's words: one paragraph of three to five short sentences, never more than 95 (Lane 100, B44, set at
+# 80; Lane 117 fix round 3, the coordinator's ruling: the writer's natural read on production sheets runs about
+# 85 words, so the cap is 95 while the prompt still asks for about 60).
+WEEK_BAND: Final = (40, 95)
 SHARED_SENTENCE: Final = "The text carries a sentence shaped like one another page carries this week"
 _NAME: Final = re.compile(r"\b[A-Z][\w'\u2019.-]*")
 _NUMBER: Final = re.compile(r"\d+(?:[.,]\d+)*%?")

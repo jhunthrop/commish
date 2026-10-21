@@ -39,6 +39,8 @@ const PLAYERS = [
 const VS_AVG_PHONE_LINES = 4;
 /** The sheet's add as SheetAdd.svelte draws it. */
 const SHEET_ADD = 'Add to my sheet';
+/** The week read's cap (research WEEK_BAND, Lane 117 fix round 3): the stand-in read runs to it. */
+const READ_CAP_WORDS = 95;
 const PHONE = 390;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const OWN_WORDS = /\btips?\b/;
@@ -57,6 +59,9 @@ interface Seen {
 	vsAvg: { value: string; caption: string };
 	projHead: boolean;
 	paragraphs: number;
+	/** The read's words, and whether any box around it clips or scrolls it (Lane 117 fix round 3). */
+	readWords: number;
+	readClipped: boolean;
 	stamps: string[];
 	side: string;
 	verb: string;
@@ -92,6 +97,22 @@ async function seen(page: Page): Promise<Seen> {
 				th.classList.contains('proj')
 			),
 			paragraphs: read?.querySelectorAll('.week-read p:not(.stamp)').length ?? 0,
+			readWords: (
+				read?.querySelector('.week-read p:not(.stamp)')?.textContent.trim().split(/\s+/) ?? []
+			).filter((w) => w !== '').length,
+			readClipped: (() => {
+				const body = read?.querySelector('.week-read p:not(.stamp)');
+				if (!body) return false;
+				const inner = body.getBoundingClientRect();
+				for (let el = body.parentElement; el && el !== document.body; el = el.parentElement) {
+					const box = el.getBoundingClientRect();
+					if (el.scrollHeight > el.clientHeight + 1 && getComputedStyle(el).overflowY !== 'visible')
+						return true;
+					if (inner.bottom > box.bottom + 1 && getComputedStyle(el).overflow !== 'visible')
+						return true;
+				}
+				return false;
+			})(),
 			stamps: [...(read?.querySelectorAll('.stamp') ?? [])].map((el) => el.textContent.trim()),
 			side: document.querySelector('main .side h3')?.textContent.trim() ?? '',
 			verb: document.querySelector('main .card .act')?.textContent.trim() ?? ''
@@ -128,6 +149,12 @@ function checkSeen(s: Seen, where: string, verb: string): void {
 	);
 	check(!s.projHead, `${where}: the game log draws a Proj column`);
 	check(s.paragraphs <= 1, `${where}: the read runs to ${String(s.paragraphs)} paragraphs`);
+	// With the stand-in read at the cap (SATURDAY_READ=1), the box grows to the whole read, never clips.
+	check(
+		s.readWords === 0 || s.readWords >= READ_CAP_WORDS,
+		`${where}: the read has ${String(s.readWords)} words`
+	);
+	check(!s.readClipped, `${where}: a box clips or scrolls the read`);
 	check(!s.stamps.some((st) => st.includes(CARD.writtenFrom)), `${where}: a season read's stamp`);
 	check(s.side === CARD.whyRest, `${where}: the tier box is titled "${s.side}"`);
 	check(s.verb.startsWith(verb), `${where}: the verb reads "${s.verb}"`);

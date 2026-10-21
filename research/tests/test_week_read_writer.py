@@ -50,7 +50,6 @@ from research.tests.week_read_fixtures import REPORT, WRITTEN_AT, on_bye, questi
 
 _USAGE = Usage(2400, 150, 2550, 0.0004)
 _A_DRAFT_AND_ONE_MORE = 2
-_THREE_DRAFTS = 3
 _PRICE = ModelPrice("zai/glm-5.3-flash", 0.15, 0.50, "test", True)
 
 
@@ -97,7 +96,7 @@ def test_the_prompt_states_the_week_the_kickoff_and_that_the_number_is_published
     user = week_prompt(starter(), ())
     assert "week 6 of 2026" in user and "Sunday 3:05 pm Central" in user and "18.4 points" in user
     assert "published projection" in WEEK_RULES and "never ours" in WEEK_RULES
-    assert "45 to 70 words in all, about 60" in WEEK_RULES and "never more than 80" in WEEK_RULES
+    assert "45 to 70 words in all, about 60" in WEEK_RULES and "never more than 95" in WEEK_RULES
     # Lane 117 (B95): the four rules the first nightly broke most, in the writer's words.
     assert "One figure to a sentence." in WEEK_RULES
     assert "The published projection is a cell you place inside a sentence about this player's week" in WEEK_RULES
@@ -137,23 +136,19 @@ def test_a_long_read_is_told_its_count_and_the_cut() -> None:
     gateway = _StubGateway([_answer(long_read), _answer(STARTER_READ)])
     assert write_week_read(starter(), gateway).source == "llm"  # type: ignore[arg-type]
     correction = gateway.asked[1][-1]["content"]
-    assert f"Your read ran {words} words, over the 80-word cap. Write it again at 50 words" in correction
-    assert length_move(80) is None
+    assert f"Your read ran {words} words, over the 95-word cap. Write it again at 60 words" in correction
+    assert length_move(95) is None
 
 
 def test_a_read_asked_shorter_still_holds_to_the_cap() -> None:
-    """Lane 100 (B44): the cap is 80 words with no overrun, even for a read already asked to be shorter (the
-    season read's 10% allowance does not carry over); Lane 117 (B95, fix round 2): two reads over it are
-    handed back, and the third, within it, lands untrimmed."""
-    extra = (
-        " Davante Adams is listed second behind him, the kind of steady pecking order that keeps the targets"
-        " flowing his way for now, and nothing in the facts says that changes."
-    )
-    longer = STARTER_READ.replace(" Start him with confidence.", extra + " Start him with confidence.")
-    assert 80 < len(longer.split()) <= 88  # noqa: PLR2004 - over the cap, inside the old 10%
+    """Lane 100 (B44): the cap is the cap with no overrun, even for a read already asked to be shorter (the
+    season read's 10% allowance does not carry over); Lane 117 (B95, fix round 3): the cap is 95, one read
+    over it is handed back, and a second over it is the facts block, never trimmed."""
+    longer = _over_the_cap()
+    assert 95 < len(longer.split()) <= 104  # noqa: PLR2004 - over the cap, inside the old 10%
     script = [_answer(" ".join([STARTER_READ, STARTER_READ])), _answer(longer), _answer(STARTER_READ)]
     result = write_week_read(starter(), _StubGateway(script))  # type: ignore[arg-type]
-    assert (result.source, result.text, result.calls) == ("llm", STARTER_READ, _THREE_DRAFTS)
+    assert (result.source, result.calls, result.fallback) == ("facts", _A_DRAFT_AND_ONE_MORE, OVER_CAP_FALL)
     assert any("Word count" in v for v in result.attempts[1].violations), result.attempts[1]
 
 
@@ -162,10 +157,11 @@ _BROKEN = f"{STARTER_READ.removesuffix(' Start him with confidence.')} It is a s
 
 
 def _over_the_cap() -> str:
-    """The starter read with a sentence of plain words before its call, no figure among them: 89 words."""
+    """The starter read with two sentences of plain words before its call, no figure among them: 102 words."""
     extra = (
         " Davante Adams is listed second behind him, the kind of steady pecking order that keeps the targets"
-        " flowing his way for now, and nothing in the facts says that changes in this game at home."
+        " flowing his way for now, and nothing in the facts says that changes in this game at home, where the Rams"
+        " keep turning to him whenever they need the ball moved."
     )
     return STARTER_READ.replace(" Start him with confidence.", extra + " Start him with confidence.")
 
@@ -174,7 +170,7 @@ def test_a_last_draft_over_the_cap_alone_is_asked_once_more_with_its_overrun_nam
     """Lane 100: the fourth draft, the first over the cap, broke only the 80-word cap, so the writer asks a
     fifth time, the overrun counted for it, and that read lands."""
     long_read = _over_the_cap()
-    assert len(long_read.split()) > 80  # noqa: PLR2004 - the cap
+    assert len(long_read.split()) > 95  # noqa: PLR2004 - the cap
     script = [*[_answer(_BROKEN)] * (MAX_CALLS_PER_READ - 1), _answer(long_read), _answer(STARTER_READ)]
     gateway = _StubGateway(script)
     result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
@@ -183,16 +179,16 @@ def test_a_last_draft_over_the_cap_alone_is_asked_once_more_with_its_overrun_nam
 
 
 def test_the_overrun_retry_is_one_and_only_for_the_cap() -> None:
-    """Lane 117 (B95, fix round 2): a draft over the cap is handed back twice, each naming its count, first at
-    50 words, then in four sentences of 45; the third over it is the facts block at once. A last draft that
-    broke another rule gets no retry."""
+    """Lane 117 (B95, fix round 3): a draft over the cap is handed back once, naming its count and asking for
+    60 words; the second over it is the facts block at once. A last draft that broke another rule gets no
+    retry."""
     long_read = _over_the_cap()
     gateway = _StubGateway([_answer(long_read)] * (MAX_CALLS_PER_READ + 2))
     result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
-    assert (result.source, result.calls, result.fallback) == ("facts", _THREE_DRAFTS, OVER_CAP_FALL)
-    assert "Your read ran 89 words, over the 80-word cap. Write it again at 50 words" in gateway.asked[1][-1]["content"]
-    second = "Your read ran 89 words, over the 80-word cap again. Write it again in four sentences, 45 words."
-    assert second in gateway.asked[2][-1]["content"]
+    assert (result.source, result.calls, result.fallback) == ("facts", _A_DRAFT_AND_ONE_MORE, OVER_CAP_FALL)
+    assert (
+        "Your read ran 102 words, over the 95-word cap. Write it again at 60 words" in gateway.asked[1][-1]["content"]
+    )
     broken = f"{long_read.removesuffix(' Start him with confidence.')} It is a safe bet he scores."
     gateway = _StubGateway([_answer(_BROKEN)] * (MAX_CALLS_PER_READ - 1) + [_answer(broken)] * 3)
     result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
@@ -204,15 +200,16 @@ OUT_READ = (
     "The published projection has him at 18.4 points, but that figure does not count for a player who sits. "
     "Bench him this week and pick up a receiver who has a game."
 )
-# A sentence of plain words, no figure among them, that takes a read over the 80-word cap.
+# Plain words, no figure among them, that take a read over the 95-word cap.
 _PLAIN_WORDS = (
     " The rest of the room is listed behind him and takes the work this week, which is the usual shape of a"
-    " week off for this group, and nothing in the facts says the shape changes once he is back."
+    " week off for this group, and nothing in the facts says the shape changes once he is back, since the"
+    " others behind him have carried the load before and know the plays."
 )
 
 
 def _bye_over_the_cap() -> str:
-    """The honest bye read with the plain sentence: over 80 words."""
+    """The honest bye read with the plain words: over 95 words."""
     return BYE_READ.replace(" Fill his spot", _PLAIN_WORDS + " Fill his spot")
 
 
@@ -224,7 +221,7 @@ def test_a_bye_or_out_players_overrun_retry_carries_the_judges_ask(sheet_of: obj
     sheet = sheet_of()  # type: ignore[operator]
     honest = BYE_READ if sheet.bye else OUT_READ
     long_read = _bye_over_the_cap() if sheet.bye else OUT_READ.replace(" Bench him", _PLAIN_WORDS + " Bench him")
-    assert len(long_read.split()) > 80  # noqa: PLR2004 - the cap
+    assert len(long_read.split()) > 95  # noqa: PLR2004 - the cap
     judged_no = Completion("No", _USAGE, "provider", "stop")
     broken = honest.replace(" this week", " this week, a safe bet", 1)
     drafts = [*[_answer(broken, "sit")] * (MAX_CALLS_PER_READ - 1), _answer(long_read, "sit")]
@@ -286,8 +283,8 @@ def test_the_step_holds_a_dollar_budget_under_the_nightly_bound() -> None:
     budget = step_budget(_PRICE, NIGHTLY_BUDGET_USD)
     assert budget.max_usd == NIGHTLY_BUDGET_USD and budget.price == _PRICE
     # Four asks, Lane 100's one overrun retry and the judge's ask that rides with it (Lane 117, B80).
-    # The budget's check prices a read at three asks at the heaviest prompt (Lane 117 fix round 2).
-    assert worst_read_usd(_PRICE) == pytest.approx(3 * (9000 * 0.15 + 600 * 0.50) / 1_000_000)
+    # The budget's check prices a read at two asks at the heaviest prompt (Lane 117 fix round 3).
+    assert worst_read_usd(_PRICE) == pytest.approx(2 * (9000 * 0.15 + 600 * 0.50) / 1_000_000)
 
 
 def test_the_worst_prompt_bound_holds_the_heaviest_correction() -> None:
