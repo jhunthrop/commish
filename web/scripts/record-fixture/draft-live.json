@@ -9,15 +9,15 @@
 			"position": "All",
 			"ours": {
 				"graded": 208,
-				"agreement": 0.61,
-				"placesOff": 41.5,
+				"agreement": 0.55,
+				"placesOff": 12.9,
 				"starters": 56,
 				"startersOf": 84
 			},
 			"adp": {
 				"graded": 208,
-				"agreement": 0.48,
-				"placesOff": 47.4,
+				"agreement": 0.55,
+				"placesOff": 12.9,
 				"starters": 60,
 				"startersOf": 84
 			}
@@ -94,28 +94,28 @@
 	"progress": [
 		{
 			"week": 1,
-			"ours": 0.5,
-			"adp": 0.41
+			"ours": 0.44,
+			"adp": 0.45
 		},
 		{
 			"week": 2,
-			"ours": 0.58,
-			"adp": 0.44
+			"ours": 0.52,
+			"adp": 0.52
 		},
 		{
 			"week": 3,
-			"ours": 0.64,
-			"adp": 0.48
+			"ours": 0.55,
+			"adp": 0.55
 		},
 		{
 			"week": 4,
-			"ours": 0.62,
-			"adp": 0.47
+			"ours": 0.54,
+			"adp": 0.54
 		},
 		{
 			"week": 5,
-			"ours": 0.61,
-			"adp": 0.48
+			"ours": 0.55,
+			"adp": 0.55
 		}
 	]
 }

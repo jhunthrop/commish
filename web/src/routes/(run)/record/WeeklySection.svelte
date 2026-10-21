@@ -38,8 +38,16 @@
 		type LeagueRecord,
 		type PlayersByWeek
 	} from '#lib/run/record-league.ts';
-	import { RECORDS_WORDS, beforeLine, weeklyBasisExtra, weeklyOpening } from '#lib/run/records.ts';
-	import type { RecordLine, RunRecord } from '#lib/run/schema.ts';
+	import {
+		RECORDS_WORDS,
+		beforeLine,
+		weeklyBasisExtra,
+		weeklyLines,
+		weeklyOpening,
+		weeklyOrderWords,
+		weeklySpan
+	} from '#lib/run/records.ts';
+	import type { RecordLine, RecordWeek, RunRecord } from '#lib/run/schema.ts';
 	import { hostWords } from '#lib/league/names.ts';
 	import { fixed } from '#lib/format/number.ts';
 	import RecordChart from './RecordChart.svelte';
@@ -86,7 +94,14 @@
 
 	const toDate = $derived(record.toDate.find((line) => line.position === position));
 	const toDateAll = $derived(allLine(record.toDate));
-	const rows = $derived(weekLines(record.weeks, unplayed));
+	/** The weekly record says its weeks and its order in its own words (fix round 1, M2 and M4); a
+	 * run's own record before Lane 114 as it always did. */
+	const rows = $derived(
+		head === null ? weekLines(record.weeks, unplayed) : weeklyLines(record.weeks, unplayed)
+	);
+	const orderOf = (week: RecordWeek): string | null =>
+		head === null ? weekOrderWords(week) : weeklyOrderWords(week);
+	const bugHead = $derived(head === null ? gradedOrders(record) : weeklySpan(record));
 	const series = $derived(chartSeries(record, position));
 	const graded = $derived(record.weeks.filter((week) => week.status === 'graded'));
 	const sources = $derived(recordSources(record));
@@ -134,7 +149,7 @@
 		<div class="bug" aria-label={standing ?? RECORD_BOX.toDate}>
 			<div class="head">
 				<span class="span">{standing}</span>
-				<span class="order">{gradedOrders(record)}</span>
+				<span class="order">{bugHead}</span>
 			</div>
 			<div class="tiles">
 				{#each RECORD_FIGURES as f (f)}
@@ -218,8 +233,7 @@
 				{#if row.week !== null && row.week.status === 'graded'}
 					<tr>
 						<td class="wk"
-							>{row.lead}{#if row.week.order}<span class="ord">{weekOrderWords(row.week)}</span
-								>{/if}</td
+							>{row.lead}{#if row.week.order}<span class="ord">{orderOf(row.week)}</span>{/if}</td
 						>
 						<td class="n plc">{line?.ours.graded ?? RECORD_BOX.none}</td>
 						{@render cells(line)}
@@ -228,8 +242,7 @@
 				{:else}
 					<tr class="quiet" class:live={row.week !== null}>
 						<td class="wk"
-							>{row.lead}{#if row.week?.order}<span class="ord">{weekOrderWords(row.week)}</span
-								>{/if}</td
+							>{row.lead}{#if row.week?.order}<span class="ord">{orderOf(row.week)}</span>{/if}</td
 						>
 						<!-- One status cell per width, each spanning the columns that width draws; the
 						     other is display: none, so the status is read once. -->
@@ -264,6 +277,8 @@
 							<th class="n plc" scope="col">{RECORDS_WORDS.rostered}</th>
 							<th class="n" scope="col">{FIGURE_HEADS.agreement}</th>
 							<th class="n" scope="col">{RECORD_BOX.espn}</th>
+							<th class="n plc" scope="col">{FIGURE_HEADS.placesOff}</th>
+							<th class="n plc" scope="col">{RECORD_BOX.espn}</th>
 							<th class="n plc" scope="col">{FIGURE_HEADS.starters}</th>
 							<th class="n plc" scope="col">{RECORD_BOX.espn}</th>
 							<th class="n" scope="col">{RECORDS_WORDS.lineupOurs}</th>
@@ -277,6 +292,8 @@
 								<td class="n plc">{row.players}</td>
 								<td class="n m ours">{figureWords(row.ours, 'agreement')}</td>
 								<td class="n m">{figureWords(row.espn, 'agreement')}</td>
+								<td class="n m ours plc">{figureWords(row.ours, 'placesOff')}</td>
+								<td class="n m plc">{figureWords(row.espn, 'placesOff')}</td>
 								<td class="n m ours plc">{figureWords(row.ours, 'starters')}</td>
 								<td class="n m plc">{figureWords(row.espn, 'starters')}</td>
 								<td class="n m ours">{fixed(row.lineup.ours)}</td>

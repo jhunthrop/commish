@@ -61,17 +61,20 @@ async function record(who: Who, width: number): Promise<void> {
 	has(weekly, 'Weeks 1 to 6', where);
 	has(weekly, 'Before that the site shipped the draft board, graded under Draft record.', where);
 	has(weekly, 'Yahoo publishes no player projection we can read, so it is not graded.', where);
-	lacks(weekly, /\bADP\b|FantasyPros|froze|freeze/u, where);
+	lacks(weekly, /\bADP\b|FantasyPros|froze|freeze|rest-of-season/iu, where);
+	if (width > PHONE_MAX) has(weekly, 'Set each week before kickoff', where);
 	has(draft, 'Draft record', where);
 	has(draft, "Our draft board against ADP, on the season's points so far", where);
 	has(draft, 'Season points through week 5', where);
 	has(draft, 'Top named counts the season', where);
 	has(draft, 'ADP named more of the season', where);
+	has(draft, 'Each position is graded on its own', where);
 	if (mode === 'upcoming') {
 		has(weekly, '(set before kickoff Thu Oct 22)', where);
 		lacks(weekly, /ESPN 0\.|Order matched by week/u, where);
 	} else {
 		has(weekly, '(set Thu Oct 22)', where);
+		has(weekly, 'Our weekly rankings, set Oct 22', where);
 		has(weekly, 'Order matched by week, 1 week graded', where);
 		has(weekly, "ESPN's is its own public projection in PPR", where);
 	}
@@ -96,11 +99,13 @@ async function front(width: number): Promise<void> {
 	const where = `front ${mode} ${String(width)}`;
 	const card = (await page.locator('aside[aria-label="Our record"]').textContent()) ?? '';
 	if (mode === 'upcoming') {
-		has(card, 'Our record, Draft record', where);
+		has(card, 'Draft record', where);
+		has(card, 'Order matched is how closely an order ranked the players', where);
 		has(card, 'Order matched, our draft board through week 5', where);
 		has(card, 'Weekly rankings start week 7.', where);
 	} else {
-		has(card, 'Our record, Weekly record', where);
+		has(card, 'Weekly record', where);
+		has(card, 'Order matched is how closely an order ranked the players', where);
 		has(card, 'Order matched, our weekly rankings over week 7', where);
 		lacks(card, /\bADP\b/u, where);
 	}

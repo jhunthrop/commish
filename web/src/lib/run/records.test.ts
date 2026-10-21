@@ -12,7 +12,10 @@ import {
 	frontRecord,
 	weeklyAsRecord,
 	weeklyBasisExtra,
-	weeklyOpening
+	weeklyLines,
+	weeklyOpening,
+	weeklyOrderWords,
+	weeklySpan
 } from './records.ts';
 import {
 	leagueRankingRows,
@@ -163,6 +166,7 @@ void test('the front card shows the draft record until a weekly week is graded, 
 	assert.deepEqual(before, {
 		name: 'Draft record',
 		value: '0.61',
+		scale: RECORDS_WORDS.draftScale,
 		caption: 'Order matched, our draft board through week 5, 214 players. ADP 0.48.',
 		second: 'Top named 56 of 84, ADP 60.',
 		note: 'Weekly rankings start week 7.'
@@ -171,6 +175,7 @@ void test('the front card shows the draft record until a weekly week is graded, 
 	assert.deepEqual(after, {
 		name: 'Weekly record',
 		value: '0.62',
+		scale: 'Order matched is how closely an order ranked the players.',
 		caption: 'Order matched, our weekly rankings over week 7, 214 players. ESPN 0.58.',
 		second: 'Starters right 61 of 84, ESPN 58 of 84.',
 		note: null
@@ -268,4 +273,33 @@ void test('before its first week is set the weekly record says that week and whe
 	const graded = weeklyAsRecord(run({ weekly: weekly([gradedSeven]) }));
 	assert.ok(graded);
 	assert.equal(weeklyOpening(graded, 7), null);
+});
+
+void test('the weeks to come read one line per state: the next with its day, the rest once (M4)', () => {
+	const weeks = [
+		gradedSeven,
+		upcoming(8, '2026-10-30T00:15:00.000Z'),
+		upcoming(9, '2026-11-06T01:15:00.000Z'),
+		upcoming(18, '2027-01-03T18:00:00.000Z')
+	];
+	assert.deepEqual(
+		weeklyLines(weeks, []).map((line) => [line.lead, line.text]),
+		[
+			['Week 7', 'set Thu Oct 22, graded Wed Oct 28'],
+			['Week 8', 'set before kickoff Thu Oct 29'],
+			['Weeks 9 to 18', 'set each week before kickoff']
+		]
+	);
+	assert.deepEqual(
+		weeklyLines([upcoming(7, '2026-10-23T00:15:00.000Z')], []).map((line) => line.text),
+		['set before kickoff Thu Oct 22']
+	);
+});
+
+void test('the weekly record names its weeks and its order as weekly rankings, never rest of season (M2)', () => {
+	const shown = weeklyAsRecord(run({ weekly: weekly([gradedSeven]) }));
+	assert.ok(shown);
+	assert.equal(weeklySpan(shown), 'Week 7');
+	assert.equal(weeklyOrderWords(gradedSeven), 'Our weekly rankings, set Oct 22');
+	assert.equal(weeklyOrderWords(upcoming(8, '2026-10-30T00:15:00.000Z')), null);
 });

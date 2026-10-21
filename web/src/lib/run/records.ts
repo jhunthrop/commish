@@ -3,15 +3,17 @@
  * week 7), and the draft record, our draft board against ADP on the season's points so far. Each is
  * named by what it grades; ADP appears on the draft record alone. The weekly record is in the record's
  * own shape, so the page reads it with the record's functions (record.ts). */
-import { weekdayLabel } from '#lib/format/date.ts';
+import { dayLabel, weekdayLabel } from '#lib/format/date.ts';
 import { plural } from '#lib/format/number.ts';
 import {
 	RATE_PLACES,
 	RECORD_BOX,
 	figureWords,
 	printPlaces,
+	weekLines,
 	type RecordFigure,
-	type RecordSource
+	type RecordSource,
+	type WeekLine
 } from './record.ts';
 import type { DraftLine, DraftRecord, RecordLine, RecordWeek, RunRecord } from './schema.ts';
 
@@ -47,7 +49,7 @@ export const RECORDS_WORDS = {
 			through === null
 				? 'It is graded on the season points of the weeks played once the first week is complete'
 				: `It is graded on each player's season points through week ${String(through)}`
-		} in PPR, on the players both rank who have played, refreshed each week as the stats land. Kickers and defenses are left out: the board takes their order from ADP.`,
+		} in PPR, on the players both rank who have played, refreshed each week as the stats land. Each position is graded on its own, our board's order among its players against their finish and ADP's likewise, and All combines the positions by players graded. A player whose bye has passed has one game fewer counted than one whose bye is ahead. Kickers and defenses are left out: the board takes their order from ADP.`,
 	draftScale:
 		'Order matched is how closely an order ranked the players as they finished the season so far: 1.00 is the same order, 0.00 no closer than chance, below it the reverse.',
 	draftChart: 'Order matched, season to date, through each week',
@@ -62,6 +64,11 @@ export const RECORDS_WORDS = {
 	frontDraftNamed: (ours: string, adp: string) => `Top named ${ours}, ADP ${adp}.`,
 	frontStarters: (ours: string, beside: string) => `Starters right ${ours}${beside}.`,
 	frontWeeklyNext: (week: number) => `Weekly rankings start week ${String(week)}.`,
+	/** The weekly record's upcoming weeks (fix round 1, M4): the next one on its own line, the rest
+	 * said once. */
+	setEach: 'set each week before kickoff',
+	/** The order a set week of the weekly record graded (M2): never "rest-of-season". */
+	weeklyOrder: (day: string) => `Our weekly rankings, set ${day}`,
 	/** The weekly record before its first week is set. */
 	opening: (week: number) => `Week ${String(week)}`,
 	openingCaption: (set: string) => `Our first weekly rankings, ${set}.`
@@ -125,6 +132,50 @@ export function beforeLine(
  * drawn, and Yahoo's absence. */
 export function weeklyBasisExtra(espnDrawn: boolean): string[] {
 	return [...(espnDrawn ? [RECORDS_WORDS.espnBasis] : []), RECORDS_WORDS.yahooBasis];
+}
+
+/** "Week 7", "Weeks 8 to 18". */
+function spanLead(weeks: readonly RecordWeek[]): string {
+	const first = weeks.at(0)?.week ?? 0;
+	const last = weeks.at(-1)?.week ?? first;
+	return first === last ? `Week ${String(first)}` : `Weeks ${String(first)} to ${String(last)}`;
+}
+
+/** The weekly record's week lines (fix round 1, M4): the record's own for the set and missed weeks;
+ * of the weeks to come, the next to set on its own line with its kickoff day ("Week 7", "set before
+ * kickoff Thu Oct 22") and the rest once ("Weeks 8 to 18", "set each week before kickoff"), so no line
+ * reads as many weeks set on one day. */
+export function weeklyLines(weeks: readonly RecordWeek[], unplayed: readonly number[]): WeekLine[] {
+	const coming = weeks.filter((week) => week.status === 'upcoming');
+	const lines = weekLines(
+		weeks.filter((week) => week.status !== 'upcoming'),
+		unplayed
+	);
+	const [next, ...rest] = coming;
+	if (next === undefined) return lines;
+	const nextLine: WeekLine = {
+		lead: spanLead([next]),
+		text:
+			next.frozenAt === null
+				? RECORDS_WORDS.setUnknown
+				: RECORDS_WORDS.setBefore(weekdayLabel(next.frozenAt)),
+		week: null
+	};
+	const restLine: WeekLine[] =
+		rest.length === 0 ? [] : [{ lead: spanLead(rest), text: RECORDS_WORDS.setEach, week: null }];
+	return [...lines, nextLine, ...restLine];
+}
+
+/** The weekly record's head in its bug (M2): the weeks it has graded, "Week 7", "Weeks 7 to 9". */
+export function weeklySpan(record: RunRecord): string {
+	return spanLead(record.weeks.filter((week) => week.status === 'graded'));
+}
+
+/** A set week's order on the weekly record (M2): "Our weekly rankings, set Oct 22". */
+export function weeklyOrderWords(week: RecordWeek): string | null {
+	return week.frozenAt === null || week.order === null
+		? null
+		: RECORDS_WORDS.weeklyOrder(dayLabel(week.frozenAt));
 }
 
 /** The draft record's orders, ours first. */
@@ -192,6 +243,8 @@ export interface FrontRecord {
 	name: string;
 	value: string;
 	caption: string;
+	/** The order matched scale, said under the figure (M4). */
+	scale: string;
 	second: string | null;
 	note: string | null;
 }
@@ -220,6 +273,7 @@ function weeklyFront(weekly: RunRecord): FrontRecord | null {
 	return {
 		name: RECORDS_WORDS.weekly,
 		value: rate(all.ours.agreement),
+		scale: weekly.scale,
 		caption: RECORDS_WORDS.frontWeekly(
 			span,
 			plural(all.ours.graded, 'player'),
@@ -246,6 +300,7 @@ function draftFront(
 	return {
 		name: RECORDS_WORDS.draft,
 		value: rate(all.ours.agreement),
+		scale: RECORDS_WORDS.draftScale,
 		caption: RECORDS_WORDS.frontDraft(
 			rate(all.adp.agreement),
 			draft.throughWeek,

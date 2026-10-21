@@ -249,15 +249,14 @@
 
 			<aside class="side" aria-label="Our record">
 				<Panel>
-					<PanelHead
-						title={page.front === null ? 'Our record' : `Our record, ${page.front.name}`}
-						aside={page.record.season.toString()}
-					/>
+					<PanelHead title="Our record" aside={page.record.season.toString()} />
 					{#if page.front}
+						<p class="standing">{page.front.name}</p>
 						<div class="figures">
 							<Figure value={page.front.value} size="lg" caption={page.front.caption} />
 						</div>
 						{#if page.front.second}<p class="record-note">{page.front.second}</p>{/if}
+						<p class="record-note">{page.front.scale}</p>
 						{#if page.front.note}<p class="record-note">{page.front.note}</p>{/if}
 					{:else}
 						{#if headline.standing}<p class="standing">{headline.standing}</p>{/if}
