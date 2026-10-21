@@ -197,7 +197,7 @@ def _run_python(case: Case, url: str, sets: Sequence[str]) -> SideRun:
 def _pass(name: str, case: Case, urls: tuple[str, str], sets: Sequence[str]) -> PassResult:
     ts = _run_typescript(case, urls[0], sets)
     py = _run_python(case, urls[1], sets)
-    diffs = tuple(diff_table(urls[0], urls[1], spec) for spec in case.tables)
+    diffs = tuple(diff_table(urls[0], urls[1], spec.in_pass(name)) for spec in case.tables)
     return PassResult(name, diffs, ts, py)
 
 

@@ -55,6 +55,12 @@ type Designation struct {
 	// the player list's injReturnDate (returnDates), nil when that list does
 	// not date him under this same status or its date does not read.
 	ReturnOn *time.Time
+	// DatingPending is a capture served before its dating was read (the
+	// runs read failed with no dated pair kept, a cold start): Listed and
+	// Since are not known yet rather than absent, so a screen says the
+	// designation alone, never "still listed" or carried over, until the
+	// dating lands (Lane 116, B91).
+	DatingPending bool
 }
 
 // Status is the designation in the contract's words, "" for a code we
@@ -478,6 +484,17 @@ func WithSince(designations map[string]Designation, runs map[RunKey]time.Time) m
 		if d.SeasonLong() && SeasonLong(d.Status(), "") {
 			d.Since = &since
 		}
+		out[id] = d
+	}
+	return out
+}
+
+// DatingPending is the designations marked DatingPending, undated until
+// their runs are read; the map handed in is not changed.
+func DatingPending(designations map[string]Designation) map[string]Designation {
+	out := make(map[string]Designation, len(designations))
+	for id, d := range designations {
+		d.DatingPending = true
 		out[id] = d
 	}
 	return out

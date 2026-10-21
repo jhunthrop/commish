@@ -126,6 +126,16 @@ ESTIME_AS_HE_SPELLS_IT = Departure(
     ("4569682",), "name", "Audric Estime", "Audric Estimé", "a name prints as he spells it (Lane 78)"
 )
 
+# Lane 116 (B77b): the moved-game pass. An earlier week 18 lists two games a day earlier; the recording then
+# lists them under their real ids, so the ingest retires each earlier row (superseded_by the new id, never
+# deleted). The legacy schedule never marked a moved game, so only the later pass departs, on those two rows.
+MOVED_WEEK_18 = "tank01-2026-week18-moved"
+MOVED_GAMES = (("20270109_SEA@LAR", "20270110_SEA@LAR"), ("20270109_NYJ@BUF", "20270110_NYJ@BUF"))
+MOVED_GAMES_RETIRED = tuple(
+    Departure((old,), "superseded_by", None, new, "a moved game's old row is retired (B77b)", passes=("later",))
+    for old, new in MOVED_GAMES
+)
+
 CASES: tuple[Case, ...] = (
     Case(
         name="tank01-roster-and-lines",
@@ -138,11 +148,14 @@ CASES: tuple[Case, ...] = (
     ),
     Case(
         name="tank01-schedule",
-        summary="every 2026 fixture, weeks 1-18, into provider_games (the stats pipeline's schedule walk)",
+        summary="every 2026 fixture, weeks 1-18, into provider_games (the stats pipeline's schedule walk); the "
+        "later pass lands the recording on an earlier week 18 that listed two games a day earlier, whose rows "
+        "it must retire",
         fixture_sets=("tank01-2026",),
-        tables=(PROVIDER_GAMES,),
+        tables=(PROVIDER_GAMES.departing(*MOVED_GAMES_RETIRED),),
         run_python=_schedule,
         now=NOW,
+        prior_fixture_sets=("tank01-2026", MOVED_WEEK_18),
     ),
     Case(
         name="tank01-adp",
