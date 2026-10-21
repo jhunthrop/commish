@@ -3949,8 +3949,8 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and
-            Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they
+            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
+            omit two-point and safety.", both missed kicks said as one missed kick), empty when they
             miss none
         basis_note_link:
           type: string
@@ -4430,8 +4430,8 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and
-            Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they
+            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
+            omit two-point and safety.", both missed kicks said as one missed kick), empty when they
             miss none
         basis_note_link:
           type: string
@@ -4521,8 +4521,8 @@ components:
         basis_note:
           type: string
           description: >-
-            the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, named ("Avg and
-            Last omit fumble and safety.", the same for a reader with no league), empty
+            the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, named ("Our stats
+            omit fumble recovery and safety.", the same for a reader with no league), empty
             when none
         basis_note_link:
           type: string
@@ -4616,8 +4616,8 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and
-            Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they
+            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
+            omit two-point and safety.", both missed kicks said as one missed kick), empty when they
             miss none
         basis_note_link:
           type: string
@@ -4965,8 +4965,8 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and
-            Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they
+            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
+            omit two-point and safety.", both missed kicks said as one missed kick), empty when they
             miss none
         basis_note_link:
           type: string
@@ -5076,8 +5076,8 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and
-            Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they
+            the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats
+            omit two-point and safety.", both missed kicks said as one missed kick), empty when they
             miss none
         basis_note_link:
           type: string

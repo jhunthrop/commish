@@ -212,8 +212,8 @@ func TestWeekOrderNamesOnlyTheTabsRulesLeftOut(t *testing.T) {
 		rules []string
 		note  string
 	}{
-		draft.K:   {[]string{"missed field goals", "missed extra points"}, "Avg and Last omit missed kick."},
-		draft.DEF: {[]string{"fumble recoveries", "safeties"}, "Avg and Last omit fumble and safety."},
+		draft.K:   {[]string{"missed field goals", "missed extra points"}, "Our stats omit missed kick."},
+		draft.DEF: {[]string{"fumble recoveries", "safeties"}, "Our stats omit fumble recovery and safety."},
 	}
 	f := newWeekOrderFixture(t)
 	f.league.Saved = &settings

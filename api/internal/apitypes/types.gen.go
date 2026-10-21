@@ -2937,7 +2937,7 @@ type LineupAdvice struct {
 	// Basis the honesty line: the lineup starts the highest week_projection at each slot after this week's designations and byes, the rest-of-season order breaking ties and standing in where a player has none
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
 	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
@@ -3344,7 +3344,7 @@ type OrderAdvice struct {
 	// Basis what the order and its two figures are, said once under the rows
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
 	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
@@ -4210,7 +4210,7 @@ type TradeAdvice struct {
 	// Basis which trades are listed (a trade sending out the top player at his position in our order only when it gains the drafter's lineup 1.0 a week or more or fills an empty spot, Lane 103) and who decides
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
 	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
@@ -4267,7 +4267,7 @@ type TradeCheck struct {
 	// Basis the honesty line beside the answer
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
 	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
@@ -4415,7 +4415,7 @@ type WaiverAdvice struct {
 	// Basis the pickup rule, the basis's first line
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
 	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
@@ -4678,7 +4678,7 @@ type WeekLineup struct {
 
 // WeekOrderAdvice defines model for WeekOrderAdvice.
 type WeekOrderAdvice struct {
-	// BasisNote the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, named ("Avg and Last omit fumble and safety.", the same for a reader with no league), empty when none
+	// BasisNote the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, named ("Our stats omit fumble recovery and safety.", the same for a reader with no league), empty when none
 	BasisNote string `json:"basis_note"`
 
 	// BasisNoteLink the words of the link to the league's Settings the web drew before Lane 111 ("Which two"), kept for that web through one deploy; the web no longer draws it. Empty with none or no league
