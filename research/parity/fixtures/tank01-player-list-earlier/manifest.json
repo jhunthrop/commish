@@ -1,0 +1,17 @@
+{
+  "provenance": "derived-from-recording",
+  "recordedAt": "2026-10-12",
+  "note": "An EARLIER player list for the club refresh (Lane 122), derived from tank01-capture-all-2026-10-12's recording of getNFLPlayerList: four of its players, their records unchanged but J.J. McCarthy's club, set back to MIN (team and teamID), the club he was with before 2026-09-28. tank01-capture-harvest runs this on top of its recordings first, then the 2026-10-12 list alone, so the later read moves him to NYG: the case's one club changing between passes. seed_players.json is the provider roster both sides of the case seed before every pass (the stale early-September clubs, Dortch DET and McCarthy MIN; a free agent, a player off the list and a defense, which keep theirs).",
+  "responses": [
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLPlayerList",
+      "status": 200,
+      "file": "player_list.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "four players of the 2026-10-12 list, McCarthy's club set back to MIN",
+      "bytes": 4520
+    }
+  ]
+}

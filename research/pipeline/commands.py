@@ -53,7 +53,7 @@ from research.pipeline.odds import backfill
 from research.pipeline.odds import ingest as odds
 from research.pipeline.preseason import boards
 from research.pipeline.preseason.ingest import first_kickoff_for
-from research.pipeline.tank01 import capture, lines
+from research.pipeline.tank01 import capture, lines, player_clubs
 from research.pipeline.tank01 import ingest as tank01
 from research.pipeline.tank01.client import API_KEY_ENV as TANK01_KEY_ENV
 from research.pipeline.tank01.client import DEFAULT_SEASON, SEASON_ENV, Tank01Client
@@ -279,6 +279,7 @@ COMMANDS: Final = MappingProxyType({
     "provider-names": Command("each crossed provider name as the universe spells it, its diacritics kept (the Lane 78 backfill)", lambda c, i: crosswalk.respell_provider_names(c).line()),
     "host-ids": Command("the fantasy hosts' player ids onto the universe", lambda c, i: host_ids.ingest_host_ids(c, i.fetcher)),
     "capture-harvest": Command("the capture harvest's five feeds", _harvest),
+    "player-clubs": Command("the newest stored player list's clubs onto provider_players, the count first (the Lane 122 one-shot; --dry-run writes nothing)", lambda c, i: player_clubs.backfill_player_clubs(c, capture.latest_player_list(c), write=not i.args.dry_run)),
     "adp-snapshot": Command("the nightly three-format ADP capture", lambda c, i: boards.ingest_adp_snapshot(c, i.fetcher, i.now)),
     "preseason": Command("week-one rosters, depth chart and the published boards per season", _preseason, atomic=False),
     "kdef-adp": Command("the kicker and defense ADP rows per season", lambda c, i: [boards.ingest_kdef_adp(c, i.fetcher, s, i.now) for s in seasons_of(i.args)]),
