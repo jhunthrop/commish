@@ -10,6 +10,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
+	"github.com/jhunthrop/commish/api/internal/entitlements/enttest"
 )
 
 // A Draft Pass alone follows more than one league.
@@ -17,7 +18,7 @@ func TestADraftPassFollowsTwoLeagues(t *testing.T) {
 	pool := dbtest.Pool(t)
 	svc := replayService(pool)
 	cara := newAccount(t, &auth.Store{Pool: pool}, "cara")
-	grantFrom(t, pool, cara, entitlements.ProductDraftPass, 2026, svc.Now(), clock2027())
+	enttest.GrantFrom(t, &entitlements.Store{Pool: pool}, cara, entitlements.ProductDraftPass, 2026, svc.Now(), clock2027())
 	for _, link := range []string{sleeperLink, mflLink} {
 		if status, _, feature := attachAs(t, svc, cara, link); status != http.StatusCreated {
 			t.Fatalf("attach %s: %d %q", link, status, feature)

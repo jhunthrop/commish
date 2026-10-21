@@ -266,6 +266,29 @@ void test("the phone Lineup leaves the defenses' scoring to the desk and says wh
 	assert.ok(phone.includes(NO_PROJ_FINAL_PART) && !phone.includes(PROJ_FINAL_PART), phone);
 });
 
+void test("the phone Matchup leaves the defenses' scoring and a started game's Proj to the desk, the tight end sentence kept (Lane 124)", () => {
+	const defense = { ...line(), player: { position: 'DEF' } } as unknown as PlayerLine;
+	const kicked = line({ kickoff: '2026-10-16T00:15:00.000Z', game_state: 'kicked_off' });
+	const parts = boxBasisParts(
+		{
+			projection: { readAt: READ, scoring: { ...CLOSEST, te_bonus: 0.5 } },
+			lines: [defense, kicked],
+			byPlayer: false,
+			teamTotal: true,
+			host: 'ffpc',
+			lineup: null
+		},
+		CENTRAL,
+		NOW
+	);
+	const desk = drawnText(parts, 'desk');
+	const phone = drawnText(parts, 'phone');
+	for (const clause of ['defenses on default scoring', 'as of kickoff once started'])
+		assert.ok(desk.includes(clause) && !phone.includes(clause), `${clause}: ${phone}`);
+	for (const kept of ['FFPC adds 0.5 a catch for TEs.', PROJ_FINAL_PART, 'read Fri 9:00 pm'])
+		assert.ok(phone.includes(kept), `${kept}: ${phone}`);
+});
+
 void test('the Matchup and Lineup keys explain Proj final only while a starter still plays (Lane 121, B99)', () => {
 	const played = line({ kickoff: '2026-10-16T00:15:00.000Z', played: true, game_state: 'final' });
 	const key = (allFinal: boolean | undefined, lineup: boolean): string =>

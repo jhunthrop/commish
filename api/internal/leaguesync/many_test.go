@@ -14,6 +14,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
+	"github.com/jhunthrop/commish/api/internal/entitlements/enttest"
 	"github.com/jhunthrop/commish/api/internal/espn"
 	"github.com/jhunthrop/commish/api/internal/scoring"
 )
@@ -103,7 +104,7 @@ func TestAMembershipFollowsTwoLeagues(t *testing.T) {
 	ctx := context.Background()
 	svc := replayService(pool)
 	bob := newAccount(t, &auth.Store{Pool: pool}, "bob")
-	grantFrom(t, pool, bob, entitlements.ProductMembership, 0, svc.Now(), svc.Now().AddDate(1, 0, 0))
+	enttest.GrantFrom(t, &entitlements.Store{Pool: pool}, bob, entitlements.ProductMembership, 0, svc.Now(), svc.Now().AddDate(1, 0, 0))
 	for _, link := range []string{sleeperLink, mflLink} {
 		if status, _, feature := attachAs(t, svc, bob, link); status != http.StatusCreated {
 			t.Fatalf("attach %s: %d %q", link, status, feature)
@@ -162,7 +163,7 @@ func TestImportScoring(t *testing.T) {
 	if status != http.StatusForbidden || e == nil || e.Feature == nil || *e.Feature != entitlements.CustomScoring {
 		t.Fatalf("without the pass: %d %+v", status, e)
 	}
-	grantFrom(t, pool, alice, entitlements.ProductDraftPass, 2026, svc.Now(), svc.Now().AddDate(0, 6, 0))
+	enttest.GrantFrom(t, &entitlements.Store{Pool: pool}, alice, entitlements.ProductDraftPass, 2026, svc.Now(), svc.Now().AddDate(0, 6, 0))
 	for _, c := range []struct{ host, link string }{{"sleeper", sleeperLink}, {"mfl", mflLink}} {
 		status, got, e := importAs(t, svc, alice, c.host, c.link)
 		if status != http.StatusOK || len(got.Applied) == 0 || len(got.Applied)+len(got.Defaulted) != len(scoring.Rules()) || got.Dropped == nil {

@@ -14,6 +14,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
+	"github.com/jhunthrop/commish/api/internal/entitlements/enttest"
 	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
@@ -80,7 +81,7 @@ func TestTheLeagueIsTheContext(t *testing.T) {
 	svc.Accounts = &account.Viewer{Entitlements: ents, Leagues: store, Now: time.Now}
 	accounts := &auth.Store{Pool: pool}
 	carol, dave := newAccount(t, accounts, "carol"), newAccount(t, accounts, "dave")
-	grantFrom(t, pool, carol, entitlements.ProductMembership, 0, svc.Now(), svc.Now().AddDate(1, 0, 0))
+	enttest.GrantFrom(t, &entitlements.Store{Pool: pool}, carol, entitlements.ProductMembership, 0, svc.Now(), svc.Now().AddDate(1, 0, 0))
 	_, sleeperID, _ := attachAs(t, svc, carol, sleeperLink)
 	_, mflID, _ := attachAs(t, svc, carol, mflLink)
 	_, daveID, _ := attachAs(t, svc, dave, sleeperLink)

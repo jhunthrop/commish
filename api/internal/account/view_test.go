@@ -10,6 +10,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
+	"github.com/jhunthrop/commish/api/internal/entitlements/enttest"
 	"github.com/jhunthrop/commish/api/internal/season"
 )
 
@@ -45,9 +46,7 @@ func TestViewGrantedMembership(t *testing.T) {
 	store := &entitlements.Store{Pool: dbtest.Pool(t)}
 	a := newAccount(t, ctx, store, "user_granted")
 	endsAt := viewNow.AddDate(1, 0, 0)
-	if err := store.Grant(ctx, a.ID, entitlements.ProductMembership, 0, endsAt, "test"); err != nil {
-		t.Fatal(err)
-	}
+	enttest.GrantFrom(t, store, a.ID, entitlements.ProductMembership, 0, viewNow, endsAt)
 
 	m := view(t, ctx, store, a)
 	if m == nil {
@@ -81,9 +80,7 @@ func TestViewSubscriptionMembership(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Grant(ctx, a.ID, entitlements.ProductMembership, 0, viewNow.AddDate(1, 0, 0), "test"); err != nil {
-		t.Fatal(err)
-	}
+	enttest.GrantFrom(t, store, a.ID, entitlements.ProductMembership, 0, viewNow, viewNow.AddDate(1, 0, 0))
 
 	m := view(t, ctx, store, a)
 	if m == nil {
