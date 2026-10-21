@@ -21,6 +21,7 @@ import { SHELF } from '../src/lib/player/shelf.ts';
 import { SHELF_PARAM } from '../src/lib/player/shelf-state.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
+import { readFaceFaults } from './read-face.ts';
 import {
 	FIXTURE_WEEK_CLOCK,
 	installFixtureClock,
@@ -263,6 +264,7 @@ async function check(
 	const tiles = await shelf(page).locator('.tile').count();
 	if (tiles < 6) fault(`${String(tiles)} tiles`);
 	if ((await shelf(page).getByText(CARD.ourRead).count()) === 0) fault('no read');
+	for (const said of await readFaceFaults(page, 'dialog.shelf[open]')) fault(said);
 	const verb = (
 		(
 			await shelf(page)

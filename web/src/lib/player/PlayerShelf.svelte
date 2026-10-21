@@ -163,8 +163,7 @@
 			<section class="read">
 				<h3><Label>{CARD.ourRead}</Label></h3>
 				{#if read}
-					<p class="stamp">{read.caption}</p>
-					{#if read.body !== null}<Capsule body={read.body} pulls={[]} />{/if}
+					<Capsule body={read.body} byline={read.caption} week pulls={[]} />
 				{:else}
 					<p class="unwritten">{CARD.readNotYet}</p>
 				{/if}
@@ -266,14 +265,6 @@
 
 	.read h3 {
 		margin: 0 0 var(--s-1);
-	}
-
-	.stamp {
-		margin: 0 0 var(--s-2);
-		font-family: var(--font-read);
-		font-style: italic;
-		font-size: var(--t-sm);
-		color: var(--ink-3);
 	}
 
 	.unwritten {

@@ -334,8 +334,7 @@
 						class="week-read"
 						aria-label={page.weekRead ? weekReadLabel(page.weekRead) : null}
 					>
-						<p class="stamp">{weekRead.caption}</p>
-						{#if weekRead.body !== null}<Capsule body={weekRead.body} pulls={[]} />{/if}
+						<Capsule body={weekRead.body} byline={weekRead.caption} week pulls={[]} />
 					</section>
 				{/if}
 				<!-- In season the read is one paragraph, the week's (Lane 100, B44): the season read and its
@@ -343,8 +342,7 @@
 				{#if page.underway}
 					{#if !weekRead}<p class="unwritten">{CARD.readNotYet}</p>{/if}
 				{:else if page.capsule}
-					{#if page.card.readStamp}<p class="stamp">{page.card.readStamp}</p>{/if}
-					<Capsule body={page.capsule.body} pulls={readPulls} />
+					<Capsule body={page.capsule.body} byline={page.card.readStamp} pulls={readPulls} />
 				{:else}
 					<p class="unwritten">{UNWRITTEN_READ}</p>
 					<LineList lines={unwritten} label="What our read of {page.name} will be built from" />
@@ -457,15 +455,6 @@
 
 	.read h3 {
 		margin: 0 0 var(--s-1);
-	}
-
-	/* The read's stamp in the reading face's caption: its day and what it was written from. */
-	.stamp {
-		margin: 0 0 var(--s-3);
-		font-family: var(--font-read);
-		font-style: italic;
-		font-size: var(--t-sm);
-		color: var(--ink-3);
 	}
 
 	/* The week-ahead read above the season's, ruled off from it. */

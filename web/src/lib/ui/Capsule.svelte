@@ -4,18 +4,24 @@
 	import Label from './Label.svelte';
 
 	interface Props {
-		/** The capsule as the grounded writer wrote it, paragraphs split by a blank line. */
-		body: string;
+		/** The capsule as the grounded writer wrote it, paragraphs split by a blank line; null for a
+		 * read withheld, its byline alone. */
+		body: string | null;
+		/** The read's stamp: its day and what it was written from or for, null with none. */
+		byline?: string | null;
+		/** The week's read in season (Lane 126): a box-score paragraph in the UI face, its byline a
+		 * plain caption. Else the season read, in the reading serif. */
+		week?: boolean;
 		/** Numbers set beside the prose after the first paragraph, each naming its basis where it has
 		 * one (run/read-figures.ts): the prose's own, which the run checks appear in it word for word,
 		 * and in season the rest of it from the run. */
 		pulls: readonly ReadFigure[];
 	}
 
-	let { body, pulls }: Props = $props();
+	let { body, byline = null, week = false, pulls }: Props = $props();
 
 	const paragraphs = $derived(
-		body
+		(body ?? '')
 			.split(/\n\s*\n/)
 			.map((paragraph) => paragraph.trim())
 			.filter((paragraph) => paragraph !== '')
@@ -26,8 +32,10 @@
 	const labelled = $derived(pulls.some((pull) => pull.label !== undefined));
 </script>
 
-<!-- Borrowed from Scout, player page only: the capsule is writing, so it is set in a reading serif. -->
-<div class="prose">
+<!-- Borrowed from Scout, the season read only: the capsule is writing, so it is set in a reading
+     serif. In season the week's read sits among the box score's tiles, so it takes the UI face. -->
+<div class="prose" class:week>
+	{#if byline}<p class="byline">{byline}</p>{/if}
 	{#if lead}<p class="lead">{lead}</p>{/if}
 	{#if pulls.length > 0}
 		<figure class="pulls">
@@ -50,6 +58,34 @@
 		font-family: var(--font-read);
 		font-optical-sizing: auto;
 		max-width: 68ch;
+	}
+
+	/* The read's stamp in the reading face's caption. */
+	.prose p.byline {
+		margin: 0 0 var(--s-3);
+		font-style: italic;
+		font-size: var(--t-sm);
+		line-height: 1.4;
+		color: var(--ink-3);
+	}
+
+	/* The week's read in season: the UI face at the box score's body size, its byline a caption like
+	   the tiles'. Its selectors outrank the phone's sizes below, so it holds at every width. */
+	.prose.week {
+		font-family: var(--font-ui);
+		max-width: var(--measure-week-read);
+	}
+
+	.prose.week p {
+		font-size: var(--t-week-read);
+		line-height: var(--lh-week-read);
+	}
+
+	.prose.week p.byline {
+		margin-bottom: var(--s-2);
+		font-style: normal;
+		font-size: var(--t-byline);
+		line-height: var(--lh-byline);
 	}
 
 	p {

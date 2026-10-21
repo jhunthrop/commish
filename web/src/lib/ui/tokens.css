@@ -15,10 +15,18 @@
 	--font-num:
 		'Big Shoulders Display', 'Big Shoulders Display Fallback', 'Oswald', 'Arial Narrow', sans-serif;
 	/* Newsreader is the reading face. Optical sizes cut for long screen reading, because the
-     capsule is writing. Allowed on the player page's prose block and its pull figures, nowhere else. */
+     capsule is writing. Allowed on the season read (the draft's, before the first kickoff) and its
+     pull figures, nowhere else. */
 	--font-read: 'Newsreader', 'Newsreader Fallback', 'Iowan Old Style', 'Charter', Georgia, serif;
 	--t-read: 1.1875rem; /* 19 capsule prose */
 	--t-pull: 2.75rem; /* 44 a pull figure, the same step as --t-2xl */
+	/* The week's read in season (Lane 126): a box-score paragraph in the UI face, one step over the
+	   tiles' 11 px captions, about 60 characters a line; its byline a caption like the tiles'. */
+	--t-week-read: var(--t-sm); /* 13 */
+	--lh-week-read: 1.5;
+	--measure-week-read: 60ch;
+	--t-byline: var(--t-xs); /* 11, the tile caption's size */
+	--lh-byline: 1.35;
 
 	/* Type scale, 1.2 ratio from a 14px base. Numbers use --font-num at the top three. */
 	--t-xs: 0.6875rem; /* 11 labels on cells, uppercase, tracked */

@@ -27,6 +27,7 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { copyFault, watchData } from './copy-scan.ts';
+import { readFaceFaults } from './read-face.ts';
 import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
 import { CARD } from '../src/lib/player/card.ts';
@@ -341,6 +342,12 @@ for (const shot of ROS ? ROS_SHOTS : SHOTS) {
 				if (shot.compare !== undefined) await openCompare(page, shot.compare);
 				const card = await read(page);
 				checkCard(card, shot, where, width);
+				for (const said of await readFaceFaults(page, 'main')) check(false, `${where}: ${said}`);
+				if (shot.weekRead === 'shown')
+					check(
+						(await page.locator('main .prose.week').count()) === 1,
+						`${where}: the week read is not set as the week's`
+					);
 				const banned = await copyFault(page, OWN_WORDS, 'body');
 				check(banned === null, `${where}: says ${banned ?? ''}`);
 				if (width === PHONE_WIDTH) {
