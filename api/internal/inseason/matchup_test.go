@@ -159,7 +159,7 @@ func TestAByeHasNoProjection(t *testing.T) {
 	for _, p := range f.raw.Players {
 		every[p.ID] = boards.ProjectedPoints{PPR: 10, Half: 10, Standard: 10}
 	}
-	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{ReadAt: projectionAt, Players: every}, nil, fixtureNow)
+	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{ReadAt: projectionAt, Players: every}, nil, fixtureNow, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

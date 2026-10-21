@@ -21,7 +21,7 @@ func TestProjectionArrivesAtTheWeeksFirstSlot(t *testing.T) {
 		}
 	}
 	data.Games = games
-	a, err := newAdvisor(f.league, data, boards.WeekProjection{}, nil, mondayNight)
+	a, err := newAdvisor(f.league, data, boards.WeekProjection{}, nil, mondayNight, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -78,51 +78,56 @@ func serve(ctx context.Context, log *slog.Logger) error {
 	}
 	cancel()
 	registry := metrics.New()
-	handler, err := build(ctx, cfg, pool, registry, log)
+	handler, drain, err := build(ctx, cfg, pool, registry, log)
 	if err != nil {
 		return err
 	}
-	return server.Run(ctx, log, cfg.HTTP.Port, handler, cfg.HTTP.MetricsPort, registry.Handler())
+	err = server.Run(ctx, log, cfg.HTTP.Port, handler, cfg.HTTP.MetricsPort, registry.Handler())
+	// ctx is done: the season reads' refreshes behind stop, and the pool
+	// closes once they have released their connections.
+	drain()
+	return err
 }
 
-// build wires every package and returns the whole handler.
-func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Observer, log *slog.Logger) (http.Handler, error) {
+// build wires every package and returns the whole handler, and the drain
+// shutdown runs before the pool closes.
+func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Observer, log *slog.Logger) (http.Handler, func(), error) {
 	now := time.Now
 	authStore := &auth.Store{Pool: pool}
 	ents := &entitlements.Store{Pool: pool}
 	sessions, err := auth.NewSessions(cfg.Session, cfg.HTTP.TrustedProxyHops, authStore, now, log)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	deviceStore := &devices.Store{Pool: pool}
 	bearer, err := auth.NewBearer(cfg.Session.CookiePassword, cfg.HTTP.TrustedProxyHops, deviceStore, now, log)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	codeKey, err := auth.DeriveKey(cfg.Session.CookiePassword, devices.PurposeCodes)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	nameFilter, err := names.Default()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	anon, err := auth.NewAnon(cfg.Session, cfg.HTTP.CORSOrigins)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	mockStore := &mocks.Store{Pool: pool}
 	stateSealer, err := auth.NewStateSealer(cfg.Session.CookiePassword)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// The board's pool lives as long as the process.
-	draftBoards, _, err := draftroom.OpenBoards(pool, cfg.Board, now)
+	draftBoards, _, err := draftroom.OpenBoards(pool, cfg.Board, now, log)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := customBoards(ctx, cfg.Board, draftBoards, now, log); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// The site's season reads the board's schedule, kept an hour: one
 	// source for /me, GET /season, the leagues' phases and Sleeper's week.
@@ -156,37 +161,42 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	exportHandler := &exports.Handler{Store: &exports.Store{Pool: pool}, Sheets: sheetStore, Objects: objects(cfg, log), Now: now, Log: log}
 	// One hourly capture read, kept for its TTL, serves the in-season
 	// screens and the board route's designations alike.
-	facts := &inseason.Cache{Reads: draftBoards.Schedule, Now: now, Log: log}
+	facts := &inseason.Cache{Reads: draftBoards.Schedule, Now: now, Log: log, Context: ctx}
 	solo, lobbies, err := rooms(ctx, cfg, pool, draftBoards, mockStore, anon, gate, leagueStore, sheetStore, authStore, facts, log)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	ff, err := newFFPCWiring(cfg, pool, log)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	yh := newYahooWiring(cfg, pool, ff, log)
 	es := newESPNWiring(cfg, pool, ff, log)
 	mf, err := newMFLWiring(cfg, pool, ff, log)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	companions, err := companionService(cfg, pool, solo, draftBoards.Schedule, ents, ff, log)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	leagueSync := leagueSyncService(cfg, pool, draftBoards, leagueStore, ents, viewer, site, ff, yh, es, mf, log)
 	moves, err := hostMoves(cfg, pool, ff, es, mf, log)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	inSeason := &inseason.Service{
 		Leagues: inseason.SyncLeagues{Sync: leagueSync}, Weeks: inseason.SyncLeagues{Sync: leagueSync}, Facts: facts,
-		Holds: sheetStore, Moves: moves, Boards: draftBoards, Season: draftBoards.Schedule.Season, Now: now, Log: log,
+		Holds: sheetStore, Moves: moves, Boards: draftBoards, Lives: &inseason.LiveBoards{Log: log},
+		Season: draftBoards.Schedule.Season, Now: now, Log: log,
 		Landings: inseason.SyncLeagues{Sync: leagueSync}, Context: ctx,
 		Records: &leaguerecord.Service{Store: &leaguerecord.Store{Pool: pool}, Orders: draftBoards.Schedule},
 	}
+	// The season's reads fill and the run's boards build before the
+	// listener opens, so neither /readyz nor the first request after a
+	// deploy waits on them (Lane 112). Bounded; a failure only logs.
+	inSeason.WarmAtStart(ctx, inseason.StartTimeout)
 	// The trade search warms as each league read lands (Lane 66u).
 	leagueSync.Poller.Landed = inSeason.OnLanded
 	// While a game is under way every screen waits for a read under the
@@ -218,9 +228,9 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	)
 	mux := http.NewServeMux()
 	if err := server.Mount(mux, routes, sessions, bearer, now); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return server.Stack(mux, log, obs, cfg.HTTP.CORSOrigins, cfg.AllowedHosts), nil
+	return server.Stack(mux, log, obs, cfg.HTTP.CORSOrigins, cfg.AllowedHosts), facts.Drain, nil
 }
 
 // gateway is Stripe, or nil (billing answers 503) when it has no keys.

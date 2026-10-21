@@ -26,7 +26,7 @@ func runFFPCRefresh(ctx context.Context, log *slog.Logger, cfg config.API, pool 
 	}
 	store := &leaguesync.Store{Pool: pool}
 	// The run's schedule answers the league's current week.
-	board, closeBoard, err := draftroom.OpenBoards(pool, cfg.Board, time.Now)
+	board, closeBoard, err := draftroom.OpenBoards(pool, cfg.Board, time.Now, log)
 	if err != nil {
 		return err
 	}

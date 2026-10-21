@@ -126,8 +126,9 @@ func (a *advisor) findAll(ctx context.Context) (map[int][]Trade, error) {
 
 // newAdvisor reads the league's roster shape and scoring from the saved
 // league and indexes the facts for its week. held is the board ids the
-// drafter tags Hold.
-func newAdvisor(l League, data Data, projection boards.WeekProjection, held map[string]bool, now time.Time) (*advisor, error) {
+// drafter tags Hold. lives keeps the board at the read's clock across
+// requests (nil builds it afresh).
+func newAdvisor(l League, data Data, projection boards.WeekProjection, held map[string]bool, now time.Time, lives *LiveBoards) (*advisor, error) {
 	if l.Saved == nil {
 		return nil, fmt.Errorf("inseason: the league has no saved settings")
 	}
@@ -141,8 +142,8 @@ func newAdvisor(l League, data Data, projection boards.WeekProjection, held map[
 	}
 	preset, _ := leaguesync.LeagueScoring(l.Saved, nil, false)
 	horizon := HorizonOf(l.Snap.Terms).Reaching(l.Board.FromWeek)
-	rest := RestAt(data.Games, l.Board.FromWeek, l.Board.Refreshed, now, horizon)
-	if l.Board, err = LiveBoard(l.Board, rest); err != nil {
+	var rest RestNow
+	if l.Board, rest, err = lives.At(l.Board, data.Games, horizon, now); err != nil {
 		return nil, fmt.Errorf("inseason: the board at the read's clock: %w", err)
 	}
 	return &advisor{rest: rest, League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, horizon: horizon, weeks: WeeksCovered(basis, firstWeek(l), horizon), pages: newPages(l.Board.Raw), now: now,

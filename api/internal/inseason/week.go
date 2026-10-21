@@ -122,7 +122,7 @@ func (s *Service) weekLeague(ctx context.Context, wl WeekLeague, held map[string
 		s.Log.Warn("inseason: week facts", "league", wl.ID, "err", err)
 		return problem(factsWords)
 	}
-	a, err := newAdvisor(l, data, s.projection(ctx, seasonOf(l), l.Snap.Week), held, s.Now())
+	a, err := newAdvisor(l, data, s.projection(ctx, seasonOf(l), l.Snap.Week), held, s.Now(), s.Lives)
 	if err != nil {
 		s.Log.Warn("inseason: week advisor", "league", wl.ID, "err", err)
 		return problem(factsWords)

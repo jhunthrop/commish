@@ -75,8 +75,12 @@ func TestCacheReadsTheProjectionOncePerWeekAndTTL(t *testing.T) {
 		t.Fatalf("%d reads for two weeks inside the TTL", n)
 	}
 	now = now.Add(CaptureTTL + time.Second)
-	if _, err := c.Projection(ctx, 2026, 6); err != nil || reads.projections.Load() != 3 {
-		t.Fatalf("after the TTL: %d reads, %v", reads.projections.Load(), err)
+	if _, err := c.Projection(ctx, 2026, 6); err != nil {
+		t.Fatal(err)
+	}
+	c.refreshes.Wait()
+	if n := reads.projections.Load(); n != 3 {
+		t.Fatalf("after the TTL: %d reads, want one refresh", n)
 	}
 }
 
@@ -106,6 +110,7 @@ func TestCacheReadsOncePerTTL(t *testing.T) {
 	if _, err := c.Data(ctx, 2026); err != nil {
 		t.Fatal(err)
 	}
+	c.refreshes.Wait()
 	if reads.lines.Load() != 1 || reads.designations.Load() != 2 || reads.gameFacts.Load() != 2 {
 		t.Fatalf("past the capture TTL: lines %d captures %d game facts %d, want 1, 2 and 2",
 			reads.lines.Load(), reads.designations.Load(), reads.gameFacts.Load())
@@ -113,8 +118,12 @@ func TestCacheReadsOncePerTTL(t *testing.T) {
 	mu.Lock()
 	now = now.Add(SeasonTTL)
 	mu.Unlock()
-	if _, err := c.Data(ctx, 2026); err != nil || reads.lines.Load() != 2 || reads.games.Load() != 2 {
-		t.Fatalf("past the season TTL: lines %d games %d (%v)", reads.lines.Load(), reads.games.Load(), err)
+	if _, err := c.Data(ctx, 2026); err != nil {
+		t.Fatal(err)
+	}
+	c.refreshes.Wait()
+	if reads.lines.Load() != 2 || reads.games.Load() != 2 {
+		t.Fatalf("past the season TTL: lines %d games %d, want one refresh each", reads.lines.Load(), reads.games.Load())
 	}
 }
 

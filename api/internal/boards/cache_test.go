@@ -1,8 +1,11 @@
 package boards
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,6 +26,26 @@ func (v *versioned) Load(context.Context, Format) (*Raw, error) {
 }
 
 func (v *versioned) Version(context.Context, Format) (string, error) { return v.version, v.err }
+
+// Each read that goes to the store logs its kind and duration (Lane 112
+// review LOW-2): the first a full load, one past the TTL with the version
+// unmoved a version check, one inside the TTL nothing.
+func TestCacheLogsEachStoreRead(t *testing.T) {
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	var logged bytes.Buffer
+	cache := &Cache{Source: &versioned{version: "a"}, TTL: time.Minute, Now: func() time.Time { return now },
+		Log: slog.New(slog.NewTextHandler(&logged, nil))}
+	for _, advance := range []time.Duration{0, 30 * time.Second, 2 * time.Minute} {
+		now = now.Add(advance)
+		if _, err := cache.Load(context.Background(), PPR); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out := logged.String()
+	if strings.Count(out, `msg="boards: board read"`) != 2 || !strings.Contains(out, "kind=load") || !strings.Contains(out, "kind=version") {
+		t.Fatalf("board read lines:\n%s", out)
+	}
+}
 
 // Past its TTL the cache keeps a board whose version stands, and reads it
 // again once the version moves or cannot be read.

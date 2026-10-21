@@ -65,7 +65,7 @@ func TestLineupCarriesTheProjectionsChangeAndTheReserve(t *testing.T) {
 		Players: map[string]boards.ProjectedPoints{qb: {PPR: 16.8}, benchQB: {PPR: 18.5}},
 		Previous: &boards.WeekProjection{Week: 6, ReadAt: before,
 			Players: map[string]boards.ProjectedPoints{qb: {PPR: 17.1}, benchQB: {PPR: 18.1}}}}
-	a, err := newAdvisor(f.league, f.data, proj, nil, fixtureNow)
+	a, err := newAdvisor(f.league, f.data, proj, nil, fixtureNow, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestLineupCarriesTheProjectionsChangeAndTheReserve(t *testing.T) {
 // no change.
 func TestAByeNeverStartsThroughTheAdvisor(t *testing.T) {
 	f := newFixture(t)
-	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, fixtureNow)
+	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, fixtureNow, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestAnEmptySpotComesBackOnTheAnswer(t *testing.T) {
 		}
 	}
 	f.data.Designations = out
-	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, fixtureNow)
+	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, fixtureNow, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

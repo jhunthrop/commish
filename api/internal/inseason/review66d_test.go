@@ -134,7 +134,7 @@ func hostShaped(t *testing.T, byPlayer bool) fixture {
 func TestTheAnswersSayWhetherTheHostGivesPlayersPoints(t *testing.T) {
 	for _, byPlayer := range []bool{false, true} {
 		f := hostShaped(t, byPlayer)
-		a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, sundayAfternoon)
+		a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, sundayAfternoon, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
