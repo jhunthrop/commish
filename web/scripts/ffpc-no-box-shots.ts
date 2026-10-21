@@ -3,7 +3,7 @@
 // stand-in (ffpc.ts, the fixture_platform=ffpc cookie), both themes at 1280 and 390, on
 // one of the fixture's clocks. FFPC lists the opponent no starters, so his state is the schedule's (his
 // roster's games): the Matchup's head reads Final only once both sides are final by their own rule, and
-// until then the opponent reads "Proj final --" under a Kicked off head. It asserts, on the member's
+// until then the opponent reads his best lineup's Proj final under a Kicked off head (Lane 127). It asserts, on the member's
 // game, the Matchup bug's head, the opponent's small figure there and on the home bug, the home bug's
 // head, each footer's lines (basis-lines.ts, eight at most at 390, five at 1280) and the copy guard, and
 // prints the footers' counts. Exits non-zero on any fault. On the home after the Sunday (Lane 125,
