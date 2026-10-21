@@ -118,8 +118,15 @@ PROVIDER_GAMES: Final = Table(
     Column("kickoff_et", Text),
     Column("status", Text, nullable=False),
     recorded_at(),
+    # The provider's new id for this game when its week no longer lists this one but lists the same two
+    # clubs under another (a date change, B77b, revision 0016); NULL for a game to play. Every reader of
+    # the schedule leaves a superseded row out (GAME_TO_PLAY).
+    Column("superseded_by", Text),
     Index("provider_games_week_idx", "season", "week"),
 )
+
+# The schedule's readers keep only the games to play: a row the ingest marked superseded is not one.
+GAME_TO_PLAY: Final = "superseded_by is null"
 
 PROVIDER_WEEKS: Final = Table(
     "provider_weeks",
@@ -144,6 +151,9 @@ CAPTURE_SNAPSHOTS: Final = Table(
     Column("captured_at", DateTime(True), nullable=False),
     Column("digest", Text, nullable=False),
     Column("payload", JSONB, nullable=False),
+    # The game a per-game box score was asked about (B86, revision 0016), whatever its answer names; NULL
+    # for every other feed and for the box scores kept before the column.
+    Column("asked_game_id", Text),
     Index("capture_snapshots_source_captured_idx", "source", "captured_at"),
 )
 

@@ -2577,6 +2577,9 @@ type InjuryDesignation struct {
 	// Listed when the provider first listed him under this status, any status (the run's start); null when the read could not date it; absent from an older answer
 	Listed *time.Time `json:"listed,omitempty"`
 
+	// ReturnWeek the week the provider expects him back (Lane 110, B79): the first week whose last game day is on or after the return date the daily player list gives him under this same status ("IR, eligible week 9"), and only when it is later than the week the designation addresses (a questionable or doubtful date in the coming days says nothing and is omitted; a multi-week out and the season-long statuses keep it); absent when that list dates no return for him, its date does not read or has passed, it is not past the addressed week, or it falls past the schedule's last week, and from an older answer
+	ReturnWeek *int `json:"return_week,omitempty"`
+
 	// Since when his unbroken run under a season-long status began, the first capture that lists it (boards.WithSince, the nightly's designations.json since); null for a week's designation, the host's own IR mark, or a run older than the captures read. The site's status chip says it ("IR since Sep 28") and keeps the read for the basis
 	Since  *time.Time        `json:"since,omitempty"`
 	Status DesignationStatus `json:"status"`

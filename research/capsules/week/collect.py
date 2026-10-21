@@ -41,6 +41,7 @@ from research.capsules.week.sheet import (
     WeekSheet,
 )
 from research.capsules.week.store import StoredWeekRead
+from research.db.schema.provider import GAME_TO_PLAY
 from research.model.domain import Position
 from research.nightly.build.player_season import SeasonContext, season_block, season_context
 from research.nightly.config import PAGE_FORMAT
@@ -208,7 +209,7 @@ def _schedule_reads(
     rows = conn.execute(
         text(
             "select week, home_team, away_team, ingested_at from research.provider_games "
-            "where season = :s and week = any(:weeks) and ingested_at <= :at"
+            f"where season = :s and week = any(:weeks) and ingested_at <= :at and {GAME_TO_PLAY}"
         ),
         {"s": season, "weeks": list(weeks), "at": as_of},
     )

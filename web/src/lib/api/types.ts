@@ -2898,6 +2898,8 @@ export interface components {
 			listed?: string | null;
 			/** @description on a page addressing the week after the platform's (Lane 95): a week's designation listed no later than his club's last game, or undated, so still listed but from before that game; the site says it with its listing date ("Out, listed Oct 12"); absent otherwise */
 			carried_over?: boolean;
+			/** @description the week the provider expects him back (Lane 110, B79): the first week whose last game day is on or after the return date the daily player list gives him under this same status ("IR, eligible week 9"), and only when it is later than the week the designation addresses (a questionable or doubtful date in the coming days says nothing and is omitted; a multi-week out and the season-long statuses keep it); absent when that list dates no return for him, its date does not read or has passed, it is not past the addressed week, or it falls past the schedule's last week, and from an older answer */
+			return_week?: number | null;
 		};
 		GamePoints: {
 			week: number;

@@ -46,7 +46,7 @@ func KickoffAt(date time.Time, kickoffET string) (time.Time, error) {
 // provider's schedule the board already reads, false while that
 // season's week 1 is not loaded.
 func (s *PGSource) FirstKickoff(ctx context.Context, seasonYear int) (time.Time, bool, error) {
-	rows, err := s.Pool.Query(ctx, `select game_date, coalesce(kickoff_et, '') from `+s.table("provider_games")+`
+	rows, err := s.Pool.Query(ctx, `select game_date, coalesce(kickoff_et, '') from `+s.gamesToPlay()+`
 		where season = $1 and week = 1 and game_date is not null`, seasonYear)
 	if err != nil {
 		return time.Time{}, false, fmt.Errorf("boards: first kickoff %d: %w", seasonYear, err)
@@ -78,7 +78,7 @@ func (s *PGSource) FirstKickoff(ctx context.Context, seasonYear int) (time.Time,
 // last game day to the end of its own last game day, Eastern. false when
 // the season's schedule is not loaded or the moment is past its last week.
 func (s *PGSource) WeekAt(ctx context.Context, seasonYear int, at time.Time) (int, bool, error) {
-	rows, err := s.Pool.Query(ctx, `select week, max(game_date) from `+s.table("provider_games")+`
+	rows, err := s.Pool.Query(ctx, `select week, max(game_date) from `+s.gamesToPlay()+`
 		where season = $1 and game_date is not null group by week order by week`, seasonYear)
 	if err != nil {
 		return 0, false, fmt.Errorf("boards: week at %d: %w", seasonYear, err)
@@ -110,7 +110,7 @@ const regularSeasonWeeks = 18
 // Eastern, false while the season's schedule is not loaded.
 func (s *PGSource) LastGameDay(ctx context.Context, seasonYear int) (time.Time, bool, error) {
 	var last *time.Time
-	err := s.Pool.QueryRow(ctx, `select max(game_date) from `+s.table("provider_games")+`
+	err := s.Pool.QueryRow(ctx, `select max(game_date) from `+s.gamesToPlay()+`
 		where season = $1 and week <= $2`, seasonYear, regularSeasonWeeks).Scan(&last)
 	if err != nil {
 		return time.Time{}, false, fmt.Errorf("boards: last game day %d: %w", seasonYear, err)

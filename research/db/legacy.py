@@ -263,12 +263,19 @@ _ENTRIES: Final = (
                     ("kickoff_et",),
                     "the empty string the legacy default held is no kickoff time",
                 ),
+                "superseded_by": Derived("NULL", (), "the legacy schedule never marked a moved game (B77b)"),
             }
         ),
         invariants=(_ONE_SEASON_OF_GAMES,),
     ),
     LegacyTable("provider_weeks", "stat_weeks", derived=MappingProxyType({"season": _PROVIDER_SEASON})),
-    LegacyTable("capture_snapshots", "capture_snapshots"),
+    LegacyTable(
+        "capture_snapshots",
+        "capture_snapshots",
+        derived=MappingProxyType(
+            {"asked_game_id": Derived("NULL", (), "the legacy capture never asked a per-game box score (B86)")}
+        ),
+    ),
     LegacyTable("player_prop_observations", "player_prop_observations"),
     LegacyTable("player_week_observations", "player_week_observations", dropped=_surrogate()),
     LegacyTable("team_week_observations", "team_week_observations", dropped=_surrogate()),

@@ -16,6 +16,7 @@ from research.capsules.facts.depth_absence import CapturedDesignation, InjuryCap
 from research.capsules.facts.depth_context import AdpCapture, PedigreeRow, ScheduledGame, TeamMetricRow
 from research.capsules.facts.depth_role import PlayerWeekShare, ScoringTally, TeamPlayerTargets
 from research.capsules.facts.model import WeekPoints
+from research.db.schema.provider import GAME_TO_PLAY
 from research.model.decide.slots import id_key
 from research.model.domain import PPR_SCORING, Position, compute_fantasy_points, round_points
 from research.model.instants import ms_instant
@@ -319,7 +320,9 @@ def team_metric_rows_for(
 def scheduled_games_for(conn: Connection, season: int) -> list[ScheduledGame]:
     """`scheduledGamesFor`: the provider's fixtures for the product season (sorted by week before use)."""
     rows = conn.execute(
-        text("select week, home_team, away_team from research.provider_games where season = :season"),
+        text(
+            f"select week, home_team, away_team from research.provider_games where season = :season and {GAME_TO_PLAY}"
+        ),
         {"season": season},
     )
     return [ScheduledGame(r.week, r.home_team, r.away_team) for r in rows]
