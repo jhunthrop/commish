@@ -3,6 +3,7 @@
 // serve.ts answers the trade builder's totals with it (Lane 66g). The API's own engine replaces all
 // of it (engine.go weekKeys, trades.go WeekProj and the filler's strength); only the rules are meant
 // to hold.
+import { lastName } from '../../src/lib/format/draft.ts';
 import type { LineupSlot, PlayerLine } from '../../src/lib/league/inseason/api.ts';
 
 const TENTH = 10;
@@ -59,20 +60,50 @@ export function rateWords(h: Horizon, from: number): string {
  * over them. */
 export const weeksCovered = (week: number, h: Horizon): number => Math.max(1, h.last - week + 1);
 
-/** What a Gain is, in the API's words (words.go gainWords, weekSpan). */
-export function gainWords(whose: string, weeks: number, h: Horizon): string {
-	const from = h.last - Math.max(1, weeks) + 1;
-	const span =
-		from === h.last
-			? `week ${String(h.last)}`
-			: `weeks ${String(from)} to ${String(h.last)}${finalWords(h, from)}`;
-	return `Gain is ${whose} change in points over replacement a week, ${span}.${rateWords(h, from)}`;
+/** The first week a span of weeks through the horizon covers. */
+const spanFrom = (weeks: number, h: Horizon): number => h.last - Math.max(1, weeks) + 1;
+
+/** The weeks by number, in the API's words (words.go weekSpan). */
+function weekSpan(weeks: number, h: Horizon): string {
+	const from = spanFrom(weeks, h);
+	return from === h.last
+		? `week ${String(h.last)}`
+		: `weeks ${String(from)} to ${String(h.last)}${finalWords(h, from)}`;
 }
 
-/** The finder's basis in the API's words (words.go TradesBasis), the one copy build.ts and
- * project.ts both write. */
-export function tradesBasis(weeks: number, h: Horizon): string {
-	return `Each team's best trade both lineups gain by, yours first. The other team decides. ${gainWords("a lineup's", weeks, h)}`;
+/** What a Gain is, in the API's words (words.go gainWords). */
+export function gainWords(whose: string, weeks: number, h: Horizon): string {
+	return `Gain is ${whose} change in points over replacement a week, ${weekSpan(weeks, h)}.${rateWords(h, spanFrom(weeks, h))}`;
+}
+
+/** The least gain a week a trade of the member's top player at his position must bring (trades.go
+ * KeepGain, Lane 103). */
+export const KEEP_GAIN = 1;
+
+/** The finder's footer and the line under its Gain head in the API's words (words.go TradesBasis,
+ * TradeGainBasis), the one copy build.ts, project.ts and waivers-at.ts write. */
+export function tradesBases(weeks: number, h: Horizon): { basis: string; gain_basis: string } {
+	return {
+		basis: `Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for ${KEEP_GAIN.toFixed(1)} a week or more, or to fill a spot.${rateWords(h, spanFrom(weeks, h))}`,
+		gain_basis: `points over replacement in each lineup, ${weekSpan(weeks, h)}`
+	};
+}
+
+/** A slot as the API's lineup rows label it (words.go SlotLabel): "QB", "RB2", "Flex 1". */
+export function slotLabel(slots: readonly LineupSlot['slot'][], at: number): string {
+	const slot = slots[at] ?? '';
+	const name = slot === 'FLEX' ? 'Flex' : slot;
+	if (slots.filter((s) => s === slot).length < 2) return name;
+	const index = slots.slice(0, at).filter((s) => s === slot).length + 1;
+	return slot === 'FLEX' ? `${name} ${String(index)}` : `${name}${String(index)}`;
+}
+
+/** The need a trade fills in the API's words (words.go TradeNeedWords, Lane 103): the empty spot, and
+ * the player it sends out who sits on bye that week when there is one. */
+export function tradeNeedWords(slot: string, onBye: PlayerLine | null): string {
+	return onBye === null
+		? `Fills your empty ${slot} this week.`
+		: `Fills your empty ${slot} while ${lastName(onBye.player.name)} sits on bye.`;
 }
 
 /** The figure a game in the API's words (pergame.go PerGameBasis). */

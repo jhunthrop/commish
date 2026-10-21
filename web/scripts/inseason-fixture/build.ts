@@ -34,7 +34,7 @@ import {
 	LAST_FANTASY_WEEK,
 	LINEUP_BASIS,
 	PER_GAME_BASIS,
-	tradesBasis,
+	tradesBases,
 	uncountedOf,
 	WAIVERS_BASIS,
 	waiverSeasonBasis,
@@ -793,7 +793,8 @@ function trades(): TradeAdvice {
 					: null
 		}));
 	return {
-		...head(tradesBasis(weeksCovered, STANDARD_HORIZON)),
+		...head(tradesBases(weeksCovered, STANDARD_HORIZON).basis),
+		gain_basis: tradesBases(weeksCovered, STANDARD_HORIZON).gain_basis,
 		per_game_basis: PER_GAME_BASIS,
 		check_basis: CHECK_BASIS,
 		teams,

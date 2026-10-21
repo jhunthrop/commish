@@ -3,7 +3,7 @@
 // both read. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { SEASON, TRADE_GAIN, WAIVER_GAIN } from './season.ts';
+import { GAIN_A_WEEK, SEASON } from './season.ts';
 import { TRADES } from './trades.ts';
 import { cardGains, WAIVERS } from './waivers.ts';
 import { ORDER } from '#lib/order/words.ts';
@@ -12,17 +12,20 @@ void test('the heads come from one module', () => {
 	assert.equal(SEASON.perGame, ORDER.perGame);
 	assert.equal(TRADES.perGame, SEASON.perGame);
 	assert.equal(WAIVERS.rest, SEASON.perGame);
-	assert.equal(TRADE_GAIN, 'Gain, over repl. a week');
-	assert.equal(WAIVER_GAIN, 'Gain a week');
-	assert.equal(WAIVERS.gain, WAIVER_GAIN);
-	assert.equal(TRADES.gainHead, TRADE_GAIN);
+	// One head for a gain on both screens, no "over repl." jargon in it (Lane 103, B42).
+	assert.equal(GAIN_A_WEEK, 'Gain a week');
+	assert.equal(WAIVERS.gain, GAIN_A_WEEK);
+	assert.equal(TRADES.gainHead, GAIN_A_WEEK);
 });
 
 void test('"A game" never heads a gain on either screen, and the card says Gain a week', () => {
 	for (const said of [...Object.values(TRADES), ...Object.values(WAIVERS)]) {
 		if (/a game/i.test(said)) assert.equal(said, SEASON.perGame, said);
+		assert.ok(!/over repl/i.test(said), said);
 	}
-	assert.equal(TRADES.aWeekForYou, 'Gain a week for you');
+	// A trade card's gains in a player's words: "+3.5 a week for your lineup, +0.8 for theirs".
+	assert.equal(TRADES.aWeekForYou, 'a week for your lineup');
+	assert.equal(TRADES.forTheirs, 'for theirs');
 	assert.equal(cardGains({ weekGain: 6.7, gain: 1.2 }), '+6.7 Proj this week, +1.2 Gain a week');
 });
 

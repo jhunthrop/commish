@@ -1001,6 +1001,8 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		out.Teams = append(out.Teams, row)
 	}
 	out.Basis = TradesBasis(a.basis, a.weeks, a.horizon)
+	gainBasis := TradeGainBasis(a.basis, a.weeks, a.horizon)
+	out.GainBasis = &gainBasis
 	out.PerGameBasis = perGameSaid(a.Board, shown...)
 	out.CheckBasis = TradeCheckBasis
 	return out, true

@@ -63,6 +63,9 @@
 		weekShown?: boolean;
 		/** The week group's head (trades.ts weekHeadFor). */
 		weekHead?: string;
+		/** What a Gain is, said once under the heads (the API's gain_basis, Lane 103, B42); null on an
+		 * older answer, whose basis says it. */
+		gainBasis?: string | null;
 	}
 
 	let {
@@ -79,6 +82,7 @@
 		now,
 		weekShown = true,
 		weekHead = TRADES.weekHead,
+		gainBasis = null,
 		onopen = () => undefined
 	}: Props = $props();
 
@@ -176,6 +180,17 @@
 			{/each}
 			<th class="room" scope="col">{TRADES.room}</th>
 		</tr>
+		{#if gainBasis}
+			<!-- At a desk the line starts under the Gain group; a phone, which folds the columns, gives it the
+			     table's width. One of the two rows is drawn at each width. -->
+			<tr class="gain-basis desk-only">
+				<td colspan="4"></td>
+				<td colspan={COLUMNS - 4} class="gb first">{gainBasis}</td>
+			</tr>
+			<tr class="gain-basis phone-only">
+				<td colspan={COLUMNS} class="gb">{gainBasis}</td>
+			</tr>
+		{/if}
 	</thead>
 	<tbody>
 		{#each rows as entry (entry.key)}
@@ -198,7 +213,9 @@
 						><b>{shortSide(entry.row.give)}</b><Icon name="chevron" size={12} /><b class="in"
 							>{shortSide(entry.row.get)}</b
 						></span
-					><span class="ph-with">{phoneWith(entry.team, entry.row)}</span></td
+					><span class="ph-with">{phoneWith(entry.team, entry.row)}</span>{#if entry.row.need}<span
+							class="ph-need">{entry.row.need}</span
+						>{/if}</td
 				>
 				<td class="get">{@render players(entry.row.get)}</td>
 				<td class="with"
@@ -206,6 +223,7 @@
 						><TeamAvatar name={entry.team.name} size={28} /><span
 							><b>{entry.team.name}</b><small>{teamAside(entry.team)}</small
 							>{#if entry.row.drop}<small class="drop-mid">{room.yours}</small
+								>{/if}{#if entry.row.need}<small class="need">{entry.row.need}</small
 								>{/if}{#if entry.row.close_for_them}<ToneChip tone="even">{CLOSE_FOR_THEM}</ToneChip
 								>{/if}</span
 						></span
@@ -490,8 +508,30 @@
 	}
 
 	.ph-deal,
-	.ph-with {
+	.ph-with,
+	.ph-need,
+	.phone-only {
 		display: none;
+	}
+
+	/* What a Gain is, once, under the heads (Lane 103, B42). */
+	.gain-basis td {
+		height: auto;
+		padding-top: 4px;
+		padding-bottom: 4px;
+		border-bottom: 1px solid var(--line);
+	}
+
+	.gb {
+		font-size: var(--t-xs);
+		line-height: 1.4;
+		color: var(--ink-3);
+	}
+
+	/* The need a trade fills (Lane 103, B43), in the With cell at a desk. */
+	.wt small.need {
+		color: var(--ink-2);
+		white-space: normal;
 	}
 
 	.wt {
@@ -813,6 +853,21 @@
 			margin-top: 2px;
 			font-size: var(--t-xs);
 			color: var(--ink-3);
+		}
+
+		.ph-need {
+			display: block;
+			margin-top: 2px;
+			font-size: var(--t-xs);
+			color: var(--ink-2);
+		}
+
+		.desk-only {
+			display: none;
+		}
+
+		.phone-only {
+			display: table-row;
 		}
 
 		.g {

@@ -34,7 +34,7 @@ import {
 import { BOX } from './box.ts';
 import { locked } from './lineup.ts';
 import { addressedWeek, arrivesPart, NEXT_WEEK, turnedPage, weekProjected } from './next-week.ts';
-import { SEASON, TRADE_GAIN } from './season.ts';
+import { GAIN_A_WEEK, SEASON } from './season.ts';
 
 /** Every word the trade table prints that is not a player's or a team's, for the copy guard. */
 export const TRADES = {
@@ -46,7 +46,7 @@ export const TRADES = {
 	them: 'Them',
 	/** The head over each side's gain, in the finder and on the builder's scoreboard: the same on the
 	 * rest-of-season order and the preseason number, which the basis names (Lane 66u). */
-	gainHead: TRADE_GAIN,
+	gainHead: GAIN_A_WEEK,
 	/** A phone drops the groups' heads, so its two gain heads say the gain (review of the mock). */
 	yourGain: `Your ${SEASON.gain.toLowerCase()}`,
 	theirGain: `Their ${SEASON.gain.toLowerCase()}`,
@@ -72,8 +72,13 @@ export const TRADES = {
 	copied: 'Copied.',
 	copyFailed: 'This browser would not copy it.',
 	proposeItOn: 'Propose it on',
-	aWeekForYou: `${SEASON.gain} a week for you`,
-	forThem: 'for them',
+	/** A card's gains in a player's words (Lane 103, B42): "+3.5 a week for your lineup, +0.8 for
+	 * theirs", the week's change beside them in the same words (weekLine). */
+	aWeekForYou: 'a week for your lineup',
+	forTheirs: 'for theirs',
+	/** The strip's first card when it is the best of more than one (Lane 103, B65): the word says it,
+	 * every card's verb draws the same. */
+	bestCard: 'Best',
 	weekWord: 'Week',
 	/** The builder's scoreboard. */
 	yourSide: 'You',
@@ -82,7 +87,7 @@ export const TRADES = {
 	sortBy: 'Sort by',
 	/** Between a total before the trade and after it, on the builder's scoreboard. */
 	to: 'to',
-	projForYou: 'Proj for you this week'
+	projForYou: 'Proj this week for your lineup'
 } as const;
 
 /** A trade as the table lists it: its team and its row, keyed as the screen marks it. */
@@ -149,6 +154,12 @@ export function worthProposing(teams: readonly TradeTeam[]): FinderRow[] {
 		.slice(0, STRIP_MOST);
 }
 
+/** The word over a strip card (Lane 103, B65): "Best" on the first of more than one, which
+ * worthProposing puts first by your gain; null on every other card and on a strip of one. */
+export function cardMark(index: number, count: number): string | null {
+	return index === 0 && count > 1 ? TRADES.bestCard : null;
+}
+
 const COUNT_WORDS = ['No', 'One', 'Two'];
 
 /** "Two trades worth proposing", "One trade worth proposing". */
@@ -157,13 +168,13 @@ export function worthTitle(count: number): string {
 	return `${n} ${count === 1 ? 'trade' : 'trades'} worth proposing`;
 }
 
-/** A trade's week in one line, from the API's two changes: "+7.3 Proj for you this week, −5.6 for
- * them"; null without a projection read (review H2). */
+/** A trade's week in one line, from the API's two changes: "+7.3 Proj this week for your lineup, −5.6
+ * for theirs", the gains' words (Lane 103); null without a projection read (review H2). */
 export function weekLine(
 	row: Pick<TradeRow, 'my_proj_change' | 'their_proj_change'>
 ): string | null {
 	if (row.my_proj_change === null || row.their_proj_change === null) return null;
-	return `${weekWord(row.my_proj_change)} ${TRADES.projForYou}, ${weekWord(row.their_proj_change)} ${TRADES.forThem}`;
+	return `${weekWord(row.my_proj_change)} ${TRADES.projForYou}, ${weekWord(row.their_proj_change)} ${TRADES.forTheirs}`;
 }
 
 /** Whether a trade still counts this week: every player it moves (both sides and the drop) has his

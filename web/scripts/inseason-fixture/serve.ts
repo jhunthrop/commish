@@ -51,6 +51,7 @@ import {
 import { CLAIM_FORM_WORDS, HOLD_MS, HOST_ID, espnMoves } from './espn-moves.ts';
 import { weekOrderAnswer, weekPosition, type WeekOrderStates } from './week-order-serve.ts';
 import { tradeChecker } from './trade-check.ts';
+import { proposedTrades } from './trade-needs.ts';
 import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
 import { finalWords, rateWords, titleWeekHorizon } from './week.ts';
 import { lineupSpent, TURNED_WEEK, turnedLineup, turnedTrades, turnedWaivers } from './turn.ts';
@@ -128,7 +129,7 @@ const [
 	recordedSync,
 	lineupRead,
 	waiversRead,
-	trades,
+	tradesRead,
 	gameWeek,
 	matchupBox,
 	scoreboardLive,
@@ -160,6 +161,8 @@ const sync: LeagueSync =
 /** The sense check's case on the fixture when asked (waiver-beats.ts, Lane 98). */
 const irDrop = process.env[IR_DROP_VARIABLE] === '1';
 const lineup = irDrop ? irDropLineup(lineupRead) : lineupRead;
+/** The trades as the API's search lists them, each need named (trade-needs.ts, Lane 103). */
+const trades = proposedTrades(tradesRead, lineup);
 /** The adds the API lists (waiver-beats.ts listedAdd), before any order is taken over them. */
 const waivers = listedOnly(irDrop ? irDropWaivers(waiversRead) : waiversRead);
 

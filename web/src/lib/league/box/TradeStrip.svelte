@@ -1,11 +1,12 @@
 <script lang="ts">
-	import StripAction from '#lib/ui/StripAction.svelte';
+	import Quiet from '#lib/ui/Quiet.svelte';
 	import type { LeagueHost } from '../api.ts';
 	import type { TradeMoves } from '../inseason/api.ts';
 	import { hostTab } from '../inseason/attach.ts';
 	import TeamAvatar from './TeamAvatar.svelte';
 	import TradeCopied from './TradeCopied.svelte';
 	import {
+		cardMark,
 		gainWord,
 		proposeVerb,
 		roomWords,
@@ -20,8 +21,10 @@
 	/** The Trades screen's decision as a strip (Lane 66g): the week, how many trades are worth
 	 * proposing, and each as a card naming the other team, both sides, both gains over the rest of
 	 * the season and the drop, with its one verb: Propose on the platform where it takes a proposal
-	 * from here, else Open the platform's trades, which copies the offer and opens its page. The first
-	 * card, the best trade, draws the verb solid and the rest quiet, so the strip spends one orange. */
+	 * from here, else Open the platform's trades, which copies the offer and opens its page. One verb
+	 * draws one way on every card (Lane 103, B65), quiet, so two cards never spend two oranges: the first
+	 * card, the best trade, says Best in words instead. A trade that fills an empty spot in the
+	 * member's lineup says so under its gains (B43). */
 	interface Props {
 		week: number;
 		rows: readonly FinderRow[];
@@ -55,29 +58,35 @@
 			{@const room = roomWords(entry.row)}
 			{@const line = said[entry.key]}
 			{@const week = weekLine(entry.row)}
+			{@const mark = cardMark(index, rows.length)}
 			<li class="card">
 				<span class="with"
-					><TeamAvatar name={entry.team.name} size={24} />with <b>{entry.team.name}</b></span
+					>{#if mark}<span class="mark">{mark}</span>{/if}<TeamAvatar
+						name={entry.team.name}
+						size={24}
+					/>with <b>{entry.team.name}</b></span
 				>
 				<span class="deal"
 					><b>{shortSide(entry.row.give)}</b> for <b>{shortSide(entry.row.get)}</b></span
 				>
 				<span class="gains"
-					><em class="mine">{gainWord(entry.row.my_gain)}</em>
-					{TRADES.aWeekForYou},
-					<em>{gainWord(entry.row.their_gain)}</em>
-					{TRADES.forThem}</span
+					><span class="side"
+						><em class="mine">{gainWord(entry.row.my_gain)}</em>
+						{TRADES.aWeekForYou},</span
+					>
+					<span class="side"><em>{gainWord(entry.row.their_gain)}</em> {TRADES.forTheirs}</span
+					></span
 				>
+				{#if entry.row.need}<span class="need">{entry.row.need}</span>{/if}
 				{#if week}<span class="week">{week}</span>{/if}
 				{#if entry.row.drop}<span class="drop">{room.yours}</span>{/if}
 				{#if entry.row.drop_reason}<span class="drop">{entry.row.drop_reason}</span>{/if}
 				<span class="act" {@attach hostTab(href)}>
-					<StripAction
-						lead={index === 0}
+					<Quiet
 						size="sm"
 						href={href === '' ? undefined : href}
 						disabled={href === ''}
-						onclick={() => void press(entry)}>{verb}</StripAction
+						onclick={() => void press(entry)}>{verb}</Quiet
 					>
 				</span>
 				{#if line}<span class="said"><TradeCopied {line} {href} /></span>{/if}
@@ -151,7 +160,15 @@
 
 	.act {
 		grid-column: 2;
-		grid-row: 1 / span 5;
+		grid-row: 1 / span 6;
+	}
+
+	.mark {
+		font-size: var(--t-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--accent-text);
 	}
 
 	.with {
@@ -183,6 +200,11 @@
 		font-variant-numeric: tabular-nums;
 	}
 
+	/* Each side's figure keeps its words on its line (Lane 103 fix round 1, LOW-2). */
+	.gains .side {
+		white-space: nowrap;
+	}
+
 	em {
 		font-style: normal;
 		font-family: var(--font-num);
@@ -205,6 +227,12 @@
 	.drop {
 		font-size: var(--t-sm);
 		color: var(--ink-3);
+	}
+
+	/* The need the trade fills, said where the trade is (Lane 103, B43). */
+	.need {
+		font-size: var(--t-sm);
+		color: var(--ink-2);
 	}
 
 	.said {
@@ -255,6 +283,7 @@
 
 		.gains,
 		.week,
+		.need,
 		.drop,
 		.said {
 			font-size: var(--t-xs);

@@ -257,5 +257,22 @@ func (a *advisor) tradeRow(mine, theirs []person, tr Trade, week tradeWeek) apit
 			SlotLabel(a.slots, tr.ForSlot), TradeMove)
 		row.DropReason = &reason
 	}
+	// The need is said only where it is why a kept player's trade is
+	// listed (Lane 103 fix round 1, HIGH-1), on the finder and the builder.
+	if needSaid(tr, candidatesAt(mine, nil)) {
+		need := TradeNeedWords(SlotLabel(a.slots, tr.Need), sentOnBye(mine, tr.Give), a.week, a.week != a.Snap.Week)
+		row.Need = &need
+	}
 	return row
+}
+
+// sentOnBye is the first player at give whose club is on bye the week the
+// page addresses, nil for none.
+func sentOnBye(people []person, give []int) *Line {
+	for _, g := range give {
+		if people[g].words.Facts.Bye {
+			return &people[g].words
+		}
+	}
+	return nil
 }

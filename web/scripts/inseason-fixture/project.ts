@@ -51,10 +51,11 @@ import {
 	uncountedOf,
 	WAIVERS_BASIS,
 	waiverSeasonBasis,
-	tradesBasis,
+	tradesBases,
 	lineupProj,
 	printedProj,
 	seasonStarters,
+	slotLabel,
 	tenth,
 	tierOf,
 	weekSlots,
@@ -539,15 +540,6 @@ function boxSide(
 const matchup = sync.matchup;
 if (!matchup) throw new Error('The fixture league has no matchup this week.');
 
-/** A slot as the API's lineup rows label it (words.go SlotLabel): "QB", "RB2", "Flex 1". */
-function slotLabel(slots: readonly LineupSlot['slot'][], at: number): string {
-	const slot = slots[at] ?? '';
-	const name = slot === 'FLEX' ? 'Flex' : slot;
-	if (slots.filter((s) => s === slot).length < 2) return name;
-	const index = slots.slice(0, at).filter((s) => s === slot).length + 1;
-	return slot === 'FLEX' ? `${name} ${String(index)}` : `${name}${String(index)}`;
-}
-
 /** The trade's sentence when its drop starts this week, in the API's words (sentences.go TradeDrop). */
 function dropReason(drop: PlayerLine, by: PlayerLine, slot: string, bySlot: string): string {
 	const dropped = lastName(drop.player.name);
@@ -702,9 +694,9 @@ function withWeek(finder: TradeAdvice): TradeAdvice {
 						: swapOnly(row.get, row.give)
 			}))
 		})),
-		// The finder's basis in the API's words, stamped whole from the one copy (week.ts tradesBasis) so a
+		// The finder's basis in the API's words, stamped whole from the one copy (week.ts tradesBases) so a
 		// rerun on an older answer says it the same way.
-		basis: tradesBasis(weeksCovered(finder.week, STANDARD_HORIZON), STANDARD_HORIZON),
+		...tradesBases(weeksCovered(finder.week, STANDARD_HORIZON), STANDARD_HORIZON),
 		per_game_basis: PER_GAME_BASIS,
 		...uncountedOf(lineup.uncounted_rules),
 		check_basis: CHECK_BASIS,
