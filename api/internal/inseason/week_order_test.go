@@ -179,23 +179,24 @@ func TestWeekOrderCountsTheRulesLeftOut(t *testing.T) {
 	saved.Scoring = apitypes.Scoring{Custom: &rules}
 	f.league.Saved = &saved
 	out := f.advisor(t, f.projection, fixtureNow).WeekOrder(draft.K, true)
-	n := len(uncountedRulesAt(saved, func(string) bool { return false }, draft.K))
-	want := uncountedOf(make([]string, n), "your", true)
-	if n < 2 || out.BasisNote != want.Note || out.BasisNoteLink != want.Link {
-		t.Fatalf("%q %q, want %d rules left out", out.BasisNote, out.BasisNoteLink, n)
+	left := uncountedRulesAt(saved, func(string) bool { return false }, draft.K)
+	want := uncountedOf(left, true)
+	if len(left) < 2 || out.BasisNote != want.Note || out.BasisNoteLink != want.Link {
+		t.Fatalf("%q %q, want %d rules left out", out.BasisNote, out.BasisNoteLink, len(left))
 	}
 	// A reader with no league is told the board's scoring, and has no Settings to open.
 	visitor := f.advisor(t, f.projection, fixtureNow).WeekOrder(draft.K, false)
-	if !strings.Contains(visitor.BasisNote, " of the PPR rules our stats lack.") || visitor.BasisNoteLink != "" {
+	if visitor.BasisNote != want.Note || visitor.BasisNoteLink != "" {
 		t.Fatalf("visitor %q %q", visitor.BasisNote, visitor.BasisNoteLink)
 	}
 }
 
-// The count is the tab's own (Lane 66w rereview N2): the recorded league
-// leaves out five rules, two-point conversions, missed field goals,
-// missed extra points, fumble recoveries and safeties; a kicker's Avg and
-// Last leave out the two kicking ones, a defense's the two defense ones.
-func TestWeekOrderCountsOnlyTheTabsRulesLeftOut(t *testing.T) {
+// The rules are the tab's own (Lane 66w rereview N2), named inline (Lane
+// 111, B33): the recorded league leaves out five rules, two-point
+// conversions, missed field goals, missed extra points, fumble recoveries
+// and safeties; a kicker's Avg and Last leave out the two kicking ones,
+// said as one missed kick, a defense's the two defense ones.
+func TestWeekOrderNamesOnlyTheTabsRulesLeftOut(t *testing.T) {
 	rules := scoring.PresetRules(apitypes.ScoringPresetPpr)
 	rules.PointsPerTwoPointConversion, rules.PointsPerReturnTouchdown = 2, 0
 	rules.PointsPerFieldGoalMissed, rules.PointsPerExtraPointMissed = -1, -1
@@ -207,22 +208,23 @@ func TestWeekOrderCountsOnlyTheTabsRulesLeftOut(t *testing.T) {
 	if all := uncountedRules(settings, carried); len(all) != 5 {
 		t.Fatalf("the league leaves out %v", all)
 	}
-	want := map[draft.Position][]string{
-		draft.K:   {"missed field goals", "missed extra points"},
-		draft.DEF: {"fumble recoveries", "safeties"},
-	}
-	for position, named := range want {
-		got := uncountedRulesAt(settings, carried, position)
-		if strings.Join(got, "|") != strings.Join(named, "|") {
-			t.Errorf("%s: %v, want %v", position, got, named)
-		}
+	want := map[draft.Position]struct {
+		rules []string
+		note  string
+	}{
+		draft.K:   {[]string{"missed field goals", "missed extra points"}, "Our stats omit missed kick."},
+		draft.DEF: {[]string{"fumble recoveries", "safeties"}, "Our stats omit fumble recovery and safety."},
 	}
 	f := newWeekOrderFixture(t)
 	f.league.Saved = &settings
 	a := f.advisor(t, f.projection, fixtureNow)
 	a.season.carried = map[string]bool{metricPointsAllowed: true, metricYardsAllowed: true}
-	for position := range want {
-		if out := a.WeekOrder(position, true); out.BasisNote != "Avg and Last miss two of your rules our stats lack." || out.BasisNoteLink != "Which two" {
+	for position, w := range want {
+		got := uncountedOf(uncountedRulesAt(settings, carried, position), true)
+		if strings.Join(got.Rules, "|") != strings.Join(w.rules, "|") {
+			t.Errorf("%s: %v, want %v", position, got.Rules, w.rules)
+		}
+		if out := a.WeekOrder(position, true); out.BasisNote != w.note || out.BasisNoteLink != "Which two" {
 			t.Errorf("%s tab: %q %q", position, out.BasisNote, out.BasisNoteLink)
 		}
 	}

@@ -7,7 +7,6 @@
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import StatusLine from '#lib/ui/StatusLine.svelte';
-	import { leagueSettingsHref } from '#lib/league/rules-link.ts';
 	import { weekOrderApi, type WeekOrderAdvice } from './api.ts';
 	import { ORDER, type RosterView } from './order.ts';
 	import {
@@ -18,7 +17,6 @@
 		weekSections,
 		weekStatus,
 		weekView,
-		type RulesLeftOut,
 		WEEK_TAB
 	} from './week.ts';
 	import WeekTable from './WeekTable.svelte';
@@ -39,7 +37,7 @@
 			key: string;
 			heading: string;
 			basis: BasisPart[];
-			rules: RulesLeftOut | null;
+			rules: string | null;
 		}) => void;
 	}
 
@@ -75,7 +73,7 @@
 					key: weekReadKey(asked.position, asked.league),
 					heading: weekHeading(answer.position, answer.week),
 					basis: weekBasis(answer, reader, memberZone(), now),
-					rules: rulesLeftOut(answer, reader, leagueSettingsHref)
+					rules: rulesLeftOut(answer)
 				});
 			})
 			.catch((error: unknown) => {

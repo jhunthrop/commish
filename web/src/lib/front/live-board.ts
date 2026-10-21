@@ -133,16 +133,17 @@ export type StripRow = Omit<BoardRowView, 'season'> & {
 
 type OrderRow = OrderAdvice['rows'][number];
 
-/** His season beside the live figures: the run's games, the answer's points a game in the league's
- * scoring (the Avg Players prints), the run's season where the answer says none. */
+/** His season beside the live figures: the answer's points a game in the league's scoring (the Avg
+ * Players prints) over the answer's games, a final the platform's points count included (Lane 111,
+ * B23), else the run's games; the run's season where the answer says none. */
 function liveSeason(run: BoardRowView, line: OrderRow['line']): BoardRowView['season'] {
 	if (run.season === undefined || line.season_avg === null || run.season.games === 0)
 		return run.season;
-	return { games: run.season.games, pointsPerGame: line.season_avg };
+	return { games: line.games_played ?? run.season.games, pointsPerGame: line.season_avg };
 }
 
 /** A row the run's top rows do not hold, from the answer's line: his name, club, face, page, the
- * answer's figures and his Avg (B78), no tier, no ADP and no games (they are the run's). Null without
+ * answer's figures, his Avg (B78) and its games (Lane 111), no tier and no ADP. Null without
  * a board id or a page to link. */
 function builtRow(row: OrderRow, projected: number, vor: number, teams: number): StripRow | null {
 	const { player, slug, headshot, position_rank: positionRank } = row.line;
@@ -169,7 +170,7 @@ function builtRow(row: OrderRow, projected: number, vor: number, teams: number):
 		tier: 1,
 		...(row.line.season_avg === null
 			? {}
-			: { season: { games: null, pointsPerGame: row.line.season_avg } }),
+			: { season: { games: row.line.games_played ?? null, pointsPerGame: row.line.season_avg } }),
 		untiered: true
 	};
 }

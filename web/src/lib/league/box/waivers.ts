@@ -15,13 +15,13 @@ import { LINES } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import {
 	anyKicked,
+	waiverFinalsParts,
 	gamePart,
-	kickedOffPartAt,
 	OPP_PART,
 	projPart,
 	said,
 	stamp,
-	uncountedParts,
+	uncountedPart,
 	type BasisPart,
 	type Clock
 } from './basis.ts';
@@ -592,14 +592,12 @@ export function waiverBasis(
 		| 'basis'
 		| 'season_basis'
 		| 'basis_note'
-		| 'basis_note_link'
 		| 'projection_read_at'
 		| 'projection_previous_read_at'
 		| 'projection_scoring'
 	> &
 		Partial<Pick<WaiverAdvice, 'pickups' | 'week' | 'for_week' | 'projection_arrives_at'>>,
 	lines: readonly PlayerLine[],
-	rulesHref: string,
 	clock: Clock,
 	now: number
 ): BasisPart[] {
@@ -624,7 +622,11 @@ export function waiverBasis(
 						defense,
 						league: true,
 						// A row past kickoff keeps its Proj as of kickoff (Lane 92, B27).
-						kicked: anyKicked(lines, now)
+						kicked: anyKicked(lines, now),
+						// A page turned past the platform's week names the week (Lane 111, B70).
+						...(advice.week === undefined
+							? {}
+							: { weeks: { week: advice.week, for_week: advice.for_week } })
 					},
 					clock
 				);
@@ -639,8 +641,8 @@ export function waiverBasis(
 		...said(proj),
 		// The phone's rows draw no expected score or weather (BoxLine phoneFacts): no read to say there.
 		...said(gamePart(lines, clock, now, 'full'), false),
-		...said(kickedOffPartAt(lines, now)),
+		...waiverFinalsParts(lines, now),
 		...said(OPP_PART),
-		...uncountedParts(advice, rulesHref)
+		...uncountedPart(advice)
 	];
 }

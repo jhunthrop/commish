@@ -21,6 +21,10 @@ export const FIXTURE_SUNDAY_READ = '2026-10-18T18:52:00.000Z';
  * final, London's and Thursday's final by the hourly status (data/game-status.json). */
 export const FIXTURE_SUNDAY_CLOCK = '2026-10-18T18:56:00.000Z';
 
+/** Sunday Oct 18 2026, 10:00 am Central (Lane 111): every Sunday game still to come, week 6's Thursday
+ * game final with its stats in. */
+export const FIXTURE_SUNDAY_MORNING_CLOCK = '2026-10-18T15:00:00.000Z';
+
 /** Monday Oct 19 2026, 11:00 am Central (Lane 80): every Sunday game final by the hourly status, their
  * stats not in yet, Monday night's ahead. */
 export const FIXTURE_MONDAY_CLOCK = '2026-10-19T16:00:00.000Z';
@@ -36,6 +40,14 @@ export const FIXTURE_MONDAY_NIGHT_CLOCK = '2026-10-20T04:00:00.000Z';
 
 /** Tuesday Oct 20 2026, noon Central (Lane 80): every week 6 game final, Monday night's included. */
 export const FIXTURE_TUESDAY_CLOCK = '2026-10-20T17:00:00.000Z';
+
+/** Wednesday Oct 21 2026, 7:00 pm Central (Lane 111): our week 6 stats have landed (research JOBS.md, the
+ * weekly pass by Wednesday evening), so Avg, Last and GP count them, never the platform's points. */
+export const FIXTURE_STATS_CLOCK = '2026-10-22T00:00:00.000Z';
+
+/** Thursday Oct 22 2026, 6:00 pm Central (Lane 111): week 7's published projection captured in its
+ * Thursday slot, its first game still to come, so a page turned to week 7 says whose Proj it is. */
+export const FIXTURE_WEEK7_READ_CLOCK = '2026-10-22T23:00:00.000Z';
 
 /** The environment variable the fixture API reads its clock from. */
 export const FIXTURE_CLOCK_VARIABLE = 'FIXTURE_CLOCK';

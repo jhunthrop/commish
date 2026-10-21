@@ -25,7 +25,7 @@
 // with the site built against PUBLIC_API_URL at the fixture API.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
-import { KICKED_OFF_PART } from '../src/lib/league/box/basis.ts';
+import { STATS_BY_WEDNESDAY } from '../src/lib/league/box/basis.ts';
 import { CARD } from '../src/lib/player/card.ts';
 import { STRENGTH_HEADS } from '../src/lib/run/strength-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
@@ -290,7 +290,7 @@ async function checkPage(page: Page, screen: Screen, width: number, at: string):
 		fault(at, 'his tier box lists fewer than three players');
 	// Sunday's rows wait on their finals, Monday's on their stats: the basis says when each lands, at a
 	// desk and on a phone (review finding 6).
-	if (day !== 'tuesday' && screen.rows !== null && !text.includes(KICKED_OFF_PART))
+	if (day !== 'tuesday' && screen.rows !== null && !text.includes(STATS_BY_WEDNESDAY))
 		fault(at, 'the basis does not say when Final and the stats land');
 	if (/through week 6(?! and)/.test(text) && day !== 'tuesday')
 		fault(at, 'a basis claims week 6 over Sunday players');
@@ -482,7 +482,7 @@ for (const screen of set === 'standin' && day !== 'sunday' ? LEAGUE_SCREENS : []
 			if (
 				screen.name !== 'league' &&
 				!(await addressesNextWeek(page)) &&
-				!(await page.locator('main').innerText()).includes(KICKED_OFF_PART) &&
+				!(await page.locator('main').innerText()).includes(STATS_BY_WEDNESDAY) &&
 				// The Lineup phone keeps the fact cells while a row still draws them, the Final sentence
 				// then the desk's alone (Lane 85 fix round 2 ruling); on Tuesday none does.
 				!(screen.name === 'lineup' && width === 390 && (await drawsFacts(page)))
@@ -586,7 +586,7 @@ for (const lag of day === 'sunday' ? LAGGING.filter((l) => l.set === set) : []) 
 			if (misplaced > 0)
 				fault(at, `${String(misplaced)} kicked-off rows under the to-play section`);
 		}
-		if (!(await page.locator('main').innerText()).includes(KICKED_OFF_PART))
+		if (!(await page.locator('main').innerText()).includes(STATS_BY_WEDNESDAY))
 			fault(at, 'the basis does not say when Final and the stats land');
 		await page.screenshot({
 			path: new URL(`lagging-${lag.name}-dark-1440.png`, out).pathname,

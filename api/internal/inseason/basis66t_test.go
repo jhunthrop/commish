@@ -53,13 +53,16 @@ func TestLineupAndWaiverRules(t *testing.T) {
 	}
 }
 
-func TestUncountedRulesAreCountedAndListed(t *testing.T) {
+// The rules Avg and Last leave out are named inline (Lane 111, B33), the
+// Settings list keeps its own words, and the old web's link words stay for
+// the deploy window.
+func TestUncountedRulesAreNamedAndListed(t *testing.T) {
 	rules := scoring.PresetRules(apitypes.ScoringPresetPpr)
 	rules.PointsPerFieldGoalMissed, rules.PointsPerReturnTouchdown, rules.PointsPerDefensiveFumbleRecovery = 0, 0, 0
 	settings := apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupStandard, Scoring: apitypes.Scoring{Custom: &rules},
 		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1, K: 1, Dst: 1}}
 	got := UncountedOf(settings, nil)
-	if got.Note != "Avg and Last miss four of your rules our stats lack." || got.Link != "Which four" {
+	if got.Note != "Our stats omit two-point, safety, points allowed and yards allowed." || got.Link != "Which four" {
 		t.Errorf("note %q link %q", got.Note, got.Link)
 	}
 	want := []string{"two-point conversions", "safeties", "a defense's points allowed", "a defense's yards allowed"}
@@ -67,8 +70,22 @@ func TestUncountedRulesAreCountedAndListed(t *testing.T) {
 		t.Errorf("rules %v", got.Rules)
 	}
 	one := UncountedOf(settings, func(m string) bool { return m != "safeties" })
-	if one.Note != "Avg and Last miss one of your rules our stats lack." || one.Link != "Which one" {
+	if one.Note != "Our stats omit safety." || one.Link != "Which one" {
 		t.Errorf("one: %q %q", one.Note, one.Link)
+	}
+	two := UncountedOf(settings, func(m string) bool { return m != "safeties" && m != "two_point_conversions" })
+	if two.Note != "Our stats omit two-point and safety." {
+		t.Errorf("two: %q", two.Note)
+	}
+	// Both missed kicks left out are one missed kick; one alone keeps its name.
+	rules.PointsPerFieldGoalMissed, rules.PointsPerExtraPointMissed = -1, -1
+	kicks := UncountedOf(settings, func(m string) bool { return m != "field_goals_missed" && m != "extra_points_missed" })
+	if kicks.Note != "Our stats omit missed kick." || len(kicks.Rules) != 2 {
+		t.Errorf("kicks: %q %v", kicks.Note, kicks.Rules)
+	}
+	extra := UncountedOf(settings, func(m string) bool { return m != "extra_points_missed" })
+	if extra.Note != "Our stats omit missed extra point." {
+		t.Errorf("extra point: %q", extra.Note)
 	}
 	none := UncountedOf(settings, func(string) bool { return true })
 	if none.Note != "" || none.Link != "" || none.Rules == nil || len(none.Rules) != 0 {
