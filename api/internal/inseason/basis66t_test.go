@@ -62,7 +62,7 @@ func TestUncountedRulesAreNamedAndListed(t *testing.T) {
 	settings := apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupStandard, Scoring: apitypes.Scoring{Custom: &rules},
 		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1, K: 1, Dst: 1}}
 	got := UncountedOf(settings, nil)
-	if got.Note != "Avg and Last miss your two-point, safety, points allowed and yards allowed rules." || got.Link != "Which four" {
+	if got.Note != "Avg and Last omit two-point, safety, points allowed and yards allowed." || got.Link != "Which four" {
 		t.Errorf("note %q link %q", got.Note, got.Link)
 	}
 	want := []string{"two-point conversions", "safeties", "a defense's points allowed", "a defense's yards allowed"}
@@ -70,21 +70,21 @@ func TestUncountedRulesAreNamedAndListed(t *testing.T) {
 		t.Errorf("rules %v", got.Rules)
 	}
 	one := UncountedOf(settings, func(m string) bool { return m != "safeties" })
-	if one.Note != "Avg and Last miss your safety rule." || one.Link != "Which one" {
+	if one.Note != "Avg and Last omit safety." || one.Link != "Which one" {
 		t.Errorf("one: %q %q", one.Note, one.Link)
 	}
 	two := UncountedOf(settings, func(m string) bool { return m != "safeties" && m != "two_point_conversions" })
-	if two.Note != "Avg and Last miss your two-point and safety rules." {
+	if two.Note != "Avg and Last omit two-point and safety." {
 		t.Errorf("two: %q", two.Note)
 	}
 	// Both missed kicks left out are one missed kick; one alone keeps its name.
 	rules.PointsPerFieldGoalMissed, rules.PointsPerExtraPointMissed = -1, -1
 	kicks := UncountedOf(settings, func(m string) bool { return m != "field_goals_missed" && m != "extra_points_missed" })
-	if kicks.Note != "Avg and Last miss your missed kick rule." || len(kicks.Rules) != 2 {
+	if kicks.Note != "Avg and Last omit missed kick." || len(kicks.Rules) != 2 {
 		t.Errorf("kicks: %q %v", kicks.Note, kicks.Rules)
 	}
 	extra := UncountedOf(settings, func(m string) bool { return m != "extra_points_missed" })
-	if extra.Note != "Avg and Last miss your missed extra point rule." {
+	if extra.Note != "Avg and Last omit missed extra point." {
 		t.Errorf("extra point: %q", extra.Note)
 	}
 	none := UncountedOf(settings, func(string) bool { return true })

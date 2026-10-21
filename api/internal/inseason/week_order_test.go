@@ -180,13 +180,13 @@ func TestWeekOrderCountsTheRulesLeftOut(t *testing.T) {
 	f.league.Saved = &saved
 	out := f.advisor(t, f.projection, fixtureNow).WeekOrder(draft.K, true)
 	left := uncountedRulesAt(saved, func(string) bool { return false }, draft.K)
-	want := uncountedOf(left, "your", true)
+	want := uncountedOf(left, true)
 	if len(left) < 2 || out.BasisNote != want.Note || out.BasisNoteLink != want.Link {
 		t.Fatalf("%q %q, want %d rules left out", out.BasisNote, out.BasisNoteLink, len(left))
 	}
 	// A reader with no league is told the board's scoring, and has no Settings to open.
 	visitor := f.advisor(t, f.projection, fixtureNow).WeekOrder(draft.K, false)
-	if !strings.HasPrefix(visitor.BasisNote, "Avg and Last miss the PPR ") || visitor.BasisNoteLink != "" {
+	if visitor.BasisNote != want.Note || visitor.BasisNoteLink != "" {
 		t.Fatalf("visitor %q %q", visitor.BasisNote, visitor.BasisNoteLink)
 	}
 }
@@ -212,15 +212,15 @@ func TestWeekOrderNamesOnlyTheTabsRulesLeftOut(t *testing.T) {
 		rules []string
 		note  string
 	}{
-		draft.K:   {[]string{"missed field goals", "missed extra points"}, "Avg and Last miss your missed kick rule."},
-		draft.DEF: {[]string{"fumble recoveries", "safeties"}, "Avg and Last miss your fumble recovery and safety rules."},
+		draft.K:   {[]string{"missed field goals", "missed extra points"}, "Avg and Last omit missed kick."},
+		draft.DEF: {[]string{"fumble recoveries", "safeties"}, "Avg and Last omit fumble and safety."},
 	}
 	f := newWeekOrderFixture(t)
 	f.league.Saved = &settings
 	a := f.advisor(t, f.projection, fixtureNow)
 	a.season.carried = map[string]bool{metricPointsAllowed: true, metricYardsAllowed: true}
 	for position, w := range want {
-		got := uncountedOf(uncountedRulesAt(settings, carried, position), "your", true)
+		got := uncountedOf(uncountedRulesAt(settings, carried, position), true)
 		if strings.Join(got.Rules, "|") != strings.Join(w.rules, "|") {
 			t.Errorf("%s: %v, want %v", position, got.Rules, w.rules)
 		}

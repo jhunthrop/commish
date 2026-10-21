@@ -63,11 +63,7 @@ func (a *advisor) WeekOrder(position draft.Position, marks bool) apitypes.WeekOr
 	scoring := projectionScoring(a.settings, a.preset)
 	// The tab's own rules (Lane 66w), said in the one sentence (Lane 66t): a reader with no league is
 	// told the board's scoring and has no Settings to open.
-	whose := "your"
-	if !marks {
-		whose = "the " + formatNames[scoring.Format]
-	}
-	un := uncountedOf(uncountedRulesAt(a.settings, a.season.Carries, position), whose, marks)
+	un := uncountedOf(uncountedRulesAt(a.settings, a.season.Carries, position), marks)
 	out := apitypes.WeekOrderAdvice{Week: a.Snap.Week, Position: apitypes.WeekOrderAdvicePosition(position),
 		BasisNote: un.Note, BasisNoteLink: un.Link, ProjectionReadAt: a.projectionReadAt(),
 		ProjectionScoring: scoring, Rows: []apitypes.WeekOrderRow{}}

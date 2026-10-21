@@ -184,8 +184,8 @@ const (
 // countable is a rule a stat line may carry no metric for (score.go):
 // the league's points for it as the basis weighs them, its words on the
 // league's Settings list, its name in a basis sentence (Lane 111, B33:
-// "Avg and Last miss your two-point and safety rules."), the spot it
-// scores and the metrics that count it.
+// "Avg and Last omit two-point and safety."), the spot it scores and the
+// metrics that count it.
 type countable struct {
 	points  float64
 	words   string
@@ -220,7 +220,7 @@ func countables(r apitypes.ScoringRules) []countable {
 		{r.PointsPerFieldGoalMissed, "missed field goals", missedFieldGoalName, kickerSpot, []string{"field_goals_missed"}},
 		{r.PointsPerExtraPointMissed, "missed extra points", missedExtraName, kickerSpot, []string{"extra_points_missed"}},
 		{r.PointsPerReturnTouchdown, "a player's kick and punt return touchdowns", "return touchdown", anySpot, []string{"kick_return_touchdowns", "punt_return_touchdowns"}},
-		{r.PointsPerDefensiveFumbleRecovery, "fumble recoveries", "fumble recovery", defenseSpot, []string{"defensive_fumbles_recovered"}},
+		{r.PointsPerDefensiveFumbleRecovery, "fumble recoveries", "fumble", defenseSpot, []string{"defensive_fumbles_recovered"}},
 		{r.PointsPerSafety, "safeties", "safety", defenseSpot, []string{"safeties"}},
 		{tierPoints(scoring.PointsAllowedTiers()), "a defense's points allowed", "points allowed", defenseSpot, []string{metricPointsAllowed}},
 		{tierPoints(scoring.YardsAllowedTiers()), "a defense's yards allowed", "yards allowed", defenseSpot, []string{metricYardsAllowed}},
@@ -277,13 +277,15 @@ type Uncounted struct {
 // UncountedOf is the league's uncounted rules. carried says whether any
 // line this season carries a metric (Season.Carries); nil carries none.
 func UncountedOf(s apitypes.LeagueSettings, carried func(string) bool) Uncounted {
-	return uncountedOf(uncountedRules(s, carried), "your", true)
+	return uncountedOf(uncountedRules(s, carried), true)
 }
 
-// uncountedOf names the rules in the one sentence every basis prints,
-// whose rules they are ("your", or a reader's stand-in "the PPR"), and
-// the old web's link words where there is a Settings to open (linked).
-func uncountedOf(left []countable, whose string, linked bool) Uncounted {
+// uncountedOf names the rules in the one sentence every basis prints, as
+// short as a phone's eight lines need (Lane 108's budget, measured on the
+// fixture's five rules: "Avg and Last omit two-point, missed kick, fumble
+// and safety."), and the old web's link words where there is a Settings
+// to open (linked).
+func uncountedOf(left []countable, linked bool) Uncounted {
 	if len(left) == 0 {
 		return Uncounted{Rules: []string{}}
 	}
@@ -291,12 +293,7 @@ func uncountedOf(left []countable, whose string, linked bool) Uncounted {
 	for _, c := range left {
 		rules = append(rules, c.words)
 	}
-	names := basisNames(left)
-	kind := "rules"
-	if len(names) == 1 {
-		kind = "rule"
-	}
-	out := Uncounted{Note: fmt.Sprintf("Avg and Last miss %s %s %s.", whose, andList(names), kind), Rules: rules}
+	out := Uncounted{Note: fmt.Sprintf("Avg and Last omit %s.", andList(basisNames(left))), Rules: rules}
 	if linked {
 		out.Link = "Which " + countWords(len(rules))
 	}
