@@ -70,6 +70,16 @@ export function finalNonePart(host: LeagueHost): string {
 	return `A ${BOX.final} of ${BOX.none} is a score ${hostWords(host)} does not send us.`;
 }
 
+/** A team its platform sends no lineup for (every side of FFPC's scoreboard but the member's, Lane
+ * 125, B104): no starters, so no Proj before kickoff, no Proj final from it, and its Final by its
+ * clubs' games (the API's schedule_state). Said once where one is on the board. */
+export function unlistedPart(host: LeagueHost, started: boolean): string {
+	const teams = `Teams ${hostWords(host)} sends no lineup for`;
+	return started
+		? `${teams} have no ${BOX.projFinal} and read ${BOX.final} by their clubs' schedules.`
+		: `${teams} have no ${BOX.proj}.`;
+}
+
 /** The Proj final's sentences: what it is once a game has kicked off, and why one is "--" where one
  * is; empty before kickoff. */
 export function projFinalWords(started: boolean, missing: boolean): string {

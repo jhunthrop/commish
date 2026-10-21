@@ -20,6 +20,7 @@ import {
 	leagueScoringWords,
 	finalNonePart,
 	projFinalWords,
+	unlistedPart,
 	teBonusSentence
 } from '../box/basis.ts';
 
@@ -107,6 +108,9 @@ export interface BugSide {
 	/** Every one of the side's starters with a game is final (the API's starters_final, else the
 	 * game's state): its figure reads Final, the Team row's and the Matchup bug's one predicate. */
 	final: boolean;
+	/** The platform lists the side no starters (the API's schedule_state, Lane 124): its state is the
+	 * schedule's and it draws no Proj or Proj final, said once by unlistedPart (Lane 125, B104). */
+	unlisted: boolean;
 	/** The big figure (Lane 92, B22): its Proj before the first kickoff, its Pts from it. */
 	big: string;
 	/** "3 to play", "2 playing" while the game is under way (the API's to_play), else empty. */
@@ -295,6 +299,7 @@ export function bugsOf(
 					avatar: team?.avatar ?? null,
 					me: side.roster_id === sync.me,
 					final,
+					unlisted: side.schedule_state !== undefined,
 					...sideFigures(side, head.state, final, columns.small === BOX.final),
 					toPlay: head.state === 'kicked_off' ? (side.to_play ?? '') : '',
 					stands: standsOf(game, side, started)
@@ -327,6 +332,19 @@ export function bugsMissFinal(bugs: readonly Bug[]): boolean {
 	return bugs.some(
 		(b) => b.state !== 'upcoming' && b.sides.some((s) => !s.final && s.small === BOX.none)
 	);
+}
+
+/** Whether a side the platform lists starters for draws a Proj final "--" (bugsMissFinal): on the
+ * League page a side it lists none for has its own sentence (unlistedPart, Lane 125). */
+export function bugsMissListedFinal(bugs: readonly Bug[]): boolean {
+	return bugsMissFinal(bugs.map((b) => ({ ...b, sides: b.sides.filter((s) => !s.unlisted) })));
+}
+
+/** Whether any bug draws a side the platform lists no starters for (Lane 125, B104). */
+export function bugsUnlisted(
+	bugs: readonly { sides: readonly Pick<BugSide, 'unlisted'>[] }[]
+): boolean {
+	return bugs.some((b) => b.sides.some((s) => s.unlisted));
 }
 
 // ---- the drafter's lineup
@@ -889,7 +907,9 @@ export function teamBasis(
 	/** A side still draws a Proj final (bugsPlaying, Lane 121): what it is is said. */
 	projFinal = started,
 	/** A final side draws "--" for its total (bugsFinalNone): why is said. */
-	finalNone = false
+	finalNone = false,
+	/** A side the platform lists no starters for is on the board (bugsUnlisted): what it draws is said. */
+	unlisted = false
 ): string {
 	const platform = hostWords(host);
 	const team = byPlayer ? `, ${BOX.totals} adds the rows` : '';
@@ -899,7 +919,11 @@ export function teamBasis(
 		readAt === null
 			? 'not in yet for this week'
 			: `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
-	const words = [projFinalWords(projFinal, missing), finalNone ? finalNonePart(host) : '']
+	const words = [
+		projFinalWords(projFinal, missing),
+		finalNone ? finalNonePart(host) : '',
+		unlisted ? unlistedPart(host, started) : ''
+	]
 		.filter((w) => w !== '')
 		.join(' ');
 	const final = words === '' ? '' : ` ${words}`;

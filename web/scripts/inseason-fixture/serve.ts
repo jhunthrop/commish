@@ -572,7 +572,7 @@ function standInAsked(req: IncomingMessage, id: string): StandIn | null {
 	// The FFPC stand-in reads on the week's Saturday (its shots, Lane 94) and, after its Sunday, with the
 	// opponent's starters unlisted as FFPC's read holds them (Lane 121 fix round 2).
 	if (ffpcAsked(req, id) && afterSunday())
-		return { ...ffpcAfterSunday(sleeperAfter(), momentAt(now())), readAt: readAt() };
+		return { ...ffpcAfterSunday(sleeperAfter(), momentAt(now()), recordedWeek), readAt: readAt() };
 	if (ffpcAsked(req, id)) {
 		const board = scoreboardNow();
 		const scoring = ffpcWeek.lineup.projection_scoring;

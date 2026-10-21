@@ -30,6 +30,8 @@ export interface SleeperMatchup {
 	roster_id: number;
 	matchup_id: number | null;
 	starters: string[];
+	/** Every player on the roster, starters and bench: FFPC's rosters page's list (Lane 125). */
+	players: string[];
 	points: number;
 }
 
@@ -141,17 +143,34 @@ export function scheduleStateOf(
 	return k.kicked > 0 ? 'kicked_off' : 'upcoming';
 }
 
+/** A schedule's state as a game's (schedule_state.go scheduleGame). */
+const SCHEDULE_GAME: Readonly<Record<GameState, ScoreboardGame['state']>> = {
+	upcoming: 'upcoming',
+	kicked_off: 'playing',
+	final: 'final'
+};
+
 /** A game's state by each side's own rule (schedule_state.go gameState, Lane 124 B102): its listed
- * starters' games, never final while a side listing none is not final by the schedule; the next
- * kickoff the listed starters'. */
+ * starters' games, never final while a side listing none (`unlisted`, each side's schedule lines) is
+ * not final by the schedule; the next kickoff the listed starters'. A game none of whose sides lists
+ * a starter with a game reads by the schedule alone, its next kickoff the schedule's (Lane 125, B104:
+ * every other game of FFPC's scoreboard). */
 export function listedGameOf(
 	listed: readonly PlayerLine[],
-	unlisted: readonly GameState[],
+	unlisted: readonly (readonly PlayerLine[])[],
 	moment: Pick<Moment, 'now' | 'final'>
 ): Pick<ScoreboardGame, 'state' | 'next_kickoff'> {
 	const k = kicks(listed, moment);
+	if (k.games === 0 && unlisted.length > 0) {
+		const all = unlisted.flat();
+		return {
+			state: SCHEDULE_GAME[scheduleStateOf(all, moment)],
+			next_kickoff: kicks(all, moment).next
+		};
+	}
 	const state = stateOf(k);
-	const waiting = state === 'final' && unlisted.some((s) => s !== 'final');
+	const waiting =
+		state === 'final' && unlisted.some((lines) => scheduleStateOf(lines, moment) !== 'final');
 	return { state: waiting ? 'playing' : state, next_kickoff: k.next };
 }
 
