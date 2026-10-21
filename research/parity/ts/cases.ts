@@ -21,7 +21,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { players } from "@research-ts/db/schema";
 import { captureOnce } from "@research-ts/projections/capture";
 import { CAPTURE_FEEDS, NFL_TEAM_ABBREVIATIONS } from "@research-ts/projections/capture-feeds";
@@ -91,6 +91,9 @@ interface SeedPlayer {
 }
 
 async function seedClubRoster({ db }: TsCaseContext): Promise<void> {
+  // The oracle's club column predates revision 0018 (Lane 123): a free agent's club is NULL now, so the
+  // scratch table takes one as the research column does.
+  await db.execute(sql`alter table ${players} alter column ${sql.identifier(players.nflTeam.name)} drop not null`);
   const rows = JSON.parse(readFileSync(join(process.cwd(), CLUB_SEED), "utf8")) as readonly SeedPlayer[];
   await db
     .insert(players)

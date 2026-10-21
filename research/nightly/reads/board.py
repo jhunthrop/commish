@@ -51,7 +51,7 @@ class StoredRow:
     player_id: str  # the provider id, the product's player id
     name: str
     position: Position
-    team: str
+    team: str | None  # None for a free agent (revision 0018)
     headshot_url: str | None
     market_adp: float | None  # the provider's ADP, the served order's tiebreak (`compareBoardOrder`)
     projected: float

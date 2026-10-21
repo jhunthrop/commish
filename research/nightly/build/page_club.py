@@ -10,8 +10,11 @@ club he played each week for.
 THE RULE. His club is the club on the newest player list read at or before the run. When his newest
 game line names another club, the line wins unless the read is at least `LIST_CATCH_UP` newer than
 that game's kickoff: the provider's roster refresh lands within a day, so a read sooner than that may
-not have caught up with the move (Lane 120 fix round 1, review M1). With no list read, or the list not
-naming him on a club (a free agent), his newest line's club; with no line either, the seeded roster's.
+not have caught up with the move (Lane 120 fix round 1, review M1). A free agent on the list has no club
+(Lane 123, B101) by the same rule: his newest line's club wins only when the read is not that much newer
+than its game. With no list read, or the list not naming him, his newest line's club; with no line
+either, the seeded roster's, which is NULL for a free agent (`provider_players.team`, revision 0018): no
+club.
 The page says which club his newest line was for only when that is not the page's club
 (`latest_club`), which happens only when a list read well after his last game moved him.
 
@@ -41,9 +44,10 @@ LIST_CATCH_UP: Final = timedelta(hours=36)
 
 @dataclass(frozen=True, slots=True)
 class RosterRead:
-    """The newest player list at the run: each listed player's club by provider id, and when it was read."""
+    """The newest player list at the run: each listed player's club by provider id (None for a free agent),
+    and when it was read."""
 
-    clubs: Mapping[str, str]
+    clubs: Mapping[str, str | None]
     read_at: datetime | None
 
 
@@ -64,8 +68,8 @@ def read_roster(conn: Connection, as_of: datetime) -> RosterRead:
     return RosterRead(MappingProxyType(listed_clubs(row.payload)), ms_instant(row.captured_at))
 
 
-def seeded_clubs(conn: Connection, player_ids: Sequence[str]) -> dict[str, str]:
-    """Each player's club on the seeded roster (`provider_players.team`)."""
+def seeded_clubs(conn: Connection, player_ids: Sequence[str]) -> dict[str, str | None]:
+    """Each player's club on the stored roster (`provider_players.team`), None for a free agent."""
     rows = conn.execute(
         text("select id, team from research.provider_players where id = any(:ids)"), {"ids": list(player_ids)}
     )
@@ -74,9 +78,10 @@ def seeded_clubs(conn: Connection, player_ids: Sequence[str]) -> dict[str, str]:
 
 @dataclass(frozen=True, slots=True)
 class ClubCall:
-    """His club as the page names it, his newest game line's week and club, and whether he moved."""
+    """His club as the page names it (None: a free agent, no club), his newest game line's week and club,
+    and whether he moved."""
 
-    club: str
+    club: str | None
     latest_week: int | None
     latest_club: str | None
     moved: bool
@@ -88,7 +93,7 @@ class ClubCall:
 
     def club_in(self, week: int, through: int) -> str | None:
         """The club whose game a week with no line of his is: none for a mover up to his newest line
-        (a week the records have reached), else the page club."""
+        (a week the records have reached), else the page club (none for a free agent)."""
         unknown = self.moved and self.latest_week is not None and week <= min(self.latest_week, through)
         return None if unknown else self.club
 
@@ -98,13 +103,19 @@ def _kickoff(games: Mapping[str, Sequence[Game]], club: str, week: int) -> datet
 
 
 def club_call(
-    seeded: str, roster: RosterRead, player_id: str, lines: Mapping[int, str], games: Mapping[str, Sequence[Game]]
+    seeded: str | None,
+    roster: RosterRead,
+    player_id: str,
+    lines: Mapping[int, str],
+    games: Mapping[str, Sequence[Game]],
 ) -> ClubCall:
     """THE RULE (module doc) for one player: `lines` is his club by week from his game lines."""
+    on_list = player_id in roster.clubs
     listed = roster.clubs.get(player_id)
     latest_week = max(lines, default=None)
     latest_club = None if latest_week is None else lines[latest_week]
-    if listed is None:
+    club: str | None
+    if not on_list:
         club = latest_club or seeded
     elif latest_club is None or latest_club == listed or latest_week is None:
         club = listed
@@ -113,12 +124,12 @@ def club_call(
         kickoff = _kickoff(games, latest_club, latest_week)
         newer = roster.read_at is None or kickoff is None or roster.read_at < kickoff + LIST_CATCH_UP
         club = latest_club if newer else listed
-    named = {seeded, *lines.values(), *([listed] if listed is not None else [])}
+    named = {named_club for named_club in (seeded, *lines.values(), listed) if named_club is not None}
     return ClubCall(club, latest_week, latest_club, len(named) > 1)
 
 
 def club_calls(
-    seeded: Mapping[str, str],
+    seeded: Mapping[str, str | None],
     roster: RosterRead,
     teams: Mapping[str, Mapping[int, str]],
     games: Mapping[str, Sequence[Game]],

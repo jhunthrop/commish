@@ -37,6 +37,7 @@ from research.capsules.render_words import (
     whole,
 )
 from research.capsules.voice_rules import in_fantasy_words
+from research.free_agent import club_words
 from research.model.jsmath import js_round, js_to_fixed
 from research.pipeline.jscompat import js_number, js_string
 
@@ -235,7 +236,7 @@ def render_facts_for_model(facts: PlayerFacts) -> str:
     """`renderFactsForModel`: the whole sheet, plain text, the user message's first half."""
     identity = facts.identity
     sections = [
-        f"Player: {identity.name}, {identity.position}, {identity.team}. Season: {facts.product_season}.",
+        f"Player: {identity.name}, {identity.position}, {club_words(identity.team)}. Season: {facts.product_season}.",
         today_line(facts),
         _board_line(facts),
     ]

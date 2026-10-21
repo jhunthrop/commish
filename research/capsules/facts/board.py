@@ -58,7 +58,7 @@ class BoardRow:
     nfl_player_id: str
     name: str
     position: Position
-    team: str
+    team: str | None  # None for a free agent (revision 0018, Lane 123)
     market_adp: float | None
     market_position_adp: str | None
     overall_rank: int

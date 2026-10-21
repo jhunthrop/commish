@@ -346,7 +346,7 @@ total counts each tested table per pass and each prerequisite table once, at its
 | crosswalk | rerun | players 24,885 (setup); provider_players 1,373 (setup, 1 declared departure); player_crosswalk 1,373 | 0 |
 | tank01-capture-all | first | capture_snapshots 11 | 0 |
 | tank01-capture-all | rerun | capture_snapshots 11 | 0 |
-| tank01-capture-harvest | first | capture_snapshots 6; provider_players 6 | 0 |
+| tank01-capture-harvest | first | capture_snapshots 6; provider_players 6 (Sharpe, a free agent, cleared to NULL) | 0 |
 | tank01-capture-harvest | rerun | capture_snapshots 6; provider_players 6 | 0 |
 | tank01-capture-harvest | prior | capture_snapshots 6; provider_players 6 | 0 |
 | tank01-capture-harvest | later | capture_snapshots 7; provider_players 6 (McCarthy MIN to NYG) | 0 |

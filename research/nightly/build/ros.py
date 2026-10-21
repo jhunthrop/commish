@@ -186,7 +186,7 @@ def _projections(
         who = PlayerWeeks(row.universe_id, row.position, row.team, _weeks(row.player_id, context))
         player = player_to_date(who, ready.window, slates, stale, SCORING)
         projection = project(player, ready.priors)
-        start = first_week_to_play(states, row.team) if player.remaining_weeks else None
+        start = first_week_to_play(states, row.team) if player.remaining_weeks and row.team is not None else None
         pace = None if stale is None or stale.per_game is None else dict(stale.per_game)
         found[row.universe_id] = RestFigures(
             projected=projection.projected,

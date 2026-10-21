@@ -244,7 +244,8 @@ class _Names:
 def name_ledger(facts: FactsContent, depth_names: list[str], depth_team_codes: list[str]) -> list[str]:
     names = _Names()
     names.add(facts.identity.name)
-    names.add_team(facts.identity.team)
+    if facts.identity.team is not None:
+        names.add_team(facts.identity.team)
     names.add(facts.identity.position)
     for item in facts.evidence:
         if item.kind == "changed_team":
