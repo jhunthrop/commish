@@ -176,9 +176,13 @@
 		width: 48px;
 	}
 
-	/* Sized to the chip ("WR 149"), so the player keeps the room for his name. */
+	/* Sized to the chip ("WR 149"), its head on two lines so the head never sets the column (Lane 108
+	   fix round 1): two boxes side by side keep each name and "at LAR Final" on a line inside their
+	   columns. */
 	.cols .rank {
 		width: 52px;
+		white-space: normal;
+		line-height: 1.1;
 	}
 
 	/* Narrow enough beside the Our rank column that two boxes side by side keep a name on a line. */
@@ -250,6 +254,12 @@
 			flex-wrap: wrap;
 			white-space: normal;
 			column-gap: 4px;
+		}
+
+		/* The Team row's "Proj final" caption on two lines over its figure, so the caption never sets
+		   the Proj column and the box keeps inside its column (Lane 108 fix round 1). */
+		.box .totals :global(small) {
+			white-space: normal;
 		}
 	}
 

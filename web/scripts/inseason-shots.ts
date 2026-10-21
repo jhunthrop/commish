@@ -1451,8 +1451,9 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 			nobody: (document.querySelector('main')?.textContent ?? '').includes('Nobody in your league'),
 			// In season the page carries no mock-draft plumbing (Lane 104, B54).
 			mock: /mock draft/i.test(document.querySelector('main')?.textContent ?? ''),
-			// The recorded league's name anywhere on the page, the switch included.
-			recordedName: document.body.textContent.includes('S.U.C.K.'),
+			// The recorded league's name in the page's own content; the header's switch keeps the member's
+			// chosen league by Lane 102's rule (B38), so it is not read.
+			recordedName: (document.querySelector('main')?.textContent ?? '').includes('S.U.C.K.'),
 			bids: [...document.querySelectorAll('main table.feed td.det')].filter((td) =>
 				/^FAAB \$\d/.test(text(td))
 			).length,
