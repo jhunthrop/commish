@@ -3,11 +3,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
-import { basisText, KICKED_OFF_PART } from './basis.ts';
+import { basisText, drawnText, KICKED_OFF_PART, phoneFinalsPart } from './basis.ts';
+import { stripLead, stripMark } from './strip.ts';
 import type { PlayerLine, TradeAdvice, TradeCheck, TradeRow, TradeTeam } from '../inseason/api.ts';
 import {
 	bugFigures,
-	cardMark,
 	checkRoom,
 	copiedTrade,
 	finderRows,
@@ -139,14 +139,18 @@ void test('the strip names at most two trades the other team gains from, never a
 	assert.deepEqual(worthProposing([team(9, 'Close', [row(0.7, 0.2)])]), []);
 });
 
-void test('the best of the strip says Best in words, every card drawing its verb the same', () => {
+void test('the best of the strip says Best in words and leads, the rest quiet (Lane 115, B87)', () => {
 	const worth = worthProposing(teams);
 	assert.deepEqual(
-		worth.map((_, i) => cardMark(i, worth.length)),
+		worth.map((_, i) => stripMark(i, worth.length)),
 		['Best', null]
 	);
+	assert.deepEqual(
+		worth.map((_, i) => stripLead(i)),
+		[true, false]
+	);
 	// A strip of one has nothing to be best among.
-	assert.equal(cardMark(0, 1), null);
+	assert.equal(stripMark(0, 1), null);
 });
 
 void test('a trade reads by last names, its gains and week signed, its room by name', () => {
@@ -509,4 +513,26 @@ void test('the basis says when Final and the stats land while a row waits on the
 		tradeBasis(advice, 'sleeper', [final], 'none', TRADE_LINKS, TRADE_CLOCK, NOW_66T)
 	);
 	assert.ok(text.includes(KICKED_OFF_PART), text);
+});
+
+void test("an opened trade's and the builder's phone say what Avg and Last count once a final is in (Lane 115 fix round 1, HIGH-1)", () => {
+	// Sunday's final counted from Sleeper's points, Monday's game still to come.
+	const sunday = line('Cam Skattebo');
+	const final: PlayerLine = {
+		...sunday,
+		facts: {
+			...sunday.facts,
+			kickoff: '2026-10-18T17:00:00.000Z',
+			played: true,
+			game_state: 'final',
+			last_games: [{ week: 6, points: 25, source: 'platform' }]
+		}
+	};
+	const monday = Date.parse('2026-10-20T00:00:00.000Z');
+	for (const opened of ['trade', 'builder'] as const) {
+		const parts = tradeBasis(advice, 'sleeper', [final], opened, TRADE_LINKS, TRADE_CLOCK, monday);
+		const phone = drawnText(parts, 'phone');
+		assert.ok(phone.includes(phoneFinalsPart('sleeper')), `${opened}: ${phone}`);
+		assert.ok(!phone.includes(KICKED_OFF_PART), `${opened}: ${phone}`);
+	}
 });

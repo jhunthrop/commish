@@ -71,6 +71,13 @@ export function projFinalWords(started: boolean, missing: boolean): string {
 	return missing ? `${PROJ_FINAL_PART} ${NO_PROJ_FINAL_PART}` : PROJ_FINAL_PART;
 }
 
+/** projFinalWords in a phone's one sentence (Lane 115 fix round 1, MEDIUM-1): why the Proj final is
+ * "--" where it is, else what it adds. */
+export function projFinalPhone(started: boolean, missing: boolean): string {
+	if (!started) return '';
+	return missing ? NO_PROJ_FINAL_PART : PROJ_FINAL_PART;
+}
+
 /** Any row's game past its kickoff at the page's clock, by the one rule (kickoff.ts). */
 export function anyKicked(lines: readonly PlayerLine[], now: number): boolean {
 	return lines.some(({ facts }) => pastKickoff(facts, now));
@@ -98,20 +105,77 @@ function whoseScoring(proj: ProjFacts, format: string): string {
 	return proj.league ? leagueScoringWords(proj.scoring, proj.host) : ` in ${format}`;
 }
 
+/** Which of the Proj sentence's clauses a width says (Lane 115): a phone leaves the defenses' scoring
+ * to the desk, and the league's order's phone its scoring (its head says "Your league scores PPR."),
+ * its read time and what a started game's Proj is too, qualifications the desk says (fix round 1,
+ * MEDIUM-2: the "--" keeps its clause instead). */
+interface ProjSays {
+	defenses: boolean;
+	scoring: boolean;
+	kicked: boolean;
+	read: boolean;
+}
+
+const DESK_SAYS: ProjSays = { defenses: true, scoring: true, kicked: true, read: true };
+const PHONE_SAYS: ProjSays = { defenses: false, scoring: true, kicked: true, read: true };
+const ORDER_PHONE_SAYS: ProjSays = { defenses: false, scoring: false, kicked: false, read: false };
+
+/** What the projection is, the words after "Proj is": "this week's published projection, PPR nearest
+ * your rules, defenses on default scoring, read Fri 9:00 pm, as of kickoff once started", "week 7's"
+ * on a page turned to week 7 (Lane 111, B70), each clause where the width says it (ProjSays). */
+function projWhat(proj: ProjFacts, clock: Clock, says: ProjSays): string {
+	const format = FORMAT_WORDS[proj.scoring.format];
+	const whose = says.scoring ? whoseScoring(proj, format) : '';
+	const defenses = proj.defense && says.defenses ? ', defenses on default scoring' : '';
+	const when = proj.readAt === null ? 'not in yet' : `read ${stamp(proj.readAt, clock)}`;
+	const read = says.read ? `, ${when}` : '';
+	const kicked = proj.kicked === true && says.kicked ? `, ${AS_OF_KICKOFF}` : '';
+	const week =
+		proj.weeks === undefined ? THIS_WEEKS : weeksWord(addressedWeek(proj.weeks), proj.weeks.week);
+	return `${week} published projection${whose}${defenses}${read}${kicked}`;
+}
+
+/** The tight end's extra after a Proj sentence, where the league's rules add one. */
+function withBonus(said: string, proj: ProjFacts): string {
+	const bonus = proj.league ? teBonusSentence(proj.scoring.te_bonus, proj.host) : null;
+	return bonus === null ? said : `${said} ${bonus}`;
+}
+
 /** "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm.", "week 7's"
  * on a page turned to week 7 (Lane 111, B70), or for FFPC's rules "..., PPR shown, nearest FFPC's
  * rules, read Mon 6:00 pm. FFPC adds 0.5 a catch for TEs." */
 export function projPart(proj: ProjFacts, clock: Clock): string {
-	const format = FORMAT_WORDS[proj.scoring.format];
-	const whose = whoseScoring(proj, format);
-	const defenses = proj.defense ? ', defenses on default scoring' : '';
-	const when = proj.readAt === null ? 'not in yet' : `read ${stamp(proj.readAt, clock)}`;
-	const kicked = proj.kicked === true ? `, ${AS_OF_KICKOFF}` : '';
-	const bonus = proj.league ? teBonusSentence(proj.scoring.te_bonus, proj.host) : null;
-	const week =
-		proj.weeks === undefined ? THIS_WEEKS : weeksWord(addressedWeek(proj.weeks), proj.weeks.week);
-	const said = `${proj.head ?? BOX.proj} is ${week} published projection${whose}${defenses}, ${when}${kicked}.`;
-	return bonus === null ? said : `${said} ${bonus}`;
+	return withBonus(`${proj.head ?? BOX.proj} is ${projWhat(proj, clock, DESK_SAYS)}.`, proj);
+}
+
+/** projPart in a phone's words (Lane 115): the defenses' scoring left to the desk. */
+export function projPhonePart(proj: ProjFacts, clock: Clock): string {
+	return withBonus(`${proj.head ?? BOX.proj} is ${projWhat(proj, clock, PHONE_SAYS)}.`, proj);
+}
+
+/** The rule our pick follows and what Proj is in one sentence, the phone Lineup's (Lane 115, B83):
+ * "Our pick is each slot's highest Proj, this week's published projection, PPR nearest your rules,
+ * read Fri 9:00 pm." */
+export function pickProjPart(proj: ProjFacts, clock: Clock): string {
+	return withBonus(`${PICK_PHONE} ${projWhat(proj, clock, PHONE_SAYS)}.`, proj);
+}
+
+/** The week column and what its Proj is in one sentence, the phone order's (Lane 115, B92): "Wk 6 is
+ * Pts once final, -- until his stats land, else this week's published projection." Its "--" keeps its
+ * clause (fix round 1, MEDIUM-2); the page's head says its scoring, the desk its read time and a
+ * started game's Proj. */
+export function weekProjPart(head: string, proj: ProjFacts, clock: Clock): string {
+	return `${head} is ${BOX.pts} once final, ${BOX.none} until his stats land, else ${projWhat(proj, clock, ORDER_PHONE_SAYS)}.`;
+}
+
+/** A sentence a phone says shorter (Lane 111's phone-only parts): the desk's words at a desk, the
+ * phone's on a phone; one part where they agree. */
+export function deskOrPhone(desk: string | null, phone: string | null): BasisPart[] {
+	if (desk === phone) return said(desk);
+	return [
+		...(desk === null || desk === '' ? [] : [{ text: desk, phone: false }]),
+		...(phone === null || phone === '' ? [] : [{ text: phone, phone: true, desk: false as const }])
+	];
 }
 
 /** "Δ Proj is its change since Thu 9:00 pm.", null without a read before. */
@@ -150,6 +214,15 @@ export const RANK_PART = `${BOX.ourRank} is his place at his position in our ord
 /** The rule our pick follows, said under the Lineup's rows (Lane 99, B11; fix round 1 shortened it
  * to one clause beside the Our rank sentence). */
 export const PICK_PART = `Our pick starts the highest ${BOX.proj} at each slot.`;
+
+/** The rule's phone clause, the head of the phone's Proj sentence (pickProjPart, Lane 115, B83). */
+const PICK_PHONE = `Our pick is each slot's highest ${BOX.proj},`;
+
+/** Our rank and Opp rank in a phone's words, the row's own "Opp 3rd" (Lane 115, B83). */
+export const RANK_OPP_PHONE = `${BOX.ourRank} is his place at his position, ${BOX.opp} the points allowed to it, 1st fewest.`;
+
+/** Opp rank in a phone's words, as its rows say it ("Opp 26th", Lane 115, B92). */
+export const OPP_PHONE = `${BOX.opp} is points allowed to his position, 1st fewest.`;
 
 /** The words every sentence of when our stats land ends on (KICKED_OFF_PART, Lane 111's two), which
  * the shots scripts look for. */
@@ -197,9 +270,14 @@ export function liveFinalsPart(host: LeagueHost, rostered: string): string {
 
 /** The phone's sentence where the platform's points count (Lane 111 fix round 1, HIGH-1): the figure
  * the phone draws keeps a sentence that says what it counts, within its eight lines. */
-export function phoneFinalsPart(host: LeagueHost): string {
-	return `${BOX.avg} and ${BOX.last} count ${hostWords(host)}'s finals, our stats ${STATS_BY_WEDNESDAY}`;
+export function phoneFinalsPart(host: LeagueHost, rows: RowsOf = 'rosters'): string {
+	// The league's order mixes free agents, whom the platform does not score (Lane 115, B92).
+	const whose = rows === 'pool' ? `${ROSTERED_PLAYERS} ${hostWords(host)}` : `${hostWords(host)}'s`;
+	return `${BOX.avg} and ${BOX.last} count ${whose} finals, our stats ${STATS_BY_WEDNESDAY}`;
 }
+
+/** Whose finals the phone's sentence counts on the league's order (phoneFinalsPart). */
+const ROSTERED_PLAYERS = "rostered players'";
 
 /** Waivers' sentence once a final is in (Lane 111 fix round 1, MEDIUM-3): its rows are free agents,
  * whom the platform does not score, so their Avg and Last are our stats until the week's land. */
@@ -260,7 +338,7 @@ export function finalsParts(
 	if (full === timing || timing === null) return [{ text: full, phone: onPhone }];
 	// Here full is the platform's sentence (finalsPartAt is kickedOffPartAt otherwise), so its host is
 	// named.
-	const short = host === null ? timing : phoneFinalsPart(host);
+	const short = host === null ? timing : phoneFinalsPart(host, rows);
 	const phone: BasisPart[] = onPhone ? [{ text: short, phone: true, desk: false }] : [];
 	return [{ text: full, phone: false }, ...phone];
 }
@@ -293,10 +371,34 @@ export function ptsPart(byPlayer: boolean, host: LeagueHost, team: TeamFigure): 
 		: `${BOX.pts} are ${platform}'s points so far, Team adds the rows.`;
 }
 
-/** The API's sentence naming the rules our stats lack (Lane 111, B33: "Our stats omit two-point
- * and safety."), no link to follow; none when it names none. */
-export function uncountedPart(advice: { basis_note: string }): BasisPart[] {
-	return said(advice.basis_note);
+/** The Pts sentence in a phone's words where the Team row adds the rows (the Lineup, Lane 115, B83):
+ * what Team adds left to the desk, a platform with no player's points said in fewer words. */
+export function ptsPhonePart(byPlayer: boolean, host: LeagueHost): string {
+	const platform = hostWords(host);
+	return byPlayer
+		? `${BOX.pts} are ${platform}'s points so far.`
+		: `${BOX.pts} are ${platform}'s team points alone.`;
+}
+
+/** The rules our stats lack in a sentence, the API's names in one of two frames (Lane 115, B92): where
+ * a row counts the platform's points, which score every rule, the stats' sentence; where none does,
+ * Avg and Last are our stats alone and the sentence says so. */
+export const UNCOUNTED = {
+	stats: (names: string): string => `Our stats omit ${names}.`,
+	ours: (names: string): string => `${BOX.avg} and ${BOX.last} are our stats, which omit ${names}.`
+} as const;
+
+/** The sentence naming the rules our stats lack (Lane 111, B33), no link to follow; none when it
+ * names none. Framed by whether any of the screen's rows counts the platform's points (UNCOUNTED); an
+ * answer without basis_note_list (before Lane 115) prints its basis_note as sent. */
+export function uncountedPart(
+	advice: { basis_note: string; basis_note_list?: string },
+	lines: readonly PlayerLine[]
+): BasisPart[] {
+	const names = advice.basis_note_list ?? '';
+	if (names === '') return said(advice.basis_note);
+	const counted = lines.some((line) => platformGame(line) !== null);
+	return said(counted ? UNCOUNTED.stats(names) : UNCOUNTED.ours(names));
 }
 
 /** A sentence part for a basis, none for an empty one. */
@@ -308,6 +410,12 @@ export function said(text: string | null, phone = true): BasisPart[] {
  * sentence (BasisBlock draws the same). */
 export function basisText(parts: readonly BasisPart[]): string {
 	return parts.map((p, i) => (p.href && i < parts.length - 1 ? `${p.text}.` : p.text)).join(' ');
+}
+
+/** The block as one width draws it: a desk's parts (every part but a phone's alone), or a phone's
+ * (every part it shows), read as basisText reads them. */
+export function drawnText(parts: readonly BasisPart[], width: 'desk' | 'phone'): string {
+	return basisText(parts.filter((p) => (width === 'desk' ? p.desk !== false : p.phone)));
 }
 
 /** Whether any row still to be played draws the Game cell's expected score or weather. */
@@ -329,14 +437,11 @@ export interface BoxBasisFacts {
 	/** A Team row draws its Proj final "--" (no figure from the API while the game is live). */
 	noFinal?: boolean;
 	host: LeagueHost;
-	/** The Lineup's: whether its strip already says whose lineup it is ("as set on ESPN"; the rule for
-	 * our pick is then said at a desk alone, Lane 99 fix round 1), the read the change counts from,
-	 * and the API's sentence naming the rules our stats lack; null on the Matchup, which draws no
-	 * evidence columns. */
+	/** The Lineup's: the read the change counts from, and the API's sentence naming the rules our
+	 * stats lack; null on the Matchup, which draws no evidence columns. */
 	lineup: {
-		asSetShown: boolean;
 		previousReadAt: string | null;
-		note: { basis_note: string };
+		note: { basis_note: string; basis_note_list?: string };
 	} | null;
 }
 
@@ -346,17 +451,16 @@ export interface BoxBasisFacts {
 export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): BasisPart[] {
 	const defense = facts.lines.some((l) => l.player.position === 'DEF');
 	const kicked = anyKicked(facts.lines, now);
-	const proj = facts.projection
-		? said(
-				projPart({ ...facts.projection, defense, league: true, kicked, host: facts.host }, clock)
-			)
-		: [];
+	const projFacts: ProjFacts | null = facts.projection
+		? { ...facts.projection, defense, league: true, kicked, host: facts.host }
+		: null;
+	const proj = projFacts ? said(projPart(projFacts, clock)) : [];
 	// What the Team row's small figure is once a game has kicked off (Lane 92, B22).
 	const final = said(projFinalWords(kicked, facts.noFinal === true));
 	const { lineup } = facts;
 	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.
 	const team = lineup === null && facts.teamTotal ? 'platform' : 'rows';
-	const pts = said(ptsPart(facts.byPlayer, facts.host, team));
+	const pts = ptsPart(facts.byPlayer, facts.host, team);
 	// When a row's Final and its stats land, said while one waits on either (Lane 85), and what Avg and
 	// Last count meanwhile (Lane 111).
 	const waiting = (onPhone: boolean): BasisPart[] =>
@@ -366,22 +470,29 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 			...proj,
 			...final,
 			...said(RANK_PART),
-			...pts,
+			...said(pts),
 			...said(gamePart(facts.lines, clock, now, 'full')),
 			...waiting(true)
 		];
+	// The phone Lineup's eight lines (Lane 115, B83): the rule our pick follows said in one clause with
+	// what Proj is, the defenses' scoring, the order Our rank is in and what Team adds left to the desk;
+	// a "--" Proj final says why in place of what it adds (fix round 1, MEDIUM-1).
 	return [
-		...said(PICK_PART, !lineup.asSetShown),
-		...proj,
-		...final,
+		...(projFacts
+			? deskOrPhone(`${PICK_PART} ${projPart(projFacts, clock)}`, pickProjPart(projFacts, clock))
+			: said(PICK_PART)),
+		...deskOrPhone(
+			projFinalWords(kicked, facts.noFinal === true),
+			projFinalPhone(kicked, facts.noFinal === true)
+		),
 		...said(deltaPart(lineup.previousReadAt, clock), false),
 		...said(gamePart(facts.lines, clock, now, 'full')),
 		// On the Lineup phone the expected score and weather are the decision's facts and keep their
 		// cells and sentence: the Final sentence is said at a desk while any row still draws them, and
 		// on the phone too once none does (Lane 85 fix round 2, the coordinator's ruling on brief item 4).
 		...waiting(!drawsFacts(facts.lines, now)),
-		...said(RANK_OPP_PART),
-		...pts,
-		...uncountedPart(lineup.note)
+		...deskOrPhone(RANK_OPP_PART, RANK_OPP_PHONE),
+		...deskOrPhone(pts, ptsPhonePart(facts.byPlayer, facts.host)),
+		...uncountedPart(lineup.note, facts.lines)
 	];
 }

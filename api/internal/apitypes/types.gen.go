@@ -2970,6 +2970,9 @@ type LineupAdvice struct {
 	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
 	BasisNoteLink string `json:"basis_note_link"`
 
+	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
+	BasisNoteList *string `json:"basis_note_list,omitempty"`
+
 	// Bench everyone else on the active roster, by the same keys (injured reserve and taxi spots left out)
 	Bench []PlayerLine `json:"bench"`
 
@@ -3376,6 +3379,9 @@ type OrderAdvice struct {
 
 	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
 	BasisNoteLink string `json:"basis_note_link"`
+
+	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
+	BasisNoteList *string `json:"basis_note_list,omitempty"`
 
 	// FromWeek the first week the rest-of-season order covers at the read's clock: the earliest with a game still to play (Lane 86; a club whose game of it kicked off counts from its next week), null on the preseason order
 	FromWeek *int `json:"from_week"`
@@ -4243,6 +4249,9 @@ type TradeAdvice struct {
 	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
 	BasisNoteLink string `json:"basis_note_link"`
 
+	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
+	BasisNoteList *string `json:"basis_note_list,omitempty"`
+
 	// CheckBasis the trade builder's own line under its scoreboard, shown before its first answer (TradeCheck.basis says the same)
 	CheckBasis string `json:"check_basis"`
 
@@ -4298,7 +4307,10 @@ type TradeCheck struct {
 	BasisNote string `json:"basis_note"`
 
 	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
-	BasisNoteLink string     `json:"basis_note_link"`
+	BasisNoteLink string `json:"basis_note_link"`
+
+	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
+	BasisNoteList *string    `json:"basis_note_list,omitempty"`
 	Fills         TradeFills `json:"fills"`
 
 	// HostNote as TradeAdvice's
@@ -4447,6 +4459,9 @@ type WaiverAdvice struct {
 
 	// BasisNoteLink the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note
 	BasisNoteLink string `json:"basis_note_link"`
+
+	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
+	BasisNoteList *string `json:"basis_note_list,omitempty"`
 
 	// ForWeek the week the page addresses (Lane 95): week, or the week after once every starter of the member's with a game has kicked off or is final; the rows' facts, Proj and pickups are that week's; absent from an older answer
 	ForWeek *int `json:"for_week,omitempty"`
@@ -4710,6 +4725,9 @@ type WeekOrderAdvice struct {
 
 	// BasisNoteLink the words of the link to the league's Settings the web drew before Lane 111 ("Which two"), kept for that web through one deploy; the web no longer draws it. Empty with none or no league
 	BasisNoteLink string `json:"basis_note_link"`
+
+	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
+	BasisNoteList *string `json:"basis_note_list,omitempty"`
 
 	// Moves the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league
 	Moves    *WaiverMoves            `json:"moves"`

@@ -179,6 +179,7 @@
 			row={drawn}
 			{tags}
 			{shortOnPhone}
+			fitOnPhone={rankCell}
 			{compact}
 			{clears}
 			{phoneFacts}

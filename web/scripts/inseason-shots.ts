@@ -33,6 +33,7 @@
 // with the site built against PUBLIC_API_URL=http://localhost:8799 and the fixture API running there
 // on the fixture week's clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z); API_ORIGIN names another
 // port. The script stops before its first shot when the API's clock is not that week's.
+import { readFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
@@ -50,6 +51,8 @@ import { BOX } from '../src/lib/league/box/box.ts';
 import { AS_OF_KICKOFF } from '../src/lib/league/box/basis.ts';
 import { HEAD_BASIS, WAIVERS } from '../src/lib/league/box/waivers.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
+import { ESPN_STAND_IN_NAME } from './inseason-fixture/espn-sync.ts';
+import { stateAt } from './inseason-fixture/game-state.ts';
 import { LEAGUE_RULES_NOTE, PER_GAME_BASIS, WAIVERS_BASIS } from './inseason-fixture/week.ts';
 
 const THEMES = ['light', 'dark'] as const;
@@ -341,8 +344,10 @@ async function tradeFaults(page: Page, width: number): Promise<string[]> {
 		if (!card.includes(TRADE_VERB) || !CARD_GAINS.test(card) || !WEEK_LINE.test(card))
 			faults.push(`card ${card.replace(/\s+/g, ' ')}`);
 	}
-	if (new Set(seen.verbLooks).size > 1)
-		faults.push(`card verbs drawn ${String(new Set(seen.verbLooks).size)} ways`);
+	// The strips' one rule (strip.ts, Lane 115, B87): the first card's verb solid, the rest quiet.
+	const looks = seen.verbLooks.map((c) => (c.split(' ').includes('verb') ? 'verb' : 'quiet'));
+	if (looks[0] !== 'verb' || looks.slice(1).some((l) => l !== 'quiet'))
+		faults.push(`card verbs drawn ${looks.join(', ')}`);
 	if (seen.cards.length > 1 && !/^Best\b/i.test(seen.cards[0] ?? ''))
 		faults.push('the first card does not say Best');
 	if (seen.gainBasis.length !== 1 || !GAIN_BASIS.test(seen.gainBasis[0] ?? ''))
@@ -447,8 +452,9 @@ for (const { name, path, ready: text } of PAGES) {
 				for (const word of await bannedSaid(page)) missing.push(`${at} says ${word}`);
 				// Sleeper adds its players' points: the bug and Totals one figure, the rows' sum (ruling (a)).
 				if (name === 'matchup') {
-					const { bug, row } = await bugAgainstTotals(page);
+					const { bug, row, label } = await bugAgainstTotals(page, FIXTURE_WEEK_CLOCK);
 					if (bug !== row) missing.push(`${at} the bug reads ${bug}, its Totals ${row}`);
+					if (label !== null) missing.push(`${at} the bug is ${label}`);
 				}
 				if (name === 'start') {
 					for (const fault of await lineupFaults(page)) missing.push(`${at} ${fault}`);
@@ -559,21 +565,60 @@ interface PlatformScreen {
 	points: boolean;
 }
 
+/** A recorded matchup starter's facts: whether its game has kicked off is its starters'. */
+interface MatchupFacts {
+	played: boolean;
+	kickoff: string | null;
+	bye: boolean;
+	opponent: string | null;
+}
+function matchupStarters(): { player: { team: string }; facts: MatchupFacts }[] {
+	const read = JSON.parse(
+		readFileSync(new URL('./inseason-fixture/data/matchup.json', import.meta.url), 'utf8')
+	) as { sides: { starters: { line: { player: { team: string }; facts: MatchupFacts } }[] }[] };
+	return read.sides.flatMap((side) => side.starters.map((s) => s.line));
+}
+
+/** Whether the matchup has kicked off at the clock, by its starters' games in the fixture and the
+ * fixture API's one game state (game-state.ts): the expectation comes from the clock, never from
+ * the screen (Lane 115, B90). Every platform's stand-in is the recorded matchup's players. */
+function matchupKickedOff(clock: string): boolean {
+	const at = Date.parse(clock);
+	return matchupStarters().some((line) => {
+		const state = stateAt({ ...line.facts, team: line.player.team }, at);
+		return state !== null && state !== 'upcoming';
+	});
+}
+
 /** The Matchup's score bug and its Totals row print one figure, the side's score (ruling (a), Lane
  * 79): the drafter's side, bug against row. Before the first kickoff the bug's big figure is its
- * Proj (Lane 92, B22), so the row's Proj is the one it matches; from kickoff its Pts. */
-async function bugAgainstTotals(page: Page): Promise<{ bug: string; row: string }> {
-	return page.evaluate((projLabel: string) => {
-		const big = document.querySelector<HTMLElement>('main .bug .sd .big');
-		const cell = big?.getAttribute('aria-label')?.startsWith(`${projLabel} `) ? 'proj' : 'pts';
-		return {
-			bug: big?.innerText.trim() ?? '',
-			row:
-				document
-					.querySelector<HTMLElement>(`main table.box tr.totals td.${cell}`)
-					?.innerText.trim() ?? ''
-		};
-	}, BOX.proj);
+ * Proj (Lane 92, B22), so the row's Proj is the one it matches; from kickoff its Pts. Which one the
+ * clock says (matchupKickedOff); the bug's own label must agree. */
+async function bugAgainstTotals(
+	page: Page,
+	clock: string
+): Promise<{ bug: string; row: string; label: string | null }> {
+	const started = matchupKickedOff(clock);
+	const want = started ? BOX.pts : BOX.proj;
+	const seen = await page.evaluate(
+		(cell: string) => {
+			const big = document.querySelector<HTMLElement>('main .bug .sd .big');
+			return {
+				bug: big?.innerText.trim() ?? '',
+				label: big?.getAttribute('aria-label') ?? '',
+				row:
+					document
+						.querySelector<HTMLElement>(`main table.box tr.totals td.${cell}`)
+						?.innerText.trim() ?? ''
+			};
+		},
+		started ? 'pts' : 'proj'
+	);
+	return {
+		bug: seen.bug,
+		row: seen.row,
+		label: seen.label.startsWith(`${want} `) ? null : `labelled "${seen.label}", not ${want}`
+	};
 }
 
 /** A platform's Matchup and Lineup in the dark at both widths (Lane 79): the Pts sentence once, the
@@ -616,8 +661,9 @@ async function platformPass(
 			if (points !== drawn.length > 0)
 				missing.push(`${at}: ${String(drawn.length)} players' points drawn`);
 			if (screen === 'matchup') {
-				const { bug, row } = await bugAgainstTotals(page);
+				const { bug, row, label } = await bugAgainstTotals(page, clock);
 				if (bug !== row) missing.push(`${at}: the bug reads ${bug}, its Totals ${row}`);
+				if (label !== null) missing.push(`${at}: the bug is ${label}`);
 				if (bugIs !== null && bug !== bugIs)
 					missing.push(`${at}: the bug reads ${bug}, not ${bugIs}`);
 				basisCounts.push(`${at}: bug ${bug}, Totals ${row}`);
@@ -1070,8 +1116,9 @@ async function lineupFaults(page: Page): Promise<string[]> {
 		faults.push(`the no one can play chips: ${seen.idleChips.join(', ')}`);
 	if (!seen.firstChipIdle) faults.push('the no one can play chip is not first');
 	if (seen.idleRows !== 1) faults.push(`${String(seen.idleRows)} rows marked no one can play`);
-	// Our rank and Opp rank share one sentence on the Lineup (Lane 99 fix round 1).
-	if ((seen.text.match(/Opp rank the points allowed to it, 1st fewest/g) ?? []).length !== 1)
+	// Our rank and Opp rank share one sentence on the Lineup (Lane 99 fix round 1), "Opp" on a phone
+	// as its rows say it (Lane 115, B83).
+	if ((seen.text.match(/Opp( rank)? the points allowed to it, 1st fewest/g) ?? []).length !== 1)
 		faults.push('the evidence basis not said once');
 	if (!/Δ Proj is its change since \w{3} \d+:\d\d [ap]m\./.test(seen.text) && seen.wide)
 		faults.push('the change basis');
@@ -1388,7 +1435,8 @@ const LEAGUE_PAGES = [
 		platform: 'Sleeper',
 		waiver: 'FAAB',
 		moves: true,
-		rules: 41
+		rules: 41,
+		title: 'S.U.C.K.'
 	},
 	{
 		name: 'league-sunday-standin',
@@ -1397,7 +1445,8 @@ const LEAGUE_PAGES = [
 		platform: 'ESPN',
 		waiver: 'Waiver',
 		moves: false,
-		rules: 39
+		rules: 39,
+		title: ESPN_STAND_IN_NAME
 	}
 ] as const;
 type LeaguePage = (typeof LEAGUE_PAGES)[number];
@@ -1436,9 +1485,11 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 			nobody: (document.querySelector('main')?.textContent ?? '').includes('Nobody in your league'),
 			// In season the page carries no mock-draft plumbing (Lane 104, B54).
 			mock: /mock draft/i.test(document.querySelector('main')?.textContent ?? ''),
-			// The recorded league's name in the page's own content; the header's switch keeps the member's
-			// chosen league by Lane 102's rule (B38), so it is not read.
+			// The recorded league's name in the page's own content.
 			recordedName: (document.querySelector('main')?.textContent ?? '').includes('S.U.C.K.'),
+			// The header's switch names the page's league (Lane 115, B89), the selected one marked in
+			// its list; the page never selects it (B38).
+			switchWords: text(document.querySelector('header .switch .words')),
 			bids: [...document.querySelectorAll('main table.feed td.det')].filter((td) =>
 				/^FAAB \$\d/.test(text(td))
 			).length,
@@ -1494,6 +1545,8 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 		faults.push(`the basis draws ${String(seen.basisLines)} lines, at most ${String(most)}`);
 	if (lp.live && seen.recordedName)
 		faults.push('the ESPN stand-in names the recorded Sleeper league');
+	if (!seen.switchWords.startsWith(lp.title))
+		faults.push(`the switch names "${seen.switchWords}", not the page's league`);
 	if (lp.live) {
 		// No move offered on a player whose game has kicked off: ESPN would refuse it.
 		for (const name of SUNDAY_MOVES.locked)

@@ -4,20 +4,22 @@
 // the league name's drawn and natural lines and whether it is cut, the Lineup Team row's gap from
 // Proj's figure to Pts's, and the rail the root names with the bottom bar's labels.
 import type { Page } from 'playwright';
+import { STRIP } from '../src/lib/league/box/strip.ts';
 
 /** The Lineup Team row's least gap between its two figures (the mock's rule). */
 export const TOTALS_GAP_MIN_PX = 8;
 /** The most lines a league's name draws. */
 export const NAME_LINES_MAX = 2;
-/** A strip's solid verbs: one, its lead. */
+/** A strip's solid verbs: one, its lead, the first card's on Waivers and Trades alike (Lane 115,
+ * B87). */
 export const STRIP_VERBS = 1;
-/** The strips whose cards draw their one verb alike, quiet, the lead said in words (Lane 103, B65:
- * the Trades strip's "Best"): none solid. */
-const ALIKE_STRIPS: Readonly<Record<string, number>> = { trades: 0 };
 
 export interface StripCount {
 	verbs: number;
 	quiet: number;
+	/** Whether a card's verb drawn solid is the first card's, and with more than one card whether the
+	 * first says Best (strip.ts); null where the strip draws no card's verb (a phone's Waivers). */
+	leadFirst: boolean | null;
 }
 
 export interface ChromeMeasures {
@@ -40,7 +42,7 @@ export interface ChromeMeasures {
 }
 
 export async function chromeMeasures(page: Page): Promise<ChromeMeasures> {
-	return page.evaluate(() => {
+	return page.evaluate((bestWord: string) => {
 		const drawn = (el: Element): boolean => {
 			const r = el.getBoundingClientRect();
 			return r.width > 1 && r.height > 1 && getComputedStyle(el).visibility !== 'hidden';
@@ -67,13 +69,23 @@ export async function chromeMeasures(page: Page): Promise<ChromeMeasures> {
 		}
 		const count = (within: Element | null, cls: string): number =>
 			within === null ? 0 : [...within.querySelectorAll(`.action.${cls}`)].filter(drawn).length;
-		const strips: Record<string, { verbs: number; quiet: number }> = {};
+		const strips: Record<string, { verbs: number; quiet: number; leadFirst: boolean | null }> = {};
 		for (const strip of document.querySelectorAll<HTMLElement>('main [data-strip]')) {
 			const key = strip.dataset.strip ?? '';
 			// The Waivers strip's verb is pinned over the bar on a phone (Screen's .pin).
 			const pins = [...document.querySelectorAll('.pin')].filter(drawn);
 			const pinned = key === 'waivers' ? pins.reduce((n, pin) => n + count(pin, 'verb'), 0) : 0;
-			strips[key] = { verbs: count(strip, 'verb') + pinned, quiet: count(strip, 'quiet') };
+			const cards = [...strip.querySelectorAll('li')];
+			const solid = cards.filter((card) => count(card, 'verb') > 0);
+			const first = cards[0];
+			const best =
+				cards.length < 2 ||
+				(first?.querySelector('.mark')?.textContent.trim().toLowerCase() ?? '') === bestWord;
+			strips[key] = {
+				verbs: count(strip, 'verb') + pinned,
+				quiet: count(strip, 'quiet'),
+				leadFirst: solid.length === 0 ? null : solid.length === 1 && solid[0] === first && best
+			};
 		}
 		const title = document.querySelector<HTMLElement>('main h2.title.wrap');
 		let name: { lines: number; natural: number; cut: boolean } | null = null;
@@ -142,7 +154,7 @@ export async function chromeMeasures(page: Page): Promise<ChromeMeasures> {
 			railLabels: labels,
 			evidenceSplits: splits
 		};
-	});
+	}, STRIP.best.toLowerCase());
 }
 
 /** One page's line for the report, as the mock's measures read. */
@@ -158,14 +170,15 @@ export function chromeLine(where: string, m: ChromeMeasures): string {
 }
 
 /** What a league page's chrome must hold at a width: no band in the phone bar, one solid verb per
- * strip (none on Trades, ALIKE_STRIPS), the name whole within two lines (unless it runs past two,
+ * strip, the first card's said Best, the name whole within two lines (unless it runs past two,
  * `long`), the Team row's figures apart. */
 export function chromeFaults(m: ChromeMeasures, phone: boolean, long = false): string[] {
 	const faults: string[] = [];
 	if (phone && m.band > 1) faults.push(`a ${m.band.toFixed(0)}px band under the bar's row`);
 	for (const [key, c] of Object.entries(m.strips)) {
-		if (c.verbs !== (ALIKE_STRIPS[key] ?? STRIP_VERBS))
-			faults.push(`the ${key} strip draws ${String(c.verbs)} verbs`);
+		if (c.verbs !== STRIP_VERBS) faults.push(`the ${key} strip draws ${String(c.verbs)} verbs`);
+		if (c.leadFirst === false)
+			faults.push(`the ${key} strip's solid verb is not the first card's, said Best`);
 	}
 	if (m.name) {
 		if (m.name.lines > NAME_LINES_MAX) faults.push(`the name draws ${String(m.name.lines)} lines`);

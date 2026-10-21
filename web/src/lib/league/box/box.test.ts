@@ -10,6 +10,7 @@ import {
 	boxRow,
 	deltaWord,
 	easeOf,
+	fitName,
 	oppRankWord,
 	expectedWords,
 	gameOf,
@@ -196,7 +197,17 @@ void test("a status is Lane 63's pill: the week's word, a season-long list's wor
 	});
 	assert.deepEqual(statusOf(null, true), { rank: 'IR', mark: 'IR', sits: true, line: null });
 	assert.equal(statusOf(null, false), null);
-	assert.deepEqual(boxRow(line(), 'QB', ZONE, true, NOW).pill, { position: 'QB', rank: 7 });
+	assert.deepEqual(boxRow(line(), 'QB', ZONE, true, NOW).pill, {
+		position: 'QB',
+		rank: 7,
+		ranked: true
+	});
+	// A screen that draws no rank says none, and the shelf takes the build's (Lane 115, B93).
+	assert.deepEqual(boxRow(line(), 'QB', ZONE, false, NOW).pill, {
+		position: 'QB',
+		rank: null,
+		ranked: false
+	});
 });
 
 void test('a row carries the projection, not the points a game, and no facts once kicked off', () => {
@@ -375,4 +386,11 @@ void test('an injured reserve row draws no matchup: the bench one says why he is
 	assert.equal(reserveRow(drawn, null), drawn);
 	assert.equal(BOX.irBench, 'IR-eligible, taking a bench spot');
 	assert.doesNotMatch(BOX.irBench, bannedPattern());
+});
+
+void test('a name too long for its phone line: a player by initial, a defense by its nickname (Lane 115 fix round 1, LOW-1)', () => {
+	const face = { src: null, mark: false, alt: '' };
+	assert.equal(fitName({ name: 'Jacory Croskey-Merritt', face }), 'J. Croskey-Merritt');
+	assert.equal(fitName({ name: 'Minnesota Vikings', face: { ...face, mark: true } }), 'Vikings');
+	assert.equal(fitName({ name: 'Chiefs D/ST', face: { ...face, mark: true } }), 'Chiefs');
 });

@@ -65,7 +65,7 @@ func (a *advisor) WeekOrder(position draft.Position, marks bool) apitypes.WeekOr
 	// told the board's scoring and has no Settings to open.
 	un := uncountedOf(uncountedRulesAt(a.settings, a.season.Carries, position), marks)
 	out := apitypes.WeekOrderAdvice{Week: a.Snap.Week, Position: apitypes.WeekOrderAdvicePosition(position),
-		BasisNote: un.Note, BasisNoteLink: un.Link, ProjectionReadAt: a.projectionReadAt(),
+		BasisNote: un.Note, BasisNoteLink: un.Link, BasisNoteList: &un.Names, ProjectionReadAt: a.projectionReadAt(),
 		ProjectionScoring: scoring, Rows: []apitypes.WeekOrderRow{}}
 	var hosts map[string]string
 	if marks {

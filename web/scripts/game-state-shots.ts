@@ -23,6 +23,7 @@
 //
 //   CLOCK=sunday|monday|tuesday SET=contract|standin node scripts/game-state-shots.ts [web origin] [out dir]
 // with the site built against PUBLIC_API_URL at the fixture API.
+import { readFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { STATS_BY_WEDNESDAY } from '../src/lib/league/box/basis.ts';
@@ -34,10 +35,12 @@ import { copyFault, watchData } from './copy-scan.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { seasonOrderWords } from './inseason-fixture/waivers-at.ts';
 import { WEEK_DONE } from './inseason-fixture/sunday.ts';
+import { lineupSpent, TURNED_WEEK } from './inseason-fixture/turn.ts';
+import type { LineupAdvice } from '../src/lib/league/inseason/api.ts';
 import { SEASON } from '../src/lib/league/box/season.ts';
 import { BOX } from '../src/lib/league/box/box.ts';
 import { TRADES } from '../src/lib/league/box/trades.ts';
-import { shortName } from '../src/lib/league/box/waivers.ts';
+import { beatsPlace, shortName } from '../src/lib/league/box/waivers.ts';
 import {
 	FIXTURE_MONDAY_CLOCK,
 	FIXTURE_SUNDAY_CLOCK,
@@ -359,16 +362,28 @@ async function checkNoWeekFigure(page: Page, at: string, words: string): Promise
 	if (day === 'tuesday' && text.includes(words)) fault(at, `"${words}" on a finished week`);
 }
 
-/** The fixture's week, the one every clock here is in. */
-const FIXTURE_WEEK = 6;
+/** The fixture's Lineup, whose starters' games decide the week turn. */
+const FIXTURE_LINEUP = JSON.parse(
+	readFileSync(new URL('./inseason-fixture/data/lineup.json', import.meta.url), 'utf8')
+) as LineupAdvice;
+/** The screens that turn to the next week once every starter of the member's has played (Lane 95). */
+const TURNING_SCREENS = new Set(['waivers', 'trades']);
+/** Whether Waivers and Trades address the next week at the clock, by the fixture API's own rule over
+ * its Lineup (turn.ts lineupSpent): the expectation comes from the clock, never from the screen
+ * (Lane 115, B90). Their rows are then all still to play and wait on nothing. */
+const TURNED = lineupSpent(FIXTURE_LINEUP, Date.parse(clock));
 
-/** Whether the screen's strip addresses a later week than the fixture's: once every starter of the
- * member's has played, Waivers and Trades address the next week (Lane 95), whose rows are all still
- * to play and wait on nothing. */
-async function addressesNextWeek(page: Page): Promise<boolean> {
+function addressesNextWeek(screen: string): boolean {
+	return TURNED && TURNING_SCREENS.has(screen);
+}
+
+/** The strip names the week the clock says it addresses: the next week's once turned. */
+async function checkStripWeek(page: Page, at: string, screen: string): Promise<void> {
+	if (!TURNING_SCREENS.has(screen)) return;
 	const head = (await page.locator('main [data-strip] .wk').allTextContents()).join(' ');
-	const week = /(\d+)/.exec(head)?.[1];
-	return week !== undefined && Number(week) > FIXTURE_WEEK;
+	const want = addressesNextWeek(screen) ? TURNED_WEEK : FIXTURE_LINEUP.week;
+	if (!new RegExp(String.raw`\b${String(want)}\b`).test(head))
+		fault(at, `the strip says "${head}", not week ${String(want)}`);
 }
 
 /** Whether a visible row draws an expected score ("29 to 21.5") or weather. */
@@ -395,6 +410,7 @@ async function checkWaivers(page: Page, at: string): Promise<void> {
 				name: tr.querySelector<HTMLElement>('.nm')?.innerText.trim() ?? '',
 				named: tr.classList.contains('moved-in'),
 				gain: tr.querySelector('.beats .gain')?.textContent.trim() ?? null,
+				beats: tr.querySelector('.beats .who')?.textContent.trim() ?? '',
 				// A row with no gain over the roster draws its figure bare and quiet (Lane 98, B13).
 				quiet: tr.querySelector('.beats .gain.quiet') !== null,
 				// The Beats text's right edge and the Add button's left (review M-J).
@@ -405,13 +421,18 @@ async function checkWaivers(page: Page, at: string): Promise<void> {
 	const locked = rows.filter((r) => /\b(Final|Kicked off)\b/.test(r.text));
 	const toPlay = rows.filter((r) => !locked.includes(r) && !r.text.includes(BOX.bye));
 	// Addressing the next week, every row is still to play and none is past its kickoff.
-	const next = await addressesNextWeek(page);
+	const next = addressesNextWeek('waivers');
 	if (day === 'tuesday' && !next && toPlay.length > 0)
 		fault(at, `${String(toPlay.length)} rows still to play on a finished week`);
 	// The season Gain order below is the played week's, once a row is past its kickoff (Lane 85).
 	if (next) {
 		if (locked.length > 0)
 			fault(at, `${String(locked.length)} rows of the next week past their kickoff`);
+		// The fixture's McConkey (LAC) sits week 7: a row he is the Beats of names his bye in the week
+		// addressed (Lane 108, B81; Lane 115, B90).
+		const onBye = beatsPlace({ name: '', starter: true, bye: true });
+		if (!rows.some((r) => r.beats.includes(onBye)))
+			fault(at, `no Beats cell says "${onBye}" on the turned week`);
 		return;
 	}
 	if (locked.length === 0) {
@@ -476,12 +497,13 @@ for (const screen of set === 'standin' && day !== 'sunday' ? LEAGUE_SCREENS : []
 			await page.goto(`${web}${screen.path}`);
 			await ready(page, screen.ready);
 			await screen.check(page, at);
+			await checkStripWeek(page, at, screen.name);
 			// Every row waits on its stats on Monday and Tuesday: each box screen's basis says when they
 			// land (the League page's basis is its standings'), but a screen on the next week's rows has
 			// none waiting (Lane 95).
 			if (
 				screen.name !== 'league' &&
-				!(await addressesNextWeek(page)) &&
+				!addressesNextWeek(screen.name) &&
 				!(await page.locator('main').innerText()).includes(STATS_BY_WEDNESDAY) &&
 				// The Lineup phone keeps the fact cells while a row still draws them, the Final sentence
 				// then the desk's alone (Lane 85 fix round 2 ruling); on Tuesday none does.

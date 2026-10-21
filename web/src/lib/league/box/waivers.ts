@@ -15,15 +15,19 @@ import { LINES } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import {
 	anyKicked,
+	deskOrPhone,
 	waiverFinalsParts,
 	gamePart,
 	OPP_PART,
+	OPP_PHONE,
 	projPart,
+	projPhonePart,
 	said,
 	stamp,
 	uncountedPart,
 	type BasisPart,
-	type Clock
+	type Clock,
+	type ProjFacts
 } from './basis.ts';
 import {
 	BOX,
@@ -596,7 +600,12 @@ export function waiverBasis(
 		| 'projection_previous_read_at'
 		| 'projection_scoring'
 	> &
-		Partial<Pick<WaiverAdvice, 'pickups' | 'week' | 'for_week' | 'projection_arrives_at'>>,
+		Partial<
+			Pick<
+				WaiverAdvice,
+				'pickups' | 'week' | 'for_week' | 'projection_arrives_at' | 'basis_note_list'
+			>
+		>,
 	lines: readonly PlayerLine[],
 	clock: Clock,
 	now: number
@@ -612,24 +621,21 @@ export function waiverBasis(
 					addressedWeek({ week: advice.week, for_week: advice.for_week }),
 					clock.zone
 				);
-	const proj =
+	const projFacts: ProjFacts | null =
 		arrives !== null
 			? null
-			: projPart(
-					{
-						readAt: advice.projection_read_at,
-						scoring: advice.projection_scoring,
-						defense,
-						league: true,
-						// A row past kickoff keeps its Proj as of kickoff (Lane 92, B27).
-						kicked: anyKicked(lines, now),
-						// A page turned past the platform's week names the week (Lane 111, B70).
-						...(advice.week === undefined
-							? {}
-							: { weeks: { week: advice.week, for_week: advice.for_week } })
-					},
-					clock
-				);
+			: {
+					readAt: advice.projection_read_at,
+					scoring: advice.projection_scoring,
+					defense,
+					league: true,
+					// A row past kickoff keeps its Proj as of kickoff (Lane 92, B27).
+					kicked: anyKicked(lines, now),
+					// A page turned past the platform's week names the week (Lane 111, B70).
+					...(advice.week === undefined
+						? {}
+						: { weeks: { week: advice.week, for_week: advice.for_week } })
+				};
 	return [
 		// The order's rule, the API's: the week's, or the season Gain once a pickup's game kicked off.
 		...said(advice.basis),
@@ -638,11 +644,14 @@ export function waiverBasis(
 		...said(dropsSaid(advice.pickups ?? []) ? WAIVERS.dropRule : null, false),
 		// A game's sentence and Δ Proj's are the line under the heads (headBasis, B35).
 		...said(seasonBasisWords(advice.season_basis)),
-		...said(proj),
+		// A phone's eight lines leave the defenses' scoring to the desk (Lane 115).
+		...(projFacts === null
+			? []
+			: deskOrPhone(projPart(projFacts, clock), projPhonePart(projFacts, clock))),
 		// The phone's rows draw no expected score or weather (BoxLine phoneFacts): no read to say there.
 		...said(gamePart(lines, clock, now, 'full'), false),
 		...waiverFinalsParts(lines, now),
-		...said(OPP_PART),
-		...uncountedPart(advice)
+		...deskOrPhone(OPP_PART, OPP_PHONE),
+		...uncountedPart(advice, lines)
 	];
 }

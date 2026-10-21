@@ -12,7 +12,6 @@
 		heldLineup,
 		LINEUP,
 		lineupBox,
-		lineupSum,
 		lineupPageWords,
 		lineupText,
 		setOnWords,
@@ -227,7 +226,6 @@
 		{host}
 		projection={{ readAt: advice.projection_read_at, scoring: advice.projection_scoring }}
 		lineup={{
-			asSetShown: lineupSum(box, host, done) !== null,
 			previousReadAt: advice.projection_previous_read_at,
 			note: advice
 		}}

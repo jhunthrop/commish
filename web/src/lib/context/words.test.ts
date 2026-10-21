@@ -1,12 +1,12 @@
 // The context's words: the switch, a league's line, the basis line and the held mark. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { switchLabel, type ContextLeague } from './words.ts';
+import { shownLeague, switchLabel, type ContextLeague } from './words.ts';
 import { heldMark, holderWords } from './held-marks.ts';
 import type { Held } from './held-words.ts';
 import { contextNote, scoresSentence } from './note-words.ts';
 import { safeThen } from './then-path.ts';
-import { leagueLine } from './menu-words.ts';
+import { followingMark, leagueLine } from './menu-words.ts';
 import {
 	clubsLead,
 	hardestFigure,
@@ -286,4 +286,20 @@ void test('a set week says it is not played yet until its first kickoff, then gr
 	};
 	assert.equal(weekLines([frozen], [6])[0]?.text, 'set Tue Oct 13, not played yet');
 	assert.equal(weekLines([frozen])[0]?.text, 'set Tue Oct 13, grades when the stats land');
+});
+
+void test("the switch names the page's league, the selected one marked in its list (Lane 115, B89)", () => {
+	const selected = league();
+	const other = league({ id: '3f0c1a52-0000-4000-8000-000000000002', name: 'Office Pool' });
+	const leagues = [selected, other];
+	// On the other league's page the switch names it; the selection is untouched (B38).
+	assert.equal(shownLeague(other.id, leagues, selected), other);
+	assert.equal(switchLabel(shownLeague(other.id, leagues, selected), null), 'Office Pool');
+	// Off a league's page, or on one the account does not follow, the selected league.
+	assert.equal(shownLeague(undefined, leagues, selected), selected);
+	assert.equal(shownLeague('unknown', leagues, selected), selected);
+	// "following" marks the selected league only where the switch names another.
+	assert.equal(followingMark(selected.id, selected.id, other.id), true);
+	assert.equal(followingMark(other.id, selected.id, other.id), false);
+	assert.equal(followingMark(selected.id, selected.id, selected.id), false);
 });

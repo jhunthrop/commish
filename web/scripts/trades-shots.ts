@@ -2,8 +2,8 @@
 // clock, the strip and the finder as a member sees them. Each asserts what it shows:
 //   the head over the gains reads "Gain a week" (no "over repl."), the line under the heads says what a
 //   Gain is in once ("points over replacement in each lineup, weeks ..."); each card's gains read
-//   "+3.5 a week for your lineup, +0.8 for theirs"; every card's verb draws the same, the first of two
-//   saying Best; the trade listed only for the need it fills says so ("Fills your empty TE ...") and
+//   "+3.5 a week for your lineup, +0.8 for theirs"; the first card's verb solid and the rest quiet,
+//   the first of two saying Best (strip.ts, Lane 115, B87); the trade listed only for the need it fills says so ("Fills your empty TE ...") and
 //   no other row does; the footer says the keep rule; and the page's copy passes the one guard
 //   (copy-scan.ts).
 // Against the built site and the fixture API (scripts/inseason-fixture/serve.ts) on the fixture
@@ -13,6 +13,7 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
 import { copyFault, watchData } from './copy-scan.ts';
+import { STRIP } from '../src/lib/league/box/strip.ts';
 import { TRADES } from '../src/lib/league/box/trades.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { fixtureApiClock, installFixtureApiClock } from './inseason-fixture/clock.ts';
@@ -96,10 +97,16 @@ function checkSeen(s: Seen, where: string, width: number): void {
 	check(s.cards.length > 0 && s.cards.length <= 2, `${where}: ${String(s.cards.length)} cards`);
 	for (const card of s.cards)
 		check(CARD_GAINS.test(card), `${where}: card ${card.replace(/\s+/g, ' ')}`);
-	check(new Set(s.verbLooks).size === 1, `${where}: card verbs ${s.verbLooks.join(' | ')}`);
+	const [lead, ...rest] = s.verbLooks.map((looks) =>
+		looks.split(' ').includes('verb') ? 'verb' : 'quiet'
+	);
+	check(
+		lead === 'verb' && rest.every((looks) => looks === 'quiet'),
+		`${where}: card verbs ${s.verbLooks.join(' | ')}`
+	);
 	if (s.cards.length > 1)
 		check(
-			s.cards[0]?.toLowerCase().startsWith(TRADES.bestCard.toLowerCase()) === true,
+			s.cards[0]?.toLowerCase().startsWith(STRIP.best.toLowerCase()) === true,
 			`${where}: the first card not Best`
 		);
 	// The need is said only where it lists the trade (fix round 1, HIGH-1): the top-ranked stand-in

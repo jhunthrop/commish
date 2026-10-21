@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerLine, WaiverRow, WeekFacts } from '../inseason/api.ts';
 import { addKey } from '../inseason/move.ts';
-import { basisText, KICKED_OFF_PART } from './basis.ts';
+import { basisText, drawnText, KICKED_OFF_PART } from './basis.ts';
 import {
 	cardGains,
 	cardName,
@@ -407,12 +407,13 @@ void test('the basis is one paragraph, the pickup rule first, each column it dra
 	);
 	// A game's sentence and Δ Proj's are the line under the heads, so the footer says neither (B35).
 	assert.equal(
-		basisText(parts),
+		drawnText(parts, 'desk'),
 		`${BASIS.basis} ${WAIVERS.dropRule} Gain is your lineup's change in points over replacement a week, weeks 6 to 17. Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. ${FACTS_SENTENCE} Opp rank is points allowed to his position, 1st fewest. ${BASIS.basis_note}`
 	);
-	assert.deepEqual(
-		parts.filter((p) => !p.phone).map((p) => p.text),
-		[WAIVERS.dropRule, FACTS_SENTENCE]
+	// A phone's eight lines leave the defenses' scoring to the desk and say Opp as its rows do (Lane 115).
+	assert.equal(
+		drawnText(parts, 'phone'),
+		`${BASIS.basis} Gain is your lineup's change in points over replacement a week, weeks 6 to 17. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Opp is points allowed to his position, 1st fewest. ${BASIS.basis_note}`
 	);
 	// The rules our stats lack are named, with no link to follow (Lane 111, B33).
 	assert.ok(parts.every((p) => p.href === undefined));
