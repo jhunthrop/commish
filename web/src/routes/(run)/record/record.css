@@ -1,0 +1,385 @@
+/* The record page (Lane 114): both records draw from these rules, the page and its two sections. */
+.record {
+	padding: var(--s-5);
+	display: flex;
+	flex-direction: column;
+	gap: var(--s-4);
+}
+.record .bug {
+	display: grid;
+	grid-template-columns: auto auto minmax(0, 1fr);
+	align-items: center;
+	gap: var(--s-3) var(--s-5);
+	padding: var(--s-3) var(--s-4);
+	border: 1px solid var(--line);
+	border-left: 4px solid var(--accent);
+	border-radius: var(--r-md);
+	background: var(--surface);
+}
+.record .head {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.record .span {
+	font-size: var(--t-xs);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: var(--track-label);
+	color: var(--accent-text);
+}
+.record h2 {
+	margin: 0;
+	font-family: var(--font-num);
+	font-weight: 800;
+	font-size: var(--t-xl);
+	line-height: 1.05;
+	text-transform: uppercase;
+}
+.record .tiles {
+	display: flex;
+	gap: var(--s-5);
+}
+.record .tile {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding-left: var(--s-4);
+	border-left: 1px solid var(--line);
+}
+.record .label {
+	font-size: var(--t-xs);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: var(--track-label);
+	color: var(--ink-3);
+}
+.record .vals {
+	display: flex;
+	align-items: baseline;
+	gap: var(--s-2);
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+.record .vals b {
+	font-family: var(--font-num);
+	font-weight: 800;
+	font-size: var(--t-2xl);
+	line-height: 1;
+	color: var(--accent-text);
+}
+.record .vals span {
+	font-size: var(--t-sm);
+	color: var(--ink-2);
+}
+/* The scale under the tiles, the bug's whole width. */
+.record .scale {
+	grid-column: 1 / -1;
+	margin: 0;
+	font-size: var(--t-sm);
+	line-height: 1.45;
+	color: var(--ink-2);
+}
+/* A league's own weeks: its box score and one sentence each, under the chart (Lanes 93, 114). */
+.record .league {
+	display: flex;
+	flex-direction: column;
+	gap: var(--s-2);
+}
+.record .league-head {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--t-xs);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: var(--track-label);
+	color: var(--ink-3);
+}
+.record .league ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+	gap: var(--s-1);
+	font-size: var(--t-sm);
+	font-variant-numeric: tabular-nums;
+}
+.record .honest {
+	margin: 0;
+	max-width: 520px;
+	font-size: var(--t-sm);
+	line-height: 1.45;
+	color: var(--ink);
+}
+.record .filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--s-2) var(--s-3);
+}
+.record .chips {
+	display: inline-flex;
+	gap: 2px;
+	padding: 3px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-pill);
+	background: var(--surface);
+}
+.record .chips button {
+	height: 30px;
+	padding: 0 var(--s-3);
+	border: 0;
+	border-radius: var(--r-pill);
+	background: transparent;
+	color: var(--ink-2);
+	font: inherit;
+	font-size: var(--t-sm);
+	font-weight: 600;
+	cursor: pointer;
+}
+.record .chips button[aria-pressed='true'] {
+	background: var(--ink);
+	color: var(--bg);
+}
+.record .figure-pick {
+	display: none;
+}
+.record .weeks {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: var(--r-md);
+	overflow: hidden;
+}
+.record th {
+	padding: 0 var(--s-2);
+	text-align: left;
+	background: var(--bg);
+	white-space: nowrap;
+}
+.record .grp th {
+	height: 22px;
+	font-size: var(--t-xs);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: var(--track-label);
+	color: var(--ink-2);
+	text-align: center;
+}
+.record .grp .g {
+	border-left: 1px solid var(--line);
+}
+.record .cols th {
+	height: 30px;
+	font-size: var(--t-xs);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: var(--track-label);
+	color: var(--ink-3);
+	border-bottom: 1px solid var(--line);
+}
+.record td {
+	height: 48px;
+	padding: 4px var(--s-2);
+	border-bottom: 1px solid var(--line);
+	vertical-align: middle;
+}
+.record .n {
+	text-align: right;
+	font-family: var(--font-num);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+.record .cols .n {
+	text-align: right;
+}
+/* Ours over the weeks that graded a yardstick, under its figure to date (N1). */
+.record .same {
+	display: block;
+	font-family: var(--font-ui);
+	font-size: var(--t-xs);
+	color: var(--ink-3);
+}
+.record td.wk {
+	font-family: var(--font-num);
+	font-weight: 700;
+	font-size: var(--t-md);
+	white-space: nowrap;
+	padding-left: var(--s-3);
+}
+.record td.wk .ord {
+	display: block;
+	font-family: var(--font-ui);
+	font-size: var(--t-xs);
+	font-weight: 500;
+	color: var(--ink-3);
+}
+.record td.plc {
+	font-weight: 600;
+	color: var(--ink-2);
+}
+.record td.m {
+	font-size: var(--t-lg);
+	font-weight: 600;
+	color: var(--ink-2);
+}
+.record td.m.ours {
+	font-weight: 800;
+	color: var(--accent-text);
+}
+.record th.m.ours,
+.record td.m.ours {
+	border-left: 1px solid var(--line);
+}
+.record td.m.starters {
+	font-size: var(--t-md);
+}
+.record td.st {
+	font-size: var(--t-sm);
+	color: var(--ink-3);
+	padding-left: var(--s-4);
+}
+.record .quiet td {
+	height: 40px;
+	color: var(--ink-3);
+}
+.record .quiet.live td {
+	background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+.record .quiet.live td:first-child {
+	box-shadow: inset 3px 0 0 var(--accent);
+}
+.record .quiet td.wide {
+	padding-left: var(--s-2);
+}
+.record .totals td {
+	height: 52px;
+	background: var(--scoreboard);
+	color: var(--scoreboard-ink-2);
+	border-bottom: 0;
+}
+.record .totals td.wk {
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--scoreboard-ink);
+}
+.record .totals td.m.ours {
+	color: var(--scoreboard-num);
+}
+@media (max-width: 1180px) {
+	.record .bug {
+		grid-template-columns: auto minmax(0, 1fr);
+	}
+	.record .tiles {
+		flex-wrap: wrap;
+		row-gap: var(--s-2);
+	}
+	.record .honest {
+		grid-column: 1 / -1;
+		max-width: none;
+	}
+}
+.record td.wide.narrow {
+	display: none;
+}
+/* Below a wide screen one figure at a time: Week, Ours and each yardstick. */
+@media (max-width: 1180px) {
+	.record .figure-pick {
+		display: inline-flex;
+	}
+	.record .grp,
+	.record .plc,
+	.record .st:not(.wide),
+	.record td.wide.desk {
+		display: none;
+	}
+	.record td.wide.narrow {
+		display: table-cell;
+	}
+	.record .weeks:not(.show-agreement) .agreement,
+	.record .weeks:not(.show-placesOff) .placesOff,
+	.record .weeks:not(.show-starters) .starters {
+		display: none;
+	}
+}
+@media (max-width: 760px) {
+	.record {
+		padding: var(--s-4);
+		gap: var(--s-3);
+	}
+	.record .bug {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.record .tiles {
+		flex-direction: column;
+		gap: var(--s-2);
+	}
+	.record .tile {
+		flex-direction: row;
+		align-items: baseline;
+		justify-content: space-between;
+		padding-left: 0;
+		border-left: 0;
+	}
+	.record .vals b {
+		font-size: var(--t-xl);
+	}
+	.record .vals span {
+		font-size: var(--t-xs);
+	}
+	.record td {
+		padding: 4px 6px;
+	}
+	.record td.m {
+		font-size: var(--t-md);
+	}
+	.record .quiet td.wide {
+		white-space: normal;
+	}
+}
+
+/* Lane 114: each record's head, what it grades beside its name. */
+.record .rec {
+	display: flex;
+	flex-direction: column;
+	gap: var(--s-3);
+}
+.record .rec-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: var(--s-1) var(--s-3);
+	padding-bottom: var(--s-2);
+	border-bottom: 2px solid var(--ink);
+}
+.record .rec-head h2 {
+	font-size: var(--t-2xl);
+}
+.record .rec-head .what {
+	font-size: var(--t-sm);
+	font-weight: 600;
+	color: var(--ink-2);
+}
+.record .bug .order {
+	font-family: var(--font-num);
+	font-weight: 800;
+	font-size: var(--t-xl);
+	line-height: 1.05;
+	text-transform: uppercase;
+}
+.record .league-weeks {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+}
+.record .league-weeks td {
+	height: 40px;
+}
+@media (max-width: 760px) {
+	.record .league-weeks .plc {
+		display: none;
+	}
+}

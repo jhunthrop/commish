@@ -153,7 +153,7 @@ def _starters(entries: Sequence[Entry], ranks: Mapping[str, float]) -> tuple[int
     return right, of
 
 
-def _score(entries: Sequence[Entry]) -> Score:
+def score_entries(entries: Sequence[Entry]) -> Score:
     """One order's score over its entries: its ranks under the fill rule against the finish."""
     if not entries:
         return Score(0, None, None, 0, 0)
@@ -165,7 +165,7 @@ def _score(entries: Sequence[Entry]) -> Score:
     return Score(len(entries), agreement, error, right, of)
 
 
-def _entries(rows: Sequence[Mapping[str, Any]], stance: str) -> list[Entry]:
+def entries_of(rows: Sequence[Mapping[str, Any]], stance: str) -> list[Entry]:
     """Each row as an entry; ADP's stance is minus its ADP, and a row a source has no number for has
     none."""
     out: list[Entry] = []
@@ -186,9 +186,14 @@ def week_lines(rows: Sequence[Mapping[str, Any]]) -> tuple[Line, ...]:
         if not subset:
             continue
         kept = any(row.get("published_points") is not None for row in subset)
-        published = _score(_entries(subset, "published_points")) if kept else None
+        published = score_entries(entries_of(subset, "published_points")) if kept else None
         lines.append(
-            Line(position, _score(_entries(subset, "board_points")), _score(_entries(subset, "adp")), published)
+            Line(
+                position,
+                score_entries(entries_of(subset, "board_points")),
+                score_entries(entries_of(subset, "adp")),
+                published,
+            )
         )
     return tuple(lines)
 
@@ -214,7 +219,7 @@ def placed_players(rows: Sequence[Mapping[str, Any]]) -> tuple[Placed, ...]:
     finished = sorted(both, key=lambda row: (-row["actual_points"], row["player_id"]))
 
     def places(stance: str) -> dict[str, int]:
-        listed = [(pid, held) for pid, held, _, _ in _entries(both, stance) if held is not None]
+        listed = [(pid, held) for pid, held, _, _ in entries_of(both, stance) if held is not None]
         return ordinal_ranks(listed)
 
     ours, adp, published = places("board_points"), places("adp"), places("published_points")
@@ -235,7 +240,11 @@ def starters_basis(to_date_lines: Sequence[Line]) -> str | None:
     naming the lineup it counts (Lane 93: a page opened from a league counts the league's own): "Starters
     right counts a standard 12-team lineup, the week's top 12 QBs, 24 RBs, 36 WRs and 12 TEs, and how
     many of them the order also put there." None before any week is graded."""
-    graded = {line.position for line in to_date_lines if line.position != ALL and line.ours.starters_of > 0}
+    return starters_words({line.position for line in to_date_lines if line.ours.starters_of > 0})
+
+
+def starters_words(graded: set[str]) -> str | None:
+    """The starters basis for the positions graded (any line whose ours counted starters)."""
     counts = [f"{n * LEAGUE_TEAMS} {_STARTER_WORDS[p]}" for p, n in STARTERS_A_TEAM.items() if p in graded]
     if not counts:
         return None
@@ -254,7 +263,7 @@ def method(to_date_lines: Sequence[Line]) -> str:
     return _METHOD.format(benchmarks="ADP and Published" if drawn else "ADP")
 
 
-def _pooled(scores: Sequence[Score], players: int) -> Score:
+def pooled(scores: Sequence[Score], players: int) -> Score:
     return Score(
         players,
         mean_or_none([s.agreement for s in scores if s.agreement is not None]),
@@ -286,18 +295,25 @@ def to_date(weeks: Sequence[Week], rows_by_week: Mapping[int, Sequence[Mapping[s
         lines.append(
             Line(
                 position,
-                _pooled([line.ours for line in found], len(players)),
-                _pooled([line.adp for line in found], len(players)),
-                _pooled(published, shared_players) if published else None,
-                _pooled([line.ours for line in shared], shared_players) if shared else None,
+                pooled([line.ours for line in found], len(players)),
+                pooled([line.adp for line in found], len(players)),
+                pooled(published, shared_players) if published else None,
+                pooled([line.ours for line in shared], shared_players) if shared else None,
             )
         )
     return tuple(lines)
 
 
-def _trails(ours: Score, theirs: Score, name: str) -> list[str]:
+# The legacy record's starters clause, "{name} had more of the week's starters right in the standard
+# lineup, 104 of 168 against our 100": the slots name, theirs, of, ours.
+STARTERS_CLAUSE: Final = (
+    "{name} had more of the week's starters right in the standard lineup, {theirs} of {of} against our {ours}"
+)
+
+
+def trail_clauses(ours: Score, theirs: Score, name: str, starters: str = STARTERS_CLAUSE) -> list[str]:
     """Each figure on which a benchmark called the weeks better than our order, as a clause, every
-    figure compared and said as the page prints it."""
+    figure compared and said as the page prints it; `starters` words the starters figure."""
     out = []
     mine, its = printed(ours.agreement, AGREEMENT_PLACES), printed(theirs.agreement, AGREEMENT_PLACES)
     if mine is not None and its is not None and its > mine:
@@ -306,9 +322,7 @@ def _trails(ours: Score, theirs: Score, name: str) -> list[str]:
     if mine is not None and its is not None and its < mine:
         out.append(f"{name} put a typical player closer to his finish, {its:.1f} places off against our {mine:.1f}")
     if theirs.starters > ours.starters and theirs.starters_of == ours.starters_of:
-        out.append(
-            f"{name} had more of the week's starters right in the standard lineup, {theirs.starters} of {theirs.starters_of} against our {ours.starters}"
-        )
+        out.append(starters.format(name=name, theirs=theirs.starters, of=theirs.starters_of, ours=ours.starters))
     return out
 
 
@@ -318,9 +332,9 @@ def honest_line(to_date_lines: Sequence[Line]) -> str | None:
     line = next((line for line in to_date_lines if line.position == ALL), None)
     if line is None:
         return None
-    clauses = _trails(line.ours, line.adp, "ADP")
+    clauses = trail_clauses(line.ours, line.adp, "ADP")
     if line.published is not None and line.ours_on_published is not None:
-        clauses += _trails(line.ours_on_published, line.published, "The published projection")
+        clauses += trail_clauses(line.ours_on_published, line.published, "The published projection")
     if not clauses:
         return None
     return " ".join(f"{clause[0].upper()}{clause[1:]}." for clause in clauses)
@@ -331,7 +345,7 @@ select week, max(frozen_at) as frozen_at from research.register_freeze_rows
 where season = :s and board_source = :source group by week order by week
 """
 _GRADED: Final = """
-select g.player_id, g.actual_points, g.graded_at, f.board_points, f.adp, f.published_points, f.board_as_of,
+select g.player_id, g.actual_points, g.graded_at, f.board_points, f.adp, f.published_points, f.espn_points, f.board_as_of,
        case when p.position in ('DEF', 'DST') then 'DST' else p.position end as position
 from research.register_grade_rows g
 join research.register_freeze_rows f on f.season = g.season and f.week = g.week and f.frozen_at = g.frozen_at
@@ -356,10 +370,11 @@ def order_source(conn: Connection, season: int, week: int, frozen_at: datetime) 
     return SHIPPED_SOURCE if shipped else SERVED_SOURCE
 
 
-def _frozen_week(
-    conn: Connection, season: int, week: int, frozen_at: datetime, grades_from: datetime | None
-) -> tuple[Week, list[Mapping[str, Any]]]:
-    source = order_source(conn, season, week, frozen_at)
+def graded_rows(
+    conn: Connection, season: int, week: int, frozen_at: datetime, source: str
+) -> tuple[list[Mapping[str, Any]], datetime | None]:
+    """A freeze's rows of one board with their latest grading's points (none before it is graded),
+    and the board's own stamp."""
     params = {"s": season, "w": week, "f": frozen_at, "source": source}
     rows: list[Mapping[str, Any]] = [row._asdict() for row in conn.execute(text(_GRADED), params)]
     board_as_of = conn.execute(
@@ -369,6 +384,14 @@ def _frozen_week(
         ),
         params,
     ).scalar_one()
+    return rows, board_as_of
+
+
+def _frozen_week(
+    conn: Connection, season: int, week: int, frozen_at: datetime, grades_from: datetime | None
+) -> tuple[Week, list[Mapping[str, Any]]]:
+    source = order_source(conn, season, week, frozen_at)
+    rows, board_as_of = graded_rows(conn, season, week, frozen_at, source)
     graded_at = max((row["graded_at"] for row in rows), default=None)
     status = "frozen" if graded_at is None else "graded"
     waits = grades_from if status == "frozen" else None

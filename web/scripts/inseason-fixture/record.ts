@@ -26,6 +26,22 @@ export function leagueRecordAnswer(espn: boolean): LeagueRecord {
 		host: espn ? 'espn' : 'sleeper',
 		teams: 12,
 		lineup: ESPN_LINEUP,
-		weeks: espn ? [{ week: 7, benchmark: 'espn', ours: 112.4, theirs: 104, margin: 8.4 }] : []
+		weeks: espn
+			? [
+					{
+						week: 7,
+						benchmark: 'espn',
+						ours: 112.4,
+						theirs: 104,
+						margin: 8.4,
+						// Lane 114, STAND-IN: the week's weekly record on the league's rostered players.
+						ranking: {
+							players: 168,
+							ours: { agreement: 0.6, places_off: 14.2, starters: 71, starters_of: 108 },
+							espn: { agreement: 0.57, places_off: 15, starters: 69, starters_of: 108 }
+						}
+					}
+				]
+			: []
 	};
 }

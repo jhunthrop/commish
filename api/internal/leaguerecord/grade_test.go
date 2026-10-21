@@ -72,9 +72,58 @@ var byes = map[string]int{"MIN": 7, "KC": 10}
 // end, the kicker and the other team's quarterback start for neither.
 func TestGradeScoresOurPicksAgainstESPNsProjectedLineup(t *testing.T) {
 	got := Grade([]boards.SetOrder{order(&gradedAt)}, reads(), 3, espnShape, byes)
+	if len(got) != 1 || got[0].Ranking == nil {
+		t.Fatalf("got %+v, want one week with its ranking", got)
+	}
+	// The ranking grades the nine rostered players both reads carry: the
+	// bye, the Out tight end, the kicker and the quarterback the read after
+	// the grading does not carry are left out.
+	if got[0].Ranking.Players != 9 {
+		t.Errorf("ranking over %d players", got[0].Ranking.Players)
+	}
+	got[0].Ranking = nil
 	want := []Week{{Week: 7, Benchmark: BenchmarkESPN, Ours: 97, Theirs: 70, Margin: 27}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
+	}
+}
+
+// The weekly record in the league (Lane 114): four receivers on two teams
+// of a one-receiver league; our order is the finish and ESPN's projection
+// its reverse, so ours matches it exactly and calls both starters, and
+// ESPN's is the reverse order and calls none.
+func TestRankGradesOurOrderAndESPNsOnTheLeaguesPlayers(t *testing.T) {
+	cands := []Candidate{{"w1", posWR}, {"w2", posWR}, {"w3", posWR}, {"w4", posWR}}
+	ours := map[string]int{"w1": 1, "w2": 2, "w3": 3, "w4": 4}
+	espn := map[string]float64{"w1": 5, "w2": 10, "w3": 15, "w4": 20}
+	actual := map[string]float64{"w1": 30, "w2": 20, "w3": 10, "w4": 0}
+	got := rank(cands, ours, espn, actual, leaguesync.Shape{Teams: 2, WR: 1})
+	if got.Players != 4 || *got.Ours.Agreement != 1 || *got.ESPN.Agreement != -1 {
+		t.Fatalf("agreement ours %v, ESPN %v", *got.Ours.Agreement, *got.ESPN.Agreement)
+	}
+	if *got.Ours.PlacesOff != 0 || *got.ESPN.PlacesOff != 2 {
+		t.Errorf("places off ours %v, ESPN %v", *got.Ours.PlacesOff, *got.ESPN.PlacesOff)
+	}
+	if got.Ours.Starters != 2 || got.Ours.StartersOf != 2 || got.ESPN.Starters != 0 || got.ESPN.StartersOf != 2 {
+		t.Errorf("starters ours %d of %d, ESPN %d of %d", got.Ours.Starters, got.Ours.StartersOf, got.ESPN.Starters, got.ESPN.StartersOf)
+	}
+}
+
+// A player ESPN does not project is tied below every one it does (the fill
+// rule), never dropped, and never one of its starters.
+func TestRankFillsAPlayerTheProjectionLacks(t *testing.T) {
+	cands := []Candidate{{"w1", posWR}, {"w2", posWR}, {"w3", posWR}}
+	espn := map[string]float64{"w2": 10, "w3": 5}
+	ranks := filledRanks(cands, byPointsValue(espn))
+	if ranks["w2"] != 1 || ranks["w3"] != 2 || ranks["w1"] != 3 {
+		t.Fatalf("ranks %v", ranks)
+	}
+	right, of := startersRight(cands, byPointsValue(espn), ByPoints(espn), map[string]float64{"w1": 30, "w2": 1, "w3": 0}, leaguesync.Shape{Teams: 1, WR: 1})
+	if right != 0 || of != 1 {
+		t.Errorf("starters %d of %d", right, of)
+	}
+	if _, ok := spearman([]float64{1}, []float64{2}); ok {
+		t.Error("a single player supports no correlation")
 	}
 }
 

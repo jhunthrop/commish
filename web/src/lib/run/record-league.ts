@@ -38,10 +38,10 @@ export function countable(record: RunRecord, players: PlayersByWeek): boolean {
 	return graded.length > 0 && graded.every((week) => (players[week.week]?.length ?? 0) > 0);
 }
 
-const SOURCES: readonly PlacedSource[] = ['ours', 'adp', 'published'];
-
-function recounted(score: Score, count: { right: number; of: number }): Score {
-	return { ...score, starters: count.right, startersOf: count.of };
+function recounted(score: Score, count: { right: number; of: number }): Score;
+function recounted(score: Score | null, count: { right: number; of: number }): Score | null;
+function recounted(score: Score | null, count: { right: number; of: number }): Score | null {
+	return score === null ? null : { ...score, starters: count.right, startersOf: count.of };
 }
 
 /** A line with each order's starters counted in the lineup. */
@@ -54,16 +54,12 @@ function lineIn(
 	const shape = lineupFor(lineup, line.position);
 	const count = (source: PlacedSource): { right: number; of: number } =>
 		startersRight(at, shape, source);
-	const [ours, adp, published] = SOURCES.map(count) as [
-		ReturnType<typeof count>,
-		ReturnType<typeof count>,
-		ReturnType<typeof count>
-	];
 	return {
 		...line,
-		ours: recounted(line.ours, ours),
-		adp: recounted(line.adp, adp),
-		published: line.published === null ? null : recounted(line.published, published)
+		ours: recounted(line.ours, count('ours')),
+		adp: recounted(line.adp, count('adp')),
+		espn: recounted(line.espn, count('espn')),
+		published: recounted(line.published, count('published'))
 	};
 }
 
@@ -89,13 +85,12 @@ function toDateIn(record: RunRecord, weeks: RunRecord['weeks']): RecordLine[] {
 				line.ours,
 				sum((l) => l.ours)
 			),
-			adp: recounted(
-				line.adp,
-				sum((l) => l.adp)
-			),
+			adp: again(line.adp, (l) => l.adp),
+			espn: again(line.espn, (l) => l.espn),
 			published: again(line.published, (l) => l.published),
-			// Ours over the weeks that graded the published projection, beside it (review 66j N1).
-			oursOnPublished: again(line.oursOnPublished, (l) => (l.published === null ? null : l.ours))
+			// Ours over the weeks that graded each yardstick, beside it (review 66j N1).
+			oursOnPublished: again(line.oursOnPublished, (l) => (l.published === null ? null : l.ours)),
+			oursOnEspn: again(line.oursOnEspn, (l) => (l.espn === null ? null : l.ours))
 		};
 	});
 }
@@ -147,6 +142,7 @@ export function honestWords(run: RunRecord, shown: RunRecord, lineup: PageLineup
 	const all = shown.toDate.find((line) => line.position === 'All');
 	const starters = [
 		startersClause('ADP', all?.ours ?? null, all?.adp ?? null),
+		startersClause('ESPN', all?.oursOnEspn ?? null, all?.espn ?? null),
 		startersClause('The published projection', all?.oursOnPublished ?? null, all?.published ?? null)
 	].filter((clause): clause is string => clause !== null);
 	const said = [...kept, ...starters];
@@ -198,25 +194,86 @@ export function leagueBasis(record: LeagueRecord, shown: PageLineup): LeagueBasi
 		: null;
 	const benchmark =
 		record.host === 'espn'
-			? `In your ESPN league, from week ${String(LEAGUE_BENCHMARK_FROM_WEEK)} each graded week also says how the lineup our order picks from your roster scored against the lineup ESPN's own projection picks, both as your league scores.`
+			? `In your ESPN league, from week ${String(LEAGUE_BENCHMARK_FROM_WEEK)} each graded week also grades our order and ESPN's own projection on the league's rostered players as your league scores, and scores the lineup each picks from your roster.`
 			: null;
 	return { starters, benchmark };
 }
 
 const BENCHMARK_NAMES: Readonly<Record<LeagueRecordWeek['benchmark'], string>> = {
-	espn: "ESPN's projected lineup",
-	published: "the published projection's lineup"
+	espn: 'ESPN',
+	published: "the week's published projection"
 };
 
-/** One graded week as the member reads it (ruling 6): "Week 7: our picks beat ESPN's projected lineup
- * by 8.4 points, 97.0 to 88.6." Every figure is the API's tenth, printed as given. */
+/** One graded week as the member reads it (Lane 114, ruling 2): "Week 7: following us instead of ESPN
+ * would have scored 8.4 more points, 112.4 to 104.0." Every figure is the API's tenth, as given. */
 export function weekSentence(week: LeagueRecordWeek): string {
 	const lead = `Week ${String(week.week)}`;
 	const them = BENCHMARK_NAMES[week.benchmark];
-	const score = `${fixed(week.ours)} to ${fixed(week.theirs)}`;
 	if (week.margin > 0)
-		return `${lead}: our picks beat ${them} by ${fixed(week.margin)} points, ${score}.`;
+		return `${lead}: following us instead of ${them} would have scored ${fixed(week.margin)} more points, ${fixed(week.ours)} to ${fixed(week.theirs)}.`;
 	if (week.margin < 0)
-		return `${lead}: ${them.charAt(0).toUpperCase()}${them.slice(1)} beat our picks by ${fixed(-week.margin)} points, ${fixed(week.theirs)} to ${fixed(week.ours)}.`;
-	return `${lead}: our picks and ${them} scored the same, ${fixed(week.ours)} each.`;
+		return `${lead}: following ${them} instead of us would have scored ${fixed(-week.margin)} more points, ${fixed(week.theirs)} to ${fixed(week.ours)}.`;
+	return `${lead}: following us or ${them} would have scored the same, ${fixed(week.ours)}.`;
+}
+
+/** A league week's measures in the record's score shape, so its cells print as the record's do. */
+export interface LeagueRankingRow {
+	week: number;
+	players: number;
+	ours: Score;
+	espn: Score;
+	/** The lineup each picked from the member's roster, as the league scores. */
+	lineup: { ours: number; espn: number };
+}
+
+type RankingScore = components['schemas']['LeagueRankingScore'];
+
+function scoreFrom(score: RankingScore, players: number): Score {
+	return {
+		graded: players,
+		agreement: score.agreement,
+		placesOff: score.places_off,
+		starters: score.starters,
+		startersOf: score.starters_of
+	};
+}
+
+/** The league's weekly record, one row a graded week ESPN's projection was read for (Lane 114): our
+ * order and ESPN's on the league's rostered players, and the lineup each picked from the roster. A week
+ * an older API answers without its ranking is left out. */
+export function leagueRankingRows(record: LeagueRecord): LeagueRankingRow[] {
+	return record.weeks.flatMap((week) => {
+		const ranking = week.ranking;
+		if (week.benchmark !== 'espn' || ranking === undefined) return [];
+		return [
+			{
+				week: week.week,
+				players: ranking.players,
+				ours: scoreFrom(ranking.ours, ranking.players),
+				espn: scoreFrom(ranking.espn, ranking.players),
+				lineup: { ours: week.ours, espn: week.theirs }
+			}
+		];
+	});
+}
+
+/** The weeks the league's own sentence speaks for: each graded week the page does not draw a row for
+ * (a published-projection week, or an answer with no ranking). */
+export function leagueSentenceWeeks(record: LeagueRecord): LeagueRecordWeek[] {
+	const drawn = new Set(leagueRankingRows(record).map((row) => row.week));
+	return record.weeks.filter((week) => !drawn.has(week.week));
+}
+
+/** The season so far in the member's league in one sentence (ruling 2): "Following us instead of ESPN
+ * would have scored 8.4 more points over 1 week." Null before an ESPN week is graded. */
+export function leagueToDate(rows: readonly LeagueRankingRow[]): string | null {
+	if (rows.length === 0) return null;
+	const margin = rows.reduce((sum, row) => sum + row.lineup.ours - row.lineup.espn, 0);
+	const tenth = Math.round(margin * 10) / 10;
+	const over = plural(rows.length, 'week');
+	if (tenth > 0)
+		return `Following us instead of ESPN would have scored ${fixed(tenth)} more points over ${over}.`;
+	if (tenth < 0)
+		return `Following ESPN instead of us would have scored ${fixed(-tenth)} more points over ${over}.`;
+	return `Following us or ESPN would have scored the same over ${over}.`;
 }

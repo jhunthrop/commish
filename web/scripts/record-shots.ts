@@ -88,11 +88,7 @@ async function record(who: Who, width: number): Promise<void> {
 		lacks(main, /standard lineup|standard 12-team/u, where);
 	}
 	if (who === 'espn') {
-		has(
-			main,
-			"Week 7: our picks beat ESPN's projected lineup by 8.4 points, 112.4 to 104.0.",
-			where
-		);
+		has(main, 'Following us instead of ESPN would have scored 8.4 more points over 1 week.', where);
 		has(main, 'In your ESPN league, from week 7', where);
 	} else lacks(main, /ESPN/u, where);
 	await page.screenshot({

@@ -185,7 +185,9 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 				ours: score,
 				adp: { ...score, agreement: 0.37 },
 				published: null,
-				oursOnPublished: null
+				oursOnPublished: null,
+				espn: null,
+				oursOnEspn: null
 			}
 		]
 	};

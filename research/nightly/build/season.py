@@ -9,8 +9,10 @@ from typing import Any, Final, Protocol
 from research.model.instants import js_iso
 from research.nightly.build.tenth import tenth
 from research.nightly.config import PAGE_FORMAT, TEAMS, RunFormat
+from research.nightly.reads import draft_record as draft_read
 from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
+from research.nightly.reads import weekly_record as weekly_read
 from research.nightly.reads.adp import AdpCapture
 from research.nightly.register_log import FrozenBy
 from research.web_contract import figure_words_path
@@ -115,15 +117,120 @@ def _placed(player: record_read.Placed) -> Json:
     }
 
 
-def record_json(
+def _optional(score: record_read.Score | None) -> Json | None:
+    return None if score is None else _score(score)
+
+
+def _weekly_line(line: weekly_read.WeeklyLine) -> Json:
+    """A weekly line in the record line's shape (`recordLineSchema`), ADP null: it is no weekly yardstick."""
+    return {
+        "position": line.position,
+        "ours": _score(line.ours),
+        "adp": None,
+        "published": _optional(line.yardsticks.get("published")),
+        "oursOnPublished": _optional(line.ours_on.get("published")),
+        "espn": _optional(line.yardsticks.get("espn")),
+        "oursOnEspn": _optional(line.ours_on.get("espn")),
+    }
+
+
+def _weekly_players(week: weekly_read.WeeklyWeek) -> list[Json]:
+    return [
+        {
+            "position": p.position,
+            "ours": p.ours,
+            "adp": None,
+            "published": p.yardsticks.get("published"),
+            "espn": p.yardsticks.get("espn"),
+            "finish": p.finish,
+        }
+        for p in week.placed
+    ]
+
+
+def _weekly_week(week: weekly_read.WeeklyWeek, frozen_by: FrozenBy, season: int) -> Json:
+    """A week of weekly rankings in the record week's shape (`recordWeekSchema`): every set week's
+    order is the rest-of-season order the site shipped."""
+    froze = week.status in {"frozen", "graded"}
+    out: Json = {
+        "week": week.week,
+        "status": week.status,
+        "frozenAt": None if week.at is None else iso(week.at),
+        "frozenBy": frozen_by.run_id(season, week.week) if froze else None,
+        "order": weekly_read.SHIPPED_ORDER if froze else None,
+        "gradedAt": None if week.graded_at is None else iso(week.graded_at),
+        "population": week.population,
+        "lines": [_weekly_line(line) for line in week.lines],
+    }
+    if week.status == "missed":
+        out["note"] = weekly_read.MISSED_NOTE
+    if week.board_as_of is not None:
+        out["orderAsOf"] = iso(week.board_as_of)
+    if week.grades_from is not None:
+        out["gradesFrom"] = iso(week.grades_from)
+    if week.placed:
+        out["players"] = _weekly_players(week)
+    return out
+
+
+def weekly_json(weekly: weekly_read.WeeklyRecord, frozen_by: FrozenBy, season: int) -> Json:
+    """The weekly record (Lane 114) in the record's own shape, so the page reads it with the record's
+    functions, plus the week it starts from."""
+    to_date = weekly.to_date
+    return {
+        "fromWeek": weekly.from_week,
+        "statistic": dict(record_read.STATISTIC),
+        "scale": record_read.SCALE,
+        "startersBasis": weekly_read.starters_basis(to_date),
+        "method": weekly_read.method(weekly.from_week, to_date),
+        "honest": weekly_read.honest_line(to_date),
+        "weeks": [_weekly_week(week, frozen_by, season) for week in weekly.weeks],
+        "toDate": [_weekly_line(line) for line in to_date],
+    }
+
+
+def _draft_line(line: draft_read.DraftLine) -> Json:
+    return {"position": line.position, "ours": _score(line.ours), "adp": _score(line.adp)}
+
+
+def draft_json(draft: draft_read.DraftRecord) -> Json:
+    """The draft record (Lane 114): our draft board against ADP on the season's points so far."""
+    return {
+        "setAt": iso(draft.set_at),
+        "boardAsOf": iso(draft.board_as_of),
+        "throughWeek": draft.through_week,
+        "namedBasis": draft_read.named_basis(draft.lines),
+        "honest": draft_read.honest_line(draft.lines),
+        "lines": [_draft_line(line) for line in draft.lines],
+        "progress": [
+            {
+                "week": point.week,
+                "ours": record_read.printed(_clamped(point.ours), record_read.AGREEMENT_PLACES),
+                "adp": record_read.printed(_clamped(point.adp), record_read.AGREEMENT_PLACES),
+            }
+            for point in draft.progress
+        ],
+    }
+
+
+def record_json(  # noqa: PLR0913 - the record's parts, each read once by the assembler
     season: int,
     weeks: Sequence[record_read.Week],
     to_date: Sequence[record_read.Line],
     frozen_by: FrozenBy,
     *,
     published_from: int | None,
+    weekly: weekly_read.WeeklyRecord | None = None,
+    draft: draft_read.DraftRecord | None = None,
 ) -> Json:
-    return {
+    # Lane 114, additive (the web parses a run without them): the two records, each named by what it
+    # grades. The fields below stay as they were for the web before it.
+    extra: Json = {}
+    if weekly is not None:
+        extra["weekly"] = weekly_json(weekly, frozen_by, season)
+    if draft is not None:
+        extra["draft"] = draft_json(draft)
+    return extra | {
         "season": season,
         "format": PAGE_FORMAT.id,
         "statistic": dict(record_read.STATISTIC),

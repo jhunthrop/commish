@@ -5200,6 +5200,36 @@ components:
         ours: { type: number, format: double, description: "our picks' points, to the tenth, as the league scores" }
         theirs: { type: number, format: double, description: "the benchmark lineup's points, to the tenth, as the league scores" }
         margin: { type: number, format: double, description: "ours less theirs, to the tenth" }
+        ranking:
+          $ref: "#/components/schemas/LeagueRanking"
+    LeagueRanking:
+      type: object
+      description: >-
+        the week's weekly record in the member's own league (Lane 114), present only where the benchmark is espn: our
+        set order and ESPN's own projection, each graded on every rostered player with a stat line at quarterback, running back,
+        receiver and tight end (none on a bye, out, suspended or on injured reserve at the read before our order was
+        set) by what he scored as the league scores; absent from an answer before Lane 114
+      required: [players, ours, espn]
+      properties:
+        players: { type: integer, description: "the rostered players graded" }
+        ours: { $ref: "#/components/schemas/LeagueRankingScore" }
+        espn: { $ref: "#/components/schemas/LeagueRankingScore" }
+    LeagueRankingScore:
+      type: object
+      required: [agreement, places_off, starters, starters_of]
+      properties:
+        agreement:
+          type: number
+          format: double
+          nullable: true
+          description: "order matched: Spearman's rank correlation with the week's points, to two places, null when the week cannot support one"
+        places_off:
+          type: number
+          format: double
+          nullable: true
+          description: "the mean distance in places between the order and the finish, to the tenth, null with no players"
+        starters: { type: integer, description: "the starters the order called right in the league's lineup across its teams" }
+        starters_of: { type: integer, description: "the starters the finish fills there" }
     LeagueShape:
       type: object
       description: the league's starting lineup by our slots, and its bench
