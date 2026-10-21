@@ -11,6 +11,7 @@ import type { LeagueHost } from '../api.ts';
 import type { PlayerLine, ProjectionScoring } from '../inseason/api.ts';
 import { hostWords, nearestRules, rulesOwner } from '../names.ts';
 import { BOX, FORMAT_WORDS, expectedWords, factsReadAt, weatherCell } from './box.ts';
+import { addressedWeek } from './next-week.ts';
 
 export type { BasisPart };
 
@@ -39,6 +40,17 @@ export interface ProjFacts {
 	kicked?: boolean;
 	/** The league's platform, named where its rules add what the column does not carry. */
 	host?: LeagueHost;
+	/** The platform's week and the week the page addresses (the API's week and for_week, Lane 95): a
+	 * page turned past the platform's week names the week its Proj is for (Lane 111, B70). */
+	weeks?: { week: number; for_week?: number };
+}
+
+const THIS_WEEKS = "this week's";
+
+/** Whose week a figure is: "this week's" on the platform's week, "week 7's" on a page turned to the
+ * week after it (Lane 111, B70). */
+export function weeksWord(week: number, platformWeek: number): string {
+	return week === platformWeek ? THIS_WEEKS : `week ${String(week)}'s`;
 }
 
 /** What a game past kickoff keeps (Lane 92, B27), the end of the Proj sentence. */
@@ -86,9 +98,9 @@ function whoseScoring(proj: ProjFacts, format: string): string {
 	return proj.league ? leagueScoringWords(proj.scoring, proj.host) : ` in ${format}`;
 }
 
-/** "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm.", or for
- * FFPC's rules "..., PPR shown, nearest FFPC's rules, read Mon 6:00 pm. FFPC adds 0.5 a catch for
- * TEs." */
+/** "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm.", "week 7's"
+ * on a page turned to week 7 (Lane 111, B70), or for FFPC's rules "..., PPR shown, nearest FFPC's
+ * rules, read Mon 6:00 pm. FFPC adds 0.5 a catch for TEs." */
 export function projPart(proj: ProjFacts, clock: Clock): string {
 	const format = FORMAT_WORDS[proj.scoring.format];
 	const whose = whoseScoring(proj, format);
@@ -96,7 +108,9 @@ export function projPart(proj: ProjFacts, clock: Clock): string {
 	const when = proj.readAt === null ? 'not in yet' : `read ${stamp(proj.readAt, clock)}`;
 	const kicked = proj.kicked === true ? `, ${AS_OF_KICKOFF}` : '';
 	const bonus = proj.league ? teBonusSentence(proj.scoring.te_bonus, proj.host) : null;
-	const said = `${proj.head ?? BOX.proj} is this week's published projection${whose}${defenses}, ${when}${kicked}.`;
+	const week =
+		proj.weeks === undefined ? THIS_WEEKS : weeksWord(addressedWeek(proj.weeks), proj.weeks.week);
+	const said = `${proj.head ?? BOX.proj} is ${week} published projection${whose}${defenses}, ${when}${kicked}.`;
 	return bonus === null ? said : `${said} ${bonus}`;
 }
 
@@ -137,12 +151,16 @@ export const RANK_PART = `${BOX.ourRank} is his place at his position in our ord
  * to one clause beside the Our rank sentence). */
 export const PICK_PART = `Our pick starts the highest ${BOX.proj} at each slot.`;
 
+/** The words every sentence of when our stats land ends on (KICKED_OFF_PART, Lane 111's two), which
+ * the shots scripts look for. */
+export const STATS_BY_WEDNESDAY = 'stats by Wednesday.';
+
 /** When a game's final and its stats land (Lane 80), short enough for a phone's basis: the hourly
  * capture reads the game's status while any game of the week waits on its final, so it turns Final at
  * the pass after it ends, however many passes were missed (Lane 84: no promise of "within the hour");
  * its stats, and so Avg and Last, come with the weekly pass on Tuesday or by Wednesday evening
  * (research JOBS.md). */
-export const KICKED_OFF_PART = `${BOX.final} lands the hour after a game ends, its stats by Wednesday.`;
+export const KICKED_OFF_PART = `${BOX.final} lands the hour after a game ends, its ${STATS_BY_WEDNESDAY}`;
 
 /** KICKED_OFF_PART where a row's game has kicked off with no final yet, or is final with the week's
  * stats not in his games yet, each by the one game-state rule at the page's clock (kickoff.ts
@@ -156,6 +174,54 @@ export function kickedOffPartAt(lines: readonly PlayerLine[], now: number): stri
 		);
 	});
 	return waiting ? KICKED_OFF_PART : null;
+}
+
+/** What Avg and Last count of a final our stats have not landed (Lane 111, B23), said once where a row
+ * counts the platform's points for one (the API's last_games source): this week's finals, or the
+ * platform week's on a page turned past it. */
+export function platformFinalsPart(host: LeagueHost, week: string, rostered: string): string {
+	return `${BOX.avg} and ${BOX.last} count ${week} finals from ${hostWords(host)}'s points${rostered}, our ${STATS_BY_WEDNESDAY}`;
+}
+
+/** KICKED_OFF_PART and platformFinalsPart in one sentence, where a row's game is still in play beside
+ * one the platform's points count (Lane 108's budget: merge before hiding). */
+export function liveFinalsPart(host: LeagueHost, rostered: string): string {
+	return `${BOX.final} lands the hour after a game ends, ${BOX.avg} and ${BOX.last} then count ${hostWords(host)}'s points${rostered}, our ${STATS_BY_WEDNESDAY}`;
+}
+
+/** Said where a final row holds neither our stats nor the platform's points (a free agent: the
+ * platform scores only rostered players), so the sentence does not claim his figures. */
+export const FOR_ROSTERED = ' for rostered players';
+
+/** A row's final the platform's points count, null without one. */
+function platformGame(line: PlayerLine): PlayerLine['facts']['last_games'][number] | null {
+	return line.facts.last_games.find((game) => game.source === 'platform') ?? null;
+}
+
+/** A row final at the page's clock whose Avg and Last hold no game of the week, from either source. */
+function bareFinal(line: PlayerLine, now: number): boolean {
+	return (
+		lineState(line.facts, now) === 'final' &&
+		!line.facts.last_games.some((game) => game.week === line.facts.week)
+	);
+}
+
+/** When a row's Final and its stats land, and what Avg and Last count meanwhile, by the one game-state
+ * rule at the page's clock: the platform's points for a final where any row counts them (Lane 111),
+ * merged with when Final lands while a game is still in play; else kickedOffPartAt. No platform (a
+ * reader with no league) is our stats alone. */
+export function finalsPartAt(
+	lines: readonly PlayerLine[],
+	now: number,
+	host: LeagueHost | null
+): string | null {
+	const counted = lines.find((line) => platformGame(line) !== null);
+	const game = counted === undefined ? null : platformGame(counted);
+	if (host === null || counted === undefined || game === null) return kickedOffPartAt(lines, now);
+	const rostered = lines.some((line) => bareFinal(line, now)) ? FOR_ROSTERED : '';
+	if (lines.some(({ facts }) => lineState(facts, now) === 'kicked_off'))
+		return liveFinalsPart(host, rostered);
+	return platformFinalsPart(host, weeksWord(game.week, counted.facts.week), rostered);
 }
 
 /** Avg and Last where a page says what they are (the player card): in the scoring the rows are in. */
@@ -178,17 +244,10 @@ export function ptsPart(byPlayer: boolean, host: LeagueHost, team: TeamFigure): 
 		: `${BOX.pts} are ${platform}'s points so far, Team adds the rows.`;
 }
 
-/** The API's count of the rules our stats lack, then its link to the league's Settings, which lists
- * them; none when it counts none. */
-export function uncountedParts(
-	advice: { basis_note: string; basis_note_link: string },
-	href: string
-): BasisPart[] {
-	if (advice.basis_note === '') return [];
-	return [
-		{ text: advice.basis_note, phone: true },
-		{ text: advice.basis_note_link, phone: true, href }
-	];
+/** The API's sentence naming the rules our stats lack (Lane 111, B33: "Avg and Last miss your
+ * two-point and safety rules."), no link to follow; none when it names none. */
+export function uncountedPart(advice: { basis_note: string }): BasisPart[] {
+	return said(advice.basis_note);
 }
 
 /** A sentence part for a basis, none for an empty one. */
@@ -223,13 +282,12 @@ export interface BoxBasisFacts {
 	host: LeagueHost;
 	/** The Lineup's: whether its strip already says whose lineup it is ("as set on ESPN"; the rule for
 	 * our pick is then said at a desk alone, Lane 99 fix round 1), the read the change counts from,
-	 * the API's count of the rules our stats lack, and its link; null on the Matchup, which draws no
+	 * and the API's sentence naming the rules our stats lack; null on the Matchup, which draws no
 	 * evidence columns. */
 	lineup: {
 		asSetShown: boolean;
 		previousReadAt: string | null;
-		note: { basis_note: string; basis_note_link: string };
-		rulesHref: string;
+		note: { basis_note: string };
 	} | null;
 }
 
@@ -250,8 +308,9 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.
 	const team = lineup === null && facts.teamTotal ? 'platform' : 'rows';
 	const pts = said(ptsPart(facts.byPlayer, facts.host, team));
-	// When a row's Final and its stats land, said while one waits on either (Lane 85).
-	const waiting = kickedOffPartAt(facts.lines, now);
+	// When a row's Final and its stats land, said while one waits on either (Lane 85), and what Avg and
+	// Last count meanwhile (Lane 111).
+	const waiting = finalsPartAt(facts.lines, now, facts.host);
 	if (lineup === null)
 		return [
 			...proj,
@@ -273,6 +332,6 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 		...said(waiting, !drawsFacts(facts.lines, now)),
 		...said(RANK_OPP_PART),
 		...pts,
-		...uncountedParts(lineup.note, lineup.rulesHref)
+		...uncountedPart(lineup.note)
 	];
 }

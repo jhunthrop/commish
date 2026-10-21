@@ -2,7 +2,7 @@
 	"week": 6,
 	"basis": "A pickup starts this week on Proj and keeps Gain at zero or better.",
 	"pickup_order": "week",
-	"basis_note": "Avg and Last miss five of your rules our stats lack.",
+	"basis_note": "Avg and Last miss your two-point, missed kick, fumble recovery and safety rules.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",
 	"read_at": "2026-10-14T19:05:38.329Z",

@@ -40,6 +40,7 @@ import { inSeason, noWeek } from './member-week.ts';
 import { inTenths, roundTenth } from './tenths.ts';
 import { FIXTURE_CLOCK_VARIABLE, FIXTURE_MONDAY_CLOCK, fixtureClock } from './clock.ts';
 import { stamped, stateAt } from './game-state.ts';
+import { platformed, platformGames } from './platform-games.ts';
 import {
 	ORDER_FROM_WEEK,
 	orderAtClock,
@@ -469,6 +470,11 @@ function tradesHolding(player: string | null): TradeAdvice {
 	};
 }
 
+/** The recorded league's finals its platform scored once its Sunday has come (platform-games.ts,
+ * Lane 111): the Avg, Last and GP of every answer about the league count them. */
+const platformNow = (): ReturnType<typeof platformGames> =>
+	afterSunday() ? platformGames(sync.host, sleeperAfter(), now()) : new Map();
+
 /** The trade builder's check (trade-check.ts). */
 const tradeCheck = tradeChecker({ trades, lineup, readAt });
 
@@ -835,7 +841,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		return;
 	}
 	if (LEAGUE_ORDER.test(url.pathname)) {
-		send(req, res, HTTP.ok, orderAt(url.searchParams, true));
+		send(req, res, HTTP.ok, platformed(orderAt(url.searchParams, true), platformNow()));
 		return;
 	}
 	// The player's week restated at the fixture's clock (Lane 85 fix round 2, M-D): after the Sunday
@@ -891,7 +897,8 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		if (id === SLOW) await new Promise((resolve) => setTimeout(resolve, HOLD_MS));
 		const standIn = standInAsked(req, id ?? '');
 		if (standIn && (route === 'lineup' || route === 'matchup' || route === 'scoreboard')) {
-			send(req, res, HTTP.ok, { ...standIn[route], read_at: standIn.readAt });
+			const games = platformGames(standIn.sync.host, standIn, now());
+			send(req, res, HTTP.ok, platformed({ ...standIn[route], read_at: standIn.readAt }, games));
 			return;
 		}
 		const bodies = {
@@ -902,8 +909,8 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			scoreboard: ESPN_MOVES.has(id ?? '') ? scoreboardLive : scoreboardNow(),
 			waivers: ESPN_MOVES.has(id ?? '')
 				? espnWaivers(url.searchParams.get('position'))
-				: waiversAt(url.searchParams.get('position')),
-			trades: tradesHolding(url.searchParams.get('player'))
+				: platformed(waiversAt(url.searchParams.get('position')), platformNow()),
+			trades: platformed(tradesHolding(url.searchParams.get('player')), platformNow())
 		} as const;
 		send(req, res, HTTP.ok, { ...bodies[route as keyof typeof bodies], read_at: readAt() });
 		return;

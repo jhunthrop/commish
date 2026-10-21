@@ -8,14 +8,18 @@ import {
 	basisText,
 	boxBasisParts,
 	deltaPart,
+	finalsPartAt,
+	FOR_ROSTERED,
 	gamePart,
 	KICKED_OFF_PART,
 	kickedOffPartAt,
+	liveFinalsPart,
 	OPP_PART,
+	platformFinalsPart,
 	RANK_OPP_PART,
 	projPart,
 	ptsPart,
-	uncountedParts,
+	uncountedPart,
 	type Clock
 } from './basis.ts';
 
@@ -131,16 +135,19 @@ void test('Pts says whether the platform gives each player his points or each te
 	}
 });
 
-void test('the uncounted rules are the API sentence, then its link to the Settings list', () => {
-	const advice = {
-		basis_note: 'Avg and Last miss five of your rules our stats lack.',
-		basis_note_link: 'Which five'
-	};
-	assert.deepEqual(uncountedParts(advice, '/league/1#uncounted'), [
-		{ text: advice.basis_note, phone: true },
-		{ text: 'Which five', phone: true, href: '/league/1#uncounted' }
-	]);
-	assert.deepEqual(uncountedParts({ basis_note: '', basis_note_link: '' }, '/x'), []);
+void test('the uncounted rules are the API sentence naming them, with no link (Lane 111, B33)', () => {
+	assert.deepEqual(
+		uncountedPart({
+			basis_note: 'Avg and Last miss your two-point, missed kick, fumble recovery and safety rules.'
+		}),
+		[
+			{
+				text: 'Avg and Last miss your two-point, missed kick, fumble recovery and safety rules.',
+				phone: true
+			}
+		]
+	);
+	assert.deepEqual(uncountedPart({ basis_note: '' }), []);
 });
 
 void test('a block reads as one paragraph: a link that more words follow closes its sentence', () => {
@@ -165,7 +172,9 @@ void test('copy guard: every basis part is fantasy words, with no dash or semico
 		RANK_OPP_PART,
 		ptsPart(false, 'espn', 'platform'),
 		ptsPart(true, 'espn', 'platform'),
-		ptsPart(true, 'espn', 'rows')
+		ptsPart(true, 'espn', 'rows'),
+		platformFinalsPart('espn', "this week's", FOR_ROSTERED),
+		liveFinalsPart('espn', FOR_ROSTERED)
 	];
 	for (const text of said) {
 		assert.doesNotMatch(text, banned, text);
@@ -185,10 +194,9 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 				asSetShown: true,
 				previousReadAt: BEFORE,
 				note: {
-					basis_note: 'Avg and Last miss five of your rules our stats lack.',
-					basis_note_link: 'Which five'
-				},
-				rulesHref: '/league/1#uncounted'
+					basis_note:
+						'Avg and Last miss your two-point, missed kick, fumble recovery and safety rules.'
+				}
 			}
 		},
 		CENTRAL,
@@ -196,7 +204,7 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 	);
 	assert.equal(
 		basisText(parts),
-		"Our pick starts the highest Proj at each slot. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Our rank is his place at his position in our order, Opp rank the points allowed to it, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. Avg and Last miss five of your rules our stats lack. Which five"
+		"Our pick starts the highest Proj at each slot. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Our rank is his place at his position in our order, Opp rank the points allowed to it, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. Avg and Last miss your two-point, missed kick, fumble recovery and safety rules."
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),
@@ -238,8 +246,7 @@ void test('the Lineup and the Matchup say when Final and the stats land while a 
 						? {
 								asSetShown: false,
 								previousReadAt: null,
-								note: { basis_note: '', basis_note_link: '' },
-								rulesHref: '/league/1#uncounted'
+								note: { basis_note: '' }
 							}
 						: null
 				},
@@ -263,8 +270,7 @@ void test('the Lineup phone keeps its fact cells; the Final sentence waits for t
 	const lineup = {
 		asSetShown: false,
 		previousReadAt: null,
-		note: { basis_note: '', basis_note_link: '' },
-		rulesHref: '/league/1#uncounted'
+		note: { basis_note: '' }
 	};
 	const at = (lines: PlayerLine[]) =>
 		boxBasisParts(
@@ -294,4 +300,98 @@ void test('the Lineup phone keeps its fact cells; the Final sentence waits for t
 void test('the Final sentence says what holds, never a promise of within the hour (Lane 84)', () => {
 	assert.equal(KICKED_OFF_PART, 'Final lands the hour after a game ends, its stats by Wednesday.');
 	assert.equal(bannedPattern().test(KICKED_OFF_PART), false);
+});
+
+/** The fixture's clocks (scripts/inseason-fixture/clock.ts): Sunday morning before the noon games,
+ * Monday night with Sunday final and the Monday game under way, Wednesday evening after our stats. */
+const SUNDAY_MORNING = Date.parse('2026-10-18T15:00:00.000Z');
+const MONDAY_NIGHT = Date.parse('2026-10-20T01:30:00.000Z');
+const WEDNESDAY = Date.parse('2026-10-22T01:00:00.000Z');
+const SUNDAY_KICKOFF = '2026-10-18T17:00:00.000Z';
+const MONDAY_KICKOFF = '2026-10-20T00:15:00.000Z';
+
+/** A Sunday starter: to come Sunday morning; final with the platform's points from Monday; final
+ * with our stats from Wednesday. */
+const sundayRow = (now: number): PlayerLine => {
+	if (now < Date.parse(SUNDAY_KICKOFF))
+		return line({
+			kickoff: SUNDAY_KICKOFF,
+			last_games: [{ week: 5, points: 10, source: 'stats' }]
+		});
+	const source = now < WEDNESDAY ? 'platform' : 'stats';
+	return line({
+		kickoff: SUNDAY_KICKOFF,
+		played: true,
+		game_state: 'final',
+		last_games: [
+			{ week: 6, points: 30.4, source },
+			{ week: 5, points: 10, source: 'stats' }
+		]
+	});
+};
+
+void test('Avg and Last say they count the platform points for a final our stats lack (Lane 111, B23)', () => {
+	// Sunday morning: nothing final, nothing said.
+	assert.equal(finalsPartAt([sundayRow(SUNDAY_MORNING)], SUNDAY_MORNING, 'espn'), null);
+	// Monday, every game final: the ruling's sentence.
+	const monday = Date.parse('2026-10-19T16:00:00.000Z');
+	assert.equal(
+		finalsPartAt([sundayRow(monday)], monday, 'espn'),
+		"Avg and Last count this week's finals from ESPN's points, our stats by Wednesday."
+	);
+	// Monday night, the Monday game in play beside them: one sentence for both, merged before hiding.
+	const inPlay = line({ kickoff: MONDAY_KICKOFF, game_state: 'kicked_off' });
+	assert.equal(
+		finalsPartAt([sundayRow(MONDAY_NIGHT), inPlay], MONDAY_NIGHT, 'espn'),
+		"Final lands the hour after a game ends, Avg and Last then count ESPN's points, our stats by Wednesday."
+	);
+	// Wednesday our stats are in: nothing waits, nothing is said.
+	assert.equal(finalsPartAt([sundayRow(WEDNESDAY)], WEDNESDAY, 'espn'), null);
+	// The platform's week named on a page turned past it (Waivers on Monday night, its rows week 7's).
+	const turned: PlayerLine = {
+		...sundayRow(monday),
+		facts: {
+			...sundayRow(monday).facts,
+			week: 7,
+			kickoff: '2026-10-25T17:00:00.000Z',
+			played: false,
+			game_state: 'upcoming'
+		}
+	};
+	assert.equal(
+		finalsPartAt([turned], monday, 'sleeper'),
+		"Avg and Last count week 6's finals from Sleeper's points, our stats by Wednesday."
+	);
+});
+
+void test('a final with neither source (a free agent) keeps the sentence to rostered players', () => {
+	const monday = Date.parse('2026-10-19T16:00:00.000Z');
+	const free = line({
+		kickoff: SUNDAY_KICKOFF,
+		played: true,
+		game_state: 'final',
+		last_games: [{ week: 5, points: 8, source: 'stats' }]
+	});
+	assert.equal(
+		finalsPartAt([sundayRow(monday), free], monday, 'espn'),
+		"Avg and Last count this week's finals from ESPN's points for rostered players, our stats by Wednesday."
+	);
+	// Without a row the platform counts, or with no league, the old sentence: our stats by Wednesday.
+	assert.equal(finalsPartAt([free], monday, 'espn'), KICKED_OFF_PART);
+	assert.equal(finalsPartAt([sundayRow(monday)], monday, null), null);
+});
+
+void test('the Proj sentence names the week a turned page addresses (Lane 111, B70)', () => {
+	const said = (weeks?: { week: number; for_week?: number }): string =>
+		projPart(
+			{ readAt: READ, scoring: CLOSEST, defense: false, league: true, ...(weeks ? { weeks } : {}) },
+			CENTRAL
+		);
+	assert.equal(
+		said({ week: 6, for_week: 7 }),
+		"Proj is week 7's published projection, PPR nearest your rules, read Fri 9:00 pm."
+	);
+	// On the platform's week, and from an answer before for_week, it is this week's.
+	for (const weeks of [{ week: 7, for_week: 7 }, { week: 6 }, undefined])
+		assert.match(said(weeks), /^Proj is this week's published projection/);
 });

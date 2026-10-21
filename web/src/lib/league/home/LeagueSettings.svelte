@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { UNCOUNTED_ANCHOR } from '../uncounted.ts';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import type { LeagueHost, LeagueTerms } from '../api.ts';
 	import {
@@ -28,12 +27,6 @@
 	}
 
 	let { terms, host, teams, uncounted }: Props = $props();
-
-	/** "Which five" asks for this card (?view=settings#uncounted): it is drawn only once the week's
-	 * read lands, after the browser has looked for the anchor, so it shows itself as it is drawn. */
-	function landOn(card: HTMLElement): void {
-		if (window.location.hash === `#${UNCOUNTED_ANCHOR}`) card.scrollIntoView();
-	}
 
 	const scoring = $derived(
 		terms.scoring ? scoringView(terms.scoring, terms.scoring_unstated) : null
@@ -116,7 +109,7 @@
 		</div>
 		<div class="side">
 			{#if uncounted.length > 0}
-				<div class="card" id={UNCOUNTED_ANCHOR} {@attach landOn}>
+				<div class="card">
 					<h3>{HOME.uncounted}</h3>
 					<p class="note">{HOME.uncountedLine}</p>
 					<ul class="uncounted">
@@ -239,11 +232,6 @@
 
 	.uncounted li:last-child {
 		border-bottom: 0;
-	}
-
-	/* The in-season bases link here: the card lands clear of the sticky top bar. */
-	#uncounted {
-		scroll-margin-top: calc(var(--s-6) * 3);
 	}
 
 	.note {

@@ -184,7 +184,7 @@ void test("the add verb is the Waivers screen's own rule: claims open and the pl
 });
 
 void test('the basis says each column once: the order, Wk 6, Opp rank, the rules our stats lack, then Game and Roster at a desk (Lane 66t)', () => {
-	const LEAGUE = { host: 'sleeper' as const, rulesHref: '/league/1#uncounted' };
+	const LEAGUE = { host: 'sleeper' as const };
 	const signedOut = basisText(orderBasis(advice([row('A')], { basis_note: '' }), null, ZONE, NOW));
 	assert.ok(signedOut.startsWith('Our rest-of-season order from week 7.'));
 	// The week column is headed by the API's week and keyed once as Pts once final, Proj before (Lane
@@ -197,8 +197,7 @@ void test('the basis says each column once: the order, Wk 6, Opp rank, the rules
 	const parts = orderBasis(
 		advice([row('A')], {
 			read_at: READ,
-			basis_note: 'Avg and Last miss five of your rules our stats lack.',
-			basis_note_link: 'Which five'
+			basis_note: 'Avg and Last miss your two-point, missed kick, fumble recovery and safety rules.'
 		}),
 		LEAGUE,
 		ZONE,
@@ -207,9 +206,18 @@ void test('the basis says each column once: the order, Wk 6, Opp rank, the rules
 	const inLeague = basisText(parts);
 	assert.match(inLeague, /, PPR nearest your rules, read /);
 	assert.match(inLeague, /Opp rank is points allowed to his position, 1st fewest\./);
-	assert.match(inLeague, /Avg and Last miss five of your rules our stats lack\. Which five\./);
+	assert.ok(
+		inLeague.includes(
+			'Avg and Last miss your two-point, missed kick, fumble recovery and safety rules.'
+		),
+		inLeague
+	);
 	assert.match(inLeague, /Roster is Sleeper's, read /);
-	assert.equal(parts.find((p) => p.href !== undefined)?.href, LEAGUE.rulesHref);
+	// The rules are named inline, with no link to follow (Lane 111, B33).
+	assert.equal(
+		parts.find((p) => p.href !== undefined),
+		undefined
+	);
 	const phone = parts.filter((p) => p.phone).map((p) => p.text);
 	assert.ok(phone.every((t) => !t.startsWith('Roster is') && !t.startsWith('Game ')));
 	assert.ok(parts.some((p) => !p.phone && p.text.startsWith('Roster is')));

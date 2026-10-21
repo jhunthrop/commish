@@ -37,6 +37,10 @@ export const FIXTURE_MONDAY_NIGHT_CLOCK = '2026-10-20T04:00:00.000Z';
 /** Tuesday Oct 20 2026, noon Central (Lane 80): every week 6 game final, Monday night's included. */
 export const FIXTURE_TUESDAY_CLOCK = '2026-10-20T17:00:00.000Z';
 
+/** Wednesday Oct 21 2026, 7:00 pm Central (Lane 111): our week 6 stats have landed (research JOBS.md, the
+ * weekly pass by Wednesday evening), so Avg, Last and GP count them, never the platform's points. */
+export const FIXTURE_STATS_CLOCK = '2026-10-22T00:00:00.000Z';
+
 /** The environment variable the fixture API reads its clock from. */
 export const FIXTURE_CLOCK_VARIABLE = 'FIXTURE_CLOCK';
 

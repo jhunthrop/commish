@@ -23,7 +23,7 @@
 	import { sheetTags } from './sheet-tags.ts';
 	import { followSwitch } from './follow-switch.svelte.ts';
 	import SeasonPanel from './SeasonPanel.svelte';
-	import { SETTINGS_VIEW, tabHref } from './inseason/tabs.ts';
+	import { tabHref } from './inseason/tabs.ts';
 	import { inSeasonApi, type LineupAdvice, type Scoreboard } from './inseason/api.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
@@ -246,11 +246,6 @@
 		}
 	}
 
-	// A link to the league's scoring rules (the week tab's "Which two", Lane 66w) opens on Settings.
-	onMount(() => {
-		if (new URLSearchParams(window.location.search).get(SETTINGS_VIEW.name) === SETTINGS_VIEW.value)
-			view = 'settings';
-	});
 	onMount(() => {
 		void lazySheet.load();
 		void read();

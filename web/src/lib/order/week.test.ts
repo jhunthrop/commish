@@ -40,15 +40,19 @@ const stored = JSON.parse(
 	'read' | 'unread',
 	Record<'K' | 'DEF', Omit<WeekOrderAdvice, 'basis_note' | 'basis_note_link'>>
 >;
+/** The API's sentences (inseason words.go uncountedOf, Lane 111): each tab's rules named inline. */
 const RULES_NOTE = {
-	basis_note: 'Avg and Last miss two of your rules our stats lack.',
-	basis_note_link: 'Which two'
+	K: { basis_note: 'Avg and Last miss your missed kick rule.', basis_note_link: 'Which two' },
+	DEF: {
+		basis_note: 'Avg and Last miss your fumble recovery and safety rules.',
+		basis_note_link: 'Which two'
+	}
 };
 const withNote = (
 	tabs: Record<'K' | 'DEF', Omit<WeekOrderAdvice, 'basis_note' | 'basis_note_link'>>
 ): Record<'K' | 'DEF', WeekOrderAdvice> => ({
-	K: { ...tabs.K, ...RULES_NOTE },
-	DEF: { ...tabs.DEF, ...RULES_NOTE }
+	K: { ...tabs.K, ...RULES_NOTE.K },
+	DEF: { ...tabs.DEF, ...RULES_NOTE.DEF }
 });
 // The fixture API's answers as it serves them: every game stamped with the API's state at its clock.
 const fixture = {
@@ -63,7 +67,6 @@ const visitor = (a: WeekOrderAdvice): WeekOrderAdvice => ({
 });
 const ESPN = { league: { id: 'office', host: 'espn' as const }, boardScoring: 'PPR' };
 const VISITOR = { league: null, boardScoring: 'PPR' };
-const settingsHref = (id: string): string => `/league/${id}?view=settings#uncounted`;
 const text = (parts: readonly { text: string }[]): string => parts.map((p) => p.text).join(' ');
 const views = (a: WeekOrderAdvice, now: number): WeekView[] =>
 	a.rows.map((r) => weekView(r, ZONE, now));
@@ -227,18 +230,11 @@ void test("a visitor's basis names the board's own scoring", () => {
 	assert.doesNotMatch(said, /\bin PPR\b/);
 });
 
-void test('the rules Avg and Last leave out are a count with the way to Settings, never a list', () => {
-	assert.deepEqual(rulesLeftOut(fixture.read.K, ESPN, settingsHref), {
-		text: 'Avg and Last miss two of your rules our stats lack.',
-		link: { words: 'Which two', href: '/league/office?view=settings#uncounted' }
-	});
-	// The API's sentence, printed as it comes; a reader with no league has no Settings to open.
-	const visitorNote = 'Avg and Last miss one of the PPR rules our stats lack.';
-	assert.deepEqual(
-		rulesLeftOut({ basis_note: visitorNote, basis_note_link: '' }, VISITOR, settingsHref),
-		{ text: visitorNote, link: null }
-	);
-	assert.equal(rulesLeftOut({ basis_note: '', basis_note_link: '' }, ESPN, settingsHref), null);
+void test('the rules Avg and Last leave out are named inline, the API sentence as it comes (Lane 111, B33)', () => {
+	assert.equal(rulesLeftOut(fixture.read.K), 'Avg and Last miss your missed kick rule.');
+	const visitorNote = 'Avg and Last miss the PPR safety rule.';
+	assert.equal(rulesLeftOut({ basis_note: visitorNote }), visitorNote);
+	assert.equal(rulesLeftOut({ basis_note: '' }), null);
 });
 
 void test('the roster chips filter the rows the API sent, the adds where the API set them', () => {
@@ -266,7 +262,7 @@ void test('every word the tab prints passes the copy guard', () => {
 		for (const said of [
 			text(weekBasis(fixture.read[position], ESPN, ZONE, SATURDAY)),
 			text(weekBasis(visitor(fixture.unread[position]), VISITOR, ZONE, TUESDAY)),
-			rulesLeftOut(fixture.read[position], ESPN, settingsHref)?.text ?? '',
+			rulesLeftOut(fixture.read[position]) ?? '',
 			Object.values(weekStatus(fixture.unread[position]) ?? {}).join(' '),
 			...Object.values(WEEK_NOUNS[position]),
 			...Object.values(WEEK_TAB),

@@ -36,7 +36,6 @@
 	import { weekPositionOf, weekReadKey } from '#lib/order/week-head.ts';
 	import { ORDER, PAGE_PURPOSE, WEEK } from '#lib/order/words.ts';
 	import type { BasisPart } from '#lib/run/board-basis.ts';
-	import type { RulesLeftOut } from '#lib/order/week.ts';
 
 	interface Props {
 		page: BoardPage;
@@ -190,11 +189,9 @@
 		key: string;
 		heading: string;
 		basis: BasisPart[];
-		rules: RulesLeftOut | null;
+		rules: string | null;
 	}
 	let weekSaid = $state<WeekSaid | null>(null);
-	/** The space before the rules' link. */
-	const GAP = ' ';
 	const said = $derived(weekPosition !== null && weekSaid?.key === weekKey ? weekSaid : null);
 	/** The in-season screens (the order, or a kickers' or defenses' week) take the page's width. */
 	const ordered = $derived(inSeason || weekPosition !== null);
@@ -242,9 +239,7 @@
 				{#if said}
 					{@const rules = said.rules}
 					<BasisLine parts={said.basis}>
-						{#snippet after()}{#if rules}{rules.text}{#if rules.link}{GAP}<a href={rules.link.href}
-										>{rules.link.words}</a
-									>{/if}{/if}{/snippet}
+						{#snippet after()}{#if rules}{rules}{/if}{/snippet}
 					</BasisLine>
 				{/if}
 			{:else if marketView}

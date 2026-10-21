@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { leagueSettingsHref } from '#lib/league/rules-link.ts';
 	import { page } from '$app/state';
 	import {
 		inSeasonApi,
@@ -59,7 +58,6 @@
 					plan={(move: HostMoveInput) => inSeasonApi.planMove(id, move)}
 					make={(move: HostMoveInput, confirm: string) => inSeasonApi.makeMove(id, move, confirm)}
 					{reread}
-					rulesHref={leagueSettingsHref(id)}
 				/>
 			{/snippet}
 		</InSeasonPage>
@@ -81,7 +79,6 @@
 					plan={(move: HostMoveInput) => inSeasonApi.planMove(id, move)}
 					make={(move: HostMoveInput, confirm: string) => inSeasonApi.makeMove(id, move, confirm)}
 					{reread}
-					rulesHref={leagueSettingsHref(id)}
 				/>
 			{/snippet}
 		</InSeasonPage>
@@ -102,7 +99,6 @@
 					me={{ name: league?.team_name ?? '', aside: league ? standingWords(league) : '' }}
 					narrow={(player: string) => inSeasonApi.trades(id, player)}
 					check={(trade: TradeCheckInput) => inSeasonApi.checkTrade(id, trade)}
-					rulesHref={leagueSettingsHref(id)}
 				/>
 			{/snippet}
 		</InSeasonPage>

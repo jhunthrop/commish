@@ -2,7 +2,7 @@
 	"week": 6,
 	"basis": "Each team's best trade both lineups gain by, yours first. The other team decides. Gain is a lineup's change in points over replacement a week, weeks 6 to 17.",
 	"check_basis": "The scoreboard is each lineup before and after the trade.",
-	"basis_note": "Avg and Last miss five of your rules our stats lack.",
+	"basis_note": "Avg and Last miss your two-point, missed kick, fumble recovery and safety rules.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",
 	"read_at": "2026-10-14T19:05:38.329Z",

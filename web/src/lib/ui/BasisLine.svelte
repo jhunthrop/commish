@@ -4,7 +4,7 @@
 
 	/** A page's basis, said once (Lane 66n): its sentences, each left out on the phone where it names
 	 * columns the phone does not draw, then the injury capture's sentence when the run carries one, then
-	 * a page's own last words with their link (after: the week tab's rules our stats lack, Lane 66w). */
+	 * a page's own last words (after: the week tab's rules our stats lack, Lane 66w, named since Lane 111). */
 	interface Props {
 		parts: readonly BasisPart[];
 		/** The capture's sentence, said on the member's clock once the page is live. */

@@ -126,28 +126,60 @@ export const WAIVERS_BASIS = 'A pickup starts this week on Proj and keeps Gain a
 
 const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 
-/** The uncounted rules' sentence and link in the API's words (words.go uncountedOf): a count of
- * whose rules, and the link's words where there is a Settings to open. */
-export function uncountedCount(
-	count: number,
+/** Each rule's name in a basis sentence, by its Settings words (words.go countables, Lane 111). */
+const RULE_NAMES: Readonly<Record<string, string>> = {
+	'two-point conversions': 'two-point',
+	'field goals of 40 yards or more': 'long field goal',
+	'missed field goals': 'missed field goal',
+	'missed extra points': 'missed extra point',
+	"a player's kick and punt return touchdowns": 'return touchdown',
+	'fumble recoveries': 'fumble recovery',
+	safeties: 'safety',
+	"a defense's points allowed": 'points allowed',
+	"a defense's yards allowed": 'yards allowed'
+};
+const MISSED_KICKS = ['missed field goal', 'missed extra point'];
+
+/** The rules' names as the API says them (words.go basisNames): both missed kicks as one. */
+function basisNames(rules: readonly string[]): string[] {
+	const names = rules.map((rule) => RULE_NAMES[rule] ?? rule);
+	const kicks = names.filter((name) => MISSED_KICKS.includes(name)).length;
+	if (kicks < 2) return names;
+	return names.flatMap((name) =>
+		name === MISSED_KICKS[0] ? ['missed kick'] : MISSED_KICKS.includes(name) ? [] : [name]
+	);
+}
+
+/** "a", "a and b", "a, b and c". */
+function andList(names: readonly string[]): string {
+	if (names.length < 2) return names.join('');
+	return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1] ?? ''}`;
+}
+
+/** The uncounted rules' sentence in the API's words (words.go uncountedOf, Lane 111): the rules named
+ * inline, whose they are, and the old web's link words where there is a Settings to open. */
+export function uncountedOf(
+	rules: readonly string[],
 	whose = 'your',
 	linked = true
 ): { basis_note: string; basis_note_link: string } {
-	if (count === 0) return { basis_note: '', basis_note_link: '' };
-	const n = COUNT_WORDS[count] ?? String(count);
+	if (rules.length === 0) return { basis_note: '', basis_note_link: '' };
+	const names = basisNames(rules);
+	const kind = names.length === 1 ? 'rule' : 'rules';
 	return {
-		basis_note: `Avg and Last miss ${n} of ${whose} rules our stats lack.`,
-		basis_note_link: linked ? `Which ${n}` : ''
+		basis_note: `Avg and Last miss ${whose} ${andList(names)} ${kind}.`,
+		basis_note_link: linked ? `Which ${COUNT_WORDS[rules.length] ?? String(rules.length)}` : ''
 	};
 }
 
-/** The league's uncounted rules in the API's words (words.go UncountedOf). */
-export function uncountedOf(rules: readonly string[]): {
-	basis_note: string;
-	basis_note_link: string;
-} {
-	return uncountedCount(rules.length);
-}
+/** The recorded league's sentence (data/lineup.json uncounted_rules), for the shots scripts. */
+export const LEAGUE_RULES_NOTE = uncountedOf([
+	'two-point conversions',
+	'missed field goals',
+	'missed extra points',
+	'fumble recoveries',
+	'safeties'
+]).basis_note;
 
 /** A figure to the tenth a page prints. */
 export const tenth = (value: number): number => Math.round(value * TENTH) / TENTH;

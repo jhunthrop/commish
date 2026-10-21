@@ -50,8 +50,6 @@
 		reread: () => void;
 		/** Puts the lineup on the clipboard. */
 		copy?: (text: string) => Promise<void>;
-		/** The league's Settings at the scoring rules our stats lack. */
-		rulesHref: string;
 		/** The instant the answer was read, in ms: the page's clock the rows and the basis draw at. */
 		now: number;
 	}
@@ -63,7 +61,6 @@
 		make,
 		reread,
 		copy = (text) => navigator.clipboard.writeText(text),
-		rulesHref,
 		now
 	}: Props = $props();
 	/** The answer with no change on a row whose game has kicked off or is final (Lane 85): every word,
@@ -203,8 +200,7 @@
 		lineup={{
 			asSetShown: lineupSum(box, host, done) !== null,
 			previousReadAt: advice.projection_previous_read_at,
-			note: advice,
-			rulesHref
+			note: advice
 		}}
 		lines={shown}
 		noFinal={box.totals.live && box.totals.final === null}
