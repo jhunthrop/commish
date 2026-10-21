@@ -6,7 +6,8 @@
 // are drawn, the one verb is the screen's (Open your lineup or the held row's words on the Lineup, the
 // add on Waivers, Compare on Players), the copy passes the one guard (copy-scan.ts), nothing scrolls
 // sideways, Escape closes it and gives the focus back to the name, the back button closes it, a reload
-// reopens it and the close button then clears the address. It prints each screen's script on load,
+// reopens it and the close button then clears the address. A player with a written read, opened from
+// the address on Players, shows the read in the UI face at the rows' body size (Lane 126). It prints each screen's script on load,
 // gzipped, before any tap (the shelf's script waits for the first). Exits non-zero on any fault.
 //
 //   [BYTES_ONLY=1] node scripts/shelf-shots.ts [web origin] [out dir]
@@ -21,6 +22,7 @@ import { SHELF } from '../src/lib/player/shelf.ts';
 import { SHELF_PARAM } from '../src/lib/player/shelf-state.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
+import { readFace } from './read-face.ts';
 import {
 	FIXTURE_WEEK_CLOCK,
 	installFixtureClock,
@@ -263,6 +265,7 @@ async function check(
 	const tiles = await shelf(page).locator('.tile').count();
 	if (tiles < 6) fault(`${String(tiles)} tiles`);
 	if ((await shelf(page).getByText(CARD.ourRead).count()) === 0) fault('no read');
+	for (const said of (await readFace(page, 'dialog.shelf[open]')).faults) fault(said);
 	const verb = (
 		(
 			await shelf(page)
@@ -339,6 +342,35 @@ for (const screen of shotScreens) {
 					await shelf(page).waitFor({ state: 'detached', timeout: READY_TIMEOUT_MS });
 					await behave(page, screen, label);
 				}
+			} catch (error: unknown) {
+				faults.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+			} finally {
+				await ctx.close();
+			}
+		}
+	}
+}
+// A player with a written week read (the stand-in run's, scripts/standin-week-reads.json), opened from
+// the address on Players: the read is drawn, in the UI face at the rows' body size (Lane 126).
+const READ_SLUG = 'puka-nacua';
+const playersScreen = SCREENS.find((s) => s.name === 'players');
+if (!process.env.BYTES_ONLY && playersScreen !== undefined) {
+	for (const theme of THEMES) {
+		for (const size of SIZES) {
+			const label = `read ${theme} ${String(size.width)}`;
+			const ctx = await context(theme, size, playersScreen.signedIn);
+			const page = await ctx.newPage();
+			try {
+				await page.goto(`${web}${playersScreen.path}?${SHELF_PARAM}=${READ_SLUG}`);
+				await ready(page, playersScreen);
+				await shelf(page).locator('.prose.week').waitFor({ timeout: READY_TIMEOUT_MS });
+				await page.evaluate(() => document.fonts.ready);
+				const face = await readFace(page, 'dialog.shelf[open]');
+				for (const said of face.faults) faults.push(`${label}: ${said}`);
+				process.stdout.write(`${label}: the read's lines ${face.lines.join(', ')} characters\n`);
+				await page.screenshot({
+					path: new URL(`shelf-read-${theme}-${String(size.width)}.png`, out).pathname
+				});
 			} catch (error: unknown) {
 				faults.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
 			} finally {

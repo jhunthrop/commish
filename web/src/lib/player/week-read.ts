@@ -1,7 +1,7 @@
 /** The week-ahead read beside the card (Lane 66v). The read quotes the published projection it was
  * written with, in PPR, as the card prints it (the run's `projection`); once the card's live read prints
- * another figure for that week, the read is withheld behind the run's words for it (`movedCaption`) and
- * the season read shows beneath it. The figures are the run's and the API's, each rounded once there:
+ * another figure for that week, the read is withheld behind the run's words for it (`movedCaption`),
+ * under the not-written-yet line (Lane 126). The figures are the run's and the API's, each rounded once there:
  * this only compares them. */
 import type { components } from '#lib/api/types.ts';
 import type { WeekRead } from '#lib/run/schema.ts';
