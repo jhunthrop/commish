@@ -19,7 +19,7 @@
 // Lane 121 (B99): the Team row's small cell on the Lineup, the Matchup and the league home reads
 // "Final" with the total once every starter is final, never "Proj final" on the clocks where every
 // week 6 game is (Tuesday, Wednesday), and never "Final" before any Sunday game is (Saturday, Sunday);
-// the league home is shot for it and its footer is not measured here.
+// the league home is shot for it and its footer measured, its words not checked here.
 // Exits non-zero on any fault.
 //
 //   CLOCK=saturday|sunday|monday|tuesday|wednesday|thursday [THEMES=both] node scripts/platform-finals-shots.ts [web origin] [out dir]
@@ -91,7 +91,8 @@ interface Screen {
 	/** What the shot opens first: a trade in the finder, or the builder, whose phone rows draw Avg
 	 * and Last (Lane 115 fix round 1, HIGH-1). */
 	open?: 'trade' | 'builder';
-	/** Shot for its Team row alone (the league home, Lane 121): no basis checked or measured. */
+	/** Shot for its Team row and its footer's lines (the league home, Lane 121): its words are not
+	 * the box screens', so check() is not asked of them. */
 	teamOnly?: boolean;
 }
 
@@ -135,7 +136,7 @@ async function teamFaults(page: Page): Promise<{ captions: string[]; faults: str
 	const captions = await page.evaluate(() =>
 		[...document.querySelectorAll<HTMLElement>('main tr.totals td.proj small')]
 			.filter((small) => small.getClientRects().length > 0)
-			.map((small) => (small.textContent ?? '').trim())
+			.map((small) => small.textContent.trim())
 	);
 	const said = (word: string): boolean =>
 		captions.some((c) => c.toLowerCase() === word.toLowerCase());
@@ -325,13 +326,11 @@ for (const theme of THEMES)
 				);
 				for (const fault of team.faults) faults.push(`${at}: ${fault}`);
 				const basis = await drawnBasis(page);
-				if (screen.teamOnly !== true) {
-					check(screen, width, basis, at);
-					const lines = await basisLines(page);
-					measures.push(`${at}: basis ${String(lines)} lines`);
-					if (lines === 0 || lines > MOST_LINES[width])
-						faults.push(`${at}: basis draws ${String(lines)} lines`);
-				}
+				if (screen.teamOnly !== true) check(screen, width, basis, at);
+				const lines = await basisLines(page);
+				measures.push(`${at}: basis ${String(lines)} lines`);
+				if (lines === 0 || lines > MOST_LINES[width])
+					faults.push(`${at}: basis draws ${String(lines)} lines`);
 				const copy = await copyFault(page);
 				if (copy !== null) faults.push(`${at}: ${copy}`);
 				if (width === 390 && ['lineup', 'matchup'].includes(screen.name))
