@@ -27,13 +27,13 @@ from research.model.ros.live import (
     SeasonPlayer,
     WeekFacts,
     Window,
-    club_at,
     player_to_date,
     stale_prior,
     window_of,
 )
 from research.model.ros.model import FORMATS, RosPriors, project
 from research.model.ros.raw_line import RawLine
+from research.nightly.build.page_club import ClubCall, call_for
 from research.nightly.build.player_season import SCORING, SeasonContext
 from research.nightly.config import PAGE_FORMAT
 from research.nightly.reads.board import BoardEntry, FormatBoard, StoredRow, board_entries
@@ -107,8 +107,11 @@ def _weeks(provider_id: str, context: SeasonContext) -> dict[int, WeekFacts]:
     return {week: WeekFacts(lines.get(week, {}), snaps.get(week, {})) for week in {*lines, *snaps}}
 
 
-def _off_board_rows(board: FormatBoard, players: Sequence[SeasonPlayer]) -> list[StoredRow]:
-    """A row for every player with a line this season the page board does not rank (points filled later)."""
+def _off_board_rows(
+    board: FormatBoard, players: Sequence[SeasonPlayer], calls: Mapping[str, ClubCall]
+) -> list[StoredRow]:
+    """A row for every player with a line this season the page board does not rank (points filled later),
+    under the page's club (Lane 120)."""
     on = {entry.row.universe_id for entry in board.entries} | {entry.row.player_id for entry in board.entries}
     return [
         StoredRow(
@@ -116,7 +119,7 @@ def _off_board_rows(board: FormatBoard, players: Sequence[SeasonPlayer]) -> list
             player_id=p.provider_id,
             name=p.name,
             position=p.position,
-            team=p.team,
+            team=call_for(calls, p.provider_id).club,
             headshot_url=p.headshot_url,
             market_adp=p.market_adp,
             projected=0.0,
@@ -180,12 +183,10 @@ def _projections(
         ),
         *((row, None) for row in extra),
     ]:
-        clubs = context.store.teams.get(row.player_id, {})
-        who = PlayerWeeks(row.universe_id, row.position, row.team, clubs, _weeks(row.player_id, context))
+        who = PlayerWeeks(row.universe_id, row.position, row.team, _weeks(row.player_id, context))
         player = player_to_date(who, ready.window, slates, stale, SCORING)
         projection = project(player, ready.priors)
-        club = club_at(who, ready.window)
-        start = first_week_to_play(states, club) if player.remaining_weeks else None
+        start = first_week_to_play(states, row.team) if player.remaining_weeks else None
         pace = None if stale is None or stale.per_game is None else dict(stale.per_game)
         found[row.universe_id] = RestFigures(
             projected=projection.projected,
@@ -273,7 +274,7 @@ def ros_boards(
         return RosResult(preseason, None, f"preseason: {ready}")
     window = ready.window
     page = next(b for b in preseason if b.format.id == PAGE_FORMAT.id)
-    extra = _off_board_rows(page, setup.season_players)
+    extra = _off_board_rows(page, setup.season_players, context.clubs)
     found = _projections(preseason, extra, context, states, ready)
     scorings = carried(ready.raw)
     held = {b.format.id: why for b in preseason if (why := held_because(b, scorings, found)) is not None}

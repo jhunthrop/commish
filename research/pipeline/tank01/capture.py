@@ -29,6 +29,7 @@ from research.pipeline.jscompat import js_iso, js_json_stringify, js_object_keys
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
 from research.pipeline.tank01.client import Paths, Tank01Client, Tank01Error
 from research.pipeline.tank01.mapping import ADP_TYPE
+from research.pipeline.tank01.player_clubs import ListRead, refresh_player_clubs
 from research.pipeline.tank01.projections import (
     PROJECTIONS_SOURCE,
     ProjectionRead,
@@ -65,6 +66,15 @@ class CaptureRequest:
 
 
 @dataclass(frozen=True)
+class ReadEffect:
+    """What a feed's read wrote beside its snapshot: its line, or a refusal, which fails the feed (the job
+    fails and alerts) while the snapshot stands."""
+
+    note: str
+    refused: bool = False
+
+
+@dataclass(frozen=True)
 class CaptureFeed:
     source: str
     cadence: Cadence
@@ -74,6 +84,15 @@ class CaptureFeed:
     # with its reason, else None. Such an answer is stored nowhere and records no check, so it is never
     # a read.
     screen: Callable[[CaptureContext, object], tuple[Status, str] | None] | None = None
+    # For a feed a table is written from as it is read (the player list's clubs, Lane 122): given the
+    # connection and the answer read (captured or unchanged), in the feed's own savepoint, what it did.
+    on_read: Callable[[Connection, object], ReadEffect] | None = None
+
+
+def player_list_clubs(conn: Connection, answer: object) -> ReadEffect:
+    """The list's clubs onto the stored players (`player_clubs`), in the snapshot's transaction."""
+    refresh = refresh_player_clubs(conn, answer)
+    return ReadEffect(refresh.line(), refused=not refresh.applied)
 
 
 def screen_player_list(_context: CaptureContext, answer: object) -> tuple[Status, str] | None:
@@ -87,10 +106,15 @@ def screen_player_list(_context: CaptureContext, answer: object) -> tuple[Status
 # THE RETURN DATES (Lane 110, B79). The player list is the one feed that carries each listed player's
 # expected return (`injury.injReturnDate`, YYYYMMDD), one request for every player; the hourly injury
 # list carries none. The harvest reads it once a day (`return_dates_due`); the API reads the date beside
-# each designation (`api/internal/boards/designations.go`).
+# each designation (`api/internal/boards/designations.go`). The same read refreshes each listed player's
+# club on `provider_players` (Lane 122, `player_clubs`).
 PLAYER_LIST_SOURCE: Final = "tank01_player_list"
 PLAYER_LIST_FEED: Final = CaptureFeed(
-    PLAYER_LIST_SOURCE, "weekly", lambda _c: [CaptureRequest(Paths.PLAYER_LIST, {})], screen_player_list
+    PLAYER_LIST_SOURCE,
+    "weekly",
+    lambda _c: [CaptureRequest(Paths.PLAYER_LIST, {})],
+    screen_player_list,
+    player_list_clubs,
 )
 
 CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
@@ -190,6 +214,8 @@ class FeedOutcome:
     status: Status
     requests: int
     reason: str | None = None
+    # What the read wrote beside its snapshot (the player list's club count), for the job's line.
+    note: str | None = None
 
 
 @dataclass(frozen=True)
@@ -256,15 +282,25 @@ def _capture_feed(
                 return FeedOutcome(feed.source, screened[0], len(requests), screened[1])
             digest = digest_of(payload)
             if digest == _latest_digest(conn, feed.source):
-                return FeedOutcome(feed.source, "unchanged", len(requests))
+                return _read_outcome(conn, feed, payload, FeedOutcome(feed.source, "unchanged", len(requests)))
             row = {"source": feed.source, "captured_at": at, "digest": digest, "payload": js_json_stringify(payload)}
             conn.execute(_INSERT, row)
-            return FeedOutcome(feed.source, "captured", len(requests))
+            return _read_outcome(conn, feed, payload, FeedOutcome(feed.source, "captured", len(requests)))
     except TOLERATED_FAILURES as error:
         screened = _screen(feed, context, error)
         failed: tuple[Status, str] = ("failed", str(error))
         status, reason = failed if screened is None else screened
         return FeedOutcome(feed.source, status, len(requests), reason)
+
+
+def _read_outcome(conn: Connection, feed: CaptureFeed, payload: object, read: FeedOutcome) -> FeedOutcome:
+    """A read's outcome after its `on_read` write: its note beside it, or a refused write's failure."""
+    if feed.on_read is None:
+        return read
+    effect = feed.on_read(conn, payload)
+    if effect.refused:
+        return FeedOutcome(read.source, "failed", read.requests, effect.note)
+    return FeedOutcome(read.source, read.status, read.requests, note=effect.note)
 
 
 def _screen(feed: CaptureFeed, context: CaptureContext, answer: object) -> tuple[Status, str] | None:
@@ -348,8 +384,8 @@ def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: dateti
     week, so a pass is at most ten requests: four single feeds, the projection, and a holiday week's
     five game days. Parsing the stored projections is the caller's next transaction
     (`projections.parse_stored_projections`), so a refused snapshot never rolls back what this pass
-    captured. The player list, for the return dates (B79), is read after the game status on what is left
-    (`capture_return_dates`)."""
+    captured. The player list, for the return dates (B79) and each listed player's club (Lane 122), is
+    read after the game status on what is left (`capture_return_dates`)."""
     read = projection_week_due(conn, season, fired_at)
     feeds = [*harvest_feeds(), *([] if read is None else [week_projection_feed(read)])]
     capture = CapturePass(
@@ -366,6 +402,19 @@ def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: dateti
 RETURN_DATES_FROM: Final = time(6)
 
 _LIST_CHECKED: Final = text(f"select checked_at from {CAPTURE_CHECKS.fullname} where source = :source")
+
+
+def latest_player_list(conn: Connection) -> ListRead | None:
+    """The newest stored player list, the one the backfill applies (`player_clubs.backfill_player_clubs`)."""
+    table = CAPTURE_SNAPSHOTS
+    query = (
+        select(table.c.captured_at, table.c.payload)
+        .where(table.c.source == PLAYER_LIST_SOURCE)
+        .order_by(table.c.captured_at.desc(), table.c.id.desc())
+        .limit(1)
+    )
+    row = conn.execute(query).first()
+    return None if row is None else ListRead(row.captured_at, row.payload)
 
 
 def return_dates_due(conn: Connection, now: datetime) -> bool:

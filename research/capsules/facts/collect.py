@@ -108,8 +108,8 @@ class SharedReads:
 def season_reads(
     conn: Connection, as_of: datetime, rows: Sequence[BoardRow], injuries: InjurySnapshot
 ) -> dict[str, SeasonSoFar]:
-    """These rows' seasons so far, each read for his board club and position."""
-    subjects = [SeasonSubject(row.player_id, row.team, row.position) for row in rows]
+    """These rows' seasons so far, each read for his page club and position."""
+    subjects = [SeasonSubject(row.player_id, row.position) for row in rows]
     statuses = {row.player_id: injuries.status_for(row.player_id) for row in rows}
     return seasons_so_far(conn, PRODUCT_SEASON, as_of, subjects, statuses)
 

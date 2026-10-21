@@ -1,20 +1,28 @@
-"""The capture-harvest case: the job's five feeds, fired twice an hour apart on the same recorded
-responses, so the second fire exercises the unchanged-digest path on both sides."""
+"""The capture-harvest case: the job's five feeds and its day read of the player list, fired twice an
+hour apart on the same recorded responses, so the second fire exercises the unchanged-digest path on both
+sides. The player list's read writes each listed player's club onto `provider_players` (Lane 122): both
+sides seed the same stale roster first, and the earlier recording moves one club between passes."""
 
+import json
 from datetime import UTC, datetime, timedelta
+from typing import Final
 
 from sqlalchemy import Connection
+from sqlalchemy.dialects.postgresql import insert
 
+from research.db import schema
 from research.parity.case import Case, Recording, RunContext
-from research.parity.cases.tables import CAPTURE_SNAPSHOTS
+from research.parity.cases.tables import CAPTURE_SNAPSHOTS, PROVIDER_PLAYERS
 from research.parity.cases.tank01 import REPLAY_KEY, _live_client
 from research.parity.record import RecordSpec
+from research.parity.replay import FIXTURES_ROOT
 from research.pipeline.budget import UnmeteredBudget
 from research.pipeline.http import Fetcher
 from research.pipeline.jscompat import js_iso
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
 from research.pipeline.tank01.capture import (
     CAPTURE_FEEDS,
+    PLAYER_LIST_FEED,
     CaptureContext,
     CapturePass,
     capture_once,
@@ -78,11 +86,33 @@ HARVEST = Recording(
 )
 
 
+# The later pass fires two hours on, the same Monday (the date-keyed feeds ask for the recorded day), so its
+# captures are stamped after the earlier pass's and the list's read is a new snapshot, not a second one at
+# the same instant.
+LATER_FIRED_AT: Final = FIRED_AT + timedelta(hours=2)
+# The earlier player list (McCarthy still MIN's) and the stale roster both sides seed before every pass.
+EARLIER_PLAYER_LIST: Final = "tank01-player-list-earlier"
+SEED_PLAYERS: Final = FIXTURES_ROOT / EARLIER_PLAYER_LIST / "seed_players.json"
+# The 2026-10-12 player list comes from the full capture's recording; the harvest's own recordings win
+# every other request the two share.
+HARVEST_SETS: Final = ("tank01-capture-all-2026-10-12", "tank01-harvest-2026-10-12")
+
+
+def _seed_players(conn: Connection) -> None:
+    """The stale roster, inserted where absent, so a later pass lands on the earlier pass's clubs."""
+    rows = json.loads(SEED_PLAYERS.read_text())
+    conn.execute(insert(schema.PROVIDER_PLAYERS).values(rows).on_conflict_do_nothing(index_elements=["id"]))
+
+
 def _harvest(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
-    """`harvestCaptures`, the in-season capture task, fired twice an hour apart."""
+    """`harvestCaptures`, the in-season capture task, fired twice an hour apart, each fire followed by the
+    player list's read and its clubs (`capture_return_dates` past its once-a-day gate)."""
     client = Tank01Client(ctx.fetcher, REPLAY_KEY)
-    run_capture_harvest(conn, client, FIRED_AT, SEASON)
-    run_capture_harvest(conn, client, FIRED_AT + timedelta(hours=1), SEASON)
+    _seed_players(conn)
+    for fired_at in (ctx.now, ctx.now + timedelta(hours=1)):
+        run_capture_harvest(conn, client, fired_at, SEASON)
+        capture = CapturePass(fired_at, SEASON, WEEK, feeds=(PLAYER_LIST_FEED,))
+        capture_once(conn, client, capture, UnmeteredBudget())
     return ()
 
 
@@ -114,11 +144,15 @@ CASES: tuple[Case, ...] = (
     ),
     Case(
         name="tank01-capture-harvest",
-        summary="the capture-harvest job's five feeds into capture_snapshots, twice (captured, then unchanged)",
-        fixture_sets=("tank01-harvest-2026-10-12",),
-        tables=(CAPTURE_SNAPSHOTS,),
+        summary="the capture-harvest job's five feeds and the player list into capture_snapshots, twice (captured, "
+        "then unchanged), and the list's clubs onto a seeded provider_players; the later pass lands the "
+        "2026-10-12 list on an earlier one that had McCarthy at MIN, whose club it must move",
+        fixture_sets=HARVEST_SETS,
+        tables=(CAPTURE_SNAPSHOTS, PROVIDER_PLAYERS),
         run_python=_harvest,
         now=FIRED_AT,
         recordings=(HARVEST,),
+        prior_fixture_sets=(*HARVEST_SETS, EARLIER_PLAYER_LIST),
+        later_now=LATER_FIRED_AT,
     ),
 )

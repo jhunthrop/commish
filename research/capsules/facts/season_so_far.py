@@ -27,6 +27,7 @@ from research.capsules.facts.model import (
 from research.capsules.facts.reference import capture_day
 from research.model.domain import Position
 from research.model.reads.teams import first_kickoff_for
+from research.nightly.build.page_club import call_for
 from research.nightly.build.player_season import SeasonContext, season_block, season_context
 from research.nightly.config import PAGE_FORMAT
 from research.nightly.reads.schedule import Game
@@ -37,10 +38,10 @@ _TOUCHDOWNS: Final = ("passing_touchdowns", "rushing_touchdowns", "receiving_tou
 
 @dataclass(frozen=True, slots=True)
 class SeasonSubject:
-    """Who a season block is read for: the provider id, his club and position on the board."""
+    """Who a season block is read for: the provider id and position on the board (his club is the
+    page's, `nightly.build.page_club`)."""
 
     player_id: str
-    team: str
     position: Position
 
 
@@ -91,7 +92,8 @@ def injury_from_week(injury: InjuryStatus, slate: Sequence[Game]) -> int | None:
 
 def season_so_far(subject: SeasonSubject, injury: InjuryStatus, context: SeasonContext) -> SeasonSoFar:
     """One player's block as the page prints it, on the writer's sheet."""
-    block = season_block(subject.player_id, subject.team, PAGE_FORMAT, subject.position, context)
+    block = season_block(subject.player_id, PAGE_FORMAT, subject.position, context)
+    club = call_for(context.clubs, subject.player_id).club
     return SeasonSoFar(
         block["season"],
         block["through"],
@@ -99,7 +101,7 @@ def season_so_far(subject: SeasonSubject, injury: InjuryStatus, context: SeasonC
         block["pointsPerGame"],
         _totals(block["totals"]),
         _weeks(block["log"], block["through"]),
-        injury_from_week(injury, context.games.get(subject.team, ())),
+        injury_from_week(injury, context.games.get(club, ())),
     )
 
 

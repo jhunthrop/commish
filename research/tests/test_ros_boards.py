@@ -21,6 +21,7 @@ from research.model.ros.model import LAST_FANTASY_WEEK
 from research.model.ros.payload import ARTIFACT_NAME, priors_from
 from research.model.ros.raw_line import RawLine
 from research.model.ros.ship import SHIPPED_ROUND, fit_and_publish
+from research.nightly.build.page_club import NO_ROSTER_READ, club_calls
 from research.nightly.build.player_season import SeasonContext, SeasonStore
 from research.nightly.build.ros import RosSetup, ros_boards
 from research.nightly.config import RUN_FORMATS
@@ -71,7 +72,8 @@ def _context(through: int) -> SeasonContext:
     }
     teams = {pid: dict.fromkeys(weeks, "KC") for pid, weeks in lines.items()}
     store = SeasonStore(lines, snaps, teams, {}, frozenset())
-    return SeasonContext(2026, 18, through, _schedule(), dict.fromkeys((*CLUBS, *MONDAY_CLUBS)), store, {})
+    clubs = club_calls(dict.fromkeys(lines, "KC"), NO_ROSTER_READ, teams, _schedule())
+    return SeasonContext(2026, 18, through, _schedule(), dict.fromkeys((*CLUBS, *MONDAY_CLUBS)), store, {}, clubs)
 
 
 def _row(pid: str, projected: float, position: Position = "WR") -> StoredRow:
@@ -215,7 +217,8 @@ def test_a_player_off_the_ppr_board_with_a_line_is_ranked_once_on_a_board_that_h
         "p7": {w: {"offensive_snaps": 30.0, "team_offensive_snaps": 60.0} for w in range(1, LINES_THROUGH + 1)},
     }
     teams = {**context.store.teams, "p7": dict.fromkeys(range(1, LINES_THROUGH + 1), "KC")}
-    context = replace(context, store=replace(context.store, lines=lines, snaps=snaps, teams=teams))
+    clubs = club_calls(dict.fromkeys(lines, "KC"), NO_ROSTER_READ, teams, _schedule())
+    context = replace(context, store=replace(context.store, lines=lines, snaps=snaps, teams=teams), clubs=clubs)
     p7 = SeasonPlayer("u-p7", "p7", "P7", "WR", "KC", None, None)
     result = ros_boards(
         boards, context, FIRST_WEEK_INSTANT, _states(FIRST_WEEK_INSTANT), replace(SETUP, season_players=(OFF, p7))

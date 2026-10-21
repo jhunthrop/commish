@@ -14,7 +14,9 @@
  * club's slate.
  *
  * A bye is his club's bye week with no game of his. A player who changed clubs can play that week
- * for the club he was with, so his log has no bye (Lane 119: five pages on run 2026-10-21T05).
+ * for the club he was with, so his log has no bye (Lane 119: five pages on run 2026-10-21T05). His
+ * week with no line before his newest one names no opponent: the run holds no fact of whose he was
+ * (Lane 120).
  */
 import { z } from 'zod';
 import { POINTS_PER_GAME_DECIMALS } from './decimals.ts';
@@ -103,9 +105,10 @@ export type PriorSeason = z.infer<typeof priorSeasonSchema>;
 
 export const gameLogRowSchema = statLineSchema.extend({
 	week: z.number().int().min(1),
-	/** The club he plays, or null on his bye. */
+	/** The club he plays; null on his bye, and on an inactive week of a player who changed clubs
+	 * before his newest line, when the run cannot say whose he was (Lane 120). */
 	opponent: club.nullable(),
-	/** True at home, false away, null on his bye. */
+	/** True at home, false away, null where the opponent is. */
 	home: z.boolean().nullable(),
 	status: z.enum(GAME_STATUSES)
 });
@@ -137,9 +140,12 @@ type Fail = (message: string) => void;
 function checkRow(row: LogRow, index: number, through: number, fail: Fail): void {
 	const at = `Week ${String(row.week)}`;
 	if (row.week !== index + 1) fail(`${at} sits at place ${String(index + 1)} in the log.`);
-	const bye = row.status === 'bye';
-	if (bye !== (row.opponent === null) || bye !== (row.home === null))
-		fail(`${at}: a bye and only a bye has no opponent.`);
+	const named = row.opponent !== null;
+	if (named !== (row.home !== null))
+		fail(`${at} names an opponent but not where, or the other way.`);
+	if (row.status === 'bye' && named) fail(`${at} is a bye but names an opponent.`);
+	if ((row.status === 'played' || row.status === 'upcoming') && !named)
+		fail(`${at} is ${row.status} but names no opponent.`);
 	if (row.status === 'upcoming' && row.week <= through)
 		fail(`${at} is upcoming, but the records reach week ${String(through)}.`);
 	const played = row.status === 'played';

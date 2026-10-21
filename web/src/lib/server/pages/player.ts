@@ -13,9 +13,11 @@ import type {
 	Designations,
 	Format,
 	IndexEntry,
+	Player,
 	PlayerFormat,
 	PlayerStatus
 } from '#lib/run/schema.ts';
+import { lastGameClubWords } from '#lib/player/club-words.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
 import type { CaptureStamp } from '#lib/format/designation.ts';
@@ -112,6 +114,9 @@ export interface PlayerPage {
 	heldTier: string | null;
 	/** His club's city and nickname, "Los Angeles Rams". */
 	clubName: string;
+	/** "Now with the Dolphins. His week 5 game was for the Chargers." when his newest game line was for
+	 * another club (Lane 120), null otherwise. */
+	clubNote: string | null;
 	/** The card's tiles and words as the build knows them (Lane 66h). */
 	card: CardBuild;
 	/** The default format's rest-of-season tile and its parts, as its line carries them. */
@@ -217,11 +222,24 @@ function tierBasisOf(
 	return tierBasisWords(lead.format.label, season, from);
 }
 
-/** His club's city and nickname. */
-function clubNameOf(list: readonly Club[], team: string): string {
+function clubOf(list: readonly Club[], team: string): Club {
 	const club = list.find((candidate) => candidate.abbr === team);
 	if (!club) throw new Error(`${team} is not among the run's clubs.`);
+	return club;
+}
+
+/** His club's city and nickname. */
+function clubNameOf(list: readonly Club[], team: string): string {
+	const club = clubOf(list, team);
 	return `${club.city} ${club.nickname}`;
+}
+
+/** The line saying his newest game was for another club (Lane 120), null when it was his own's or the
+ * run is from before the field. */
+function clubNoteOf(list: readonly Club[], loaded: Player): string | null {
+	const last = loaded.lastGameClub;
+	if (!last) return null;
+	return lastGameClubWords(clubOf(list, loaded.team), last.week, clubOf(list, last.club));
 }
 
 /** Each week's last kickoff across the run's schedule. */
@@ -316,6 +334,7 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		status,
 		heldTier: listed?.seasonLong === true ? HELD_TIER_WORDS : null,
 		clubName: clubNameOf(clubList, loaded.team),
+		clubNote: clubNoteOf(clubList, loaded),
 		card: cardBuild(loaded.season, loaded.capsule),
 		restTile: lead.restTile,
 		restParts: lead.restParts,

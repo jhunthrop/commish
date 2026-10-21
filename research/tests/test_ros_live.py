@@ -95,12 +95,13 @@ def test_the_players_input_stops_at_the_lines_and_ranks_from_the_window() -> Non
         2: WeekFacts({"receptions": 6.0}, {"offensive_snaps": 30.0, "team_offensive_snaps": 60.0}),
         6: WeekFacts({"receptions": 9.0}, {}),  # a week past the lines' reach is not read
     }
-    who = PlayerWeeks("p", "WR", "KC", {1: "KC", 2: "BUF"}, weeks)
+    # His club at the run is the page's (`page_club`, Lane 120): Buffalo, whichever club his weeks were for.
+    who = PlayerWeeks("p", "WR", "BUF", weeks)
     schedule = {"KC": [1, 2, 3, 4, 5, 6, 7], "BUF": [1, 2, 3, 5, 6, 8, 9, 17, 18]}
     player = player_to_date(
         who, Window(7, 5), ClubSlates(schedule, schedule), stale_prior(None, _SERVED, 17.0), SCORING
     )
-    assert player.club_weeks == (1, 2, 3, 5)  # his latest club is Buffalo
+    assert player.club_weeks == (1, 2, 3, 5)  # Buffalo's weeks through the lines
     assert [g.week for g in player.played] == [1, 2]
     assert player.remaining_weeks == (8, 9, 17)  # Buffalo plays weeks 8, 9 and 17 from week 7
     assert player.streak == 2

@@ -11,7 +11,9 @@ Tank01's week of games once for their statuses (Lane 80, `pipeline/tank01/game_s
 calls an hour), and a game that answer still has open, or leaves out, 3 h 30 m past its kickoff by its own box score
 (Lane 101, at most two a pass), so a game is final the hour after it ends. Then, once an Eastern day from
 06:00, on what the pass left of its ten requests, the player list (Lane 110, B79), the one feed carrying
-each injured player's expected return (`injReturnDate`), which the API reads beside his designation.
+each injured player's expected return (`injReturnDate`), which the API reads beside his designation; the
+same read writes each listed player's club onto `provider_players` and names how many changed (Lane 122,
+`pipeline/tank01/player_clubs.py`), and a read that would change more than 60 writes none and fails.
 
 `usage-backfill` runs the weekly pass's usage steps alone (play-by-play and the three charted feeds)
 for every week nflverse has published: the operator's one-shot for weeks played before the steps
@@ -263,14 +265,16 @@ def _game_status(engine: Engine, client: Tank01Client, now: datetime, season: in
 
 
 def _return_dates(engine: Engine, client: Tank01Client, now: datetime, season: int, budget: FixedBudget) -> bool:
-    """The day's player list (Lane 110, B79) in a transaction of its own: its line when due, a failure
-    failing the job (the next hour asks again), a pass with no request left only named."""
+    """The day's player list (Lane 110, B79) and its clubs (Lane 122) in a transaction of its own: its line
+    when due, with the clubs it changed, a failure or a refused club write failing the job (the next hour
+    asks again), a pass with no request left only named."""
     with engine.begin() as conn:
         outcome = capture_return_dates(conn, client, now, season, budget)
     if outcome is None:
         return True
     reason = "" if outcome.reason is None else f", {outcome.reason}"
-    _line(f"  {outcome.source}: {outcome.status}, {outcome.requests} requests{reason}")
+    note = "" if outcome.note is None else f", {outcome.note}"
+    _line(f"  {outcome.source}: {outcome.status}, {outcome.requests} requests{reason}{note}")
     return outcome.status != "failed"
 
 

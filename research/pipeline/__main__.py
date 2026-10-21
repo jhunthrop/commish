@@ -68,6 +68,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--last-week", type=int, default=None, help="tank01-roster: stop after this week")
     parser.add_argument("--budget", type=float, default=DEFAULT_BACKFILL_BUDGET, help="props-backfill: credits")
     parser.add_argument("--check", action="store_true", help="coaches, win-totals-seed: validate, write nothing")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="player-clubs: print the count and the changes, write nothing"
+    )
     return parser
 
 
