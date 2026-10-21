@@ -317,7 +317,7 @@ void test('copy guard: every Waivers line is fantasy words, with no dash, semico
 		copiedWords('espn', 'Gainwell', true).said,
 		copiedWords('espn', 'Gainwell', false).said,
 		countWords(poolRows(advice, ZONE, NOW), 'espn'),
-		basisText(waiverBasis(BASIS, [gainwell.add, saints], HOST, CLOCK, NOW)),
+		basisText(waiverBasis(BASIS, [gainwell.add, saints], CLOCK, NOW)),
 		headBasisText(headBasis(BASIS.projection_previous_read_at, true, CLOCK)),
 		stripDecision([{ add: 'Otton', drop: 'Mason', dropWhy: WAIVERS.irBench }])
 	];
@@ -358,12 +358,11 @@ const BASIS = {
 	basis: 'A pickup starts this week on Proj and keeps Gain at zero or better.',
 	season_basis:
 		"Gain is your lineup's change in points over replacement a week, weeks 6 to 17. A game is our order's points a game.",
-	basis_note: 'Avg and Last omit two-point, missed kick, fumble and safety.',
+	basis_note: 'Our stats omit two-point, missed kick, fumble recovery and safety.',
 	projection_read_at: '2026-10-17T02:00:00.000Z',
 	projection_previous_read_at: '2026-10-16T02:00:00.000Z',
 	projection_scoring: { format: 'ppr' as const, league_own: false }
 };
-const HOST = 'sleeper';
 const CLOCK = { zone: ZONE, zoned: false };
 
 void test("before the addressed week's projection is read the basis says nothing of Proj: the screen draws no Proj column and says the day over the table (Lane 95)", () => {
@@ -375,7 +374,7 @@ void test("before the addressed week's projection is read the basis says nothing
 		projection_previous_read_at: null,
 		projection_arrives_at: '2026-10-22T22:15:00.000Z'
 	};
-	const text = basisText(waiverBasis(ahead, [saints], HOST, CLOCK, NOW));
+	const text = basisText(waiverBasis(ahead, [saints], CLOCK, NOW));
 	assert.doesNotMatch(text, /projections expected/);
 	assert.doesNotMatch(text, /published projection/);
 	assert.doesNotMatch(text, /Δ Proj/);
@@ -392,17 +391,10 @@ void test("a page turned to week 7 says its Proj is week 7's, and the drop's Sun
 			last_games: [{ week: 6, points: 14.2, source: 'platform' }, ...gainwell.add.facts.last_games]
 		}
 	};
-	const text = basisText(waiverBasis(turned, [drop, saints], HOST, CLOCK, NOW));
+	const text = basisText(waiverBasis(turned, [drop, saints], CLOCK, NOW));
 	assert.ok(text.includes("Proj is week 7's published projection"), text);
-	assert.ok(
-		text.includes(
-			"Avg and Last count week 6's finals from Sleeper's points for rostered players, our stats by Wednesday."
-		),
-		text
-	);
-	const unturned = basisText(
-		waiverBasis({ ...BASIS, week: 6, for_week: 6 }, [saints], HOST, CLOCK, NOW)
-	);
+	assert.ok(text.includes("Free agents' Avg and Last are our stats, week 6's by Wednesday."), text);
+	const unturned = basisText(waiverBasis({ ...BASIS, week: 6, for_week: 6 }, [saints], CLOCK, NOW));
 	assert.ok(unturned.includes("Proj is this week's published projection"), unturned);
 });
 
@@ -410,7 +402,6 @@ void test('the basis is one paragraph, the pickup rule first, each column it dra
 	const parts = waiverBasis(
 		{ ...BASIS, pickups: advice.pickups },
 		[gainwell.add, saints],
-		HOST,
 		CLOCK,
 		NOW
 	);
@@ -431,7 +422,6 @@ void test('the basis is one paragraph, the pickup rule first, each column it dra
 	const later = waiverBasis(
 		BASIS,
 		[gainwell.add, saints],
-		HOST,
 		CLOCK,
 		Date.parse(saints.facts.kickoff ?? '')
 	);
@@ -457,9 +447,9 @@ void test('the basis says when Final and the stats land while a row waits on the
 		...gainwell.add,
 		facts: { ...gainwell.add.facts, played: true, game_state: 'final' as const }
 	};
-	const text = basisText(waiverBasis(BASIS, [final, saints], HOST, CLOCK, NOW));
+	const text = basisText(waiverBasis(BASIS, [final, saints], CLOCK, NOW));
 	assert.ok(text.includes(KICKED_OFF_PART), text);
-	assert.ok(!basisText(waiverBasis(BASIS, [saints], HOST, CLOCK, NOW)).includes(KICKED_OFF_PART));
+	assert.ok(!basisText(waiverBasis(BASIS, [saints], CLOCK, NOW)).includes(KICKED_OFF_PART));
 });
 
 /** A row as the API sends it in the season Gain order (inseason season_order.go, Lane 85 fix round
@@ -511,7 +501,6 @@ void test('in the API season order the web prints it: the season Gain in Beats, 
 		waiverBasis(
 			{ ...BASIS, basis: SEASON_WORDS, pickups: tuesday.pickups },
 			rows.map((r) => r.add),
-			HOST,
 			CLOCK,
 			NOW
 		)
@@ -529,9 +518,9 @@ void test('the web never re-orders the strip: the cards are the API pickups in i
 		['Chiefs', 'Gainwell']
 	);
 	// Under the week's rule the drop's reason follows the pickup sentence, at a desk.
-	const week = waiverBasis({ ...BASIS, pickups: [gainwell] }, [gainwell.add], HOST, CLOCK, NOW);
+	const week = waiverBasis({ ...BASIS, pickups: [gainwell] }, [gainwell.add], CLOCK, NOW);
 	assert.ok(week.some((p) => p.text === WAIVERS.dropRule && !p.phone));
-	const none = waiverBasis({ ...BASIS, pickups: [] }, [gainwell.add], HOST, CLOCK, NOW);
+	const none = waiverBasis({ ...BASIS, pickups: [] }, [gainwell.add], CLOCK, NOW);
 	assert.ok(!none.some((p) => p.text === WAIVERS.dropRule));
 });
 

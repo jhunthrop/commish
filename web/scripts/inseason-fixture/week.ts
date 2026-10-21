@@ -133,7 +133,7 @@ const RULE_NAMES: Readonly<Record<string, string>> = {
 	'missed field goals': 'missed field goal',
 	'missed extra points': 'missed extra point',
 	"a player's kick and punt return touchdowns": 'return touchdown',
-	'fumble recoveries': 'fumble',
+	'fumble recoveries': 'fumble recovery',
 	safeties: 'safety',
 	"a defense's points allowed": 'points allowed',
 	"a defense's yards allowed": 'yards allowed'
@@ -164,7 +164,7 @@ export function uncountedOf(
 ): { basis_note: string; basis_note_link: string } {
 	if (rules.length === 0) return { basis_note: '', basis_note_link: '' };
 	return {
-		basis_note: `Avg and Last omit ${andList(basisNames(rules))}.`,
+		basis_note: `Our stats omit ${andList(basisNames(rules))}.`,
 		basis_note_link: linked ? `Which ${COUNT_WORDS[rules.length] ?? String(rules.length)}` : ''
 	};
 }

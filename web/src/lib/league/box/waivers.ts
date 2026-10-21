@@ -15,7 +15,7 @@ import { LINES } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import {
 	anyKicked,
-	finalsParts,
+	waiverFinalsParts,
 	gamePart,
 	OPP_PART,
 	projPart,
@@ -598,7 +598,6 @@ export function waiverBasis(
 	> &
 		Partial<Pick<WaiverAdvice, 'pickups' | 'week' | 'for_week' | 'projection_arrives_at'>>,
 	lines: readonly PlayerLine[],
-	host: LeagueHost,
 	clock: Clock,
 	now: number
 ): BasisPart[] {
@@ -642,7 +641,7 @@ export function waiverBasis(
 		...said(proj),
 		// The phone's rows draw no expected score or weather (BoxLine phoneFacts): no read to say there.
 		...said(gamePart(lines, clock, now, 'full'), false),
-		...finalsParts(lines, now, host, 'pool', true),
+		...waiverFinalsParts(lines, now),
 		...said(OPP_PART),
 		...uncountedPart(advice)
 	];

@@ -42,9 +42,9 @@ const stored = JSON.parse(
 >;
 /** The API's sentences (inseason words.go uncountedOf, Lane 111): each tab's rules named inline. */
 const RULES_NOTE = {
-	K: { basis_note: 'Avg and Last omit missed kick.', basis_note_link: 'Which two' },
+	K: { basis_note: 'Our stats omit missed kick.', basis_note_link: 'Which two' },
 	DEF: {
-		basis_note: 'Avg and Last omit fumble and safety.',
+		basis_note: 'Our stats omit fumble recovery and safety.',
 		basis_note_link: 'Which two'
 	}
 };
@@ -231,8 +231,8 @@ void test("a visitor's basis names the board's own scoring", () => {
 });
 
 void test('the rules Avg and Last leave out are named inline, the API sentence as it comes (Lane 111, B33)', () => {
-	assert.equal(rulesLeftOut(fixture.read.K), 'Avg and Last omit missed kick.');
-	const visitorNote = 'Avg and Last omit safety.';
+	assert.equal(rulesLeftOut(fixture.read.K), 'Our stats omit missed kick.');
+	const visitorNote = 'Our stats omit safety.';
 	assert.equal(rulesLeftOut({ basis_note: visitorNote }), visitorNote);
 	assert.equal(rulesLeftOut({ basis_note: '' }), null);
 });

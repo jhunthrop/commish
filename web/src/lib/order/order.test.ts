@@ -197,7 +197,7 @@ void test('the basis says each column once: the order, Wk 6, Opp rank, the rules
 	const parts = orderBasis(
 		advice([row('A')], {
 			read_at: READ,
-			basis_note: 'Avg and Last omit two-point, missed kick, fumble and safety.'
+			basis_note: 'Our stats omit two-point, missed kick, fumble recovery and safety.'
 		}),
 		LEAGUE,
 		ZONE,
@@ -207,7 +207,7 @@ void test('the basis says each column once: the order, Wk 6, Opp rank, the rules
 	assert.match(inLeague, /, PPR nearest your rules, read /);
 	assert.match(inLeague, /Opp rank is points allowed to his position, 1st fewest\./);
 	assert.ok(
-		inLeague.includes('Avg and Last omit two-point, missed kick, fumble and safety.'),
+		inLeague.includes('Our stats omit two-point, missed kick, fumble recovery and safety.'),
 		inLeague
 	);
 	assert.match(inLeague, /Roster is Sleeper's, read /);

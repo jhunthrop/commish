@@ -320,7 +320,6 @@
 		waiverBasis(
 			{ ...shown, pickups: advice.pickups },
 			lines,
-			host,
 			{ zone: memberZone(), zoned: false },
 			now
 		)

@@ -54,7 +54,7 @@ export function weeksWord(week: number, platformWeek: number): string {
 }
 
 /** What a game past kickoff keeps (Lane 92, B27), the end of the Proj sentence. */
-export const AS_OF_KICKOFF = 'as of kickoff for a game under way or final';
+export const AS_OF_KICKOFF = 'as of kickoff once started';
 
 /** What Proj final is (Lane 92, B22, round 2), said once where a game has kicked off: a starter to
  * play has his whole Proj left, one in play the rest of it, one done none (Lane 99 fix round 1 said it
@@ -153,14 +153,18 @@ export const PICK_PART = `Our pick starts the highest ${BOX.proj} at each slot.`
 
 /** The words every sentence of when our stats land ends on (KICKED_OFF_PART, Lane 111's two), which
  * the shots scripts look for. */
-export const STATS_BY_WEDNESDAY = 'stats by Wednesday.';
+export const STATS_BY_WEDNESDAY = 'by Wednesday.';
 
 /** When a game's final and its stats land (Lane 80), short enough for a phone's basis: the hourly
  * capture reads the game's status while any game of the week waits on its final, so it turns Final at
  * the pass after it ends, however many passes were missed (Lane 84: no promise of "within the hour");
  * its stats, and so Avg and Last, come with the weekly pass on Tuesday or by Wednesday evening
  * (research JOBS.md). */
-export const KICKED_OFF_PART = `${BOX.final} lands the hour after a game ends, its ${STATS_BY_WEDNESDAY}`;
+/** When a game's Final lands, the start of KICKED_OFF_PART and liveFinalsPart (fix round 1: short, so
+ * the phone's basis keeps to eight lines beside the rules our stats omit). */
+const FINAL_LANDS = `${BOX.final} lands the hour after a game`;
+
+export const KICKED_OFF_PART = `${FINAL_LANDS}, stats ${STATS_BY_WEDNESDAY}`;
 
 /** KICKED_OFF_PART where a row's game has kicked off with no final yet, or is final with the week's
  * stats not in his games yet, each by the one game-state rule at the page's clock (kickoff.ts
@@ -182,18 +186,30 @@ export function kickedOffPartAt(lines: readonly PlayerLine[], now: number): stri
  * counts the platform's points for one (the API's last_games source): this week's finals, or the
  * platform week's on a page turned past it. */
 export function platformFinalsPart(host: LeagueHost, week: string, rostered: string): string {
-	return `${BOX.avg} and ${BOX.last} count ${week} finals from ${hostWords(host)}'s points${rostered}, our ${STATS_BY_WEDNESDAY}`;
+	return `${BOX.avg} and ${BOX.last} count ${week} finals from ${hostWords(host)}'s points${rostered}, our stats ${STATS_BY_WEDNESDAY}`;
 }
 
 /** KICKED_OFF_PART and platformFinalsPart in one sentence, where a row's game is still in play beside
  * one the platform's points count (Lane 108's budget: merge before hiding). */
 export function liveFinalsPart(host: LeagueHost, rostered: string): string {
-	return `${BOX.final} lands the hour after a game ends, ${BOX.avg} and ${BOX.last} then count ${hostWords(host)}'s points${rostered}, our ${STATS_BY_WEDNESDAY}`;
+	return `${FINAL_LANDS}, ${BOX.avg} and ${BOX.last} then count ${hostWords(host)}'s points${rostered}, our stats ${STATS_BY_WEDNESDAY}`;
 }
 
-/** Said on a screen that lists free agents (Waivers, the league's order): the platform scores only
- * rostered players, so a free agent's Avg and Last wait on our stats and the sentence does not claim
- * his. */
+/** The phone's sentence where the platform's points count (Lane 111 fix round 1, HIGH-1): the figure
+ * the phone draws keeps a sentence that says what it counts, within its eight lines. */
+export function phoneFinalsPart(host: LeagueHost): string {
+	return `${BOX.avg} and ${BOX.last} count ${hostWords(host)}'s finals, our stats ${STATS_BY_WEDNESDAY}`;
+}
+
+/** Waivers' sentence once a final is in (Lane 111 fix round 1, MEDIUM-3): its rows are free agents,
+ * whom the platform does not score, so their Avg and Last are our stats until the week's land. */
+export function freeAgentsPart(week: number): string {
+	return `Free agents' ${BOX.avg} and ${BOX.last} are our stats, week ${String(week)}'s ${STATS_BY_WEDNESDAY}`;
+}
+
+/** Said on the league's order, whose rows mix rostered players and free agents: the platform scores
+ * only rostered players, so a free agent's Avg and Last wait on our stats and the sentence does not
+ * claim his. */
 export const FOR_ROSTERED = ' for rostered players';
 
 /** A row's final the platform's points count, null without one. */
@@ -202,7 +218,7 @@ function platformGame(line: PlayerLine): PlayerLine['facts']['last_games'][numbe
 }
 
 /** Whose rows a screen draws: the league's rostered players alone (the Lineup, the Matchup, Trades),
- * or its pool too (Waivers, the league's order). */
+ * or its pool too (the league's order). */
 export type RowsOf = 'rosters' | 'pool';
 
 /** When a row's Final and its stats land, and what Avg and Last count meanwhile, by the one game-state
@@ -226,9 +242,9 @@ export function finalsPartAt(
 
 /** finalsPartAt as a basis's parts: the sentence where the platform's points count (Lane 111) at a
  * desk, and on a phone, whose eight lines cannot hold it beside the rules our stats lack (Lane 108's
- * budget, measured on the fixture's five rules), when Final and our stats land alone (KICKED_OFF_PART)
- * while a row waits on them. onPhone false says neither on a phone (the Lineup while a row still
- * draws its fact cells, Lane 85). */
+ * budget, measured on the fixture's five rules), its short form (phoneFinalsPart, fix round 1) while
+ * a row waits on Final or our stats. onPhone false says neither on a phone (the Lineup while a row
+ * still draws its fact cells, Lane 85). */
 export function finalsParts(
 	lines: readonly PlayerLine[],
 	now: number,
@@ -242,8 +258,19 @@ export function finalsParts(
 	// Nothing waits on Final or our stats in the page's week (a page turned past the platform's):
 	// the one sentence is said on both.
 	if (full === timing || timing === null) return [{ text: full, phone: onPhone }];
-	const phone: BasisPart[] = onPhone ? [{ text: timing, phone: true, desk: false }] : [];
+	// Here full is the platform's sentence (finalsPartAt is kickedOffPartAt otherwise), so its host is
+	// named.
+	const short = host === null ? timing : phoneFinalsPart(host);
+	const phone: BasisPart[] = onPhone ? [{ text: short, phone: true, desk: false }] : [];
 	return [{ text: full, phone: false }, ...phone];
+}
+
+/** Waivers' parts: once a row counts the platform's points (a drop on the member's roster), the
+ * free agents' own state, one sentence on both (fix round 1, MEDIUM-3); else when Final and the stats
+ * land (kickedOffPartAt). */
+export function waiverFinalsParts(lines: readonly PlayerLine[], now: number): BasisPart[] {
+	const game = lines.map(platformGame).find((g) => g !== null) ?? null;
+	return said(game === null ? kickedOffPartAt(lines, now) : freeAgentsPart(game.week));
 }
 
 /** Avg and Last where a page says what they are (the player card): in the scoring the rows are in. */
@@ -266,7 +293,7 @@ export function ptsPart(byPlayer: boolean, host: LeagueHost, team: TeamFigure): 
 		: `${BOX.pts} are ${platform}'s points so far, Team adds the rows.`;
 }
 
-/** The API's sentence naming the rules our stats lack (Lane 111, B33: "Avg and Last omit two-point
+/** The API's sentence naming the rules our stats lack (Lane 111, B33: "Our stats omit two-point
  * and safety."), no link to follow; none when it names none. */
 export function uncountedPart(advice: { basis_note: string }): BasisPart[] {
 	return said(advice.basis_note);

@@ -233,7 +233,7 @@ async function check(
 			rows: table?.querySelectorAll('tbody tr:not(.sec)').length ?? 0,
 			mine: table?.querySelectorAll('tbody tr.mine').length ?? 0,
 			status: document.querySelector('main .status')?.textContent.trim() ?? '',
-			rules: basis?.textContent.match(/Avg and Last omit [^.]+\./)?.[0] ?? '',
+			rules: basis?.textContent.match(/Our stats omit [^.]+\./)?.[0] ?? '',
 			rulesLink: basis?.querySelector('a')?.getAttribute('href') ?? '',
 			glued: /[a-z]\.[A-Z]/.test(basis?.textContent ?? ''),
 			host: [...document.querySelectorAll('main p, main td, main th, main a, main button')]
@@ -268,8 +268,8 @@ async function check(
 	if (!seen.sections.includes('Bye in week 6')) said.push(`${at}: no bye section`);
 	// The fixture's league leaves out two rules a tab (week-order-serve.ts), named inline (Lane 111,
 	// B33): the kickers' as one missed kick, the defenses' both.
-	const named = screen.path.endsWith('/k') ? 'missed kick' : 'fumble and safety';
-	if (seen.rules !== `Avg and Last omit ${named}.`)
+	const named = screen.path.endsWith('/k') ? 'missed kick' : 'fumble recovery and safety';
+	if (seen.rules !== `Our stats omit ${named}.`)
 		said.push(`${at}: the rules left out read "${seen.rules}"`);
 	if (seen.glued) said.push(`${at}: two basis sentences run together`);
 	// No link to follow: the rules are named where they are said.
