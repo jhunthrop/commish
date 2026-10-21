@@ -19,7 +19,15 @@ from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
 from research.capsules.week.render import render_week_facts_block, render_week_sheet
 from research.capsules.week.rules import WEEK_NEVER_WORDS, week_rule_violations
-from research.capsules.week.sheet import BoardPlace, DepthPlace, PublishedProjection, Status, Weather, WeekGame
+from research.capsules.week.sheet import (
+    BoardPlace,
+    DepthPlace,
+    PublishedProjection,
+    Status,
+    Weather,
+    WeekGame,
+    WeekSheet,
+)
 from research.capsules.week.start_advice import start_advice_in
 from research.capsules.week.validate import sentence_shapes, validate_week_read, with_season
 from research.tests.week_read_fixtures import (
@@ -347,6 +355,63 @@ def test_a_cells_figure_named_as_another_cell_is_refused() -> None:
     assert not any("a cell that prints another figure" in v for v in week_rule_violations(named, sheet, "start"))
     off = named.replace(f"{board.points:g} PPR", "25.9 PPR")
     assert any("as his rest-of-season points" in v for v in week_rule_violations(off, sheet, "start"))
+
+
+_NAMED = "a cell that prints another"
+
+
+def _named_hits(sentence: str, sheet: WeekSheet, read: str = STARTER_READ, call: str = "start") -> list[str]:
+    last = read.rsplit(". ", maxsplit=1)[-1]
+    text = read.replace(last, f"{sentence} {last}")
+    return [v for v in week_rule_violations(text, sheet, call) if _NAMED in v]
+
+
+@pytest.mark.parametrize(
+    ("sentence", "cell"),
+    [
+        ("He averages 24.1 PPR points.", "his points a game (Avg)"),
+        ("His rest-of-season figure of 25.9 points stands.", "his rest-of-season points"),
+        ("He put up 25.9 points in his last game.", "his last game's points (Last)"),
+        ("His last game, he scored 31.2 points.", "his last game's points (Last)"),
+        ("He brings 24.1 points in his next game.", "his next game's points"),
+    ],
+)
+def test_every_drawn_cell_name_carries_its_own_figure(sentence: str, cell: str) -> None:
+    """Lane 117 (B80): Avg, Rest of season, Last and his next game are checked by name before or after the
+    figure, beside "a game" and "rest of season"."""
+    hits = _named_hits(sentence, starter())
+    assert hits and f"as {cell}" in hits[0], hits
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "He averages 25.9 PPR points.",
+        "His rest-of-season figure of 230 points stands.",
+        "He put up 24.1 points in his last game.",
+        "He brings 18.4 points in his next game.",
+        "The Cardinals rank 26th of 32 against receivers.",
+    ],
+)
+def test_a_figure_named_as_its_own_cell_passes(sentence: str) -> None:
+    assert not _named_hits(sentence, starter())
+
+
+def test_the_opponents_rank_is_opp_ranks_and_a_bye_has_none() -> None:
+    """Lane 117 (B80): a rank against his position is the Opp rank cell's; on his bye the sheet carries no
+    opponent's rank, so any one stated is refused, and a figure named as this week's is too."""
+    hits = _named_hits("The Cardinals rank 12th of 32 against receivers.", starter())
+    assert hits and "Opp rank" in hits[0]
+    assert _named_hits("Arizona sits 12th against receivers.", starter())
+    assert not _named_hits("He ranks 8th in our rest-of-season order.", starter())
+    bye = on_bye()
+    assert any("Opp rank" in v for v in _named_hits("Green Bay is 12th of 32 against backs.", bye, BYE_READ, "hold"))
+    assert any(
+        "on a week the card shows his bye" in v
+        for v in _named_hits("He has 21.3 points this week.", bye, BYE_READ, "hold")
+    )
+    assert any("next game" in v for v in _named_hits("He brings 21.3 points next week.", bye, BYE_READ, "hold"))
+    assert not _named_hits("He brings 21.3 PPR points a game.", bye, BYE_READ, "hold")
 
 
 def test_the_sheet_prints_a_chance_of_rain_only_as_the_cell_names_it() -> None:

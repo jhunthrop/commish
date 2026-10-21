@@ -137,12 +137,12 @@ def test_under_lane_100_every_recorded_read_is_refused_by_name(name: str) -> Non
 
 @pytest.mark.parametrize("name", _ALL_READS)
 def test_replayed_against_its_recording_the_writer_falls_to_the_facts_block(name: str) -> None:
-    """The writer's own path on the recorded answers: every draft is handed back, and after its four asks
-    (the calls the recording took live) the read is his facts block."""
+    """The writer's own path on the recorded answers: every draft is handed back, and within the asks the
+    recording took live (a second draft over the cap ends it sooner, Lane 117) the read is his facts block."""
     sheet, player = _sheet(name)
     gateway = _Replay(player["answers"])
     result = write_week_read(sheet, gateway, tuple(player["avoid"]), frozenset(player["taken"]))  # type: ignore[arg-type]
-    assert result.source == "facts" and result.calls == player["calls"]
+    assert result.source == "facts" and result.calls <= player["calls"]
     assert result.fallback is not None and result.fallback.startswith("failed validation")
     assert all(attempt.violations for attempt in result.attempts)
 

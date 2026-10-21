@@ -39,9 +39,16 @@ from research.capsules.week.validate import WEEK_BAND, validate_week_read
 # read is short, and a fourth failure is a facts block, retried on the cadence's terms. The season read's ceiling is six for two reads and a narrative.
 MAX_CALLS_PER_READ: Final = 4
 # Lane 100: a read whose last draft within the ceiling broke only the 80-word cap is asked once more, its
-# overrun named, before it falls to the facts block. The run's budget counts it in a read's worst case.
+# overrun named, before it falls to the facts block. For a player who may not be started (a bye, Out) the
+# retry carries the judge's ask with it, as a playing player's read needs none (Lane 117, B80). The run's
+# budget counts both in a read's worst case.
 OVERRUN_RETRIES: Final = 1
-MAX_ASKS_PER_READ: Final = MAX_CALLS_PER_READ + OVERRUN_RETRIES
+OVERRUN_JUDGE_ASKS: Final = 1
+# Lane 117 (B95): a draft over the cap is handed back once, its count and the target named
+# (`prompt.length_move`); a second draft over it is the facts block, never trimmed to fit.
+OVER_CAP_DRAFTS: Final = 2
+OVER_CAP_TWICE: Final = "failed validation: the read ran over the 80-word cap twice"
+MAX_ASKS_PER_READ: Final = MAX_CALLS_PER_READ + OVERRUN_RETRIES + OVERRUN_JUDGE_ASKS
 # A five-sentence read and its call run about 180 tokens; the cap leaves room and never cuts an honest read.
 MAX_TOKENS: Final = 600
 
@@ -86,23 +93,45 @@ def _gateway_why(error: GenerationError) -> str:
     return "the gateway's answer was refused, empty or cut"
 
 
+def _over_cap(result: ValidationResult) -> bool:
+    return result.band_failure is not None and result.band_failure.words > WEEK_BAND[1]
+
+
 class _Asks:
-    """The read's asks so far, the writer's and the judge's together, within `MAX_CALLS_PER_READ` and the
-    overrun's one more (`OVERRUN_RETRIES`) once granted."""
+    """The read's asks so far, the writer's and the judge's together, within `MAX_CALLS_PER_READ`, the
+    overrun's one more draft (`OVERRUN_RETRIES`) once granted, and with it for a player who may not be
+    started the judge's ask on that draft (`OVERRUN_JUDGE_ASKS`), which no draft may spend."""
 
     def __init__(self) -> None:
         self.made = 0
         self.extra = 0
+        self.judge_extra = 0
+        self.over_cap = 0
 
     @property
     def left(self) -> bool:
+        """Whether another draft may be asked."""
         return self.made < MAX_CALLS_PER_READ + self.extra
 
-    def grant_overrun(self, result: ValidationResult) -> None:
-        """One more ask, once, when the ceiling is reached and the draft broke the word cap alone."""
-        over = result.band_failure is not None and result.band_failure.words > WEEK_BAND[1]
+    @property
+    def judge_left(self) -> bool:
+        """Whether the judge may be asked on the draft in hand."""
+        return self.made < MAX_CALLS_PER_READ + self.extra + self.judge_extra
+
+    def count_over(self, result: ValidationResult) -> bool:
+        """Counts a draft over the word cap; True once one is over it the second time (`OVER_CAP_DRAFTS`)."""
+        if _over_cap(result):
+            self.over_cap += 1
+        return self.over_cap >= OVER_CAP_DRAFTS
+
+    def grant_overrun(self, result: ValidationResult, judged: bool) -> None:
+        """One more ask, once, when the ceiling is reached and the draft broke the word cap alone; and the
+        judge's ask on that draft when the read is `judged`."""
+        over = _over_cap(result)
         if not self.left and self.extra < OVERRUN_RETRIES and over and len(result.violations) == 1:
             self.extra += 1
+            if judged:
+                self.judge_extra += OVERRUN_JUDGE_ASKS
 
 
 def _judged_start(sheet: WeekSheet, text: str, judge: GatewayClient) -> tuple[bool, Usage | None]:
@@ -146,10 +175,16 @@ def write_week_read(
         answer = parse_week_answer(completion.content)
         text = answer.read or ""
         result = validate_week_read(text, sheet, taken, answer.call)
-        asks.grant_overrun(result)
+        if asks.count_over(result):
+            attempts.append(WeekAttempt(text, answer.call, result.violations))
+            # The fall names the guard a figure broke before the cap, as every fall does (fallback_violation).
+            alone = len(result.violations) == 1
+            why = OVER_CAP_TWICE if alone else f"failed validation: {fallback_violation(result.violations)}"
+            return _facts(sheet, usage, made(), attempts, why)
+        asks.grant_overrun(result, judged=not sheet.may_start)
         violations = result.violations
         if result.ok and not sheet.may_start:
-            if not asks.left:
+            if not asks.judge_left:
                 attempts.append(WeekAttempt(text, answer.call, ("No ask was left for the judge.",)))
                 break
             asks.made += 1
