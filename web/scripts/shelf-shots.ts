@@ -22,7 +22,7 @@ import { SHELF } from '../src/lib/player/shelf.ts';
 import { SHELF_PARAM } from '../src/lib/player/shelf-state.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
-import { readFaceFaults } from './read-face.ts';
+import { readFace } from './read-face.ts';
 import {
 	FIXTURE_WEEK_CLOCK,
 	installFixtureClock,
@@ -265,7 +265,7 @@ async function check(
 	const tiles = await shelf(page).locator('.tile').count();
 	if (tiles < 6) fault(`${String(tiles)} tiles`);
 	if ((await shelf(page).getByText(CARD.ourRead).count()) === 0) fault('no read');
-	for (const said of await readFaceFaults(page, 'dialog.shelf[open]')) fault(said);
+	for (const said of (await readFace(page, 'dialog.shelf[open]')).faults) fault(said);
 	const verb = (
 		(
 			await shelf(page)
@@ -365,8 +365,9 @@ if (!process.env.BYTES_ONLY && playersScreen !== undefined) {
 				await ready(page, playersScreen);
 				await shelf(page).locator('.prose.week').waitFor({ timeout: READY_TIMEOUT_MS });
 				await page.evaluate(() => document.fonts.ready);
-				for (const said of await readFaceFaults(page, 'dialog.shelf[open]'))
-					faults.push(`${label}: ${said}`);
+				const face = await readFace(page, 'dialog.shelf[open]');
+				for (const said of face.faults) faults.push(`${label}: ${said}`);
+				process.stdout.write(`${label}: the read's lines ${face.lines.join(', ')} characters\n`);
 				await page.screenshot({
 					path: new URL(`shelf-read-${theme}-${String(size.width)}.png`, out).pathname
 				});

@@ -1,4 +1,4 @@
-// Screenshots of the player card (Lane 66h) in both themes at 1440 and 390, on a Central clock:
+// Screenshots of the player card (Lane 66h) in both themes at 1440, 1280 and 390, on a Central clock:
 // signed out (the week in PPR, Add to my sheet), and in the fixture's Sleeper league a player another
 // roster holds (Trade for him), one our lineup starts (Start him), one no roster holds (Open Sleeper
 // waivers), Compare open with a second player, a player whose week read is withheld (his status
@@ -7,10 +7,11 @@
 //   the six tiles, each "--" with its reason on the tile, Opp rank's direction in words, the shared
 //   status pill, the verb and Compare, the week read's caption (or its withheld caption alone), the
 //   season read's stamp (before the first kickoff only), the week ahead's row, the earlier seasons
-//   collapsed, the week read in the UI face (read-face.ts), the basis in at most five rendered lines
-//   at 1440 and eight at 390, the page's copy passing the one guard (betting and trading words,
-//   "host", a dash or a semicolon; the names the run and the API handed it skipped, copy-scan.ts),
-//   nothing scrolling sideways, and on a phone the pinned verb clearing the first tiles.
+//   collapsed, the week read in the UI face at about 60 characters a line (read-face.ts), the basis
+//   in at most five rendered lines on a desk and eight at 390, the page's copy passing the one guard
+//   (betting and trading words, "host", a dash or a semicolon; the names the run and the API handed
+//   it skipped, copy-scan.ts), nothing scrolling sideways, and on a phone the pinned verb clearing
+//   the first tiles.
 // The Rest of season tile shows on a run that ranks the rest of the season: set ROS_FROM_WEEK to its
 // first week (the site built from the nightly's contract fixture run, research/nightly/contract/
 // fixture, PUBLIC_RUN_ID=2026-10-21T12-ros) and one signed-out page is shot with the tile held to
@@ -27,7 +28,7 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { copyFault, watchData } from './copy-scan.ts';
-import { readFaceFaults } from './read-face.ts';
+import { readFace } from './read-face.ts';
 import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
 import { CARD } from '../src/lib/player/card.ts';
@@ -36,7 +37,7 @@ import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/
 
 const THEMES = ['dark', 'light'] as const;
 const PHONE_WIDTH = 390;
-const WIDTHS = [1440, PHONE_WIDTH] as const;
+const WIDTHS = [1440, 1280, PHONE_WIDTH] as const;
 const VIEWPORT_HEIGHT = 900;
 const ZONE = 'America/Chicago';
 const READY_TIMEOUT_MS = 30_000;
@@ -51,7 +52,7 @@ const DIRECTION = /, (among the easiest for|among the toughest for|in the middle
 const ROS_FROM_WEEK = process.env.ROS_FROM_WEEK;
 const REST_CAPTION = /^from week \d+, (\d+\.\d a game, )?[A-Z]{2}\d+ in our order$/;
 /** The basis's rendered lines at most, by width (review M6). */
-const BASIS_LINES: Readonly<Record<number, number>> = { 1440: 5, [PHONE_WIDTH]: 8 };
+const BASIS_LINES: Readonly<Record<number, number>> = { 1440: 5, 1280: 5, [PHONE_WIDTH]: 8 };
 const WEEK_READ = /Written \w{3} \d{1,2}:\d{2} [ap]m Central, for week \d+/;
 const WITHHELD = 'His status changed since this read was written. A new read is due by';
 
@@ -353,7 +354,10 @@ for (const shot of ROS ? ROS_SHOTS : SHOTS) {
 				if (shot.compare !== undefined) await openCompare(page, shot.compare);
 				const card = await read(page);
 				checkCard(card, shot, where, width);
-				for (const said of await readFaceFaults(page, 'main')) check(false, `${where}: ${said}`);
+				const face = await readFace(page, 'main');
+				for (const said of face.faults) check(false, `${where}: ${said}`);
+				if (face.lines.length > 0)
+					process.stdout.write(`${where}: the read's lines ${face.lines.join(', ')} characters\n`);
 				if (shot.weekRead === 'shown')
 					check(
 						(await page.locator('main .prose.week').count()) === 1,

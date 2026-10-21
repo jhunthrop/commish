@@ -71,8 +71,11 @@
 
 	/* The week's read in season: the UI face at the rows' body size (--t-md), its byline a caption like
 	   the tiles'. Its selectors outrank the phone's sizes below, so it holds at every width. */
+	/* The block itself is capped at the measure, set at the read's size so its ch are the read's, and
+	   sits at the left of its column (shelf or desk page) rather than stretching across it. */
 	.prose.week {
 		font-family: var(--font-ui);
+		font-size: var(--t-week-read);
 		max-width: var(--measure-week-read);
 	}
 
