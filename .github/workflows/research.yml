@@ -95,12 +95,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
+      # Node 24, the research image's: pytest runs the schema gate's reader (run-contract.ts) under it.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
       - name: The TypeScript oracle's dependencies
         working-directory: .
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        # The web's reader and its zod, which tests/test_season_contract.py drives through the schema
+        # gate over a page the writer made (Lane 119); with CI set the test never skips.
+      - name: The web's run reader dependencies
+        working-directory: web
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: The TypeScript oracle's tests on its live nightly paths (the rest of its suite predates the pivot, launch item 2026-10-18)
         working-directory: research-ts
