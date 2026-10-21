@@ -407,5 +407,5 @@ func (s *Service) publicAdvisor(ctx context.Context) (*advisor, error) {
 	}
 	week := nextWeek(data.Games)
 	l := League{Snap: leaguesync.Snapshot{Season: s.Season, Week: week}, Saved: &settings, Board: board}
-	return newAdvisor(l, data, s.projection(ctx, s.Season, week), nil, s.Now())
+	return newAdvisor(l, data, s.projection(ctx, s.Season, week), nil, s.Now(), s.Lives)
 }

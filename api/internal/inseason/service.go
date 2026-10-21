@@ -76,6 +76,10 @@ type Service struct {
 	// Boards values our board for the reads with no league: the public player read and the public
 	// order (PublicSettings).
 	Boards BoardSource
+	// Lives keeps each board at the read's clock for the minute, built
+	// once for every route that reads it (Lane 112); nil builds it per
+	// request.
+	Lives *LiveBoards
 	// Context is main's: shutdown stops every trade search and warm run
 	// (rereview 66u W3); nil is context.Background.
 	Context context.Context
@@ -206,7 +210,7 @@ func (s *Service) leagueAdvisor(ctx context.Context, l League, account uuid.UUID
 	if err != nil {
 		return nil, fmt.Errorf("held: %w", err)
 	}
-	a, err := newAdvisor(l, data, s.projection(ctx, seasonOf(l), l.Snap.Week), held, s.Now())
+	a, err := newAdvisor(l, data, s.projection(ctx, seasonOf(l), l.Snap.Week), held, s.Now(), s.Lives)
 	if err != nil {
 		return nil, err
 	}

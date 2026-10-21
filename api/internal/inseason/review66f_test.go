@@ -152,7 +152,7 @@ func TestWaiverDropsListEveryChoice(t *testing.T) {
 // page is in the week order (Lane 95: with none read, the season Gain's).
 func TestWaiverAnswerCarriesTheTable(t *testing.T) {
 	f := newFixture(t)
-	a, err := newAdvisor(f.league, f.data, everyoneProjected(f), nil, fixtureNow)
+	a, err := newAdvisor(f.league, f.data, everyoneProjected(f), nil, fixtureNow, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

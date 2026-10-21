@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"strings"
 	"sync"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
@@ -58,7 +57,7 @@ func (b *Boards) For(ctx context.Context, s apitypes.LeagueSettings) (boards.Boa
 	if err != nil {
 		return boards.Board{}, err
 	}
-	key := shapeKey{raw: raw, teams: s.Teams, slots: slotKey(slots), ranked: boards.RankedFor(s.Scoring)}
+	key := shapeKey{raw: raw, teams: s.Teams, slots: boards.SlotKey(slots), ranked: boards.RankedFor(s.Scoring)}
 	b.mu.Lock()
 	if v, ok := b.valued[key]; ok {
 		b.mu.Unlock()
@@ -95,14 +94,6 @@ func (b *Boards) raw(ctx context.Context, s apitypes.LeagueSettings, slots []dra
 		preset = *s.Scoring.Preset
 	}
 	return b.Raw.Load(ctx, boards.FormatFor(preset))
-}
-
-func slotKey(slots []draft.SlotConfig) string {
-	var sb strings.Builder
-	for _, s := range slots {
-		fmt.Fprintf(&sb, "%s:%d;", s.Slot, s.Count)
-	}
-	return sb.String()
 }
 
 // A figure the room or the report shows (ADP, points, over replacement,

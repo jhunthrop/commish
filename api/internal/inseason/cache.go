@@ -36,7 +36,8 @@ const (
 const ReadTimeout = 5 * time.Second
 
 // Cache keeps the reads for their TTLs, each read once however many
-// requests ask for it at the same time, as the board cache does.
+// requests ask for it at the same time, as the board cache does. Past
+// its TTL a read is refreshed behind the value kept (cached).
 type Cache struct {
 	Reads Reads
 	Now   func() time.Time
@@ -49,6 +50,10 @@ type Cache struct {
 	group   singleflight.Group
 	mu      sync.Mutex
 	entries map[string]entry
+	// refreshing is each key a refresh is reading behind its kept value,
+	// refreshes the refreshes still running (a test waits on them).
+	refreshing map[string]bool
+	refreshes  sync.WaitGroup
 }
 
 type entry struct {
@@ -137,14 +142,24 @@ func (c *Cache) Designations(ctx context.Context) (map[string]boards.Designation
 // read, solo.DesignationSource), the dating kept for CaptureTTL too. A dating
 // read that fails is logged and the designations answer undated, so a
 // row says "as of" rather than the board losing its statuses.
+//
+// The dating is kept under one key with the capture it was read for: a
+// newer capture dates by the runs kept while its own are read behind
+// (Lane 112 ruling 2), so an hourly capture never makes a request wait.
+// A run that goes on keeps its start; a status the kept runs do not hold
+// answers undated until they land.
 func (c *Cache) DatedDesignations(ctx context.Context) (map[string]boards.Designation, error) {
 	designations, err := c.Designations(ctx)
 	if err != nil || len(designations) == 0 {
 		return designations, err
 	}
 	newest := boards.Newest(designations)
-	runs, err := cached(c, ctx, "designation-runs/"+newest.Format(time.RFC3339Nano), CaptureTTL, func(ctx context.Context) (map[boards.RunKey]time.Time, error) {
-		return c.Reads.DesignationRuns(ctx, newest)
+	stale := func(e entry) bool {
+		return c.Now().Sub(e.at) > CaptureTTL || !e.value.(datedRuns).newest.Equal(newest)
+	}
+	runs, err := cachedUnless(c, ctx, "designation-runs", stale, func(ctx context.Context) (datedRuns, error) {
+		runs, err := c.Reads.DesignationRuns(ctx, newest)
+		return datedRuns{newest: newest, runs: runs}, err
 	})
 	if err != nil {
 		if c.Log != nil {
@@ -152,36 +167,39 @@ func (c *Cache) DatedDesignations(ctx context.Context) (map[string]boards.Design
 		}
 		return designations, nil
 	}
-	return boards.WithSince(designations, runs), nil
+	return boards.WithSince(designations, runs.runs), nil
 }
 
-// cached is the value kept for key while younger than ttl, else read
-// once for every caller waiting on it.
+// datedRuns is the designation runs read for the capture at newest.
+type datedRuns struct {
+	newest time.Time
+	runs   map[boards.RunKey]time.Time
+}
+
+// cached is the value kept for key while younger than ttl (cachedUnless).
 func cached[V any](c *Cache, ctx context.Context, key string, ttl time.Duration, read func(context.Context) (V, error)) (V, error) {
-	if v, ok := c.fresh(key, ttl); ok {
-		return v.(V), nil
+	return cachedUnless(c, ctx, key, func(e entry) bool { return c.Now().Sub(e.at) > ttl }, read)
+}
+
+// cachedUnless is the value kept for key, read once for every caller
+// waiting on it when nothing is kept. Once stale says the kept value is
+// stale it still answers at once while one refresh reads it again behind
+// it (Lane 112 ruling 2): a request waits on the store only when the
+// cache holds nothing.
+func cachedUnless[V any](c *Cache, ctx context.Context, key string, stale func(entry) bool, read func(context.Context) (V, error)) (V, error) {
+	if e, ok := c.kept(key); ok {
+		if stale(e) {
+			refreshBehind(c, ctx, key, read)
+		}
+		return e.value.(V), nil
 	}
 	v, err, _ := c.group.Do(key, func() (any, error) {
-		// A flight that ended between the check and this call kept its
+		// A fill that ended between the check and this call kept its
 		// answer: use it rather than read again.
-		if v, ok := c.fresh(key, ttl); ok {
-			return v, nil
+		if e, ok := c.kept(key); ok {
+			return e.value, nil
 		}
-		// The read is shared: one viewer leaving must not fail the rest,
-		// and the read still ends within its timeout.
-		readCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), c.timeout())
-		defer cancel()
-		value, err := read(readCtx)
-		if err != nil {
-			return nil, err
-		}
-		c.mu.Lock()
-		if c.entries == nil {
-			c.entries = map[string]entry{}
-		}
-		c.entries[key] = entry{value: value, at: c.Now()}
-		c.mu.Unlock()
-		return value, nil
+		return fill(c, ctx, key, read, false)
 	})
 	if err != nil {
 		var zero V
@@ -190,15 +208,64 @@ func cached[V any](c *Cache, ctx context.Context, key string, ttl time.Duration,
 	return v.(V), nil
 }
 
-// fresh is the value kept for key while younger than ttl.
-func (c *Cache) fresh(key string, ttl time.Duration) (any, bool) {
+// refreshBehind reads key again in the background unless a refresh of it
+// is already running. A refresh that fails is logged and the kept value
+// stands, so the next read past the TTL tries again.
+func refreshBehind[V any](c *Cache, ctx context.Context, key string, read func(context.Context) (V, error)) {
+	c.mu.Lock()
+	if c.refreshing[key] {
+		c.mu.Unlock()
+		return
+	}
+	if c.refreshing == nil {
+		c.refreshing = map[string]bool{}
+	}
+	c.refreshing[key] = true
+	c.refreshes.Add(1)
+	c.mu.Unlock()
+	go func() {
+		defer c.refreshes.Done()
+		defer func() {
+			c.mu.Lock()
+			delete(c.refreshing, key)
+			c.mu.Unlock()
+		}()
+		if _, err := fill(c, ctx, key, read, true); err != nil && c.Log != nil {
+			c.Log.Warn("inseason: a refresh failed; the kept read answers until the next", "key", key, "err", err)
+		}
+	}()
+}
+
+// fill reads key and keeps the answer, logging how long the read took
+// (Lane 112 ruling 4): behind is set for a refresh no request waited on.
+// The read is shared: one viewer leaving must not fail the rest, and the
+// read still ends within its timeout.
+func fill[V any](c *Cache, ctx context.Context, key string, read func(context.Context) (V, error), behind bool) (any, error) {
+	readCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), c.timeout())
+	defer cancel()
+	start := time.Now()
+	value, err := read(readCtx)
+	if err != nil {
+		return nil, err
+	}
+	if c.Log != nil {
+		c.Log.Info("inseason: cache fill", "key", key, "ms", time.Since(start).Milliseconds(), "behind", behind)
+	}
+	c.mu.Lock()
+	if c.entries == nil {
+		c.entries = map[string]entry{}
+	}
+	c.entries[key] = entry{value: value, at: c.Now()}
+	c.mu.Unlock()
+	return value, nil
+}
+
+// kept is the value kept for key, however old.
+func (c *Cache) kept(key string) (entry, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	e, ok := c.entries[key]
-	if !ok || c.Now().Sub(e.at) > ttl {
-		return nil, false
-	}
-	return e.value, true
+	return e, ok
 }
 
 func (c *Cache) timeout() time.Duration {

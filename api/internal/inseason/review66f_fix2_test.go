@@ -95,7 +95,7 @@ func TestTheStripOnTheRecordedLeague(t *testing.T) {
 		}
 		every[p.ID] = boards.ProjectedPoints{PPR: v, Half: v, Standard: v}
 	}
-	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{ReadAt: projectionAt, Players: every}, nil, fixtureNow)
+	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{ReadAt: projectionAt, Players: every}, nil, fixtureNow, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -112,7 +112,7 @@ func pickupPage(t *testing.T, f fixture, now time.Time, position draft.Position)
 func pickupPageFor(t *testing.T, f fixture, now time.Time, position draft.Position, asked string) apitypes.WaiverAdvice {
 	t.Helper()
 	f.league.Snap.ReadAt = now.Add(-time.Minute)
-	a, err := newAdvisor(f.league, f.data, everyoneProjected(f), nil, now)
+	a, err := newAdvisor(f.league, f.data, everyoneProjected(f), nil, now, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -40,7 +40,7 @@ func (f formatBoards) For(_ context.Context, s apitypes.LeagueSettings) (boards.
 // at the same clock.
 func TestThePlayerReadCarriesEveryRunFormatAtTheReadsClock(t *testing.T) {
 	sundayEvening := restSunday.Add(5 * time.Hour)
-	lives, err := liveRunBoards(context.Background(), formatBoards{t}, restWeekSix(true, false), sundayEvening)
+	lives, err := liveRunBoards(context.Background(), formatBoards{t}, restWeekSix(true, false), sundayEvening, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestThePlayerReadCarriesEveryRunFormatAtTheReadsClock(t *testing.T) {
 // A tier in another format is that format's live board's, and with no
 // tier asked the read carries none.
 func TestTheTierIsInTheFormatAsked(t *testing.T) {
-	lives, err := liveRunBoards(context.Background(), formatBoards{t}, restWeekSix(true, true), restMonday.Add(14*time.Hour))
+	lives, err := liveRunBoards(context.Background(), formatBoards{t}, restWeekSix(true, true), restMonday.Add(14*time.Hour), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func BenchmarkLiveRunBoards(b *testing.B) {
 	f.league.Board.Order, f.league.Board.FromWeek = boards.OrderRestOfSeason, 6
 	src := &askingBoards{board: f.league.Board}
 	for b.Loop() {
-		if _, err := liveRunBoards(context.Background(), src, f.data.Games, fixtureNow); err != nil {
+		if _, err := liveRunBoards(context.Background(), src, f.data.Games, fixtureNow, nil); err != nil {
 			b.Fatal(err)
 		}
 	}

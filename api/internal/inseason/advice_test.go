@@ -236,7 +236,7 @@ func BenchmarkTradesRoute(b *testing.B) {
 	f := newFixture(b)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, fixtureNow)
+		a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, fixtureNow, nil)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -252,7 +252,7 @@ func BenchmarkWaiversRoute(b *testing.B) {
 	f := newFixture(b)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, fixtureNow)
+		a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, fixtureNow, nil)
 		if err != nil {
 			b.Fatal(err)
 		}

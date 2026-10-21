@@ -183,10 +183,15 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	}
 	inSeason := &inseason.Service{
 		Leagues: inseason.SyncLeagues{Sync: leagueSync}, Weeks: inseason.SyncLeagues{Sync: leagueSync}, Facts: facts,
-		Holds: sheetStore, Moves: moves, Boards: draftBoards, Season: draftBoards.Schedule.Season, Now: now, Log: log,
+		Holds: sheetStore, Moves: moves, Boards: draftBoards, Lives: &inseason.LiveBoards{Log: log},
+		Season: draftBoards.Schedule.Season, Now: now, Log: log,
 		Landings: inseason.SyncLeagues{Sync: leagueSync}, Context: ctx,
 		Records: &leaguerecord.Service{Store: &leaguerecord.Store{Pool: pool}, Orders: draftBoards.Schedule},
 	}
+	// The season's reads fill and the run's boards build before the
+	// listener opens, so neither /readyz nor the first request after a
+	// deploy waits on them (Lane 112). Bounded; a failure only logs.
+	inSeason.WarmAtStart(ctx, inseason.StartTimeout)
 	// The trade search warms as each league read lands (Lane 66u).
 	leagueSync.Poller.Landed = inSeason.OnLanded
 	// While a game is under way every screen waits for a read under the
