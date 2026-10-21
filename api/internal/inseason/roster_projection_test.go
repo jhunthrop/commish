@@ -145,30 +145,8 @@ func TestTheBestLineupTakesTheBetterQuarterbackAndLeavesAnEmptySlotEmpty(t *test
 // come) only the two receivers' 5 and 6 count, so 33 + 11 = 44, on the
 // board; its Proj is all five's, 52. Team 7, with no roster, has neither.
 func TestARosterSidesProjectedFinalAddsOnlyThePlayersStillToPlay(t *testing.T) {
-	f := pairedFixture(t)
-	projection := weekProjection(f)
 	sunday := time.Date(2026, 10, 18, 14, 0, 0, 0, east)
-	for i := range f.data.Games {
-		g := &f.data.Games[i]
-		if g.Week != 6 {
-			continue
-		}
-		switch g.Team {
-		case "LV", "MIA", "NYJ", "PHI":
-			g.Kickoff, g.Final = sunday.Add(-5*time.Hour), true
-		case "ARI", "ATL":
-			g.Kickoff, g.Final = sunday.Add(-time.Hour), false
-		default:
-			g.Kickoff, g.Final = sunday.Add(2*time.Hour), false
-		}
-	}
-	ffpcBoard(&f)
-	team := &f.league.Snap.Teams[2]
-	team.Players, team.Reserve, team.Taxi = team.Players[:5], nil, nil
-	for i, proj := range []float64{20, 10, 11, 5, 6} {
-		projection.Players[fmt.Sprintf("p%03d", 30+i)] = boards.ProjectedPoints{PPR: proj, Half: proj, Standard: proj}
-	}
-	board := scoreboardOf(t, ffpcService(t, f, projection, sunday))
+	board := teamThreeBoard(t, sunday, nil)
 	game, three := sideOf(t, board, 3)
 	if game.State != apitypes.ScoreboardGameStatePlaying {
 		t.Fatalf("team 3's game %s, want playing", game.State)
@@ -179,4 +157,62 @@ func TestARosterSidesProjectedFinalAddsOnlyThePlayersStillToPlay(t *testing.T) {
 	if _, seven := sideOf(t, board, 7); seven.Projection != nil || seven.ProjectedFinal != nil || seven.ProjectionBestLineup != nil {
 		t.Errorf("team 7 with no roster: Proj %v Proj final %v flag %v", deref(seven.Projection), deref(seven.ProjectedFinal), seven.ProjectionBestLineup)
 	}
+}
+
+// Review MEDIUM-2 (Lane 127): on Monday night the in-play back of team 3's
+// best lineup adds the rest of his Proj by Lane 92's rule, max(0, 11 - 4),
+// where the read gives his points: 33 + 5 + 6 + 7 = 51, above the 33 the
+// platform counts and the 44 with his rest left out. With no player's
+// points (FFPC's read) his Pts are unknown and he adds nothing: 44.
+func TestARosterSidesProjectedFinalAddsTheRestOfAPlayerInPlay(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		points map[string]float64
+		want   float64
+	}{
+		{"his points read", map[string]float64{"h032": 4}, 51},
+		{"no player's points (FFPC)", nil, 44},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, three := sideOf(t, teamThreeBoard(t, mondayNight, tc.points), 3)
+			if deref(three.ProjectedFinal) != tc.want || three.Points != 33 {
+				t.Errorf("team 3 Proj final %v over %v points, want %v", deref(three.ProjectedFinal), three.Points, tc.want)
+			}
+		})
+	}
+}
+
+// teamThreeBoard is the FFPC board at `at` with team 3 holding five players
+// (QB on LV and RB on PHI final, RB on ARI in play, WRs on CLE and JAX to
+// come), their Proj 20, 10, 11, 5 and 6, and its read's player points.
+func teamThreeBoard(t *testing.T, at time.Time, points map[string]float64) apitypes.Scoreboard {
+	t.Helper()
+	f := pairedFixture(t)
+	projection := weekProjection(f)
+	for i := range f.data.Games {
+		g := &f.data.Games[i]
+		if g.Week != 6 {
+			continue
+		}
+		switch g.Team {
+		case "LV", "MIA", "NYJ", "PHI":
+			g.Kickoff, g.Final = at.Add(-5*time.Hour), true
+		case "ARI", "ATL":
+			g.Kickoff, g.Final = at.Add(-time.Hour), false
+		default:
+			g.Kickoff, g.Final = at.Add(2*time.Hour), false
+		}
+	}
+	ffpcBoard(&f)
+	team := &f.league.Snap.Teams[2]
+	team.Players, team.Reserve, team.Taxi = team.Players[:5], nil, nil
+	for i := range f.league.Snap.Matchups {
+		if side := &f.league.Snap.Matchups[i]; side.RosterID == 3 && points != nil {
+			side.PlayerPoints = points
+		}
+	}
+	for i, proj := range []float64{20, 10, 11, 5, 6} {
+		projection.Players[fmt.Sprintf("p%03d", 30+i)] = boards.ProjectedPoints{PPR: proj, Half: proj, Standard: proj}
+	}
+	return scoreboardOf(t, ffpcService(t, f, projection, at))
 }

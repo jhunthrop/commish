@@ -22,7 +22,15 @@ func projectedFinal(points *float64, starters []apitypes.PlayerLine, started boo
 	if points == nil || !started || len(starters) == 0 {
 		return nil
 	}
-	sum := *points
+	return pointsPlusLeft(*points, starters)
+}
+
+// pointsPlusLeft is the points so far plus what each of the lines has
+// left by Lane 92's rule: a player still to play his whole Proj, one in
+// play the rest of it (restOfProjection), one final or out nothing; nil
+// while one still to play has no Proj.
+func pointsPlusLeft(points float64, starters []apitypes.PlayerLine) *float64 {
+	sum := points
 	for _, l := range starters {
 		f := l.Facts
 		if f.Bye || f.GameState == nil || sitsOut(f) {

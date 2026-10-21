@@ -99,16 +99,22 @@ function hiddenSide(side: ScoreboardSide, state: GameState, read: RosterRead): S
 }
 
 /** A best lineup's projected final (roster_projection.go rosterProjectedFinal): once the game has
- * kicked off, FFPC's points so far plus the printed Proj of each player of the lineup still to play,
- * one in play or final adding nothing, one out nothing; null before, or while one still to play has no
- * Proj. */
+ * kicked off, FFPC's points so far plus the printed Proj of each player of the lineup still to play
+ * and the rest of it for one in play where his points are read (none on FFPC), one final or out
+ * nothing; null before, or while one still to play has no Proj. */
 function bestLineupFinal(points: number, read: RosterRead): number | null {
 	if (!read.started || read.roster === null) return null;
 	let sum = points;
 	for (const line of weekStarters(read.roster, read.slots)) {
 		if (line.facts.bye || line.facts.kickoff === null || sitsOut(line)) continue;
-		if (kickedOffAt(line, read.moment.now)) continue;
 		const proj = printedProj(line);
+		if (kickedOffAt(line, read.moment.now)) {
+			// In play, the rest of his Proj where his points are read (Lane 92's rule, review MEDIUM-2);
+			// FFPC gives none, so nothing. Final, nothing.
+			const pts = line.facts.points_this_week;
+			if (!read.moment.final(line) && proj !== null && pts !== null) sum += Math.max(0, proj - pts);
+			continue;
+		}
 		if (proj === null) return null;
 		sum += proj;
 	}

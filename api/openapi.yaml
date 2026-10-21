@@ -4065,7 +4065,7 @@ components:
             while a starter still to play has no Proj, for a side the platform lists no starters for and whose roster
             the read does not carry, or absent from an older answer. For a side listing no starters whose roster the
             read carries (projection_best_lineup), its score so far plus the Proj of our best lineup's players still
-            to play, one in play or final adding nothing (Lane 127)
+            to play and the rest of the Proj of one in play where the read gives his points (Lane 92), one final adding nothing (Lane 127)
         projection_best_lineup:
           type: boolean
           description: >-
@@ -4166,8 +4166,8 @@ components:
             the score unread, while a starter still to play has no week projection, for a side the platform lists no
             starters for (FFPC's opponent view) whose roster the read does not carry, or absent from an older answer.
             For a side whose projection is our best lineup (projection_best_lineup), once the game reads playing or
-            final: its points plus the week projection of that lineup's players still to play, one in play or final
-            adding nothing (Lane 127)
+            final: its points plus the week projection of that lineup's players still to play, the rest of the Proj of one in play
+            where the read gives his points (Lane 92), one final adding nothing (Lane 127)
     ScoreboardGame:
       type: object
       required: [state, next_kickoff, sides]

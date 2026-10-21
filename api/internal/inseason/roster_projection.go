@@ -52,27 +52,18 @@ func bestLineup(config []draft.SlotConfig, people []person) []apitypes.PlayerLin
 }
 
 // rosterProjectedFinal is the projected final of a side whose Proj is our
-// best lineup from its roster (Lane 127 fix round 1): the platform's team
-// points so far plus the week projection, as printed, of each player of
-// that lineup still to play; one in play or final adds nothing (his part
-// is in the points the platform gives), one out counts nothing. Nil
+// best lineup from its roster (Lane 127 fix round 1, review MEDIUM-2):
+// the platform's team points so far plus, by Lane 92's rule over that
+// lineup, the Proj of each player still to play and the rest of it,
+// max(0, Proj - his Pts), for each in play; one final or out adds
+// nothing. Where the platform gives no player's points (FFPC), an in-play
+// player's Pts are unknown and he adds nothing (restOfProjection). Nil
 // before the game has kicked off (the Proj is then the figure), with the
-// score unread, or while a player still to play has no Proj.
+// score unread, or while a player still to play has no Proj. An empty
+// lineup leaves the points.
 func rosterProjectedFinal(points *float64, lineup []apitypes.PlayerLine, started bool) *float64 {
 	if points == nil || !started {
 		return nil
 	}
-	sum := *points
-	for _, l := range lineup {
-		f := l.Facts
-		if f.Bye || f.GameState == nil || *f.GameState != apitypes.GameStateUpcoming || sitsOut(f) {
-			continue
-		}
-		if l.WeekProjection == nil {
-			return nil
-		}
-		sum += roundTenth(*l.WeekProjection)
-	}
-	total := roundTenth(sum)
-	return &total
+	return pointsPlusLeft(*points, lineup)
 }
