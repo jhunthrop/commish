@@ -3,6 +3,7 @@
  * through one week (the league board prints one basis for all), and every week still to play on a
  * player's club slate with a kickoff (his page prints its day). The stand-in's writer and the build's
  * reader (server/run.ts) both run them, so a run that breaks one fails before any page renders.
+ * A bye in a log is a week his club's slate has no game (Lane 119), the only place the run can say it.
  */
 import type { PlayerSeason } from './season.ts';
 import type { Schedule } from './schema.ts';
@@ -44,7 +45,23 @@ function checkKickoffs(players: readonly SeasonedPlayer[], schedule: Schedule): 
 	}
 }
 
+/** Every bye is a week his club does not play. A week it does not play may also be a game he played
+ * for the club he was with, so the log need not carry the bye (season.ts allows at most one). */
+function checkByes(players: readonly SeasonedPlayer[], schedule: Schedule): void {
+	const slates = new Map(schedule.slates.map((slate) => [slate.abbr, slate] as const));
+	for (const p of players) {
+		const weeks = new Set(slates.get(p.team)?.games.map((game) => game.week));
+		const wrong = p.season.log.find((row) => row.status === 'bye' && weeks.has(row.week));
+		if (wrong) {
+			throw new Error(
+				`players/${p.id}.json has a bye in week ${String(wrong.week)}, but ${p.team} plays that week.`
+			);
+		}
+	}
+}
+
 export function checkRunSeasons(players: readonly SeasonedPlayer[], schedule: Schedule): void {
 	checkOneBasis(players);
 	checkKickoffs(players, schedule);
+	checkByes(players, schedule);
 }

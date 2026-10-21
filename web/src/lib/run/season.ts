@@ -8,9 +8,13 @@
  * line scored in the block's format). A field is null when the records do not carry it.
  *
  * The parse checks the block against itself: every week of the regular season once and in order
- * with exactly one bye, statuses that agree with `through`, a stat line on played weeks only,
+ * with at most one bye, statuses that agree with `through`, a stat line on played weeks only,
  * totals that are the played weeks' sums, and points a game as `pointsPerGameOf` rounds them. The
- * build's reader checks `weeks` against the run's schedule.
+ * build's reader checks `weeks` against the run's schedule, and season-checks.ts holds a bye to his
+ * club's slate.
+ *
+ * A bye is his club's bye week with no game of his. A player who changed clubs can play that week
+ * for the club he was with, so his log has no bye (Lane 119: five pages on run 2026-10-21T05).
  */
 import { z } from 'zod';
 import { POINTS_PER_GAME_DECIMALS } from './decimals.ts';
@@ -145,7 +149,8 @@ function checkRow(row: LogRow, index: number, through: number, fail: Fail): void
 		fail(`${at} is ${row.status} but carries a stat line.`);
 }
 
-/** Every week once and in order, exactly one bye, and nothing played after an upcoming week. */
+/** Every week once and in order, at most one bye (none when he played his club's bye week for the
+ * club he was with), and nothing played after an upcoming week. */
 function checkWeeks(season: Season, fail: Fail): void {
 	const { log, weeks, through } = season;
 	if (log.length !== weeks)
@@ -155,7 +160,7 @@ function checkWeeks(season: Season, fail: Fail): void {
 		checkRow(row, index, through, fail);
 	});
 	const byes = log.filter((row) => row.status === 'bye').length;
-	if (byes !== 1) fail(`The log has ${String(byes)} byes, a club has one.`);
+	if (byes > 1) fail(`The log has ${String(byes)} byes, a club has one.`);
 	const firstUpcoming = log.findIndex((row) => row.status === 'upcoming');
 	const late =
 		firstUpcoming === -1
