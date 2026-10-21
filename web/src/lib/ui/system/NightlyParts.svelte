@@ -194,7 +194,7 @@
 		<Parts>
 			<Part
 				name="The capsule"
-				about="Newsreader, on the player page only. The run checks every pull figure appears in the prose word for word."
+				about="Newsreader, on the season read before the first kickoff only; in season the week's read takes the UI face. The run checks every pull figure appears in the prose word for word."
 			/>
 		</Parts>
 	{/if}
