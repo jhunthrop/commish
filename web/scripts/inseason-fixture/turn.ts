@@ -107,13 +107,16 @@ export function turnedWaivers(waivers: WaiverAdvice, now: number): WaiverAdvice 
 	};
 }
 
-/** The trade answer for week 7: every line's game, no week change, the arrival said. */
-export function turnedTrades(trades: TradeAdvice): TradeAdvice {
+/** The trade answer for week 7: every line's game, no week change, the arrival said; once week 7's
+ * published projection is captured (Lane 111) its read stamp, so the basis names week 7's Proj. The
+ * stand-in holds no week 7 figures: every Proj stays "--". */
+export function turnedTrades(trades: TradeAdvice, now: number): TradeAdvice {
+	const read = now >= Date.parse(WEEK7_PROJECTION_ARRIVES);
 	return {
 		...trades,
 		for_week: TURNED_WEEK,
-		projection_read_at: null,
-		projection_arrives_at: WEEK7_PROJECTION_ARRIVES,
+		projection_read_at: read ? WEEK7_PROJECTION_ARRIVES : null,
+		projection_arrives_at: read ? null : WEEK7_PROJECTION_ARRIVES,
 		roster: trades.roster.map(turnedLine),
 		teams: trades.teams.map((team) => ({
 			...team,

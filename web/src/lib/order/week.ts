@@ -224,7 +224,8 @@ export function weekBasis(
 			finalsPartAt(
 				advice.rows.map((row) => row.line),
 				now,
-				league?.host ?? null
+				league?.host ?? null,
+				'pool'
 			),
 			false
 		),

@@ -102,7 +102,7 @@ export function weekOrderAnswer(
 		return {
 			...answer,
 			// A reader with no league: the board's scoring, no Settings to open (week_order.go).
-			...uncountedOf(UNCOUNTED_RULES[position], 'the PPR', false),
+			...uncountedOf(UNCOUNTED_RULES[position], false),
 			read_at: null,
 			moves: null,
 			rows: answer.rows.map((row) => ({ ...row, roster: null, move: null }))

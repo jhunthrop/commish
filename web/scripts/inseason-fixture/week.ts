@@ -133,7 +133,7 @@ const RULE_NAMES: Readonly<Record<string, string>> = {
 	'missed field goals': 'missed field goal',
 	'missed extra points': 'missed extra point',
 	"a player's kick and punt return touchdowns": 'return touchdown',
-	'fumble recoveries': 'fumble recovery',
+	'fumble recoveries': 'fumble',
 	safeties: 'safety',
 	"a defense's points allowed": 'points allowed',
 	"a defense's yards allowed": 'yards allowed'
@@ -157,17 +157,14 @@ function andList(names: readonly string[]): string {
 }
 
 /** The uncounted rules' sentence in the API's words (words.go uncountedOf, Lane 111): the rules named
- * inline, whose they are, and the old web's link words where there is a Settings to open. */
+ * inline, and the old web's link words where there is a Settings to open. */
 export function uncountedOf(
 	rules: readonly string[],
-	whose = 'your',
 	linked = true
 ): { basis_note: string; basis_note_link: string } {
 	if (rules.length === 0) return { basis_note: '', basis_note_link: '' };
-	const names = basisNames(rules);
-	const kind = names.length === 1 ? 'rule' : 'rules';
 	return {
-		basis_note: `Avg and Last miss ${whose} ${andList(names)} ${kind}.`,
+		basis_note: `Avg and Last omit ${andList(basisNames(rules))}.`,
 		basis_note_link: linked ? `Which ${COUNT_WORDS[rules.length] ?? String(rules.length)}` : ''
 	};
 }

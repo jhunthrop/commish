@@ -9,7 +9,7 @@ import type { LeagueHost } from '#lib/league/api.ts';
 import {
 	anyKicked,
 	gamePart,
-	finalsPartAt,
+	finalsParts,
 	OPP_PART,
 	projPart,
 	said,
@@ -184,7 +184,7 @@ export function orderBasis(
 		...(league === null ? [] : uncountedPart(advice)),
 		...said(gamePart(lines, clock, now, 'read'), false),
 		// Said on the phone too: the board has the room (review finding 6); K/DST keeps it to a desk.
-		...said(finalsPartAt(lines, now, league?.host ?? null)),
+		...finalsParts(lines, now, league?.host ?? null, 'pool', true),
 		...(league !== null && advice.read_at !== null
 			? said(rosterBasis(league.host, advice.read_at, zone), false)
 			: [])

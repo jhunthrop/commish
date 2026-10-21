@@ -22,7 +22,7 @@ import { LINES, verbWords } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import {
 	gamePart,
-	finalsPartAt,
+	finalsParts,
 	OPP_PART,
 	projPart,
 	ptsPart,
@@ -447,7 +447,7 @@ export function tradeBasis(
 ): BasisPart[] {
 	// The builder's boxes draw a defense; a trade never holds one (Lane 66g).
 	const defense = opened === 'builder' && lines.some((l) => l.player.position === 'DEF');
-	const waiting = finalsPartAt(lines, now, host);
+	const waiting = finalsParts(lines, now, host, 'rosters', true);
 	// Before the week's projection is read, the day it arrives in its place (Lane 95).
 	const arrives =
 		advice.week === undefined
@@ -488,7 +488,7 @@ export function tradeBasis(
 		...said(advice.basis),
 		...(opened === 'none' ? [] : said(advice.per_game_basis)),
 		...proj,
-		...said(waiting),
+		...waiting,
 		...players,
 		// The week's group is drawn only once its projection is read (weekProjected, TradeFinder).
 		...said(weekProjected(advice) ? WEEK_ROOM : ROOM_PART, false),

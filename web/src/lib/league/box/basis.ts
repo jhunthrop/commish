@@ -168,9 +168,11 @@ export const KICKED_OFF_PART = `${BOX.final} lands the hour after a game ends, i
 export function kickedOffPartAt(lines: readonly PlayerLine[], now: number): string | null {
 	const waiting = lines.some(({ facts }) => {
 		const state = lineState(facts, now);
+		// A final the platform's points count (Lane 111) still waits on our stats.
 		return (
 			state === 'kicked_off' ||
-			(state === 'final' && !facts.last_games.some((game) => game.week === facts.week))
+			(state === 'final' &&
+				!facts.last_games.some((game) => game.week === facts.week && game.source !== 'platform'))
 		);
 	});
 	return waiting ? KICKED_OFF_PART : null;
@@ -189,8 +191,9 @@ export function liveFinalsPart(host: LeagueHost, rostered: string): string {
 	return `${BOX.final} lands the hour after a game ends, ${BOX.avg} and ${BOX.last} then count ${hostWords(host)}'s points${rostered}, our ${STATS_BY_WEDNESDAY}`;
 }
 
-/** Said where a final row holds neither our stats nor the platform's points (a free agent: the
- * platform scores only rostered players), so the sentence does not claim his figures. */
+/** Said on a screen that lists free agents (Waivers, the league's order): the platform scores only
+ * rostered players, so a free agent's Avg and Last wait on our stats and the sentence does not claim
+ * his. */
 export const FOR_ROSTERED = ' for rostered players';
 
 /** A row's final the platform's points count, null without one. */
@@ -198,13 +201,9 @@ function platformGame(line: PlayerLine): PlayerLine['facts']['last_games'][numbe
 	return line.facts.last_games.find((game) => game.source === 'platform') ?? null;
 }
 
-/** A row final at the page's clock whose Avg and Last hold no game of the week, from either source. */
-function bareFinal(line: PlayerLine, now: number): boolean {
-	return (
-		lineState(line.facts, now) === 'final' &&
-		!line.facts.last_games.some((game) => game.week === line.facts.week)
-	);
-}
+/** Whose rows a screen draws: the league's rostered players alone (the Lineup, the Matchup, Trades),
+ * or its pool too (Waivers, the league's order). */
+export type RowsOf = 'rosters' | 'pool';
 
 /** When a row's Final and its stats land, and what Avg and Last count meanwhile, by the one game-state
  * rule at the page's clock: the platform's points for a final where any row counts them (Lane 111),
@@ -213,15 +212,38 @@ function bareFinal(line: PlayerLine, now: number): boolean {
 export function finalsPartAt(
 	lines: readonly PlayerLine[],
 	now: number,
-	host: LeagueHost | null
+	host: LeagueHost | null,
+	rows: RowsOf
 ): string | null {
 	const counted = lines.find((line) => platformGame(line) !== null);
 	const game = counted === undefined ? null : platformGame(counted);
 	if (host === null || counted === undefined || game === null) return kickedOffPartAt(lines, now);
-	const rostered = lines.some((line) => bareFinal(line, now)) ? FOR_ROSTERED : '';
+	const rostered = rows === 'pool' ? FOR_ROSTERED : '';
 	if (lines.some(({ facts }) => lineState(facts, now) === 'kicked_off'))
 		return liveFinalsPart(host, rostered);
 	return platformFinalsPart(host, weeksWord(game.week, counted.facts.week), rostered);
+}
+
+/** finalsPartAt as a basis's parts: the sentence where the platform's points count (Lane 111) at a
+ * desk, and on a phone, whose eight lines cannot hold it beside the rules our stats lack (Lane 108's
+ * budget, measured on the fixture's five rules), when Final and our stats land alone (KICKED_OFF_PART)
+ * while a row waits on them. onPhone false says neither on a phone (the Lineup while a row still
+ * draws its fact cells, Lane 85). */
+export function finalsParts(
+	lines: readonly PlayerLine[],
+	now: number,
+	host: LeagueHost | null,
+	rows: RowsOf,
+	onPhone: boolean
+): BasisPart[] {
+	const full = finalsPartAt(lines, now, host, rows);
+	if (full === null) return [];
+	const timing = kickedOffPartAt(lines, now);
+	// Nothing waits on Final or our stats in the page's week (a page turned past the platform's):
+	// the one sentence is said on both.
+	if (full === timing || timing === null) return [{ text: full, phone: onPhone }];
+	const phone: BasisPart[] = onPhone ? [{ text: timing, phone: true, desk: false }] : [];
+	return [{ text: full, phone: false }, ...phone];
 }
 
 /** Avg and Last where a page says what they are (the player card): in the scoring the rows are in. */
@@ -244,8 +266,8 @@ export function ptsPart(byPlayer: boolean, host: LeagueHost, team: TeamFigure): 
 		: `${BOX.pts} are ${platform}'s points so far, Team adds the rows.`;
 }
 
-/** The API's sentence naming the rules our stats lack (Lane 111, B33: "Avg and Last miss your
- * two-point and safety rules."), no link to follow; none when it names none. */
+/** The API's sentence naming the rules our stats lack (Lane 111, B33: "Avg and Last omit two-point
+ * and safety."), no link to follow; none when it names none. */
 export function uncountedPart(advice: { basis_note: string }): BasisPart[] {
 	return said(advice.basis_note);
 }
@@ -310,7 +332,8 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	const pts = said(ptsPart(facts.byPlayer, facts.host, team));
 	// When a row's Final and its stats land, said while one waits on either (Lane 85), and what Avg and
 	// Last count meanwhile (Lane 111).
-	const waiting = finalsPartAt(facts.lines, now, facts.host);
+	const waiting = (onPhone: boolean): BasisPart[] =>
+		finalsParts(facts.lines, now, facts.host, 'rosters', onPhone);
 	if (lineup === null)
 		return [
 			...proj,
@@ -318,7 +341,7 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 			...said(RANK_PART),
 			...pts,
 			...said(gamePart(facts.lines, clock, now, 'full')),
-			...said(waiting)
+			...waiting(true)
 		];
 	return [
 		...said(PICK_PART, !lineup.asSetShown),
@@ -329,7 +352,7 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 		// On the Lineup phone the expected score and weather are the decision's facts and keep their
 		// cells and sentence: the Final sentence is said at a desk while any row still draws them, and
 		// on the phone too once none does (Lane 85 fix round 2, the coordinator's ruling on brief item 4).
-		...said(waiting, !drawsFacts(facts.lines, now)),
+		...waiting(!drawsFacts(facts.lines, now)),
 		...said(RANK_OPP_PART),
 		...pts,
 		...uncountedPart(lineup.note)

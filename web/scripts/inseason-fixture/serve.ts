@@ -457,7 +457,7 @@ function waiversAt(position: string | null): WaiverAdvice {
 /** The trades holding one player, by his board id, every team kept. */
 function tradesHolding(player: string | null): TradeAdvice {
 	const atClock = tradesAtClock(trades, fromWeekNow(), HORIZON);
-	const answer = turnedNow() ? turnedTrades(atClock) : atClock;
+	const answer = turnedNow() ? turnedTrades(atClock, now()) : atClock;
 	if (player === null) return answer;
 	const holds = (side: { player: { board_id: string | null } }[]): boolean =>
 		side.some((line) => line.player.board_id === player);

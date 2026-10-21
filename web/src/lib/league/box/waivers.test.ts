@@ -358,7 +358,7 @@ const BASIS = {
 	basis: 'A pickup starts this week on Proj and keeps Gain at zero or better.',
 	season_basis:
 		"Gain is your lineup's change in points over replacement a week, weeks 6 to 17. A game is our order's points a game.",
-	basis_note: 'Avg and Last miss your two-point, missed kick, fumble recovery and safety rules.',
+	basis_note: 'Avg and Last omit two-point, missed kick, fumble and safety.',
 	projection_read_at: '2026-10-17T02:00:00.000Z',
 	projection_previous_read_at: '2026-10-16T02:00:00.000Z',
 	projection_scoring: { format: 'ppr' as const, league_own: false }
@@ -396,7 +396,7 @@ void test("a page turned to week 7 says its Proj is week 7's, and the drop's Sun
 	assert.ok(text.includes("Proj is week 7's published projection"), text);
 	assert.ok(
 		text.includes(
-			"Avg and Last count week 6's finals from Sleeper's points, our stats by Wednesday."
+			"Avg and Last count week 6's finals from Sleeper's points for rostered players, our stats by Wednesday."
 		),
 		text
 	);

@@ -18,7 +18,7 @@
 </script>
 
 <p class="basis">
-	{#each parts as part, i (i)}<span class:desk={!part.phone}
+	{#each parts as part, i (i)}<span class:desk={!part.phone} class:phone={part.desk === false}
 			>{i > 0 ? ` ${part.text}` : part.text}</span
 		>{/each}{tail ? ` ${tail}` : ''}{#if after}{GAP}{@render after()}{/if}
 </p>
@@ -32,9 +32,17 @@
 		color: var(--ink-2);
 	}
 
+	.phone {
+		display: none;
+	}
+
 	@media (max-width: 760px) {
 		.desk {
 			display: none;
+		}
+
+		.phone {
+			display: inline;
 		}
 	}
 </style>

@@ -320,7 +320,7 @@ const advice: Pick<
 	basis:
 		"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is a lineup's change in points over replacement a week, weeks 6 to 17.",
 	per_game_basis: "A game is our order's points a game.",
-	basis_note: 'Avg and Last miss your two-point, missed kick, fumble recovery and safety rules.',
+	basis_note: 'Avg and Last omit two-point, missed kick, fumble and safety.',
 	projection_read_at: '2026-10-17T02:00:00.000Z',
 	projection_scoring: { format: 'ppr', league_own: false },
 	player_points: true

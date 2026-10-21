@@ -3220,7 +3220,7 @@ export interface components {
 			projection_previous_read_at: string | null;
 			/** @description the honesty line: the lineup starts the highest week_projection at each slot after this week's designations and byes, the rest-of-season order breaking ties and standing in where a player has none */
 			basis: string;
-			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last miss your two-point and safety rules.", both missed kicks said as one missed kick), empty when they miss none */
+			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none */
 			basis_note: string;
 			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
 			basis_note_link: string;
@@ -3538,7 +3538,7 @@ export interface components {
 			week: number;
 			/** @description what the order and its two figures are, said once under the rows */
 			basis: string;
-			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last miss your two-point and safety rules.", both missed kicks said as one missed kick), empty when they miss none */
+			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none */
 			basis_note: string;
 			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
 			basis_note_link: string;
@@ -3600,7 +3600,7 @@ export interface components {
 			week: number;
 			/** @enum {string} */
 			position: 'K' | 'DEF';
-			/** @description the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, named ("Avg and Last miss your fumble recovery and safety rules."; a reader with no league, "the PPR ... rules"), empty when none */
+			/** @description the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, named ("Avg and Last omit fumble and safety.", the same for a reader with no league), empty when none */
 			basis_note: string;
 			/** @description the words of the link to the league's Settings the web drew before Lane 111 ("Which two"), kept for that web through one deploy; the web no longer draws it. Empty with none or no league */
 			basis_note_link: string;
@@ -3665,7 +3665,7 @@ export interface components {
 			basis: string;
 			/** @description what the Rest of season column and a gain over the rest of the season are, said once under the rows */
 			season_basis: string;
-			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last miss your two-point and safety rules.", both missed kicks said as one missed kick), empty when they miss none */
+			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none */
 			basis_note: string;
 			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
 			basis_note_link: string;
@@ -3895,7 +3895,7 @@ export interface components {
 			gain_basis?: string;
 			/** @description every player on the drafter's active roster (injured reserve and taxi spots left out), by position then name: the picker's own players, a trade found or not */
 			roster: components['schemas']['PlayerLine'][];
-			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last miss your two-point and safety rules.", both missed kicks said as one missed kick), empty when they miss none */
+			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none */
 			basis_note: string;
 			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
 			basis_note_link: string;
@@ -3981,7 +3981,7 @@ export interface components {
 			week: number;
 			/** @description the honesty line beside the answer */
 			basis: string;
-			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last miss your two-point and safety rules.", both missed kicks said as one missed kick), empty when they miss none */
+			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Avg and Last omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none */
 			basis_note: string;
 			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
 			basis_note_link: string;
