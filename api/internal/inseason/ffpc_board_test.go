@@ -137,8 +137,13 @@ func otherGameSides(t *testing.T, f fixture, g apitypes.ScoreboardGame, playing 
 			states[i] = *side.ScheduleState
 		}
 		if side.Starters != 0 || side.Played != 0 || side.StartersFinal != nil || side.ProjectedFinal != nil ||
-			side.Projection != nil || side.ToPlay != nil || (side.InPlay != nil && *side.InPlay != 0) {
+			side.ToPlay != nil || (side.InPlay != nil && *side.InPlay != 0) {
 			t.Errorf("team %d with no starters: %+v", side.RosterId, side)
+		}
+		// Its Proj is its roster's best lineup where FFPC carries the roster, none without (Lane 127).
+		best := side.ProjectionBestLineup != nil && *side.ProjectionBestLineup
+		if best == ffpcRosterless[side.RosterId] || (!best && side.Projection != nil) {
+			t.Errorf("team %d Proj %v best lineup %v", side.RosterId, deref(side.Projection), side.ProjectionBestLineup)
 		}
 		if side.Points != 30+float64(side.RosterId) || !side.PointsRead {
 			t.Errorf("team %d points %v read %v, want FFPC's total", side.RosterId, side.Points, side.PointsRead)

@@ -3313,9 +3313,11 @@ export interface components {
 			points_read: boolean;
 			/**
 			 * Format: double
-			 * @description the side's starters' week projections summed, each as printed to the tenth, a starter with none counting nothing; null when no starter has one
+			 * @description the side's starters' week projections summed, each as printed to the tenth, a starter with none counting nothing; null when no starter has one. For a side the platform lists no starters for whose roster the league read carries (FFPC's rosters page, projection_best_lineup), our best lineup from that roster this week under the league's slots (Lane 127, B105): the lineup rule's week fill, every player who can play this week, one whose game has kicked off included, summed the same way; null for such a side with no roster
 			 */
 			projection: number | null;
+			/** @description true where projection is our best lineup from the side's roster (Lane 127, B105): a side the platform lists no starters for whose roster the league read carries. Absent for a side that lists starters, for one with no roster read, and from an older answer, whose projection for such a side is null */
+			projection_best_lineup?: boolean;
 			/** @description the starters the host lists for the side */
 			starters: number;
 			/** @description those starters whose game has kicked off */

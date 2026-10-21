@@ -148,6 +148,11 @@ func livePoints(p boards.Player, rest RestNow) (float64, bool) {
 	if p.Points == nil {
 		return 0, false
 	}
+	if p.Team == "" {
+		// A free agent (no club, Lane 123) has no game left to count, his
+		// one more game (game_points) among them (Lane 127, B103).
+		return 0, true
+	}
 	run := rest.Run[p.Team]
 	if p.GamePoints == nil {
 		if run == 0 {

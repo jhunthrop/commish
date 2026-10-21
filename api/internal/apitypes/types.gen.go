@@ -4010,9 +4010,12 @@ type ScoreboardSide struct {
 	// ProjectedFinal the side's projected final once any starter of the game has kicked off: points (the platform's score so far), plus for each starter in play the rest of his week projection (max(0, Proj - his points so far), nothing where the platform gives no player's points), plus the week projection of each starter still to play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, for a side the platform lists no starters for (FFPC's opponent view), or absent from an older answer
 	ProjectedFinal *float64 `json:"projected_final,omitempty"`
 
-	// Projection the side's starters' week projections summed, each as printed to the tenth, a starter with none counting nothing; null when no starter has one
+	// Projection the side's starters' week projections summed, each as printed to the tenth, a starter with none counting nothing; null when no starter has one. For a side the platform lists no starters for whose roster the league read carries (FFPC's rosters page, projection_best_lineup), our best lineup from that roster this week under the league's slots (Lane 127, B105): the lineup rule's week fill, every player who can play this week, one whose game has kicked off included, summed the same way; null for such a side with no roster
 	Projection *float64 `json:"projection"`
-	RosterId   int      `json:"roster_id"`
+
+	// ProjectionBestLineup true where projection is our best lineup from the side's roster (Lane 127, B105): a side the platform lists no starters for whose roster the league read carries. Absent for a side that lists starters, for one with no roster read, and from an older answer, whose projection for such a side is null
+	ProjectionBestLineup *bool `json:"projection_best_lineup,omitempty"`
+	RosterId             int   `json:"roster_id"`
 
 	// ScheduleState the side's state by the schedule, for a side the platform lists no starters for (FFPC's opponent view), whose state no starter's game can give (Lane 124, B102): its roster's games where the league read carries the roster, else every game of the week, each by gameStateAt; final once every one is final, kicked_off once one has kicked off, upcoming before. The game's state is final only once this is too. Absent for a side that lists starters, whose starters say it, and from an older answer, which reads the game's state
 	ScheduleState *GameState `json:"schedule_state,omitempty"`

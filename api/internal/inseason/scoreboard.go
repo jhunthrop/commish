@@ -168,10 +168,14 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 		out.Sides[i].ProjectedFinal = projectedFinal(sidePoints(s), starters[i], game.kicked > 0)
 	}
 	// A side listing no starters reads by the schedule, and the game is final only once it is too
-	// (Lane 124, B102).
+	// (Lane 124, B102); its Proj is our best lineup from its roster where the read carries one (Lane
+	// 127, B105).
 	unlisted := make([]*kickoffs, len(sides))
 	for i, s := range sides {
 		unlisted[i] = a.scheduleRead(s)
+		if proj, ok := a.rosterProjection(s); ok {
+			out.Sides[i].Projection, out.Sides[i].ProjectionBestLineup = proj, &ok
+		}
 	}
 	out.State, out.NextKickoff = gameState(game, unlisted)
 	// The pooled count stays for the web before Lane 92; each side says its own.
