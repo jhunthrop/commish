@@ -801,7 +801,7 @@ func (a *advisor) pool(position draft.Position) []person {
 			continue
 		}
 		id := p.ID
-		lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(p), BoardId: &id, Name: p.Name, Position: string(p.Position), Team: p.Team}
+		lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(p), BoardId: &id, Name: p.Name, Position: string(p.Position), Team: boards.WireClub(p.Team)}
 		add := a.build(p.ID, lp, nil)
 		// Back this week from injured reserve (Lane 118 fix round 1): he counts in the
 		// rest-of-season lineup his move is measured on, so a move that gains lists him.

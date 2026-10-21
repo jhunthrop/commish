@@ -22,6 +22,7 @@ from research.capsules.store import WRITTEN_SOURCE, StoredCapsule
 from research.capsules.week.cadence import projection_moved
 from research.capsules.week.caption import PROJECTION_MOVED_CAPTION, status_changed_caption, written_caption
 from research.capsules.week.store import StoredWeekRead
+from research.free_agent import run_club
 from research.model.instants import js_iso
 from research.nightly.build.page_club import call_for, last_game_club
 from research.nightly.build.player_season import SeasonContext, prior_seasons, season_block
@@ -84,8 +85,9 @@ def identities(boards: Sequence[FormatBoard]) -> list[Identity]:
     for player_id, entry in seen.items():
         row = entry.row
         base = slug_of(row.name)
-        slug = base if counts[base] == 1 else _slug_with_place(base, row.position, row.team)
-        out.append(Identity(player_id, slug, row.name, WEB_POSITION[row.position], row.team, row.headshot_url))
+        team = run_club(row.team)
+        slug = base if counts[base] == 1 else _slug_with_place(base, row.position, team)
+        out.append(Identity(player_id, slug, row.name, WEB_POSITION[row.position], team, row.headshot_url))
     return out
 
 
@@ -100,14 +102,15 @@ def market_identities(people: Sequence[Identity], entries: Sequence[MarketEntry]
     for entry in entries:
         player = entry.player
         base = slug_of(player.name)
-        slug = base if counts[base] == 1 and base not in taken else _slug_with_place(base, player.position, player.team)
+        team = run_club(player.team)
+        slug = base if counts[base] == 1 and base not in taken else _slug_with_place(base, player.position, team)
         out.append(
             Identity(
                 player.player_id,
                 slug,
                 player.name,
                 WEB_POSITION[player.position],
-                player.team,
+                team,
                 player.headshot_url,
                 MARKET_ORDER,
             )

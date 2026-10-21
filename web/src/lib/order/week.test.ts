@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
 import { KICKED_OFF_PART, UNCOUNTED } from '#lib/league/box/basis.ts';
-import { BOX } from '#lib/league/box/box.ts';
+import { BOX, heldGame } from '#lib/league/box/box.ts';
 import type { WeekOrderAdvice } from './api.ts';
 import { stamped } from '../../../scripts/inseason-fixture/game-state.ts';
 import { weekOrderPath } from './path.ts';
@@ -104,8 +104,7 @@ void test('the sections: to play first, then the played Thursday games marked Fi
 	const played = sections[1]?.rows ?? [];
 	assert.equal(played.length, 2);
 	for (const row of played) {
-		assert.ok(row.box.game !== null && row.box.game !== 'bye');
-		assert.equal(row.box.game.when, 'Final');
+		assert.equal(heldGame(row.box.game)?.when, 'Final');
 		assert.equal(row.box.expected, null);
 	}
 	assert.equal(sections[2]?.rows.length, 4);
@@ -149,9 +148,7 @@ void test("the Monday after: the API's kicked-off rows say Kicked off, and the b
 	const view = views(kicked, monday).find(
 		(v) => v.section === 'kicked_off' && v.box.game !== 'bye'
 	);
-	const game = view?.box.game;
-	assert.ok(game !== undefined && game !== null && game !== 'bye');
-	assert.equal(game.when, BOX.kickedOff);
+	assert.equal(heldGame(view?.box.game ?? null)?.when, BOX.kickedOff);
 	const said = weekBasis(kicked, VISITOR, ZONE, monday);
 	assert.ok(
 		said.some((p) => p.text === KICKED_OFF_PART && !p.phone),

@@ -177,3 +177,35 @@ void test('a week whose club the run cannot name says he did not play, never Bye
 		]
 	);
 });
+
+void test("a free agent's weeks past the records list no row, and his played weeks stand (Lane 123)", () => {
+	const quiet = (week: number): GameLogRow => ({
+		...EMPTY,
+		snapShare: null,
+		points: null,
+		week,
+		opponent: null,
+		home: null,
+		status: 'inactive'
+	});
+	const season: PlayerSeason = {
+		season: 2026,
+		format: 'ppr-12',
+		weeks: 6,
+		through: 3,
+		games: 1,
+		pointsPerGame: 12.5,
+		totals: { ...EMPTY, snapShare: null, points: 12.5 },
+		log: [played(1, 12.5), quiet(2), quiet(3), quiet(4), quiet(5), quiet(6)]
+	};
+	const view = seasonView(season, 'WR', [FORMAT], () => null);
+	assert.deepEqual(
+		view.rows.map((row) => [row.week, row.opponent]),
+		[
+			[1, 'vs BUF'],
+			[2, 'Did not play'],
+			[3, 'Did not play']
+		]
+	);
+	assert.deepEqual(view.ahead, []);
+});

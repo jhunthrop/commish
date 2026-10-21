@@ -120,7 +120,8 @@ def facts_input_for(row: BoardRow, shared: SharedReads) -> FactsInput:
     gsis = color.universe_ids.get(row.player_id)
     story = None if gsis is None else color.stories.get(gsis)
     books = BooksNumbers(
-        () if gsis is None else color.props.get(gsis, ()), color.win_totals.get(source_team_code(row.team))
+        () if gsis is None else color.props.get(gsis, ()),
+        None if row.team is None else color.win_totals.get(source_team_code(row.team)),
     )
     return FactsInput(
         Identity(row.player_id, row.name, row.position, row.team),
@@ -220,7 +221,10 @@ def collect_board_facts(conn: Connection, as_of: datetime, history: ReadThrough 
     board_positions = list(dict.fromkeys([*(row.position for row in rows), *market_order_positions_on_board(conn)]))
     positions = active_peers_for(conn, board_positions, PRODUCT_SEASON)
     universe_ids = universe_ids_for(conn, [row.player_id for row in rows])
-    team_by_gsis = {universe_ids[row.player_id]: row.team for row in rows if row.player_id in universe_ids}
+    # A free agent (no club, Lane 123) has no club's color to read.
+    team_by_gsis = {
+        universe_ids[row.player_id]: row.team for row in rows if row.player_id in universe_ids and row.team is not None
+    }
     color = collect_color(conn, Population(positions, universe_ids, team_by_gsis), as_of, history)
     injuries = injury_snapshot(conn, as_of)
     shared = SharedReads(

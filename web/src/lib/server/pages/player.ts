@@ -1,6 +1,7 @@
 /** A player's page: his numbers in the default format, his tier and its mates, where drafters take
  * him and from which sources, his season so far, his capsule, and his numbers in every other format
  * the run carries. */
+import { FREE_AGENT_CLUB, isFreeAgent } from '#lib/format/free-agent.ts';
 import { windowLabel } from '#lib/format/date.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import { availableTierOf } from '#lib/run/held-places.ts';
@@ -228,8 +229,9 @@ function clubOf(list: readonly Club[], team: string): Club {
 	return club;
 }
 
-/** His club's city and nickname. */
+/** His club's city and nickname; a free agent's club cell, "FA" (Lane 123). */
 function clubNameOf(list: readonly Club[], team: string): string {
+	if (isFreeAgent(team)) return FREE_AGENT_CLUB;
 	const club = clubOf(list, team);
 	return `${club.city} ${club.nickname}`;
 }
@@ -239,7 +241,8 @@ function clubNameOf(list: readonly Club[], team: string): string {
 function clubNoteOf(list: readonly Club[], loaded: Player): string | null {
 	const last = loaded.lastGameClub;
 	if (!last) return null;
-	return lastGameClubWords(clubOf(list, loaded.team), last.week, clubOf(list, last.club));
+	const club = isFreeAgent(loaded.team) ? null : clubOf(list, loaded.team);
+	return lastGameClubWords(club, last.week, clubOf(list, last.club));
 }
 
 /** Each week's last kickoff across the run's schedule. */
@@ -255,8 +258,10 @@ async function lastKickoffsOf(): Promise<Record<number, string>> {
 	return last;
 }
 
-/** His club's game in each week, from the run's schedule: its kickoff and its state at the run. */
+/** His club's game in each week, from the run's schedule: its kickoff and its state at the run. A free
+ * agent (Lane 123) has no club, so no game in any week. */
 async function kickoffsOf(team: string): Promise<KickoffOf> {
+	if (isFreeAgent(team)) return () => null;
 	const slate = (await schedule()).slates.find((candidate) => candidate.abbr === team);
 	if (!slate) throw new Error(`${team} has no slate on the run's schedule.`);
 	return (week) => {

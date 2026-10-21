@@ -182,8 +182,9 @@ class PlayerWeeks:
 
     player_id: str
     position: Position
-    # The club whose games are his rest of season: the page's (`nightly.build.page_club`, Lane 120).
-    club: str
+    # The club whose games are his rest of season: the page's (`nightly.build.page_club`, Lane 120), None
+    # for a free agent (Lane 123), who has no club game played or left.
+    club: str | None
     weeks: Mapping[int, WeekFacts]
 
 
@@ -206,7 +207,8 @@ def player_to_date(
     from `from_week` (`slates.to_play`, each club's weeks whose game has not kicked off, Lane 86): a game of
     the window's first week his club has already played is no game left."""
     club = who.club
-    weeks = slates.weeks.get(club, ())
+    weeks = () if club is None else slates.weeks.get(club, ())
+    to_play = () if club is None else slates.to_play.get(club, ())
     played = []
     for week in sorted(w for w in who.weeks if w <= window.through):
         game = game_played(week, who.weeks[week], who.position, rules)
@@ -217,6 +219,6 @@ def player_to_date(
         who.position,
         tuple(sorted(w for w in weeks if w <= window.through)),
         tuple(played),
-        tuple(sorted(w for w in slates.to_play.get(club, ()) if window.from_week <= w <= counted_through(window))),
+        tuple(sorted(w for w in to_play if window.from_week <= w <= counted_through(window))),
         stale,
     )

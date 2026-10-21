@@ -225,7 +225,7 @@ def test_the_rule_a_line_newer_than_the_read_wins() -> None:
     assert kept.club_in(2, 5) == "LAC"
 
 
-def test_the_list_leaves_out_a_free_agent_and_a_code_outside_the_32() -> None:
+def test_the_list_names_a_free_agent_with_no_club_and_leaves_out_a_code_outside_the_32() -> None:
     payload = [
         {"playerID": "1", "team": "BUF", "isFreeAgent": "False"},
         {"playerID": "2", "team": "", "isFreeAgent": "True"},
@@ -234,8 +234,42 @@ def test_the_list_leaves_out_a_free_agent_and_a_code_outside_the_32() -> None:
         {"team": "KC"},
         "not a player",
     ]
-    assert listed_clubs(payload) == {"1": "BUF"}
+    assert listed_clubs(payload) == {"1": "BUF", "2": None, "4": None}
     assert listed_clubs({"body": []}) == {}
+
+
+def test_a_free_agent_on_the_list_has_no_club_unless_a_newer_line_names_one() -> None:
+    """Lane 123 (B101): the list's free agent has no club, over a stale seed and over a NULL one; his line
+    wins only while the read is not 36 hours newer than its game, as a move's does."""
+    eastern = ZoneInfo("America/New_York")
+    sunday = datetime(2026, 10, 25, 13, tzinfo=eastern)
+    games = {"NYJ": [Game(8, "BUF", True, sunday)]}
+    tuesday = RosterRead(MappingProxyType({WEASE: None}), datetime(2026, 10, 27, 6, tzinfo=eastern))
+    assert club_call("MIA", tuesday, WEASE, {}, games) == ClubCall(None, None, None, False)
+    assert club_call(None, tuesday, WEASE, {}, games) == ClubCall(None, None, None, False)
+    cut = club_call(None, tuesday, WEASE, {8: "NYJ"}, games)
+    assert cut == ClubCall(None, 8, "NYJ", False)
+    assert last_game_club(cut) == {"club": "NYJ", "week": 8}  # the page says he is now a free agent
+    monday = replace(tuesday, read_at=datetime(2026, 10, 26, 6, tzinfo=eastern))
+    signed = club_call(None, monday, WEASE, {8: "NYJ"}, games)
+    assert signed.club == "NYJ" and last_game_club(signed) is None
+    # No read, a NULL club and no line: no club; a line: his line's.
+    assert club_call(None, NO_ROSTER_READ, WEASE, {}, games).club is None
+    assert club_call(None, NO_ROSTER_READ, WEASE, {8: "NYJ"}, games).club == "NYJ"
+
+
+def test_a_free_agents_weeks_with_no_line_name_no_opponent() -> None:
+    """A free agent's log: a week of his line keeps its club's game, every other week names none, never a
+    bye of a club he is not with."""
+    fixture, games = _fixture(), _games()
+    store = _store(fixture, games)
+    read = RosterRead(MappingProxyType({DORTCH: None}), datetime(2026, 10, 20, 6, tzinfo=ZoneInfo("UTC")))
+    call = club_call(None, read, DORTCH, store.teams[DORTCH], games)
+    assert call.club is None and call.latest_club == "BUF"
+    context = SeasonContext(2026, 18, fixture["through"], games, _byes(games), store, {}, {DORTCH: call})
+    dortch = _block(DORTCH, context)
+    assert _where(dortch[5]) == ("LAR", False, "played")
+    assert [_where(dortch[w]) for w in range(6, 19)] == [(None, None, "inactive")] * 13
 
 
 def _page(pid: str, club: str, elsewhere: Json | None) -> Json:

@@ -101,7 +101,7 @@ def season_so_far(subject: SeasonSubject, injury: InjuryStatus, context: SeasonC
         block["pointsPerGame"],
         _totals(block["totals"]),
         _weeks(block["log"], block["through"]),
-        injury_from_week(injury, context.games.get(club, ())),
+        injury_from_week(injury, () if club is None else context.games.get(club, ())),
     )
 
 

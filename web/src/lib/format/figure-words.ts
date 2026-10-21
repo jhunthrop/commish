@@ -22,6 +22,11 @@ export interface FigureWords {
 	restFrom: string;
 	/** "from week {week}'s games left": the same while a game of that week has kicked off. */
 	restFromPartial: string;
+	/** "FA": the club cell of a free agent, no club (Lane 123, B101), as the API and the run carry it
+	 * (clubs.ts isFreeAgent). */
+	freeAgentClub: string;
+	/** "a free agent": the same in a sentence. */
+	freeAgent: string;
 }
 
 export const FIGURE: Readonly<FigureWords> = TABLE;

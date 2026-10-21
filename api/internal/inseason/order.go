@@ -322,7 +322,7 @@ func (a *advisor) orderRow(p boards.Player, rank int, hosts map[string]string, t
 func (a *advisor) boardPerson(p boards.Player, hosts map[string]string) person {
 	id := p.ID
 	hostID, rostered := hosts[p.ID]
-	lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(p), BoardId: &id, Name: p.Name, Position: string(p.Position), Team: p.Team}
+	lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(p), BoardId: &id, Name: p.Name, Position: string(p.Position), Team: boards.WireClub(p.Team)}
 	if !rostered {
 		return a.build(p.ID, lp, nil)
 	}

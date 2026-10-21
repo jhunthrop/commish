@@ -65,14 +65,16 @@ list's own, and becomes the designation's `return_week`.
 The player's club (Lane 122). The same read, captured or unchanged, writes each listed player's club onto
 his existing `provider_players` row in the snapshot's savepoint (`pipeline/tank01/player_clubs.py`,
 `CaptureFeed.on_read`), and the line names the count (`tank01_player_list: captured, 1 requests, 2 clubs
-changed`). Nothing is inserted or retired; a player off the list, a free agent and a code outside the 32
-keep their club. A read that would change more than 60 clubs writes none and fails the pass (the job
+changed`). Nothing is inserted or retired; a player off the list and a code outside the 32 keep their
+club. A player the list carries as a free agent has none: his club becomes NULL (Lane 123, B101, revision
+0018), counted as a change under the same ceiling, and the API answers "FA" for him (no bye, no game). A read that would change more than 60 clubs writes none and fails the pass (the job
 alerts) while its snapshot stands; the day's read is not taken, so the next hour asks again. The operator's
 one-shot `python -m research.pipeline player-clubs [--dry-run]` applies the newest stored list with no
 ceiling, its count first. A day with more than 60 club changes (cut-down day) refuses the write and
 alerts every hour until an operator runs `python -m research.pipeline player-clubs`. The API, the nightly's board and the capsules read the column as before. The
 parity case `tank01-capture-harvest` covers the write (its later pass lands the 2026-10-12 list on an
-earlier one, `parity/fixtures/tank01-player-list-earlier`, that had McCarthy at MIN).
+earlier one, `parity/fixtures/tank01-player-list-earlier`, that had McCarthy at MIN; Sharpe, listed a free
+agent, is cleared on every pass).
 
 A moved game (Lane 110, B77b). The `tank01-schedule` ingest (an operator command,
 `python -m research.pipeline tank01-schedule`; no job runs it on a schedule, so run it once a game has

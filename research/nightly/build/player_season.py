@@ -262,12 +262,14 @@ def season_block(player_id: str, run_format: RunFormat, position: Position, cont
         snapped = (snaps.get(week) or {}).get(_SNAPS, 0.0) > 0
         line = found if _has_ingest(found, usage=False) or snapped else None
         club = teams.get(week) or call.club_in(week, context.through)
-        if club is None and line is None:
-            # No line, and a mover's week up to his newest line: no club the run can name.
+        if club is None and line is not None:
+            # Snaps with no club line are his page club's game, as before the rule.
+            club = call.club
+        if club is None:
+            # No club the run can name: a mover's week up to his newest line, or a free agent's (Lane 123),
+            # whose snaps with no club line name no game either.
             log.append({**_empty(), "week": week, "opponent": None, "home": None, "status": "inactive"})
             continue
-        # Snaps with no club line are his page club's game, as before the rule.
-        club = club or call.club
         game = next((g for g in context.games.get(club, ()) if g.week == week), None)
         if game is None:
             if context.byes.get(club) != week or line is not None:

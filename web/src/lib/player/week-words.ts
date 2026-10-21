@@ -3,6 +3,7 @@
  * prints; live.ts reads the answer and builds the links. */
 import type { components } from '#lib/api/types.ts';
 import { memberZone, weekdayName, weekdayTime } from '#lib/format/clock.ts';
+import { isFreeAgent } from '#lib/format/free-agent.ts';
 import { lineState, lineupOpen, pastKickoff, toPlay } from '../league/box/kickoff.ts';
 import { signed } from '#lib/format/number.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
@@ -27,6 +28,7 @@ import {
 	easeOf,
 	expectedWords,
 	gameOf,
+	heldGame,
 	oppRankWord,
 	weatherCell,
 	type WeatherCell
@@ -273,6 +275,7 @@ export function verbOf(
 
 /** Why his Proj is "--": his bye, no snapshot stored for the week, or the snapshot leaves him out. */
 function noProjWords(week: PlayerWeek): string {
+	if (isFreeAgent(week.line.player.team)) return CARD.freeAgentWeek;
 	if (week.line.facts.bye) return CARD.byeWeek;
 	return week.projection_read_at === null ? CARD.projNotIn : CARD.projNotHim;
 }
@@ -349,11 +352,13 @@ function oppTile(week: PlayerWeek, position: string): CardTile {
 	const { opp_rank: rank, facts } = week.line;
 	const opponent = facts.opponent ?? '';
 	if (rank === null) {
+		// A free agent has no opponent to rank (Lane 123): the Wk tile says why.
+		const none = isFreeAgent(week.line.player.team) || facts.opponent === null;
 		return {
 			key: 'opp',
 			label: CARD.opp,
 			value: NONE,
-			caption: facts.bye ? BOX.bye : `${opponent}, ${CARD.notRanked}`,
+			caption: facts.bye ? BOX.bye : none ? '' : `${opponent}, ${CARD.notRanked}`,
 			tone: null
 		};
 	}
@@ -403,6 +408,9 @@ function deltaCaption(week: PlayerWeek, zone: string): string {
 function deltaTile(week: PlayerWeek, zone: string, now: number): CardTile {
 	const after = afterByeOf(week);
 	if (after !== null) return afterByeProjTile(after, week.projection_scoring, zone);
+	// A free agent has no game (Lane 123): no change to measure, and no kickoff to say.
+	if (isFreeAgent(week.line.player.team))
+		return { key: 'delta', label: CARD.delta, value: NONE, caption: '', tone: 'quiet' };
 	const ahead = toPlay(week.line.facts, now) || week.line.facts.bye;
 	return {
 		key: 'delta',
@@ -478,8 +486,9 @@ export function liveBasis(week: PlayerWeek, league: boolean, zone: string, now: 
 
 /** The card's head from the read: its week, and the game or the bye in it. */
 function headOf(week: PlayerWeek, zone: string, now: number): CardHead {
-	const game = gameOf(week.line.facts, zone, now);
-	const opponent = game === null ? NONE : game === 'bye' ? BOX.bye : game.where;
+	const game = gameOf(week.line.facts, week.line.player.team, zone, now);
+	const opponent =
+		game === null ? NONE : game === 'bye' ? BOX.bye : game === 'no-club' ? BOX.noClub : game.where;
 	return { week: week.week, opponent };
 }
 
@@ -492,8 +501,8 @@ function nextOf(
 	now: number
 ): { cell: NextCell | null; next: LogNext | null } {
 	const { facts } = week.line;
-	const game = gameOf(facts, zone, now);
-	if (game === null || game === 'bye') return { cell: null, next: null };
+	const game = heldGame(gameOf(facts, week.line.player.team, zone, now));
+	if (game === null) return { cell: null, next: null };
 	const ahead = toPlay(facts, now);
 	const cell: NextCell = {
 		where: game.where,

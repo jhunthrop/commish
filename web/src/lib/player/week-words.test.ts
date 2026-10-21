@@ -438,6 +438,34 @@ void test("the card's head is the API's week, the bye said in it, so one card sh
 	assert.equal(tile(bye.tiles, 'proj').label, 'Wk 6');
 });
 
+void test("a free agent's card heads No club, and its week tiles say why with no kickoff (Lane 123)", () => {
+	// The API's answer for a player the daily list names with no club: "FA", no game, no Proj.
+	const free = card(
+		week(
+			{ projection_previous_read_at: BEFORE },
+			{
+				player: { ...week().line.player, team: 'FA' },
+				opp_rank: null,
+				week_projection: null,
+				projection_delta: null,
+				facts: facts({ opponent: null, home: null, kickoff: null })
+			}
+		)
+	);
+	assert.deepEqual(free.head, { week: 6, opponent: 'No club' });
+	assert.equal(free.cell, null);
+	assert.deepEqual(
+		[tile(free.tiles, 'proj').value, tile(free.tiles, 'proj').caption],
+		[NONE, 'A free agent, no game this week']
+	);
+	assert.deepEqual([tile(free.tiles, 'opp').value, tile(free.tiles, 'opp').caption], [NONE, '']);
+	assert.deepEqual(
+		[tile(free.tiles, 'delta').value, tile(free.tiles, 'delta').caption],
+		[NONE, '']
+	);
+	for (const t of free.tiles) assert.doesNotMatch(t.caption, /kicked off|no team/i);
+});
+
 void test('with no league the basis names PPR and no league, and there is no verb', () => {
 	const { verb, basis } = card(
 		week({ verb: { kind: 'trade', holder: 'Nacua Matata', host_url: null, note: null } })

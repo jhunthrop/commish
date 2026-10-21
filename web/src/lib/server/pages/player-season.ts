@@ -92,6 +92,12 @@ function splitLog(log: readonly GameLogRow[]): [GameLogRow[], GameLogRow[]] {
 	return first === -1 ? [[...log], []] : [log.slice(0, first), log.slice(first)];
 }
 
+/** A week past the records with no club to name: a free agent's (Lane 123), who has no game in it, so
+ * the log lists no row for it rather than saying he did not play a week not yet played. */
+function unnamedAhead(row: GameLogRow, through: number): boolean {
+	return row.week > through && row.status === 'inactive' && row.opponent === null;
+}
+
 function basisWords(season: PlayerSeason, position: Position, format: Format): string {
 	const source = `Stats from the NFL's records, scored in ${format.label}`;
 	if (season.games === 0) return `${source}.`;
@@ -178,7 +184,9 @@ export function seasonView(
 		heads: columns.map(({ short, full }) => ({ short, full })),
 		pointsHead: { short: 'Pts', full: `${format.label} points` },
 		line: seasonLine(season, columns, format),
-		rows: past.map((row) => logRow(row, columns)),
+		rows: past
+			.filter((row) => !unnamedAhead(row, season.through))
+			.map((row) => logRow(row, columns)),
 		ahead: ahead.map((row) => aheadRow(row, kickoffOf)),
 		none: noneWords(season),
 		basis: basisWords(season, position, format),

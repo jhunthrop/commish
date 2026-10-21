@@ -6,6 +6,7 @@
  * A bye in a log is a week his club's slate has no game (Lane 119), the only place the run can say it.
  * A page that says his newest line was another club's names that club and a week he played (Lane 120).
  */
+import { FREE_AGENT_WORDS, isFreeAgent } from '#lib/format/free-agent.ts';
 import type { PlayerSeason } from './season.ts';
 import type { Schedule } from './schema.ts';
 
@@ -31,10 +32,25 @@ function checkOneBasis(players: readonly SeasonedPlayer[]): void {
 	}
 }
 
+/** A free agent (Lane 123) has no club, so no slate: no week of his is still to play and none is a bye.
+ * A week he played keeps the club his line was for. */
+function checkFreeAgent(p: SeasonedPlayer): void {
+	const wrong = p.season.log.find((row) => row.status === 'upcoming' || row.status === 'bye');
+	if (wrong) {
+		throw new Error(
+			`players/${p.id}.json is ${FREE_AGENT_WORDS}, but his week ${String(wrong.week)} is ${wrong.status === 'bye' ? 'a bye' : 'still to play'}.`
+		);
+	}
+}
+
 /** Every upcoming week is a game on his club's slate, so it has a kickoff. */
 function checkKickoffs(players: readonly SeasonedPlayer[], schedule: Schedule): void {
 	const slates = new Map(schedule.slates.map((slate) => [slate.abbr, slate] as const));
 	for (const p of players) {
+		if (isFreeAgent(p.team)) {
+			checkFreeAgent(p);
+			continue;
+		}
 		const slate = slates.get(p.team);
 		if (!slate) throw new Error(`players/${p.id}.json's club ${p.team} has no slate.`);
 		const weeks = new Set(slate.games.map((game) => game.week));

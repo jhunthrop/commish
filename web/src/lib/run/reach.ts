@@ -9,16 +9,20 @@ import type { GameLogRow, PlayerSeason } from './season.ts';
 
 /** What a season's reach reads of a season block: its through week and its log's statuses. */
 export type CountedSeason = Pick<PlayerSeason, 'through'> & {
-	log: readonly Pick<GameLogRow, 'week' | 'status'>[];
+	/** Each week's status, and its opponent where the caller has it (none named: no game). */
+	log: readonly (Pick<GameLogRow, 'week' | 'status'> & { opponent?: GameLogRow['opponent'] })[];
 };
 
 /** The week his season's figures reach (the ruling on the sweep's X3): the run's through week, or his
  * own later game already in the records (played, or inactive once his club's game is in), as a
- * Thursday game is before Sunday's are. A player page's head says it as his own ("through week 5"). */
+ * Thursday game is before Sunday's are. A player page's head says it as his own ("through week 5"). A
+ * week naming no opponent holds no game (a free agent's, Lane 123), so it reaches nothing. */
 export function countedWeek(season: CountedSeason): number {
 	return season.log.reduce(
 		(week, row) =>
-			row.status === 'played' || row.status === 'inactive' ? Math.max(week, row.week) : week,
+			row.status === 'played' || (row.status === 'inactive' && row.opponent !== null)
+				? Math.max(week, row.week)
+				: week,
 		season.through
 	);
 }

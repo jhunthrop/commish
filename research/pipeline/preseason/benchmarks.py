@@ -32,7 +32,7 @@ class RosterIdentity:
     player_id: str
     name: str
     position: str
-    team: str
+    team: str | None  # None for a free agent (revision 0018, Lane 123)
 
 
 @dataclass(frozen=True)

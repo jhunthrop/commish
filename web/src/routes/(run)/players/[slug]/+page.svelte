@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { isFreeAgent } from '#lib/format/free-agent.ts';
 	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
@@ -251,7 +252,7 @@
 			name={page.name}
 			headshot={page.headshot}
 			team={page.team}
-			club={{ name: page.clubName, href: links.club(page.team) }}
+			club={isFreeAgent(page.team) ? null : { name: page.clubName, href: links.club(page.team) }}
 			position={page.position}
 			status={listed}
 			positionRank={n.positionRank}

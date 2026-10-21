@@ -277,7 +277,7 @@ def _lines_stamp(conn: Connection, season: int, as_of: datetime) -> datetime | N
     )
 
 
-def _ranked_players(conn: Connection) -> dict[str, tuple[Position, str]]:
+def _ranked_players(conn: Connection) -> dict[str, tuple[Position, str | None]]:
     rows = conn.execute(
         text("select id, position, team from research.provider_players where position = any(:p)"),
         {"p": list(RANKED_POSITIONS)},
@@ -285,7 +285,7 @@ def _ranked_players(conn: Connection) -> dict[str, tuple[Position, str]]:
     return {r.id: (cast("Position", r.position), r.team) for r in rows}
 
 
-def _blocks(context: SeasonContext, players: Mapping[str, tuple[Position, str]]) -> dict[str, Json]:
+def _blocks(context: SeasonContext, players: Mapping[str, tuple[Position, str | None]]) -> dict[str, Json]:
     """Each player's season block in PPR; a player whose slate does not read (a trade mid-bye) is left out."""
     out = {}
     for pid, (position, _club) in players.items():
@@ -297,7 +297,10 @@ def _blocks(context: SeasonContext, players: Mapping[str, tuple[Position, str]])
 
 
 def allowed_by_opponent(
-    context: SeasonContext, blocks: Mapping[str, Json], players: Mapping[str, tuple[Position, str]], read_at: datetime
+    context: SeasonContext,
+    blocks: Mapping[str, Json],
+    players: Mapping[str, tuple[Position, str | None]],
+    read_at: datetime,
 ) -> dict[tuple[str, str], Allowed]:
     """Each club's PPR points allowed a game to each position this season over its games in the records,
     ranked 1 for the fewest (the API's `rankAllowed`): a position with no counted line is not ranked."""
@@ -423,13 +426,16 @@ def last_read_of(stored: StoredWeekRead | None) -> LastRead | None:
 def week_sheet(
     facts: WeekFacts, subject: Subject, stored: Mapping[tuple[str, int], StoredWeekRead]
 ) -> WeekSheet | None:
-    """One subject's sheet, or None when his club has no week ahead or his season does not read."""
+    """One subject's sheet, or None when his club has no week ahead, he has no club (a free agent, Lane
+    123), or his season does not read."""
     identity = subject.facts.identity
     block = facts.blocks.get(identity.id)
     if block is None:
         return None
     # The page's club (Lane 120): a block is written only for a player the context names a club for.
     club = call_for(facts.context.clubs, identity.id).club
+    if club is None:
+        return None
     cw = facts.weeks.get(club)
     if cw is None:
         return None

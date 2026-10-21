@@ -196,6 +196,41 @@ void test("his game line is the row's Game cell, none on a bye", () => {
 	assert.equal(rowNext(rowOf(rows, 'sam-laporta')), null);
 });
 
+/** The fixture's answer with one player as the API answers a free agent (Lane 123): his club cell
+ * "FA", no game, no bye and no Proj. */
+function asFreeAgent(answer: unknown, slug: string): unknown {
+	const walk = (value: unknown): unknown => {
+		if (Array.isArray(value)) return value.map(walk);
+		if (value === null || typeof value !== 'object') return value;
+		const record = Object.fromEntries(Object.entries(value).map(([k, v]) => [k, walk(v)]));
+		if (record.slug !== slug || typeof record.player !== 'object' || record.player === null)
+			return record;
+		const facts = record.facts as Record<string, unknown>;
+		return {
+			...record,
+			player: { ...(record.player as Record<string, unknown>), team: 'FA' },
+			facts: { ...facts, opponent: null, home: null, kickoff: null, bye: false },
+			week_projection: null,
+			opp_rank: null
+		};
+	};
+	return walk(answer);
+}
+
+void test("a free agent's shelf reads FA in the club cell and No club in the game cell (Lane 123)", () => {
+	const now = Date.parse(FIXTURE_WEEK_CLOCK);
+	const answer = asFreeAgent(data('lineup', FIXTURE_WEEK_CLOCK), 'jaxson-dart') as LineupAdvice;
+	const box = lineupBox(heldLineup(answer, now), ZONE, now);
+	const rows = [...box.starters.map((e) => e.row), ...box.bench.map((e) => e.row), ...box.reserve];
+	const dart = rowOf(rows, 'jaxson-dart');
+	assert.equal(dart.club, 'FA');
+	assert.equal(dart.game, 'no-club');
+	assert.equal(rowNext(dart), null);
+	assert.equal(rowSource(dart)?.player.team, 'FA');
+	// The rest of the fixture keeps its clubs and games.
+	assert.notEqual(rowOf(rows, 'sam-laporta').club, 'FA');
+});
+
 void test("the shelf's words pass the copy guard", () => {
 	for (const words of Object.values(SHELF)) assert.doesNotMatch(words, bannedPattern());
 });

@@ -2822,7 +2822,7 @@ components:
         id: { type: string }
         name: { type: string }
         position: { $ref: "#/components/schemas/PlayerPosition" }
-        team: { type: string }
+        team: { type: string, description: "his club's code, \"FA\" for a free agent (no club: no bye, Lane 123)" }
         headshot: { type: string }
         adp: { type: number, format: double, nullable: true, description: where drafters take him, null with no source }
         points: { type: number, format: double, nullable: true, description: projected season points, null for kickers and defenses }
@@ -3439,7 +3439,7 @@ components:
         board_id: { type: string, nullable: true, description: the player's id on our board, null when unplaced }
         name: { type: string }
         position: { type: string }
-        team: { type: string }
+        team: { type: string, description: "his club's code. On a row built from our board (the order, the card, a pickup) \"FA\" for a free agent (no club: no game, no bye, Lane 123); on a league roster row the platform's own" }
         injured_reserve:
           type: boolean
           description: >-

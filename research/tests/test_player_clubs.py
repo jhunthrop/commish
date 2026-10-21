@@ -1,8 +1,10 @@
-"""The daily player list refreshes each listed player's club on `provider_players` (Lane 122).
+"""The daily player list refreshes each listed player's club on `provider_players` (Lane 122), a free
+agent's to NULL (Lane 123, B101).
 
 Through the capture pass (`capture_return_dates`, the harvest's day read): the club write lands in the
-snapshot's transaction, a player off the list, a free agent and a code outside the 32 keep their row, a
-pass past the ceiling writes no club and fails while the snapshot stands, and the next hour retries it.
+snapshot's transaction, a free agent's club is cleared and counts as a change, a player off the list and a
+code outside the 32 keep their row, a free agent who signs takes his club, a pass past the ceiling writes
+no club and fails while the snapshot stands, and the next hour retries it.
 The operator's backfill applies the newest stored list with no ceiling, its dry run writing nothing.
 
 Runs against a migrated scratch database and needs PARITY_DATABASE_URL (skipped without it, run by CI).
@@ -107,7 +109,7 @@ def _read(conn: Connection, fetcher: _Fetcher, at: datetime) -> FeedOutcome | No
     return capture_return_dates(conn, Tank01Client(fetcher, "key"), at, SEASON, FixedBudget(1))
 
 
-def _clubs(conn: Connection) -> dict[str, str]:
+def _clubs(conn: Connection) -> dict[str, str | None]:
     return {r.id: r.team for r in conn.execute(select(PROVIDER_PLAYERS.c.id, PROVIDER_PLAYERS.c.team))}
 
 
@@ -128,10 +130,21 @@ def test_the_days_read_writes_each_listed_players_club(engine: Engine) -> None:
     with engine.begin() as conn:
         outcome = _read(conn, _Fetcher(), _eastern(20, 6))
         clubs = _clubs(conn)
-    assert outcome == FeedOutcome(PLAYER_LIST_SOURCE, "captured", 1, note="2 clubs changed")
-    # The movers take the list's club; the rest keep their row: Allen unmoved, the free agent, the
-    # player off the list and the defense. The id the store does not hold is never inserted.
-    assert clubs == {**SEEDED_CLUBS, "4037235": "BUF", "4433970": "NYG"}
+    assert outcome == FeedOutcome(PLAYER_LIST_SOURCE, "captured", 1, note="3 clubs changed")
+    # The movers take the list's club and the free agent has none; the rest keep their row: Allen
+    # unmoved, the player off the list and the defense. The id the store does not hold is never inserted.
+    assert clubs == {**SEEDED_CLUBS, "4037235": "BUF", "4433970": "NYG", "4872957": None}
+
+
+def test_a_free_agent_who_signs_takes_his_club(engine: Engine) -> None:
+    fetcher = _Fetcher()
+    with engine.begin() as conn:
+        _read(conn, fetcher, _eastern(20, 6))
+        fetcher.body = [*LIST[:3], _listed("4872957", "IND"), *LIST[4:]]
+        signed = _read(conn, fetcher, _eastern(21, 6))
+        clubs = _clubs(conn)
+    assert signed == FeedOutcome(PLAYER_LIST_SOURCE, "captured", 1, note="1 club changed")
+    assert clubs["4872957"] == "IND"
 
 
 def test_a_club_that_changes_between_reads_is_written_by_the_later_one(engine: Engine) -> None:
@@ -168,12 +181,12 @@ def _crowd(conn: Connection, count: int) -> list[dict[str, object]]:
 
 def test_a_read_past_the_ceiling_writes_no_club_fails_and_keeps_its_snapshot(engine: Engine) -> None:
     with engine.begin() as conn:
-        body = _crowd(conn, MAX_CLUB_CHANGES_PER_PASS - 1)  # with Dortch and McCarthy, 61 changes
+        body = _crowd(conn, MAX_CLUB_CHANGES_PER_PASS - 2)  # with Dortch, McCarthy and Sharpe, 61 changes
         refused = _read(conn, _Fetcher(body=body), _eastern(20, 6))
         clubs, stored, checked = _clubs(conn), _stored(conn), _checked(conn)
     assert refused is not None and refused.status == "failed" and refused.requests == 1
     assert refused.reason is not None and refused.reason.startswith("refused 61 club changes, more than 60")
-    assert clubs["4037235"] == "DET" and clubs["crowd-000"] == "DET"
+    assert clubs["4037235"] == "DET" and clubs["crowd-000"] == "DET" and clubs["4872957"] == "IND"
     # The return dates stand: the snapshot is stored, but the day's read is not taken, so the next hour
     # asks again and fails again while the provider's list stays so.
     assert (stored, checked) == (1, None)
@@ -181,11 +194,11 @@ def test_a_read_past_the_ceiling_writes_no_club_fails_and_keeps_its_snapshot(eng
 
 def test_a_read_at_the_ceiling_writes_every_club(engine: Engine) -> None:
     with engine.begin() as conn:
-        body = _crowd(conn, MAX_CLUB_CHANGES_PER_PASS - 2)  # 60 changes
+        body = _crowd(conn, MAX_CLUB_CHANGES_PER_PASS - 3)  # 60 changes, the free agent's among them
         outcome = _read(conn, _Fetcher(body=body), _eastern(20, 6))
         clubs = _clubs(conn)
     assert outcome == FeedOutcome(PLAYER_LIST_SOURCE, "captured", 1, note="60 clubs changed")
-    assert clubs["crowd-057"] == "BUF"
+    assert clubs["crowd-056"] == "BUF" and clubs["4872957"] is None
 
 
 def test_the_refused_list_is_written_once_the_provider_answers_right(engine: Engine) -> None:
@@ -196,7 +209,7 @@ def test_the_refused_list_is_written_once_the_provider_answers_right(engine: Eng
         fetcher.body = LIST
         later = _read(conn, fetcher, _eastern(20, 7))
         clubs = _clubs(conn)
-    assert later == FeedOutcome(PLAYER_LIST_SOURCE, "captured", 1, note="2 clubs changed")
+    assert later == FeedOutcome(PLAYER_LIST_SOURCE, "captured", 1, note="3 clubs changed")
     assert clubs["4037235"] == "BUF" and clubs["crowd-000"] == "DET"
 
 
@@ -213,16 +226,18 @@ def test_the_backfill_applies_the_newest_stored_list_with_no_ceiling(engine: Eng
         again = backfill_player_clubs(conn, read, write=True)
     assert (
         dry.splitlines()[0]
-        == "62 clubs would change, dry run, nothing written, from the list read at 2026-10-20T10:00:00+00:00"
+        == "63 clubs would change, dry run, nothing written, from the list read at 2026-10-20T10:00:00+00:00"
     )
     assert "  4037235 Greg Dortch DET to BUF" in dry.splitlines()
-    assert before["4037235"] == "DET"
-    assert done.splitlines()[0].startswith("62 clubs changed")
+    assert "  4872957 Raylen Sharpe IND to free agent" in dry.splitlines()
+    assert before["4037235"] == "DET" and before["4872957"] == "IND"
+    assert done.splitlines()[0].startswith("63 clubs changed")
     assert after["4037235"] == "BUF" and after["crowd-059"] == "BUF" and after["DST-BUF"] == "BUF"
+    assert after["4872957"] is None
     assert again.splitlines() == ["0 clubs changed, from the list read at 2026-10-20T10:00:00+00:00"]
 
 
-def test_the_list_names_a_club_only_for_a_listed_player_on_one_of_the_32() -> None:
+def test_the_list_names_a_club_for_a_listed_player_on_one_of_the_32_and_none_for_a_free_agent() -> None:
     body = [
         _listed("1", "BUF"),
         _listed("2", "MIA", free_agent=True),
@@ -233,6 +248,6 @@ def test_the_list_names_a_club_only_for_a_listed_player_on_one_of_the_32() -> No
         {"playerID": "6", "team": None},
         "not a player",
     ]
-    assert listed_clubs(body) == {"1": "BUF", "4": "WSH"}
+    assert listed_clubs(body) == {"1": "BUF", "2": None, "4": "WSH"}
     assert listed_clubs({"body": body}) == {}
     assert len(NFL_TEAM_ABBREVIATIONS) == 32  # noqa: PLR2004 - the 32 clubs

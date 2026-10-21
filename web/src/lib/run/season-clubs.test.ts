@@ -131,4 +131,38 @@ void test('the page says where he is now and whose his last game was', () => {
 		lastGameClubWords({ nickname: 'Dolphins' }, 5, { nickname: 'Chargers' }),
 		'Now with the Dolphins. His week 5 game was for the Chargers.'
 	);
+	// A free agent (Lane 123): no club now, said in words, never "no team".
+	assert.equal(
+		lastGameClubWords(null, 5, { nickname: 'Lions' }),
+		'Now a free agent. His week 5 game was for the Lions.'
+	);
+});
+
+void test("a free agent's page reads FA with no week still to play and no bye (Lane 123)", () => {
+	const after = Object.fromEntries(
+		page.season.log.filter((row) => row.week > 5).map((row) => [row.week, unknown] as const)
+	);
+	const freeAgent = seasonSchema.parse(withRows(after));
+	const check = (team: string, season: PlayerSeason): string | null => {
+		try {
+			checkRunSeasons(
+				[{ id: page.id, team, season, lastGameClub: { club: 'DET', week: 5 } }],
+				schedule
+			);
+			return null;
+		} catch (error) {
+			return error instanceof Error ? error.message : String(error);
+		}
+	};
+	assert.equal(check('FA', freeAgent), null);
+	// His page as the run's player file carries it: "FA" is a club cell the schema reads.
+	const base = read('players/4429795.json') as Record<string, unknown>;
+	assert.equal(playerSchema.parse({ ...base, team: 'FA' }).team, 'FA');
+	// A free agent with a week still to play, or a bye, has a club after all: refused.
+	assert.equal(
+		check('FA', page.season),
+		`players/${page.id}.json is a free agent, but his week 6 is a bye.`
+	);
+	const upcoming = seasonSchema.parse(withRows({ ...after, 18: page.season.log[17] ?? {} }));
+	assert.match(check('FA', upcoming) ?? '', /his week 18 is still to play\.$/);
 });

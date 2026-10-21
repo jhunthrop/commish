@@ -14,7 +14,9 @@ void test('the words are the one table the API embeds, every head named', () => 
 		avg: 'Avg',
 		week: 'Wk',
 		restFrom: 'from week {week}',
-		restFromPartial: "from week {week}'s games left"
+		restFromPartial: "from week {week}'s games left",
+		freeAgentClub: 'FA',
+		freeAgent: 'a free agent'
 	});
 });
 

@@ -9,9 +9,11 @@ player's club now; this is its one writer.
 THE RULE. Every player the list carries on a club gets that club on his existing row, in the same
 transaction as the list's own snapshot. Nothing is retired and nothing is inserted: the row is the
 player's current club, his history stays in the game lines, and seeding a new player stays the
-roster seed's job. A player the list does not carry keeps his row and his club, and so does a free
-agent and a player whose code is not one of the 32 (the list's `team` for a free agent is his last
-club, not a club he plays for; Lane 120's page club reads the list the same way).
+roster seed's job. A player the list carries as a free agent has no club: his row's club becomes NULL
+(Lane 123, B101; the list's `team` for a free agent is his last club, not a club he plays for, and
+revision 0018 lets the column hold it). A player the list does not carry keeps his row and his club,
+and so does a player whose code is not one of the 32. A cleared club counts as a change like any
+other, under the same ceiling. Lane 120's page club reads the list through `listed_clubs` too.
 
 THE CEILING. A pass that would change more than `MAX_CLUB_CHANGES_PER_PASS` clubs writes none and
 fails its feed, so the job fails and alerts: that many is a provider glitch, not a trade deadline (the
@@ -38,15 +40,24 @@ MAX_CLUB_CHANGES_PER_PASS: Final = 60
 _CLUBS: Final = frozenset(NFL_TEAM_ABBREVIATIONS)
 
 
+# How a change's log line names a free agent's club, which the store holds as NULL.
+FREE_AGENT_LOG_WORDS: Final = "free agent"
+
+
+def _club_words(club: str | None) -> str:
+    return FREE_AGENT_LOG_WORDS if club is None else club
+
+
 @dataclass(frozen=True)
 class ClubChange:
     player_id: str
     name: str
-    before: str
-    after: str
+    # None is a free agent's: no club.
+    before: str | None
+    after: str | None
 
     def words(self) -> str:
-        return f"{self.player_id} {self.name} {self.before} to {self.after}"
+        return f"{self.player_id} {self.name} {_club_words(self.before)} to {_club_words(self.after)}"
 
 
 @dataclass(frozen=True)
@@ -66,22 +77,25 @@ class ClubRefresh:
         )
 
 
-def listed_clubs(payload: object) -> dict[str, str]:
-    """Each player's club on the list, by provider id: a free agent, or a code not among the 32, is left out."""
+def listed_clubs(payload: object) -> dict[str, str | None]:
+    """Each listed player's club by provider id, None for a free agent (no club, whatever his `team` says);
+    a player on a code not among the 32 is left out."""
     if not isinstance(payload, list):
         return {}
-    out: dict[str, str] = {}
+    out: dict[str, str | None] = {}
     for raw in payload:
         record = raw if isinstance(raw, dict) else {}
         player_id, club = record.get("playerID"), record.get("team")
-        free_agent = str(record.get("isFreeAgent", "")).strip().lower() == "true"
-        on_a_club = isinstance(club, str) and club in _CLUBS and not free_agent
-        if isinstance(player_id, str) and player_id.strip() and on_a_club:
-            out[player_id.strip()] = str(club)
+        if not isinstance(player_id, str) or not player_id.strip():
+            continue
+        if str(record.get("isFreeAgent", "")).strip().lower() == "true":
+            out[player_id.strip()] = None
+        elif isinstance(club, str) and club in _CLUBS:
+            out[player_id.strip()] = club
     return out
 
 
-def club_changes(conn: Connection, clubs: Mapping[str, str]) -> tuple[ClubChange, ...]:
+def club_changes(conn: Connection, clubs: Mapping[str, str | None]) -> tuple[ClubChange, ...]:
     """The stored players whose club the list names otherwise, in id order."""
     if not clubs:
         return ()

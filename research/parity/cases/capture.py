@@ -145,8 +145,9 @@ CASES: tuple[Case, ...] = (
     Case(
         name="tank01-capture-harvest",
         summary="the capture-harvest job's five feeds and the player list into capture_snapshots, twice (captured, "
-        "then unchanged), and the list's clubs onto a seeded provider_players; the later pass lands the "
-        "2026-10-12 list on an earlier one that had McCarthy at MIN, whose club it must move",
+        "then unchanged), and the list's clubs onto a seeded provider_players, the listed free agent's cleared "
+        "to NULL (Lane 123); the later pass lands the 2026-10-12 list on an earlier one that had McCarthy at "
+        "MIN, whose club it must move",
         fixture_sets=HARVEST_SETS,
         tables=(CAPTURE_SNAPSHOTS, PROVIDER_PLAYERS),
         run_python=_harvest,

@@ -28,7 +28,7 @@ class MarketPlayer:
     player_id: str  # the provider id, the product's player id
     name: str
     position: Position  # "K" or "DEF"
-    team: str
+    team: str | None  # None for a free agent (revision 0018)
     headshot_url: str | None
 
 

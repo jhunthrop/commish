@@ -3,6 +3,7 @@
  * injured reserve; a decision strip above it naming each swap, each spot no one who can play fills,
  * and the Proj the swaps add over the lineup as the platform has it set now; one evidence line per
  * swap built from the row's own columns. Pure, tested in lineup.test.ts. */
+import { FREE_AGENT_WORDS } from '#lib/format/free-agent.ts';
 import { lastName } from '#lib/format/draft.ts';
 import { designationWord } from '#lib/format/designation.ts';
 import { fixed } from '#lib/format/number.ts';
@@ -16,6 +17,7 @@ import {
 	boxNumber,
 	boxRow,
 	easeOf,
+	heldGame,
 	oppRankWord,
 	projTotal,
 	RANKED_CLUBS,
@@ -215,6 +217,7 @@ export function whyLine(into: BoxRow, out: BoxRow | null, slot: string): string 
 			? `${name} is next in our order, with no ${BOX.proj} this week.`
 			: `${name} is the next ${slot} with a ${BOX.proj}, ${boxNumber(into.proj)}.`;
 	if (out.game === 'bye') return `${sat} is on bye. ${next}`;
+	if (out.game === 'no-club') return `${sat} is ${FREE_AGENT_WORDS}. ${next}`;
 	if (out.status?.rank != null)
 		return `${sat} is on a season-long list, ${out.status.mark}. ${next}`;
 	if (out.status !== null && out.status.mark !== designationWord('questionable'))
@@ -224,8 +227,9 @@ export function whyLine(into: BoxRow, out: BoxRow | null, slot: string): string 
 	if (into.status) parts.push(into.status.mark);
 	const against = AGAINST[into.position];
 	const rank = into.evidence.oppRank;
-	if (into.game !== null && into.game !== 'bye') {
-		parts.push(into.game.where);
+	const game = heldGame(into.game);
+	if (game !== null) {
+		parts.push(game.where);
 		if (rank !== null && against) parts.push(rankWords(rank, into.evidence.oppOf, against));
 	}
 	return `${parts.join(', ')}.`;

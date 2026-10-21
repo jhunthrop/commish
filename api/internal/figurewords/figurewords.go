@@ -33,6 +33,12 @@ type Words struct {
 	// RestFromPartial is the same while a game of that week has kicked
 	// off (Lane 86): "from week 6's games left".
 	RestFromPartial string `json:"restFromPartial"`
+	// FreeAgentClub is the club cell of a player with no club (Lane 123,
+	// B101): the daily list names him a free agent and the store holds
+	// NULL, so every answer that carries a club string carries this one.
+	FreeAgentClub string `json:"freeAgentClub"`
+	// FreeAgent says the same in a sentence: "a free agent".
+	FreeAgent string `json:"freeAgent"`
 }
 
 // WeekSlot is the placeholder RestFrom and RestFromPartial carry.
@@ -45,7 +51,7 @@ func Parse(b []byte) (Words, error) {
 		return Words{}, fmt.Errorf("figurewords: %w", err)
 	}
 	for name, word := range map[string]string{"projected": w.Projected, "points": w.Points, "perGame": w.PerGame, "avg": w.Avg, "week": w.Week,
-		"restFrom": w.RestFrom, "restFromPartial": w.RestFromPartial} {
+		"restFrom": w.RestFrom, "restFromPartial": w.RestFromPartial, "freeAgentClub": w.FreeAgentClub, "freeAgent": w.FreeAgent} {
 		if word == "" {
 			return Words{}, fmt.Errorf("figurewords: no word for %s", name)
 		}

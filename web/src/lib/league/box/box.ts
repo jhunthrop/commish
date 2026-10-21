@@ -8,6 +8,7 @@ import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 import { defenseWords } from '#lib/format/clubs.ts';
+import { isFreeAgent } from '#lib/format/free-agent.ts';
 import { lastName } from '#lib/format/draft.ts';
 import {
 	designationWord,
@@ -72,6 +73,8 @@ export const BOX = {
 	/** A bench row on injured reserve, in place of his game: why he is a drop (Lane 98, B34). */
 	irBench: 'IR-eligible, taking a bench spot',
 	bye: 'Bye',
+	/** A free agent's game cell (Lane 123, B101): his club cell is "FA", and he has no game to name. */
+	noClub: 'No club',
 	final: GAME_STATE_WORDS.final,
 	/** The Lineup once every starter of the member's has played and the matchup still plays (Lane 91):
 	 * nothing is left to set, and the week is not over. */
@@ -167,8 +170,8 @@ export interface BoxRow {
 	/** He carries an injured reserve tag (the report's or the platform's own): a bench row says why
 	 * he is a drop, an IR row draws no matchup (Lane 98, B34). */
 	reserve: boolean;
-	/** His game, "bye" on a bye week, null when we hold none. */
-	game: BoxGame | 'bye' | null;
+	/** His game, "bye" on a bye week, "no-club" for a free agent, null when we hold none. */
+	game: RowGame;
 	/** "20 to 22.5": the expected score with his club's first, null once kicked off or without it. */
 	expected: string | null;
 	weather: WeatherCell | null;
@@ -344,10 +347,21 @@ export function weatherCell(facts: Pick<WeekFacts, 'roof' | 'weather'>): Weather
 	return roof === null ? null : { glyph: 'outdoors', words: BOX.outdoors };
 }
 
+/** A box row's game: the game, the bye, a free agent's none ("No club", Lane 123), or null when we
+ * hold no game. */
+export type RowGame = BoxGame | 'bye' | 'no-club' | null;
+
+/** The game a row's cell names, null on a bye, for a free agent and without one held. */
+export function heldGame(game: RowGame): BoxGame | null {
+	return game === null || game === 'bye' || game === 'no-club' ? null : game;
+}
+
 /** His game's first line: the opponent with "at" or "vs", then by the game's state at the page's clock
  * (kickoff.ts lineState, the one rule the score bug reads) the kickoff on the member's clock, "Kicked
- * off" or "Final"; "bye" on a bye week; null when we hold no game. */
-export function gameOf(facts: WeekFacts, zone: string, now: number): BoxGame | 'bye' | null {
+ * off" or "Final"; "bye" on a bye week; "no-club" for a free agent, whose club cell is "FA" (he has no
+ * game and no bye); null when we hold no game. */
+export function gameOf(facts: WeekFacts, club: string, zone: string, now: number): RowGame {
+	if (isFreeAgent(club)) return 'no-club';
 	if (facts.bye) return 'bye';
 	if (facts.opponent === null) return null;
 	const where = `${facts.home === false ? 'at' : 'vs'} ${facts.opponent}`;
@@ -390,7 +404,7 @@ export function boxRow(
 		pill: pillOf(player.position, line.position_rank, ranked),
 		status: rowStatus(facts.designation, player.injured_reserve, ahead, zone),
 		reserve: onReserve(line),
-		game: gameOf(facts, zone, now),
+		game: gameOf(facts, player.team, zone, now),
 		expected: ahead ? expectedWords(facts) : null,
 		weather: ahead ? weatherCell(facts) : null,
 		proj: line.week_projection,

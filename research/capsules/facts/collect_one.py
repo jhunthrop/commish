@@ -65,7 +65,8 @@ class ServedBoardCache:
         if self._board is None or self._read_at is None or now - self._read_at >= BOARD_MEMO_SECONDS:
             rows = board_rows(conn, PRODUCT_SEASON, as_of)
             self._board = ServedBoard(
-                {row.player_id: row.overall_rank for row in rows}, {row.nfl_player_id: row.team for row in rows}
+                {row.player_id: row.overall_rank for row in rows},
+                {row.nfl_player_id: row.team for row in rows if row.team is not None},
             )
             self._read_at = now
         return self._board
@@ -93,7 +94,11 @@ def collect_player_facts(
     projection = projections[0]
     peers = active_peers_for(conn, [identity.position], PRODUCT_SEASON)
     board = served.served(conn, as_of)
-    color = collect_color(conn, Population(peers, {player_id: gsis}, {gsis: identity.team}, board.teams), as_of)
+    color = collect_color(
+        conn,
+        Population(peers, {player_id: gsis}, {} if identity.team is None else {gsis: identity.team}, board.teams),
+        as_of,
+    )
     rank = board.ranks.get(player_id)
     row = BoardRow(
         player_id, gsis, identity.name, identity.position, identity.team, identity.adp, identity.pos_adp,

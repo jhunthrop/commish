@@ -41,7 +41,8 @@ PROVIDER_PLAYERS: Final = Table(
     Column("id", Text, primary_key=True),
     Column("name", Text, nullable=False),
     Column("position", Text, nullable=False),
-    Column("team", Text, nullable=False),
+    # NULL for a free agent: the daily list names him with no club (revision 0018, Lane 123).
+    Column("team", Text),
     Column("adp", Double(53)),
     Column("pos_adp", Text),
     Column("headshot_url", Text),

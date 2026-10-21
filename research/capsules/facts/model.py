@@ -111,7 +111,7 @@ class Identity:
     id: str
     name: str
     position: Position
-    team: str
+    team: str | None  # None for a free agent (revision 0018, Lane 123)
 
 
 @dataclass(frozen=True, slots=True)
