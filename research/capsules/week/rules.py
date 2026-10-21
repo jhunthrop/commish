@@ -33,7 +33,7 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.page_figures import page_tenth
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
-from research.capsules.week.cells import cell_figures, misnamed
+from research.capsules.week.cells import cell_figures, misnamed, misranked
 from research.capsules.week.report_day import report_words
 from research.capsules.week.sheet import WeekSheet, points_text
 from research.capsules.week.start_advice import start_advice_in
@@ -163,34 +163,47 @@ def _unit_violations(sentences: Sequence[str], season: int) -> list[str]:
 
 def stated_figures(sentence: str, season: int) -> list[tuple[str, float]]:
     """The figures a sentence states, (as written, value): a rank's "of 32" belongs to its rank."""
-    return [(raw, value) for raw, value, _ in _stated(sentence, season)]
+    return [(raw, value) for raw, value, _, _ in _stated(sentence, season)]
 
 
-def _stated(sentence: str, season: int) -> list[tuple[str, float, str]]:
-    """Each stated figure with the text after it, where its name is."""
+def _stated(sentence: str, season: int) -> list[tuple[str, float, str, str]]:
+    """Each stated figure with the text before and after it, where its name is."""
     return [
-        (raw, value, sentence[end:])
+        (raw, value, sentence[:start], sentence[end:])
         for raw, value, start, end in figures_of(sentence, season)
         if not _ORDINAL_OF_BEFORE.search(sentence[:start])
     ]
 
 
+_NAME_AS_THE_CELL: Final = (
+    "Name each figure as its cell does: his points a game are his Avg, his last game's points are Last's, a "
+    "game's points are that game's, his rest-of-season points are the Rest of season tile's, this week's are "
+    "the week's published projection (none on his bye), and the opponent's rank is Opp rank's."
+)
+
+
 def _misnamed_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
-    """A cell's figure named as another cell (Lane 100 review M1): "37.7 PPR points a game" where his Avg
-    is 25.9 and 37.7 is a game's."""
+    """A cell's figure named as another cell (Lane 100 review M1, Lane 117 B80): "37.7 PPR points a game"
+    where his Avg is 25.9 and 37.7 is a game's; a rank against his position that is not Opp rank's."""
     out = []
     for s in sentences:
-        for raw, value, after in _stated(s, sheet.season):
-            cell = misnamed(after, page_tenth(value), sheet)
+        for raw, value, before, after in _stated(s, sheet.season):
+            cell = misnamed(before, after, page_tenth(value), sheet)
             if cell is not None:
                 out.append(
                     _sentence_violation(
-                        f'names "{raw}" as {cell}, a cell that prints another figure',
-                        s,
-                        "Name each figure as its cell does: his points a game are his Avg, a game's points are "
-                        "that game's.",
+                        f'names "{raw}" as {cell}, a cell that prints another figure', s, _NAME_AS_THE_CELL
                     )
                 )
+        out.extend(
+            _sentence_violation(
+                f'names "{raw}" as the opponent\'s rank against his position (Opp rank), a cell that prints another '
+                "rank",
+                s,
+                _NAME_AS_THE_CELL,
+            )
+            for raw in misranked(s, sheet)
+        )
     return out
 
 
@@ -259,13 +272,13 @@ def _projection_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[s
     figure, value = points_text(projection.points), page_tenth(projection.points)
     allowed = _published_figures(sheet)
     for s in sentences:
-        stated = {page_tenth(v) for _, v, _, _ in figures_of(s, sheet.season)}
+        stated = {page_tenth(v) for _, v, _, _ in _stated(s, sheet.season)}  # a rank's "of 32" is its rank's
         if _NAMES_PROJECTION.search(s) and value not in stated:
             out.append(
                 _sentence_violation(
                     "names the published projection without its figure",
                     s,
-                    f'Give its figure exactly: "the published projection has him at {figure} points".',
+                    f"Give its figure, {figure} points, exactly, in a sentence written for this player's week.",
                 )
             )
         if _PUBLISHED.search(s) and stated - allowed:
@@ -293,7 +306,7 @@ def _projection_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[s
                 _sentence_violation(
                     f"quotes the {figure} points without saying it is published",
                     s,
-                    f'Say it is the published projection in that sentence: "the published projection has him at {figure} points".',
+                    f"Name it the published projection, with its {figure} points, in a sentence about this player's week.",
                 )
             )
     if not any(_NAMES_PROJECTION.search(s) for s in sentences):

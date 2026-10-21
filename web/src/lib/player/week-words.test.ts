@@ -11,6 +11,8 @@ import {
 	publishedOn,
 	unreadBasis,
 	vsAvgReason,
+	vsAvgCaption,
+	compareLeadsWithoutVerb,
 	type BasisTile,
 	type CardTile
 } from './card.ts';
@@ -662,7 +664,7 @@ void test('vs Avg is his rest of season a game less his Avg, from the two printe
 	assert.equal(filled.find((t) => t.key === 'vsAvg')?.value, '\u22128.7');
 	assert.equal(
 		filled.find((t) => t.key === 'vsAvg')?.caption,
-		'22.0 a game from week 6 against his 30.7: our figure weighs his 5 games against his preseason pace'
+		'22.0 a game vs his 30.7 Avg: 5 games weighed with his preseason pace'
 	);
 	// "--" stands with the plain caption: no reason beside a figure not drawn (fix round 1, M4).
 	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.caption, CARD.vsAvgCaption);
@@ -670,6 +672,32 @@ void test('vs Avg is his rest of season a game less his Avg, from the two printe
 	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.value, NONE);
 	// In another scoring than the tile's the figure a game is not the tile's: no gap is drawn.
 	assert.equal(at(22.0, 'half_ppr').find((t) => t.key === 'vsAvg')?.value, NONE);
+});
+
+void test('vs Avg names both figures and the preseason pace, as its tile beside it does (Lane 117)', () => {
+	// Its four phone lines are the shot script's to count (player-bye-shots.ts), never a character proxy.
+	const caption = vsAvgCaption('22.0', '30.7', vsAvgReason(5));
+	assert.equal(caption, '22.0 a game vs his 30.7 Avg: 5 games weighed with his preseason pace');
+	assert.match(caption, new RegExp(CARD.preseasonPace.toLowerCase()));
+});
+
+void test('in season with no league verb Compare leads before the read answers, preseason the sheet (Lane 117, B80)', () => {
+	assert.equal(compareLeadsWithoutVerb(REST), true);
+	assert.equal(compareLeadsWithoutVerb(null), false);
+	// The read with no league agrees with the card before it.
+	const live = liveCard({
+		week: week(),
+		player: PLAYER,
+		league: null,
+		tiles: BUILT,
+		opponents: {},
+		games: 5,
+		rest: REST,
+		screenHref: href,
+		zone: ZONE,
+		now: NOW
+	});
+	assert.equal(live.compareLeads, compareLeadsWithoutVerb(REST));
 });
 
 /** The site's copy guard, with the card's own words: "tip" (the copy rules' no-tips ruling). */

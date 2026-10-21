@@ -597,13 +597,44 @@ const WEEK_POSITION_WORDS = 'Pick a position: K or DEF';
 const DEFAULT_ORDER_ROWS = 100;
 const MIN_SEARCH = 2;
 
+/** FIXTURE_TWO_QB=1 (Lane 117, B78): a league's order valued as a two-quarterback league's, so the
+ * front door's strip holds quarterbacks the run's top rows do not and builds them from the answer.
+ * STAND-INS, named so: each quarterback's points over replacement rises by TWO_QB_LIFT (the second
+ * quarterback slot lowers his replacement level), the rows are ranked again by it, and a line with
+ * an Avg and no games count carries STAND_IN_GAMES (the API's games_played, Lane 111). */
+const twoQb = process.env.FIXTURE_TWO_QB === '1';
+const TWO_QB_LIFT = 50;
+const STAND_IN_GAMES = 5;
+
+function twoQbRows(rows: readonly OrderRow[]): OrderRow[] {
+	return rows
+		.map((row) => {
+			if (row.line.player.position !== 'QB') return row;
+			const vor = row.points_over_replacement;
+			const games =
+				row.line.games_played ?? (row.line.season_avg === null ? undefined : STAND_IN_GAMES);
+			return {
+				...row,
+				points_over_replacement: vor === null ? null : vor + TWO_QB_LIFT,
+				line: games === undefined ? row.line : { ...row.line, games_played: games }
+			};
+		})
+		.sort(
+			(a, b) =>
+				(b.points_over_replacement ?? Number.NEGATIVE_INFINITY) -
+				(a.points_over_replacement ?? Number.NEGATIVE_INFINITY)
+		)
+		.map((row, i) => ({ ...row, rank: i + 1 }));
+}
+
 /** The order's view as the API answers it (order.ts): one position ranked by its total (a stand-in
  * place: the fixture's own order of its stand-in totals, 1 to n among the players it holds), or every
  * position in order.json's order; a search's letters in the name or club;
  * the limit. Without a league the rows carry no roster and no move, and no read. */
 function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
 	// Each total over his club's games left at the clock (Lane 86, rest-now.ts).
-	const live = orderAtClock(order, now());
+	const atClock = orderAtClock(order, now());
+	const live = league && twoQb ? { ...atClock, rows: twoQbRows(atClock.rows) } : atClock;
 	const position = params.get('position');
 	const q = (params.get('q') ?? '').trim().toLowerCase();
 	const limit = Number(params.get('limit') ?? DEFAULT_ORDER_ROWS);

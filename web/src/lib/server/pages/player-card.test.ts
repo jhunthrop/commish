@@ -175,7 +175,7 @@ void test('in season the row under the tiles is his preseason figures as stored 
 				'vsAvg',
 				'--',
 				'rest of season a game against his Avg',
-				'our figure weighs his 5 games against his preseason pace'
+				'5 games weighed with his preseason pace'
 			]
 		]
 	);

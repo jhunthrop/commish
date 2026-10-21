@@ -10,7 +10,7 @@
 // from is his club's first game not yet kicked off (Thursday's clubs start at week 7); a game is final
 // at the Saturday instant once its kickoff has passed. Everything else is the contract run's.
 //
-//   node scripts/inseason-fixture/saturday-run.ts
+//   [SATURDAY_OUT=4429023] [SATURDAY_PACE=1] [SATURDAY_READ=1] node scripts/inseason-fixture/saturday-run.ts
 // then build with PUBLIC_RUN_ID=2026-10-17T17-ros PUBLIC_RUN_BASE_URL=.runs and start the fixture API
 // with FIXTURE_RUN_ID=2026-10-17T17-ros.
 import { cp, readFile, readdir, writeFile } from 'node:fs/promises';
@@ -95,6 +95,36 @@ function sharedTier(numbers: Json, position: unknown): Json {
 		: numbers;
 }
 
+/** SATURDAY_PACE=1 (Lane 117, B80): a STAND-IN preseason pace a game on every in-season page, his
+ * preseason points over the 17 games, so the vs Avg tile draws its reason as a run that stores the
+ * pace does (Lane 100's preseasonPerGame); the contract run predates the field. */
+const PACE_GAMES = 17;
+const pace = process.env.SATURDAY_PACE === '1';
+function withPace(numbers: Json): Json {
+	const points = numbers.preseasonPoints;
+	return pace && typeof points === 'number'
+		? { ...numbers, preseasonPerGame: tenth(points / PACE_GAMES) }
+		: numbers;
+}
+
+/** SATURDAY_READ=1 (Lane 117, B95 fix round 3): a STAND-IN week read for Gibbs at the cap of 95 words, hand
+ * written for the shots (never a recording), so the player page shows the box a full read grows to. */
+const longRead = process.env.SATURDAY_READ === '1';
+const LONG_READ_PLAYER = '4429795';
+const LONG_READ = {
+	week: FIRST_WEEK,
+	body:
+		'The Lions are off in week 6 of 2026, so Jahmyr Gibbs does not play and scores nothing this week. ' +
+		"There is no designation for him on Friday's report, and he still leads the Detroit backfield ahead of Sione Vaki. " +
+		'His 30.7 PPR points a game over 5 games make him a weekly starter once Detroit is back from its week off. ' +
+		'Keep him on your roster, fill his spot with a back who has a game this week, and put him straight back into your lineup for week 7 at home against Green Bay.',
+	caption: 'Written Sat 11:12 am Central, for week 6',
+	status: null,
+	call: 'hold',
+	writtenAt: '2026-10-17T16:12:00.000Z',
+	factsAt: '2026-10-17T16:00:00.000Z'
+};
+
 const index = (await read('index.json')) as unknown as { id: string; team: string }[];
 const teamOf = new Map(index.map((p) => [p.id, p.team]));
 for (const file of await readdir(new URL('boards/', OUT))) {
@@ -110,9 +140,10 @@ for (const file of await readdir(new URL('players/', OUT))) {
 	page.formats = Object.fromEntries(
 		Object.entries(page.formats as Record<string, Json>).map(([id, n]) => [
 			id,
-			sharedTier(moved(n, team), page.position)
+			withPace(sharedTier(moved(n, team), page.position))
 		])
 	);
+	if (longRead && page.id === LONG_READ_PLAYER) page.weekRead = LONG_READ;
 	await write(`players/${file}`, page);
 }
 const manifest = await read('manifest.json');
@@ -132,4 +163,17 @@ manifest.formats = (manifest.formats as Json[]).map((f) => ({
 	refreshedAt: at
 }));
 await write('manifest.json', manifest);
+// SATURDAY_OUT=<board id> (Lane 117, B80): a STAND-IN injury capture listing that player Out for
+// week 6, read Friday afternoon, so the player page shots hold an Out player beside a playing one
+// and one on his bye. The contract run carries no capture of its own.
+const out = process.env.SATURDAY_OUT;
+if (out !== undefined && out !== '') {
+	const readAt = '2026-10-16T21:00:00.000Z';
+	await write('designations.json', {
+		readAt,
+		checkedAt: readAt,
+		source: 'stand-in',
+		players: { [out]: { status: 'out', seasonLong: false, since: null } }
+	});
+}
 process.stdout.write(`${SATURDAY_RUN_ID}: written to ${OUT.pathname}\n`);

@@ -53,7 +53,7 @@ from research.capsules.week.store import (
     stored_week_reads,
     upsert_week_read,
 )
-from research.capsules.week.write import MAX_ASKS_PER_READ, MAX_TOKENS, WeekReadResult, write_week_read
+from research.capsules.week.write import MAX_TOKENS, WeekReadResult, write_week_read
 from research.nightly.capsule_step import checked_price
 from research.nightly.steps import StepRecord
 from research.nightly.week_read_demotion import demote_shared, read_shapes
@@ -69,16 +69,24 @@ PAGES_PER_NIGHT: Final = 700
 # THE DOLLARS (the coordinator's M3), from fix round 2's recordings (the fixture run, 11 calls; the 50-player
 # sample, 27 live calls over 8 reads; the judge, 16 calls): a read averages $0.0016 to $0.0019, the judge's
 # call $0.00006 (one of the read's four, on the 152 of 536 sheets that may not start him), the dearest call
-# $0.00065, so a read's worst case (4 calls) is $0.0026 (5 with Lane 100's overrun retry, $0.0033) and a full week turnover of 536 reads about $0.95 on
+# $0.00065, so a read's worst case (4 calls) is $0.0026 (6 with the overrun retry and its judge ask, priced at WORST_PROMPT_TOKENS below; Lane 117 replayed 40 production reads at $0.0015 each on average) and a full week turnover of 536 reads about $0.95 on
 # average and $1.39 at worst: the night holds $1.40. An hourly pass writes only the reads a status moved (a
 # projection move waits for the nightly, Lane 66v): $0.05 a pass, and $0.60 across a Central day's passes
 # (the capture runs 18 times). A day of week reads is at most $2.00, beside the capsule night's ruled bound of about $4.15.
 NIGHTLY_BUDGET_USD: Final = 1.40
 HOURLY_BUDGET_USD: Final = 0.05
 HOURLY_DAY_USD: Final = 0.60
-# The heaviest prompt a week read's ask carries (a correction with its ledger and every line's stamp; the
-# recordings' largest was 3,630 tokens), for a read's worst case against what is left of the budget.
-WORST_PROMPT_TOKENS: Final = 3_700
+# The heaviest prompt a week read's ask carries (a correction with its ledger and every line's stamp), for a
+# read's worst case against what is left of the budget. Measured on Lane 117's replay of 40 production
+# sheets of week 7 after the four-rule prompt: 8,506 prompt tokens at 17,643 characters, the fewest
+# characters a token 1.87 (the recordings of Lane 72 had peaked at 3,630).
+WORST_PROMPT_TOKENS: Final = 9_000
+# The asks the budget's check prices a read at before it starts (the coordinator's ruling, Lane 117 fix round
+# 3): two at the heaviest prompt, a draft and its one retry. A read may make more (MAX_ASKS_PER_READ); the gateway's reservation is the
+# hard stop for those in flight.
+BUDGETED_CALLS_PER_READ: Final = 2
+# The fewest characters a prompt token took on that replay, for counting a built prompt (the tests).
+MIN_CHARS_PER_TOKEN: Final = 1.8
 # The recordings' dearest call, for a budget in calls when the price list cannot be read.
 WORST_CALL_USD: Final = 0.00065
 Log = Callable[[str], None]
@@ -126,10 +134,11 @@ class WeekReadSpend:
 
 
 def worst_read_usd(price: ModelPrice) -> float:
-    """A read's worst case in dollars: every ask at the heaviest prompt and the whole completion allowance."""
+    """A read's worst case in dollars for the budget's check before it starts: `BUDGETED_CALLS_PER_READ` asks at
+    the heaviest prompt and the whole completion allowance."""
     per_in = (price.input_usd_per_million or 0.0) / 1_000_000
     per_out = (price.output_usd_per_million or 0.0) / 1_000_000
-    return MAX_ASKS_PER_READ * (WORST_PROMPT_TOKENS * per_in + MAX_TOKENS * per_out)
+    return BUDGETED_CALLS_PER_READ * (WORST_PROMPT_TOKENS * per_in + MAX_TOKENS * per_out)
 
 
 def step_budget(price: ModelPrice, usd: float) -> RunBudget:

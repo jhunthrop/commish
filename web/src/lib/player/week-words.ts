@@ -41,6 +41,7 @@ import {
 	NONE,
 	printTenth,
 	publishedOn,
+	compareLeadsWithoutVerb,
 	vsAvgCaption,
 	withTile,
 	type BasisTile,
@@ -560,11 +561,10 @@ function vsAvgTile(week: PlayerWeek, rest: RestParts | null, built: BasisTile): 
 	const same = week.projection_scoring.format === rest.scoring;
 	if (!same || perGame === null || avg === null) return built;
 	const tenths = Math.round(perGame * TENTHS) - Math.round(avg * TENTHS);
-	const from = restNow(week, rest)?.from ?? rest.from;
 	return {
 		...built,
 		value: signed(tenths / TENTHS),
-		caption: vsAvgCaption(printTenth(perGame), from, printTenth(avg), built.reason)
+		caption: vsAvgCaption(printTenth(perGame), printTenth(avg), built.reason)
 	};
 }
 
@@ -617,7 +617,7 @@ export function liveCard({
 		verb,
 		// Signed out in season no lineup or league verb fits either: Compare leads, not the sheet's add
 		// (Lane 100 fix round 1, M3).
-		compareLeads: held || (league === null && rest !== null),
+		compareLeads: held || (league === null && compareLeadsWithoutVerb(rest)),
 		basis: liveBasis(week, leagueVerb !== null, zone, now),
 		rest: restAtClock,
 		formats: formatsOf(week, restAtClock),

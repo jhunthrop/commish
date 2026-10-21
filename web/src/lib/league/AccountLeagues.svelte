@@ -110,7 +110,9 @@
 					<tr>
 						<th scope="row">
 							<a class="st open" href={resolve('/league/[id]', { id: league.id })}
-								><b>{followedName(league)}</b><span>{row.team}</span></a
+								><b class="name" title={followedName(league)}>{followedName(league)}</b><span
+									>{row.team}</span
+								></a
 							>
 						</th>
 						<td><span class="st"><b class="num">{row.record}</b><span>{row.place}</span></span></td>
@@ -189,6 +191,17 @@
 
 	.open:hover b {
 		text-decoration: underline;
+	}
+
+	/* A league's name keeps at most two lines at a desk, the whole name on its title (Lane 117, B84). */
+	@media (min-width: 901px) {
+		.name {
+			display: -webkit-box;
+			-webkit-box-orient: vertical;
+			-webkit-line-clamp: 2;
+			line-clamp: 2;
+			overflow: hidden;
+		}
 	}
 
 	.tfoot {

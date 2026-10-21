@@ -11,6 +11,8 @@ the read, so a reader never meets a number he cannot find on the page.
 """
 
 import re
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Final
 
 from research.capsules.page_figures import page_tenth
@@ -73,23 +75,108 @@ def cell_figures(sheet: WeekSheet) -> frozenset[float]:
     return frozenset(_projection_cells(sheet) | _game_cells(sheet) | _season_cells(sheet))
 
 
-# A figure's name right after it (Lane 100 review M1): a rate a game is his Avg's, a figure for the rest of
-# the season is the Rest of season tile's. The published projection's naming is the projection rule's.
+# A figure's name, right after it or right before it (Lane 100 review M1, Lane 117 B80): every cell the card
+# draws by a name a read may give one of its figures. A figure named as a cell is that cell's figure, or the
+# read is refused: his Avg's points a game, the Rest of season tile's points, his Last game's points, this
+# week's points (none on a bye), his next game's points (on a bye the week after's Proj, which the sheet
+# does not carry; else the week's published projection or its expected score).
+_POINTS: Final = r"(?:(?:half-)?ppr\s+)?(?:fantasy\s+)?points?"
 _A_GAME: Final = re.compile(r"^\s*(?:(?:half-)?ppr\s+)?(?:fantasy\s+)?(?:points?\s+)?(?:a|per)\s+game\b", re.IGNORECASE)
+_AVG_BEFORE: Final = re.compile(r"\b(?:averag(?:e|es|ed|ing)|avg)(?:\s+(?:of|is|was))?\s*$", re.IGNORECASE)
 _REST: Final = re.compile(
-    r"^\s*(?:(?:half-)?ppr\s+)?(?:fantasy\s+)?points?\s+(?:for\s+|over\s+)?(?:the\s+)?rest\b|^\s*(?:ppr\s+)?"
-    r"rest-of-season\b",
+    rf"^\s*{_POINTS}\s+(?:for\s+|over\s+)?(?:the\s+)?rest\b|^\s*(?:ppr\s+)?rest-of-season\b",
+    re.IGNORECASE,
+)
+_REST_BEFORE: Final = re.compile(
+    r"\brest[- ]of[- ]season(?:\s+(?:figure|points))?(?:\s+(?:of|is|at))?\s*$", re.IGNORECASE
+)
+_LAST_GAME: Final = r"(?:his\s+)?(?:last|latest|most\s+recent)\s+(?:game|week|outing|time\s+out)"
+_LAST: Final = re.compile(
+    rf"^\s*{_POINTS}\s+(?:(?:in|from|during)\s+{_LAST_GAME}|last\s+(?:week|game|time))\b", re.IGNORECASE
+)
+_LAST_BEFORE: Final = re.compile(
+    rf"\b{_LAST_GAME}(?:'s)?(?:\s*,)?(?:\s+(?:he|was|of|brought))?(?:\s+(?:scored|posted|put\s+up|had))?\s*$",
+    re.IGNORECASE,
+)
+_THIS_WEEK: Final = re.compile(rf"^\s*{_POINTS}\s+this\s+week\b", re.IGNORECASE)
+# His next game is this week's for a player who plays (review M3); next week, or the week after a bye, is a
+# week the sheet carries no figure for.
+_NEXT_GAME: Final = re.compile(rf"^\s*{_POINTS}\s+(?:in|for|from)\s+(?:his|the)\s+next\s+game\b", re.IGNORECASE)
+_NEXT_BEFORE: Final = re.compile(r"\bnext\s+game(?:'s)?(?:\s+(?:of|is|at))?\s*$", re.IGNORECASE)
+_NEXT_WEEK: Final = re.compile(
+    rf"^\s*{_POINTS}\s+(?:(?:in|for|from)\s+(?:his|the)\s+next\s+week|next\s+week|after\s+the\s+bye)\b",
+    re.IGNORECASE,
+)
+_NEXT_WEEK_BEFORE: Final = re.compile(r"\bnext\s+week(?:'s)?(?:\s+(?:of|is|at))?\s*$", re.IGNORECASE)
+# A rank against his position (the Opp rank cell): "26th of 32", "9th against running backs".
+_RANK: Final = re.compile(
+    r"\b(\d+)(?:st|nd|rd|th)\b(?=\s+(?:of\s+(\d+)|against\b|in\s+(?:ppr\s+)?points\s+allowed\b))(?!\s+in\s+our\b)",
     re.IGNORECASE,
 )
 
 
-def misnamed(after: str, value: float, sheet: WeekSheet) -> str | None:
-    """The cell a figure is named as, when that cell prints another figure (`after` is the text right after
-    the figure); None when its name and its cell agree or it names none of them."""
-    if _A_GAME.match(after) and (sheet.points_per_game is None or page_tenth(sheet.points_per_game) != value):
-        return "his points a game (Avg)"
+@dataclass(frozen=True, slots=True)
+class NamedCell:
+    """A cell by the names a read gives its figure, and the figures it prints for a sheet."""
+
+    name: str
+    after: re.Pattern[str]
+    before: re.Pattern[str] | None
+    figures: Callable[[WeekSheet], frozenset[float]]
+
+
+def _avg(sheet: WeekSheet) -> frozenset[float]:
+    return frozenset(() if sheet.points_per_game is None else (page_tenth(sheet.points_per_game),))
+
+
+def _rest(sheet: WeekSheet) -> frozenset[float]:
     b = sheet.board
-    rest = None if b is None or not b.rest_of_season or b.points is None else page_tenth(b.points)
-    if _REST.match(after) and rest != value:
-        return "his rest-of-season points"
+    return frozenset(() if b is None or not b.rest_of_season or b.points is None else (page_tenth(b.points),))
+
+
+def _last(sheet: WeekSheet) -> frozenset[float]:
+    # last_games is newest first (`collect.last_games`): the Last tile is the newest.
+    return frozenset(() if not sheet.last_games else (page_tenth(sheet.last_games[0].points),))
+
+
+def _none(sheet: WeekSheet) -> frozenset[float]:
+    del sheet
+    return frozenset()
+
+
+def _this_week(sheet: WeekSheet) -> frozenset[float]:
+    """The week tile: no figure on a bye, else the published projection and the game's expected score."""
+    return frozenset() if sheet.bye else frozenset(_projection_cells(sheet) | _game_cells(sheet))
+
+
+NAMED_CELLS: Final = (
+    NamedCell("his points a game (Avg)", _A_GAME, _AVG_BEFORE, _avg),
+    NamedCell("his rest-of-season points", _REST, _REST_BEFORE, _rest),
+    NamedCell("his last game's points (Last)", _LAST, _LAST_BEFORE, _last),
+    NamedCell("this week's points, on a week the card shows his bye", _THIS_WEEK, None, _this_week),
+    NamedCell("his next game's points", _NEXT_GAME, _NEXT_BEFORE, _this_week),
+    NamedCell("next week's points, a week the sheet carries no figure for", _NEXT_WEEK, _NEXT_WEEK_BEFORE, _none),
+)
+
+
+def misnamed(before: str, after: str, value: float, sheet: WeekSheet) -> str | None:
+    """The cell a figure is named as, when that cell prints another figure (`before` and `after` are the text
+    either side of the figure); None when its name and its cell agree or it names none of them."""
+    for cell in NAMED_CELLS:
+        named = cell.after.match(after) or (cell.before is not None and cell.before.search(before))
+        if named and value not in cell.figures(sheet):
+            return cell.name
     return None
+
+
+def misranked(sentence: str, sheet: WeekSheet) -> list[str]:
+    """Each rank against his position the sentence states that is not the Opp rank cell's, as written: on a
+    bye the sheet carries no opponent's rank, so any one is refused."""
+    a = sheet.allowed
+    shown = None if a is None or sheet.bye else (a.rank, a.of)
+    out = []
+    for match in _RANK.finditer(sentence):
+        rank, of = int(match.group(1)), match.group(2)
+        if shown is None or rank != shown[0] or (of is not None and int(of) != shown[1]):
+            out.append(match.group(0))
+    return out
