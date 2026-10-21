@@ -64,7 +64,7 @@ const SCREENS: readonly Screen[] = [
 		path: `/league/${id}/start`,
 		signedIn: true,
 		ready: 'Copy the lineup',
-		verb: new RegExp(`^(${CARD.openLineup}|${CARD.kickedOff}|${CARD.gameFinal})$`),
+		verb: new RegExp(`^(${SHELF.backToLineup}|${CARD.kickedOff}|${CARD.gameFinal})$`),
 		shot: true
 	},
 	{
@@ -200,10 +200,27 @@ async function openShelf(page: Page, by: 'pointer' | 'event' = 'pointer'): Promi
 
 const cardOf = (page: Page): string | null => new URL(page.url()).searchParams.get(SHELF_PARAM);
 
-async function check(page: Page, screen: Screen, label: string, width: number): Promise<void> {
+/** The rank the first row draws, its digits alone, null when it draws none (Waivers, Trades). */
+async function rowRank(page: Page): Promise<string | null> {
+	const row = opener(page).locator('xpath=ancestor::tr[1]');
+	const cell = row.locator('.rank-n, .pos').first();
+	if ((await cell.count()) === 0) return null;
+	return (await cell.innerText()).replace(/\D/g, '') || null;
+}
+
+async function check(
+	page: Page,
+	screen: Screen,
+	label: string,
+	width: number,
+	rank: string | null
+): Promise<void> {
 	const fault = (said: string): void => {
 		faults.push(`${label}: ${said}`);
 	};
+	// One player, one rank (fix round 1, HIGH-1): the card's pill says the row's.
+	const pill = (await shelf(page).locator('.pos').first().innerText()).replace(/\D/g, '');
+	if (rank !== null && pill !== rank) fault(`the row ranks him ${rank}, the card ${pill}`);
 	const slug = cardOf(page);
 	if (slug === null) fault(`the address has no ?${SHELF_PARAM}=`);
 	const box = await shelf(page).boundingBox();
@@ -294,8 +311,9 @@ for (const screen of shotScreens) {
 			try {
 				await page.goto(`${web}${screen.path}`);
 				await ready(page, screen);
+				const rank = await rowRank(page);
 				await openShelf(page);
-				await check(page, screen, label, size.width);
+				await check(page, screen, label, size.width, rank);
 				await page.screenshot({
 					path: new URL(`shelf-${screen.name}-${theme}-${String(size.width)}.png`, out).pathname
 				});

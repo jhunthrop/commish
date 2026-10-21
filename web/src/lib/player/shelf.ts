@@ -4,16 +4,36 @@
  * tiles at once, his Pts in place of Proj once his game has kicked off (the screen's one game-state
  * rule, kickoff.ts lineState as the row carries it), and the verb by the screen and his game. */
 import { BOX, deltaWord, easeOf, oppRankWord, type BoxRow } from '#lib/league/box/box.ts';
-import { CARD, NONE, printTenth, TILE_ORDER, type CardTile, type TileKey } from './card.ts';
-import type { ScreenOffer, ShelfScreen } from './shelf-state.ts';
+import type { StatusView } from '#lib/run/status-view.ts';
+import type { Position } from '#lib/types/player.ts';
+import type { CardSource } from './card-source.ts';
+import {
+	CARD,
+	NONE,
+	printTenth,
+	restRankWords,
+	TILE_ORDER,
+	type CardTile,
+	type TileKey
+} from './card.ts';
+import type { OfferWords, ScreenOffer, ShelfScreen, ShelfTap } from './shelf-state.ts';
 import type { NextCell } from './week-words.ts';
 
 /** The shelf's own words, in one place for the copy guard. */
 export const SHELF = {
 	/** The link to his page, at the top right. */
 	fullPage: 'Full page',
-	close: 'Close'
+	close: 'Close',
+	/** The Lineup's own verb: the shelf closes onto his row there (fix round 1, MEDIUM-1). */
+	backToLineup: 'Back to your lineup'
 } as const;
+
+/** The verbs worded by the card or the shelf rather than by the screen. */
+const OFFER_WORDS: Readonly<Record<OfferWords, string>> = {
+	openLineup: CARD.openLineup,
+	backToLineup: SHELF.backToLineup,
+	compare: CARD.compare
+};
 
 /** The screens whose verb is the member's lineup. */
 const LINEUP_SCREENS: ReadonlySet<ShelfScreen> = new Set(['lineup', 'matchup', 'league']);
@@ -45,7 +65,7 @@ export function shelfVerb(
 		if (state === 'kicked_off') return { kind: 'held', words: CARD.kickedOff };
 	}
 	const { line, href, run, focus } = offer;
-	const label = 'label' in offer ? offer.label : CARD[offer.card];
+	const label = 'label' in offer ? offer.label : OFFER_WORDS[offer.card];
 	return { kind: 'act', label, line, href, run, focus };
 }
 
@@ -134,4 +154,79 @@ export function rowNext(row: Pick<BoxRow, 'game' | 'expected' | 'weather'>): Nex
 		expected: row.expected,
 		weather: row.weather
 	};
+}
+
+/** His card's head: the tapped row's own facts as the screen drew them at its clock (his designation
+ * and the pre-game tag rule, the platform's IR and its words, his rest-of-season rank), his page's
+ * build only for what the row does not carry, and the build alone with no row (fix round 1, HIGH-1:
+ * one player never shows two ranks or two designations on one screen). */
+export interface ShelfHead {
+	position: Position | null;
+	rank: number | undefined;
+	status: StatusView | null;
+	/** Said in place of his game, as the row's Game cell says it. */
+	note: string | null;
+}
+
+/** What the build says of his head, null before it is read. */
+export interface BuiltHead {
+	position: Position;
+	rank: number;
+	status: StatusView | null;
+}
+
+export function shelfHead(tap: ShelfTap | null, built: BuiltHead | null): ShelfHead {
+	if (tap === null)
+		return {
+			position: built?.position ?? null,
+			rank: built?.rank,
+			status: built?.status ?? null,
+			note: null
+		};
+	const { row, note } = tap;
+	return {
+		position: row.pill?.position ?? built?.position ?? null,
+		rank: row.pill?.rank ?? built?.rank,
+		status: row.status,
+		note
+	};
+}
+
+/** The week read's source from the row alone, for a card whose build cannot be read: the player as
+ * the row names him and its cells as the tiles; null for a row our board does not place. */
+export function rowSource(row: BoxRow): CardSource | null {
+	if (row.boardId === null) return null;
+	return {
+		player: {
+			id: row.boardId,
+			name: row.name,
+			team: row.club,
+			position: row.pill?.position ?? row.position
+		},
+		tiles: rowTiles(row, null),
+		opponents: {},
+		games: 0,
+		rest: null,
+		tier: null,
+		basisTiles: [],
+		lastKickoffs: {}
+	};
+}
+
+/** The rest-of-season tile's caption names his rank in our order as the build had it ("QB12 in our
+ * order"): once the row's rank stands in the pill, the caption names the same one, so the card never
+ * says two (fix round 1, HIGH-1). Tiles as given when either rank is missing or they agree. */
+export function rankedTiles(
+	tiles: readonly CardTile[],
+	position: string | null,
+	built: number | undefined,
+	shown: number | undefined
+): CardTile[] {
+	if (position === null || built === undefined || shown === undefined || built === shown)
+		return [...tiles];
+	const from = restRankWords(position, built);
+	const to = restRankWords(position, shown);
+	return tiles.map((tile) =>
+		tile.key === 'rest' ? { ...tile, caption: tile.caption.replace(from, to) } : tile
+	);
 }

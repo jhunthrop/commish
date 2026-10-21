@@ -14,7 +14,10 @@ export type ShelfScreen =
  * the way to his row on the Lineup and for Compare (shelf.ts words those once the shelf loads); the
  * line under it; and where it goes or what it does on the screen (the Waivers claim with its drop,
  * the trade builder, his row on the Lineup). */
-export type ScreenOffer = ({ label: string } | { card: 'openLineup' | 'compare' }) & {
+/** The verbs the card or the shelf words (shelf.ts). */
+export type OfferWords = 'openLineup' | 'backToLineup' | 'compare';
+
+export type ScreenOffer = ({ label: string } | { card: OfferWords }) & {
 	line: string | null;
 	href: string | null;
 	run: (() => void) | null;
@@ -32,6 +35,12 @@ export function lineupOffer(to: { href: string } | { run: () => void }): ScreenO
 		run: 'run' in to ? to.run : null,
 		focus: null
 	};
+}
+
+/** The Lineup's own offer: back onto his row there, with his swap said under it when the advice
+ * makes one (fix round 1, MEDIUM-1). */
+export function backToLineupOffer(run: () => void, line: string | null): ScreenOffer {
+	return { card: 'backToLineup', line, href: null, run, focus: null };
 }
 
 /** The Players screen's offer: Compare, the comparison page with him on one side. */
@@ -82,9 +91,18 @@ export function plainClick(event: ShelfClick): boolean {
 	);
 }
 
+/** The row a card opened from, as the screen drew it at its clock: the row, and the line its game cell
+ * says in place of the game (BoxGame's note: "IR-eligible, taking a bench spot"), null with none. */
+export interface ShelfTap {
+	row: BoxRow;
+	note: string | null;
+}
+
 /** What the screen tells its shelf. */
 export interface ShelfOptions {
 	screen: ShelfScreen;
+	/** The screen's clock in ms, the instant its rows are drawn at: the card's week is drawn at it too. */
+	now: () => number;
 	/** The league his week is read in (the screen's), null with none. */
 	league: () => CardLeague | null;
 	/** The screen's verb for his row, null where it gives him none. */
@@ -111,6 +129,8 @@ export interface ShelfNav {
 	back: () => void;
 	/** Brings what an id names into view and focuses its first control; false when it is not there. */
 	focus: (id: string) => boolean;
+	/** Starts loading the shelf's script. */
+	warm: () => void;
 }
 
 /** What takes the focus back. */
@@ -132,7 +152,7 @@ export class ShelfHost implements ShelfOpener {
 	readonly options: ShelfOptions;
 	readonly #nav: ShelfNav;
 	/** Each row tapped, by slug: the shelf opens on its cells at once. */
-	readonly #rows = new Map<string, BoxRow>();
+	readonly #taps = new Map<string, ShelfTap>();
 	/** The name tapped, which takes the focus back once the shelf closes. */
 	#opener: Focusable | null = null;
 	/** Whether the open card is the history entry this screen pushed (else it came with the address). */
@@ -151,15 +171,22 @@ export class ShelfHost implements ShelfOpener {
 	}
 
 	/** The row the card opened from, null when the screen holds none for him. */
-	row(slug: string): BoxRow | null {
-		return this.#rows.get(slug) ?? this.options.rowOf?.(slug) ?? null;
+	tap(slug: string): ShelfTap | null {
+		const tapped = this.#taps.get(slug);
+		if (tapped !== undefined) return tapped;
+		const row = this.options.rowOf?.(slug) ?? null;
+		return row === null ? null : { row, note: null };
 	}
 
-	open = (event: ShelfClick, row: BoxRow): void => {
+	warm = (): void => {
+		this.#nav.warm();
+	};
+
+	open = (event: ShelfClick, row: BoxRow, note: string | null = null): void => {
 		const { slug } = row;
 		if (slug === null || !plainClick(event)) return;
 		event.preventDefault();
-		this.#rows.set(slug, row);
+		this.#taps.set(slug, { row, note });
 		this.#opener = focusable(event.currentTarget);
 		this.#pushed = true;
 		this.#nav.go(shelfHref(this.#nav.href(), slug), { state: { card: slug } });

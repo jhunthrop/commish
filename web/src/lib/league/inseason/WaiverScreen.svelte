@@ -14,6 +14,7 @@
 	import WaiverTable from '../box/WaiverTable.svelte';
 	import {
 		addVerbWords,
+		cardGains,
 		cardName,
 		copiedWords,
 		countWords,
@@ -330,10 +331,11 @@
 		const names = namesOnScreen(shown);
 		return {
 			label: verbWords(paired),
-			line: moveWords({
+			// The pair and its gain, as the strip's card says them (fix round 1, LOW-8).
+			line: `${moveWords({
 				add: cardName(paired.add.player.name, names),
 				drop: advised ? cardName(advised.row.name, names) : null
-			}),
+			})}, ${cardGains({ weekGain: paired.week_gain, gain: paired.gain })}`,
 			href: null,
 			run: () => act(paired),
 			// The claim made here opens its confirmation; the platform's page opens in a new tab.
@@ -343,6 +345,7 @@
 
 	const shelf = providePlayerShelf({
 		screen: 'waivers',
+		now: () => now,
 		league: () => ({ id: page.params.id ?? '', host }),
 		offer: shelfOffer,
 		rowOf: (slug) =>

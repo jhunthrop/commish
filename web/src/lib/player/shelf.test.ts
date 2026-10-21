@@ -12,16 +12,27 @@ import {
 import { stamped } from '../../../scripts/inseason-fixture/game-state.ts';
 import { inTenths } from '../../../scripts/inseason-fixture/tenths.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
-import { BOX, type BoxRow } from '#lib/league/box/box.ts';
-import { heldLineup, lineupBox } from '#lib/league/box/lineup.ts';
+import { BOX, reserveRow, rowStatus, type BoxRow } from '#lib/league/box/box.ts';
+import { heldLineup, lineupBox, swapOf, swapWords } from '#lib/league/box/lineup.ts';
 import { addVerbWords, poolRows } from '#lib/league/box/waivers.ts';
 import type { LineupAdvice, WaiverAdvice } from '#lib/league/inseason/api.ts';
 import { BUILDER_LINES } from '#lib/league/inseason/builder.ts';
 import { CARD, NONE } from './card.ts';
-import { gameTiles, rowNext, rowTiles, SHELF, shelfVerb, type ShelfVerb } from './shelf.ts';
+import {
+	gameTiles,
+	rankedTiles,
+	rowNext,
+	rowSource,
+	rowTiles,
+	SHELF,
+	shelfHead,
+	shelfVerb,
+	type ShelfVerb
+} from './shelf.ts';
 import {
 	SHELF_PARAM,
 	ShelfHost,
+	backToLineupOffer,
 	compareOffer,
 	lineupOffer,
 	plainClick,
@@ -212,6 +223,9 @@ function fakeNav(
 		focus: (target: string) => {
 			nav.log.push(`focus ${target}`);
 			return target === OPENED_PANEL;
+		},
+		warm: () => {
+			nav.log.push('warm');
 		}
 	};
 	return nav;
@@ -238,7 +252,12 @@ function click(over: Partial<ShelfClick> = {}): ShelfClick & { prevented: boolea
 const SCREEN = 'https://trycommish.com/league/x/waivers?player=4689114';
 /** The panel a verb opens on the screen, which the fake browser finds. */
 const OPENED_PANEL = 'claim-move';
-const options = { screen: 'waivers' as const, league: () => null, offer: () => null };
+const options = {
+	screen: 'waivers' as const,
+	now: () => Date.parse(FIXTURE_WEEK_CLOCK),
+	league: () => null,
+	offer: () => null
+};
 
 void test('a tap opens his card at ?card=, keeping the screen and its asked player', () => {
 	const nav = fakeNav(SCREEN);
@@ -251,7 +270,7 @@ void test('a tap opens his card at ?card=, keeping the screen and its asked play
 	assert.equal(shelfSlug(nav.at), 'jaxson-dart');
 	assert.equal(new URL(nav.at).searchParams.get('player'), '4689114');
 	assert.deepEqual(nav.log, [`push ${shelfHref(SCREEN, 'jaxson-dart')}`]);
-	assert.equal(host.row('jaxson-dart'), dart);
+	assert.deepEqual(host.tap('jaxson-dart'), { row: dart, note: null });
 });
 
 void test('a modified click goes to his page as the link does', () => {
@@ -288,7 +307,7 @@ void test('a reload reopens the card the address names, and closing it then clea
 	const host = new ShelfHost({ ...options, rowOf: (slug) => rowBySlug(rows, slug) }, nav);
 	host.restore();
 	assert.equal(host.slug, 'jaxson-dart');
-	assert.equal(host.row('jaxson-dart')?.name, 'Jaxson Dart');
+	assert.equal(host.tap('jaxson-dart')?.row.name, 'Jaxson Dart');
 	assert.deepEqual(nav.log, [`replace ${reloaded}`]);
 	host.close();
 	assert.deepEqual(nav.log.at(-1), `replace ${SCREEN}`);
@@ -324,4 +343,64 @@ void test("a verb that leaves the screen replaces the card's entry", () => {
 void test('the address field is its own, never the asked player', () => {
 	assert.notEqual(SHELF_PARAM, 'player');
 	assert.equal(shelfSlug(`${SCREEN}&${SHELF_PARAM}=`), null);
+});
+
+void test("the tapped row's facts stay over his page's build: its IR words and its rank", () => {
+	const dart = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'jaxson-dart');
+	assert.equal(dart.pill?.rank, 31);
+	// On the member's IR on the platform, drawn as the bench's IR row draws him (Lane 98).
+	const onIr = { ...reserveRow(dart, 'bench'), status: rowStatus(null, true, true, ZONE) };
+	assert.ok(onIr.status);
+	const built = { position: 'QB' as const, rank: 12, status: null };
+	const head = shelfHead({ row: onIr, note: BOX.irBench }, built);
+	assert.equal(head.rank, 31);
+	assert.equal(head.status, onIr.status);
+	assert.equal(head.note, 'IR-eligible, taking a bench spot');
+	// A tag the row drops once his game kicks off (Lane 104) stays dropped: the build's never returns.
+	const tagged = { position: 'QB' as const, rank: 12, status: onIr.status };
+	assert.equal(shelfHead({ row: dart, note: null }, tagged).status, dart.status);
+	// With no row (a shared link to a card the screen does not hold) the build's head stands.
+	assert.deepEqual(shelfHead(null, built), { position: 'QB', rank: 12, status: null, note: null });
+});
+
+void test("the Lineup's own verb closes onto his row, his swap under it", () => {
+	const now = Date.parse(FIXTURE_WEEK_CLOCK);
+	const box = lineupBox(
+		heldLineup(data('lineup', FIXTURE_WEEK_CLOCK) as LineupAdvice, now),
+		ZONE,
+		now
+	);
+	const dart = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'jaxson-dart');
+	const swap = swapOf(box.swaps, dart);
+	assert.ok(swap);
+	const verb = actOf(shelfVerb('lineup', dart.state, backToLineupOffer(NOTHING, swapWords(swap))));
+	assert.equal(verb.label, SHELF.backToLineup);
+	assert.notEqual(verb.label, CARD.openLineup);
+	assert.equal(verb.line, 'QB, Dart in, Rodgers out');
+	// The bench player the swap sits carries the same line.
+	const rodgers = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'aaron-rodgers');
+	assert.equal(swapOf(box.swaps, rodgers), swap);
+});
+
+void test('a card whose build cannot be read still reads his week from the row', () => {
+	const dart = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'jaxson-dart');
+	const source = rowSource(dart);
+	assert.ok(source);
+	assert.equal(source.player.id, dart.boardId);
+	assert.equal(source.player.name, 'Jaxson Dart');
+	assert.equal(source.tiles.length, 6);
+	assert.equal(rowSource({ ...dart, boardId: null }), null);
+});
+
+void test("the rest-of-season tile names the row's rank, never the build's beside it", () => {
+	const dart = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'jaxson-dart');
+	const built = rowTiles(dart, null).map((t) =>
+		t.key === 'rest' ? { ...t, caption: 'PPR points for 2026, QB12 in our order' } : t
+	);
+	const tiles = rankedTiles(built, 'QB', 12, 31);
+	assert.equal(
+		tiles.find((t) => t.key === 'rest')?.caption,
+		'PPR points for 2026, QB31 in our order'
+	);
+	assert.deepEqual(rankedTiles(built, 'QB', 12, undefined), built);
 });

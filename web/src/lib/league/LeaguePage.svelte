@@ -471,6 +471,7 @@
 								tagsOf={sheetTags}
 								stamp={stampOf(lineupRead)}
 								host={sync.host}
+								now={now.getTime()}
 							/>
 						{/if}
 					</div>

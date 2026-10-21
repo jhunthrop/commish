@@ -6,8 +6,11 @@ import type { BoxRow } from '#lib/league/box/box.ts';
 
 /** What a row's name asks of the screen it is on. */
 export interface ShelfOpener {
-	/** Opens his card over the screen; leaves the link to go to his page for a modified click. */
-	open: (event: MouseEvent, row: BoxRow) => void;
+	/** Opens his card over the screen with the row as drawn and the line its game cell says in place
+	 * of the game (an IR bench row's words); leaves the link to his page for a modified click. */
+	open: (event: MouseEvent, row: BoxRow, note: string | null) => void;
+	/** Starts loading the shelf's script: a finger or the focus is on a name. */
+	warm: () => void;
 }
 
 const KEY = Symbol('player shelf');

@@ -16,6 +16,8 @@
 		lineupPageWords,
 		lineupText,
 		setOnWords,
+		swapOf,
+		swapWords,
 		type CopyLine
 	} from '../box/lineup.ts';
 	import MovePanel from './MovePanel.svelte';
@@ -32,7 +34,7 @@
 	import { LINES, lineupDecision, lineupTitle } from './words.ts';
 	import { page } from '$app/state';
 	import { markAsked } from '../box/asked.ts';
-	import { lineupOffer, rowBySlug } from '#lib/player/shelf-state.ts';
+	import { backToLineupOffer, rowBySlug } from '#lib/player/shelf-state.ts';
 	import { providePlayerShelf } from '#lib/player/shelf-host.ts';
 	import PlayerShelfLayer from '#lib/player/PlayerShelfLayer.svelte';
 
@@ -79,12 +81,21 @@
 	const done = $derived(advice.week_done ?? null);
 	const doneState = $derived(advice.week_done_state ?? null);
 	const box = $derived(lineupBox(advice, memberZone(), now));
-	/** A row's name opens his card over the lineup (Lane 113); its verb brings his row into view. */
+	/** A row's name opens his card over the lineup (Lane 113); its verb closes it onto his row, with his
+	 * swap under it when the advice makes one. */
 	const shelf = providePlayerShelf({
 		screen: 'lineup',
+		now: () => now,
 		league: () => ({ id: page.params.id ?? '', host }),
-		offer: ({ boardId }) =>
-			boardId === null ? null : lineupOffer({ run: () => void markAsked(document, boardId) }),
+		offer: (row) => {
+			const { boardId } = row;
+			if (boardId === null) return null;
+			const swap = swapOf(box.swaps, row);
+			return backToLineupOffer(
+				() => void markAsked(document, boardId),
+				swap === null ? null : swapWords(swap)
+			);
+		},
 		rowOf: (slug) =>
 			rowBySlug(
 				[...box.starters.map((e) => e.row), ...box.bench.map((e) => e.row), ...box.reserve],

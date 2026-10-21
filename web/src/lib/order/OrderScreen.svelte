@@ -126,6 +126,7 @@
 	// svelte-ignore state_referenced_locally
 	const shelf = providePlayerShelf({
 		screen: mode,
+		now: () => now,
 		league: () => (mode === 'rest' ? league : null),
 		offer: shelfOffer,
 		rowOf: (slug) =>

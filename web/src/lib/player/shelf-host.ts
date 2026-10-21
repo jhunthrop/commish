@@ -5,6 +5,15 @@ import { page } from '$app/state';
 import { provideShelfOpener } from './shelf-context.ts';
 import { ShelfHost, type ShelfNav, type ShelfOptions } from './shelf-state.ts';
 
+let loading: Promise<typeof import('./PlayerShelf.svelte')> | null = null;
+
+/** The shelf's script, loaded once: at the first finger or focus on a name, at the screen's first
+ * idle moment, or at the tap, whichever comes first, so the tap draws the row's cells at once. */
+export function loadShelf(): Promise<typeof import('./PlayerShelf.svelte')> {
+	loading ??= import('./PlayerShelf.svelte');
+	return loading;
+}
+
 const KIT: ShelfNav = {
 	href: () => window.location.href,
 	card: () => page.state.card,
@@ -22,7 +31,8 @@ const KIT: ShelfNav = {
 			.querySelector<HTMLElement>('button, [href], input, select')
 			?.focus({ preventScroll: true });
 		return true;
-	}
+	},
+	warm: () => void loadShelf()
 };
 
 /** Called by the screen in its own setup: its rows' names open the shelf from here on. */

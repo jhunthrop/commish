@@ -29,6 +29,8 @@
 		stamp?: string | null;
 		/** The league's platform, which the player shelf reads his week in. */
 		host: LeagueHost;
+		/** The page's clock in ms, the instant its rows are drawn at. */
+		now: number;
 	}
 
 	let {
@@ -39,12 +41,14 @@
 		benchHref,
 		tagsOf,
 		stamp = null,
-		host
+		host,
+		now
 	}: Props = $props();
 
 	/** A starter's name opens his card over the page (Lane 113); its verb is his row on the Lineup. */
 	const shelf = providePlayerShelf({
 		screen: 'league',
+		now: () => now,
 		league: () => ({ id: page.params.id ?? '', host }),
 		offer: ({ boardId, position }) =>
 			boardId === null

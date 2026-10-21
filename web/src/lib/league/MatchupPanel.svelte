@@ -113,6 +113,7 @@
 
 	const shelf = providePlayerShelf({
 		screen: 'matchup',
+		now: () => now.getTime(),
 		league: () => ({ id: page.params.id ?? '', host: sync.host }),
 		offer: shelfOffer,
 		rowOf: (slug) => rowBySlug([...rowsOf(mine), ...rowsOf(theirs)], slug)

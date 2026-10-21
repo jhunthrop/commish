@@ -14,7 +14,16 @@
 	import CardNext from './CardNext.svelte';
 	import CardTiles from './CardTiles.svelte';
 	import { readCard } from './live.ts';
-	import { gameTiles, rowNext, rowTiles, SHELF, shelfVerb } from './shelf.ts';
+	import {
+		gameTiles,
+		rankedTiles,
+		rowNext,
+		rowSource,
+		rowTiles,
+		SHELF,
+		shelfHead,
+		shelfVerb
+	} from './shelf.ts';
 	import type { ShelfHost } from './shelf-state.ts';
 	import { shownWeekRead } from './week-read.ts';
 	import type { LiveCard } from './week-words.ts';
@@ -31,7 +40,8 @@
 
 	let { slug, host }: Props = $props();
 
-	const row = $derived(host.row(slug));
+	const tap = $derived(host.tap(slug));
+	const row = $derived(tap?.row ?? null);
 	const league = $derived(host.options.league());
 	/** His page's build once read, null before or when it cannot be. */
 	let built = $state<CardData | null>(null);
@@ -44,11 +54,29 @@
 	const game = $derived(row?.state ?? null);
 	const tiles = $derived.by(() => {
 		const base = built !== null && lead !== null ? builtTiles(built, lead) : null;
-		const shown = live?.tiles ?? (row === null ? base : rowTiles(row, base));
-		return shown === null ? [] : gameTiles(shown, game, row?.pts ?? null);
+		const cells = live?.tiles ?? (row === null ? base : rowTiles(row, base));
+		if (cells === null) return [];
+		const ranked = rankedTiles(cells, shown.position, lead?.numbers.positionRank, shown.rank);
+		return gameTiles(ranked, game, row?.pts ?? null);
 	});
 	const head = $derived(live?.head ?? built?.card.next ?? null);
-	const cell = $derived(live?.cell ?? (row === null ? null : rowNext(row)));
+	/** His card's head: the row's own facts, the build's only where the row carries none (HIGH-1). */
+	const shown = $derived(
+		shelfHead(
+			tap,
+			built === null || lead === null
+				? null
+				: {
+						position: built.position,
+						rank: lead.numbers.positionRank,
+						status: built.status?.words.view ?? null
+					}
+		)
+	);
+	/** The row's Game cell says why he has no game (an IR bench row's words): the shelf says it too. */
+	const cell = $derived(
+		shown.note !== null ? null : (live?.cell ?? (row === null ? null : rowNext(row)))
+	);
 	const read = $derived(
 		built?.weekRead ? shownWeekRead(built.weekRead, live?.projection ?? null) : null
 	);
@@ -56,23 +84,35 @@
 		live?.basis ?? [unreadBasis(failed, tiles.find((t) => t.key === 'proj')?.label ?? CARD.proj)]
 	);
 	const verb = $derived(shelfVerb(host.options.screen, game, row && host.options.offer(row)));
-	const position = $derived(built?.position ?? row?.pill?.position ?? null);
-	/** His place at his position as his page's card prints it, the row's until his page is read. */
-	const rank = $derived(lead?.numbers.positionRank ?? row?.pill?.rank ?? undefined);
-	const status = $derived(built?.status?.words.view ?? row?.status ?? null);
-
-	onMount(async () => {
+	/** His page's build, null when it cannot be read: the row's cells and the week read still stand. */
+	async function readBuild(): Promise<CardData | null> {
 		try {
 			const response = await fetch(links.playerCard(slug));
 			if (!response.ok) throw new Error(`His card answered ${String(response.status)}.`);
-			const page = await response.json<CardData>();
-			built = page;
-			const at = contextLine(page.lines) ?? page;
-			// The screen's clock: the card is drawn at the moment its week is read.
-			live = await readCard(cardSource(page, at, null), league, null, () => Date.now());
+			return await response.json<CardData>();
+		} catch (error: unknown) {
+			// eslint-disable-next-line no-console -- the card draws from the row instead
+			console.warn('player shelf: his card', error);
+			return null;
+		}
+	}
+
+	onMount(async () => {
+		const page = await readBuild();
+		built = page;
+		const source =
+			page === null
+				? row === null
+					? null
+					: rowSource(row)
+				: cardSource(page, contextLine(page.lines) ?? page, null);
+		try {
+			if (source === null) throw new Error('Neither his card nor his row is held.');
+			// The screen's clock: the card's week is drawn at the instant the screen's rows are.
+			live = await readCard(source, league, null, host.options.now);
 		} catch (error: unknown) {
 			// eslint-disable-next-line no-console -- the basis line says the figures could not be read
-			console.warn('player shelf', error);
+			console.warn('player shelf: the week', error);
 			failed = true;
 		}
 	});
@@ -101,25 +141,33 @@
 							><img src={clubMark(built.team)} alt="" width="18" height="18" />{built.clubName}</a
 						>
 					{:else if row}<span class="club">{row.club}</span>{/if}
-					{#if position}<StatusPill {position} positionRank={rank} {status} />{/if}
+					{#if shown.position}<StatusPill
+							position={shown.position}
+							positionRank={shown.rank}
+							status={shown.status}
+						/>{/if}
 				</div>
 			</div>
 		</div>
-		{#if head !== null || cell !== null}
+		{#if shown.note !== null}
+			<p class="next note">{shown.note}</p>
+		{:else if head !== null || cell !== null}
 			<div class="next">
 				<CardNext week={head?.week ?? null} opponent={head?.opponent ?? null} {cell} folded />
 			</div>
 		{/if}
 		{#if tiles.length > 0}<div class="tiles"><CardTiles {tiles} folded /></div>{/if}
-		<section class="read">
-			<h3><Label>{CARD.ourRead}</Label></h3>
-			{#if read}
-				<p class="stamp">{read.caption}</p>
-				{#if read.body !== null}<Capsule body={read.body} pulls={[]} />{/if}
-			{:else if built}
-				<p class="unwritten">{CARD.readNotYet}</p>
-			{/if}
-		</section>
+		{#if built}
+			<section class="read">
+				<h3><Label>{CARD.ourRead}</Label></h3>
+				{#if read}
+					<p class="stamp">{read.caption}</p>
+					{#if read.body !== null}<Capsule body={read.body} pulls={[]} />{/if}
+				{:else}
+					<p class="unwritten">{CARD.readNotYet}</p>
+				{/if}
+			</section>
+		{/if}
 		<div class="basis">
 			{#each basis as line (line)}<p>{line}</p>{/each}
 		</div>
@@ -195,6 +243,12 @@
 	.next {
 		padding-top: var(--s-2);
 		border-top: 1px solid var(--line);
+	}
+
+	.note {
+		margin: 0;
+		font-size: var(--t-sm);
+		color: var(--ink-2);
 	}
 
 	/* The tiles as the card draws them, boxed on their own in the shelf. */

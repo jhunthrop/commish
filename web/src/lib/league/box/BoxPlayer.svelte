@@ -87,7 +87,9 @@
 				<a
 					href={links.playerSeason(row.slug)}
 					aria-haspopup={shelf ? 'dialog' : undefined}
-					onclick={shelf ? (event) => shelf.open(event, row) : undefined}>{@render named()}</a
+					onclick={shelf ? (event) => shelf.open(event, row, note) : undefined}
+					onpointerdown={shelf?.warm}
+					onfocus={shelf?.warm}>{@render named()}</a
 				>
 			{:else}
 				<b>{@render named()}</b>

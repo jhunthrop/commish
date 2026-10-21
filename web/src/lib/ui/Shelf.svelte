@@ -5,7 +5,7 @@
 	/** A shelf over the screen (Lane 113): a modal dialog, a bottom sheet about nine tenths of the
 	 * phone's height with a drag handle, a side shelf 480 px wide from the right at a desk, the screen
 	 * dimmed behind it. The browser's modal dialog traps the focus and takes Escape; a tap on the dim,
-	 * the close button or a drag down on the handle closes it too. Each asks the owner to close
+	 * the close button or a drag down on the handle or the top row closes it too. Each asks the owner to close
 	 * (onclose), which unmounts it: the owner keeps the address and gives the focus back. Its body
 	 * scrolls inside; the foot, the screen's one verb, stays at the bottom. */
 	interface Props {
@@ -27,13 +27,27 @@
 	const DISMISS_PX = 96;
 
 	let dialog: HTMLDialogElement | undefined = $state();
+	let closer: HTMLButtonElement | undefined = $state();
+	/** Set as it unmounts, so its own close is not taken for one the owner did not ask for. */
+	let leaving = false;
 	/** The drag down from the handle as it moves, null at rest. */
 	let drag = $state<{ from: number; by: number } | null>(null);
 
 	onMount(() => {
 		dialog?.showModal();
-		return () => dialog?.close();
+		// The focus starts on the close button, never on a link that would leave the screen.
+		closer?.focus();
+		return () => {
+			leaving = true;
+			dialog?.close();
+		};
 	});
+
+	/** A close the owner did not ask for (the browser's own): the owner closes it too, so the address
+	 * and the focus follow. */
+	function onDialogClose(): void {
+		if (!leaving) onclose();
+	}
 
 	/** Escape: the owner closes it, so the address and the focus follow. */
 	function oncancel(event: Event): void {
@@ -46,8 +60,10 @@
 		if (event.target === dialog) onclose();
 	}
 
+	/** A drag from anywhere along the top but its link and button. */
 	function ondown(event: PointerEvent): void {
 		if (event.button !== 0) return;
+		if (event.target instanceof Element && event.target.closest('a, button')) return;
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 		drag = { from: event.clientY, by: 0 };
 	}
@@ -70,23 +86,30 @@
 	bind:this={dialog}
 	{oncancel}
 	{onclick}
+	onclose={onDialogClose}
 	style:--drag="{drag?.by ?? 0}px"
 >
+	<!-- The drag is the pointer's alone: Escape, the dim and the close button close it for every
+	     other way in. -->
 	<div
-		class="grab"
+		class="head"
+		role="presentation"
 		onpointerdown={ondown}
 		onpointermove={onmove}
 		onpointerup={onup}
 		onpointercancel={onup}
-		aria-hidden="true"
 	>
-		<span class="handle"></span>
-	</div>
-	<div class="top">
-		{@render top?.()}
-		<button type="button" class="close" aria-label={closeLabel} onclick={onclose}
-			><Icon name="close" size={20} /></button
-		>
+		<div class="grab" aria-hidden="true"><span class="handle"></span></div>
+		<div class="top">
+			{@render top?.()}
+			<button
+				type="button"
+				class="close"
+				aria-label={closeLabel}
+				onclick={onclose}
+				bind:this={closer}><Icon name="close" size={20} /></button
+			>
+		</div>
 	</div>
 	<div class="body">{@render children()}</div>
 	{#if foot}<div class="foot">{@render foot()}</div>{/if}
@@ -223,14 +246,18 @@
 			background: rgb(0 0 0 / 0.55);
 		}
 
-		/* The handle: a drag down on it closes the sheet. */
+		/* The handle and the whole top row: a drag down on them closes the sheet. */
+		.head {
+			flex: none;
+			touch-action: none;
+			cursor: grab;
+		}
+
 		.grab {
 			display: flex;
 			justify-content: center;
 			flex: none;
 			padding: var(--s-2) 0 var(--s-1);
-			touch-action: none;
-			cursor: grab;
 		}
 
 		.handle {

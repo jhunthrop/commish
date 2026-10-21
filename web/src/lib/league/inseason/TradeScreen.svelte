@@ -196,6 +196,7 @@
 
 	const shelf = providePlayerShelf({
 		screen: 'trades',
+		now: () => now,
 		league: () => ({ id: page.params.id ?? '', host }),
 		offer: shelfOffer,
 		rowOf: (slug) => {
