@@ -3,6 +3,8 @@ package leaguerecord
 import (
 	"math"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
@@ -57,13 +59,21 @@ func byPointsValue(points map[string]float64) stanceOf {
 	}
 }
 
-// rank grades a week's league: every rostered candidate both reads carry,
-// ours by the set order and ESPN's by its projection, against the points.
+// rank grades a week's league: every rostered candidate with a points
+// split for the week (the record's rule, review M1: a player with no stat
+// line is graded by neither, never counted as scoring none), ours by the
+// set order and ESPN's by its projection, against the points.
 func rank(cands []Candidate, ours map[string]int, espn map[string]float64, actual map[string]float64, shape leaguesync.Shape) Ranking {
+	var played []Candidate
+	for _, c := range cands {
+		if _, ok := actual[c.ID]; ok {
+			played = append(played, c)
+		}
+	}
 	return Ranking{
-		Players: len(cands),
-		Ours:    scoreOf(cands, byRankValue(ours), ByRank(ours), actual, shape),
-		ESPN:    scoreOf(cands, byPointsValue(espn), ByPoints(espn), actual, shape),
+		Players: len(played),
+		Ours:    scoreOf(played, byRankValue(ours), ByRank(ours), actual, shape),
+		ESPN:    scoreOf(played, byPointsValue(espn), ByPoints(espn), actual, shape),
 	}
 }
 
@@ -207,7 +217,27 @@ func startersRight(cands []Candidate, stance stanceOf, order Stance, actual map[
 	return right, len(finished)
 }
 
+// roundTo rounds as the record prints (record.py printed): half away from
+// zero on the value's shortest decimal form, so 0.285 is 0.29 although its
+// binary double sits just below it.
 func roundTo(v float64, places int) float64 {
-	step := math.Pow(10, float64(places))
-	return math.Round(v*step) / step
+	text := strconv.FormatFloat(math.Abs(v), 'f', -1, 64)
+	whole, frac, _ := strings.Cut(text, ".")
+	if len(frac) <= places {
+		return v
+	}
+	kept := whole + frac[:places]
+	n, err := strconv.ParseInt(kept, 10, 64)
+	if err != nil {
+		step := math.Pow(10, float64(places))
+		return math.Round(v*step) / step
+	}
+	if frac[places] >= '5' {
+		n++
+	}
+	out := float64(n) / math.Pow(10, float64(places))
+	if v < 0 {
+		return -out
+	}
+	return out
 }
