@@ -132,21 +132,29 @@ export const CARD = {
 export const TILE_ORDER: readonly TileKey[] = ['proj', 'rest', 'opp', 'avg', 'last', 'delta'];
 
 /** Why his figure a game sits where it does against his Avg, from the order's stored basis: the
- * preseason pace a game it starts from, weighed against the games he has played (Lane 100, B51). */
+ * preseason pace a game it starts from (the Preseason pace tile beside it), weighed against the games
+ * he has played (Lane 100, B51), short enough for its phone tile (Lane 117, B80). */
 export function vsAvgReason(games: number): string {
-	return `our figure weighs his ${plural(games, 'game')} against his preseason pace`;
+	return `${plural(games, 'game')} weighed with his pace`;
 }
 
+/** The most characters vs Avg's caption takes with its figures and reason, so it fits four lines of
+ * its phone tile, a third of a 390 screen (Lane 117, B80; the shot script counts the lines). */
+export const VS_AVG_CAPTION_MAX = 60;
+
 /** vs Avg's caption once its two figures are read, both named as the card prints them (Lane 100 fix
- * round 1, HIGH-1): "22.0 a game from week 7 against his 30.7", then the stored reason. */
-export function vsAvgCaption(
-	perGame: string,
-	from: string,
-	avg: string,
-	reason: string | null
-): string {
-	const figures = `${perGame} a game ${from} against his ${avg}`;
+ * round 1, HIGH-1): "22.0 a game vs his 30.7 Avg", then the stored reason. Its first week is the
+ * Rest of season tile's, said there. */
+export function vsAvgCaption(perGame: string, avg: string, reason: string | null): string {
+	const figures = `${perGame} a game vs his ${avg} Avg`;
 	return reason === null ? figures : `${figures}: ${reason}`;
+}
+
+/** Whether Compare is the card's one verb while no league verb stands (Lane 100 fix round 1, M3;
+ * Lane 117, B80): in season, with his rest-of-season figure in hand, the sheet's add never leads,
+ * before the week's read answers as after it. Preseason the sheet's add stays. */
+export function compareLeadsWithoutVerb(rest: RestParts | null): boolean {
+	return rest !== null;
 }
 
 /** The Proj of the week after his bye while it is not in: the day it is first published. */

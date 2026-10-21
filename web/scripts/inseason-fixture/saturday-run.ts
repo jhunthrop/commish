@@ -10,7 +10,7 @@
 // from is his club's first game not yet kicked off (Thursday's clubs start at week 7); a game is final
 // at the Saturday instant once its kickoff has passed. Everything else is the contract run's.
 //
-//   node scripts/inseason-fixture/saturday-run.ts
+//   [SATURDAY_OUT=4429023] node scripts/inseason-fixture/saturday-run.ts
 // then build with PUBLIC_RUN_ID=2026-10-17T17-ros PUBLIC_RUN_BASE_URL=.runs and start the fixture API
 // with FIXTURE_RUN_ID=2026-10-17T17-ros.
 import { cp, readFile, readdir, writeFile } from 'node:fs/promises';
@@ -132,4 +132,17 @@ manifest.formats = (manifest.formats as Json[]).map((f) => ({
 	refreshedAt: at
 }));
 await write('manifest.json', manifest);
+// SATURDAY_OUT=<board id> (Lane 117, B80): a STAND-IN injury capture listing that player Out for
+// week 6, read Friday afternoon, so the player page shots hold an Out player beside a playing one
+// and one on his bye. The contract run carries no capture of its own.
+const out = process.env.SATURDAY_OUT;
+if (out !== undefined && out !== '') {
+	const readAt = '2026-10-16T21:00:00.000Z';
+	await write('designations.json', {
+		readAt,
+		checkedAt: readAt,
+		source: 'stand-in',
+		players: { [out]: { status: 'out', seasonLong: false, since: null } }
+	});
+}
 process.stdout.write(`${SATURDAY_RUN_ID}: written to ${OUT.pathname}\n`);

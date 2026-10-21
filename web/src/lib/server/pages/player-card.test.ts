@@ -171,12 +171,7 @@ void test('in season the row under the tiles is his preseason figures as stored 
 		[
 			['preseason', '262.1', 'PPR points for 2026, the full season', null],
 			['pace', '17.5', 'a game, the pace our figure starts from', null],
-			[
-				'vsAvg',
-				'--',
-				'rest of season a game against his Avg',
-				'our figure weighs his 5 games against his preseason pace'
-			]
+			['vsAvg', '--', 'rest of season a game against his Avg', '5 games weighed with his pace']
 		]
 	);
 	// With no stored pace there is no reason to give: the cell alone.

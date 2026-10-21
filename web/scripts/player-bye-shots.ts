@@ -6,6 +6,10 @@
 //   is published; the row under the tiles holds Preseason, Preseason pace and vs Avg; the game log draws
 //   no Proj column; the read is one paragraph with no season read's stamp under it; the tier box is
 //   titled by what it holds; and the page's copy passes the one guard (copy-scan.ts).
+// Beside him (Lane 117, B80) a playing player (Josh Jacobs, GB at DAL in week 6) and an Out one
+// (MarShawn Lloyd, Out on the stand-in capture SATURDAY_OUT=4429023 writes into the Saturday run), each
+// signed out and signed in. For every page: before the week's read answers the card's verb is Compare
+// (never the sheet's add), and at 390 the vs Avg caption takes at most four lines.
 // STAND-INS, named here and in the lane's report: the fixture league's rosters do not hold Gibbs, so the
 // signed-in shot answers his league read with the verb of the member's own (kind lineup, the route below);
 // the fixture holds no week 7 allowances (player-week.ts AFTER_BYE_RANK).
@@ -25,8 +29,17 @@ const WIDTHS = [1280, 390] as const;
 const VIEWPORT_HEIGHT = 900;
 const ZONE = 'America/Chicago';
 const READY_TIMEOUT_MS = 30_000;
-const SLUG = 'jahmyr-gibbs';
-const BOARD_ID = '4429795';
+/** The players shot: one on his bye (every bye check below), one playing, one Out (Lane 117). */
+const PLAYERS = [
+	{ slug: 'jahmyr-gibbs', id: '4429795', kind: 'bye', ready: 'Wk 7 vs GB' },
+	{ slug: 'josh-jacobs', id: '4047365', kind: 'playing', ready: 'DAL' },
+	{ slug: 'marshawn-lloyd', id: '4429023', kind: 'out', ready: 'DAL' }
+] as const;
+/** The most lines vs Avg's caption takes in its phone tile (B80). */
+const VS_AVG_PHONE_LINES = 4;
+/** The sheet's add as SheetAdd.svelte draws it. */
+const SHEET_ADD = 'Add to my sheet';
+const PHONE = 390;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const OWN_WORDS = /\btips?\b/;
 /** The signed-in verb the clock should give: Open your lineup before the week's last kickoff. */
@@ -110,7 +123,7 @@ function checkSeen(s: Seen, where: string, verb: string): void {
 	const gap = s.vsAvg;
 	check(
 		/^[+\u2212]\d+\.\d$/.test(gap.value) &&
-			/^\d+\.\d a game from week \d+ against his \d+\.\d: /.test(gap.caption),
+			/^\d+\.\d a game vs his \d+\.\d Avg: /.test(gap.caption),
 		`${where}: vs Avg ${JSON.stringify(gap)}`
 	);
 	check(!s.projHead, `${where}: the game log draws a Proj column`);
@@ -120,49 +133,102 @@ function checkSeen(s: Seen, where: string, verb: string): void {
 	check(s.verb.startsWith(verb), `${where}: the verb reads "${s.verb}"`);
 }
 
+/** The vs Avg caption's rendered lines. */
+async function vsAvgLines(page: Page): Promise<number> {
+	return page.evaluate(() => {
+		const cap = document.querySelector('main .card .tiles.basis .tile:last-child .cap');
+		if (cap === null) return 0;
+		const lineHeight = parseFloat(getComputedStyle(cap).lineHeight);
+		return Math.round(cap.getBoundingClientRect().height / lineHeight);
+	});
+}
+
+/** The card's verb as the page first draws it, the week's read held back until it is seen. */
+async function verbBeforeRead(page: Page, url: string): Promise<string> {
+	let release: () => void = () => undefined;
+	const held = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	await page.route(`${API_ORIGIN}/**/players/*`, async (route) => {
+		await held;
+		await route.continue();
+	});
+	await page.goto(url, { waitUntil: 'domcontentloaded' });
+	await page.locator('main .card .act').waitFor({ timeout: READY_TIMEOUT_MS });
+	const verb = (await page.locator('main .card .act').textContent())?.trim() ?? '';
+	release();
+	await page.unroute(`${API_ORIGIN}/**/players/*`);
+	return verb;
+}
+
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
-for (const signedIn of [false, true]) {
-	// Signed out in season Compare leads too (fix round 1, M3).
-	const verb = signedIn ? VERB : CARD.compare;
-	for (const theme of THEMES) {
-		for (const width of WIDTHS) {
-			const where = `${signedIn ? 'roster' : 'signed-out'} ${theme} ${String(width)}`;
-			const ctx = await browser.newContext({
-				viewport: { width, height: VIEWPORT_HEIGHT },
-				colorScheme: theme,
-				timezoneId: ZONE
-			});
-			watchData(ctx);
-			await installFixtureApiClock(ctx, API_ORIGIN);
-			if (signedIn) {
-				await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
-				// STAND-IN: his league read with the verb of a player on the member's own roster.
-				await ctx.route(`${API_ORIGIN}/leagues/attached/*/players/${BOARD_ID}*`, async (route) => {
-					const answer = await route.fetch();
-					const body = (await answer.json()) as { data: { verb: unknown } };
-					body.data.verb = { kind: 'lineup', holder: null, host_url: null, note: null };
-					await route.fulfill({ response: answer, json: body });
+for (const player of PLAYERS) {
+	for (const signedIn of [false, true]) {
+		// Signed out in season Compare leads too (fix round 1, M3).
+		const verb = signedIn && player.kind === 'bye' ? VERB : CARD.compare;
+		for (const theme of THEMES) {
+			for (const width of WIDTHS) {
+				const who = `${player.kind}-${signedIn ? 'roster' : 'signed-out'}`;
+				const where = `${who} ${theme} ${String(width)}`;
+				const ctx = await browser.newContext({
+					viewport: { width, height: VIEWPORT_HEIGHT },
+					colorScheme: theme,
+					timezoneId: ZONE
 				});
+				watchData(ctx);
+				await installFixtureApiClock(ctx, API_ORIGIN);
+				if (signedIn) {
+					await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
+				}
+				if (signedIn && player.kind === 'bye') {
+					// STAND-IN: his league read with the verb of a player on the member's own roster.
+					await ctx.route(
+						`${API_ORIGIN}/leagues/attached/*/players/${player.id}*`,
+						async (route) => {
+							const answer = await route.fetch();
+							const body = (await answer.json()) as { data: { verb: unknown } };
+							body.data.verb = { kind: 'lineup', holder: null, host_url: null, note: null };
+							await route.fulfill({ response: answer, json: body });
+						}
+					);
+				}
+				await ctx.addInitScript(
+					([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
+					[THEME_STORAGE_KEY, theme] as const
+				);
+				const page = await ctx.newPage();
+				const url = `${web}/players/${player.slug}`;
+				// The sheet's add never leads before the read answers (B80).
+				const first = await verbBeforeRead(page, url);
+				check(
+					first.startsWith(CARD.compare) && !first.includes(SHEET_ADD),
+					`${where}: before the read the verb reads "${first}"`
+				);
+				await page.goto(url, { waitUntil: 'networkidle' });
+				await page
+					.locator('main .card .tile .cap', { hasText: player.ready })
+					.first()
+					.waitFor({ timeout: READY_TIMEOUT_MS });
+				await page.evaluate(() => document.fonts.ready);
+				await page.waitForLoadState('networkidle');
+				const shown = await seen(page);
+				if (player.kind === 'bye') checkSeen(shown, where, verb);
+				else if (!signedIn)
+					check(shown.verb.startsWith(verb), `${where}: the verb reads "${shown.verb}"`);
+				if (width === PHONE) {
+					const lines = await vsAvgLines(page);
+					check(
+						lines <= VS_AVG_PHONE_LINES,
+						`${where}: vs Avg's caption takes ${String(lines)} lines`
+					);
+				}
+				const banned = await copyFault(page, OWN_WORDS, 'body');
+				check(banned === null, `${where}: says ${banned ?? ''}`);
+				const name = `${who}-${theme}-${String(width)}.png`;
+				await page.screenshot({ path: new URL(name, out).pathname, fullPage: true });
+				await ctx.close();
 			}
-			await ctx.addInitScript(
-				([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
-				[THEME_STORAGE_KEY, theme] as const
-			);
-			const page = await ctx.newPage();
-			await page.goto(`${web}/players/${SLUG}`, { waitUntil: 'networkidle' });
-			await page
-				.locator('main .card .tile .cap', { hasText: 'Wk 7 vs GB' })
-				.first()
-				.waitFor({ timeout: READY_TIMEOUT_MS });
-			await page.evaluate(() => document.fonts.ready);
-			await page.waitForLoadState('networkidle');
-			checkSeen(await seen(page), where, verb);
-			const banned = await copyFault(page, OWN_WORDS, 'body');
-			check(banned === null, `${where}: says ${banned ?? ''}`);
-			const name = `${signedIn ? 'roster' : 'signed-out'}-${theme}-${String(width)}.png`;
-			await page.screenshot({ path: new URL(name, out).pathname, fullPage: true });
-			await ctx.close();
 		}
 	}
 }

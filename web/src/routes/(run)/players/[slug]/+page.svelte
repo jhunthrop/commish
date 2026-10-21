@@ -10,7 +10,7 @@
 	import { readFigures } from '#lib/run/read-figures.ts';
 	import { liveStatusClock, type LiveStatus } from '#lib/run/live-status.ts';
 	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
-	import { CARD, unreadBasis, type CardTile } from '#lib/player/card.ts';
+	import { CARD, compareLeadsWithoutVerb, unreadBasis, type CardTile } from '#lib/player/card.ts';
 	import type { CardLeague, LiveCard } from '#lib/player/week-words.ts';
 	import { shownWeekRead, weekReadLabel } from '#lib/player/week-read.ts';
 	import { cliffAt, lineFiguresAt, matesAt } from '#lib/player/live-figures.ts';
@@ -262,7 +262,7 @@
 			verb={live?.verb ?? null}
 			{tiles}
 			basisTiles={live?.basisTiles ?? lead.basisTiles}
-			compareLeads={live?.compareLeads ?? false}
+			compareLeads={live?.compareLeads ?? compareLeadsWithoutVerb(lead.restParts)}
 			{comparing}
 			oncompare={toggleCompare}
 		>
