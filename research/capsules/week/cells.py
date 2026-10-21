@@ -88,7 +88,7 @@ _REST: Final = re.compile(
     re.IGNORECASE,
 )
 _REST_BEFORE: Final = re.compile(
-    r"\brest[- ]of[- ]season(?:\s+(?:figure|total|points))?(?:\s+(?:of|is|at))?\s*$", re.IGNORECASE
+    r"\brest[- ]of[- ]season(?:\s+(?:figure|points))?(?:\s+(?:of|is|at))?\s*$", re.IGNORECASE
 )
 _LAST_GAME: Final = r"(?:his\s+)?(?:last|latest|most\s+recent)\s+(?:game|week|outing|time\s+out)"
 _LAST: Final = re.compile(
@@ -99,11 +99,15 @@ _LAST_BEFORE: Final = re.compile(
     re.IGNORECASE,
 )
 _THIS_WEEK: Final = re.compile(rf"^\s*{_POINTS}\s+this\s+week\b", re.IGNORECASE)
-_NEXT_GAME: Final = re.compile(
-    rf"^\s*{_POINTS}\s+(?:(?:in|for|from)\s+(?:his|the)\s+next\s+(?:game|week)|next\s+week|after\s+the\s+bye)\b",
+# His next game is this week's for a player who plays (review M3); next week, or the week after a bye, is a
+# week the sheet carries no figure for.
+_NEXT_GAME: Final = re.compile(rf"^\s*{_POINTS}\s+(?:in|for|from)\s+(?:his|the)\s+next\s+game\b", re.IGNORECASE)
+_NEXT_BEFORE: Final = re.compile(r"\bnext\s+game(?:'s)?(?:\s+(?:of|is|at))?\s*$", re.IGNORECASE)
+_NEXT_WEEK: Final = re.compile(
+    rf"^\s*{_POINTS}\s+(?:(?:in|for|from)\s+(?:his|the)\s+next\s+week|next\s+week|after\s+the\s+bye)\b",
     re.IGNORECASE,
 )
-_NEXT_BEFORE: Final = re.compile(r"\bnext\s+(?:game|week)(?:'s)?(?:\s+(?:of|is|at))?\s*$", re.IGNORECASE)
+_NEXT_WEEK_BEFORE: Final = re.compile(r"\bnext\s+week(?:'s)?(?:\s+(?:of|is|at))?\s*$", re.IGNORECASE)
 # A rank against his position (the Opp rank cell): "26th of 32", "9th against running backs".
 _RANK: Final = re.compile(
     r"\b(\d+)(?:st|nd|rd|th)\b(?=\s+(?:of\s+(\d+)|against\b|in\s+(?:ppr\s+)?points\s+allowed\b))(?!\s+in\s+our\b)",
@@ -135,6 +139,11 @@ def _last(sheet: WeekSheet) -> frozenset[float]:
     return frozenset(() if not sheet.last_games else (page_tenth(sheet.last_games[0].points),))
 
 
+def _none(sheet: WeekSheet) -> frozenset[float]:
+    del sheet
+    return frozenset()
+
+
 def _this_week(sheet: WeekSheet) -> frozenset[float]:
     """The week tile: no figure on a bye, else the published projection and the game's expected score."""
     return frozenset() if sheet.bye else frozenset(_projection_cells(sheet) | _game_cells(sheet))
@@ -146,6 +155,7 @@ NAMED_CELLS: Final = (
     NamedCell("his last game's points (Last)", _LAST, _LAST_BEFORE, _last),
     NamedCell("this week's points, on a week the card shows his bye", _THIS_WEEK, None, _this_week),
     NamedCell("his next game's points", _NEXT_GAME, _NEXT_BEFORE, _this_week),
+    NamedCell("next week's points, a week the sheet carries no figure for", _NEXT_WEEK, _NEXT_WEEK_BEFORE, _none),
 )
 
 

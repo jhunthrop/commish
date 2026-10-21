@@ -272,7 +272,7 @@ def _projection_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[s
     figure, value = points_text(projection.points), page_tenth(projection.points)
     allowed = _published_figures(sheet)
     for s in sentences:
-        stated = {page_tenth(v) for _, v, _, _ in figures_of(s, sheet.season)}
+        stated = {page_tenth(v) for _, v, _, _ in _stated(s, sheet.season)}  # a rank's "of 32" is its rank's
         if _NAMES_PROJECTION.search(s) and value not in stated:
             out.append(
                 _sentence_violation(
@@ -306,7 +306,7 @@ def _projection_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[s
                 _sentence_violation(
                     f"quotes the {figure} points without saying it is published",
                     s,
-                    f'Say it is the published projection in that sentence: "the published projection has him at {figure} points".',
+                    f"Name it the published projection, with its {figure} points, in a sentence about this player's week.",
                 )
             )
     if not any(_NAMES_PROJECTION.search(s) for s in sentences):

@@ -18,8 +18,9 @@ from research.capsules.season_voice import SeasonClock, time_frame_hits
 from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
 from research.capsules.week.render import render_week_facts_block, render_week_sheet
-from research.capsules.week.rules import WEEK_NEVER_WORDS, week_rule_violations
+from research.capsules.week.rules import WEEK_NEVER_WORDS, stated_figures, week_rule_violations
 from research.capsules.week.sheet import (
+    Allowed,
     BoardPlace,
     DepthPlace,
     PublishedProjection,
@@ -410,8 +411,29 @@ def test_the_opponents_rank_is_opp_ranks_and_a_bye_has_none() -> None:
         "on a week the card shows his bye" in v
         for v in _named_hits("He has 21.3 points this week.", bye, BYE_READ, "hold")
     )
-    assert any("next game" in v for v in _named_hits("He brings 21.3 points next week.", bye, BYE_READ, "hold"))
+    assert any("next week" in v for v in _named_hits("He brings 21.3 points next week.", bye, BYE_READ, "hold"))
+    # Review M3: for a player who plays, next week is a week the sheet carries no figure for; his next game
+    # is this week's.
+    assert any("next week" in v for v in _named_hits("He brings 18.4 points next week.", starter()))
+    assert not _named_hits("He brings 18.4 points in his next game.", starter())
     assert not _named_hits("He brings 21.3 PPR points a game.", bye, BYE_READ, "hold")
+
+
+def test_a_ranks_of_32_is_never_a_second_figure_on_the_projection() -> None:
+    """Lane 117 fix round 1 (H2): "21st of 32" is the opponent's rank, the 32 its own, so Christian
+    McCaffrey's sentence puts nothing on the published projection and states one figure."""
+    sheet = replace(
+        questionable(),
+        name="Christian McCaffrey",
+        team="SF",
+        game=WeekGame(6, "ATL", home=True, kickoff=KICKOFF),
+        projection=PublishedProjection(18.6, CAPTURED, None, None),
+        allowed=Allowed(21, 32, 22.0, "RB", 5, LINES),
+    )
+    sentence = "The published projection has him at 18.6 points, and Atlanta sits 21st of 32 against running backs."
+    violations = week_rule_violations(f"{sentence} He plays. Start him.", sheet, "start")
+    assert not [v for v in violations if "on the published projection" in v or "draws in no cell" in v], violations
+    assert stated_figures(sentence, sheet.season) == [("18.6", 18.6)]
 
 
 def test_the_sheet_prints_a_chance_of_rain_only_as_the_cell_names_it() -> None:

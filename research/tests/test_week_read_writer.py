@@ -13,6 +13,7 @@ import pytest
 
 from research.capsules.gateway import Completion, GenerationError
 from research.capsules.gateway_ledger import ModelPrice, Usage
+from research.capsules.rule_notes import notes_of
 from research.capsules.run_budget import BudgetSpentError
 from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.week.cadence import (
@@ -22,15 +23,25 @@ from research.capsules.week.cadence import (
     UNWRITTEN,
     due_reason,
 )
-from research.capsules.week.prompt import WEEK_RULES, answer_json, length_move, parse_week_answer, week_prompt
+from research.capsules.week.prompt import (
+    WEEK_RULES,
+    answer_json,
+    length_move,
+    parse_week_answer,
+    week_correction,
+    week_prompt,
+)
 from research.capsules.week.sheet import Status
 from research.capsules.week.store import StoredWeekRead
+from research.capsules.week.validate import validate_week_read
 from research.capsules.week.write import MAX_ASKS_PER_READ, MAX_CALLS_PER_READ, OVER_CAP_TWICE, write_week_read
 from research.nightly.week_read_demotion import shared_week_sentences, stored_facts_block, week_demotions
 from research.nightly.week_reads import (
     HOURLY_BUDGET_USD,
     HOURLY_DAY_USD,
+    MIN_CHARS_PER_TOKEN,
     NIGHTLY_BUDGET_USD,
+    WORST_PROMPT_TOKENS,
     step_budget,
     worst_read_usd,
 )
@@ -88,9 +99,12 @@ def test_the_prompt_states_the_week_the_kickoff_and_that_the_number_is_published
     assert "45 to 70 words in all, about 60" in WEEK_RULES and "never more than 80" in WEEK_RULES
     # Lane 117 (B95): the four rules the first nightly broke most, in the writer's words.
     assert "One figure to a sentence." in WEEK_RULES
-    assert 'never "The published projection has him at 23 points."' in WEEK_RULES
+    assert "The published projection is a cell you place inside a sentence about this player's week" in WEEK_RULES
+    # Review H1 and M1: no stock projection sentence to copy, no trading word, no report name the facts never give.
+    for primed in ("has him at", "the stock", "Tuesday-night"):
+        assert primed not in WEEK_RULES, primed
     assert "The season once, with the first week you name" in WEEK_RULES
-    assert "The injury list by the name the facts give it" in WEEK_RULES
+    assert "The injury list in the facts' own words for it" in WEEK_RULES
     assert "Pick the two or three facts that decide his week" in WEEK_RULES
     assert "quote at most 3 figures" in WEEK_RULES and "Never retell the cells" in WEEK_RULES
     assert '"in our preseason order" or "in our rest-of-season order"' in WEEK_RULES
@@ -268,7 +282,18 @@ def test_the_step_holds_a_dollar_budget_under_the_nightly_bound() -> None:
     budget = step_budget(_PRICE, NIGHTLY_BUDGET_USD)
     assert budget.max_usd == NIGHTLY_BUDGET_USD and budget.price == _PRICE
     # Four asks, Lane 100's one overrun retry and the judge's ask that rides with it (Lane 117, B80).
-    assert worst_read_usd(_PRICE) == pytest.approx(6 * (3700 * 0.15 + 600 * 0.50) / 1_000_000)
+    assert worst_read_usd(_PRICE) == pytest.approx(6 * (9000 * 0.15 + 600 * 0.50) / 1_000_000)
+
+
+def test_the_worst_prompt_bound_holds_the_heaviest_correction() -> None:
+    """Review M4: the last correction a read can get (every rule broken so far, each with its sentence) on the
+    fullest fixture sheet, counted at the fewest characters a token took, fits WORST_PROMPT_TOKENS."""
+    long_read = _over_the_cap()
+    broken = [long_read, _BROKEN, STARTER_READ.replace("18.4 points", "18.7 points"), "Buy him. Buy him now."]
+    ledger = notes_of([(text, validate_week_read(text, starter()).violations) for text in broken])
+    user = week_correction(starter(), long_read, ledger, ("Start him with confidence.",) * 12)
+    chars = len(WEEK_RULES) + len(user)
+    assert chars / MIN_CHARS_PER_TOKEN <= WORST_PROMPT_TOKENS, chars
     assert step_budget(ModelPrice("m", None, None, "unread", None), HOURLY_BUDGET_USD).max_calls == int(0.05 / 0.00065)
     assert pytest.approx(2.00) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
 

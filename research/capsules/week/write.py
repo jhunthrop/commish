@@ -47,7 +47,7 @@ OVERRUN_JUDGE_ASKS: Final = 1
 # Lane 117 (B95): a draft over the cap is handed back once, its count and the target named
 # (`prompt.length_move`); a second draft over it is the facts block, never trimmed to fit.
 OVER_CAP_DRAFTS: Final = 2
-OVER_CAP_TWICE: Final = "failed validation: the read ran over the 80-word cap twice"
+OVER_CAP_TWICE: Final = f"failed validation: the read ran over the {WEEK_BAND[1]}-word cap twice"
 MAX_ASKS_PER_READ: Final = MAX_CALLS_PER_READ + OVERRUN_RETRIES + OVERRUN_JUDGE_ASKS
 # A five-sentence read and its call run about 180 tokens; the cap leaves room and never cuts an honest read.
 MAX_TOKENS: Final = 600
