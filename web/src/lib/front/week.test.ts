@@ -450,10 +450,7 @@ void test("the front door's FFPC bug says the opponent's figures as the home doe
 		projection_best_lineup: true,
 		schedule_state: 'kicked_off'
 	});
-	assert.match(
-		sunday ?? '',
-		/ Teams FFPC sends no lineup for have no Proj final\.$/
-	);
+	assert.match(sunday ?? '', / Teams FFPC sends no lineup for have no Proj final\.$/);
 	assert.doesNotMatch(sunday ?? '', /No Proj final while/);
 	for (const said of [friday, sunday]) assert.doesNotMatch(said ?? '', bannedPattern());
 });

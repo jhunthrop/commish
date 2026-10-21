@@ -322,10 +322,7 @@ void test('a side FFPC lists no starters for is said once by its own sentence, n
 		false,
 		unlistedDrawn(bugs)
 	);
-	assert.match(
-		said,
-		/ Teams FFPC sends no lineup for have no Proj final\.$/
-	);
+	assert.match(said, / Teams FFPC sends no lineup for have no Proj final\.$/);
 	assert.doesNotMatch(said, /No Proj final while|Proj final adds/);
 	assert.doesNotMatch(said, BANNED);
 	assert.equal(said.split('FFPC sends no lineup').length, 2, 'said once');
