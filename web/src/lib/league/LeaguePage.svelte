@@ -285,7 +285,8 @@
 	);
 	const moves = $derived(sync ? feedRows(sync) : []);
 	const lineupHref = $derived(tabHref('start', id));
-	/** What every number on the in-season page is, said once and at most five lines: the standings,
+	/** What every number on the in-season page is, said once in one paragraph, at most five lines at a
+	 * desk and eight on a phone (Lane 108, B82: merged so no sentence ends a short line): the standings,
 	 * a team's projection and points, the game facts. A feed the platform gives us none of is not
 	 * drawn, so the basis says nothing of it (Lane 104, B54). */
 	const weekBasis = $derived(
@@ -475,8 +476,8 @@
 					{#if sync.moves_read}<MovesFeed rows={moves} none={HOME.noMoves} />{/if}
 					<!-- In season the page carries no draft plumbing: the mock draft lives under Account and
 					     the rail's Mock draft (Lane 104, B54). -->
-					<div class="basis">
-						{#each weekBasis as line (line)}<p>{line}</p>{/each}
+					<div class="basis" data-basis="league">
+						<p>{weekBasis.join(' ')}</p>
 					</div>
 				{:else if board}
 					<SeasonPanel

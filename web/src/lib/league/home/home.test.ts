@@ -585,13 +585,13 @@ void test('copy guard: every League page word is fantasy words, with no dash or 
 			false,
 			ZONE
 		),
-		"A team's Proj adds its starters' published projections in PPR, the closest match to this league's rules, read Fri 9:00 pm Central. Pts are Sleeper's so far."
+		"A team's Proj adds its starters' published projections, PPR nearest your rules, read Fri 9:00 pm Central. Pts are Sleeper's so far."
 	);
 	// Ruling (b) of Lane 79: where the lineup's rows carry points, its Team adds them, said in the
 	// same sentence.
 	assert.equal(
 		teamBasis('espn', null, { format: 'ppr', league_own: true }, true, ZONE),
-		"A team's Proj adds its starters' published projections in PPR, this league's own, not in yet for this week. Pts are ESPN's so far, and your lineup's Team adds its rows."
+		"A team's Proj adds its starters' published projections on your rules, not in yet for this week. Pts are ESPN's so far, Team adds the rows."
 	);
 });
 

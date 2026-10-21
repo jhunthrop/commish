@@ -244,8 +244,8 @@
 			white-space: nowrap;
 		}
 
-		/* The game cell gives way first: its kickoff and facts wrap before a name would. */
-		.box :global(.opp),
+		/* The game cell gives way first: its facts wrap before a name would, and its opponent keeps
+		   his game's state beside the club ("at LAR Final", Lane 108, B83). */
 		.box :global(.facts) {
 			flex-wrap: wrap;
 			white-space: normal;
@@ -265,7 +265,7 @@
 		}
 
 		.c-rank {
-			width: 52px;
+			width: 36px;
 		}
 
 		.c-game {
@@ -288,9 +288,10 @@
 			width: 38px;
 		}
 
-		/* Its head on two lines, so the player keeps the room for his name. */
+		/* Its head on two lines over the rank alone (Lane 108, B83), so the player keeps the room for his
+		   name. */
 		.cols .rank {
-			width: 52px;
+			width: 36px;
 			white-space: normal;
 			line-height: 1.1;
 		}
