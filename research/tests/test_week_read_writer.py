@@ -167,7 +167,7 @@ def _over_the_cap() -> str:
 
 
 def test_a_last_draft_over_the_cap_alone_is_asked_once_more_with_its_overrun_named() -> None:
-    """Lane 100: the fourth draft, the first over the cap, broke only the 80-word cap, so the writer asks a
+    """Lane 100: the fourth draft, the first over the cap, broke only the 40 to 95 band, so the writer asks a
     fifth time, the overrun counted for it, and that read lands."""
     long_read = _over_the_cap()
     assert len(long_read.split()) > 95  # noqa: PLR2004 - the cap

@@ -41,6 +41,11 @@ type Calendar struct {
 	// PlayoffStartWeek is the league's first playoff week as the host
 	// states it, 0 when the host does not say.
 	PlayoffStartWeek int `json:"playoff_start_week,omitempty"`
+	// RegularSeasonLast is the league's last regular-season week where
+	// the host states it and no playoff start follows it (MyFantasyLeague's
+	// lastRegularSeasonWeek when its regular season is the whole season,
+	// Lane 121 fix round 1), 0 otherwise.
+	RegularSeasonLast int `json:"regular_season_last,omitempty"`
 	// WaiversClosed says the host has closed adds for the league
 	// (Sleeper's disable_adds, ESPN's acquisition limit of none).
 	WaiversClosed bool `json:"waivers_closed,omitempty"`

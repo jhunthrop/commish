@@ -69,6 +69,15 @@ export const WAIVERS = {
 	irBench: 'IR, on your bench'
 } as const;
 
+/** The columns' basis, once under their heads (Lane 98, B35): each head with what it is. */
+export const HEAD_BASIS = {
+	rest: 'is our rest-of-season points a game',
+	avg: 'his season average',
+	/** "his Proj's change since Sunday 2 pm". */
+	delta: (since: string): string => `his ${BOX.proj}'s change since ${since}`,
+	beats: 'the player he would replace in your rest-of-season lineup'
+} as const;
+
 /** Every word the Stash group prints (Lane 118, B79): its divider, its line, a row's Game cell, Beats
  * cell and verb. */
 export const STASH = {
@@ -82,22 +91,16 @@ export const STASH = {
 	open: 'Open',
 	/** Under the drop's name, as the gaining rows name theirs. */
 	drop: 'Drop',
-	/** The group's line (fix round 1): where the week comes from, and that A game is the rate his player
-	 * page shows. */
-	line: 'Stash rows come back by the listed return date. A game is his rate when he plays.',
+	/** The group's line (fix round 1): where the week comes from, and A game in the heads' own words
+	 * (Lane 121, B99), so the screen defines it one way. */
+	line: `Stash rows come back by the listed return date. ${WAIVERS.rest} ${HEAD_BASIS.rest}.`,
+	/** Said once where the platform states neither the playoffs' first week nor a playoff start, so
+	 * the regular season the group keeps to is taken (the API's regular_season_taken, Lane 121 B99). */
+	taken: (last: number): string => `Regular season taken as weeks 1 to ${String(last)}.`,
 	/** Said once where the page leaves an IR or out free agent unlisted for want of a date. */
 	undated: 'IR and out players without a return date are not listed.',
 	/** Said once where the page leaves one unlisted whose return is after the regular season. */
 	late: 'IR and out players back after the regular season are not listed.'
-} as const;
-
-/** The columns' basis, once under their heads (Lane 98, B35): each head with what it is. */
-export const HEAD_BASIS = {
-	rest: 'is our rest-of-season points a game',
-	avg: 'his season average',
-	/** "his Proj's change since Sunday 2 pm". */
-	delta: (since: string): string => `his ${BOX.proj}'s change since ${since}`,
-	beats: 'the player he would replace in your rest-of-season lineup'
 } as const;
 
 /** A name's second mention: "Gainwell", a defense by its club ("Chiefs" from "Chiefs D/ST"). */
@@ -349,14 +352,21 @@ function stashWho(
 
 /** The Stash group's line (B79), said once under its divider: where its rows' weeks come from and what
  * A game is, then the IR and out free agents left out for want of a date or for a return after the
- * regular season; empty with none of them, so no group is drawn. */
+ * regular season, and, where the group keeps to a regular season the platform does not state, the weeks
+ * taken (Lane 121, B99); empty with none of them, so no group is drawn. */
 export function stashBasis(
-	advice: Partial<Pick<WaiverAdvice, 'stash' | 'stash_undated' | 'stash_late'>>
+	advice: Partial<
+		Pick<WaiverAdvice, 'stash' | 'stash_undated' | 'stash_late' | 'regular_season_taken'>
+	>
 ): string[] {
+	const rows = (advice.stash ?? []).length > 0;
+	const late = (advice.stash_late ?? 0) > 0;
+	const taken = advice.regular_season_taken;
 	return [
-		...((advice.stash ?? []).length > 0 ? [STASH.line] : []),
+		...(rows ? [STASH.line] : []),
 		...((advice.stash_undated ?? 0) > 0 ? [STASH.undated] : []),
-		...((advice.stash_late ?? 0) > 0 ? [STASH.late] : [])
+		...(late ? [STASH.late] : []),
+		...((rows || late) && taken !== undefined ? [STASH.taken(taken)] : [])
 	];
 }
 

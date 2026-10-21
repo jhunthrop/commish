@@ -400,6 +400,7 @@ export function lineupBox(
 	const proj = projTotal(counted);
 	const asSet = projTotal(setRows(placed, satRows));
 	const setGames = placed.map((p) => (p.slot.host ?? p.slot.ours).facts);
+	const read = linesRead(setGames, now);
 	return {
 		starters,
 		bench,
@@ -418,11 +419,12 @@ export function lineupBox(
 			pts: totalsPts(ours, advice.player_points, advice.team_points),
 			final: advice.projected_final ?? null,
 			live: setGames.some((facts) => pastKickoff(facts, now)),
+			allFinal: read.state === 'final',
 			note: totalsNote(counted, advice.projection_read_at !== null, advice.week)
 		},
 		asSet,
 		gain: proj === null || asSet === null ? null : Math.round((proj - asSet) * TENTHS) / TENTHS,
-		playing: linesRead(setGames, now).state === 'playing'
+		playing: read.state === 'playing'
 	};
 }
 

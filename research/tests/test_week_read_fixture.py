@@ -2,8 +2,8 @@
 2026 (a starter, a Questionable player and a player on bye), with the gateway's recorded answers. No live
 call is made here.
 
-Lane 100 (B17, B44) holds the read to one paragraph of at most 80 words that quotes only the page's cells,
-at most three of them. Every recorded read is longer and retells the cells (a figure the page draws in no
+Lane 100 (B17, B44) holds the read to one paragraph in the 40 to 95 band (WEEK_BAND, Lane 117) that quotes
+only the page's cells, at most three of them. Every recorded read is longer and retells the cells (a figure the page draws in no
 cell among them), so each is now the guard's case: refused by name, and the writer replayed against the
 recorded answers falls to its facts block. A read the rules take is shown on each sheet by a hand-written
 read (`HAND_WRITTEN`, written for this test and never a recording), through the writer's own path.
@@ -29,6 +29,7 @@ from research.capsules.gateway_ledger import Usage
 from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.sentences import split_sentences
 from research.capsules.throttle_waits import AskWaits, RunWaits
+from research.capsules.validate import word_count
 from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
 from research.capsules.week.prompt import answer_json, parse_week_answer
@@ -40,6 +41,8 @@ from research.capsules.week.write import write_week_read
 from research.tests.week_read_fixtures import sheet_from_json
 
 _FIXTURE = Path(__file__).parent / "testdata" / "week_reads" / "recorded.json"
+# The player page shots' stand-in read at the cap (Lane 121, B98), checked here against the recorded sheet.
+_LONG_READ = _FIXTURE.with_name("long_bye_read.json")
 _RECORDED: list[dict[str, Any]] = json.loads(_FIXTURE.read_text())["players"]
 _NAMES = [p["sheet"]["name"] for p in _RECORDED]
 # Lane 66v: CeeDee Lamb's recorded read quotes the published projection as 19.4, the old sheet's toFixed of
@@ -161,7 +164,7 @@ def test_the_recorded_read_keeps_the_guards_that_stand(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_a_hand_written_read_of_each_sheet_is_one_the_rules_take(name: str) -> None:
-    """One paragraph, at most 80 words, only the cells' figures and at most three, through the writer's own
+    """One paragraph in the 40 to 95 band, only the cells' figures and at most three, through the writer's own
     path in one call (and the judge's no for a player who may not be started)."""
     sheet, player = _sheet(name)
     read, call = HAND_WRITTEN[name]
@@ -176,6 +179,24 @@ def test_a_hand_written_read_of_each_sheet_is_one_the_rules_take(name: str) -> N
     written = write_week_read(sheet, _Replay(answers), tuple(player["avoid"]), taken)  # type: ignore[arg-type]
     assert (written.source, written.text, written.call, written.calls) == ("llm", read, call, len(answers))
     assert written.call in CALLS and (written.call != "start" or sheet.may_start)
+
+
+def test_the_player_page_shots_full_read_is_one_the_writer_takes() -> None:
+    """Lane 121 (B98): the stand-in read the player page shots draw at the cap (web/scripts/inseason-fixture
+    saturday-run.ts) passes the writer's validator on Gibbs's sheet, at the band's top, and lands through the
+    writer's own path, so the box a full read grows to is shot on a read the nightly would publish."""
+    stand_in: dict[str, str] = json.loads(_LONG_READ.read_text())
+    sheet, player = _sheet(stand_in["name"])
+    read, call = stand_in["body"], stand_in["call"]
+    taken = frozenset(player["taken"])
+    result = validate_week_read(read, sheet, taken, call)
+    assert result.ok, result.violations
+    assert word_count(read) == WEEK_BAND[1] and "\n" not in read
+    answers = [{"content": answer_json(read, call), "usage": None, "provider": "replay"}]
+    if not sheet.may_start:
+        answers.append({"content": "no", "usage": None, "provider": "replay"})
+    written = write_week_read(sheet, _Replay(answers), tuple(player["avoid"]), taken)  # type: ignore[arg-type]
+    assert (written.source, written.text, written.call) == ("llm", read, call)
 
 
 def test_a_recorded_figure_the_card_does_not_print_is_refused() -> None:

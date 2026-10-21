@@ -3224,7 +3224,7 @@ export interface components {
 			basis: string;
 			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none */
 			basis_note: string;
-			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
+			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
 			/** @description the rules basis_note counts, in words ("two-point conversions"), for the league's Settings to list; empty when it counts none */
 			uncounted_rules: string[];
@@ -3297,6 +3297,8 @@ export interface components {
 			te_bonus?: number;
 		};
 		ScoreboardSide: {
+			/** @description every one of the side's starters with a game this week has a final game at the read's clock (gameStateAt), empty slots, byes and starters with no game held not counting, false with none (Lane 121, B99): the side's figure reads Final with its total; absent for a side the platform lists no starters for (FFPC's opponent view) and from an older answer, both of which read the game's state */
+			starters_final?: boolean;
 			roster_id: number;
 			/**
 			 * Format: double
@@ -3555,7 +3557,7 @@ export interface components {
 			basis: string;
 			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none */
 			basis_note: string;
-			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
+			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/**
@@ -3617,7 +3619,7 @@ export interface components {
 			position: 'K' | 'DEF';
 			/** @description the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, named ("Our stats omit fumble recovery and safety.", the same for a reader with no league), empty when none */
 			basis_note: string;
-			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
+			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
 			/**
 			 * Format: date-time
@@ -3682,7 +3684,7 @@ export interface components {
 			season_basis: string;
 			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none */
 			basis_note: string;
-			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
+			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
@@ -3711,6 +3713,8 @@ export interface components {
 			rows: components['schemas']['WaiverRow'][];
 			/** @description the Stash group (Lane 118, B79): free agents on injured reserve or ruled out due back in the week the page addresses or later, inside the league's regular season (before its first playoff week, else the order's last week), each row's stash set, by his rest-of-season points a game, highest first, at most 10; one due back in the week the page addresses whose move gains is in rows instead; never among rows or pickups, never counted with the rows that gain; absent from an older answer */
 			stash?: components['schemas']['WaiverRow'][];
+			/** @description the regular season's last week as taken where the league's platform states neither its playoffs' first week nor a playoff start (Lane 121, B99): 14, the week the Stash group keeps returns to, for its line to say "Regular season taken as weeks 1 to 14."; absent where the platform states it, and from an older answer */
+			regular_season_taken?: number;
 			/** @description how many free agents on injured reserve or ruled out this page leaves unlisted because their return week is after the regular season (Lane 118 fix round 1), for the basis to say once; absent from an older answer */
 			stash_late?: number;
 			/** @description how many free agents on injured reserve or ruled out this page leaves unlisted because no read dates their return (Lane 118, B79), for the basis to say once; absent from an older answer */
@@ -3918,7 +3922,7 @@ export interface components {
 			roster: components['schemas']['PlayerLine'][];
 			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none */
 			basis_note: string;
-			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
+			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
@@ -4004,7 +4008,7 @@ export interface components {
 			basis: string;
 			/** @description the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none */
 			basis_note: string;
-			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
+			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */

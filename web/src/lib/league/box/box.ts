@@ -210,6 +210,18 @@ const NO_EVIDENCE: RowEvidence = {
 	season: null
 };
 
+/** The Team row's small figure under the Proj column (Lane 92, B22): none before the game kicks off,
+ * where the Proj is the big figure; from kickoff the projected final; once every starter is final the
+ * team's total, captioned Final (Lane 121, B99), the Pts it equals. */
+export function teamSmallFigure(
+	totals: Pick<BoxTotals, 'live' | 'allFinal' | 'final' | 'pts'>
+): { caption: string; figure: number | null } | null {
+	if (!totals.live) return null;
+	return totals.allFinal
+		? { caption: BOX.final, figure: totals.pts }
+		: { caption: BOX.projFinal, figure: totals.final };
+}
+
 /** A box's totals row: the starters' projection and points so far summed, and how many playing
  * starters have a figure when one lacks it. */
 export interface BoxTotals {
@@ -221,6 +233,9 @@ export interface BoxTotals {
 	/** The game has kicked off: Pts is the row's big figure and the projected final the small one;
 	 * before it the Proj is the big one. */
 	live: boolean;
+	/** Every starter with a game is final at the page's clock (linesRead, Lane 121 B99): the small
+	 * figure is the team's final total, captioned Final, no longer a projection. */
+	allFinal: boolean;
 	/** Beside Totals: before the week's projection lands, that it has not; once it has, how many
 	 * playing starters have a Proj when one lacks it. Null when there is nothing to say. */
 	note: string | null;

@@ -368,3 +368,48 @@ func TestWeekOrderRoutes(t *testing.T) {
 		}
 	}
 }
+
+// On the Monday-night clock a rostered kicker whose Sunday game is final
+// carries the platform's points as his week 6 game (Lane 121, B97), as
+// every league screen's row does (Season.gamesOf), so the web frames the
+// rules our stats omit by the rows it draws.
+func TestWeekOrderARosteredKickersFinalCountsThePlatformsPoints(t *testing.T) {
+	f, projection := liveFixture(t)
+	for i := range f.league.Snap.Matchups {
+		side := &f.league.Snap.Matchups[i]
+		if side.PlayerPoints == nil {
+			side.PlayerPoints = map[string]float64{}
+		}
+		for _, id := range side.Starters {
+			side.PlayerPoints[id] = 9.9
+		}
+	}
+	s := liveService(t, f, projection)
+	s.Now = func() time.Time { return mondayNight }
+	code, env := serve(t, s, leaguePath+"order/week?position=K")
+	if code != http.StatusOK || !env.Ok {
+		t.Fatalf("league K: %d %+v", code, env.Error)
+	}
+	var out apitypes.WeekOrderAdvice
+	if err := json.Unmarshal(env.Data, &out); err != nil {
+		t.Fatal(err)
+	}
+	counted := 0
+	for _, row := range out.Rows {
+		for _, g := range row.Line.Facts.LastGames {
+			if g.Source == nil || *g.Source != apitypes.GamePointsSourcePlatform {
+				continue
+			}
+			counted++
+			if g.Week != 6 || g.Points != 9.9 {
+				t.Errorf("%s: platform game %+v, want week 6 at 9.9", row.Line.Player.Name, g)
+			}
+			if row.Roster == nil || row.Roster.Kind == apitypes.RosterMarkKindFree {
+				t.Errorf("%s carries the platform's points as a free agent", row.Line.Player.Name)
+			}
+		}
+	}
+	if counted == 0 {
+		t.Fatal("no rostered kicker's final counts the platform's points")
+	}
+}

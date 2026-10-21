@@ -135,7 +135,7 @@ def test_the_judge_refuses_each_phrasing_with_the_list_switched_off(
     phrase: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The writer's own path, the list never firing: the recorded verdict alone refuses the read. The
-    recorded text runs past Lane 100's cap of 80 words, so the cap is lifted here as the list is."""
+    recorded text runs past the 40 to 95 band (WEEK_BAND), so the cap is lifted here as the list is."""
     monkeypatch.setattr(rules, "start_advice_in", lambda sentence, name: None)
     monkeypatch.setattr(week_validate, "WEEK_BAND", (40, 100))
     verdict = next(v for v in _verdicts() if v["phrase"] == phrase)

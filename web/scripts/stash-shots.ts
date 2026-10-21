@@ -9,7 +9,11 @@
 // Every page: nothing scrolls sideways and the copy passes the one guard (copy-scan.ts). Exits
 // non-zero on any fault.
 //
-//   [STASH=present|absent] node scripts/stash-shots.ts [web origin] [out dir]
+// Lane 121 (B99): the Stash line says A game in the heads' words, and with the fixture API started with
+// FIXTURE_SEASON_TAKEN=1 (a league stating no regular season's end) "Regular season taken as weeks 1 to
+// 14.", never without it.
+//
+//   [STASH=present|absent] [FIXTURE_SEASON_TAKEN=1] node scripts/stash-shots.ts [web origin] [out dir]
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
 import { BOX } from '../src/lib/league/box/box.ts';
@@ -22,11 +26,16 @@ import {
 	installFixtureApiClock
 } from './inseason-fixture/clock.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
+import { SEASON_TAKEN_VARIABLE } from './inseason-fixture/waiver-beats.ts';
 
 const web = process.argv[2] ?? 'http://localhost:4196';
 const API_ORIGIN = process.env.API_ORIGIN ?? 'http://localhost:8799';
 const out = new URL(process.argv[3] ?? '../screenshots/stash/', import.meta.url);
 const expectStash = (process.env.STASH ?? 'present') === 'present';
+/** The fixture API answers as for a league stating no regular season's end (Lane 121, B99). */
+const expectTaken = process.env[SEASON_TAKEN_VARIABLE] === '1';
+/** The recorded league's last regular week, as the API takes it there. */
+const TAKEN_LAST = 14;
 const THEMES = ['light', 'dark'] as const;
 const WIDTHS = [1280, 390] as const;
 const HEIGHTS = { 1280: 900, 390: 844 } as const;
@@ -69,6 +78,8 @@ async function checkStash(page: Page, where: string): Promise<void> {
 	if (!expectStash) return;
 	const line = await page.locator('main table.pool tr.stash-basis').innerText();
 	if (!line.includes(STASH.line)) fault(where, `the Stash line reads "${line}"`);
+	if (line.includes(STASH.taken(TAKEN_LAST)) !== expectTaken)
+		fault(where, `the Stash line ${expectTaken ? 'lacks' : 'says'} the season taken: "${line}"`);
 	for (const [name, week] of Object.entries(STASHED)) {
 		const row = page.locator('main table.pool tr', { hasText: name }).first();
 		const said = await row.innerText();

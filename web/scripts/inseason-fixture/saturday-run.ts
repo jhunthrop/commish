@@ -107,20 +107,26 @@ function withPace(numbers: Json): Json {
 		: numbers;
 }
 
-/** SATURDAY_READ=1 (Lane 117, B95 fix round 3): a STAND-IN week read for Gibbs at the cap of 95 words, hand
- * written for the shots (never a recording), so the player page shows the box a full read grows to. */
+/** SATURDAY_READ=1 (Lane 117, B95 fix round 3): a STAND-IN week read for Gibbs at the cap of the 40 to 95
+ * band, hand written for the shots (never a recording), so the player page shows the box a full read grows
+ * to. Its body and call are research's (Lane 121, B98), where a test runs the writer's validator on them
+ * against Gibbs's recorded sheet, so the shot draws a read the nightly would publish. */
 const longRead = process.env.SATURDAY_READ === '1';
-const LONG_READ_PLAYER = '4429795';
+const LONG_READ_FILE = new URL(
+	'../../../research/tests/testdata/week_reads/long_bye_read.json',
+	import.meta.url
+);
+const standIn = JSON.parse(await readFile(LONG_READ_FILE, 'utf8')) as {
+	id: string;
+	body: string;
+	call: string;
+};
 const LONG_READ = {
 	week: FIRST_WEEK,
-	body:
-		'The Lions are off in week 6 of 2026, so Jahmyr Gibbs does not play and scores nothing this week. ' +
-		"There is no designation for him on Friday's report, and he still leads the Detroit backfield ahead of Sione Vaki. " +
-		'His 30.7 PPR points a game over 5 games make him a weekly starter once Detroit is back from its week off. ' +
-		'Keep him on your roster, fill his spot with a back who has a game this week, and put him straight back into your lineup for week 7 at home against Green Bay.',
+	body: standIn.body,
 	caption: 'Written Sat 11:12 am Central, for week 6',
 	status: null,
-	call: 'hold',
+	call: standIn.call,
 	writtenAt: '2026-10-17T16:12:00.000Z',
 	factsAt: '2026-10-17T16:00:00.000Z'
 };
@@ -143,7 +149,7 @@ for (const file of await readdir(new URL('players/', OUT))) {
 			withPace(sharedTier(moved(n, team), page.position))
 		])
 	);
-	if (longRead && page.id === LONG_READ_PLAYER) page.weekRead = LONG_READ;
+	if (longRead && page.id === standIn.id) page.weekRead = LONG_READ;
 	await write(`players/${file}`, page);
 }
 const manifest = await read('manifest.json');
