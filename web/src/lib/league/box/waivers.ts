@@ -69,6 +69,27 @@ export const WAIVERS = {
 	irBench: 'IR, on your bench'
 } as const;
 
+/** Every word the Stash group prints (Lane 118, B79): its divider, its line, a row's Game cell, Beats
+ * cell and verb. */
+export const STASH = {
+	head: 'Stash',
+	verb: 'Stash',
+	/** A stash's Game cell: the week he is due back. */
+	back: (week: number): string => `Back week ${String(week)}`,
+	/** The Beats cell of a stash an open IR slot takes: the slot, under it its state. */
+	slot: 'IR slot',
+	open: 'Open',
+	/** Under the drop's name on a stash that takes a roster spot, as the gaining rows name theirs. */
+	drop: 'Drop',
+	/** The group's line: the week each row comes back and where his rate counts from. */
+	backOne: (week: number): string =>
+		`Stash rows come back week ${String(week)} by the platform's return date, their rate counts from then.`,
+	backEach:
+		"Stash rows come back the week each names by the platform's return date, their rate counts from then.",
+	/** Said once where the page leaves an IR or out free agent unlisted for want of a date. */
+	undated: 'IR players without a return date are not listed.'
+} as const;
+
 /** The columns' basis, once under their heads (Lane 98, B35): each head with what it is. */
 export const HEAD_BASIS = {
 	rest: 'is our rest-of-season points a game',
@@ -116,7 +137,19 @@ export interface PoolRow {
 	order: number;
 	/** The row is offered as a pickup: a Gain above zero, or a card of the strip (B13). */
 	gains: boolean;
+	/** A row of the Stash group (Lane 118, B79), null on a row of the table's other groups. */
+	stash: StashCell | null;
 	source: WaiverRow;
+}
+
+/** A stash as its row draws it (B79): his Game cell, his verb, and whom the Beats cell names. */
+export interface StashCell {
+	/** "Back week 9". */
+	back: string;
+	/** Stash where an open IR slot takes him, else Add with the row's drop. */
+	verb: 'stash' | 'add';
+	/** The Beats cell: the open IR slot, or the drop by name; null with neither. */
+	who: { name: string; place: string } | null;
 }
 
 /** One card of the strip. */
@@ -249,9 +282,69 @@ export function poolRows(
 			clears: clearsWords(source.clears),
 			order: source.gain,
 			gains,
+			stash: null,
 			source
 		};
 	});
+}
+
+/** The Stash group's rows (B79) in the API's order, by his rate from his return week: his Game cell
+ * says the week, A game is that rate, Beats names the open IR slot or the drop. Never counted with the
+ * rows that gain. */
+export function stashRows(
+	advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'roster'> & Partial<Pick<WaiverAdvice, 'stash'>>,
+	zone: string,
+	now: number
+): PoolRow[] {
+	const names = namesOnScreen(advice);
+	return (advice.stash ?? []).flatMap((source) => {
+		const { stash } = source;
+		if (stash === undefined) return [];
+		const key = addKey(source);
+		const verb = stash.ir_slot ? 'stash' : 'add';
+		return [
+			{
+				key,
+				row: { ...boxRow(source.add, '', zone, false, now), key },
+				rest: stash.per_game,
+				beats: { who: null, gain: null, gains: false, week: null },
+				named: false,
+				clears: clearsWords(source.clears),
+				order: stash.per_game ?? Number.NEGATIVE_INFINITY,
+				gains: false,
+				stash: { back: STASH.back(stash.back_week), verb, who: stashWho(source, verb, names) },
+				source
+			}
+		];
+	});
+}
+
+/** Whom a stash's Beats cell names (B79): the open IR slot, else his drop as the gaining rows name a
+ * player, else nobody. */
+function stashWho(
+	source: WaiverRow,
+	verb: StashCell['verb'],
+	names: readonly string[]
+): StashCell['who'] {
+	if (verb === 'stash') return { name: STASH.slot, place: STASH.open };
+	return source.drop === null
+		? null
+		: { name: beatsName(source.drop.player.name, names), place: STASH.drop };
+}
+
+/** The Stash group's line (B79), said once under its divider: the week its rows come back and where
+ * their rate counts from, then that an IR or out free agent with no date is not listed; empty with
+ * neither, so no group is drawn. */
+export function stashBasis(
+	advice: Partial<Pick<WaiverAdvice, 'stash' | 'stash_undated'>>
+): string[] {
+	const weeks = [
+		...new Set((advice.stash ?? []).flatMap((r) => (r.stash ? [r.stash.back_week] : [])))
+	];
+	const [only] = weeks;
+	const back =
+		only === undefined ? [] : [weeks.length === 1 ? STASH.backOne(only) : STASH.backEach];
+	return [...back, ...((advice.stash_undated ?? 0) > 0 ? [STASH.undated] : [])];
 }
 
 /** The table's two groups (B13): the rows offered as pickups, then those with no gain over the roster
@@ -277,9 +370,11 @@ export function cardName(name: string, onScreen: readonly string[]): string {
 	return sharing.size > 1 ? name : short;
 }
 
-/** Every player's name the screen shows: the adds and the member's roster. */
-export function namesOnScreen(advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'roster'>): string[] {
-	return [...advice.rows, ...advice.pickups]
+/** Every player's name the screen shows: the adds, the stashes and the member's roster. */
+export function namesOnScreen(
+	advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'roster'> & Partial<Pick<WaiverAdvice, 'stash'>>
+): string[] {
+	return [...advice.rows, ...advice.pickups, ...(advice.stash ?? [])]
 		.map((r) => r.add.player.name)
 		.concat(advice.roster.map((l) => l.player.name));
 }

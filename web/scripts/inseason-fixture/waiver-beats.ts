@@ -6,10 +6,13 @@
 // carried over from a game already played aside) is not listed. FIXTURE_IR_DROP=1 stamps the
 // fixture with the sense check's case (B34, B41): the strip's drop, Roschon Johnson, on injured
 // reserve on the bench, and two free agents the table no longer lists, De'Von Achane on injured
-// reserve and Tyquan Thornton ruled out.
+// reserve and Tyquan Thornton ruled out, each dated back (Lane 118, B79: weeks 9 and 8), so they sit
+// in the Stash group; FIXTURE_IR_SLOT=1 opens one injured reserve slot on the member's team, so
+// Achane's verb is Stash.
 import type { components } from '../../src/lib/api/types.ts';
 import type { LineupAdvice, WaiverAdvice, WaiverRow } from '../../src/lib/league/inseason/api.ts';
 import { addKey } from '../../src/lib/league/inseason/move.ts';
+import { ORDER_FROM_WEEK } from './rest-now.ts';
 import { roundTenth } from './tenths.ts';
 import { seasonStarters } from './week.ts';
 
@@ -18,6 +21,13 @@ type Beats = NonNullable<WaiverRow['beats']>;
 
 /** The environment variable that stamps the sense check's case on the fixture. */
 export const IR_DROP_VARIABLE = 'FIXTURE_IR_DROP';
+/** The environment variable that opens one injured reserve slot on the member's team (B79). */
+export const IR_SLOT_VARIABLE = 'FIXTURE_IR_SLOT';
+
+/** The recorded Sleeper league's last regular-season week: its playoffs start in week 15. */
+const LAST_REGULAR_WEEK = 14;
+/** The order's last week (horizon.go LastWeek). */
+const LAST_WEEK = 17;
 
 /** The positions each starting slot takes (engine.go Slots). */
 const ACCEPTS: Readonly<Record<string, readonly string[]>> = {
@@ -34,7 +44,8 @@ const ACCEPTS: Readonly<Record<string, readonly string[]>> = {
 /** The season-long lists (waiver_beats.go seasonLongLists). */
 const SEASON_LONG = new Set(['injured_reserve', 'pup', 'nfi']);
 
-/** Whether the table lists a free agent (waiver_beats.go listedAdd). */
+/** Whether the table lists a free agent (waiver_stash.go listedAdd; a pending dating is never on the
+ * wire, so the stand-in has none). */
 export function listedAdd(line: PlayerLine): boolean {
 	const d = line.facts.designation;
 	if (d === null) return true;
@@ -107,9 +118,49 @@ export function restatedBeats(answer: WaiverAdvice, lineup: LineupAdvice): Waive
 	return { ...answer, rows: answer.rows.map(restate), pickups: answer.pickups.map(restate) };
 }
 
-/** The answer with the adds it does not list gone (pageMoves). */
-export function listedOnly(answer: WaiverAdvice): WaiverAdvice {
-	return { ...answer, rows: answer.rows.filter((r) => listedAdd(r.add)) };
+/** A free agent the table leaves out whom the Stash group can hold (waiver_stash.go returnHeld). */
+function returnHeld(line: PlayerLine): boolean {
+	const status = line.facts.designation?.status;
+	return !listedAdd(line) && (status === 'injured_reserve' || status === 'out');
+}
+
+/** His rate from his return week, the stand-in's: his rest-of-season points a game over the weeks
+ * left, spread over the weeks from his return (waiver_stash.go perGameFrom counts his club's games;
+ * the stand-in has no bye in them). */
+function perGameFrom(line: PlayerLine, back: number): number | null {
+	const rate = line.rest_of_season_per_game;
+	if (rate === null) return null;
+	return roundTenth((rate * (LAST_WEEK - ORDER_FROM_WEEK + 1)) / (LAST_WEEK - back + 1));
+}
+
+/** One stash (waiver_stash.go stashRow): no week figure, and with an open slot no drop. */
+function stashRow(row: WaiverRow, back: number, irSlot: boolean): WaiverRow {
+	const slot = irSlot && row.add.facts.designation?.status === 'injured_reserve';
+	const base = { ...row, week_gain: null, pickup: false, starts: false };
+	return {
+		...(slot ? { ...base, drop: null, drops: [], beats: null } : base),
+		stash: { back_week: back, per_game: perGameFrom(row.add, back), ir_slot: slot }
+	};
+}
+
+/** The answer with the adds it does not list gone (pageMoves), the ones due back in the regular season
+ * in the Stash group by their rate from then, and the count of those whose return no read dates
+ * (waiver_stash.go stashRows). */
+export function listedOnly(answer: WaiverAdvice, irSlot = false): WaiverAdvice {
+	const held = answer.rows.filter((r) => returnHeld(r.add));
+	const stash = held
+		.flatMap((r) => {
+			const back = r.add.facts.designation?.return_week ?? null;
+			return back === null || back > LAST_REGULAR_WEEK ? [] : [stashRow(r, back, irSlot)];
+		})
+		.sort((a, b) => (b.stash?.per_game ?? -Infinity) - (a.stash?.per_game ?? -Infinity));
+	return {
+		...answer,
+		rows: answer.rows.filter((r) => listedAdd(r.add)),
+		stash,
+		stash_undated: held.filter((r) => (r.add.facts.designation?.return_week ?? null) === null)
+			.length
+	};
 }
 
 /** The sense check's case on a fixture line: the strip's drop on injured reserve, two free agents on a
@@ -118,8 +169,13 @@ const IR_SINCE = '2026-09-22T12:00:00.000Z';
 const READ = '2026-10-16T21:00:00.000Z';
 const STAMPED: Readonly<Record<string, PlayerLine['facts']['designation']>> = {
 	'Roschon Johnson': { status: 'injured_reserve', as_of: READ, since: IR_SINCE },
-	"De'Von Achane": { status: 'injured_reserve', as_of: READ, since: '2026-09-28T12:00:00.000Z' },
-	'Tyquan Thornton': { status: 'out', as_of: READ, since: null }
+	"De'Von Achane": {
+		status: 'injured_reserve',
+		as_of: READ,
+		since: '2026-09-28T12:00:00.000Z',
+		return_week: 9
+	},
+	'Tyquan Thornton': { status: 'out', as_of: READ, since: null, return_week: 8 }
 };
 
 /** A line with the case's designation, when the case names him. */

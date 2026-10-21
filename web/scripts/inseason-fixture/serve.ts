@@ -20,7 +20,8 @@ import type {
 	Scoreboard,
 	TradeAdvice,
 	TradeCheckInput,
-	WaiverAdvice
+	WaiverAdvice,
+	WaiverRow
 } from '../../src/lib/league/inseason/api.ts';
 import type { components } from '../../src/lib/api/types.ts';
 
@@ -61,7 +62,8 @@ import {
 	irDropWaivers,
 	listedOnly,
 	restatedBeats,
-	IR_DROP_VARIABLE
+	IR_DROP_VARIABLE,
+	IR_SLOT_VARIABLE
 } from './waiver-beats.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
@@ -165,7 +167,10 @@ const lineup = irDrop ? irDropLineup(lineupRead) : lineupRead;
 /** The trades as the API's search lists them, each need named (trade-needs.ts, Lane 103). */
 const trades = proposedTrades(tradesRead, lineup);
 /** The adds the API lists (waiver-beats.ts listedAdd), before any order is taken over them. */
-const waivers = listedOnly(irDrop ? irDropWaivers(waiversRead) : waiversRead);
+const waivers = listedOnly(
+	irDrop ? irDropWaivers(waiversRead) : waiversRead,
+	process.env[IR_SLOT_VARIABLE] === '1'
+);
 
 /** The recorded week the scoreboard is restated from at the fixture's clock (scoreboard-at.ts). */
 const recordedWeek = {
@@ -452,9 +457,13 @@ const waiversNow = (): WaiverAdvice => {
 function waiversAt(position: string | null): WaiverAdvice {
 	const answer = waiversNow();
 	if (position === null) return answer;
-	const rows = answer.rows.filter((row) => row.add.player.position === position);
-	const pickups = answer.pickups.filter((row) => row.add.player.position === position);
-	return { ...answer, rows, pickups };
+	const at = (row: WaiverRow): boolean => row.add.player.position === position;
+	return {
+		...answer,
+		rows: answer.rows.filter(at),
+		pickups: answer.pickups.filter(at),
+		stash: (answer.stash ?? []).filter(at)
+	};
 }
 
 /** The trades holding one player, by his board id, every team kept. */

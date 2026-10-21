@@ -74,6 +74,9 @@
 		/** A player on injured reserve (Lane 98, B34): on the bench his game cell says why he is a drop,
 		 * in the IR slot it is empty; neither draws his matchup (Opp rank), the slot no points. */
 		reserve?: 'bench' | 'slot' | null;
+		/** A Waivers stash row's Game cell (Lane 118, B79): "Back week 9" in place of his game, with no
+		 * matchup, Proj or points, as an IR slot row draws none. */
+		away?: string | null;
 	}
 
 	let {
@@ -99,11 +102,12 @@
 		phoneOpp = true,
 		projCells = true,
 		rankCell = false,
-		reserve = null
+		reserve = null,
+		away = null
 	}: Props = $props();
-	/** The row as drawn: an IR row without its matchup (reserveRow). */
-	const drawn = $derived(reserveRow(row, reserve));
-	const note = $derived(reserve === 'bench' ? BOX.irBench : null);
+	/** The row as drawn: an IR row, or a stash, without its matchup (reserveRow). */
+	const drawn = $derived(reserveRow(row, reserve ?? (away === null ? null : 'slot')));
+	const note = $derived(away ?? (reserve === 'bench' ? BOX.irBench : null));
 	const picked = $derived(pick?.state === 'on');
 	const rank = $derived(drawn.evidence.oppRank);
 	/** The Opp rank's colour, while his game is still to come (Lane 99, B56): on a game played it is
