@@ -87,4 +87,6 @@ try {
 	await browser.close();
 }
 if (faults.length > 0) throw new Error(faults.join('\n'));
-console.log(`club-move shots: ${String(THEMES.length * WIDTHS.length)} in ${out.pathname}`);
+process.stdout.write(
+	`club-move shots: ${String(THEMES.length * WIDTHS.length)} in ${out.pathname}\n`
+);
