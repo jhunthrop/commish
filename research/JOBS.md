@@ -69,7 +69,8 @@ changed`). Nothing is inserted or retired; a player off the list, a free agent a
 keep their club. A read that would change more than 60 clubs writes none and fails the pass (the job
 alerts) while its snapshot stands; the day's read is not taken, so the next hour asks again. The operator's
 one-shot `python -m research.pipeline player-clubs [--dry-run]` applies the newest stored list with no
-ceiling, its count first. The API, the nightly's board and the capsules read the column as before. The
+ceiling, its count first. A day with more than 60 club changes (cut-down day) refuses the write and
+alerts every hour until an operator runs `python -m research.pipeline player-clubs`. The API, the nightly's board and the capsules read the column as before. The
 parity case `tank01-capture-harvest` covers the write (its later pass lands the 2026-10-12 list on an
 earlier one, `parity/fixtures/tank01-player-list-earlier`, that had McCarthy at MIN).
 

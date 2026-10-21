@@ -29,7 +29,6 @@ from research.nightly.build.page_club import (
     club_calls,
     last_game_club,
     read_roster,
-    roster_clubs,
     seeded_clubs,
 )
 from research.nightly.build.player_season import SeasonContext, SeasonStore, season_block
@@ -37,6 +36,7 @@ from research.nightly.config import GATES, PAGE_FORMAT
 from research.nightly.reads.schedule import Game
 from research.parity import databases
 from research.pipeline.tank01.capture import PLAYER_LIST_SOURCE
+from research.pipeline.tank01.player_clubs import listed_clubs
 
 _TESTDATA: Final = Path(__file__).parent / "testdata" / "page_club" / "five-movers.json"
 _SCHEDULE: Final = (
@@ -92,7 +92,7 @@ def _store(fixture: Json, games: dict[str, list[Game]]) -> SeasonStore:
 def _provider_read(fixture: Json) -> RosterRead:
     """The provider's clubs as one list read at its newest recorded instant."""
     payload = [{"playerID": p["id"], "team": p["providerClub"], "isFreeAgent": "False"} for p in fixture["players"]]
-    return RosterRead(MappingProxyType(roster_clubs(payload)), datetime.fromisoformat(fixture["providerReadAt"]))
+    return RosterRead(MappingProxyType(listed_clubs(payload)), datetime.fromisoformat(fixture["providerReadAt"]))
 
 
 def _context(roster: RosterRead) -> SeasonContext:
@@ -234,8 +234,8 @@ def test_the_list_leaves_out_a_free_agent_and_a_code_outside_the_32() -> None:
         {"team": "KC"},
         "not a player",
     ]
-    assert roster_clubs(payload) == {"1": "BUF"}
-    assert roster_clubs({"body": []}) == {}
+    assert listed_clubs(payload) == {"1": "BUF"}
+    assert listed_clubs({"body": []}) == {}
 
 
 def _page(pid: str, club: str, elsewhere: Json | None) -> Json:

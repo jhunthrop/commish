@@ -31,10 +31,9 @@ from sqlalchemy import Connection, text
 from research.model.instants import ms_instant
 from research.nightly.reads.board import FormatBoard
 from research.nightly.reads.schedule import Game
-from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
 from research.pipeline.tank01.capture import PLAYER_LIST_SOURCE
+from research.pipeline.tank01.player_clubs import listed_clubs
 
-_CLUBS: Final = frozenset(NFL_TEAM_ABBREVIATIONS)
 # How much newer than a game's kickoff a list read must be to win over that game's line: the provider's
 # roster refresh lands within a day, with half a day's margin (the coordinator's ruling, review M1).
 LIST_CATCH_UP: Final = timedelta(hours=36)
@@ -51,20 +50,6 @@ class RosterRead:
 NO_ROSTER_READ: Final = RosterRead(MappingProxyType({}), None)
 
 
-def roster_clubs(payload: Any) -> dict[str, str]:
-    """The list's club for each player on one: a free agent, or a club code not among the 32, is left out."""
-    if not isinstance(payload, list):
-        return {}
-    out: dict[str, str] = {}
-    for raw in payload:
-        record = raw if isinstance(raw, dict) else {}
-        player_id, club = record.get("playerID"), record.get("team")
-        free_agent = str(record.get("isFreeAgent", "")).strip().lower() == "true"
-        if isinstance(player_id, str) and player_id and club in _CLUBS and not free_agent:
-            out[player_id] = str(club)
-    return out
-
-
 def read_roster(conn: Connection, as_of: datetime) -> RosterRead:
     """The newest player list read at or before `as_of`; none before the list was first read."""
     row = conn.execute(
@@ -76,7 +61,7 @@ def read_roster(conn: Connection, as_of: datetime) -> RosterRead:
     ).first()
     if row is None:
         return NO_ROSTER_READ
-    return RosterRead(MappingProxyType(roster_clubs(row.payload)), ms_instant(row.captured_at))
+    return RosterRead(MappingProxyType(listed_clubs(row.payload)), ms_instant(row.captured_at))
 
 
 def seeded_clubs(conn: Connection, player_ids: Sequence[str]) -> dict[str, str]:
