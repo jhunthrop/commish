@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import WeatherGlyph from '#lib/league/box/WeatherGlyph.svelte';
 	import StatusPill from '#lib/ui/StatusPill.svelte';
 	import type { StatusView } from '#lib/run/status-view.ts';
 	import Face from '#lib/ui/Face.svelte';
@@ -9,6 +8,8 @@
 	import { clubMark } from '#lib/ui/club-mark.ts';
 	import type { Position } from '#lib/types/player.ts';
 	import { CARD, type BasisTile, type CardHead, type CardTile } from './card.ts';
+	import CardNext from './CardNext.svelte';
+	import CardTiles from './CardTiles.svelte';
 	import type { CardVerb, NextCell } from './week-words.ts';
 
 	/** The player card (Lane 66h): his face, name, club and position with his status, whose roster he
@@ -90,17 +91,7 @@
 			<p class="holder" class:room={holdRoom}>{holder ?? ''}</p>
 		</div>
 		{#if next}
-			<div class="next">
-				<span class="wk">{CARD.week} {next.week}</span>
-				<span class="opp"
-					><b>{cell?.where ?? next.opponent}</b>{#if cell?.when}<span>{cell.when}</span>{/if}</span
-				>
-				<span class="facts"
-					>{#if cell?.expected}<span class="exp">{cell.expected}</span>{/if}{#if cell?.weather}<span
-							class="wx"><WeatherGlyph glyph={cell.weather.glyph} />{cell.weather.words}</span
-						>{/if}</span
-				>
-			</div>
+			<div class="next"><CardNext week={next.week} opponent={next.opponent} {cell} /></div>
 		{/if}
 		<div class="act">
 			{#if compareLeads}
@@ -122,26 +113,7 @@
 			{#if verb?.note}<p class="note">{verb.note}</p>{/if}
 		</div>
 	</div>
-	<div class="tiles" style:--n={tiles.length}>
-		{#each tiles as tile (tile.key)}
-			<div class="tile {tile.tone ?? ''}">
-				<span class="lb">{tile.label}</span>
-				<span class="v"><span class="fig">{tile.value}</span></span>
-				<span class="cap">{tile.caption}</span>
-			</div>
-		{/each}
-	</div>
-	{#if basisTiles.length > 0}
-		<div class="tiles basis" style:--n={basisTiles.length}>
-			{#each basisTiles as tile (tile.key)}
-				<div class="tile">
-					<span class="lb">{tile.label}</span>
-					<span class="v"><span class="fig">{tile.value}</span></span>
-					<span class="cap">{tile.caption}</span>
-				</div>
-			{/each}
-		</div>
-	{/if}
+	<CardTiles {tiles} {basisTiles} />
 </section>
 
 <style>
@@ -212,55 +184,9 @@
 	}
 
 	.next {
-		display: flex;
-		flex-direction: column;
-		gap: 3px;
 		min-width: 200px;
 		padding-left: var(--s-5);
 		border-left: 1px solid var(--line);
-	}
-
-	.wk {
-		font-size: var(--t-xs);
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: var(--track-label);
-		color: var(--accent-text);
-	}
-
-	.opp {
-		display: flex;
-		gap: 6px;
-		font-size: var(--t-md);
-	}
-
-	.opp span {
-		color: var(--ink-2);
-		font-variant-numeric: tabular-nums;
-	}
-
-	.facts {
-		display: flex;
-		align-items: center;
-		gap: var(--s-2);
-		min-height: 1lh;
-		font-size: var(--t-xs);
-		color: var(--ink-3);
-		font-variant-numeric: tabular-nums;
-	}
-
-	.exp {
-		font-family: var(--font-num);
-		font-size: var(--t-md);
-		font-weight: 600;
-		letter-spacing: 0.02em;
-		color: var(--ink-2);
-	}
-
-	.wx {
-		display: inline-flex;
-		align-items: center;
-		gap: 3px;
 	}
 
 	.act {
@@ -273,86 +199,6 @@
 		margin: 0;
 		font-size: var(--t-xs);
 		line-height: 1.4;
-		color: var(--ink-3);
-	}
-
-	.tiles {
-		display: grid;
-		grid-template-columns: repeat(var(--n), minmax(0, 1fr));
-		border-top: 1px solid var(--line);
-		background: var(--bg);
-	}
-
-	.tile {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		min-width: 0;
-		padding: var(--s-3) var(--s-4);
-		border-left: 1px solid var(--line);
-	}
-
-	.tile:first-child {
-		border-left: 0;
-	}
-
-	/* The row the figures above start from, quieter than the week's. */
-	.basis {
-		background: var(--surface);
-	}
-
-	.basis .v {
-		font-size: var(--t-xl);
-	}
-
-	.lb {
-		font-size: var(--t-xs);
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: var(--track-label);
-		color: var(--ink-3);
-		white-space: nowrap;
-	}
-
-	.v {
-		font-family: var(--font-num);
-		font-size: var(--t-2xl);
-		font-weight: 800;
-		line-height: 1;
-		color: var(--ink);
-		font-variant-numeric: tabular-nums;
-	}
-
-	.lead .v {
-		color: var(--accent-text);
-	}
-
-	.quiet .v {
-		font-size: var(--t-xl);
-		font-weight: 700;
-		color: var(--ink-2);
-	}
-
-	/* The opponent's ease: the rank carries it, the tint repeats it. */
-	.easy .fig,
-	.hard .fig {
-		padding: 0 6px;
-		border-radius: var(--r-sm);
-	}
-
-	.easy .fig {
-		background: var(--gain-bg);
-		color: var(--gain-ink);
-	}
-
-	.hard .fig {
-		background: var(--loss-bg);
-		color: var(--loss-ink);
-	}
-
-	.cap {
-		font-size: var(--t-xs);
-		line-height: 1.35;
 		color: var(--ink-3);
 	}
 
@@ -393,17 +239,10 @@
 
 		.next {
 			grid-column: 1 / -1;
-			flex-flow: row wrap;
-			align-items: baseline;
-			gap: 4px var(--s-3);
 			min-width: 0;
 			padding: var(--s-2) 0 0;
 			border-left: 0;
 			border-top: 1px solid var(--line);
-		}
-
-		.wk {
-			flex-basis: 100%;
 		}
 
 		/* The verb pinned above the tab bar, Compare beside it. */
@@ -433,44 +272,6 @@
 
 		.note {
 			display: none;
-		}
-
-		.tiles {
-			grid-template-columns: repeat(3, minmax(0, 1fr));
-		}
-
-		.tile {
-			padding: var(--s-2) var(--s-3);
-			border-top: 1px solid var(--line);
-		}
-
-		.tile:nth-child(3n + 1) {
-			border-left: 0;
-		}
-
-		.tile:nth-child(-n + 3) {
-			border-top: 0;
-		}
-
-		/* On a phone the row under the tiles keeps its three across, as the tiles above it do. */
-		.basis .tile {
-			border-top: 0;
-		}
-
-		.basis .tile:first-child {
-			border-left: 0;
-		}
-
-		.v {
-			font-size: var(--t-xl);
-		}
-
-		.lb {
-			font-size: 10px;
-		}
-
-		.cap {
-			font-size: 11px;
 		}
 	}
 </style>

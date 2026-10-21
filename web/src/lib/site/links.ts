@@ -68,6 +68,8 @@ export const links = {
 	/** A new mock with a saved league's settings filled in, so drafting it is one tap. */
 	mockLeague: (savedId: string): string =>
 		`${sectionHref('mock')}?${new URLSearchParams({ league: savedId }).toString()}`,
+	/** The prerendered top of his page the player shelf reads (Lane 113). */
+	playerCard: (slug: string): string => resolve('/data/cards/[slug].json', { slug }),
 	/** The prerendered JSON a browser fetches for one player's numbers. */
 	playerData: (id: string): string => resolve('/data/players/[id].json', { id })
 } as const;

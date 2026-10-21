@@ -11,9 +11,10 @@
 	import { liveStatusClock, type LiveStatus } from '#lib/run/live-status.ts';
 	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
 	import { CARD, unreadBasis, type CardTile } from '#lib/player/card.ts';
-	import type { CardLeague, LiveCard, RestParts } from '#lib/player/week-words.ts';
+	import type { CardLeague, LiveCard } from '#lib/player/week-words.ts';
 	import { shownWeekRead, weekReadLabel } from '#lib/player/week-read.ts';
 	import { cliffAt, lineFiguresAt, matesAt } from '#lib/player/live-figures.ts';
+	import { builtTiles, cardSource } from '#lib/player/card-source.ts';
 	import PlayerCard from '#lib/player/PlayerCard.svelte';
 	import type PlayerCompare from '#lib/player/PlayerCompare.svelte';
 	import Credit from '#lib/site/Credit.svelte';
@@ -72,18 +73,13 @@
 			void import('#lib/player/PlayerCompare.svelte').then((module) => (Compare = module.default));
 	}
 	/** The tiles as built: rest of season in the lead format, the week's tiles "--" until read. */
-	const built = $derived<CardTile[]>(
-		page.card.tiles.flatMap((tile) => (tile.key === 'opp' ? [lead.restTile, tile] : [tile]))
-	);
+	const built = $derived<CardTile[]>(builtTiles(page, lead));
 	/** The week-ahead read as the page shows it: withheld once the card prints another projection. */
 	const weekRead = $derived(
 		page.weekRead ? shownWeekRead(page.weekRead, live?.projection ?? null) : null
 	);
 	/** The week's figures over the tiles as built. */
 	const tiles = $derived<CardTile[]>(live === null ? built : live.tiles);
-	/** Rest of season's parts as the build words them (Lane 63's held rule, its scoring), which the
-	 * read's figure a game joins in that scoring only. */
-	const rest = $derived<RestParts | null>(lead.restParts);
 
 	/** Each read's number: only the latest one asked is shown (review M7). */
 	let asked = 0;
@@ -96,7 +92,6 @@
 		if (key !== readFor) live = null;
 		try {
 			const module = await import('#lib/player/live.ts');
-			const player = { id: page.id, name: page.name, team: page.team, position: page.position };
 			const tierFormat = apiFormatOf(lead.format);
 			const ask =
 				tierFormat === null || page.tier.mates.length === 0
@@ -106,23 +101,15 @@
 							next: page.tier.cliff?.nextId ?? null,
 							format: tierFormat
 						};
-			const week = await module.readWeek(player, at, ask);
-			if (mine !== asked) return;
-			live = module.liveCard({
-				week,
-				player,
-				league: at,
-				tiles: built,
-				opponents: page.card.opponents,
-				games: page.card.games,
-				rest,
-				tier: { label: scoring, season, single: page.tier.mates.length === 1 },
-				basisTiles: lead.basisTiles,
-				lastKickoffs: page.lastKickoffs,
-				screenHref: module.screenHrefFor(at),
-				// The page's clock: the card is drawn at the moment its week is read.
-				now: Date.now()
+			const source = cardSource(page, lead, {
+				label: scoring,
+				season,
+				single: page.tier.mates.length === 1
 			});
+			// The page's clock: the card is drawn at the moment its week is read.
+			const card = await module.readCard(source, at, ask, () => Date.now());
+			if (mine !== asked) return;
+			live = card;
 			readFor = key;
 			failed = false;
 		} catch (error: unknown) {
@@ -339,7 +326,7 @@
 
 		<div class="split">
 			<article class="read">
-				<h3><Label>Our read</Label></h3>
+				<h3><Label>{CARD.ourRead}</Label></h3>
 				{#if weekRead}
 					<section
 						class="week-read"

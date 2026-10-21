@@ -41,6 +41,11 @@
 	import { BUILDER_LINES, builtFrom, type Picks } from './builder.ts';
 	import { Narrowing, pickKey, pickerPlayers, tradeHolding } from './state.ts';
 	import { EVERY_TRADE, LINES, noTradeWith, tradeDecision } from './words.ts';
+	import { page } from '$app/state';
+	import { boxRow, type BoxRow } from '../box/box.ts';
+	import type { ScreenOffer } from '#lib/player/shelf-state.ts';
+	import { providePlayerShelf } from '#lib/player/shelf-host.ts';
+	import PlayerShelfLayer from '#lib/player/PlayerShelfLayer.svelte';
 
 	/** The Trades screen as a trade table (spec §6, Lane 66g): a strip naming the trades worth
 	 * proposing, each with both sides, both gains and its one verb; the picker that narrows to the
@@ -93,10 +98,11 @@
 		building = { picks, opening: openings };
 	}
 
-	/** Build a trade with the first team that has a trade found, else the first team. */
-	function buildNew(): void {
+	/** Build a trade with the first team that has a trade found, else the first team, giving the
+	 * member's players named (none from the strip's verb). */
+	function buildNew(give: string[] = []): void {
 		const first = shown.teams.find((t) => t.trades.length > 0) ?? shown.teams[0];
-		build({ team: first?.roster_id ?? null, give: [], get: [] });
+		build({ team: first?.roster_id ?? null, give, get: [] });
 	}
 
 	// The route's reader is fixed for the page's life.
@@ -171,6 +177,30 @@
 	);
 	const everyCount = $derived(advice.teams.reduce((n, t) => n + t.trades.length, 0));
 	const bestCount = $derived(advice.teams.filter((t) => t.trades.length > 0).length);
+
+	/** The player shelf's verb (Lane 113): Build a trade with him in it, from the team that holds him,
+	 * or from the member's side when he is the member's. */
+	function shelfOffer({ key }: BoxRow): ScreenOffer | null {
+		const holder = advice.teams.find((team) => team.roster.some((l) => l.player.host_id === key));
+		const mine = advice.roster.some((l) => l.player.host_id === key);
+		if (holder === undefined && !mine) return null;
+		const run = (): void => {
+			if (holder !== undefined) build({ team: holder.roster_id, give: [], get: [key] });
+			else buildNew([key]);
+		};
+		return { label: BUILDER_LINES.open, line: null, href: null, run, focus: BUILDER_ID };
+	}
+
+	const shelf = providePlayerShelf({
+		screen: 'trades',
+		now: () => now,
+		league: () => ({ id: page.params.id ?? '', host }),
+		offer: shelfOffer,
+		rowOf: (slug) => {
+			const line = lines.find((l) => l.slug === slug);
+			return line === undefined ? null : boxRow(line, '', memberZone(), false, now);
+		}
+	});
 
 	/** A player page's "Trade for him" names him (?player=, Lane 66h): the builder opens with him
 	 * picked from the team that holds him, and the trades narrow to those holding him. */
@@ -281,8 +311,11 @@
 			>
 		</ChipGroup>
 		<span class="build"
-			><Quiet size="sm" controls={BUILDER_ID} expanded={building !== null} onclick={buildNew}
-				>{BUILDER_LINES.open}</Quiet
+			><Quiet
+				size="sm"
+				controls={BUILDER_ID}
+				expanded={building !== null}
+				onclick={() => buildNew()}>{BUILDER_LINES.open}</Quiet
 			></span
 		>
 	</div>
@@ -307,6 +340,7 @@
 		/>
 	</div>
 	<BasisBlock parts={basis} id={BASIS_ID} />
+	<PlayerShelfLayer host={shelf} />
 </Screen>
 
 <style>

@@ -79,7 +79,10 @@ export const LINEUP = {
 	copyFailed: 'This browser would not copy it.',
 	noOneCanPlay: 'no one on your roster can play this week',
 	noOneHere: 'No one on your roster can play here this week',
-	heldEmpty: 'has kicked off, the spot stays empty'
+	heldEmpty: 'has kicked off, the spot stays empty',
+	/** A swap's two sides, as the strip's chips say them: "Dart in", "Rodgers out". */
+	swapIn: 'in',
+	swapOut: 'out'
 } as const;
 
 /** The Lineup's bench, as a link from another page opens it (the League page's bench count). */
@@ -424,4 +427,16 @@ export function copiedLine(host: LeagueHost, copied: boolean): CopyLine {
 /** Said when the lineup is set and the platform takes our writes: "Lineup set on ESPN". */
 export function setOnWords(host: LeagueHost): string {
 	return `Lineup set on ${hostWords(host)}`;
+}
+
+/** The swap the advice makes with him, in or out, by his row; null when it makes none. */
+export function swapOf(swaps: readonly Swap[], row: Pick<BoxRow, 'key' | 'name'>): Swap | null {
+	const short = shortName(row.name);
+	return swaps.find((swap) => swap.key === row.key || swap.out === short) ?? null;
+}
+
+/** A swap in the strip's words: "QB, Dart in, Rodgers out". */
+export function swapWords(swap: Swap): string {
+	const into = `${swap.slot}, ${swap.in} ${LINEUP.swapIn}`;
+	return swap.out === null ? into : `${into}, ${swap.out} ${LINEUP.swapOut}`;
 }

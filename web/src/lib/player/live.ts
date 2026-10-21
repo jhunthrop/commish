@@ -5,9 +5,17 @@ import { PUBLIC_API_URL } from '$app/env/public';
 import { resolve } from '$app/paths';
 import { apiClient } from '#lib/api/client.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
-import type { CardLeague, CardPlayer, PlayerWeek, ScreenHref } from './week-words.ts';
+import type { CardSource } from './card-source.ts';
+import {
+	liveCard,
+	type CardLeague,
+	type CardPlayer,
+	type LiveCard,
+	type PlayerWeek,
+	type ScreenHref
+} from './week-words.ts';
 
-export { liveCard } from './week-words.ts';
+export { liveCard };
 
 const client = apiClient(PUBLIC_API_URL);
 
@@ -54,4 +62,16 @@ export function screenHrefFor(league: CardLeague | null): ScreenHref {
 		const base = resolve('/league/[id]/[screen]', { id: league.id, screen });
 		return `${base}?${new URLSearchParams(query).toString()}`;
 	};
+}
+
+/** His week read and worded over the card's build (the player page's and the shelf's one way, Lane
+ * 113), drawn at the clock the read answers at. */
+export async function readCard(
+	source: CardSource,
+	league: CardLeague | null,
+	tier: TierQuery | null,
+	now: () => number
+): Promise<LiveCard> {
+	const week = await readWeek(source.player, league, tier);
+	return liveCard({ ...source, week, league, screenHref: screenHrefFor(league), now: now() });
 }

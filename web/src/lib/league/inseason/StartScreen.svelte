@@ -16,6 +16,8 @@
 		lineupPageWords,
 		lineupText,
 		setOnWords,
+		swapOf,
+		swapWords,
 		type CopyLine
 	} from '../box/lineup.ts';
 	import MovePanel from './MovePanel.svelte';
@@ -30,6 +32,11 @@
 		type MoveStep
 	} from './move.ts';
 	import { LINES, lineupDecision, lineupTitle } from './words.ts';
+	import { page } from '$app/state';
+	import { markAsked } from '../box/asked.ts';
+	import { backToLineupOffer, rowBySlug } from '#lib/player/shelf-state.ts';
+	import { providePlayerShelf } from '#lib/player/shelf-host.ts';
+	import PlayerShelfLayer from '#lib/player/PlayerShelfLayer.svelte';
 
 	/** Start and sit (spec §4) as one lineup table (Lane 66e): a strip with the week, the count of
 	 * changes, each swap as a chip and what they add to the lineup as the platform has it set now,
@@ -71,6 +78,27 @@
 	const done = $derived(advice.week_done ?? null);
 	const doneState = $derived(advice.week_done_state ?? null);
 	const box = $derived(lineupBox(advice, memberZone(), now));
+	/** A row's name opens his card over the lineup (Lane 113); its verb closes it onto his row, with his
+	 * swap under it when the advice makes one. */
+	const shelf = providePlayerShelf({
+		screen: 'lineup',
+		now: () => now,
+		league: () => ({ id: page.params.id ?? '', host }),
+		offer: (row) => {
+			const { boardId } = row;
+			if (boardId === null) return null;
+			const swap = swapOf(box.swaps, row);
+			return backToLineupOffer(
+				() => void markAsked(document, boardId),
+				swap === null ? null : swapWords(swap)
+			);
+		},
+		rowOf: (slug) =>
+			rowBySlug(
+				[...box.starters.map((e) => e.row), ...box.bench.map((e) => e.row), ...box.reserve],
+				slug
+			)
+	});
 	// Your sheet's tags mark your rows once the sheet is in (review L7).
 	onMount(() => void lazySheet.load());
 	/** Every line on the screen, for the game facts' read said once under the rows. */
@@ -192,6 +220,7 @@
 		{/if}
 	{/snippet}
 	<LineupTable label={lineupTitle(advice.week)} {box} tagsOf={sheetTags} noBench={LINES.noBench} />
+	<PlayerShelfLayer host={shelf} />
 	<BoxBasis
 		byPlayer={advice.player_points}
 		teamTotal={false}
