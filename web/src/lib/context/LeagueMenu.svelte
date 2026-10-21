@@ -13,7 +13,15 @@
 	import { signInReturn } from './sign-in.ts';
 	import { followThen } from './then-path.ts';
 	import { siteContext } from './context.svelte.ts';
-	import { FOLLOW_ANOTHER, FOLLOW_FIRST, leagueLine, menuLast, phaseWords } from './menu-words.ts';
+	import {
+		FOLLOW_ANOTHER,
+		FOLLOW_FIRST,
+		FOLLOWING,
+		followingMark,
+		leagueLine,
+		menuLast,
+		phaseWords
+	} from './menu-words.ts';
 	import { FALLBACK_BOARDS, runBoards, type RunBoard } from './run-boards.ts';
 	import { DEFAULT_CONTEXT_FORMAT, leagueName } from './words.ts';
 
@@ -22,6 +30,14 @@
 	 * or for a free account with its one league, what more leagues come with. Signed out it is the
 	 * formats and the way to sign in. Loaded on the first intent to open the switch, with how it
 	 * closes: a tap outside every control that opens it, Escape, or a page it opens. */
+
+	interface Props {
+		/** The league the switch names: pressed in the list, the selected one marked "following" where
+		 * they differ, a league's page (Lane 115, B89). */
+		shown: string | null;
+	}
+
+	let { shown }: Props = $props();
 
 	/** What marks a control that opens the menu (the switch): its own tap opens and closes it. */
 	const OPENER = '[data-opens-leagues]';
@@ -97,11 +113,15 @@
 				<button
 					type="button"
 					class="league"
-					aria-pressed={candidate.id === league?.id}
+					aria-pressed={candidate.id === shown}
 					onclick={() => void choose({ league: candidate.id })}
 				>
 					<span class="name"
-						>{leagueName(candidate)}{#if phases.has(candidate.id)}<span class="phase"
+						>{leagueName(
+							candidate
+						)}{#if followingMark(candidate.id, league?.id ?? null, shown)}<span
+								class="phase following">{FOLLOWING}</span
+							>{/if}{#if phases.has(candidate.id)}<span class="phase"
 								>{phases.get(candidate.id)}</span
 							>{/if}</span
 					>
@@ -133,8 +153,8 @@
 		{#if !siteContext.signedIn}
 			<Quiet size="sm" href={signInHref}>Sign in to follow your league</Quiet>
 		{:else}
-			{#if league}
-				<Quiet size="sm" href={links.league(league.id)}>League page</Quiet>
+			{#if shown}
+				<Quiet size="sm" href={links.league(shown)}>League page</Quiet>
 			{/if}
 			<!-- The last row (spec 2026-10-16 §2): the switch is the one place a league is chosen. -->
 			{#if last === 'one-league-free'}
@@ -200,6 +220,11 @@
 		font-weight: 500;
 		color: var(--ink-2);
 		white-space: nowrap;
+	}
+
+	/* The selected league, where the switch names another (B89). */
+	.following {
+		color: var(--accent-text);
 	}
 
 	.line {

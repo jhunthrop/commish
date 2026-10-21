@@ -22,9 +22,8 @@ export interface ActionProps {
 /** The two looks an action takes: the solid verb, or the quiet outline. */
 export type ActionVariant = 'verb' | 'quiet';
 
-/** A strip's action (the Waivers cards; Trades draws every card quiet, Lane 103): its lead, the
- * strip's first or chosen card, is the one solid verb, every other card the same words quiet, so a
- * strip spends one orange. */
+/** A strip's action (the Waivers and Trades cards, Lane 115, B87): its lead, the strip's first card,
+ * is the one solid verb, every other card the same words quiet, so a strip spends one orange. */
 export function stripVariant(lead: boolean): ActionVariant {
 	return lead ? 'verb' : 'quiet';
 }

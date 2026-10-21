@@ -143,7 +143,7 @@
 					{:else if row}<span class="club">{row.club}</span>{/if}
 					{#if shown.position}<StatusPill
 							position={shown.position}
-							positionRank={shown.rank}
+							positionRank={shown.rank ?? undefined}
 							status={shown.status}
 						/>{/if}
 				</div>

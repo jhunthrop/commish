@@ -162,7 +162,9 @@ export function rowNext(row: Pick<BoxRow, 'game' | 'expected' | 'weather'>): Nex
  * one player never shows two ranks or two designations on one screen). */
 export interface ShelfHead {
 	position: Position | null;
-	rank: number | undefined;
+	/** His rank at his position; null where the tapped row draws him unranked (the Lineup and the
+	 * Matchup, Lane 115, B93), which the shelf says too; undefined with none to say. */
+	rank: number | null | undefined;
 	status: StatusView | null;
 	/** Said in place of his game, as the row's Game cell says it. */
 	note: string | null;
@@ -186,7 +188,8 @@ export function shelfHead(tap: ShelfTap | null, built: BuiltHead | null): ShelfH
 	const { row, note } = tap;
 	return {
 		position: row.pill?.position ?? built?.position ?? null,
-		rank: row.pill?.rank ?? built?.rank,
+		// A screen that draws ranks says his, none included (B93); one that draws none leaves the build's.
+		rank: row.pill?.ranked === true ? row.pill.rank : (row.pill?.rank ?? built?.rank),
 		status: row.status,
 		note
 	};
@@ -215,18 +218,19 @@ export function rowSource(row: BoxRow): CardSource | null {
 
 /** The rest-of-season tile's caption names his rank in our order as the build had it ("QB12 in our
  * order"): once the row's rank stands in the pill, the caption names the same one, so the card never
- * says two (fix round 1, HIGH-1). Tiles as given when either rank is missing or they agree. */
+ * says two (fix round 1, HIGH-1); where the row draws him unranked (null, Lane 115, B93) the caption
+ * names none. Tiles as given when either rank is missing or they agree. */
 export function rankedTiles(
 	tiles: readonly CardTile[],
 	position: string | null,
 	built: number | undefined,
-	shown: number | undefined
+	shown: number | null | undefined
 ): CardTile[] {
 	if (position === null || built === undefined || shown === undefined || built === shown)
 		return [...tiles];
 	const from = restRankWords(position, built);
-	const to = restRankWords(position, shown);
+	const [was, now] = shown === null ? [`, ${from}`, ''] : [from, restRankWords(position, shown)];
 	return tiles.map((tile) =>
-		tile.key === 'rest' ? { ...tile, caption: tile.caption.replace(from, to) } : tile
+		tile.key === 'rest' ? { ...tile, caption: tile.caption.replace(was, now) } : tile
 	);
 }

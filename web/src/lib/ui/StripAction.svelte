@@ -3,7 +3,7 @@
 	import { stripVariant, type ActionProps } from './actions.ts';
 
 	interface Props extends ActionProps {
-		/** The strip's lead card (its first, or the one chosen): the one solid verb. Every other card
+		/** The strip's lead card (its first, the best): the one solid verb. Every other card
 		 * draws the same words quiet, at the same size, so the cards line up. */
 		lead: boolean;
 	}

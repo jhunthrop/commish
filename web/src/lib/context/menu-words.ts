@@ -19,6 +19,20 @@ export function leagueLine(league: ContextLeague): string {
 	return parts.join(', ');
 }
 
+/** Beside the selected league's name in the list, where the account has more than one and a
+ * league's page shows another (Lane 115, B89). */
+export const FOLLOWING = 'following';
+
+/** Whether a league in the list says it is the selected one: only where the switch names another,
+ * a league's page. */
+export function followingMark(
+	candidate: string,
+	selected: string | null,
+	shown: string | null
+): boolean {
+	return candidate === selected && shown !== selected;
+}
+
 /** The menu's last row, the way to follow a league beside the account's. */
 export const FOLLOW_ANOTHER = 'Follow another league';
 /** The last row for an account with no league yet. */

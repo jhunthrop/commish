@@ -54,7 +54,7 @@ import { weekOrderAnswer, weekPosition, type WeekOrderStates } from './week-orde
 import { tradeChecker } from './trade-check.ts';
 import { proposedTrades } from './trade-needs.ts';
 import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
-import { finalWords, rateWords, titleWeekHorizon } from './week.ts';
+import { finalWords, rateWords, titleWeekHorizon, withRuleList } from './week.ts';
 import { lineupSpent, TURNED_WEEK, turnedLineup, turnedTrades, turnedWaivers } from './turn.ts';
 import {
 	irDropLineup,
@@ -421,7 +421,8 @@ function send(
 		JSON.stringify({
 			ok,
 			// Every game stamped with the API's state at the fixture's clock (Lane 80).
-			data: ok ? stamped(body, now()) : null,
+			// The rules a basis names beside its sentence, as the API sends them (Lane 115, B92).
+			data: ok ? stamped(withRuleList(body), now()) : null,
 			error: ok ? null : { code, message: String(body) }
 		})
 	);
@@ -442,8 +443,10 @@ const waiversNow = (): WaiverAdvice => {
 	const ordered = turnedNow()
 		? turnedWaivers({ ...waivers, season_basis: answer.season_basis }, now())
 		: answer;
-	// Beats as the API names them in that order (waiver-beats.ts, Lane 98).
-	return restatedBeats(ordered, lineupNow());
+	// Beats as the API names them in that order (waiver-beats.ts, Lane 98), each starter's bye his
+	// bye in the week the page addresses (Lane 108, B81): week 7's once turned, so a starter whose
+	// club sits week 7 reads "Starter, bye" (Lane 115, B90).
+	return restatedBeats(ordered, turnedNow() ? turnedLineup(lineupNow()) : lineupNow());
 };
 
 function waiversAt(position: string | null): WaiverAdvice {

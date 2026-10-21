@@ -169,14 +169,33 @@ export function uncountedOf(
 	};
 }
 
-/** The recorded league's sentence (data/lineup.json uncounted_rules), for the shots scripts. */
-export const LEAGUE_RULES_NOTE = uncountedOf([
+/** The API's sentence's rule names (words.go Uncounted.Names, Lane 115, B92): the words between
+ * "Our stats omit " and the full stop. */
+const NOTE_NAMES = /^Our stats omit (.+)\.$/;
+
+/** An answer with the rules its basis_note names as the API now sends them beside it
+ * (basis_note_list), for the stored answers written before Lane 115; an answer that names none, or
+ * already carries them, as it is. */
+export function withRuleList<T>(body: T): T {
+	if (typeof body !== 'object' || body === null || !('basis_note' in body)) return body;
+	if ('basis_note_list' in body) return body;
+	const note = (body as { basis_note: unknown }).basis_note;
+	if (typeof note !== 'string') return body;
+	return { ...body, basis_note_list: NOTE_NAMES.exec(note)?.[1] ?? '' };
+}
+
+/** The recorded league's sentence (data/lineup.json uncounted_rules). */
+const LEAGUE_RULES_SENTENCE = uncountedOf([
 	'two-point conversions',
 	'missed field goals',
 	'missed extra points',
 	'fumble recoveries',
 	'safeties'
 ]).basis_note;
+
+/** The recorded league's rules our stats omit, as both of the web's frames name them ("Our stats
+ * omit ...", "Avg and Last are our stats, which omit ...", Lane 115, B92), for the shots scripts. */
+export const LEAGUE_RULES_NOTE = NOTE_NAMES.exec(LEAGUE_RULES_SENTENCE)?.[1] ?? '';
 
 /** A figure to the tenth a page prints. */
 export const tenth = (value: number): number => Math.round(value * TENTH) / TENTH;

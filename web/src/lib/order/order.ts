@@ -8,13 +8,17 @@ import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import {
 	anyKicked,
+	deskOrPhone,
 	gamePart,
 	finalsParts,
 	OPP_PART,
+	OPP_PHONE,
 	projPart,
 	said,
 	uncountedPart,
-	type BasisPart
+	weekProjPart,
+	type BasisPart,
+	type ProjFacts
 } from '#lib/league/box/basis.ts';
 import { BOX, boxRow, type BoxRow } from '#lib/league/box/box.ts';
 import { lineState } from '#lib/league/box/kickoff.ts';
@@ -165,22 +169,23 @@ export function orderBasis(
 	const lines = advice.rows.map((row) => row.line);
 	// The order carries no defense (Lane 66m), so the projection's defense words never apply. The week
 	// column is keyed first, then what its Proj is (Lane 92: no week column is called Proj).
-	const proj = projPart(
-		{
-			readAt: advice.projection_read_at,
-			scoring: advice.projection_scoring,
-			defense: false,
-			league: league !== null,
-			kicked: anyKicked(lines, now)
-		},
-		clock
-	);
+	const projFacts: ProjFacts = {
+		readAt: advice.projection_read_at,
+		scoring: advice.projection_scoring,
+		defense: false,
+		league: league !== null,
+		kicked: anyKicked(lines, now)
+	};
+	const week = `${weekColumnPart(advice.week)} ${projPart(projFacts, clock)}`;
 	return [
 		...said(advice.basis),
-		...said(weekColumnPart(advice.week)),
-		...said(proj),
-		...said(OPP_PART),
-		...(league === null ? [] : uncountedPart(advice)),
+		// A league's phone says the week column and its Proj in one sentence, the scoring left to the
+		// page's head ("Your league scores PPR."), so the order keeps to eight lines (Lane 115, B92).
+		...(league === null
+			? said(week)
+			: deskOrPhone(week, weekProjPart(weekHead(advice.week), projFacts, clock))),
+		...deskOrPhone(OPP_PART, OPP_PHONE),
+		...(league === null ? [] : uncountedPart(advice, lines)),
 		...said(gamePart(lines, clock, now, 'read'), false),
 		// Said on the phone too: the board has the room (review finding 6); K/DST keeps it to a desk.
 		...finalsParts(lines, now, league?.host ?? null, 'pool', true),

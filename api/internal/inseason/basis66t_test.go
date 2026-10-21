@@ -87,9 +87,38 @@ func TestUncountedRulesAreNamedAndListed(t *testing.T) {
 	if extra.Note != "Our stats omit missed extra point." {
 		t.Errorf("extra point: %q", extra.Note)
 	}
+	if got.Names != "two-point, safety, points allowed and yards allowed" {
+		t.Errorf("names %q", got.Names)
+	}
 	none := UncountedOf(settings, func(string) bool { return true })
 	if none.Note != "" || none.Link != "" || none.Rules == nil || len(none.Rules) != 0 {
 		t.Errorf("none: %+v", none)
+	}
+}
+
+// Past four rules the sentence names four and counts the rest (Lane 115,
+// B92), so a league scoring every uncounted rule keeps a phone's footer;
+// Names is the same words for the web's own frame.
+func TestUncountedRulesNameFourThenCountTheRest(t *testing.T) {
+	rules := scoring.PresetRules(apitypes.ScoringPresetPpr)
+	rules.PointsPerFieldGoalMissed, rules.PointsPerReturnTouchdown, rules.PointsPerDefensiveFumbleRecovery = -1, 6, 2
+	settings := apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupStandard, Scoring: apitypes.Scoring{Custom: &rules},
+		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1, K: 1, Dst: 1}}
+	got := UncountedOf(settings, nil)
+	if len(got.Rules) <= namedRulesMost {
+		t.Fatalf("the case needs more than four rules: %v", got.Rules)
+	}
+	more := countWords(len(basisNames(uncountedRules(settings, nil))) - namedRulesMost)
+	wantNames := "two-point, missed field goal, return touchdown, fumble recovery and " + more + " more"
+	if got.Names != wantNames || got.Note != "Our stats omit "+wantNames+"." {
+		t.Errorf("names %q note %q", got.Names, got.Note)
+	}
+	// Four are named whole.
+	four := UncountedOf(settings, func(m string) bool {
+		return m != "two_point_conversions" && m != "safeties" && m != metricPointsAllowed && m != metricYardsAllowed
+	})
+	if four.Note != "Our stats omit two-point, safety, points allowed and yards allowed." {
+		t.Errorf("four: %q", four.Note)
 	}
 }
 

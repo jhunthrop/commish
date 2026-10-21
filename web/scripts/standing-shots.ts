@@ -16,7 +16,15 @@
 // http://localhost:8999), and the fixture API running there on one of the three clocks.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
-import { PICK_PART, RANK_OPP_PART, RANK_PART } from '../src/lib/league/box/basis.ts';
+import {
+	PICK_PART,
+	RANK_OPP_PART,
+	RANK_OPP_PHONE,
+	RANK_PART
+} from '../src/lib/league/box/basis.ts';
+
+/** The phone Lineup's opening clause: the rule our pick follows (basis.ts pickProjPart). */
+const PICK_PHONE_START = "Our pick is each slot's highest Proj,";
 import { BOX } from '../src/lib/league/box/box.ts';
 import { LINEUP } from '../src/lib/league/box/lineup.ts';
 import type { LineupAdvice, MatchupBox } from '../src/lib/league/inseason/api.ts';
@@ -144,12 +152,16 @@ async function lineupScreen(page: Page, at: string, width: number): Promise<void
 		`${at}: the rule for our pick above the rows`
 	);
 	const basis = await page.locator('[data-basis]').last().innerText();
-	if (width > PHONE_MAX)
-		expect(
-			basis.startsWith(PICK_PART),
-			`${at}: the basis does not open with the rule for our pick`
-		);
-	expect(basis.includes(RANK_OPP_PART), `${at}: the basis does not say what Our rank is`);
+	const phone = width <= PHONE_MAX;
+	// The phone says the rule in one clause with what Proj is, Our rank in fewer words (Lane 115, B83).
+	expect(
+		basis.startsWith(phone ? PICK_PHONE_START : PICK_PART),
+		`${at}: the basis does not open with the rule for our pick`
+	);
+	expect(
+		basis.includes(phone ? RANK_OPP_PHONE : RANK_OPP_PART),
+		`${at}: the basis does not say what Our rank is`
+	);
 	const missed = await texts(page, 'div.strip .missed');
 	expect(
 		(missed[0] ?? null) === (lineup.missed ?? null),

@@ -16,7 +16,18 @@ export const DEFAULT_CONTEXT_FORMAT: BoardFormat = 'ppr';
 /** A followed league's name, or its host's when its read has none yet. */
 export const leagueName = followedName;
 
-/** The switch's own words: the selected league's name, else the format pages are in. */
+/** The league the switch names (Lane 115, B89): on a league's page that league, when the account
+ * follows it, else the selected one. Opening the page never selects it (B38): the selection stays
+ * the member's, marked in the switch's list. */
+export function shownLeague(
+	page: string | undefined,
+	leagues: readonly ContextLeague[],
+	selected: ContextLeague | null
+): ContextLeague | null {
+	return (page === undefined ? undefined : leagues.find((l) => l.id === page)) ?? selected;
+}
+
+/** The switch's own words: the shown league's name, else the format pages are in. */
 export function switchLabel(league: ContextLeague | null, format: BoardFormat | null): string {
 	return league ? leagueName(league) : FORMAT_LABELS[format ?? DEFAULT_CONTEXT_FORMAT];
 }
