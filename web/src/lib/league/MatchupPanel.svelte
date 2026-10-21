@@ -12,6 +12,7 @@
 		nextKickoff,
 		sideBox,
 		standingLine,
+		unlistedStates,
 		type SideBox
 	} from './box/matchup.ts';
 	import { readCell } from './home/home.ts';
@@ -66,12 +67,16 @@
 		)
 	);
 
-	/** Every starter the screen holds a line for is final (Lane 121 fix round 1): a side with no box
-	 * follows it. */
+	/** The states by the schedule of the sides the platform lists no starters for (Lane 124, B102). */
+	const unlisted = $derived(unlistedStates(box));
+
+	/** Every starter the screen holds a line for is final and every side listing none is by the
+	 * schedule (Lane 124, B102): a side with no box follows it. */
 	const headFinal = $derived(
 		matchupFinal(
 			(box?.sides ?? []).flatMap((s) => s.starters.map((st) => st.line)),
-			now.getTime()
+			now.getTime(),
+			unlisted
 		)
 	);
 
@@ -97,7 +102,11 @@
 	const lines = $derived([...(mine?.lines ?? []), ...(theirs?.lines ?? [])]);
 	/** The bug's middle, "Decided" while the side behind has nobody left (the API's, Lane 99 B31). */
 	const kickoff = $derived(
-		decidedHead(nextKickoff(lines, now.getTime()), box?.decided === true, started)
+		decidedHead(
+			nextKickoff(lines, now.getTime(), undefined, unlisted),
+			box?.decided === true,
+			started
+		)
 	);
 	/** The read beside the live score (Lane 92, B06), while the game is under way. */
 	const read = $derived(

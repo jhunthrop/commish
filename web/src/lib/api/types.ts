@@ -3274,6 +3274,8 @@ export interface components {
 			team_total: boolean;
 			/** @description where the side's starters stand while the game is playing, by the score bug's rule (ScoreboardSide.to_play): "3 to play", "2 playing", never a zero; null otherwise, or absent from an older answer */
 			to_play?: string | null;
+			/** @description the side's state by the schedule, for a side the platform lists no starters for (FFPC's opponent view), whose state no starter's game can give (Lane 124, B102): its roster's games where the league read carries the roster, else every game of the week, each by gameStateAt; final once every one is final, kicked_off once one has kicked off, upcoming before. The game's state is final only once this is too. Absent for a side that lists starters, whose starters say it, and from an older answer, which reads the game's state */
+			schedule_state?: components['schemas']['GameState'];
 			/**
 			 * Format: double
 			 * @description the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far, the rest of the Proj of its starters in play and the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, or absent from an older answer
@@ -3297,7 +3299,9 @@ export interface components {
 			te_bonus?: number;
 		};
 		ScoreboardSide: {
-			/** @description every one of the side's starters with a game this week has a final game at the read's clock (gameStateAt), empty slots, byes and starters with no game held not counting, false with none (Lane 121, B99): the side's figure reads Final with its total; absent for a side the platform lists no starters for (FFPC's opponent view) and from an older answer, both of which read the game's state */
+			/** @description the side's state by the schedule, for a side the platform lists no starters for (FFPC's opponent view), whose state no starter's game can give (Lane 124, B102): its roster's games where the league read carries the roster, else every game of the week, each by gameStateAt; final once every one is final, kicked_off once one has kicked off, upcoming before. The game's state is final only once this is too. Absent for a side that lists starters, whose starters say it, and from an older answer, which reads the game's state */
+			schedule_state?: components['schemas']['GameState'];
+			/** @description every one of the side's starters with a game this week has a final game at the read's clock (gameStateAt), empty slots, byes and starters with no game held not counting, false with none (Lane 121, B99): the side's figure reads Final with its total; absent for a side the platform lists no starters for (FFPC's opponent view), which says schedule_state instead, and from an older answer, which reads the game's state */
 			starters_final?: boolean;
 			roster_id: number;
 			/**

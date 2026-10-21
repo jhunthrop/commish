@@ -8,6 +8,7 @@
 // it; serve.ts restates the week at its clock by it.
 import { readFile } from 'node:fs/promises';
 import type {
+	GameState,
 	LineupAdvice,
 	MatchupBox,
 	PlayerLine,
@@ -100,7 +101,7 @@ export function sitsOut(line: PlayerLine): boolean {
 	return status !== undefined && status !== 'questionable' && status !== 'doubtful';
 }
 
-function kicks(lines: readonly PlayerLine[], moment: Moment): Kicks {
+function kicks(lines: readonly PlayerLine[], moment: Pick<Moment, 'now' | 'final'>): Kicks {
 	const out: Kicks = { kicked: 0, done: 0, finals: 0, inPlay: 0, toCome: 0, games: 0, next: null };
 	for (const line of lines) {
 		const { facts } = line;
@@ -126,6 +127,32 @@ function kicks(lines: readonly PlayerLine[], moment: Moment): Kicks {
 function stateOf(k: Kicks): ScoreboardGame['state'] {
 	if (k.kicked === 0) return 'upcoming';
 	return k.done === k.games ? 'final' : 'playing';
+}
+
+/** A side's state by the schedule (schedule_state.go scheduleState, Lane 124 B102), for a side the
+ * platform lists no starters for: its roster's games, final once every one is, kicked off once one
+ * has kicked off, upcoming before. */
+export function scheduleStateOf(
+	roster: readonly PlayerLine[],
+	moment: Pick<Moment, 'now' | 'final'>
+): GameState {
+	const k = kicks(roster, moment);
+	if (k.games > 0 && k.finals === k.games) return 'final';
+	return k.kicked > 0 ? 'kicked_off' : 'upcoming';
+}
+
+/** A game's state by each side's own rule (schedule_state.go gameState, Lane 124 B102): its listed
+ * starters' games, never final while a side listing none is not final by the schedule; the next
+ * kickoff the listed starters'. */
+export function listedGameOf(
+	listed: readonly PlayerLine[],
+	unlisted: readonly GameState[],
+	moment: Pick<Moment, 'now' | 'final'>
+): Pick<ScoreboardGame, 'state' | 'next_kickoff'> {
+	const k = kicks(listed, moment);
+	const state = stateOf(k);
+	const waiting = state === 'final' && unlisted.some((s) => s !== 'final');
+	return { state: waiting ? 'playing' : state, next_kickoff: k.next };
 }
 
 /** The count while the game is under way (words.go ToPlayWords), never a zero; null otherwise. */

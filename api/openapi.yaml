@@ -4047,6 +4047,14 @@ components:
             where the side's starters stand while the game is playing, by the score bug's rule
             (ScoreboardSide.to_play): "3 to play", "2 playing", never a zero; null otherwise, or absent from an older
             answer
+        schedule_state:
+          allOf: [{ $ref: "#/components/schemas/GameState" }]
+          description: >-
+            the side's state by the schedule, for a side the platform lists no starters for (FFPC's opponent view),
+            whose state no starter's game can give (Lane 124, B102): its roster's games where the league read carries
+            the roster, else every game of the week, each by gameStateAt; final once every one is final, kicked_off
+            once one has kicked off, upcoming before. The game's state is final only once this is too. Absent for a
+            side that lists starters, whose starters say it, and from an older answer, which reads the game's state
         projected_final:
           type: number
           format: double
@@ -4087,13 +4095,22 @@ components:
       type: object
       required: [roster_id, points, points_read, projection, starters, played]
       properties:
+        schedule_state:
+          allOf: [{ $ref: "#/components/schemas/GameState" }]
+          description: >-
+            the side's state by the schedule, for a side the platform lists no starters for (FFPC's opponent view),
+            whose state no starter's game can give (Lane 124, B102): its roster's games where the league read carries
+            the roster, else every game of the week, each by gameStateAt; final once every one is final, kicked_off
+            once one has kicked off, upcoming before. The game's state is final only once this is too. Absent for a
+            side that lists starters, whose starters say it, and from an older answer, which reads the game's state
         starters_final:
           type: boolean
           description: >-
             every one of the side's starters with a game this week has a final game at the read's clock
             (gameStateAt), empty slots, byes and starters with no game held not counting, false with none
             (Lane 121, B99): the side's figure reads Final with its total; absent for a side the platform lists
-            no starters for (FFPC's opponent view) and from an older answer, both of which read the game's state
+            no starters for (FFPC's opponent view), which says schedule_state instead, and from an older answer, which
+            reads the game's state
         roster_id: { type: integer }
         points: { type: number, format: double, description: "the side's points so far as the host scores them, to the tenth" }
         points_read: { type: boolean, description: false when the host's score could not be read; points then says nothing }

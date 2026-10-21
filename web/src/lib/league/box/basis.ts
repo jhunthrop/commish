@@ -125,6 +125,9 @@ interface ProjSays {
 const DESK_SAYS: ProjSays = { defenses: true, scoring: true, kicked: true, read: true };
 const PHONE_SAYS: ProjSays = { defenses: false, scoring: true, kicked: true, read: true };
 const ORDER_PHONE_SAYS: ProjSays = { defenses: false, scoring: false, kicked: false, read: false };
+/** The phone Matchup's (Lane 124): the defenses' scoring and what a started game's Proj is left to the
+ * desk, as the phone order's, so its eight lines hold FFPC's tight end sentence beside the Final's. */
+const MATCHUP_PHONE_SAYS: ProjSays = { defenses: false, scoring: true, kicked: false, read: true };
 
 /** What the projection is, the words after "Proj is": "this week's published projection, PPR nearest
  * your rules, defenses on default scoring, read Fri 9:00 pm, as of kickoff once started", "week 7's"
@@ -152,6 +155,14 @@ function withBonus(said: string, proj: ProjFacts): string {
  * rules, read Mon 6:00 pm. FFPC adds 0.5 a catch for TEs." */
 export function projPart(proj: ProjFacts, clock: Clock): string {
 	return withBonus(`${proj.head ?? BOX.proj} is ${projWhat(proj, clock, DESK_SAYS)}.`, proj);
+}
+
+/** projPart in the phone Matchup's words (Lane 124, MATCHUP_PHONE_SAYS). */
+export function projMatchupPhonePart(proj: ProjFacts, clock: Clock): string {
+	return withBonus(
+		`${proj.head ?? BOX.proj} is ${projWhat(proj, clock, MATCHUP_PHONE_SAYS)}.`,
+		proj
+	);
 }
 
 /** projPart in a phone's words (Lane 115): the defenses' scoring left to the desk. */
@@ -465,7 +476,11 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	const projFacts: ProjFacts | null = facts.projection
 		? { ...facts.projection, defense, league: true, kicked, host: facts.host }
 		: null;
-	const proj = projFacts ? said(projPart(projFacts, clock)) : [];
+	// The phone Matchup's eight lines (Lane 124): the defenses' scoring and the started game's Proj
+	// left to the desk, qualifications the desk says (MATCHUP_PHONE_SAYS).
+	const proj = projFacts
+		? deskOrPhone(projPart(projFacts, clock), projMatchupPhonePart(projFacts, clock))
+		: [];
 	// What the Team row's small figure is while a starter still plays (Lane 92, B22; once every one is
 	// final the row reads Final, Lane 121 B99, and needs no key).
 	const projFinal = kicked && facts.allFinal !== true;

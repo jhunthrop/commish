@@ -14,6 +14,7 @@ import { lateFinals, stamped } from '../../../../scripts/inseason-fixture/game-s
 import { linesOf, recordedMatchups } from '../../../../scripts/inseason-fixture/scoreboard-at.ts';
 import {
 	afterSundayOf,
+	momentAt,
 	WEEK_DONE,
 	WEEK_DONE_KICKED_OFF
 } from '../../../../scripts/inseason-fixture/sunday.ts';
@@ -28,18 +29,19 @@ import type {
 	TradeAdvice,
 	WaiverAdvice
 } from '../inseason/api.ts';
-import {
-	bugsFinalNone,
-	bugsMissFinal,
-	bugsOf,
-	lineupSummary,
-	type Bug,
-	type BugSide
-} from '../home/home.ts';
+import { bugsMissFinal, bugsOf, lineupSummary, type Bug, type BugSide } from '../home/home.ts';
 import { BOX, teamSmallFigure } from './box.ts';
-import { gameHead } from './kickoff.ts';
+import { gameHead, KICKOFF } from './kickoff.ts';
 import { changesTitle, heldLineup, lineupBox, lineupSum, locked } from './lineup.ts';
-import { bugFigures, sideBox, sideScore } from './matchup.ts';
+import {
+	bugFigures,
+	decidedHead,
+	matchupFinal,
+	nextKickoff,
+	sideBox,
+	sideScore,
+	unlistedStates
+} from './matchup.ts';
 
 const data = (name: string): unknown =>
 	inTenths(
@@ -66,6 +68,7 @@ const week = {
 	}),
 	box: matchup
 };
+const week6 = week;
 /** The week at a clock as the stand-in API sends it: every game stamped with the API's state. */
 const at = (clock: string): ReturnType<typeof afterSundayOf> => {
 	const now = Date.parse(clock);
@@ -242,46 +245,147 @@ void test("Monday night: one predicate for a side's Final on the Matchup, the ho
 	assert.equal(teamSmallFigure(live)?.caption, BOX.projFinal);
 });
 
-void test('Tuesday in an FFPC league: the opponent it lists no starters for reads Final on the Matchup and the home alike (Lane 121 fix round 2, HIGH-2)', () => {
-	const now = Date.parse(FIXTURE_TUESDAY_CLOCK);
-	const week = ffpcAfterSunday(at(FIXTURE_TUESDAY_CLOCK));
+/** The FFPC stand-in at a clock (Lane 121 fix round 2, Lane 124): the week as the stand-in API sends it,
+ * the opponent unlisted, his state by his roster's games; `late` clubs' finals not held yet. */
+function ffpcAt(clock: string, late?: ReadonlySet<string>): ReturnType<typeof ffpcAfterSunday> {
+	const now = Date.parse(clock);
+	const week = stamped(
+		afterSundayOf({ sync, lineup, matchup }, week6, now, clock, late),
+		now,
+		late
+	) as ReturnType<typeof afterSundayOf>;
+	return ffpcAfterSunday(week, momentAt(now, late));
+}
+
+/** What the member's FFPC game reads at a clock on the home and the Matchup, side by side. */
+function ffpcScreens(clock: string, late?: ReadonlySet<string>) {
+	const now = Date.parse(clock);
+	const week = ffpcAt(clock, late);
 	const me = week.sync.me;
 	const game = week.scoreboard.games.find((g) => g.sides.some((s) => s.roster_id === me));
 	assert.ok(game);
-	assert.equal(game.state, 'final');
 	const hidden = game.sides.find((s) => s.roster_id !== me);
 	assert.ok(hidden);
-	// The API sends no starters_final for a side it lists no starters for: the web reads the game.
+	// The API sends no starters_final for a side it lists no starters for, its schedule_state instead.
 	assert.equal(hidden.starters_final, undefined);
 	assert.equal(hidden.starters, 0);
 	const bugs: Bug[] = bugsOf(week.scoreboard, week.sync, now, ZONE);
 	const bug = bugs.find((b) => b.sides.some((s) => s.rosterId === me));
 	assert.ok(bug);
-	const home: BugSide | undefined = bug.sides.find((s) => s.rosterId === hidden.roster_id);
-	assert.ok(home);
-	assert.equal(home.final, true);
-	assert.equal(bug.columns.small, BOX.final);
-	// Nothing on the home says a Proj final is missing: the side is final.
-	assert.equal(bugsMissFinal(bugs), false);
-	// The Matchup: the opponent's box holds no starters, so it follows the bug's Final head.
+	const home = bug.sides.find((s) => s.rosterId === hidden.roster_id);
+	const homeMine = bug.sides.find((s) => s.rosterId === me);
+	assert.ok(home && homeMine);
 	const box = week.matchup.sides.find((s) => s.roster_id === hidden.roster_id);
 	const opponent = week.sync.matchup?.opponent;
-	assert.ok(opponent);
-	assert.equal(box?.starters.length ?? 0, 0);
+	assert.ok(box && opponent);
+	// FFPC's rosters page carries the opponent's roster: his box lists no starters, his players benched.
+	assert.equal(box.starters.length, 0);
+	assert.ok(box.bench.length > 0);
+	// No starter of his to count while the game plays.
+	assert.equal(box.to_play ?? null, null);
+	const lines = week.matchup.sides.flatMap((s) => s.starters.map((st) => st.line));
+	const unlisted = unlistedStates(week.matchup);
+	const headFinal = matchupFinal(lines, now, unlisted);
 	const read = {
 		hostTotal: null,
 		landed: true,
 		week: week.matchup.week,
 		now,
 		started: true,
-		headFinal: true
+		headFinal
 	};
-	const team = sideBox(opponent, box ?? null, read, ZONE).totals;
-	assert.equal(team.allFinal, home.final);
-	assert.ok(bugFigures(team, true).small.startsWith(BOX.final));
-	// A Final with no total says why, on both surfaces.
-	if (team.pts === null) assert.equal(bugFigures(team, true).small, `${BOX.final} ${BOX.none}`);
-	if (home.small === BOX.none) assert.equal(bugsFinalNone(bugs), true);
+	const team = sideBox(opponent, box, read, ZONE).totals;
+	const card = lineupSummary(week.lineup, ZONE, now);
+	return {
+		state: game.state,
+		schedule: hidden.schedule_state,
+		bugHead: bug.head,
+		column: bug.columns.small,
+		homeFinal: home.final,
+		homeMineFinal: homeMine.final,
+		homeSmall: home.small,
+		missFinal: bugsMissFinal(bugs),
+		// The bug's middle as the Matchup draws it, Decided where the API says so (it says none here).
+		matchupHead:
+			decidedHead(nextKickoff(lines, now, ZONE, unlisted), week.matchup.decided === true, true)
+				?.head ?? null,
+		headFinal,
+		teamFinal: team.allFinal,
+		teamSmall: bugFigures(team, true).small,
+		title: card.done === null ? null : changesTitle(0, card.done, card.doneState)
+	};
+}
+
+void test('Tuesday in an FFPC league: the opponent it lists no starters for reads Final on the Matchup and the home alike (Lane 121 fix round 2, HIGH-2)', () => {
+	const got = ffpcScreens(FIXTURE_TUESDAY_CLOCK);
+	assert.equal(got.state, 'final');
+	assert.equal(got.schedule, 'final');
+	assert.equal(got.homeFinal, true);
+	assert.equal(got.column, BOX.final);
+	// Nothing on the home says a Proj final is missing: the side is final.
+	assert.equal(got.missFinal, false);
+	assert.equal(got.headFinal, true);
+	assert.equal(got.matchupHead, KICKOFF.final);
+	assert.equal(got.teamFinal, got.homeFinal);
+	assert.ok(got.teamSmall.startsWith(BOX.final));
+	assert.equal(got.title, BOX.final);
+});
+
+void test("B102: an FFPC opponent with no box keeps his game state from his roster's games while the member's side is done (Lane 124)", () => {
+	// Tuesday with LV at BUF's final not held: every starter of the member's final, the opponent's Cook
+	// (BUF) still playing, and FFPC lists the opponent no starters.
+	const late = ffpcScreens(FIXTURE_TUESDAY_CLOCK, lateFinals('LV,BUF'));
+	assert.equal(late.state, 'playing');
+	assert.equal(late.schedule, 'kicked_off');
+	assert.equal(late.homeMineFinal, true);
+	assert.equal(late.homeFinal, false);
+	assert.equal(late.bugHead, KICKOFF.kickedOff);
+	assert.equal(late.column, BOX.projFinal);
+	// The Matchup's head is Kicked off, never Final, and the opponent reads Proj final --.
+	assert.equal(late.headFinal, false);
+	assert.equal(late.matchupHead, KICKOFF.kickedOff);
+	assert.equal(late.teamFinal, false);
+	assert.equal(late.teamSmall, `${BOX.projFinal} ${BOX.none}`);
+	assert.equal(late.homeSmall, BOX.none);
+	assert.equal(late.missFinal, true);
+	assert.equal(late.title, BOX.locked);
+	// Monday night, the Monday game under way with a player on each roster: both still play.
+	const night = ffpcScreens(FIXTURE_MONDAY_NIGHT_CLOCK);
+	assert.equal(night.state, 'playing');
+	assert.equal(night.schedule, 'kicked_off');
+	assert.equal(night.homeFinal, false);
+	assert.equal(night.matchupHead, KICKOFF.kickedOff);
+	assert.equal(night.teamSmall, `${BOX.projFinal} ${BOX.none}`);
+	assert.equal(night.title, BOX.locked);
+});
+
+void test('an answer without schedule_state reads as before: the side follows the head, the home the game (Lane 124)', () => {
+	const now = Date.parse(FIXTURE_TUESDAY_CLOCK);
+	const week = ffpcAt(FIXTURE_TUESDAY_CLOCK, lateFinals('LV,BUF'));
+	const me = week.sync.me;
+	const older = {
+		...week.scoreboard,
+		games: week.scoreboard.games.map((g) => ({
+			...g,
+			sides: g.sides.map((s) => {
+				const rest = { ...s };
+				delete rest.schedule_state;
+				return rest;
+			})
+		}))
+	};
+	const bug = bugsOf(older, week.sync, now, ZONE).find((b) =>
+		b.sides.some((s) => s.rosterId === me)
+	);
+	assert.equal(bug?.sides.find((s) => s.rosterId !== me)?.final, false);
+	const box = week.matchup.sides.find((s) => s.roster_id !== me);
+	const opponent = week.sync.matchup?.opponent;
+	assert.ok(box && opponent);
+	const rest = { ...box };
+	delete rest.schedule_state;
+	const read = { hostTotal: null, landed: true, week: 6, now, started: true, headFinal: true };
+	assert.equal(sideBox(opponent, rest, read, ZONE).totals.allFinal, true);
+	assert.equal(matchupFinal([], now, unlistedStates({ sides: [rest] })), false);
 });
 
 void test('the scoreboard and the Matchup print one figure for each side, its rows added (review M2)', () => {

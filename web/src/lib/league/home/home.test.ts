@@ -265,6 +265,10 @@ void test("a side reads Final once every one of its starters is, the Team row's 
 	assert.equal(sideFinal({}, 'final'), true);
 	assert.equal(sideFinal({}, 'kicked_off'), false);
 	assert.equal(sideFinal({ starters_final: true }, 'upcoming'), false);
+	// A side listing no starters reads by the schedule's state, whatever the game's (Lane 124, B102).
+	assert.equal(sideFinal({ schedule_state: 'final' }, 'kicked_off'), true);
+	assert.equal(sideFinal({ schedule_state: 'kicked_off' }, 'kicked_off'), false);
+	assert.equal(sideFinal({ schedule_state: 'final' }, 'upcoming'), false);
 	// A final side whose score is unread reads Final --, and the key says why.
 	const unread = board('final');
 	const side = unread.games[0]?.sides[1];

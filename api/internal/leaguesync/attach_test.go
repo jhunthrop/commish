@@ -19,6 +19,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
+	"github.com/jhunthrop/commish/api/internal/entitlements/enttest"
 	"github.com/jhunthrop/commish/api/internal/leagues"
 	"github.com/jhunthrop/commish/api/internal/mfl"
 	"github.com/jhunthrop/commish/api/internal/mock"
@@ -225,9 +226,7 @@ func TestAttachIsScopedToTheAccount(t *testing.T) {
 	}
 
 	// A second league needs many_leagues, so alice holds a Draft Pass for it.
-	if err := (&entitlements.Store{Pool: pool}).Grant(ctx, alice.ID, entitlements.ProductDraftPass, 2026, clock2027(), "test"); err != nil {
-		t.Fatal(err)
-	}
+	enttest.GrantFrom(t, &entitlements.Store{Pool: pool}, alice.ID, entitlements.ProductDraftPass, 2026, svc.Now(), clock2027())
 	status, body = a.do(svc.attach, http.MethodPost, "/leagues/attach", apitypes.AttachInput{
 		Link: "https://www43.myfantasyleague.com/2026/home/" + ReplayMFLLeague, Me: apitypes.AttachSeat{Username: strp("alice")},
 	}, "")

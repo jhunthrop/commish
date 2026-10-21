@@ -46,7 +46,7 @@ export function sundayFinal(line: PlayerLine): boolean {
 }
 
 /** A moment of the week: its instant and its rule for a final. */
-interface Moment {
+export interface Moment {
 	now: number;
 	final: (line: PlayerLine) => boolean;
 }
@@ -262,6 +262,12 @@ export function sundayOf(recorded: Recorded): Week {
 
 /** A league after its Sunday, at the fixture's clock `now`: every game final by the API's rule then
  * (stateAt), its scoreboard restated from the recorded week at that clock. */
+/** How the API reads a starter's game at `now`: final by its rule (game-state.ts stateAt), the
+ * `late` clubs' finals not held yet. */
+export function momentAt(now: number, late?: ReadonlySet<string>): Moment {
+	return { now, final: (line) => stateAt(line.facts, now, late) === 'final' };
+}
+
 export function afterSundayOf(
 	recorded: Omit<Recorded, 'scoreboardLive'>,
 	week: RecordedWeek,
@@ -269,7 +275,7 @@ export function afterSundayOf(
 	readAt: string,
 	late?: ReadonlySet<string>
 ): Week & { scoreboard: Scoreboard } {
-	const moment: Moment = { now, final: (line) => stateAt(line.facts, now, late) === 'final' };
+	const moment = momentAt(now, late);
 	const scoreboard = scoreboardAt(week, { ...moment, scored: true }, readAt);
 	return { ...weekOf(recorded, scoreboard, moment), scoreboard };
 }

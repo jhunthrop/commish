@@ -45,13 +45,21 @@ func (a *advisor) Matchup() (apitypes.MatchupBox, bool) {
 			game.add(l.Facts)
 		}
 	}
+	// A side the platform lists no starters for reads by the schedule, the game final only once it
+	// is too: the scoreboard's rule (Lane 124, B102).
+	unlisted := make([]*kickoffs, len(sides))
+	for i, s := range sides {
+		unlisted[i] = a.scheduleRead(s)
+	}
+	state, _ := gameState(game, unlisted)
 	for i := range out.Sides {
 		out.Sides[i].ProjectedFinal = projectedFinal(sidePoints(sides[i]), starters[i], started)
 		// Each side's count by the score bug's rule (fix round 1, MEDIUM-3).
-		out.Sides[i].ToPlay = own[i].toPlay(game.state())
+		out.Sides[i].ToPlay = own[i].toPlay(state)
+		out.Sides[i].ScheduleState = scheduleStateOf(unlisted[i])
 	}
 	// Where the member stands, under the bug's two scores (Lane 99, B31).
-	out.Standing, out.Decided = standingFields(standingOf(game.state(), sides, starters))
+	out.Standing, out.Decided = standingFields(standingOf(state, sides, starters))
 	return out, true
 }
 
