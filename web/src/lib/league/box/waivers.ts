@@ -44,6 +44,8 @@ export const WAIVERS = {
 	rest: SEASON.perGame,
 	starter: 'Starter',
 	bench: 'Bench',
+	/** After Starter for a rest-of-season starter on his bye in the week addressed (Lane 108, B81). */
+	onBye: 'bye',
 	find: 'Find a player',
 	noneFound: 'No player free to add by that name.',
 	/** The card's rest-of-season gain and the drop panel's head over it. */
@@ -81,8 +83,9 @@ export function shortName(name: string): string {
 export interface BeatsCell {
 	/** The player his move replaces (the API's: the offered move's drop, else the weakest starter he
 	 * would displace), or the open spot he fills; null where he beats nobody, and on a row that gains
-	 * nothing ("if he beats nobody, say nothing"). */
-	who: { name: string; starter: boolean } | null;
+	 * nothing ("if he beats nobody, say nothing"). Starter is his place in the rest-of-season lineup,
+	 * bye his bye in the week addressed (Lane 108, B81). */
+	who: { name: string; starter: boolean; bye: boolean } | null;
 	/** The season Gain, the column's key on every row in either order (review M-A); null on a row the
 	 * rule cannot judge (a Gain with no one named), which draws no Gain (fix round 1, H1). */
 	gain: number | null;
@@ -187,7 +190,9 @@ function beatsOf(
 			? null
 			: {
 					name: beats.open_spot ? WAIVERS.openSpot : beatsName(beats.name, names),
-					starter: beats.starter
+					starter: beats.starter,
+					// An answer before Lane 108 sends no bye: read as off it.
+					bye: beats.bye === true
 				};
 	const judged = beats !== null || !positive(source.gain);
 	return {
@@ -203,6 +208,13 @@ function beatsOf(
 export function beatsWord(beats: Pick<BeatsCell, 'gain' | 'gains'>): string {
 	if (beats.gain === null) return BOX.none;
 	return beats.gains ? `${gainWord(beats.gain)} ${SEASON.gain}` : gainWord(beats.gain);
+}
+
+/** The named player's place under his name (Lane 108, B81): his place in the rest-of-season lineup,
+ * "Starter" or "Bench", and "Starter, bye" for a starter on his bye in the week addressed. */
+export function beatsPlace(who: NonNullable<BeatsCell['who']>): string {
+	if (!who.starter) return WAIVERS.bench;
+	return who.bye ? `${WAIVERS.starter}, ${WAIVERS.onBye}` : WAIVERS.starter;
 }
 
 /** The card's week figure under its row's Gain: "+4.8 Proj" (review M1). */

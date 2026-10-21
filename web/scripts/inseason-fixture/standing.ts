@@ -192,7 +192,7 @@ export function missedOf(pick: LineupAdvice, moment: StandingMoment): string | n
 	const more = misses.length - named.length;
 	const said = named.map((m, i) => {
 		if (i < named.length - 1 || more === 0) return `${m.words}.`;
-		return `${m.words}, and ${more === 1 ? 'one' : String(more)} more.`;
+		return `${m.words}, and ${more === 1 ? 'one more slot' : `${String(more)} more slots`}.`;
 	});
 	return [...said, ...total].join(' ');
 }

@@ -31,6 +31,7 @@ import {
 	WAIVERS,
 	waiverBasis,
 	withDrop,
+	beatsPlace,
 	beatsWord,
 	dropWhy,
 	dropWhyWords,
@@ -116,8 +117,20 @@ const row = (add: PlayerLine, over: Partial<WaiverRow> = {}): WaiverRow => ({
 		open_spot: false
 	},
 	drops: [
-		{ host_id: lemon.player.host_id, gain: 1.2, week_gain: 6.7, starts_this_week: false },
-		{ host_id: vidal.player.host_id, gain: 0.6, week_gain: 6.7, starts_this_week: true }
+		{
+			host_id: lemon.player.host_id,
+			gain: 1.2,
+			week_gain: 6.7,
+			starts_this_week: false,
+			season_starter: false
+		},
+		{
+			host_id: vidal.player.host_id,
+			gain: 0.6,
+			week_gain: 6.7,
+			starts_this_week: true,
+			season_starter: true
+		}
 	],
 	clears: null,
 	sentence: '',
@@ -136,7 +149,15 @@ const chiefs = row(line('Chiefs D/ST', 'DEF', 9.6, 7), {
 		gain: 2.7,
 		open_spot: false
 	},
-	drops: [{ host_id: saints.player.host_id, gain: 0.3, week_gain: 2.7, starts_this_week: true }]
+	drops: [
+		{
+			host_id: saints.player.host_id,
+			gain: 0.3,
+			week_gain: 2.7,
+			starts_this_week: true,
+			season_starter: true
+		}
+	]
 });
 const mevis = row(line('Harrison Mevis', 'K', 6.7, 7.6), {
 	gain: -0.3,
@@ -316,7 +337,7 @@ void test('Beats prints the open spot only when the API says it: an empty Beats 
 	});
 	const [only] = poolRows({ rows: [taylor], pickups: [taylor], roster: [] }, ZONE, NOW);
 	assert.deepEqual(only?.beats, {
-		who: { name: 'Open spot', starter: true },
+		who: { name: 'Open spot', starter: true, bye: false },
 		gain: 1.2,
 		gains: true,
 		week: 4.8
@@ -445,7 +466,7 @@ void test('in the API season order the web prints it: the season Gain in Beats, 
 	const top = pool[0];
 	assert.ok(top?.beats);
 	assert.deepEqual(top.beats, {
-		who: { name: 'Vidal', starter: true },
+		who: { name: 'Vidal', starter: true, bye: false },
 		gain: 1.2,
 		gains: true,
 		week: null
@@ -568,7 +589,15 @@ void test('a card whose drop is on injured reserve on the bench says so (B34)', 
 			gain: null,
 			open_spot: false
 		},
-		drops: [{ host_id: 'Jordan Mason', gain: 2, week_gain: null, starts_this_week: false }]
+		drops: [
+			{
+				host_id: 'Jordan Mason',
+				gain: 2,
+				week_gain: null,
+				starts_this_week: false,
+				season_starter: false
+			}
+		]
 	});
 	const [card] = pickupCards({ rows: [otton], pickups: [otton], roster: [mason, lemon] });
 	assert.ok(card);
@@ -578,7 +607,7 @@ void test('a card whose drop is on injured reserve on the bench says so (B34)', 
 	// Beats names the drop, on the bench, at the row's season Gain (B14).
 	const [shown] = poolRows({ rows: [otton], pickups: [otton], roster: [] }, ZONE, NOW);
 	assert.deepEqual(shown?.beats, {
-		who: { name: 'Mason', starter: false },
+		who: { name: 'Mason', starter: false, bye: false },
 		gain: 2,
 		gains: true,
 		week: 6.7
@@ -589,7 +618,15 @@ void test('a card whose drop is on injured reserve on the bench says so (B34)', 
 	assert.equal(
 		dropWhy({
 			drop: mason,
-			drops: [{ host_id: 'Jordan Mason', gain: 1, week_gain: null, starts_this_week: true }]
+			drops: [
+				{
+					host_id: 'Jordan Mason',
+					gain: 1,
+					week_gain: null,
+					starts_this_week: true,
+					season_starter: true
+				}
+			]
 		}),
 		null
 	);
@@ -662,4 +699,29 @@ void test('Beats says a shared surname with its first initial (review M2)', () =
 		NOW
 	);
 	assert.equal(shown?.beats.who?.name, 'R. Johnson');
+});
+
+void test('Beats names his place in the rest-of-season lineup, a starter on bye saying so (Lane 108, B81)', () => {
+	assert.equal(beatsPlace({ name: 'Vidal', starter: true, bye: false }), 'Starter');
+	assert.equal(beatsPlace({ name: 'Vidal', starter: true, bye: true }), 'Starter, bye');
+	assert.equal(beatsPlace({ name: 'Mason', starter: false, bye: true }), 'Bench');
+	// The API's bye reaches the cell; an answer before Lane 108 sends none and reads as off it.
+	const beats = {
+		host_id: 'Jordan Mason',
+		name: 'Jordan Mason',
+		starter: true,
+		gain: null,
+		open_spot: false
+	};
+	const onBye = row(line('Cade Otton', 'TE', 7.7, 9.1), {
+		gain: 2,
+		beats: { ...beats, bye: true }
+	});
+	const [shown] = poolRows({ rows: [onBye], pickups: [], roster: [] }, ZONE, NOW);
+	assert.ok(shown?.beats.who);
+	assert.equal(beatsPlace(shown.beats.who), 'Starter, bye');
+	const older = row(line('Cade Otton', 'TE', 7.7, 9.1), { gain: 2, beats });
+	const [before] = poolRows({ rows: [older], pickups: [], roster: [] }, ZONE, NOW);
+	assert.ok(before?.beats.who);
+	assert.equal(beatsPlace(before.beats.who), 'Starter');
 });

@@ -304,7 +304,7 @@ func remap(m Waiver, from, to []person) Waiver {
 	}
 	for _, d := range m.Drops {
 		if j := at(d.At); j >= 0 {
-			out.Drops = append(out.Drops, Drop{At: j, Gain: d.Gain, StartsThisWeek: d.StartsThisWeek})
+			out.Drops = append(out.Drops, Drop{At: j, Gain: d.Gain, StartsThisWeek: d.StartsThisWeek, SeasonStarter: d.SeasonStarter})
 		}
 	}
 	return out

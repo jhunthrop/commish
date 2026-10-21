@@ -935,7 +935,7 @@ func waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiv
 	for _, d := range move.Drops {
 		weekGain, _, _ := week.with(add.cand, d.At)
 		row.Drops = append(row.Drops, apitypes.WaiverDrop{HostId: mine[d.At].cand.ID, Gain: roundTenth(d.Gain), WeekGain: &weekGain,
-			StartsThisWeek: d.StartsThisWeek})
+			StartsThisWeek: d.StartsThisWeek, SeasonStarter: d.SeasonStarter})
 	}
 	row.Pickup = !move.NoDrop && isPickup(row)
 	if day, ok := clears[add.cand.ID]; ok {

@@ -62,20 +62,28 @@ function displaced(row: WaiverRow, lineup: LineupAdvice, seasonOrder: boolean): 
 		host_id: low.player.host_id,
 		name: low.player.name,
 		starter: true,
+		...byeOf(low),
 		gain: seasonOrder || proj === null || theirs === null ? null : roundTenth(proj - theirs),
 		open_spot: false
 	};
 }
 
-/** The offered move's Beats: the player it drops (waiver_beats.go dropBeats). */
+/** The Beats cell's bye, sent only when he is on it (waiver_beats.go byeOf, Lane 108). */
+function byeOf(line: PlayerLine): { bye?: true } {
+	return line.facts.bye ? { bye: true } : {};
+}
+
+/** The offered move's Beats: the player it drops, labelled by his rest-of-season place (waiver_beats.go
+ * dropBeats, Lane 108, B81). */
 function dropBeats(row: WaiverRow): WaiverRow['beats'] {
 	const { drop } = row;
 	if (drop === null) return row.beats;
-	const starts = row.drops.some((d) => d.host_id === drop.player.host_id && d.starts_this_week);
+	const starter = row.drops.some((d) => d.host_id === drop.player.host_id && d.season_starter);
 	return {
 		host_id: drop.player.host_id,
 		name: drop.player.name,
-		starter: starts,
+		starter,
+		...byeOf(drop),
 		gain: row.week_gain,
 		open_spot: false
 	};

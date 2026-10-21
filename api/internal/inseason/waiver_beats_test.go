@@ -169,3 +169,98 @@ func TestListedAddKeepsACarriedOverOut(t *testing.T) {
 		})
 	}
 }
+
+// Every drop a move could take carries his place in the rest-of-season
+// lineup the Gain is measured on (Lane 108, B81): the ten the fill starts
+// are season starters, the bench is not.
+func TestEveryDropCarriesItsSeasonLineupPlace(t *testing.T) {
+	squad := Squad{Players: pprRoster(), Held: map[string]bool{}}
+	starts := map[string]bool{}
+	for _, id := range pprHost() {
+		starts[id] = true
+	}
+	got := Waivers(twelveTeamPPR(t), SeasonGames, squad, []Candidate{player("fa", draft.RB, 10, 60)})[0]
+	if len(got.Drops) == 0 {
+		t.Fatal("no drops")
+	}
+	for _, d := range got.Drops {
+		id := squad.Players[d.At].ID
+		if d.SeasonStarter != starts[id] {
+			t.Errorf("%s: season starter %v, want %v", id, d.SeasonStarter, starts[id])
+		}
+	}
+}
+
+// The strip's Beats labels its drop by his rest-of-season place, never by
+// this week's lineup, and says his bye in the week addressed (Lane 108,
+// B81): a season starter on bye reads "Starter, bye", a bench player this
+// week's lineup starts reads "Bench".
+func TestTheOfferedDropIsLabelledByItsSeasonPlace(t *testing.T) {
+	cases := []struct {
+		name                         string
+		season, thisWeek, bye        bool
+		wantStarter, wantByeReported bool
+	}{
+		{"a season starter on bye this week", true, false, true, true, true},
+		{"a bench player this week's lineup starts", false, true, false, false, false},
+		{"a season starter playing this week", true, true, false, true, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			line := apitypes.PlayerLine{Player: apitypes.LeaguePlayer{HostId: "d1", Name: "Drop One"}}
+			line.Facts.Bye = tc.bye
+			row := apitypes.WaiverRow{Drop: &line, Drops: []apitypes.WaiverDrop{
+				{HostId: "d1", SeasonStarter: tc.season, StartsThisWeek: tc.thisWeek},
+			}}
+			got := dropBeats(row)
+			if got.Starter != tc.wantStarter || (got.Bye != nil) != tc.wantByeReported || (got.Bye != nil && !*got.Bye) {
+				t.Fatalf("starter %v bye %v, want %v %v", got.Starter, got.Bye, tc.wantStarter, tc.wantByeReported)
+			}
+		})
+	}
+}
+
+// Through the engine at the fixture's Saturday and Tuesday: each strip
+// card's Beats reads its drop's season place and bye, and every other
+// row's named player is a season starter with his own bye (B81).
+func TestBeatsReadsTheSeasonPlaceThroughTheEngine(t *testing.T) {
+	f := newFixture(t)
+	for _, now := range []time.Time{saturdayNoon, tuesdayNoon} {
+		out := pickupPage(t, f, now, "")
+		roster := map[string]apitypes.PlayerLine{}
+		for _, l := range out.Roster {
+			roster[l.Player.HostId] = l
+		}
+		for _, c := range out.Pickups {
+			assertDropLabel(t, now, c)
+		}
+		for _, r := range out.Rows {
+			if r.Pickup || r.Beats == nil || r.Beats.OpenSpot {
+				continue
+			}
+			if !r.Beats.Starter {
+				t.Errorf("%s: %s names %s off the season lineup", now.Weekday(), r.Add.Player.Name, r.Beats.Name)
+			}
+			if line, ok := roster[r.Beats.HostId]; ok && (r.Beats.Bye != nil) != line.Facts.Bye {
+				t.Errorf("%s: %s's Beats bye %v, %s on bye %v", now.Weekday(), r.Add.Player.Name, r.Beats.Bye, r.Beats.Name, line.Facts.Bye)
+			}
+		}
+	}
+}
+
+// assertDropLabel is a card whose Beats reads its drop's season place and
+// bye.
+func assertDropLabel(t *testing.T, now time.Time, c apitypes.WaiverRow) {
+	t.Helper()
+	if c.Drop == nil {
+		return
+	}
+	for _, d := range c.Drops {
+		if d.HostId == c.Drop.Player.HostId && c.Beats.Starter != d.SeasonStarter {
+			t.Errorf("%s card: Beats starter %v, drop's season place %v", now.Weekday(), c.Beats.Starter, d.SeasonStarter)
+		}
+	}
+	if (c.Beats.Bye != nil) != c.Drop.Facts.Bye {
+		t.Errorf("%s card: Beats bye %v, drop on bye %v", now.Weekday(), c.Beats.Bye, c.Drop.Facts.Bye)
+	}
+}

@@ -376,7 +376,9 @@ function pickupTable(advice: WaiverAdvice): WaiverAdvice {
 					? tenth(row.gain + por(row.drop) - por(d))
 					: row.gain,
 				week_gain: week(row.add, d).gain,
-				starts_this_week: base.starts.has(d.player.host_id)
+				starts_this_week: base.starts.has(d.player.host_id),
+				// His place in the rest-of-season lineup (Lane 108, B81), which the strip's Beats reads.
+				season_starter: seasonStarts.has(d.player.host_id)
 			}))
 			.sort((a, b) =>
 				a.host_id === row.drop?.player.host_id
