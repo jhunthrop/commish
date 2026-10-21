@@ -92,7 +92,11 @@ async function shoot(page: Page, name: string, width: number): Promise<void> {
 }
 
 const league = `/league/${FIXTURE_IDS.league}`;
-for (const width of WIDTHS) {
+/** ACCOUNT_ONLY=1 shoots the Account room alone, which a static server holds (the league pages need the
+ * Worker): Lane 117's B84 shots. */
+const ACCOUNT_ONLY = process.env.ACCOUNT_ONLY === '1';
+
+async function leaguePages(width: number): Promise<void> {
 	const home = await open(width, league, 'Standings');
 	const seeding = await home.locator('.stand .seeding').textContent();
 	if (seeding?.trim() !== SEEDING) fault(`league ${String(width)}`, `seeding "${seeding ?? ''}"`);
@@ -108,7 +112,10 @@ for (const width of WIDTHS) {
 	if (!body.includes(NEAREST_WORDS) || !body.includes(TE_WORDS))
 		fault(`lineup ${String(width)}`, 'no nearest rules and tight end extra in the basis');
 	await shoot(start, 'ffpc-lineup', width);
+}
 
+for (const width of WIDTHS) {
+	if (!ACCOUNT_ONLY) await leaguePages(width);
 	const account = await open(width, '/account', 'Platforms');
 	const states = await account.locator('.platforms tbody .st b').allTextContents();
 	const lines = await account.locator('.platforms tbody .st b + span').allTextContents();

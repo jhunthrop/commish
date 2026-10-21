@@ -10,7 +10,7 @@
 // from is his club's first game not yet kicked off (Thursday's clubs start at week 7); a game is final
 // at the Saturday instant once its kickoff has passed. Everything else is the contract run's.
 //
-//   [SATURDAY_OUT=4429023] node scripts/inseason-fixture/saturday-run.ts
+//   [SATURDAY_OUT=4429023] [SATURDAY_PACE=1] node scripts/inseason-fixture/saturday-run.ts
 // then build with PUBLIC_RUN_ID=2026-10-17T17-ros PUBLIC_RUN_BASE_URL=.runs and start the fixture API
 // with FIXTURE_RUN_ID=2026-10-17T17-ros.
 import { cp, readFile, readdir, writeFile } from 'node:fs/promises';
@@ -95,6 +95,18 @@ function sharedTier(numbers: Json, position: unknown): Json {
 		: numbers;
 }
 
+/** SATURDAY_PACE=1 (Lane 117, B80): a STAND-IN preseason pace a game on every in-season page, his
+ * preseason points over the 17 games, so the vs Avg tile draws its reason as a run that stores the
+ * pace does (Lane 100's preseasonPerGame); the contract run predates the field. */
+const PACE_GAMES = 17;
+const pace = process.env.SATURDAY_PACE === '1';
+function withPace(numbers: Json): Json {
+	const points = numbers.preseasonPoints;
+	return pace && typeof points === 'number'
+		? { ...numbers, preseasonPerGame: tenth(points / PACE_GAMES) }
+		: numbers;
+}
+
 const index = (await read('index.json')) as unknown as { id: string; team: string }[];
 const teamOf = new Map(index.map((p) => [p.id, p.team]));
 for (const file of await readdir(new URL('boards/', OUT))) {
@@ -110,7 +122,7 @@ for (const file of await readdir(new URL('players/', OUT))) {
 	page.formats = Object.fromEntries(
 		Object.entries(page.formats as Record<string, Json>).map(([id, n]) => [
 			id,
-			sharedTier(moved(n, team), page.position)
+			withPace(sharedTier(moved(n, team), page.position))
 		])
 	);
 	await write(`players/${file}`, page);
