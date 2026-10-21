@@ -5,9 +5,14 @@ import { test } from 'node:test';
 import { countedWeek, newestCountedWeek } from './reach.ts';
 import type { GameLogRow } from './season.ts';
 
-const row = (week: number, status: GameLogRow['status']): Pick<GameLogRow, 'week' | 'status'> => ({
+const row = (
+	week: number,
+	status: GameLogRow['status'],
+	opponent: string | null = 'KC'
+): Pick<GameLogRow, 'week' | 'status' | 'opponent'> => ({
 	week,
-	status
+	status,
+	opponent: status === 'bye' ? null : opponent
 });
 
 void test('a season reaches its through week, or his later game that is already in', () => {
@@ -18,6 +23,13 @@ void test('a season reaches its through week, or his later game that is already 
 	assert.equal(countedWeek(sunday), 5);
 	assert.equal(countedWeek(bye), 5);
 	assert.equal(countedWeek({ through: 5, log: [row(6, 'inactive')] }), 6);
+	// A free agent's weeks name no opponent (Lane 123): no game, so his season reaches the records only.
+	const freeAgent = {
+		through: 5,
+		log: [row(5, 'played'), row(6, 'inactive', null), row(18, 'inactive', null)]
+	};
+	assert.equal(countedWeek(freeAgent), 5);
+	assert.equal(newestCountedWeek([freeAgent, sunday]), 5);
 });
 
 void test("the run's figures reach the newest counted game of any player, never less than through", () => {

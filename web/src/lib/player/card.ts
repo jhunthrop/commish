@@ -1,9 +1,11 @@
 /** The player card (Lane 66h): the tiles under his name and the words every number's basis takes.
  * The types and words both halves share: the build words what the run holds (rest of season, Avg and
  * Last before the week is read), and the week's read (live.ts) words what the API holds. */
+import { FREE_AGENT_WORDS } from '#lib/format/clubs.ts';
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
 import { plural } from '#lib/format/number.ts';
+import { sentenceStart } from '#lib/format/sentence.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
 
 /** A tile's tone: the accent for this week's projection, the ease of his opponent, quiet for the
@@ -113,6 +115,8 @@ export const CARD = {
 	nextProjNotIn: 'Not in yet',
 	/** A "--" says why on its tile (review M4). */
 	byeWeek: 'Bye this week',
+	/** A free agent's week (Lane 123, B101): his club cell is FA, and he has no game to project. */
+	freeAgentWeek: `${sentenceStart(FREE_AGENT_WORDS)}, no game this week`,
 	projNotIn: "This week's projection is not in yet",
 	projNotHim: "Not in this week's published projection",
 	noEarlierRead: 'No earlier read this week',
