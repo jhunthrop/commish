@@ -15,6 +15,7 @@
 		gainWord,
 		HEAD_SEPARATOR,
 		sameWeekGain,
+		STASH,
 		WAIVERS,
 		type DropRow,
 		type HeadBasisPart,
@@ -50,6 +51,13 @@
 		/** Whether Proj and Δ Proj are drawn: not until the week's published projection is read
 		 * (Lane 95), as Trades drops its week group. */
 		projected?: boolean;
+		/** The Stash group's rows (Lane 118, B79), under its own divider after the rest. */
+		stash?: readonly PoolRow[];
+		/** The Stash group's line under its divider (stashBasis); the group is drawn when it has rows
+		 * or a line. */
+		stashLine?: readonly string[];
+		/** A stash's verb where an open IR slot takes him: the platform's page with his name. */
+		onstash?: (row: PoolRow) => void;
 	}
 
 	let {
@@ -65,7 +73,10 @@
 		onchoose,
 		go,
 		empty,
-		projected = true
+		projected = true,
+		stash = [],
+		stashLine = [],
+		onstash = () => undefined
 	}: Props = $props();
 
 	/** The week's two projection columns, left out while no projection is read. */
@@ -113,6 +124,8 @@
 {#snippet entryRows(entry: PoolRow)}
 	{@const isOpen = open === entry.key}
 	{@const quiet = !entry.gains}
+	{@const stashed = entry.stash}
+	{@const verbWord = stashed?.verb === 'stash' ? STASH.verb : LINES.add}
 	<tbody>
 		<BoxLine
 			phoneFacts={false}
@@ -124,33 +137,54 @@
 			clears={entry.clears}
 			phoneMore="{WAIVERS.rest} {boxNumber(entry.rest)}"
 			projCells={projected}
+			away={stashed?.back ?? null}
 		>
 			{#snippet tail()}
 				{@render restCell(entry.rest)}
-				<td class="n beats" class:loud={!quiet && (entry.beats.gain ?? 0) > 0}>
-					<span class="bt"
-						>{#if entry.beats.who}<span class="who"
-								><b>{entry.beats.who.name}</b><span>{beatsPlace(entry.beats.who)}</span></span
-							>{/if}<span class="figs"
-							><span class="gain" class:quiet>{beatsWord(entry.beats)}</span
-							>{#if entry.beats.week !== null}<span class="bweek"
-									>{beatsWeekWord(entry.beats.week)}</span
-								>{/if}</span
-						></span
+				{#if stashed}
+					<!-- A stash names the open IR slot or his drop, as the gaining rows name a player, and no
+					     Gain: he plays no game until the week he is back (Lane 118, B79). -->
+					<td class="n beats"
+						>{#if stashed.who}<span class="bt"
+								><span class="who"><b>{stashed.who.name}</b><span>{stashed.who.place}</span></span
+								></span
+							>{/if}</td
 					>
-				</td>
+				{:else}
+					<td class="n beats" class:loud={!quiet && (entry.beats.gain ?? 0) > 0}>
+						<span class="bt"
+							>{#if entry.beats.who}<span class="who"
+									><b>{entry.beats.who.name}</b><span>{beatsPlace(entry.beats.who)}</span></span
+								>{/if}<span class="figs"
+								><span class="gain" class:quiet>{beatsWord(entry.beats)}</span
+								>{#if entry.beats.week !== null}<span class="bweek"
+										>{beatsWeekWord(entry.beats.week)}</span
+									>{/if}</span
+							></span
+						>
+					</td>
+				{/if}
 				<td class="act"
-					><button
-						type="button"
-						class="add"
-						class:quiet
-						class:on={isOpen}
-						aria-expanded={isOpen}
-						aria-controls="drops-{entry.key}"
-						aria-label="{isOpen ? WAIVERS.close : LINES.add} {entry.row.name}"
-						onclick={() => ontoggle(entry)}
-						><Icon name={isOpen ? 'chevron' : 'plus'} size={14} /><span>{LINES.add}</span></button
-					></td
+					>{#if stashed?.verb === 'stash' && !stashed.drops}<button
+							type="button"
+							class="add quiet word"
+							aria-label="{STASH.verb} {entry.row.name}"
+							onclick={() => onstash(entry)}><span>{STASH.verb}</span></button
+						>{:else}<button
+							type="button"
+							class="add"
+							class:quiet
+							class:word={stashed?.verb === 'stash'}
+							class:on={isOpen}
+							aria-expanded={isOpen}
+							aria-controls="drops-{entry.key}"
+							aria-label="{isOpen ? WAIVERS.close : verbWord} {entry.row.name}"
+							onclick={() => ontoggle(entry)}
+							>{#if stashed?.verb !== 'stash'}<Icon
+									name={isOpen ? 'chevron' : 'plus'}
+									size={14}
+								/>{/if}<span>{verbWord}</span></button
+						>{/if}</td
 				>
 			{/snippet}
 		</BoxLine>
@@ -256,6 +290,19 @@
 	{/if}
 	{#if rows.length === 0}
 		<tbody><tr><td class="empty" colspan={COLUMNS}>{empty}</td></tr></tbody>
+	{/if}
+	{#if stash.length > 0 || stashLine.length > 0}
+		<!-- The Stash group (Lane 118, B79): its own divider and its own line, never counted with the
+		     rows that gain. -->
+		<tbody>
+			<tr class="divider"><th colspan={COLUMNS} scope="rowgroup">{STASH.head}</th></tr>
+			{#if stashLine.length > 0}
+				<tr class="stash-basis"><td colspan={COLUMNS}>{stashLine.join(' ')}</td></tr>
+			{/if}
+		</tbody>
+		{#each stash as entry (entry.key)}
+			{@render entryRows(entry)}
+		{/each}
 	{/if}
 </table>
 
@@ -454,6 +501,16 @@
 		text-transform: uppercase;
 		letter-spacing: var(--track-label);
 		color: var(--ink-2);
+	}
+
+	/* The Stash group's line under its divider (Lane 118, B79), as the heads' line is drawn. */
+	.stash-basis td {
+		padding: 4px var(--s-2) 6px;
+		background: var(--bg);
+		border-bottom: 1px solid var(--line);
+		font-size: var(--t-xs);
+		line-height: 1.35;
+		color: var(--ink-3);
 	}
 
 	/* The rows with no gain over the roster, under one divider (B13). */
@@ -690,6 +747,21 @@
 
 		.add span {
 			display: none;
+		}
+
+		/* The Stash verb keeps its word: it has no icon to stand in for it (Lane 118, B79). */
+		.act:has(.add.word) {
+			padding: 0 2px;
+		}
+
+		.add.word {
+			width: auto;
+			padding: 0 3px;
+			font-size: var(--t-xs);
+		}
+
+		.add.word span {
+			display: inline;
 		}
 
 		.dsect td {

@@ -52,7 +52,7 @@
 	<div class="sum">
 		{#if sum}<b class="figure">{sum.figure}</b><span class="words"
 				>{sum.words}{#if sum.gain}, <em>{sum.gain}</em>{/if}</span
-			>{/if}
+			>{#if sum.final}<span class="final">{sum.final}</span>{/if}{/if}
 		{#if done !== null}<span class="words done">{done}</span>{/if}
 		<a class="past" href={links.record()}>{LINEUP.pastWeeks}</a>
 	</div>
@@ -176,6 +176,16 @@
 	.words {
 		font-size: var(--t-xs);
 		color: var(--ink-3);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+
+	/* The projected final beside the moving Pts (Lane 118, B88): a figure cell, the Matchup's. */
+	.final {
+		font-family: var(--font-num);
+		font-size: var(--t-md);
+		font-weight: 700;
+		color: var(--ink-2);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}

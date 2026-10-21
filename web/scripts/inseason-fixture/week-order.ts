@@ -23,10 +23,7 @@ import { FIXTURE_UNREAD_CLOCK, FIXTURE_WEEK_CLOCK } from './clock.ts';
 import { roundTenth } from './tenths.ts';
 
 /** A tab's answer as stored: the rules sentence is the reader's, set when served (week-order-serve.ts). */
-type WeekOrderAdvice = Omit<
-	components['schemas']['WeekOrderAdvice'],
-	'basis_note' | 'basis_note_link'
->;
+type WeekOrderAdvice = Omit<components['schemas']['WeekOrderAdvice'], 'basis_note'>;
 type WeekOrderRow = components['schemas']['WeekOrderRow'];
 type PlayerLine = components['schemas']['PlayerLine'];
 type ClubGame = components['schemas']['ClubGame'];

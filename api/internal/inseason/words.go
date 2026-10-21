@@ -264,13 +264,10 @@ func countWords(n int) string {
 // Uncounted is the league's rules a season's lines carry no metric for,
 // so Avg and Last leave them out (Lane 66t): Note names them for a
 // screen's basis (Lane 111, B33), Rules lists them in the league's
-// Settings words. Link is the words of the link to that list the web drew
-// before Lane 111 ("Which two"), kept for the web of the deploy before;
-// the web no longer draws it. Note and Link are empty, Rules too, when the
-// league scores none of them or every one is counted.
+// Settings words. Note is empty, Rules too, when the league scores none
+// of them or every one is counted.
 type Uncounted struct {
 	Note  string
-	Link  string
 	Rules []string
 	// Names is the rules as Note names them, at most four then "and two
 	// more" (Lane 115, B92), for the web to say in its own frame: "Avg
@@ -287,16 +284,15 @@ const namedRulesMost = 4
 // UncountedOf is the league's uncounted rules. carried says whether any
 // line this season carries a metric (Season.Carries); nil carries none.
 func UncountedOf(s apitypes.LeagueSettings, carried func(string) bool) Uncounted {
-	return uncountedOf(uncountedRules(s, carried), true)
+	return uncountedOf(uncountedRules(s, carried))
 }
 
 // uncountedOf names the rules in the one sentence every basis prints, the
 // stats' sentence (Lane 111 fix round 1: true beside the platform's points,
 // which score every rule), as short as a phone's eight lines need: "Our
 // stats omit two-point, missed kick, fumble recovery and safety." for the
-// fixture's five; and the old web's link words where there is a Settings
-// to open (linked).
-func uncountedOf(left []countable, linked bool) Uncounted {
+// fixture's five.
+func uncountedOf(left []countable) Uncounted {
 	if len(left) == 0 {
 		return Uncounted{Rules: []string{}}
 	}
@@ -305,11 +301,7 @@ func uncountedOf(left []countable, linked bool) Uncounted {
 		rules = append(rules, c.words)
 	}
 	names := andList(cappedNames(basisNames(left)))
-	out := Uncounted{Note: fmt.Sprintf("Our stats omit %s.", names), Rules: rules, Names: names}
-	if linked {
-		out.Link = "Which " + countWords(len(rules))
-	}
-	return out
+	return Uncounted{Note: fmt.Sprintf("Our stats omit %s.", names), Rules: rules, Names: names}
 }
 
 // basisNames is the rules' names as a basis says them, the two missed

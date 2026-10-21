@@ -3904,7 +3904,7 @@ components:
         sentence: { type: string, nullable: true, description: the reason for a change, from facts; null when unchanged }
     LineupAdvice:
       type: object
-      required: [week, basis, basis_note, basis_note_link, uncounted_rules, order_basis, refreshed, read_at, projection_read_at, projection_previous_read_at, projection_scoring, player_points, team_points, set, slots, empty_slots, bench, reserve, host_lineup_url, host_note, moves]
+      required: [week, basis, basis_note, uncounted_rules, order_basis, refreshed, read_at, projection_read_at, projection_previous_read_at, projection_scoring, player_points, team_points, set, slots, empty_slots, bench, reserve, host_lineup_url, host_note, moves]
       properties:
         week: { type: integer }
         player_points:
@@ -3959,12 +3959,6 @@ components:
             fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
-        basis_note_link:
-          type: string
-          description: >-
-            the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"),
-            kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no
-            basis_note
         uncounted_rules:
           type: array
           items: { type: string }
@@ -4426,9 +4420,34 @@ components:
           nullable: true
           description: "the day a claim on him clears, from the platform (Yahoo's waiver wire); null when it does not say"
         sentence: { type: string }
+        stash:
+          allOf: [{ $ref: "#/components/schemas/WaiverStash" }]
+          description: set on a row of the Stash group alone (Lane 118, B79); absent on every other row
+    WaiverStash:
+      type: object
+      required: [back_week, per_game, ir_slot]
+      properties:
+        back_week:
+          type: integer
+          description: "the week he is due back by the listed return date: the week the page addresses (for_week) or later"
+        per_game:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            his rest-of-season points a game, the add's rest_of_season_per_game (the figure his player page shows), the
+            figure the group sorts by; null where the board carries none
+        ir_slot:
+          type: boolean
+          description: >-
+            the member's team has an injured reserve slot open that takes him on the league's platform (ESPN, Sleeper
+            and Yahoo slots from the league's settings; an out player only where the platform's slot takes one), so the
+            verb is Stash; false elsewhere (FFPC and MyFantasyLeague always), the verb Add. Either way the row names the
+            drop the gaining rows' rule names (an IR slot frees no bench spot until the platform moves him), none only
+            with a bench spot open
     OrderAdvice:
       type: object
-      required: [week, basis, basis_note, basis_note_link, order_basis, refreshed, from_week, read_at, projection_read_at, projection_scoring, rank_by, moves, total, rows]
+      required: [week, basis, basis_note, order_basis, refreshed, from_week, read_at, projection_read_at, projection_scoring, rank_by, moves, total, rows]
       properties:
         week: { type: integer, description: the week the rows' Game cell and Proj are for }
         basis:
@@ -4447,12 +4466,6 @@ components:
             fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
-        basis_note_link:
-          type: string
-          description: >-
-            the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"),
-            kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no
-            basis_note
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time, description: when the order was made }
         from_week:
@@ -4528,7 +4541,7 @@ components:
             otherwise (and always for the drafter's own players)
     WeekOrderAdvice:
       type: object
-      required: [week, position, basis_note, basis_note_link, read_at, projection_read_at, projection_scoring, moves, rows]
+      required: [week, position, basis_note, read_at, projection_read_at, projection_scoring, moves, rows]
       properties:
         week: { type: integer, description: the week the rows' Game cell and Proj are for }
         position: { type: string, enum: [K, DEF] }
@@ -4545,11 +4558,6 @@ components:
             fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
-        basis_note_link:
-          type: string
-          description: >-
-            the words of the link to the league's Settings the web drew before Lane 111 ("Which two"), kept for that web
-            through one deploy; the web no longer draws it. Empty with none or no league
         read_at:
           type: string
           format: date-time
@@ -4597,7 +4605,7 @@ components:
         team: { type: string, nullable: true, description: the holding team's name when kind is team, else null }
     WaiverAdvice:
       type: object
-      required: [week, basis, pickup_order, season_basis, basis_note, basis_note_link, order_basis, refreshed, read_at, projection_read_at, projection_previous_read_at, projection_scoring, lineup_proj, pickups_proj, pickups, rows, roster, host_waivers_url, host_note, moves]
+      required: [week, basis, pickup_order, season_basis, basis_note, order_basis, refreshed, read_at, projection_read_at, projection_previous_read_at, projection_scoring, lineup_proj, pickups_proj, pickups, rows, roster, host_waivers_url, host_note, moves]
       properties:
         week: { type: integer, description: "the platform's current week, the week a claim names" }
         for_week:
@@ -4647,12 +4655,6 @@ components:
             fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
-        basis_note_link:
-          type: string
-          description: >-
-            the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"),
-            kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no
-            basis_note
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time }
         read_at: { type: string, format: date-time }
@@ -4687,9 +4689,29 @@ components:
           description: >-
             positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in
             the season_gain order; a free agent on a season-long list (injured reserve, PUP, NFI) or ruled out this week
-            is not listed (no read gives his return), save the player a link asked for; a week's out carried over from a
-            game already played is listed
+            is not listed in them, save the player a link asked for (an injured reserve or out free agent whose return
+            week falls in the regular season is in stash instead); a week's out carried over from a game already played
+            is listed, and so is one whose listing's dating is still pending (Lane 118, B94)
           items: { $ref: "#/components/schemas/WaiverRow" }
+        stash:
+          type: array
+          description: >-
+            the Stash group (Lane 118, B79): free agents on injured reserve or ruled out due back in the week the page
+            addresses or later, inside the league's regular season (before its first playoff week, else the order's last
+            week), each row's stash set, by his rest-of-season points a game, highest first, at most 10; one due back in
+            the week the page addresses whose move gains is in rows instead; never among rows or pickups, never counted
+            with the rows that gain; absent from an older answer
+          items: { $ref: "#/components/schemas/WaiverRow" }
+        stash_late:
+          type: integer
+          description: >-
+            how many free agents on injured reserve or ruled out this page leaves unlisted because their return week
+            is after the regular season (Lane 118 fix round 1), for the basis to say once; absent from an older answer
+        stash_undated:
+          type: integer
+          description: >-
+            how many free agents on injured reserve or ruled out this page leaves unlisted because no read dates their
+            return (Lane 118, B79), for the basis to say once; absent from an older answer
         roster:
           type: array
           description: the member's active roster (injured reserve and taxi spots left out), the lines beats and drops name
@@ -4950,7 +4972,7 @@ components:
         answered_at: { type: string, format: date-time, nullable: true }
     TradeAdvice:
       type: object
-      required: [week, basis, basis_note, basis_note_link, per_game_basis, order_basis, refreshed, read_at, teams, roster, host_trades_url, host_note, check_basis, moves, projection_scoring, projection_read_at, player_points]
+      required: [week, basis, basis_note, per_game_basis, order_basis, refreshed, read_at, teams, roster, host_trades_url, host_note, check_basis, moves, projection_scoring, projection_read_at, player_points]
       properties:
         week: { type: integer, description: "the platform's current week" }
         for_week:
@@ -5003,12 +5025,6 @@ components:
             fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
-        basis_note_link:
-          type: string
-          description: >-
-            the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"),
-            kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no
-            basis_note
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time }
         read_at: { type: string, format: date-time }
@@ -5104,7 +5120,7 @@ components:
         theirs_room: { type: boolean, description: "the same for theirs (their drop is theirs to choose, so it is not named)" }
     TradeCheck:
       type: object
-      required: [week, basis, basis_note, basis_note_link, order_basis, refreshed, read_at, trade, fills, totals, host_trades_url, host_note]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, trade, fills, totals, host_trades_url, host_note]
       properties:
         week: { type: integer }
         basis: { type: string, description: the honesty line beside the answer }
@@ -5121,12 +5137,6 @@ components:
             fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row
             counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note,
             absent from an older answer
-        basis_note_link:
-          type: string
-          description: >-
-            the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"),
-            kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no
-            basis_note
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time }
         read_at: { type: string, format: date-time }

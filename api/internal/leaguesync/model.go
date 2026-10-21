@@ -209,6 +209,14 @@ type Shape struct {
 	Flex      int `json:"flex"`
 	SuperFlex int `json:"super_flex"`
 	Bench     int `json:"bench"`
+	// IR is the league's injured reserve slots on a team, from its
+	// platform's settings (ESPN, Sleeper, Yahoo; 0 where a platform's are
+	// not read), and IROut whether a player ruled out may take one beside
+	// a player on injured reserve (Lane 118, B79): ESPN's slot takes him,
+	// Sleeper's where the league allows it, Yahoo's never. Neither is on
+	// the wire; a snapshot saved before them reads no slot.
+	IR    int  `json:"ir,omitempty"`
+	IROut bool `json:"ir_out,omitempty"`
 	// Unfollowed names the slots a mock room cannot draft (a defensive
 	// player, a receiver-only flex), empty when every slot is followed.
 	Unfollowed []string `json:"unfollowed"`

@@ -124,8 +124,6 @@ export const LINEUP_BASIS =
 /** The Waivers pickup rule (words.go WaiversBasis). */
 export const WAIVERS_BASIS = 'A pickup starts this week on Proj and keeps Gain at zero or better.';
 
-const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
-
 /** Each rule's name in a basis sentence, by its Settings words (words.go countables, Lane 111). */
 const RULE_NAMES: Readonly<Record<string, string>> = {
 	'two-point conversions': 'two-point',
@@ -157,16 +155,10 @@ function andList(names: readonly string[]): string {
 }
 
 /** The uncounted rules' sentence in the API's words (words.go uncountedOf, Lane 111): the rules named
- * inline, and the old web's link words where there is a Settings to open. */
-export function uncountedOf(
-	rules: readonly string[],
-	linked = true
-): { basis_note: string; basis_note_link: string } {
-	if (rules.length === 0) return { basis_note: '', basis_note_link: '' };
-	return {
-		basis_note: `Our stats omit ${andList(basisNames(rules))}.`,
-		basis_note_link: linked ? `Which ${COUNT_WORDS[rules.length] ?? String(rules.length)}` : ''
-	};
+ * inline. */
+export function uncountedOf(rules: readonly string[]): { basis_note: string } {
+	if (rules.length === 0) return { basis_note: '' };
+	return { basis_note: `Our stats omit ${andList(basisNames(rules))}.` };
 }
 
 /** The API's sentence's rule names (words.go Uncounted.Names, Lane 115, B92): the words between

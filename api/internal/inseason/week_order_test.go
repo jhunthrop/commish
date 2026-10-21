@@ -180,14 +180,14 @@ func TestWeekOrderCountsTheRulesLeftOut(t *testing.T) {
 	f.league.Saved = &saved
 	out := f.advisor(t, f.projection, fixtureNow).WeekOrder(draft.K, true)
 	left := uncountedRulesAt(saved, func(string) bool { return false }, draft.K)
-	want := uncountedOf(left, true)
-	if len(left) < 2 || out.BasisNote != want.Note || out.BasisNoteLink != want.Link {
-		t.Fatalf("%q %q, want %d rules left out", out.BasisNote, out.BasisNoteLink, len(left))
+	want := uncountedOf(left)
+	if len(left) < 2 || out.BasisNote != want.Note {
+		t.Fatalf("%q, want %d rules left out", out.BasisNote, len(left))
 	}
-	// A reader with no league is told the board's scoring, and has no Settings to open.
+	// A reader with no league is told the board's scoring in the same sentence.
 	visitor := f.advisor(t, f.projection, fixtureNow).WeekOrder(draft.K, false)
-	if visitor.BasisNote != want.Note || visitor.BasisNoteLink != "" {
-		t.Fatalf("visitor %q %q", visitor.BasisNote, visitor.BasisNoteLink)
+	if visitor.BasisNote != want.Note {
+		t.Fatalf("visitor %q", visitor.BasisNote)
 	}
 }
 
@@ -220,12 +220,12 @@ func TestWeekOrderNamesOnlyTheTabsRulesLeftOut(t *testing.T) {
 	a := f.advisor(t, f.projection, fixtureNow)
 	a.season.carried = map[string]bool{metricPointsAllowed: true, metricYardsAllowed: true}
 	for position, w := range want {
-		got := uncountedOf(uncountedRulesAt(settings, carried, position), true)
+		got := uncountedOf(uncountedRulesAt(settings, carried, position))
 		if strings.Join(got.Rules, "|") != strings.Join(w.rules, "|") {
 			t.Errorf("%s: %v, want %v", position, got.Rules, w.rules)
 		}
-		if out := a.WeekOrder(position, true); out.BasisNote != w.note || out.BasisNoteLink != "Which two" {
-			t.Errorf("%s tab: %q %q", position, out.BasisNote, out.BasisNoteLink)
+		if out := a.WeekOrder(position, true); out.BasisNote != w.note {
+			t.Errorf("%s tab: %q", position, out.BasisNote)
 		}
 	}
 }

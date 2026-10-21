@@ -95,27 +95,3 @@ func boardIDOf(line apitypes.PlayerLine) string {
 	}
 	return *line.Player.BoardId
 }
-
-// seasonLongLists are the designations that keep a player out for weeks.
-var seasonLongLists = map[apitypes.DesignationStatus]bool{
-	apitypes.DesignationStatusInjuredReserve: true,
-	apitypes.DesignationStatusPup:            true,
-	apitypes.DesignationStatusNfi:            true,
-}
-
-// listedAdd is whether the table lists a free agent (B41): not one on a
-// season-long list or ruled out, whose return no read gives (the
-// injury captures carry no return week), so he is no pickup and no
-// stash. A week's out carried over from a game already played (Lane 95)
-// stays: that listing predates the week the page addresses.
-func listedAdd(p person) bool {
-	d := p.line.Facts.Designation
-	if d == nil {
-		return true
-	}
-	if seasonLongLists[d.Status] {
-		return false
-	}
-	carried := d.CarriedOver != nil && *d.CarriedOver
-	return d.Status != apitypes.DesignationStatusOut || carried
-}

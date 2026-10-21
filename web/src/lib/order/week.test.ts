@@ -36,20 +36,14 @@ const stored = JSON.parse(
 		new URL('../../../scripts/inseason-fixture/data/week-order.json', import.meta.url),
 		'utf8'
 	)
-) as Record<
-	'read' | 'unread',
-	Record<'K' | 'DEF', Omit<WeekOrderAdvice, 'basis_note' | 'basis_note_link'>>
->;
+) as Record<'read' | 'unread', Record<'K' | 'DEF', Omit<WeekOrderAdvice, 'basis_note'>>>;
 /** The API's sentences (inseason words.go uncountedOf, Lane 111): each tab's rules named inline. */
 const RULES_NOTE = {
-	K: { basis_note: 'Our stats omit missed kick.', basis_note_link: 'Which two' },
-	DEF: {
-		basis_note: 'Our stats omit fumble recovery and safety.',
-		basis_note_link: 'Which two'
-	}
+	K: { basis_note: 'Our stats omit missed kick.' },
+	DEF: { basis_note: 'Our stats omit fumble recovery and safety.' }
 };
 const withNote = (
-	tabs: Record<'K' | 'DEF', Omit<WeekOrderAdvice, 'basis_note' | 'basis_note_link'>>
+	tabs: Record<'K' | 'DEF', Omit<WeekOrderAdvice, 'basis_note'>>
 ): Record<'K' | 'DEF', WeekOrderAdvice> => ({
 	K: { ...tabs.K, ...RULES_NOTE.K },
 	DEF: { ...tabs.DEF, ...RULES_NOTE.DEF }

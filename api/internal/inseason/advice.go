@@ -615,7 +615,7 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	// The rows end on the week's projection (Lane 66d), so the basis says
 	// nothing of points a game; the page says the projection's read itself.
 	un := UncountedOf(a.settings, a.season.Carries)
-	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis), BasisNote: un.Note, BasisNoteLink: un.Link, BasisNoteList: &un.Names, UncountedRules: un.Rules, OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis), BasisNote: un.Note, BasisNoteList: &un.Names, UncountedRules: un.Rules, OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: a.givesPlayerPoints(mySide), TeamPoints: teamPoints(mySide, people), Set: true, Slots: []apitypes.LineupSlot{}, EmptySlots: []apitypes.LineupAdviceEmptySlots{}, Bench: []apitypes.PlayerLine{}, Reserve: a.reserve(team, mySide),
 		Moves: CopyOnlyMoves(a.Snap.Ref.Host),
 	}
@@ -802,7 +802,13 @@ func (a *advisor) pool(position draft.Position) []person {
 		}
 		id := p.ID
 		lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(p), BoardId: &id, Name: p.Name, Position: string(p.Position), Team: p.Team}
-		out = append(out, a.build(p.ID, lp, nil))
+		add := a.build(p.ID, lp, nil)
+		// Back this week from injured reserve (Lane 118 fix round 1): he counts in the
+		// rest-of-season lineup his move is measured on, so a move that gains lists him.
+		if backThisWeek(add) {
+			add.cand.InjuredReserve = false
+		}
+		out = append(out, add)
 	}
 	return out
 }
@@ -886,6 +892,9 @@ func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.Waive
 		return apitypes.WaiverAdvice{}, false
 	}
 	out := a.waiverPage(run)
+	// The Stash group, apart from the rows and the strip (Lane 118, B79).
+	stash, counts := a.stashRows(run, asked)
+	out.Stash, out.StashUndated, out.StashLate = &stash, &counts.undated, &counts.late
 	for _, move := range shown {
 		row := waiverRow(run.w, run.week, run.mine, run.pool[move.Add], move, run.clears)
 		// A row past its kickoff has no week figure, whichever the order (Lane 85 fix round 4).
@@ -945,7 +954,7 @@ func (a *advisor) waiverPage(run waiverRun) apitypes.WaiverAdvice {
 	forWeek := h.forWeek
 	out := apitypes.WaiverAdvice{Week: h.week, ForWeek: &forWeek, ProjectionArrivesAt: a.projectionArrivesAt(), Basis: WaiversBasisFor(a.week, a.week != a.Snap.Week), PickupOrder: weekOrder,
 		SeasonBasis: withPerGame(a.Board, WaiverSeasonBasis(a.basis, a.weeks, a.horizon), run.mine, run.pool),
-		BasisNote:   un.Note, BasisNoteLink: un.Link, BasisNoteList: &un.Names, OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt,
+		BasisNote:   un.Note, BasisNoteList: &un.Names, OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt,
 		ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
 		Pickups: []apitypes.WaiverRow{}, Rows: []apitypes.WaiverRow{}, Roster: lines(run.mine, indexes(len(run.mine))), Moves: CopyOnlyClaims(a.Snap.Ref.Host)}
 	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
@@ -953,17 +962,17 @@ func (a *advisor) waiverPage(run waiverRun) apitypes.WaiverAdvice {
 }
 
 // pageMoves is the moves a page carries: the first cut of the adds it
-// lists (listedAdd), and the asked player's wherever he falls, in the
+// lists (listedMove), and the asked player's wherever he falls, in the
 // search's order.
 func pageMoves(moves []Waiver, pool []person, asked string, cut int) []Waiver {
 	out := make([]Waiver, 0, min(len(moves), cut+1))
 	listed := 0
 	for _, move := range moves {
 		add := pool[move.Add]
-		if isAsked(add, asked) || (listed < cut && listedAdd(add)) {
+		if isAsked(add, asked) || (listed < cut && listedMove(add, move)) {
 			out = append(out, move)
 		}
-		if listedAdd(add) {
+		if listedMove(add, move) {
 			listed++
 		}
 	}
@@ -1032,7 +1041,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	h := a.header()
 	un := UncountedOf(a.settings, a.season.Carries)
 	forWeek := h.forWeek
-	out := apitypes.TradeAdvice{Week: h.week, ForWeek: &forWeek, ProjectionArrivesAt: a.projectionArrivesAt(), BasisNote: un.Note, BasisNoteLink: un.Link, BasisNoteList: &un.Names, OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.TradeAdvice{Week: h.week, ForWeek: &forWeek, ProjectionArrivesAt: a.projectionArrivesAt(), BasisNote: un.Note, BasisNoteList: &un.Names, OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine), Moves: TradeMoves(a.Snap.Ref.Host),
 		ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: a.givesPlayerPoints(a.side(a.Me))}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)

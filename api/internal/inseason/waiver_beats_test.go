@@ -143,33 +143,6 @@ func TestIRAndOutFreeAgentsAreNotListed(t *testing.T) {
 	}
 }
 
-// A week's out carried over from a game already played stays listed (Lane
-// 95's designation), the rest of an out is not.
-func TestListedAddKeepsACarriedOverOut(t *testing.T) {
-	carried, fresh := true, false
-	cases := []struct {
-		name string
-		d    *apitypes.InjuryDesignation
-		want bool
-	}{
-		{"no designation", nil, true},
-		{"questionable", &apitypes.InjuryDesignation{Status: apitypes.DesignationStatusQuestionable}, true},
-		{"out this week", &apitypes.InjuryDesignation{Status: apitypes.DesignationStatusOut, CarriedOver: &fresh}, false},
-		{"out, carried over", &apitypes.InjuryDesignation{Status: apitypes.DesignationStatusOut, CarriedOver: &carried}, true},
-		{"injured reserve", &apitypes.InjuryDesignation{Status: apitypes.DesignationStatusInjuredReserve}, false},
-		{"injured reserve, carried over", &apitypes.InjuryDesignation{Status: apitypes.DesignationStatusInjuredReserve, CarriedOver: &carried}, false},
-		{"physically unable", &apitypes.InjuryDesignation{Status: apitypes.DesignationStatusPup}, false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			p := person{line: apitypes.PlayerLine{Facts: apitypes.WeekFacts{Designation: tc.d}}}
-			if got := listedAdd(p); got != tc.want {
-				t.Fatalf("listed %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
 // Every drop a move could take carries his place in the rest-of-season
 // lineup the Gain is measured on (Lane 108, B81): the ten the fill starts
 // are season starters, the bench is not.

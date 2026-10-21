@@ -13852,6 +13852,5 @@
 	"projection_read_at": "2026-10-17T02:00:00.000Z",
 	"projection_scoring": { "format": "ppr", "league_own": false },
 	"player_points": true,
-	"per_game_basis": "A game is our order's points a game.",
-	"basis_note_link": "Which five"
+	"per_game_basis": "A game is our order's points a game."
 }

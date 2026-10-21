@@ -269,6 +269,9 @@ func espnShape(counts map[int]int, teams int) Shape {
 		case posBench:
 			sh.Bench += n
 		case posReserve:
+			// ESPN's IR slot takes a player ruled out as well (Lane 118, B79).
+			sh.IR += n
+			sh.IROut = sh.IR > 0
 		default:
 			unfollowed[espn.SlotName(slot)] = true
 		}

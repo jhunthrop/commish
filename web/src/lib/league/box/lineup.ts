@@ -8,7 +8,7 @@ import { designationWord } from '#lib/format/designation.ts';
 import { fixed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
 import type { LineupAdvice, LineupSlot, PlayerLine, WeekDoneState } from '../inseason/api.ts';
-import { pastKickoff } from './kickoff.ts';
+import { linesRead, pastKickoff } from './kickoff.ts';
 import { hostWords } from '../names.ts';
 import { satIds } from '../inseason/words.ts';
 import {
@@ -64,6 +64,9 @@ export interface LineupBox {
 	asSet: number | null;
 	/** What the swaps add, with to without, one decimal; null without both totals. */
 	gain: number | null;
+	/** The lineup as set is under way at the page's clock (linesRead over its starters' games, the
+	 * Team row's one rule): one has kicked off and not every one is final (Lane 118, B88). */
+	playing: boolean;
 }
 
 /** Every word the Lineup's strip and verb print, in one place for the copy guard. */
@@ -117,6 +120,9 @@ export interface StripSum {
 	figure: string;
 	words: string;
 	gain: string | null;
+	/** "Proj final 112.4" beside the moving Pts while the lineup still plays (Lane 118, B88): the
+	 * Matchup's projected final, its sentence already in the basis; absent otherwise. */
+	final?: string | null;
 }
 
 /** The lineup as the platform holds it, in the strip's words. */
@@ -145,13 +151,25 @@ export function asSetWords(host: LeagueHost): string {
  * once every starter has kicked off the lineup's points so far, "76.8" and "Pts as set on ESPN"; null with
  * neither figure. */
 export function lineupSum(
-	box: Pick<LineupBox, 'totals' | 'asSet' | 'gain' | 'swaps'>,
+	box: Pick<LineupBox, 'totals' | 'asSet' | 'gain' | 'swaps' | 'playing'>,
 	host: LeagueHost,
 	done: string | null
 ): StripSum | null {
 	if (done === null) return stripSum(box, null, asSetWords(host));
 	if (box.totals.pts === null) return null;
-	return { figure: boxNumber(box.totals.pts), words: `${BOX.pts} ${asSetWords(host)}`, gain: null };
+	return {
+		figure: boxNumber(box.totals.pts),
+		words: `${BOX.pts} ${asSetWords(host)}`,
+		gain: null,
+		final: projFinalCell(box)
+	};
+}
+
+/** "Proj final 112.4" while the lineup as set still plays and the API gives its projected final
+ * (projfinal.go, the Matchup's); null once every starter is final or with no figure. */
+export function projFinalCell(box: Pick<LineupBox, 'totals' | 'playing'>): string | null {
+	const { final } = box.totals;
+	return box.playing && final !== null ? `${BOX.projFinal} ${boxNumber(final)}` : null;
 }
 
 /** The position an opponent's rank is against, in a sentence. A defense has no rank (the API ranks
@@ -377,6 +395,7 @@ export function lineupBox(
 	);
 	const proj = projTotal(counted);
 	const asSet = projTotal(setRows(placed, satRows));
+	const setGames = placed.map((p) => (p.slot.host ?? p.slot.ours).facts);
 	return {
 		starters,
 		bench,
@@ -394,11 +413,12 @@ export function lineupBox(
 			proj,
 			pts: totalsPts(ours, advice.player_points, advice.team_points),
 			final: advice.projected_final ?? null,
-			live: placed.some((p) => pastKickoff((p.slot.host ?? p.slot.ours).facts, now)),
+			live: setGames.some((facts) => pastKickoff(facts, now)),
 			note: totalsNote(counted, advice.projection_read_at !== null, advice.week)
 		},
 		asSet,
-		gain: proj === null || asSet === null ? null : Math.round((proj - asSet) * TENTHS) / TENTHS
+		gain: proj === null || asSet === null ? null : Math.round((proj - asSet) * TENTHS) / TENTHS,
+		playing: linesRead(setGames, now).state === 'playing'
 	};
 }
 

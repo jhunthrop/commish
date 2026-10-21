@@ -273,7 +273,7 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 	}
 	out := apitypes.OrderAdvice{Week: h.week, Basis: OrderScreenBasis(a.basis, RestFrom{Week: a.Board.FromWeek, Partial: a.rest.Partial}, OrderLeague(marks, a.settings, scoring.Format), a.horizon), OrderBasis: h.basis,
 		Refreshed: h.refreshed, ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: scoring,
-		BasisNote: un.Note, BasisNoteLink: un.Link, BasisNoteList: &un.Names, RankBy: rankBy(q.position), Rows: []apitypes.OrderRow{}}
+		BasisNote: un.Note, BasisNoteList: &un.Names, RankBy: rankBy(q.position), Rows: []apitypes.OrderRow{}}
 	if carriesPerGame(a.Board) {
 		from := a.Board.FromWeek
 		out.FromWeek = &from

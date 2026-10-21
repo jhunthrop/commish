@@ -24,13 +24,15 @@ const (
 
 // Bounds every answer is held to.
 const (
-	maxTeams    = 32
-	maxRounds   = 50
-	maxSlots    = 60
-	maxNameLen  = 80
-	maxTextLen  = 40
-	maxScoring  = 200
-	maxPosition = 60
+	maxTeams = 32
+	// maxReserveSlots bounds settings.reserve_slots: more is no league's.
+	maxReserveSlots = 10
+	maxRounds       = 50
+	maxSlots        = 60
+	maxNameLen      = 80
+	maxTextLen      = 40
+	maxScoring      = 200
+	maxPosition     = 60
 )
 
 var playerIDPattern = regexp.MustCompile(`^[A-Za-z0-9_]{1,16}$`)
@@ -107,6 +109,11 @@ type League struct {
 	// PlayoffRoundType is settings.playoff_round_type: 0 a week a round, 1
 	// a two-week final, 2 two weeks a round.
 	PlayoffRoundType int
+	// ReserveSlots is settings.reserve_slots, each team's injured reserve
+	// slots, 0 when unset; ReserveAllowOut is settings.reserve_allow_out, a
+	// player ruled out may take one (Lane 118, B79).
+	ReserveSlots    int
+	ReserveAllowOut bool
 }
 
 type wireDraft struct {
@@ -341,6 +348,12 @@ func (w wireLeague) validate(id string) (League, error) {
 	}
 	if n, ok := intSetting(w.Settings["playoff_round_type"]); ok && n >= 0 && n <= 2 {
 		l.PlayoffRoundType = n
+	}
+	if n, ok := intSetting(w.Settings["reserve_slots"]); ok && n > 0 && n <= maxReserveSlots {
+		l.ReserveSlots = n
+	}
+	if n, ok := intSetting(w.Settings["reserve_allow_out"]); ok {
+		l.ReserveAllowOut = n == 1
 	}
 	return l, nil
 }

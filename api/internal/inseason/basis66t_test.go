@@ -54,24 +54,23 @@ func TestLineupAndWaiverRules(t *testing.T) {
 }
 
 // The rules Avg and Last leave out are named inline (Lane 111, B33), the
-// Settings list keeps its own words, and the old web's link words stay for
-// the deploy window.
+// Settings list keeps its own words, and no link words are sent (Lane 118).
 func TestUncountedRulesAreNamedAndListed(t *testing.T) {
 	rules := scoring.PresetRules(apitypes.ScoringPresetPpr)
 	rules.PointsPerFieldGoalMissed, rules.PointsPerReturnTouchdown, rules.PointsPerDefensiveFumbleRecovery = 0, 0, 0
 	settings := apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupStandard, Scoring: apitypes.Scoring{Custom: &rules},
 		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1, K: 1, Dst: 1}}
 	got := UncountedOf(settings, nil)
-	if got.Note != "Our stats omit two-point, safety, points allowed and yards allowed." || got.Link != "Which four" {
-		t.Errorf("note %q link %q", got.Note, got.Link)
+	if got.Note != "Our stats omit two-point, safety, points allowed and yards allowed." {
+		t.Errorf("note %q", got.Note)
 	}
 	want := []string{"two-point conversions", "safeties", "a defense's points allowed", "a defense's yards allowed"}
 	if !reflect.DeepEqual(got.Rules, want) {
 		t.Errorf("rules %v", got.Rules)
 	}
 	one := UncountedOf(settings, func(m string) bool { return m != "safeties" })
-	if one.Note != "Our stats omit safety." || one.Link != "Which one" {
-		t.Errorf("one: %q %q", one.Note, one.Link)
+	if one.Note != "Our stats omit safety." {
+		t.Errorf("one: %q", one.Note)
 	}
 	two := UncountedOf(settings, func(m string) bool { return m != "safeties" && m != "two_point_conversions" })
 	if two.Note != "Our stats omit two-point and safety." {
@@ -91,7 +90,7 @@ func TestUncountedRulesAreNamedAndListed(t *testing.T) {
 		t.Errorf("names %q", got.Names)
 	}
 	none := UncountedOf(settings, func(string) bool { return true })
-	if none.Note != "" || none.Link != "" || none.Rules == nil || len(none.Rules) != 0 {
+	if none.Note != "" || none.Rules == nil || len(none.Rules) != 0 {
 		t.Errorf("none: %+v", none)
 	}
 }
@@ -151,7 +150,7 @@ func TestOrderSaysTheFigureAGame(t *testing.T) {
 	if !strings.HasSuffix(out.Basis, " "+PerGameBasis()) {
 		t.Errorf("%q", out.Basis)
 	}
-	if out.BasisNote != "" || out.BasisNoteLink != "" {
-		t.Errorf("no league, note %q %q", out.BasisNote, out.BasisNoteLink)
+	if out.BasisNote != "" {
+		t.Errorf("no league, note %q", out.BasisNote)
 	}
 }

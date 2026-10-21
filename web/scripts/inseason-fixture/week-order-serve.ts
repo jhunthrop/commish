@@ -10,7 +10,7 @@ type WaiverMoves = components['schemas']['WaiverMoves'];
 type Position = WeekOrderAdvice['position'];
 
 /** A tab's answer as week-order.ts writes it: the rules sentence is the reader's, set here. */
-type StoredAdvice = Omit<WeekOrderAdvice, 'basis_note' | 'basis_note_link'>;
+type StoredAdvice = Omit<WeekOrderAdvice, 'basis_note'>;
 
 /** The week's two states, as week-order.ts writes them. */
 export interface WeekOrderStates {
@@ -101,8 +101,7 @@ export function weekOrderAnswer(
 	if (league === null) {
 		return {
 			...answer,
-			// A reader with no league: the board's scoring, no Settings to open (week_order.go).
-			...uncountedOf(UNCOUNTED_RULES[position], false),
+			// A reader with no league: the board's scoring in the same sentence (week_order.go).
 			read_at: null,
 			moves: null,
 			rows: answer.rows.map((row) => ({ ...row, roster: null, move: null }))

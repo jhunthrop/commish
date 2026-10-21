@@ -26,7 +26,8 @@ const (
 // sleeperShape counts the league's lineup. A slot outside the rooms'
 // roster is named in Unfollowed rather than guessed at.
 func sleeperShape(l sleeper.League) Shape {
-	s := Shape{Teams: l.TotalRosters}
+	// Sleeper's injured reserve slots are settings, not roster positions (Lane 118, B79).
+	s := Shape{Teams: l.TotalRosters, IR: l.ReserveSlots, IROut: l.ReserveSlots > 0 && l.ReserveAllowOut}
 	unfollowed := map[string]bool{}
 	for _, p := range l.RosterPositions {
 		switch strings.ToUpper(p) {

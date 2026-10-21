@@ -8,7 +8,8 @@
 // Checks on Waivers: the count is the rows over the divider, every row under it draws its figure
 // quiet and names no one, a loud Gain is above zero, the line under the heads says Beats once, the
 // strip says why its drop is the one named, the named row's Beats names that drop, the IR and out
-// free agents are not listed, and the drop panel's IR bench row says why he is a drop. On the Lineup
+// free agents are not listed in the table's groups but in the Stash group under its own divider, each
+// saying the week he is back (Lane 118, B79), and the drop panel's IR bench row says why he is a drop. On the Lineup
 // (saturday) the IR bench row says so and the IR slot row draws no game. Every page: nothing scrolls
 // sideways and the copy passes the one guard (copy-scan.ts). Exits non-zero on any fault.
 //
@@ -19,7 +20,7 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { BOX } from '../src/lib/league/box/box.ts';
-import { HEAD_BASIS, WAIVERS } from '../src/lib/league/box/waivers.ts';
+import { HEAD_BASIS, STASH, WAIVERS } from '../src/lib/league/box/waivers.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import {
@@ -53,6 +54,8 @@ const DROP = 'Roschon Johnson';
 /** His Beats name: Theo Johnson is a row on the same screen (review M2). */
 const DROP_BEATS = 'R. Johnson';
 const UNLISTED = ["De'Von Achane", 'Tyquan Thornton'];
+/** The week each is back (waiver-beats.ts STAMPED). */
+const BACK: Readonly<Record<string, number>> = { "De'Von Achane": 9, 'Tyquan Thornton': 8 };
 const IR_SLOT = 'Tank Bigsby';
 
 await requireFixtureClock(API_ORIGIN, CLOCKS[day]);
@@ -158,7 +161,15 @@ async function checkWaivers(page: Page, where: string, text: string): Promise<vo
 	const basis = (await page.locator('main [data-basis]').allInnerTexts()).join(' ');
 	if (basis.includes(HEAD_BASIS.rest) || basis.includes(`${BOX.delta} is its change`))
 		fault(where, 'the footer says a column the heads line says');
-	for (const name of UNLISTED) if (text.includes(name)) fault(where, `${name} is listed`);
+	const groups = await stashGroups(page);
+	for (const name of UNLISTED) {
+		if (groups.table.some((row) => row.includes(name))) fault(where, `${name} is listed`);
+		const stash = groups.stash.find((row) => row.includes(name));
+		if (stash === undefined) fault(where, `${name} is not in the Stash group`);
+		else if (!stash.includes(STASH.back(BACK[name] ?? 0)))
+			fault(where, `${name}'s stash row reads "${stash}"`);
+	}
+	if (!groups.line.includes(STASH.line)) fault(where, `the Stash line reads "${groups.line}"`);
 	const moves = await page.locator('main [data-strip="waivers"] .pickup .move').allInnerTexts();
 	const card = moves.find((m) => m.includes(DROP)) ?? null;
 	if (card === null) {
@@ -169,6 +180,22 @@ async function checkWaivers(page: Page, where: string, text: string): Promise<vo
 	// The card's row names its drop in Beats (B14), Johnson by his last name.
 	if (!rows.some((r) => r.named && r.who === DROP_BEATS))
 		fault(where, `no tinted row names ${DROP} in Beats`);
+}
+
+/** The table's rows before the Stash divider and after it, as their text, and the group's line. */
+async function stashGroups(
+	page: Page
+): Promise<{ table: string[]; stash: string[]; line: string }> {
+	return page.locator('main table.pool').evaluate((table, head: string) => {
+		const out = { table: [] as string[], stash: [] as string[], line: '' };
+		let inStash = false;
+		for (const tr of Array.from(table.querySelectorAll<HTMLElement>('tbody tr'))) {
+			if (tr.classList.contains('divider')) inStash = tr.innerText.trim().toLowerCase() === head;
+			else if (tr.classList.contains('stash-basis')) out.line = tr.innerText.trim();
+			else (inStash ? out.stash : out.table).push(tr.innerText);
+		}
+		return out;
+	}, STASH.head.toLowerCase());
 }
 
 /** Opens the named row's drops: the IR bench drop says why he is one. */

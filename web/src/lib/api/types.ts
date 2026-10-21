@@ -3224,8 +3224,6 @@ export interface components {
 			basis_note: string;
 			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
-			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
-			basis_note_link: string;
 			/** @description the rules basis_note counts, in words ("two-point conversions"), for the league's Settings to list; empty when it counts none */
 			uncounted_rules: string[];
 			order_basis: components['schemas']['OrderBasis'];
@@ -3534,6 +3532,19 @@ export interface components {
 			 */
 			clears: string | null;
 			sentence: string;
+			/** @description set on a row of the Stash group alone (Lane 118, B79); absent on every other row */
+			stash?: components['schemas']['WaiverStash'];
+		};
+		WaiverStash: {
+			/** @description the week he is due back by the listed return date: the week the page addresses (for_week) or later */
+			back_week: number;
+			/**
+			 * Format: double
+			 * @description his rest-of-season points a game, the add's rest_of_season_per_game (the figure his player page shows), the figure the group sorts by; null where the board carries none
+			 */
+			per_game: number | null;
+			/** @description the member's team has an injured reserve slot open that takes him on the league's platform (ESPN, Sleeper and Yahoo slots from the league's settings; an out player only where the platform's slot takes one), so the verb is Stash; false elsewhere (FFPC and MyFantasyLeague always), the verb Add. Either way the row names the drop the gaining rows' rule names (an IR slot frees no bench spot until the platform moves him), none only with a bench spot open */
+			ir_slot: boolean;
 		};
 		OrderAdvice: {
 			/** @description the week the rows' Game cell and Proj are for */
@@ -3544,8 +3555,6 @@ export interface components {
 			basis_note: string;
 			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
-			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
-			basis_note_link: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/**
 			 * Format: date-time
@@ -3608,8 +3617,6 @@ export interface components {
 			basis_note: string;
 			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
-			/** @description the words of the link to the league's Settings the web drew before Lane 111 ("Which two"), kept for that web through one deploy; the web no longer draws it. Empty with none or no league */
-			basis_note_link: string;
 			/**
 			 * Format: date-time
 			 * @description when the league was read from its platform, null without a league
@@ -3675,8 +3682,6 @@ export interface components {
 			basis_note: string;
 			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
-			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
-			basis_note_link: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
 			refreshed: string;
@@ -3700,8 +3705,14 @@ export interface components {
 			pickups_proj: number | null;
 			/** @description the pickups worth making, chosen as a set from every add we rank, at most 3: each measured against the lineup with the ones before it made, kept only while he still starts and raises the Proj, no two taking the same player of the member's (topped or dropped); each one's week_gain is his over the ones before (the strip's cards); empty when no pickup beats the roster */
 			pickups: components['schemas']['WaiverRow'][];
-			/** @description positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order; a free agent on a season-long list (injured reserve, PUP, NFI) or ruled out this week is not listed (no read gives his return), save the player a link asked for; a week's out carried over from a game already played is listed */
+			/** @description positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order; a free agent on a season-long list (injured reserve, PUP, NFI) or ruled out this week is not listed in them, save the player a link asked for (an injured reserve or out free agent whose return week falls in the regular season is in stash instead); a week's out carried over from a game already played is listed, and so is one whose listing's dating is still pending (Lane 118, B94) */
 			rows: components['schemas']['WaiverRow'][];
+			/** @description the Stash group (Lane 118, B79): free agents on injured reserve or ruled out due back in the week the page addresses or later, inside the league's regular season (before its first playoff week, else the order's last week), each row's stash set, by his rest-of-season points a game, highest first, at most 10; one due back in the week the page addresses whose move gains is in rows instead; never among rows or pickups, never counted with the rows that gain; absent from an older answer */
+			stash?: components['schemas']['WaiverRow'][];
+			/** @description how many free agents on injured reserve or ruled out this page leaves unlisted because their return week is after the regular season (Lane 118 fix round 1), for the basis to say once; absent from an older answer */
+			stash_late?: number;
+			/** @description how many free agents on injured reserve or ruled out this page leaves unlisted because no read dates their return (Lane 118, B79), for the basis to say once; absent from an older answer */
+			stash_undated?: number;
 			/** @description the member's active roster (injured reserve and taxi spots left out), the lines beats and drops name */
 			roster: components['schemas']['PlayerLine'][];
 			/** @description the host's waiver page, empty when we know none */
@@ -3907,8 +3918,6 @@ export interface components {
 			basis_note: string;
 			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
-			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
-			basis_note_link: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
 			refreshed: string;
@@ -3995,8 +4004,6 @@ export interface components {
 			basis_note: string;
 			/** @description one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer */
 			basis_note_list?: string;
-			/** @description the words of the link to the league's Settings list of the rules the web drew before Lane 111 ("Which four"), kept for that web through one deploy; the web no longer draws it, as basis_note names the rules. Empty with no basis_note */
-			basis_note_link: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
 			refreshed: string;

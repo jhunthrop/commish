@@ -232,7 +232,6 @@ const check = (
 	week: 6,
 	basis: '',
 	basis_note: '',
-	basis_note_link: '',
 	order_basis: 'rest_of_season',
 	refreshed: '2026-10-14T19:05:37.917Z',
 	read_at: '2026-10-15T19:05:37.917Z',

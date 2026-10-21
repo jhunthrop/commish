@@ -280,7 +280,13 @@ export function reserveRow(row: BoxRow, reserve: 'bench' | 'slot' | null): BoxRo
 		weather: null,
 		pts: reserve === 'slot' ? null : row.pts,
 		proj: reserve === 'slot' ? null : row.proj,
-		evidence: { ...row.evidence, oppRank: null, oppOf: null }
+		// An IR slot row and a stash have no Proj this week, so no change in it either (Lane 118).
+		evidence: {
+			...row.evidence,
+			oppRank: null,
+			oppOf: null,
+			delta: reserve === 'slot' ? null : row.evidence.delta
+		}
 	};
 }
 

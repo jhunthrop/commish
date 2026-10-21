@@ -1,0 +1,159 @@
+package inseason
+
+import (
+	"sort"
+
+	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/boards"
+)
+
+// The adds Waivers lists and the Stash group (Lane 98, B41; Lane 118,
+// B79). A free agent on a season-long list or ruled out is no pickup this
+// week: with a return week inside the league's regular season he is a
+// stash, sorted by his rate a game; without one he is not listed. One due
+// back in the week the page addresses is listed with the rows when his
+// move gains, and is a stash "back this week" when it does not.
+
+// MaxStashRows is the most rows the Stash group carries.
+const MaxStashRows = 10
+
+// seasonLongLists are the designations that keep a player out for weeks.
+var seasonLongLists = map[string]bool{
+	boards.StatusInjuredReserve: true,
+	boards.StatusPUP:            true,
+	boards.StatusNFI:            true,
+}
+
+// listedAdd is whether the table lists a free agent by his designation
+// alone (B41): not one on a season-long list or ruled out, who is no
+// pickup this week. A week's out carried over from a game already played
+// (Lane 95) stays: that listing predates the week the page addresses. So
+// does one whose dating is still pending (Lane 118, B94): not yet known,
+// he reads as his designation alone, as a questionable or doubtful one
+// does.
+func listedAdd(p person) bool {
+	d := p.words.Facts.Designation
+	if d == nil {
+		return true
+	}
+	if seasonLongLists[d.Status] {
+		return false
+	}
+	return d.Status != boards.StatusOut || d.CarriedOver || d.Pending
+}
+
+// listedMove is whether the table lists a free agent's move: listedAdd,
+// or one held back (returnHeld) who is due back in the week the page
+// addresses and whose move gains (Lane 118 fix round 1): he plays this
+// week, so he is a pickup like any other.
+func listedMove(p person, move Waiver) bool {
+	return listedAdd(p) || (backThisWeek(p) && positive(move.Gain))
+}
+
+// returnHeld is a free agent the table leaves out by his designation whom
+// the Stash group can hold (B79): on injured reserve or ruled out.
+func returnHeld(p person) bool {
+	d := p.words.Facts.Designation
+	return d != nil && !listedAdd(p) && (d.Status == boards.StatusInjuredReserve || d.Status == boards.StatusOut)
+}
+
+// backThisWeek is a held-back free agent due back in the week his facts
+// address.
+func backThisWeek(p person) bool {
+	if !returnHeld(p) {
+		return false
+	}
+	back := p.words.Facts.Designation.Back
+	return back != nil && *back == p.words.Facts.Week
+}
+
+// lastRegularWeek is the league's regular season's last week: the week
+// before its first playoff week where its platform states one, else the
+// order's last week.
+func (a *advisor) lastRegularWeek() int {
+	if first := a.Snap.Terms.PlayoffFirst; first > 1 && first-1 <= a.horizon.Last {
+		return first - 1
+	}
+	return a.horizon.Last
+}
+
+// stashWeek is the week a free agent the Stash group holds is due back,
+// false for one it does not: not held back (returnHeld), no return week,
+// or one past the regular season.
+func (a *advisor) stashWeek(p person) (int, bool) {
+	if !returnHeld(p) {
+		return 0, false
+	}
+	back := p.words.Facts.Designation.Back
+	if back == nil || *back > a.lastRegularWeek() {
+		return 0, false
+	}
+	return *back, true
+}
+
+// irSlotOpen is whether the member's team has an injured reserve slot
+// open that takes him on the league's platform (B79): the league's slots
+// from its settings, less the ones his roster fills; a player ruled out
+// only where the platform's slot takes one.
+func (a *advisor) irSlotOpen(p person) bool {
+	shape := a.Snap.Shape
+	team, ok := a.Snap.TeamByRoster(a.Me)
+	if !ok || shape.IR <= len(team.Reserve) {
+		return false
+	}
+	return p.words.Facts.Designation.Status == boards.StatusInjuredReserve || shape.IROut
+}
+
+// stashCounts is what the Stash group's line counts: the held-back free
+// agents no read dates, and those due back after the regular season.
+type stashCounts struct {
+	undated, late int
+}
+
+// stashRows is the Stash group (B79): every free agent stashWeek holds
+// whose move the table does not list, the asked player aside (his row is
+// in the table), each a waiver row with its stash set, by his rate a
+// game, highest first, at most MaxStashRows.
+func (a *advisor) stashRows(run waiverRun, asked string) ([]apitypes.WaiverRow, stashCounts) {
+	out := []apitypes.WaiverRow{}
+	var counts stashCounts
+	for _, move := range run.moves {
+		add := run.pool[move.Add]
+		if isAsked(add, asked) || listedMove(add, move) || !returnHeld(add) {
+			continue
+		}
+		back, ok := a.stashWeek(add)
+		switch {
+		case ok:
+			out = append(out, a.stashRow(run, add, move, back))
+		case add.words.Facts.Designation.Back == nil:
+			counts.undated++
+		default:
+			counts.late++
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return ratedAbove(out[i].Stash.PerGame, out[j].Stash.PerGame) })
+	return out[:min(len(out), MaxStashRows)], counts
+}
+
+// stashRow is one stash: the waiver row of his move with no week figure
+// and no Beats (he plays no game before the week he is back), its rate
+// the figure his player page shows, his rest-of-season points a game
+// (Lane 118 fix round 1, HIGH-1). The drop is the gaining rows' drop
+// rule's: an IR slot frees no bench spot until the platform moves him, so
+// only a roster with a bench spot open (the search's no-drop move) has
+// none.
+func (a *advisor) stashRow(run waiverRun, add person, move Waiver, back int) apitypes.WaiverRow {
+	row := waiverRow(run.w, run.week, run.mine, add, move, run.clears)
+	row.WeekGain, row.Pickup, row.Starts, row.Beats = nil, false, false, nil
+	row.Stash = &apitypes.WaiverStash{BackWeek: back, PerGame: add.line.RestOfSeasonPerGame, IrSlot: a.irSlotOpen(add)}
+	return row
+}
+
+// ratedAbove orders two rates highest first, a missing one last.
+func ratedAbove(a, b *float64) bool {
+	if a == nil || b == nil {
+		return a != nil && b == nil
+	}
+	return *a > *b
+}

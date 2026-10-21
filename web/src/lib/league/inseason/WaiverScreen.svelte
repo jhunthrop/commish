@@ -28,6 +28,9 @@
 		pickupCards,
 		poolRows,
 		sortRows,
+		stashBasis,
+		stashRows,
+		STASH,
 		stripDecision,
 		WAIVERS,
 		waiverBasis,
@@ -161,9 +164,26 @@
 		})
 	);
 	const rows = $derived(findRows(sortRows(pool, sort), query));
+	/** The Stash group (Lane 118, B79): its rows, sorted and found as the table's, and its line. */
+	const stashPool = $derived(
+		stashRows(
+			{
+				rows: shown.rows,
+				pickups: advice.pickups,
+				roster: shown.roster,
+				stash: shown.stash,
+				week: shown.week,
+				for_week: shown.for_week
+			},
+			memberZone(),
+			now
+		)
+	);
+	const stash = $derived(findRows(sortRows(stashPool, sort), query));
+	const stashLine = $derived(stashBasis(shown));
 	const cards = $derived(pickupCards(advice));
 	const card = $derived(cards.find((c) => c.key === chosenCard) ?? cards[0] ?? null);
-	const openRow = $derived(pool.find((r) => r.key === open) ?? null);
+	const openRow = $derived([...pool, ...stashPool].find((r) => r.key === open) ?? null);
 	const drops = $derived(openRow ? dropRows(openRow.source, shown.roster, memberZone(), now) : []);
 	const drop = $derived(drops.find((d) => d.key === chosenDrop) ?? drops[0] ?? null);
 	const onHost = $derived(claimsOnHost(shown));
@@ -321,18 +341,31 @@
 	/** The player shelf's verb on an add's row (Lane 113): the screen's own, for the add with the
 	 * advice's drop, its pair said under it; none on a player of the member's. */
 	function shelfOffer(tapped: BoxRow): ScreenOffer | null {
-		const entry = pool.find((r) => r.row.key === tapped.key);
+		const entry = [...pool, ...stashPool].find((r) => r.row.key === tapped.key);
 		if (entry === undefined) return null;
+		const { stash: stashed } = entry;
+		// A stash an open IR slot takes: the platform's page with his name, his week said under it.
+		if (stashed?.verb === 'stash' && !stashed.drops) {
+			return {
+				label: STASH.verb,
+				line: stashed.back,
+				href: null,
+				run: () => openPlatform(entry.source),
+				focus: null
+			};
+		}
 		const advised = dropRows(entry.source, shown.roster, memberZone(), now)[0] ?? null;
 		const paired = withDrop(entry.source, advised);
 		const names = namesOnScreen(shown);
+		const move = moveWords({
+			add: cardName(paired.add.player.name, names),
+			drop: advised ? cardName(advised.row.name, names) : null
+		});
 		return {
 			label: verbWords(paired),
-			// The pair and its gain, as the strip's card says them (fix round 1, LOW-8).
-			line: `${moveWords({
-				add: cardName(paired.add.player.name, names),
-				drop: advised ? cardName(advised.row.name, names) : null
-			})}, ${cardGains({ weekGain: paired.week_gain, gain: paired.gain })}`,
+			// The pair and its gain, as the strip's card says them (fix round 1, LOW-8); a stash's week
+			// in place of a gain he cannot make before it (Lane 118, B79).
+			line: `${move}, ${stashed ? stashed.back : cardGains({ weekGain: paired.week_gain, gain: paired.gain })}`,
 			href: null,
 			run: () => act(paired),
 			// The claim made here opens its confirmation; the platform's page opens in a new tab.
@@ -347,7 +380,7 @@
 		offer: shelfOffer,
 		rowOf: (slug) =>
 			rowBySlug(
-				pool.map((r) => r.row),
+				[...pool, ...stashPool].map((r) => r.row),
 				slug
 			)
 	});
@@ -479,6 +512,9 @@
 			onchoose={(d: DropRow) => (chosenDrop = d.key)}
 			{go}
 			empty={WAIVERS.noneFound}
+			{stash}
+			{stashLine}
+			onstash={(entry: PoolRow) => openPlatform(entry.source)}
 		/>
 	</div>
 	<PlayerShelfLayer host={shelf} />
