@@ -122,11 +122,15 @@ export function sideBox(
 				pts: sideScore(rows, box, read.hostTotal),
 				final: box.projected_final ?? null,
 				live: read.started,
+				// A box with no starters (FFPC's opponent view) has no line to read: the side follows the
+				// bug's head, as a side with no box does (fix round 2, HIGH-2).
 				allFinal:
-					linesRead(
-						box.starters.map((s) => s.line.facts),
-						read.now
-					).state === 'final',
+					box.starters.length === 0
+						? read.headFinal === true
+						: linesRead(
+								box.starters.map((s) => s.line.facts),
+								read.now
+							).state === 'final',
 				note: totalsNote(rows, read.landed, read.week)
 			},
 			lines: [...box.starters.map((s) => s.line), ...box.bench],

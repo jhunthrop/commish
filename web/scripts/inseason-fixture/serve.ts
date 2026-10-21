@@ -34,7 +34,7 @@ import { playerWeek, type Sheet } from './player-week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 import { ESPN_STAND_IN_NAME, espnMatchup, espnSync } from './espn-sync.ts';
 import { yahooStandIn } from './yahoo.ts';
-import { ffpcStandIn } from './ffpc.ts';
+import { ffpcAfterSunday, ffpcStandIn } from './ffpc.ts';
 import { afterSundayOf, SUNDAY, sundayOf } from './sunday.ts';
 import { linesOf, recordedMatchups, scoreboardAt } from './scoreboard-at.ts';
 import { inSeason, noWeek } from './member-week.ts';
@@ -569,7 +569,10 @@ interface StandIn extends StandInWeek {
  * the recorded league on the Sunday, the recorded league as Yahoo's on either day. */
 function standInAsked(req: IncomingMessage, id: string): StandIn | null {
 	const sunday = SUNDAY_WEEK.test(req.headers.cookie ?? '');
-	// The FFPC stand-in reads on the week's Saturday alone (its shots, Lane 94).
+	// The FFPC stand-in reads on the week's Saturday (its shots, Lane 94) and, after its Sunday, with the
+	// opponent's starters unlisted as FFPC's read holds them (Lane 121 fix round 2).
+	if (ffpcAsked(req, id) && afterSunday())
+		return { ...ffpcAfterSunday(sleeperAfter()), readAt: readAt() };
 	if (ffpcAsked(req, id)) {
 		const board = scoreboardNow();
 		const scoring = ffpcWeek.lineup.projection_scoring;

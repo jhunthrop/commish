@@ -59,8 +59,14 @@ func TestStartersFinalAgreesWithTheMatchupsStartersOnMondayNight(t *testing.T) {
 	done := scoreboardOf(t, s)
 	for _, g := range done.Games {
 		for _, side := range g.Sides {
-			// A side with no starter's game held (the fixture's other teams start players with no
-			// schedule here) is never final: nothing of it is.
+			// A side listing no starters sends none (fix round 2); one whose starters hold no game is
+			// never final: nothing of it is.
+			if side.Starters == 0 {
+				if side.StartersFinal != nil {
+					t.Errorf("roster %d lists no starters and sends starters_final", side.RosterId)
+				}
+				continue
+			}
 			want := side.Played > 0
 			if side.StartersFinal == nil || *side.StartersFinal != want {
 				t.Errorf("roster %d: final %v with every week 6 game final, %d played", side.RosterId, side.StartersFinal, side.Played)
@@ -118,4 +124,61 @@ func linesFinal(starters []apitypes.BoxStarter) bool {
 		}
 	}
 	return games > 0 && finals == games
+}
+
+// An FFPC-shaped pairing on the Tuesday clock (Lane 121 fix round 2,
+// HIGH-2): the platform lists the opponent no starters, so the scoreboard
+// sends no starters_final for that side (the web reads the game's state,
+// Final, as the Matchup's head does), while the member's side says it.
+func TestStartersFinalIsAbsentForASideWithNoStartersListed(t *testing.T) {
+	f, projection := liveFixture(t)
+	for i := range f.data.Games {
+		if f.data.Games[i].Week == 6 {
+			f.data.Games[i].Final = true
+		}
+	}
+	me := f.league.Snap.Matchups[0]
+	for i := range f.league.Snap.Matchups {
+		side := &f.league.Snap.Matchups[i]
+		if side.Game == me.Game && side.RosterID != me.RosterID {
+			side.Starters, side.PlayerPoints = nil, nil
+		}
+	}
+	s := liveService(t, f, projection)
+	s.Now = func() time.Time { return tuesdayNoon }
+	board := scoreboardOf(t, s)
+	box := matchupOf(t, s)
+	for _, g := range board.Games {
+		if !hasRoster(g, me.RosterID) {
+			continue
+		}
+		for _, side := range g.Sides {
+			if side.RosterId == me.RosterID {
+				if side.StartersFinal == nil || !*side.StartersFinal {
+					t.Errorf("the member's side: starters_final %v, want true", side.StartersFinal)
+				}
+				continue
+			}
+			if side.StartersFinal != nil {
+				t.Errorf("the opponent listing no starters sends starters_final %v, want none", *side.StartersFinal)
+			}
+			if g.State != apitypes.ScoreboardGameStateFinal {
+				t.Errorf("the game reads %s, want final, the state the web falls back to", g.State)
+			}
+		}
+	}
+	for _, b := range box.Sides {
+		if b.RosterId != me.RosterID && len(b.Starters) != 0 {
+			t.Errorf("the Matchup box holds %d starters for the FFPC opponent, want none", len(b.Starters))
+		}
+	}
+}
+
+func hasRoster(g apitypes.ScoreboardGame, roster int) bool {
+	for _, s := range g.Sides {
+		if s.RosterId == roster {
+			return true
+		}
+	}
+	return false
 }

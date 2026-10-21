@@ -120,7 +120,7 @@ func (k kickoffs) toPlay(game apitypes.ScoreboardGameState) *string {
 // a final game (Lane 121, B99): the side's figure reads Final with its
 // total, the web's one predicate (box.ts teamSmallFigure). Empty slots,
 // byes and starters with no game held do not count; none with a game is
-// not final.
+// not final. A side listing no starters at all sends none (scoreboardGame).
 func (k kickoffs) startersFinal() *bool {
 	final := k.games > 0 && k.finals == k.games
 	return &final
@@ -173,7 +173,11 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 	for i := range out.Sides {
 		out.Sides[i].ToPlay = own[i].toPlay(out.State)
 		out.Sides[i].InPlay = own[i].inPlayCount()
-		out.Sides[i].StartersFinal = own[i].startersFinal()
+		// A side the platform lists no starters for (FFPC's opponent view) says nothing, so the web
+		// reads the game's state for it, as the Matchup does (Lane 121 fix round 2, HIGH-2).
+		if len(sides[i].Starters) > 0 {
+			out.Sides[i].StartersFinal = own[i].startersFinal()
+		}
 	}
 	return out
 }
