@@ -66,7 +66,9 @@ A moved game (Lane 110, B77b). The `tank01-schedule` ingest (an operator command
 `python -m research.pipeline tank01-schedule`; no job runs it on a schedule, so run it once a game has
 moved, as for week 18's flexed games) marks a stored game `superseded_by` the new id when the provider's week no longer lists its id but lists the same two clubs under another (a date
 change); every schedule read, the API's and research's, leaves a superseded row out, and an id listed
-again is a game to play again. A game the week drops with no such pair is left as it stands.
+again is a game to play again. A game the week drops with no such pair is left as it stands. The parity case
+`tank01-schedule` covers it (Lane 116): its later pass lands the recording on an earlier week 18 that listed two
+games a day earlier (`parity/fixtures/tank01-2026-week18-moved`), and both earlier rows are kept, retired.
 
 The order of a Thursday's passes, all America/New_York (Lane 93 sets the register's order on the
 Thursday pass, in the 12 hours before the first kickoff):

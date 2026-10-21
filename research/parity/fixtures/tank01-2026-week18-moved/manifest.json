@@ -1,0 +1,17 @@
+{
+  "provenance": "derived-from-recording",
+  "recordedAt": "2026-10-12",
+  "note": "An EARLIER week 18 for the moved-game pass (Lane 116, B77b), derived from tank01-2026's recording of week 18's fixtures: the same answer with two games listed a day earlier, 20270110_SEA@LAR and 20270110_NYJ@BUF as 20270109_SEA@LAR and 20270109_NYJ@BUF (gameID, gameDate and cbsLink moved a day). tank01-schedule runs this on top of tank01-2026 first, then tank01-2026 alone, so the recording re-lists the two games under new ids for the same two clubs, as the provider does when a game's date changes (a week 18 flex, a postponement): the stored 20270109 rows must be retired (superseded_by the 20270110 id), never deleted.",
+  "responses": [
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=18",
+      "status": 200,
+      "file": "games_week_18.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, two games moved to 20270109",
+      "bytes": 7309
+    }
+  ]
+}

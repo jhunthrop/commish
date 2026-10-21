@@ -53,6 +53,9 @@ class Departure:
     ts: Value
     py: Value
     why: str
+    # The passes it appears in (`later`: a departure only a later release on top of an earlier one makes,
+    # a moved game retired), every pass when empty.
+    passes: tuple[str, ...] = ()
 
 
 def declared(departures: Sequence[Departure], key: Key, column: str, ts: Value, py: Value) -> Departure | None:
@@ -88,6 +91,10 @@ class TableSpec:
 
     def departing(self, *departures: Departure) -> "TableSpec":
         return replace(self, departures=(*self.departures, *departures))
+
+    def in_pass(self, name: str) -> "TableSpec":
+        """The spec as the named pass compares it: only the departures that pass makes."""
+        return replace(self, departures=tuple(d for d in self.departures if not d.passes or name in d.passes))
 
 
 @dataclass(frozen=True)
