@@ -22,6 +22,8 @@ CODES: Final[Mapping[str, str]] = {
     "IR": "injured_reserve",
     "IR-R": "injured_reserve",
     "INJURED RESERVE": "injured_reserve",
+    # The player list's and the roster sweep's words for IR-R (Lane 110).
+    "INJURED RESERVE - DESIGNATED TO RETURN": "injured_reserve",
     "SUSP": "suspended",
     "SUS": "suspended",
     "SUSPENDED": "suspended",

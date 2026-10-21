@@ -176,7 +176,7 @@ func teamWeekKey(week int, team string) string { return fmt.Sprintf("%d|%s", wee
 // date and Eastern time.
 func (s *PGSource) games(ctx context.Context, season int) ([]TeamWeek, error) {
 	rows, err := s.Pool.Query(ctx, `select week, home_team, away_team, game_date, coalesce(kickoff_et, '')
-		from `+s.table("provider_games")+` where season = $1 and game_date is not null
+		from `+s.gamesToPlay()+` where season = $1 and game_date is not null
 		order by week, home_team collate "C" limit $2`, season, maxTeamWeeks+1)
 	if err != nil {
 		return nil, fmt.Errorf("boards: read schedule %d: %w", season, err)

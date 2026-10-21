@@ -483,7 +483,8 @@ func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
 		out.GameState = &state
 	}
 	if d := f.Designation; d != nil {
-		out.Designation = &apitypes.InjuryDesignation{Status: apitypes.DesignationStatus(d.Status), AsOf: d.AsOf, Since: d.Since, Listed: d.Listed}
+		out.Designation = &apitypes.InjuryDesignation{Status: apitypes.DesignationStatus(d.Status), AsOf: d.AsOf, Since: d.Since,
+			Listed: d.Listed, ReturnWeek: d.ReturnWeek}
 		if d.CarriedOver {
 			carried := true
 			out.Designation.CarriedOver = &carried

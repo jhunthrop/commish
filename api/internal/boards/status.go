@@ -29,7 +29,9 @@ func designationCodeTable() map[string]string {
 		"D": StatusDoubtful, "DOUBTFUL": StatusDoubtful,
 		"O": StatusOut, "OUT": StatusOut,
 		"IR": StatusInjuredReserve, "IR-R": StatusInjuredReserve, "INJURED RESERVE": StatusInjuredReserve,
-		"SUSP": StatusSuspended, "SUS": StatusSuspended, "SUSPENDED": StatusSuspended,
+		// The player list's and the roster sweep's words for IR-R (Lane 110).
+		"INJURED RESERVE - DESIGNATED TO RETURN": StatusInjuredReserve,
+		"SUSP":                                   StatusSuspended, "SUS": StatusSuspended, "SUSPENDED": StatusSuspended,
 		"PUP": StatusPUP,
 		"NFI": StatusNFI,
 	}

@@ -12,7 +12,8 @@
     uv run python -m research.parity list                every case and fixture set
 
 `ingest` and `schema` need PARITY_DATABASE_URL (a Postgres where the harness may create its own
-`parity_*` scratch databases, and drops every one of them, leftovers included) and, for the
+`parity_*` scratch databases, in the family the URL's database names, and drops every one of that family,
+leftovers included; `databases.py`) and, for the
 TypeScript side, the repository's node_modules. Each case runs in passes (`runner.py`): into empty
 databases, again on top, and from an earlier recording to today's where one exists. Exit status is
 non-zero on any difference, on a declared table empty on both sides, on the two sides asking for

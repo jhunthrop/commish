@@ -30,6 +30,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import Connection, text
 
 from research.capsules.facts.team_names import NFL_TEAM_NAMES
+from research.db.schema.provider import GAME_TO_PLAY
 from research.errors import ResearchError
 from research.model.backtest import sum_left
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS, product_team_code
@@ -117,7 +118,7 @@ def slates_by_club(conn: Connection, season: int) -> dict[str, list[Game]]:
     rows = conn.execute(
         text(
             "select week, home_team, away_team, game_date, kickoff_et from research.provider_games "
-            "where season = :s and week between 1 and :last order by week, game_id"
+            f"where season = :s and week between 1 and :last and {GAME_TO_PLAY} order by week, game_id"
         ),
         {"s": season, "last": REGULAR_SEASON_WEEKS},
     )

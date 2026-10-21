@@ -17,7 +17,7 @@ whose designation or headlines moved) is a capsule concern and lands with the ca
 import hashlib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Final, Literal
 from zoneinfo import ZoneInfo
 
@@ -76,6 +76,23 @@ class CaptureFeed:
     screen: Callable[[CaptureContext, object], tuple[Status, str] | None] | None = None
 
 
+def screen_player_list(_context: CaptureContext, answer: object) -> tuple[Status, str] | None:
+    """A player list with no players is a failure, never stored: stored, it would read as everyone's
+    return date cleared. The provider's own failure stays the plain failure it is."""
+    if isinstance(answer, Exception) or (isinstance(answer, list) and answer):
+        return None
+    return "failed", "the player list answered no players"
+
+
+# THE RETURN DATES (Lane 110, B79). The player list is the one feed that carries each listed player's
+# expected return (`injury.injReturnDate`, YYYYMMDD), one request for every player; the hourly injury
+# list carries none. The harvest reads it once a day (`return_dates_due`); the API reads the date beside
+# each designation (`api/internal/boards/designations.go`).
+PLAYER_LIST_SOURCE: Final = "tank01_player_list"
+PLAYER_LIST_FEED: Final = CaptureFeed(
+    PLAYER_LIST_SOURCE, "weekly", lambda _c: [CaptureRequest(Paths.PLAYER_LIST, {})], screen_player_list
+)
+
 CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
     CaptureFeed(
         "tank01_injuries",
@@ -101,7 +118,7 @@ CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
     ),
     CaptureFeed("tank01_injuries_by_date", "daily", lambda _c: [CaptureRequest(Paths.INJURIES_BY_DATE, {})]),
     CaptureFeed("tank01_inactives", "game-day", lambda c: [CaptureRequest(Paths.INACTIVES, {"week": str(c.week)})]),
-    CaptureFeed("tank01_player_list", "weekly", lambda _c: [CaptureRequest(Paths.PLAYER_LIST, {})]),
+    PLAYER_LIST_FEED,
 )
 
 # The harvest's deliberate subset: single-request feeds a player card or capsule reads.
@@ -137,7 +154,9 @@ def week_game_dates(games: Sequence[tuple[int, date]], at: datetime) -> tuple[st
 def stored_week_game_dates(conn: Connection, season: int, at: datetime) -> tuple[str, ...]:
     """`week_game_dates` over the provider schedule's dated games of the season."""
     table = PROVIDER_GAMES
-    query = select(table.c.week, table.c.game_date).where(table.c.season == season, table.c.game_date.is_not(None))
+    query = select(table.c.week, table.c.game_date).where(
+        table.c.season == season, table.c.game_date.is_not(None), table.c.superseded_by.is_(None)
+    )
     return week_game_dates([(int(r.week), r.game_date) for r in conn.execute(query)], at)
 
 
@@ -329,7 +348,8 @@ def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: dateti
     week, so a pass is at most ten requests: four single feeds, the projection, and a holiday week's
     five game days. Parsing the stored projections is the caller's next transaction
     (`projections.parse_stored_projections`), so a refused snapshot never rolls back what this pass
-    captured."""
+    captured. The player list, for the return dates (B79), is read after the game status on what is left
+    (`capture_return_dates`)."""
     read = projection_week_due(conn, season, fired_at)
     feeds = [*harvest_feeds(), *([] if read is None else [week_projection_feed(read)])]
     capture = CapturePass(
@@ -340,3 +360,38 @@ def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: dateti
         game_dates=stored_week_game_dates(conn, season, fired_at),
     )
     return capture_once(conn, client, capture, FixedBudget(CAPTURE_HARVEST_REQUEST_BUDGET))
+
+
+# The player list's day opens at 06:00 Eastern, the harvest's first pass of the day.
+RETURN_DATES_FROM: Final = time(6)
+
+_LIST_CHECKED: Final = text(f"select checked_at from {CAPTURE_CHECKS.fullname} where source = :source")
+
+
+def return_dates_due(conn: Connection, now: datetime) -> bool:
+    """The player list is due once an Eastern day: from 06:00 until a pass reads it (captured or
+    unchanged, `capture_checks`). A failed read records no check, so the next pass asks again; an
+    operator's full capture after 06:00 is the day's read too."""
+    east = now.astimezone(_EASTERN)
+    opens = datetime.combine(east.date(), RETURN_DATES_FROM, _EASTERN)
+    if east < opens:
+        return False
+    checked = conn.execute(_LIST_CHECKED, {"source": PLAYER_LIST_SOURCE}).scalar_one_or_none()
+    return checked is None or checked < opens
+
+
+def capture_return_dates(
+    conn: Connection, client: Tank01Client, now: datetime, season: int, budget: FixedBudget
+) -> FeedOutcome | None:
+    """The day's read of the player list (B79), last in the harvest's pass, on what the capture and the
+    game status left of the pass's ten requests, so it never costs a game its final; None when the day's
+    read is taken or not yet due. A pass with nothing left names it left for a later pass (the next hour
+    asks again), never a failure; a provider failure or a list with no players is a failure, stored
+    nowhere, and asked again the next hour."""
+    if not return_dates_due(conn, now):
+        return None
+    if budget.limit < 1:
+        return FeedOutcome(PLAYER_LIST_SOURCE, "budget-refused", 0, "left for a later pass, this pass's requests spent")
+    capture = CapturePass(now, season, current_nfl_week(conn, season), feeds=(PLAYER_LIST_FEED,))
+    (outcome,) = capture_once(conn, client, capture, budget).feeds
+    return outcome

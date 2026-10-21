@@ -33,12 +33,16 @@ is refused: kept, its game left at the week's status, and the pass's line FAILED
 fails its parse. The fallback's calls count against the pass's budget, not against HOURLY_CAP, which is
 the week feed's.
 
-A REFUSAL THAT REPEATS (Lane 107, B76). A game whose newest REFUSAL_CAP kept box scores (the answers that
-name it) are one refused answer is not asked again: the pass names it once, "refused 3 times, waiting on
-the final", and still fails its line, until the final is held another way or GIVE_UP_AFTER has passed.
-A GAME THAT MOVED (Lane 107, B77). The game id carries its date, so a game moved to another day (a week
-18 Saturday game, a postponement) leaves its old row in the stored schedule; a stored game whose club the
-answer carries under another id is never absent, only named in the line as superseded by that id.
+A REFUSAL THAT REPEATS (Lane 107, B76; Lane 110, B86). A game whose newest REFUSAL_CAP kept box scores (the
+answers asked about it, `asked_game_id`, whatever game they name, or none) are one refused answer is not
+asked again: the pass names it once, "refused 3 times, waiting on the final", and still fails its line,
+until the final is held another way or GIVE_UP_AFTER has passed. A box score kept before that column counts
+for the game its answer names.
+A GAME THAT MOVED (Lane 107, B77; Lane 110, B77b). The game id carries its date, so a game moved to another
+day (a week 18 Saturday game, a postponement) leaves its old row in the stored schedule until the schedule
+ingest marks it superseded (`superseded_by`), and a marked row is never read here. Until then a stored game
+whose club the answer carries under another id is never absent, only named in the line as superseded by
+that id.
 
 A FINAL IS HELD by the one rule, the `club_week_finals` view (revision 0014): the weekly result, a
 Tank01 final, or a line with the club, which the API's week facts and the run's states read too."""
@@ -88,10 +92,11 @@ _LOCK_KEY: Final = 80_0001
 _LOCK: Final = text("select pg_advisory_xact_lock(:key)")
 
 
-# Every call kept, the same answer twice included: the hour's calls are counted from these rows.
+# Every call kept, the same answer twice included: the hour's calls are counted from these rows. A box
+# score names the game it was asked about (B86); the week's call names none.
 _INSERT: Final = text(
-    f"insert into {CAPTURE_SNAPSHOTS.fullname} (source, captured_at, digest, payload) "
-    "values (:source, :captured_at, :digest, cast(:payload as jsonb))"
+    f"insert into {CAPTURE_SNAPSHOTS.fullname} (source, captured_at, digest, payload, asked_game_id) "
+    "values (:source, :captured_at, :digest, cast(:payload as jsonb), :asked)"
 )
 
 
@@ -185,7 +190,9 @@ def absent_games(conn: Connection, season: int, week: int, answered: Sequence[Ga
     """A stored game the answer leaves out is absent, unless either of its clubs appears in the answer
     under any id: then it is superseded by that game, and never asked about by its dead id (B77)."""
     t = PROVIDER_GAMES
-    query = select(t.c.game_id, t.c.home_team, t.c.away_team).where(t.c.season == season, t.c.week == week)
+    query = select(t.c.game_id, t.c.home_team, t.c.away_team).where(
+        t.c.season == season, t.c.week == week, t.c.superseded_by.is_(None)
+    )
     ids = {game.game_id for game in answered}
     by_club = {
         source_team_code(club): game.game_id for game in answered for club in (game.home_nfl_team, game.away_nfl_team)
@@ -216,9 +223,16 @@ class _Fallback:
 _STATUS_WORDS: Final[dict[GameStatus, str]] = {"final": "final", "in_progress": "under way", "scheduled": "scheduled"}
 
 
-def _store(conn: Connection, source: str, body: object, now: datetime) -> None:
-    """Every call kept verbatim, its own row, and its source marked checked at the pass."""
-    row = {"source": source, "captured_at": now, "digest": digest_of(body), "payload": js_json_stringify(body)}
+def _store(conn: Connection, source: str, body: object, now: datetime, asked: str | None = None) -> None:
+    """Every call kept verbatim, its own row with the game it asked about, and its source marked checked at
+    the pass."""
+    row = {
+        "source": source,
+        "captured_at": now,
+        "digest": digest_of(body),
+        "payload": js_json_stringify(body),
+        "asked": asked,
+    }
     conn.execute(_INSERT, row)
     record_checks(conn, [FeedOutcome(source, "captured", 1)], now)
 
@@ -232,28 +246,38 @@ def _ask_box_score(
         body = client.get(Paths.BOX_SCORE, {"gameID": game.game_id})
     except (ResearchError, httpx.HTTPError) as error:
         return None, f"FAILED, {game.game_id} box score: {error}"
-    _store(conn, BOX_SCORE_SOURCE, body, now)
-    read = map_box_score_game(body, week)
-    if read is None or read.game_id != game.game_id:
+    _store(conn, BOX_SCORE_SOURCE, body, now, asked=game.game_id)
+    status = box_score_status(body, game, week)
+    if status is None:
         return None, f"FAILED, {game.game_id} box score refused: it is not that game with a status"
-    return read.status, f"{game.game_id} box score {_STATUS_WORDS[read.status]}"
+    return status, f"{game.game_id} box score {_STATUS_WORDS[status]}"
 
 
-# A game's newest kept box scores: an answer is the game's when it names the game (`gameID`).
+def box_score_status(body: object, game: GameSummary, week: int) -> GameStatus | None:
+    """The asked game's status in its box score, None when the answer is refused: the mapper refuses it,
+    or it names another game."""
+    read = map_box_score_game(body, week)
+    return None if read is None or read.game_id != game.game_id else read.status
+
+
+# A game's newest kept box scores: the ones asked about it (B86), and before that column, the ones whose
+# answer names it (`gameID`).
 _GAME_BOX_SCORES: Final = text(
     f"select digest, payload from {CAPTURE_SNAPSHOTS.fullname} "
-    "where source = :source and payload ->> 'gameID' = :game order by captured_at desc, id desc limit :cap"
+    "where source = :source and coalesce(asked_game_id, payload ->> 'gameID') = :game "
+    "order by captured_at desc, id desc limit :cap"
 )
 
 
 def refused_out(conn: Connection, game: GameSummary, week: int) -> bool:
-    """The game's newest REFUSAL_CAP kept box scores are one answer (the same digest) and the mapper
-    refuses it: the provider has said the same unreadable thing that many times (B76)."""
+    """The game's newest REFUSAL_CAP kept box scores are one answer (the same digest) and it is refused, by
+    the mapper or for naming another game or none: the provider has said the same unreadable thing that
+    many times (B76, B86)."""
     params = {"source": BOX_SCORE_SOURCE, "game": game.game_id, "cap": REFUSAL_CAP}
     kept = conn.execute(_GAME_BOX_SCORES, params).all()
     if len(kept) < REFUSAL_CAP or len({row.digest for row in kept}) != 1:
         return False
-    return map_box_score_game(kept[0].payload, week) is None
+    return box_score_status(kept[0].payload, game, week) is None
 
 
 def _refused_note(game: GameSummary) -> str:

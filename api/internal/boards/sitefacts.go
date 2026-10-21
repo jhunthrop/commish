@@ -18,7 +18,7 @@ import (
 func (s *PGSource) PostseasonEnd(ctx context.Context, seasonYear int) (int, time.Time, bool, error) {
 	var week *int
 	var last *time.Time
-	err := s.Pool.QueryRow(ctx, `select max(week), max(game_date) from `+s.table("provider_games")+`
+	err := s.Pool.QueryRow(ctx, `select max(week), max(game_date) from `+s.gamesToPlay()+`
 		where season = $1 and week > $2 and game_date is not null`, seasonYear, regularSeasonWeeks).Scan(&week, &last)
 	if err != nil {
 		return 0, time.Time{}, false, fmt.Errorf("boards: postseason end %d: %w", seasonYear, err)

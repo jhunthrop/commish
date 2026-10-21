@@ -420,3 +420,66 @@ def test_one_club_in_the_answer_under_another_id_supersedes_the_stored_game(engi
         conn.execute(insert(PROVIDER_GAMES), [stale])
         result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(5))
         assert f"20261018_WSH@ARI superseded by {WSH_SF}" in result.line and "absent" not in result.line
+
+
+_OTHER_GAME: Final = {"gameID": "20261019_LAR@SEA", "home": "SEA", "away": "LAR", **_FINAL}
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        pytest.param(_OTHER_GAME, id="another-game"),
+        pytest.param({"home": "SF", "away": "WSH", **_FINAL}, id="no-game"),
+        pytest.param({}, id="empty"),
+    ],
+)
+def test_a_refused_answer_naming_another_game_or_none_counts_toward_the_asked_games_cap(
+    engine: Engine, answer: dict[str, str]
+) -> None:
+    """B86: the cap keys on the game asked about (`asked_game_id`), so an answer that names another game
+    or none is still that game's refusal, and three alike stop the asking."""
+    client = _Client({WSH_SF: answer})
+    client.week = _LATE_GAME_FINAL
+    passes = [PASS_AT + timedelta(hours=hour) for hour in range(REFUSAL_CAP + 2)]
+    with engine.begin() as conn:
+        _seed(conn)
+        results = [capture_game_status(conn, cast(Tank01Client, client), SEASON, at, FixedBudget(5)) for at in passes]
+        asked = conn.execute(
+            select(CAPTURE_SNAPSHOTS.c.asked_game_id).where(CAPTURE_SNAPSHOTS.c.source == BOX_SCORE_SOURCE)
+        ).scalars()
+        assert list(asked) == [WSH_SF] * REFUSAL_CAP
+    assert _box_calls(client) == REFUSAL_CAP
+    assert results[-1].failed
+    assert results[-1].line.endswith(f"FAILED, {WSH_SF} box score refused 3 times, waiting on the final")
+
+
+def test_a_box_score_kept_before_the_column_counts_for_the_game_it_names(engine: Engine) -> None:
+    """Rows kept before revision 0016 carry no asked game: they count for the game their answer names."""
+    client = _refusing()
+    rows = [
+        {"source": BOX_SCORE_SOURCE, "captured_at": PASS_AT - timedelta(hours=hour), "digest": "same",
+         "payload": _REFUSED_BODY, "asked_game_id": None}
+        for hour in range(1, REFUSAL_CAP + 1)
+    ]  # fmt: skip
+    with engine.begin() as conn:
+        _seed(conn)
+        conn.execute(insert(CAPTURE_SNAPSHOTS), rows)
+        result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(5))
+    assert _box_calls(client) == 0
+    assert result.line.endswith("refused 3 times, waiting on the final")
+
+
+def test_a_stored_game_the_ingest_marked_superseded_is_never_absent(engine: Engine) -> None:
+    """B77b: a row the schedule ingest marked superseded is not a game to play, so the status pass never
+    names it, even when no club of it appears in this answer."""
+    client = _WeekWithout({})
+    client.week = _LATE_GAME_FINAL
+    with engine.begin() as conn:
+        _seed(conn)
+        _seed_schedule(conn)
+        conn.execute(
+            PROVIDER_GAMES.update().where(PROVIDER_GAMES.c.game_id == WSH_SF).values(superseded_by="20261020_WSH@SF")
+        )
+        result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(5))
+    assert WSH_SF not in result.line
+    assert _box_calls(client) == 0
