@@ -12,7 +12,6 @@
 import type { components } from '../../src/lib/api/types.ts';
 import type { LineupAdvice, WaiverAdvice, WaiverRow } from '../../src/lib/league/inseason/api.ts';
 import { addKey } from '../../src/lib/league/inseason/move.ts';
-import { ORDER_FROM_WEEK } from './rest-now.ts';
 import { roundTenth } from './tenths.ts';
 import { seasonStarters } from './week.ts';
 
@@ -26,8 +25,6 @@ export const IR_SLOT_VARIABLE = 'FIXTURE_IR_SLOT';
 
 /** The recorded Sleeper league's last regular-season week: its playoffs start in week 15. */
 const LAST_REGULAR_WEEK = 14;
-/** The order's last week (horizon.go LastWeek). */
-const LAST_WEEK = 17;
 
 /** The positions each starting slot takes (engine.go Slots). */
 const ACCEPTS: Readonly<Record<string, readonly string[]>> = {
@@ -124,28 +121,23 @@ function returnHeld(line: PlayerLine): boolean {
 	return !listedAdd(line) && (status === 'injured_reserve' || status === 'out');
 }
 
-/** His rate from his return week, the stand-in's: his rest-of-season points a game over the weeks
- * left, spread over the weeks from his return (waiver_stash.go perGameFrom counts his club's games;
- * the stand-in has no bye in them). */
-function perGameFrom(line: PlayerLine, back: number): number | null {
-	const rate = line.rest_of_season_per_game;
-	if (rate === null) return null;
-	return roundTenth((rate * (LAST_WEEK - ORDER_FROM_WEEK + 1)) / (LAST_WEEK - back + 1));
-}
-
-/** One stash (waiver_stash.go stashRow): no week figure, and with an open slot no drop. */
+/** One stash (waiver_stash.go stashRow): no week figure and no Beats, his rate the figure his player
+ * page shows, the drop the gaining rows' rule names (the stand-in's member has no bench spot open). */
 function stashRow(row: WaiverRow, back: number, irSlot: boolean): WaiverRow {
 	const slot = irSlot && row.add.facts.designation?.status === 'injured_reserve';
-	const base = { ...row, week_gain: null, pickup: false, starts: false };
 	return {
-		...(slot ? { ...base, drop: null, drops: [], beats: null } : base),
-		stash: { back_week: back, per_game: perGameFrom(row.add, back), ir_slot: slot }
+		...row,
+		week_gain: null,
+		pickup: false,
+		starts: false,
+		beats: null,
+		stash: { back_week: back, per_game: row.add.rest_of_season_per_game, ir_slot: slot }
 	};
 }
 
 /** The answer with the adds it does not list gone (pageMoves), the ones due back in the regular season
- * in the Stash group by their rate from then, and the count of those whose return no read dates
- * (waiver_stash.go stashRows). */
+ * in the Stash group by their rate a game, and the counts of those whose return no read dates or falls
+ * after the regular season (waiver_stash.go stashRows). The stand-in dates no one back this week. */
 export function listedOnly(answer: WaiverAdvice, irSlot = false): WaiverAdvice {
 	const held = answer.rows.filter((r) => returnHeld(r.add));
 	const stash = held
@@ -159,6 +151,8 @@ export function listedOnly(answer: WaiverAdvice, irSlot = false): WaiverAdvice {
 		rows: answer.rows.filter((r) => listedAdd(r.add)),
 		stash,
 		stash_undated: held.filter((r) => (r.add.facts.designation?.return_week ?? null) === null)
+			.length,
+		stash_late: held.filter((r) => (r.add.facts.designation?.return_week ?? 0) > LAST_REGULAR_WEEK)
 			.length
 	};
 }

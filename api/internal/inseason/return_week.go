@@ -53,6 +53,17 @@ func (s *Season) returnWeek(on *time.Time) *int {
 	return nil
 }
 
+// returnFrom is the return week when it is no earlier than the week the
+// Season addresses: a return inside that week is a player back this week
+// (Lane 118 fix round 1, MEDIUM-2), a passed date says nothing.
+func (s *Season) returnFrom(on *time.Time) *int {
+	week := s.returnWeek(on)
+	if week == nil || *week < s.week {
+		return nil
+	}
+	return week
+}
+
 // returnAfter is the return week only when it is later than the week the
 // Season addresses (the lane 110 review, MEDIUM-1): a questionable or
 // doubtful date in the coming days, or a date the provider let pass, names

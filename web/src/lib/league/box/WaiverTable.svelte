@@ -125,6 +125,7 @@
 	{@const isOpen = open === entry.key}
 	{@const quiet = !entry.gains}
 	{@const stashed = entry.stash}
+	{@const verbWord = stashed?.verb === 'stash' ? STASH.verb : LINES.add}
 	<tbody>
 		<BoxLine
 			phoneFacts={false}
@@ -164,7 +165,7 @@
 					</td>
 				{/if}
 				<td class="act"
-					>{#if stashed?.verb === 'stash'}<button
+					>{#if stashed?.verb === 'stash' && !stashed.drops}<button
 							type="button"
 							class="add quiet word"
 							aria-label="{STASH.verb} {entry.row.name}"
@@ -173,12 +174,16 @@
 							type="button"
 							class="add"
 							class:quiet
+							class:word={stashed?.verb === 'stash'}
 							class:on={isOpen}
 							aria-expanded={isOpen}
 							aria-controls="drops-{entry.key}"
-							aria-label="{isOpen ? WAIVERS.close : LINES.add} {entry.row.name}"
+							aria-label="{isOpen ? WAIVERS.close : verbWord} {entry.row.name}"
 							onclick={() => ontoggle(entry)}
-							><Icon name={isOpen ? 'chevron' : 'plus'} size={14} /><span>{LINES.add}</span></button
+							>{#if stashed?.verb !== 'stash'}<Icon
+									name={isOpen ? 'chevron' : 'plus'}
+									size={14}
+								/>{/if}<span>{verbWord}</span></button
 						>{/if}</td
 				>
 			{/snippet}

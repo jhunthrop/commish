@@ -3536,14 +3536,14 @@ export interface components {
 			stash?: components['schemas']['WaiverStash'];
 		};
 		WaiverStash: {
-			/** @description the week he is due back, his designation's return_week */
+			/** @description the week he is due back by the listed return date: the week the page addresses (for_week) or later */
 			back_week: number;
 			/**
 			 * Format: double
-			 * @description his rest-of-season points over his club's games from back_week through the order's last week, one decimal, the figure the group sorts by; null where the board carries no rest-of-season points for him
+			 * @description his rest-of-season points a game, the add's rest_of_season_per_game (the figure his player page shows), the figure the group sorts by; null where the board carries none
 			 */
 			per_game: number | null;
-			/** @description the member's team has an injured reserve slot open that takes him on the league's platform (ESPN, Sleeper and Yahoo slots from the league's settings; an out player only where the platform's slot takes one), so the verb is Stash with no drop; false elsewhere (FFPC and MyFantasyLeague always), the verb Add with the row's drop */
+			/** @description the member's team has an injured reserve slot open that takes him on the league's platform (ESPN, Sleeper and Yahoo slots from the league's settings; an out player only where the platform's slot takes one), so the verb is Stash; false elsewhere (FFPC and MyFantasyLeague always), the verb Add. Either way the row names the drop the gaining rows' rule names (an IR slot frees no bench spot until the platform moves him), none only with a bench spot open */
 			ir_slot: boolean;
 		};
 		OrderAdvice: {
@@ -3707,8 +3707,10 @@ export interface components {
 			pickups: components['schemas']['WaiverRow'][];
 			/** @description positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order; a free agent on a season-long list (injured reserve, PUP, NFI) or ruled out this week is not listed in them, save the player a link asked for (an injured reserve or out free agent whose return week falls in the regular season is in stash instead); a week's out carried over from a game already played is listed, and so is one whose listing's dating is still pending (Lane 118, B94) */
 			rows: components['schemas']['WaiverRow'][];
-			/** @description the Stash group (Lane 118, B79): free agents on injured reserve or ruled out whose return_week falls inside the league's regular season (before its first playoff week, else the order's last week), each row's stash set, by the rest-of-season rate from his return week, highest first, at most 10; never among rows or pickups, never counted with the rows that gain; absent from an older answer */
+			/** @description the Stash group (Lane 118, B79): free agents on injured reserve or ruled out due back in the week the page addresses or later, inside the league's regular season (before its first playoff week, else the order's last week), each row's stash set, by his rest-of-season points a game, highest first, at most 10; one due back in the week the page addresses whose move gains is in rows instead; never among rows or pickups, never counted with the rows that gain; absent from an older answer */
 			stash?: components['schemas']['WaiverRow'][];
+			/** @description how many free agents on injured reserve or ruled out this page leaves unlisted because their return week is after the regular season (Lane 118 fix round 1), for the basis to say once; absent from an older answer */
+			stash_late?: number;
 			/** @description how many free agents on injured reserve or ruled out this page leaves unlisted because no read dates their return (Lane 118, B79), for the basis to say once; absent from an older answer */
 			stash_undated?: number;
 			/** @description the member's active roster (injured reserve and taxi spots left out), the lines beats and drops name */

@@ -802,7 +802,13 @@ func (a *advisor) pool(position draft.Position) []person {
 		}
 		id := p.ID
 		lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(p), BoardId: &id, Name: p.Name, Position: string(p.Position), Team: p.Team}
-		out = append(out, a.build(p.ID, lp, nil))
+		add := a.build(p.ID, lp, nil)
+		// Back this week from injured reserve (Lane 118 fix round 1): he counts in the
+		// rest-of-season lineup his move is measured on, so a move that gains lists him.
+		if backThisWeek(add) {
+			add.cand.InjuredReserve = false
+		}
+		out = append(out, add)
 	}
 	return out
 }
@@ -887,8 +893,8 @@ func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.Waive
 	}
 	out := a.waiverPage(run)
 	// The Stash group, apart from the rows and the strip (Lane 118, B79).
-	stash, undated := a.stashRows(run, asked)
-	out.Stash, out.StashUndated = &stash, &undated
+	stash, counts := a.stashRows(run, asked)
+	out.Stash, out.StashUndated, out.StashLate = &stash, &counts.undated, &counts.late
 	for _, move := range shown {
 		row := waiverRow(run.w, run.week, run.mine, run.pool[move.Add], move, run.clears)
 		// A row past its kickoff has no week figure, whichever the order (Lane 85 fix round 4).
@@ -956,17 +962,17 @@ func (a *advisor) waiverPage(run waiverRun) apitypes.WaiverAdvice {
 }
 
 // pageMoves is the moves a page carries: the first cut of the adds it
-// lists (listedAdd), and the asked player's wherever he falls, in the
+// lists (listedMove), and the asked player's wherever he falls, in the
 // search's order.
 func pageMoves(moves []Waiver, pool []person, asked string, cut int) []Waiver {
 	out := make([]Waiver, 0, min(len(moves), cut+1))
 	listed := 0
 	for _, move := range moves {
 		add := pool[move.Add]
-		if isAsked(add, asked) || (listed < cut && listedAdd(add)) {
+		if isAsked(add, asked) || (listed < cut && listedMove(add, move)) {
 			out = append(out, move)
 		}
-		if listedAdd(add) {
+		if listedMove(add, move) {
 			listed++
 		}
 	}

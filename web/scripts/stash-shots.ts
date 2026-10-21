@@ -68,7 +68,7 @@ async function checkStash(page: Page, where: string): Promise<void> {
 	if (drawn !== expectStash) fault(where, `the Stash group drawn ${String(drawn)}`);
 	if (!expectStash) return;
 	const line = await page.locator('main table.pool tr.stash-basis').innerText();
-	if (!line.includes(STASH.backEach)) fault(where, `the Stash line reads "${line}"`);
+	if (!line.includes(STASH.line)) fault(where, `the Stash line reads "${line}"`);
 	for (const [name, week] of Object.entries(STASHED)) {
 		const row = page.locator('main table.pool tr', { hasText: name }).first();
 		const said = await row.innerText();

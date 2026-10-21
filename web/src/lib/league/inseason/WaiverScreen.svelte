@@ -167,7 +167,14 @@
 	/** The Stash group (Lane 118, B79): its rows, sorted and found as the table's, and its line. */
 	const stashPool = $derived(
 		stashRows(
-			{ rows: shown.rows, pickups: advice.pickups, roster: shown.roster, stash: shown.stash },
+			{
+				rows: shown.rows,
+				pickups: advice.pickups,
+				roster: shown.roster,
+				stash: shown.stash,
+				week: shown.week,
+				for_week: shown.for_week
+			},
 			memberZone(),
 			now
 		)
@@ -338,7 +345,7 @@
 		if (entry === undefined) return null;
 		const { stash: stashed } = entry;
 		// A stash an open IR slot takes: the platform's page with his name, his week said under it.
-		if (stashed?.verb === 'stash') {
+		if (stashed?.verb === 'stash' && !stashed.drops) {
 			return {
 				label: STASH.verb,
 				line: stashed.back,

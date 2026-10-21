@@ -169,7 +169,7 @@ async function checkWaivers(page: Page, where: string, text: string): Promise<vo
 		else if (!stash.includes(STASH.back(BACK[name] ?? 0)))
 			fault(where, `${name}'s stash row reads "${stash}"`);
 	}
-	if (!groups.line.includes(STASH.backEach)) fault(where, `the Stash line reads "${groups.line}"`);
+	if (!groups.line.includes(STASH.line)) fault(where, `the Stash line reads "${groups.line}"`);
 	const moves = await page.locator('main [data-strip="waivers"] .pickup .move').allInnerTexts();
 	const card = moves.find((m) => m.includes(DROP)) ?? null;
 	if (card === null) {

@@ -74,20 +74,21 @@ export const WAIVERS = {
 export const STASH = {
 	head: 'Stash',
 	verb: 'Stash',
-	/** A stash's Game cell: the week he is due back. */
+	/** A stash's Game cell: the week he is due back (backWords). */
 	back: (week: number): string => `Back week ${String(week)}`,
-	/** The Beats cell of a stash an open IR slot takes: the slot, under it its state. */
+	backNow: 'Back this week',
+	/** The Beats cell of a stash an open IR slot takes with a bench spot open: the slot, its state. */
 	slot: 'IR slot',
 	open: 'Open',
-	/** Under the drop's name on a stash that takes a roster spot, as the gaining rows name theirs. */
+	/** Under the drop's name, as the gaining rows name theirs. */
 	drop: 'Drop',
-	/** The group's line: the week each row comes back and where his rate counts from. */
-	backOne: (week: number): string =>
-		`Stash rows come back week ${String(week)} by the platform's return date, their rate counts from then.`,
-	backEach:
-		"Stash rows come back the week each names by the platform's return date, their rate counts from then.",
+	/** The group's line (fix round 1): where the week comes from, and that A game is the rate his player
+	 * page shows. */
+	line: 'Stash rows come back by the listed return date. A game is his rate when he plays.',
 	/** Said once where the page leaves an IR or out free agent unlisted for want of a date. */
-	undated: 'IR players without a return date are not listed.'
+	undated: 'IR and out players without a return date are not listed.',
+	/** Said once where the page leaves one unlisted whose return is after the regular season. */
+	late: 'IR and out players back after the regular season are not listed.'
 } as const;
 
 /** The columns' basis, once under their heads (Lane 98, B35): each head with what it is. */
@@ -144,12 +145,15 @@ export interface PoolRow {
 
 /** A stash as its row draws it (B79): his Game cell, his verb, and whom the Beats cell names. */
 export interface StashCell {
-	/** "Back week 9". */
+	/** "Back week 9", "Back this week". */
 	back: string;
-	/** Stash where an open IR slot takes him, else Add with the row's drop. */
+	/** Stash where an open IR slot takes him, else Add. */
 	verb: 'stash' | 'add';
-	/** The Beats cell: the open IR slot, or the drop by name; null with neither. */
+	/** The Beats cell: his drop by name (the gaining rows' drop rule), else the open IR slot; null with
+	 * neither. */
 	who: { name: string; place: string } | null;
+	/** He names a drop: either verb opens the drop panel; a Stash with none opens the platform's page. */
+	drops: boolean;
 }
 
 /** One card of the strip. */
@@ -292,11 +296,13 @@ export function poolRows(
  * says the week, A game is that rate, Beats names the open IR slot or the drop. Never counted with the
  * rows that gain. */
 export function stashRows(
-	advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'roster'> & Partial<Pick<WaiverAdvice, 'stash'>>,
+	advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'roster' | 'week'> &
+		Partial<Pick<WaiverAdvice, 'stash' | 'for_week'>>,
 	zone: string,
 	now: number
 ): PoolRow[] {
 	const names = namesOnScreen(advice);
+	const addressed = addressedWeek({ week: advice.week, for_week: advice.for_week });
 	return (advice.stash ?? []).flatMap((source) => {
 		const { stash } = source;
 		if (stash === undefined) return [];
@@ -312,39 +318,46 @@ export function stashRows(
 				clears: clearsWords(source.clears),
 				order: stash.per_game ?? Number.NEGATIVE_INFINITY,
 				gains: false,
-				stash: { back: STASH.back(stash.back_week), verb, who: stashWho(source, verb, names) },
+				stash: {
+					back: backWords(stash.back_week, addressed),
+					verb,
+					who: stashWho(source, verb, names),
+					drops: source.drop !== null
+				},
 				source
 			}
 		];
 	});
 }
 
-/** Whom a stash's Beats cell names (B79): the open IR slot, else his drop as the gaining rows name a
- * player, else nobody. */
+/** A stash's Game cell: "Back this week" in the week the page addresses, else "Back week 9". */
+export function backWords(week: number, addressed: number): string {
+	return week === addressed ? STASH.backNow : STASH.back(week);
+}
+
+/** Whom a stash's Beats cell names (B79): his drop as the gaining rows name a player (the IR slot frees
+ * no bench spot until the platform moves him, fix round 1 ruling), else the open IR slot, else nobody. */
 function stashWho(
 	source: WaiverRow,
 	verb: StashCell['verb'],
 	names: readonly string[]
 ): StashCell['who'] {
-	if (verb === 'stash') return { name: STASH.slot, place: STASH.open };
-	return source.drop === null
-		? null
-		: { name: beatsName(source.drop.player.name, names), place: STASH.drop };
+	if (source.drop !== null)
+		return { name: beatsName(source.drop.player.name, names), place: STASH.drop };
+	return verb === 'stash' ? { name: STASH.slot, place: STASH.open } : null;
 }
 
-/** The Stash group's line (B79), said once under its divider: the week its rows come back and where
- * their rate counts from, then that an IR or out free agent with no date is not listed; empty with
- * neither, so no group is drawn. */
+/** The Stash group's line (B79), said once under its divider: where its rows' weeks come from and what
+ * A game is, then the IR and out free agents left out for want of a date or for a return after the
+ * regular season; empty with none of them, so no group is drawn. */
 export function stashBasis(
-	advice: Partial<Pick<WaiverAdvice, 'stash' | 'stash_undated'>>
+	advice: Partial<Pick<WaiverAdvice, 'stash' | 'stash_undated' | 'stash_late'>>
 ): string[] {
-	const weeks = [
-		...new Set((advice.stash ?? []).flatMap((r) => (r.stash ? [r.stash.back_week] : [])))
+	return [
+		...((advice.stash ?? []).length > 0 ? [STASH.line] : []),
+		...((advice.stash_undated ?? 0) > 0 ? [STASH.undated] : []),
+		...((advice.stash_late ?? 0) > 0 ? [STASH.late] : [])
 	];
-	const [only] = weeks;
-	const back =
-		only === undefined ? [] : [weeks.length === 1 ? STASH.backOne(only) : STASH.backEach];
-	return [...back, ...((advice.stash_undated ?? 0) > 0 ? [STASH.undated] : [])];
 }
 
 /** The table's two groups (B13): the rows offered as pickups, then those with no gain over the roster

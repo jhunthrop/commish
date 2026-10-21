@@ -4496,8 +4496,11 @@ type WaiverAdvice struct {
 	// SeasonBasis what the Rest of season column and a gain over the rest of the season are, said once under the rows
 	SeasonBasis string `json:"season_basis"`
 
-	// Stash the Stash group (Lane 118, B79): free agents on injured reserve or ruled out whose return_week falls inside the league's regular season (before its first playoff week, else the order's last week), each row's stash set, by the rest-of-season rate from his return week, highest first, at most 10; never among rows or pickups, never counted with the rows that gain; absent from an older answer
+	// Stash the Stash group (Lane 118, B79): free agents on injured reserve or ruled out due back in the week the page addresses or later, inside the league's regular season (before its first playoff week, else the order's last week), each row's stash set, by his rest-of-season points a game, highest first, at most 10; one due back in the week the page addresses whose move gains is in rows instead; never among rows or pickups, never counted with the rows that gain; absent from an older answer
 	Stash *[]WaiverRow `json:"stash,omitempty"`
+
+	// StashLate how many free agents on injured reserve or ruled out this page leaves unlisted because their return week is after the regular season (Lane 118 fix round 1), for the basis to say once; absent from an older answer
+	StashLate *int `json:"stash_late,omitempty"`
 
 	// StashUndated how many free agents on injured reserve or ruled out this page leaves unlisted because no read dates their return (Lane 118, B79), for the basis to say once; absent from an older answer
 	StashUndated *int `json:"stash_undated,omitempty"`
@@ -4604,13 +4607,13 @@ type WaiverRow struct {
 
 // WaiverStash defines model for WaiverStash.
 type WaiverStash struct {
-	// BackWeek the week he is due back, his designation's return_week
+	// BackWeek the week he is due back by the listed return date: the week the page addresses (for_week) or later
 	BackWeek int `json:"back_week"`
 
-	// IrSlot the member's team has an injured reserve slot open that takes him on the league's platform (ESPN, Sleeper and Yahoo slots from the league's settings; an out player only where the platform's slot takes one), so the verb is Stash with no drop; false elsewhere (FFPC and MyFantasyLeague always), the verb Add with the row's drop
+	// IrSlot the member's team has an injured reserve slot open that takes him on the league's platform (ESPN, Sleeper and Yahoo slots from the league's settings; an out player only where the platform's slot takes one), so the verb is Stash; false elsewhere (FFPC and MyFantasyLeague always), the verb Add. Either way the row names the drop the gaining rows' rule names (an IR slot frees no bench spot until the platform moves him), none only with a bench spot open
 	IrSlot bool `json:"ir_slot"`
 
-	// PerGame his rest-of-season points over his club's games from back_week through the order's last week, one decimal, the figure the group sorts by; null where the board carries no rest-of-season points for him
+	// PerGame his rest-of-season points a game, the add's rest_of_season_per_game (the figure his player page shows), the figure the group sorts by; null where the board carries none
 	PerGame *float64 `json:"per_game"`
 }
 

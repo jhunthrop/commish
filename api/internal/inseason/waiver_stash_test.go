@@ -64,16 +64,15 @@ func TestTheStashGroupHoldsWhoComesBackInTheRegularSeason(t *testing.T) {
 	}
 	stash := *page.Stash
 	weeks := map[string]int{ids[0]: 9, ids[1]: 8}
-	games := map[string]float64{ids[0]: 9, ids[1]: 10}
 	for _, r := range stash {
 		id := *r.Add.Player.BoardId
 		if r.Stash == nil || r.Stash.BackWeek != weeks[id] {
 			t.Fatalf("%s stash %+v, want back week %d", id, r.Stash, weeks[id])
 		}
-		bp, _ := f.league.Board.Player(id)
-		want := roundTenth(*bp.Points / games[id])
-		if r.Stash.PerGame == nil || *r.Stash.PerGame != want {
-			t.Errorf("%s rate %v, want %.1f over his club's games from week %d", id, r.Stash.PerGame, want, weeks[id])
+		// The rate is the figure his player page shows, his rest-of-season points a game,
+		// never re-divided over the games after his return (fix round 1, HIGH-1).
+		if want := r.Add.RestOfSeasonPerGame; want == nil || !samePerGame(r.Stash.PerGame, want) {
+			t.Errorf("%s rate %v, want his rest-of-season points a game %v", id, r.Stash.PerGame, want)
 		}
 		if r.WeekGain != nil || r.Pickup || r.Starts {
 			t.Errorf("%s carries a week figure: %+v", id, r)
@@ -102,6 +101,9 @@ func TestTheStashGroupHoldsWhoComesBackInTheRegularSeason(t *testing.T) {
 	if page.StashUndated == nil || *page.StashUndated != 1 {
 		t.Errorf("undated %v, want the one injured reserve with no date", page.StashUndated)
 	}
+	if page.StashLate == nil || *page.StashLate != 1 {
+		t.Errorf("late %v, want the one back in the playoffs", page.StashLate)
+	}
 	// The player a link asked for keeps his row in the table, out of the stash.
 	asked := pickupPageFor(t, f, stashNow, "", ids[0])
 	if _, listed := rowOf(asked.Rows, ids[0]); !listed {
@@ -113,16 +115,18 @@ func TestTheStashGroupHoldsWhoComesBackInTheRegularSeason(t *testing.T) {
 }
 
 // The verb's rule (B79): an open injured reserve slot from the league's
-// settings that takes him is Stash with no drop; an out player takes one
-// only where the platform's slot takes an out; a filled slot is Add.
+// settings that takes him is Stash; an out player takes one only where the
+// platform's slot takes an out; a filled slot is Add. The drop is the
+// gaining rows' rule either way (fix round 1 ruling): the IR slot frees no
+// bench spot, so a full roster names one; only an open bench spot has none.
 func TestAStashTakesAnOpenIRSlotThatTakesHim(t *testing.T) {
 	f, ids := stashFixture(t)
 	f.league.Snap.Shape.IR = 1
 	stash := *pickupPage(t, f, stashNow, "").Stash
 	ir, _ := rowOf(stash, ids[0])
 	out, _ := rowOf(stash, ids[1])
-	if !ir.Stash.IrSlot || ir.Drop != nil || len(ir.Drops) != 0 || ir.Beats != nil {
-		t.Errorf("the injured reserve player with a slot open: slot %v drop %v drops %d", ir.Stash.IrSlot, ir.Drop, len(ir.Drops))
+	if !ir.Stash.IrSlot || ir.Drop == nil || ir.Beats != nil {
+		t.Errorf("the injured reserve player with a slot open on a full roster: slot %v drop %v", ir.Stash.IrSlot, ir.Drop)
 	}
 	if out.Stash.IrSlot || out.Drop == nil {
 		t.Errorf("the out player where the slot takes no out: slot %v drop %v", out.Stash.IrSlot, out.Drop)
@@ -141,6 +145,55 @@ func TestAStashTakesAnOpenIRSlotThatTakesHim(t *testing.T) {
 		if r.Stash.IrSlot {
 			t.Errorf("%s: a filled slot is still Stash", r.Add.Player.Name)
 		}
+	}
+	// A bench spot open and the IR slot open: Stash with no drop.
+	for i := range f.league.Snap.Teams {
+		if f.league.Snap.Teams[i].RosterID == f.league.Me {
+			players := f.league.Snap.Teams[i].Players
+			f.league.Snap.Teams[i].Reserve = nil
+			f.league.Snap.Teams[i].Players = players[:len(players)-1]
+		}
+	}
+	open, _ := rowOf(*pickupPage(t, f, stashNow, "").Stash, ids[0])
+	if open.Stash == nil || !open.Stash.IrSlot || open.Drop != nil {
+		t.Errorf("a bench spot and the IR slot open: %+v drop %v", open.Stash, open.Drop)
+	}
+}
+
+// A free agent due back in the week the page addresses (fix round 1,
+// MEDIUM-2): listed with the rows when his move gains, in the Stash group
+// back this week when it does not; never dropped, never counted undated.
+func TestABackThisWeekFreeAgentIsListedOrStashedNeverHidden(t *testing.T) {
+	f := restFixture(t)
+	f.league.Snap.Terms.PlayoffFirst, f.league.Snap.Terms.PlayoffLast = 15, 17
+	before := pickupPage(t, f, stashNow, "")
+	first, last := before.Rows[0], before.Rows[len(before.Rows)-1]
+	if !positive(first.Gain) || positive(last.Gain) {
+		t.Fatalf("the baseline's first and last rows gain %v and %v", first.Gain, last.Gain)
+	}
+	gains, flat := *first.Add.Player.BoardId, *last.Add.Player.BoardId
+	// Week 7's last game is Sunday Oct 25, the week the Wednesday page addresses.
+	stamp := stashNow.Add(-6 * time.Hour)
+	f.data.Designations = map[string]boards.Designation{
+		gains: {Code: "IR", AsOf: stamp, ReturnOn: eastDay(time.October, 25)},
+		flat:  {Code: "IR", AsOf: stamp, ReturnOn: eastDay(time.October, 25)},
+	}
+	page := pickupPage(t, f, stashNow, "")
+	if row, listed := rowOf(page.Rows, gains); !listed || !positive(row.Gain) {
+		t.Errorf("the gaining player back this week: listed %v", listed)
+	}
+	if _, in := rowOf(*page.Stash, gains); in {
+		t.Error("the gaining player back this week is in the stash too")
+	}
+	row, in := rowOf(*page.Stash, flat)
+	if !in || row.Stash.BackWeek != 7 {
+		t.Errorf("the player back this week with no gain: in the stash %v, %+v", in, row.Stash)
+	}
+	if _, listed := rowOf(page.Rows, flat); listed {
+		t.Error("the player back this week with no gain is in the rows")
+	}
+	if *page.StashUndated != 0 {
+		t.Errorf("undated %d, want none: both have a date", *page.StashUndated)
 	}
 }
 
