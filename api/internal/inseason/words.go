@@ -270,14 +270,14 @@ type Uncounted struct {
 	Note  string
 	Rules []string
 	// Names is the rules as Note names them, at most four then "and two
-	// more" (Lane 115, B92), for the web to say in its own frame: "Avg
+	// more rules" (Lane 115, B92; Lane 121, B97), for the web to say in its own frame: "Avg
 	// and Last are our stats, which omit ..." where no row counts the
 	// platform's points.
 	Names string
 }
 
 // namedRulesMost is the most rules a basis names before it counts the rest
-// ("and two more"), so the sentence keeps to a phone's eight lines however
+// ("and two more rules"), so the sentence keeps to a phone's eight lines however
 // many rules a league scores (Lane 115, B92).
 const namedRulesMost = 4
 
@@ -326,13 +326,24 @@ func basisNames(left []countable) []string {
 }
 
 // cappedNames is the first namedRulesMost names and the rest counted,
-// "two more", where there are more.
+// "two more rules" ("one more rule"), where there are more: the word
+// rules closes the sentence, which points nowhere else (Lane 121, B97;
+// the Settings anchor went in Lane 111).
 func cappedNames(names []string) []string {
 	if len(names) <= namedRulesMost {
 		return names
 	}
 	kept := append([]string{}, names[:namedRulesMost]...)
-	return append(kept, countWords(len(names)-namedRulesMost)+" more")
+	return append(kept, moreRules(len(names)-namedRulesMost))
+}
+
+// moreRules is the rules past the named ones, in words: "one more rule",
+// "two more rules".
+func moreRules(n int) string {
+	if n == 1 {
+		return "one more rule"
+	}
+	return countWords(n) + " more rules"
 }
 
 // missedKick reports whether the rule is a missed field goal or extra point.

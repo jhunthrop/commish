@@ -16,6 +16,10 @@
 // omit ..." where no row counts the platform's points, "Our stats omit ..." where one does), the
 // league's order's phone names rostered players' finals, the Lineup states its pick rule at both
 // widths (B83), and on a phone every Lineup and Matchup name keeps one line (B83, B90).
+// Lane 121 (B99): the Team row's small cell on the Lineup, the Matchup and the league home reads
+// "Final" with the total once every starter is final, never "Proj final" on the clocks where every
+// week 6 game is (Tuesday, Wednesday), and never "Final" before any Sunday game is (Saturday, Sunday);
+// the league home is shot for it and its footer measured, its words not checked here.
 // Exits non-zero on any fault.
 //
 //   CLOCK=saturday|sunday|monday|tuesday|wednesday|thursday [THEMES=both] node scripts/platform-finals-shots.ts [web origin] [out dir]
@@ -27,6 +31,7 @@ import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { basisLines } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { STRIP } from '../src/lib/league/box/strip.ts';
+import { BOX } from '../src/lib/league/box/box.ts';
 import {
 	FIXTURE_MONDAY_NIGHT_CLOCK,
 	FIXTURE_STATS_CLOCK,
@@ -86,6 +91,9 @@ interface Screen {
 	/** What the shot opens first: a trade in the finder, or the builder, whose phone rows draw Avg
 	 * and Last (Lane 115 fix round 1, HIGH-1). */
 	open?: 'trade' | 'builder';
+	/** Shot for its Team row and its footer's lines (the league home, Lane 121): its words are not
+	 * the box screens', so check() is not asked of them. */
+	teamOnly?: boolean;
 }
 
 /** The opened trade's and the builder's words once drawn. */
@@ -113,8 +121,105 @@ function leagueScreens(platform: boolean): Screen[] {
 			platform,
 			open: 'builder'
 		},
-		{ name: 'players', path: PLAYERS, ready: PLAYERS_READY, platform }
+		{ name: 'players', path: PLAYERS, ready: PLAYERS_READY, platform },
+		{ name: 'home', path: LEAGUE, ready: BOX.totals, platform, teamOnly: true }
 	];
+}
+
+/** The clocks where every week 6 game is final (clock.ts), and those before any Sunday game is. */
+const ALL_FINAL: readonly Day[] = ['tuesday', 'wednesday'];
+const NONE_FINAL_SUNDAY: readonly Day[] = ['saturday', 'sunday'];
+
+/** The Team rows' small captions as drawn (TeamFigures, box.ts teamSmallFigure), and their faults on
+ * the clock (Lane 121, B99). */
+async function teamFaults(
+	page: Page,
+	screen: Screen
+): Promise<{ captions: string[]; faults: string[] }> {
+	const captions = await page.evaluate(() =>
+		[...document.querySelectorAll<HTMLElement>('main tr.totals td.proj small')]
+			.filter((small) => small.getClientRects().length > 0)
+			.map((small) => small.textContent.trim())
+	);
+	// The score bugs and the footer follow the Team row (coordinator's ruling on Lane 121): with every
+	// week 6 game final, no "Proj final" anywhere on the Lineup, the Matchup or the league home.
+	const anywhere = await page.evaluate(
+		(word) => (document.querySelector('main')?.textContent ?? '').includes(word),
+		BOX.projFinal
+	);
+	const said = (word: string): boolean =>
+		captions.some((c) => c.toLowerCase() === word.toLowerCase());
+	const faults = [
+		...(ALL_FINAL.includes(day) && said(BOX.projFinal)
+			? [`a Team row reads ${BOX.projFinal} with every week 6 game final`]
+			: []),
+		...(NONE_FINAL_SUNDAY.includes(day) && said(BOX.final)
+			? [`a Team row reads ${BOX.final} before Sunday's games`]
+			: []),
+		...(ALL_FINAL.includes(day) && ['lineup', 'matchup', 'home'].includes(screen.name) && anywhere
+			? [`the page says ${BOX.projFinal} with every week 6 game final`]
+			: [])
+	];
+	return { captions, faults: [...faults, ...(await sideFaults(page, screen))] };
+}
+
+/** Each side's Final as a screen's score bugs draw it, by team name (Lane 121 fix round 1, HIGH-1):
+ * the Matchup bug's small line, the home bugs' small cell or their column head. */
+async function bugFinals(page: Page, screen: Screen): Promise<Map<string, boolean>> {
+	const word = BOX.final.toLowerCase();
+	const pairs = await page.evaluate(
+		({ name, final }) => {
+			const text = (el: Element | null): string => (el?.textContent ?? '').trim().toLowerCase();
+			if (name === 'matchup')
+				return [...document.querySelectorAll('main .bug .sd')].map((sd) => {
+					const small = text(sd.querySelector('.sc small'));
+					return [text(sd.querySelector('.nm b')), small.startsWith(`${final} `)] as const;
+				});
+			return [...document.querySelectorAll('main a.bug')].flatMap((bug) => {
+				const head = text(bug.querySelector('.bh .n.sm')) === final;
+				return [...bug.querySelectorAll('.bt')].map(
+					(bt) =>
+						[
+							text(bt.querySelector('.nm')),
+							head || text(bt.querySelector('.proj')).startsWith(`${final} `)
+						] as const
+				);
+			});
+		},
+		{ name: screen.name, final: word }
+	);
+	return new Map(pairs);
+}
+
+/** The Matchup's bug agrees with its Team rows side by side, and across screens the Matchup and the
+ * home call each side Final alike at the same width and theme (kept in `finalsSeen`). */
+const finalsSeen = new Map<string, Map<string, boolean>>();
+async function sideFaults(page: Page, screen: Screen): Promise<string[]> {
+	if (!['matchup', 'home'].includes(screen.name)) return [];
+	const finals = await bugFinals(page, screen);
+	const out: string[] = [];
+	if (screen.name === 'matchup') {
+		const rows = await page.evaluate(() =>
+			[...document.querySelectorAll<HTMLElement>('main tr.totals td.proj small')]
+				.filter((small) => small.getClientRects().length > 0)
+				.map((small) => small.textContent.trim().toLowerCase())
+		);
+		const bugs = [...finals.values()];
+		rows.forEach((row, i) => {
+			const bug = bugs[i];
+			if (bug !== undefined && bug !== (row === BOX.final.toLowerCase()))
+				out.push(`the Matchup bug and Team row ${String(i + 1)} disagree on Final ("${row}")`);
+		});
+	}
+	for (const [team, final] of finals) {
+		const seen = finalsSeen.get(team) ?? new Map<string, boolean>();
+		for (const [where, other] of seen)
+			if (where !== screen.name && other !== final)
+				out.push(`${team} reads ${final ? 'Final' : 'Proj final'} here, the other on the ${where}`);
+		seen.set(screen.name, final);
+		finalsSeen.set(team, seen);
+	}
+	return out;
 }
 
 const SCREENS: Readonly<Record<Day, readonly Screen[]>> = {
@@ -286,8 +391,16 @@ for (const theme of THEMES)
 					await page.getByRole('button', { name: 'Build a trade' }).click();
 					await ready(page, BUILDER_READY);
 				}
+				const team = await teamFaults(page, screen);
+				measures.push(
+					`${at}: bug Final ${[...(await bugFinals(page, screen)).entries()].map(([n, f]) => `${n}=${String(f)}`).join(', ')}`
+				);
+				measures.push(
+					`${at}: Team ${team.captions.length > 0 ? team.captions.join(', ') : 'none'}`
+				);
+				for (const fault of team.faults) faults.push(`${at}: ${fault}`);
 				const basis = await drawnBasis(page);
-				check(screen, width, basis, at);
+				if (screen.teamOnly !== true) check(screen, width, basis, at);
 				const lines = await basisLines(page);
 				measures.push(`${at}: basis ${String(lines)} lines`);
 				if (lines === 0 || lines > MOST_LINES[width])

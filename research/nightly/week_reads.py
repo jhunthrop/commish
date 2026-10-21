@@ -66,13 +66,16 @@ NIGHTLY: Final = "nightly"
 HOURLY: Final = "hourly"
 # A night's reads: the whole board (about 536 pages) with room.
 PAGES_PER_NIGHT: Final = 700
-# THE DOLLARS (the coordinator's M3), from fix round 2's recordings (the fixture run, 11 calls; the 50-player
-# sample, 27 live calls over 8 reads; the judge, 16 calls): a read averages $0.0016 to $0.0019, the judge's
-# call $0.00006 (one of the read's four, on the 152 of 536 sheets that may not start him), the dearest call
-# $0.00065, so a read's worst case (4 calls) is $0.0026 (6 with the overrun retry and its judge ask, priced at WORST_PROMPT_TOKENS below; Lane 117 replayed 40 production reads at $0.0015 each on average) and a full week turnover of 536 reads about $0.95 on
-# average and $1.39 at worst: the night holds $1.40. An hourly pass writes only the reads a status moved (a
-# projection move waits for the nightly, Lane 66v): $0.05 a pass, and $0.60 across a Central day's passes
-# (the capture runs 18 times). A day of week reads is at most $2.00, beside the capsule night's ruled bound of about $4.15.
+# THE DOLLARS (the coordinator's M3). On the recordings (fix round 2) and Lane 117's replay of 40 production reads
+# a read averages under $0.002, so a full turnover of the board's 536 reads sits inside NIGHTLY_BUDGET_USD on
+# average. The worst case is no such sum: a read may make MAX_ASKS_PER_READ asks, each at up to
+# WORST_PROMPT_TOKENS in and MAX_TOKENS out, and a night of reads at that worst can cost more than
+# NIGHTLY_BUDGET_USD. So the night is held by the pass's hard stop at NIGHTLY_BUDGET_USD (`step_budget`, the
+# gateway's reservation), not by this sum: before a read starts the budget's check prices it at
+# BUDGETED_CALLS_PER_READ asks at the worst (`worst_read_usd`), and a read cut by the stop falls to its facts
+# block. An hourly pass writes only the reads a status moved (a projection move
+# waits for the nightly, Lane 66v), held the same way at HOURLY_BUDGET_USD a pass and HOURLY_DAY_USD across a
+# Central day's passes (the capture runs 18 times).
 NIGHTLY_BUDGET_USD: Final = 1.40
 HOURLY_BUDGET_USD: Final = 0.05
 HOURLY_DAY_USD: Final = 0.60

@@ -231,6 +231,7 @@
 		}}
 		lines={shown}
 		noFinal={box.totals.live && box.totals.final === null}
+		allFinal={box.totals.allFinal}
 		{now}
 	/>
 </Screen>

@@ -67,14 +67,47 @@ func backThisWeek(p person) bool {
 	return back != nil && *back == p.words.Facts.Week
 }
 
-// lastRegularWeek is the league's regular season's last week: the week
-// before its first playoff week where its platform states one, else the
-// order's last week.
-func (a *advisor) lastRegularWeek() int {
-	if first := a.Snap.Terms.PlayoffFirst; first > 1 && first-1 <= a.horizon.Last {
-		return first - 1
+// takenRegularLast is the regular season's last week where the league's
+// platform states neither its playoffs' first week nor a playoff start
+// (Lane 121, B99): week 14, as most leagues' schedules have it, and the
+// Stash line says so ("Regular season taken as weeks 1 to 14.").
+const takenRegularLast = 14
+
+// lastRegularWeek is the league's regular season's last week (Lane 121,
+// B99): the week before its first playoff week as the league's terms
+// state it (Sleeper's, ESPN's and FFPC's rules page), else before the
+// league's playoff start (MyFantasyLeague's week after its last regular
+// week), else the last regular week a league with no playoffs states
+// (MyFantasyLeague's whole season, fix round 1 LOW-3), else
+// takenRegularLast, taken true.
+func (a *advisor) lastRegularWeek() (last int, taken bool) {
+	c := a.Snap.Calendar
+	return regularSeasonLast(a.Snap.Terms.PlayoffFirst, c.PlayoffStartWeek, c.RegularSeasonLast, a.horizon.Last)
+}
+
+// regularSeasonLast is the week before the first of the stated playoff
+// starts inside the season's horizon, else a stated last regular week
+// inside it, else takenRegularLast, taken.
+func regularSeasonLast(termsFirst, calendarFirst, statedLast, horizon int) (int, bool) {
+	for _, first := range []int{termsFirst, calendarFirst} {
+		if first > 1 && first-1 <= horizon {
+			return first - 1, false
+		}
 	}
-	return a.horizon.Last
+	if statedLast > 0 && statedLast <= horizon {
+		return statedLast, false
+	}
+	return min(takenRegularLast, horizon), true
+}
+
+// regularSeasonTaken is the regular season's last week as taken, for the
+// Waivers answer, nil where the league's platform states it.
+func (a *advisor) regularSeasonTaken() *int {
+	last, taken := a.lastRegularWeek()
+	if !taken {
+		return nil
+	}
+	return &last
 }
 
 // stashWeek is the week a free agent the Stash group holds is due back,
@@ -85,7 +118,7 @@ func (a *advisor) stashWeek(p person) (int, bool) {
 		return 0, false
 	}
 	back := p.words.Facts.Designation.Back
-	if back == nil || *back > a.lastRegularWeek() {
+	if last, _ := a.lastRegularWeek(); back == nil || *back > last {
 		return 0, false
 	}
 	return *back, true

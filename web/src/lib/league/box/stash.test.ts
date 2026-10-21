@@ -12,11 +12,15 @@ import {
 	backWords,
 	countWords,
 	gainGroups,
+	HEAD_BASIS,
+	headBasis,
+	headBasisText,
 	namesOnScreen,
 	poolRows,
 	STASH,
 	stashBasis,
-	stashRows
+	stashRows,
+	WAIVERS
 } from './waivers.ts';
 
 const ZONE = 'America/Chicago';
@@ -101,17 +105,44 @@ void test("the group's line says where the week comes from, what A game is, and 
 	assert.deepEqual(stashBasis(withSlot), [STASH.line]);
 	assert.equal(
 		STASH.line,
-		'Stash rows come back by the listed return date. A game is his rate when he plays.'
+		'Stash rows come back by the listed return date. A game is our rest-of-season points a game.'
 	);
+	// A game is defined one way on the screen (Lane 121, B99): the line says the heads' own words.
+	const heads = headBasisText(headBasis(null, true, { zone: ZONE, zoned: false }));
+	assert.ok(heads.includes(`${WAIVERS.rest} ${HEAD_BASIS.rest}`), heads);
+	assert.ok(STASH.line.includes(`${WAIVERS.rest} ${HEAD_BASIS.rest}.`));
 	assert.deepEqual(stashBasis({ stash: [], stash_undated: 3 }), [STASH.undated]);
 	assert.deepEqual(stashBasis({ ...withSlot, stash_undated: 1, stash_late: 2 }), [
 		STASH.line,
 		STASH.undated,
 		STASH.late
 	]);
-	for (const words of [STASH.line, STASH.undated, STASH.late, STASH.back(9), STASH.backNow]) {
+	for (const words of [
+		STASH.line,
+		STASH.undated,
+		STASH.late,
+		STASH.taken(14),
+		STASH.back(9),
+		STASH.backNow
+	]) {
 		assert.equal(bannedIn(words), null, words);
 	}
+});
+
+void test('a regular season the platform does not state is said where the group keeps to it', () => {
+	// FFPC and MyFantasyLeague with neither the playoffs' first week nor a playoff start (Lane 121, B99).
+	const taken = { ...withSlot, regular_season_taken: 14 };
+	assert.equal(STASH.taken(14), 'Regular season taken as weeks 1 to 14.');
+	assert.deepEqual(stashBasis(taken), [STASH.line, STASH.taken(14)]);
+	assert.deepEqual(stashBasis({ ...taken, stash: [], stash_late: 1 }), [
+		STASH.late,
+		STASH.taken(14)
+	]);
+	// Nothing the group shows keeps to the season's end: no rows, none left out as late.
+	assert.deepEqual(stashBasis({ ...taken, stash: [], stash_undated: 2 }), [STASH.undated]);
+	assert.deepEqual(stashBasis({ ...taken, stash: [] }), []);
+	// Stated by the platform, or an answer from before Lane 121: nothing taken is said.
+	assert.deepEqual(stashBasis(withSlot), [STASH.line]);
 });
 
 void test('an answer from before the group parses: no rows, no line, no group', () => {

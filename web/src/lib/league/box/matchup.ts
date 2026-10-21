@@ -15,6 +15,7 @@ import {
 	totalsNote,
 	totalsPts,
 	slotWord,
+	teamSmallFigure,
 	type BoxRow,
 	type BoxStarter,
 	type BoxTotals
@@ -42,6 +43,9 @@ export interface SideRead {
 	now: number;
 	/** The game has kicked off (matchupStarted): the Team row's Pts are its big figure. */
 	started: boolean;
+	/** The bug's head is Final by the lines the screen holds (matchupFinal): a side with no box, whose
+	 * starters no line shows, reads Final under it (Lane 121 fix round 1). */
+	headFinal?: boolean;
 }
 
 /** A side's figures as its score bug prints them. */
@@ -49,22 +53,34 @@ export interface BugTotals {
 	pts: number | null;
 	proj: number | null;
 	final: number | null;
+	/** Every starter of the side's is final (BoxTotals.allFinal, Lane 121 B99). */
+	allFinal: boolean;
 	/** Where the side's starters stand while the game is under way (the API's to_play), else empty. */
 	toPlay: string;
 }
 
 /** A matchup side's two figures (Lane 92, B22): before the first kickoff its Proj big and nothing
- * under; from it its Pts big with "Proj final" under, "--" where the API gives none. */
+ * under; from it its Pts big with the Team row's small figure under (box.ts teamSmallFigure, one rule
+ * for both): "Proj final", "--" where the API gives none, and "Final" with the total once every
+ * starter is final (Lane 121, B99). */
 export function bugFigures(
-	s: Pick<BugTotals, 'pts' | 'proj' | 'final'>,
+	s: Pick<BugTotals, 'pts' | 'proj' | 'final' | 'allFinal'>,
 	started: boolean
 ): { big: string; bigLabel: string; small: string } {
-	if (!started) return { big: boxNumber(s.proj), bigLabel: BOX.proj, small: '' };
+	const small = teamSmallFigure({ ...s, live: started });
+	if (small === null) return { big: boxNumber(s.proj), bigLabel: BOX.proj, small: '' };
 	return {
 		big: boxNumber(s.pts),
 		bigLabel: BOX.pts,
-		small: `${BOX.projFinal} ${boxNumber(s.final)}`
+		small: `${small.caption} ${boxNumber(small.figure)}`
 	};
+}
+
+/** Whether every starter's game is final at the page's clock, by the one rule (kickoff.ts): the bug's
+ * Final head over the lines it reads. */
+export function matchupFinal(lines: readonly PlayerLine[], now: number): boolean {
+	const games = lines.flatMap(({ facts }) => (facts.bye || facts.kickoff === null ? [] : [facts]));
+	return games.length > 0 && linesRead(games, now).state === 'final';
 }
 
 /** Whether any starter's game has kicked off at the page's clock, by the one rule (kickoff.ts). */
@@ -106,6 +122,15 @@ export function sideBox(
 				pts: sideScore(rows, box, read.hostTotal),
 				final: box.projected_final ?? null,
 				live: read.started,
+				// A box with no starters (FFPC's opponent view) has no line to read: the side follows the
+				// bug's head, as a side with no box does (fix round 2, HIGH-2).
+				allFinal:
+					box.starters.length === 0
+						? read.headFinal === true
+						: linesRead(
+								box.starters.map((s) => s.line.facts),
+								read.now
+							).state === 'final',
 				note: totalsNote(rows, read.landed, read.week)
 			},
 			lines: [...box.starters.map((s) => s.line), ...box.bench],
@@ -125,6 +150,9 @@ export function sideBox(
 			pts: sideScore(rows, side, read.hostTotal),
 			final: null,
 			live: read.started,
+			// No line of the API's holds its starters' games: it follows the bug's head, so it never
+			// reads Proj final under a Final head (fix round 1, HIGH-1).
+			allFinal: read.headFinal === true,
 			note: null
 		},
 		lines: [],

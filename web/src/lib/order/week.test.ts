@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
-import { KICKED_OFF_PART } from '#lib/league/box/basis.ts';
+import { KICKED_OFF_PART, UNCOUNTED } from '#lib/league/box/basis.ts';
 import { BOX } from '#lib/league/box/box.ts';
 import type { WeekOrderAdvice } from './api.ts';
 import { stamped } from '../../../scripts/inseason-fixture/game-state.ts';
@@ -225,10 +225,39 @@ void test("a visitor's basis names the board's own scoring", () => {
 });
 
 void test('the rules Avg and Last leave out are named inline, the API sentence as it comes (Lane 111, B33)', () => {
+	// An answer from before Lane 115 (no basis_note_list) prints its sentence as sent.
 	assert.equal(rulesLeftOut(fixture.read.K), 'Our stats omit missed kick.');
 	const visitorNote = 'Our stats omit safety.';
-	assert.equal(rulesLeftOut({ basis_note: visitorNote }), visitorNote);
-	assert.equal(rulesLeftOut({ basis_note: '' }), null);
+	assert.equal(rulesLeftOut({ basis_note: visitorNote, rows: [] }), visitorNote);
+	assert.equal(rulesLeftOut({ basis_note: '', rows: [] }), null);
+});
+
+void test("the tab's rules sentence takes every league screen's frame, by whether a row counts the platform's final (Lane 121, B97)", () => {
+	const listed = { ...fixture.read.K, basis_note_list: 'missed kick' };
+	// No row on the platform's points: Avg and Last are our stats.
+	assert.ok(!listed.rows.some((r) => r.line.facts.last_games.some((g) => g.source === 'platform')));
+	assert.equal(rulesLeftOut(listed), UNCOUNTED.ours('missed kick'));
+	// A rostered kicker whose Monday final the platform scored: the stats' sentence.
+	const [first, ...rest] = listed.rows;
+	assert.ok(first !== undefined);
+	const scored = {
+		...first,
+		line: {
+			...first.line,
+			facts: {
+				...first.line.facts,
+				last_games: [
+					{ week: 6, points: 9.0, source: 'platform' as const },
+					...first.line.facts.last_games
+				]
+			}
+		}
+	};
+	assert.equal(
+		rulesLeftOut({ ...listed, rows: [scored, ...rest] }),
+		UNCOUNTED.stats('missed kick')
+	);
+	assert.equal(rulesLeftOut({ ...listed, basis_note: '', basis_note_list: '' }), null);
 });
 
 void test('the roster chips filter the rows the API sent, the adds where the API set them', () => {

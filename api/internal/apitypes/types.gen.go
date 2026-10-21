@@ -2967,7 +2967,7 @@ type LineupAdvice struct {
 	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
-	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
+	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
 	BasisNoteList *string `json:"basis_note_list,omitempty"`
 
 	// Bench everyone else on the active roster, by the same keys (injured reserve and taxi spots left out)
@@ -3374,7 +3374,7 @@ type OrderAdvice struct {
 	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
-	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
+	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
 	BasisNoteList *string `json:"basis_note_list,omitempty"`
 
 	// FromWeek the first week the rest-of-season order covers at the read's clock: the earliest with a game still to play (Lane 86; a club whose game of it kicked off counts from its next week), null on the preseason order
@@ -4010,6 +4010,9 @@ type ScoreboardSide struct {
 	// Starters the starters the host lists for the side
 	Starters int `json:"starters"`
 
+	// StartersFinal every one of the side's starters with a game this week has a final game at the read's clock (gameStateAt), empty slots, byes and starters with no game held not counting, false with none (Lane 121, B99): the side's figure reads Final with its total; absent for a side the platform lists no starters for (FFPC's opponent view) and from an older answer, both of which read the game's state
+	StartersFinal *bool `json:"starters_final,omitempty"`
+
 	// ToPlay while the game is playing, where the side's starters stand, never a zero: "3 to play" while any starter with a game is still to come (an out starter whose game is still to come counts), "2 playing" once none is and some are in play; null once every starter is final, on bye or out of a game under way, before kickoff, or absent from an older answer
 	ToPlay *string `json:"to_play,omitempty"`
 }
@@ -4240,7 +4243,7 @@ type TradeAdvice struct {
 	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
-	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
+	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
 	BasisNoteList *string `json:"basis_note_list,omitempty"`
 
 	// CheckBasis the trade builder's own line under its scoreboard, shown before its first answer (TradeCheck.basis says the same)
@@ -4297,7 +4300,7 @@ type TradeCheck struct {
 	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
-	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
+	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
 	BasisNoteList *string    `json:"basis_note_list,omitempty"`
 	Fills         TradeFills `json:"fills"`
 
@@ -4445,7 +4448,7 @@ type WaiverAdvice struct {
 	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, named (Lane 111, B33: "Our stats omit two-point and safety.", both missed kicks said as one missed kick), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
-	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
+	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
 	BasisNoteList *string `json:"basis_note_list,omitempty"`
 
 	// ForWeek the week the page addresses (Lane 95): week, or the week after once every starter of the member's with a game has kicked off or is final; the rows' facts, Proj and pickups are that week's; absent from an older answer
@@ -4486,6 +4489,9 @@ type WaiverAdvice struct {
 	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
 	ReadAt            time.Time         `json:"read_at"`
 	Refreshed         time.Time         `json:"refreshed"`
+
+	// RegularSeasonTaken the regular season's last week as taken where the league's platform states neither its playoffs' first week nor a playoff start (Lane 121, B99): 14, the week the Stash group keeps returns to, for its line to say "Regular season taken as weeks 1 to 14."; absent where the platform states it, and from an older answer
+	RegularSeasonTaken *int `json:"regular_season_taken,omitempty"`
 
 	// Roster the member's active roster (injured reserve and taxi spots left out), the lines beats and drops name
 	Roster []PlayerLine `json:"roster"`
@@ -4732,7 +4738,7 @@ type WeekOrderAdvice struct {
 	// BasisNote the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, named ("Our stats omit fumble recovery and safety.", the same for a reader with no league), empty when none
 	BasisNote string `json:"basis_note"`
 
-	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
+	// BasisNoteList one sentence fragment, not a list: the rules basis_note names, as it names them, at most four then the rest counted ("two-point, missed kick, fumble recovery, safety and one more rule", Lane 115, B92), for the web to say in its own frame where no row counts the platform's points ("Avg and Last are our stats, which omit ..."); empty with no basis_note, absent from an older answer
 	BasisNoteList *string `json:"basis_note_list,omitempty"`
 
 	// Moves the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league
