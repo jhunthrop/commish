@@ -2972,7 +2972,7 @@ type LineupAdvice struct {
 	UncountedRules []string `json:"uncounted_rules"`
 	Week           int      `json:"week"`
 
-	// WeekDone the sentence once every starter of the member's with a game this week has it final, a bye starter aside ("Every starter of yours has played, so nothing is left to set."): it says the lineup, never the week, and stands in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer
+	// WeekDone the sentence once every starter of the member's with a game this week has kicked off, a bye starter aside ("Every starter of yours has kicked off, so nothing is left to set." while any is still in play, "Every starter of yours has played, so nothing is left to set." once every one is final): it says the lineup, never the week, and stands in place of the changes and the verb; null while any starter's game is still to come, or absent from an older answer
 	WeekDone *string `json:"week_done,omitempty"`
 
 	// WeekDoneState present whenever week_done is, null otherwise or absent from an older answer
@@ -4543,7 +4543,7 @@ type WeekBug struct {
 	Teams []LeagueTeam `json:"teams"`
 }
 
-// WeekDoneState the matchup's state once the member's starters have all played: final when the matchup's game is final by the one game-state rule (every starter on both sides final), or the member has no opponent this week; locked while any starter on either side still has a game to play, nothing left to set
+// WeekDoneState the matchup's state once the member's starters have all kicked off: final when the matchup's game is final by the one game-state rule (every starter on both sides final), or with no opponent this week once the member's own starters are all final; locked while any starter on either side is still in play or has a game to play, nothing left to set
 type WeekDoneState string
 
 // WeekFacts one player's week; a fact we do not hold is null, never zero
@@ -4636,7 +4636,7 @@ type WeekLineup struct {
 	// Swaps each change, in the league's slot order
 	Swaps []WeekSwap `json:"swaps"`
 
-	// WeekDone the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter of the member's has played, which the front door says in place of the changes and the verb; null before, or absent from an older answer
+	// WeekDone the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter of the member's has kicked off, which the front door says in place of the changes and the verb; null before, or absent from an older answer
 	WeekDone *string `json:"week_done,omitempty"`
 
 	// WeekDoneState the Lineup's own week_done_state, present whenever week_done is, null otherwise or absent from an older answer

@@ -277,7 +277,7 @@ func TestWeekRouteWithNothingWired(t *testing.T) {
 // once every starter has played (Lane 85 fix round, M1; Lane 91), none
 // before.
 func TestLineupSummaryCarriesTheWeekDone(t *testing.T) {
-	done, locked := WeekDoneWords(), apitypes.WeekDoneStateLocked
+	done, locked := WeekDoneWords(true), apitypes.WeekDoneStateLocked
 	got := lineupSummary(apitypes.LineupAdvice{Slots: weekSlots(), WeekDone: &done, WeekDoneState: &locked})
 	if got.WeekDone == nil || *got.WeekDone != done || got.WeekDoneState == nil || *got.WeekDoneState != locked {
 		t.Fatalf("week done %v, state %v", got.WeekDone, got.WeekDoneState)

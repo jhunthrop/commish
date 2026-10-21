@@ -82,7 +82,7 @@ export interface FrontNudge {
 	/** Set your lineup with changes to make, else a quiet way to the Lineup; none once every starter
 	 * has played. */
 	verb: string | null;
-	/** The API's sentence once every starter of the member's has played (week_done), null before. */
+	/** The API's sentence once every starter of the member's has kicked off (week_done), null before. */
 	done: string | null;
 	solid: boolean;
 	href: string;
@@ -242,7 +242,7 @@ export function nudgeOf(league: WeekLeague, href: ScreenHref): FrontNudge | null
 		out: s.out === null ? null : shortName(s.out.name)
 	}));
 	const changes = lineup.changes;
-	// The Lineup's own sentence once every starter has played: Locked or Final, no sum and no verb,
+	// The Lineup's own sentence once every starter has kicked off: Locked or Final, no sum and no verb,
 	// as its strip says.
 	const done = lineup.week_done ?? null;
 	return {

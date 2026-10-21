@@ -152,10 +152,11 @@ func newAdvisor(l League, data Data, projection boards.WeekProjection, held map[
 
 // addressedWeek is the week an action screen addresses (Lane 95): the first
 // week the member can still act on, from the member's lineup at the read's
-// clock. Once every starter of the member's with a game has kicked off or is
-// final by the one game state (gameStateAt, the facts weekDone reads), byes
-// aside, the lineup's week is spent and the screens turn to the next one the
-// schedule holds; a member with no team in the read stays on the week.
+// clock. Once every starter of the member's with a game has kicked off or
+// is final by the one game state (gameStateAt, the condition weekDone fires
+// on since Lane 109), byes aside, the lineup's week is spent and the
+// screens turn to the next one the schedule holds; a member with no team
+// in the read stays on the week.
 func (a *advisor) addressedWeek() int {
 	lineup, ok := a.Lineup()
 	if !ok {
@@ -608,7 +609,7 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	}
 	out.WeekDone = weekDone(out.Slots)
 	if out.WeekDone != nil {
-		state := a.weekDoneState()
+		state := a.weekDoneState(out.Slots)
 		out.WeekDoneState = &state
 	}
 	// Where the lineup as set missed our pick, once it has kicked off (Lane 99, B11).
@@ -666,43 +667,50 @@ func setStarters(slots []apitypes.LineupSlot) []apitypes.PlayerLine {
 }
 
 // weekDoneState is the member's matchup once their starters have all
-// played (Lane 91): final when the scoreboard's game is (every starter on
-// both sides final by gameStateAt, the bug's own count), or when the
-// member has no opponent this week; locked while any starter on either
-// side still has a game to play.
-func (a *advisor) weekDoneState() apitypes.WeekDoneState {
-	if mine := a.side(a.Me); mine == nil || mine.Game == 0 {
-		return apitypes.WeekDoneStateFinal
+// kicked off (Lane 91, Lane 109): final when the scoreboard's game is
+// (every starter on both sides final by gameStateAt, the bug's own
+// count), or with no opponent this week once the member's own starters
+// are all final; locked while any starter on either side is still in
+// play or still has a game to play.
+func (a *advisor) weekDoneState(slots []apitypes.LineupSlot) apitypes.WeekDoneState {
+	if mine := a.side(a.Me); mine != nil && mine.Game != 0 {
+		for _, sides := range a.pairings() {
+			if sides[0].RosterID != a.Me || sides[0].Game == 0 {
+				continue
+			}
+			if a.scoreboardGame(sides).State != apitypes.ScoreboardGameStateFinal {
+				return apitypes.WeekDoneStateLocked
+			}
+			return apitypes.WeekDoneStateFinal
+		}
 	}
-	for _, sides := range a.pairings() {
-		if sides[0].RosterID != a.Me || sides[0].Game == 0 {
-			continue
-		}
-		if a.scoreboardGame(sides).State != apitypes.ScoreboardGameStateFinal {
-			return apitypes.WeekDoneStateLocked
-		}
-		return apitypes.WeekDoneStateFinal
+	if !everyStarterPast(slots, apitypes.GameStateFinal) {
+		return apitypes.WeekDoneStateLocked
 	}
 	return apitypes.WeekDoneStateFinal
 }
 
-// weekDone is the Lineup's sentence once every starter with a game has it
-// final by the one state (gameStateAt), a bye starter aside; nil while
-// any is still to come or under way, or with no starter who has a game.
-// It says the lineup, never the week (Lane 91): the matchup may still play.
+// weekDone is the Lineup's sentence once every starter with a game has
+// kicked off by the one state (gameStateAt), a bye starter aside (Lane
+// 109): nothing is left to set from the last kickoff, not the last
+// final. Its words say "kicked off" while any is in play and "played"
+// once every one is final; nil while any is still to come, or with no
+// starter who has a game. It says the lineup, never the week (Lane 91):
+// the matchup may still play.
 func weekDone(slots []apitypes.LineupSlot) *string {
-	if !everyStarterPast(slots, apitypes.GameStateFinal) {
+	if !everyStarterPast(slots, apitypes.GameStateKickedOff) {
 		return nil
 	}
-	words := WeekDoneWords()
+	words := WeekDoneWords(everyStarterPast(slots, apitypes.GameStateFinal))
 	return &words
 }
 
 // everyStarterPast reports whether every starter with a game this week, a
 // bye starter aside, has his game at least at state by the one game state
 // (gameStateAt): kicked off (kicked off or final) or final. False with no
-// starter who has a game. weekDone and addressedWeek read it (Lane 95), so
-// the Lineup's sentence and the action screens' week turn on the same facts.
+// starter who has a game. weekDone, weekDoneState and addressedWeek read
+// it (Lane 95, Lane 109), so the Lineup's sentence and the action
+// screens' week turn on the same facts at the same kickoff.
 func everyStarterPast(slots []apitypes.LineupSlot, state apitypes.GameState) bool {
 	games := 0
 	for _, s := range slots {

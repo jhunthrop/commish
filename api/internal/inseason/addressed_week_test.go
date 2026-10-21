@@ -122,8 +122,14 @@ func TestAddressedWeekTurnsOnKickoff(t *testing.T) {
 	if got := addressedWeek(final, 18, func(week int) bool { return week <= 18 }); got != 18 {
 		t.Errorf("the season's last week turned to %d", got)
 	}
-	if weekDone(final) == nil || weekDone([]apitypes.LineupSlot{state(apitypes.GameStateKickedOff)}) != nil {
-		t.Error("the Lineup's sentence waits on final, the same starters the turn reads")
+	// The Lineup's sentence fires at the same kickoff the turn reads (Lane 109).
+	inPlay := []apitypes.LineupSlot{state(apitypes.GameStateFinal), state(apitypes.GameStateKickedOff)}
+	toCome := []apitypes.LineupSlot{state(apitypes.GameStateFinal), state(apitypes.GameStateUpcoming)}
+	if weekDone(inPlay) == nil || addressedWeek(inPlay, 6, always) != 7 {
+		t.Error("the Lineup's sentence and the turn disagree once every starter has kicked off")
+	}
+	if weekDone(toCome) != nil || addressedWeek(toCome, 6, always) != 6 {
+		t.Error("the Lineup's sentence or the turn fired with a starter still to come")
 	}
 }
 
