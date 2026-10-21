@@ -171,8 +171,8 @@ void test("with no row on the platform's points, Avg and Last are said to be our
 		{ text: 'Our stats omit two-point and safety.', phone: true }
 	]);
 	assert.equal(
-		UNCOUNTED.ours('a, b, c, d and two more'),
-		'Avg and Last are our stats, which omit a, b, c, d and two more.'
+		UNCOUNTED.ours('a, b, c, d and two more rules'),
+		'Avg and Last are our stats, which omit a, b, c, d and two more rules.'
 	);
 });
 

@@ -107,8 +107,8 @@ func TestUncountedRulesNameFourThenCountTheRest(t *testing.T) {
 	if len(got.Rules) <= namedRulesMost {
 		t.Fatalf("the case needs more than four rules: %v", got.Rules)
 	}
-	more := countWords(len(basisNames(uncountedRules(settings, nil))) - namedRulesMost)
-	wantNames := "two-point, missed field goal, return touchdown, fumble recovery and " + more + " more"
+	more := moreRules(len(basisNames(uncountedRules(settings, nil))) - namedRulesMost)
+	wantNames := "two-point, missed field goal, return touchdown, fumble recovery and " + more
 	if got.Names != wantNames || got.Note != "Our stats omit "+wantNames+"." {
 		t.Errorf("names %q note %q", got.Names, got.Note)
 	}
@@ -118,6 +118,21 @@ func TestUncountedRulesNameFourThenCountTheRest(t *testing.T) {
 	})
 	if four.Note != "Our stats omit two-point, safety, points allowed and yards allowed." {
 		t.Errorf("four: %q", four.Note)
+	}
+}
+
+// The count closes the sentence with the word rules, one rule or more
+// (Lane 121, B97): "and two more rules.", "and one more rule.".
+func TestUncountedRulesCountedPastFourEndOnRules(t *testing.T) {
+	names := []string{"two-point", "missed kick", "fumble recovery", "safety", "return touchdown", "yards allowed"}
+	if got := andList(cappedNames(names)); got != "two-point, missed kick, fumble recovery, safety and two more rules" {
+		t.Errorf("six: %q", got)
+	}
+	if got := andList(cappedNames(names[:5])); got != "two-point, missed kick, fumble recovery, safety and one more rule" {
+		t.Errorf("five: %q", got)
+	}
+	if got := andList(cappedNames(names[:4])); got != "two-point, missed kick, fumble recovery and safety" {
+		t.Errorf("four: %q", got)
 	}
 }
 
