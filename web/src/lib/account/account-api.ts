@@ -7,6 +7,7 @@ import { ApiError, type ApiClient } from '#lib/api/client.ts';
 import { hasSessionCookie } from '#lib/api/session.ts';
 import { isSignedOut } from '#lib/api/status.ts';
 import type { components } from '#lib/api/types.ts';
+import { withoutVisitSaved } from './visit-saved.ts';
 
 export type Account = components['schemas']['Account'];
 export type AccountSheet = components['schemas']['Sheet'];
@@ -60,11 +61,15 @@ export function accountApi(client: ApiClient, online: () => boolean): AccountApi
 				if (error instanceof ApiError || error instanceof TypeError) return unreachableKind(online);
 				throw error;
 			}
-			const [sheets, mocks, groupPasses] = await Promise.all([
+			const [listed, mocks, groupPasses] = await Promise.all([
 				client.call<AccountSheet[]>(`/sheets?per_page=${String(LIST_SIZE)}`),
 				client.call<AccountMock[]>(`/mocks?per_page=${String(LIST_SIZE)}`),
 				client.call<AccountGroupPass[]>('/billing/group-passes')
 			]);
+			// An empty sheet a visit saved before Lane 105 goes on this read (Lane 117, B84).
+			const sheets = await withoutVisitSaved(listed, (id) =>
+				client.call<null>(`/sheets/${encodeURIComponent(id)}`, { method: 'DELETE' })
+			);
 			return { kind: 'signed-in', account, sheets, mocks, groupPasses };
 		},
 		cancelMembership: () => client.call<Account>('/billing/membership/cancel', { method: 'POST' }),

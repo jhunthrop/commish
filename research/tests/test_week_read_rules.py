@@ -18,8 +18,17 @@ from research.capsules.season_voice import SeasonClock, time_frame_hits
 from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
 from research.capsules.week.render import render_week_facts_block, render_week_sheet
-from research.capsules.week.rules import WEEK_NEVER_WORDS, week_rule_violations
-from research.capsules.week.sheet import BoardPlace, DepthPlace, PublishedProjection, Status, Weather, WeekGame
+from research.capsules.week.rules import WEEK_NEVER_WORDS, stated_figures, week_rule_violations
+from research.capsules.week.sheet import (
+    Allowed,
+    BoardPlace,
+    DepthPlace,
+    PublishedProjection,
+    Status,
+    Weather,
+    WeekGame,
+    WeekSheet,
+)
 from research.capsules.week.start_advice import start_advice_in
 from research.capsules.week.validate import sentence_shapes, validate_week_read, with_season
 from research.tests.week_read_fixtures import (
@@ -349,6 +358,84 @@ def test_a_cells_figure_named_as_another_cell_is_refused() -> None:
     assert any("as his rest-of-season points" in v for v in week_rule_violations(off, sheet, "start"))
 
 
+_NAMED = "a cell that prints another"
+
+
+def _named_hits(sentence: str, sheet: WeekSheet, read: str = STARTER_READ, call: str = "start") -> list[str]:
+    last = read.rsplit(". ", maxsplit=1)[-1]
+    text = read.replace(last, f"{sentence} {last}")
+    return [v for v in week_rule_violations(text, sheet, call) if _NAMED in v]
+
+
+@pytest.mark.parametrize(
+    ("sentence", "cell"),
+    [
+        ("He averages 24.1 PPR points.", "his points a game (Avg)"),
+        ("His rest-of-season figure of 25.9 points stands.", "his rest-of-season points"),
+        ("He put up 25.9 points in his last game.", "his last game's points (Last)"),
+        ("His last game, he scored 31.2 points.", "his last game's points (Last)"),
+        ("He brings 24.1 points in his next game.", "his next game's points"),
+    ],
+)
+def test_every_drawn_cell_name_carries_its_own_figure(sentence: str, cell: str) -> None:
+    """Lane 117 (B80): Avg, Rest of season, Last and his next game are checked by name before or after the
+    figure, beside "a game" and "rest of season"."""
+    hits = _named_hits(sentence, starter())
+    assert hits and f"as {cell}" in hits[0], hits
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "He averages 25.9 PPR points.",
+        "His rest-of-season figure of 230 points stands.",
+        "He put up 24.1 points in his last game.",
+        "He brings 18.4 points in his next game.",
+        "The Cardinals rank 26th of 32 against receivers.",
+    ],
+)
+def test_a_figure_named_as_its_own_cell_passes(sentence: str) -> None:
+    assert not _named_hits(sentence, starter())
+
+
+def test_the_opponents_rank_is_opp_ranks_and_a_bye_has_none() -> None:
+    """Lane 117 (B80): a rank against his position is the Opp rank cell's; on his bye the sheet carries no
+    opponent's rank, so any one stated is refused, and a figure named as this week's is too."""
+    hits = _named_hits("The Cardinals rank 12th of 32 against receivers.", starter())
+    assert hits and "Opp rank" in hits[0]
+    assert _named_hits("Arizona sits 12th against receivers.", starter())
+    assert not _named_hits("He ranks 8th in our rest-of-season order.", starter())
+    bye = on_bye()
+    assert any("Opp rank" in v for v in _named_hits("Green Bay is 12th of 32 against backs.", bye, BYE_READ, "hold"))
+    assert any(
+        "on a week the card shows his bye" in v
+        for v in _named_hits("He has 21.3 points this week.", bye, BYE_READ, "hold")
+    )
+    assert any("next week" in v for v in _named_hits("He brings 21.3 points next week.", bye, BYE_READ, "hold"))
+    # Review M3: for a player who plays, next week is a week the sheet carries no figure for; his next game
+    # is this week's.
+    assert any("next week" in v for v in _named_hits("He brings 18.4 points next week.", starter()))
+    assert not _named_hits("He brings 18.4 points in his next game.", starter())
+    assert not _named_hits("He brings 21.3 PPR points a game.", bye, BYE_READ, "hold")
+
+
+def test_a_ranks_of_32_is_never_a_second_figure_on_the_projection() -> None:
+    """Lane 117 fix round 1 (H2): "21st of 32" is the opponent's rank, the 32 its own, so Christian
+    McCaffrey's sentence puts nothing on the published projection and states one figure."""
+    sheet = replace(
+        questionable(),
+        name="Christian McCaffrey",
+        team="SF",
+        game=WeekGame(6, "ATL", home=True, kickoff=KICKOFF),
+        projection=PublishedProjection(18.6, CAPTURED, None, None),
+        allowed=Allowed(21, 32, 22.0, "RB", 5, LINES),
+    )
+    sentence = "The published projection has him at 18.6 points, and Atlanta sits 21st of 32 against running backs."
+    violations = week_rule_violations(f"{sentence} He plays. Start him.", sheet, "start")
+    assert not [v for v in violations if "on the published projection" in v or "draws in no cell" in v], violations
+    assert stated_figures(sentence, sheet.season) == [("18.6", 18.6)]
+
+
 def test_the_sheet_prints_a_chance_of_rain_only_as_the_cell_names_it() -> None:
     """Lane 100 review M2 and LOW-2: below 20% the cell names no chance, so the sheet prints none; the
     weather rounds as the page's Math.round does (60.5 is 61)."""
@@ -369,14 +456,16 @@ def test_a_read_states_at_most_three_figures_and_one_paragraph() -> None:
     assert any("more than one paragraph" in v for v in week_rule_violations(split, starter(), "start"))
 
 
-def test_the_cap_is_eighty_words_with_no_overrun() -> None:
-    """Lane 100 (B44): at most 80 words, whatever the read was asked before."""
+def test_the_cap_is_ninety_five_words_with_no_overrun() -> None:
+    """Lane 100 (B44), the cap 95 since Lane 117 fix round 3: at most 95 words, whatever the read was asked
+    before."""
     padded = STARTER_READ.replace(
         "Start him with confidence.",
         "He has been the steadiest part of a passing game that runs through him on every down that matters, "
-        "and nothing in the facts says that changes now that the Rams are at home. Start him.",
+        "and nothing in the facts says that changes now that the Rams are at home. The rest of the room "
+        "behind him has not moved in weeks, and the plays still run his way. Start him.",
     )
-    assert len(padded.split()) > 80  # noqa: PLR2004 - the cap
+    assert len(padded.split()) > 95  # noqa: PLR2004 - the cap
     result = validate_week_read(padded, starter(), call="start")
     assert result.band_failure is not None and not result.ok
 

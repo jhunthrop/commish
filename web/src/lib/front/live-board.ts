@@ -27,15 +27,16 @@ export const STRIP_WORDS = {
 	/** What Over replacement counts, said once under the heads (B46). */
 	overReplacement: (teams: number): string =>
 		`Over replacement: his projected points above the last starter at his position for ${String(teams)} teams.`,
-	/** Why a row built from the answer has no Tier or GP (B78). */
+	/** Why a row built from the answer reads "--" for Tier, said once in the basis (B78, Lane 117):
+	 * his tier is the run's, and the page carries the top rows of the board it is built on alone. */
 	untiered: (label: string): string =>
-		`Tier and GP come from our ${label} board's top ${String(STRIP_POOL)}, so a player outside it reads "${EMPTY_FIGURE}".`,
+		`Tier reads "${EMPTY_FIGURE}" past the top ${String(STRIP_POOL)} of our ${label} board, which is as far as the front page lists.`,
 	/** The strip's head in a scoring: "The top of our half PPR board" (B78). */
 	head: (scoring: string): string => `The top of our ${scoring} board`,
 	/** The strip's head in the scoring nearest the league's rules. */
 	nearestHead: (scoring: string): string => `The top of our board, ${scoring} nearest your rules`,
-	/** Avg beside a projection in the nearest scoring (B78). */
-	leagueAvg: "Avg is in your league's own scoring."
+	/** Avg beside a projection in the nearest scoring, said in the basis (B78, Lane 117). */
+	leagueAvg: "Avg in your league's scoring."
 } as const;
 
 /** "Projected and Over replacement updated 8:50 am Central.": the run's figures with its time. */
@@ -104,17 +105,20 @@ export function stripHead(runLabel: string, scoring: Scoring | null): string {
 	return scoring.league_own ? STRIP_WORDS.head(words) : STRIP_WORDS.nearestHead(words);
 }
 
-/** The strip's footer, each sentence said once (B78): why Tier and GP read empty when a row is built
- * from the answer, and that Avg is in the league's own scoring when the projection's is the nearest. */
-export function stripFooter(
+/** The strip's basis parts beyond the run's, each said once (B78, Lane 117): why Tier reads "--"
+ * when a row is built from the answer, and that Avg is in the league's scoring when the head names
+ * the projection's nearest scoring. Never a word per row; at a desk alone, as a phone draws
+ * neither column. */
+export function stripBasisParts(
 	rows: readonly StripRow[],
 	runLabel: string,
 	scoring: Scoring | null
-): string[] {
-	return [
+): BasisPart[] {
+	const words = [
 		...(rows.some((row) => row.untiered === true) ? [STRIP_WORDS.untiered(runLabel)] : []),
 		...(scoring !== null && !scoring.league_own ? [STRIP_WORDS.leagueAvg] : [])
 	];
+	return words.map((text) => ({ text, phone: false }));
 }
 
 /** His season as a strip row prints it: games null where the run does not hold him (B78). */
