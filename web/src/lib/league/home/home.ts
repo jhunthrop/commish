@@ -174,13 +174,15 @@ export function bugColumns(
 }
 
 /** A side's Final (Lane 121 fix round 1, HIGH-1): every one of its starters with a game is final, the
- * API's starters_final; an older answer reads the game's state. Never before the first kickoff. */
+ * API's starters_final; a side the platform lists no starters for by the schedule, its schedule_state
+ * (Lane 124, B102); an older answer reads the game's state. Never before the first kickoff. */
 export function sideFinal(
-	side: Pick<ScoreboardGame['sides'][number], 'starters_final'>,
+	side: Pick<ScoreboardGame['sides'][number], 'starters_final' | 'schedule_state'>,
 	state: GameHead['state']
 ): boolean {
 	if (state === 'upcoming') return false;
-	return side.starters_final ?? state === 'final';
+	if (side.starters_final !== undefined) return side.starters_final;
+	return (side.schedule_state ?? state) === 'final';
 }
 
 /** Whether a bug still draws a Proj final (a side of a started game not final): what the key

@@ -3194,6 +3194,9 @@ type MatchupBoxSide struct {
 	ProjectedFinal *float64 `json:"projected_final,omitempty"`
 	RosterId       int      `json:"roster_id"`
 
+	// ScheduleState the side's state by the schedule, for a side the platform lists no starters for (FFPC's opponent view), whose state no starter's game can give (Lane 124, B102): its roster's games where the league read carries the roster, else every game of the week, each by gameStateAt; final once every one is final, kicked_off once one has kicked off, upcoming before. The game's state is final only once this is too. Absent for a side that lists starters, whose starters say it, and from an older answer, which reads the game's state
+	ScheduleState *GameState `json:"schedule_state,omitempty"`
+
 	// Starters the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents)
 	Starters []BoxStarter `json:"starters"`
 
@@ -4011,10 +4014,13 @@ type ScoreboardSide struct {
 	Projection *float64 `json:"projection"`
 	RosterId   int      `json:"roster_id"`
 
+	// ScheduleState the side's state by the schedule, for a side the platform lists no starters for (FFPC's opponent view), whose state no starter's game can give (Lane 124, B102): its roster's games where the league read carries the roster, else every game of the week, each by gameStateAt; final once every one is final, kicked_off once one has kicked off, upcoming before. The game's state is final only once this is too. Absent for a side that lists starters, whose starters say it, and from an older answer, which reads the game's state
+	ScheduleState *GameState `json:"schedule_state,omitempty"`
+
 	// Starters the starters the host lists for the side
 	Starters int `json:"starters"`
 
-	// StartersFinal every one of the side's starters with a game this week has a final game at the read's clock (gameStateAt), empty slots, byes and starters with no game held not counting, false with none (Lane 121, B99): the side's figure reads Final with its total; absent for a side the platform lists no starters for (FFPC's opponent view) and from an older answer, both of which read the game's state
+	// StartersFinal every one of the side's starters with a game this week has a final game at the read's clock (gameStateAt), empty slots, byes and starters with no game held not counting, false with none (Lane 121, B99): the side's figure reads Final with its total; absent for a side the platform lists no starters for (FFPC's opponent view), which says schedule_state instead, and from an older answer, which reads the game's state
 	StartersFinal *bool `json:"starters_final,omitempty"`
 
 	// ToPlay while the game is playing, where the side's starters stand, never a zero: "3 to play" while any starter with a game is still to come (an out starter whose game is still to come counts), "2 playing" once none is and some are in play; null once every starter is final, on bye or out of a game under way, before kickoff, or absent from an older answer

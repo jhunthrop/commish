@@ -167,17 +167,24 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 	for i, s := range sides {
 		out.Sides[i].ProjectedFinal = projectedFinal(sidePoints(s), starters[i], game.kicked > 0)
 	}
-	out.State, out.NextKickoff = game.state(), game.next
+	// A side listing no starters reads by the schedule, and the game is final only once it is too
+	// (Lane 124, B102).
+	unlisted := make([]*kickoffs, len(sides))
+	for i, s := range sides {
+		unlisted[i] = a.scheduleRead(s)
+	}
+	out.State, out.NextKickoff = gameState(game, unlisted)
 	// The pooled count stays for the web before Lane 92; each side says its own.
 	out.ToPlay = game.toPlay(out.State)
 	for i := range out.Sides {
 		out.Sides[i].ToPlay = own[i].toPlay(out.State)
 		out.Sides[i].InPlay = own[i].inPlayCount()
-		// A side the platform lists no starters for (FFPC's opponent view) says nothing, so the web
-		// reads the game's state for it, as the Matchup does (Lane 121 fix round 2, HIGH-2).
+		// A side the platform lists no starters for (FFPC's opponent view) sends no starters_final
+		// (Lane 121 fix round 2, HIGH-2), its state by the schedule instead (Lane 124, B102).
 		if len(sides[i].Starters) > 0 {
 			out.Sides[i].StartersFinal = own[i].startersFinal()
 		}
+		out.Sides[i].ScheduleState = scheduleStateOf(unlisted[i])
 	}
 	return out
 }

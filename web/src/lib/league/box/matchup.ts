@@ -2,9 +2,9 @@
  * league's read alone when there is none, its totals, and the score bug's middle (the next kickoff).
  * Pure functions, tested in matchup.test.ts. */
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
-import { gameHead, KICKOFF, linesRead } from './kickoff.ts';
+import { gameHead, KICKOFF, linesRead, type GameRead } from './kickoff.ts';
 import type { MatchupSide } from '../api.ts';
-import type { MatchupBox, MatchupBoxSide, PlayerLine } from '../inseason/api.ts';
+import type { GameState, MatchupBox, MatchupBoxSide, PlayerLine } from '../inseason/api.ts';
 import {
 	BOX,
 	boxNumber,
@@ -48,6 +48,14 @@ export interface SideRead {
 	headFinal?: boolean;
 }
 
+/** A box side listing no starters (FFPC's opponent view) is Final by its own state, the schedule's
+ * (the API's schedule_state, Lane 124 B102); an answer without it follows the bug's head (Lane 121). */
+function unlistedFinal(box: Pick<MatchupBoxSide, 'schedule_state'>, read: SideRead): boolean {
+	return box.schedule_state === undefined
+		? read.headFinal === true
+		: box.schedule_state === 'final';
+}
+
 /** A side's figures as its score bug prints them. */
 export interface BugTotals {
 	pts: number | null;
@@ -76,17 +84,43 @@ export function bugFigures(
 	};
 }
 
-/** Whether every starter's game is final at the page's clock, by the one rule (kickoff.ts): the bug's
- * Final head over the lines it reads. */
-export function matchupFinal(lines: readonly PlayerLine[], now: number): boolean {
+/** The states by the schedule of the box's sides the platform lists no starters for (the API's
+ * schedule_state, Lane 124 B102: FFPC's opponent view), none from an answer without them. */
+export function unlistedStates(box: Pick<MatchupBox, 'sides'> | null): GameState[] {
+	return (box?.sides ?? []).flatMap((s) =>
+		s.schedule_state === undefined ? [] : [s.schedule_state]
+	);
+}
+
+/** The matchup's game as one read (Lane 124, B102): its starters' lines by the one rule (kickoff.ts
+ * linesRead), never final while a side the platform lists no starters for is not final by the
+ * schedule (unlisted); null when no starter has a game. */
+export function matchupRead(
+	lines: readonly PlayerLine[],
+	now: number,
+	unlisted: readonly GameState[] = []
+): GameRead | null {
 	const games = lines.flatMap(({ facts }) => (facts.bye || facts.kickoff === null ? [] : [facts]));
-	return games.length > 0 && linesRead(games, now).state === 'final';
+	if (games.length === 0) return null;
+	const read = linesRead(games, now);
+	const waiting = read.state === 'final' && unlisted.some((s) => s !== 'final');
+	return waiting ? { ...read, state: 'playing' } : read;
+}
+
+/** Whether the matchup is final at the page's clock (matchupRead): the bug's Final head, every side
+ * final by its own rule. */
+export function matchupFinal(
+	lines: readonly PlayerLine[],
+	now: number,
+	unlisted: readonly GameState[] = []
+): boolean {
+	return matchupRead(lines, now, unlisted)?.state === 'final';
 }
 
 /** Whether any starter's game has kicked off at the page's clock, by the one rule (kickoff.ts). */
 export function matchupStarted(lines: readonly PlayerLine[], now: number): boolean {
-	const games = lines.flatMap(({ facts }) => (facts.bye || facts.kickoff === null ? [] : [facts]));
-	return games.length > 0 && gameHead(linesRead(games, now), now).state !== 'upcoming';
+	const read = matchupRead(lines, now);
+	return read !== null && gameHead(read, now).state !== 'upcoming';
 }
 
 /** A side's score, the one figure the score bug and the Matchup's Totals row both print (ruling (a),
@@ -122,11 +156,11 @@ export function sideBox(
 				pts: sideScore(rows, box, read.hostTotal),
 				final: box.projected_final ?? null,
 				live: read.started,
-				// A box with no starters (FFPC's opponent view) has no line to read: the side follows the
-				// bug's head, as a side with no box does (fix round 2, HIGH-2).
+				// A box with no starters (FFPC's opponent view) has no line to read: the side is Final by
+				// the schedule (Lane 124, B102).
 				allFinal:
 					box.starters.length === 0
-						? read.headFinal === true
+						? unlistedFinal(box, read)
 						: linesRead(
 								box.starters.map((s) => s.line.facts),
 								read.now
@@ -189,22 +223,19 @@ export function standingLine(
 export function nextKickoff(
 	lines: readonly PlayerLine[],
 	now: number,
-	zone: string = memberZone()
+	zone: string = memberZone(),
+	unlisted: readonly GameState[] = []
 ): { head: string; words: string } | null {
 	const games = lines.flatMap(({ facts, player }) =>
 		facts.bye || facts.kickoff === null || facts.opponent === null
 			? []
 			: [{ at: facts.kickoff, club: player.team, facts }]
 	);
-	if (games.length === 0) return null;
-	// Each starter's game by the one rule at the page's clock, gathered once (kickoff.ts linesRead).
-	const head = gameHead(
-		linesRead(
-			games.map((g) => g.facts),
-			now
-		),
-		now
-	);
+	// Each starter's game by the one rule at the page's clock, gathered once (matchupRead), a side
+	// listing no starters final by the schedule only (Lane 124, B102).
+	const read = matchupRead(lines, now, unlisted);
+	if (games.length === 0 || read === null) return null;
+	const head = gameHead(read, now);
 	if (head.state === 'final') return { head: KICKOFF.final, words: '' };
 	const next = games.find((g) => g.at === head.next);
 	if (next === undefined)
