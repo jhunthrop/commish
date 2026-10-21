@@ -7,6 +7,10 @@ it, because the writer's were never parsed by the reader. Here the writer's `sea
 page and the real gate (`schema_gate`, the web's `server/run.ts` under node) reads it inside a copy of
 the in-season contract fixture, so a reader rule the writer breaks fails here, and the other way round.
 
+Lane 120 extends the mover: his page club comes from the writer's own rule (`page_club`, a list read
+after his week 6 game naming DET), his weeks before his first line name no opponent, and his page says
+his newest line was LAC's (`lastGameClub`); the reader refuses a played week that names none.
+
 It needs node and the web's dependencies (`npm ci` in `web/`); CI installs them, so there it never
 skips.
 """
@@ -14,12 +18,13 @@ skips.
 import json
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Final
 
 import pytest
 
+from research.nightly.build.page_club import RosterRead, club_calls, last_game_club
 from research.nightly.build.player_season import SeasonContext, SeasonStore, season_block
 from research.nightly.config import PAGE_FORMAT
 from research.nightly.reads.schedule import Game
@@ -76,7 +81,12 @@ def _context(run: Path, through: int) -> SeasonContext:
         carried=dict.fromkeys(range(1, weeks + 1), _CARRIED),
         in_records=in_records,
     )
-    return SeasonContext(2026, weeks, through, games, byes, store, {})
+    # Lane 120: the list read two days after his week 6 game names DET, so the page is DET's and says
+    # his newest line was LAC's.
+    last = next(g.kickoff for g in games[_FORMER_CLUB] if g.week == max(_FORMER_WEEKS))
+    roster = RosterRead({_PLAYER: _PAGE_CLUB}, last + timedelta(days=2))
+    clubs = club_calls({_PLAYER: _PAGE_CLUB}, roster, store.teams, games)
+    return SeasonContext(2026, weeks, through, games, byes, store, {}, clubs)
 
 
 def _write_mover(root: Path) -> Json:
@@ -86,8 +96,10 @@ def _write_mover(root: Path) -> Json:
     page_path = run / "players" / f"{_PLAYER}.json"
     page = _read(page_path)
     assert page["team"] == _PAGE_CLUB
-    season = season_block(_PLAYER, _PAGE_CLUB, PAGE_FORMAT, "RB", _context(run, page["season"]["through"]))
-    page_path.write_text(json.dumps({**page, "season": season}))
+    context = _context(run, page["season"]["through"])
+    season = season_block(_PLAYER, PAGE_FORMAT, "RB", context)
+    elsewhere = last_game_club(context.clubs[_PLAYER])
+    page_path.write_text(json.dumps({**page, "season": season, "lastGameClub": elsewhere}))
     index = [
         {**entry, "season": {"games": season["games"], "pointsPerGame": season["pointsPerGame"]}}
         if entry["id"] == _PLAYER
@@ -105,9 +117,27 @@ def test_a_player_who_played_his_club_bye_week_for_another_club_passes_the_gate(
     assert [by_week[w]["status"] for w in _FORMER_WEEKS] == ["played", "played"]
     assert (by_week[_CLUB_BYE]["opponent"], by_week[_CLUB_BYE]["home"]) == ("KC", False)
     assert not [row for row in season["log"] if row["status"] == "bye"]
+    # Lane 120: his weeks before his first line name no opponent (the run cannot say whose he was).
+    assert [(by_week[w]["opponent"], by_week[w]["status"]) for w in range(1, 5)] == [(None, "inactive")] * 4
+    assert _read(tmp_path / "runs" / _RUN / "players" / f"{_PLAYER}.json")["lastGameClub"] == {
+        "club": _FORMER_CLUB,
+        "week": max(_FORMER_WEEKS),
+    }
     record = schema_gate(tmp_path, _RUN, contract_dir(os.environ))
     assert record.passed, record.reasons
     assert "4 of 4 player pages parsed" in record.summary
+
+
+def test_a_played_week_with_no_opponent_is_refused_by_the_gate(tmp_path: Path) -> None:
+    _write_mover(tmp_path)
+    page_path = tmp_path / "runs" / _RUN / "players" / f"{_PLAYER}.json"
+    page = _read(page_path)
+    week = max(_FORMER_WEEKS)
+    log = [{**row, "opponent": None, "home": None} if row["week"] == week else row for row in page["season"]["log"]]
+    page_path.write_text(json.dumps({**page, "season": {**page["season"], "log": log}}))
+    record = schema_gate(tmp_path, _RUN, contract_dir(os.environ))
+    assert not record.passed
+    assert any(f"Week {week} is played but names no opponent" in r for r in record.reasons)
 
 
 def test_a_bye_on_a_week_his_club_plays_is_refused_by_the_gate(tmp_path: Path) -> None:

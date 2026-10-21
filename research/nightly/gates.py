@@ -18,6 +18,8 @@ so the site keeps building from the last clean run. Every failure is a named rea
 5. `adp`: every format has an ADP source with a stamped capture and players in it.
 6. `schema` (`schema_gate.py`): the web's own reader and schema over the whole run, so a run the
    build would refuse never moves a pointer.
+7. `clubs` (Lane 120): at most `GATES.max_club_elsewhere_pages` pages whose club is not the club of
+   their newest game line; the summary names every one.
 """
 
 from collections.abc import Mapping, Sequence
@@ -168,6 +170,23 @@ def basis_gate(manifest: Json, adp: Json, record: Json, schedule: Json) -> GateR
     )
     reasons += [f"basis_missing:source:{a}" for a in needed if a not in artifacts]
     return gate_record("basis", reasons, "every number names its basis")
+
+
+def club_gate(players: Sequence[Json]) -> GateRecord:
+    """The pages whose club is not the club of their newest game line (`lastGameClub`, Lane 120): each
+    such page says which club the line was for, and past the line (`GATES.max_club_elsewhere_pages`) the
+    run fails, since no real week moves that many."""
+    elsewhere = sorted(
+        f"{page['id']} {page['team']} (week {page['lastGameClub']['week']} {page['lastGameClub']['club']})"
+        for page in players
+        if page.get("lastGameClub") is not None
+    )
+    most = GATES.max_club_elsewhere_pages
+    reasons = [f"club_elsewhere_pages:{len(elsewhere)}>{most}"] if len(elsewhere) > most else []
+    named = f": {', '.join(elsewhere)}" if elsewhere else ""
+    return gate_record(
+        "clubs", reasons, f"{len(elsewhere)} of {len(players)} pages name a club their newest line was not for{named}"
+    )
 
 
 def adp_gate(formats: Sequence[RunFormat], adp: Json) -> GateRecord:

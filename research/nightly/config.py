@@ -89,6 +89,11 @@ class Gates:
     max_held_out_drop: float = 0.005
     # Players a board carries per league-wide starting spot its positions alone can fill.
     depth_players_per_spot: int = 1
+    # The most pages whose club is not the club of their newest game line (Lane 120). Measured on the
+    # 2016-2025 seasons (nflverse weekly rosters against each player's newest line, QB/RB/WR/TE): at most
+    # 15 players in any of 165 weeks, 12 in the trade deadline weeks, of 373 to 662 with a line. Twice that
+    # holds every real week; a misread list moves hundreds.
+    max_club_elsewhere_pages: int = 30
 
 
 GATES: Final = Gates()

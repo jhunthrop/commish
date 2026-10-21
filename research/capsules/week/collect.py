@@ -43,6 +43,7 @@ from research.capsules.week.sheet import (
 from research.capsules.week.store import StoredWeekRead
 from research.db.schema.provider import GAME_TO_PLAY
 from research.model.domain import Position
+from research.nightly.build.page_club import call_for
 from research.nightly.build.player_season import SeasonContext, season_block, season_context
 from research.nightly.config import PAGE_FORMAT
 from research.nightly.designations import read_statuses, status_word
@@ -287,9 +288,9 @@ def _ranked_players(conn: Connection) -> dict[str, tuple[Position, str]]:
 def _blocks(context: SeasonContext, players: Mapping[str, tuple[Position, str]]) -> dict[str, Json]:
     """Each player's season block in PPR; a player whose slate does not read (a trade mid-bye) is left out."""
     out = {}
-    for pid, (position, team) in players.items():
+    for pid, (position, _club) in players.items():
         try:
-            out[pid] = season_block(pid, team, PAGE_FORMAT, position, context)
+            out[pid] = season_block(pid, PAGE_FORMAT, position, context)
         except ValueError:
             continue
     return out
@@ -424,9 +425,13 @@ def week_sheet(
 ) -> WeekSheet | None:
     """One subject's sheet, or None when his club has no week ahead or his season does not read."""
     identity = subject.facts.identity
-    cw = facts.weeks.get(identity.team)
     block = facts.blocks.get(identity.id)
-    if cw is None or block is None:
+    if block is None:
+        return None
+    # The page's club (Lane 120): a block is written only for a player the context names a club for.
+    club = call_for(facts.context.clubs, identity.id).club
+    cw = facts.weeks.get(club)
+    if cw is None:
         return None
     game = (
         None
@@ -436,16 +441,16 @@ def week_sheet(
             cw.game.opponent,
             cw.game.home,
             cw.game.kickoff,
-            facts.schedule_reads.get((cw.game.week, identity.team)),
+            facts.schedule_reads.get((cw.game.week, club)),
         )
     )
-    key = (cw.week, identity.team)
+    key = (cw.week, club)
     log = block["log"]
     return WeekSheet(
         player_id=subject.universe_id,
         name=identity.name,
         position=identity.position,
-        team=identity.team,
+        team=club,
         season=facts.season,
         week=cw.week,
         written_at=facts.as_of,

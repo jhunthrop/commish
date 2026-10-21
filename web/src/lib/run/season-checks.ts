@@ -4,6 +4,7 @@
  * player's club slate with a kickoff (his page prints its day). The stand-in's writer and the build's
  * reader (server/run.ts) both run them, so a run that breaks one fails before any page renders.
  * A bye in a log is a week his club's slate has no game (Lane 119), the only place the run can say it.
+ * A page that says his newest line was another club's names that club and a week he played (Lane 120).
  */
 import type { PlayerSeason } from './season.ts';
 import type { Schedule } from './schema.ts';
@@ -13,6 +14,7 @@ export interface SeasonedPlayer {
 	id: string;
 	team: string;
 	season: PlayerSeason;
+	lastGameClub?: { club: string; week: number } | null;
 }
 
 /** Every season block shares one format and one through week. */
@@ -60,8 +62,24 @@ function checkByes(players: readonly SeasonedPlayer[], schedule: Schedule): void
 	}
 }
 
+/** A page that says his newest line was another club's (Lane 120) names a club other than his own and
+ * a week his log has him play. */
+function checkLastGameClub(players: readonly SeasonedPlayer[]): void {
+	for (const p of players) {
+		const last = p.lastGameClub;
+		if (!last) continue;
+		const played = p.season.log.some((row) => row.week === last.week && row.status === 'played');
+		if (last.club === p.team || !played) {
+			throw new Error(
+				`players/${p.id}.json says his week ${String(last.week)} line was for ${last.club}, but ${last.club === p.team ? 'that is his club' : 'his log has no game that week'}.`
+			);
+		}
+	}
+}
+
 export function checkRunSeasons(players: readonly SeasonedPlayer[], schedule: Schedule): void {
 	checkOneBasis(players);
 	checkKickoffs(players, schedule);
 	checkByes(players, schedule);
+	checkLastGameClub(players);
 }

@@ -15,6 +15,7 @@ import {
 import { countedWeek } from '#lib/run/reach.ts';
 import type { Format, Game } from '#lib/run/schema.ts';
 import { GAME_STATE_WORDS } from '#lib/format/game-facts.ts';
+import { UNKNOWN_CLUB_WEEK } from '#lib/player/club-words.ts';
 import { STAT_COLUMNS, captionFor, type StatColumn } from '#lib/run/stat-columns.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { AheadRow, LogHead, LogRow, PriorRow, SeasonLine } from '#lib/ui/game-log.ts';
@@ -41,7 +42,9 @@ export interface SeasonView {
 export type KickoffOf = (week: number) => { kickoff: string; state: Game['state'] | null } | null;
 
 function opponentWords(row: GameLogRow): string {
-	if (row.opponent === null) return 'Bye';
+	if (row.status === 'bye') return 'Bye';
+	// An inactive week of a player who changed clubs before his newest line names no club (Lane 120).
+	if (row.opponent === null) return UNKNOWN_CLUB_WEEK;
 	return `${row.home === true ? 'vs' : 'at'} ${row.opponent}`;
 }
 
@@ -52,7 +55,7 @@ function logRow(row: GameLogRow, columns: readonly StatColumn[]): LogRow {
 	return {
 		week: row.week,
 		opponent: opponentWords(row),
-		note: row.status === 'inactive' ? 'Did not play' : '',
+		note: row.status === 'inactive' && row.opponent !== null ? 'Did not play' : '',
 		tone: played ? 'played' : row.status === 'bye' ? 'bye' : 'quiet',
 		points: points === null ? null : fixed(points),
 		cells: played ? columns.map((column) => column.value(row)) : null
@@ -69,7 +72,7 @@ function dayWords(game: NonNullable<ReturnType<KickoffOf>>): string {
 }
 
 function aheadRow(row: GameLogRow, kickoffOf: KickoffOf): AheadRow {
-	const bye = row.opponent === null;
+	const bye = row.status === 'bye';
 	const game = bye ? null : kickoffOf(row.week);
 	// The run's reader holds every week still to play to a kickoff (season-checks.ts).
 	if (!bye && game === null)

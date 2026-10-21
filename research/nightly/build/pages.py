@@ -23,6 +23,7 @@ from research.capsules.week.cadence import projection_moved
 from research.capsules.week.caption import PROJECTION_MOVED_CAPTION, status_changed_caption, written_caption
 from research.capsules.week.store import StoredWeekRead
 from research.model.instants import js_iso
+from research.nightly.build.page_club import call_for, last_game_club
 from research.nightly.build.player_season import SeasonContext, prior_seasons, season_block
 from research.nightly.build.tenth import tenth, tenth_or_none
 from research.nightly.config import MARKET_ORDER, PAGE_FORMAT, PROJECTION_ORDER, TEAMS, RunFormat
@@ -361,7 +362,7 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
             # Every season block is scored in the page format, whichever board ranks him (the web
             # holds every block to one format, review N15).
             row = entry.row
-            season = season_block(who.id, row.team, inputs.formats[PAGE_FORMAT.id], row.position, inputs.season)
+            season = season_block(who.id, inputs.formats[PAGE_FORMAT.id], row.position, inputs.season)
             prior = prior_seasons(who.id, inputs.formats[PAGE_FORMAT.id], row.position, inputs.season)
         formats[format_id] = numbers_of(
             entry, inputs.adp_by_format[format_id].get(who.id), inputs.tier_drops[format_id][who.id]
@@ -383,6 +384,8 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
         "weekRead": _week_read(who, universe_id, inputs),
         "season": season,
         "priorSeasons": prior,
+        # The club his newest game line was for, when it is not the page's (Lane 120).
+        "lastGameClub": last_game_club(call_for(inputs.season.clubs, who.id)),
     }
 
 
