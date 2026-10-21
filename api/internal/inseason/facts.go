@@ -66,6 +66,9 @@ type Designation struct {
 	// or did not date: still listed, so still shown and still his tier, but
 	// said with its listing date and ranked below a fresh one on the strip.
 	CarriedOver bool
+	// ReturnWeek is the week the provider expects him back (returnWeek, the
+	// player list's return date), nil when it dates no return.
+	ReturnWeek *int
 }
 
 // Facts is one player's week (spec §3, WeekFacts). A fact we do not hold
@@ -144,12 +147,15 @@ type Season struct {
 	// 95, Turned): a week's designation listed before his club's last game
 	// is marked carried over, never dropped.
 	turned bool
+	// weekEnds is each week's end, for the return week (weekEndsOf).
+	weekEnds []weekEnd
 }
 
 // NewSeason indexes the data for the league's rules, the week and now.
 func NewSeason(d Data, rules Rules, week int, now time.Time) *Season {
 	s := &Season{week: week, now: now, games: map[teamWeek]boards.TeamWeek{}, scheduled: map[string]bool{},
-		points: map[string][]GamePoints{}, designations: d.Designations, gameFacts: d.GameFacts, lastKickoff: map[string]time.Time{}}
+		points: map[string][]GamePoints{}, designations: d.Designations, gameFacts: d.GameFacts, lastKickoff: map[string]time.Time{},
+		weekEnds: weekEndsOf(d.Games)}
 	for _, g := range d.Games {
 		s.games[teamWeek{g.Week, g.Team}] = g
 		s.scheduled[g.Team] = true
@@ -363,7 +369,8 @@ func (s *Season) carriedOver(d boards.Designation, team string) bool {
 func (s *Season) designation(p Player) *Designation {
 	if d, ok := s.designations[p.BoardID]; ok && p.BoardID != "" {
 		if status := boards.StatusOf(d.Code); status != "" {
-			return &Designation{Status: status, AsOf: d.AsOf, Since: d.Since, Listed: d.Listed, CarriedOver: s.carriedOver(d, p.Team)}
+			return &Designation{Status: status, AsOf: d.AsOf, Since: d.Since, Listed: d.Listed,
+				CarriedOver: s.carriedOver(d, p.Team), ReturnWeek: s.returnAfter(d.ReturnOn)}
 		}
 	}
 	if p.HostIR {

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/jhunthrop/commish/api/internal/season"
 )
 
 // The injury captures (the hourly capture job): the by-date list is the
@@ -49,6 +51,10 @@ type Designation struct {
 	// or an undated read. The in-season screens tell by it whether a week's
 	// designation came before or after his club's last game (Lane 95).
 	Listed *time.Time
+	// ReturnOn is the day the provider expects him back, midnight Eastern:
+	// the player list's injReturnDate (returnDates), nil when that list does
+	// not date him under this same status or its date does not read.
+	ReturnOn *time.Time
 }
 
 // Status is the designation in the contract's words, "" for a code we
@@ -95,6 +101,7 @@ func (s *PGSource) Designations(ctx context.Context) (map[string]Designation, er
 		if source == injuriesByDate {
 			s.noteOuts(ctx, out)
 		}
+		s.returnDates(ctx, out)
 		return out, nil
 	}
 	return map[string]Designation{}, nil
@@ -258,6 +265,119 @@ func (s *PGSource) noteOuts(ctx context.Context, out map[string]Designation) {
 			out[id] = d
 		}
 	}
+}
+
+// playerList is the player list research reads once a day (Lane 110,
+// B79): the one provider feed carrying each listed player's expected
+// return (injury.injReturnDate, YYYYMMDD). Its newest capture within
+// noteWindow of the designations' list dates them, as a roster sweep's
+// notes do.
+const playerList = "tank01_player_list"
+
+// listedReturn is one player's entry on the player list: his designation
+// in the provider's words and the return date it gives.
+type listedReturn struct {
+	code string
+	date string
+}
+
+// returnDates gives each designation the player list's return date for
+// him (ReturnOnOf). A list that cannot be read leaves every designation
+// undated, logged; a list too far from the designations' leaves them
+// undated.
+func (s *PGSource) returnDates(ctx context.Context, out map[string]Designation) {
+	at := Newest(out)
+	if at.IsZero() {
+		return
+	}
+	listedAt, listed, err := s.listedReturns(ctx, at.Add(noteWindow))
+	if err != nil {
+		slog.Warn("boards: the player list's return dates were not read; the designations answer undated", "err", err)
+		return
+	}
+	if listedAt.IsZero() || listedAt.Before(at.Add(-noteWindow)) {
+		return
+	}
+	for id, d := range out {
+		e, ok := listed[id]
+		if !ok {
+			continue
+		}
+		if on, ok := ReturnOnOf(e.code, e.date, d.Status(), listedAt); ok {
+			d.ReturnOn = &on
+			out[id] = d
+		}
+	}
+}
+
+// listedReturns is the newest player list at or before before: its stamp
+// and each player it gives a return date, by player id. A zero stamp is
+// no list. The list is never loaded whole (it is some 4 MB): the store
+// picks out the dated entries.
+func (s *PGSource) listedReturns(ctx context.Context, before time.Time) (time.Time, map[string]listedReturn, error) {
+	query := `with newest as (
+  select payload, captured_at from ` + s.table("capture_snapshots") + `
+  where source = $1 and captured_at <= $2 order by captured_at desc limit 1
+)
+select n.captured_at, jsonb_typeof(n.payload) = 'array', btrim(coalesce(e->>'playerID', '')),
+  coalesce(e->'injury'->>'designation', ''), btrim(coalesce(e->'injury'->>'injReturnDate', ''))
+from newest n left join lateral jsonb_array_elements(case when jsonb_typeof(n.payload) = 'array' then n.payload else '[]'::jsonb end) as e
+  on jsonb_typeof(e) = 'object' and jsonb_typeof(e->'injury') = 'object' and btrim(coalesce(e->'injury'->>'injReturnDate', '')) <> ''
+limit $3`
+	rows, err := s.Pool.Query(ctx, query, playerList, before, maxCaptureEntries+1)
+	if err != nil {
+		return time.Time{}, nil, fmt.Errorf("boards: read the player list: %w", err)
+	}
+	defer rows.Close()
+	var at time.Time
+	out := map[string]listedReturn{}
+	n := 0
+	for rows.Next() {
+		var list bool
+		var id string
+		var e listedReturn
+		if err := rows.Scan(&at, &list, &id, &e.code, &e.date); err != nil {
+			return time.Time{}, nil, fmt.Errorf("boards: scan the player list: %w", err)
+		}
+		if !list {
+			return time.Time{}, nil, fmt.Errorf("boards: the player list of %v is not a list", at)
+		}
+		if n++; n > maxCaptureEntries {
+			return time.Time{}, nil, fmt.Errorf("boards: the player list dates over %d players", maxCaptureEntries)
+		}
+		if id != "" {
+			out[id] = e
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return time.Time{}, nil, fmt.Errorf("boards: read the player list: %w", err)
+	}
+	return at.UTC(), out, nil
+}
+
+// returnDateLayout is the provider's YYYYMMDD.
+const returnDateLayout = "20060102"
+
+// ReturnOnOf is the player list's return date for a designation, midnight
+// Eastern, false unless it reads strictly: the list names him under the
+// same status (code in the provider's words, status the designation's), and
+// the date is a real YYYYMMDD day no earlier than the list's own Eastern
+// day (an earlier one is a date the provider let pass, not a return). A
+// missing or unparseable date is no date, never a guess.
+func ReturnOnOf(code, date, status string, listedAt time.Time) (time.Time, bool) {
+	if status == "" || StatusOf(code) != status || len(date) != len(returnDateLayout) {
+		return time.Time{}, false
+	}
+	east := season.Eastern()
+	on, err := time.ParseInLocation(returnDateLayout, date, east)
+	if err != nil {
+		return time.Time{}, false
+	}
+	listed := listedAt.In(east)
+	if on.Before(time.Date(listed.Year(), listed.Month(), listed.Day(), 0, 0, 0, 0, east)) {
+		return time.Time{}, false
+	}
+	return on, true
 }
 
 // The run read looks back this far and over at most this many captures

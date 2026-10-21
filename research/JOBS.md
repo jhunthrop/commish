@@ -48,6 +48,26 @@ gap, plus one an hour, at most 17 a day, while unpublished.
 `depth-chart-check` is the round 4 stamp check (it writes nothing; its recorded run is the
 coordinator's).
 
+The return dates (Lane 110, B79). The player list (`getNFLPlayerList`, source `tank01_player_list`) is
+the one Tank01 feed carrying each listed player's expected return (`injury.injReturnDate`, YYYYMMDD); the
+hourly injuries by date carries none, and the 32-request roster sweep does not fit a pass.
+`inseason-capture` reads it once an Eastern day, on the first pass at or after 06:00 that has a request
+left: last in the pass, after the game status, on what the capture and the status left of the ten
+(`pipeline/tank01/capture.py` `capture_return_dates`). A pass with none left logs
+`tank01_player_list: budget-refused, 0 requests, left for a later pass, ...` and the next hour asks. A
+read equal to the newest stored list writes none and counts as the day's; a failed read or a list with
+no players stores nothing and fails the pass, and the next hour asks again. One request a day, seven a
+week, about 150 a regular season (plus one an hour while it fails). The API reads the newest list within
+48 hours of the injury list beside each designation (`api/internal/boards/designations.go`
+`returnDates`): a return date counts only under the same status, as a real day no earlier than the
+list's own, and becomes the designation's `return_week`.
+
+A moved game (Lane 110, B77b). The `tank01-schedule` ingest (an operator command,
+`python -m research.pipeline tank01-schedule`; no job runs it on a schedule, so run it once a game has
+moved, as for week 18's flexed games) marks a stored game `superseded_by` the new id when the provider's week no longer lists its id but lists the same two clubs under another (a date
+change); every schedule read, the API's and research's, leaves a superseded row out, and an id listed
+again is a game to play again. A game the week drops with no such pair is left as it stands.
+
 The order of a Thursday's passes, all America/New_York (Lane 93 sets the register's order on the
 Thursday pass, in the 12 hours before the first kickoff):
 

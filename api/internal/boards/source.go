@@ -65,10 +65,20 @@ func NewPGSource(pool *pgxpool.Pool, schema string, season int, sourcePrefix str
 
 func (s *PGSource) table(name string) string { return pgx.Identifier{s.Schema, name}.Sanitize() }
 
+// gamesToPlay is the provider's schedule without the rows the schedule
+// ingest marked superseded (a game moved to another date under a new id,
+// research revision 0016, B77b): every schedule read takes it in place of
+// provider_games. The mark is read through to_jsonb, so an api deployed
+// ahead of the migration, or a table without the column, reads every row
+// as before.
+func (s *PGSource) gamesToPlay() string {
+	return `(select * from ` + s.table("provider_games") + ` g where to_jsonb(g) ->> 'superseded_by' is null) as provider_games`
+}
+
 // byeQuery is each team's bye: the first week of the season's schedule
 // it plays no game.
 func (s *PGSource) byeQuery() string {
-	games := s.table("provider_games")
+	games := s.gamesToPlay()
 	return `with season_games as (select home_team, away_team, week from ` + games + ` where season = $1),
 played as (
   select home_team as team, week from season_games union select away_team, week from season_games

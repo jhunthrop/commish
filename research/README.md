@@ -29,6 +29,7 @@ uv run python -m research.pipeline season --first 2026 --last 2026
 uv run python -m research.pipeline coaches --check          # validate a committed seed, write nothing
 
 # parity (needs a Postgres where it may create parity_* databases, and the root node_modules)
+# the URL's database names the scratch family: parity_<that name>__* (see Scratch databases below)
 export PARITY_DATABASE_URL=postgres://commish:commish@localhost:5433/commish_test
 uv run python -m research.parity schema                     # migrations vs declared schema, the legacy map
 uv run python -m research.parity schema --against $URL      # plus a live research schema, read only
@@ -240,7 +241,24 @@ recording with the filter stated in its manifest), so a supersede that does not 
 claim leaves rows only one side holds. Proven: with the retire line removed, the case fails. A pass also fails on a declared
 table empty on both sides, on the two sides asking for different recordings, or on different exit
 statuses from the operator scripts. Every scratch database is dropped when its case ends, and any
-`parity_*` leftover when a run starts.
+leftover of its own family when a run starts.
+
+**Scratch databases (B85).** The harness and pytest's database-backed tests make their scratch
+databases on the server `PARITY_DATABASE_URL` points at, never in the database it names. A caller names
+one by its role (`parity_test_designations`); the server's name carries the URL's database as a family,
+`parity_<database>__<role without parity_>` (`parity_lane110_research_test__test_designations` for
+`.../lane110_research_test`), shortened with a digest past Postgres's 63 bytes (`parity/databases.py`).
+The leftover sweep at a run's start drops only its own family's. So two lanes sharing one server (5433)
+never collide as long as each points `PARITY_DATABASE_URL` at a database of its own:
+
+```sh
+createdb -h localhost -p 5433 -U commish lane110_research_test
+PARITY_DATABASE_URL=postgres://commish:commish@localhost:5433/lane110_research_test uv run pytest
+PARITY_DATABASE_URL=postgres://commish:commish@localhost:5433/lane110_research_test uv run python -m research.parity schema
+dropdb -h localhost -p 5433 -U commish lane110_research_test
+```
+
+The database the URL names is only the admin connection and the family's name: nothing is written in it.
 
 Operator scripts the harness runs UNMODIFIED, as the oracle, exit status included:
 `coaches-ingest.ts`, `projection-context.ts`, `roster-weeks-ingest.ts`, `draft-picks-ingest.ts`,
