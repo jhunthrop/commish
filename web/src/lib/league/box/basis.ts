@@ -72,13 +72,18 @@ export function teBonusSentence(bonus: number | undefined, host?: LeagueHost): s
 	return `${sentenceStart(rulesOwner(host))} adds ${String(bonus)} a catch for TEs.`;
 }
 
-/** The figures' scoring against the league's: its own, or the column shown nearest its rules
- * (Lane 94 ruling: "PPR shown, nearest FFPC's rules" where the rules add a tight end's extra). */
+/** A league's figures' scoring against its rules: its own, or the column shown nearest them (Lane 94 ruling: "PPR shown, nearest FFPC's rules" where the rules add a tight end's extra). One
+ * phrase for every league screen, the League page's team sentence too (Lane 108, B82). */
+export function leagueScoringWords(scoring: ProjectionScoring, host?: LeagueHost): string {
+	const format = FORMAT_WORDS[scoring.format];
+	if (scoring.league_own) return ' on your rules';
+	if (scoring.te_bonus === undefined) return `, ${format} nearest your rules`;
+	return `, ${format} shown, ${nearestRules(host)}`;
+}
+
+/** The figures' scoring: a league's against its rules, else the format alone. */
 function whoseScoring(proj: ProjFacts, format: string): string {
-	if (!proj.league) return ` in ${format}`;
-	if (proj.scoring.league_own) return ' on your rules';
-	if (proj.scoring.te_bonus === undefined) return `, ${format} nearest your rules`;
-	return `, ${format} shown, ${nearestRules(proj.host)}`;
+	return proj.league ? leagueScoringWords(proj.scoring, proj.host) : ` in ${format}`;
 }
 
 /** "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm.", or for

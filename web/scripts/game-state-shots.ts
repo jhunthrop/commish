@@ -359,6 +359,18 @@ async function checkNoWeekFigure(page: Page, at: string, words: string): Promise
 	if (day === 'tuesday' && text.includes(words)) fault(at, `"${words}" on a finished week`);
 }
 
+/** The fixture's week, the one every clock here is in. */
+const FIXTURE_WEEK = 6;
+
+/** Whether the screen's strip addresses a later week than the fixture's: once every starter of the
+ * member's has played, Waivers and Trades address the next week (Lane 95), whose rows are all still
+ * to play and wait on nothing. */
+async function addressesNextWeek(page: Page): Promise<boolean> {
+	const head = (await page.locator('main [data-strip] .wk').allTextContents()).join(' ');
+	const week = /(\d+)/.exec(head)?.[1];
+	return week !== undefined && Number(week) > FIXTURE_WEEK;
+}
+
 /** Whether a visible row draws an expected score ("29 to 21.5") or weather. */
 async function drawsFacts(page: Page): Promise<boolean> {
 	const rows = await page
@@ -392,8 +404,16 @@ async function checkWaivers(page: Page, at: string): Promise<void> {
 	);
 	const locked = rows.filter((r) => /\b(Final|Kicked off)\b/.test(r.text));
 	const toPlay = rows.filter((r) => !locked.includes(r) && !r.text.includes(BOX.bye));
-	if (day === 'tuesday' && toPlay.length > 0)
+	// Addressing the next week, every row is still to play and none is past its kickoff.
+	const next = await addressesNextWeek(page);
+	if (day === 'tuesday' && !next && toPlay.length > 0)
 		fault(at, `${String(toPlay.length)} rows still to play on a finished week`);
+	// The season Gain order below is the played week's, once a row is past its kickoff (Lane 85).
+	if (next) {
+		if (locked.length > 0)
+			fault(at, `${String(locked.length)} rows of the next week past their kickoff`);
+		return;
+	}
 	if (locked.length === 0) {
 		fault(at, 'no row past its kickoff');
 		return;
@@ -457,9 +477,11 @@ for (const screen of set === 'standin' && day !== 'sunday' ? LEAGUE_SCREENS : []
 			await ready(page, screen.ready);
 			await screen.check(page, at);
 			// Every row waits on its stats on Monday and Tuesday: each box screen's basis says when they
-			// land (the League page's basis is its standings').
+			// land (the League page's basis is its standings'), but a screen on the next week's rows has
+			// none waiting (Lane 95).
 			if (
 				screen.name !== 'league' &&
+				!(await addressesNextWeek(page)) &&
 				!(await page.locator('main').innerText()).includes(KICKED_OFF_PART) &&
 				// The Lineup phone keeps the fact cells while a row still draws them, the Final sentence
 				// then the desk's alone (Lane 85 fix round 2 ruling); on Tuesday none does.

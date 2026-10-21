@@ -190,12 +190,13 @@
 	{#if rankCell}
 		<!-- His place in our order alone: unranked (or a defense) is "--", and a season-long list's
 		     word stays in his status chip, never here (fix round 1, MEDIUM-2); an injured reserve row
-		     leaves it empty (Lane 98's IR rows). -->
+		     leaves it empty (Lane 98's IR rows). On a phone the cell prints the rank alone and the club
+		     line his position, so the name keeps its line (Lane 108, B83). -->
 		<td class="rank" data-position={drawn.position}
-			>{#if reserve !== null}{:else if drawn.pill && drawn.pill.rank !== null}<PositionPill
-					position={drawn.pill.position}
-					rank={drawn.pill.rank}
-				/>{:else}<span class="none">{BOX.none}</span>{/if}</td
+			>{#if reserve !== null}{:else if drawn.pill && drawn.pill.rank !== null}<span class="chip"
+					><PositionPill position={drawn.pill.position} rank={drawn.pill.rank} /></span
+				><span class="rank-n">{drawn.pill.rank}</span>{:else}<span class="none">{BOX.none}</span
+				>{/if}</td
 		>
 	{/if}
 	{#if !compact}<td class="game"><BoxGame row={drawn} {clears} {note} /></td>{/if}
@@ -388,6 +389,11 @@
 		white-space: nowrap;
 	}
 
+	/* The rank alone, a phone's (B83). */
+	.rank-n {
+		display: none;
+	}
+
 	.n {
 		text-align: right;
 		font-family: var(--font-num);
@@ -530,13 +536,34 @@
 			padding-inline: 2px;
 		}
 
+		/* The rank alone under the Our rank head, his position beside his club (BoxPlayer), so the
+		   cell gives the name its room (Lane 108, B83). */
+		.rank .chip {
+			display: none;
+		}
+
+		.rank .rank-n {
+			display: inline;
+			font-family: var(--font-num);
+			font-size: var(--t-md);
+			font-weight: 700;
+			font-variant-numeric: tabular-nums;
+		}
+
 		.player:has(+ .rank) {
 			padding-right: 2px;
+			padding-left: 4px;
+		}
+
+		/* The slot word a size down beside the Our rank boxes' names (Lane 108, B83). */
+		.slot:has(+ .player + .rank) {
+			font-size: var(--t-sm);
+			letter-spacing: 0;
 		}
 
 		.op {
-			width: 34px;
-			padding: 0 2px;
+			width: 30px;
+			padding: 0 1px;
 		}
 
 		.why {
