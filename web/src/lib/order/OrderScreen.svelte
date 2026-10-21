@@ -17,12 +17,20 @@
 		ORDER,
 		ORDER_POSITIONS,
 		orderBasis,
+		moveHref,
+		moveWords,
 		orderView,
 		rosterFilter,
 		type OrderView,
 		type RosterView
 	} from './order.ts';
 	import OrderTable from './OrderTable.svelte';
+	import type { BoxRow } from '#lib/league/box/box.ts';
+	import { tabHref } from '#lib/league/inseason/tabs.ts';
+	import { links } from '#lib/site/links.ts';
+	import { compareOffer, rowBySlug, type ScreenOffer } from '#lib/player/shelf-state.ts';
+	import { providePlayerShelf } from '#lib/player/shelf-host.ts';
+	import PlayerShelfLayer from '#lib/player/PlayerShelfLayer.svelte';
 
 	/** The Rest of season and Players screens' table, its filters and its basis (Lane 66j), read from
 	 * the API: for the selected league with its rosters and moves on Rest of season, for a 12-team PPR
@@ -96,6 +104,36 @@
 			? null
 			: { id: leagueId, host: league.host, moves: advice.moves }
 	);
+
+	/** The player shelf's verb (Lane 113): Compare on Players; on Rest of season the row's own move
+	 * (Trade for him, or the add), none on a row with no move. */
+	function shelfOffer(tapped: BoxRow): ScreenOffer | null {
+		if (mode === 'players')
+			return tapped.slug === null ? null : compareOffer(links.compare(tapped.slug));
+		const view = views.find((v) => v.box.key === tapped.key);
+		const href = view === undefined ? null : moveHref(view, tableLeague?.id ?? null, tabHref);
+		if (view === undefined || href === null || tableLeague === null) return null;
+		return {
+			label: moveWords(view, tableLeague.moves, tableLeague.host),
+			line: null,
+			href,
+			run: null,
+			focus: null
+		};
+	}
+
+	// The screen's mode is fixed for its life.
+	// svelte-ignore state_referenced_locally
+	const shelf = providePlayerShelf({
+		screen: mode,
+		league: () => (mode === 'rest' ? league : null),
+		offer: shelfOffer,
+		rowOf: (slug) =>
+			rowBySlug(
+				views.map((v) => v.box),
+				slug
+			)
+	});
 
 	async function read(): Promise<void> {
 		const mine = (latest += 1);
@@ -238,6 +276,7 @@
 
 	<!-- One paragraph; a sentence about a column the phone does not draw is not said there. -->
 	<BasisBlock parts={basis} />
+	<PlayerShelfLayer host={shelf} />
 </div>
 
 <style>

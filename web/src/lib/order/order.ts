@@ -20,7 +20,7 @@ import { BOX, boxRow, type BoxRow } from '#lib/league/box/box.ts';
 import { lineState } from '#lib/league/box/kickoff.ts';
 import { addVerbWords } from '#lib/league/box/waivers.ts';
 import { hostWords } from '#lib/league/names.ts';
-import { askedQuery } from '#lib/league/box/asked.ts';
+import { askedHref } from '#lib/league/box/asked.ts';
 import type { OrderAdvice, OrderPosition, OrderRow, RosterMark } from './api.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
 import { ORDER } from './words.ts';
@@ -142,8 +142,7 @@ export function moveHref(
 ): string | null {
 	if (league === null || row.move === null) return null;
 	const screen = row.move === 'add' ? 'waivers' : 'trades';
-	const query = askedQuery(screen, { id: row.key, position: row.position });
-	return `${screenHref(screen, league)}?${new URLSearchParams(query).toString()}`;
+	return askedHref(screenHref(screen, league), screen, { id: row.key, position: row.position });
 }
 
 /** Whose rosters the marks are, named once with the member's platform. */

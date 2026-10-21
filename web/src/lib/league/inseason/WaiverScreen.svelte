@@ -62,6 +62,11 @@
 	import { NOT_FREE, POSITION_PARAM, askedPlayer, markAsked } from '../box/asked.ts';
 	import { onMount, tick } from 'svelte';
 	import { LINES } from './words.ts';
+	import { page } from '$app/state';
+	import type { BoxRow } from '../box/box.ts';
+	import { rowBySlug, type ScreenOffer } from '#lib/player/shelf-state.ts';
+	import { providePlayerShelf } from '#lib/player/shelf-host.ts';
+	import PlayerShelfLayer from '#lib/player/PlayerShelfLayer.svelte';
 
 	/** Waivers (spec §5) as a pickup table (Lane 66f): a strip with a card for each pickup worth
 	 * making (it starts this week, the lineup's Proj rises and the rest of the season does not fall),
@@ -315,6 +320,38 @@
 		markAsked(document, asked);
 	});
 
+	/** The player shelf's verb on an add's row (Lane 113): the screen's own, for the add with the
+	 * advice's drop, its pair said under it; none on a player of the member's. */
+	function shelfOffer(tapped: BoxRow): ScreenOffer | null {
+		const entry = pool.find((r) => r.row.key === tapped.key);
+		if (entry === undefined) return null;
+		const advised = dropRows(entry.source, shown.roster, memberZone(), now)[0] ?? null;
+		const paired = withDrop(entry.source, advised);
+		const names = namesOnScreen(shown);
+		return {
+			label: verbWords(paired),
+			line: moveWords({
+				add: cardName(paired.add.player.name, names),
+				drop: advised ? cardName(advised.row.name, names) : null
+			}),
+			href: null,
+			run: () => act(paired),
+			// The claim made here opens its confirmation; the platform's page opens in a new tab.
+			focus: claimsHere(paired) ? MOVE_ID : null
+		};
+	}
+
+	const shelf = providePlayerShelf({
+		screen: 'waivers',
+		league: () => ({ id: page.params.id ?? '', host }),
+		offer: shelfOffer,
+		rowOf: (slug) =>
+			rowBySlug(
+				pool.map((r) => r.row),
+				slug
+			)
+	});
+
 	/** The pair the drop panel's verb acts on: the open add with the drop chosen. */
 	const pair = $derived(openRow ? withDrop(openRow.source, drop) : null);
 	/** The basis, one paragraph within five lines at a desk and eight on a phone (Lane 66t). The page
@@ -445,6 +482,7 @@
 			empty={WAIVERS.noneFound}
 		/>
 	</div>
+	<PlayerShelfLayer host={shelf} />
 	<BasisBlock parts={basis} />
 </Screen>
 

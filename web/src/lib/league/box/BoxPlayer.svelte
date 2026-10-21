@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { links } from '#lib/site/links.ts';
+	import { shelfOpener } from '#lib/player/shelf-context.ts';
 	import ClubMark from '#lib/ui/ClubMark.svelte';
 	import Face from '#lib/ui/Face.svelte';
 	import NameWords from '#lib/ui/NameWords.svelte';
@@ -58,6 +59,9 @@
 	/** A phone's face where the Our rank cell sits beside the name (Lane 108, B83): a little smaller,
 	 * so a name keeps one line. Matches the phone rule for the club mark below. */
 	const APART_PHONE_FACE = 28;
+	/** The screen's player shelf (Lane 113): his name opens his card over the screen, his page
+	 * stays the link's for a new tab. Undefined where no screen holds one. */
+	const shelf = shelfOpener();
 </script>
 
 {#snippet named()}
@@ -80,7 +84,11 @@
 	<span class="who">
 		<span class="nm">
 			{#if row.slug !== null}
-				<a href={links.playerSeason(row.slug)}>{@render named()}</a>
+				<a
+					href={links.playerSeason(row.slug)}
+					aria-haspopup={shelf ? 'dialog' : undefined}
+					onclick={shelf ? (event) => shelf.open(event, row) : undefined}>{@render named()}</a
+				>
 			{:else}
 				<b>{@render named()}</b>
 			{/if}

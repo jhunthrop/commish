@@ -21,7 +21,7 @@ import { POSITIONS, type Position } from '#lib/types/player.ts';
 import { GAME_STATE_WORDS, halves, PRECIPITATION_NAMED_FROM } from '#lib/format/game-facts.ts';
 import { fixed, ordinal, signed } from '#lib/format/number.ts';
 import { clubMark } from '#lib/ui/club-mark.ts';
-import { lineState, toPlay } from './kickoff.ts';
+import { lineState, toPlay, type GameHead } from './kickoff.ts';
 import { carriedMark } from './next-week.ts';
 import type { LeaguePlayer } from '../api.ts';
 import type { LineupSlot, PlayerLine, ProjectionScoring, WeekFacts } from '../inseason/api.ts';
@@ -170,6 +170,9 @@ export interface BoxRow {
 	/** His game is still to come at the page's clock (kickoff.ts toPlay): the Opp rank's colour draws
 	 * only then (Lane 99, B56). */
 	toCome: boolean;
+	/** His game's state at the page's clock (kickoff.ts lineState): the player shelf's verb and its
+	 * Proj or Pts tile follow it (Lane 113). Null on a bye or without a kickoff held. */
+	state: GameHead['state'] | null;
 	/** The season's figures the Lineup shows beside his projection (Lane 66e). */
 	evidence: RowEvidence;
 }
@@ -363,6 +366,7 @@ export function boxRow(
 		proj: line.week_projection,
 		pts: facts.points_this_week,
 		toCome: ahead,
+		state: lineState(facts, now),
 		evidence: evidenceOf(line)
 	};
 }
@@ -429,6 +433,7 @@ export function hostRow(player: LeaguePlayer, slot: string, pts: number | null):
 		proj: null,
 		pts,
 		toCome: false,
+		state: null,
 		evidence: NO_EVIDENCE
 	};
 }

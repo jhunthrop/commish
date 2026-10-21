@@ -6,6 +6,12 @@
 	import MoveMark from '../box/MoveMark.svelte';
 	import { changesTitle, stripSum } from '../box/lineup.ts';
 	import { HOME, type LineupSummary } from './home.ts';
+	import { page } from '$app/state';
+	import type { LeagueHost } from '../api.ts';
+	import { askedHref } from '../box/asked.ts';
+	import { lineupOffer, rowBySlug } from '#lib/player/shelf-state.ts';
+	import { providePlayerShelf } from '#lib/player/shelf-host.ts';
+	import PlayerShelfLayer from '#lib/player/PlayerShelfLayer.svelte';
 
 	/** The drafter's lineup on the League page (Lane 66i): the starters as set on the platform in the
 	 * Lineup's columns (slot, player, game, Proj, Pts) with their totals, and above them the advice in
@@ -21,9 +27,35 @@
 		tagsOf: (boardId: string | null) => readonly string[];
 		/** "Last read 3:05 pm" when the latest lineup read failed and this is the last good one. */
 		stamp?: string | null;
+		/** The league's platform, which the player shelf reads his week in. */
+		host: LeagueHost;
 	}
 
-	let { team, platform, summary, lineupHref, benchHref, tagsOf, stamp = null }: Props = $props();
+	let {
+		team,
+		platform,
+		summary,
+		lineupHref,
+		benchHref,
+		tagsOf,
+		stamp = null,
+		host
+	}: Props = $props();
+
+	/** A starter's name opens his card over the page (Lane 113); its verb is his row on the Lineup. */
+	const shelf = providePlayerShelf({
+		screen: 'league',
+		league: () => ({ id: page.params.id ?? '', host }),
+		offer: ({ boardId, position }) =>
+			boardId === null
+				? null
+				: lineupOffer({ href: askedHref(lineupHref, 'start', { id: boardId, position }) }),
+		rowOf: (slug) =>
+			rowBySlug(
+				summary.starters.map((s) => s.row),
+				slug
+			)
+	});
 
 	const sum = $derived(stripSum(summary.box, summary.done));
 	const changes = $derived(summary.box.swaps.length);
@@ -62,6 +94,7 @@
 	</div>
 	<BoxTable {team} mine starters={summary.starters} bench={[]} totals={summary.totals} {tagsOf} />
 	<a class="bench" href={benchHref}>{summary.benchWords}</a>
+	<PlayerShelfLayer host={shelf} />
 </section>
 
 <style>

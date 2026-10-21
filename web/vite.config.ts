@@ -47,12 +47,13 @@ const FORM_PARTS =
  * words, which the player card's week reads too, and Lane 63's status pill, which the player card
  * draws too (Lane 66h), the League page's board parts and the front door's week band (Lane 66k,
  * loaded on demand), and the order's screens the board and Players pages load after their first
- * paint (Lane 66j). Four league pages
+ * paint (Lane 66j), and the player shelf those screens open with the card's words and parts it
+ * shares with his page (Lane 113). Four league pages
  * share them, so they are kept out of the shared chunk by name, and the bundler splits them among
  * the pages that load them. (A group of their own would pull in everything they import, the API
  * client too, and land it on every page that reads the API.) */
 const LEAGUE_PAGE_PARTS =
-	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|board|model|api|follow-switch\.svelte|phase-words|sheet-tags)\.|league[\\/](inseason|box|home)[\\/]|front[\\/]|order[\\/]|context[\\/]choose\.svelte\.|format[\\/](clock|clubs|game-facts)\.|ui[\\/](rail-order|club-mark|ClubMark|StatusPill|StatusChip)\.)/;
+	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|board|model|api|follow-switch\.svelte|phase-words|sheet-tags)\.|league[\\/](inseason|box|home)[\\/]|front[\\/]|order[\\/]|context[\\/]choose\.svelte\.|player[\\/](shelf|shelf-context|shelf-state|shelf-host|PlayerShelfLayer|PlayerShelf|card|card-source|CardTiles|CardNext)\.|format[\\/](clock|clubs|game-facts)\.|ui[\\/](rail-order|club-mark|ClubMark|StatusPill|StatusChip)\.)/;
 /** Lane 63's status pill and its chip, which the board row (Lane 66n), the player card, the league's
  * rows and the front door's week draw: a group of its own, listed ahead of the rows group, so the rows
  * group does not pull it in and a player page never loads the board row's chunk for it. The chip's

@@ -25,15 +25,27 @@ export function askedQuery(
 		: { [ASKED_PARAM]: who.id };
 }
 
+/** A league screen's address naming him: the screen's page, then its query. */
+export function askedHref(
+	base: string,
+	screen: AskedScreen,
+	who: { id: string; position: string }
+): string {
+	return `${base}?${new URLSearchParams(askedQuery(screen, who)).toString()}`;
+}
+
 /** The board id the address asks for, null with none. */
 export function askedPlayer(href: string): string | null {
 	return new URL(href).searchParams.get(ASKED_PARAM);
 }
 
-/** Marks his row under root and scrolls it to the middle; false when no row there is his. */
+/** Marks his row under root, the one row marked, and scrolls it to the middle; false when no row
+ * there is his. The player shelf's Open your lineup on the Lineup marks his the same way (Lane 113). */
 export function markAsked(root: Element | Document, boardId: string): boolean {
 	const row = root.querySelector(`tr[data-player="${CSS.escape(boardId)}"]`);
 	if (!(row instanceof HTMLElement)) return false;
+	for (const marked of root.querySelectorAll<HTMLElement>('tr[data-asked]'))
+		delete marked.dataset.asked;
 	row.dataset.asked = '';
 	row.scrollIntoView({ block: 'center' });
 	return true;

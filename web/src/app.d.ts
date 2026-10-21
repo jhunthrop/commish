@@ -12,7 +12,11 @@ declare global {
 		// interface Error {}
 		// interface Locals {}
 		// interface PageData {}
-		// interface PageState {}
+		interface PageState {
+			/** The player whose card is open over a screen, by his page's slug (Lane 113, the player
+			 * shelf). */
+			card?: string;
+		}
 	}
 }
 

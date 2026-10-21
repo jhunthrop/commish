@@ -72,6 +72,10 @@ const ALLOWED: Readonly<Record<string, Site>> = {
 		reads: 1,
 		why: "the compare page's cards, drawn when the weeks are read"
 	},
+	'src/lib/player/PlayerShelf.svelte': {
+		reads: 1,
+		why: "the player shelf's card, drawn when the week is read, as his page's"
+	},
 	'src/routes/(run)/players/[slug]/+page.svelte': {
 		reads: 1,
 		why: "the player page's live card, drawn when the week is read"

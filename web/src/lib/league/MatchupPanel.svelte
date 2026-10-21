@@ -17,6 +17,13 @@
 	import type { LeagueHost, LeagueSync, MatchupSide } from './api.ts';
 	import type { MatchupBox } from './inseason/api.ts';
 	import { hostWords, matchupGap, scoreGap, scoreUnread, teamName } from './model.ts';
+	import { page } from '$app/state';
+	import { askedHref } from './box/asked.ts';
+	import type { BoxRow } from './box/box.ts';
+	import { tabHref } from './inseason/tabs.ts';
+	import { lineupOffer, rowBySlug, type ScreenOffer } from '#lib/player/shelf-state.ts';
+	import { providePlayerShelf } from '#lib/player/shelf-host.ts';
+	import PlayerShelfLayer from '#lib/player/PlayerShelfLayer.svelte';
 
 	/** This week's game as a box score (Lane 66d): the score bug with both teams, their points so far
 	 * and their projections, then each team's box (its starters in their slots, its totals, its
@@ -90,6 +97,27 @@
 				)
 			: null
 	);
+	/** Each side's rows, the member's first. */
+	const rowsOf = (side: SideBox | null): BoxRow[] =>
+		side === null ? [] : [...side.starters.map((s) => s.row), ...side.bench];
+
+	/** The player shelf's verb (Lane 113): the way to his row on the member's Lineup, for the member's
+	 * players; none for the opponent's. */
+	function shelfOffer({ key, boardId, position }: BoxRow): ScreenOffer | null {
+		const id = page.params.id ?? '';
+		if (boardId === null || !rowsOf(mine).some((r) => r.key === key)) return null;
+		return lineupOffer({
+			href: askedHref(tabHref('start', id), 'start', { id: boardId, position })
+		});
+	}
+
+	const shelf = providePlayerShelf({
+		screen: 'matchup',
+		league: () => ({ id: page.params.id ?? '', host: sync.host }),
+		offer: shelfOffer,
+		rowOf: (slug) => rowBySlug([...rowsOf(mine), ...rowsOf(theirs)], slug)
+	});
+
 	/** FFPC is read as one member, so the API keeps only the viewer's own starters. */
 	const hidden = $derived(`${hostWords(sync.host)} shows us your lineup only.`);
 </script>
@@ -163,6 +191,7 @@
 			lineup={null}
 			now={now.getTime()}
 		/>
+		<PlayerShelfLayer host={shelf} />
 	</div>
 {:else}
 	<p class="note">{matchupGap(sync, now)}</p>

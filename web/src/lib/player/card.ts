@@ -99,6 +99,8 @@ export const CARD = {
 	writtenFrom: 'from his facts through last season',
 	/** The tier box in season, titled by what it holds (Lane 100, B30). */
 	whyRest: 'Why his rest-of-season figure',
+	/** The read's head on his page and in the player shelf (Lane 113). */
+	ourRead: 'Our read',
 	/** In season, the read's place while no week read stands for him (Lane 100, B44). */
 	readNotYet: 'Our read for his next game is not written yet.',
 	/** The in-season row under the tiles (Lane 100, B17 and B51). */
