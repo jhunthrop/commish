@@ -30,6 +30,9 @@ void test('a sheet is visit-saved when it holds no player and was not written si
 	assert.equal(visitSaved(KEPT), false);
 	assert.equal(visitSaved(EMPTIED_SINCE), false);
 	assert.equal(visitSaved({ ...VISIT_SAVED, updated_at: VISIT_SAVES_ENDED_AT }), false);
+	// Review M2: a sheet cleared before the stamp, after a write, and a New sheet named since it was
+	// made were written by the member: kept.
+	assert.equal(visitSaved({ ...VISIT_SAVED, updated_at: '2026-10-16T12:00:00Z' }), false);
 });
 
 void test('the visit-saved sheet is deleted and left off the list; a failed delete keeps it listed', async () => {

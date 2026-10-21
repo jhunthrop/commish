@@ -304,8 +304,6 @@
 		gap: var(--s-3);
 	}
 
-	/* The strip's footer: why a cell reads empty, which scoring Avg is in (B78). */
-
 	.more {
 		display: flex;
 		flex-wrap: wrap;

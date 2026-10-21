@@ -135,12 +135,8 @@ export const TILE_ORDER: readonly TileKey[] = ['proj', 'rest', 'opp', 'avg', 'la
  * preseason pace a game it starts from (the Preseason pace tile beside it), weighed against the games
  * he has played (Lane 100, B51), short enough for its phone tile (Lane 117, B80). */
 export function vsAvgReason(games: number): string {
-	return `${plural(games, 'game')} weighed with his pace`;
+	return `${plural(games, 'game')} weighed with his preseason pace`;
 }
-
-/** The most characters vs Avg's caption takes with its figures and reason, so it fits four lines of
- * its phone tile, a third of a 390 screen (Lane 117, B80; the shot script counts the lines). */
-export const VS_AVG_CAPTION_MAX = 60;
 
 /** vs Avg's caption once its two figures are read, both named as the card prints them (Lane 100 fix
  * round 1, HIGH-1): "22.0 a game vs his 30.7 Avg", then the stored reason. Its first week is the

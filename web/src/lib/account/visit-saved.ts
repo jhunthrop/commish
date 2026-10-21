@@ -14,18 +14,21 @@ type Sheet = components['schemas']['Sheet'];
  * 07f11dc4 (Lane 105's merge fd473054 in it) finished at 00:00:35Z. */
 export const VISIT_SAVES_ENDED_AT = '2026-10-21T00:01:00Z';
 
-/** Whether a sheet is one a visit saved: no players, and not written to since the visit save
- * ended. */
-export function visitSaved(sheet: Pick<Sheet, 'row_count' | 'updated_at'>): boolean {
-	return sheet.row_count === 0 && Date.parse(sheet.updated_at) < Date.parse(VISIT_SAVES_ENDED_AT);
+/** Whether a sheet is one a visit saved: no players, made before the visit save ended, and never
+ * written to after it was made (a sheet a member made or cleared on purpose was written, review M2). */
+export function visitSaved(sheet: Pick<Sheet, 'row_count' | 'created_at' | 'updated_at'>): boolean {
+	return (
+		sheet.row_count === 0 &&
+		sheet.created_at === sheet.updated_at &&
+		Date.parse(sheet.updated_at) < Date.parse(VISIT_SAVES_ENDED_AT)
+	);
 }
 
 /** The account's sheets once the visit-saved ones are removed: each is deleted through `remove`,
  * and one whose delete fails stays listed, so the next read of the account tries it again. */
-export async function withoutVisitSaved<S extends Pick<Sheet, 'id' | 'row_count' | 'updated_at'>>(
-	sheets: readonly S[],
-	remove: (id: string) => Promise<unknown>
-): Promise<S[]> {
+export async function withoutVisitSaved<
+	S extends Pick<Sheet, 'id' | 'row_count' | 'created_at' | 'updated_at'>
+>(sheets: readonly S[], remove: (id: string) => Promise<unknown>): Promise<S[]> {
 	const saved = sheets.filter(visitSaved);
 	const outcomes = await Promise.allSettled(saved.map((sheet) => remove(sheet.id)));
 	const removed = new Set(

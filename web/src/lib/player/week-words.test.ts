@@ -12,7 +12,6 @@ import {
 	unreadBasis,
 	vsAvgReason,
 	vsAvgCaption,
-	VS_AVG_CAPTION_MAX,
 	compareLeadsWithoutVerb,
 	type BasisTile,
 	type CardTile
@@ -665,7 +664,7 @@ void test('vs Avg is his rest of season a game less his Avg, from the two printe
 	assert.equal(filled.find((t) => t.key === 'vsAvg')?.value, '\u22128.7');
 	assert.equal(
 		filled.find((t) => t.key === 'vsAvg')?.caption,
-		'22.0 a game vs his 30.7 Avg: 5 games weighed with his pace'
+		'22.0 a game vs his 30.7 Avg: 5 games weighed with his preseason pace'
 	);
 	// "--" stands with the plain caption: no reason beside a figure not drawn (fix round 1, M4).
 	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.caption, CARD.vsAvgCaption);
@@ -675,10 +674,11 @@ void test('vs Avg is his rest of season a game less his Avg, from the two printe
 	assert.equal(at(22.0, 'half_ppr').find((t) => t.key === 'vsAvg')?.value, NONE);
 });
 
-void test('vs Avg fits four lines of its phone tile at the longest figures and games (Lane 117, B80)', () => {
-	const longest = vsAvgCaption('40.0', '40.0', vsAvgReason(17));
-	assert.ok(longest.length <= VS_AVG_CAPTION_MAX, longest);
-	assert.match(longest, /40\.0 a game vs his 40\.0 Avg/);
+void test('vs Avg names both figures and the preseason pace, as its tile beside it does (Lane 117)', () => {
+	// Its four phone lines are the shot script's to count (player-bye-shots.ts), never a character proxy.
+	const caption = vsAvgCaption('22.0', '30.7', vsAvgReason(5));
+	assert.equal(caption, '22.0 a game vs his 30.7 Avg: 5 games weighed with his preseason pace');
+	assert.match(caption, new RegExp(CARD.preseasonPace.toLowerCase()));
 });
 
 void test('in season with no league verb Compare leads before the read answers, preseason the sheet (Lane 117, B80)', () => {

@@ -153,7 +153,10 @@ void test("a player the run's rows do not hold is drawn from the answer's own li
 	// One basis part says why Tier reads empty, only when a built row is shown, never per row (Lane
 	// 117): the run tiers him, and the page carries its top 40 alone.
 	assert.deepEqual(stripBasisParts(rows, 'PPR', { format: 'ppr', league_own: true }), [
-		{ text: 'Tier reads "--" for a player outside the top 40 of our PPR board.', phone: false }
+		{
+			text: 'Tier reads "--" past the top 40 of our PPR board, which is as far as the front page lists.',
+			phone: false
+		}
 	]);
 	assert.deepEqual(stripBasisParts(rows.slice(1), 'PPR', { format: 'ppr', league_own: true }), []);
 	assert.deepEqual(

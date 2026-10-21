@@ -28,9 +28,9 @@ export const STRIP_WORDS = {
 	overReplacement: (teams: number): string =>
 		`Over replacement: his projected points above the last starter at his position for ${String(teams)} teams.`,
 	/** Why a row built from the answer reads "--" for Tier, said once in the basis (B78, Lane 117):
-	 * his tier is the run's, and the page carries the run's top rows alone. */
+	 * his tier is the run's, and the page carries the top rows of the board it is built on alone. */
 	untiered: (label: string): string =>
-		`Tier reads "${EMPTY_FIGURE}" for a player outside the top ${String(STRIP_POOL)} of our ${label} board.`,
+		`Tier reads "${EMPTY_FIGURE}" past the top ${String(STRIP_POOL)} of our ${label} board, which is as far as the front page lists.`,
 	/** The strip's head in a scoring: "The top of our half PPR board" (B78). */
 	head: (scoring: string): string => `The top of our ${scoring} board`,
 	/** The strip's head in the scoring nearest the league's rules. */
