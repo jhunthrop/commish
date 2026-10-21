@@ -33,11 +33,14 @@ is refused: kept, its game left at the week's status, and the pass's line FAILED
 fails its parse. The fallback's calls count against the pass's budget, not against HOURLY_CAP, which is
 the week feed's.
 
-A REFUSAL THAT REPEATS (Lane 107, B76; Lane 110, B86). A game whose newest REFUSAL_CAP kept box scores (the
-answers asked about it, `asked_game_id`, whatever game they name, or none) are one refused answer is not
-asked again: the pass names it once, "refused 3 times, waiting on the final", and still fails its line,
-until the final is held another way or GIVE_UP_AFTER has passed. A box score kept before that column counts
-for the game its answer names.
+A REFUSAL THAT REPEATS (Lane 107, B76; Lane 110, B86; Lane 116). A box score is asked at most REFUSAL_CAP
+times in a row per asked game id: a game whose newest REFUSAL_CAP kept box scores (the answers asked about
+it, `asked_game_id`, whatever game they name, or none, whatever their digest) are all refused is not asked
+again. The pass still names it once in a FAILED line with the count, "refused 3 times, not asked again,
+waiting on the final", until the final is held another way or GIVE_UP_AFTER has passed, and each refusal
+asked says its count ("refused 2 of 3 times"). Only a game's first refusal in a row fails the pass's verdict,
+so the job's failure alert fires once per game, not every hour; a provider failure (nothing kept) still
+fails every pass. A box score kept before that column counts for the game its answer names.
 A GAME THAT MOVED (Lane 107, B77; Lane 110, B77b). The game id carries its date, so a game moved to another
 day (a week 18 Saturday game, a postponement) leaves its old row in the stored schedule until the schedule
 ingest marks it superseded (`superseded_by`), and a marked row is never read here. Until then a stored game
@@ -83,8 +86,8 @@ FALLBACK_CAP: Final = 2
 # A game with no final this long after its kickoff stops being asked about (Lane 84 review): past the
 # weekly stats of Tuesday or Wednesday evening, its final will not come from the hourly status.
 GIVE_UP_AFTER: Final = timedelta(days=4)
-# A box score refused this many times with one answer (the same digest) is not asked again (B76): the
-# line still fails each pass, naming it, until the final comes another way or GIVE_UP_AFTER passes.
+# A box score refused this many times in a row for the game asked is not asked again (B76, B86, Lane 116):
+# the line still says FAILED each pass, naming it, until the final comes another way or GIVE_UP_AFTER passes.
 REFUSAL_CAP: Final = 3
 _HOUR: Final = timedelta(hours=1)
 # The status pass's advisory lock (pg_advisory_xact_lock), released with its transaction.
@@ -220,6 +223,24 @@ class _Fallback:
     failed: bool
 
 
+@dataclass(frozen=True)
+class _Answer:
+    """One box score asked: its status (None when it failed or was refused), its note, and whether it fails
+    the pass's verdict."""
+
+    status: GameStatus | None
+    note: str
+    alert: bool
+
+
+@dataclass(frozen=True)
+class _Asking:
+    """A lagging game this pass asks about, and its refusals in a row before it (refusals)."""
+
+    game: GameSummary
+    refused: int
+
+
 _STATUS_WORDS: Final[dict[GameStatus, str]] = {"final": "final", "in_progress": "under way", "scheduled": "scheduled"}
 
 
@@ -237,20 +258,22 @@ def _store(conn: Connection, source: str, body: object, now: datetime, asked: st
     record_checks(conn, [FeedOutcome(source, "captured", 1)], now)
 
 
-def _ask_box_score(
-    conn: Connection, client: Tank01Client, game: GameSummary, week: int, now: datetime
-) -> tuple[GameStatus | None, str]:
-    """One game's box score, kept and read through the mapper. None with the reason when the provider
-    failed (nothing to keep) or the kept answer is refused."""
+def _ask_box_score(conn: Connection, client: Tank01Client, asking: _Asking, week: int, now: datetime) -> _Answer:
+    """One game's box score, kept and read through the mapper. No status with the reason when the provider
+    failed (nothing to keep, the verdict fails) or the kept answer is refused (its count in the line, the
+    verdict failing on the game's first refusal in a row only)."""
+    game = asking.game
     try:
         body = client.get(Paths.BOX_SCORE, {"gameID": game.game_id})
     except (ResearchError, httpx.HTTPError) as error:
-        return None, f"FAILED, {game.game_id} box score: {error}"
+        return _Answer(None, f"FAILED, {game.game_id} box score: {error}", alert=True)
     _store(conn, BOX_SCORE_SOURCE, body, now, asked=game.game_id)
     status = box_score_status(body, game, week)
     if status is None:
-        return None, f"FAILED, {game.game_id} box score refused: it is not that game with a status"
-    return status, f"{game.game_id} box score {_STATUS_WORDS[status]}"
+        count = asking.refused + 1
+        note = f"FAILED, {game.game_id} box score refused {count} of {REFUSAL_CAP} times: it is not that game with a status"
+        return _Answer(None, note, alert=asking.refused == 0)
+    return _Answer(status, f"{game.game_id} box score {_STATUS_WORDS[status]}", alert=False)
 
 
 def box_score_status(body: object, game: GameSummary, week: int) -> GameStatus | None:
@@ -263,25 +286,27 @@ def box_score_status(body: object, game: GameSummary, week: int) -> GameStatus |
 # A game's newest kept box scores: the ones asked about it (B86), and before that column, the ones whose
 # answer names it (`gameID`).
 _GAME_BOX_SCORES: Final = text(
-    f"select digest, payload from {CAPTURE_SNAPSHOTS.fullname} "
+    f"select payload from {CAPTURE_SNAPSHOTS.fullname} "
     "where source = :source and coalesce(asked_game_id, payload ->> 'gameID') = :game "
     "order by captured_at desc, id desc limit :cap"
 )
 
 
-def refused_out(conn: Connection, game: GameSummary, week: int) -> bool:
-    """The game's newest REFUSAL_CAP kept box scores are one answer (the same digest) and it is refused, by
-    the mapper or for naming another game or none: the provider has said the same unreadable thing that
-    many times (B76, B86)."""
+def refusals(conn: Connection, game: GameSummary, week: int) -> int:
+    """How many of the game's newest kept box scores, up to REFUSAL_CAP, are refused in a row from the
+    newest: by the mapper, or for naming another game or none, whatever their digest (B76, B86, Lane 116).
+    An answer that read stops the count."""
     params = {"source": BOX_SCORE_SOURCE, "game": game.game_id, "cap": REFUSAL_CAP}
-    kept = conn.execute(_GAME_BOX_SCORES, params).all()
-    if len(kept) < REFUSAL_CAP or len({row.digest for row in kept}) != 1:
-        return False
-    return box_score_status(kept[0].payload, game, week) is None
+    count = 0
+    for row in conn.execute(_GAME_BOX_SCORES, params):
+        if box_score_status(row.payload, game, week) is not None:
+            break
+        count += 1
+    return count
 
 
-def _refused_note(game: GameSummary) -> str:
-    return f"FAILED, {game.game_id} box score refused {REFUSAL_CAP} times, waiting on the final"
+def _refused_note(game: GameSummary, count: int) -> str:
+    return f"FAILED, {game.game_id} box score refused {count} times, not asked again, waiting on the final"
 
 
 def to_ask(lagging: Sequence[GameSummary], budget: FixedBudget) -> list[GameSummary]:
@@ -290,18 +315,12 @@ def to_ask(lagging: Sequence[GameSummary], budget: FixedBudget) -> list[GameSumm
     return asked if budget.reserve(len(asked)).granted else []
 
 
-def _fallback(
-    conn: Connection, client: Tank01Client, asked: Sequence[GameSummary], week: int, now: datetime
-) -> _Fallback:
+def _fallback(conn: Connection, client: Tank01Client, asked: Sequence[_Asking], week: int, now: datetime) -> _Fallback:
     """The games asked about one by one; a failed or refused answer leaves its game at the week's status."""
-    statuses: dict[str, GameStatus] = {}
-    notes: list[str] = []
-    for game in asked:
-        status, note = _ask_box_score(conn, client, game, week, now)
-        notes.append(note)
-        if status is not None:
-            statuses[game.game_id] = status
-    return _Fallback(statuses, len(asked), tuple(notes), len(statuses) < len(asked))
+    answers = {a.game.game_id: _ask_box_score(conn, client, a, week, now) for a in asked}
+    statuses = {game_id: a.status for game_id, a in answers.items() if a.status is not None}
+    notes = tuple(a.note for a in answers.values())
+    return _Fallback(statuses, len(asked), notes, any(a.alert for a in answers.values()))
 
 
 def capture_game_status(
@@ -328,10 +347,11 @@ def capture_game_status(
     games = map_games(body, week)
     absent = absent_games(conn, season, week, games)
     lagging = lagging_games([*games, *absent.games], kickoffs, held, week, now)
-    capped = [game for game in lagging if refused_out(conn, game, week)]
+    refused = {game.game_id: refusals(conn, game, week) for game in lagging}
+    capped = [game for game in lagging if refused[game.game_id] >= REFUSAL_CAP]
     askable = [game for game in lagging if game not in capped]
     asked = to_ask(askable, budget.after(1))
-    fallback = _fallback(conn, client, asked, week, now)
+    fallback = _fallback(conn, client, [_Asking(game, refused[game.game_id]) for game in asked], week, now)
     answered = [game for game in absent.games if game.game_id in fallback.statuses]
     read = [replace(game, status=fallback.statuses.get(game.game_id, game.status)) for game in [*games, *answered]]
     superseded = [f"{old} superseded by {new}" for old, new in absent.superseded]
@@ -342,5 +362,7 @@ def capture_game_status(
     requests = 1 + fallback.requests
     head = f"week {week}, {len(rows)} clubs read, {finals} final, {requests} request{'' if requests == 1 else 's'}"
     unasked = [f"{left} lagging, not asked this pass"] if (left := len(askable) - len(asked)) else []
-    notes = [*superseded, *missing, *fallback.notes, *map(_refused_note, capped), *unasked]
-    return StatusResult(requests, written, "; ".join([head, *notes]), fallback.failed or bool(capped))
+    capped_notes = [_refused_note(game, refused[game.game_id]) for game in capped]
+    notes = [*superseded, *missing, *fallback.notes, *capped_notes, *unasked]
+    # A capped game's line says FAILED but is not the verdict: its first refusal already failed a pass.
+    return StatusResult(requests, written, "; ".join([head, *notes]), fallback.failed)

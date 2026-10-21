@@ -124,6 +124,10 @@ REGISTER_FREEZE_ROWS: Final = Table(
     # The week's published projection for him in PPR, the newest snapshot at the freeze (revision
     # 0013): a benchmark the record grades beside ours from week 7, NULL where it lists no row for him.
     Column("published_points", Double(53)),
+    # ESPN's own weekly projection for him in PPR, the newest public read at or before the freeze
+    # (revision 0017, Lane 114): a yardstick the weekly record grades beside ours from week 7, NULL
+    # where that read lists no row for him, where he has no ESPN id, and on every earlier freeze.
+    Column("espn_points", Double(53)),
     one_of("implementation", IMPLEMENTATIONS, "register_freeze_rows_implementation_ck"),
     _player_fk("register_freeze_rows", "RESTRICT"),
 )

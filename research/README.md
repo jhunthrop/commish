@@ -336,6 +336,8 @@ total counts each tested table per pass and each prerequisite table once, at its
 | tank01-roster-and-lines | rerun | provider_players 1,373; provider_stat_lines 944 | 0 |
 | tank01-schedule | first | provider_games 272 | 0 |
 | tank01-schedule | rerun | provider_games 272 | 0 |
+| tank01-schedule | prior | provider_games 272 | 0 |
+| tank01-schedule | later | provider_games 274 (2 declared departures: the moved games retired) | 0 |
 | tank01-adp | first | provider_players 1,373 | 0 |
 | tank01-adp | rerun | provider_players 1,373 | 0 |
 | tank01-headshots | first | provider_players 1,373 | 0 |

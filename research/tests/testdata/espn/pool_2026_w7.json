@@ -1,0 +1,159 @@
+{
+ "players": [
+  {
+   "id": 3117251,
+   "onTeamId": 0,
+   "player": {
+    "id": 3117251,
+    "fullName": "Christian McCaffrey",
+    "defaultPositionId": 2,
+    "proTeamId": 25,
+    "injuryStatus": "ACTIVE",
+    "stats": [
+     {
+      "appliedTotal": 22.62776036,
+      "externalId": "20257",
+      "id": "1120257",
+      "proTeamId": 0,
+      "scoringPeriodId": 7,
+      "seasonId": 2025,
+      "statSourceId": 1,
+      "statSplitTypeId": 1
+     },
+     {
+      "appliedTotal": 21.92636838,
+      "externalId": "20267",
+      "id": "1120267",
+      "proTeamId": 0,
+      "scoringPeriodId": 7,
+      "seasonId": 2026,
+      "statSourceId": 1,
+      "statSplitTypeId": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": 4430878,
+   "onTeamId": 0,
+   "player": {
+    "id": 4430878,
+    "fullName": "Jaxon Smith-Njigba",
+    "defaultPositionId": 3,
+    "proTeamId": 26,
+    "injuryStatus": "ACTIVE",
+    "stats": [
+     {
+      "appliedTotal": 20.04057226,
+      "externalId": "20257",
+      "id": "1120257",
+      "proTeamId": 0,
+      "scoringPeriodId": 7,
+      "seasonId": 2025,
+      "statSourceId": 1,
+      "statSplitTypeId": 1
+     },
+     {
+      "appliedTotal": 20.06557684,
+      "externalId": "20267",
+      "id": "1120267",
+      "proTeamId": 0,
+      "scoringPeriodId": 7,
+      "seasonId": 2026,
+      "statSourceId": 1,
+      "statSplitTypeId": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": 4379399,
+   "onTeamId": 0,
+   "player": {
+    "id": 4379399,
+    "fullName": "James Cook III",
+    "defaultPositionId": 2,
+    "proTeamId": 2,
+    "injuryStatus": "ACTIVE",
+    "stats": [
+     {
+      "appliedTotal": 0.0,
+      "externalId": "20257",
+      "id": "1120257",
+      "proTeamId": 0,
+      "scoringPeriodId": 7,
+      "seasonId": 2025,
+      "statSourceId": 1,
+      "statSplitTypeId": 1
+     },
+     {
+      "appliedTotal": 0.0,
+      "externalId": "20267",
+      "id": "1120267",
+      "proTeamId": 0,
+      "scoringPeriodId": 7,
+      "seasonId": 2026,
+      "statSourceId": 1,
+      "statSplitTypeId": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": 4361307,
+   "onTeamId": 0,
+   "player": {
+    "id": 4361307,
+    "fullName": "Trey McBride",
+    "defaultPositionId": 4,
+    "proTeamId": 22,
+    "injuryStatus": "ACTIVE",
+    "stats": [
+     {
+      "appliedTotal": 16.27637718,
+      "externalId": "20257",
+      "id": "1120257",
+      "proTeamId": 0,
+      "scoringPeriodId": 7,
+      "seasonId": 2025,
+      "statSourceId": 1,
+      "statSplitTypeId": 1
+     },
+     {
+      "appliedTotal": 15.86060253,
+      "externalId": "20267",
+      "id": "1120267",
+      "proTeamId": 0,
+      "scoringPeriodId": 7,
+      "seasonId": 2026,
+      "statSourceId": 1,
+      "statSplitTypeId": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": 3116406,
+   "onTeamId": 0,
+   "player": {
+    "id": 3116406,
+    "fullName": "Tyreek Hill",
+    "defaultPositionId": 3,
+    "proTeamId": 0,
+    "injuryStatus": "QUESTIONABLE",
+    "stats": [
+     {
+      "appliedTotal": 0.0,
+      "externalId": "20257",
+      "id": "1120257",
+      "proTeamId": 0,
+      "scoringPeriodId": 7,
+      "seasonId": 2025,
+      "statSourceId": 1,
+      "statSplitTypeId": 1
+     }
+    ]
+   }
+  }
+ ]
+}

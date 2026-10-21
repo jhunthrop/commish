@@ -4097,6 +4097,30 @@ export interface components {
 			 * @description ours less theirs, to the tenth
 			 */
 			margin: number;
+			ranking?: components['schemas']['LeagueRanking'];
+		};
+		/** @description the week's weekly record in the member's own league (Lane 114), present only where the benchmark is espn: our set order and ESPN's own projection, each graded on every rostered player with a stat line at quarterback, running back, receiver and tight end (none on a bye, out, suspended or on injured reserve at the read before our order was set) by what he scored as the league scores; absent from an answer before Lane 114 */
+		LeagueRanking: {
+			/** @description the rostered players graded */
+			players: number;
+			ours: components['schemas']['LeagueRankingScore'];
+			espn: components['schemas']['LeagueRankingScore'];
+		};
+		LeagueRankingScore: {
+			/**
+			 * Format: double
+			 * @description order matched: Spearman's rank correlation with the week's points, to two places, null when the week cannot support one
+			 */
+			agreement: number | null;
+			/**
+			 * Format: double
+			 * @description the mean distance in places between the order and the finish, to the tenth, null with no players
+			 */
+			places_off: number | null;
+			/** @description the starters the order called right in the league's lineup across its teams */
+			starters: number;
+			/** @description the starters the finish fills there */
+			starters_of: number;
 		};
 		/** @description the league's starting lineup by our slots, and its bench */
 		LeagueShape: {

@@ -1,6 +1,6 @@
 """THE REGISTER'S WEEKLY PASS (`season-week`), ported from `research-ts/src/projections/season-week/steps.ts`.
 
-Thirteen steps, each isolated: a step that raises is reported as failed and the pass carries on to the
+Fourteen steps, each isolated: a step that raises is reported as failed and the pass carries on to the
 next, because a dead odds key must never stop the freeze that runs after it. The exit status is
 non-zero when any step failed.
 
@@ -16,6 +16,9 @@ non-zero when any step failed.
 1d. **kicking-defense**: the season's kicking and team-defense weeks (`nflverse_kicking_weeks`,
    `nflverse_team_defense_weeks`), then both as stat lines the API reads (`kdef_lines`, source
    `nflverse_kdef_week`), each stamped as its club's lines that week (Lane 70a).
+1e. **espn-projections**: ESPN's public weekly projection for the coming week (Lane 114,
+   `pipeline/espn/projections.py`), read before the freeze so the order set on this pass keeps a read
+   taken minutes before it (`espn_points`); a failed read fails this step alone, never the freeze.
 2. **props-snapshot**: the odds provider's player props for the coming fourteen days.
 3. **grade**: every frozen week not yet graded, whose games are complete (below), against the
    stats now held. Each grade row is stamped `implementation = 'python'`.
@@ -50,6 +53,7 @@ from research.model.instants import js_iso, ms_instant
 from research.model.reads.teams import kickoff_instants_by_week
 from research.model.register.freeze import SERVED_SOURCE, SHIPPED_SOURCE, take_freeze
 from research.model.register.grade import grade_week, latest_freeze_for
+from research.pipeline.espn import projections as espn_projections
 from research.pipeline.http import Fetcher
 from research.pipeline.nflverse import ingest, season_stats
 from research.pipeline.nflverse.client import NflverseClient, NflverseError
@@ -74,12 +78,14 @@ LAST_POSSIBLE_WEEK: Final = 22
 OPPONENT_RATINGS: Final = "opponent-ratings"
 GAME_TABLE: Final = "game-table"
 KICKING_DEFENSE: Final = "kicking-defense"
+ESPN_PROJECTIONS: Final = "espn-projections"
 STEPS: Final = (
     "stats-ingest",
     *usage_steps.USAGE_STEPS,
     OPPONENT_RATINGS,
     GAME_TABLE,
     KICKING_DEFENSE,
+    ESPN_PROJECTIONS,
     "props-snapshot",
     "grade",
     "freeze",
@@ -172,6 +178,26 @@ def kicking_defense(context: SeasonWeekContext) -> StepResult:
         )
     return usage_steps.written_result(
         KICKING_DEFENSE, refresh.written, refresh.summary(context.season), refresh.detail()
+    )
+
+
+def espn_projections_step(context: SeasonWeekContext) -> StepResult:
+    """ESPN's projection for the week the freeze sets next, read once and kept at the pass's instant."""
+    with context.engine.connect() as conn:
+        candidate = week_to_freeze(kickoff_instants_by_week(conn, context.season), context.now)
+    if candidate is None:
+        return StepResult(
+            ESPN_PROJECTIONS, "skipped", f"no week of {context.season} kicks off after {js_iso(context.now)}"
+        )
+    week, _ = candidate
+    with context.engine.begin() as conn:
+        read = espn_projections.read_week(conn, context.fetcher, context.season, week, context.now)
+    if not read.published:
+        return StepResult(ESPN_PROJECTIONS, "skipped", f"ESPN lists no projection for {context.season} week {week} yet")
+    return StepResult(
+        ESPN_PROJECTIONS,
+        "ok",
+        f"week {week}: {read.listed} players projected, {read.written} rows kept at {js_iso(context.now)}",
     )
 
 
@@ -336,6 +362,7 @@ def _bodies(context: SeasonWeekContext) -> dict[str, Callable[[], StepResult]]:
         OPPONENT_RATINGS: lambda: opponent_ratings(context),
         GAME_TABLE: lambda: game_table(context),
         KICKING_DEFENSE: lambda: kicking_defense(context),
+        ESPN_PROJECTIONS: lambda: espn_projections_step(context),
         "props-snapshot": lambda: props_snapshot(context),
         "grade": lambda: grade(context),
         "freeze": lambda: freeze(context),

@@ -93,6 +93,10 @@ def _capture_all(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
 
 
 CASES: tuple[Case, ...] = (
+    # B73 (Lane 107) departs from the oracle where this recording cannot show it: for a week not published
+    # yet the TypeScript full list stores the empty answer, the Python one screens it out and stores none.
+    # The recorded week-1 projections are published, so both store them; a mismatch on a recording of an
+    # unpublished week is that intended departure, not a bug.
     Case(
         name="tank01-capture-all",
         summary="captureOnce with every feed (the operator's stats:capture pass) into capture_snapshots",

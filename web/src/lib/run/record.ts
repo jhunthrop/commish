@@ -128,6 +128,16 @@ function startersBeside(line: RecordLine): RecordHeadline['starters'] {
 	};
 }
 
+/** The first yardstick a line draws beside ours, in page order (ADP, ESPN, then Published), and its
+ * score: the one a headline names. */
+function firstBeside(line: RecordLine): { source: RecordSource; score: Score } | null {
+	for (const source of RECORD_SOURCES) {
+		const score = source === 'ours' ? null : line[source];
+		if (score !== null) return { source, score };
+	}
+	return null;
+}
+
 /** Graded: our rank agreement with the finish over every graded week, the span and the players it
  * counts, ADP's beside it, starters right beside both, and how many played weeks are graded. Not yet:
  * how many of the set weeks are graded. */
@@ -141,9 +151,12 @@ export function recordHeadline(
 	const standing = standingWords(record);
 	const gaps = gapWords(record, unplayed);
 	if (overall && agreement !== null && agreement !== undefined && graded.length > 0) {
-		const adp = overall.adp.agreement;
+		const beside = firstBeside(overall);
+		const rate = beside?.score.agreement ?? null;
 		const adpPart =
-			adp === null ? '' : `. ADP ${printPlaces(adp, RATE_PLACES)} on the same players`;
+			beside === null || rate === null
+				? ''
+				: `. ${RECORD_BOX[beside.source]} ${printPlaces(rate, RATE_PLACES)} on the same players`;
 		return {
 			value: printPlaces(agreement, RATE_PLACES),
 			caption: `${capitalized(rankAgreement(record))}, ours over ${weekSpan(graded)} and ${plural(overall.ours.graded, 'player')}${adpPart}.`,
@@ -245,8 +258,9 @@ export function weekLines(
 	});
 }
 
-/** The three orders a record row compares, ours first. */
-export const RECORD_SOURCES = ['ours', 'adp', 'published'] as const;
+/** The orders a record row compares, ours first: ADP on the legacy and draft records, ESPN's and the
+ * published projection on the weekly record (Lane 114). */
+export const RECORD_SOURCES = ['ours', 'adp', 'espn', 'published'] as const;
 export type RecordSource = (typeof RECORD_SOURCES)[number];
 
 /** The three figures a record row gives each order (Lane 66j). */
@@ -262,6 +276,7 @@ export const RECORD_BOX = {
 	status: 'Status',
 	ours: 'Ours',
 	adp: 'ADP',
+	espn: 'ESPN',
 	published: 'Published',
 	toDate: 'To date',
 	none: EMPTY_FIGURE,
@@ -336,30 +351,45 @@ export function figureWords(score: Score | null, figure: RecordFigure): string {
 		: `${String(score.starters)} of ${String(score.startersOf)}`;
 }
 
-/** The published projection's figure to date with ours over the same weeks beside it (review 66j N1):
- * the run pools ours again over the weeks that graded published, so the two compare like with like.
- * `ours` is null on a week's line, where both are graded on the same rows already. */
-export function publishedBeside(
+/** The season to date's ours pooled again over the weeks that graded a yardstick, its name on a line. */
+const OURS_ON: Readonly<Partial<Record<RecordSource, 'oursOnPublished' | 'oursOnEspn'>>> = {
+	published: 'oursOnPublished',
+	espn: 'oursOnEspn'
+};
+
+/** A yardstick's figure with ours over the same weeks beside it (review 66j N1): the run pools ours
+ * again over the weeks that graded the published projection or ESPN's, so the two compare like with
+ * like. `ours` is null on a week's line, where both are graded on the same rows already, and for ADP,
+ * graded every week ours is. */
+export function besideOf(
 	line: RecordLine | undefined,
+	source: RecordSource,
 	figure: RecordFigure
-): { published: string; ours: string | null } {
-	const same = line?.oursOnPublished ?? null;
+): { value: string; ours: string | null } {
+	const key = OURS_ON[source];
+	const same = key === undefined ? null : (line?.[key] ?? null);
 	return {
-		published: figureWords(scoreOf(line, 'published'), figure),
+		value: figureWords(scoreOf(line, source), figure),
 		ours: same === null ? null : `${RECORD_BOX.ours} ${figureWords(same, figure)}`
 	};
 }
 
-/** Whether the record draws the published projection: once a graded week carries it, so the season to
- * date does (Lane 82, the honest empty state: no column, no figure, no line before). The nightly names
- * Published in its method by the same rule (research/nightly/reads/record.py method). */
-export function publishedDrawn(record: RunRecord): boolean {
-	return record.toDate.some((line) => line.published !== null);
+/** Whether the record draws an order: ours always; a yardstick once a graded week carries it, so the
+ * season to date does (Lane 82, the honest empty state: no column, no figure, no line before). The
+ * nightly names a yardstick in its method by the same rule (research/nightly/reads/record.py method,
+ * weekly_record.py drawn). */
+export function sourceDrawn(record: RunRecord, source: RecordSource): boolean {
+	return source === 'ours' || record.toDate.some((line) => line[source] !== null);
 }
 
-/** The orders the record draws, ours first: Published only once drawn. */
+/** Whether the record draws the published projection. */
+export function publishedDrawn(record: RunRecord): boolean {
+	return sourceDrawn(record, 'published');
+}
+
+/** The orders the record draws, ours first. */
 export function recordSources(record: RunRecord): readonly RecordSource[] {
-	return publishedDrawn(record) ? RECORD_SOURCES : RECORD_SOURCES.filter((s) => s !== 'published');
+	return RECORD_SOURCES.filter((source) => sourceDrawn(record, source));
 }
 
 /** The page's lead, naming only the orders drawn. */

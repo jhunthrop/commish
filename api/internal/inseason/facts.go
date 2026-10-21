@@ -408,9 +408,12 @@ func (s *Season) Turned() *Season {
 
 // carriedOver reports whether a designation is a week's that a turned
 // Season carries over from a game already played: listed no later than his
-// club's last kickoff before the week, or undated.
+// club's last kickoff before the week, or undated. One whose dating is
+// still pending (boards.DatingPending, a cold start's failed runs read) is
+// not known to be undated, so it is never carried over until the dating
+// lands (Lane 116, B91).
 func (s *Season) carriedOver(d boards.Designation, team string) bool {
-	if !s.turned || d.SeasonLong() {
+	if !s.turned || d.SeasonLong() || d.DatingPending {
 		return false
 	}
 	last, played := s.lastKickoff[team]

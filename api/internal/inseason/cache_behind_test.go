@@ -2,6 +2,7 @@ package inseason
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -181,6 +182,8 @@ type movingCaptures struct {
 	// started is when each status's run began.
 	started map[string]time.Time
 	gate    chan struct{}
+	// runsDown fails the runs read.
+	runsDown bool
 }
 
 func (r *movingCaptures) capture(at time.Time, code string) {
@@ -203,12 +206,15 @@ func (r *movingCaptures) Designations(context.Context) (map[string]boards.Design
 
 func (r *movingCaptures) DesignationRuns(context.Context, time.Time) (map[boards.RunKey]time.Time, error) {
 	r.mu.Lock()
-	gate, status, start := r.gate, boards.StatusOf(r.code), r.started[boards.StatusOf(r.code)]
+	gate, status, start, down := r.gate, boards.StatusOf(r.code), r.started[boards.StatusOf(r.code)], r.runsDown
 	r.mu.Unlock()
 	if gate != nil {
 		<-gate
 	}
 	r.runs.Add(1)
+	if down {
+		return nil, errors.New("runs down")
+	}
 	return map[boards.RunKey]time.Time{{PlayerID: "p2", Status: status}: start}, nil
 }
 
@@ -263,6 +269,49 @@ func TestANewStatusIsNeverServedUndated(t *testing.T) {
 	got := served(d)
 	if err != nil || got.Status != boards.StatusOut || got.CarriedOver || got.Listed == nil || !got.Listed.Equal(friday.Add(time.Hour)) {
 		t.Fatalf("after 16:00 is dated: %+v %v", got, err)
+	}
+}
+
+// A cold start whose dating read fails is never served as if dated (Lane
+// 116, B91): the capture answers marked pending, so on a turned week past
+// his club's last game p2's Out shows alone, neither listed nor carried
+// over (never "still listed"). Nothing is kept, so the next request reads
+// the pair again, and once its dating lands he is Out, listed at its run's
+// start, carried over from the game played after it.
+func TestAColdStartsFailedDatingIsPendingUntilItLands(t *testing.T) {
+	sunday := time.Date(2026, 10, 18, 17, 0, 0, 0, time.UTC)
+	reads := &movingCaptures{runsDown: true}
+	reads.capture(sunday.Add(-48*time.Hour), "O")
+	reads.capture(sunday.Add(-24*time.Hour), "O")
+	tuesday := sunday.Add(48 * time.Hour)
+	c := &Cache{Reads: reads, Now: func() time.Time { return tuesday }}
+	ctx := context.Background()
+	games := []boards.TeamWeek{
+		{Team: "BUF", Week: 7, Kickoff: sunday, Final: true},
+		{Team: "BUF", Week: 8, Kickoff: sunday.Add(7 * 24 * time.Hour)},
+	}
+	p2 := Player{BoardID: "p2", Team: "BUF", Position: draft.WR}
+	served := func(d map[string]boards.Designation) *Designation {
+		return NewSeason(Data{Designations: d, Games: games}, Rules{}, 8, tuesday).Turned().designation(p2)
+	}
+	d, err := c.DatedDesignations(ctx)
+	got := served(d)
+	if err != nil || got == nil || got.Status != boards.StatusOut || got.CarriedOver || got.Listed != nil {
+		t.Fatalf("cold start, dating down: %+v %v, want Out alone", got, err)
+	}
+	if !d["p2"].DatingPending {
+		t.Fatalf("cold start, dating down: %+v, want it marked pending", d["p2"])
+	}
+	reads.mu.Lock()
+	reads.runsDown = false
+	reads.mu.Unlock()
+	d, err = c.DatedDesignations(ctx)
+	got = served(d)
+	if err != nil || d["p2"].DatingPending || got == nil || !got.CarriedOver || got.Listed == nil || !got.Listed.Equal(sunday.Add(-48*time.Hour)) {
+		t.Fatalf("next refill, dating up: %+v %+v %v, want Out listed Friday, carried over", got, d["p2"], err)
+	}
+	if n := reads.runs.Load(); n != 2 {
+		t.Fatalf("%d runs reads, want the failed one and the refill", n)
 	}
 }
 

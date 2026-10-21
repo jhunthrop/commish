@@ -342,7 +342,9 @@ def _box_calls(client: _Client) -> int:
     return sum(1 for path, _ in client.calls if path == Paths.BOX_SCORE)
 
 
-def test_a_box_score_refused_three_times_alike_is_not_asked_again_and_still_fails(engine: Engine) -> None:
+def test_a_box_score_refused_three_times_is_not_asked_again_and_alerts_once(engine: Engine) -> None:
+    """B76 (Lane 116): at most three asks per asked game; every pass's line says FAILED with the count, and
+    only the game's first refusal fails the pass's verdict, so the job's alert fires once, not hourly."""
     client = _refusing()
     passes = [PASS_AT + timedelta(hours=hour) for hour in range(REFUSAL_CAP + 2)]
     with engine.begin() as conn:
@@ -350,17 +352,21 @@ def test_a_box_score_refused_three_times_alike_is_not_asked_again_and_still_fail
         results = [capture_game_status(conn, cast(Tank01Client, client), SEASON, at, FixedBudget(5)) for at in passes]
         assert _kept(conn, BOX_SCORE_SOURCE) == REFUSAL_CAP
     assert REFUSAL_CAP == 3 and _box_calls(client) == REFUSAL_CAP  # noqa: PLR2004 - the ruling says three
-    for asked in results[:REFUSAL_CAP]:
-        assert asked.failed and asked.requests == WEEK_AND_ONE_BOX_SCORE
-        assert f"FAILED, {WSH_SF} box score refused: it is not that game with a status" in asked.line
+    for count, asked in enumerate(results[:REFUSAL_CAP], start=1):
+        assert asked.requests == WEEK_AND_ONE_BOX_SCORE
+        assert f"FAILED, {WSH_SF} box score refused {count} of 3 times: it is not that game with a status" in asked.line
+    assert [r.failed for r in results] == [True, False, False, False, False]
     for waiting in results[REFUSAL_CAP:]:
-        assert waiting.failed and waiting.requests == WEEK_FEED_ONLY
+        assert waiting.requests == WEEK_FEED_ONLY
         assert waiting.line == (
-            f"week 6, 6 clubs read, 4 final, 1 request; FAILED, {WSH_SF} box score refused 3 times, waiting on the final"
+            f"week 6, 6 clubs read, 4 final, 1 request; "
+            f"FAILED, {WSH_SF} box score refused 3 times, not asked again, waiting on the final"
         )
 
 
-def test_a_refusal_that_changes_is_asked_again(engine: Engine) -> None:
+def test_a_refusal_that_changes_still_counts_toward_the_cap(engine: Engine) -> None:
+    """Lane 116: the cap is three asks per asked game, whatever each refused answer's digest."""
+
     class _Changing(_Client):
         def get(self, path: str, query: dict[str, str] | None = None) -> object:
             answer = super().get(path, query)
@@ -369,11 +375,29 @@ def test_a_refusal_that_changes_is_asked_again(engine: Engine) -> None:
     client = _refusing(_Changing)
     with engine.begin() as conn:
         _seed(conn)
-        for hour in range(REFUSAL_CAP + 1):
+        for hour in range(REFUSAL_CAP + 2):
             capture_game_status(
                 conn, cast(Tank01Client, client), SEASON, PASS_AT + timedelta(hours=hour), FixedBudget(5)
             )
-    assert _box_calls(client) == REFUSAL_CAP + 1
+    assert _box_calls(client) == REFUSAL_CAP
+
+
+def test_an_answer_that_reads_starts_the_count_again(engine: Engine) -> None:
+    """Refusals count in a row: an answer that reads (here under way) between them restarts the count, and the
+    next refusal is a first again, failing the verdict."""
+    client = _refusing()
+    still_open = _as_wsh_sf({"gameStatus": "Live - In Progress", "gameStatusCode": "1"})
+    answers: list[object] = [_REFUSED_BODY, _REFUSED_BODY, still_open, _REFUSED_BODY]
+    results = []
+    with engine.begin() as conn:
+        _seed(conn)
+        for hour, answer in enumerate(answers):
+            client.box_scores = {WSH_SF: answer}
+            at = PASS_AT + timedelta(hours=hour)
+            results.append(capture_game_status(conn, cast(Tank01Client, client), SEASON, at, FixedBudget(5)))
+    assert _box_calls(client) == len(answers)
+    assert [r.failed for r in results] == [True, False, False, True]
+    assert "refused 1 of 3 times" in results[-1].line
 
 
 def test_a_capped_game_ends_when_its_final_comes_another_way(engine: Engine) -> None:
@@ -449,8 +473,10 @@ def test_a_refused_answer_naming_another_game_or_none_counts_toward_the_asked_ga
         ).scalars()
         assert list(asked) == [WSH_SF] * REFUSAL_CAP
     assert _box_calls(client) == REFUSAL_CAP
-    assert results[-1].failed
-    assert results[-1].line.endswith(f"FAILED, {WSH_SF} box score refused 3 times, waiting on the final")
+    assert [r.failed for r in results] == [True, False, False, False, False]
+    assert results[-1].line.endswith(
+        f"FAILED, {WSH_SF} box score refused 3 times, not asked again, waiting on the final"
+    )
 
 
 def test_a_box_score_kept_before_the_column_counts_for_the_game_it_names(engine: Engine) -> None:
@@ -466,7 +492,8 @@ def test_a_box_score_kept_before_the_column_counts_for_the_game_it_names(engine:
         conn.execute(insert(CAPTURE_SNAPSHOTS), rows)
         result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(5))
     assert _box_calls(client) == 0
-    assert result.line.endswith("refused 3 times, waiting on the final")
+    assert result.line.endswith("refused 3 times, not asked again, waiting on the final")
+    assert not result.failed
 
 
 def test_a_stored_game_the_ingest_marked_superseded_is_never_absent(engine: Engine) -> None:

@@ -156,8 +156,10 @@ func (c *Cache) Projection(ctx context.Context, season, week int) (boards.WeekPr
 //
 // A dating read that fails is logged. With a pair kept, that pair stands
 // and the next request past the TTL tries again; with none, the capture
-// answers undated, so a row says "as of" rather than the board losing its
-// statuses, and nothing is kept, so the next request reads the pair again.
+// answers undated and marked DatingPending (Lane 116, B91), so a row says
+// the designation alone rather than the board losing its statuses, never
+// "still listed" or carried over, and nothing is kept, so the next request
+// reads the pair again.
 func (c *Cache) DatedDesignations(ctx context.Context) (map[string]boards.Designation, error) {
 	designations, err := cached(c, ctx, "designations", CaptureTTL, c.readDated)
 	var undated *undatedCapture
@@ -165,7 +167,7 @@ func (c *Cache) DatedDesignations(ctx context.Context) (map[string]boards.Design
 		if c.Log != nil {
 			c.Log.Warn("inseason: the designation runs were not read; the statuses answer undated", "err", undated.err)
 		}
-		return undated.designations, nil
+		return boards.DatingPending(undated.designations), nil
 	}
 	return designations, err
 }

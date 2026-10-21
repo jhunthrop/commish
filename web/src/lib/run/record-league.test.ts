@@ -44,7 +44,7 @@ void test("on a league page the honest sentence counts the league's starters, as
 	const lineup = pageLineup(live, espn, players);
 	const shown = shownRecord(live, players, lineup);
 	const all = shown.toDate.find((line) => line.position === 'All');
-	assert.deepEqual([all?.ours.starters, all?.adp.starters, all?.ours.startersOf], [101, 107, 168]);
+	assert.deepEqual([all?.ours.starters, all?.adp?.starters, all?.ours.startersOf], [101, 107, 168]);
 	assert.equal(
 		honestWords(live, shown, lineup),
 		"ADP had more of the week's starters right, 107 of 168 against our 101."
@@ -60,7 +60,10 @@ void test("the league's basis names its lineup across its teams and says the kic
 		said.starters,
 		"Starters right counts your league's lineup, QB, 2 RB, 2 WR, TE and a flex across 12 teams, and how many of the week's starters there the order also put there. Its kickers and defenses are not counted: the record grades neither in season."
 	);
-	assert.match(said.benchmark ?? '', /^In your ESPN league, from week 7/u);
+	assert.match(
+		said.benchmark ?? '',
+		/^In your ESPN league, from week 7 each graded week also grades our order and ESPN's/u
+	);
 	assert.equal(leagueBasis(espn, pageLineup(live, espn, {})).starters, null);
 });
 
@@ -68,14 +71,14 @@ void test('a week reads who won by how much, in either direction', () => {
 	const week = { week: 7, benchmark: 'espn' as const, ours: 97, theirs: 88.6, margin: 8.4 };
 	assert.equal(
 		weekSentence(week),
-		"Week 7: our picks beat ESPN's projected lineup by 8.4 points, 97.0 to 88.6."
+		'Week 7: following us instead of ESPN would have scored 8.4 more points, 97.0 to 88.6.'
 	);
 	assert.equal(
 		weekSentence({ ...week, ours: 88.6, theirs: 97, margin: -8.4 }),
-		"Week 7: ESPN's projected lineup beat our picks by 8.4 points, 97.0 to 88.6."
+		'Week 7: following ESPN instead of us would have scored 8.4 more points, 97.0 to 88.6.'
 	);
 	assert.equal(
 		weekSentence({ ...week, benchmark: 'published', theirs: 97, margin: 0 }),
-		"Week 7: our picks and the published projection's lineup scored the same, 97.0 each."
+		"Week 7: following us or the week's published projection would have scored the same, 97.0."
 	);
 });

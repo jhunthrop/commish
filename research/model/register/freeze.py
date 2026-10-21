@@ -142,6 +142,25 @@ def week_published_points(conn: Connection, season: int, week: int, as_of: datet
     return {str(row.player_id): float(row.ppr_points) for row in rows}
 
 
+_ESPN: Final = """
+with newest as (
+  select max(read_at) as read_at from research.espn_projection_rows where season = :s and week = :w and read_at <= :a
+)
+select p.id as player_id, r.ppr_points from research.espn_projection_rows r
+join newest n on n.read_at = r.read_at
+join research.players p on p.espn_id = r.espn_id
+where r.season = :s and r.week = :w
+"""
+
+
+def week_espn_points(conn: Connection, season: int, week: int, as_of: datetime) -> dict[str, float]:
+    """ESPN's own weekly projection at the freeze (Lane 114, Amendment 5): each player's PPR points on
+    the newest public read of the week taken at or before `as_of`, by research player id through his
+    ESPN id. Empty when no read of the week was taken by then."""
+    rows = conn.execute(text(_ESPN), {"s": season, "w": week, "a": as_of})
+    return {str(row.player_id): float(row.ppr_points) for row in rows}
+
+
 _SHIPPED: Final = """
 select c.player_id, b.refreshed, b.points, b.rank, b.run_id from research.published_boards b
 join research.player_crosswalk c on c.provider_player_id = b.player_id
@@ -192,6 +211,7 @@ def _coverage(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
         "ecr": sum(1 for row in rows if row["ecr"] is not None),
         "props": sum(1 for row in rows if row["props_points"] is not None),
         "published": sum(1 for row in rows if row["published_points"] is not None),
+        "espn": sum(1 for row in rows if row["espn_points"] is not None),
     }
 
 
@@ -218,6 +238,15 @@ def _stored_board(conn: Connection, season: int, source: str, as_of: datetime) -
             {"s": season, "source": source, "a": as_of},
         )
     )
+
+
+@dataclass(frozen=True, slots=True)
+class Yardsticks:
+    """The week's projections a freeze keeps beside each row: the published one (Lane 66j) and ESPN's
+    (Lane 114), each by research player id."""
+
+    published: Mapping[str, float]
+    espn: Mapping[str, float]
 
 
 @dataclass(frozen=True, slots=True)
@@ -249,11 +278,12 @@ def take_freeze(conn: Connection, season: int, week: int, now: datetime) -> Free
     ecr = {row.player_id: row.rank for row in preseason_rankings_as_of(conn, season, ECR_SOURCE, frozen_at)}
     props = week_props_consensus(conn, season, (kickoff, kickoffs.get(week + 1)), frozen_at)
     published = week_published_points(conn, season, week, frozen_at)
+    yardsticks = Yardsticks(published, week_espn_points(conn, season, week, frozen_at))
     rows: list[dict[str, Any]] = []
     coverage: dict[str, dict[str, int]] = {}
     for source, role in REGISTER_BOARD_SOURCES:
         board_rows = [
-            _freeze_row(season, week, frozen_at, entry, adp, ecr, props, published)
+            _freeze_row(season, week, frozen_at, entry, adp, ecr, props, yardsticks)
             for entry in _stored_board(conn, season, source, frozen_at)
         ]
         unnamed = sorted({js_iso(row["board_as_of"]) for row in board_rows if row["model_version"] is None})
@@ -270,7 +300,7 @@ def take_freeze(conn: Connection, season: int, week: int, now: datetime) -> Free
         coverage[source] = _coverage(board_rows)
         rows.extend(board_rows)
     shipped = [
-        _freeze_row(season, week, frozen_at, entry, adp, ecr, props, published)
+        _freeze_row(season, week, frozen_at, entry, adp, ecr, props, yardsticks)
         for entry in shipped_board(conn, season, frozen_at)
     ]
     if shipped:
@@ -288,7 +318,7 @@ def _freeze_row(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its
     adp: Mapping[str, float],
     ecr: Mapping[str, float],
     props: Mapping[str, PropsStance],
-    published: Mapping[str, float],
+    yardsticks: "Yardsticks",
 ) -> dict[str, Any]:
     stance = props.get(entry.player_id)
     return {
@@ -306,8 +336,9 @@ def _freeze_row(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its
         "ecr": ecr.get(entry.player_id),
         "props_points": None if stance is None else stance.points,
         "props_markets": None if stance is None else stance.markets,
-        "published_points": published.get(entry.player_id),
+        "published_points": yardsticks.published.get(entry.player_id),
         "model_version": entry.model_version,
+        "espn_points": yardsticks.espn.get(entry.player_id),
     }
 
 
@@ -315,9 +346,10 @@ def _record(conn: Connection, rows: Sequence[Mapping[str, Any]]) -> None:
     """`recordFreezeRows`: a plain insert, no conflict clause; a second claim at an instant is refused."""
     statement = text(
         "insert into research.register_freeze_rows (season, week, frozen_at, board_source, player_id, implementation, board_as_of, "
-        "board_points, board_rank, board_value_rank, adp, ecr, props_points, props_markets, published_points, model_version) values "
-        "(:season, :week, :frozen_at, :board_source, :player_id, :implementation, :board_as_of, :board_points, :board_rank, "
-        ":board_value_rank, :adp, :ecr, :props_points, cast(:props_markets as jsonb), :published_points, :model_version)"
+        "board_points, board_rank, board_value_rank, adp, ecr, props_points, props_markets, published_points, model_version, "
+        "espn_points) values (:season, :week, :frozen_at, :board_source, :player_id, :implementation, :board_as_of, :board_points, "
+        ":board_rank, :board_value_rank, :adp, :ecr, :props_points, cast(:props_markets as jsonb), :published_points, :model_version, "
+        ":espn_points)"
     )
     for row in rows:
         conn.execute(
