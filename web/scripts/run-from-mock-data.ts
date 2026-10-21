@@ -15,6 +15,11 @@
 //     research.player_capsules: the writer's newest read for each player and when it wrote it
 //     and the three seasons before it for each page's earlier seasons (standin-season.ts)
 //   scripts/standin-week-reads.json   Lane 72's three recorded week-ahead reads, the stand-in's weekRead
+//   scripts/standin-designations.json the injury capture the stand-in is marked with (Lane 128): the
+//     newest by-date capture in the dev store on 2026-10-21 (stamped 2026-10-14T02:03:35.613Z), as
+//     `research.nightly mark` wrote it beside this run, read once and kept, so every build and every
+//     shot script reads the same designations and none reads dev at shot time; written as the run's
+//     designations.json for the players its board ranks
 //     research.player_week_observations and friends: each player's season so far
 //     (standin-season.ts, scored with fantasy-points.ts)
 //   research-ts/src/domain/nfl-team-names.ts for each club's city and nickname
@@ -45,6 +50,7 @@ import {
 	adpSchema,
 	boardSchema,
 	clubsSchema,
+	designationsSchema,
 	indexSchema,
 	latestPointerSchema,
 	manifestSchema,
@@ -55,6 +61,7 @@ import {
 	type BoardRow,
 	type Capsule,
 	type Club,
+	type Designations,
 	type Format,
 	type Game,
 	type IndexEntry,
@@ -301,6 +308,17 @@ async function weekReads(): Promise<Map<string, WeekRead>> {
 			{ week, body, caption, writtenAt, call, status, factsAt: null }
 		])
 	);
+}
+
+/** The recorded injury capture (scripts/standin-designations.json) for the players the board ranks,
+ * as `research.nightly mark` writes a run's designations.json (designations_file): one capture, so
+ * the board, the player pages and every shot read the same statuses. */
+async function recordedDesignations(rows: readonly BoardRow[]): Promise<Designations> {
+	const file = new URL('./standin-designations.json', import.meta.url);
+	const recorded = designationsSchema.parse(JSON.parse(await readFile(file, 'utf8')));
+	const ranked = new Set(rows.map((row) => row.id));
+	const players = Object.entries(recorded.players).filter(([id]) => ranked.has(id));
+	return { ...recorded, players: Object.fromEntries(players) };
 }
 
 function playerPages(
@@ -659,6 +677,7 @@ function artifacts(parts: {
 	index: IndexEntry[];
 	clubs: Club[];
 	schedule: Schedule;
+	designations: Designations;
 }): Map<string, unknown> {
 	const check = <T>(schema: z.ZodType<T>, value: T, path: string): [string, T] => {
 		const result = schema.safeParse(value);
@@ -673,7 +692,8 @@ function artifacts(parts: {
 		check(recordSchema, parts.record, RUN_PATHS.record),
 		check(indexSchema, parts.index, RUN_PATHS.index),
 		check(clubsSchema, parts.clubs, RUN_PATHS.clubs),
-		check(scheduleSchema, parts.schedule, RUN_PATHS.schedule)
+		check(scheduleSchema, parts.schedule, RUN_PATHS.schedule),
+		check(designationsSchema, parts.designations, RUN_PATHS.designations)
 	]);
 }
 
@@ -786,7 +806,8 @@ async function main(): Promise<void> {
 			record,
 			index,
 			clubs,
-			schedule
+			schedule,
+			designations: await recordedDesignations(rows)
 		});
 		await writeLocal(files);
 		if (process.argv.includes('--upload')) await upload(files);

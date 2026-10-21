@@ -2,12 +2,14 @@
 // and 390, on a Central clock: the board's basis line with the capture's sentence, a row on injured
 // reserve (his rank shown as IR, below every available player at his position), a doubtful row with
 // its mark, the position view's season-long block, both player pages, and the record's method words.
-// Each asserts what it shows. Against the built site served static, built from a run whose
-// designations.json the capture wrote (`uv run python -m research.nightly mark --out web/.runs`).
+// Each asserts what it shows. Against the built site served static, built from the stand-in run
+// `npm run standin` writes, marked with the recorded capture (scripts/standin-designations.json,
+// Lane 128): nothing read from dev at shot time.
 //
 //   node scripts/injury-status-shots.ts [web origin] [out dir]
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
+import { heldTierWords } from '../src/lib/run/player-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 
 const THEMES = ['light', 'dark'] as const;
@@ -129,7 +131,7 @@ async function playerPages(page: Page, tag: string): Promise<void> {
 	// In season the player card carries no drafters fact (Lane 66h); nothing frames a draft spot.
 	check(!/picks? (later|earlier)/.test(text), `${tag}: nothing frames his draft spot`);
 	check(
-		text.includes('No tier while he is on a season-long list.') && !/\bTier \d/.test(text),
+		text.includes(heldTierWords('injured_reserve')) && !/\bTier \d/.test(text),
 		`${tag}: no tier aside places him`
 	);
 	await page.screenshot({ path: file(`player-ir-${tag}`) });
