@@ -283,7 +283,7 @@ export interface LineupSummary {
 	starters: BoxStarter[];
 	totals: BoxTotals;
 	benchWords: string;
-	/** The API's sentence once every starter of the member's has played (week_done), null before. */
+	/** The API's sentence once every starter of the member's has kicked off (week_done), null before. */
 	done: string | null;
 	/** Locked while the matchup still plays, final once it is (week_done_state); null before, or
 	 * from the previous API. */

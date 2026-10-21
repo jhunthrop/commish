@@ -362,11 +362,16 @@ func ToPlayWords(toPlay, playing int) string {
 }
 
 // WeekDoneWords is the Lineup's sentence once every starter of the
-// member's has played (Lane 85): nothing is left to set, so it stands
-// where the changes and the verb would. It says the lineup, never the
-// week (Lane 91): the score bug beside it says who is still to play.
-func WeekDoneWords() string {
-	return "Every starter of yours has played, so nothing is left to set."
+// member's with a game has kicked off (Lane 85, Lane 109): nothing is
+// left to set, so it stands where the changes and the verb would. "has
+// kicked off" while any of them is still in play, "has played" once
+// every one is final. It says the lineup, never the week (Lane 91): the
+// score bug beside it says who is still to play.
+func WeekDoneWords(everyFinal bool) string {
+	if everyFinal {
+		return "Every starter of yours has played, so nothing is left to set."
+	}
+	return "Every starter of yours has kicked off, so nothing is left to set."
 }
 
 // WaiversBasis is the waiver page's pickup rule (§5.3, Lane 66f): the

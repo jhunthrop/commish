@@ -93,8 +93,8 @@ export function shortName(name: string): string {
 const NUMBER_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
 
 /** "Three changes", "One change", "12 changes", or "Your lineup is set"; once the API says every
- * starter of the member's has played (its week_done sentence, said beside it), "Locked" while the
- * matchup still plays and "Final" once it is final (Lane 91). An answer with the sentence and no
+ * starter of the member's has kicked off (its week_done sentence, said beside it, Lane 109), "Locked"
+ * while the matchup still plays and "Final" once it is final (Lane 91). An answer with the sentence and no
  * state, from the previous API, says "Final" as it did. */
 export function changesTitle(
 	n: number,
@@ -124,7 +124,7 @@ export function stripSum(
 	done: string | null = null,
 	asSet: string = AS_SET
 ): StripSum | null {
-	// Every starter played leaves no Proj to add: the API's sentence stands in the sum's place.
+	// Every starter kicked off leaves no Proj to add: the API's sentence stands in the sum's place.
 	if (box.totals.proj === null || done !== null) return null;
 	const figure = boxNumber(box.totals.proj);
 	if (box.swaps.length === 0) return { figure, words: `${BOX.proj} ${asSet}`, gain: null };
@@ -139,7 +139,7 @@ export function asSetWords(host: LeagueHost): string {
 }
 
 /** The Lineup strip's figure (Lane 99, B11), the platform named: stripSum's with "as set on ESPN", or
- * once every starter has played the lineup's points, "76.8" and "Pts as set on ESPN"; null with
+ * once every starter has kicked off the lineup's points so far, "76.8" and "Pts as set on ESPN"; null with
  * neither figure. */
 export function lineupSum(
 	box: Pick<LineupBox, 'totals' | 'asSet' | 'gain' | 'swaps'>,
