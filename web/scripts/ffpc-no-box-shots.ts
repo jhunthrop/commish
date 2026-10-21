@@ -5,7 +5,10 @@
 // until then the opponent reads "Proj final --" under a Kicked off head. It asserts, on the member's
 // game, the Matchup bug's head, the opponent's small figure there and on the home bug, the home bug's
 // head, each footer's lines (basis-lines.ts, eight at most at 390, five at 1280) and the copy guard, and
-// prints the footers' counts. Exits non-zero on any fault.
+// prints the footers' counts. Exits non-zero on any fault. On the home after the Sunday (Lane 125,
+// B104) every other game lists no starters on either side too: it prints each other bug's head and
+// figures, and asserts no other bug reads Final while a side of it reads "--", and the footer says the
+// teams FFPC sends no lineup for once.
 //   saturday, sunday   before the week's Sunday: the opponent listed as the stand-in reads him;
 //   monday             Monday night, the Monday game under way with a player on each roster: Kicked off;
 //   tuesday            every week 6 game final: Final on both sides;
@@ -18,6 +21,7 @@
 // with the site built against PUBLIC_API_URL at the fixture API.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Locator, type Page } from 'playwright';
+import { unlistedPart } from '../src/lib/league/box/basis.ts';
 import { BOX } from '../src/lib/league/box/box.ts';
 import { KICKOFF } from '../src/lib/league/box/kickoff.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
@@ -113,6 +117,34 @@ async function homeBug(page: Page): Promise<{ head: string; opponent: string }> 
 	};
 }
 
+/** Every other home bug as it reads (Lane 125, B104): "head: small/big | small/big", and the faults
+ * of a bug whose head reads Final with a side still at "--". */
+async function otherBugs(page: Page, at: string): Promise<{ said: string[]; faults: string[] }> {
+	const said: string[] = [];
+	const faults: string[] = [];
+	for (const bug of await page.locator('main a.bug:not(.mine)').all()) {
+		const head = await drawn(bug.locator('.bh .st'));
+		const sides = await Promise.all(
+			(await bug.locator('.bt').all()).map(
+				async (side) => `${await drawn(side.locator('.proj'))}/${await drawn(side.locator('.pts'))}`
+			)
+		);
+		said.push(`${head}: ${sides.join(' | ')}`);
+		if (
+			head.toLowerCase() === KICKOFF.final.toLowerCase() &&
+			sides.some((s) => s.startsWith(BOX.none))
+		)
+			faults.push(`${at}: other bug "${head}" with a side at "${BOX.none}"`);
+	}
+	return { said, faults };
+}
+
+/** How many times the footer names the teams FFPC sends no lineup for. */
+async function unlistedSaid(page: Page): Promise<number> {
+	const text = await drawn(page.locator('[data-basis="league"]'));
+	return text.split(unlistedPart('ffpc', true)).length - 1;
+}
+
 /** The opponent's small figure's faults against the clock's state. */
 function opponentFaults(small: string, at: string): string[] {
 	if (want.opponentFinal === null) return [];
@@ -145,6 +177,14 @@ for (const theme of THEMES)
 				);
 				if (lines === 0 || lines > MOST_LINES[width])
 					faults.push(`${at}: footer draws ${String(lines)} lines`);
+				// After the Sunday the home's other games list no starters either (Lane 125, B104).
+				if (screen.name === 'home' && want.head !== null) {
+					const others = await otherBugs(page, at);
+					footers.push(...others.said.map((s) => `  ${s}`));
+					faults.push(...others.faults);
+					const times = await unlistedSaid(page);
+					if (times !== 1) faults.push(`${at}: the unlisted teams said ${String(times)} times`);
+				}
 				const copy = await copyFault(page);
 				if (copy !== null) faults.push(`${at}: ${copy}`);
 				await page.screenshot({

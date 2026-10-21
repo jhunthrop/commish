@@ -3190,7 +3190,7 @@ type MatchupBoxSide struct {
 	// PlayerPoints the host gives each player's points for this side; false where it gives the side's total alone
 	PlayerPoints bool `json:"player_points"`
 
-	// ProjectedFinal the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far, the rest of the Proj of its starters in play and the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, or absent from an older answer
+	// ProjectedFinal the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far, the rest of the Proj of its starters in play and the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, for a side the platform lists no starters for, or absent from an older answer
 	ProjectedFinal *float64 `json:"projected_final,omitempty"`
 	RosterId       int      `json:"roster_id"`
 
@@ -4007,7 +4007,7 @@ type ScoreboardSide struct {
 	// PointsRead false when the host's score could not be read; points then says nothing
 	PointsRead bool `json:"points_read"`
 
-	// ProjectedFinal the side's projected final once any starter of the game has kicked off: points (the platform's score so far), plus for each starter in play the rest of his week projection (max(0, Proj - his points so far), nothing where the platform gives no player's points), plus the week projection of each starter still to play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, or absent from an older answer
+	// ProjectedFinal the side's projected final once any starter of the game has kicked off: points (the platform's score so far), plus for each starter in play the rest of his week projection (max(0, Proj - his points so far), nothing where the platform gives no player's points), plus the week projection of each starter still to play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, for a side the platform lists no starters for (FFPC's opponent view), or absent from an older answer
 	ProjectedFinal *float64 `json:"projected_final,omitempty"`
 
 	// Projection the side's starters' week projections summed, each as printed to the tenth, a starter with none counting nothing; null when no starter has one

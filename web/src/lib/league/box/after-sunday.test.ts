@@ -19,7 +19,7 @@ import {
 	WEEK_DONE_KICKED_OFF
 } from '../../../../scripts/inseason-fixture/sunday.ts';
 import { inTenths } from '../../../../scripts/inseason-fixture/tenths.ts';
-import { ffpcAfterSunday } from '../../../../scripts/inseason-fixture/ffpc.ts';
+import { FFPC_ROSTERLESS, ffpcAfterSunday } from '../../../../scripts/inseason-fixture/ffpc.ts';
 import { platformed, platformGames } from '../../../../scripts/inseason-fixture/platform-games.ts';
 import type { LeagueSync } from '../api.ts';
 import type {
@@ -29,7 +29,15 @@ import type {
 	TradeAdvice,
 	WaiverAdvice
 } from '../inseason/api.ts';
-import { bugsMissFinal, bugsOf, lineupSummary, type Bug, type BugSide } from '../home/home.ts';
+import {
+	bugsMissFinal,
+	bugsMissListedFinal,
+	bugsOf,
+	bugsUnlisted,
+	lineupSummary,
+	type Bug,
+	type BugSide
+} from '../home/home.ts';
 import { BOX, teamSmallFigure } from './box.ts';
 import { gameHead, KICKOFF } from './kickoff.ts';
 import { changesTitle, heldLineup, lineupBox, lineupSum, locked } from './lineup.ts';
@@ -254,7 +262,7 @@ function ffpcAt(clock: string, late?: ReadonlySet<string>): ReturnType<typeof ff
 		now,
 		late
 	) as ReturnType<typeof afterSundayOf>;
-	return ffpcAfterSunday(week, momentAt(now, late));
+	return ffpcAfterSunday(week, momentAt(now, late), week6);
 }
 
 /** What the member's FFPC game reads at a clock on the home and the Matchup, side by side. */
@@ -357,6 +365,98 @@ void test("B102: an FFPC opponent with no box keeps his game state from his rost
 	assert.equal(night.matchupHead, KICKOFF.kickedOff);
 	assert.equal(night.teamSmall, `${BOX.projFinal} ${BOX.none}`);
 	assert.equal(night.title, BOX.locked);
+});
+
+/** The clubs whose week 6 game is still on at each clock: SF at WSH on Monday night, LV at BUF on the
+ * late Tuesday (its final not held), none after. */
+const STILL_ON = {
+	monday: new Set(['SF', 'WSH']),
+	late: new Set(['LV', 'BUF']),
+	none: new Set<string>()
+};
+
+/** A side's schedule_state read from the recorded week, not the stand-in: by the clubs its roster's
+ * lines meet where FFPC carries the roster, else by the week, kicked off while a club `on` plays. */
+function wantSchedule(rosterId: number, on: ReadonlySet<string>): 'kicked_off' | 'final' {
+	if (FFPC_ROSTERLESS.has(rosterId)) return on.size > 0 ? 'kicked_off' : 'final';
+	const players = week6.matchups.find((m) => m.roster_id === rosterId)?.players ?? [];
+	const plays = players.some((id) => {
+		const facts = week6.lines.get(id)?.facts;
+		return facts?.opponent != null && on.has(facts.opponent);
+	});
+	return plays ? 'kicked_off' : 'final';
+}
+
+void test('B104: every other FFPC game reads by the schedule on the home, each side by its roster or the week (Lane 125)', () => {
+	const clocks = [
+		{ clock: FIXTURE_MONDAY_NIGHT_CLOCK, on: STILL_ON.monday, late: undefined },
+		{ clock: FIXTURE_TUESDAY_CLOCK, on: STILL_ON.late, late: lateFinals('LV,BUF') },
+		{ clock: FIXTURE_TUESDAY_CLOCK, on: STILL_ON.none, late: undefined },
+		{ clock: FIXTURE_STATS_CLOCK, on: STILL_ON.none, late: undefined }
+	];
+	for (const { clock, on, late } of clocks) {
+		const at = `${clock}${late ? ' late' : ''}`;
+		const now = Date.parse(clock);
+		const week = ffpcAt(clock, late);
+		const bugs = bugsOf(week.scoreboard, week.sync, now, ZONE);
+		const others = week.scoreboard.games.filter(
+			(g) => !g.sides.some((s) => s.roster_id === sync.me)
+		);
+		assert.equal(others.length, 5, at);
+		/** Each form a side of the roster rule and of the week's draws. */
+		const forms = new Set<string>();
+		const ruleOf = (rosterId: number): string =>
+			FFPC_ROSTERLESS.has(rosterId) ? 'week' : 'roster';
+		for (const game of others) {
+			const bug = bugs.find((b) =>
+				b.sides.every((s, i) => s.rosterId === game.sides[i]?.roster_id)
+			);
+			assert.ok(bug, at);
+			const states = game.sides.map((side) => {
+				// FFPC lists no starters on either side: no count, no Proj, no Proj final, its total.
+				assert.equal(side.starters, 0, at);
+				assert.equal(side.starters_final, undefined, at);
+				assert.equal(side.projection, null, at);
+				assert.equal(side.projected_final, null, at);
+				assert.equal(side.to_play, null, at);
+				assert.equal(
+					side.schedule_state,
+					wantSchedule(side.roster_id, on),
+					`${at} ${String(side.roster_id)}`
+				);
+				return side.schedule_state;
+			});
+			const final = states.every((s) => s === 'final');
+			assert.equal(game.to_play, null, at);
+			assert.equal(game.next_kickoff, null, at);
+			// The head: Final once both sides are, Kicked off before; the column with it.
+			assert.equal(bug.head, final ? KICKOFF.final : KICKOFF.kickedOff, at);
+			assert.equal(bug.columns.small, final ? BOX.final : BOX.projFinal, at);
+			for (const [i, side] of bug.sides.entries()) {
+				const wire = game.sides[i];
+				assert.ok(wire);
+				const pts = wire.points.toFixed(1);
+				forms.add(`${ruleOf(wire.roster_id)} ${side.final ? 'final' : 'playing'}`);
+				assert.equal(side.final, wire.schedule_state === 'final', at);
+				assert.equal(side.big, pts, at);
+				assert.equal(side.toPlay, '', at);
+				// Final with its total, said Final under a Proj final head; "--" while it plays.
+				const small = final ? pts : side.final ? `${BOX.final} ${pts}` : BOX.none;
+				assert.equal(side.small, small, `${at} ${String(wire.roster_id)}`);
+			}
+		}
+		// Both rules draw on every clock. While a game is on, the roster rule draws a side done and a
+		// side still playing, the week's every side playing; after it, every side final.
+		const want =
+			on.size > 0
+				? ['roster final', 'roster playing', 'week playing']
+				: ['roster final', 'week final'];
+		assert.deepEqual([...forms].sort(), want, at);
+		// The home's footer says the unlisted sides once, by their own sentence, never the starters key:
+		// the member's starters all hold a Proj.
+		assert.equal(bugsUnlisted(bugs), true, at);
+		assert.equal(bugsMissListedFinal(bugs), false, at);
+	}
 });
 
 void test('an answer without schedule_state reads as before: the side follows the head, the home the game (Lane 124)', () => {

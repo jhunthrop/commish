@@ -15,9 +15,11 @@ import (
 // Nil before the game has kicked off (started: any starter of either side
 // past kickoff; the Proj is then the figure), with the score unread, or
 // while a starter still to play has no Proj (fix round 1, MEDIUM-4): a
-// figure that left him out would read low, so none is printed.
+// figure that left him out would read low, so none is printed. Nil for a
+// side listing no starters (FFPC's opponent view, Lane 125): with no
+// starter to project, its points so far would read as its final.
 func projectedFinal(points *float64, starters []apitypes.PlayerLine, started bool) *float64 {
-	if points == nil || !started {
+	if points == nil || !started || len(starters) == 0 {
 		return nil
 	}
 	sum := *points
