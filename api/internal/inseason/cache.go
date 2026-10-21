@@ -60,8 +60,9 @@ type Cache struct {
 	entries map[string]entry
 	// refreshing is each key a refresh is reading behind its kept value,
 	// failed when each key's last refresh failed, refreshes the refreshes
-	// still running (Drain).
+	// still running (Drain), draining set once Drain has begun.
 	refreshing map[string]bool
+	draining   bool
 	failed     map[string]time.Time
 	refreshes  sync.WaitGroup
 }
@@ -234,7 +235,9 @@ func cachedUnless[V any](c *Cache, ctx context.Context, key string, stale func(e
 // value stands, so a read past the TTL tries again after RetryAfter.
 func refreshBehind[V any](c *Cache, key string, read func(context.Context) (V, error)) {
 	c.mu.Lock()
-	if c.refreshing[key] || c.Now().Sub(c.failed[key]) < RetryAfter {
+	// Once shutdown has begun no refresh starts, so Drain never waits on
+	// a refresh added while it waits.
+	if c.draining || c.base().Err() != nil || c.refreshing[key] || c.Now().Sub(c.failed[key]) < RetryAfter {
 		c.mu.Unlock()
 		return
 	}
@@ -263,7 +266,14 @@ func refreshBehind[V any](c *Cache, key string, read func(context.Context) (V, e
 
 // Drain waits for the refreshes still running: main's shutdown, after its
 // context is cancelled, so each ends at once or within its read timeout.
-func (c *Cache) Drain() { c.refreshes.Wait() }
+// From then on no refresh starts (refreshBehind); the kept values still
+// answer.
+func (c *Cache) Drain() {
+	c.mu.Lock()
+	c.draining = true
+	c.mu.Unlock()
+	c.refreshes.Wait()
+}
 
 // base is the context a refresh runs on: Context, else Background.
 func (c *Cache) base() context.Context {

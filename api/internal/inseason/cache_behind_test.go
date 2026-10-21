@@ -101,7 +101,7 @@ func TestCacheServesTheKeptValueDuringARefresh(t *testing.T) {
 		}
 	}
 	close(gate)
-	c.Drain()
+	c.refreshes.Wait()
 	if n := reads.n.Load(); n != 2 {
 		t.Fatalf("%d reads, want the fill and one refresh", n)
 	}
@@ -163,7 +163,7 @@ func TestCacheStartsOneFillAndOneRefresh(t *testing.T) {
 		}
 	}
 	close(gate)
-	c.Drain()
+	c.refreshes.Wait()
 	if n := reads.n.Load(); n != 2 {
 		t.Fatalf("two requests past the TTL started %d refreshes", n-1)
 	}
@@ -258,7 +258,7 @@ func TestANewStatusIsNeverServedUndated(t *testing.T) {
 		}
 	}
 	close(gate)
-	c.Drain()
+	c.refreshes.Wait()
 	d, err := c.DatedDesignations(ctx)
 	got := served(d)
 	if err != nil || got.Status != boards.StatusOut || got.CarriedOver || got.Listed == nil || !got.Listed.Equal(friday.Add(time.Hour)) {
@@ -282,11 +282,11 @@ func TestCacheKeepsTheValueWhenARefreshFails(t *testing.T) {
 	if err != nil || len(d.Lines) != 1 {
 		t.Fatalf("past the TTL with the store down: %+v %v", d, err)
 	}
-	c.Drain()
+	c.refreshes.Wait()
 	if _, err := c.Data(ctx, 2026); err != nil {
 		t.Fatal(err)
 	}
-	c.Drain()
+	c.refreshes.Wait()
 	if n := reads.lines.Load(); n != 2 {
 		t.Fatalf("%d line reads inside RetryAfter, want the fill and one refresh", n)
 	}
@@ -294,7 +294,7 @@ func TestCacheKeepsTheValueWhenARefreshFails(t *testing.T) {
 	if _, err := c.Data(ctx, 2026); err != nil {
 		t.Fatal(err)
 	}
-	c.Drain()
+	c.refreshes.Wait()
 	if n := reads.lines.Load(); n != 3 {
 		t.Fatalf("%d line reads past RetryAfter, want a second refresh", n)
 	}
@@ -313,7 +313,7 @@ func TestARefreshRunsOnTheServersContext(t *testing.T) {
 	done()
 	stopped := make(chan struct{})
 	go func() {
-		c.Drain()
+		c.refreshes.Wait()
 		close(stopped)
 	}()
 	select {
@@ -326,5 +326,37 @@ func TestARefreshRunsOnTheServersContext(t *testing.T) {
 	case <-stopped:
 	case <-time.After(time.Second):
 		t.Fatal("shutdown did not stop the refresh")
+	}
+}
+
+// Once the server's context is done, or Drain has begun, a stale read
+// starts no refresh: shutdown never waits on a refresh added while it
+// waits (review LOW-R1-2), and the kept value still answers.
+func TestNoRefreshStartsOnceShutdownBegins(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		begin func(c *Cache, shutdown context.CancelFunc)
+	}{
+		{"context done", func(_ *Cache, shutdown context.CancelFunc) { shutdown() }},
+		{"draining", func(c *Cache, _ context.CancelFunc) { c.Drain() }},
+	} {
+		reads := &countingReads{}
+		clock := &lockedClock{now: behindNoon}
+		server, shutdown := context.WithCancel(context.Background())
+		c := &Cache{Reads: reads, Now: clock.Now, Context: server}
+		if _, err := c.Data(context.Background(), 2026); err != nil {
+			t.Fatal(err)
+		}
+		tc.begin(c, shutdown)
+		clock.add(SeasonTTL + time.Second)
+		d, err := c.Data(context.Background(), 2026)
+		if err != nil || len(d.Lines) != 1 {
+			t.Fatalf("%s: %+v %v, want the kept value", tc.name, d, err)
+		}
+		c.refreshes.Wait()
+		if n := reads.lines.Load(); n != 1 {
+			t.Fatalf("%s: %d line reads, want no refresh", tc.name, n)
+		}
+		shutdown()
 	}
 }
