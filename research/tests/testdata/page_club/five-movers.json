@@ -1,0 +1,357 @@
+{
+ "about": "The five pages Lane 119 named (run 2026-10-21T05), as the dev store recorded them: each player's seeded roster club (provider_players.team), the provider's club on its newest recorded depth chart read (providerReadAt), and his 2026 game lines through week 5 (player_week_teams, player_week_observations: nflverse_player_week and nflverse_snap_counts). Read 2026-10-21, Lane 120.",
+ "providerReadAt": "2026-10-14T02:31:22.094000+00:00",
+ "through": 5,
+ "players": [
+  {
+   "id": "4426535",
+   "name": "Theo Wease Jr.",
+   "position": "WR",
+   "seed": "MIA",
+   "providerClub": "LAC",
+   "providerSeenAt": "2026-10-14T02:31:22.094000+00:00",
+   "clubs": {
+    "5": "LAC"
+   },
+   "lines": {
+    "5": {
+     "carries": 0.0,
+     "completions": 0.0,
+     "defensive_interceptions": 0.0,
+     "defensive_touchdowns": 0.0,
+     "extra_points_made": 0.0,
+     "field_goals_made": 0.0,
+     "fumbles_lost": 0.0,
+     "interceptions": 0.0,
+     "pass_attempts": 0.0,
+     "passing_touchdowns": 0.0,
+     "passing_yards": 0.0,
+     "receiving_touchdowns": 0.0,
+     "receiving_yards": 16.0,
+     "receptions": 1.0,
+     "rushing_touchdowns": 0.0,
+     "rushing_yards": 0.0,
+     "sacks": 0.0,
+     "targets": 1.0,
+     "team_carries": 34.0,
+     "team_pass_attempts": 24.0,
+     "team_targets": 21.0
+    }
+   },
+   "snaps": {
+    "5": {
+     "offensive_snaps": 43.0,
+     "team_offensive_snaps": 67.0
+    }
+   }
+  },
+  {
+   "id": "4037235",
+   "name": "Greg Dortch",
+   "position": "WR",
+   "seed": "DET",
+   "providerClub": "BUF",
+   "providerSeenAt": "2026-10-14T02:31:22.094000+00:00",
+   "clubs": {
+    "1": "BUF",
+    "2": "BUF",
+    "3": "BUF",
+    "4": "BUF",
+    "5": "BUF"
+   },
+   "lines": {
+    "1": {
+     "carries": 0.0,
+     "completions": 0.0,
+     "defensive_interceptions": 0.0,
+     "defensive_touchdowns": 0.0,
+     "extra_points_made": 0.0,
+     "field_goals_made": 0.0,
+     "fumbles_lost": 0.0,
+     "interceptions": 0.0,
+     "pass_attempts": 0.0,
+     "passing_touchdowns": 0.0,
+     "passing_yards": 0.0,
+     "receiving_touchdowns": 0.0,
+     "receiving_yards": 0.0,
+     "receptions": 0.0,
+     "rushing_touchdowns": 0.0,
+     "rushing_yards": 0.0,
+     "sacks": 0.0,
+     "targets": 0.0,
+     "team_carries": 21.0,
+     "team_pass_attempts": 29.0,
+     "team_targets": 28.0
+    },
+    "2": {
+     "carries": 0.0,
+     "completions": 0.0,
+     "defensive_interceptions": 0.0,
+     "defensive_touchdowns": 0.0,
+     "extra_points_made": 0.0,
+     "field_goals_made": 0.0,
+     "fumbles_lost": 0.0,
+     "interceptions": 0.0,
+     "pass_attempts": 0.0,
+     "passing_touchdowns": 0.0,
+     "passing_yards": 0.0,
+     "receiving_touchdowns": 0.0,
+     "receiving_yards": 0.0,
+     "receptions": 0.0,
+     "rushing_touchdowns": 0.0,
+     "rushing_yards": 0.0,
+     "sacks": 0.0,
+     "targets": 0.0,
+     "team_carries": 36.0,
+     "team_pass_attempts": 31.0,
+     "team_targets": 28.0
+    },
+    "3": {
+     "carries": 0.0,
+     "completions": 0.0,
+     "defensive_interceptions": 0.0,
+     "defensive_touchdowns": 0.0,
+     "extra_points_made": 0.0,
+     "field_goals_made": 0.0,
+     "fumbles_lost": 0.0,
+     "interceptions": 0.0,
+     "pass_attempts": 0.0,
+     "passing_touchdowns": 0.0,
+     "passing_yards": 0.0,
+     "receiving_touchdowns": 0.0,
+     "receiving_yards": 0.0,
+     "receptions": 0.0,
+     "rushing_touchdowns": 0.0,
+     "rushing_yards": 0.0,
+     "sacks": 0.0,
+     "targets": 0.0,
+     "team_carries": 33.0,
+     "team_pass_attempts": 26.0,
+     "team_targets": 26.0
+    },
+    "4": {
+     "carries": 0.0,
+     "completions": 0.0,
+     "defensive_interceptions": 0.0,
+     "defensive_touchdowns": 0.0,
+     "extra_points_made": 0.0,
+     "field_goals_made": 0.0,
+     "fumbles_lost": 0.0,
+     "interceptions": 0.0,
+     "pass_attempts": 0.0,
+     "passing_touchdowns": 0.0,
+     "passing_yards": 0.0,
+     "receiving_touchdowns": 0.0,
+     "receiving_yards": 0.0,
+     "receptions": 0.0,
+     "rushing_touchdowns": 0.0,
+     "rushing_yards": 0.0,
+     "sacks": 0.0,
+     "targets": 0.0,
+     "team_carries": 20.0,
+     "team_pass_attempts": 33.0,
+     "team_targets": 30.0
+    },
+    "5": {
+     "carries": 0.0,
+     "completions": 0.0,
+     "defensive_interceptions": 0.0,
+     "defensive_touchdowns": 0.0,
+     "extra_points_made": 0.0,
+     "field_goals_made": 0.0,
+     "fumbles_lost": 0.0,
+     "interceptions": 0.0,
+     "pass_attempts": 0.0,
+     "passing_touchdowns": 0.0,
+     "passing_yards": 0.0,
+     "receiving_touchdowns": 0.0,
+     "receiving_yards": 0.0,
+     "receptions": 0.0,
+     "rushing_touchdowns": 0.0,
+     "rushing_yards": 0.0,
+     "sacks": 0.0,
+     "targets": 0.0,
+     "team_carries": 37.0,
+     "team_pass_attempts": 19.0,
+     "team_targets": 18.0
+    }
+   },
+   "snaps": {
+    "1": {
+     "offensive_snaps": 0.0,
+     "team_offensive_snaps": 58.0
+    },
+    "2": {
+     "offensive_snaps": 4.0,
+     "team_offensive_snaps": 74.0
+    },
+    "3": {
+     "offensive_snaps": 5.0,
+     "team_offensive_snaps": 66.0
+    },
+    "4": {
+     "offensive_snaps": 2.0,
+     "team_offensive_snaps": 59.0
+    },
+    "5": {
+     "offensive_snaps": 0.0,
+     "team_offensive_snaps": 64.0
+    }
+   }
+  },
+  {
+   "id": "4433970",
+   "name": "J.J. McCarthy",
+   "position": "QB",
+   "seed": "MIN",
+   "providerClub": "NYG",
+   "providerSeenAt": "2026-10-14T02:31:22.094000+00:00",
+   "clubs": {
+    "5": "NYG"
+   },
+   "lines": {
+    "5": {
+     "carries": 2.0,
+     "completions": 0.0,
+     "defensive_interceptions": 0.0,
+     "defensive_touchdowns": 0.0,
+     "extra_points_made": 0.0,
+     "field_goals_made": 0.0,
+     "fumbles_lost": 0.0,
+     "interceptions": 0.0,
+     "pass_attempts": 0.0,
+     "passing_touchdowns": 0.0,
+     "passing_yards": 0.0,
+     "receiving_touchdowns": 0.0,
+     "receiving_yards": 0.0,
+     "receptions": 0.0,
+     "rushing_touchdowns": 0.0,
+     "rushing_yards": 2.0,
+     "sacks": 0.0,
+     "targets": 0.0,
+     "team_carries": 28.0,
+     "team_pass_attempts": 54.0,
+     "team_targets": 52.0
+    }
+   },
+   "snaps": {
+    "5": {
+     "offensive_snaps": 5.0,
+     "team_offensive_snaps": 89.0
+    }
+   }
+  },
+  {
+   "id": "4257364",
+   "name": "Zavier Scott",
+   "position": "RB",
+   "seed": "MIN",
+   "providerClub": "CHI",
+   "providerSeenAt": "2026-10-13T11:55:20.118000+00:00",
+   "clubs": {
+    "5": "CHI"
+   },
+   "lines": {
+    "5": {
+     "carries": 0.0,
+     "completions": 0.0,
+     "defensive_interceptions": 0.0,
+     "defensive_touchdowns": 0.0,
+     "extra_points_made": 0.0,
+     "field_goals_made": 0.0,
+     "fumbles_lost": 0.0,
+     "interceptions": 0.0,
+     "pass_attempts": 0.0,
+     "passing_touchdowns": 0.0,
+     "passing_yards": 0.0,
+     "receiving_touchdowns": 0.0,
+     "receiving_yards": 0.0,
+     "receptions": 0.0,
+     "rushing_touchdowns": 0.0,
+     "rushing_yards": 0.0,
+     "sacks": 0.0,
+     "targets": 0.0,
+     "team_carries": 24.0,
+     "team_pass_attempts": 40.0,
+     "team_targets": 40.0
+    }
+   },
+   "snaps": {
+    "5": {
+     "offensive_snaps": 0.0,
+     "team_offensive_snaps": 69.0
+    }
+   }
+  },
+  {
+   "id": "4257188",
+   "name": "Charlie Jones",
+   "position": "WR",
+   "seed": "CIN",
+   "providerClub": "NYG",
+   "providerSeenAt": "2026-10-14T02:31:22.094000+00:00",
+   "clubs": {
+    "4": "NYG",
+    "5": "NYG"
+   },
+   "lines": {
+    "4": {
+     "carries": 0.0,
+     "completions": 0.0,
+     "defensive_interceptions": 0.0,
+     "defensive_touchdowns": 0.0,
+     "extra_points_made": 0.0,
+     "field_goals_made": 0.0,
+     "fumbles_lost": 0.0,
+     "interceptions": 0.0,
+     "pass_attempts": 0.0,
+     "passing_touchdowns": 0.0,
+     "passing_yards": 0.0,
+     "receiving_touchdowns": 0.0,
+     "receiving_yards": 0.0,
+     "receptions": 0.0,
+     "rushing_touchdowns": 0.0,
+     "rushing_yards": 0.0,
+     "sacks": 0.0,
+     "targets": 0.0,
+     "team_carries": 28.0,
+     "team_pass_attempts": 29.0,
+     "team_targets": 29.0
+    },
+    "5": {
+     "carries": 0.0,
+     "completions": 0.0,
+     "defensive_interceptions": 0.0,
+     "defensive_touchdowns": 0.0,
+     "extra_points_made": 0.0,
+     "field_goals_made": 0.0,
+     "fumbles_lost": 0.0,
+     "interceptions": 0.0,
+     "pass_attempts": 0.0,
+     "passing_touchdowns": 0.0,
+     "passing_yards": 0.0,
+     "receiving_touchdowns": 0.0,
+     "receiving_yards": 0.0,
+     "receptions": 0.0,
+     "rushing_touchdowns": 0.0,
+     "rushing_yards": 0.0,
+     "sacks": 0.0,
+     "targets": 0.0,
+     "team_carries": 28.0,
+     "team_pass_attempts": 54.0,
+     "team_targets": 52.0
+    }
+   },
+   "snaps": {
+    "4": {
+     "offensive_snaps": 1.0,
+     "team_offensive_snaps": 67.0
+    },
+    "5": {
+     "offensive_snaps": 0.0,
+     "team_offensive_snaps": 89.0
+    }
+   }
+  }
+ ]
+}

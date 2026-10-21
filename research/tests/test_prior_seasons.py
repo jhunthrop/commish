@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import Connection
 
 from research.nightly.build import player_season
+from research.nightly.build.page_club import NO_ROSTER_READ
 from research.nightly.build.player_season import (
     PRIOR_SEASONS,
     SeasonContext,
@@ -63,6 +64,8 @@ def test_only_the_page_path_reads_the_seasons_before(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(player_season, "read_season_store", store)
     monkeypatch.setattr(schedule_read, "slates_by_club", lambda _conn, _season: {"KC": [Game(1, "BUF", True, NOW)]})
     monkeypatch.setattr(schedule_read, "clubs_of", lambda _games: [])
+    monkeypatch.setattr(player_season, "seeded_clubs", lambda _conn, _ids: {"p1": "KC"})
+    monkeypatch.setattr(player_season, "read_roster", lambda _conn, _as_of: NO_ROSTER_READ)
     conn = Connection.__new__(Connection)
     writers = player_season.season_context(conn, 2026, ["p1"], NOW)
     assert (writers.prior, read) == ({}, [2026])

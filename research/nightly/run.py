@@ -141,6 +141,7 @@ def _judge(deps: RunDeps, assembled: Assembled, steps: list[StepOutcome], draft:
         gates.capsule_gate(capsule.capsule_gate, capsule.page_reasons),
         gates.adp_gate(assembled.formats, files["adp.json"]),
         gates.basis_gate(draft, files["adp.json"], files["record.json"], files["schedule.json"]),
+        gates.club_gate([files[f"players/{who.id}.json"] for who in assembled.people]),
     ]
     return Judged(records, scores)
 
