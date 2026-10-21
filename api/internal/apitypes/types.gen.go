@@ -4475,9 +4475,6 @@ type WaiverDrop struct {
 	// HostId the dropped player's host id, a line in the answer's roster
 	HostId string `json:"host_id"`
 
-	// SeasonStarter the rest-of-season lineup the gain is measured on starts him, before the add (Lane 108, B81): the Beats cell of the strip's move reads Starter or Bench by it
-	SeasonStarter bool `json:"season_starter"`
-
 	// StartsThisWeek the lineup the Lineup screen sets this week starts him; the panel marks him, and the row's own drop is one only when the lineup stays full with the add in it (Lane 66u)
 	StartsThisWeek bool `json:"starts_this_week"`
 

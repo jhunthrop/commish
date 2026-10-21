@@ -256,6 +256,7 @@ func (r waiverRun) strip(moves []Waiver) []apitypes.WaiverRow {
 // sentence all on that base.
 func cardRows(w *Writer, config []draft.SlotConfig, hostStarters []string, mine, pool []person, moves []Waiver, clears map[string]openapi_types.Date) []apitypes.WaiverRow {
 	out := make([]apitypes.WaiverRow, 0, len(moves))
+	places := seasonPlacesOf(moves, mine)
 	cum := mine
 	for _, m := range moves {
 		week := newPickupWeek(config, candidates(cum), hostStarters)
@@ -263,7 +264,7 @@ func cardRows(w *Writer, config []draft.SlotConfig, hostStarters []string, mine,
 		row := waiverRow(w, week, cum, pool[m.Add], move, clears)
 		row.Pickup = true
 		// The banner's move names the player it drops (B14).
-		row.Beats = dropBeats(row)
+		row.Beats = dropBeats(row, places)
 		out = append(out, row)
 		cum = afterCard(cum, move.Drop, pool[m.Add])
 	}

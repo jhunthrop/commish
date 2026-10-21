@@ -828,6 +828,8 @@ func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.Waive
 		return apitypes.WaiverAdvice{}, false
 	}
 	shown := pageMoves(run.moves, run.pool, asked, MaxWaiverRows)
+	// Each drop's place in the rest-of-season lineup, for the strip's Beats (B81).
+	places := seasonPlacesOf(run.moves, run.mine)
 	// The strip is chosen from every add we rank, before the rows' cut.
 	strip, proj := run.stripMoves()
 	order, ok := a.pageOrder(run, position, asked, run.orderOf(shown, strip))
@@ -845,20 +847,20 @@ func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.Waive
 	}
 	if order == seasonOrder {
 		// The rule says the week the page addresses (Lane 95), the turned one too.
-		out = inSeasonOrder(out, shown)
+		out = inSeasonOrder(out, shown, places)
 		out.Basis = SeasonOrderWords(a.week)
 		return out, true
 	}
 	if out.ProjectionReadAt == nil {
 		// No published projection for the week yet (Lane 95): no Proj to
 		// order the week by, so the page takes the season Gain order.
-		out = inSeasonOrder(out, shown)
+		out = inSeasonOrder(out, shown, places)
 		out.Basis = UnprojectedOrderWords(a.week)
 		return out, true
 	}
 	out.Pickups = run.strip(strip)
 	// A row the strip offers names its own drop in Beats (B14).
-	out.Rows = offered(out.Rows, out.Pickups)
+	out.Rows = offered(out.Rows, out.Pickups, places)
 	if out.ProjectionReadAt != nil {
 		base := run.week.base.proj
 		out.LineupProj, out.PickupsProj = &base, &proj
@@ -943,7 +945,7 @@ func waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiv
 	for _, d := range move.Drops {
 		weekGain, _, _ := week.with(add.cand, d.At)
 		row.Drops = append(row.Drops, apitypes.WaiverDrop{HostId: mine[d.At].cand.ID, Gain: roundTenth(d.Gain), WeekGain: &weekGain,
-			StartsThisWeek: d.StartsThisWeek, SeasonStarter: d.SeasonStarter})
+			StartsThisWeek: d.StartsThisWeek})
 	}
 	row.Pickup = !move.NoDrop && isPickup(row)
 	if day, ok := clears[add.cand.ID]; ok {

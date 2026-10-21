@@ -11,6 +11,7 @@ import type { components } from '../../src/lib/api/types.ts';
 import type { LineupAdvice, WaiverAdvice, WaiverRow } from '../../src/lib/league/inseason/api.ts';
 import { addKey } from '../../src/lib/league/inseason/move.ts';
 import { roundTenth } from './tenths.ts';
+import { seasonStarters } from './week.ts';
 
 type PlayerLine = components['schemas']['PlayerLine'];
 type Beats = NonNullable<WaiverRow['beats']>;
@@ -75,14 +76,13 @@ function byeOf(line: PlayerLine): { bye?: true } {
 
 /** The offered move's Beats: the player it drops, labelled by his rest-of-season place (waiver_beats.go
  * dropBeats, Lane 108, B81). */
-function dropBeats(row: WaiverRow): WaiverRow['beats'] {
+function dropBeats(row: WaiverRow, places: ReadonlySet<string>): WaiverRow['beats'] {
 	const { drop } = row;
 	if (drop === null) return row.beats;
-	const starter = row.drops.some((d) => d.host_id === drop.player.host_id && d.season_starter);
 	return {
 		host_id: drop.player.host_id,
 		name: drop.player.name,
-		starter,
+		starter: places.has(drop.player.host_id),
 		...byeOf(drop),
 		gain: row.week_gain,
 		open_spot: false
@@ -93,8 +93,15 @@ function dropBeats(row: WaiverRow): WaiverRow['beats'] {
 export function restatedBeats(answer: WaiverAdvice, lineup: LineupAdvice): WaiverAdvice {
 	const season = answer.pickup_order === 'season_gain';
 	const cards = new Set(answer.pickups.map(addKey));
+	// The rest-of-season lineup's starters, as the API's search reads them (seasonPlacesOf).
+	const places = new Set(
+		seasonStarters(
+			answer.roster,
+			lineup.slots.map((s) => s.slot)
+		).map((l) => l.player.host_id)
+	);
 	const restate = (row: WaiverRow): WaiverRow => {
-		if (cards.has(addKey(row))) return { ...row, beats: dropBeats(row) };
+		if (cards.has(addKey(row))) return { ...row, beats: dropBeats(row, places) };
 		return { ...row, beats: displaced(row, lineup, season) };
 	};
 	return { ...answer, rows: answer.rows.map(restate), pickups: answer.pickups.map(restate) };

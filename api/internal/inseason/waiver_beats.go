@@ -34,18 +34,32 @@ func replacedBeats(add person, mine []person, r Replaced) *apitypes.WaiverBeats 
 // that move drops, his place in the rest-of-season lineup (Lane 108,
 // B81), his bye in the week addressed, and the move's week gain (null
 // where the row's is). A move with no drop keeps the row's own Beats.
-func dropBeats(row apitypes.WaiverRow) *apitypes.WaiverBeats {
+func dropBeats(row apitypes.WaiverRow, places seasonPlaces) *apitypes.WaiverBeats {
 	if row.Drop == nil {
 		return row.Beats
 	}
-	starter := false
-	for _, d := range row.Drops {
-		if d.HostId == row.Drop.Player.HostId {
-			starter = d.SeasonStarter
+	id := row.Drop.Player.HostId
+	return &apitypes.WaiverBeats{HostId: id, Name: row.Drop.Player.Name, Starter: places[id],
+		Bye: byeOf(*row.Drop), Gain: row.WeekGain}
+}
+
+// seasonPlaces is whether the rest-of-season lineup the Gain is measured
+// on starts each player of the member's, by host id (Lane 108, B81): the
+// strip's Beats labels its drop by it. Server-side only, never on the wire.
+type seasonPlaces map[string]bool
+
+// seasonPlacesOf is the places the searched moves' drops carry (every
+// move's own drop is among its Drops), mine their squad.
+func seasonPlacesOf(moves []Waiver, mine []person) seasonPlaces {
+	out := seasonPlaces{}
+	for _, m := range moves {
+		for _, d := range m.Drops {
+			if d.At >= 0 && d.At < len(mine) {
+				out[mine[d.At].cand.ID] = d.SeasonStarter
+			}
 		}
 	}
-	return &apitypes.WaiverBeats{HostId: row.Drop.Player.HostId, Name: row.Drop.Player.Name, Starter: starter,
-		Bye: byeOf(*row.Drop), Gain: row.WeekGain}
+	return out
 }
 
 // byeOf is the Beats cell's bye: true on his bye in the week the line
@@ -60,7 +74,7 @@ func byeOf(line apitypes.PlayerLine) *bool {
 
 // offered is the rows with the strip's adds naming their own drop in
 // Beats (B14): the card a row is for is the move the banner offers.
-func offered(rows, cards []apitypes.WaiverRow) []apitypes.WaiverRow {
+func offered(rows, cards []apitypes.WaiverRow, places seasonPlaces) []apitypes.WaiverRow {
 	on := make(map[string]bool, len(cards))
 	for _, c := range cards {
 		on[c.Add.Player.HostId+"|"+boardIDOf(c.Add)] = true
@@ -68,7 +82,7 @@ func offered(rows, cards []apitypes.WaiverRow) []apitypes.WaiverRow {
 	out := make([]apitypes.WaiverRow, len(rows))
 	for i, r := range rows {
 		if on[r.Add.Player.HostId+"|"+boardIDOf(r.Add)] {
-			r.Beats = dropBeats(r)
+			r.Beats = dropBeats(r, places)
 		}
 		out[i] = r
 	}

@@ -121,15 +121,13 @@ const row = (add: PlayerLine, over: Partial<WaiverRow> = {}): WaiverRow => ({
 			host_id: lemon.player.host_id,
 			gain: 1.2,
 			week_gain: 6.7,
-			starts_this_week: false,
-			season_starter: false
+			starts_this_week: false
 		},
 		{
 			host_id: vidal.player.host_id,
 			gain: 0.6,
 			week_gain: 6.7,
-			starts_this_week: true,
-			season_starter: true
+			starts_this_week: true
 		}
 	],
 	clears: null,
@@ -154,8 +152,7 @@ const chiefs = row(line('Chiefs D/ST', 'DEF', 9.6, 7), {
 			host_id: saints.player.host_id,
 			gain: 0.3,
 			week_gain: 2.7,
-			starts_this_week: true,
-			season_starter: true
+			starts_this_week: true
 		}
 	]
 });
@@ -594,8 +591,7 @@ void test('a card whose drop is on injured reserve on the bench says so (B34)', 
 				host_id: 'Jordan Mason',
 				gain: 2,
 				week_gain: null,
-				starts_this_week: false,
-				season_starter: false
+				starts_this_week: false
 			}
 		]
 	});
@@ -623,8 +619,7 @@ void test('a card whose drop is on injured reserve on the bench says so (B34)', 
 					host_id: 'Jordan Mason',
 					gain: 1,
 					week_gain: null,
-					starts_this_week: true,
-					season_starter: true
+					starts_this_week: true
 				}
 			]
 		}),

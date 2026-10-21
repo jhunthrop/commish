@@ -38,7 +38,7 @@ func (r waiverRun) orderOf(shown, strip []Waiver) apitypes.WaiverAdvicePickupOrd
 // figure withheld, the strip the first row worth making (a Gain above zero,
 // into an open roster spot or with its own drop by the one drop rule), the
 // week's Proj sums held and the basis the order's.
-func inSeasonOrder(out apitypes.WaiverAdvice, moves []Waiver) apitypes.WaiverAdvice {
+func inSeasonOrder(out apitypes.WaiverAdvice, moves []Waiver, places seasonPlaces) apitypes.WaiverAdvice {
 	at := indexes(len(out.Rows))
 	sort.SliceStable(at, func(i, j int) bool { return out.Rows[at[i]].Gain > out.Rows[at[j]].Gain })
 	rows := make([]apitypes.WaiverRow, len(at))
@@ -51,7 +51,7 @@ func inSeasonOrder(out apitypes.WaiverAdvice, moves []Waiver) apitypes.WaiverAdv
 		rows[k].Pickup = k == first
 		if k == first {
 			// The banner's move names the player it drops (B14).
-			rows[k].Beats = dropBeats(rows[k])
+			rows[k].Beats = dropBeats(rows[k], places)
 		}
 	}
 	out.Rows, out.Pickups = rows, []apitypes.WaiverRow{}
