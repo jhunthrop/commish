@@ -19,9 +19,11 @@ import {
 	AS_OF_KICKOFF,
 	leagueScoringWords,
 	finalNonePart,
+	NONE_UNLISTED,
 	projFinalWords,
 	unlistedPart,
-	teBonusSentence
+	teBonusSentence,
+	type UnlistedDrawn
 } from '../box/basis.ts';
 
 type ScoreboardGame = Scoreboard['games'][number];
@@ -109,8 +111,11 @@ export interface BugSide {
 	 * game's state): its figure reads Final, the Team row's and the Matchup bug's one predicate. */
 	final: boolean;
 	/** The platform lists the side no starters (the API's schedule_state, Lane 124): its state is the
-	 * schedule's and it draws no Proj or Proj final, said once by unlistedPart (Lane 125, B104). */
+	 * schedule's and it draws no Proj final, said once by unlistedPart (Lane 125, B104). */
 	unlisted: boolean;
+	/** Its Proj is our best lineup from its roster (the API's projection_best_lineup, Lane 127, B105),
+	 * false from an older answer, which sends none. */
+	bestLineup: boolean;
 	/** The big figure (Lane 92, B22): its Proj before the first kickoff, its Pts from it. */
 	big: string;
 	/** "3 to play", "2 playing" while the game is under way (the API's to_play), else empty. */
@@ -300,6 +305,7 @@ export function bugsOf(
 					me: side.roster_id === sync.me,
 					final,
 					unlisted: side.schedule_state !== undefined,
+					bestLineup: side.projection_best_lineup === true,
 					...sideFigures(side, head.state, final, columns.small === BOX.final),
 					toPlay: head.state === 'kicked_off' ? (side.to_play ?? '') : '',
 					stands: standsOf(game, side, started)
@@ -334,17 +340,36 @@ export function bugsMissFinal(bugs: readonly Bug[]): boolean {
 	);
 }
 
-/** Whether a side the platform lists starters for draws a Proj final "--" (bugsMissFinal): on the
- * League page a side it lists none for has its own sentence (unlistedPart, Lane 125). */
-export function bugsMissListedFinal(bugs: readonly Bug[]): boolean {
-	return bugsMissFinal(bugs.map((b) => ({ ...b, sides: b.sides.filter((s) => !s.unlisted) })));
+/** The bugs with only the sides the platform lists starters for: a side it lists none for draws its
+ * own figures, said by unlistedPart (Lane 125), never by the starters' keys. */
+function listedOnly(bugs: readonly Bug[]): Bug[] {
+	return bugs.map((b) => ({ ...b, sides: b.sides.filter((s) => !s.unlisted) }));
 }
 
-/** Whether any bug draws a side the platform lists no starters for (Lane 125, B104). */
-export function bugsUnlisted(
-	bugs: readonly { sides: readonly Pick<BugSide, 'unlisted'>[] }[]
-): boolean {
-	return bugs.some((b) => b.sides.some((s) => s.unlisted));
+/** Whether a side the platform lists starters for draws a Proj final "--" (bugsMissFinal), on the
+ * League page and the front door alike. */
+export function bugsMissListedFinal(bugs: readonly Bug[]): boolean {
+	return bugsMissFinal(listedOnly(bugs));
+}
+
+/** Whether a side the platform lists starters for still draws a Proj final (bugsPlaying): what it
+ * adds is said only then (Lane 127: an unlisted side's "--" is unlistedPart's). */
+export function bugsPlayingListed(bugs: readonly Bug[]): boolean {
+	return bugsPlaying(listedOnly(bugs));
+}
+
+/** What the sides the platform lists no starters for draw (Lane 125, B104; Lane 127, B105), by the
+ * bug's own state at the page's clock: before kickoff a Proj from the roster's best lineup or "--"
+ * with no roster, once under way "--" under Proj final until the side is final. */
+export function unlistedDrawn(bugs: readonly Bug[]): UnlistedDrawn {
+	const drawn = bugs.flatMap((b) =>
+		b.sides.filter((s) => s.unlisted).map((s) => ({ upcoming: b.state === 'upcoming', s }))
+	);
+	return {
+		bestLineup: drawn.some(({ upcoming, s }) => upcoming && s.bestLineup && s.big !== BOX.none),
+		noProj: drawn.some(({ upcoming, s }) => upcoming && s.big === BOX.none),
+		noProjFinal: drawn.some(({ upcoming, s }) => !upcoming && !s.final && s.small === BOX.none)
+	};
 }
 
 // ---- the drafter's lineup
@@ -908,8 +933,8 @@ export function teamBasis(
 	projFinal = started,
 	/** A final side draws "--" for its total (bugsFinalNone): why is said. */
 	finalNone = false,
-	/** A side the platform lists no starters for is on the board (bugsUnlisted): what it draws is said. */
-	unlisted = false
+	/** What the sides the platform lists no starters for draw (unlistedDrawn): each said once. */
+	unlisted: UnlistedDrawn = NONE_UNLISTED
 ): string {
 	const platform = hostWords(host);
 	const team = byPlayer ? `, ${BOX.totals} adds the rows` : '';
@@ -922,7 +947,7 @@ export function teamBasis(
 	const words = [
 		projFinalWords(projFinal, missing),
 		finalNone ? finalNonePart(host) : '',
-		unlisted ? unlistedPart(host, started) : ''
+		unlistedPart(host, unlisted)
 	]
 		.filter((w) => w !== '')
 		.join(' ');

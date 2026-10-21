@@ -70,14 +70,45 @@ export function finalNonePart(host: LeagueHost): string {
 	return `A ${BOX.final} of ${BOX.none} is a score ${hostWords(host)} does not send us.`;
 }
 
-/** A team its platform sends no lineup for (every side of FFPC's scoreboard but the member's, Lane
- * 125, B104): no starters, so no Proj before kickoff, no Proj final from it, and its Final by its
- * clubs' games (the API's schedule_state). Said once where one is on the board. */
-export function unlistedPart(host: LeagueHost, started: boolean): string {
-	const teams = `Teams ${hostWords(host)} sends no lineup for`;
-	return started
-		? `${teams} have no ${BOX.projFinal} and read ${BOX.final} by their clubs' schedules.`
-		: `${teams} have no ${BOX.proj}.`;
+/** What the teams a platform sends no lineup for draw on a board (every side of FFPC's scoreboard but
+ * the member's, Lane 125, B104; Lane 127, B105), each said once where it is drawn. */
+export interface UnlistedDrawn {
+	/** A side's Proj is our best lineup from its roster (the API's projection_best_lineup). */
+	bestLineup: boolean;
+	/** A side draws "--" under Proj: the platform sends us no roster to draw a lineup from. */
+	noProj: boolean;
+	/** A side of a game under way draws "--" under Proj final, its Final by its clubs' games. */
+	noProjFinal: boolean;
+}
+
+export const NONE_UNLISTED: UnlistedDrawn = {
+	bestLineup: false,
+	noProj: false,
+	noProjFinal: false
+};
+
+/** The words for the teams a platform sends no lineup for (Lane 125, B104; Lane 127, B105): each
+ * figure they draw said once, never a Proj final's absence where a Proj is what is drawn. The first
+ * sentence names the teams, the rest go on from it; empty with none drawn. */
+export function unlistedPart(host: LeagueHost, drawn: UnlistedDrawn): string {
+	const platform = hostWords(host);
+	const teams = `teams ${platform} sends no lineup for`;
+	const parts: string[] = [];
+	if (drawn.bestLineup)
+		parts.push(`${BOX.proj} for ${teams} is our best lineup from their rosters.`);
+	if (drawn.noProjFinal)
+		parts.push(
+			parts.length > 0
+				? `Under way they have no ${BOX.projFinal}.`
+				: `${sentenceStart(teams)} have no ${BOX.projFinal}.`
+		);
+	if (drawn.noProj)
+		parts.push(
+			parts.length > 0
+				? `Those ${platform} sends no roster for have no ${BOX.proj}.`
+				: `${sentenceStart(teams)} have no ${BOX.proj}.`
+		);
+	return parts.join(' ');
 }
 
 /** The Proj final's sentences: what it is once a game has kicked off, and why one is "--" where one

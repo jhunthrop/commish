@@ -8,6 +8,15 @@ import type { BrowserContext } from 'playwright';
  * it too (Lane 77). */
 export const FIXTURE_WEEK_CLOCK = '2026-10-17T17:00:00.000Z';
 
+/** Thursday Oct 15 2026, 9:00 pm Central (Lane 127, B105): week 6's Thursday game under way, every
+ * Sunday game still to come. STAND-IN: the recorded projection and game facts were read Friday evening,
+ * so their stamps are later than this clock. */
+export const FIXTURE_THURSDAY_NIGHT_CLOCK = '2026-10-16T02:00:00.000Z';
+
+/** Friday Oct 16 2026, noon Central (Lane 127, B105): the Thursday game final, Sunday's still to come.
+ * STAND-IN: the recorded reads' stamps are that evening's. */
+export const FIXTURE_FRIDAY_CLOCK = '2026-10-16T17:00:00.000Z';
+
 /** Tuesday Oct 13 2026, noon Central: week 6 before its projection and its game facts are read, every
  * game still to be played (Lane 66w's honest empty state). */
 export const FIXTURE_UNREAD_CLOCK = '2026-10-13T17:00:00.000Z';

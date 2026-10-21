@@ -15,9 +15,10 @@ import {
 	bugsFinalNone,
 	bugsMissFinal,
 	bugsMissListedFinal,
-	bugsUnlisted,
 	bugsOf,
 	bugsPlaying,
+	bugsPlayingListed,
+	unlistedDrawn,
 	sideFinal,
 	projectedFinalOf,
 	readCell,
@@ -301,28 +302,105 @@ void test('a side FFPC lists no starters for is said once by its own sentence, n
 			[true, true, `${BOX.final} 71.4`]
 		]
 	);
-	assert.equal(bugsUnlisted(bugs), true);
-	// The "--" is the unlisted side's: the starters key stays unsaid, the League page's own sentence
-	// says it (the front door's one bug keeps bugsMissFinal).
+	assert.deepEqual(unlistedDrawn(bugs), { bestLineup: false, noProj: false, noProjFinal: true });
+	// The "--" is the unlisted side's: the starters keys stay unsaid, the sides' own sentence says it,
+	// on the League page and the front door alike (Lane 127).
 	assert.equal(bugsMissFinal(bugs), true);
 	assert.equal(bugsMissListedFinal(bugs), false);
+	assert.equal(bugsPlayingListed(bugs), false);
 	const scoring = { format: 'ppr', league_own: false, te_bonus: 0.5 } as const;
 	const read = '2026-10-17T02:00:00.000Z';
-	const said = teamBasis('ffpc', read, scoring, false, ZONE, true, false, true, false, true);
+	const said = teamBasis(
+		'ffpc',
+		read,
+		scoring,
+		false,
+		ZONE,
+		true,
+		false,
+		false,
+		false,
+		unlistedDrawn(bugs)
+	);
 	assert.match(
 		said,
-		/ Teams FFPC sends no lineup for have no Proj final and read Final by their clubs' schedules\.$/
+		/ Teams FFPC sends no lineup for have no Proj final\.$/
 	);
-	assert.doesNotMatch(said, /No Proj final while/);
+	assert.doesNotMatch(said, /No Proj final while|Proj final adds/);
 	assert.doesNotMatch(said, BANNED);
 	assert.equal(said.split('FFPC sends no lineup').length, 2, 'said once');
-	// Before kickoff the side draws no Proj: that is what is said.
+	// Before kickoff a side with no roster draws no Proj: that is what is said.
+	const none = { bestLineup: false, noProj: true, noProjFinal: false };
 	assert.match(
-		teamBasis('ffpc', read, scoring, false, ZONE, false, false, false, false, true),
+		teamBasis('ffpc', read, scoring, false, ZONE, false, false, false, false, none),
 		/ Teams FFPC sends no lineup for have no Proj\.$/
 	);
 	// A board with every side listed says nothing of it.
-	assert.equal(bugsUnlisted(bugsOf(board('playing'), SYNC, SATURDAY, ZONE)), false);
+	assert.deepEqual(unlistedDrawn(bugsOf(board('playing'), SYNC, SATURDAY, ZONE)), {
+		bestLineup: false,
+		noProj: false,
+		noProjFinal: false
+	});
+});
+
+void test("before Sunday a side FFPC sends no lineup for draws its roster's best lineup, said so once (Lane 127, B105)", () => {
+	const scoring = { format: 'ppr', league_own: false, te_bonus: 0.5 } as const;
+	const read = '2026-10-17T02:00:00.000Z';
+	const friday = board('upcoming');
+	const game = friday.games[0];
+	assert.ok(game);
+	// One side with a roster (its best lineup's Proj), one with none.
+	game.sides = game.sides.map((s, i) => ({
+		...s,
+		starters: 0,
+		projection: i === 0 ? 88.4 : null,
+		projected_final: null,
+		schedule_state: 'upcoming',
+		...(i === 0 ? { projection_best_lineup: true } : {})
+	}));
+	const bugs = bugsOf(friday, SYNC, SATURDAY, ZONE);
+	assert.deepEqual(
+		bugs[0]?.sides.map((s) => [s.bestLineup, s.big]),
+		[
+			[true, '88.4'],
+			[false, BOX.none]
+		]
+	);
+	const drawn = unlistedDrawn(bugs);
+	assert.deepEqual(drawn, { bestLineup: true, noProj: true, noProjFinal: false });
+	const said = teamBasis('ffpc', read, scoring, false, ZONE, false, false, false, false, drawn);
+	assert.match(
+		said,
+		/ Proj for teams FFPC sends no lineup for is our best lineup from their rosters\. Those FFPC sends no roster for have no Proj\.$/
+	);
+	assert.doesNotMatch(said, /Proj final/);
+	assert.doesNotMatch(said, BANNED);
+	// Thursday's game under way beside the Sunday bugs: what each draws, the teams named once.
+	const both = teamBasis('ffpc', read, scoring, false, ZONE, true, false, false, false, {
+		bestLineup: true,
+		noProj: false,
+		noProjFinal: true
+	});
+	assert.match(
+		both,
+		/ Proj for teams FFPC sends no lineup for is our best lineup from their rosters\. Under way they have no Proj final\.$/
+	);
+	assert.equal(both.split('sends no lineup').length, 2, 'the teams said once');
+	// An older answer sends no projection_best_lineup and no Proj: the Lane 125 sentence.
+	const older = board('upcoming');
+	const og = older.games[0];
+	assert.ok(og);
+	og.sides = og.sides.map((s) => ({
+		...s,
+		starters: 0,
+		projection: null,
+		schedule_state: 'upcoming'
+	}));
+	assert.deepEqual(unlistedDrawn(bugsOf(older, SYNC, SATURDAY, ZONE)), {
+		bestLineup: false,
+		noProj: true,
+		noProjFinal: false
+	});
 });
 
 void test('a kickoff before the page clock is never the next: the bug reads Kicked off', () => {

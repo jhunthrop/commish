@@ -24,7 +24,13 @@ import {
 	type Swap
 } from '#lib/league/box/lineup.ts';
 import { bugsOf, type Bug } from '#lib/league/home/home.ts';
-import { AS_OF_KICKOFF, projFinalWords } from '#lib/league/box/basis.ts';
+import {
+	AS_OF_KICKOFF,
+	NONE_UNLISTED,
+	projFinalWords,
+	unlistedPart,
+	type UnlistedDrawn
+} from '#lib/league/box/basis.ts';
 import { gameHead } from '#lib/league/box/kickoff.ts';
 import { carriedMark, NEXT_WEEK } from '#lib/league/box/next-week.ts';
 import { agoWords } from '#lib/league/model.ts';
@@ -368,7 +374,10 @@ export function weekBasis(
 	/** Its bug draws a Proj final "--" (round 2). */
 	missing = false,
 	/** A side of its bug still draws a Proj final (bugsPlaying, Lane 121). */
-	projFinal = started
+	projFinal = started,
+	/** What its sides the platform lists no starters for draw (unlistedDrawn, Lane 127): the home's
+	 * sentence for them, never the starters' key. */
+	unlisted: UnlistedDrawn = NONE_UNLISTED
 ): string[] {
 	const platform = hostWords(league.host);
 	const lines = [
@@ -386,8 +395,9 @@ export function weekBasis(
 			turned === null
 				? `${FRONT.gain} ${FRONT.pickupGain}`
 				: `${FRONT.gain} ${FRONT.turnedPickup(turned)}`;
+		const unsaid = unlistedPart(league.host, unlisted);
 		lines.push(
-			`${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}, ${when}${started ? `, ${AS_OF_KICKOFF}` : ''}. ${pickup}${projFinal ? ` ${projFinalWords(true, missing)}` : ''}`
+			`${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}, ${when}${started ? `, ${AS_OF_KICKOFF}` : ''}. ${pickup}${projFinal ? ` ${projFinalWords(true, missing)}` : ''}${unsaid === '' ? '' : ` ${unsaid}`}`
 		);
 	}
 	return lines;

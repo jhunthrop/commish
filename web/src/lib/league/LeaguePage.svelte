@@ -40,9 +40,9 @@
 		HOME,
 		bugsOf,
 		bugsMissListedFinal,
-		bugsPlaying,
+		bugsPlayingListed,
 		bugsFinalNone,
-		bugsUnlisted,
+		unlistedDrawn,
 		projectedFinalOf,
 		feedRows,
 		lineupSummary,
@@ -300,9 +300,9 @@
 								memberZone(),
 								bugs.some((b) => b.state !== 'upcoming'),
 								bugsMissListedFinal(bugs),
-								bugsPlaying(bugs),
+								bugsPlayingListed(bugs),
 								bugsFinalNone(bugs),
-								bugsUnlisted(bugs)
+								unlistedDrawn(bugs)
 							)
 						: null,
 					// The season panel names the zone once, so the read's time does not repeat it.

@@ -33,7 +33,7 @@ import {
 	bugsMissFinal,
 	bugsMissListedFinal,
 	bugsOf,
-	bugsUnlisted,
+	unlistedDrawn,
 	lineupSummary,
 	type Bug,
 	type BugSide
@@ -413,10 +413,13 @@ void test('B104: every other FFPC game reads by the schedule on the home, each s
 			);
 			assert.ok(bug, at);
 			const states = game.sides.map((side) => {
-				// FFPC lists no starters on either side: no count, no Proj, no Proj final, its total.
+				// FFPC lists no starters on either side: no count, no Proj final, its total; its Proj our
+				// best lineup from its roster where the page carries one, none without (Lane 127).
 				assert.equal(side.starters, 0, at);
 				assert.equal(side.starters_final, undefined, at);
-				assert.equal(side.projection, null, at);
+				const roster = !FFPC_ROSTERLESS.has(side.roster_id);
+				assert.equal(side.projection_best_lineup, roster ? true : undefined, at);
+				if (!roster) assert.equal(side.projection, null, at);
 				assert.equal(side.projected_final, null, at);
 				assert.equal(side.to_play, null, at);
 				assert.equal(
@@ -454,7 +457,7 @@ void test('B104: every other FFPC game reads by the schedule on the home, each s
 		assert.deepEqual([...forms].sort(), want, at);
 		// The home's footer says the unlisted sides once, by their own sentence, never the starters key:
 		// the member's starters all hold a Proj.
-		assert.equal(bugsUnlisted(bugs), true, at);
+		assert.equal(unlistedDrawn(bugs).noProjFinal, on.size > 0, at);
 		assert.equal(bugsMissListedFinal(bugs), false, at);
 	}
 });

@@ -1,15 +1,20 @@
-// Screenshots of an FFPC opponent with no box (Lane 124, B102): the Matchup and the league home of the
-// fixture's FFPC stand-in (ffpc.ts, the fixture_platform=ffpc cookie), both themes at 1280 and 390, on
+// Screenshots of an FFPC opponent with no box (Lane 124, B102): the Matchup, the league home and the
+// front door (Lane 127: its basis says the opponent's figure as the home does) of the fixture's FFPC
+// stand-in (ffpc.ts, the fixture_platform=ffpc cookie), both themes at 1280 and 390, on
 // one of the fixture's clocks. FFPC lists the opponent no starters, so his state is the schedule's (his
 // roster's games): the Matchup's head reads Final only once both sides are final by their own rule, and
 // until then the opponent reads "Proj final --" under a Kicked off head. It asserts, on the member's
 // game, the Matchup bug's head, the opponent's small figure there and on the home bug, the home bug's
 // head, each footer's lines (basis-lines.ts, eight at most at 390, five at 1280) and the copy guard, and
 // prints the footers' counts. Exits non-zero on any fault. On the home after the Sunday (Lane 125,
-// B104) every other game lists no starters on either side too: it prints each other bug's head and
-// figures, and asserts no other bug reads Final while a side of it reads "--", and the footer says the
-// teams FFPC sends no lineup for once.
-//   saturday, sunday   before the week's Sunday: the opponent listed as the stand-in reads him;
+// B104) every other game lists no starters on either side too, and before it (Lane 127): it prints each
+// other bug's head and figures on every clock, and asserts no other bug reads Final while a side of it
+// reads "--", that the footer names the teams FFPC sends no lineup for once while one draws a figure of
+// its own (never on a board whose every game is final), and never says they have no Proj final unless
+// a game under way draws one "--".
+//   thursday-night,    before the week's Sunday (Lane 127, B105): Thursday's game under way, then
+//   friday, saturday,  final, every other side unlisted, its Proj our best lineup from its roster or
+//   sunday             "--" with none; the Matchup's opponent listed as the stand-in reads him;
 //   monday             Monday night, the Monday game under way with a player on each roster: Kicked off;
 //   tuesday            every week 6 game final: Final on both sides;
 //   tuesday-late       Tuesday with LV at BUF's final not held (FIXTURE_LATE_FINAL=LV,BUF): every
@@ -21,16 +26,17 @@
 // with the site built against PUBLIC_API_URL at the fixture API.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Locator, type Page } from 'playwright';
-import { unlistedPart } from '../src/lib/league/box/basis.ts';
 import { BOX } from '../src/lib/league/box/box.ts';
 import { KICKOFF } from '../src/lib/league/box/kickoff.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { basisLines } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import {
+	FIXTURE_FRIDAY_CLOCK,
 	FIXTURE_MONDAY_NIGHT_CLOCK,
 	FIXTURE_STATS_CLOCK,
 	FIXTURE_SUNDAY_MORNING_CLOCK,
+	FIXTURE_THURSDAY_NIGHT_CLOCK,
 	FIXTURE_TUESDAY_CLOCK,
 	FIXTURE_WEEK_CLOCK,
 	installFixtureApiClock,
@@ -39,14 +45,32 @@ import {
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 
 /** Each clock, and what the member's game reads there: the Matchup's head and whether the opponent
- * reads Final (null where neither is held: before the Sunday). */
+ * reads Final (null where neither is held: before the Sunday), and how many times the home's footer
+ * names the teams FFPC sends no lineup for (none once every game is final: they draw their totals). */
 const CLOCKS = {
-	saturday: { at: FIXTURE_WEEK_CLOCK, head: null, opponentFinal: null },
-	sunday: { at: FIXTURE_SUNDAY_MORNING_CLOCK, head: null, opponentFinal: null },
-	monday: { at: FIXTURE_MONDAY_NIGHT_CLOCK, head: KICKOFF.kickedOff, opponentFinal: false },
-	tuesday: { at: FIXTURE_TUESDAY_CLOCK, head: KICKOFF.final, opponentFinal: true },
-	'tuesday-late': { at: FIXTURE_TUESDAY_CLOCK, head: KICKOFF.kickedOff, opponentFinal: false },
-	wednesday: { at: FIXTURE_STATS_CLOCK, head: KICKOFF.final, opponentFinal: true }
+	'thursday-night': {
+		at: FIXTURE_THURSDAY_NIGHT_CLOCK,
+		head: null,
+		opponentFinal: null,
+		unlistedSaid: 1
+	},
+	friday: { at: FIXTURE_FRIDAY_CLOCK, head: null, opponentFinal: null, unlistedSaid: 1 },
+	saturday: { at: FIXTURE_WEEK_CLOCK, head: null, opponentFinal: null, unlistedSaid: 1 },
+	sunday: { at: FIXTURE_SUNDAY_MORNING_CLOCK, head: null, opponentFinal: null, unlistedSaid: 1 },
+	monday: {
+		at: FIXTURE_MONDAY_NIGHT_CLOCK,
+		head: KICKOFF.kickedOff,
+		opponentFinal: false,
+		unlistedSaid: 1
+	},
+	tuesday: { at: FIXTURE_TUESDAY_CLOCK, head: KICKOFF.final, opponentFinal: true, unlistedSaid: 0 },
+	'tuesday-late': {
+		at: FIXTURE_TUESDAY_CLOCK,
+		head: KICKOFF.kickedOff,
+		opponentFinal: false,
+		unlistedSaid: 1
+	},
+	wednesday: { at: FIXTURE_STATS_CLOCK, head: KICKOFF.final, opponentFinal: true, unlistedSaid: 0 }
 } as const;
 type Day = keyof typeof CLOCKS;
 const day = (process.env.CLOCK ?? 'monday') as Day;
@@ -67,8 +91,13 @@ const COOKIES = [
 const LEAGUE = `/league/${FIXTURE_IDS.league}`;
 const SCREENS = [
 	{ name: 'matchup', path: `${LEAGUE}/matchup`, ready: 'Week 6' },
-	{ name: 'home', path: LEAGUE, ready: BOX.totals }
+	{ name: 'home', path: LEAGUE, ready: BOX.totals },
+	// The front door's lead bug is the member's FFPC game (Lane 127): its basis says the opponent's figure.
+	{ name: 'front', path: '/', ready: 'McConkey Kong' }
 ] as const;
+const FRONT_BASIS = 'main .front-week .basis';
+/** The starters' key the front door once gave the FFPC opponent's "--" (Lane 125 review LOW-4). */
+const STARTERS_KEY = 'No Proj final while';
 const PROJ_FINAL_NONE = `${BOX.projFinal} ${BOX.none}`;
 
 await requireFixtureClock(API_ORIGIN, want.at);
@@ -117,11 +146,16 @@ async function homeBug(page: Page): Promise<{ head: string; opponent: string }> 
 	};
 }
 
-/** Every other home bug as it reads (Lane 125, B104): "head: small/big | small/big", and the faults
- * of a bug whose head reads Final with a side still at "--". */
-async function otherBugs(page: Page, at: string): Promise<{ said: string[]; faults: string[] }> {
+/** Every other home bug as it reads (Lane 125, B104): "head: small/big | small/big", the faults of a
+ * bug whose head reads Final with a side still at "--", and whether a game under way draws a side's
+ * Proj final "--". */
+async function otherBugs(
+	page: Page,
+	at: string
+): Promise<{ said: string[]; faults: string[]; noProjFinal: boolean }> {
 	const said: string[] = [];
 	const faults: string[] = [];
+	let noProjFinal = false;
 	for (const bug of await page.locator('main a.bug:not(.mine)').all()) {
 		const head = await drawn(bug.locator('.bh .st'));
 		const sides = await Promise.all(
@@ -131,18 +165,34 @@ async function otherBugs(page: Page, at: string): Promise<{ said: string[]; faul
 		);
 		said.push(`${head}: ${sides.join(' | ')}`);
 		if (
+			head.toLowerCase() === KICKOFF.kickedOff.toLowerCase() &&
+			sides.some((s) => s.startsWith(`${BOX.none}/`))
+		)
+			noProjFinal = true;
+		if (
 			head.toLowerCase() === KICKOFF.final.toLowerCase() &&
 			sides.some((s) => s.startsWith(BOX.none))
 		)
 			faults.push(`${at}: other bug "${head}" with a side at "${BOX.none}"`);
 	}
-	return { said, faults };
+	return { said, faults, noProjFinal };
 }
 
-/** How many times the footer names the teams FFPC sends no lineup for. */
-async function unlistedSaid(page: Page): Promise<number> {
-	const text = await drawn(page.locator('[data-basis="league"]'));
-	return text.split(unlistedPart('ffpc', true)).length - 1;
+/** The home footer's words for the teams FFPC sends no lineup for (basis.ts unlistedPart). */
+const UNLISTED_NAMED = /teams FFPC sends no lineup for/gi;
+const NO_PROJ_FINAL_SAID = 'have no Proj final';
+
+/** How many times the footer names the teams FFPC sends no lineup for, and whether it says they have
+ * no Proj final. */
+async function unlistedSaid(
+	page: Page,
+	basis = '[data-basis="league"]'
+): Promise<{ times: number; noProjFinal: boolean }> {
+	const text = await drawn(page.locator(basis));
+	return {
+		times: [...text.matchAll(UNLISTED_NAMED)].length,
+		noProjFinal: text.includes(NO_PROJ_FINAL_SAID)
+	};
 }
 
 /** The opponent's small figure's faults against the clock's state. */
@@ -166,24 +216,48 @@ for (const theme of THEMES)
 					.first()
 					.waitFor({ timeout: READY_TIMEOUT_MS });
 				await page.evaluate(() => document.fonts.ready);
-				const bug = screen.name === 'matchup' ? await matchupBug(page) : await homeBug(page);
-				const head = bug.head.toLowerCase();
-				if (want.head !== null && head !== want.head.toLowerCase())
+				if (screen.name === 'front') {
+					// The front door: the home's words for the opponent, never the starters' key.
+					const lines = await basisLines(page, FRONT_BASIS);
+					footers.push(`${at}: footer ${String(lines)} lines`);
+					if (lines === 0 || lines > MOST_LINES[width])
+						faults.push(`${at}: footer draws ${String(lines)} lines`);
+					const said = await unlistedSaid(page, FRONT_BASIS);
+					if (said.times !== want.unlistedSaid)
+						faults.push(`${at}: the unlisted teams said ${String(said.times)} times`);
+					if ((await drawn(page.locator(FRONT_BASIS))).includes(STARTERS_KEY))
+						faults.push(`${at}: the front door keys the opponent with the starters' sentence`);
+				}
+				const bug =
+					screen.name === 'matchup'
+						? await matchupBug(page)
+						: screen.name === 'home'
+							? await homeBug(page)
+							: null;
+				if (
+					bug !== null &&
+					want.head !== null &&
+					bug.head.toLowerCase() !== want.head.toLowerCase()
+				)
 					faults.push(`${at}: head "${bug.head}", want "${want.head}"`);
-				faults.push(...opponentFaults(bug.opponent, at));
-				const lines = await basisLines(page);
-				footers.push(
-					`${at}: footer ${String(lines)} lines, head "${bug.head}", opponent "${bug.opponent}"`
-				);
+				if (bug !== null) faults.push(...opponentFaults(bug.opponent, at));
+				const lines = bug === null ? 1 : await basisLines(page);
+				if (bug !== null)
+					footers.push(
+						`${at}: footer ${String(lines)} lines, head "${bug.head}", opponent "${bug.opponent}"`
+					);
 				if (lines === 0 || lines > MOST_LINES[width])
 					faults.push(`${at}: footer draws ${String(lines)} lines`);
-				// After the Sunday the home's other games list no starters either (Lane 125, B104).
-				if (screen.name === 'home' && want.head !== null) {
+				// The home's other games list no starters either (Lane 125, B104), before Sunday too (Lane 127).
+				if (screen.name === 'home') {
 					const others = await otherBugs(page, at);
 					footers.push(...others.said.map((s) => `  ${s}`));
 					faults.push(...others.faults);
-					const times = await unlistedSaid(page);
-					if (times !== 1) faults.push(`${at}: the unlisted teams said ${String(times)} times`);
+					const said = await unlistedSaid(page);
+					if (said.times !== want.unlistedSaid)
+						faults.push(`${at}: the unlisted teams said ${String(said.times)} times`);
+					if (said.noProjFinal && !others.noProjFinal)
+						faults.push(`${at}: the footer says no Proj final where no game under way draws one`);
 				}
 				const copy = await copyFault(page);
 				if (copy !== null) faults.push(`${at}: ${copy}`);

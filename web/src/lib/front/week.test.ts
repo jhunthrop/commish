@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { WEEK_DONE } from '../../../scripts/inseason-fixture/sunday.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { components } from '#lib/api/types.ts';
+import { bugsMissListedFinal, bugsPlayingListed, unlistedDrawn } from '#lib/league/home/home.ts';
 import {
 	FRONT,
 	chipsOf,
@@ -397,6 +398,64 @@ void test('the basis says whose figures, what Proj is and when it was read, once
 		/ Gain is what the changes add\. A pickup's gain is the Proj he adds this week\.$/
 	);
 	assert.doesNotMatch(basis.join(' '), /strip/i);
+});
+
+void test("the front door's FFPC bug says the opponent's figures as the home does, never the starters key (Lane 127, B105)", () => {
+	const ffpc = (state: 'upcoming' | 'playing', opponent: Partial<Schemas['ScoreboardSide']>) => {
+		const game = SUCK.bug?.game;
+		assert.ok(game);
+		const [mine, theirs] = game.sides;
+		assert.ok(mine && theirs);
+		const league: WeekLeague = {
+			...SUCK,
+			host: 'ffpc',
+			bug: {
+				...(SUCK.bug ?? { teams: [], first: [] }),
+				game: {
+					...game,
+					state,
+					sides: [
+						state === 'upcoming' ? mine : { ...mine, projected_final: 80.2 },
+						{ ...theirs, starters: 0, projected_final: null, ...opponent }
+					]
+				}
+			}
+		};
+		const bug = frontLeague(league, href, NOW, ZONE).bug;
+		assert.ok(bug);
+		const started = bug.state !== 'upcoming';
+		return weekBasis(
+			league,
+			false,
+			ZONE,
+			started,
+			bugsMissListedFinal([bug]),
+			bugsPlayingListed([bug]),
+			unlistedDrawn([bug])
+		)[1];
+	};
+	// Before Sunday his Proj is our best lineup from his roster.
+	const friday = ffpc('upcoming', {
+		projection: 97.1,
+		projection_best_lineup: true,
+		schedule_state: 'upcoming'
+	});
+	assert.match(
+		friday ?? '',
+		/ Proj for teams FFPC sends no lineup for is our best lineup from their rosters\.$/
+	);
+	// Once kicked off his Proj final is "--": the home's sentence, never "No Proj final while".
+	const sunday = ffpc('playing', {
+		projection: 97.1,
+		projection_best_lineup: true,
+		schedule_state: 'kicked_off'
+	});
+	assert.match(
+		sunday ?? '',
+		/ Teams FFPC sends no lineup for have no Proj final\.$/
+	);
+	assert.doesNotMatch(sunday ?? '', /No Proj final while/);
+	for (const said of [friday, sunday]) assert.doesNotMatch(said ?? '', bannedPattern());
 });
 
 void test('the roster head counts its chips, and each other league carries its changes', () => {
