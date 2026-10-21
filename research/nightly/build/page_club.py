@@ -8,11 +8,12 @@ Lane 110, in `capture_snapshots`) and names his club now; the game lines (`playe
 club he played each week for.
 
 THE RULE. His club is the club on the newest player list read at or before the run. When his newest
-game line names another club and its game kicked off after that read, the line wins: the list had not
-caught up. With no list read, or the list not naming him on a club (a free agent), his newest line's
-club; with no line either, the seeded roster's. The page says which club his newest line was for only
-when that is not the page's club (`latest_club`), which happens only when a list read newer than his
-last game moved him.
+game line names another club, the line wins unless the read is at least `LIST_CATCH_UP` newer than
+that game's kickoff: the provider's roster refresh lands within a day, so a read sooner than that may
+not have caught up with the move (Lane 120 fix round 1, review M1). With no list read, or the list not
+naming him on a club (a free agent), his newest line's club; with no line either, the seeded roster's.
+The page says which club his newest line was for only when that is not the page's club
+(`latest_club`), which happens only when a list read well after his last game moved him.
 
 THE WEEKS WITH NO LINE. A player is a mover when the season's facts (the seeded roster, the list read,
 his lines) name more than one club. A mover's week with no line, up to his newest line's week, names no
@@ -21,7 +22,7 @@ opponent: the run holds no fact of which club he was with. His weeks after it ar
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import MappingProxyType
 from typing import Any, Final
 
@@ -34,6 +35,9 @@ from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
 from research.pipeline.tank01.capture import PLAYER_LIST_SOURCE
 
 _CLUBS: Final = frozenset(NFL_TEAM_ABBREVIATIONS)
+# How much newer than a game's kickoff a list read must be to win over that game's line: the provider's
+# roster refresh lands within a day, with half a day's margin (the coordinator's ruling, review M1).
+LIST_CATCH_UP: Final = timedelta(hours=36)
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,7 +126,7 @@ def club_call(
     else:
         # A line whose game the schedule does not hold is taken as the newer fact.
         kickoff = _kickoff(games, latest_club, latest_week)
-        newer = roster.read_at is None or kickoff is None or kickoff > roster.read_at
+        newer = roster.read_at is None or kickoff is None or roster.read_at < kickoff + LIST_CATCH_UP
         club = latest_club if newer else listed
     named = {seeded, *lines.values(), *([listed] if listed is not None else [])}
     return ClubCall(club, latest_week, latest_club, len(named) > 1)

@@ -6,10 +6,12 @@ through the writer's own `club_calls` and `season_block`."""
 
 import json
 import os
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Final
+from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy import insert
@@ -19,6 +21,7 @@ from research.db.schema import CAPTURE_SNAPSHOTS, PROVIDER_PLAYERS
 from research.db.url import sqlalchemy_url
 from research.nightly import gates
 from research.nightly.build.page_club import (
+    LIST_CATCH_UP,
     NO_ROSTER_READ,
     ClubCall,
     RosterRead,
@@ -180,6 +183,30 @@ def test_a_list_read_after_his_last_game_moves_the_page_and_names_the_lines_club
     assert _where(wease[5]) == ("DEN", True, "played")  # the line keeps the club it was for
     assert _where(wease[6]) == (None, None, "bye")  # then MIA's slate: its week 6 bye
     assert _where(wease[7]) == ("NYJ", False, "upcoming")
+
+
+def test_a_list_read_wins_over_the_line_only_36_hours_after_its_kickoff() -> None:
+    """Fix round 1 (review M1): the provider's list can be a day behind a move, so a read the morning after
+    a Sunday game naming the old club is not yet newer than the new club's line."""
+    eastern = ZoneInfo("America/New_York")
+    sunday = datetime(2026, 10, 25, 13, tzinfo=eastern)  # a Sunday 13:00 ET game for his new club
+    games = {"NYJ": [Game(8, "BUF", True, sunday)]}
+    lines = {8: "NYJ"}
+    monday = RosterRead(MappingProxyType({WEASE: "MIA"}), datetime(2026, 10, 26, 6, tzinfo=eastern))
+    held = club_call("MIA", monday, WEASE, lines, games)
+    assert held.club == "NYJ"
+    assert last_game_club(held) is None  # no "Now with" line
+    tuesday = RosterRead(MappingProxyType({WEASE: "MIA"}), datetime(2026, 10, 27, 6, tzinfo=eastern))
+    moved = club_call("MIA", tuesday, WEASE, lines, games)
+    assert moved.club == "MIA"
+    assert last_game_club(moved) == {"club": "NYJ", "week": 8}  # the read wins and the line is said
+    # The line holds until exactly 36 hours after kickoff.
+    edge = RosterRead(MappingProxyType({WEASE: "MIA"}), sunday + LIST_CATCH_UP)
+    assert club_call("MIA", edge, WEASE, lines, games).club == "MIA"
+    assert (
+        club_call("MIA", replace(edge, read_at=sunday + LIST_CATCH_UP - timedelta(seconds=1)), WEASE, lines, games).club
+        == "NYJ"
+    )
 
 
 def test_the_rule_a_line_newer_than_the_read_wins() -> None:

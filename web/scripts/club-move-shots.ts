@@ -5,7 +5,7 @@
 // (copy-scan.ts).
 // STAND-IN, named here and in the lane's report: Jahmyr Gibbs as a constructed mover. The in-season
 // contract fixture's page rewritten by the research writer itself (`season_block`, `last_game_club`):
-// his week 5 and 6 lines for LAC, the provider's list read the day after his week 6 game naming DET.
+// his week 5 and 6 lines for LAC, the provider's list read two days after his week 6 game naming DET.
 // Build the site from that run (PUBLIC_RUN_ID=2026-10-21T12-ros PUBLIC_RUN_BASE_URL=.runs) and start
 // the fixture API with FIXTURE_RUN_ID=2026-10-21T12-ros and FIXTURE_CLOCK at the clock to shoot:
 //

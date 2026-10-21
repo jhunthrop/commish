@@ -81,10 +81,10 @@ def _context(run: Path, through: int) -> SeasonContext:
         carried=dict.fromkeys(range(1, weeks + 1), _CARRIED),
         in_records=in_records,
     )
-    # Lane 120: the list read the day after his week 6 game names DET, so the page is DET's and says
+    # Lane 120: the list read two days after his week 6 game names DET, so the page is DET's and says
     # his newest line was LAC's.
     last = next(g.kickoff for g in games[_FORMER_CLUB] if g.week == max(_FORMER_WEEKS))
-    roster = RosterRead({_PLAYER: _PAGE_CLUB}, last + timedelta(days=1))
+    roster = RosterRead({_PLAYER: _PAGE_CLUB}, last + timedelta(days=2))
     clubs = club_calls({_PLAYER: _PAGE_CLUB}, roster, store.teams, games)
     return SeasonContext(2026, weeks, through, games, byes, store, {}, clubs)
 
