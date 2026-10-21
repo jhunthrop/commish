@@ -4490,11 +4490,17 @@ type WaiverAdvice struct {
 	// Roster the member's active roster (injured reserve and taxi spots left out), the lines beats and drops name
 	Roster []PlayerLine `json:"roster"`
 
-	// Rows positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order; a free agent on a season-long list (injured reserve, PUP, NFI) or ruled out this week is not listed (no read gives his return), save the player a link asked for; a week's out carried over from a game already played is listed
+	// Rows positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order; a free agent on a season-long list (injured reserve, PUP, NFI) or ruled out this week is not listed in them, save the player a link asked for (an injured reserve or out free agent whose return week falls in the regular season is in stash instead); a week's out carried over from a game already played is listed, and so is one whose listing's dating is still pending (Lane 118, B94)
 	Rows []WaiverRow `json:"rows"`
 
 	// SeasonBasis what the Rest of season column and a gain over the rest of the season are, said once under the rows
 	SeasonBasis string `json:"season_basis"`
+
+	// Stash the Stash group (Lane 118, B79): free agents on injured reserve or ruled out whose return_week falls inside the league's regular season (before its first playoff week, else the order's last week), each row's stash set, by the rest-of-season rate from his return week, highest first, at most 10; never among rows or pickups, never counted with the rows that gain; absent from an older answer
+	Stash *[]WaiverRow `json:"stash,omitempty"`
+
+	// StashUndated how many free agents on injured reserve or ruled out this page leaves unlisted because no read dates their return (Lane 118, B79), for the basis to say once; absent from an older answer
+	StashUndated *int `json:"stash_undated,omitempty"`
 
 	// Week the platform's current week, the week a claim names
 	Week int `json:"week"`
@@ -4589,8 +4595,23 @@ type WaiverRow struct {
 	// Starts he starts this week in the lineup the advice sets with him in (the highest Proj after designations and byes)
 	Starts bool `json:"starts"`
 
+	// Stash set on a row of the Stash group alone (Lane 118, B79); absent on every other row
+	Stash *WaiverStash `json:"stash,omitempty"`
+
 	// WeekGain this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out, less the lineup's without him, one decimal; 0 when he would not start. Null on every row once any pickup's add or drop has kicked off (gameStateAt): the pickups then go in season Gain order and no week figure counts
 	WeekGain *float64 `json:"week_gain"`
+}
+
+// WaiverStash defines model for WaiverStash.
+type WaiverStash struct {
+	// BackWeek the week he is due back, his designation's return_week
+	BackWeek int `json:"back_week"`
+
+	// IrSlot the member's team has an injured reserve slot open that takes him on the league's platform (ESPN, Sleeper and Yahoo slots from the league's settings; an out player only where the platform's slot takes one), so the verb is Stash with no drop; false elsewhere (FFPC and MyFantasyLeague always), the verb Add with the row's drop
+	IrSlot bool `json:"ir_slot"`
+
+	// PerGame his rest-of-season points over his club's games from back_week through the order's last week, one decimal, the figure the group sorts by; null where the board carries no rest-of-season points for him
+	PerGame *float64 `json:"per_game"`
 }
 
 // WeekBug defines model for WeekBug.

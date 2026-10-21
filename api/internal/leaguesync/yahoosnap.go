@@ -144,6 +144,8 @@ func yahooShape(s yahoo.Settings, teams int) Shape {
 		case yahooBench:
 			sh.Bench += n
 		case yahooReserve:
+			// Yahoo's IR slot takes the injured reserve lists, never a week's out (Lane 118, B79).
+			sh.IR += n
 		default:
 			if w := scoring.HostText(slot.Position); w != "" && n > 0 {
 				unfollowed[w] = true

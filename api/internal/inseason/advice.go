@@ -886,6 +886,9 @@ func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.Waive
 		return apitypes.WaiverAdvice{}, false
 	}
 	out := a.waiverPage(run)
+	// The Stash group, apart from the rows and the strip (Lane 118, B79).
+	stash, undated := a.stashRows(run, asked)
+	out.Stash, out.StashUndated = &stash, &undated
 	for _, move := range shown {
 		row := waiverRow(run.w, run.week, run.mine, run.pool[move.Add], move, run.clears)
 		// A row past its kickoff has no week figure, whichever the order (Lane 85 fix round 4).

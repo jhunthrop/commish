@@ -82,6 +82,10 @@ type Designation struct {
 	// ReturnWeek is the week the provider expects him back (returnWeek, the
 	// player list's return date), nil when it dates no return.
 	ReturnWeek *int
+	// Pending is a designation whose dating is still pending
+	// (boards.DatingPending, a cold start's failed runs read): not yet
+	// known, so never on the wire and never carried over (Lane 116, B91).
+	Pending bool
 }
 
 // Facts is one player's week (spec §3, WeekFacts). A fact we do not hold
@@ -426,7 +430,7 @@ func (s *Season) designation(p Player) *Designation {
 	if d, ok := s.designations[p.BoardID]; ok && p.BoardID != "" {
 		if status := boards.StatusOf(d.Code); status != "" {
 			return &Designation{Status: status, AsOf: d.AsOf, Since: d.Since, Listed: d.Listed,
-				CarriedOver: s.carriedOver(d, p.Team), ReturnWeek: s.returnAfter(d.ReturnOn)}
+				CarriedOver: s.carriedOver(d, p.Team), ReturnWeek: s.returnAfter(d.ReturnOn), Pending: d.DatingPending}
 		}
 	}
 	if p.HostIR {
