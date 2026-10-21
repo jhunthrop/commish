@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { isFreeAgent } from '#lib/format/clubs.ts';
+	import { isFreeAgent } from '#lib/format/free-agent.ts';
 	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';

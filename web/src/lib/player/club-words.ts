@@ -1,5 +1,5 @@
 /** The words a player page says when its club is not the one his game lines were for (Lane 120). */
-import { FREE_AGENT_WORDS } from '#lib/format/clubs.ts';
+import { FREE_AGENT_WORDS } from '#lib/format/free-agent.ts';
 
 /** A club as the run's clubs.json names it. */
 interface Named {

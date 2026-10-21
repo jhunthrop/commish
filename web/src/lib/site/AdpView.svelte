@@ -20,7 +20,7 @@
 	import RowSheetTags from './RowSheetTags.svelte';
 	import SiteShell from './SiteShell.svelte';
 	import { lazySheet } from './lazy-sheet.svelte.ts';
-	import { isFreeAgent } from '#lib/format/clubs.ts';
+	import { isFreeAgent } from '#lib/format/free-agent.ts';
 	import { links } from './links.ts';
 
 	interface Props {

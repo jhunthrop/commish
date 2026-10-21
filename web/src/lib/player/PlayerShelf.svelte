@@ -9,7 +9,7 @@
 	import StatusPill from '#lib/ui/StatusPill.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { clubMark } from '#lib/ui/club-mark.ts';
-	import { isFreeAgent } from '#lib/format/clubs.ts';
+	import { isFreeAgent } from '#lib/format/free-agent.ts';
 	import { builtTiles, cardSource, type CardData } from './card-source.ts';
 	import { CARD, unreadBasis } from './card.ts';
 	import CardNext from './CardNext.svelte';

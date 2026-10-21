@@ -2,7 +2,7 @@
 // room's player carries that as his club cell, no club mark, no bye. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { FREE_AGENT_CLUB, isFreeAgent } from '#lib/format/clubs.ts';
+import { FREE_AGENT_CLUB, isFreeAgent } from '#lib/format/free-agent.ts';
 import type { RoomBoard } from './api.ts';
 import { boardOf } from './model.ts';
 

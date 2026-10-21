@@ -7,7 +7,8 @@
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
-import { defenseWords, isFreeAgent } from '#lib/format/clubs.ts';
+import { defenseWords } from '#lib/format/clubs.ts';
+import { isFreeAgent } from '#lib/format/free-agent.ts';
 import { lastName } from '#lib/format/draft.ts';
 import {
 	designationWord,

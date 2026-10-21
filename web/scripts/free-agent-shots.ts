@@ -17,7 +17,7 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Route } from 'playwright';
 import { copyFault, watchData } from './copy-scan.ts';
-import { FREE_AGENT_CLUB } from '../src/lib/format/clubs.ts';
+import { FREE_AGENT_CLUB } from '../src/lib/format/free-agent.ts';
 import { BOX } from '../src/lib/league/box/box.ts';
 import { lastGameClubWords } from '../src/lib/player/club-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';

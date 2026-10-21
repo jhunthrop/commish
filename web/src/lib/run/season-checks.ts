@@ -6,7 +6,7 @@
  * A bye in a log is a week his club's slate has no game (Lane 119), the only place the run can say it.
  * A page that says his newest line was another club's names that club and a week he played (Lane 120).
  */
-import { FREE_AGENT_WORDS, isFreeAgent } from '#lib/format/clubs.ts';
+import { FREE_AGENT_WORDS, isFreeAgent } from '#lib/format/free-agent.ts';
 import type { PlayerSeason } from './season.ts';
 import type { Schedule } from './schema.ts';
 

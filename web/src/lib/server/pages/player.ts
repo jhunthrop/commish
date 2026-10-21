@@ -1,7 +1,7 @@
 /** A player's page: his numbers in the default format, his tier and its mates, where drafters take
  * him and from which sources, his season so far, his capsule, and his numbers in every other format
  * the run carries. */
-import { FREE_AGENT_CLUB, isFreeAgent } from '#lib/format/clubs.ts';
+import { FREE_AGENT_CLUB, isFreeAgent } from '#lib/format/free-agent.ts';
 import { windowLabel } from '#lib/format/date.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import { availableTierOf } from '#lib/run/held-places.ts';

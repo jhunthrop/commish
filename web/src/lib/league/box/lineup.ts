@@ -3,7 +3,7 @@
  * injured reserve; a decision strip above it naming each swap, each spot no one who can play fills,
  * and the Proj the swaps add over the lineup as the platform has it set now; one evidence line per
  * swap built from the row's own columns. Pure, tested in lineup.test.ts. */
-import { FREE_AGENT_WORDS } from '#lib/format/clubs.ts';
+import { FREE_AGENT_WORDS } from '#lib/format/free-agent.ts';
 import { lastName } from '#lib/format/draft.ts';
 import { designationWord } from '#lib/format/designation.ts';
 import { fixed } from '#lib/format/number.ts';

@@ -3,7 +3,7 @@
  * prints; live.ts reads the answer and builds the links. */
 import type { components } from '#lib/api/types.ts';
 import { memberZone, weekdayName, weekdayTime } from '#lib/format/clock.ts';
-import { isFreeAgent } from '#lib/format/clubs.ts';
+import { isFreeAgent } from '#lib/format/free-agent.ts';
 import { lineState, lineupOpen, pastKickoff, toPlay } from '../league/box/kickoff.ts';
 import { signed } from '#lib/format/number.ts';
 import { weekHead } from '#lib/format/figure-words.ts';

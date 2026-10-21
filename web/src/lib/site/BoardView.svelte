@@ -30,7 +30,7 @@
 	import type { BoardRowView } from '#lib/run/schema.ts';
 	import type { StatusView } from '#lib/run/status-view.ts';
 	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
-	import { isFreeAgent } from '#lib/format/clubs.ts';
+	import { isFreeAgent } from '#lib/format/free-agent.ts';
 	import { links, tierAnchor } from './links.ts';
 	import type OrderScreenComponent from '#lib/order/OrderScreen.svelte';
 	import type WeekScreenComponent from '#lib/order/WeekScreen.svelte';
