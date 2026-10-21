@@ -370,7 +370,7 @@ func (s *Season) designation(p Player) *Designation {
 	if d, ok := s.designations[p.BoardID]; ok && p.BoardID != "" {
 		if status := boards.StatusOf(d.Code); status != "" {
 			return &Designation{Status: status, AsOf: d.AsOf, Since: d.Since, Listed: d.Listed,
-				CarriedOver: s.carriedOver(d, p.Team), ReturnWeek: s.returnWeek(d.ReturnOn)}
+				CarriedOver: s.carriedOver(d, p.Team), ReturnWeek: s.returnAfter(d.ReturnOn)}
 		}
 	}
 	if p.HostIR {

@@ -52,3 +52,16 @@ func (s *Season) returnWeek(on *time.Time) *int {
 	}
 	return nil
 }
+
+// returnAfter is the return week only when it is later than the week the
+// Season addresses (the lane 110 review, MEDIUM-1): a questionable or
+// doubtful date in the coming days, or a date the provider let pass, names
+// the page's own week or an earlier one and says nothing, so it is
+// omitted; a multi-week out and the season-long statuses keep theirs.
+func (s *Season) returnAfter(on *time.Time) *int {
+	week := s.returnWeek(on)
+	if week == nil || *week <= s.week {
+		return nil
+	}
+	return week
+}

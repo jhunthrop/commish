@@ -51,6 +51,7 @@ func TestTheFactsCarryTheReturnWeek(t *testing.T) {
 	data := Data{Games: fixtureGames(), Designations: map[string]boards.Designation{
 		"mia-wr": {Code: "IR", AsOf: time.Date(2026, 9, 19, 14, 0, 0, 0, time.UTC), ReturnOn: eastDay(time.September, 22)},
 		"buf-rb": {Code: "IR", AsOf: time.Date(2026, 9, 19, 14, 0, 0, 0, time.UTC)},
+		"ne-rb":  {Code: "Q", AsOf: time.Date(2026, 9, 19, 14, 0, 0, 0, time.UTC), ReturnOn: eastDay(time.September, 20)},
 	}}
 	s := NewSeason(data, RulesOf(scoring.Standard()), 2, time.Date(2026, 9, 19, 12, 0, 0, 0, east))
 	dated := s.For(Player{BoardID: "mia-wr", Team: "MIA", Position: draft.WR}).Designation
@@ -60,6 +61,10 @@ func TestTheFactsCarryTheReturnWeek(t *testing.T) {
 	if undated := s.For(Player{BoardID: "buf-rb", Team: "BUF", Position: draft.RB}).Designation; undated == nil || undated.ReturnWeek != nil {
 		t.Fatalf("the undated IR %+v, want no week", undated)
 	}
+	// A date in the addressed week itself (a questionable player's next game) says nothing: omitted.
+	if q := s.For(Player{BoardID: "ne-rb", Team: "NE", Position: draft.RB}).Designation; q == nil || q.ReturnWeek != nil {
+		t.Fatalf("the questionable back %+v, want no week: his date is the addressed week's", q)
+	}
 	host := s.For(Player{BoardID: "nobody", Team: "NE", Position: draft.WR, HostIR: true, ReadAt: time.Now()}).Designation
 	if host == nil || host.ReturnWeek != nil {
 		t.Fatalf("the host's IR mark %+v, want no week", host)
@@ -67,7 +72,8 @@ func TestTheFactsCarryTheReturnWeek(t *testing.T) {
 }
 
 // Through the engine: the member's injured starter's row on Waivers says
-// the week he is due back, and a free agent's undated IR says none.
+// the week he is due back, a multi-week out keeps his, and an undated IR
+// and a questionable date in the addressed week say none.
 func TestWaiversRowsCarryTheReturnWeek(t *testing.T) {
 	f, projection := liveFixture(t)
 	// Two weeks after the fixture's week 6, so a return date has a week ahead.
@@ -77,6 +83,8 @@ func TestWaiversRowsCarryTheReturnWeek(t *testing.T) {
 	f.data.Designations = map[string]boards.Designation{
 		"p001": {Code: "IR", AsOf: asOf, ReturnOn: eastDay(time.October, 27)},
 		"p002": {Code: "IR", AsOf: asOf},
+		"p003": {Code: "Q", AsOf: asOf, ReturnOn: eastDay(time.October, 18)},
+		"p004": {Code: "O", AsOf: asOf, ReturnOn: eastDay(time.October, 26)},
 	}
 	s := liveService(t, f, projection)
 	w := decode[apitypes.WaiverAdvice](t, s, "waivers")
@@ -92,5 +100,11 @@ func TestWaiversRowsCarryTheReturnWeek(t *testing.T) {
 	}
 	if !found["p002"] || weeks["p002"] != nil {
 		t.Fatalf("p002's return week %v (listed %v), want none for an undated IR", weeks["p002"], found["p002"])
+	}
+	if !found["p003"] || weeks["p003"] != nil {
+		t.Fatalf("p003's return week %v (listed %v), want none: Oct 18 is no later than the week Waivers addresses", weeks["p003"], found["p003"])
+	}
+	if !found["p004"] || weeks["p004"] == nil || *weeks["p004"] != 8 {
+		t.Fatalf("p004's return week %v (listed %v), want 8: the Monday after week 7, past the week Waivers addresses", weeks["p004"], found["p004"])
 	}
 }
