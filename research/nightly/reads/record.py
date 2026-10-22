@@ -347,7 +347,7 @@ select week, max(frozen_at) as frozen_at from research.register_freeze_rows
 where season = :s and board_source = :source group by week order by week
 """
 _GRADED: Final = """
-select g.player_id, g.actual_points, g.graded_at, f.board_points, f.adp, f.published_points, f.espn_points, f.board_as_of,
+select g.player_id, g.actual_points, g.graded_at, f.board_points, f.adp, f.published_points, f.espn_points, f.espn_read_at, f.board_as_of,
        case when p.position in ('DEF', 'DST') then 'DST' else p.position end as position
 from research.register_grade_rows g
 join research.register_freeze_rows f on f.season = g.season and f.week = g.week and f.frozen_at = g.frozen_at

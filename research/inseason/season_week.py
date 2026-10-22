@@ -1,6 +1,6 @@
 """THE REGISTER'S WEEKLY PASS (`season-week`), ported from `research-ts/src/projections/season-week/steps.ts`.
 
-Fourteen steps, each isolated: a step that raises is reported as failed and the pass carries on to the
+Fifteen steps, each isolated: a step that raises is reported as failed and the pass carries on to the
 next, because a dead odds key must never stop the freeze that runs after it. The exit status is
 non-zero when any step failed.
 
@@ -28,6 +28,11 @@ non-zero when any step failed.
    ok; a week whose first kickoff passed unfrozen is listed as MISSED (the record marks it) but
    never fails the pass, since nothing can be done for it. The step fails only when the coming week
    could not be frozen.
+4a. **espn-fill**: the coming week's standing freeze, when it kept no ESPN figure (its read failed or
+   was not yet published), takes the first ESPN read taken after it and before the week's first
+   kickoff, on its rows with none, the read's instant kept as `espn_read_at` (Amendment 6, Lane 146,
+   `model/register/espn_fill.py`). A freeze that kept ESPN's read is untouched; a read at or after the
+   first kickoff never fills.
 5. **scoreboard**: the running score, read fresh.
 
 ONE CHANGE FROM THE ORACLE, on purpose: a week is graded only once its last kickoff is
@@ -51,6 +56,7 @@ from research.inseason.scoreboard import scoreboard_lines
 from research.inseason.step_result import Status, StepResult
 from research.model.instants import js_iso, ms_instant
 from research.model.reads.teams import kickoff_instants_by_week
+from research.model.register.espn_fill import fill_empty_espn_yardstick
 from research.model.register.freeze import SERVED_SOURCE, SHIPPED_SOURCE, take_freeze
 from research.model.register.grade import grade_week, latest_freeze_for
 from research.pipeline.espn import projections as espn_projections
@@ -79,6 +85,7 @@ OPPONENT_RATINGS: Final = "opponent-ratings"
 GAME_TABLE: Final = "game-table"
 KICKING_DEFENSE: Final = "kicking-defense"
 ESPN_PROJECTIONS: Final = "espn-projections"
+ESPN_FILL: Final = "espn-fill"
 STEPS: Final = (
     "stats-ingest",
     *usage_steps.USAGE_STEPS,
@@ -89,6 +96,7 @@ STEPS: Final = (
     "props-snapshot",
     "grade",
     "freeze",
+    ESPN_FILL,
     "scoreboard",
 )
 
@@ -344,6 +352,22 @@ def _take_freeze(context: SeasonWeekContext, candidate: tuple[int, datetime] | N
     )
 
 
+def espn_fill(context: SeasonWeekContext) -> StepResult:
+    """The coming week's standing freeze filled from the first ESPN read before kickoff, if it kept none."""
+    with context.engine.connect() as conn:
+        candidate = week_to_freeze(kickoff_instants_by_week(conn, context.season), context.now)
+    if candidate is None:
+        return StepResult(ESPN_FILL, "skipped", f"no week of {context.season} kicks off after {js_iso(context.now)}")
+    week, kickoff = candidate
+    with context.engine.begin() as conn:
+        fill = fill_empty_espn_yardstick(conn, context.season, week, kickoff)
+    if fill.reason is not None or fill.read_at is None:
+        return StepResult(ESPN_FILL, "skipped", f"week {week}: {fill.reason}")
+    return StepResult(
+        ESPN_FILL, "ok", f"week {week}: filled {fill.filled} rows from the read at {js_iso(fill.read_at)}"
+    )
+
+
 def scoreboard(context: SeasonWeekContext) -> StepResult:
     with context.engine.connect() as conn:
         lines = scoreboard_lines(conn, context.season)
@@ -366,6 +390,7 @@ def _bodies(context: SeasonWeekContext) -> dict[str, Callable[[], StepResult]]:
         "props-snapshot": lambda: props_snapshot(context),
         "grade": lambda: grade(context),
         "freeze": lambda: freeze(context),
+        ESPN_FILL: lambda: espn_fill(context),
         "scoreboard": lambda: scoreboard(context),
     }
 

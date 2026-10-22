@@ -170,6 +170,9 @@ def _weekly_week(week: weekly_read.WeeklyWeek, frozen_by: FrozenBy, season: int)
         out["gradesFrom"] = iso(week.grades_from)
     if week.placed:
         out["players"] = _weekly_players(week)
+    # Lane 146, additive (a web before it reads the week without it): what the week says of ESPN's read.
+    if week.espn_note is not None:
+        out["espnNote"] = week.espn_note
     return out
 
 

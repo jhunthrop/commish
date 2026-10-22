@@ -142,23 +142,48 @@ def week_published_points(conn: Connection, season: int, week: int, as_of: datet
     return {str(row.player_id): float(row.ppr_points) for row in rows}
 
 
-_ESPN: Final = """
-with newest as (
-  select max(read_at) as read_at from research.espn_projection_rows where season = :s and week = :w and read_at <= :a
-)
+_ESPN_NEWEST: Final = """
+select max(read_at) from research.espn_projection_rows where season = :s and week = :w and read_at <= :a
+"""
+_ESPN_FIRST_BETWEEN: Final = """
+select min(read_at) from research.espn_projection_rows
+where season = :s and week = :w and read_at > :after and read_at < :before
+"""
+_ESPN_AT: Final = """
 select p.id as player_id, r.ppr_points from research.espn_projection_rows r
-join newest n on n.read_at = r.read_at
 join research.players p on p.espn_id = r.espn_id
-where r.season = :s and r.week = :w
+where r.season = :s and r.week = :w and r.read_at = :r
 """
 
 
-def week_espn_points(conn: Connection, season: int, week: int, as_of: datetime) -> dict[str, float]:
-    """ESPN's own weekly projection at the freeze (Lane 114, Amendment 5): each player's PPR points on
-    the newest public read of the week taken at or before `as_of`, by research player id through his
-    ESPN id. Empty when no read of the week was taken by then."""
-    rows = conn.execute(text(_ESPN), {"s": season, "w": week, "a": as_of})
-    return {str(row.player_id): float(row.ppr_points) for row in rows}
+@dataclass(frozen=True, slots=True)
+class EspnRead:
+    """One ESPN read of a week: its instant (None when there is no such read) and each player's PPR
+    points on it, by research player id through his ESPN id."""
+
+    read_at: datetime | None
+    points: Mapping[str, float]
+
+
+def _espn_read(conn: Connection, season: int, week: int, read_at: datetime | None) -> EspnRead:
+    if read_at is None:
+        return EspnRead(None, {})
+    rows = conn.execute(text(_ESPN_AT), {"s": season, "w": week, "r": read_at})
+    return EspnRead(ms_instant(read_at), {str(row.player_id): float(row.ppr_points) for row in rows})
+
+
+def week_espn_read(conn: Connection, season: int, week: int, as_of: datetime) -> EspnRead:
+    """ESPN's own weekly projection at the freeze (Lane 114, Amendment 5): the newest public read of the
+    week taken at or before `as_of`, empty when no read of the week was taken by then."""
+    newest = conn.execute(text(_ESPN_NEWEST), {"s": season, "w": week, "a": as_of}).scalar()
+    return _espn_read(conn, season, week, newest)
+
+
+def first_espn_read_between(conn: Connection, season: int, week: int, after: datetime, before: datetime) -> EspnRead:
+    """The first ESPN read of the week taken strictly after `after` and strictly before `before`
+    (Amendment 6: after a freeze that kept none, before the week's first kickoff); empty when none was."""
+    first = conn.execute(text(_ESPN_FIRST_BETWEEN), {"s": season, "w": week, "after": after, "before": before}).scalar()
+    return _espn_read(conn, season, week, first)
 
 
 _SHIPPED: Final = """
@@ -243,10 +268,11 @@ def _stored_board(conn: Connection, season: int, source: str, as_of: datetime) -
 @dataclass(frozen=True, slots=True)
 class Yardsticks:
     """The week's projections a freeze keeps beside each row: the published one (Lane 66j) and ESPN's
-    (Lane 114), each by research player id."""
+    (Lane 114), each by research player id, with the instant of the ESPN read (Lane 146)."""
 
     published: Mapping[str, float]
     espn: Mapping[str, float]
+    espn_read_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -278,7 +304,8 @@ def take_freeze(conn: Connection, season: int, week: int, now: datetime) -> Free
     ecr = {row.player_id: row.rank for row in preseason_rankings_as_of(conn, season, ECR_SOURCE, frozen_at)}
     props = week_props_consensus(conn, season, (kickoff, kickoffs.get(week + 1)), frozen_at)
     published = week_published_points(conn, season, week, frozen_at)
-    yardsticks = Yardsticks(published, week_espn_points(conn, season, week, frozen_at))
+    espn = week_espn_read(conn, season, week, frozen_at)
+    yardsticks = Yardsticks(published, espn.points, espn.read_at)
     rows: list[dict[str, Any]] = []
     coverage: dict[str, dict[str, int]] = {}
     for source, role in REGISTER_BOARD_SOURCES:
@@ -321,6 +348,7 @@ def _freeze_row(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its
     yardsticks: "Yardsticks",
 ) -> dict[str, Any]:
     stance = props.get(entry.player_id)
+    espn_points = yardsticks.espn.get(entry.player_id)
     return {
         "season": season,
         "week": week,
@@ -338,7 +366,8 @@ def _freeze_row(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its
         "props_markets": None if stance is None else stance.markets,
         "published_points": yardsticks.published.get(entry.player_id),
         "model_version": entry.model_version,
-        "espn_points": yardsticks.espn.get(entry.player_id),
+        "espn_points": espn_points,
+        "espn_read_at": None if espn_points is None else yardsticks.espn_read_at,
     }
 
 
@@ -347,9 +376,9 @@ def _record(conn: Connection, rows: Sequence[Mapping[str, Any]]) -> None:
     statement = text(
         "insert into research.register_freeze_rows (season, week, frozen_at, board_source, player_id, implementation, board_as_of, "
         "board_points, board_rank, board_value_rank, adp, ecr, props_points, props_markets, published_points, model_version, "
-        "espn_points) values (:season, :week, :frozen_at, :board_source, :player_id, :implementation, :board_as_of, :board_points, "
+        "espn_points, espn_read_at) values (:season, :week, :frozen_at, :board_source, :player_id, :implementation, :board_as_of, :board_points, "
         ":board_rank, :board_value_rank, :adp, :ecr, :props_points, cast(:props_markets as jsonb), :published_points, :model_version, "
-        ":espn_points)"
+        ":espn_points, :espn_read_at)"
     )
     for row in rows:
         conn.execute(
