@@ -405,9 +405,15 @@ type RunKey struct {
 // that reaches the window's oldest capture is left out (no date). A
 // capture whose list does not read, or that falls below the floor, is
 // skipped, never a break in a run.
+//
+// Each capture's count is taken once (Lane 129): listed_caps is read by
+// both window steps after it, and inlined (Postgres's default for a CTE
+// read once) its count subquery ran three times per capture, re-parsing
+// every list in the window thrice; that read ran past the cache's five
+// seconds in production from 2026-10-18 on.
 func (s *PGSource) DesignationRuns(ctx context.Context, newest time.Time) (map[RunKey]time.Time, error) {
 	codes, statuses := runCodes()
-	query := `with listed_caps as (
+	query := `with listed_caps as materialized (
   select payload, captured_at, (
     select count(distinct btrim(e->>'playerID')) from jsonb_array_elements(payload->'injList') as e
     where btrim(coalesce(e->>'playerID', '')) <> '' and btrim(coalesce(e->>'designation', '')) <> ''
