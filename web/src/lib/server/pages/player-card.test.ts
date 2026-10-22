@@ -166,7 +166,15 @@ void test("the read's stamp is its day and what it was written from", () => {
 });
 
 void test('in season the row under the tiles is the pace as stored and our rate vs his Avg (Lane 139, C08, C09)', () => {
-	const stored = { ...NUMBERS, preseasonPoints: 262.1, preseasonPerGame: 17.5, preseasonShare: 29 };
+	// The steps' figures from the run (Lane 139 fix round 1): the blend, the share and the rate.
+	const stored = {
+		...NUMBERS,
+		preseasonPoints: 262.1,
+		preseasonPerGame: 17.5,
+		preseasonShare: 29,
+		blendedPerGame: 27.1,
+		ratePerGame: 24.1
+	};
 	assert.deepEqual(
 		basisTiles(IN_SEASON, stored, 5).map((t) => [t.key, t.label, t.value, t.caption, t.reason]),
 		[
@@ -176,16 +184,16 @@ void test('in season the row under the tiles is the pace as stored and our rate 
 				'Our rate vs his Avg',
 				'--',
 				'our rest-of-season rate a game against his Avg',
-				'5 games weighted with his preseason pace at 29%, less missed games'
+				'in 5 games, blended with his usage 27.1, weighted 29% to his preseason pace 24.1, games he may miss taken out'
 			]
 		]
 	);
 	// The preseason total is not drawn beside the pace: the two never reconcile (C09).
 	assert.ok(!basisTiles(IN_SEASON, stored, 5).some((t) => t.value === '262.1'));
-	// A run older than the share says the weighting without it.
+	// A run older than the fields names the steps without their figures.
 	assert.equal(
-		basisTiles(IN_SEASON, { ...stored, preseasonShare: undefined }, 5).at(-1)?.reason,
-		'5 games weighted with his preseason pace, less missed games'
+		basisTiles(IN_SEASON, { ...stored, ratePerGame: undefined }, 5).at(-1)?.reason,
+		'in 5 games, weighted with his preseason pace, games he may miss taken out'
 	);
 	// With no stored pace there is no reason to give: the cell alone.
 	assert.deepEqual(

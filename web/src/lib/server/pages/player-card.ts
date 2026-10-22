@@ -134,7 +134,15 @@ export function basisTiles(format: Format, numbers: PlayerFormat, games: number)
 			label: BASIS_WORDS.vsAvg,
 			value: NONE,
 			caption: BASIS_WORDS.vsAvgCaption,
-			reason: pace === null ? null : vsAvgReason(games, numbers.preseasonShare ?? null)
+			reason:
+				pace === null
+					? null
+					: vsAvgReason({
+							games,
+							blended: numbers.blendedPerGame ?? null,
+							share: numbers.preseasonShare ?? null,
+							rate: numbers.ratePerGame ?? null
+						})
 		}
 	];
 }

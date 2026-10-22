@@ -182,7 +182,7 @@ export function restFigures(
  * (docs/research/2026-10-14-rest-of-season-preregistration.md), so a back's half PPR figure can sit off
  * the PPR and Standard midpoint. */
 export const FORMATS_FITTED_APART =
-	'Each format is fitted in its own scoring, so Half PPR need not sit halfway between PPR and Standard.';
+	'Each format weighs his season against his preseason pace by its own fit, so Half PPR need not sit halfway between PPR and Standard.';
 
 /** The every-format table's points heading and each line's label: "Rest of season from week 7" when
  * every line prints in-season points, "Projected" otherwise, and when the table mixes the two each

@@ -36,7 +36,7 @@ from research.capsules.voice_rules import named_rule
 from research.capsules.week.cells import cell_figures, misnamed, misranked
 from research.capsules.week.rank_words import fits, rank_words, superlatives_in
 from research.capsules.week.report_day import report_words
-from research.capsules.week.sheet import WeekSheet, points_text
+from research.capsules.week.sheet import STATUS_WORDS, WeekSheet, points_text
 from research.capsules.week.start_advice import start_advice_in
 
 MIN_SENTENCES: Final = 3
@@ -118,11 +118,20 @@ _ORDINAL_OF_BEFORE: Final = re.compile(r"\d(?:st|nd|rd|th)\s+of\s+$", re.IGNOREC
 # the call in its own verb ("start him", "sit him", "keep him", "find a fill-in"), his status on the list, or
 # that he does not play.
 _RANK_WORD: Final = re.compile(r"\b\d+(?:st|nd|rd|th)\b", re.IGNORECASE)
+# A call is a verb said of him ("start him", "sit Gibbs", "keep him on the bench"), never "sits first among".
 _CALL_WORDS: Final = re.compile(
-    r"\b(?:(?:start|sit|bench|keep|hold|drop|add)(?:s|ed|ing)?|fill-in|pick(?:s|ing)? (?:him )?up)\b", re.IGNORECASE
+    r"\b(?:[Ss]tart|[Ss]it|[Bb]ench|[Kk]eep|[Hh]old|[Dd]rop|[Aa]dd|[Pp]lay)(?:s|ed|ing)? (?:him|them|[A-Z]\w+)\b|"
+    r"\bfill-in\b|\b[Pp]ick(?:s|ing)? (?:him )?up\b"
 )
-_STATUS_WORDS: Final = re.compile(r"\b(?:questionable|doubtful|designation|designated)\b", re.IGNORECASE)
+# His status as the sheet says it (`sheet.STATUS_WORDS`, the one source) and the words for a player with none.
+_STATUS_WORDS: Final = re.compile(
+    r"\b(?:"
+    + "|".join(re.escape(word.removeprefix("on ")) for word in STATUS_WORDS.values())
+    + r"|IR|PUP|designation|designated|healthy|cleared|active|practiced|practice)\b",
+    re.IGNORECASE,
+)
 _SET_UP: Final = ":"
+_ALLOWS: Final = re.compile(r"\b(?:allow\w*|gives? up|giving up|gave up|surrender\w*)\b", re.IGNORECASE)
 
 
 def _sentence_violation(what: str, sentence: str, remedy: str) -> str:
@@ -451,7 +460,9 @@ def _superlative_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[
     allowed, 1st the fewest, so "the most" is the last rank alone (`rank_words`)."""
     a = sheet.allowed
     out = []
-    for s in sentences:
+    # Only a sentence about what an opponent allows reads as its rank (review LOW-1): "the most points of any
+    # Rams receiver" is his own figure, the cells' rule's to judge.
+    for s in (s for s in sentences if _ALLOWS.search(s)):
         for raw, said in superlatives_in(s):
             if a is not None and not sheet.bye and fits(said, a.rank, a.of):
                 continue

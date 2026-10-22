@@ -71,6 +71,10 @@ class StoredRow:
     # In season, the share of his rate a game that pace carries, k / (k + games played) (Lane 139, C08);
     # None wherever the pace is.
     preseason_share: float | None = None
+    # In season, the steps from his Avg to our rate the page names (Lane 139 fix round 1): his season blended
+    # with his usage, None before a game or without the pace, and the model's rate a game he plays.
+    blended_per_game: float | None = None
+    rate_per_game: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

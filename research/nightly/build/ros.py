@@ -31,7 +31,7 @@ from research.model.ros.live import (
     stale_prior,
     window_of,
 )
-from research.model.ros.model import FORMATS, RosPriors, prior_share, project
+from research.model.ros.model import FORMATS, RosPriors, blended_rate, prior_share, project
 from research.model.ros.raw_line import RawLine
 from research.nightly.build.page_club import ClubCall, call_for
 from research.nightly.build.player_season import SCORING, SeasonContext
@@ -56,6 +56,10 @@ class RestFigures:
     preseason_per_game: Mapping[str, float] | None = None
     # By scoring, the share of his rate a game the preseason pace carries (Lane 139, C08), with the pace only.
     preseason_share: Mapping[str, float] | None = None
+    # By scoring, the steps the player page names from his Avg to our rate (Lane 139 fix round 1): his season
+    # blended with his usage (None before a game), and the model's rate a game he plays.
+    blended_per_game: Mapping[str, float] | None = None
+    rate_per_game: Mapping[str, float] | None = None
 
 
 Projections = Mapping[str, RestFigures]
@@ -191,6 +195,7 @@ def _projections(
         start = first_week_to_play(states, row.team) if player.remaining_weeks and row.team is not None else None
         pace = None if stale is None or stale.per_game is None else dict(stale.per_game)
         share = None if pace is None else {name: prior_share(player, name, ready.priors) for name in FORMATS}
+        blended = {name: blended_rate(player, name, ready.priors) for name in FORMATS}
         found[row.universe_id] = RestFigures(
             projected=projection.projected,
             expected_games=projection.expected_games,
@@ -198,8 +203,15 @@ def _projections(
             game_points=_one_game(projection.game_points, row.team),
             preseason_per_game=pace,
             preseason_share=share,
+            blended_per_game=None if pace is None or None in blended.values() else _known(blended),
+            rate_per_game=dict(projection.per_game),
         )
     return found  # fmt: skip
+
+
+def _known(by: Mapping[str, float | None]) -> dict[str, float]:
+    """A mapping whose values are all known, typed as such."""
+    return {name: value for name, value in by.items() if value is not None}
 
 
 def _one_game(game_points: Mapping[str, float], club: str | None) -> Mapping[str, float]:
@@ -222,6 +234,8 @@ def _reranked(board: FormatBoard, extra: Sequence[StoredRow], found: Projections
             game_points=found[row.universe_id].game_points[board.format.scoring],
             preseason_per_game=_pace(found[row.universe_id], board.format.scoring),
             preseason_share=_share(found[row.universe_id], board.format.scoring),
+            blended_per_game=_step(found[row.universe_id].blended_per_game, board.format.scoring),
+            rate_per_game=_step(found[row.universe_id].rate_per_game, board.format.scoring),
             floor=None,
             median=None,
             ceiling=None,
@@ -240,6 +254,11 @@ def _pace(figures: RestFigures, scoring: str) -> float | None:
 def _share(figures: RestFigures, scoring: str) -> float | None:
     """The share of his rate a game the preseason pace carries in `scoring`, None without the pace."""
     return None if figures.preseason_share is None else figures.preseason_share.get(scoring)
+
+
+def _step(by: Mapping[str, float] | None, scoring: str) -> float | None:
+    """One step's figure in `scoring`, None where the run holds none."""
+    return None if by is None else by.get(scoring)
 
 
 def carried(raw: RawLine) -> frozenset[str]:

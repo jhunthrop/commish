@@ -14,6 +14,7 @@
 		FIGURE_HEADS,
 		ORDER,
 		figureColumns,
+		sortedFigure,
 		moveHref,
 		moveWords,
 		type OrderView
@@ -44,6 +45,8 @@
 
 	const marked = $derived(league !== null);
 	const figures = $derived(figureColumns(rankBy));
+	/** The column # sorts on, its head marked where it is not the big first column (MEDIUM-3). */
+	const sortedBy = $derived(sortedFigure(rankBy));
 	const SEPARATOR = ', ';
 
 	/** The folded line under the name below 1100 px: every figure after the key, the opponent's rank,
@@ -82,7 +85,12 @@
 			<th class="game" scope="col">{BOX.game}</th>
 			<th class="n proj" scope="col">{weekHead(week)}</th>
 			{#each figures as f, i (f)}
-				<th class="n {i === 0 ? 'key' : 'ev fig'}" scope="col">{FIGURE_HEADS[f]}</th>
+				<th
+					class="n {i === 0 ? 'key' : 'ev fig'}"
+					class:sorted={f === sortedBy && i > 0}
+					scope="col"
+					aria-sort={f === sortedBy ? 'descending' : undefined}>{FIGURE_HEADS[f]}</th
+				>
 			{/each}
 			<th class="n ev first" scope="col">{BOX.avg}</th>
 			<th class="n ev" scope="col">{BOX.last}</th>
@@ -175,6 +183,20 @@
 		color: var(--ink-3);
 		border-bottom: 1px solid var(--line);
 		white-space: nowrap;
+	}
+
+	/* The head # sorts on: in ink, with the sort's caret in the accent, as the boards draw it. */
+	.cols .sorted {
+		color: var(--ink);
+	}
+
+	.cols .sorted::after {
+		content: '';
+		display: inline-block;
+		margin-left: 4px;
+		border: 4px solid transparent;
+		border-bottom: 5px solid var(--accent);
+		vertical-align: 3px;
 	}
 
 	.cols .rank {

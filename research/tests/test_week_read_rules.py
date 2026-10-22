@@ -639,3 +639,35 @@ def test_a_change_under_half_a_point_is_no_cell_a_read_may_quote() -> None:
     text = "Puka Nacua's published projection is 18.4 points, up 0.1 points since the figure before it."
     assert any("a figure the page draws in no cell" in v for v in week_rule_violations(text, sheet, "start"))
     assert not any("no cell" in v for v in week_rule_violations(text.replace("0.1", "0.5"), starter(), "start"))
+
+
+@pytest.mark.parametrize(
+    "opener",
+    [
+        "Nacua is listed Out on Friday's report.",
+        "Puka Nacua is healthy and leads the Rams in targets again.",
+        "Puka Nacua is on injured reserve and does not play.",
+        "Keep him on your bench this week.",
+    ],
+)
+def test_a_status_first_opener_is_taken_for_every_status(opener: str) -> None:
+    """Review MEDIUM-1: the status words are the sheet's own (`STATUS_WORDS`), Out among them."""
+    assert not any("opens" in v for v in week_rule_violations(opener, starter(), "start"))
+
+
+def test_a_loose_call_word_does_not_carry_a_scene_set_opener() -> None:
+    """Review MEDIUM-1: "sits first among" is no call."""
+    text = "Gibbs sits first among Detroit running backs as the week opens."
+    assert any("opens" in v for v in week_rule_violations(text, starter(), "start"))
+
+
+def test_a_superlative_of_his_own_is_not_read_as_the_opponent_s_rank() -> None:
+    """Review LOW-1: only a sentence about what an opponent allows is held to Opp rank."""
+    text = "Nacua has scored the most PPR points of any Rams receiver this season."
+    assert not any("Opp rank counts" in v for v in week_rule_violations(text, starter()))
+
+
+def test_a_short_list_names_the_nearer_end() -> None:
+    """Review LOW-2: 1st of 4 is the fewest, never among the most."""
+    assert rank_words(1, 4) == "the fewest"
+    assert rank_words(4, 4) == "the most"

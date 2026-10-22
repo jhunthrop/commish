@@ -150,7 +150,7 @@ function checkSeen(s: Seen, where: string, verb: string): void {
 	const gap = s.vsAvg;
 	check(
 		/^[+\u2212]\d+\.\d$/.test(gap.value) &&
-			/^\d+\.\d a game vs his \d+\.\d Avg: /.test(gap.caption),
+			/^\d+\.\d Avg in \d+ games?, .+: \d+\.\d a game$/.test(gap.caption),
 		`${where}: vs Avg ${JSON.stringify(gap)}`
 	);
 	check(!s.projHead, `${where}: the game log draws a Proj column`);

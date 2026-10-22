@@ -12,6 +12,7 @@ import {
 	FIGURE_HEADS,
 	ORDER,
 	figureColumns,
+	sortedFigure,
 	moveHref,
 	moveWords,
 	orderBasis,
@@ -230,6 +231,9 @@ void test('the Game cell labels its expected score with both clubs, never a fina
 void test('the big figure is his projected points, the sort key beside it (Lane 139, C20)', () => {
 	assert.deepEqual(figureColumns('points_over_replacement'), ['total', 'por', 'perGame']);
 	assert.deepEqual(figureColumns('rest_of_season_points'), ['total', 'perGame']);
+	// The head of the column # sorts on is marked (fix round 1, MEDIUM-3).
+	assert.equal(sortedFigure('points_over_replacement'), 'por');
+	assert.equal(sortedFigure('rest_of_season_points'), 'total');
 	assert.equal(FIGURE_HEADS.por, 'Over repl.');
 	assert.equal(FIGURE_HEADS.total, 'Projected');
 });

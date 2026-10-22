@@ -679,7 +679,7 @@ void test('our rate vs his Avg is the rest of season a game less his Avg, from t
 			label: BASIS_WORDS.vsAvg,
 			value: NONE,
 			caption: BASIS_WORDS.vsAvgCaption,
-			reason: vsAvgReason(5, 29)
+			reason: vsAvgReason({ games: 5, blended: 27.1, share: 29, rate: 24.1 })
 		}
 	];
 	const at = (perGame: number | null, format: 'ppr' | 'half_ppr' = 'ppr') =>
@@ -703,7 +703,7 @@ void test('our rate vs his Avg is the rest of season a game less his Avg, from t
 	assert.equal(filled.find((t) => t.key === 'vsAvg')?.value, '\u22128.7');
 	assert.equal(
 		filled.find((t) => t.key === 'vsAvg')?.caption,
-		'22.0 a game vs his 30.7 Avg: 5 games weighted with his preseason pace at 29%, less missed games'
+		'30.7 Avg in 5 games, blended with his usage 27.1, weighted 29% to his preseason pace 24.1, games he may miss taken out: 22.0 a game'
 	);
 	// "--" stands with the plain caption: no reason beside a figure not drawn (fix round 1, M4).
 	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.caption, BASIS_WORDS.vsAvgCaption);
@@ -715,11 +715,18 @@ void test('our rate vs his Avg is the rest of season a game less his Avg, from t
 
 void test('our rate vs his Avg names both figures, the pace and its share, as its tile beside it does (Lane 139, C08)', () => {
 	// Its phone lines are the shot script's to count (player-bye-shots.ts), never a character proxy.
-	const caption = vsAvgCaption('22.0', '30.7', vsAvgReason(5, 29));
+	const caption = vsAvgCaption(
+		'22.0',
+		'30.7',
+		vsAvgReason({ games: 5, blended: 27.1, share: 29, rate: 24.1 })
+	);
+	// Each step in order, from his Avg to our rate, each figure the run's (Lane 139 fix round 1).
 	assert.equal(
 		caption,
-		'22.0 a game vs his 30.7 Avg: 5 games weighted with his preseason pace at 29%, less missed games'
+		'30.7 Avg in 5 games, blended with his usage 27.1, weighted 29% to his preseason pace 24.1, games he may miss taken out: 22.0 a game'
 	);
+	assert.doesNotMatch(caption, /\bless\b/u);
+	assert.equal(vsAvgCaption('22.0', '30.7', null), '22.0 a game vs his 30.7 Avg');
 	assert.match(caption, new RegExp(BASIS_WORDS.pace.toLowerCase()));
 	assert.match(BASIS_WORDS.vsAvg, /^Our rate/u);
 });
@@ -759,7 +766,7 @@ void test('copy guard: no card word uses a betting or trading word, the word hos
 		CARD.tier,
 		CARD.readNotYet,
 		...Object.values(BASIS_WORDS),
-		vsAvgReason(5, 29),
+		vsAvgReason({ games: 5, blended: 27.1, share: 29, rate: 24.1 }),
 		publishedOn('Thursday'),
 		CARD.writtenFrom,
 		CARD.startHim,

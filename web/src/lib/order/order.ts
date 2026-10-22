@@ -50,6 +50,12 @@ export function figureColumns(rankBy: OrderAdvice['rank_by']): readonly FigureKe
 	return rankBy === 'points_over_replacement' ? ['total', 'por', 'perGame'] : ['total', 'perGame'];
 }
 
+/** The column the # sorts on, marked in its head (Lane 139 fix round 1, MEDIUM-3; the 2026-10-19
+ * ruling: a sorted column draws its key): Over repl. across positions, Projected at one. */
+export function sortedFigure(rankBy: OrderAdvice['rank_by']): FigureKey {
+	return rankBy === 'points_over_replacement' ? 'por' : 'total';
+}
+
 /** A figure column's head. */
 export const FIGURE_HEADS: Readonly<Record<FigureKey, string>> = {
 	por: ORDER.overRepl,

@@ -188,6 +188,10 @@ def numbers_of(entry: BoardEntry, adp: float | None, tier_drop: float | None) ->
             "preseasonPerGame": None if before is None else tenth_or_none(row.preseason_per_game),
             # The share of his rate a game that pace carries, a whole percent (Lane 139, C08).
             "preseasonShare": None if before is None else percent_or_none(row.preseason_share),
+            # The steps from his Avg to our rate (Lane 139 fix round 1): his season blended with his usage, and
+            # the model's rate a game he plays, before the games he may miss.
+            "blendedPerGame": None if before is None else tenth_or_none(row.blended_per_game),
+            "ratePerGame": tenth_or_none(row.rate_per_game),
             # The week his rest of season starts from: his club's first game still to play (Lane 86).
             "restFromWeek": row.from_week,
             # One more club game at his rate (Lane 96): a league whose title week is past the run's last

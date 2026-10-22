@@ -139,14 +139,14 @@
 			--tile-cap: 11px;
 		}
 
-		/* The row under the tiles keeps its own count across, so our rate's reason has the room for its
-		   share (Lane 139, C08). */
+		/* The row under the tiles one to a line, so our rate's steps from his Avg have the phone's width
+		   (Lane 139 fix round 1). */
 		.tiles.basis {
-			--across: var(--n);
+			--across: 1;
 		}
 	}
 
 	.tiles.basis.folded {
-		--across: var(--n);
+		--across: 1;
 	}
 </style>

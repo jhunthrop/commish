@@ -142,6 +142,11 @@ export const boardRowSchema = z.object({
 	/** In season, the share of his rate a game that pace carries, a whole percent (Lane 139, C08): null
 	 * with the pace, absent on a run older than the field. */
 	preseasonShare: z.number().int().min(0).max(100).nullable().optional(),
+	/** In season, the steps from his Avg to our rate the card names (Lane 139 fix round 1): his season
+	 * blended with his usage a game (null before a game or without the pace), and the model's rate a
+	 * game he plays, before the games he may miss. Absent on a run older than the fields. */
+	blendedPerGame: points.nullable().optional(),
+	ratePerGame: points.nullable().optional(),
 	/** In season, the week his rest of season starts from: his club's first game still to play at the
 	 * run (Lane 86), null with none left. Absent preseason and on a run older than the field, where the
 	 * format's rosFromWeek stands. */

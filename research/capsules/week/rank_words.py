@@ -46,7 +46,7 @@ def fits(said: Superlative, rank: int, of: int) -> bool:
     """Whether the superlative is true of `rank` of `of` (1 the fewest)."""
     place = _from_end(rank, of, said.end)
     if said.among:
-        return 1 <= place <= 1 + AMONG_REACH
+        return 1 <= place <= 1 + AMONG_REACH and 2 * place <= of
     return place == said.place
 
 
@@ -64,7 +64,9 @@ def rank_words(rank: int, of: int) -> str | None:
     """The words a rank is said with: "the most" or "the second most" at the end itself and next to it,
     "among the most" a little further in, the same from the fewest end; None for a rank between, which is
     said by its rank alone."""
-    for end in ("most", "fewest"):
+    # The nearer end first, so a short list never names the far one (review LOW-2).
+    ends: tuple[End, End] = ("most", "fewest") if 2 * rank > of + 1 else ("fewest", "most")
+    for end in ends:
         place = _from_end(rank, of, end)
         if place in _PLACE_WORDS:
             return f"the {_PLACE_WORDS[place]}{end}"

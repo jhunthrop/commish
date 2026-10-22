@@ -219,6 +219,24 @@ def test_each_row_carries_the_share_of_his_rate_the_preseason_pace_carries() -> 
         assert numbers_of(by_id["p9"], None, None)["preseasonShare"] is None
 
 
+def test_each_row_carries_the_steps_from_his_avg_to_our_rate() -> None:
+    """Lane 139 fix round 1 (HIGH-1), from the run: his season blended with his usage, then weighted with the
+    pace to the model's rate a game he plays, which times his expected games is his rest of season."""
+    result = ros_boards(_boards(), _context(LINES_THROUGH), FIRST_WEEK_INSTANT, _states(FIRST_WEEK_INSTANT), SETUP)
+    for board in result.boards:
+        k = PRIORS.shrinkage[f"WR|{board.format.scoring}"].k
+        by_id = {e.row.player_id: e.row for e in board.entries}
+        p1 = by_id["p1"]
+        assert p1.blended_per_game is not None and p1.rate_per_game is not None
+        share = k / (k + LINES_THROUGH)
+        assert p1.rate_per_game == pytest.approx(share * 16.0 + (1 - share) * p1.blended_per_game)
+        assert p1.rate_per_game * p1.expected_games == pytest.approx(p1.projected)
+        printed = numbers_of(next(e for e in board.entries if e.row.player_id == "p1"), None, None)
+        assert printed["blendedPerGame"] == round(p1.blended_per_game, 1)
+        # Off the preseason line: no pace, so no blend is named; his rate stands.
+        assert by_id["p9"].blended_per_game is None and by_id["p9"].rate_per_game is not None
+
+
 def test_a_raw_line_without_a_scoring_keeps_that_format_preseason_alone() -> None:
     boards = _boards()
     result = ros_boards(
