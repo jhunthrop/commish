@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Format } from '#lib/run/schema.ts';
 import { STAT_FIELDS, type GameLogRow, type PlayerSeason, type StatLine } from '#lib/run/season.ts';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
+import { SEASON_LOG_WORDS } from '#lib/run/season-log-words.ts';
 import { seasonView } from './player-season.ts';
+
+void test("the season log's words pass the copy guard (Lane 138)", () => {
+	for (const words of Object.values(SEASON_LOG_WORDS))
+		assert.doesNotMatch(words, bannedPattern(), words);
+});
 
 const EMPTY = Object.fromEntries(STAT_FIELDS.map((field) => [field, null])) as Omit<
 	StatLine,
@@ -221,7 +228,7 @@ void test("a free agent's weeks past the records list no row, and his played wee
 		]),
 		[
 			['vs BUF', '', 'played'],
-			['Played, no line', '', 'quiet'],
+			['Played, no stats', '', 'quiet'],
 			['Did not play', '', 'quiet']
 		]
 	);

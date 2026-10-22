@@ -61,7 +61,7 @@ function opponentWords(row: GameLogRow): string {
 	// An inactive week of a player who changed clubs before his newest line names no club (Lane 120),
 	// nor a free agent's week of offensive snaps with no club edge, which he played (Lane 138).
 	if (row.opponent === null)
-		return row.unnamedGame === true ? SEASON_LOG_WORDS.playedNoLine : SEASON_LOG_WORDS.didNotPlay;
+		return row.unnamedGame === true ? SEASON_LOG_WORDS.playedNoStats : SEASON_LOG_WORDS.didNotPlay;
 	return `${row.home === true ? 'vs' : 'at'} ${row.opponent}`;
 }
 

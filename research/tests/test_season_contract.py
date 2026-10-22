@@ -357,7 +357,7 @@ def test_the_line_winning_over_the_list_read_passes_the_gate_with_writer_made_bo
 def test_a_free_agents_snaps_in_a_week_with_no_club_edge_pass_the_gate(tmp_path: Path) -> None:
     """Gap 4: a free agent (the list after his week 6 LAC line names no club) with offensive snaps in week 3
     and no club edge that week: the run names no club, so the week names no opponent, and says he played
-    a game it cannot name (Lane 138: the log reads "Played, no line", never "Did not play")."""
+    a game it cannot name (Lane 138: the log reads "Played, no stats", never "Did not play")."""
     season = _write_mover(tmp_path, Mover(dict.fromkeys(_FORMER_WEEKS, _LINE), {3: _OFFENSIVE_SNAPS}, None))
     by_week = {row["week"]: row for row in season["log"]}
     assert (by_week[3]["status"], by_week[3]["opponent"], by_week[3].get("unnamedGame")) == ("inactive", None, True)

@@ -2,7 +2,7 @@
 // API's clock: his player page and his row on the Players list. Each asserts what it shows: the card's
 // club cell reads "FA" with no club link and no mark, the card's week says "No club", the line under the
 // card says he is now a free agent and whose his last game was, the log lists no week past the records,
-// his week of offensive snaps with no club edge reads "Played, no line" (Lane 138),
+// his week of offensive snaps with no club edge reads "Played, no stats" (Lane 138),
 // the Players row's club cell reads "FA" and its game cell "No club", and the page's copy passes the one
 // guard (copy-scan.ts).
 // STAND-INS, named here and in the lane's report:
@@ -139,7 +139,7 @@ try {
 			});
 			const unnamed = card.rows.find((r) => r.week === UNNAMED_GAME_WEEK)?.text ?? '';
 			if (
-				!unnamed.includes(SEASON_LOG_WORDS.playedNoLine) ||
+				!unnamed.includes(SEASON_LOG_WORDS.playedNoStats) ||
 				unnamed.includes(SEASON_LOG_WORDS.didNotPlay)
 			)
 				faults.push(`${where}: his week ${String(UNNAMED_GAME_WEEK)} row reads "${unnamed}"`);
