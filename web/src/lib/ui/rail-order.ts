@@ -4,6 +4,7 @@
 import {
 	PHONE_RAIL_ITEMS,
 	RAIL_ITEMS,
+	railInSeason,
 	type LeaguePhase,
 	type RailItem,
 	type RailKey
@@ -59,4 +60,10 @@ export const RAIL_WITHOUT_LEAGUE: readonly RailEntry[] = entries([
 /** A rail key's items. */
 export function railOfKey(key: RailKey): readonly RailEntry[] {
 	return key === 'playoffs_waivers' ? railFor('playoffs', true) : railFor(key, false);
+}
+
+/** The items a root shows (rail-css.ts): its rail key's, or on a season rail whose root names no
+ * league the rail without a league (Lane 83). The shots read it to say what each page must show. */
+export function railShown(key: RailKey, league: boolean): readonly RailEntry[] {
+	return !league && railInSeason(key) ? RAIL_WITHOUT_LEAGUE : railOfKey(key);
 }

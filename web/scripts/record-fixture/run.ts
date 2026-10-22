@@ -14,6 +14,11 @@
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { manifestSchema, recordSchema, RUN_PATHS } from '../../src/lib/run/schema.ts';
 import { withTwoRecords, type TwoMode } from './two.ts';
+import {
+	RECORD_LIVE_RUN_ID,
+	RECORD_SHAPE_RUN_ID,
+	recordTwoRunId
+} from '../inseason-fixture/run-ids.ts';
 
 /** `live` (Lane 93) shoots the record as the nightly writes it from the dev store on Monday night of
  * week 6 (record-live.json): weeks 1 and 2 graded with their players, 3 to 5 not set, 6 waiting.
@@ -22,10 +27,10 @@ const TWO = process.argv[2] === 'two';
 const TWO_MODE: TwoMode = process.argv[3] === 'graded' ? 'graded' : 'upcoming';
 const LIVE = process.argv[2] === 'live' || TWO;
 const RECORD_SHOTS_RUN = TWO
-	? `2026-10-21T12-two-${TWO_MODE}`
+	? recordTwoRunId(TWO_MODE)
 	: LIVE
-		? '2026-10-21T12-live-week6'
-		: '2026-10-21T12-live-shape';
+		? RECORD_LIVE_RUN_ID
+		: RECORD_SHAPE_RUN_ID;
 const SOURCE_RUN = new URL(
 	'../../../research/nightly/contract/fixture/runs/2026-10-21T12-ros/',
 	import.meta.url

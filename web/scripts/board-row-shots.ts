@@ -2,8 +2,10 @@
 // ADP, a club, Compare and the schedule, in both themes at 1440 and 390, with what each must hold
 // asserted at every width:
 // - no page scrolls sideways (1440, 1024, 768 and 390), and no row's last cell runs past the row;
-// - the basis is at most five rendered lines (the schedule's lead two on a desk);
-// - a row's name is set larger than its figures, the Gap head names its sum, a plus gap is green and
+// - the basis is at most five rendered lines (the schedule's lead two on a desk; the in-season order
+//   and the K tab's week eight on a phone);
+// - a row's name is set larger than its figures but Projected, its biggest, at the name's size (B46),
+//   the Gap head names its sum, a plus gap is green and
 //   a minus gap rose, on the rows and on Compare;
 // - in season the board is the order's (review 66n finding 3): built with the order's first line and
 //   no run row, so the page before the script and the order after it never disagree;
@@ -116,20 +118,28 @@ async function checkNoGap(page: Page, tag: string): Promise<void> {
 }
 
 async function checkRows(page: Page, tag: string): Promise<void> {
+	// Projected is the row's biggest figure, set at the name's size (B46, 8fbac850); every other
+	// figure sits under the name.
 	const sizes = await page.evaluate(() => {
 		const row = document.querySelector('.row');
 		const name = row?.querySelector('.name');
-		const figure = row?.querySelector('.n:not(.rk)');
-		return name && figure
-			? {
-					name: parseFloat(getComputedStyle(name).fontSize),
-					figure: parseFloat(getComputedStyle(figure).fontSize)
-				}
+		const size = (el: Element): number => parseFloat(getComputedStyle(el).fontSize);
+		const figures = [...(row?.querySelectorAll('.n:not(.rk):not(.c-proj)') ?? [])].map(size);
+		const proj = row?.querySelector('.n.c-proj');
+		return name && figures.length > 0
+			? { name: size(name), figure: Math.max(...figures), proj: proj ? size(proj) : null }
 			: null;
 	});
 	if (!sizes) fail(tag, 'no board row with a name and a figure');
-	else if (sizes.name <= sizes.figure)
-		fail(tag, `name ${String(sizes.name)}px not above figure ${String(sizes.figure)}px`);
+	else {
+		if (sizes.name <= sizes.figure)
+			fail(tag, `name ${String(sizes.name)}px not above figure ${String(sizes.figure)}px`);
+		if (sizes.proj !== null && (sizes.proj > sizes.name || sizes.proj <= sizes.figure))
+			fail(
+				tag,
+				`Projected ${String(sizes.proj)}px is not the biggest figure at most the name's ${String(sizes.name)}px`
+			);
+	}
 	if (GAPLESS) {
 		await checkNoGap(page, tag);
 	} else {
@@ -173,12 +183,14 @@ async function checkPage(page: Page, shot: Shot, tag: string, width: number): Pr
 	}
 	// The in-season board is the order, whose basis is its own paragraph (Lane 66q turned its check on).
 	const lines = await renderedLines(page, shot.kind === 'order' ? 'main [data-basis] p' : '.basis');
-	const most =
-		shot.kind !== 'order'
-			? MAX_BASIS_LINES
-			: width > PHONE_MAX
-				? MAX_ORDER_BASIS_LINES.desk
-				: MAX_ORDER_BASIS_LINES.phone;
+	// In season the K tab is the week's kickers (Lane 66w), an in-season screen with the order's
+	// budget: five lines at a desk, eight on a phone.
+	const inSeason = shot.kind === 'order' || shot.kind === 'draft-order';
+	const most = !inSeason
+		? MAX_BASIS_LINES
+		: width > PHONE_MAX
+			? MAX_ORDER_BASIS_LINES.desk
+			: MAX_ORDER_BASIS_LINES.phone;
 	if (lines === null || lines === 0) fail(tag, 'no basis');
 	else if (lines > most) fail(tag, `basis ${String(lines)} lines`);
 	process.stdout.write(`${tag} basis ${String(lines)} lines\n`);

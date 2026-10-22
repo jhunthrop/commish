@@ -4,10 +4,11 @@
 // before his first line say he did not play with no opponent, and the page's copy passes the one guard
 // (copy-scan.ts).
 // STAND-IN, named here and in the lane's report: Jahmyr Gibbs as a constructed mover. The in-season
-// contract fixture's page rewritten by the research writer itself (`season_block`, `last_game_club`):
+// contract fixture's page rewritten by the research writer's rules (`season_block`, `last_game_club`):
 // his week 5 and 6 lines for LAC, the provider's list read two days after his week 6 game naming DET.
-// Build the site from that run (PUBLIC_RUN_ID=2026-10-21T12-ros PUBLIC_RUN_BASE_URL=.runs) and start
-// the fixture API with FIXTURE_RUN_ID=2026-10-21T12-ros and FIXTURE_CLOCK at the clock to shoot:
+// That run is written by `node scripts/inseason-fixture/mover-run.ts mover` (2026-10-21T12-mover). Build
+// the site from it (PUBLIC_RUN_ID=2026-10-21T12-mover PUBLIC_RUN_BASE_URL=.runs) and start the fixture
+// API with FIXTURE_RUN_ID=2026-10-21T12-mover and FIXTURE_CLOCK at the clock to shoot:
 //
 //   node scripts/club-move-shots.ts [web origin] [out dir]
 import { mkdir } from 'node:fs/promises';

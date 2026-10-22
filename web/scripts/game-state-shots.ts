@@ -5,7 +5,9 @@
 //   tuesday  every week 6 game final.
 // The fixture API must run on the same clock (FIXTURE_CLOCK); it stamps every game with the API's state
 // at it, the finals from the hourly status rows (inseason-fixture/game-state.ts).
-// SET=contract (the site built from the contract run, 2026-10-21T12-ros): the board's RB tab signed in,
+// SET=contract (the site built from the Saturday run, inseason-fixture/saturday-run.ts: the contract run,
+// 2026-10-21T12-ros, moved back to the fixture week's Saturday, Lane 86; the fixture API started with
+// FIXTURE_RUN_ID=2026-10-17T17-ros, `npm run shots` does both): the board's RB tab signed in,
 // /players, Josh Allen's card (his live week replaces the run's week still to play: still to play on
 // Sunday, Final after), the schedule and the clubs (Rest of season strength, never the
 // preseason's). SET=standin (the site built from the stand-in run): Jaxson Dart's card, whose live week

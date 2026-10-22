@@ -12,6 +12,7 @@
 // with the site built on the live record run against the fixture API at the api origin.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
+import { RECORD_WORDS } from '../src/lib/run/record.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { installFixtureApiClock } from './inseason-fixture/clock.ts';
 
@@ -61,12 +62,10 @@ async function record(who: Who, width: number): Promise<void> {
 	has(main, 'Graded 2 of 5 weeks played', where);
 	has(main, 'Weeks 3 to 5 were not set before kickoff, so they cannot be graded.', where);
 	has(main, 'Week 6 grades Wednesday when the stats land.', where);
-	has(main, 'Places off is the average number of places', where);
-	has(
-		main,
-		"Each week will also be graded against the week's published projection from the first week",
-		where
-	);
+	has(main, RECORD_WORDS.placesOff, where);
+	// A run's own record leaves the published projection's start to the weekly record's desk and names
+	// Published in its lead once its column is drawn (Lane 131, record.ts recordBasis): never here.
+	lacks(main, /graded against the week's published projection/u, where);
 	lacks(main, /Rates print|froze|freeze|one provider/u, where);
 	if (width > PHONE_MAX) {
 		has(main, 'Set Tue Sep 8, graded Tue Oct 13', where);

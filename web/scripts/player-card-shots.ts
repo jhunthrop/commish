@@ -14,7 +14,8 @@
 //   the first tiles.
 // The Rest of season tile shows on a run that ranks the rest of the season: set ROS_FROM_WEEK to its
 // first week (the site built from the nightly's contract fixture run, research/nightly/contract/
-// fixture, PUBLIC_RUN_ID=2026-10-21T12-ros) and one signed-out page is shot with the tile held to
+// fixture, PUBLIC_RUN_ID=2026-10-21T12-ros, ROS_FROM_WEEK=7) and one signed-out page is shot, Compare
+// leading, with the tile held to
 // "Rest of season ... in our order"; that run predates the reads' stamps and the earlier seasons, so
 // those two are not asked of it. Otherwise the tile is held to "Projected".
 // A season-long player (De'Von Achane on injured reserve) reads the run's designations, which
@@ -23,7 +24,7 @@
 // his tier box ("On IR, not ranked") are held to Lane 63's word.
 // Against the built site served by the Worker and the fixture API (scripts/inseason-fixture/serve.ts).
 //
-//   [ROS_FROM_WEEK=6] node scripts/player-card-shots.ts [web origin] [out dir]
+//   [ROS_FROM_WEEK=7] node scripts/player-card-shots.ts [web origin] [out dir]
 // with the site built against PUBLIC_API_URL pointing at the fixture API.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
@@ -132,9 +133,10 @@ const SHOTS: readonly Shot[] = [
 	}
 ];
 
-/** On the contract fixture's rest-of-season run: one signed-out page, the run's own player. */
+/** On the contract fixture's rest-of-season run: one signed-out page, the run's own player. A run that
+ * ranks the rest of the season leads with Compare (card.ts compareLeadsWithoutVerb, Lane 117). */
 const ROS_SHOTS: readonly Shot[] = [
-	{ name: 'ros', slug: 'josh-allen', signedIn: false, verb: 'Add to my sheet', weekRead: 'none' }
+	{ name: 'ros', slug: 'josh-allen', signedIn: false, verb: CARD.compare, weekRead: 'none' }
 ];
 const ROS = ROS_FROM_WEEK !== undefined;
 
@@ -168,6 +170,9 @@ function check(ok: boolean, what: string): void {
 
 interface Card {
 	labels: string[];
+	/** The first row of tiles alone, never the row under it (Preseason and vs Avg on a run that ranks
+	 * the rest of the season, Lane 100). */
+	first: string[];
 	values: Record<string, string>;
 	captions: Record<string, string>;
 	/** The page is past the first kickoff: the season read is not drawn. */
@@ -208,6 +213,9 @@ async function read(page: Page): Promise<Card> {
 		const toggle = document.querySelector<HTMLElement>('main .season tbody.earlier button');
 		return {
 			labels,
+			first: [...document.querySelectorAll('main .card .tiles:not(.basis) .tile .lb')].map((el) =>
+				el.textContent.trim()
+			),
 			values: pick('.v'),
 			captions: pick('.cap'),
 			pill: document.querySelector<HTMLElement>('main .card .sub')?.innerText ?? '',
@@ -266,7 +274,7 @@ function onBye(card: Card): boolean {
 function checkTiles(card: Card, where: string): void {
 	const rest = ROS_FROM_WEEK === undefined ? PROJECTED : REST;
 	// The week tile is headed by its week beside the season's Projected ("Wk 6", the ruling).
-	const [weekTile = '', ...others] = card.labels;
+	const [weekTile = '', ...others] = card.first;
 	// On his bye the change's tile gives his next game's Proj instead (Lane 100, B30).
 	const bye = onBye(card);
 	const [last = ''] = others.slice(-1);
@@ -286,7 +294,7 @@ function checkTiles(card: Card, where: string): void {
 		);
 	check(
 		WEEK_TILE.test(weekTile) && others.join('|') === want.join('|'),
-		`${where}: tiles ${card.labels.join(', ')}`
+		`${where}: tiles ${card.first.join(', ')}`
 	);
 	if (ROS_FROM_WEEK !== undefined)
 		check(REST_CAPTION.test(card.captions[REST] ?? ''), `${where}: rest of season's caption`);

@@ -15,8 +15,8 @@
 // fixture API with FIXTURE_RUN_ID=2026-10-15T13-oneboard.
 import { cp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { restFromWords } from '../../src/lib/run/rest-from.ts';
+import { ONE_BOARD_RUN_ID } from './run-ids.ts';
 
-export const ONE_BOARD_RUN_ID = '2026-10-15T13-oneboard';
 /** Thursday Oct 15 2026, 8:50 am Central: before week 6's Thursday game. */
 const RUN_AT = '2026-10-15T13:50:00.000Z';
 const FIRST_WEEK = 6;

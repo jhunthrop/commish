@@ -56,6 +56,8 @@ for (const width of WIDTHS) {
 		try {
 			await page
 				.getByText(screen.said, { exact: false })
+				// A width draws its own copy of a line both widths carry (the phone head and the desk head).
+				.filter({ visible: true })
 				.first()
 				.waitFor({ timeout: READY_TIMEOUT_MS });
 		} catch {

@@ -16,9 +16,8 @@
 import { cp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { restFromWords } from '../../src/lib/run/rest-from.ts';
 import { FIXTURE_WEEK_CLOCK } from './clock.ts';
+import { CONTRACT_RUN_ID as SOURCE_ID, SATURDAY_RUN_ID } from './run-ids.ts';
 
-const SOURCE_ID = '2026-10-21T12-ros';
-export const SATURDAY_RUN_ID = '2026-10-17T17-ros';
 const SOURCE = new URL(
 	`../../../research/nightly/contract/fixture/runs/${SOURCE_ID}/`,
 	import.meta.url

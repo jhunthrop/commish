@@ -17,6 +17,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
+import { UNCOUNTED } from '../src/lib/league/box/basis.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import {
 	FIXTURE_CLOCK_VARIABLE,
@@ -233,7 +234,10 @@ async function check(
 			rows: table?.querySelectorAll('tbody tr:not(.sec)').length ?? 0,
 			mine: table?.querySelectorAll('tbody tr.mine').length ?? 0,
 			status: document.querySelector('main .status')?.textContent.trim() ?? '',
-			rules: basis?.textContent.match(/Our stats omit [^.]+\./)?.[0] ?? '',
+			rules:
+				basis?.textContent.match(
+					/(Avg and Last are our stats, which omit|Our stats omit) [^.]+\./
+				)?.[0] ?? '',
 			rulesLink: basis?.querySelector('a')?.getAttribute('href') ?? '',
 			glued: /[a-z]\.[A-Z]/.test(basis?.textContent ?? ''),
 			host: [...document.querySelectorAll('main p, main td, main th, main a, main button')]
@@ -267,9 +271,11 @@ async function check(
 	}
 	if (!seen.sections.includes('Bye in week 6')) said.push(`${at}: no bye section`);
 	// The fixture's league leaves out two rules a tab (week-order-serve.ts), named inline (Lane 111,
-	// B33): the kickers' as one missed kick, the defenses' both.
+	// B33): the kickers' as one missed kick, the defenses' both. No row's final counts the platform's
+	// points on either clock, so the sentence takes the frame that says Avg and Last are our stats
+	// (basis.ts uncountedPart, Lane 121, B97).
 	const named = screen.path.endsWith('/k') ? 'missed kick' : 'fumble recovery and safety';
-	if (seen.rules !== `Our stats omit ${named}.`)
+	if (seen.rules !== UNCOUNTED.ours(named))
 		said.push(`${at}: the rules left out read "${seen.rules}"`);
 	if (seen.glued) said.push(`${at}: two basis sentences run together`);
 	// No link to follow: the rules are named where they are said.
