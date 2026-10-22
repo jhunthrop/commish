@@ -15,8 +15,8 @@ import (
 const plansMaxAge = "public, max-age=300"
 
 // plans is the pass page's catalog: what each product unlocks, always,
-// and its price from Stripe once checkout is open. The page never holds
-// a price of its own.
+// and its price from Stripe once checkout is open, none in a free season.
+// The page never holds a price of its own.
 func (s *Service) plans(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	features, err := s.planFeatures(ctx)
@@ -24,18 +24,14 @@ func (s *Service) plans(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, s.Log, "billing: plan features", err)
 		return
 	}
-	yr := s.Sale.Season(ctx, s.Now())
+	now := s.Now()
+	yr := s.Sale.Season(ctx, now)
+	free := s.Free.Open(now)
 	out := apitypes.PlanCatalog{
-		Season: yr, PassEndsAt: season.End(yr), CheckoutOpen: s.Gateway != nil, Features: features, Membership: []apitypes.Price{},
+		Season: yr, PassEndsAt: season.End(yr), CheckoutOpen: s.Gateway != nil && !free, FreeSeason: &free,
+		Features: features, Membership: []apitypes.Price{},
 	}
-	// With checkout open the figures are Stripe's own; closed, they are the
-	// launch prices stripe-setup creates (LaunchPrices, the one source), so
-	// the page can say what each costs before anyone can pay.
-	lookup := s.lookupPrice
-	if s.Gateway == nil {
-		lookup = launchPrice
-	}
-	if err := planPrices(ctx, lookup, &out); err != nil {
+	if err := planPrices(ctx, s.priceLookup(free), &out); err != nil {
 		httpx.WriteInternal(w, r, s.Log, "billing: plans", err)
 		return
 	}
@@ -58,6 +54,25 @@ func (s *Service) planFeatures(ctx context.Context) (apitypes.PlanFeatures, erro
 		DraftPass: orEmpty(entitlements.ProductDraftPass), Membership: orEmpty(entitlements.ProductMembership),
 	}, nil
 }
+
+// priceLookup is where the catalog's figures come from. With checkout
+// open they are Stripe's own; closed, they are the launch prices
+// stripe-setup creates (LaunchPrices, the one source), so the page can
+// say what each costs before anyone can pay. A free season publishes
+// none: every price stays null.
+func (s *Service) priceLookup(free bool) func(context.Context, string) (*apitypes.Price, error) {
+	switch {
+	case free:
+		return noPrice
+	case s.Gateway == nil:
+		return launchPrice
+	default:
+		return s.lookupPrice
+	}
+}
+
+// noPrice is the free season's lookup: no figure for any key.
+func noPrice(context.Context, string) (*apitypes.Price, error) { return nil, nil }
 
 // launchPrice is a launch price by its lookup key, nil for none.
 func launchPrice(_ context.Context, key string) (*apitypes.Price, error) {

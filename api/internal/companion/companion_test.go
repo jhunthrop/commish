@@ -90,6 +90,35 @@ func TestLapsedPassLosesTheCompanion(t *testing.T) {
 	}
 }
 
+// In the free season an account with no pass passes the companion's gate
+// (the read and the report ask the same one) and reads the report, and the card's full reasoning and range of outcomes are
+// its own: the real store answers yes without a table (it has no pool).
+func TestTheFreeSeasonOpensTheCompanion(t *testing.T) {
+	account := auth.Account{ID: uuid.New()}
+	row := Row{ID: uuid.New(), AccountID: account.ID}
+	inSeason := time.Date(2026, time.October, 22, 12, 0, 0, 0, time.UTC)
+	s := &Service{
+		Store: storedRepo{row: row}, Entitlements: &entitlements.Store{Free: entitlements.FreeSeason(2026)},
+		Now: func() time.Time { return inSeason }, Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	req := httptest.NewRequest(http.MethodGet, "/companions/"+row.ID.String()+"/report", nil)
+	req.SetPathValue("id", row.ID.String())
+	req = req.WithContext(auth.WithAccount(req.Context(), account))
+	rec := httptest.NewRecorder()
+	if !s.allowed(rec, req) {
+		t.Fatalf("free season: the companion refused with %d %s", rec.Code, rec.Body.String())
+	}
+	s.report(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("free season report: %d %s, want 200", rec.Code, rec.Body.String())
+	}
+	for _, f := range []entitlements.Feature{entitlements.FullReasoning, entitlements.RangeOfOutcomes} {
+		if ok, err := s.can(context.Background(), account.ID, f); err != nil || !ok {
+			t.Errorf("free season %s: %v %v, want granted", f, ok, err)
+		}
+	}
+}
+
 // countingHost counts the reads that reach it and fails every one when
 // down.
 type countingHost struct {
