@@ -21,7 +21,9 @@
 // record shots run, scripts/record-fixture/run.ts, is live's shape).
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
+import { onListWords } from '../src/lib/format/designation.ts';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
+import { ORDER } from '../src/lib/order/words.ts';
 import { locationFor, parseBaseUrl, parseRunId } from '../src/lib/run/config.ts';
 import { RECORD_BOX, publishedDrawn, recordBasis } from '../src/lib/run/record.ts';
 import { RUN_PATHS, recordSchema, type RunRecord } from '../src/lib/run/schema.ts';
@@ -385,7 +387,17 @@ async function addFaults(): Promise<string[]> {
 	const said: string[] = [];
 	const ctx = await context('dark', BASIS_WIDTH, true);
 	const page = await ctx.newPage();
+	// The backs' view: its one free back is on IR with no return date (the capture, Lane 128), so his
+	// row draws the IR words in the verb's place and no add, and the add followed is the whole order's first.
 	await open(page, SCREENS[0]);
+	const held = page.locator('main table.order tr', { has: page.locator('.held') });
+	if ((await held.count()) === 0) said.push('rest: no free back on IR draws the IR words');
+	for (const text of await held.allInnerTexts()) {
+		if (!text.includes(`${onListWords('IR')}, ${ORDER.noReturn}`))
+			said.push(`rest: an IR free agent's row reads "${text}"`);
+	}
+	if ((await held.locator('a.verb').count()) > 0) said.push('rest: an IR free agent has a verb');
+	await open(page, { ...SCREENS[0], path: '/board/ppr-12' });
 	const add = page.locator('main table.order a.verb.add').first();
 	if ((await add.count()) === 0) {
 		await ctx.close();

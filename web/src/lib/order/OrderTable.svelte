@@ -356,6 +356,11 @@
 		.cols .act {
 			width: 40px;
 		}
+
+		/* No room for the IR words in the glyph's column: his status chip says IR on his name's line. */
+		.held {
+			display: none;
+		}
 	}
 
 	@media (max-width: 760px) {
