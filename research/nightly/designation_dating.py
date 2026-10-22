@@ -25,7 +25,7 @@ A digest that does not match the API's (a capture the two parsers read apart) is
 instance looks up: the instance then dates the capture itself, as before. It is never a wrong dating.
 
 THE GRANT. The job's role writes into the API's schema: `usage` on schema `app` and `select, insert,
-delete` on `app.designation_datings` (the role owning the schema grants it once).
+delete` on `app.designation_datings`, kept in the API's migration 00030 (Lane 141, B116).
 """
 
 import hashlib

@@ -21,6 +21,10 @@
 //   tuesday-late       Tuesday with LV at BUF's final not held (FIXTURE_LATE_FINAL=LV,BUF): every
 //                      starter of the member's final, the opponent's roster still playing: Kicked off;
 //   wednesday          our week 6 stats in: Final.
+// ROSTERLESS=1, on a fixture API under FIXTURE_FFPC_ROSTERLESS_OPPONENT=1 (Lane 141, B121): the
+// member's opponent has no roster read either, so he draws "--" (Proj "--" before kickoff, "Proj final
+// --" under way) on the Matchup and the home, and each footer says why in its own sentence ("Teams FFPC
+// sends no lineup or roster for show --."), never the starters' "No Proj final while...".
 //
 //   FIXTURE_CLOCK=<the clock's instant> [FIXTURE_LATE_FINAL=LV,BUF] PORT=8924 node scripts/inseason-fixture/serve.ts
 //   CLOCK=monday|tuesday|... API_ORIGIN=http://localhost:8924 node scripts/ffpc-no-box-shots.ts [web origin] [out dir]
@@ -85,6 +89,9 @@ const CLOCKS = {
 type Day = keyof typeof CLOCKS;
 const day = (process.env.CLOCK ?? 'monday') as Day;
 const want = CLOCKS[day];
+/** The member's opponent has no lineup or roster read (Lane 141, B121). */
+const rosterless = process.env.ROSTERLESS === '1';
+const shotDay = rosterless ? `${day}-rosterless` : day;
 const web = process.argv[2] ?? 'http://localhost:4324';
 const out = new URL(process.argv[3] ?? `../screenshots/lane-124/${day}/`, import.meta.url);
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8924').origin;
@@ -227,6 +234,9 @@ async function unlistedSaid(
 /** The opponent's small figure's faults against the clock's state. */
 function opponentFaults(small: string, at: string): string[] {
 	if (want.opponentFinal === null) return [];
+	// No roster read for him: "--" while he plays (Lane 141, B121).
+	if (rosterless && !want.opponentFinal)
+		return [PROJ_FINAL_NONE, BOX.none].includes(small) ? [] : [`${at}: opponent "${small}"`];
 	if (want.opponentFinal)
 		return small.startsWith(BOX.projFinal) ? [`${at}: opponent "${small}"`] : [];
 	// Not final: his best lineup's Proj final (Lane 127 fix round 1), never "--": he has a roster.
@@ -252,7 +262,12 @@ for (const theme of THEMES)
 					if (lines === 0 || lines > MOST_LINES[width])
 						faults.push(`${at}: footer draws ${String(lines)} lines`);
 					const said = await unlistedSaid(page, FRONT_BASIS);
-					if (said.times !== want.unlistedSaid)
+					// The front door's bug is the member's game alone: with his opponent rosterless it says
+					// that sentence, never the best lineup's (Lane 141, B121).
+					const frontSaid = rosterless ? 0 : want.unlistedSaid;
+					if (rosterless && said.rosterless !== want.unlistedSaid)
+						faults.push(`${at}: the rosterless said ${String(said.rosterless)} times`);
+					if (said.times !== frontSaid)
 						faults.push(`${at}: the unlisted teams said ${String(said.times)} times`);
 					if ((await drawn(page.locator(FRONT_BASIS))).includes(STARTERS_KEY))
 						faults.push(`${at}: the front door keys the opponent with the starters' sentence`);
@@ -277,11 +292,12 @@ for (const theme of THEMES)
 					const figure =
 						bug.opponent === '' ? bug.big : bug.opponent.replace(`${BOX.projFinal} `, '');
 					beforeSundayProj.set(key, { ...beforeSundayProj.get(key), [screen.name]: figure });
-					if (figure === BOX.none || figure === '')
+					// With no roster read he draws "--" (Lane 141, B121); else his best lineup's figure.
+					if (rosterless ? figure !== BOX.none : figure === BOX.none || figure === '')
 						faults.push(`${at}: the opponent's figure "${figure}" before Sunday`);
 				}
 				// At the live clock the opponent's Proj final is above his points (his back at pace).
-				if (day === 'monday-live' && screen.name === 'home') {
+				if (day === 'monday-live' && screen.name === 'home' && !rosterless) {
 					const home = await homeBug(page);
 					footers.push(`  opponent Proj final ${home.opponent} over Pts ${home.points}`);
 					if (!(Number(home.opponent) > Number(home.points)))
@@ -293,8 +309,20 @@ for (const theme of THEMES)
 					const said = await unlistedSaid(page, 'main [data-basis]');
 					// Before Sunday his best lineup's Proj is drawn and said too (Lane 137, B107).
 					const wantSaid = want.opponentFinal === true ? 0 : 1;
-					if (said.times !== wantSaid)
+					// With no roster read, his "--" is said in its own sentence instead (Lane 141, B121).
+					const [best, none] = rosterless ? [0, wantSaid] : [wantSaid, 0];
+					if (said.times !== best)
 						faults.push(`${at}: the Matchup names the unlisted teams ${String(said.times)} times`);
+					if (said.rosterless !== none)
+						faults.push(`${at}: the Matchup names the rosterless ${String(said.rosterless)} times`);
+					// The starters' key only for a Proj final "--" of the member's own (Lane 141, B121).
+					const mine = await drawn(
+						page.locator('main section.bug').first().locator('.sd.me .sc small')
+					);
+					const key = (await drawn(page.locator('main [data-basis]'))).includes(STARTERS_KEY);
+					if (key && mine !== PROJ_FINAL_NONE)
+						faults.push(`${at}: the Matchup keys the opponent's "--" with the starters' sentence`);
+					footers.push(`  ${at}: member "${mine}", rosterless said ${String(said.rosterless)}`);
 				}
 				if (bug !== null)
 					footers.push(
@@ -318,7 +346,8 @@ for (const theme of THEMES)
 				const copy = await copyFault(page);
 				if (copy !== null) faults.push(`${at}: ${copy}`);
 				await page.screenshot({
-					path: new URL(`ffpc-${screen.name}-${day}-${theme}-${String(width)}.png`, out).pathname,
+					path: new URL(`ffpc-${screen.name}-${shotDay}-${theme}-${String(width)}.png`, out)
+						.pathname,
 					fullPage: true
 				});
 			} catch (error) {
