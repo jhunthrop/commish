@@ -55,11 +55,8 @@ export const RATE_PLACES = 2;
 
 /** The record's words, in one place for the copy guard (Lane 93). */
 export const RECORD_WORDS = {
-	/** Places off in a player's words, said once in the basis (B04), short enough for a phone's eight
-	 * lines beside the run's own sentences (Lane 131). */
-	placesOff: 'Places off is how many places a player finished from his rank.',
-	/** The published projection named where its column is drawn, on a run's own record (Lane 131). */
-	published: "Published is the week's published projection.",
+	/** Places off in a player's words, its meaning whole, said once in the basis (B04, Lane 131). */
+	placesOff: 'Places off is how many places a player finished from his rank, lower is better.',
 	/** The weeks no order was set for: never graded after the fact (B03). */
 	missedOne: (week: string) => `${week} was not set before kickoff, so it cannot be graded.`,
 	missedMany: (weeks: string) => `${weeks} were not set before kickoff, so they cannot be graded.`,
@@ -438,16 +435,16 @@ export function saidOnly(texts: readonly (string | null)[]): string[] {
 
 /** A run's own record's basis, before Lane 114, every sentence drawn at both widths and held to a
  * phone's eight lines (Lane 131): the run's method, each measure in a player's words (order matched,
- * places off, starters right in the lineup it counts), and the published projection once its column
- * is drawn. A league's own sentences replace the starters one and follow. The season-long rule and
- * the published projection's start are qualifications the weekly record says at a desk alone. */
+ * places off, starters right in the lineup it counts). A league's own sentences replace the starters
+ * one and follow. The season-long rule and the published projection's start are qualifications the
+ * weekly record says at a desk alone; the page's lead names the week's published projection once its
+ * column is drawn (recordLead), so the basis does not. */
 export function recordBasis(record: RunRecord, league: LeagueBasis | null = null): string[] {
 	return saidOnly([
 		record.method,
 		record.scale,
 		RECORD_WORDS.placesOff,
 		league?.starters ?? record.startersBasis,
-		publishedDrawn(record) ? RECORD_WORDS.published : null,
 		league?.benchmark ?? null
 	]);
 }
