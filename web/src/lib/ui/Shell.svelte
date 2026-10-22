@@ -53,6 +53,11 @@
 			? (weekLabel ?? (week ? weekRankingsWord(week) : item.label))
 			: item.label;
 
+	// The week item's label is held unpainted while a page the Worker draws reads the site's season
+	// (context/first-season.ts), so it paints once, named (Lane 143).
+	const held = (item: RailItem): boolean =>
+		item.key === WEEK_RANKINGS_KEY && weekLabel === undefined && siteContext.seasonPending;
+
 	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
 	// The site's context: the session's copy at once, then /me. The rail's Board (/board, which
 	// names no format) opens in the context's format by itself (follow.svelte.ts).
@@ -76,7 +81,7 @@
 		aria-current={item.section === current ? 'page' : undefined}
 	>
 		<RailIcon name={item.icon} />
-		<span>{labelOf(item)}</span>
+		<span class:held={held(item)}>{labelOf(item)}</span>
 	</a>
 {/snippet}
 
@@ -157,6 +162,11 @@
 		color: var(--ink);
 		border-bottom: 4px solid var(--accent);
 		padding-bottom: 2px;
+	}
+
+	/* The week item's label while the season is read: its room kept, nothing painted (Lane 143). */
+	.item span.held {
+		visibility: hidden;
 	}
 
 	.item {

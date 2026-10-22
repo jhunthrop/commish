@@ -139,17 +139,24 @@ class SiteContext {
 		return this.#asked;
 	}
 
-	/** The site's season before a page the Worker draws first renders (Lane 143, B126): its layout's
-	 * load awaits it, so the rail's week item is named on the first paint and never renamed after.
-	 * The season already read, else the session's copy, else GET /season; /me still corrects it. */
-	firstSeason(): Promise<SiteSeason | null> {
+	/** The site's season is being read for a page the Worker draws (firstSeason): the rail holds the
+	 * week item's label unpainted until it lands, so it is named once and never renamed (Lane 143). */
+	seasonPending = $state(false);
+
+	/** Starts the site's season read for a page the Worker draws, as its layout's load runs (Lane 143,
+	 * B126): the season already held, else the session's copy, else GET /season, read alongside the
+	 * page's own first read and never awaited before the page paints. /me still corrects it. */
+	firstSeason(): void {
 		const kept = this.season ?? keptSeason(this.#copy(sessionToken())?.season);
 		if (kept !== null) {
 			this.season = kept;
-			return Promise.resolve(kept);
+			return;
 		}
-		this.#seasonRead ??= readSeason().then((season) => (this.season ??= season));
-		return this.#seasonRead;
+		if (this.#seasonRead) return;
+		this.seasonPending = true;
+		this.#seasonRead = readSeason()
+			.then((season) => (this.season ??= season))
+			.finally(() => (this.seasonPending = false));
 	}
 
 	/** The kept copy when this session (or, signed out, this browser) wrote it; null otherwise. */

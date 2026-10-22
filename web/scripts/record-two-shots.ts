@@ -42,6 +42,8 @@ const RAIL_WIDTHS = [1280, 390] as const;
 const PHONE_MAX = 760;
 const SETTLE_MS = 600;
 const READY_TIMEOUT_MS = 30_000;
+/** A 3G-like round trip, added to each API answer on the league page's waterfall (Lane 143). */
+const API_LATENCY_MS = 300;
 
 type Who = 'signed-out' | 'espn';
 type Theme = 'light' | 'dark';
@@ -55,7 +57,13 @@ await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 const faults: string[] = [];
 
-async function open(who: Who, width: number, path: string, theme: Theme = 'light'): Promise<Page> {
+async function open(
+	who: Who,
+	width: number,
+	path: string,
+	theme: Theme = 'light',
+	blank = false
+): Promise<Page> {
 	const ctx = await browser.newContext({
 		viewport: { width, height: width <= PHONE_MAX ? 844 : 900 },
 		deviceScaleFactor: width <= PHONE_MAX ? 2 : 1,
@@ -70,6 +78,8 @@ async function open(who: Who, width: number, path: string, theme: Theme = 'light
 	if (who === 'espn')
 		await ctx.addCookies([SIGNED_IN, ESPN].map((c) => ({ ...c, domain: 'localhost', path: '/' })));
 	const page = await ctx.newPage();
+	// A blank page is navigated by the caller, once it watches the page's requests.
+	if (blank) return page;
 	await page.goto(`${web}${path}`, { waitUntil: 'networkidle', timeout: READY_TIMEOUT_MS });
 	await page.waitForTimeout(SETTLE_MS);
 	return page;
@@ -81,14 +91,44 @@ function watchWeekItem(): void {
 	const drawn: string[] = [];
 	Object.assign(window, { weekItemDrawn: drawn });
 	const read = (): void => {
-		const label = document.querySelector('nav.rail .item[data-k="week"] span')?.textContent.trim();
-		if (label !== undefined && label !== '' && drawn.at(-1) !== label) drawn.push(label);
+		const span = document.querySelector('nav.rail .item[data-k="week"] span');
+		// A label held unpainted while the season is read (Shell's held) is not drawn.
+		if (span === null || span.classList.contains('held')) return;
+		const label = span.textContent.trim();
+		if (label !== '' && drawn.at(-1) !== label) drawn.push(label);
 	};
 	new MutationObserver(read).observe(document, {
 		subtree: true,
 		childList: true,
-		characterData: true
+		characterData: true,
+		attributes: true,
+		attributeFilter: ['class']
 	});
+}
+
+/** When a read was asked and answered, in ms from the page's navigation (an elapsed timer, not the clock). */
+interface Span {
+	start: number;
+	end: number;
+}
+
+/** Records the request spans of the URLs a test names, from the navigation on. */
+function waterfall(page: Page, names: Readonly<Record<string, RegExp>>): Map<string, Span> {
+	const spans = new Map<string, Span>();
+	const from = performance.now();
+	page.on('request', (request) => {
+		for (const [name, pattern] of Object.entries(names))
+			if (pattern.test(request.url()) && !spans.has(name))
+				spans.set(name, { start: Math.round(performance.now() - from), end: Number.NaN });
+	});
+	page.on('requestfinished', (request) => {
+		for (const [name, pattern] of Object.entries(names)) {
+			const span = spans.get(name);
+			if (pattern.test(request.url()) && span && Number.isNaN(span.end))
+				spans.set(name, { ...span, end: Math.round(performance.now() - from) });
+		}
+	});
+	return spans;
 }
 
 const has = (text: string, want: string, where: string): void => {
@@ -296,7 +336,32 @@ async function rail(who: Who, width: number): Promise<void> {
 	if (who !== 'espn') return;
 	// A league page the Worker draws names the week from the API's season, read before its first
 	// render (context/first-season.ts), so it never paints another name first.
-	const league = await open(who, width, `/league/${FIXTURE_IDS.espnDone}`);
+	// The season read runs alongside the league's own first read, never before it (Lane 143): the
+	// two spans overlap, so the season adds no round trip before the page paints.
+	const league = await open(who, width, 'about:blank', 'light', true);
+	// Every API answer a 3G-like round trip late, so a read held behind another shows as a gap.
+	await league.route(`${API_ORIGIN}/**`, async (route) => {
+		await new Promise((done) => setTimeout(done, API_LATENCY_MS));
+		await route.continue();
+	});
+	const spans = waterfall(league, {
+		season: /\/season$/u,
+		sync: /\/leagues\/attached\/[^/]+\/sync$/u
+	});
+	await league.goto(`${web}/league/${FIXTURE_IDS.espnDone}`, {
+		waitUntil: 'networkidle',
+		timeout: READY_TIMEOUT_MS
+	});
+	await league.waitForTimeout(SETTLE_MS);
+	const season = spans.get('season');
+	const sync = spans.get('sync');
+	const line = (span: Span | undefined): string =>
+		span ? `${String(span.start)} to ${String(span.end)} ms` : 'never asked';
+	process.stdout.write(
+		`waterfall league ${String(width)}: season ${line(season)}, sync ${line(sync)}\n`
+	);
+	if (!season || !sync || !(season.start < sync.end && sync.start < season.end))
+		faults.push(`${where} league: the season read and the league's read do not overlap`);
 	await league
 		.locator('nav.rail .item[data-k="week"] span')
 		.waitFor({ state: 'attached', timeout: READY_TIMEOUT_MS })
