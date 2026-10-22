@@ -12,7 +12,6 @@ import { withoutVisitSaved } from './visit-saved.ts';
 export type Account = components['schemas']['Account'];
 export type AccountSheet = components['schemas']['Sheet'];
 export type AccountMock = components['schemas']['Mock'];
-export type AccountGroupPass = components['schemas']['GroupPass'];
 
 /** How many of each list the page shows: the most recent first. */
 export const LIST_SIZE = 20;
@@ -25,8 +24,6 @@ export type AccountState =
 			account: Account;
 			sheets: AccountSheet[];
 			mocks: AccountMock[];
-			/** The group passes this account bought, newest first. */
-			groupPasses: AccountGroupPass[];
 	  }
 	/** The browser has no connection. */
 	| { kind: 'offline' }
@@ -61,16 +58,15 @@ export function accountApi(client: ApiClient, online: () => boolean): AccountApi
 				if (error instanceof ApiError || error instanceof TypeError) return unreachableKind(online);
 				throw error;
 			}
-			const [listed, mocks, groupPasses] = await Promise.all([
+			const [listed, mocks] = await Promise.all([
 				client.call<AccountSheet[]>(`/sheets?per_page=${String(LIST_SIZE)}`),
-				client.call<AccountMock[]>(`/mocks?per_page=${String(LIST_SIZE)}`),
-				client.call<AccountGroupPass[]>('/billing/group-passes')
+				client.call<AccountMock[]>(`/mocks?per_page=${String(LIST_SIZE)}`)
 			]);
 			// An empty sheet a visit saved before Lane 105 goes on this read (Lane 117, B84).
 			const sheets = await withoutVisitSaved(listed, (id) =>
 				client.call<null>(`/sheets/${encodeURIComponent(id)}`, { method: 'DELETE' })
 			);
-			return { kind: 'signed-in', account, sheets, mocks, groupPasses };
+			return { kind: 'signed-in', account, sheets, mocks };
 		},
 		cancelMembership: () => client.call<Account>('/billing/membership/cancel', { method: 'POST' }),
 		resumeMembership: () => client.call<Account>('/billing/membership/resume', { method: 'POST' }),

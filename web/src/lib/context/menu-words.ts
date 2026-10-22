@@ -39,13 +39,13 @@ export const FOLLOW_ANOTHER = 'Follow another league';
 export const FOLLOW_FIRST = 'Follow your league';
 
 /** What closes a signed-in account's menu: the way to follow its first league, the way to follow
- * another for an account that may follow more, or, for one that may not (no many_leagues), what
- * more leagues come with (OneLeagueFree) and no row leading to a page that would refuse it. */
-export type MenuLast = 'follow-first' | 'follow-another' | 'one-league-free';
+ * another for an account that may follow more, or, for one that may not (no many_leagues), no row,
+ * so none leads to a page that would refuse it (Lane 150: no row says what more leagues come with). */
+export type MenuLast = 'follow-first' | 'follow-another' | null;
 
 export function menuLast(leagues: number, many: boolean): MenuLast {
 	if (leagues === 0) return 'follow-first';
-	return many ? 'follow-another' : 'one-league-free';
+	return many ? 'follow-another' : null;
 }
 
 /** Each league's phase in a word beside its name, by league id, only when the account's leagues

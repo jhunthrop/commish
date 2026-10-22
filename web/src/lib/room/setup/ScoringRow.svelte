@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
@@ -11,9 +10,8 @@
 
 	type Scoring = LeagueSettings['scoring'];
 
-	/** The scoring row: a preset in one tap, or the league's own rules with the Draft Pass (brought in
-	 * from its host or entered by hand). Without the pass the row says where the exact rules come
-	 * from. */
+	/** The scoring row: a preset in one tap, or the league's own rules (brought in from its platform
+	 * or entered by hand) for an account with custom_scoring. Signed out, the row says to sign in. */
 	interface Props {
 		scoring: Scoring;
 		/** The account has custom_scoring (from /me, never a plan name). */
@@ -63,11 +61,6 @@
 		<span class="pass">
 			Sign in to follow your league and bring in its scoring. Until then a mock drafts on PPR.
 			<Quiet size="sm" href={signInTo}>Sign in</Quiet>
-		</span>
-	{:else if asked && !exactRules}
-		<span class="pass">
-			Your league's exact scoring comes with the Draft Pass. Until then a mock drafts on PPR.
-			<Quiet size="sm" href={resolve('/pass')}>See the Draft Pass</Quiet>
 		</span>
 	{/if}
 </SetupRow>

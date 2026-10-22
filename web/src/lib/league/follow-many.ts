@@ -63,9 +63,6 @@ export function missedWords(missed: Missed<ToFollow>): string {
 	return `${missed.league.name} was not followed. ${missed.reason}`;
 }
 
-/** The line a free account reads where a second league would be. */
-export const ONE_LEAGUE_FREE = 'One league is free. Follow more leagues with the Draft Pass.';
-
 /** The most leagues one account follows (the API's MaxLinksPerAccount), so a count read from an
  * address is believed only inside it. */
 export const MOST_LEAGUES = 20;

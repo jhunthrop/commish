@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { forgetContext } from '#lib/context/forget.ts';
 	import { THEN_PARAM, safeThen } from '#lib/context/then-path.ts';
@@ -14,7 +13,6 @@
 	import ActionRow from '#lib/ui/ActionRow.svelte';
 	import ActionRows from '#lib/ui/ActionRows.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
-	import Panel from '#lib/ui/Panel.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import LineList from '#lib/ui/LineList.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
@@ -31,26 +29,19 @@
 		type AccountSheet,
 		type AccountState
 	} from './account-api.ts';
-	import {
-		ARRIVAL_POLL_MS,
-		ARRIVAL_TRIES,
-		arrivalWords,
-		boughtFrom,
-		hasArrived,
-		type Arrival
-	} from './arrival.ts';
 	import AccountLeagues from '#lib/league/AccountLeagues.svelte';
 	import { AttachedList } from '#lib/league/attached-list.svelte.ts';
 	import AccountConnections from '#lib/hosts/AccountConnections.svelte';
 	import AccountDevices from '#lib/hosts/AccountDevices.svelte';
-	import GroupPasses from './GroupPasses.svelte';
 	import { hostsApi, openHostsOf } from '#lib/hosts/api.ts';
 	import { SWITCHED_SHUT, type OpenHosts } from '#lib/league/hosts.ts';
 	import { CONNECT, keeps, memberHosts, signedOutTitle } from './keeps.ts';
 	import { accountLinks } from './links.ts';
 	import { hasFeature } from './features.ts';
+	import { freeSeasonAt } from '#lib/pass/free-season.ts';
 	import {
-		boughtMembership,
+		FREE_SEE,
+		boughtPlan,
 		displayName,
 		draftToolsRecede,
 		mockLine,
@@ -65,8 +56,8 @@
 
 	let { weekLabel }: Props = $props();
 
-	/** Your account: who you are, your sheets and mocks, your pass or membership with its one-click
-	 * cancel, and sign out. Signed out, the sign-in verb and what an account keeps. The shell is
+	/** Your account: who you are, your sheets and mocks, your plan (free this season, Lane 150), and
+	 * sign out. Signed out, the sign-in verb and what an account keeps. The shell is
 	 * prerendered and everything inside it is read from the API in the browser. */
 	const api = accountApi(apiClient(PUBLIC_API_URL), () => navigator.onLine);
 
@@ -74,8 +65,6 @@
 	/** The API's sentence for an action that failed, shown beside the action. */
 	let problem = $state<string | null>(null);
 	let busy = $state(false);
-	/** Back from checkout: what was bought, and whether it shows on the account yet. */
-	let arrival = $state<Arrival>({ kind: 'none' });
 	/** The switched hosts open here (the hosts answer's enabled): shut until it is read, so a host
 	 * switched off is never promised. */
 	let openHosts = $state<OpenHosts>(SWITCHED_SHUT);
@@ -98,21 +87,6 @@
 		}
 	}
 
-	/** Reads the account until what checkout bought is on it, or says it is slow. */
-	async function awaitArrival(): Promise<void> {
-		if (arrival.kind === 'none') return;
-		const { bought } = arrival;
-		for (let tries = 0; tries < ARRIVAL_TRIES; tries++) {
-			if (view && hasArrived(view, bought, Date.now())) {
-				arrival = { kind: 'on', bought };
-				return;
-			}
-			await new Promise((done) => setTimeout(done, ARRIVAL_POLL_MS));
-			await load();
-		}
-		arrival = { kind: 'slow', bought };
-	}
-
 	/** The account's attached leagues, read once for the Platforms and Leagues attached tables both
 	 * (Lane 94 fix round 2), in the browser alone: the shell is prerendered. */
 	const attached = new AttachedList();
@@ -125,15 +99,9 @@
 			void siteContext.load().then(() => window.location.replace(then));
 			return;
 		}
-		const bought = boughtFrom(page.url.searchParams);
-		if (bought) {
-			arrival = { kind: 'waiting', bought };
-			void goto(resolve('/account'), { replace: true, shallow: true });
-		}
 		void load().then(() => {
 			if (view?.kind === 'signed-out') void readOpenHosts();
 			if (view?.kind === 'signed-in') void attached.load();
-			return awaitArrival();
 		});
 		const again = (): void => void load();
 		window.addEventListener('online', again);
@@ -255,14 +223,9 @@
 				{#snippet actions()}<Quiet onclick={() => void load()}>Try again</Quiet>{/snippet}
 			</EmptyState>
 		{:else}
-			{@const { account, sheets, mocks, groupPasses } = view}
-			{@const plan = planWords(account)}
-			{@const arrived = arrivalWords(arrival)}
-			{#if arrived}
-				<Panel edge={arrival.kind === 'slow' ? 'loss' : 'accent'} padding="sm">
-					<p class="arrival" role="status">{arrived}</p>
-				</Panel>
-			{/if}
+			{@const { account, sheets, mocks } = view}
+			{@const free = freeSeasonAt(new Date())}
+			{@const plan = planWords(account, free)}
 			<div class="who">
 				<div class="title">
 					<h2>{displayName(account)}</h2>
@@ -275,13 +238,6 @@
 				<div class="lists">
 					<AccountConnections list={attached} />
 					<AccountLeagues features={account.features} list={attached} />
-					{#if groupPasses.length > 0}
-						<GroupPasses
-							passes={groupPasses}
-							features={account.features}
-							onclaimed={() => void load()}
-						/>
-					{/if}
 				</div>
 
 				<aside class="side" aria-label="Your plan and display">
@@ -290,6 +246,7 @@
 						<div class="kv">
 							<div class="kvr">
 								<span class="st"><b class="plan">{plan.title}</b><span>{plan.line}</span></span>
+								{#if free}<Quiet size="sm" href={accountLinks.pass()}>{FREE_SEE}</Quiet>{/if}
 							</div>
 							{#if plan.action === 'cancel'}
 								<div class="kvr">
@@ -308,8 +265,8 @@
 									>
 								</div>
 							{/if}
-							<!-- Receipts are a purchase question, not a feature one: a claimer's pass has none. -->
-							{#if boughtMembership(account) || account.draft_pass?.source === 'purchase' || groupPasses.length > 0}
+							<!-- Receipts are a purchase question, not a feature one. -->
+							{#if boughtPlan(account)}
 								<div class="kvr">
 									<span class="st"
 										><b>Billing and receipts</b><span>Your card and every receipt</span></span
@@ -317,19 +274,14 @@
 									<Quiet size="sm" disabled={busy} onclick={() => void billing()}>Open</Quiet>
 								</div>
 							{/if}
-							<div class="kvr">
-								{#if hasFeature(account.features, 'live_draft_advisor')}
+							{#if hasFeature(account.features, 'live_draft_advisor')}
+								<div class="kvr">
 									<span class="st"
 										><b>Live draft companion</b><span>On your phone while you draft</span></span
 									>
 									<Quiet size="sm" href={accountLinks.companion()}>Open</Quiet>
-								{:else}
-									<span class="st"
-										><b>Draft Pass</b><span>Every league and the live draft companion</span></span
-									>
-									<Quiet size="sm" href={accountLinks.pass()}>See the Draft Pass</Quiet>
-								{/if}
-							</div>
+								</div>
+							{/if}
 						</div>
 						{#if problem}<p class="problem" role="alert">{problem}</p>{/if}
 					</section>
@@ -619,11 +571,6 @@
 		color: var(--ink);
 		text-decoration: underline;
 		text-underline-offset: 3px;
-	}
-
-	.arrival {
-		margin: 0;
-		font-size: var(--t-md);
 	}
 
 	.problem {

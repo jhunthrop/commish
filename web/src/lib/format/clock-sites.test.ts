@@ -44,7 +44,11 @@ const ALLOWED: Readonly<Record<string, Site>> = {
 	},
 	'src/lib/account/AccountPage.svelte': {
 		reads: 1,
-		why: 'whether a bought pass has arrived, asked once a poll'
+		why: "the plan card's clock, whether the free season is on when the account is drawn (Lane 150)"
+	},
+	'src/lib/pass/PassPage.svelte': {
+		reads: 1,
+		why: "the free page's clock, set when it opens, for the free season (Lane 150)"
 	},
 	'src/lib/hosts/AccountConnections.svelte': {
 		reads: 1,

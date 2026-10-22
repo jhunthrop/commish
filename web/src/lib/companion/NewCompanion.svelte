@@ -13,23 +13,23 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import LineList from '#lib/ui/LineList.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
-	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { isSignedOut } from '#lib/api/status.ts';
 	import { MAX_TEAMS } from '#lib/room/setup/setup.ts';
 	import { ApiError, companions, type CompanionCreate, type CompanionSummary } from './api.ts';
-	import { has, recentLine } from './model.ts';
+	import { recentLine } from './model.ts';
+	import { SIGNED_OUT_WORDS } from './new-words.ts';
 	import FFPCLeagues from '#lib/hosts/FFPCLeagues.svelte';
 	import { ffpcOpen, hostsApi, type HostLeague } from '#lib/hosts/api.ts';
 
-	/** Start following a draft: paste the Sleeper link, say which seat is yours, one verb. Without the
-	 * live draft feature (answered by Can through /me) the page says where it comes from. */
+	/** Start following a draft: paste the Sleeper link, say which seat is yours, one verb. Signed out,
+	 * what it does and the sign-in (Lane 150: free this season, nothing says what it comes with). */
 
 	/** The words in the link field for a development replay (COMPANION_REPLAY on the API), which
 	 * always follows the recorded draft. */
 	const REPLAY_WORDS = 'The recorded draft (development replay)';
 
-	type View = 'loading' | 'signed-out' | 'no-pass' | 'form' | 'unreachable';
+	type View = 'loading' | 'signed-out' | 'form' | 'unreachable';
 
 	let view = $state<View>('loading');
 	/** Where the draft runs: Sleeper by its link, or FFPC read as you. */
@@ -57,11 +57,7 @@
 		if (replay) link = REPLAY_WORDS;
 		companions
 			.me()
-			.then(async (me) => {
-				if (!has(me.features, 'live_draft_advisor')) {
-					view = 'no-pass';
-					return;
-				}
+			.then(async () => {
 				try {
 					recent = await companions.recent();
 				} catch {
@@ -125,21 +121,10 @@
 		{#if view === 'loading'}
 			<div class="reserve"></div>
 		{:else if view === 'signed-out'}
-			<EmptyState
-				title="Our call beside your real draft comes with the Draft Pass"
-				line="Paste your Sleeper draft link and get our pick at each of your turns, against the picks your league makes."
-			>
+			<EmptyState title={SIGNED_OUT_WORDS.title} line={SIGNED_OUT_WORDS.line}>
 				{#snippet actions()}
-					<Verb href={links.pass()}>See the Draft Pass</Verb>
-					<Quiet href={companions.signInUrl(links.companionNew())}>I have a pass, sign in</Quiet>
+					<Verb href={companions.signInUrl(links.companionNew())}>{SIGNED_OUT_WORDS.verb}</Verb>
 				{/snippet}
-			</EmptyState>
-		{:else if view === 'no-pass'}
-			<EmptyState
-				title="Our call beside your real draft comes with the Draft Pass"
-				line="Paste your Sleeper draft link and get our pick at each of your turns, against the picks your league makes."
-			>
-				{#snippet actions()}<Verb href={links.pass()}>See the Draft Pass</Verb>{/snippet}
 			</EmptyState>
 		{:else if view === 'unreachable'}
 			<EmptyState title="This page can't reach Commish right now" line="Reload in a moment." />

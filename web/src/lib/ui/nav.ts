@@ -215,7 +215,7 @@ export const RAIL_FOOT: RailItem = {
 	label: 'Account',
 	href: '/account',
 	icon: 'account',
-	owns: ['account', 'pass', 'claim']
+	owns: ['account', 'pass']
 };
 
 /** The rail a visitor sees: a phase, and in the playoffs whether waivers still run. */

@@ -4,7 +4,7 @@ import { freeLine } from '#lib/pass/words.ts';
 import { plural } from '#lib/format/number.ts';
 import { FORMAT_LABELS } from '#lib/sheet/format.ts';
 import { railInSeason, railKey, railPhase } from '#lib/ui/nav.ts';
-import type { Account, AccountGroupPass, AccountMock, AccountSheet } from './account-api.ts';
+import type { Account, AccountMock, AccountSheet } from './account-api.ts';
 
 /** The name we greet you by: your name, else your handle, else your email. */
 export function displayName(account: Account): string {
@@ -87,8 +87,25 @@ export function boughtMembership(account: Pick<Account, 'membership'>): boolean 
 	return account.membership?.source === 'subscription';
 }
 
-/** Membership first, since it includes the pass; then the pass; then free. */
-export function planWords(account: Account): PlanWords {
+/** The plan card in the free season (Lane 150): every tool is on every account. */
+export const FREE_SEASON_PLAN: PlanWords = {
+	title: 'Free this season',
+	line: 'Every tool is on your account through the 2026 season.',
+	action: null
+};
+
+/** The plan card's way to the free page, in the free season. */
+export const FREE_SEE = "See what's free";
+
+/** Whether the account paid for its plan, so its card keeps the billing it has and its receipts. */
+export function boughtPlan(account: Pick<Account, 'membership' | 'draft_pass'>): boolean {
+	return boughtMembership(account) || account.draft_pass?.source === 'purchase';
+}
+
+/** In the free season every account's card says so, but a plan paid for keeps its own (its cancel
+ * and receipts); outside it, Membership first, since it includes the pass, then the pass, then free. */
+export function planWords(account: Account, freeSeason: boolean): PlanWords {
+	if (freeSeason && !boughtPlan(account)) return FREE_SEASON_PLAN;
 	const { membership, draft_pass: pass } = account;
 	if (membership && hasLiveMembership(account)) {
 		return MEMBERSHIP_SOURCES[membership.source](membership);
@@ -127,43 +144,4 @@ export function mockLine(mock: AccountMock): string {
 			? `finished ${dayLabel(mock.completed_at)}`
 			: `started ${dayLabel(mock.created_at)}`;
 	return `${String(settings.teams)} teams · ${scoring} · ${slot} · ${state}`;
-}
-
-/** One seat of a group pass as the buyer's panel lists it. */
-export interface SeatLine {
-	key: string;
-	lead: string;
-	text: string;
-}
-
-/** A group pass's seats: each claimed one by handle and day, then how many are open. */
-export function seatLines(pass: AccountGroupPass): SeatLine[] {
-	const claimed = pass.claims.map((claim, i) => ({
-		key: `seat-${String(i + 1)}`,
-		lead: claim.handle ? `@${claim.handle}` : 'A drafter with no handle yet',
-		text: `claimed ${dayLabel(claim.claimed_at)}`
-	}));
-	const open = pass.seats - pass.claims.length;
-	if (open <= 0) return claimed;
-	return [
-		...claimed,
-		{
-			key: 'open',
-			lead: open === pass.seats ? `All ${String(open)} open` : `${String(open)} open`,
-			text: 'waiting on the link'
-		}
-	];
-}
-
-const GROUP_PASS_ENDED: Readonly<Partial<Record<AccountGroupPass['status'], string>>> = {
-	refunded: 'Refunded. The passes from it have ended.',
-	disputed: 'The payment was disputed, so the passes from it are paused.'
-};
-
-/** "For the 2026 season" for a live pass, or why it no longer grants anything. */
-export function groupPassLine(pass: AccountGroupPass): string {
-	return (
-		GROUP_PASS_ENDED[pass.status] ??
-		`For the ${String(pass.season)} season, one pass per team. Send the link to your league.`
-	);
 }

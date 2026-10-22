@@ -58,16 +58,18 @@ void test("a league's line is its host and scoring, and superflex when it reads 
 	);
 });
 
-void test('a TE premium league on the PPR board says it in plain words, and where exact rules rank it', () => {
+void test('a TE premium league on the PPR board says it in plain words, and where exact rules rank it with them', () => {
 	const te = league({ scoring: 'te_premium' });
 	assert.equal(
 		contextNote(te, 'ppr', false)?.text,
-		"Your league gives tight ends extra points per catch. This board is PPR, nearest FFPC's rules. The Draft Pass ranks it by your league's exact rules."
+		"Your league gives tight ends extra points per catch. This board is PPR, nearest FFPC's rules."
 	);
 	assert.equal(
 		contextNote(te, 'ppr', false, 'These figures are')?.text,
-		"Your league gives tight ends extra points per catch. These figures are PPR, nearest FFPC's rules. The Draft Pass ranks it by your league's exact rules."
+		"Your league gives tight ends extra points per catch. These figures are PPR, nearest FFPC's rules."
 	);
+	// Nothing says what the exact rules come with (Lane 150).
+	assert.equal(contextNote(te, 'ppr', false)?.link, null);
 	const saved = '3f0c1a52-0000-4000-8000-000000000009';
 	assert.deepEqual(contextNote({ ...te, settings_league_id: saved }, 'ppr', true), {
 		text: "Your league gives tight ends extra points per catch. This board is PPR, nearest FFPC's rules.",

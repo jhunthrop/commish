@@ -4,7 +4,6 @@
 	import { page } from '$app/state';
 	import { hasFeature } from '#lib/account/features.ts';
 	import { apiClient } from '#lib/api/client.ts';
-	import OneLeagueFree from '#lib/league/OneLeagueFree.svelte';
 	import { links } from '#lib/site/links.ts';
 	import Label from '#lib/ui/Label.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
@@ -157,9 +156,7 @@
 				<Quiet size="sm" href={links.league(shown)}>League page</Quiet>
 			{/if}
 			<!-- The last row (spec 2026-10-16 §2): the switch is the one place a league is chosen. -->
-			{#if last === 'one-league-free'}
-				<OneLeagueFree />
-			{:else}
+			{#if last !== null}
 				<Quiet size="sm" href={links.leagueNew()}
 					>{last === 'follow-first' ? FOLLOW_FIRST : FOLLOW_ANOTHER}</Quiet
 				>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, type Snippet } from 'svelte';
+	import { onMount } from 'svelte';
 	import FFPCSignIn from './FFPCSignIn.svelte';
 	import LeagueChoice from './LeagueChoice.svelte';
 	import {
@@ -29,11 +29,9 @@
 		/** Leagues already followed, by FFPC league id, to our league's page: shown as such, never
 		 * chosen again. */
 		followed?: ReadonlyMap<string, string>;
-		/** A line under the chips, like what more leagues come with. */
-		limit?: Snippet;
 	}
 
-	let { verb, onpick, typed = false, most = 1, followed = new Map(), limit }: Props = $props();
+	let { verb, onpick, typed = false, most = 1, followed = new Map() }: Props = $props();
 
 	type View = 'loading' | 'off' | 'signin' | 'again' | 'leagues' | 'unreachable';
 
@@ -111,7 +109,6 @@
 		{onpick}
 		{most}
 		{followed}
-		{limit}
 		typed={typed ? byHand : undefined}
 		onfailure={signInAgain}
 	/>
