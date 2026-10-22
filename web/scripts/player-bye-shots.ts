@@ -13,8 +13,10 @@
 // STAND-INS, named here and in the lane's report: the fixture league's rosters do not hold Gibbs, so the
 // signed-in shot answers his league read with the verb of the member's own (kind lineup, the route below);
 // the fixture holds no week 7 allowances (player-week.ts AFTER_BYE_RANK).
-// Against the site built from the Saturday run (scripts/inseason-fixture/saturday-run.ts) and the fixture
-// API, started with FIXTURE_RUN_ID=2026-10-17T17-ros and FIXTURE_CLOCK at the clock to shoot:
+// Against the site built from the Saturday run (scripts/inseason-fixture/saturday-run.ts, written with
+// SATURDAY_OUT=4429023 SATURDAY_PACE=1 SATURDAY_READ=1) and the fixture API, started with
+// FIXTURE_RUN_ID=2026-10-17T17-ros and FIXTURE_CLOCK at the clock to shoot: the fixture week's, or with
+// VERB=Compare the Tuesday after the week's last game (`npm run shots` runs both):
 //
 //   [VERB=Compare] node scripts/player-bye-shots.ts [web origin] [out dir]
 import { mkdir } from 'node:fs/promises';
@@ -41,6 +43,8 @@ const VS_AVG_PHONE_LINES = 4;
 const SHEET_ADD = 'Add to my sheet';
 /** The week read's cap (research WEEK_BAND, Lane 117 fix round 3): the stand-in read runs to it. */
 const READ_CAP_WORDS = 95;
+/** The read's body: its paragraphs, never the byline caption (Lane 126) or a season read's stamp. */
+const READ_BODY = '.week-read p:not(.stamp):not(.byline)';
 const PHONE = 390;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const OWN_WORDS = /\btips?\b/;
@@ -68,7 +72,7 @@ interface Seen {
 }
 
 async function seen(page: Page): Promise<Seen> {
-	return page.evaluate(() => {
+	return page.evaluate((readBody: string) => {
 		const tile = (t: Element): [string, { value: string; caption: string }] => [
 			t.querySelector('.lb')?.textContent.trim() ?? '',
 			{
@@ -96,12 +100,12 @@ async function seen(page: Page): Promise<Seen> {
 			projHead: [...document.querySelectorAll('main .season thead th')].some((th) =>
 				th.classList.contains('proj')
 			),
-			paragraphs: read?.querySelectorAll('.week-read p:not(.stamp)').length ?? 0,
-			readWords: (
-				read?.querySelector('.week-read p:not(.stamp)')?.textContent.trim().split(/\s+/) ?? []
-			).filter((w) => w !== '').length,
+			paragraphs: read?.querySelectorAll(readBody).length ?? 0,
+			readWords: (read?.querySelector(readBody)?.textContent.trim().split(/\s+/) ?? []).filter(
+				(w) => w !== ''
+			).length,
 			readClipped: (() => {
-				const body = read?.querySelector('.week-read p:not(.stamp)');
+				const body = read?.querySelector(readBody);
 				if (!body) return false;
 				const inner = body.getBoundingClientRect();
 				for (let el = body.parentElement; el && el !== document.body; el = el.parentElement) {
@@ -117,7 +121,7 @@ async function seen(page: Page): Promise<Seen> {
 			side: document.querySelector('main .side h3')?.textContent.trim() ?? '',
 			verb: document.querySelector('main .card .act')?.textContent.trim() ?? ''
 		};
-	});
+	}, READ_BODY);
 }
 
 const failures: string[] = [];

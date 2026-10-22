@@ -1,9 +1,14 @@
 // The in-season screens' basis parts (Lane 66t): each names one column the screen draws, once, and
 // the copy guard holds over every one. Run with `npm test`.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import {
+	FIXTURE_MONDAY_NIGHT_CLOCK,
+	FIXTURE_WEEK_CLOCK
+} from '../../../../scripts/inseason-fixture/clock.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
-import type { PlayerLine, WeekFacts } from '../inseason/api.ts';
+import type { MatchupBox, PlayerLine, WeekFacts } from '../inseason/api.ts';
 import {
 	basisText,
 	boxBasisParts,
@@ -596,4 +601,54 @@ void test('the phone says why a "--" stands: a Proj final with none, a final gam
 		),
 		"Wk 6 is Pts once final, -- until his stats land, else this week's published projection."
 	);
+});
+
+/** The fixture league's Matchup answer (scripts/inseason-fixture/data/matchup.json): every line of
+ * both sides, as MatchupPanel hands them to its key. */
+const fixtureMatchup = JSON.parse(
+	readFileSync(
+		new URL('../../../../scripts/inseason-fixture/data/matchup.json', import.meta.url),
+		'utf8'
+	)
+) as MatchupBox;
+const fixtureLines = fixtureMatchup.sides.flatMap((s) => [
+	...s.starters.map((st) => st.line),
+	...s.bench
+]);
+
+void test('the Matchup says its Proj sentence once in the page, each width its own clauses of it (Lane 132, B111)', () => {
+	const count = (text: string): number => text.split('Proj is ').length - 1;
+	for (const clock of [FIXTURE_WEEK_CLOCK, FIXTURE_MONDAY_NIGHT_CLOCK]) {
+		const parts = boxBasisParts(
+			{
+				projection: {
+					readAt: fixtureMatchup.projection_read_at,
+					scoring: fixtureMatchup.projection_scoring
+				},
+				lines: fixtureLines,
+				byPlayer: true,
+				teamTotal: false,
+				host: 'sleeper',
+				lineup: null
+			},
+			CENTRAL,
+			Date.parse(clock)
+		);
+		// The page holds every part, drawn or hidden: the sentence is in it once.
+		const page = basisText(parts);
+		assert.equal(count(page), 1, page);
+		const desk = drawnText(parts, 'desk');
+		const phone = drawnText(parts, 'phone');
+		assert.equal(count(desk), 1, desk);
+		assert.equal(count(phone), 1, phone);
+		// The fixture's Matchup holds a defense, and Thursday's game has kicked off on both clocks.
+		for (const clause of ['defenses on default scoring', 'as of kickoff once started'])
+			assert.ok(desk.includes(clause) && !phone.includes(clause), `${clause}: ${phone}`);
+		assert.ok(
+			phone.includes(
+				"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm."
+			),
+			phone
+		);
+	}
 });

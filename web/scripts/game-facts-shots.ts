@@ -2,7 +2,8 @@
 // kickoff weather with their read time, on the pickup table (Lane 66f) and an opened trade of the
 // Trades table (Lane 66g) as a cell, and on the Lineup and Matchup box scores (Lane 66d) as a cell ("20 to 22.5" and the weather in two or
 // three words) with the read said once under the boxes, in both themes at 1440 and 390 on a Central
-// clock (on a phone the waiver and trade rows keep to their decision, so they carry none). Each asserts
+// clock (on a phone the waiver and trade rows keep to their decision, so they carry none, and their
+// basis says no Game sentence there, a sentence going with its figures: 61b03440). Each asserts
 // what it shows, no betting word, and that nothing scrolls sideways. Against the built site served static and the
 // fixture API (scripts/inseason-fixture/serve.ts), whose /games/week answers the recorded week.
 //
@@ -53,8 +54,9 @@ const PAGES = [
 		name: 'waivers',
 		path: `/league/${id}/waivers`,
 		ready: 'Open Sleeper waivers',
-		// The pickup table is a box score too (Lane 66f): its Game cells and one read line.
-		phone: true
+		// The pickup table is a box score too (Lane 66f): its Game cells and one read line at a desk;
+		// a phone's rows keep to the decision (BoxLine phoneFacts, 61b03440).
+		phone: false
 	},
 	{
 		name: 'trades',
@@ -213,8 +215,12 @@ for (const { name, path, ready, phone } of PAGES) {
 					for (const e of cells.expected) check(EXPECTED.test(e), `${where}: expected "${e}"`);
 					check(cells.weather.length > 0 === cellsShown, `${where}: weather in a box`);
 					for (const w of cells.weather) check(CELL_WEATHER.test(w), `${where}: weather "${w}"`);
+					// The read line is said once where the Game cells are drawn, and not where they are not.
 					const read = (cells.text.match(FACTS_READ) ?? []).length;
-					check(read === 1, `${where}: the Game cell's line said ${String(read)} times`);
+					check(
+						read === (cellsShown ? 1 : 0),
+						`${where}: the Game cell's line said ${String(read)} times`
+					);
 					check(cells.stamped === 0, `${where}: ${String(cells.stamped)} rows carry a read stamp`);
 					for (const said of [...cells.expected, ...cells.weather]) {
 						check(!BETTING.test(said), `${where}: a betting word in "${said}"`);

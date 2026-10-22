@@ -8,7 +8,9 @@
 // - the page: Jahmyr Gibbs as a constructed free agent. The in-season contract fixture run copied to
 //   .runs with his page rewritten by the research writer's rules (`run_club(None)` for his club, his DET
 //   lines of weeks 1 to 5 kept, every later week a no-club week, `last_game_club` naming DET week 5);
-//   build the site from it (PUBLIC_RUN_ID=2026-10-21T12-ros PUBLIC_RUN_BASE_URL=.runs).
+//   written by `node scripts/inseason-fixture/mover-run.ts free-agent` (2026-10-21T12-free-agent);
+//   build the site from it (PUBLIC_RUN_ID=2026-10-21T12-free-agent PUBLIC_RUN_BASE_URL=.runs) and start
+//   the fixture API with FIXTURE_RUN_ID=2026-10-21T12-free-agent.
 // - the API: the fixture API's answers for him rewritten in the browser as the API answers a free agent
 //   (boards.WireClub's "FA", no game, no bye, no Proj, no Opp rank): his card's week
 //   (/players/<id>/week) and the first row of the Players list (/order).

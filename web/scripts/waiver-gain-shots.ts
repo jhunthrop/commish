@@ -53,9 +53,9 @@ const LEAGUE = `/league/${FIXTURE_IDS.league}`;
 const DROP = 'Jaxson Dart';
 /** His Beats name: his last name, no other Dart on the screen (review M2). */
 const DROP_BEATS = 'Dart';
-const UNLISTED = ["De'Von Achane", 'Tyquan Thornton'];
+const UNLISTED = ["De'Von Achane", 'Joe Royer'];
 /** The week each is back (waiver-beats.ts STAMPED). */
-const BACK: Readonly<Record<string, number>> = { "De'Von Achane": 9, 'Tyquan Thornton': 8 };
+const BACK: Readonly<Record<string, number>> = { "De'Von Achane": 9, 'Joe Royer': 8 };
 const IR_SLOT = 'Tank Bigsby';
 
 await requireFixtureClock(API_ORIGIN, CLOCKS[day]);

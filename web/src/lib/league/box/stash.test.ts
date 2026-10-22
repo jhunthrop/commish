@@ -33,12 +33,12 @@ const stored = inTenths(
 		)
 	)
 ) as WaiverAdvice;
-/** The sense check's case (FIXTURE_IR_DROP): Achane on injured reserve back week 9, Thornton out back
+/** The sense check's case (FIXTURE_IR_DROP): Achane on injured reserve back week 9, Royer out back
  * week 8; with one IR slot open on the member's team (FIXTURE_IR_SLOT) or none. */
 const withSlot = listedOnly(irDropWaivers(stored), true);
 const noSlot = listedOnly(irDropWaivers(stored), false);
 const ACHANE = "De'Von Achane";
-const THORNTON = 'Tyquan Thornton';
+const ROYER = 'Joe Royer';
 
 void test('the Stash group holds the two due back, by the rate his player page shows, each saying his week', () => {
 	const rows = stashRows(withSlot, ZONE, NOW);
@@ -46,7 +46,7 @@ void test('the Stash group holds the two due back, by the rate his player page s
 		rows.map((r) => [r.row.name, r.stash?.back]),
 		[
 			[ACHANE, STASH.back(9)],
-			[THORNTON, STASH.back(8)]
+			[ROYER, STASH.back(8)]
 		]
 	);
 	// A game is his rest-of-season points a game, the player page's figure, never re-divided over
@@ -68,16 +68,16 @@ void test('a return in the week the page addresses reads Back this week', () => 
 void test('an open IR slot that takes him is Stash, naming the drop a full roster needs; else Add naming it', () => {
 	const byName = new Map(stashRows(withSlot, ZONE, NOW).map((r) => [r.row.name, r]));
 	const achane = byName.get(ACHANE);
-	const thornton = byName.get(THORNTON);
-	assert.ok(achane?.stash && thornton?.stash);
+	const royer = byName.get(ROYER);
+	assert.ok(achane?.stash && royer?.stash);
 	// The IR slot frees no bench spot until the platform moves him: the stand-in's full roster names
 	// the gaining rows' drop (fix round 1 ruling).
 	assert.equal(achane.stash.verb, 'stash');
 	assert.equal(achane.stash.who?.place, STASH.drop);
 	assert.equal(achane.stash.drops, true);
 	// The out player: the slot here takes no out, so his verb is Add with his drop.
-	assert.equal(thornton.stash.verb, 'add');
-	assert.equal(thornton.stash.who?.place, STASH.drop);
+	assert.equal(royer.stash.verb, 'add');
+	assert.equal(royer.stash.who?.place, STASH.drop);
 	const shut = stashRows(noSlot, ZONE, NOW);
 	assert.ok(shut.every((r) => r.stash?.verb === 'add'));
 	// A bench spot open as well: Stash with no drop, the slot named.
@@ -93,7 +93,7 @@ void test('an open IR slot that takes him is Stash, naming the drop a full roste
 
 void test('the group never counts with the rows that gain, and the table no longer lists them', () => {
 	const rows = poolRows(withSlot, ZONE, NOW);
-	assert.ok(!rows.some((r) => r.row.name === ACHANE || r.row.name === THORNTON));
+	assert.ok(!rows.some((r) => r.row.name === ACHANE || r.row.name === ROYER));
 	const before = countWords(rows, 'sleeper');
 	const groups = gainGroups(rows);
 	assert.equal(groups.gaining.length + groups.rest.length, rows.length);
@@ -102,7 +102,8 @@ void test('the group never counts with the rows that gain, and the table no long
 });
 
 void test("the group's line says where the week comes from, what A game is, and the unlisted once", () => {
-	assert.deepEqual(stashBasis(withSlot), [STASH.line]);
+	// The capture's undated lists (Thornton on IR among them, Lane 132) are said once under the line.
+	assert.deepEqual(stashBasis(withSlot), [STASH.line, STASH.undated]);
 	assert.equal(
 		STASH.line,
 		'Stash rows come back by the listed return date. A game is our rest-of-season points a game.'
@@ -133,16 +134,16 @@ void test('a regular season the platform does not state is said where the group 
 	// FFPC and MyFantasyLeague with neither the playoffs' first week nor a playoff start (Lane 121, B99).
 	const taken = { ...withSlot, regular_season_taken: 14 };
 	assert.equal(STASH.taken(14), 'Regular season taken as weeks 1 to 14.');
-	assert.deepEqual(stashBasis(taken), [STASH.line, STASH.taken(14)]);
-	assert.deepEqual(stashBasis({ ...taken, stash: [], stash_late: 1 }), [
+	assert.deepEqual(stashBasis(taken), [STASH.line, STASH.undated, STASH.taken(14)]);
+	assert.deepEqual(stashBasis({ ...taken, stash: [], stash_undated: 0, stash_late: 1 }), [
 		STASH.late,
 		STASH.taken(14)
 	]);
 	// Nothing the group shows keeps to the season's end: no rows, none left out as late.
 	assert.deepEqual(stashBasis({ ...taken, stash: [], stash_undated: 2 }), [STASH.undated]);
-	assert.deepEqual(stashBasis({ ...taken, stash: [] }), []);
+	assert.deepEqual(stashBasis({ ...taken, stash: [], stash_undated: 0 }), []);
 	// Stated by the platform, or an answer from before Lane 121: nothing taken is said.
-	assert.deepEqual(stashBasis(withSlot), [STASH.line]);
+	assert.deepEqual(stashBasis(withSlot), [STASH.line, STASH.undated]);
 });
 
 void test('an answer from before the group parses: no rows, no line, no group', () => {

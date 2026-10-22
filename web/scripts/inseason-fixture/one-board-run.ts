@@ -15,8 +15,8 @@
 // fixture API with FIXTURE_RUN_ID=2026-10-15T13-oneboard.
 import { cp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { restFromWords } from '../../src/lib/run/rest-from.ts';
+import { ONE_BOARD_RUN_ID } from './run-ids.ts';
 
-export const ONE_BOARD_RUN_ID = '2026-10-15T13-oneboard';
 /** Thursday Oct 15 2026, 8:50 am Central: before week 6's Thursday game. */
 const RUN_AT = '2026-10-15T13:50:00.000Z';
 const FIRST_WEEK = 6;
@@ -51,7 +51,10 @@ const order = (await readJson(new URL('./data/order.json', import.meta.url))) as
 };
 const boardUrl = new URL(`boards/${FORMAT}.json`, OUT);
 const board = await readJson(boardUrl);
-const rows = board.rows as Json[];
+// The kickers' and defenses' market rows stay as the stand-in writes them, after every ranked row.
+const MARKET = 'market';
+const market = (board.rows as Json[]).filter((row) => row.orderBasis === MARKET);
+const rows = (board.rows as Json[]).filter((row) => row.orderBasis !== MARKET);
 const byId = new Map(rows.map((row) => [String(row.id), row]));
 const led: Json[] = [];
 let thursday: Json | null = null;
@@ -97,11 +100,12 @@ const rest = rows
 		preseasonPoints: row.projected,
 		restFromWeek: FIRST_WEEK
 	}));
-board.rows = [...led, ...rest].map((row, i) => ({
+const ranked = [...led, ...rest].map((row, i) => ({
 	...row,
 	ourRank: i + 1,
 	vorRound: Math.ceil((i + 1) / TEAMS)
 }));
+board.rows = [...ranked, ...market.map((row, i) => ({ ...row, ourRank: ranked.length + i + 1 }))];
 await writeFile(boardUrl, JSON.stringify(board));
 
 // Each player page's PPR numbers in season: his preseason place beside them, as the board's rows.

@@ -43,7 +43,7 @@ const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const LEAGUE = `/league/${FIXTURE_IDS.league}`;
 /** The fixture case's stashes (waiver-beats.ts STAMPED) and the week each is back. */
-const STASHED: Readonly<Record<string, number>> = { "De'Von Achane": 9, 'Tyquan Thornton': 8 };
+const STASHED: Readonly<Record<string, number>> = { "De'Von Achane": 9, 'Joe Royer': 8 };
 
 const running = (await fixtureApiClock(API_ORIGIN)).clock;
 const playing = running === FIXTURE_MONDAY_NIGHT_CLOCK;

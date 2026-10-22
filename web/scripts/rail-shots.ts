@@ -10,8 +10,8 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
-import { RAIL_KEYS, railInSeason, type RailKey } from '../src/lib/ui/nav.ts';
-import { RAIL_WITHOUT_LEAGUE, railFor } from '../src/lib/ui/rail-order.ts';
+import { RAIL_KEYS, type RailKey } from '../src/lib/ui/nav.ts';
+import { railShown } from '../src/lib/ui/rail-order.ts';
 import {
 	FIXTURE_PHASES,
 	MANY_COOKIE,
@@ -43,12 +43,7 @@ const KEY_OF: Readonly<Record<FixturePhase, RailKey>> = {
 
 /** A rail's labels; a season rail with no league selected is the rail without a league (Lane 83). */
 function railLabels(key: RailKey, phone: boolean, league: boolean): string[] {
-	const items =
-		!league && railInSeason(key)
-			? RAIL_WITHOUT_LEAGUE
-			: key === 'playoffs_waivers'
-				? railFor('playoffs', true)
-				: railFor(key, false);
+	const items = railShown(key, league);
 	const shown = phone ? items.filter((item) => !item.wideOnly) : items;
 	return [...shown.map((item) => item.label), ...(phone ? [] : ['Account'])];
 }

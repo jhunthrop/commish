@@ -8,15 +8,18 @@
 // (Lane 60: the words are drawn for both phases and the root's rail shows one). Against the built site and the fixture API (scripts/inseason-fixture/serve.ts), which
 // answers GET /season with week 6.
 //
-//   [ROS_FROM_WEEK=6] node scripts/season-pages-shots.ts [web origin] [out dir]
+//   [ROS_FROM_WEEK=7] node scripts/season-pages-shots.ts [web origin] [out dir]
 // with the site built against PUBLIC_API_URL=http://localhost:8799 and the fixture API running there.
+// ROS_FROM_WEEK names a run that ranks the rest of the season from that week, played in none of it:
+// the contract fixture run (2026-10-21T12-ros) ranks from week 7.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { signedOutTitle } from '../src/lib/account/keeps.ts';
 import { PAGE_VERBS, boardWords, frontWords } from '../src/lib/site/season-words.ts';
 import { PHASE_COOKIE } from './inseason-fixture/phases.ts';
 import { RAIL_KEYS, railInSeason, type RailKey } from '../src/lib/ui/nav.ts';
-import { railOfKey } from '../src/lib/ui/rail-order.ts';
+import { railShown } from '../src/lib/ui/rail-order.ts';
+import { restFromWords } from '../src/lib/run/rest-from.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 
 const THEMES = ['light', 'dark'] as const;
@@ -30,7 +33,12 @@ const SEASON = 2026;
 const ROS_FROM_WEEK = process.env.ROS_FROM_WEEK;
 const COVER = {
 	season: SEASON,
-	...(ROS_FROM_WEEK === undefined ? {} : { rosFromWeek: Number(ROS_FROM_WEEK) })
+	...(ROS_FROM_WEEK === undefined
+		? {}
+		: {
+				rosFromWeek: Number(ROS_FROM_WEEK),
+				restFrom: restFromWords(Number(ROS_FROM_WEEK), false)
+			})
 };
 const PLAYER = 'puka-nacua';
 /** The league whose phase differs from the site's season (the fixture's pre-draft league). */
@@ -76,6 +84,12 @@ function file(name: string): string {
 async function rootRail(page: Page): Promise<RailKey | null> {
 	const rail = await page.evaluate(() => document.documentElement.getAttribute('data-rail'));
 	return RAIL_KEYS.find((key) => key === rail) ?? null;
+}
+
+/** Whether the root names a league selected: a season rail with none shows the rail without a league
+ * (Lane 83, rail-order.ts railShown). */
+async function namesLeague(page: Page): Promise<boolean> {
+	return page.evaluate(() => document.documentElement.hasAttribute('data-league'));
 }
 
 /** The words as drawn: the first match not inside a set of words the root's rail hides (a page
@@ -255,7 +269,7 @@ for (const theme of THEMES) {
 		// The board's item lights wherever this width's rail shows it (the phone's in-season five
 		// leave Rest of season to the wide rail).
 		const boardRail = (await rootRail(page)) ?? 'pre_draft';
-		const want = railOfKey(boardRail)
+		const want = railShown(boardRail, await namesLeague(page))
 			.filter((item) => item.section === 'board' && (width > PHONE_MAX || !item.wideOnly))
 			.map((item) => item.label);
 		if (JSON.stringify(lit) !== JSON.stringify(want)) {
@@ -274,7 +288,9 @@ for (const theme of THEMES) {
 		const where = `home no script ${theme} ${String(width)}`;
 		if (rail === null) failures.push(`${where}: the root names no rail`);
 		else {
-			const items = railOfKey(rail).filter((item) => width > PHONE_MAX || !item.wideOnly);
+			const items = railShown(rail, await namesLeague(still)).filter(
+				(item) => width > PHONE_MAX || !item.wideOnly
+			);
 			const shown = await still.evaluate(() =>
 				[...document.querySelectorAll<HTMLElement>('nav.rail .item[data-k]')]
 					.filter((item) => item.getBoundingClientRect().width > 0)
