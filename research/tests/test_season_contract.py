@@ -11,6 +11,12 @@ Lane 120 extends the mover: his page club comes from the writer's own rule (`pag
 after his week 6 game naming DET), his weeks before his first line name no opponent, and his page says
 his newest line was LAC's (`lastGameClub`); the reader refuses a played week that names none.
 
+Lane 135: run 2026-10-22T05 failed its schema gate on Josiah Deguara, whose newest line (PHI, week 4)
+was a special-teams game: a club edge and a usage row of zeros, no stat line and no offensive snap, so
+his log reads that week inactive under PHI's opponent while his page says the line was PHI's. The reader
+required a played week. The mover here now also plays his newest line's week that way, and a free agent
+(Lane 123: the list read after his last game names no club) goes through the same writer and gate.
+
 It needs node and the web's dependencies (`npm ci` in `web/`); CI installs them, so there it never
 skips.
 """
@@ -18,12 +24,15 @@ skips.
 import json
 import os
 import shutil
+from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Final
 
 import pytest
 
+from research.free_agent import FREE_AGENT_CLUB, run_club
 from research.nightly.build.page_club import RosterRead, club_calls, last_game_club
 from research.nightly.build.player_season import SeasonContext, SeasonStore, season_block
 from research.nightly.config import PAGE_FORMAT
@@ -60,8 +69,25 @@ def _read(path: Path) -> Any:
     return json.loads(path.read_text())
 
 
-def _context(run: Path, through: int) -> SeasonContext:
-    """The fixture's slate, every club's games in the records through `through`, and his LAC lines."""
+@dataclass(frozen=True, slots=True)
+class Mover:
+    """His LAC weeks as the store holds them, and the club the list read after his last one names."""
+
+    lines: Mapping[int, Mapping[str, float]]
+    snaps: Mapping[int, Mapping[str, float]]
+    listed: str | None
+
+
+_PLAYED_BOTH: Final = Mover(dict.fromkeys(_FORMER_WEEKS, _LINE), {}, _PAGE_CLUB)
+# Lane 135: his week 5 for LAC on special teams only, as the store held Deguara's PHI week 4: the usage
+# ingest's zeros and his club's totals, a snap row with no offensive snap, and no stat line.
+_SPECIAL_TEAMS: Final = {"carries": 0.0, "targets": 0.0, "pass_attempts": 0.0, "team_carries": 27.0}
+_NO_OFFENSIVE_SNAP: Final = {"offensive_snaps": 0.0, "team_offensive_snaps": 61.0}
+_SPECIAL_TEAMS_LAST: Final = Mover({4: _LINE, 5: _SPECIAL_TEAMS}, {5: _NO_OFFENSIVE_SNAP}, _PAGE_CLUB)
+
+
+def _context(run: Path, through: int, mover: Mover) -> SeasonContext:
+    """The fixture's slate, every club's games in the records through `through`, and his LAC weeks."""
     slates = _read(run / "schedule.json")["slates"]
     games = {
         slate["abbr"]: [
@@ -75,33 +101,34 @@ def _context(run: Path, through: int) -> SeasonContext:
     }
     in_records = frozenset((club, g.week) for club, slate in games.items() for g in slate if g.week <= through)
     store = SeasonStore(
-        lines={_PLAYER: dict.fromkeys(_FORMER_WEEKS, _LINE)},
-        snaps={},
-        teams={_PLAYER: dict.fromkeys(_FORMER_WEEKS, _FORMER_CLUB)},
+        lines={_PLAYER: {week: dict(line) for week, line in mover.lines.items()}},
+        snaps={_PLAYER: {week: dict(snap) for week, snap in mover.snaps.items()}},
+        teams={_PLAYER: dict.fromkeys(mover.lines, _FORMER_CLUB)},
         carried=dict.fromkeys(range(1, weeks + 1), _CARRIED),
         in_records=in_records,
     )
-    # Lane 120: the list read two days after his week 6 game names DET, so the page is DET's and says
-    # his newest line was LAC's.
-    last = next(g.kickoff for g in games[_FORMER_CLUB] if g.week == max(_FORMER_WEEKS))
-    roster = RosterRead({_PLAYER: _PAGE_CLUB}, last + timedelta(days=2))
+    # Lane 120: the list read two days after his newest line's game names DET (or, Lane 123, no club), so the
+    # page is that club's and says his newest line was LAC's.
+    last = next(g.kickoff for g in games[_FORMER_CLUB] if g.week == max(mover.lines))
+    roster = RosterRead({_PLAYER: mover.listed}, last + timedelta(days=2))
     clubs = club_calls({_PLAYER: _PAGE_CLUB}, roster, store.teams, games)
     return SeasonContext(2026, weeks, through, games, byes, store, {}, clubs)
 
 
-def _write_mover(root: Path) -> Json:
-    """The fixture copied under `root`, his page's season the writer's block for the mover."""
+def _write_mover(root: Path, mover: Mover = _PLAYED_BOTH) -> Json:
+    """The fixture copied under `root`, his page's club and season the writer's for the mover."""
     shutil.copytree(_FIXTURE / "runs" / _RUN, root / "runs" / _RUN)
     run = root / "runs" / _RUN
     page_path = run / "players" / f"{_PLAYER}.json"
     page = _read(page_path)
     assert page["team"] == _PAGE_CLUB
-    context = _context(run, page["season"]["through"])
+    context = _context(run, page["season"]["through"], mover)
     season = season_block(_PLAYER, PAGE_FORMAT, "RB", context)
-    elsewhere = last_game_club(context.clubs[_PLAYER])
-    page_path.write_text(json.dumps({**page, "season": season, "lastGameClub": elsewhere}))
+    call = context.clubs[_PLAYER]
+    team = run_club(call.club)
+    page_path.write_text(json.dumps({**page, "team": team, "season": season, "lastGameClub": last_game_club(call)}))
     index = [
-        {**entry, "season": {"games": season["games"], "pointsPerGame": season["pointsPerGame"]}}
+        {**entry, "team": team, "season": {"games": season["games"], "pointsPerGame": season["pointsPerGame"]}}
         if entry["id"] == _PLAYER
         else entry
         for entry in _read(run / "index.json")
@@ -153,3 +180,43 @@ def test_a_bye_on_a_week_his_club_plays_is_refused_by_the_gate(tmp_path: Path) -
     record = schema_gate(tmp_path, _RUN, contract_dir(os.environ))
     assert not record.passed
     assert any(f"has a bye in week {week}, but {_PAGE_CLUB} plays that week" in r for r in record.reasons)
+
+
+def test_a_newest_line_on_special_teams_only_passes_the_gate(tmp_path: Path) -> None:
+    """Lane 135, the night's refusal: his page says his week 5 line was LAC's, and his log reads that week
+    inactive under LAC's opponent, because the line has no stat and no offensive snap."""
+    season = _write_mover(tmp_path, _SPECIAL_TEAMS_LAST)
+    by_week = {row["week"]: row for row in season["log"]}
+    assert (by_week[4]["status"], by_week[5]["status"]) == ("played", "inactive")
+    assert (by_week[5]["opponent"], by_week[5]["home"]) == ("DEN", True)
+    page = _read(tmp_path / "runs" / _RUN / "players" / f"{_PLAYER}.json")
+    assert (page["team"], page["lastGameClub"]) == (_PAGE_CLUB, {"club": _FORMER_CLUB, "week": 5})
+    record = schema_gate(tmp_path, _RUN, contract_dir(os.environ))
+    assert record.passed, record.reasons
+    assert "4 of 4 player pages parsed" in record.summary
+
+
+def test_a_free_agent_after_his_last_line_passes_the_gate(tmp_path: Path) -> None:
+    """Lane 123 through the writer: the list read after his week 6 game names no club, so his page is FA,
+    names no game after his last line, and says that line was LAC's."""
+    season = _write_mover(tmp_path, Mover(dict.fromkeys(_FORMER_WEEKS, _LINE), {}, None))
+    page = _read(tmp_path / "runs" / _RUN / "players" / f"{_PLAYER}.json")
+    assert (page["team"], page["lastGameClub"]) == (FREE_AGENT_CLUB, {"club": _FORMER_CLUB, "week": 6})
+    after = [row for row in season["log"] if row["week"] > max(_FORMER_WEEKS)]
+    assert after
+    assert {(row["status"], row["opponent"]) for row in after} == {("inactive", None)}
+    record = schema_gate(tmp_path, _RUN, contract_dir(os.environ))
+    assert record.passed, record.reasons
+    assert "4 of 4 player pages parsed" in record.summary
+
+
+def test_a_last_game_club_on_a_week_that_is_not_its_game_is_refused_by_the_gate(tmp_path: Path) -> None:
+    """The reader still holds the page to a week his log shows as that club's game."""
+    _write_mover(tmp_path, _SPECIAL_TEAMS_LAST)
+    page_path = tmp_path / "runs" / _RUN / "players" / f"{_PLAYER}.json"
+    page = _read(page_path)
+    page_path.write_text(json.dumps({**page, "lastGameClub": {"club": _FORMER_CLUB, "week": 3}}))
+    record = schema_gate(tmp_path, _RUN, contract_dir(os.environ))
+    assert not record.passed
+    refusal = f"week 3 line was for {_FORMER_CLUB}, but his log has no {_FORMER_CLUB} game that week"
+    assert any(refusal in r for r in record.reasons)
