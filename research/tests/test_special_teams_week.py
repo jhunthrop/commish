@@ -81,12 +81,17 @@ def test_a_read_calling_the_special_teams_week_missed_fails_validation() -> None
         "He missed week 4 of 2026.",
         "He did not play in week 4 of 2026 for the Eagles.",
         "Week 4 of 2026 he sat out.",
+        "He missed weeks 4 and 5 of 2026.",
+        "He missed weeks 1 and 5 of 2026 and played special teams only in week 4, then missed week 4 of 2026 again.",
     ):
         assert _rules(text, clock), text
     for text in (
         "His week 4 of 2026 snaps were on special teams for the Eagles.",
         "He missed weeks 1 and 5 of 2026.",
         "He missed week 4 of 2025.",
+        # Review M1: the weeks he missed, and the special-teams week said as special teams.
+        "He missed weeks 1 and 5 of 2026 and played special teams only in week 4.",
+        "He missed weeks 1 and 5 of 2026, but in week 4 of 2026 he was on special teams for the Eagles.",
     ):
         assert not _rules(text, clock), text
     # No special-teams week, no rule.

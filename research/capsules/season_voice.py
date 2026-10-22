@@ -316,16 +316,35 @@ def names_missed_weeks(text: str, clock: SeasonClock) -> bool:
     )
 
 
+# Where a sentence's clauses part: a stop, a contrast, or an "and" that starts a new verb rather than
+# continuing a week list ("weeks 1 and 5" stays one clause, "and played special teams" starts one).
+_CLAUSE_BREAK: Final = re.compile(
+    rf"[;:]|,?\s+(?:but|while|though|whereas|then)\s+|,?\s+and\s+(?!(?:weeks?\s+)?{_WEEK_NUMBER}\b)",
+    re.IGNORECASE,
+)
+_SPECIAL_TEAMS_WORDS: Final = re.compile(r"\bspecial[- ]teams?\b", re.IGNORECASE)
+
+
+def _missed_clauses(sentence: str) -> list[str]:
+    """The clauses a word for missing governs, leaving out one that names special teams."""
+    return [
+        clause
+        for clause in _CLAUSE_BREAK.split(sentence)
+        if _MISSED_WORDS.search(clause) and not _SPECIAL_TEAMS_WORDS.search(clause)
+    ]
+
+
 def calls_special_teams_week_missed(text: str, clock: SeasonClock) -> bool:
-    """A sentence that names his special-teams week (this season's, or no season named) beside a word for
-    missing it: the page says he was on the field that week (Lane 144, B117)."""
+    """A missed clause (the week list a word for missing governs) that names his special-teams week, this
+    season's or with no season named: the page says he was on the field that week (Lane 144, B117). A
+    sentence that names that week as special teams beside the weeks he missed is honest and passes."""
     week = clock.special_teams
     if not clock.in_season or week is None:
         return False
     return any(
-        _MISSED_WORDS.search(sentence)
-        and any(r.season in (None, clock.season) and week in r.weeks for r in week_references(sentence))
+        any(r.season in (None, clock.season) and week in r.weeks for r in week_references(clause))
         for sentence in split_sentences(text)
+        for clause in _missed_clauses(sentence)
     )
 
 
