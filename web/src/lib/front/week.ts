@@ -385,8 +385,11 @@ export function weekBasis(
 	const setOn = unlisted.bestLineup
 		? ''
 		: ` A team's ${BOX.proj} adds its starters as set on ${platform}.`;
+	// While the teams' sentence carries its pace clause, the other leagues' line drops its qualification
+	// (Lane 127 fix round 3), so a Monday evening's phone keeps to eight lines.
+	const own = unlisted.paced ? '' : ', each from its own platform';
 	const lines = [
-		`Record, place and ${BOX.pts} are ${platform}'s.${setOn}${others ? ' Your other leagues read the same way, each from its own platform.' : ''}`
+		`Record, place and ${BOX.pts} are ${platform}'s.${setOn}${others ? ` Your other leagues read the same way${own}.` : ''}`
 	];
 	const scoring = league.projection_scoring;
 	if (scoring !== null) {

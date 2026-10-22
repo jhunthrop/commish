@@ -469,6 +469,13 @@ void test("the front door's FFPC bug says the opponent's figures as the home doe
 		/as set on/
 	);
 	assert.match(weekBasis(SUCK, false, ZONE)[0] ?? '', /as set on Sleeper/);
+	// While the pace clause is said the other leagues' line drops its qualification (fix round 3).
+	const paced = { bestLineup: true, noRoster: false, paced: true };
+	assert.match(
+		weekBasis(SUCK, true, ZONE, true, false, true, paced)[0] ?? '',
+		/ Your other leagues read the same way\.$/
+	);
+	assert.match(weekBasis(SUCK, true, ZONE)[0] ?? '', /each from its own platform\.$/);
 });
 
 void test('the roster head counts its chips, and each other league carries its changes', () => {
