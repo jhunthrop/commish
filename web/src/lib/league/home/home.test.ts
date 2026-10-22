@@ -15,9 +15,10 @@ import {
 	bugsFinalNone,
 	bugsMissFinal,
 	bugsMissListedFinal,
-	bugsUnlisted,
 	bugsOf,
 	bugsPlaying,
+	bugsPlayingListed,
+	unlistedDrawn,
 	sideFinal,
 	projectedFinalOf,
 	readCell,
@@ -281,11 +282,11 @@ void test("a side reads Final once every one of its starters is, the Team row's 
 	assert.equal(bugsFinalNone([none]), true);
 });
 
-void test('a side FFPC lists no starters for is said once by its own sentence, never the starters key (Lane 125, B104)', () => {
+void test('a side FFPC lists no starters or roster for draws "--", said once by its own sentence, never the starters key (Lane 125, Lane 127 fix round 1)', () => {
 	const night = board('playing');
 	const game = night.games[0];
 	assert.ok(game);
-	// Both sides unlisted, as every other game of FFPC's scoreboard: no starters, no Proj final.
+	// Both sides unlisted with no roster: no starters, no Proj, no Proj final.
 	game.sides = game.sides.map((s, i) => ({
 		...s,
 		starters: 0,
@@ -301,28 +302,120 @@ void test('a side FFPC lists no starters for is said once by its own sentence, n
 			[true, true, `${BOX.final} 71.4`]
 		]
 	);
-	assert.equal(bugsUnlisted(bugs), true);
-	// The "--" is the unlisted side's: the starters key stays unsaid, the League page's own sentence
-	// says it (the front door's one bug keeps bugsMissFinal).
+	assert.deepEqual(unlistedDrawn(bugs), { bestLineup: false, noRoster: true, paced: false });
+	// The "--" is the side's with no roster: the starters keys stay unsaid, its own sentence says it,
+	// on the League page and the front door alike.
 	assert.equal(bugsMissFinal(bugs), true);
 	assert.equal(bugsMissListedFinal(bugs), false);
+	assert.equal(bugsPlayingListed(bugs), false);
 	const scoring = { format: 'ppr', league_own: false, te_bonus: 0.5 } as const;
 	const read = '2026-10-17T02:00:00.000Z';
-	const said = teamBasis('ffpc', read, scoring, false, ZONE, true, false, true, false, true);
-	assert.match(
-		said,
-		/ Teams FFPC sends no lineup for have no Proj final and read Final by their clubs' schedules\.$/
+	const said = teamBasis(
+		'ffpc',
+		read,
+		scoring,
+		false,
+		ZONE,
+		true,
+		false,
+		false,
+		false,
+		unlistedDrawn(bugs)
 	);
-	assert.doesNotMatch(said, /No Proj final while/);
+	assert.match(said, / Teams FFPC sends no lineup or roster for read --\.$/);
+	assert.doesNotMatch(said, /No Proj final while|Proj final adds|have no Proj final/);
 	assert.doesNotMatch(said, BANNED);
 	assert.equal(said.split('FFPC sends no lineup').length, 2, 'said once');
-	// Before kickoff the side draws no Proj: that is what is said.
-	assert.match(
-		teamBasis('ffpc', read, scoring, false, ZONE, false, false, false, false, true),
-		/ Teams FFPC sends no lineup for have no Proj\.$/
-	);
 	// A board with every side listed says nothing of it.
-	assert.equal(bugsUnlisted(bugsOf(board('playing'), SYNC, SATURDAY, ZONE)), false);
+	assert.deepEqual(unlistedDrawn(bugsOf(board('playing'), SYNC, SATURDAY, ZONE)), {
+		bestLineup: false,
+		noRoster: false,
+		paced: false
+	});
+});
+
+void test("a side FFPC sends no lineup for draws its roster's best lineup before and after kickoff, one sentence for both (Lane 127, fix round 1)", () => {
+	const scoring = { format: 'ppr', league_own: false, te_bonus: 0.5 } as const;
+	const read = '2026-10-17T02:00:00.000Z';
+	const best = / Proj for teams FFPC sends no lineup for is our best lineup from their rosters\./;
+	const friday = board('upcoming');
+	const game = friday.games[0];
+	assert.ok(game);
+	// One side with a roster (its best lineup's Proj), one with none.
+	game.sides = game.sides.map((s, i) => ({
+		...s,
+		starters: 0,
+		projection: i === 0 ? 88.4 : null,
+		projected_final: null,
+		schedule_state: 'upcoming',
+		...(i === 0 ? { projection_best_lineup: true } : {})
+	}));
+	const bugs = bugsOf(friday, SYNC, SATURDAY, ZONE);
+	assert.deepEqual(
+		bugs[0]?.sides.map((s) => [s.bestLineup, s.big]),
+		[
+			[true, '88.4'],
+			[false, BOX.none]
+		]
+	);
+	const drawn = unlistedDrawn(bugs);
+	assert.deepEqual(drawn, { bestLineup: true, noRoster: true, paced: false });
+	const said = teamBasis('ffpc', read, scoring, false, ZONE, false, false, false, false, drawn);
+	assert.match(said, new RegExp(`${best.source}$`));
+	assert.doesNotMatch(said, /Proj final/);
+	assert.doesNotMatch(said, BANNED);
+	// Under way: its Proj final is the best lineup's too, the same sentence, the key for what it adds.
+	const night = board('playing');
+	const ng = night.games[0];
+	assert.ok(ng);
+	ng.sides = ng.sides.map((s) => ({
+		...s,
+		starters: 0,
+		projection: 88.4,
+		projected_final: 80.1,
+		projection_best_lineup: true,
+		projected_final_paced: true,
+		schedule_state: 'kicked_off'
+	}));
+	const under = bugsOf(night, SYNC, SATURDAY, ZONE);
+	assert.equal(under[0]?.sides[0]?.small, '80.1');
+	assert.deepEqual(unlistedDrawn(under), { bestLineup: true, noRoster: false, paced: true });
+	// Both sides are the best lineup's: its sentence says their Proj final, its pace clause with it, and
+	// the listed sides' key stays unsaid (fix round 3).
+	assert.equal(bugsPlayingListed(under), false);
+	const both = teamBasis(
+		'ffpc',
+		read,
+		scoring,
+		false,
+		ZONE,
+		true,
+		bugsMissListedFinal(under),
+		bugsPlayingListed(under),
+		false,
+		unlistedDrawn(under)
+	);
+	assert.match(
+		both,
+		/ Proj for teams FFPC sends no lineup for is our best lineup from their rosters, in-play players at their projection's pace\.$/
+	);
+	assert.doesNotMatch(both, /Proj final adds/);
+	assert.equal(both.split('sends no lineup').length, 2, 'the teams said once');
+	// An older answer sends no projection_best_lineup and no Proj: the teams with no roster's words.
+	const older = board('upcoming');
+	const og = older.games[0];
+	assert.ok(og);
+	og.sides = og.sides.map((s) => ({
+		...s,
+		starters: 0,
+		projection: null,
+		schedule_state: 'upcoming'
+	}));
+	assert.deepEqual(unlistedDrawn(bugsOf(older, SYNC, SATURDAY, ZONE)), {
+		bestLineup: false,
+		noRoster: true,
+		paced: false
+	});
 });
 
 void test('a kickoff before the page clock is never the next: the bug reads Kicked off', () => {

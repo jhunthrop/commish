@@ -32,7 +32,16 @@ from research.capsules.facts.depth_context import (
     schedule_for,
     team_context_for,
 )
-from research.capsules.facts.depth_model import Depth, PriorSeason, ScoringUsage, TargetCompetition
+from research.capsules.facts.depth_model import (
+    Coaching,
+    Depth,
+    DepthChart,
+    PriorSeason,
+    Schedule,
+    ScoringUsage,
+    TargetCompetition,
+    TeamContext,
+)
 from research.capsules.facts.depth_role import (
     DepthRow,
     PlayerWeekShare,
@@ -75,12 +84,14 @@ class DepthOptions:
     product_season: int
     prior_seasons: tuple[int, ...]
     positions: Mapping[str, Position]
-    team_by_player_id: Mapping[str, str]
+    # Each subject's club, None for a free agent (Lane 127, B103): his record without a club's facts.
+    team_by_player_id: Mapping[str, str | None]
     as_of: datetime
     # The team every board player is on, for placing his depth-chart room (`team_by_player_id` when
     # None: the board pass's subjects are the whole board). A single-player read passes the served
-    # board's, so his room holds the same men the board pass puts in it.
-    room_teams: Mapping[str, str] | None = None
+    # board's, so his room holds the same men the board pass puts in it. A board player held as None is
+    # a free agent, in no club's room.
+    room_teams: Mapping[str, str | None] | None = None
 
 
 def _headlines(
@@ -150,12 +161,48 @@ def _seasons(player_id: str, data: _Pass) -> list[SeasonInputs]:
     return out
 
 
-def _depth_for(player_id: str, team: str, data: _Pass) -> Depth:
+@dataclass(frozen=True, slots=True)
+class _ClubFacts:
+    """The depth facts a club gives him: who calls the plays, his place on its depth chart, who else
+    eats there, its offense and its schedule. A free agent has none (Lane 127, B103)."""
+
+    coaching: Coaching | None
+    depth_chart: DepthChart | None
+    target_competition: TargetCompetition | None
+    team_context: TeamContext | None
+    schedule: Schedule | None
+
+
+_NO_CLUB: Final = _ClubFacts(None, None, None, None, None)
+
+
+def _club_facts(player_id: str, team: str | None, data: _Pass) -> _ClubFacts:
+    if team is None:
+        return _NO_CLUB
     options = data.options
     position = options.positions.get(player_id)
     prior = options.prior_seasons[0] if options.prior_seasons else None
     source_team = source_team_code(team)
     product_team = product_team_code(source_team)
+    return _ClubFacts(
+        coaching_for(source_team, options.product_season, data.play_callers),
+        None if position is None else depth_chart_for(player_id, product_team, position, data.rows_by_room, data.names),
+        data.competition_by_team.get(source_team),
+        None
+        if prior is None
+        else team_context_for(
+            prior, data.prior_team_rows.get(source_team, ()), data.week_one_team_rows.get(source_team, ())
+        ),
+        schedule_for(product_team, data.games, data.indoors.get(source_team, {})),
+    )
+
+
+def _depth_for(player_id: str, team: str | None, data: _Pass) -> Depth:
+    """His depth facts: his own record whatever his club, his club's only where he has one (a free
+    agent, `team` None, carries none of them, so no depth-chart line; Lane 127, B103)."""
+    options = data.options
+    prior = options.prior_seasons[0] if options.prior_seasons else None
+    club = _club_facts(player_id, team, data)
     seasons = _seasons(player_id, data)
     pedigree_row = data.pedigree.get(player_id)
     recent = () if prior is None else data.week_scores.get(prior, {}).get(player_id, ())
@@ -163,20 +210,16 @@ def _depth_for(player_id: str, team: str, data: _Pass) -> Depth:
         season_endings_for(seasons),
         games_missed_for(seasons),
         injury_history_for(player_id, data.captures),
-        coaching_for(source_team, options.product_season, data.play_callers),
+        club.coaching,
         None
         if pedigree_row is None
         else pedigree_for(pedigree_row, data.opening_day, options.product_season, data.colleges.get(player_id)),
-        None if position is None else depth_chart_for(player_id, product_team, position, data.rows_by_room, data.names),
+        club.depth_chart,
         None if prior is None else role_trend_for(prior, data.weekly_shares.get(player_id, ())),
-        data.competition_by_team.get(source_team),
+        club.target_competition,
         data.scoring_usage.get(player_id),
-        None
-        if prior is None
-        else team_context_for(
-            prior, data.prior_team_rows.get(source_team, ()), data.week_one_team_rows.get(source_team, ())
-        ),
-        schedule_for(product_team, data.games, data.indoors.get(source_team, {})),
+        club.team_context,
+        club.schedule,
         market_movement_for(data.adp_history.get(player_id, ())),
         None if prior is None else volatility_for(prior, recent),
         prior_seasons_for([data.headlines.get(season, {}).get(player_id) for season in options.prior_seasons]),
@@ -207,7 +250,9 @@ def _depth_rows(
         rooms_known = options.team_by_player_id if options.room_teams is None else options.room_teams
         board_team = rooms_known.get(player_id)
         archive_team = team_of.get(player_id)
-        if position is None or (board_team is None and archive_team is None):
+        # A board free agent is in no club's room, never his old club's by the archive (Lane 127).
+        free_agent = player_id in rooms_known and board_team is None
+        if position is None or free_agent or (board_team is None and archive_team is None):
             continue
         product = product_team_code(source_team_code(board_team) if board_team is not None else str(archive_team))
         row = DepthRow(player_id, product, position, slot.slot, options.product_season, slot.as_of)

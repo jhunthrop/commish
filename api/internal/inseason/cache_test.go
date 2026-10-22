@@ -101,6 +101,7 @@ func TestCacheReadsOncePerTTL(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+	c.refreshes.Wait()
 	if reads.lines.Load() != 1 || reads.designations.Load() != 1 {
 		t.Fatalf("twelve viewers read lines %d and captures %d times, want once", reads.lines.Load(), reads.designations.Load())
 	}
@@ -130,13 +131,19 @@ func TestCacheReadsOncePerTTL(t *testing.T) {
 // The board route's designations are the in-season screens' read: one
 // capture read and one dating read serve both within the TTL, and the
 // screens' data carries each season-long status's start, so their chip
-// says since when as the board's does (review 66n finding 3).
+// says since when as the board's does (review 66n finding 3). The dating
+// lands behind the first read, which answers the capture pending (Lane
+// 129), and dates the capture that read held.
 func TestCacheSharesTheCaptureRead(t *testing.T) {
 	reads := &countingReads{}
 	c := &Cache{Reads: reads, Now: time.Now}
 	ctx := context.Background()
 	data, err := c.Data(ctx, 2026)
-	if err != nil {
+	if err != nil || !data.Designations["p2"].DatingPending {
+		t.Fatalf("cold: %+v %v, want the capture pending", data.Designations, err)
+	}
+	c.refreshes.Wait()
+	if data, err = c.Data(ctx, 2026); err != nil {
 		t.Fatal(err)
 	}
 	if since := data.Designations["p2"].Since; since == nil || !since.Equal(captureAt.Add(-time.Hour)) {

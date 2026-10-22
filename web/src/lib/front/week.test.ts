@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { WEEK_DONE } from '../../../scripts/inseason-fixture/sunday.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { components } from '#lib/api/types.ts';
+import { bugsMissListedFinal, bugsPlayingListed, unlistedDrawn } from '#lib/league/home/home.ts';
 import {
 	FRONT,
 	chipsOf,
@@ -397,6 +398,84 @@ void test('the basis says whose figures, what Proj is and when it was read, once
 		/ Gain is what the changes add\. A pickup's gain is the Proj he adds this week\.$/
 	);
 	assert.doesNotMatch(basis.join(' '), /strip/i);
+});
+
+void test("the front door's FFPC bug says the opponent's figures as the home does, never the starters key (Lane 127, B105)", () => {
+	const ffpc = (state: 'upcoming' | 'playing', opponent: Partial<Schemas['ScoreboardSide']>) => {
+		const game = SUCK.bug?.game;
+		assert.ok(game);
+		const [mine, theirs] = game.sides;
+		assert.ok(mine && theirs);
+		const league: WeekLeague = {
+			...SUCK,
+			host: 'ffpc',
+			bug: {
+				...(SUCK.bug ?? { teams: [], first: [] }),
+				game: {
+					...game,
+					state,
+					sides: [
+						state === 'upcoming' ? mine : { ...mine, projected_final: 80.2 },
+						{ ...theirs, starters: 0, projected_final: null, ...opponent }
+					]
+				}
+			}
+		};
+		const bug = frontLeague(league, href, NOW, ZONE).bug;
+		assert.ok(bug);
+		const started = bug.state !== 'upcoming';
+		return weekBasis(
+			league,
+			false,
+			ZONE,
+			started,
+			bugsMissListedFinal([bug]),
+			bugsPlayingListed([bug]),
+			unlistedDrawn([bug])
+		)[1];
+	};
+	// Before Sunday his Proj is our best lineup from his roster.
+	const friday = ffpc('upcoming', {
+		projection: 97.1,
+		projection_best_lineup: true,
+		schedule_state: 'upcoming'
+	});
+	assert.match(
+		friday ?? '',
+		/ Proj for teams FFPC sends no lineup for is our best lineup from their rosters\.$/
+	);
+	// Once kicked off his Proj final is the best lineup's too: the same sentence, its pace clause
+	// (fix rounds 1 and 3).
+	const sunday = ffpc('playing', {
+		projection: 97.1,
+		projected_final: 91.3,
+		projection_best_lineup: true,
+		projected_final_paced: true,
+		schedule_state: 'kicked_off'
+	});
+	assert.match(
+		sunday ?? '',
+		/ Proj for teams FFPC sends no lineup for is our best lineup from their rosters, in-play players at their projection's pace\.$/
+	);
+	// With no roster his "--" is said so, never by the starters' key.
+	const rosterless = ffpc('playing', { projection: null, schedule_state: 'kicked_off' });
+	assert.match(rosterless ?? '', / Teams FFPC sends no lineup or roster for read --\.$/);
+	assert.doesNotMatch(rosterless ?? '', /No Proj final while/);
+	for (const said of [friday, sunday, rosterless]) assert.doesNotMatch(said ?? '', bannedPattern());
+	// The opponent's Proj is our best lineup, not his starters as set: that sentence goes (fix round 3).
+	const best = { bestLineup: true, noRoster: false, paced: false };
+	assert.doesNotMatch(
+		weekBasis(SUCK, false, ZONE, false, false, false, best)[0] ?? '',
+		/as set on/
+	);
+	assert.match(weekBasis(SUCK, false, ZONE)[0] ?? '', /as set on Sleeper/);
+	// While the pace clause is said the other leagues' line drops its qualification (fix round 3).
+	const paced = { bestLineup: true, noRoster: false, paced: true };
+	assert.match(
+		weekBasis(SUCK, true, ZONE, true, false, true, paced)[0] ?? '',
+		/ Your other leagues read the same way\.$/
+	);
+	assert.match(weekBasis(SUCK, true, ZONE)[0] ?? '', /each from its own platform\.$/);
 });
 
 void test('the roster head counts its chips, and each other league carries its changes', () => {

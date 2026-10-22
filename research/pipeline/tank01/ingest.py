@@ -1,8 +1,8 @@
 """THE STATS PROVIDER'S INGESTS: the roster and its weekly lines, the fixtures, and the ADP column.
 
 `ingest_roster_and_lines` is `seedPlayers` (`src/data/seed/seed-players.ts`): the roster upserted
-into `players` (ADP left alone: only the ADP feed writes it), then every week's box scores into
-`provider_stat_lines`, one line per player, upserted. `ingest_schedule` is the stats pipeline's
+into `players` (ADP left alone: only the ADP feed writes it; a stored club too, the daily list's, Lane
+127), then every week's box scores into `provider_stat_lines`, one line per player, upserted. `ingest_schedule` is the stats pipeline's
 fixture walk into `provider_games` (`stats-pipeline/schedule.ts`). `ingest_adp` is its ADP enrichment
 (`stats-pipeline/adp.ts`): an UPDATE of `players.adp` and `pos_adp`, never an insert.
 
@@ -56,19 +56,41 @@ def _stat_line_row(season: int, line: StatLine) -> dict[str, object]:
 
 @dataclass(frozen=True)
 class SeedReport:
+    """What the seed wrote: every listed player's name, position and headshot, a club only on the rows
+    it created (`new_players`), and the week lines. The operator's command prints it as it reads."""
+
     players: int
     stat_lines: int
+    new_players: int = 0
+
+    def __str__(self) -> str:
+        return (
+            f"{self.players} players' names, positions and headshots ({self.new_players} new, each with the "
+            f"list's club; no stored club rewritten, the daily list owns it), {self.stat_lines} stat lines"
+        )
 
 
-def _upsert_roster(conn: Connection, players: list[Player]) -> None:
+# THE CLUB IS THE DAILY LIST'S (Lane 127, B103): the seed's roster read is as old as its run, so its club
+# never overwrites a stored one (`player_clubs` keeps the column current). A row the seed creates takes
+# the list's club, since the daily list inserts no player.
+_ROSTER_KEEPS: Final = ("id", "adp", "team")
+
+
+def _upsert_roster(conn: Connection, players: list[Player]) -> int:
+    """The roster upserted; how many rows it created."""
+    created = 0
     for batch in _chunks(players, _SEED_BATCH):
         rows = [
             {"id": p.id, "name": p.name, "position": p.position, "team": p.nfl_team, "headshot_url": p.headshot_url}
             for p in batch
         ]
         statement = insert(PROVIDER_PLAYERS).values(rows)
-        update_set = excluded_set(statement, PROVIDER_PLAYERS, ("id", "adp"))
-        conn.execute(statement.on_conflict_do_update(index_elements=[PROVIDER_PLAYERS.c.id], set_=update_set))
+        update_set = excluded_set(statement, PROVIDER_PLAYERS, _ROSTER_KEEPS)
+        upsert = statement.on_conflict_do_update(index_elements=[PROVIDER_PLAYERS.c.id], set_=update_set)
+        # Postgres leaves xmax at 0 on a row the statement inserted and sets it on one it updated.
+        inserted = conn.execute(upsert.returning(text("xmax = 0"))).scalars().all()
+        created += sum(1 for was_inserted in inserted if was_inserted)
+    return created
 
 
 def retire_other_seasons(conn: Connection, season: int) -> int:
@@ -103,7 +125,7 @@ def ingest_roster_and_lines(
     reserve_or_raise(ledger, LIST_PLAYERS_REQUEST_COST, "the player list")
     players = provider.list_players()
     retire_other_seasons(conn, provider.season)
-    _upsert_roster(conn, players)
+    created = _upsert_roster(conn, players)
     # The provider's spelling was just written back; a crossed player keeps his own (Lane 78).
     LOG.info("tank01 roster: %s", respell_provider_names(conn).line())
     checkpoint()
@@ -121,7 +143,7 @@ def ingest_roster_and_lines(
         _upsert_week(conn, provider.season, week_lines)
         checkpoint()
         stat_count += len(week_lines)
-    return SeedReport(players=len(players), stat_lines=stat_count)
+    return SeedReport(players=len(players), stat_lines=stat_count, new_players=created)
 
 
 def _provider_date(raw: str) -> date | None:

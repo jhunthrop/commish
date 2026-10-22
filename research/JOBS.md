@@ -122,7 +122,9 @@ or board is reported and the rest are kept, as the TypeScript carries on.
 
 The Tank01 store holds one season: `tank01-roster` and `tank01-schedule` first retire every row
 of any other season (`retire_other_seasons`, in the same transaction as the write), so the first
-write of a new season starts it clean.
+write of a new season starts it clean. `tank01-roster` never rewrites a stored club
+(`provider_players.team`): the daily list (`player-clubs`) owns it, and the seed sets a club only on a
+row it creates, as its printed report says (Lane 127).
 
 ## Scheduled jobs (the registry)
 
