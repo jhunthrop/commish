@@ -6,7 +6,8 @@
 
 `capture-harvest` takes the hourly provider capture, dates the newest injury capture for the API into
 `app.designation_datings` (Lane 134, `nightly/designation_dating.py`) in the capture's transaction, in a
-savepoint (Lane 141, B116), then reads the hour's game figures from it into
+savepoint (Lane 141, B116); a connection lost in that transaction writes the capture again, once, undated, on
+a fresh connection from the answers already read (Lane 143, B125), then reads the hour's game figures from it into
 `tank01_lines` and the weather service's kickoff forecasts into `nws_forecast` (Lane 66a). While a game
 of the current week that kicked off has no final, up to four days past its kickoff (Lane 84), it asks
 Tank01's week of games once for their statuses (Lane 80, `pipeline/tank01/game_status.py`, at most two
@@ -38,7 +39,7 @@ import argparse
 import logging
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Final
@@ -73,12 +74,13 @@ from research.nightly.register_log import WEEKLY_SUFFIX, record_freeze, record_p
 from research.nightly.week_reads import run_week_read_step
 from research.pipeline.budget import FixedBudget
 from research.pipeline.commands import ODDS_KEY_ENV, now_ms
-from research.pipeline.http import LiveFetcher
+from research.pipeline.http import Fetcher, LiveFetcher
 from research.pipeline.kickoff_slots import due_slot, kickoff_slots
 from research.pipeline.kickoffs import stored_kickoffs
 from research.pipeline.nws.client import NwsClient
 from research.pipeline.nws.forecast import FORECAST_SOURCE, run_forecast_pass
 from research.pipeline.odds.touchdowns import run_td_snapshot
+from research.pipeline.recording_fetcher import RecordingFetcher
 from research.pipeline.tank01.capture import (
     CAPTURE_HARVEST_REQUEST_BUDGET,
     CaptureResult,
@@ -91,6 +93,10 @@ from research.pipeline.tank01.lines import LINES_SOURCE, lines_after_harvest
 from research.pipeline.tank01.projections import parse_stored_projections
 
 TASKS: Final = ("season-week", "usage-backfill", "capture-harvest")
+CONNECTION_LOST_LINE: Final = (
+    "the connection was lost before the capture committed; the capture committed again on a new connection, "
+    "undated (the API dates it itself)"
+)
 LOG: Final = logging.getLogger(__name__)
 
 
@@ -220,11 +226,12 @@ def _capture_harvest(now: datetime) -> bool:
     fetcher = LiveFetcher()
     season = int(os.environ.get(SEASON_ENV, DEFAULT_SEASON))
     try:
-        # The dating commits with the capture it dates, so no API instance sees the capture undated and
-        # dates it itself (Lane 141, B116); its savepoint keeps the capture from a refused dating.
-        with engine.begin() as conn:
-            result = run_capture_harvest(conn, Tank01Client(fetcher, key), now, season)
-            dated_ok = _date_designations(conn, now)
+        result, dated_ok = _capture_dated(
+            engine,
+            lambda conn, answers: run_capture_harvest(conn, Tank01Client(answers, key), now, season),
+            RecordingFetcher(fetcher),
+            now,
+        )
         facts_ok = _game_facts(engine, fetcher, result, now)
         # On what the harvest left of its request budget this pass (Lane 80).
         left = CAPTURE_HARVEST_REQUEST_BUDGET - sum(feed.requests for feed in result.feeds)
@@ -248,6 +255,31 @@ def _capture_harvest(now: datetime) -> bool:
     charts = _slot_depth_charts(now, season)
     _week_reads(now)
     return not failed and dated_ok and facts_ok and status.ok and returns_ok and parsed and market and charts
+
+
+def _capture_dated(
+    engine: Engine, capture: Callable[[Connection, Fetcher], CaptureResult], answers: RecordingFetcher, now: datetime
+) -> tuple[CaptureResult, bool]:
+    """The capture and its dating in one transaction: the dating commits with the capture it dates, so no
+    API instance sees the capture undated and dates it itself (Lane 141, B116), and its savepoint keeps the
+    capture from a refused dating. A savepoint can not keep it from a dead connection (Lane 143, B125): the
+    transaction is lost with it, so the capture is written again, once, on a fresh connection and without
+    its dating (the API dates the capture itself), from the answers the first attempt kept, never asking
+    the provider twice. The dating's failure is its own line; a second loss fails the job."""
+    dated_ok = True
+    with engine.connect() as conn:
+        try:
+            with conn.begin():
+                result = capture(conn, answers)
+                dated_ok = _date_designations(conn, now)
+            return result, dated_ok
+        except SQLAlchemyError:
+            if not conn.invalidated:
+                raise
+            LOG.exception("the capture's transaction was lost with its connection")
+    _line(f"capture-harvest: {CONNECTION_LOST_LINE}")
+    with engine.begin() as conn:
+        return capture(conn, answers.replay()), dated_ok
 
 
 def _date_designations(conn: Connection, now: datetime) -> bool:

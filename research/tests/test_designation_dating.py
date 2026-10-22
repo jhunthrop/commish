@@ -9,13 +9,14 @@ reads and the write run against a migrated scratch database and need PARITY_DATA
 import gzip
 import json
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator, Mapping
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import pytest
 from sqlalchemy import Connection, Engine, insert, select, text
+from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
 
 from research.capsules.facts.depth_reads import designations_in
 from research.db.engine import make_engine
@@ -44,6 +45,10 @@ from research.nightly.designation_runs import (
 )
 from research.nightly.designations import newest_readable
 from research.parity import databases
+from research.pipeline.http import Fetcher, HttpResponse
+from research.pipeline.recording_fetcher import RecordingFetcher
+from research.pipeline.tank01.capture import CaptureResult, FeedOutcome
+from research.pipeline.tank01.client import Tank01Client
 
 _API = Path(__file__).resolve().parents[2] / "api"
 _GOLDEN = json.loads((_API / "testdata" / "designation-dating.json").read_text())
@@ -261,3 +266,91 @@ def test_a_refused_dating_rolls_back_only_itself(
     assert _stored(recorded, _LATER) == (True, [])
     out = capsys.readouterr().out
     assert "designation-dating: FAILED, IntegrityError" in out and "the API dates the capture itself" in out
+
+
+# A DEAD CONNECTION IN THE DATING (Lane 143, B125): the capture is written again on a fresh connection,
+# undated, from the answers the first attempt read, and the dating's failure is its own line.
+
+
+class _OneAnswer:
+    """The provider: one answer, counted, so a retry that asks it again shows."""
+
+    def __init__(self) -> None:
+        self.asked = 0
+
+    def get(self, url: str, headers: Mapping[str, str] | None = None) -> HttpResponse:
+        self.asked += 1
+        return HttpResponse(200, json.dumps({"body": _later_capture(_LATER)["payload"]}).encode())
+
+    def stream(self, url: str, headers: Mapping[str, str] | None = None) -> tuple[int, Iterator[bytes]]:
+        raise AssertionError("never streamed")
+
+
+def _capture_from() -> Callable[[Connection, Fetcher], CaptureResult]:
+    """A capture that reads its feed through the fetcher it is handed and stores the answer."""
+
+    def capture(conn: Connection, answers: Fetcher) -> CaptureResult:
+        body = Tank01Client(answers, "key").get("/getNFLTeams")
+        row = {**_later_capture(_LATER), "payload": body}
+        conn.execute(insert(CAPTURE_SNAPSHOTS), [row])
+        return CaptureResult([FeedOutcome(BY_DATE_SOURCE, "captured", 1)])
+
+    return capture
+
+
+def _killed(engine: Engine) -> Callable[[Connection, datetime], DatingOutcome]:
+    """A dating whose connection the server terminates mid-read (a failover, a proxy drop)."""
+
+    def dating(conn: Connection, _now: datetime) -> DatingOutcome:
+        pid = conn.execute(text("select pg_backend_pid()")).scalar_one()
+        with engine.connect() as other:
+            other.execute(text("select pg_terminate_backend(:pid)"), {"pid": pid})
+        conn.execute(text("select 1"))
+        return DatingOutcome("never reached")
+
+    return dating
+
+
+def test_a_dead_connection_in_the_dating_keeps_the_capture(
+    recorded: Engine, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(inseason, "date_newest_capture", _killed(recorded))
+    provider = _OneAnswer()
+    result, dated_ok = inseason._capture_dated(recorded, _capture_from(), RecordingFetcher(provider), _NOW)
+    # The capture is stored, undated (the API dates it itself), and the provider was asked once.
+    assert _stored(recorded, _LATER) == (True, [])
+    assert provider.asked == 1
+    assert result.feeds == [FeedOutcome(BY_DATE_SOURCE, "captured", 1)]
+    # A dating failure is never the hour's verdict, and both failures are named.
+    assert dated_ok
+    out = capsys.readouterr().out
+    assert "designation-dating: FAILED, OperationalError" in out
+    assert f"capture-harvest: {inseason.CONNECTION_LOST_LINE}" in out
+
+
+def test_without_the_retry_the_dead_connection_loses_the_capture(
+    recorded: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The premise of the retry: the savepoint alone can not keep the capture from a dead connection.
+    monkeypatch.setattr(inseason, "date_newest_capture", _killed(recorded))
+    with pytest.raises(SQLAlchemyError), recorded.begin() as conn:
+        conn.execute(insert(CAPTURE_SNAPSHOTS), [_later_capture(_LATER)])
+        assert inseason._date_designations(conn, _NOW)
+    assert _stored(recorded, _LATER) == (False, [])
+
+
+def test_a_live_connection_commits_once_and_dates(recorded: Engine, capsys: pytest.CaptureFixture[str]) -> None:
+    provider = _OneAnswer()
+    _, dated_ok = inseason._capture_dated(recorded, _capture_from(), RecordingFetcher(provider), _NOW)
+    assert dated_ok and provider.asked == 1
+    assert _stored(recorded, _LATER) == (True, [_LATER])
+    assert inseason.CONNECTION_LOST_LINE not in capsys.readouterr().out
+
+
+def test_a_statement_error_in_the_capture_is_never_retried(recorded: Engine) -> None:
+    def broken(conn: Connection, _answers: Fetcher) -> CaptureResult:
+        conn.execute(text("select * from no_such_table"))
+        return CaptureResult([])
+
+    with pytest.raises(ProgrammingError):
+        inseason._capture_dated(recorded, broken, RecordingFetcher(_OneAnswer()), _NOW)
