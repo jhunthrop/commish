@@ -4,7 +4,7 @@
 // board in season, signed in with the recorded Sleeper league selected; Players is signed out; Our
 // record reads the run the site was built from. At 1440, 1024, 800, 768 and 390 it asserts the page
 // never scrolls sideways, and that every screen's basis draws at most five rendered lines at 1440 and
-// eight at 390 (measured as line boxes, basis-lines.ts; Lane 66q, 66t). It also asserts the heads ("Our rest-of-season order" over #, Rest of season
+// eight at 390 (measured as line boxes, basis-lines.ts; Lane 66q, 66t). It also asserts the heads ("Our rest-of-season order" over # on Rest of season, "Week 7 rank" on Players, Rest of season
 // over Projected and A game, the week projection headed "Wk 6"), that every figure cell prints one decimal or --, that Trade for him sits on
 // fewer than a third of the rows, that the copy passes the one guard ("host" among its words, the
 // names the API and the run handed it skipped, copy-scan.ts), the record's Order matched head with the
@@ -87,14 +87,18 @@ const SCREENS = [
 		path: '/board/ppr-12/rb',
 		signedIn: true,
 		ready: 'Our rest-of-season order',
-		table: 'table.order'
+		table: 'table.order',
+		group: 'Our rest-of-season order'
 	},
 	{
 		name: 'players',
 		path: '/players',
 		signedIn: false,
 		ready: 'Find a player',
-		table: 'table.order'
+		table: 'table.order',
+		// In season Players is the week's rankings, its rank head the week's (Lane 142): the contract
+		// run ranks from week 7.
+		group: 'Week 7 rank'
 	},
 	{
 		name: 'record',
@@ -203,7 +207,7 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 	});
 	const said: string[] = [];
 	if (seen.rows === 0) said.push(`${screen.name}: no rows`);
-	if (width >= FOLDS_AT && !seen.groups.includes('Our rest-of-season order'))
+	if (width >= FOLDS_AT && 'group' in screen && !seen.groups.includes(screen.group))
 		said.push(`${screen.name}: no order group over # (${seen.groups.join('|')})`);
 	if (width >= FOLDS_AT && !seen.groups.includes('Rest of season'))
 		said.push(`${screen.name}: no Rest of season group`);

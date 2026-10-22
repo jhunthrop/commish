@@ -215,6 +215,21 @@ async function railLabels(page: Page): Promise<string[]> {
 	);
 }
 
+/** The rail's week item is "Week 7 rankings" as drawn, and shown wherever its rail shows it: every
+ * desk, and the phone's five without a league (a followed league's five are its own pages). No
+ * shown item says Players in season. */
+async function weekItemFaults(page: Page, who: Who, width: number, where: string): Promise<void> {
+	const drawn = await page.evaluate(
+		() => document.querySelector('nav.rail .item[data-k="week"] span')?.textContent.trim() ?? ''
+	);
+	if (drawn !== 'Week 7 rankings') faults.push(`${where}: the week item reads "${drawn}"`);
+	const labels = await railLabels(page);
+	const shown = width > PHONE_MAX || who === 'signed-out';
+	if (shown && !labels.includes('Week 7 rankings'))
+		faults.push(`${where}: the rail shows ${labels.join(', ')}`);
+	if (labels.includes('Players')) faults.push(`${where}: the rail still says Players`);
+}
+
 /** The week's rankings under one name (Lane 142, ruling 1): the rail on the run's page and on a league
  * page the Worker draws, the bar's crumb, the page's head and its rank column; no rail item says
  * Players in season. */
@@ -222,13 +237,11 @@ async function rail(who: Who, width: number): Promise<void> {
 	const page = await open(who, width, '/players');
 	const where = `rail ${who} ${String(width)}`;
 	const head = page.locator('table.order th.g-order');
+	// The group row over # folds away on a phone, so the head is read as drawn, not as shown.
 	await head
-		.waitFor({ timeout: READY_TIMEOUT_MS })
+		.waitFor({ state: 'attached', timeout: READY_TIMEOUT_MS })
 		.catch(() => faults.push(`${where}: the order table never drew`));
-	const labels = await railLabels(page);
-	if (!labels.includes('Week 7 rankings'))
-		faults.push(`${where}: the rail shows ${labels.join(', ')}`);
-	if (labels.includes('Players')) faults.push(`${where}: the rail still says Players`);
+	await weekItemFaults(page, who, width, where);
 	has(
 		(await page.locator('main h1, main h2').first().textContent()) ?? '',
 		'Week 7 rankings',
@@ -251,16 +264,13 @@ async function rail(who: Who, width: number): Promise<void> {
 	await league
 		.waitForFunction(
 			() =>
-				[...document.querySelectorAll<HTMLElement>('nav.rail .item[data-k="week"]')].some(
-					(item) => item.innerText.trim() === 'Week 7 rankings'
-				),
+				document.querySelector('nav.rail .item[data-k="week"] span')?.textContent.trim() ===
+				'Week 7 rankings',
 			undefined,
 			{ timeout: READY_TIMEOUT_MS }
 		)
 		.catch(() => undefined);
-	const leagueLabels = await railLabels(league);
-	if (!leagueLabels.includes('Week 7 rankings'))
-		faults.push(`${where} league: the rail shows ${leagueLabels.join(', ')}`);
+	await weekItemFaults(league, who, width, `${where} league`);
 	await league.screenshot({
 		path: new URL(`rail-league-${who}-${String(width)}.png`, out).pathname
 	});
