@@ -332,18 +332,18 @@ total counts each tested table per pass and each prerequisite table once, at its
 | nflverse-context | rerun | team_week_observations 16,240; player_week_observations 13,526; nflverse_injuries 11,735; nflverse_roster_weeks 11,028; coaches 944 (setup) | 0 |
 | nflverse-derived-stat-lines | first | player_week_observations 9,212 | 0 |
 | nflverse-derived-stat-lines | rerun | player_week_observations 9,212 | 0 |
-| tank01-roster-and-lines | first | provider_players 1,373; provider_stat_lines 944 | 0 |
-| tank01-roster-and-lines | rerun | provider_players 1,373; provider_stat_lines 944 | 0 |
+| tank01-roster-and-lines | first | provider_players 1,373 (535 declared departures: a free agent's new row holds no club); provider_stat_lines 944 | 0 |
+| tank01-roster-and-lines | rerun | provider_players 1,373 (535 declared departures: a free agent's new row holds no club); provider_stat_lines 944 | 0 |
 | tank01-schedule | first | provider_games 272 | 0 |
 | tank01-schedule | rerun | provider_games 272 | 0 |
 | tank01-schedule | prior | provider_games 272 | 0 |
 | tank01-schedule | later | provider_games 274 (2 declared departures: the moved games retired) | 0 |
-| tank01-adp | first | provider_players 1,373 | 0 |
-| tank01-adp | rerun | provider_players 1,373 | 0 |
-| tank01-headshots | first | provider_players 1,373 | 0 |
-| tank01-headshots | rerun | provider_players 1,373 | 0 |
-| crosswalk | first | players 24,885 (setup); provider_players 1,373 (setup, 1 declared departure); player_crosswalk 1,373 | 0 |
-| crosswalk | rerun | players 24,885 (setup); provider_players 1,373 (setup, 1 declared departure); player_crosswalk 1,373 | 0 |
+| tank01-adp | first | provider_players 1,373 (535 declared departures: a free agent's new row holds no club) | 0 |
+| tank01-adp | rerun | provider_players 1,373 (535 declared departures: a free agent's new row holds no club) | 0 |
+| tank01-headshots | first | provider_players 1,373 (535 declared departures: a free agent's new row holds no club) | 0 |
+| tank01-headshots | rerun | provider_players 1,373 (535 declared departures: a free agent's new row holds no club) | 0 |
+| crosswalk | first | players 24,885 (setup); provider_players 1,373 (setup, 536 declared departures: Estimé's name, and the free agents' clubs); player_crosswalk 1,373 | 0 |
+| crosswalk | rerun | players 24,885 (setup); provider_players 1,373 (setup, 536 declared departures: Estimé's name, and the free agents' clubs); player_crosswalk 1,373 | 0 |
 | tank01-capture-all | first | capture_snapshots 11 | 0 |
 | tank01-capture-all | rerun | capture_snapshots 11 | 0 |
 | tank01-capture-harvest | first | capture_snapshots 6; provider_players 6 (Sharpe, a free agent, cleared to NULL) | 0 |

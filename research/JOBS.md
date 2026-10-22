@@ -124,7 +124,10 @@ The Tank01 store holds one season: `tank01-roster` and `tank01-schedule` first r
 of any other season (`retire_other_seasons`, in the same transaction as the write), so the first
 write of a new season starts it clean. `tank01-roster` never rewrites a stored club
 (`provider_players.team`): the daily list (`player-clubs`) owns it, and the seed sets a club only on a
-row it creates, as its printed report says (Lane 127).
+row it creates, as its printed report says (Lane 127). That club is the daily list's by its own rule
+(Lane 144): none for a player the list marks a free agent, whose listed `team` is his last club. No job
+runs the seed; it stays the operator's, as the only writer that inserts a `provider_players` row (the
+daily list inserts none) and the remediation the register's grade names.
 
 ## Scheduled jobs (the registry)
 

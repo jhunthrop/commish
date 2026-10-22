@@ -34,6 +34,9 @@ class Player:
     nfl_team: str
     headshot_url: str | None
     adp: float | None = None
+    # The list marks him a free agent (`listed_as_free_agent`): `nfl_team` is then his last club, not one he
+    # plays for, so a row the seed creates for him holds no club (Lane 144, B103).
+    free_agent: bool = False
 
 
 @dataclass(frozen=True)
@@ -91,6 +94,12 @@ def group(entry: object, name: str) -> Mapping[str, object]:
     return found if isinstance(found, dict) else {}
 
 
+def listed_as_free_agent(record: Mapping[str, object]) -> bool:
+    """The player list marks him a free agent: its `team` is then his last club, not a club he plays for
+    (Lane 123). The one reading of the flag, for the daily list's club writer and the roster seed alike."""
+    return str(record.get("isFreeAgent", "")).strip().lower() == "true"
+
+
 def map_player_list(body: object) -> list[Player]:
     if not isinstance(body, list):
         return []
@@ -105,7 +114,8 @@ def map_player_list(body: object) -> list[Player]:
         if player_id == "" or name == "" or nfl_team == "" or position not in SCORED_POSITIONS:
             continue
         headshot = text(record.get("espnHeadshot")) or None
-        players.append(Player(player_id, name, position, nfl_team, headshot))
+        free_agent = listed_as_free_agent(record)
+        players.append(Player(player_id, name, position, nfl_team, headshot, free_agent=free_agent))
     return players
 
 

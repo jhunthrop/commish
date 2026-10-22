@@ -33,6 +33,7 @@ from sqlalchemy import Connection, text
 
 from research.db.schema import PROVIDER_PLAYERS
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
+from research.pipeline.tank01.mapping import listed_as_free_agent
 
 LOG: Final = logging.getLogger(__name__)
 
@@ -88,7 +89,7 @@ def listed_clubs(payload: object) -> dict[str, str | None]:
         player_id, club = record.get("playerID"), record.get("team")
         if not isinstance(player_id, str) or not player_id.strip():
             continue
-        if str(record.get("isFreeAgent", "")).strip().lower() == "true":
+        if listed_as_free_agent(record):
             out[player_id.strip()] = None
         elif isinstance(club, str) and club in _CLUBS:
             out[player_id.strip()] = club

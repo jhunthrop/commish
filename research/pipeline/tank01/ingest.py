@@ -66,14 +66,22 @@ class SeedReport:
     def __str__(self) -> str:
         return (
             f"{self.players} players' names, positions and headshots ({self.new_players} new, each with the "
-            f"list's club; no stored club rewritten, the daily list owns it), {self.stat_lines} stat lines"
+            f"list's club, none for a free agent; no stored club rewritten, the daily list owns it), "
+            f"{self.stat_lines} stat lines"
         )
 
 
 # THE CLUB IS THE DAILY LIST'S (Lane 127, B103): the seed's roster read is as old as its run, so its club
 # never overwrites a stored one (`player_clubs` keeps the column current). A row the seed creates takes
-# the list's club, since the daily list inserts no player.
+# the list's club by the daily list's own rule (`player_clubs.listed_clubs`, Lane 144): none for a player
+# the list marks a free agent, whose `team` is his last club. Otherwise a fresh store's first list pass
+# would clear every such club at once, past its change ceiling.
 _ROSTER_KEEPS: Final = ("id", "adp", "team")
+
+
+def _seeded_club(player: Player) -> str | None:
+    """The club a row the seed creates holds: the list's, none for a free agent."""
+    return None if player.free_agent else player.nfl_team
 
 
 def _upsert_roster(conn: Connection, players: list[Player]) -> int:
@@ -81,7 +89,13 @@ def _upsert_roster(conn: Connection, players: list[Player]) -> int:
     created = 0
     for batch in _chunks(players, _SEED_BATCH):
         rows = [
-            {"id": p.id, "name": p.name, "position": p.position, "team": p.nfl_team, "headshot_url": p.headshot_url}
+            {
+                "id": p.id,
+                "name": p.name,
+                "position": p.position,
+                "team": _seeded_club(p),
+                "headshot_url": p.headshot_url,
+            }
             for p in batch
         ]
         statement = insert(PROVIDER_PLAYERS).values(rows)
