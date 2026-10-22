@@ -158,19 +158,71 @@ const ORDER_PHONE_SAYS: ProjSays = { defenses: false, scoring: false, kicked: fa
  * desk, as the phone order's, so its eight lines hold FFPC's tight end sentence beside the Final's. */
 const MATCHUP_PHONE_SAYS: ProjSays = { defenses: false, scoring: true, kicked: false, read: true };
 
-/** What the projection is, the words after "Proj is": "this week's published projection, PPR nearest
- * your rules, defenses on default scoring, read Fri 9:00 pm, as of kickoff once started", "week 7's"
- * on a page turned to week 7 (Lane 111, B70), each clause where the width says it (ProjSays). */
-function projWhat(proj: ProjFacts, clock: Clock, says: ProjSays): string {
+/** A clause of the Proj sentence and the ProjSays field that says it (null: every width says it). */
+interface ProjClause {
+	text: string;
+	says: keyof ProjSays | null;
+}
+
+/** The clause a projection over a defense adds after its scoring. */
+const DEFENSES_CLAUSE = ', defenses on default scoring';
+
+/** What the projection is, clause by clause: "this week's published projection" ("week 7's" on a page
+ * turned to week 7, Lane 111, B70), its scoring, the defenses', its read and a started game's Proj,
+ * a clause empty where the projection has nothing to say there. */
+function projClauses(proj: ProjFacts, clock: Clock): ProjClause[] {
 	const format = FORMAT_WORDS[proj.scoring.format];
-	const whose = says.scoring ? whoseScoring(proj, format) : '';
-	const defenses = proj.defense && says.defenses ? ', defenses on default scoring' : '';
 	const when = proj.readAt === null ? 'not in yet' : `read ${stamp(proj.readAt, clock)}`;
-	const read = says.read ? `, ${when}` : '';
-	const kicked = proj.kicked === true && says.kicked ? `, ${AS_OF_KICKOFF}` : '';
 	const week =
 		proj.weeks === undefined ? THIS_WEEKS : weeksWord(addressedWeek(proj.weeks), proj.weeks.week);
-	return `${week} published projection${whose}${defenses}${read}${kicked}`;
+	return [
+		{ text: `${week} published projection`, says: null },
+		{ text: whoseScoring(proj, format), says: 'scoring' },
+		{ text: proj.defense ? DEFENSES_CLAUSE : '', says: 'defenses' },
+		{ text: `, ${when}`, says: 'read' },
+		{ text: proj.kicked === true ? `, ${AS_OF_KICKOFF}` : '', says: 'kicked' }
+	];
+}
+
+function saidBy(clause: ProjClause, says: ProjSays): boolean {
+	return clause.says === null || says[clause.says];
+}
+
+/** What the projection is, the words after "Proj is": "this week's published projection, PPR nearest
+ * your rules, defenses on default scoring, read Fri 9:00 pm, as of kickoff once started", each clause
+ * where the width says it (ProjSays). */
+function projWhat(proj: ProjFacts, clock: Clock, says: ProjSays): string {
+	return projClauses(proj, clock)
+		.filter((c) => saidBy(c, says))
+		.map((c) => c.text)
+		.join('');
+}
+
+/** A clause of a sentence and the widths that draw it. */
+interface WidthClause {
+	text: string;
+	desk: boolean;
+	phone: boolean;
+}
+
+/** One sentence whose clauses differ by width, as parts in the page once (Lane 132, B111): each run of
+ * clauses the same widths draw is one part, every part after the first joined to the one before, so
+ * each width draws its own clauses of the one sentence. */
+function widthParts(clauses: readonly WidthClause[]): BasisPart[] {
+	const runs = clauses
+		.filter((c) => c.text !== '' && (c.desk || c.phone))
+		.reduce<WidthClause[]>((acc, c) => {
+			const last = acc.at(-1);
+			return last?.desk === c.desk && last.phone === c.phone
+				? [...acc.slice(0, -1), { ...last, text: last.text + c.text }]
+				: [...acc, c];
+		}, []);
+	return runs.map((r, i) => ({
+		text: r.text,
+		phone: r.phone,
+		...(r.desk ? {} : { desk: false as const }),
+		...(i > 0 ? { joined: true as const } : {})
+	}));
 }
 
 /** The tight end's extra after a Proj sentence, where the league's rules add one. */
@@ -186,12 +238,25 @@ export function projPart(proj: ProjFacts, clock: Clock): string {
 	return withBonus(`${proj.head ?? BOX.proj} is ${projWhat(proj, clock, DESK_SAYS)}.`, proj);
 }
 
-/** projPart in the phone Matchup's words (Lane 124, MATCHUP_PHONE_SAYS). */
-export function projMatchupPhonePart(proj: ProjFacts, clock: Clock): string {
-	return withBonus(
-		`${proj.head ?? BOX.proj} is ${projWhat(proj, clock, MATCHUP_PHONE_SAYS)}.`,
-		proj
-	);
+/** The Matchup's Proj sentence, in the page once (Lane 132, B111): projPart's clauses at a desk, the
+ * phone leaving the defenses' scoring and a started game's Proj to the desk (Lane 124,
+ * MATCHUP_PHONE_SAYS), and FFPC's tight end extra after it at both widths. */
+export function projMatchupParts(proj: ProjFacts, clock: Clock): BasisPart[] {
+	const both = { desk: true, phone: true };
+	const clauses = projClauses(proj, clock).map((c) => ({
+		text: c.text,
+		desk: saidBy(c, DESK_SAYS),
+		phone: saidBy(c, MATCHUP_PHONE_SAYS)
+	}));
+	const bonus = proj.league ? teBonusSentence(proj.scoring.te_bonus, proj.host) : null;
+	return [
+		...widthParts([
+			{ text: `${proj.head ?? BOX.proj} is `, ...both },
+			...clauses,
+			{ text: '.', ...both }
+		]),
+		...said(bonus)
+	];
 }
 
 /** projPart in a phone's words (Lane 115): the defenses' scoring left to the desk. */
@@ -455,7 +520,12 @@ export function said(text: string | null, phone = true): BasisPart[] {
 /** The block as one paragraph reads, every part drawn: a link that more words follow closes its
  * sentence (BasisBlock draws the same). */
 export function basisText(parts: readonly BasisPart[]): string {
-	return parts.map((p, i) => (p.href && i < parts.length - 1 ? `${p.text}.` : p.text)).join(' ');
+	return parts
+		.map((p, i) => {
+			const text = p.href && i < parts.length - 1 ? `${p.text}.` : p.text;
+			return i === 0 || p.joined === true ? text : ` ${text}`;
+		})
+		.join('');
 }
 
 /** The block as one width draws it: a desk's parts (every part but a phone's alone), or a phone's
@@ -511,10 +581,8 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 		? { ...facts.projection, defense, league: true, kicked, host: facts.host }
 		: null;
 	// The phone Matchup's eight lines (Lane 124): the defenses' scoring and the started game's Proj
-	// left to the desk, qualifications the desk says (MATCHUP_PHONE_SAYS).
-	const proj = projFacts
-		? deskOrPhone(projPart(projFacts, clock), projMatchupPhonePart(projFacts, clock))
-		: [];
+	// left to the desk, qualifications the desk says (MATCHUP_PHONE_SAYS), in one sentence (Lane 132).
+	const proj = projFacts ? projMatchupParts(projFacts, clock) : [];
 	// What the Team row's small figure is while a starter still plays (Lane 92, B22; once every one is
 	// final the row reads Final, Lane 121 B99, and needs no key).
 	const projFinal = kicked && facts.allFinal !== true;

@@ -21,6 +21,9 @@ export interface BasisPart {
 	topic?: 'gap';
 	/** A part drawn as a link: the page its words open (the league's rules, our record). */
 	href?: string;
+	/** A clause of the sentence the part before opens, drawn with no space before it, so a sentence
+	 * whose clauses differ by width is in the page once (Lane 132, B111). */
+	joined?: true;
 }
 
 export interface BasisFacts {

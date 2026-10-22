@@ -19,7 +19,7 @@
 
 <p class="basis">
 	{#each parts as part, i (i)}<span class:desk={!part.phone} class:phone={part.desk === false}
-			>{i > 0 ? ` ${part.text}` : part.text}</span
+			>{i > 0 && part.joined !== true ? ` ${part.text}` : part.text}</span
 		>{/each}{tail ? ` ${tail}` : ''}{#if after}{GAP}{@render after()}{/if}
 </p>
 
