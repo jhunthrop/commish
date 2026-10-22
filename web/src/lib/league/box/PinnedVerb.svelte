@@ -11,7 +11,7 @@
 	let { children }: Props = $props();
 </script>
 
-<div class="pinned">{@render children()}</div>
+<div class="pinned" data-pin>{@render children()}</div>
 
 <style>
 	@media (max-width: 760px) {

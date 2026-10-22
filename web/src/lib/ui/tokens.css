@@ -53,6 +53,9 @@
 	--verb-h: 42px; /* the one solid verb, and the top bar slot that holds it */
 	--touch: 44px; /* the smallest target a thumb gets on a phone */
 	--tab-bar-h: 64px; /* the phone's tab bar, the rail laid along the bottom */
+	--pin-reserve: calc(
+		var(--s-6) + 64px
+	); /* the room under the site footer for a verb pinned above the tab bar */
 	--rail-w: 84px;
 	--side-w: 296px;
 	--switch-w: 232px; /* the league switch where the bar has the room */

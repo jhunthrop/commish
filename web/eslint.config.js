@@ -74,7 +74,8 @@ export default defineConfig(
 			'src/lib/account/**/*.svelte',
 			'src/lib/league/**/*.svelte',
 			'src/lib/order/**/*.svelte',
-			'src/lib/player/**/*.svelte'
+			'src/lib/player/**/*.svelte',
+			'src/lib/legal/**/*.svelte'
 		],
 		rules: {
 			'svelte/no-navigation-without-resolve': [
