@@ -58,13 +58,15 @@ export const RECORDS_WORDS = {
 	setUnknown: 'set before its first kickoff',
 	espnBasis:
 		"ESPN's is its own public projection in PPR, read before the week's first kickoff, on its players with an ESPN id.",
-	/** The weekly run's two ESPN sentences (Lane 146, research/nightly/reads/weekly_record.py), here
+	/** The weekly run's yardstick sentences (Lanes 146 and 148, research/nightly/reads/weekly_record.py), here
 	 * for the copy guard and the stand-in run only: the page prints a week's espnNote as the run wrote
 	 * it, never these. */
 	espnReadAfter:
 		"ESPN's projection this week was read after our weekly rankings were set, still before the first kickoff.",
 	espnUnread:
 		"ESPN's projection was not read before this week's first kickoff, so the week is graded against the week's published projection alone.",
+	noYardstick:
+		"No yardstick was read before this week's first kickoff, so the week is graded on its own order alone.",
 	/** The season-long rule in a player's words (C16). */
 	seasonLong:
 		'A player put on IR or another season-long list after we set the order is still graded at the rank we set.',
@@ -266,6 +268,12 @@ export function weeklySpan(record: RunRecord): string {
 }
 
 /** A set week's order on the weekly record (M2): "Our weekly rankings, set Oct 22". */
+/** The sentence the run wrote under a week's row, drawn on a graded week only (Lane 148): a note
+ * sent on a week not yet graded says nothing beside a comparison the page does not draw. */
+export function weekNote(week: RecordWeek | null): string | undefined {
+	return week?.status === 'graded' ? week.espnNote : undefined;
+}
+
 export function weeklyOrderWords(week: RecordWeek): string | null {
 	return week.frozenAt === null || week.order === null
 		? null

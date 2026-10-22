@@ -133,7 +133,9 @@ def test_a_filled_freeze_is_never_filled_twice(store: Engine) -> None:
     _read(store, _READ + timedelta(hours=1), _PROJECTED)
     again = _step(store, _PASS + timedelta(hours=1))
     assert again.status == "skipped"
-    assert again.summary == "week 7: the freeze at 2026-10-22T18:00:31.000Z kept ESPN's read"
+    assert again.summary == (  # Lane 148: the trail names the fill, not a read the freeze kept
+        "week 7: the freeze at 2026-10-22T18:00:31.000Z was filled earlier from the read at 2026-10-22T19:03:50.000Z"
+    )
     kept = _kept(store)
     assert kept[SHIPPED_SOURCE, "00-a"] == (18.5, _READ)
     assert kept[SHIPPED_SOURCE, "00-b"] == (None, None)  # the later read never fills the rest
@@ -145,6 +147,7 @@ def test_a_freeze_that_kept_espns_read_is_untouched(store: Engine) -> None:
     _read(store, _READ, _PROJECTED)
     step = _step(store)
     assert step.status == "skipped"
+    assert step.summary == "week 7: the freeze at 2026-10-22T18:00:31.000Z kept ESPN's read"
     kept = _kept(store)
     assert kept[SHIPPED_SOURCE, "00-a"] == (15.0, early)
     assert kept[SHIPPED_SOURCE, "00-b"] == (None, None)
@@ -205,10 +208,11 @@ def test_the_weekly_record_says_when_espns_read_came_after_the_order_was_set() -
     assert weekly_record.espn_note(_rows(18.5, _FROZEN), _FROZEN) is None  # the freeze's own read
     assert weekly_record.espn_note(_rows(18.5, None), _FROZEN) is None  # a fill whose read is not named
     assert weekly_record.espn_note(_rows(None, None), _FROZEN) == weekly_record.ESPN_UNREAD_NOTE
-    assert weekly_record.espn_note(_rows(None, None, None), _FROZEN) is None  # nothing to grade against
+    # Lane 148: neither yardstick, so the week is graded on its own order alone and says so
+    assert weekly_record.espn_note(_rows(None, None, None), _FROZEN) == weekly_record.NO_YARDSTICK_NOTE
     assert weekly_record.espn_note([], _FROZEN) is None
     banned, _ = site_list(list_file())
-    for note in (weekly_record.ESPN_READ_AFTER_NOTE, weekly_record.ESPN_UNREAD_NOTE):
+    for note in (weekly_record.ESPN_READ_AFTER_NOTE, weekly_record.ESPN_UNREAD_NOTE, weekly_record.NO_YARDSTICK_NOTE):
         assert banned.search(note) is None
 
 

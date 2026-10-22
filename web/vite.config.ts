@@ -102,6 +102,10 @@ export default defineConfig({
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 			adapter: adapter(),
+			// Absolute asset paths on every page (Lane 148 fix round 1): the not-found page is one
+			// file the Worker serves at any depth (/players/no-such-player), where relative ones
+			// would resolve under the missing page's folder and its scripts would never load.
+			paths: { relative: false },
 			inlineStyleThreshold: INLINE_STYLE_LIMIT,
 			prerender: {
 				// Pages read one shared, memoized run, so several can render at once.

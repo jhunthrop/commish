@@ -49,6 +49,7 @@
 		weeklyPending,
 		weeklySources,
 		weeklySpan,
+		weekNote,
 		type NextGrade
 	} from '#lib/run/records.ts';
 	import type { RecordLine, RecordWeek, RunRecord } from '#lib/run/schema.ts';
@@ -268,7 +269,7 @@
 			{/if}
 			{#each rows as row (row.lead)}
 				{@const line = row.week?.lines.find((l) => l.position === position)}
-				{@const note = head === null ? undefined : row.week?.espnNote}
+				{@const note = head === null ? undefined : weekNote(row.week)}
 				{#if row.week !== null && row.week.status === 'graded'}
 					<tr class:noted={note !== undefined}>
 						<td class="wk"

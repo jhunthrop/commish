@@ -1,7 +1,7 @@
 {
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	// The prep site. Prerendered pages and assets are Workers static assets, served with no Worker in
-	// the path. The Worker answers what is left: the headshot image route and SvelteKit's 404.
+	// the path. The Worker answers what is left: the headshot image route, a missing page (the prerendered 404 page from the assets, with a 404) and SvelteKit's error page.
 	"name": "commish-web",
 	"compatibility_date": "2026-10-12",
 	"compatibility_flags": ["nodejs_als"],

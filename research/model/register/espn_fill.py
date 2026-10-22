@@ -19,9 +19,13 @@ from research.model.instants import js_iso
 from research.model.register.freeze import first_espn_read_between
 from research.model.register.grade import latest_freeze_for
 
+# Whether the freeze holds any ESPN figure, and the latest read instant among them: later than the
+# freeze when an earlier fill put them there.
 _KEPT: Final = """
-select exists (select 1 from research.register_freeze_rows
-               where season = :s and week = :w and frozen_at = :f and espn_points is not null)
+select bool_or(espn_points is not null) as kept,
+       max(espn_read_at) filter (where espn_points is not null) as read_at
+from research.register_freeze_rows
+where season = :s and week = :w and frozen_at = :f
 """
 _FILL: Final = """
 update research.register_freeze_rows f set espn_points = r.ppr_points, espn_read_at = r.read_at
@@ -49,9 +53,9 @@ def fill_empty_espn_yardstick(conn: Connection, season: int, week: int, kickoff:
     frozen_at = latest_freeze_for(conn, season, week)
     if frozen_at is None:
         return EspnFill(week, 0, None, f"no freeze holds week {week} yet")
-    kept = conn.execute(text(_KEPT), {"s": season, "w": week, "f": frozen_at}).scalar_one()
-    if kept:
-        return EspnFill(week, 0, None, f"the freeze at {js_iso(frozen_at)} kept ESPN's read")
+    held = conn.execute(text(_KEPT), {"s": season, "w": week, "f": frozen_at}).one()
+    if held.kept:
+        return EspnFill(week, 0, None, _held_reason(frozen_at, held.read_at))
     read = first_espn_read_between(conn, season, week, frozen_at, kickoff)
     if read.read_at is None:
         return EspnFill(
@@ -64,3 +68,11 @@ def fill_empty_espn_yardstick(conn: Connection, season: int, week: int, kickoff:
     if not filled:
         return EspnFill(week, 0, read.read_at, f"the read at {js_iso(read.read_at)} lists no player the freeze holds")
     return EspnFill(week, filled, read.read_at, None)
+
+
+def _held_reason(frozen_at: datetime, read_at: datetime | None) -> str:
+    """Why a freeze holding ESPN figures is left alone: an earlier fill put them there (their read is
+    later than the freeze), or the freeze kept its own read."""
+    if read_at is not None and read_at > frozen_at:
+        return f"the freeze at {js_iso(frozen_at)} was filled earlier from the read at {js_iso(read_at)}"
+    return f"the freeze at {js_iso(frozen_at)} kept ESPN's read"
