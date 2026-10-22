@@ -23,13 +23,6 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 /** Codes the client names itself, for an answer that never arrived or was not the envelope. */
 export const CLIENT_CODES = { offline: 'offline', malformed: 'malformed' } as const;
 
-/** The client's own sentences, for the same two cases. */
-const CLIENT_WORDS = {
-	offline: 'We could not reach Commish',
-	malformed: 'Commish answered in a way we did not expect',
-	refused: 'Something went wrong'
-} as const;
-
 /** Google's front end answering for a service that is down, cold or past its timeout: its own HTML
  * page and no envelope, so the API never answered (launch audit G2). */
 const GATEWAY_STATUSES = new Set([502, 503, 504]);
@@ -104,54 +97,38 @@ function bodyFor(options: RequestOptions): BodyInit | undefined {
 /** The answer that never arrived: no network, a hung API past its wait, or Google's front end
  * answering for it. Status 0, so a caller reads it as "can't reach" and a write as maybe sent. */
 function unreachable(): ApiError {
-	return new ApiError(0, { code: CLIENT_CODES.offline, message: CLIENT_WORDS.offline });
+	return new ApiError(0, { code: CLIENT_CODES.offline, message: 'We could not reach Commish' });
 }
 
-/** A signal that aborts when the caller's does or when `ms` pass, whichever is first. Built by hand:
- * AbortSignal.any is missing before Safari 17.4. */
-interface Deadline {
-	readonly signal: AbortSignal;
-	/** Whether the wait ran out, as against the caller aborting. */
-	passed(): boolean;
-	clear(): void;
-}
-
-function deadline(caller: AbortSignal | undefined, ms: number): Deadline {
+/** A signal that aborts when the caller's does or when `ms` pass, and the clearing of its timer.
+ * Built by hand: AbortSignal.any is missing before Safari 17.4. */
+function deadline(caller: AbortSignal | undefined, ms: number): [AbortSignal, () => void] {
 	const controller = new AbortController();
-	const follow = (): void => {
+	const stop = (): void => {
 		controller.abort(caller?.reason);
 	};
-	const timer = setTimeout(() => {
-		controller.abort(new DOMException('The API did not answer in time', 'TimeoutError'));
-	}, ms);
-	if (caller?.aborted) follow();
-	else caller?.addEventListener('abort', follow, { once: true });
-	return {
-		signal: controller.signal,
-		passed: () => controller.signal.aborted && caller?.aborted !== true,
-		clear: () => {
-			clearTimeout(timer);
-			caller?.removeEventListener('abort', follow);
-		}
-	};
+	caller?.addEventListener('abort', stop);
+	if (caller?.aborted) stop();
+	const timer = setTimeout(stop, ms);
+	return [controller.signal, () => clearTimeout(timer)];
 }
 
 /** The payload of an answer, read through the envelope. An answer that is not one is "can't reach"
  * when the wait ran out reading it or Google's front end sent it, and malformed otherwise. */
-async function payload<T>(response: Response, wait: Deadline, caller?: AbortSignal): Promise<T> {
+async function payload<T>(response: Response, wait: AbortSignal, caller?: AbortSignal): Promise<T> {
 	const parsed: unknown = await response.json().catch(() => null);
 	if (!isEnvelope(parsed)) {
 		if (caller?.aborted) throw caller.reason;
-		if (wait.passed() || GATEWAY_STATUSES.has(response.status)) throw unreachable();
+		if (wait.aborted || GATEWAY_STATUSES.has(response.status)) throw unreachable();
 		throw new ApiError(response.status, {
 			code: CLIENT_CODES.malformed,
-			message: CLIENT_WORDS.malformed
+			message: 'Commish answered in a way we did not expect'
 		});
 	}
 	if (!parsed.ok || parsed.error) {
 		throw new ApiError(
 			response.status,
-			parsed.error ?? { code: CLIENT_CODES.malformed, message: CLIENT_WORDS.refused }
+			parsed.error ?? { code: CLIENT_CODES.malformed, message: 'Something went wrong' }
 		);
 	}
 	return parsed.data as T;
@@ -168,7 +145,7 @@ export function apiClient(
 		async call<T>(path: string, options: RequestOptions = {}): Promise<T> {
 			const method = options.method ?? 'GET';
 			const kind = options.timeout ?? (SAFE_METHODS.has(method) ? 'read' : 'write');
-			const wait = deadline(options.signal, timeouts[kind]);
+			const [wait, clear] = deadline(options.signal, timeouts[kind]);
 			try {
 				let response: Response;
 				try {
@@ -177,7 +154,7 @@ export function apiClient(
 						credentials: 'include',
 						headers: headersFor(method, options),
 						body: bodyFor(options),
-						signal: wait.signal
+						signal: wait
 					});
 				} catch (cause) {
 					if (options.signal?.aborted) throw cause;
@@ -185,7 +162,7 @@ export function apiClient(
 				}
 				return await payload<T>(response, wait, options.signal);
 			} finally {
-				wait.clear();
+				clear();
 			}
 		},
 		signInUrl(returnTo: string): string {

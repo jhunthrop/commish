@@ -63,10 +63,8 @@ function html(status: number): typeof fetch {
 		);
 }
 
-void test('the site waits 8 s for a read and 20 s for a write', () => {
-	assert.equal(REQUEST_TIMEOUT_MS.read, 8_000);
-	assert.equal(REQUEST_TIMEOUT_MS.write, 20_000);
-	assert.ok(REQUEST_TIMEOUT_MS.platform > 40_000, "past the API's 40 s for connecting ESPN");
+void test("the site waits 8 s for a read, 20 s for a write, 45 s for a platform's live read", () => {
+	assert.deepEqual(REQUEST_TIMEOUT_MS, { read: 8_000, write: 20_000, platform: 45_000 });
 });
 
 void test(
@@ -74,11 +72,14 @@ void test(
 	HANG,
 	async () => {
 		const client = apiClient(ORIGIN, slow(10_000), WAITS);
-		const started = Date.now();
 		await assert.rejects(client.call('/me'), isUnreachable);
-		assert.ok(Date.now() - started < WAITS.write, 'cut off at the read wait, not a longer one');
 	}
 );
+
+void test('a read answered after the read wait (and before the write wait) is already cut off', async () => {
+	const client = apiClient(ORIGIN, slow(WAITS.read * 3), WAITS);
+	await assert.rejects(client.call('/me'), isUnreachable);
+});
 
 void test('a write waits the write wait, so an answer after the read wait still lands', async () => {
 	const client = apiClient(
@@ -94,9 +95,7 @@ void test(
 	HANG,
 	async () => {
 		const client = apiClient(ORIGIN, slow(10_000), WAITS);
-		const started = Date.now();
 		await assert.rejects(client.call('/sheets', { method: 'POST', body: {} }), isUnreachable);
-		assert.ok(Date.now() - started >= WAITS.write - 5, 'not cut off at the read wait');
 	}
 );
 
