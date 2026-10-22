@@ -38,6 +38,32 @@ void test('with no build behind the Worker the error page answers instead', asyn
 	assert.equal(await notFoundPage(assets(404, []), page('/no-such-page')), null);
 });
 
+/** Static assets that honour a conditional request, as Workers static assets do: a matching ETag
+ * is a 304 with no body. */
+const ETAG = '"404-built"';
+const conditional: Assets = {
+	fetch: (request) =>
+		Promise.resolve(
+			request.headers.get('if-none-match') === ETAG
+				? new Response(null, { status: 304, headers: { etag: ETAG } })
+				: new Response(PAGE, { status: 200, headers: { etag: ETAG, 'content-type': 'text/html' } })
+		)
+};
+
+void test('a second visit carrying the ETag still gets the page with its body (fix round 1)', async () => {
+	const first = await notFoundPage(conditional, page('/no-such-page'));
+	assert.ok(first);
+	const etag = first.headers.get('etag');
+	assert.equal(etag, ETAG);
+	const again = new Request('https://trycommish.app/no-such-page', {
+		headers: { accept: 'text/html', 'if-none-match': etag, 'if-modified-since': 'Thu, 22 Oct 2026' }
+	});
+	const second = await notFoundPage(conditional, again);
+	assert.ok(second, 'the Worker error page would answer');
+	assert.equal(second.status, 404);
+	assert.equal(await second.text(), PAGE);
+});
+
 void test('only a page request is answered with the page, never a missing script or a post', () => {
 	assert.equal(asksForPage(page('/no-such-page')), true);
 	assert.equal(asksForPage(page('/_app/immutable/chunks/gone.js', '*/*')), false);

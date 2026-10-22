@@ -26,10 +26,12 @@ export async function notFoundPage(
 	request: Request
 ): Promise<Response | null> {
 	if (assets === undefined) return null;
+	// Only what the page is asked as: a reader's conditional headers (If-None-Match and the like)
+	// would get a 304 with no body for the asset, never the not-found page (fix round 1).
 	const page = await assets.fetch(
 		new Request(new URL(NOT_FOUND_PATH, request.url), {
 			method: request.method,
-			headers: request.headers
+			headers: { accept: request.headers.get('accept') ?? 'text/html' }
 		})
 	);
 	if (!page.ok) return null;

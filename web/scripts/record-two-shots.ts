@@ -20,7 +20,8 @@
 // (the fixture's order re-dated to the board's week, inseason-fixture/serve.ts orderWeek).
 // The held week item keeps the named label's room at 390 as well as at the desk (Lane 148, B127): a
 // signed-out room page the Worker draws, opened in a new tab after a prerendered page, measures it.
-// A missing page is the prerendered not-found page with a 404, its week item named once from the build.
+// A missing page, at the root and inside a section, is the prerendered not-found page with a 404, its
+// week item named once from the build, its scripts loaded and its rail navigating in the page.
 //
 //   node scripts/record-two-shots.ts <upcoming|graded|published> [web origin] [api origin] [out dir]
 import { mkdir } from 'node:fs/promises';
@@ -434,27 +435,71 @@ async function rail(who: Who, width: number): Promise<void> {
 	await league.context().close();
 }
 
+/** Missing pages at the root and inside a prerendered section (Lane 148, fix round 1): the not-found
+ * page is one file served at any depth, so its asset paths must be absolute. */
+const MISSING = [
+	{ path: '/no-such-page', name: 'root' },
+	{ path: '/players/no-such-player', name: 'nested' }
+] as const;
+
 /** A page that does not exist (Lane 148): the Worker answers the prerendered not-found page with a
- * 404, its words from the word table and its week item named at build, once, never renamed. */
+ * 404, its words from the word table and its week item named at build, once, never renamed; its
+ * scripts load and the rail navigates in the page, with no document load (it hydrated). */
 async function notFound(who: Who, width: number, where: string): Promise<void> {
-	const page = await open(who, width, 'about:blank', 'light', true);
-	const answer = await page.goto(`${web}/no-such-page`, {
-		waitUntil: 'networkidle',
-		timeout: READY_TIMEOUT_MS
-	});
-	await page.waitForTimeout(SETTLE_MS);
-	const at = `${where} not found`;
-	if (answer?.status() !== NOT_FOUND)
-		faults.push(`${at}: answered ${String(answer?.status())}, not ${String(NOT_FOUND)}`);
-	const main = (await page.locator('main').textContent()) ?? '';
-	has(main, ERROR_WORDS.notFound.head, at);
-	has(main, ERROR_WORDS.notFound.lead, at);
-	has(main, ERROR_WORDS.toBoard, at);
-	await weekItemFaults(page, who, width, at);
-	await page.screenshot({
-		path: new URL(`not-found-${who}-${String(width)}.png`, out).pathname
-	});
-	await page.context().close();
+	for (const missing of MISSING) {
+		const page = await open(who, width, 'about:blank', 'light', true);
+		const at = `${where} not found ${missing.name}`;
+		page.on('response', (response) => {
+			if (response.url().includes('/_app/') && response.status() >= 400)
+				faults.push(`${at}: ${response.url()} answered ${String(response.status())}`);
+		});
+		page.on('requestfailed', (request) => {
+			if (request.url().includes('/_app/')) faults.push(`${at}: ${request.url()} failed`);
+		});
+		const answer = await page.goto(`${web}${missing.path}`, {
+			waitUntil: 'networkidle',
+			timeout: READY_TIMEOUT_MS
+		});
+		await page.waitForTimeout(SETTLE_MS);
+		if (answer?.status() !== NOT_FOUND)
+			faults.push(`${at}: answered ${String(answer?.status())}, not ${String(NOT_FOUND)}`);
+		const main = (await page.locator('main').textContent()) ?? '';
+		has(main, ERROR_WORDS.notFound.head, at);
+		has(main, ERROR_WORDS.notFound.lead, at);
+		has(main, ERROR_WORDS.toBoard, at);
+		await weekItemFaults(page, who, width, at);
+		await page.screenshot({
+			path: new URL(`not-found-${missing.name}-${who}-${String(width)}.png`, out).pathname
+		});
+		await railNavigates(page, at);
+		await page.context().close();
+	}
+}
+
+/** A tap on the rail's week item (on a phone with a league, the first item it draws) navigates in
+ * the page: the router took it, so the page hydrated. A page whose scripts never loaded falls back
+ * to a document load, which drops the marker set before the tap. */
+async function railNavigates(page: Page, at: string): Promise<void> {
+	const week = page.locator('nav.rail .item[data-k="week"]');
+	const item = (await week.isVisible())
+		? week
+		: page.locator('nav.rail .item[data-k]:visible').first();
+	const href = await item.getAttribute('href');
+	if (href === null) {
+		faults.push(`${at}: the rail draws no item to tap`);
+		return;
+	}
+	await page.evaluate(() => Object.assign(window, { stayedInPage: true }));
+	await item.click();
+	await page
+		.waitForURL((url) => url.pathname === new URL(href, web).pathname, {
+			timeout: READY_TIMEOUT_MS
+		})
+		.catch(() => faults.push(`${at}: a tap on the rail did not reach ${href}`));
+	const stayed = await page.evaluate(
+		() => (window as unknown as { stayedInPage?: boolean }).stayedInPage === true
+	);
+	if (!stayed) faults.push(`${at}: the rail's tap loaded a new document, the page never hydrated`);
 }
 
 /** A page the Worker draws, opened with every API answer a 3G-like round trip late and the season's
