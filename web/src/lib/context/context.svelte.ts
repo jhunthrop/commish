@@ -74,6 +74,19 @@ function railOf(
 
 const client = apiClient(PUBLIC_API_URL);
 
+/** The site's season as GET /season answers it (public), null unanswered. */
+function readSeason(): Promise<SiteSeason | null> {
+	return client.call<SiteSeason>('/season').catch(() => null);
+}
+
+/** A kept season in its own shape, else null: a copy written before Lane 142 kept the phase word
+ * alone, and a tab that outlives the deploy still holds it (Lane 143, B126). */
+function keptSeason(season: unknown): SiteSeason | null {
+	return typeof season === 'object' && season !== null && 'phase' in season
+		? (season as SiteSeason)
+		: null;
+}
+
 /** The lines a league's basis line takes on a phone, 0 with no league: three for TE premium's (plain
  * words, plain PPR, where its exact rules rank it), two for a lineup or a board other than PPR the
  * run may lack, else one. */
@@ -114,6 +127,8 @@ class SiteContext {
 	choices = $state(0);
 
 	#asked: Promise<void> | null = null;
+	/** The first page's read of GET /season (firstSeason), which the first signed-out refresh takes. */
+	#seasonRead: Promise<SiteSeason | null> | null = null;
 	#heldWanted = false;
 	#session: string | null = null;
 	#account: string | null = null;
@@ -124,11 +139,31 @@ class SiteContext {
 		return this.#asked;
 	}
 
+	/** The site's season is being read for a page the Worker draws (firstSeason): the rail holds the
+	 * week item's label unpainted until it lands, so it is named once and never renamed (Lane 143). */
+	seasonPending = $state(false);
+
+	/** Starts the site's season read for a page the Worker draws, as its layout's load runs (Lane 143,
+	 * B126): the season already held, else the session's copy, else GET /season, read alongside the
+	 * page's own first read and never awaited before the page paints. /me still corrects it. */
+	firstSeason(): void {
+		const kept = this.season ?? keptSeason(this.#copy(sessionToken())?.season);
+		if (kept !== null) {
+			this.season = kept;
+			return;
+		}
+		if (this.#seasonRead) return;
+		this.seasonPending = true;
+		this.#seasonRead = readSeason()
+			.then((season) => (this.season ??= season))
+			.finally(() => (this.seasonPending = false));
+	}
+
 	/** The kept copy when this session (or, signed out, this browser) wrote it; null otherwise. */
-	#copy(): Kept | null {
+	#copy(session = this.#session): Kept | null {
 		try {
 			const kept = JSON.parse(sessionStorage.getItem(CONTEXT_KEY) ?? 'null') as Kept | null;
-			return kept?.session === this.#session ? kept : null;
+			return kept?.session === session ? kept : null;
 		} catch {
 			return null;
 		}
@@ -140,7 +175,7 @@ class SiteContext {
 		const kept = this.#copy();
 		if (kept) {
 			this.#account = kept.account;
-			this.season = kept.season;
+			this.season = keptSeason(kept.season) ?? this.season;
 			this.#show(kept.league, kept.leagues, kept.format);
 		}
 		await this.refresh();
@@ -155,8 +190,11 @@ class SiteContext {
 			this.#show(null, [], this.#copy()?.format ?? null);
 			this.features = [];
 			// The site's season for a visitor with no account (GET /season, public): it corrects the
-			// rail the page was built with. Unanswered, the build's stands.
-			this.season = await client.call<SiteSeason>('/season').catch(() => null);
+			// rail the page was built with. Unanswered, the build's stands. The first takes the page's
+			// first read, when its layout asked one (firstSeason).
+			const read = this.#seasonRead ?? readSeason();
+			this.#seasonRead = null;
+			this.season = await read;
 		} else {
 			try {
 				this.take(await client.call<Account>('/me'));

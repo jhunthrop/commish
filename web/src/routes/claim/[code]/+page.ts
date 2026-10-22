@@ -1,3 +1,9 @@
+import { seasonFirst } from '#lib/context/first-season.ts';
+import type { PageLoad } from './$types';
+
 /** A claim link is one group pass: rendered in the browser against the API, never prerendered. */
 export const ssr = false;
 export const prerender = false;
+
+/** The site's season read alongside the page's first read, so the rail names the week once (Lane 143, B126). */
+export const load: PageLoad = seasonFirst;

@@ -20,7 +20,7 @@ import type {
 } from '#lib/run/schema.ts';
 import { lastGameClubWords } from '#lib/player/club-words.ts';
 import type { Position } from '#lib/types/player.ts';
-import { unwrittenLines, type UnwrittenLine } from '#lib/run/unwritten-words.ts';
+import type { UnwrittenLine } from '#lib/run/unwritten-words.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
 import type { CaptureStamp } from '#lib/format/designation.ts';
 import { playerStatusWords, type PlayerStatusWords } from '#lib/run/status-view.ts';
@@ -34,6 +34,7 @@ import {
 } from './player-season.ts';
 import type { PlayerSeason, PriorSeason } from '#lib/run/season.ts';
 import { basisTiles, cardBuild, restParts, restTile, type CardBuild } from './player-card.ts';
+import { unwrittenByFormat } from './player-unwritten.ts';
 import type { BasisTile, CardTile, RestParts } from '#lib/player/card.ts';
 import {
 	adp,
@@ -352,30 +353,6 @@ async function seasonOf(
 	);
 }
 
-/** What his written read will be built from in each format that ranks him (run/unwritten-words.ts). */
-function unwrittenByFormat(
-	lines: readonly FormatLine[],
-	position: Position,
-	year: number,
-	held: string | null
-): Record<string, UnwrittenLine[]> {
-	return Object.fromEntries(
-		lines.map((line) => [
-			line.format.id,
-			unwrittenLines({
-				position,
-				numbers: line.numbers,
-				boardSize: line.boardSize,
-				label: line.format.label,
-				unit: line.format.unit,
-				year,
-				restOfSeason: line.rest !== null,
-				held
-			})
-		])
-	);
-}
-
 export async function playerPage(slug: string, now: number): Promise<PlayerPage> {
 	const entry = await entryBySlug(slug);
 	const [read, run, sources, underway, capture, clubList, lastKickoffs] = await Promise.all([
@@ -447,9 +424,13 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		weekRead: loaded.weekRead,
 		lastKickoffs,
 		copyOf: loaded.copyOf,
-		unwritten:
-			underway || loaded.capsule !== null
-				? {}
-				: unwrittenByFormat(lines, loaded.position, run.season, status?.words.view.rank ?? null)
+		unwritten: unwrittenByFormat({
+			lines,
+			position: loaded.position,
+			year: run.season,
+			held: status?.words.view.rank ?? null,
+			underway,
+			written: loaded.capsule !== null
+		})
 	};
 }

@@ -29,6 +29,13 @@
 	import { sheetStore as store } from './store.svelte.ts';
 	import { FIXED_TAGS, ownTags, sameTag, tagLabel } from './tags.ts';
 
+	interface Props {
+		/** The rail's week item, named at build in season (server/build-week.ts, Lane 143, B126). */
+		weekLabel?: string | undefined;
+	}
+
+	let { weekLabel }: Props = $props();
+
 	const directory = fileDirectory();
 	/** The mock draft section, whose route another lane builds. */
 	const mockHref = sectionHref('mock');
@@ -166,7 +173,7 @@
 	<title>Your cheat sheet · Commish</title>
 </svelte:head>
 
-<Shell title="Cheat sheet" active="sheet">
+<Shell title="Cheat sheet" active="sheet" {weekLabel}>
 	{#snippet search()}
 		<Search
 			placeholder={rows.length > 0

@@ -7,6 +7,7 @@
 	import Stamp from './Stamp.svelte';
 	import { barRows } from './bar-rows.ts';
 	import {
+		HELD_WEEK_LABEL,
 		HOME_HREF,
 		PHONE_RAIL_ITEMS,
 		RAIL_FOOT,
@@ -38,8 +39,9 @@
 		 * name the selected league's. */
 		league?: string;
 		/** The rail's week order named for the run's week, "Week 7 rankings" (Lane 140, C19), built
-		 * with the page; absent before the season and on a page the Worker draws, which names it from
-		 * the context's week. */
+		 * with the page (a prerendered one, server/build-week.ts); absent outside the season and on a
+		 * page the Worker draws in the browser, which names it from the context's week, read before
+		 * its first render (context/first-season.ts, Lane 143, B126). */
 		weekLabel?: string;
 		children: Snippet;
 	}
@@ -51,6 +53,11 @@
 		item.key === WEEK_RANKINGS_KEY
 			? (weekLabel ?? (week ? weekRankingsWord(week) : item.label))
 			: item.label;
+
+	// The week item's label is held unpainted while a page the Worker draws reads the site's season
+	// (context/first-season.ts), so it paints once, named (Lane 143).
+	const held = (item: RailItem): boolean =>
+		item.key === WEEK_RANKINGS_KEY && weekLabel === undefined && siteContext.seasonPending;
 
 	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
 	// The site's context: the session's copy at once, then /me. The rail's Board (/board, which
@@ -75,7 +82,9 @@
 		aria-current={item.section === current ? 'page' : undefined}
 	>
 		<RailIcon name={item.icon} />
-		<span>{labelOf(item)}</span>
+		<!-- Held, the label keeps the room of the longest in-season form (nav.ts HELD_WEEK_LABEL), so
+		     nothing below it moves when the season names it (Lane 143 fix round 1). -->
+		<span class:held={held(item)}>{held(item) ? HELD_WEEK_LABEL : labelOf(item)}</span>
 	</a>
 {/snippet}
 
@@ -156,6 +165,11 @@
 		color: var(--ink);
 		border-bottom: 4px solid var(--accent);
 		padding-bottom: 2px;
+	}
+
+	/* The week item's label while the season is read: its room kept, nothing painted (Lane 143). */
+	.item span.held {
+		visibility: hidden;
 	}
 
 	.item {
