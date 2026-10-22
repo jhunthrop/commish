@@ -414,17 +414,10 @@ export function publishedWords(record: RunRecord): string {
 	return `From week ${String(from)} each week is also graded against the week's published projection${named}.`;
 }
 
-/** A frozen board grades a player moved to a season-long list where it froze (the record's held-out
- * rule): no figure on the record reads the hourly capture, so its read time is not said here. */
-export const HELD_OUT_METHOD =
-	'A player moved to a season-long list is graded where the order was set.';
-
 /** What a page opened from a league says in the record's basis in place of the run's own: what the
- * starters figure counts in the league's lineup, what that lineup leaves uncounted (a qualification,
- * said at a desk alone, Lane 131), and the league's own benchmark. */
+ * starters figure counts in the league's lineup, and the league's own benchmark. */
 export interface LeagueBasis {
 	starters: string | null;
-	aside: string | null;
 	benchmark: string | null;
 }
 
@@ -436,8 +429,8 @@ export function saidOnly(texts: readonly (string | null)[]): string[] {
 /** A run's own record's basis, before Lane 114, every sentence drawn at both widths and held to a
  * phone's eight lines (Lane 131): the run's method, each measure in a player's words (order matched,
  * places off, starters right in the lineup it counts). A league's own sentences replace the starters
- * one and follow. The season-long rule and the published projection's start are qualifications the
- * weekly record says at a desk alone; the page's lead names the week's published projection once its
+ * one and follow. The season-long rule and the published projection's start are qualifications it
+ * leaves out; the page's lead names the week's published projection once its
  * column is drawn (recordLead), so the basis does not. */
 export function recordBasis(record: RunRecord, league: LeagueBasis | null = null): string[] {
 	return saidOnly([

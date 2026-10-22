@@ -3,13 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { BasisPart } from './board-basis.ts';
-import {
-	HELD_OUT_METHOD,
-	RECORD_WORDS,
-	publishedWords,
-	recordSources,
-	weekLines
-} from './record.ts';
+import { RECORD_WORDS, publishedWords, recordSources, weekLines } from './record.ts';
 import {
 	RECORDS_WORDS,
 	beforeLine,
@@ -84,7 +78,7 @@ const draft: DraftRecord = {
 	boardAsOf: '2026-09-07T21:57:33.121Z',
 	throughWeek: 5,
 	namedBasis:
-		"Top named counts the season's top 12 QBs so far, and how many of them the order also put in its top 12.",
+		"Top named counts how many of the season's top 12 QBs so far the order also ranked that high.",
 	honest: null,
 	lines: [
 		{ position: 'All', ours: score(0.61, 56), adp: score(0.48, 60) },
@@ -167,7 +161,7 @@ const drawnOn = (parts: readonly BasisPart[], width: 'phone' | 'desk'): string[]
 		.filter((part) => (width === 'phone' ? part.phone : part.desk !== false))
 		.map((part) => part.text);
 
-void test("the weekly basis: a phone says the figures' sentences, a desk the qualifications too (Lane 131)", () => {
+void test("the weekly basis: both widths say the figures' sentences, a desk three qualifications more (Lanes 131, 138)", () => {
 	const record = {
 		...run({}),
 		...weekly([gradedSeven]),
@@ -175,28 +169,38 @@ void test("the weekly basis: a phone says the figures' sentences, a desk the qua
 	};
 	const phone = [record.scale, RECORD_WORDS.placesOff, 'Starters right counts a standard lineup.'];
 	assert.deepEqual(drawnOn(weeklyBasis(record, null, true), 'phone'), phone);
+	// The method, the season-long rule and the published projection's promise are said elsewhere.
 	assert.deepEqual(drawnOn(weeklyBasis(record, null, true), 'desk'), [
-		record.method,
-		HELD_OUT_METHOD,
 		...phone,
-		publishedWords(record),
 		RECORDS_WORDS.espnBasis,
 		RECORDS_WORDS.yahooBasis
 	]);
 	assert.ok(!drawnOn(weeklyBasis(record, null, false), 'desk').includes(RECORDS_WORDS.espnBasis));
-	const league = { starters: 'In your lineup.', aside: 'No kickers.', benchmark: 'ESPN too.' };
+	const withPublished = {
+		...record,
+		publishedFromWeek: 7,
+		toDate: record.toDate.map((line) => ({ ...line, published: score(0.55) }))
+	};
+	assert.ok(
+		drawnOn(weeklyBasis(withPublished, null, true), 'desk').includes(publishedWords(withPublished)),
+		"the published column's start, once drawn"
+	);
+	const league = { starters: 'In your lineup.', benchmark: 'ESPN too.' };
 	const opened = weeklyBasis(record, league, true);
-	assert.deepEqual(drawnOn(opened, 'phone'), [
+	const figures = [
 		record.scale,
 		RECORD_WORDS.placesOff,
 		'In your lineup.',
 		RECORDS_WORDS.leagueRow
+	];
+	assert.deepEqual(drawnOn(opened, 'phone'), figures);
+	assert.deepEqual(drawnOn(opened, 'desk'), [
+		...figures,
+		RECORDS_WORDS.espnBasis,
+		RECORDS_WORDS.yahooBasis
 	]);
-	for (const qualification of ['No kickers.', 'ESPN too.'])
-		assert.ok(drawnOn(opened, 'desk').includes(qualification), qualification);
-	assert.ok(!drawnOn(opened, 'desk').includes(RECORDS_WORDS.leagueRow), 'the desk says it whole');
 	const noBenchmark = weeklyBasis(record, { ...league, benchmark: null }, true);
-	assert.ok(!drawnOn(noBenchmark, 'phone').includes(RECORDS_WORDS.leagueRow));
+	assert.ok(!drawnOn(noBenchmark, 'desk').includes(RECORDS_WORDS.leagueRow));
 });
 
 void test('the front card shows the draft record until a weekly week is graded, then the weekly one', () => {
