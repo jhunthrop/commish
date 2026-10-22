@@ -32,8 +32,10 @@
 <SiteShell title="Players" run={data.run}>
 	{#snippet tail()}<Quiet href={links.compare()}>Compare two players</Quiet>{/snippet}
 	<main class="players">
+		<!-- In season the page is the week's rankings the rail and the front card link (Lane 140 fix
+		     round 1, MEDIUM-3); the bar keeps Players as its crumb. -->
 		<PageHead
-			title="Players"
+			title={data.run.weekRankings ?? 'Players'}
 			lead={Order === null
 				? `Every player on our ${data.format.label} board · by position · our rank overall at the right`
 				: PAGE_PURPOSE.players}

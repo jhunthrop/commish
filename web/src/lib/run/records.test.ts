@@ -1,7 +1,10 @@
 // The two records (Lane 114): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { BYE_WORDS } from '#lib/format/bye.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
+import { RAIL_ITEMS, WEEK_RANKINGS_KEY, weekRankingsWord } from '#lib/ui/nav.ts';
+import { PAIR_WORDS } from './record-pair.ts';
 import type { BasisPart } from './board-basis.ts';
 import { RECORD_WORDS, publishedWords, recordSources, weekLines } from './record.ts';
 import {
@@ -13,9 +16,14 @@ import {
 	frontRecord,
 	weeklyAsRecord,
 	weeklyBasis,
+	draftKeys,
+	draftPairs,
+	oursLeadsAll,
 	weeklyLines,
-	weeklyOpening,
 	weeklyOrderWords,
+	weeklyPairs,
+	weeklyPending,
+	weeklySources,
 	weeklySpan
 } from './records.ts';
 import {
@@ -144,15 +152,39 @@ void test('the weekly record reads as a record with ESPN beside ours and no ADP 
 	assert.equal(weekLines(shown.weeks)[0]?.text, 'set Thu Oct 22, graded Wed Oct 28');
 });
 
-void test('weeks 1 to 6 are one line that names the first week of weekly rankings and its set day', () => {
-	const ahead = upcoming(7, '2026-10-23T00:15:00.000Z');
-	assert.deepEqual(beforeLine(7, ahead), {
+void test('weeks 1 to 6 are one line that says the set rule once (C14)', () => {
+	assert.deepEqual(beforeLine(7), {
 		lead: 'Weeks 1 to 6',
-		text: 'Weekly rankings start week 7 (set before kickoff Thu Oct 22). Before that the site shipped the draft board, graded under Draft record.'
+		text: "Weekly rankings start week 7. Each week's are set before its first kickoff and graded as set, never as refreshed after. Before that the site shipped the draft board, graded under Draft record."
 	});
-	assert.equal(beforeLine(7, gradedSeven)?.text.includes('(set Thu Oct 22)'), true);
-	assert.equal(beforeLine(1, ahead), null);
-	assert.equal(beforeLine(2, ahead)?.lead, 'Week 1');
+	assert.equal(beforeLine(1), null);
+	assert.equal(beforeLine(2)?.lead, 'Week 1');
+});
+
+void test("the weekly record draws ESPN's columns from its first week, the published projection's once graded (C15)", () => {
+	const ahead = weeklyAsRecord(
+		run({ weekly: weekly([upcoming(7, '2026-10-23T00:15:00.000Z')], []) })
+	);
+	assert.ok(ahead);
+	assert.deepEqual(weeklySources(ahead), ['ours', 'espn']);
+	const published = weeklyAsRecord(
+		run({
+			weekly: weekly(
+				[gradedSeven],
+				gradedSeven.lines.map((line) => ({ ...line, published: score(0.55) }))
+			)
+		})
+	);
+	assert.ok(published);
+	assert.deepEqual(weeklySources(published), ['ours', 'espn', 'published']);
+	assert.match(
+		RECORDS_WORDS.lead,
+		/our weekly rankings against ESPN and the week's published projection,/u
+	);
+	assert.equal(
+		RECORDS_WORDS.weeklyWhat,
+		"Our weekly rankings against ESPN and the week's published projection"
+	);
 });
 
 /** A basis's words at a width: a phone draws its phone parts, a desk every part but a phone-only one. */
@@ -161,32 +193,32 @@ const drawnOn = (parts: readonly BasisPart[], width: 'phone' | 'desk'): string[]
 		.filter((part) => (width === 'phone' ? part.phone : part.desk !== false))
 		.map((part) => part.text);
 
-void test("the weekly basis: both widths say the figures' sentences, a desk three qualifications more (Lanes 131, 138)", () => {
+void test("the weekly basis: both widths say the figures' sentences, a desk ESPN's and the season-long rule more (Lanes 131, 138, 140)", () => {
 	const record = {
 		...run({}),
 		...weekly([gradedSeven]),
 		startersBasis: 'Starters right counts a standard lineup.'
 	};
 	const phone = [record.scale, RECORD_WORDS.placesOff, 'Starters right counts a standard lineup.'];
-	assert.deepEqual(drawnOn(weeklyBasis(record, null, true), 'phone'), phone);
-	// The method, the season-long rule and the published projection's promise are said elsewhere.
-	assert.deepEqual(drawnOn(weeklyBasis(record, null, true), 'desk'), [
+	assert.deepEqual(drawnOn(weeklyBasis(record, null), 'phone'), phone);
+	// The method and the published projection's promise are said elsewhere; Yahoo is not named (C27).
+	assert.deepEqual(drawnOn(weeklyBasis(record, null), 'desk'), [
 		...phone,
 		RECORDS_WORDS.espnBasis,
-		RECORDS_WORDS.yahooBasis
+		RECORDS_WORDS.seasonLong
 	]);
-	assert.ok(!drawnOn(weeklyBasis(record, null, false), 'desk').includes(RECORDS_WORDS.espnBasis));
+	assert.ok(!drawnOn(weeklyBasis(record, null), 'desk').some((text) => text.includes('Yahoo')));
 	const withPublished = {
 		...record,
 		publishedFromWeek: 7,
 		toDate: record.toDate.map((line) => ({ ...line, published: score(0.55) }))
 	};
 	assert.ok(
-		drawnOn(weeklyBasis(withPublished, null, true), 'desk').includes(publishedWords(withPublished)),
+		drawnOn(weeklyBasis(withPublished, null), 'desk').includes(publishedWords(withPublished)),
 		"the published column's start, once drawn"
 	);
 	const league = { starters: 'In your lineup.', benchmark: 'ESPN too.' };
-	const opened = weeklyBasis(record, league, true);
+	const opened = weeklyBasis(record, league);
 	const figures = [
 		record.scale,
 		RECORD_WORDS.placesOff,
@@ -197,9 +229,9 @@ void test("the weekly basis: both widths say the figures' sentences, a desk thre
 	assert.deepEqual(drawnOn(opened, 'desk'), [
 		...figures,
 		RECORDS_WORDS.espnBasis,
-		RECORDS_WORDS.yahooBasis
+		RECORDS_WORDS.seasonLong
 	]);
-	const noBenchmark = weeklyBasis(record, { ...league, benchmark: null }, true);
+	const noBenchmark = weeklyBasis(record, { ...league, benchmark: null });
 	assert.ok(!drawnOn(noBenchmark, 'desk').includes(RECORDS_WORDS.leagueRow));
 });
 
@@ -207,23 +239,104 @@ void test('the front card shows the draft record until a weekly week is graded, 
 	const before = frontRecord(
 		run({ draft, weekly: weekly([upcoming(7, '2026-10-23T00:15:00.000Z')], []) })
 	);
+	// Ours and ADP at one size, each pair naming its leader (C05).
 	assert.deepEqual(before, {
 		name: 'Draft record',
-		value: '0.61',
+		pairs: [
+			{
+				label: 'Order matched',
+				ours: '0.61',
+				theirs: '0.48',
+				name: 'ADP',
+				leader: 'ours',
+				lead: 'ours by 0.13'
+			},
+			{
+				label: 'Top named',
+				ours: '56 of 84',
+				theirs: '60 of 84',
+				name: 'ADP',
+				leader: 'theirs',
+				lead: 'ADP by 4'
+			}
+		],
 		scale: RECORDS_WORDS.draftScale,
-		caption: 'Order matched, our draft board through week 5, 214 players. ADP 0.48.',
-		second: 'Top named 56 of 84, ADP 60.',
+		caption: 'Our draft board through week 5, 214 players.',
+		second: null,
 		note: 'Weekly rankings start week 7.'
 	});
+	assert.match(RECORDS_WORDS.draftScale, /below 0\.00 the order runs backwards\.$/u);
 	const after = frontRecord(run({ draft, weekly: weekly([gradedSeven]) }));
 	assert.deepEqual(after, {
 		name: 'Weekly record',
-		value: '0.62',
+		pairs: [
+			{
+				label: 'Order matched',
+				ours: '0.62',
+				theirs: '0.58',
+				name: 'ESPN',
+				leader: 'ours',
+				lead: 'ours by 0.04'
+			},
+			{
+				label: 'Starters right',
+				ours: '61 of 84',
+				theirs: '58 of 84',
+				name: 'ESPN',
+				leader: 'ours',
+				lead: 'ours by 3'
+			}
+		],
 		scale: 'Order matched is how closely an order ranked the players.',
-		caption: 'Order matched, our weekly rankings over week 7, 214 players. ESPN 0.58.',
-		second: 'Starters right 61 of 84, ESPN 58 of 84.',
+		caption: 'Our weekly rankings over week 7, 214 players.',
+		second: null,
 		note: null
 	});
+});
+
+void test('the weekly record never accents ours where ESPN or the published projection leads (fix round 1, HIGH-1)', () => {
+	// ESPN leads starters right, ours leads order matched; places off is level.
+	const line = {
+		position: 'All' as const,
+		ours: { ...score(0.62, 50), placesOff: 44.3 },
+		adp: null,
+		espn: { ...score(0.32, 52), placesOff: 44.3 },
+		oursOnEspn: null,
+		published: { ...score(0.7, 49), placesOff: 40.1 },
+		oursOnPublished: { ...score(0.6, 50), placesOff: 41.0 }
+	};
+	const sources = ['ours', 'espn', 'published'] as const;
+	const starters = weeklyPairs(line, 'starters', sources);
+	assert.deepEqual(
+		starters.map((pair) => [pair.name, pair.ours, pair.theirs, pair.lead]),
+		[
+			['ESPN', '50 of 84', '52 of 84', 'ESPN by 2'],
+			['Published', '50 of 84', '49 of 84', 'ours by 1']
+		]
+	);
+	assert.equal(oursLeadsAll(starters), false);
+	// Against Published, ours is ours over the weeks that graded it (0.60), which Published leads.
+	const agreement = weeklyPairs(line, 'agreement', sources);
+	assert.deepEqual(
+		agreement.map((pair) => pair.lead),
+		['ours by 0.30', 'Published by 0.10']
+	);
+	assert.equal(oursLeadsAll(agreement), false);
+	assert.equal(oursLeadsAll(weeklyPairs(line, 'agreement', ['ours', 'espn'])), true);
+	assert.equal(weeklyPairs(line, 'placesOff', ['ours', 'espn'])[0]?.lead, 'level');
+	// With no yardstick graded there is nothing to lead, so ours is not accented.
+	assert.equal(
+		oursLeadsAll(weeklyPairs({ ...line, espn: null }, 'agreement', ['ours', 'espn'])),
+		false
+	);
+	// The front card names ESPN's leader on starters right once week 7 grades.
+	const card = frontRecord(
+		run({
+			draft,
+			weekly: weekly([gradedSeven], [{ ...line, published: null, oursOnPublished: null }])
+		})
+	);
+	assert.equal(card?.pairs.find((pair) => pair.label === 'Starters right')?.lead, 'ESPN by 2');
 });
 
 void test('the draft table lists each position, All as its totals, and its chart skips a missing point', () => {
@@ -306,7 +419,20 @@ void test('the records say no banned word and no em-dash', () => {
 		...Object.values(RECORDS_WORDS).flatMap((value: unknown) =>
 			typeof value === 'string' ? [value] : []
 		),
-		RECORDS_WORDS.before(7, 'set before kickoff Thu Oct 22'),
+		RECORDS_WORDS.before(7),
+		RECORDS_WORDS.pending(7),
+		RECORDS_WORDS.pendingWhen('Wed Oct 28', 'Monday'),
+		RECORDS_WORDS.pendingWhen(null, 'Monday'),
+		RECORDS_WORDS.namedKey('12 QB, 24 RB'),
+		RECORDS_WORDS.gradesOn('Wed Oct 28'),
+		RECORDS_WORDS.frontWeekly('week 7', '214 players'),
+		...Object.values(PAIR_WORDS).flatMap((value: unknown) =>
+			typeof value === 'string' ? [value] : []
+		),
+		PAIR_WORDS.by('ADP', '4'),
+		BYE_WORDS.done,
+		weekRankingsWord(7),
+		RAIL_ITEMS.find((item) => item.key === WEEK_RANKINGS_KEY)?.label ?? '',
 		RECORDS_WORDS.draftSet('Tue Sep 8'),
 		RECORDS_WORDS.draftGraded(5),
 		RECORDS_WORDS.draftGraded(null)
@@ -317,18 +443,62 @@ void test('the records say no banned word and no em-dash', () => {
 	}
 });
 
-void test('before its first week is set the weekly record says that week and when it is set', () => {
+void test('before a week is graded the weekly record draws no figure: the week and when it grades (C04)', () => {
+	const monday = '2026-10-27T00:15:00.000Z';
 	const ahead = weeklyAsRecord(
 		run({ weekly: weekly([upcoming(7, '2026-10-23T00:15:00.000Z')], []) })
 	);
 	assert.ok(ahead);
-	assert.deepEqual(weeklyOpening(ahead, 7), {
-		value: 'Week 7',
-		caption: 'Our first weekly rankings, set before kickoff Thu Oct 22.'
+	assert.deepEqual(weeklyPending(ahead, { week: 7, lastKickoff: monday }), {
+		title: 'Week 7 not graded yet',
+		when: "Grades after Monday's game."
 	});
+	// A set week grades on the run's own day: its last kickoff and the grading pass's wait.
+	const set: RecordWeek = {
+		...gradedSeven,
+		status: 'frozen',
+		gradedAt: null,
+		population: 0,
+		lines: [],
+		gradesFrom: '2026-10-28T12:15:00.000Z'
+	};
+	const frozen = weeklyAsRecord(run({ weekly: weekly([set], []) }));
+	assert.ok(frozen);
+	const pending = weeklyPending(frozen, { week: 7, lastKickoff: monday });
+	assert.deepEqual(pending, {
+		title: 'Week 7 not graded yet',
+		when: "Grades from Wed Oct 28, after Monday's game."
+	});
+	assert.ok(pending);
+	assert.doesNotMatch(pending.title.replace(/^Week \d+/u, ''), /\d/u);
+	assert.equal(
+		weeklyPending(frozen, { week: 7, lastKickoff: null })?.when,
+		'Grades when the stats land.'
+	);
 	const graded = weeklyAsRecord(run({ weekly: weekly([gradedSeven]) }));
 	assert.ok(graded);
-	assert.equal(weeklyOpening(graded, 7), null);
+	assert.equal(weeklyPending(graded, { week: 8, lastKickoff: monday }), null);
+	assert.equal(weeklyPending(ahead, null), null);
+});
+
+void test('the draft tiles say what top named counts and that places off is better lower (C17)', () => {
+	const tops = (position: 'QB' | 'RB', of: number) => ({
+		position,
+		ours: { ...score(0.5, 1), startersOf: of },
+		adp: { ...score(0.5, 1), startersOf: of }
+	});
+	assert.deepEqual(
+		draftKeys({ ...draft, lines: [...draft.lines.slice(0, 1), tops('QB', 12), tops('RB', 24)] }),
+		{
+			agreement: null,
+			placesOff: 'lower is better',
+			starters: 'of the top 12 QB, 24 RB'
+		}
+	);
+	const pairs = draftPairs({ position: 'All', ours: score(0.54, 53), adp: score(0.54, 56) });
+	assert.equal(pairs.agreement.lead, 'level');
+	assert.equal(pairs.agreement.leader, 'level');
+	assert.equal(pairs.starters.lead, 'ADP by 3');
 });
 
 void test('the weeks to come read one line per state: the next with its day, the rest once (M4)', () => {
@@ -341,7 +511,7 @@ void test('the weeks to come read one line per state: the next with its day, the
 	assert.deepEqual(
 		weeklyLines(weeks, []).map((line) => [line.lead, line.text]),
 		[
-			['Week 7', 'set Thu Oct 22, graded Wed Oct 28'],
+			['Week 7', 'set Thu Oct 22, 1:00 pm Central, graded Wed Oct 28'],
 			['Week 8', 'set before kickoff Thu Oct 29'],
 			['Weeks 9 to 18', 'set each week before kickoff']
 		]

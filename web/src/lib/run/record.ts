@@ -24,7 +24,7 @@ export interface RecordHeadline {
 }
 
 /** A phrase with its first letter capital. */
-function capitalized(words: string): string {
+export function capitalized(words: string): string {
 	return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 }
 
@@ -403,15 +403,16 @@ export function publishedFrom(record: RunRecord): number | null {
 	return record.publishedFromWeek;
 }
 
-/** The published projection's basis (B04, review M3): the week it starts, named only once a set order
- * has kept it, "From week 7 each week is also graded against the week's published projection."; before
- * that a promise with no week in it, never one renewed each week. */
+/** The published projection's basis as a plain rule (B04, review M3, Lane 140 C16): the week it
+ * starts, named only once a set order has kept it, "From week 7 the week's published projection
+ * (Published) is graded beside ours on the same players."; before that the rule with no week in it,
+ * never a promise renewed each week. */
 export function publishedWords(record: RunRecord): string {
 	const from = publishedFrom(record);
 	if (from === null)
-		return "Each week will also be graded against the week's published projection from the first week our order is set with it.";
+		return "The week's published projection is graded beside ours from the first week we read it before setting our order.";
 	const named = publishedDrawn(record) ? ' (Published)' : '';
-	return `From week ${String(from)} each week is also graded against the week's published projection${named}.`;
+	return `From week ${String(from)} the week's published projection${named} is graded beside ours on the same players.`;
 }
 
 /** What a page opened from a league says in the record's basis in place of the run's own: what the

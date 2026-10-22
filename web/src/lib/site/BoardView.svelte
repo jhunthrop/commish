@@ -205,6 +205,7 @@
 		{columns}
 		scale={page.scale}
 		bye={page.byes[player.team] ?? null}
+		byesFrom={page.format.rosFromWeek ?? null}
 		{framing}
 		eager={i < EAGER_ROWS}
 		season={player.season}

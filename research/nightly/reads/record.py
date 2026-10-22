@@ -46,10 +46,12 @@ _STARTER_WORDS: Final = {"QB": "QBs", "RB": "RBs", "WR": "WRs", "TE": "TEs", "K"
 AGREEMENT_PLACES: Final = 2
 PLACES_OFF_PLACES: Final = 1
 # The agreement's scale, its ends in the form the page prints the rate (ruling R2, Lane 78): 1.00 and 0.00.
-# Lane 93 (B04): the measure named and its whole range said, below 0.00 included, in a player's words.
+# Lane 93 (B04): the measure named and its whole range said, below 0.00 included, in a player's words;
+# Lane 140 (C30): what below 0.00 means, said plainly.
 SCALE: Final = (
-    f"Order matched is how closely an order ranked the players as they finished the week: "
-    f"{1:.{AGREEMENT_PLACES}f} is the same order, {0:.{AGREEMENT_PLACES}f} no closer than chance, below it the reverse."
+    f"Order matched is how closely an order ranked the players to the week's finish: "
+    f"{1:.{AGREEMENT_PLACES}f} is the same order, {0:.{AGREEMENT_PLACES}f} no closer than chance, "
+    f"below {0:.{AGREEMENT_PLACES}f} the order runs backwards."
 )
 
 

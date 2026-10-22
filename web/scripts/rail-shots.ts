@@ -10,7 +10,7 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
-import { RAIL_KEYS, type RailKey } from '../src/lib/ui/nav.ts';
+import { RAIL_KEYS, railItemLabel, type RailKey } from '../src/lib/ui/nav.ts';
 import { railShown } from '../src/lib/ui/rail-order.ts';
 import {
 	FIXTURE_PHASES,
@@ -45,7 +45,8 @@ const KEY_OF: Readonly<Record<FixturePhase, RailKey>> = {
 function railLabels(key: RailKey, phone: boolean, league: boolean): string[] {
 	const items = railShown(key, league);
 	const shown = phone ? items.filter((item) => !item.wideOnly) : items;
-	return [...shown.map((item) => item.label), ...(phone ? [] : ['Account'])];
+	// The stand-in ranks the full season, so the week's order is drawn with no week (Lane 140).
+	return [...shown.map((item) => railItemLabel(item, null)), ...(phone ? [] : ['Account'])];
 }
 
 await mkdir(out, { recursive: true });

@@ -58,6 +58,7 @@
 				{leagueRecord}
 				{players}
 				head={null}
+				next={null}
 			/>
 		{:else}
 			<WeeklySection
@@ -67,6 +68,7 @@
 				{leagueRecord}
 				{players}
 				head={{ title: RECORDS_WORDS.weekly, what: RECORDS_WORDS.weeklyWhat }}
+				next={weekly.next}
 			/>
 		{/if}
 		<DraftSection draft={run.draft} {run} />

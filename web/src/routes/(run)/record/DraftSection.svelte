@@ -1,6 +1,8 @@
 <script lang="ts">
 	import BasisBlock from '#lib/ui/BasisBlock.svelte';
+	import PairTile from '#lib/ui/PairTile.svelte';
 	import { RECORD_BOX, type RecordFigure } from '#lib/run/record.ts';
+	import { oursAccented } from '#lib/run/record-pair.ts';
 	import {
 		DRAFT_FIGURES,
 		DRAFT_SOURCES,
@@ -8,6 +10,8 @@
 		draftBasis,
 		draftCell,
 		draftHeads,
+		draftKeys,
+		draftPairs,
 		draftRows,
 		draftSeries
 	} from '#lib/run/records.ts';
@@ -30,15 +34,19 @@
 	const series = $derived(draft === undefined ? {} : draftSeries(draft));
 	const weeks = $derived(draft?.progress.map((point) => point.week) ?? []);
 	const basis = $derived(draft === undefined ? [] : draftBasis(draft));
+	const keys = $derived(draft === undefined ? null : draftKeys(draft));
 
 	const capitalized = (words: string): string =>
 		`${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 </script>
 
 {#snippet cells(line: DraftLine)}
+	{@const pairs = draftPairs(line)}
 	{#each DRAFT_FIGURES as f (f)}
 		{#each DRAFT_SOURCES as source (source)}
-			<td class="n m {f} {source}">{draftCell(line, source, f)}</td>
+			<td class="n m {f} {source}" class:trails={source === 'ours' && !oursAccented(pairs[f])}
+				>{draftCell(line, source, f)}</td
+			>
 		{/each}
 	{/each}
 {/snippet}
@@ -60,13 +68,9 @@
 				</div>
 				<div class="tiles">
 					{#each DRAFT_FIGURES as f (f)}
+						{@const pairs = draftPairs(rows.all)}
 						<div class="tile">
-							<span class="label">{HEADS[f]}</span>
-							<span class="vals"
-								><b>{draftCell(rows.all, 'ours', f)}</b><span
-									>{RECORD_BOX.adp} {draftCell(rows.all, 'adp', f)}</span
-								></span
-							>
+							<PairTile label={HEADS[f]} key={keys?.[f] ?? null} pair={pairs[f]} />
 						</div>
 					{/each}
 				</div>
