@@ -3,7 +3,6 @@
 	import { ApiError } from '#lib/api/client.ts';
 	import { memberZone } from '#lib/format/clock.ts';
 	import type { LeagueHost } from '#lib/league/api.ts';
-	import type { BasisPart } from '#lib/run/board-basis.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import StatusLine from '#lib/ui/StatusLine.svelte';
@@ -14,10 +13,13 @@
 		rulesLeftOut,
 		weekBasis,
 		weekRosterFilter,
+		weekNone,
+		weekSearch,
 		weekSections,
 		weekStatus,
 		weekView,
-		WEEK_TAB
+		WEEK_TAB,
+		type WeekSaid
 	} from './week.ts';
 	import WeekTable from './WeekTable.svelte';
 	import { weekHeading, weekReadKey, type WeekPosition } from './week-head.ts';
@@ -33,15 +35,12 @@
 		boardScoring: string;
 		/** The tab's head, basis and the rules our stats lack once the week is read, keyed by the tab
 		 * it was asked for (weekReadKey), so the page never shows it under another. */
-		onread?: (said: {
-			key: string;
-			heading: string;
-			basis: BasisPart[];
-			rules: string | null;
-		}) => void;
+		onread?: (said: WeekSaid) => void;
+		/** The Players page's search (Lane 155): the rows whose name or club holds it. */
+		search?: string;
 	}
 
-	let { position, league = null, boardScoring, onread }: Props = $props();
+	let { position, league = null, boardScoring, onread, search = '' }: Props = $props();
 
 	let advice = $state<WeekOrderAdvice | null>(null);
 	/** The instant the answer is drawn at, in ms, set with the answer (the screen's one clock). */
@@ -50,7 +49,7 @@
 	let roster = $state<RosterView>('everyone');
 
 	const views = $derived(advice?.rows.map((row) => weekView(row, memberZone(), now)) ?? []);
-	const shown = $derived(views.filter(weekRosterFilter(roster)));
+	const shown = $derived(views.filter(weekRosterFilter(roster)).filter(weekSearch(search)));
 	const sections = $derived(advice === null ? [] : weekSections(shown, advice.week));
 	const status = $derived(advice === null ? null : weekStatus(advice));
 	const tableLeague = $derived(
@@ -100,12 +99,16 @@
 		<p class="reading" aria-live="polite">{WEEK.reading}</p>
 	{:else}
 		{#if status}<StatusLine lead={status.lead} rest={status.rest} />{/if}
-		<WeekTable
-			label={weekHeading(advice.position, advice.week)}
-			{sections}
-			proj={landed(advice)}
-			league={tableLeague}
-		/>
+		{#if shown.length === 0 && views.length > 0}
+			<p class="reading">{weekNone(advice.position)}</p>
+		{:else}
+			<WeekTable
+				label={weekHeading(advice.position, advice.week)}
+				{sections}
+				proj={landed(advice)}
+				league={tableLeague}
+			/>
+		{/if}
 	{/if}
 </div>
 

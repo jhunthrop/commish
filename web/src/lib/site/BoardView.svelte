@@ -35,8 +35,8 @@
 	import type OrderScreenComponent from '#lib/order/OrderScreen.svelte';
 	import type WeekScreenComponent from '#lib/order/WeekScreen.svelte';
 	import { weekPositionOf, weekReadKey } from '#lib/order/week-head.ts';
+	import type { WeekSaid } from '#lib/order/week.ts';
 	import { ORDER, PAGE_PURPOSE, WEEK } from '#lib/order/words.ts';
-	import type { BasisPart } from '#lib/run/board-basis.ts';
 
 	interface Props {
 		page: BoardPage;
@@ -186,12 +186,6 @@
 	const weekKey = $derived(weekReadKey(weekPosition, orderLeague?.id ?? null));
 	/** The week's head, basis and the rules our stats lack, once its read lands, kept with the tab it
 	 * was read for: another tab never shows them, so a tab change never leaves a stale head. */
-	interface WeekSaid {
-		key: string;
-		heading: string;
-		basis: BasisPart[];
-		rules: string | null;
-	}
 	let weekSaid = $state<WeekSaid | null>(null);
 	const said = $derived(weekPosition !== null && weekSaid?.key === weekKey ? weekSaid : null);
 	/** The in-season screens (the order, or a kickers' or defenses' week) take the page's width. */

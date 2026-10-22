@@ -23,6 +23,7 @@ import { lineState } from '#lib/league/box/kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { WeekOrderAdvice, WeekOrderRow } from './api.ts';
 import { rosterBasis, rosterWords, type RosterView } from './order.ts';
+import { MIN_SEARCH } from './path.ts';
 import { WEEK_MANY, type WeekPosition } from './week-head.ts';
 
 /** Each position's words: its rows in the plural, one of them, whose a row's figures are, and whose
@@ -52,6 +53,8 @@ export interface WeekView {
 	/** The platform's id for him, which the add's rule reads. */
 	hostId: string;
 	box: BoxRow;
+	/** The API's name for him or the club ("Tennessee Titans"), which a search reads beside the row's. */
+	named: string;
 	section: WeekOrderRow['section'];
 	/** His game's kickoff, which a played section's head names the day of. */
 	kickoff: string | null;
@@ -71,6 +74,7 @@ export function weekView(row: WeekOrderRow, zone: string, now: number): WeekView
 		position: player.position,
 		hostId: player.host_id,
 		box: { ...box, key, name },
+		named: player.name,
 		// The section by the one game-state rule at the page's clock (kickoff.ts lineState), so a read
 		// that lags a kickoff sits under Kicked off with its Game cell (Lane 85 fix round 2, H-A).
 		section: sectionAt(row, now),
@@ -83,6 +87,31 @@ export function weekView(row: WeekOrderRow, zone: string, now: number): WeekView
 /** A roster chip's rows, filtered in the browser: the tab holds one row a club. */
 export function weekRosterFilter(view: RosterView): (row: WeekView) => boolean {
 	return (row) => view === 'everyone' || row.roster?.kind === view;
+}
+
+/** A search on the week's rows (Lane 155, the Players page's search on its K and D/ST chips): a row
+ * whose name, the API's name or club holds the letters, case aside; every row until the search holds
+ * the API's fewest letters, as the order's search reads. */
+export function weekSearch(q: string): (row: Pick<WeekView, 'box' | 'named'>) => boolean {
+	const letters = q.trim().toLowerCase();
+	if (letters.length < MIN_SEARCH) return () => true;
+	return (row) =>
+		[row.box.name, row.named, row.box.club].some((said) => said.toLowerCase().includes(letters));
+}
+
+/** The line in the table's place when a search matches no row: "No defense matches." */
+export function weekNone(position: WeekPosition): string {
+	return `No ${WEEK_NOUNS[position].one} matches.`;
+}
+
+/** What a week read says once it lands, for the page to draw over the rows (the board's tab and the
+ * Players page): the head, the basis and the rules our stats lack, keyed by the tab it was asked for
+ * (week-head.ts weekReadKey), so a page never shows it under another. */
+export interface WeekSaid {
+	key: string;
+	heading: string;
+	basis: BasisPart[];
+	rules: string | null;
 }
 
 /** The week's projection is in once a row carries a Proj (the Floor to ceiling rule: a column no row

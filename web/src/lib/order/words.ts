@@ -42,8 +42,10 @@ export const WEEK = {
 } as const;
 
 /** Each in-season page's purpose, one sentence under its head (Lane 104, B40): Players is every
- * player our order covers, Rest of season the same order in your league's view. */
+ * player our order covers and this week's kickers and defenses, never said to be in it (Lane 155),
+ * Rest of season the same order in your league's view. */
 export const PAGE_PURPOSE = {
-	players: 'Every QB, RB, WR and TE in our order, to look up and to compare.',
+	players:
+		"Every QB, RB, WR and TE in our order, and this week's kickers and defenses, to look up and to compare.",
 	rest: "Our order in your league's view: who holds each player, the free agents, and this week's kickers and defenses."
 } as const;
