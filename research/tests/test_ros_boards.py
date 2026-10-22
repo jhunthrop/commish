@@ -204,6 +204,21 @@ def test_each_row_carries_the_preseason_pace_the_model_starts_him_from() -> None
         assert paces == {"p1": 16.0, "p2": 13.0, "p3": 10.0, "p9": None}
 
 
+def test_each_row_carries_the_share_of_his_rate_the_preseason_pace_carries() -> None:
+    """Lane 139 (C08): k / (k + games played) in the board's scoring, the fitted k of his position and
+    format, printed as a whole percent; none for a player off the preseason line."""
+    result = ros_boards(_boards(), _context(LINES_THROUGH), FIRST_WEEK_INSTANT, _states(FIRST_WEEK_INSTANT), SETUP)
+    for board in result.boards:
+        k = PRIORS.shrinkage[f"WR|{board.format.scoring}"].k
+        by_id = {e.row.player_id: e for e in board.entries}
+        assert by_id["p9"].row.preseason_share is None
+        for pid in ("p1", "p2", "p3"):
+            assert by_id[pid].row.preseason_share == pytest.approx(k / (k + LINES_THROUGH))
+        printed = numbers_of(by_id["p1"], None, None)["preseasonShare"]
+        assert printed == round(100 * k / (k + LINES_THROUGH))
+        assert numbers_of(by_id["p9"], None, None)["preseasonShare"] is None
+
+
 def test_a_raw_line_without_a_scoring_keeps_that_format_preseason_alone() -> None:
     boards = _boards()
     result = ros_boards(

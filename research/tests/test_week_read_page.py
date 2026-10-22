@@ -9,7 +9,7 @@ from research.capsules.week.caption import PROJECTION_MOVED_CAPTION
 from research.capsules.week.sheet import PublishedProjection
 from research.capsules.week.store import StoredWeekRead
 from research.nightly.assemble import served_projections
-from research.nightly.build.pages import UNREAD, week_read_json
+from research.nightly.build.pages import UNREAD, ReadClock, week_read_json
 
 _WRITTEN = datetime(2026, 10, 17, 2, 0, tzinfo=UTC)
 
@@ -22,11 +22,11 @@ def _read(source: str = "llm", status: str | None = "questionable") -> StoredWee
 
 
 def test_a_standing_read_is_served_with_its_caption_status_and_call() -> None:
-    served = week_read_json(_read(), "questionable", kicked_off=False, as_of=_WRITTEN)
+    served = week_read_json(_read(), "questionable", kicked_off=False, clock=ReadClock(_WRITTEN))
     assert served == {
         "week": 6,
         "body": "Bijan Robinson is Questionable on Friday's report.",
-        "caption": "Written Fri 9:00 pm Central, for week 6",
+        "caption": "Written Fri Oct 16, 9:00 pm CT, for week 6",
         "status": "questionable",
         "call": "start",
         "writtenAt": "2026-10-17T02:00:00.000Z",
@@ -38,33 +38,46 @@ def test_a_standing_read_is_served_with_its_caption_status_and_call() -> None:
 
 def test_a_read_whose_projection_the_card_no_longer_prints_is_withheld() -> None:
     """Lane 66v (the sweep's X5): Josh Allen's read quoted 26.6 while his card printed 26.4."""
-    moved = week_read_json(_read(), "questionable", kicked_off=False, as_of=_WRITTEN, projection=15.0)
+    moved = week_read_json(_read(), "questionable", kicked_off=False, clock=ReadClock(_WRITTEN), projection=15.0)
     assert moved is not None
     assert moved["body"] is None and moved["call"] is None
     assert moved["caption"] == PROJECTION_MOVED_CAPTION
-    same = week_read_json(_read(), "questionable", kicked_off=False, as_of=_WRITTEN, projection=15.24)
+    same = week_read_json(_read(), "questionable", kicked_off=False, clock=ReadClock(_WRITTEN), projection=15.24)
     assert same is not None and same["body"] is not None
     # A run that read no projection for the week does not judge it.
-    unread = week_read_json(_read(), "questionable", kicked_off=False, as_of=_WRITTEN, projection=UNREAD)
+    unread = week_read_json(_read(), "questionable", kicked_off=False, clock=ReadClock(_WRITTEN), projection=UNREAD)
     assert unread is not None and unread["body"] is not None
 
 
 def test_a_read_written_against_another_status_is_withheld_behind_its_caption() -> None:
-    served = week_read_json(_read(), "out", kicked_off=False, as_of=_WRITTEN)
+    served = week_read_json(_read(), "out", kicked_off=False, clock=ReadClock(_WRITTEN))
     assert served is not None
     assert served["body"] is None and served["call"] is None
     # Friday 9:00 pm Central: the next hourly pass is Friday 11:00 pm Eastern.
     assert (
         served["caption"]
-        == "His status changed since this read was written. A new read is due by Fri 10:00 pm Central."
+        == "His status changed since this read was written. A new read is due by Fri Oct 16, 10:00 pm CT."
     )
     assert served["status"] == "questionable"
 
 
+def test_a_standing_read_says_the_newer_status_read_it_was_served_against() -> None:
+    """Lane 139 (C13): a status read after the write is named, the read standing on it (a moved status is
+    withheld), and one at or before the write is not."""
+    later = datetime(2026, 10, 17, 7, 20, tzinfo=UTC)
+    served = week_read_json(_read(), "questionable", kicked_off=False, clock=ReadClock(later, later))
+    assert served is not None and served["body"] is not None
+    assert served["caption"] == (
+        "Written Fri Oct 16, 9:00 pm CT, for week 6. Status read again Sat Oct 17, 2:20 am CT, no change"
+    )
+    same = week_read_json(_read(), "questionable", kicked_off=False, clock=ReadClock(later, _WRITTEN))
+    assert same is not None and same["caption"] == "Written Fri Oct 16, 9:00 pm CT, for week 6"
+
+
 def test_a_facts_row_or_a_kicked_off_game_serves_no_read() -> None:
-    assert week_read_json(_read(source="facts"), "questionable", kicked_off=False, as_of=_WRITTEN) is None
-    assert week_read_json(_read(), "questionable", kicked_off=True, as_of=_WRITTEN) is None
-    assert week_read_json(None, None, kicked_off=False, as_of=_WRITTEN) is None
+    assert week_read_json(_read(source="facts"), "questionable", kicked_off=False, clock=ReadClock(_WRITTEN)) is None
+    assert week_read_json(_read(), "questionable", kicked_off=True, clock=ReadClock(_WRITTEN)) is None
+    assert week_read_json(None, None, kicked_off=False, clock=ReadClock(_WRITTEN)) is None
 
 
 def test_the_run_serves_each_players_projection_for_the_board_week_as_the_card_prints_it() -> None:

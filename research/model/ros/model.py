@@ -180,6 +180,15 @@ def shrunk_rate(prior: float, games: int, form: float | None, opportunity: float
     return (shrink.k * prior + games * blended) / (shrink.k + games)
 
 
+def prior_share(player: PlayerToDate, format_name: str, priors: RosPriors) -> float:
+    """The weight his prior rate carries in `per_game`'s shrunk rate, k / (k + G): all of it before a game
+    (Lane 139, C08: the share the player page names beside his preseason pace)."""
+    if not player.played:
+        return 1.0
+    k = priors.shrinkage[cell(player.position, format_name)].k
+    return k / (k + len(player.played))
+
+
 def per_game(player: PlayerToDate, format_name: str, priors: RosPriors) -> float:
     key = cell(player.position, format_name)
     return max(

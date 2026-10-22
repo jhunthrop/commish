@@ -68,6 +68,9 @@ class StoredRow:
     # In season, the preseason pace a game the rest-of-season model starts him from in the board's
     # scoring (Lane 100, `nightly.build.ros`); None preseason or for a player the preseason line lacks.
     preseason_per_game: float | None = None
+    # In season, the share of his rate a game that pace carries, k / (k + games played) (Lane 139, C08);
+    # None wherever the pace is.
+    preseason_share: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

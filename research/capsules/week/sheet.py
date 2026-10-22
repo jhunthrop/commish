@@ -47,9 +47,24 @@ ORDER_WORDS: Final[Mapping[bool, str]] = {True: "our rest-of-season order", Fals
 def central_day_and_time(instant: datetime, *, short: bool = False) -> str:
     """An instant as the page says it, in Central time: "Sunday 3:05 pm" ("Sun 3:05 pm" when short)."""
     local = instant.astimezone(CENTRAL)
-    day = local.strftime("%a" if short else "%A")
+    return f"{local.strftime('%a' if short else '%A')} {_clock(local)}"
+
+
+def _clock(local: datetime) -> str:
+    """A local time of day as the page says it: "3:05 pm"."""
     hour = local.hour % 12 or 12
-    return f"{day} {hour}:{local.minute:02d} {'am' if local.hour < 12 else 'pm'}"  # noqa: PLR2004 - noon
+    return f"{hour}:{local.minute:02d} {'am' if local.hour < 12 else 'pm'}"  # noqa: PLR2004 - noon
+
+
+# The zone's short name after a page stamp (Lane 139, C12), as the web's `stampAt` names Central.
+CENTRAL_SHORT: Final = "CT"
+
+
+def central_stamp(instant: datetime) -> str:
+    """An instant as a page stamp says it, in Central time with the day's date (Lane 139, C12): "Wed Oct 21,
+    11:12 am CT", the web's one stamp format (`format/clock.ts stampAt`)."""
+    local = instant.astimezone(CENTRAL)
+    return f"{local.strftime('%a %b')} {local.day}, {_clock(local)} {CENTRAL_SHORT}"
 
 
 def points_text(value: float) -> str:
