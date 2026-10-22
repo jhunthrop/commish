@@ -14,7 +14,7 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
-	import { freeSeasonAt, freeSeasonFlag } from './free-season.ts';
+	import { freeSeasonAt, readFreeSeason } from './free-season.ts';
 	import { ALWAYS_FREE, FREE_WORDS, freeSeasonLines, type FreeLine } from './words.ts';
 
 	interface Props {
@@ -45,10 +45,9 @@
 		const now = new Date();
 		signedIn = hasSessionCookie();
 		free = freeSeasonAt(now);
-		void client
-			.call<unknown>('/billing/plans')
-			.then((plans) => (free = freeSeasonAt(now, freeSeasonFlag(plans))))
-			.catch(() => undefined);
+		void readFreeSeason(() => client.call<unknown>('/billing/plans'), now).then(
+			(answer) => (free = answer)
+		);
 		void hostsApi
 			.connections()
 			.then((hosts) => (openHosts = openHostsOf(hosts)))

@@ -38,7 +38,7 @@
 	import { CONNECT, keeps, memberHosts, signedOutTitle } from './keeps.ts';
 	import { accountLinks } from './links.ts';
 	import { hasFeature } from './features.ts';
-	import { freeSeasonAt } from '#lib/pass/free-season.ts';
+	import { freeSeasonAt, readFreeSeason } from '#lib/pass/free-season.ts';
 	import {
 		FREE_SEE,
 		boughtPlan,
@@ -59,7 +59,8 @@
 	/** Your account: who you are, your sheets and mocks, your plan (free this season, Lane 150), and
 	 * sign out. Signed out, the sign-in verb and what an account keeps. The shell is
 	 * prerendered and everything inside it is read from the API in the browser. */
-	const api = accountApi(apiClient(PUBLIC_API_URL), () => navigator.onLine);
+	const client = apiClient(PUBLIC_API_URL);
+	const api = accountApi(client, () => navigator.onLine);
 
 	let view = $state<AccountState | null>(null);
 	/** The API's sentence for an action that failed, shown beside the action. */
@@ -68,6 +69,8 @@
 	/** The switched hosts open here (the hosts answer's enabled): shut until it is read, so a host
 	 * switched off is never promised. */
 	let openHosts = $state<OpenHosts>(SWITCHED_SHUT);
+	/** The free season for the plan card, the catalog's flag first, as the free page reads it. */
+	let free = $state(false);
 
 	/** Reads which switched hosts are open, for the signed-out page's lines. */
 	async function readOpenHosts(): Promise<void> {
@@ -92,6 +95,12 @@
 	const attached = new AttachedList();
 
 	onMount(() => {
+		// The page's clock, set when it opens, for the free season.
+		const now = new Date();
+		free = freeSeasonAt(now);
+		void readFreeSeason(() => client.call<unknown>('/billing/plans'), now).then(
+			(answer) => (free = answer)
+		);
 		// Back from signing in on a content page: the store reads the account and keeps the league
 		// line's hint, then the reader goes on to the page they left, which paints with its room.
 		const then = safeThen(page.url.searchParams.get(THEN_PARAM), page.url.origin);
@@ -224,7 +233,6 @@
 			</EmptyState>
 		{:else}
 			{@const { account, sheets, mocks } = view}
-			{@const free = freeSeasonAt(new Date())}
 			{@const plan = planWords(account, free)}
 			<div class="who">
 				<div class="title">

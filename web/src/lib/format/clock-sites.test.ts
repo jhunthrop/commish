@@ -44,7 +44,7 @@ const ALLOWED: Readonly<Record<string, Site>> = {
 	},
 	'src/lib/account/AccountPage.svelte': {
 		reads: 1,
-		why: "the plan card's clock, whether the free season is on when the account is drawn (Lane 150)"
+		why: "the page's clock, set when it opens, for the plan card's free season (Lane 150)"
 	},
 	'src/lib/pass/PassPage.svelte': {
 		reads: 1,

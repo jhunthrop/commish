@@ -259,12 +259,18 @@ export const SHOT_CASES: readonly ShotCase[] = [
 		}
 	),
 	once('front-account-shots', 'standin', FIXTURE_WEEK_CLOCK),
-	// The free season (Lane 150): on an API before Lane 149's flag, and with it.
+	// The free season (Lane 150): on an API before Lane 149's flag, and with it true and false.
 	once('pass-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	once('pass-shots', 'standin', FIXTURE_WEEK_CLOCK, {
 		name: 'pass-shots-flag',
 		fixture: { [FREE_SEASON_VARIABLE]: '1' },
 		env: { [FREE_SEASON_VARIABLE]: '1' }
+	}),
+	// The flag false inside the clock's season: the founder ended it, and the API wins (fix round 1).
+	once('pass-shots', 'standin', FIXTURE_WEEK_CLOCK, {
+		name: 'pass-shots-ended',
+		fixture: { [FREE_SEASON_VARIABLE]: '0' },
+		env: { [FREE_SEASON_VARIABLE]: '0' }
 	}),
 	once('league-rail-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	once('purpose-shots', 'standin', FIXTURE_WEEK_CLOCK, { name: 'purpose-shots-week' }),

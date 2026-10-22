@@ -825,7 +825,9 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			membership: [],
 			group_pass: null,
 			features: { draft_pass: [], membership: [] },
-			...(process.env[FREE_SEASON_VARIABLE] === '1' ? { free_season: true } : {})
+			...(process.env[FREE_SEASON_VARIABLE] === undefined
+				? {}
+				: { free_season: process.env[FREE_SEASON_VARIABLE] === '1' })
 		});
 		return;
 	}

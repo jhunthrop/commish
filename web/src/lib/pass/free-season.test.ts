@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { bannedIn } from '#lib/format/copy-guard.ts';
 import { LEAGUE_HOSTS } from '#lib/league/hosts.ts';
 import { hostWords } from '#lib/league/names.ts';
-import { FREE_SEASON_ENDS, freeSeasonAt, freeSeasonFlag } from './free-season.ts';
+import { FREE_SEASON_ENDS, freeSeasonAt, freeSeasonFlag, readFreeSeason } from './free-season.ts';
 import { ALWAYS_FREE, FREE_WORDS, freeLine, freeSeasonLines } from './words.ts';
 
 const WEEK_7 = new Date('2026-10-22T16:00:00Z');
@@ -17,11 +17,50 @@ void test('the season is free to its end, the end itself not', () => {
 	assert.equal(freeSeasonAt(ENDS), false);
 });
 
-void test("the API's flag says free when true, and an absent or false flag leaves the clock rule", () => {
+void test("the API's flag wins either way, and the clock rule speaks only while it is absent (fix round 1)", () => {
+	// The founder ends the free season from the one setting: false before the boundary is not free.
+	assert.equal(freeSeasonAt(WEEK_7, false), false);
+	// And a season the founder extends: true after the boundary is free.
 	assert.equal(freeSeasonAt(ENDS, true), true);
-	assert.equal(freeSeasonAt(ENDS, false), false);
+	// Absent, an API before Lane 149: the clock.
+	assert.equal(freeSeasonAt(WEEK_7, undefined), true);
 	assert.equal(freeSeasonAt(ENDS, undefined), false);
-	assert.equal(freeSeasonAt(WEEK_7, false), true);
+});
+
+void test('the page and the account page read the flag through one function, the clock on a failed read', async () => {
+	assert.equal(await readFreeSeason(() => Promise.resolve({ free_season: false }), WEEK_7), false);
+	assert.equal(await readFreeSeason(() => Promise.resolve({ free_season: true }), ENDS), true);
+	assert.equal(await readFreeSeason(() => Promise.resolve({ season: 2027 }), WEEK_7), true);
+	assert.equal(await readFreeSeason(() => Promise.reject(new Error('down')), WEEK_7), true);
+	assert.equal(await readFreeSeason(() => Promise.reject(new Error('down')), ENDS), false);
+});
+
+void test('the not-free state says what stays free and promises no price', () => {
+	assert.equal(FREE_WORDS.always.title, 'Free on Commish');
+	assert.equal(
+		FREE_WORDS.always.lead,
+		'The board, every player, our record, mock drafts and your cheat sheet are free for every account.'
+	);
+	assert.deepEqual(
+		ALWAYS_FREE.map((line) => line.lead),
+		[
+			'The board',
+			'Every player',
+			'ADP and our record',
+			'Mock drafts',
+			'Your cheat sheet',
+			'One league'
+		]
+	);
+	for (const words of [
+		...Object.values(FREE_WORDS.always),
+		...ALWAYS_FREE.flatMap((line) => [line.lead, line.text])
+	])
+		assert.doesNotMatch(
+			words,
+			/\$|\bprices?\b|\bpaid\b|Draft Pass|Membership|checkout|\blater\b/i,
+			words
+		);
 });
 
 void test('the flag is read only when present and a boolean, so an API before Lane 149 parses', () => {

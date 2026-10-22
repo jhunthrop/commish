@@ -15,8 +15,9 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { FREE_SEE, FREE_SEASON_PLAN } from '../src/lib/account/words.ts';
+import { freeLine } from '../src/lib/pass/words.ts';
 import { SIGNED_OUT_WORDS } from '../src/lib/companion/new-words.ts';
-import { FREE_WORDS } from '../src/lib/pass/words.ts';
+import { ALWAYS_FREE, FREE_WORDS } from '../src/lib/pass/words.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
 import { FREE_SEASON_VARIABLE } from './inseason-fixture/phases.ts';
@@ -37,12 +38,17 @@ const FOOT_LINES = { desk: 5, phone: 8 } as const;
 /** A paid product by name, or one of the 2027 figures, anywhere on a page. */
 const PAID = /\bDraft Pass\b|\bMembership\b|\$(?:39|99|14\.99|29)\b|checkout/iu;
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8866').origin;
+/** The catalog's flag as the case sets it: true, false (the founder ended the season), or absent. */
 const FLAGGED = process.env[FREE_SEASON_VARIABLE] === '1';
+const ENDED = process.env[FREE_SEASON_VARIABLE] === '0';
+/** The free page's words in the state the catalog puts it in: the flag wins, the clock without it. */
+const STATE = ENDED ? FREE_WORDS.always : FREE_WORDS.season;
+const ROWS = ENDED ? ALWAYS_FREE.length : SEASON_ROWS;
 await requireFixtureClock(API_ORIGIN);
 
 const web = process.argv[2] ?? 'http://localhost:4266';
 const out = new URL(process.argv[3] ?? '../screenshots/pass/', import.meta.url);
-const tag = FLAGGED ? '-flag' : '';
+const tag = FLAGGED ? '-flag' : ENDED ? '-ended' : '';
 
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
@@ -112,6 +118,10 @@ async function freePage(theme: string, width: number, signedIn: boolean): Promis
 	await page.goto(`${web}/pass`);
 	const verb = signedIn ? FREE_WORDS.follow : FREE_WORDS.signIn;
 	await ready(page, verb);
+	// The build paints the clock's state; the catalog's answer turns it.
+	await page
+		.locator('main .lead .line', { hasText: STATE.lead })
+		.waitFor({ timeout: READY_TIMEOUT_MS });
 	const seen = await page.evaluate(() => ({
 		title: document.title,
 		heading: document.querySelector('main .head .title')?.textContent.trim() ?? '',
@@ -130,20 +140,21 @@ async function freePage(theme: string, width: number, signedIn: boolean): Promis
 		})(),
 		buttons: document.querySelectorAll('main button').length
 	}));
-	if (seen.title !== `${FREE_WORDS.season.title} · Commish`) fault(where, `title ${seen.title}`);
-	if (seen.heading !== FREE_WORDS.season.title) fault(where, `heading ${seen.heading}`);
-	if (seen.lead !== FREE_WORDS.season.lead) fault(where, `lead ${seen.lead}`);
+	if (seen.title !== `${STATE.title} · Commish`) fault(where, `title ${seen.title}`);
+	if (seen.heading !== STATE.title) fault(where, `heading ${seen.heading}`);
+	if (seen.lead !== STATE.lead) fault(where, `lead ${seen.lead}`);
 	if (seen.verbs.join() !== verb) fault(where, `verbs ${seen.verbs.join(', ')}`);
-	if (seen.rows !== SEASON_ROWS || seen.links !== SEASON_ROWS)
+	if (seen.rows !== ROWS || seen.links !== ROWS)
 		fault(where, `${String(seen.rows)} rows, ${String(seen.links)} links`);
-	if (seen.foot !== FREE_WORDS.later) fault(where, `foot ${seen.foot}`);
+	// Ended, no footer says what comes later: the page promises nothing.
+	if (seen.foot !== (ENDED ? '' : FREE_WORDS.later)) fault(where, `foot ${seen.foot}`);
 	const footBudget = width < 500 ? FOOT_LINES.phone : FOOT_LINES.desk;
 	if (seen.footLines > footBudget) fault(where, `the footer draws ${String(seen.footLines)} lines`);
 	process.stdout.write(
 		`${where}: footer ${String(seen.footLines)} of ${String(footBudget)} lines\n`
 	);
 	if (seen.buttons !== 0) fault(where, `${String(seen.buttons)} buttons`);
-	if (FLAGGED && !read.plans) fault(where, 'the catalog was not read');
+	if ((FLAGGED || ENDED) && !read.plans) fault(where, 'the catalog was not read');
 	await common(page, where);
 	await page.screenshot({ path: file(`pass-${who}`, theme, width), fullPage: true });
 	await ctx.close();
@@ -155,8 +166,16 @@ async function account(theme: string, width: number, signedIn: boolean): Promise
 	const ctx = await context(theme, width, signedIn);
 	const page = await ctx.newPage();
 	await page.goto(`${web}/account`);
-	await ready(page, signedIn ? FREE_SEASON_PLAN.title : 'Sign in');
-	if (signedIn) {
+	await ready(page, signedIn ? (ENDED ? 'Free' : FREE_SEASON_PLAN.title) : 'Sign in');
+	if (signedIn && ENDED) {
+		await page.waitForLoadState('networkidle');
+		const plan = await page.evaluate(() => ({
+			line: document.querySelector('[aria-label="Plan"] .kvr .st span')?.textContent.trim() ?? '',
+			links: document.querySelectorAll('[aria-label="Plan"] .kvr a').length
+		}));
+		if (plan.line !== freeLine()) fault(where, `plan ${plan.line}`);
+		if (plan.links !== 0) fault(where, `the ended plan card links ${String(plan.links)}`);
+	} else if (signedIn) {
 		const plan = await page.evaluate(() => ({
 			line: document.querySelector('[aria-label="Plan"] .kvr .st span')?.textContent.trim() ?? '',
 			link: document.querySelector('[aria-label="Plan"] .kvr a')?.textContent.trim() ?? '',
@@ -223,6 +242,7 @@ for (const theme of THEMES) {
 		if (FLAGGED) continue;
 		await account(theme, width, false);
 		await account(theme, width, true);
+		if (ENDED) continue;
 		await companion(theme, width);
 		await claim(theme, width);
 	}
@@ -233,4 +253,4 @@ if (faults.length > 0) {
 	process.stderr.write(`${faults.join('\n')}\n`);
 	process.exit(1);
 }
-process.stdout.write(`the free season's pages${FLAGGED ? ' (flag on)' : ''}: no faults\n`);
+process.stdout.write(`the free season's pages${tag}: no faults\n`);
