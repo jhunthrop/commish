@@ -110,9 +110,15 @@ function splitLog(log: readonly GameLogRow[]): [GameLogRow[], GameLogRow[]] {
 }
 
 /** A week past the records with no club to name: a free agent's (Lane 123), who has no game in it, so
- * the log lists no row for it rather than saying he did not play a week not yet played. */
+ * the log lists no row for it rather than saying he did not play a week not yet played. A week he did
+ * play that the run cannot name keeps its row (Lane 138). */
 function unnamedAhead(row: GameLogRow, through: number): boolean {
-	return row.week > through && row.status === 'inactive' && row.opponent === null;
+	return (
+		row.week > through &&
+		row.status === 'inactive' &&
+		row.opponent === null &&
+		row.unnamedGame !== true
+	);
 }
 
 function basisWords(season: PlayerSeason, position: Position, format: Format): string {
