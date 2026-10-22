@@ -23,8 +23,8 @@ import {
 	boxBasisParts,
 	drawnText,
 	NONE_UNLISTED,
-	unlistedCrowded,
 	unlistedLong,
+	unlistedPhoneForm,
 	unlistedPart
 } from './basis.ts';
 import { BOX } from './box.ts';
@@ -215,20 +215,26 @@ void test('a team with neither lineup nor roster is explained beside best-lineup
 	assert.equal(unlistedPart('ffpc', { ...NONE_UNLISTED, noRoster: true }), NO_ROSTER);
 });
 
-void test("the League page's Game cell says its read alone only while the teams' words run past the one plain sentence", () => {
+void test('a crowded phone cuts qualifications, never the Game or Proj final sentence (fix round 1, HIGH-1 and HIGH-2)', () => {
 	const best = { ...NONE_UNLISTED, bestLineup: true };
 	assert.equal(unlistedLong(best), false);
 	assert.equal(unlistedLong({ ...best, skipped: true }), true);
 	assert.equal(unlistedLong({ ...best, noRoster: true }), true);
 	assert.equal(unlistedLong({ ...best, paced: true }), true);
 	assert.equal(unlistedLong({ ...NONE_UNLISTED, noRoster: true }), false);
-	// Crowded: the pace clause and another extra; the League page then leaves the Game read and "as of
-	// kickoff" out (LeaguePage.svelte, teamBasis).
-	assert.equal(unlistedCrowded({ ...best, paced: true }), false);
-	assert.equal(unlistedCrowded({ ...best, paced: true, noRoster: true }), true);
-	assert.equal(unlistedCrowded({ ...best, skipped: true, noRoster: true }), false);
-	const crowded = { ...best, paced: true, skipped: true };
-	const basis = (drawn: typeof best) =>
+	// The two FFPC sentences as one only where the second joins a pace clause or a skip (the ruling).
+	assert.equal(unlistedPhoneForm({ ...best, noRoster: true }), 'short');
+	assert.equal(unlistedPhoneForm({ ...best, noRoster: true, paced: true }), 'one');
+	assert.equal(
+		unlistedPart('ffpc', { ...best, noRoster: true }, 'one'),
+		'Teams FFPC sends no lineup for read our best lineup from their rosters, or -- with none.'
+	);
+	assert.match(
+		unlistedPart('ffpc', { ...best, paced: true }, 'short'),
+		/, in-play players at pace\.$/
+	);
+	const crowded = { ...best, paced: true, noRoster: true };
+	const basis = (drawn: typeof best, width: 'desk' | 'phone') =>
 		teamBasis(
 			'ffpc',
 			null,
@@ -239,37 +245,51 @@ void test("the League page's Game cell says its read alone only while the teams'
 			false,
 			true,
 			false,
-			drawn
+			drawn,
+			width
 		);
-	assert.match(basis(best), /as of kickoff once started/);
-	assert.doesNotMatch(basis(crowded), /as of kickoff/);
+	// The desk says everything; the crowded phone leaves "as of kickoff" and the tight end's extra to
+	// it, keeps the Proj final sentence and says the teams in one sentence.
+	const desk = basis(crowded, 'desk');
+	const phone = basis(crowded, 'phone');
+	assert.match(desk, /as of kickoff once started/);
+	assert.match(desk, /FFPC adds 0\.5 a catch for TEs\./);
+	assert.ok(desk.includes(NO_ROSTER));
+	assert.doesNotMatch(phone, /as of kickoff|a catch for TEs/);
+	assert.match(phone, /Proj final adds the Pts/);
+	assert.equal(phone.split('sends no lineup').length, 2, phone);
+	// Not crowded, the phone is the desk.
+	assert.equal(basis(best, 'phone'), basis(best, 'desk'));
 });
 
-void test('the Matchup phone says the Proj final in one sentence and the Game read alone while the teams words run long', () => {
+void test('the Matchup phone keeps the Proj final and Game sentences while the teams words run long, cutting qualifications', () => {
 	const { side, totals } = fridayOpponent();
-	const unlisted = { ...matchupUnlisted(side, totals), noRoster: true };
+	const unlisted = { ...matchupUnlisted(side, totals), paced: true };
 	const box = friday.matchup;
+	const lines = box.sides.flatMap((s) => [...s.starters.map((st) => st.line), ...s.bench]);
 	const parts = boxBasisParts(
 		{
 			projection: { readAt: box.projection_read_at, scoring: box.projection_scoring },
-			lines: box.sides.flatMap((s) => [...s.starters.map((st) => st.line), ...s.bench]),
+			lines,
+			kicked: true,
 			byPlayer: false,
 			teamTotal: true,
 			host: 'ffpc',
-			noFinal: true,
 			unlisted,
 			lineup: null
 		},
 		{ zone: ZONE, zoned: false },
-		Date.parse('2026-10-18T18:30:00.000Z')
+		FRIDAY
 	);
 	const desk = drawnText(parts, 'desk');
 	const phone = drawnText(parts, 'phone');
-	assert.match(desk, /Proj final adds the Pts/);
-	assert.doesNotMatch(phone, /Proj final adds the Pts/);
-	assert.match(phone, /No Proj final while/);
-	assert.match(desk, /Game is each club's expected points/);
-	assert.match(phone, /Game was read/);
+	for (const text of [desk, phone]) {
+		assert.match(text, /Proj final adds the Pts/);
+		assert.match(text, /Game is each club's expected points/);
+	}
+	for (const text of [desk, phone]) assert.match(text, /their projection's pace\./);
+	assert.match(desk, /read Fri/);
+	assert.doesNotMatch(phone.split('Game')[0] ?? '', /read Fri/);
 });
 
 void test("the Matchup's head and its Proj final key read the starters' games, never the unlisted opponent's bench (B107 addendum)", () => {
@@ -294,4 +314,21 @@ void test("the Matchup's head and its Proj final key read the starters' games, n
 		FRIDAY
 	);
 	assert.doesNotMatch(drawnText(parts, 'desk'), /Proj final/);
+});
+
+void test("a listed league's Matchup head reads its starters, a Thursday bench player's game moving nothing (review LOW-3)", () => {
+	// The recorded Sleeper box as served before Sunday: every starter plays Sunday or later.
+	const starters = matchup.sides.flatMap((s) => s.starters.map((st) => st.line));
+	const benchman = matchup.sides.flatMap((s) => s.bench)[0];
+	assert.ok(benchman);
+	assert.ok(
+		starters.every((l) => l.facts.kickoff === null || Date.parse(l.facts.kickoff) > FRIDAY)
+	);
+	// His game kicked off Thursday night.
+	const thursday = {
+		...benchman,
+		facts: { ...benchman.facts, kickoff: '2026-10-16T00:15:00.000Z', bye: false, opponent: 'CLE' }
+	};
+	assert.equal(nextKickoff(starters, FRIDAY, ZONE)?.head, KICKOFF.first);
+	assert.equal(nextKickoff([...starters, thursday], FRIDAY, ZONE)?.head, KICKOFF.next);
 });

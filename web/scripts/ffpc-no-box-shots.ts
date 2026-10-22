@@ -215,7 +215,8 @@ async function unlistedSaid(
 	page: Page,
 	basis = '[data-basis="league"]'
 ): Promise<{ times: number; rosterless: number; noProjFinal: boolean }> {
-	const text = await drawn(page.locator(basis));
+	// What the width draws: a desk's or a phone's form, never both (innerText leaves the hidden one out).
+	const text = (await page.locator(basis).allInnerTexts()).join(' ');
 	return {
 		times: [...text.matchAll(UNLISTED_NAMED)].length,
 		rosterless: [...text.matchAll(ROSTERLESS_NAMED)].length,

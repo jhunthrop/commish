@@ -363,8 +363,15 @@ function unlistedMatchup(
 		standing: null,
 		decided: null,
 		sides: matchup.sides.map((s) => {
-			if (s.roster_id === me) return s;
 			const board = boardSide(s.roster_id);
+			// The member's side keeps his starters; his Proj final and count are the board's by the one
+			// rule (matchup.go and scoreboard.go projectedFinal, Lane 137 fix round 1, MEDIUM-1).
+			if (s.roster_id === me)
+				return {
+					...s,
+					projected_final: board?.projected_final ?? null,
+					to_play: board?.to_play ?? null
+				};
 			const best = board?.projection_best_lineup === true;
 			return {
 				...s,

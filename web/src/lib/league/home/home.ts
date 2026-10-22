@@ -17,7 +17,8 @@ import { hostWords } from '../names.ts';
 import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
 import {
 	AS_OF_KICKOFF,
-	unlistedCrowded,
+	unlistedLong,
+	unlistedPhoneForm,
 	leagueScoringWords,
 	finalNonePart,
 	NONE_UNLISTED,
@@ -963,11 +964,16 @@ export function teamBasis(
 	/** A final side draws "--" for its total (bugsFinalNone): why is said. */
 	finalNone = false,
 	/** What the sides the platform lists no starters for draw (unlistedDrawn): each said once. */
-	unlisted: UnlistedDrawn = NONE_UNLISTED
+	unlisted: UnlistedDrawn = NONE_UNLISTED,
+	/** The width it is said at: a phone with the teams' words long (unlistedLong) leaves FFPC's tight
+	 * end extra and "as of kickoff" to the desk and says the teams' words short (unlistedPhoneForm),
+	 * never a drawn figure's sentence (Lane 137 fix round 1, HIGH-2). */
+	width: 'desk' | 'phone' = 'desk'
 ): string {
 	const platform = hostWords(host);
 	const team = byPlayer ? `, ${BOX.totals} adds the rows` : '';
-	const bonus = scoring.league_own ? null : teBonusSentence(scoring.te_bonus, host);
+	const crowded = width === 'phone' && unlistedLong(unlisted);
+	const bonus = scoring.league_own || crowded ? null : teBonusSentence(scoring.te_bonus, host);
 	const whose = leagueScoringWords(scoring, host);
 	const when =
 		readAt === null
@@ -978,14 +984,12 @@ export function teamBasis(
 	const words = [
 		projFinalPhone(projFinal, missing),
 		finalNone ? finalNonePart(host) : '',
-		unlistedPart(host, unlisted)
+		unlistedPart(host, unlisted, crowded ? unlistedPhoneForm(unlisted) : 'full')
 	]
 		.filter((w) => w !== '')
 		.join(' ');
 	const final = words === '' ? '' : ` ${words}`;
 	const extra = bonus === null ? '' : ` ${bonus}`;
-	// Crowded (unlistedCrowded), "as of kickoff" goes too, so the phone keeps to eight lines (Lane 137,
-	// B107): a best lineup is not held at kickoff anyway.
-	const asOf = started && !unlistedCrowded(unlisted);
+	const asOf = started && !crowded;
 	return `A team's ${BOX.proj} adds its starters' published projections${whose}, ${when}${asOf ? `, ${AS_OF_KICKOFF}` : ''}.${extra} ${BOX.pts} are ${platform}'s so far${team}.${final}`;
 }

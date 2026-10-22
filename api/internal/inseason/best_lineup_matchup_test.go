@@ -52,7 +52,27 @@ func TestTheFFPCMatchupOpponentHasTheHomesBestLineupProj(t *testing.T) {
 		if box.Standing != nil || box.Decided != nil {
 			t.Errorf("%s: standing %v decided %v beside a best-lineup Proj", at, box.Standing, box.Decided)
 		}
+		// One figure per side across screens (fix round 1, the veteran's Sunday morning): each side's
+		// Proj final and count are the board's on the Matchup, the member's as well as the opponent's.
+		for _, roster := range []int{me, them} {
+			_, board := sideOf(t, scoreboardOf(t, s), roster)
+			m := matchupSideOf(t, box, roster)
+			if deref(m.ProjectedFinal) != deref(board.ProjectedFinal) || strOf(m.ToPlay) != strOf(board.ToPlay) {
+				t.Errorf("%s team %d: Matchup Proj final %v to play %q, board %v and %q", at, roster,
+					deref(m.ProjectedFinal), strOf(m.ToPlay), deref(board.ProjectedFinal), strOf(board.ToPlay))
+			}
+		}
+		if _, mine := sideOf(t, scoreboardOf(t, s), me); at.After(liveSunday) && mine.ProjectedFinal == nil {
+			t.Errorf("%s: the member's Proj final none under way", at)
+		}
 	}
+}
+
+func strOf(p *string) string {
+	if p == nil {
+		return "<nil>"
+	}
+	return *p
 }
 
 // B107 ruling 2 (Lane 137): a player with no Proj never empties a team's
