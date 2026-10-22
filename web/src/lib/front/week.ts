@@ -380,8 +380,13 @@ export function weekBasis(
 	unlisted: UnlistedDrawn = NONE_UNLISTED
 ): string[] {
 	const platform = hostWords(league.host);
+	// Where the opponent's Proj is our best lineup of his roster, his is not his starters as set: the
+	// teams' sentence says what it is instead (Lane 127 fix round 3), the phone keeping to eight lines.
+	const setOn = unlisted.bestLineup
+		? ''
+		: ` A team's ${BOX.proj} adds its starters as set on ${platform}.`;
 	const lines = [
-		`Record, place and ${BOX.pts} are ${platform}'s. A team's ${BOX.proj} adds its starters as set on ${platform}.${others ? ' Your other leagues read the same way, each from its own platform.' : ''}`
+		`Record, place and ${BOX.pts} are ${platform}'s.${setOn}${others ? ' Your other leagues read the same way, each from its own platform.' : ''}`
 	];
 	const scoring = league.projection_scoring;
 	if (scoring !== null) {

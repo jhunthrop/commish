@@ -77,9 +77,16 @@ export interface UnlistedDrawn {
 	bestLineup: boolean;
 	/** A side draws "--" under Proj or Proj final: the platform sends us no roster for it either. */
 	noRoster: boolean;
+	/** A best-lineup side draws a Proj final that counts a player in play at his projection's pace (the
+	 * API's projected_final_paced, Lane 127 fix round 3), said in the same sentence. */
+	paced: boolean;
 }
 
-export const NONE_UNLISTED: UnlistedDrawn = { bestLineup: false, noRoster: false };
+export const NONE_UNLISTED: UnlistedDrawn = { bestLineup: false, noRoster: false, paced: false };
+
+/** How a best lineup's in-play player counts where the platform gives no player's points (Lane 127 fix
+ * round 3, roster_projection.go inPlayAt): the clause the sentence gains while a Proj final is drawn. */
+export const PACE_CLAUSE = "in-play players at their projection's pace";
 
 /** The words for the teams a platform sends no lineup for (Lane 127 fix round 1): one sentence covers
  * their Proj and their Proj final alike, said once, the "--" of a team with no roster read beside it
@@ -88,7 +95,7 @@ export const NONE_UNLISTED: UnlistedDrawn = { bestLineup: false, noRoster: false
 export function unlistedPart(host: LeagueHost, drawn: UnlistedDrawn): string {
 	const platform = hostWords(host);
 	if (drawn.bestLineup)
-		return `${BOX.proj} for teams ${platform} sends no lineup for is our best lineup from their rosters.`;
+		return `${BOX.proj} for teams ${platform} sends no lineup for is our best lineup from their rosters${drawn.paced ? `, ${PACE_CLAUSE}` : ''}.`;
 	return drawn.noRoster ? `Teams ${platform} sends no lineup or roster for read ${BOX.none}.` : '';
 }
 
@@ -483,6 +490,8 @@ export interface BoxBasisFacts {
 	/** A Team row draws its Proj final from our best lineup of its roster (an FFPC opponent, the
 	 * API's projection_best_lineup, Lane 127 fix round 1): said once, as the League page says it. */
 	bestLineup?: boolean;
+	/** That Proj final counts a player in play at his projection's pace (projected_final_paced). */
+	paced?: boolean;
 	host: LeagueHost;
 	/** The Lineup's: the read the change counts from, and the API's sentence naming the rules our
 	 * stats lack; null on the Matchup, which draws no evidence columns. */
@@ -514,7 +523,11 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 		...said(facts.finalNone === true ? finalNonePart(facts.host) : null),
 		...said(
 			projFinal && facts.bestLineup === true
-				? unlistedPart(facts.host, { bestLineup: true, noRoster: false })
+				? unlistedPart(facts.host, {
+						bestLineup: true,
+						noRoster: false,
+						paced: facts.paced === true
+					})
 				: null
 		)
 	];

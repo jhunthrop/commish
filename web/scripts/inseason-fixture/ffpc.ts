@@ -84,7 +84,15 @@ function hiddenSide(side: ScoreboardSide, state: GameState, read: RosterRead): S
 	const rest: ScoreboardSide = { ...side };
 	delete rest.starters_final;
 	delete rest.projection_best_lineup;
-	const { roster } = read;
+	// FFPC's rosters page gives no player's points, and a player we hold no Proj for is no part of a
+	// lineup we project (roster_projection.go bestLineup, fix round 3).
+	const roster =
+		read.roster
+			?.filter((l) => printedProj(l) !== null)
+			.map((l) => ({ ...l, facts: { ...l.facts, points_this_week: null } })) ?? null;
+	const projected = { ...read, roster };
+	delete rest.projected_final_paced;
+	const final = roster === null ? null : bestLineupFinal(side.points, projected);
 	return {
 		...rest,
 		starters: 0,
@@ -93,15 +101,47 @@ function hiddenSide(side: ScoreboardSide, state: GameState, read: RosterRead): S
 		...(roster === null ? {} : { projection_best_lineup: true }),
 		to_play: null,
 		in_play: 0,
-		projected_final: roster === null ? null : bestLineupFinal(side.points, read),
+		projected_final: final,
+		...(final !== null && pacedAt(projected) ? { projected_final_paced: true } : {}),
 		schedule_state: state
 	};
 }
 
+/** Whether a best lineup's Proj final counts a player in play at his projection's pace
+ * (roster_projection.go pacedFinal): one in play, no points read, some of his game left. */
+function pacedAt(read: RosterRead): boolean {
+	if (read.roster === null) return false;
+	return weekStarters(read.roster, read.slots).some((line) => {
+		const proj = printedProj(line);
+		return (
+			proj !== null &&
+			line.facts.points_this_week === null &&
+			!line.facts.bye &&
+			!sitsOut(line) &&
+			kickedOffAt(line, read.moment.now) &&
+			!read.moment.final(line) &&
+			inPlayLeft(line, proj, read.moment.now) > 0
+		);
+	});
+}
+
+/** How long a game is taken to last for an in-play player's pace (roster_projection.go gameLength). */
+const GAME_LENGTH_MS = (3 * 60 + 15) * 60 * 1000;
+
+/** What a best lineup's player in play still adds (roster_projection.go inPlayAt): max(0, Proj - Pts)
+ * where his points are read, else his Proj times the share of his game left, held between 0 and 1. */
+function inPlayLeft(line: PlayerLine, proj: number, now: number): number {
+	const pts = line.facts.points_this_week;
+	if (pts !== null) return Math.max(0, proj - pts);
+	if (line.facts.kickoff === null) return 0;
+	const left = 1 - (now - Date.parse(line.facts.kickoff)) / GAME_LENGTH_MS;
+	return proj * Math.min(1, Math.max(0, left));
+}
+
 /** A best lineup's projected final (roster_projection.go rosterProjectedFinal): once the game has
  * kicked off, FFPC's points so far plus the printed Proj of each player of the lineup still to play
- * and the rest of it for one in play where his points are read (none on FFPC), one final or out
- * nothing; null before, or while one still to play has no Proj. */
+ * and the rest of it for one in play (inPlayLeft), one final or out nothing; null before, or while one
+ * still to play has no Proj. */
 function bestLineupFinal(points: number, read: RosterRead): number | null {
 	if (!read.started || read.roster === null) return null;
 	let sum = points;
@@ -109,10 +149,10 @@ function bestLineupFinal(points: number, read: RosterRead): number | null {
 		if (line.facts.bye || line.facts.kickoff === null || sitsOut(line)) continue;
 		const proj = printedProj(line);
 		if (kickedOffAt(line, read.moment.now)) {
-			// In play, the rest of his Proj where his points are read (Lane 92's rule, review MEDIUM-2);
-			// FFPC gives none, so nothing. Final, nothing.
-			const pts = line.facts.points_this_week;
-			if (!read.moment.final(line) && proj !== null && pts !== null) sum += Math.max(0, proj - pts);
+			// In play, the rest of his Proj (roster_projection.go inPlayAt): Lane 92's rule where his points
+			// are read, else his Proj at its pace, the share of his 3 h 15 m game left (fix round 3). Final,
+			// nothing.
+			if (!read.moment.final(line) && proj !== null) sum += inPlayLeft(line, proj, read.moment.now);
 			continue;
 		}
 		if (proj === null) return null;
@@ -308,6 +348,9 @@ export function ffpcAfterSunday(
 							// No starter of his to count (matchup.go toPlay over none).
 							to_play: null,
 							projected_final: boardSide(s.roster_id)?.projected_final ?? null,
+							...(boardSide(s.roster_id)?.projected_final_paced === true
+								? { projected_final_paced: true }
+								: {}),
 							...(boardSide(s.roster_id)?.projection_best_lineup === true
 								? { projection_best_lineup: true }
 								: {}),

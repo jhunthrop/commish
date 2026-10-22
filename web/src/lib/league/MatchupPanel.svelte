@@ -221,6 +221,8 @@
 				theirs.totals.final !== null &&
 				box?.sides.find((b) => b.roster_id === matchup.opponent?.roster_id)
 					?.projection_best_lineup === true}
+			paced={box?.sides.find((b) => b.roster_id === matchup.opponent?.roster_id)
+				?.projected_final_paced === true}
 			lineup={null}
 			now={now.getTime()}
 		/>

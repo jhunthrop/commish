@@ -185,7 +185,8 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 	// fix round 1); a side with no roster read keeps none (Lane 125).
 	for i, s := range sides {
 		if rostered[i] {
-			out.Sides[i].ProjectedFinal = rosterProjectedFinal(sidePoints(s), lineups[i], out.State != apitypes.ScoreboardGameStateUpcoming)
+			out.Sides[i].ProjectedFinal = rosterProjectedFinal(sidePoints(s), lineups[i], out.State != apitypes.ScoreboardGameStateUpcoming, a.now)
+			out.Sides[i].ProjectedFinalPaced = pacedFinal(out.Sides[i].ProjectedFinal, lineups[i], a.now)
 		}
 	}
 	// The pooled count stays for the web before Lane 92; each side says its own.

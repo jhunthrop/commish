@@ -33,6 +33,7 @@ import { basisLines } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import {
 	FIXTURE_FRIDAY_CLOCK,
+	FIXTURE_LIVE_CLOCK,
 	FIXTURE_MONDAY_NIGHT_CLOCK,
 	FIXTURE_STATS_CLOCK,
 	FIXTURE_SUNDAY_MORNING_CLOCK,
@@ -57,6 +58,14 @@ const CLOCKS = {
 	friday: { at: FIXTURE_FRIDAY_CLOCK, head: null, opponentFinal: null, unlistedSaid: 1 },
 	saturday: { at: FIXTURE_WEEK_CLOCK, head: null, opponentFinal: null, unlistedSaid: 1 },
 	sunday: { at: FIXTURE_SUNDAY_MORNING_CLOCK, head: null, opponentFinal: null, unlistedSaid: 1 },
+	// Monday night 25 minutes into its game (Lane 127 fix round 3): the opponent's in-play back counts
+	// at his projection's pace, so his Proj final reads above his points.
+	'monday-live': {
+		at: FIXTURE_LIVE_CLOCK,
+		head: KICKOFF.kickedOff,
+		opponentFinal: false,
+		unlistedSaid: 1
+	},
 	monday: {
 		at: FIXTURE_MONDAY_NIGHT_CLOCK,
 		head: KICKOFF.kickedOff,
@@ -137,12 +146,13 @@ async function matchupBug(page: Page): Promise<{ head: string; opponent: string 
 	};
 }
 
-/** The member's home bug: its head and the opponent's small figure. */
-async function homeBug(page: Page): Promise<{ head: string; opponent: string }> {
+/** The member's home bug: its head, the opponent's small figure and his points. */
+async function homeBug(page: Page): Promise<{ head: string; opponent: string; points: string }> {
 	const bug = page.locator('main a.bug.mine').first();
 	return {
 		head: await drawn(bug.locator('.bh .st')),
-		opponent: await drawn(bug.locator('.bt:not(.me) .proj'))
+		opponent: await drawn(bug.locator('.bt:not(.me) .proj')),
+		points: await drawn(bug.locator('.bt:not(.me) .pts'))
 	};
 }
 
@@ -241,6 +251,13 @@ for (const theme of THEMES)
 				)
 					faults.push(`${at}: head "${bug.head}", want "${want.head}"`);
 				if (bug !== null) faults.push(...opponentFaults(bug.opponent, at));
+				// At the live clock the opponent's Proj final is above his points (his back at pace).
+				if (day === 'monday-live' && screen.name === 'home') {
+					const home = await homeBug(page);
+					footers.push(`  opponent Proj final ${home.opponent} over Pts ${home.points}`);
+					if (!(Number(home.opponent) > Number(home.points)))
+						faults.push(`${at}: opponent Proj final ${home.opponent} not above his ${home.points}`);
+				}
 				const lines = bug === null ? 1 : await basisLines(page);
 				// The Matchup says the opponent's best-lineup Proj final once while he plays (Lane 127).
 				if (screen.name === 'matchup') {

@@ -158,8 +158,9 @@ func otherGameSides(t *testing.T, f fixture, g apitypes.ScoreboardGame, playing 
 
 // The member's FFPC opponent, listing no starters, has his roster's best
 // lineup's projected final on the board and the Matchup alike (Lane 127
-// fix round 1, superseding Lane 125's none): on Monday night every player
-// of it is final or in play, so it is his points.
+// fix round 1, superseding Lane 125's none): on Monday night his lineup's
+// players in play, FFPC giving no player's points, add their Proj at its
+// pace (fix round 3), so the figure is above his points.
 func TestAnFFPCOpponentsProjectedFinalIsHisBestLineupsOnTheBoardAndTheMatchup(t *testing.T) {
 	f, projection := liveFixture(t)
 	me, them := ffpcBoard(&f)
@@ -168,9 +169,9 @@ func TestAnFFPCOpponentsProjectedFinalIsHisBestLineupsOnTheBoardAndTheMatchup(t 
 	_, theirs := sideOf(t, scoreboardOf(t, s), them)
 	box := matchupOf(t, s)
 	boxed := boxSideOf(t, box, them)
-	if deref(theirs.ProjectedFinal) != theirs.Points || deref(boxed.ProjectedFinal) != theirs.Points ||
+	if theirs.ProjectedFinal == nil || *theirs.ProjectedFinal <= theirs.Points || deref(boxed.ProjectedFinal) != *theirs.ProjectedFinal ||
 		boxed.ProjectionBestLineup == nil || !*boxed.ProjectionBestLineup {
-		t.Errorf("the opponent's projected final: board %v, Matchup %v (flag %v), want his %v points",
+		t.Errorf("the opponent's projected final: board %v, Matchup %v (flag %v), want one figure above his %v points",
 			deref(theirs.ProjectedFinal), deref(boxed.ProjectedFinal), boxed.ProjectionBestLineup, theirs.Points)
 	}
 	if _, mine := sideOf(t, scoreboardOf(t, s), me); mine.ProjectedFinal == nil {

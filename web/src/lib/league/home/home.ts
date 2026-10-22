@@ -116,6 +116,9 @@ export interface BugSide {
 	/** Its Proj is our best lineup from its roster (the API's projection_best_lineup, Lane 127, B105),
 	 * false from an older answer, which sends none. */
 	bestLineup: boolean;
+	/** Its Proj final counts a player in play at his projection's pace (projected_final_paced, Lane 127
+	 * fix round 3). */
+	paced: boolean;
 	/** The big figure (Lane 92, B22): its Proj before the first kickoff, its Pts from it. */
 	big: string;
 	/** "3 to play", "2 playing" while the game is under way (the API's to_play), else empty. */
@@ -306,6 +309,7 @@ export function bugsOf(
 					final,
 					unlisted: side.schedule_state !== undefined,
 					bestLineup: side.projection_best_lineup === true,
+					paced: side.projected_final_paced === true,
 					...sideFigures(side, head.state, final, columns.small === BOX.final),
 					toPlay: head.state === 'kicked_off' ? (side.to_play ?? '') : '',
 					stands: standsOf(game, side, started)
@@ -353,10 +357,11 @@ export function bugsMissListedFinal(bugs: readonly Bug[]): boolean {
 	return bugsMissFinal(lineupSidesOnly(bugs));
 }
 
-/** Whether a side with a lineup still draws a Proj final (bugsPlaying): what it adds is said only then
- * (Lane 127: a "--" with no roster is unlistedPart's). */
+/** Whether a side the platform lists starters for still draws a Proj final (bugsPlaying): what it adds
+ * is said only then. A best lineup's Proj final is said by unlistedPart, its pace clause included (Lane
+ * 127 fix round 3), and a "--" with no roster too. */
 export function bugsPlayingListed(bugs: readonly Bug[]): boolean {
-	return bugsPlaying(lineupSidesOnly(bugs));
+	return bugsPlaying(bugs.map((b) => ({ ...b, sides: b.sides.filter((s) => !s.unlisted) })));
 }
 
 /** The figure a side draws in its bug's state at the page's clock: its Proj before kickoff, its Proj
@@ -377,7 +382,15 @@ export function unlistedDrawn(bugs: readonly Bug[]): UnlistedDrawn {
 	);
 	return {
 		bestLineup: drawn.some(({ s, figure }) => s.bestLineup && figure !== BOX.none),
-		noRoster: drawn.some(({ s, figure }) => !s.bestLineup && figure === BOX.none)
+		noRoster: drawn.some(({ s, figure }) => !s.bestLineup && figure === BOX.none),
+		// A Proj final drawn from a best lineup: a game under way, the side not final (fix round 3).
+		paced: bugs.some(
+			(b) =>
+				b.state !== 'upcoming' &&
+				b.sides.some(
+					(s) => s.unlisted && s.bestLineup && s.paced && !s.final && s.small !== BOX.none
+				)
+		)
 	};
 }
 

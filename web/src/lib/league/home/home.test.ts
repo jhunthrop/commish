@@ -302,7 +302,7 @@ void test('a side FFPC lists no starters or roster for draws "--", said once by 
 			[true, true, `${BOX.final} 71.4`]
 		]
 	);
-	assert.deepEqual(unlistedDrawn(bugs), { bestLineup: false, noRoster: true });
+	assert.deepEqual(unlistedDrawn(bugs), { bestLineup: false, noRoster: true, paced: false });
 	// The "--" is the side's with no roster: the starters keys stay unsaid, its own sentence says it,
 	// on the League page and the front door alike.
 	assert.equal(bugsMissFinal(bugs), true);
@@ -329,7 +329,8 @@ void test('a side FFPC lists no starters or roster for draws "--", said once by 
 	// A board with every side listed says nothing of it.
 	assert.deepEqual(unlistedDrawn(bugsOf(board('playing'), SYNC, SATURDAY, ZONE)), {
 		bestLineup: false,
-		noRoster: false
+		noRoster: false,
+		paced: false
 	});
 });
 
@@ -358,7 +359,7 @@ void test("a side FFPC sends no lineup for draws its roster's best lineup before
 		]
 	);
 	const drawn = unlistedDrawn(bugs);
-	assert.deepEqual(drawn, { bestLineup: true, noRoster: true });
+	assert.deepEqual(drawn, { bestLineup: true, noRoster: true, paced: false });
 	const said = teamBasis('ffpc', read, scoring, false, ZONE, false, false, false, false, drawn);
 	assert.match(said, new RegExp(`${best.source}$`));
 	assert.doesNotMatch(said, /Proj final/);
@@ -373,12 +374,15 @@ void test("a side FFPC sends no lineup for draws its roster's best lineup before
 		projection: 88.4,
 		projected_final: 80.1,
 		projection_best_lineup: true,
+		projected_final_paced: true,
 		schedule_state: 'kicked_off'
 	}));
 	const under = bugsOf(night, SYNC, SATURDAY, ZONE);
 	assert.equal(under[0]?.sides[0]?.small, '80.1');
-	assert.deepEqual(unlistedDrawn(under), { bestLineup: true, noRoster: false });
-	assert.equal(bugsPlayingListed(under), true);
+	assert.deepEqual(unlistedDrawn(under), { bestLineup: true, noRoster: false, paced: true });
+	// Both sides are the best lineup's: its sentence says their Proj final, its pace clause with it, and
+	// the listed sides' key stays unsaid (fix round 3).
+	assert.equal(bugsPlayingListed(under), false);
 	const both = teamBasis(
 		'ffpc',
 		read,
@@ -391,7 +395,11 @@ void test("a side FFPC sends no lineup for draws its roster's best lineup before
 		false,
 		unlistedDrawn(under)
 	);
-	assert.match(both, new RegExp(`Proj final adds .*${best.source}$`));
+	assert.match(
+		both,
+		/ Proj for teams FFPC sends no lineup for is our best lineup from their rosters, in-play players at their projection's pace\.$/
+	);
+	assert.doesNotMatch(both, /Proj final adds/);
 	assert.equal(both.split('sends no lineup').length, 2, 'the teams said once');
 	// An older answer sends no projection_best_lineup and no Proj: the teams with no roster's words.
 	const older = board('upcoming');
@@ -405,7 +413,8 @@ void test("a side FFPC sends no lineup for draws its roster's best lineup before
 	}));
 	assert.deepEqual(unlistedDrawn(bugsOf(older, SYNC, SATURDAY, ZONE)), {
 		bestLineup: false,
-		noRoster: true
+		noRoster: true,
+		paced: false
 	});
 });
 
