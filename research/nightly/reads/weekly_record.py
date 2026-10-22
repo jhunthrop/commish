@@ -16,7 +16,8 @@ again over those weeks beside it, like with like.
 ESPN's read is said beside its comparison when it was not the read the order was set with (Amendment 6,
 Lane 146): a freeze whose ESPN read failed takes the first read after it and before the week's first
 kickoff (`espn_read_at` later than the freeze), and a week no read before kickoff reached is graded
-against the published projection alone. A week whose freeze kept ESPN's read says nothing.
+against the published projection alone; a week with neither yardstick says it is graded on its own order
+alone (Lane 148). A week whose freeze kept ESPN's read says nothing.
 """
 
 from collections.abc import Mapping, Sequence
@@ -58,14 +59,17 @@ _METHOD: Final = (
     "From week {week} we set our weekly rankings before each week's first kickoff and graded them on the "
     "week's points{beside}."
 )
-# Beside the ESPN comparison of a graded week (Amendment 6): the read came after the order was set, or
-# no read before kickoff reached the week.
+# Beside the ESPN comparison of a graded week (Amendment 6): the read came after the order was set, no
+# read before kickoff reached the week, or neither yardstick did (Lane 148).
 ESPN_READ_AFTER_NOTE: Final = (
     "ESPN's projection this week was read after our weekly rankings were set, still before the first kickoff."
 )
 ESPN_UNREAD_NOTE: Final = (
     "ESPN's projection was not read before this week's first kickoff, so the week is graded against the "
     "week's published projection alone."
+)
+NO_YARDSTICK_NOTE: Final = (
+    "No yardstick was read before this week's first kickoff, so the week is graded on its own order alone."
 )
 _BESIDE_NAMES: Final = {"espn": "ESPN's projection", "published": "the week's published projection"}
 
@@ -249,11 +253,13 @@ def first_week(shipped: set[int], kickoffs: Mapping[int, datetime], as_of: datet
 def espn_note(rows: Sequence[Mapping[str, Any]], frozen_at: datetime) -> str | None:
     """What a graded week says of ESPN's read (Amendment 6): read after the order was set when any row's
     figure came from a read later than the freeze, unread when no row carries one but the published
-    projection is there to grade against alone; None when the freeze kept ESPN's own read."""
+    projection is there to grade against alone, no yardstick when neither is; None when the freeze kept
+    ESPN's own read."""
     if any(row.get("espn_points") is not None and _later(row.get("espn_read_at"), frozen_at) for row in rows):
         return ESPN_READ_AFTER_NOTE
     if rows and all(row.get("espn_points") is None for row in rows):
-        return ESPN_UNREAD_NOTE if any(row.get("published_points") is not None for row in rows) else None
+        published = any(row.get("published_points") is not None for row in rows)
+        return ESPN_UNREAD_NOTE if published else NO_YARDSTICK_NOTE
     return None
 
 
