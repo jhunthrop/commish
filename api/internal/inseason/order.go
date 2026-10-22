@@ -195,12 +195,17 @@ func (a *advisor) rosterMark(boardID string) apitypes.RosterMark {
 	return mark
 }
 
-// moveOf is the one move a row admits: add a free player, trade for one
-// the finder brings in, nothing for the drafter's own. The finder is read
-// only for a row on another roster.
-func moveOf(mark apitypes.RosterMark, boardID string, targets Targets) *apitypes.OrderRowMove {
+// moveOf is the one move a row admits: add a free player Waivers lists,
+// trade for one the finder brings in, nothing for the drafter's own. A
+// free player Waivers leaves out (unlisted: on a list with no return week
+// it holds him to, Lane 128) admits none, so the order never opens Waivers
+// on a player it does not list. The finder is read only for a row on
+// another roster.
+func moveOf(mark apitypes.RosterMark, boardID string, unlisted bool, targets Targets) *apitypes.OrderRowMove {
 	var m apitypes.OrderRowMove
 	switch {
+	case mark.Kind == apitypes.RosterMarkKindFree && unlisted:
+		return nil
 	case mark.Kind == apitypes.RosterMarkKindFree:
 		m = apitypes.OrderRowMoveAdd
 	case mark.Kind == apitypes.RosterMarkKindTeam && targets()[boardID]:
@@ -307,11 +312,12 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 // orderRow is one player's row: his line as the league's screens draw it,
 // his place, the order's two keys, and in a league his roster and move.
 func (a *advisor) orderRow(p boards.Player, rank int, hosts map[string]string, targets Targets) apitypes.OrderRow {
-	row := apitypes.OrderRow{Line: a.boardPerson(p, hosts).line, Rank: rank, RestOfSeasonPoints: a.restOfSeasonPoints(p),
+	person := a.boardPerson(p, hosts)
+	row := apitypes.OrderRow{Line: person.line, Rank: rank, RestOfSeasonPoints: a.restOfSeasonPoints(p),
 		PointsOverReplacement: a.pointsOverReplacement(p)}
 	if targets != nil {
 		mark := a.rosterMark(p.ID)
-		row.Roster, row.Move = &mark, moveOf(mark, p.ID, targets)
+		row.Roster, row.Move = &mark, moveOf(mark, p.ID, a.unlistedAdd(person), targets)
 	}
 	return row
 }

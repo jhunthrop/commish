@@ -124,6 +124,18 @@ func (a *advisor) stashWeek(p person) (int, bool) {
 	return *back, true
 }
 
+// unlistedAdd is a free agent neither Waivers' table nor its Stash group
+// holds (Lane 128): one listedAdd leaves out whom stashWeek does not hold,
+// on injured reserve with no return week among them. The order offers him
+// no move.
+func (a *advisor) unlistedAdd(p person) bool {
+	if listedAdd(p) {
+		return false
+	}
+	_, held := a.stashWeek(p)
+	return !held
+}
+
 // irSlotOpen is whether the member's team has an injured reserve slot
 // open that takes him on the league's platform (B79): the league's slots
 // from its settings, less the ones his roster fills; a player ruled out

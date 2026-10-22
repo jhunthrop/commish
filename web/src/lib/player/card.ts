@@ -4,6 +4,9 @@
 import { FREE_AGENT_WORDS } from '#lib/format/free-agent.ts';
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
+import { onListWords } from '#lib/format/designation.ts';
+
+export { onListWords };
 import { plural } from '#lib/format/number.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
 
@@ -127,18 +130,15 @@ export const CARD = {
 	notRanked: 'not ranked yet',
 	/** The game log's collapsed earlier seasons (review M8). */
 	earlierSeasons: 'Earlier seasons',
+	/** A listed player's basis in place of the week's figures his card does not draw (Lane 128): his
+	 * Wk, Opp rank and Δ Proj tiles say "On IR". */
+	listedWeek: 'Wk, Opp rank and Δ Proj are his once he is back.',
 	/** The waiver verb where we know no page of the platform's: our own screen, named as ours. */
 	findOnWaivers: 'Find him on Waivers'
 } as const;
 
 /** The week's own tiles, which a listed player's list stands in for. */
 const WEEK_KEYS: ReadonlySet<TileKey> = new Set(['proj', 'opp', 'delta']);
-
-/** "On IR": a listed player's week tiles say his list in place of a Proj, an Opp rank or a change
- * (Lane 128 fix round 1): his game is not his. */
-export function onListWords(word: string): string {
-	return `On ${word}`;
-}
 
 /** The week's tiles of a player on a season-long list ("IR", the list's word): Proj, Opp rank and
  * the change are "--" with the list as their reason; null keeps the tiles. */
@@ -193,7 +193,13 @@ export function withTile(tiles: readonly CardTile[], next: CardTile): CardTile[]
 
 /** The basis line while the week is unread, or when it cannot be read, naming the week tile by its
  * head ("Wk 6"). */
-export function unreadBasis(failed: boolean, weekTile: string): string {
+export function unreadBasis(
+	failed: boolean,
+	weekTile: string,
+	listed: string | null = null
+): string {
+	// A listed player's week tiles say his list, read or not (Lane 128).
+	if (listed !== null) return CARD.listedWeek;
 	return failed
 		? `${weekTile}, ${CARD.opp} and ${CARD.delta} show "${NONE}" because this week's figures could not be read just now.`
 		: `${weekTile}, ${CARD.opp} and ${CARD.delta} are this week's, read as the page opens.`;

@@ -126,6 +126,7 @@
 								said={moveWords(row, league.moves, league.host)}
 								name={row.box.name}
 							/>
+						{:else if league !== null && row.held !== null}<span class="held">{row.held}</span>
 						{:else if end}{@render end(row)}{/if}
 					</td>
 				{/if}
@@ -299,6 +300,12 @@
 	.act {
 		text-align: right;
 		white-space: nowrap;
+	}
+
+	/* The verb's place for a free agent with no return date: the IR words, quiet, as a caption. */
+	.held {
+		font-size: var(--t-xs);
+		color: var(--ink-3);
 	}
 
 	.ph-mark,

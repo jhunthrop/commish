@@ -813,4 +813,28 @@ void test("a listed player's week is not his: Proj, Opp rank and the change say 
 	assert.equal(tile(listed(byeWeek(18.4, null)), 'delta').label, 'Wk 7 Proj');
 	// No list: the week's own figures.
 	assert.equal(tile(card(week()).tiles, 'proj').caption, 'PPR');
+	// His basis says only what the card shows: one sentence for the On IR tiles, then Avg and Last
+	// (fix round 2); his game's expected score, weather and Proj are not drawn.
+	const whole = liveCard({
+		week: week(),
+		player: RB,
+		league: null,
+		tiles: BUILT,
+		opponents: {},
+		games: 5,
+		rest: REST,
+		held: 'IR',
+		screenHref: href,
+		zone: ZONE,
+		now: NOW
+	});
+	assert.equal(whole.basis.length, 1);
+	assert.ok(whole.basis[0]?.startsWith(CARD.listedWeek), whole.basis[0]);
+	assert.doesNotMatch(whole.basis.join(' '), /published projection|Opp rank is|expected points/u);
+	assert.deepEqual(
+		[whole.cell?.expected, whole.cell?.weather, whole.next?.proj],
+		[null, null, NONE]
+	);
+	assert.equal(unreadBasis(false, 'Wk 6', 'IR'), CARD.listedWeek);
+	assert.notEqual(unreadBasis(false, 'Wk 6', null), CARD.listedWeek);
 });

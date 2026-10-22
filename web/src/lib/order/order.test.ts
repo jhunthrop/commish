@@ -77,6 +77,34 @@ const row = (name: string, over: Partial<OrderRow> = {}): OrderRow => ({
 	...over
 });
 
+void test('a free agent on IR with no move says why in the verb cell, his week not his (Lane 128)', () => {
+	const ir = { status: 'injured_reserve', as_of: READ } as const;
+	const listed = line('Achane', 'RB', { facts: { ...facts, designation: ir } });
+	const free = { kind: 'free', team: null } as const;
+	const undated = orderView(
+		row('Achane', { line: listed, roster: free, move: null }),
+		ZONE,
+		true,
+		NOW
+	);
+	assert.equal(undated.held, 'On IR, no return date');
+	assert.equal(undated.week, null, 'no week figure for a player on a list');
+	assert.equal(undated.box.proj, null);
+	// Due back (the API keeps his add): the verb, no words.
+	const dated = orderView(
+		row('Achane', { line: listed, roster: free, move: 'add' }),
+		ZONE,
+		true,
+		NOW
+	);
+	assert.equal(dated.held, null);
+	// A free agent on no list, and a rostered player on one, carry none either.
+	assert.equal(orderView(row('Hall', { roster: free, move: 'add' }), ZONE, true, NOW).held, null);
+	const yours = { kind: 'yours', team: null } as const;
+	assert.equal(orderView(row('Dart', { line: listed, roster: yours }), ZONE, true, NOW).held, null);
+	assert.doesNotMatch(undated.held, bannedPattern());
+});
+
 const advice = (rows: OrderRow[], over: Partial<OrderAdvice> = {}): OrderAdvice => ({
 	week: 6,
 	basis: 'Our rest-of-season order from week 7.',

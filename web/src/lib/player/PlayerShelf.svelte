@@ -83,7 +83,13 @@
 		built?.weekRead ? shownWeekRead(built.weekRead, live?.projection ?? null) : null
 	);
 	const basis = $derived(
-		live?.basis ?? [unreadBasis(failed, tiles.find((t) => t.key === 'proj')?.label ?? CARD.proj)]
+		live?.basis ?? [
+			unreadBasis(
+				failed,
+				tiles.find((t) => t.key === 'proj')?.label ?? CARD.proj,
+				shown.status?.rank ?? null
+			)
+		]
 	);
 	const verb = $derived(shelfVerb(host.options.screen, game, row && host.options.offer(row)));
 	/** His page's build, null when it cannot be read: the row's cells and the week read still stand. */

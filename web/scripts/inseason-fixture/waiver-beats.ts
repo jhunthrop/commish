@@ -132,6 +132,13 @@ function returnHeld(line: PlayerLine): boolean {
 	return !listedAdd(line) && (status === 'injured_reserve' || status === 'out');
 }
 
+/** Whether Waivers holds a free agent, listed or in its Stash group (waiver_stash.go unlistedAdd's
+ * converse, Lane 128): the order offers an add only on such a player. */
+export function waiversHold(line: PlayerLine): boolean {
+	const back = line.facts.designation?.return_week ?? null;
+	return listedAdd(line) || (returnHeld(line) && back !== null && back <= LAST_REGULAR_WEEK);
+}
+
 /** One stash (waiver_stash.go stashRow): no week figure and no Beats, his rate the figure his player
  * page shows, the drop the gaining rows' rule names (the stand-in's member has no bench spot open). */
 function stashRow(row: WaiverRow, back: number, irSlot: boolean): WaiverRow {

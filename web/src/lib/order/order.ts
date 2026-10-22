@@ -5,6 +5,7 @@
  * the API's answer, so every word the screens print is tested here; every figure is the API's,
  * printed as it comes. */
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
+import { onListWords } from '#lib/format/designation.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import {
 	anyKicked,
@@ -68,6 +69,20 @@ export interface OrderView {
 	/** Whose roster holds him in words, with its kind for the chip; null without a league. */
 	roster: { kind: RosterMark['kind']; words: string } | null;
 	move: OrderRow['move'];
+	/** In the verb's place, a free agent on a list the API gives no move ("On IR, no return date",
+	 * Lane 128); null otherwise. */
+	held: string | null;
+}
+
+/** The verb cell's words for a free agent on a list whom the order gives no move: Waivers neither
+ * lists nor stashes him (no return week), so the cell says so (Lane 128). */
+export function heldMoveWords(
+	row: Pick<OrderRow, 'move' | 'roster'>,
+	status: BoxRow['status']
+): string | null {
+	if (row.move !== null || row.roster?.kind !== 'free' || status === null || !onList(status))
+		return null;
+	return `${onListWords(status.rank ?? '')}, ${ORDER.noReturn}`;
 }
 
 /** A roster mark in words: Yours, Free, or the holding team's name. */
@@ -96,7 +111,8 @@ export function orderView(row: OrderRow, zone: string, pillRank: boolean, now: n
 			perGame: row.line.rest_of_season_per_game
 		},
 		roster: row.roster === null ? null : { kind: row.roster.kind, words: rosterWords(row.roster) },
-		move: row.move
+		move: row.move,
+		held: heldMoveWords(row, box.status)
 	};
 }
 

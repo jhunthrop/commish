@@ -459,7 +459,18 @@ function restTile(week: PlayerWeek, rest: RestParts | null, fallback: CardTile):
 /** The basis lines the week's read says, once each and short (the Waivers forms): the projection's
  * with its change's, then the evidence columns' scoring with the game facts' read while his game is
  * still to be played at `now`. A "--" says why on its own tile. */
-export function liveBasis(week: PlayerWeek, league: boolean, zone: string, now: number): string[] {
+export function liveBasis(
+	week: PlayerWeek,
+	league: boolean,
+	zone: string,
+	now: number,
+	listed = false
+): string[] {
+	const scoringWords = league
+		? 'your scoring'
+		: `${SCORING_WORDS[week.projection_scoring.format]} scoring`;
+	// A listed player's card draws no week figure (Lane 128): his basis says only what it shows.
+	if (listed) return [`${CARD.listedWeek} ${avgLastPart(scoringWords)}`];
 	// The card's page names no zone elsewhere, so each time says it (basis.ts, the one source).
 	const clock = { zone, zoned: true };
 	const proj = [
@@ -477,10 +488,7 @@ export function liveBasis(week: PlayerWeek, league: boolean, zone: string, now: 
 	]
 		.filter((said) => said !== null)
 		.join(' ');
-	const scoring = league
-		? 'your scoring'
-		: `${SCORING_WORDS[week.projection_scoring.format]} scoring`;
-	const evidence = `${OPP_PART} ${avgLastPart(scoring)}`;
+	const evidence = `${OPP_PART} ${avgLastPart(scoringWords)}`;
 	const facts = gamePart([week.line], clock, now, 'next') ?? kickedOffPartAt([week.line], now);
 	return [proj, facts === null ? evidence : `${evidence} ${facts}`];
 }
@@ -499,19 +507,21 @@ function headOf(week: PlayerWeek, zone: string, now: number): CardHead {
 function nextOf(
 	week: PlayerWeek,
 	zone: string,
-	now: number
+	now: number,
+	listed = false
 ): { cell: NextCell | null; next: LogNext | null } {
 	const { facts } = week.line;
 	const game = heldGame(gameOf(facts, week.line.player.team, zone, now));
 	if (game === null) return { cell: null, next: null };
-	const ahead = toPlay(facts, now);
+	// A listed player's game is not his (Lane 128): its expected score, weather and Proj are not drawn.
+	const ahead = toPlay(facts, now) && !listed;
 	const cell: NextCell = {
 		where: game.where,
 		when: game.when,
 		expected: ahead ? expectedWords(facts) : null,
 		weather: ahead ? weatherCell(facts) : null
 	};
-	const proj = week.line.week_projection;
+	const proj = listed ? null : week.line.week_projection;
 	return {
 		cell,
 		next: {
@@ -612,7 +622,7 @@ export function liveCard({
 		lastTile(week, opponents, fallback('last')),
 		deltaTile(week, zone, now)
 	].reduce<CardTile[]>((all, tile) => withTile(all, tile), [...tiles]);
-	const { cell, next } = nextOf(week, zone, now);
+	const { cell, next } = nextOf(week, zone, now, listed !== null);
 	const leagueVerb = league !== null && week.verb !== null ? week.verb : null;
 	const held = leagueVerb !== null && !verbFits(leagueVerb, lastKickoffs[week.week] ?? null, now);
 	const verb =
@@ -632,7 +642,7 @@ export function liveCard({
 		// Signed out in season no lineup or league verb fits either: Compare leads, not the sheet's add
 		// (Lane 100 fix round 1, M3).
 		compareLeads: held || (league === null && compareLeadsWithoutVerb(rest)),
-		basis: liveBasis(week, leagueVerb !== null, zone, now),
+		basis: liveBasis(week, leagueVerb !== null, zone, now, listed !== null),
 		rest: restAtClock,
 		formats: formatsOf(week, restAtClock),
 		tier: tierOf(week, restAtClock, tier),

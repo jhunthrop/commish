@@ -211,7 +211,9 @@
 	const weekTileHead = $derived(tiles.find((tile) => tile.key === 'proj')?.label ?? CARD.proj);
 	/** Every number's basis, once: the week's, the rest of season's, the season's. */
 	const basis = $derived([
-		...(live === null ? [unreadBasis(failed, weekTileHead)] : live.basis),
+		...(live === null
+			? [unreadBasis(failed, weekTileHead, page.status?.words.view.rank ?? null)]
+			: live.basis),
 		page.season.basis
 	]);
 </script>

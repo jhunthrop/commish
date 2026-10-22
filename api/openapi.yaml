@@ -4595,7 +4595,8 @@ components:
           description: >-
             the one move his row admits: add for a player no roster holds at a position the league starts, trade for a
             player on another roster whom the trade finder's best trade with his team brings in for the drafter, null
-            otherwise (and always for the drafter's own players)
+            otherwise (and always for the drafter's own players, and for a free agent Waivers neither lists nor
+            stashes, one on injured reserve with no return week among them)
     WeekOrderAdvice:
       type: object
       required: [week, position, basis_note, read_at, projection_read_at, projection_scoring, moves, rows]

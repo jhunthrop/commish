@@ -58,8 +58,10 @@ import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
 import { finalWords, rateWords, titleWeekHorizon, withRuleList } from './week.ts';
 import { lineupSpent, TURNED_WEEK, turnedLineup, turnedTrades, turnedWaivers } from './turn.ts';
 import {
+	irDropLine,
 	irDropLineup,
 	irDropWaivers,
+	waiversHold,
 	listedOnly,
 	restatedBeats,
 	seasonTakenWaivers,
@@ -645,6 +647,14 @@ function twoQbRows(rows: readonly OrderRow[]): OrderRow[] {
 		.map((row, i) => ({ ...row, rank: i + 1 }));
 }
 
+/** A league's order row as the API moves it (order.go moveOf, Lane 128): with the sense check's case
+ * stamped on his line when asked, and no add for a free agent Waivers neither lists nor stashes. */
+function leagueOrderRow(row: OrderRow): OrderRow {
+	const line = irDrop ? irDropLine(row.line) : row.line;
+	const move = row.move === 'add' && !waiversHold(line) ? null : row.move;
+	return { ...row, line, move };
+}
+
 /** The order's view as the API answers it (order.ts): one position ranked by its total (a stand-in
  * place: the fixture's own order of its stand-in totals, 1 to n among the players it holds), or every
  * position in order.json's order; a search's letters in the name or club;
@@ -677,7 +687,7 @@ function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
 	);
 	const rows = found
 		.slice(0, limit)
-		.map((row) => (league ? row : { ...row, roster: null, move: null }));
+		.map((row) => (league ? leagueOrderRow(row) : { ...row, roster: null, move: null }));
 	return {
 		...live,
 		// A league's order runs to its last week (words.go OrderScreenBasis, Lane 96); the read with no

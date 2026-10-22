@@ -398,6 +398,10 @@ if (!process.env.BYTES_ONLY && lineupScreen !== undefined) {
 				const listed = await shelf(page).locator('.tile').filter({ hasText: IR_CASE.week }).count();
 				if (listed !== IR_CASE.weekTiles)
 					faults.push(`${label}: ${String(listed)} tiles say "${IR_CASE.week}"`);
+				// His basis says only what his card shows (fix round 2).
+				const basis = await shelf(page).locator('.basis').innerText();
+				if (!basis.startsWith(CARD.listedWeek) || /published projection|Opp rank is/u.test(basis))
+					faults.push(`${label}: the basis reads "${basis}"`);
 				await page.screenshot({
 					path: new URL(`shelf-lineup-ir-${theme}-${String(size.width)}.png`, out).pathname
 				});

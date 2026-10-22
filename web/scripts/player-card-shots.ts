@@ -321,6 +321,12 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 				card.values[label] === NONE && card.captions[label] === onListWords('IR'),
 				`${where}: ${label} reads "${card.values[label] ?? ''}", "${card.captions[label] ?? ''}"`
 			);
+		// His basis says only what his card shows (fix round 2).
+		check(
+			(card.basis[0] ?? '').startsWith(CARD.listedWeek) &&
+				!/published projection|Opp rank is/u.test(card.basis.join(' ')),
+			`${where}: the basis reads "${card.basis.join(' ')}"`
+		);
 		check(
 			card.tierBox.includes(heldTierWords('injured_reserve')) && !/\bTier \d/.test(card.tierBox),
 			`${where}: the tier box places a held player: "${card.tierBox}"`

@@ -3619,7 +3619,7 @@ export interface components {
 			/** @description whose roster in the league holds him, null without a league */
 			roster: components['schemas']['RosterMark'] | null;
 			/**
-			 * @description the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players)
+			 * @description the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players, and for a free agent Waivers neither lists nor stashes, one on injured reserve with no return week among them)
 			 * @enum {string|null}
 			 */
 			move: 'add' | 'trade' | null;

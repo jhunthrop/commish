@@ -37,6 +37,12 @@ export function rankWord(status: DesignationStatus): string {
 	return RANK_WORDS[status];
 }
 
+/** "On IR": a listed player's word where a figure of his week would be (Lane 128): his week tiles,
+ * and the order's verb cell for a free agent with no return date. */
+export function onListWords(word: string): string {
+	return `On ${word}`;
+}
+
 /** "Questionable as of Thu 4:10 pm": the designation with when the report said so. */
 export function designationMark(
 	status: DesignationStatus,
