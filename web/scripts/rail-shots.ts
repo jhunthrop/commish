@@ -235,9 +235,11 @@ for (const theme of THEMES) {
 				if (many && (last.text !== 'Follow another league' || last.href !== '/league/new')) {
 					failures.push(`${where}: the last row is ${last.text} to ${String(last.href)}`);
 				}
+				// An account that may follow no more gets no row to follow another, and nothing says what
+				// more leagues come with (Lane 150).
 				if (
 					!many &&
-					(last.text.includes('Follow another league') || !last.text.includes('Draft Pass'))
+					(last.text.includes('Follow another league') || last.text.includes('Draft Pass'))
 				) {
 					failures.push(`${where}: the last row is ${last.text}`);
 				}
