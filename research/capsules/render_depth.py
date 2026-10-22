@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Final
 from research.capsules.facts.depth_model import Depth, Fixture, GamesMissed
 from research.capsules.page_figures import page_tenth_text
 from research.capsules.render_words import percent, ranked_clause, week_of, whole
-from research.free_agent import FREE_AGENT_WORDS
 from research.model.jsmath import js_to_fixed
 from research.pipeline.jscompat import js_string
 
@@ -314,10 +313,11 @@ def _prior_seasons(facts: "PlayerFacts") -> str | None:
 
 def _no_club(facts: "PlayerFacts") -> str | None:
     """A free agent's one line (Lane 127, B103): why the record holds no club's facts, his depth chart's
-    among them; None for a player on a club."""
+    among them; None for a player on a club. The sheet's Player line says "a free agent" (render.py
+    player_line), so this line does not say it again (review MEDIUM-3)."""
     if facts.identity.team is not None:
         return None
-    return f"Club: none, {FREE_AGENT_WORDS}, so the record holds no depth chart, play caller, offence or schedule."
+    return "Club: none, so the record holds no depth chart, play caller, offence or schedule."
 
 
 def render_depth_section(facts: "PlayerFacts") -> str | None:

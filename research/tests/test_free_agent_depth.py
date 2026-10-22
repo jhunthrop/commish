@@ -12,6 +12,7 @@ from research.capsules.facts.depth_collect import DepthOptions, _depth_for, _dep
 from research.capsules.facts.depth_model import EMPTY_DEPTH, PriorSeason
 from research.capsules.facts.depth_reads import DepthSlot
 from research.capsules.facts.depth_role import DepthRow
+from research.capsules.render import player_line
 from research.capsules.render_depth import render_depth_section
 from research.free_agent import FREE_AGENT_WORDS
 
@@ -82,14 +83,20 @@ def _facts(team: str | None, depth: object) -> "PlayerFacts":
     return cast("PlayerFacts", SimpleNamespace(identity=identity, depth=depth, season=None, product_season=2026))
 
 
-def test_the_record_says_a_free_agent_once_and_draws_no_depth_chart_line() -> None:
-    record = render_depth_section(_facts(None, _depth_for(_HIM, None, _pass({_HIM: None}))))
+def test_the_sheet_says_a_free_agent_once_and_the_record_draws_no_depth_chart_line() -> None:
+    """Review MEDIUM-3: the Player line says "a free agent" and the record, which says why it holds no
+    club's facts, does not say it again: once across both."""
+    facts = _facts(None, _depth_for(_HIM, None, _pass({_HIM: None})))
+    record = render_depth_section(facts)
     assert record is not None
-    assert record.count(FREE_AGENT_WORDS) == 1
+    said = player_line(facts) + "\n" + record
+    assert said.count(FREE_AGENT_WORDS) == 1
+    assert player_line(facts) == f"Player: Him, WR, {FREE_AGENT_WORDS}. Season: 2026."
+    assert "Club: none" in record
     assert "Depth chart" not in record
     assert "Season by season: 2025" in record
-    # Even with nothing else held, the free agent's line is the record.
+    # Even with nothing else held, the no-club line is the record, and says it no second time.
     bare = render_depth_section(_facts(None, EMPTY_DEPTH))
-    assert bare is not None and bare.count(FREE_AGENT_WORDS) == 1
+    assert bare is not None and "Club: none" in bare and FREE_AGENT_WORDS not in bare
     on_club = render_depth_section(_facts("KC", _depth_for(_HIM, "KC", _pass({_HIM: "KC"}))))
     assert on_club is not None and FREE_AGENT_WORDS not in on_club and "Depth chart" in on_club
