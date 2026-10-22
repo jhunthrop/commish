@@ -14,4 +14,5 @@ export const clubRunId = (run: ClubRun): string => `2026-10-21T12-${run}`;
  * writes it on Monday night of week 6, and the two records' runs by mode (Lane 114). */
 export const RECORD_SHAPE_RUN_ID = '2026-10-21T12-live-shape';
 export const RECORD_LIVE_RUN_ID = '2026-10-21T12-live-week6';
-export const recordTwoRunId = (mode: 'upcoming' | 'graded'): string => `2026-10-21T12-two-${mode}`;
+export const recordTwoRunId = (mode: 'upcoming' | 'graded' | 'published'): string =>
+	`2026-10-21T12-two-${mode}`;

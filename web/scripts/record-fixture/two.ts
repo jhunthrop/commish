@@ -7,10 +7,13 @@
 //   lines and players are week 2's from the live record with ADP's figures relabelled as ESPN's and ADP
 //   removed, so the weekly table, its ESPN column, the league recount and the front card can be shot
 //   before any week of weekly rankings exists. Its figures are not a grade of anything.
+//   `published` is the same STAND-IN with the week's published projection graded beside ESPN (Lane
+//   142): its figures are week 1's ADP lines relabelled, so the front card's two yardsticks can be
+//   shot. They are not a grade of anything either.
 import { readFile } from 'node:fs/promises';
 import type { RecordLine, RecordWeek, RunRecord } from '../../src/lib/run/schema.ts';
 
-export type TwoMode = 'upcoming' | 'graded';
+export type TwoMode = 'upcoming' | 'graded' | 'published';
 
 const FROM_WEEK = 7;
 const SET_AT = '2026-10-22T18:00:00.000Z';
@@ -31,7 +34,13 @@ function asEspn(line: RecordLine): RecordLine {
 	};
 }
 
-function gradedStandIn(source: RecordWeek): RecordWeek {
+/** A line with the published projection's figures from another week's ADP at its position. */
+function withPublished(line: RecordLine, from: readonly RecordLine[]): RecordLine {
+	return { ...line, published: from.find((f) => f.position === line.position)?.adp ?? null };
+}
+
+function gradedStandIn(source: RecordWeek, published: readonly RecordLine[] | null): RecordWeek {
+	const lines = source.lines.map(asEspn);
 	return {
 		...source,
 		week: FROM_WEEK,
@@ -39,7 +48,7 @@ function gradedStandIn(source: RecordWeek): RecordWeek {
 		gradedAt: GRADED_AT,
 		order: 'rest_of_season',
 		orderAsOf: '2026-10-22T09:00:00.000Z',
-		lines: source.lines.map(asEspn),
+		lines: published === null ? lines : lines.map((line) => withPublished(line, published)),
 		players: source.players?.map((p) => ({ ...p, espn: p.adp, adp: null, published: null }))
 	};
 }
@@ -49,11 +58,13 @@ export async function withTwoRecords(record: RunRecord, mode: TwoMode): Promise<
 	const draft = await json(new URL('draft-live.json', import.meta.url));
 	const later = record.weeks.filter((week) => week.week > FROM_WEEK);
 	const seven = record.weeks.find((week) => week.week === FROM_WEEK);
+	const one = record.weeks.find((week) => week.week === 1);
 	const two = record.weeks.find((week) => week.week === 2);
-	if (seven === undefined || two === undefined)
-		throw new Error('the live record lacks week 2 or week 7');
-	const first = mode === 'graded' ? gradedStandIn(two) : seven;
-	const toDate = mode === 'graded' ? first.lines : [];
+	if (seven === undefined || one === undefined || two === undefined)
+		throw new Error('the live record lacks week 1, 2 or 7');
+	const graded = mode !== 'upcoming';
+	const first = graded ? gradedStandIn(two, mode === 'published' ? one.lines : null) : seven;
+	const toDate = graded ? first.lines : [];
 	return {
 		...record,
 		draft,
@@ -61,11 +72,10 @@ export async function withTwoRecords(record: RunRecord, mode: TwoMode): Promise<
 			fromWeek: FROM_WEEK,
 			statistic: record.statistic,
 			scale: record.scale,
-			startersBasis: mode === 'graded' ? record.startersBasis : null,
-			method:
-				mode === 'graded'
-					? "From week 7 we set our weekly rankings before each week's first kickoff and graded them on the week's points, beside ESPN's projection on the same players."
-					: "From week 7 we set our weekly rankings before each week's first kickoff and graded them on the week's points.",
+			startersBasis: graded ? record.startersBasis : null,
+			method: graded
+				? "From week 7 we set our weekly rankings before each week's first kickoff and graded them on the week's points, beside ESPN's projection on the same players."
+				: "From week 7 we set our weekly rankings before each week's first kickoff and graded them on the week's points.",
 			honest: null,
 			weeks: [first, ...later],
 			toDate

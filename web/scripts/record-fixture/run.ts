@@ -9,7 +9,7 @@
 //
 // Usage: node scripts/record-fixture/run.ts   writes web/.runs/runs/2026-10-21T12-live-shape/
 // then build with PUBLIC_RUN_BASE_URL=.runs PUBLIC_RUN_ID=2026-10-21T12-live-shape.
-//        node scripts/record-fixture/run.ts two [upcoming|graded]   (Lane 114, two.ts) writes
+//        node scripts/record-fixture/run.ts two [upcoming|graded|published]   (Lane 114, two.ts) writes
 // web/.runs/runs/2026-10-21T12-two-<mode>/: the live record with the draft and weekly records.
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { manifestSchema, recordSchema, RUN_PATHS } from '../../src/lib/run/schema.ts';
@@ -24,7 +24,8 @@ import {
  * week 6 (record-live.json): weeks 1 and 2 graded with their players, 3 to 5 not set, 6 waiting.
  * `two` (Lane 114) is the live record with its two records beside it. */
 const TWO = process.argv[2] === 'two';
-const TWO_MODE: TwoMode = process.argv[3] === 'graded' ? 'graded' : 'upcoming';
+const TWO_MODE: TwoMode =
+	process.argv[3] === 'graded' || process.argv[3] === 'published' ? process.argv[3] : 'upcoming';
 const LIVE = process.argv[2] === 'live' || TWO;
 const RECORD_SHOTS_RUN = TWO
 	? recordTwoRunId(TWO_MODE)
