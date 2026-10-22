@@ -148,8 +148,9 @@ function sideProj(
 
 /** What a box side the platform lists no starters for draws from our best lineup of its roster (an
  * FFPC opponent; basis.ts UnlistedDrawn): its Proj before kickoff (Lane 137, B107), its Proj final
- * while it plays (Lane 127 fix round 1), said once in the basis; nothing once it is final, where it
- * draws "--", or for a side listing starters. */
+ * while it plays (Lane 127 fix round 1), said once in the basis; with no roster read for it either, its
+ * "--" under either (noRoster, Lane 141, B121); nothing once it is final, for a best lineup drawing
+ * "--", or for a side listing starters. */
 export function matchupUnlisted(
 	box: Pick<
 		MatchupBoxSide,
@@ -157,9 +158,14 @@ export function matchupUnlisted(
 	> | null,
 	totals: Pick<BoxTotals, 'proj' | 'final' | 'live' | 'allFinal'>
 ): UnlistedDrawn {
-	if (box === null || box.starters.length > 0 || box.projection_best_lineup !== true)
-		return NONE_UNLISTED;
-	const figure = !totals.live ? totals.proj : totals.allFinal ? null : totals.final;
+	if (box === null || box.starters.length > 0) return NONE_UNLISTED;
+	// Once final the side draws its total, so neither figure is drawn (finalNonePart keys a "--" total).
+	if (totals.live && totals.allFinal) return NONE_UNLISTED;
+	const figure = totals.live ? totals.final : totals.proj;
+	// No roster read for him either: his Proj or Proj final reads "--", said in its own sentence, as
+	// the League page says it, never the starters' "No Proj final while..." (Lane 141, B121).
+	if (box.projection_best_lineup !== true)
+		return figure === null ? { ...NONE_UNLISTED, noRoster: true } : NONE_UNLISTED;
 	if (figure === null) return NONE_UNLISTED;
 	return {
 		bestLineup: true,
@@ -167,6 +173,19 @@ export function matchupUnlisted(
 		paced: totals.live && box.projected_final_paced === true,
 		skipped: box.best_lineup_skipped === true
 	};
+}
+
+/** Whether a Team row under way draws its Proj final "--" that the starters' key explains (basis.ts
+ * NO_PROJ_FINAL_PART): the member's, or an opponent's but one with no lineup or roster read, whose
+ * "--" its own sentence says (matchupUnlisted noRoster, Lane 141, B121). */
+export function matchupNoFinal(
+	mine: Pick<BoxTotals, 'live' | 'final'> | null,
+	theirs: Pick<BoxTotals, 'live' | 'final'> | null,
+	theirsUnlisted: Pick<UnlistedDrawn, 'noRoster'>
+): boolean {
+	const missing = (s: Pick<BoxTotals, 'live' | 'final'> | null): boolean =>
+		s !== null && s.live && s.final === null;
+	return missing(mine) || (missing(theirs) && !theirsUnlisted.noRoster);
 }
 
 /** A side's box: the API's rows when it answered for the side, else the league read's starters with

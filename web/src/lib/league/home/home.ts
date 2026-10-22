@@ -17,15 +17,14 @@ import { hostWords } from '../names.ts';
 import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
 import {
 	AS_OF_KICKOFF,
-	unlistedLong,
-	unlistedPhoneForm,
 	leagueScoringWords,
 	finalNonePart,
 	NONE_UNLISTED,
 	projFinalPhone,
 	unlistedPart,
 	teBonusSentence,
-	type UnlistedDrawn
+	type UnlistedDrawn,
+	type UnlistedForm
 } from '../box/basis.ts';
 
 type ScoreboardGame = Scoreboard['games'][number];
@@ -945,6 +944,16 @@ export function standingsBasis(
 	return `Standings follow ${platform}'s record, ${tiebreakWords(platform, terms)}. ${HOME.pointsFor} and ${HOME.pointsAgainst} are points for and against, ${HOME.streak} the current run${waiverBasis(platform, terms)}.`;
 }
 
+/** What a crowded phone leaves out of the team sentences (week-basis.ts): FFPC's tight end extra, "as
+ * of kickoff", and the FFPC teams' words said whole or short (UnlistedForm). */
+export interface TeamCuts {
+	teBonus: boolean;
+	asOf: boolean;
+	unlistedForm: UnlistedForm;
+}
+
+export const NO_TEAM_CUTS: TeamCuts = { teBonus: false, asOf: false, unlistedForm: 'full' };
+
 /** What a team's Proj and Pts are on the scoreboard and in the standings, short enough that the
  * page's basis keeps to eight lines on a phone (Lane 108, B82): the scoring in the words every
  * league screen's Proj sentence uses (leagueScoringWords). */
@@ -965,15 +974,13 @@ export function teamBasis(
 	finalNone = false,
 	/** What the sides the platform lists no starters for draw (unlistedDrawn): each said once. */
 	unlisted: UnlistedDrawn = NONE_UNLISTED,
-	/** The width it is said at: a phone with the teams' words long (unlistedLong) leaves FFPC's tight
-	 * end extra and "as of kickoff" to the desk and says the teams' words short (unlistedPhoneForm),
-	 * never a drawn figure's sentence (Lane 137 fix round 1, HIGH-2). */
-	width: 'desk' | 'phone' = 'desk'
+	/** What a crowded phone leaves to the desk (week-basis.ts, by the room left, Lane 141 B121), never a
+	 * drawn figure's sentence (Lane 137 fix round 1, HIGH-2); a desk cuts nothing. */
+	cuts: TeamCuts = NO_TEAM_CUTS
 ): string {
 	const platform = hostWords(host);
 	const team = byPlayer ? `, ${BOX.totals} adds the rows` : '';
-	const crowded = width === 'phone' && unlistedLong(unlisted);
-	const bonus = scoring.league_own || crowded ? null : teBonusSentence(scoring.te_bonus, host);
+	const bonus = scoring.league_own || cuts.teBonus ? null : teBonusSentence(scoring.te_bonus, host);
 	const whose = leagueScoringWords(scoring, host);
 	const when =
 		readAt === null
@@ -984,12 +991,12 @@ export function teamBasis(
 	const words = [
 		projFinalPhone(projFinal, missing),
 		finalNone ? finalNonePart(host) : '',
-		unlistedPart(host, unlisted, crowded ? unlistedPhoneForm(unlisted) : 'full')
+		unlistedPart(host, unlisted, cuts.unlistedForm)
 	]
 		.filter((w) => w !== '')
 		.join(' ');
 	const final = words === '' ? '' : ` ${words}`;
 	const extra = bonus === null ? '' : ` ${bonus}`;
-	const asOf = started && !crowded;
+	const asOf = started && !cuts.asOf;
 	return `A team's ${BOX.proj} adds its starters' published projections${whose}, ${when}${asOf ? `, ${AS_OF_KICKOFF}` : ''}.${extra} ${BOX.pts} are ${platform}'s so far${team}.${final}`;
 }

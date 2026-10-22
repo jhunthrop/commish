@@ -193,6 +193,17 @@ export function bestLineupProj(
  * 2 v 6 have none, and 3 v 9 one, so the week-wide rule draws beside the roster rule on one board. */
 export const FFPC_ROSTERLESS: ReadonlySet<number> = new Set([4, 8, 2, 6, 9]);
 
+/** FIXTURE_FFPC_ROSTERLESS_OPPONENT=1 (Lane 141, B121): the member's opponent is a team FFPC's rosters
+ * page carries no roster for too, so his Matchup side reads "--" under Proj and Proj final and its
+ * key says why. */
+export const FFPC_ROSTERLESS_OPPONENT_VARIABLE = 'FIXTURE_FFPC_ROSTERLESS_OPPONENT';
+
+/** The teams the stand-in's rosters page carries no roster for: FFPC_ROSTERLESS, and the member's
+ * opponent where asked (FFPC_ROSTERLESS_OPPONENT_VARIABLE). */
+export function ffpcRosterless(opponent: number | null, asked: boolean): ReadonlySet<number> {
+	return asked && opponent !== null ? new Set([...FFPC_ROSTERLESS, opponent]) : FFPC_ROSTERLESS;
+}
+
 /** A club's game of the week as the stored schedule holds it (data/games.json). */
 interface WeekGame {
 	opponent: string | null;
@@ -227,6 +238,8 @@ function weekLines(template: PlayerLine): PlayerLine[] {
 export interface RecordedRosters {
 	matchups: readonly SleeperMatchup[];
 	lines: ReadonlyMap<string, PlayerLine>;
+	/** The teams FFPC's rosters page carries none for (ffpcRosterless); FFPC_ROSTERLESS absent. */
+	rosterless?: ReadonlySet<number>;
 }
 
 /** A Matchup side's whole roster, its starters and its bench. */
@@ -243,7 +256,7 @@ function rosterReads(
 	const boxed = new Map(matchup.sides.map((s) => [s.roster_id, boxRoster(s)] as const));
 	const players = new Map(recorded.matchups.map((m) => [m.roster_id, m.players] as const));
 	return (rosterId) => {
-		if (FFPC_ROSTERLESS.has(rosterId)) return null;
+		if ((recorded.rosterless ?? FFPC_ROSTERLESS).has(rosterId)) return null;
 		const roster =
 			boxed.get(rosterId) ??
 			(players.get(rosterId) ?? []).flatMap((id) => recorded.lines.get(id) ?? []);
@@ -267,7 +280,11 @@ function ffpcScoreboard(
 	ffpc: Pick<FfpcWeek, 'lineup' | 'matchup'>,
 	moment: Pick<Moment, 'now' | 'final'>,
 	recorded: RecordedRosters
-): { scoreboard: Scoreboard; stateOf: (rosterId: number) => GameState } {
+): {
+	scoreboard: Scoreboard;
+	stateOf: (rosterId: number) => GameState;
+	rosters: (rosterId: number) => readonly PlayerLine[] | null;
+} {
 	const me = week.sync.me;
 	const listed = ffpc.matchup.sides.find((s) => s.roster_id === me)?.starters.map((st) => st.line);
 	const template = listed?.[0];
@@ -306,7 +323,7 @@ function ffpcScoreboard(
 		projection_scoring: ffpc.lineup.projection_scoring,
 		games: week.scoreboard.games.map(gameOf)
 	};
-	return { scoreboard, stateOf };
+	return { scoreboard, stateOf, rosters };
 }
 
 /** The FFPC stand-in before its Sunday (Lane 127, B105): the recorded week's Saturday answers as FFPC's,
@@ -318,14 +335,14 @@ export function ffpcBeforeSunday(
 	recorded: RecordedRosters
 ): FfpcWeek {
 	const ffpc = ffpcStandIn(week);
-	const { scoreboard, stateOf } = ffpcScoreboard(week, ffpc, moment, recorded);
+	const { scoreboard, stateOf, rosters } = ffpcScoreboard(week, ffpc, moment, recorded);
 	// The Matchup's opponent unlisted as FFPC's read holds him from Thursday night on too (Lane 137,
 	// B107 and its addendum): his Proj the board's best lineup, both teams' points the board's, as one
 	// read holds them.
 	return {
 		...ffpc,
 		sync: boardPoints(ffpc.sync, scoreboard),
-		matchup: unlistedMatchup(ffpc.matchup, week.sync.me, scoreboard, stateOf),
+		matchup: unlistedMatchup(ffpc.matchup, week.sync.me, scoreboard, stateOf, rosters),
 		scoreboard
 	};
 }
@@ -353,7 +370,8 @@ function unlistedMatchup(
 	matchup: MatchupBox,
 	me: number,
 	scoreboard: Scoreboard,
-	stateOf: (rosterId: number) => GameState
+	stateOf: (rosterId: number) => GameState,
+	rosters: (rosterId: number) => readonly PlayerLine[] | null
 ): MatchupBox {
 	const boardSide = (rosterId: number): ScoreboardSide | undefined =>
 		scoreboard.games.flatMap((g) => g.sides).find((s) => s.roster_id === rosterId);
@@ -376,7 +394,8 @@ function unlistedMatchup(
 			return {
 				...s,
 				starters: [],
-				bench: boxRoster(s),
+				// Every player the rosters page carries for him, none where it carries no roster (Lane 141).
+				bench: rosters(s.roster_id) === null ? [] : boxRoster(s),
 				// No starter of his to count (matchup.go toPlay over none).
 				to_play: null,
 				projected_final: board?.projected_final ?? null,
@@ -403,7 +422,7 @@ export function ffpcAfterSunday(
 ): FfpcWeek {
 	const ffpc = ffpcStandIn(week);
 	const me = week.sync.me;
-	const { scoreboard, stateOf } = ffpcScoreboard(week, ffpc, moment, recorded);
+	const { scoreboard, stateOf, rosters } = ffpcScoreboard(week, ffpc, moment, recorded);
 	const done = ffpc.lineup.week_done_state ?? null;
 	return {
 		...ffpc,
@@ -411,7 +430,7 @@ export function ffpcAfterSunday(
 			...ffpc.lineup,
 			week_done_state: done === null ? null : weekDoneState(scoreboard, me, done === 'final')
 		},
-		matchup: unlistedMatchup(ffpc.matchup, me, scoreboard, stateOf),
+		matchup: unlistedMatchup(ffpc.matchup, me, scoreboard, stateOf, rosters),
 		scoreboard
 	};
 }

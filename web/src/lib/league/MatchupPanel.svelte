@@ -4,10 +4,12 @@
 	import BoxBasis from './box/BoxBasis.svelte';
 	import { sheetTags } from './sheet-tags.ts';
 	import { BOX } from './box/box.ts';
+	import { NONE_UNLISTED } from './box/basis.ts';
 	import { KICKOFF } from './box/kickoff.ts';
 	import {
 		decidedHead,
 		matchupFinal,
+		matchupNoFinal,
 		matchupStarted,
 		matchupUnlisted,
 		nextKickoff,
@@ -94,6 +96,16 @@
 	const mine = $derived(matchup ? boxOf(matchup.mine) : null);
 	const theirs = $derived(matchup?.opponent ? boxOf(matchup.opponent) : null);
 	const lines = $derived([...(mine?.lines ?? []), ...(theirs?.lines ?? [])]);
+	/** What the opponent's Team row draws where the platform lists him no starters (an FFPC opponent):
+	 * his best lineup's figure, or "--" with no roster read, said once in the key. */
+	const theirsUnlisted = $derived(
+		theirs === null
+			? NONE_UNLISTED
+			: matchupUnlisted(
+					box?.sides.find((b) => b.roster_id === matchup?.opponent?.roster_id) ?? null,
+					theirs.totals
+				)
+	);
 	/** The bug's middle, "Decided" while the side behind has nobody left (the API's, Lane 99 B31). */
 	const kickoff = $derived(
 		decidedHead(
@@ -205,17 +217,12 @@
 			projection={box ? { readAt: box.projection_read_at, scoring: box.projection_scoring } : null}
 			{lines}
 			kicked={started}
-			noFinal={[mine, theirs].some((s) => s !== null && s.totals.live && s.totals.final === null)}
+			noFinal={matchupNoFinal(mine.totals, theirs?.totals ?? null, theirsUnlisted)}
 			allFinal={[mine, theirs].every((s) => s === null || s.totals.allFinal)}
 			finalNone={[mine, theirs].some(
 				(s) => s !== null && s.totals.live && s.totals.allFinal && s.totals.pts === null
 			)}
-			unlisted={theirs === null
-				? undefined
-				: matchupUnlisted(
-						box?.sides.find((b) => b.roster_id === matchup.opponent?.roster_id) ?? null,
-						theirs.totals
-					)}
+			unlisted={theirsUnlisted}
 			lineup={null}
 			now={now.getTime()}
 		/>

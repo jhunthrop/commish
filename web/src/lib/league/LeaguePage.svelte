@@ -27,7 +27,7 @@
 	import { inSeasonApi, type LineupAdvice, type Scoreboard } from './inseason/api.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
-	import { gamePart, unlistedLong } from './box/basis.ts';
+	import { leagueWeekParts, weekBasisText } from './home/week-basis.ts';
 	import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 	import { BENCH_ANCHOR } from './box/lineup.ts';
 	import RosterPanel from './RosterPanel.svelte';
@@ -39,18 +39,12 @@
 	import {
 		HOME,
 		bugsOf,
-		bugsMissListedFinal,
-		bugsPlayingListed,
-		bugsFinalNone,
-		unlistedDrawn,
 		projectedFinalOf,
 		feedRows,
 		lineupSummary,
 		movesBasis,
 		projections,
-		standingsBasis,
-		standingsRows,
-		teamBasis
+		standingsRows
 	} from './home/home.ts';
 	import {
 		POLL_MS,
@@ -286,44 +280,26 @@
 	/** What every number on the in-season page is, said once in one paragraph, at most five lines at a
 	 * desk and eight on a phone (Lane 108, B82: merged so no sentence ends a short line): the standings,
 	 * a team's projection and points, the game facts. A feed the platform gives us none of is not
-	 * drawn, so the basis says nothing of it (Lane 104, B54). A desk's and a phone's (Lane 137 fix
-	 * round 1): the phone says qualifications short where the FFPC teams' words run long. */
-	function weekBasisAt(width: 'desk' | 'phone'): string {
-		if (!sync) return '';
-		const unlisted = unlistedDrawn(bugs);
-		return [
-			standingsBasis(sync.host, sync.terms),
-			scoreboard
-				? teamBasis(
-						sync.host,
-						scoreboard.projection_read_at,
-						scoreboard.projection_scoring,
-						advice?.player_points ?? false,
-						memberZone(),
-						bugs.some((b) => b.state !== 'upcoming'),
-						bugsMissListedFinal(bugs),
-						bugsPlayingListed(bugs),
-						bugsFinalNone(bugs),
-						unlisted,
-						width
-					)
-				: null,
-			// The season panel names the zone once, so the read's time does not repeat it. Where the FFPC
-			// teams' words carry the pace clause, the Game cell's read alone (the Lineup says what the cell
-			// is, Lane 127 fix round 3); on a phone too where they run long (Lane 137 fix round 1).
-			advice
-				? gamePart(
-						advice.slots.flatMap((s) => (s.host ? [s.host] : [])),
-						{ zone: memberZone(), zoned: false },
-						now.getTime(),
-						unlisted.paced || (width === 'phone' && unlistedLong(unlisted)) ? 'read' : 'full'
-					)
-				: null
-		]
-			.filter((line): line is string => line !== null)
-			.join(' ');
-	}
-	const weekBasis = $derived({ desk: weekBasisAt('desk'), phone: weekBasisAt('phone') });
+	 * drawn, so the basis says nothing of it (Lane 104, B54). A desk's and a phone's: the phone makes its
+	 * cuts by the room left where the FFPC teams' words run long (week-basis.ts, Lane 141, B121). */
+	const weekParts = $derived(
+		sync
+			? leagueWeekParts({
+					sync,
+					scoreboard,
+					playerPoints: advice?.player_points ?? false,
+					gameLines: advice ? advice.slots.flatMap((s) => (s.host ? [s.host] : [])) : null,
+					bugs,
+					now: now.getTime(),
+					zone: memberZone()
+				})
+			: null
+	);
+	const weekBasis = $derived(
+		weekParts
+			? { desk: weekBasisText(weekParts, 'desk'), phone: weekBasisText(weekParts, 'phone') }
+			: { desk: '', phone: '' }
+	);
 	/** Before the draft and after the season: the scoring the board's figures are in. */
 	const boardBasis = $derived(
 		board && sync

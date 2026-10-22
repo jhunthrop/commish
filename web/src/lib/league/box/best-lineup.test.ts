@@ -19,6 +19,7 @@ import type {
 	WaiverAdvice
 } from '../inseason/api.ts';
 import { bugsOf, teamBasis, unlistedDrawn } from '../home/home.ts';
+import { weekBasisText } from '../home/week-basis.ts';
 import {
 	boxBasisParts,
 	drawnText,
@@ -222,7 +223,8 @@ void test('a crowded phone cuts qualifications, never the Game or Proj final sen
 	assert.equal(unlistedLong({ ...best, noRoster: true }), true);
 	assert.equal(unlistedLong({ ...best, paced: true }), true);
 	assert.equal(unlistedLong({ ...NONE_UNLISTED, noRoster: true }), false);
-	// The two FFPC sentences as one only where the second joins a pace clause or a skip (the ruling).
+	// The two FFPC sentences as one only where the second joins the pace clause (the ruling); beside a
+	// skip alone, or no clause, they stay two.
 	assert.equal(unlistedPhoneForm({ ...best, noRoster: true }), 'short');
 	assert.equal(unlistedPhoneForm({ ...best, noRoster: true, paced: true }), 'one');
 	assert.equal(
@@ -234,19 +236,30 @@ void test('a crowded phone cuts qualifications, never the Game or Proj final sen
 		/, in-play players at pace\.$/
 	);
 	const crowded = { ...best, paced: true, noRoster: true };
+	// A phone with no room left (Lane 141, B121: the cuts by the room, every one made here).
 	const basis = (drawn: typeof best, width: 'desk' | 'phone') =>
-		teamBasis(
-			'ffpc',
-			null,
-			friday.scoreboard.projection_scoring,
-			false,
-			ZONE,
-			true,
-			false,
-			true,
-			false,
-			drawn,
-			width
+		weekBasisText(
+			{
+				standings: '',
+				team: (cuts) =>
+					teamBasis(
+						'ffpc',
+						null,
+						friday.scoreboard.projection_scoring,
+						false,
+						ZONE,
+						true,
+						false,
+						true,
+						false,
+						drawn,
+						cuts
+					),
+				game: null,
+				unlisted: drawn
+			},
+			width,
+			{ lines: 1, chars: 10 }
 		);
 	// The desk says everything; the crowded phone leaves "as of kickoff" and the tight end's extra to
 	// it, keeps the Proj final sentence and says the teams in one sentence.
