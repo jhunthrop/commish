@@ -377,7 +377,12 @@ export const recordWeekSchema = z
 		/** A graded week's players, for counting the starters a league's own lineup calls right (Lane
 		 * 93): each order's place among the week's graded players (null where it has no stance on him)
 		 * and his place in the finish, in the finish's order. Absent before Lane 93. */
-		players: z.array(placedPlayerSchema).optional()
+		players: z.array(placedPlayerSchema).optional(),
+		/** When ESPN's projection for the week was read after our weekly rankings were set, or not read
+		 * before its first kickoff: one sentence the weekly record prints as written under the week's
+		 * row (Lane 146, Amendment 6). Absent on a week with nothing to say and on every run before
+		 * Lane 146. */
+		espnNote: phrase.optional()
 	})
 	.superRefine((week, ctx) => {
 		const froze = week.status === 'graded' || week.status === 'frozen';

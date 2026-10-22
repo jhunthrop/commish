@@ -1,6 +1,8 @@
 // The two records (Lane 114): run with `npm test`.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { BYE_WORDS } from '#lib/format/bye.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { RAIL_ITEMS, WEEK_RANKINGS_KEY, weekRankingsWord } from '#lib/ui/nav.ts';
@@ -564,4 +566,43 @@ void test('the weekly record names its weeks and its order as weekly rankings, n
 	assert.equal(weeklySpan(shown), 'Week 7');
 	assert.equal(weeklyOrderWords(gradedSeven), 'Our weekly rankings, set Oct 22');
 	assert.equal(weeklyOrderWords(upcoming(8, '2026-10-30T00:15:00.000Z')), null);
+});
+
+void test("a week carries the run's ESPN sentence as written, and a run before Lane 146 parses without one (Lane 147)", () => {
+	const noted = { ...gradedSeven, espnNote: RECORDS_WORDS.espnReadAfter };
+	const eight = { ...gradedSeven, week: 8 };
+	const shown = weeklyAsRecord(run({ weekly: weekly([noted, eight]) }));
+	assert.ok(shown);
+	assert.equal(shown.weeks[0]?.espnNote, RECORDS_WORDS.espnReadAfter);
+	assert.equal(shown.weeks[1]?.espnNote, undefined);
+	// The previous run has no field: every week parses with nothing to draw (the deploy pair).
+	const old = weeklyAsRecord(run({ weekly: weekly([gradedSeven]) }));
+	assert.ok(old);
+	assert.ok(old.weeks.every((week) => week.espnNote === undefined));
+	// A sentence the web does not know is printed as the run wrote it, never rewritten.
+	const other = weeklyAsRecord(
+		run({ weekly: weekly([{ ...gradedSeven, espnNote: 'Read late.' }]) })
+	);
+	assert.equal(other?.weeks[0]?.espnNote, 'Read late.');
+	assert.throws(() => run({ weekly: weekly([{ ...gradedSeven, espnNote: '' }]) }));
+	for (const words of [RECORDS_WORDS.espnReadAfter, RECORDS_WORDS.espnUnread]) {
+		assert.doesNotMatch(words, bannedPattern(), words);
+		assert.doesNotMatch(words, /—/u, words);
+	}
+});
+
+/** A Python string constant as written in the run's word table, its adjacent literals joined. */
+function pythonConstant(source: string, name: string): string {
+	const body = new RegExp(`^${name}: Final = \\(\\n([\\s\\S]*?)\\n\\)`, 'mu').exec(source)?.[1];
+	assert.ok(body, `${name} is not in the run's word table`);
+	return [...body.matchAll(/"([^"]*)"/gu)].map((match) => match[1]).join('');
+}
+
+void test("the word table's ESPN sentences are the run's own, word for word (Lane 147)", () => {
+	const source = readFileSync(
+		fileURLToPath(new URL('../../../../research/nightly/reads/weekly_record.py', import.meta.url)),
+		'utf8'
+	);
+	assert.equal(pythonConstant(source, 'ESPN_READ_AFTER_NOTE'), RECORDS_WORDS.espnReadAfter);
+	assert.equal(pythonConstant(source, 'ESPN_UNREAD_NOTE'), RECORDS_WORDS.espnUnread);
 });

@@ -268,8 +268,9 @@
 			{/if}
 			{#each rows as row (row.lead)}
 				{@const line = row.week?.lines.find((l) => l.position === position)}
+				{@const note = head === null ? undefined : row.week?.espnNote}
 				{#if row.week !== null && row.week.status === 'graded'}
-					<tr>
+					<tr class:noted={note !== undefined}>
 						<td class="wk"
 							>{row.lead}{#if row.week.order}<span class="ord">{orderOf(row.week)}</span>{/if}</td
 						>
@@ -278,7 +279,7 @@
 						<td class="st">{capitalized(row.text)}</td>
 					</tr>
 				{:else}
-					<tr class="quiet" class:live={row.week !== null}>
+					<tr class="quiet" class:live={row.week !== null} class:noted={note !== undefined}>
 						<td class="wk"
 							>{row.lead}{#if row.week?.order}<span class="ord">{orderOf(row.week)}</span>{/if}</td
 						>
@@ -286,6 +287,14 @@
 						     other is display: none, so the status is read once. -->
 						<td class="st wide desk" colspan={spans.desk}>{capitalized(row.text)}</td>
 						<td class="st wide narrow" colspan={spans.narrow}>{capitalized(row.text)}</td>
+					</tr>
+				{/if}
+				{#if note !== undefined}
+					<!-- The week's ESPN sentence as the run wrote it (Lane 147), its basis said once under
+					     its row: one cell per width, as the status rows draw it. -->
+					<tr class="note">
+						<td class="desk" colspan={1 + spans.desk}>{note}</td>
+						<td class="narrow" colspan={1 + spans.narrow}>{note}</td>
 					</tr>
 				{/if}
 			{/each}

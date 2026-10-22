@@ -57,7 +57,14 @@ export const RECORDS_WORDS = {
 	/** A first week with no date on file yet. */
 	setUnknown: 'set before its first kickoff',
 	espnBasis:
-		"ESPN's is its own public projection in PPR, read before our order was set, on its players with an ESPN id.",
+		"ESPN's is its own public projection in PPR, read before the week's first kickoff, on its players with an ESPN id.",
+	/** The weekly run's two ESPN sentences (Lane 146, research/nightly/reads/weekly_record.py), here
+	 * for the copy guard and the stand-in run only: the page prints a week's espnNote as the run wrote
+	 * it, never these. */
+	espnReadAfter:
+		"ESPN's projection this week was read after our weekly rankings were set, still before the first kickoff.",
+	espnUnread:
+		"ESPN's projection was not read before this week's first kickoff, so the week is graded against the week's published projection alone.",
 	/** The season-long rule in a player's words (C16). */
 	seasonLong:
 		'A player put on IR or another season-long list after we set the order is still graded at the rank we set.',
