@@ -162,6 +162,15 @@ def test_the_read_asks_for_the_weeks_projected_splits_on_ppr_defaults() -> None:
     assert wanted["filterStatsForScoringPeriodIds"]["value"] == [7]
 
 
+def test_the_pool_filter_carries_a_sort_beside_its_limit() -> None:
+    # ESPN answers 400 FILTER_LIMIT_MISSING_SORT to a limit without a sort (checked 2026-10-22).
+    wanted = json.loads(projections.pool_headers(7)["X-Fantasy-Filter"])["players"]
+    assert "limit" in wanted
+    sorts = {key: value for key, value in wanted.items() if key.startswith("sort")}
+    assert sorts, "a limit needs a sort"
+    assert all(isinstance(value, dict) and "sortPriority" in value for value in sorts.values())
+
+
 def test_a_read_is_kept_and_the_freeze_takes_the_newest_at_or_before_it(engine: Engine) -> None:
     early, late = _SET - timedelta(hours=30), _SET - timedelta(minutes=30)
     with engine.connect() as conn:

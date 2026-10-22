@@ -7,6 +7,8 @@ projects with no sign-in, each with one stat split per scoring period and source
 week W of season S is the split with `seasonId` S, `scoringPeriodId` W, `statSourceId` 1 (projected) and
 `statSplitTypeId` 1 (one scoring period); its `appliedTotal` is the PPR points as the defaults score
 them (checked 2026-10-20: the week 7 totals equal the PPR sum of the split's own stats to a tenth).
+The filter's limit travels with a sort (checked 2026-10-22: a limit needs a sort, ESPN answers 400
+FILTER_LIMIT_MISSING_SORT without one); the order is irrelevant, every projected player is kept.
 
 The in-season pass reads the coming week once per pass, before its freeze (`season_week`), so the
 Thursday 14:00 Eastern pass that sets the order keeps a read taken minutes before it. Every read is kept
@@ -51,6 +53,8 @@ def pool_headers(week: int) -> dict[str, str]:
             "filterStatsForSplitTypeIds": {"value": [ONE_PERIOD_SPLIT]},
             "filterStatsForScoringPeriodIds": {"value": [week]},
             "limit": POOL_LIMIT,
+            # The sort ESPN's own client sends; a limit without a sort is refused.
+            "sortPercOwned": {"sortPriority": 1, "sortAsc": False},
         }
     }
     return {"X-Fantasy-Filter": json.dumps(wanted, separators=(",", ":")), "Accept": "application/json"}
