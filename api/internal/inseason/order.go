@@ -85,10 +85,9 @@ func parseOrderQuery(r *http.Request, league bool) (orderQuery, map[string]strin
 // 66m).
 var orderPositions = map[draft.Position]bool{draft.QB: true, draft.RB: true, draft.WR: true, draft.TE: true}
 
-// ranked is the view's players in our order with each one's place in it:
-// at a position his position rank, across positions his place by points
-// over replacement.
-func (a *advisor) ranked(position draft.Position) ([]boards.Player, []int) {
+// ranked is the view's players in our order: at a position by his
+// position rank, across positions by points over replacement.
+func (a *advisor) ranked(position draft.Position) []boards.Player {
 	var players []boards.Player
 	for _, p := range a.Board.Raw.Players {
 		if (position == "" || p.Position == position) && orderPositions[p.Position] && a.starts(p.Position) {
@@ -99,11 +98,7 @@ func (a *advisor) ranked(position draft.Position) ([]boards.Player, []int) {
 		sort.SliceStable(players, func(i, j int) bool {
 			return a.Board.PositionRanks[players[i].ID] < a.Board.PositionRanks[players[j].ID]
 		})
-		ranks := make([]int, len(players))
-		for i, p := range players {
-			ranks[i] = a.Board.PositionRanks[p.ID]
-		}
-		return players, ranks
+		return players
 	}
 	sort.SliceStable(players, func(i, j int) bool {
 		vi, hi := a.Board.Values[players[i].ID]
@@ -113,11 +108,42 @@ func (a *advisor) ranked(position draft.Position) ([]boards.Player, []int) {
 		}
 		return hi && vi > vj
 	})
-	ranks := make([]int, len(players))
-	for i := range players {
+	return players
+}
+
+// playingFirst is the order with every player on a season-long list
+// (Facts.SeasonLong: injured reserve, PUP, NFI, suspended, out for the
+// season, the platform's IR mark) after every available one, each group
+// kept in its order and numbered on from the last available place (Lane
+// 128): the in-season order never ranks him as playing (the 2026-10-16
+// ruling), so his row draws the list's word in place of its number.
+func (a *advisor) playingFirst(players []boards.Player, hosts map[string]string) ([]boards.Player, []int) {
+	var playing, listed []boards.Player
+	for _, p := range players {
+		if a.seasonLong(p, hosts) {
+			listed = append(listed, p)
+		} else {
+			playing = append(playing, p)
+		}
+	}
+	ordered := append(playing, listed...)
+	ranks := make([]int, len(ordered))
+	for i := range ordered {
 		ranks[i] = i + 1
 	}
-	return players, ranks
+	return ordered, ranks
+}
+
+// seasonLong is whether a board player is on a season-long list as his
+// line reads it: the capture's designation, or the platform's IR mark on
+// the roster that holds him.
+func (a *advisor) seasonLong(p boards.Player, hosts map[string]string) bool {
+	hostIR := false
+	if hostID, rostered := hosts[p.ID]; rostered {
+		hostIR = a.Player(hostID).InjuredReserve
+	}
+	d := a.season.designation(Player{BoardID: p.ID, Team: p.Team, Position: p.Position, HostIR: hostIR, ReadAt: a.Snap.ReadAt})
+	return d != nil && d.SeasonLong
 }
 
 // matches is whether a search's letters are in his name or his club,
@@ -289,7 +315,7 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 		out.ReadAt = &readAt
 		hosts = a.hostIDs()
 	}
-	players, ranks := a.ranked(q.position)
+	players, ranks := a.playingFirst(a.ranked(q.position), hosts)
 	for i, p := range players {
 		if !matches(p, q.q) || (q.roster != "" && a.rosterMark(p.ID).Kind != q.roster) {
 			continue

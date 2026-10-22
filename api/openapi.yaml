@@ -3520,6 +3520,13 @@ components:
             on a page addressing the week after the platform's (Lane 95): a week's designation listed no later than his
             club's last game, or undated, so still listed but from before that game; the site says it with its listing
             date ("Out, listed Oct 12"); absent otherwise
+        season_long:
+          type: boolean
+          description: >-
+            true when the status keeps him off the field for weeks the rest-of-season figure counts (injured reserve,
+            PUP, NFI, suspended, out with the capture's note saying out for the season, the platform's own IR mark):
+            the in-season order places him after every available player, his line carries no rank and no week
+            figure is his (Lane 128); absent otherwise and from an older answer
         return_week:
           type: integer
           nullable: true

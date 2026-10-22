@@ -36,7 +36,7 @@ func listedAdd(p person) bool {
 	if d == nil {
 		return true
 	}
-	if seasonLongLists[d.Status] {
+	if seasonLongLists[d.Status] || d.SeasonLong {
 		return false
 	}
 	return d.Status != boards.StatusOut || d.CarriedOver || d.Pending

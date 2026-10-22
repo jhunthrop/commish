@@ -310,7 +310,9 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 		check(card.pill.includes(shot.held), `${where}: the pill does not say ${shot.held}`);
 		const rest = card.captions[PROJECTED] ?? card.captions[REST] ?? '';
 		check(
-			rest.includes(`${shot.held}, unranked while on a season-long list`) &&
+			// Unranked, the list left to the pill beside it (Lane 128 fix round 1, LOW-4).
+			rest.includes('unranked while on a season-long list') &&
+				!rest.includes(shot.held) &&
 				!/\d+ in our order/.test(rest),
 			`${where}: the rest tile ranks a held player: "${rest}"`
 		);

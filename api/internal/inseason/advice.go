@@ -492,6 +492,10 @@ func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
 			carried := true
 			out.Designation.CarriedOver = &carried
 		}
+		if d.SeasonLong {
+			long := true
+			out.Designation.SeasonLong = &long
+		}
 	}
 	for _, g := range f.LastGames {
 		out.LastGames = append(out.LastGames, apitypes.GamePoints{Week: g.Week, Points: roundTenth(g.Points), Source: sourceOf(g)})

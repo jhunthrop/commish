@@ -96,7 +96,7 @@
 			{@const href = moveHref(row, league?.id ?? null, tabHref)}
 			{@const rank = row.box.evidence.oppRank}
 			<tr class:mine={row.roster?.kind === 'yours'}>
-				<td class="n rank">{row.rank}</td>
+				<td class="n rank">{row.place}</td>
 				<td class="player">
 					<BoxPlayer row={row.box} tags={tagsOf(row.box.boardId)}>
 						{#snippet after()}<span class="ph-mark">{@render mark(row, 'fold')}</span>{/snippet}

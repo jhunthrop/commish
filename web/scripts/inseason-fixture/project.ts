@@ -152,7 +152,12 @@ const SEASON_LONG = new Map(
 function designated(line: PlayerLine): PlayerLine {
 	const listed = line.player.board_id === null ? undefined : SEASON_LONG.get(line.player.board_id);
 	if (listed !== undefined) {
-		const designation = { status: listed.status, as_of: CAPTURE.readAt, since: listed.since };
+		const designation = {
+			status: listed.status,
+			as_of: CAPTURE.readAt,
+			since: listed.since,
+			season_long: true
+		};
 		return { ...line, position_rank: null, facts: { ...line.facts, designation } };
 	}
 	const status = DESIGNATIONS[line.player.name];

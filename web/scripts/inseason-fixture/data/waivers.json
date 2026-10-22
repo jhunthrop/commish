@@ -198,7 +198,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -287,7 +288,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-28T22:00:00.000Z"
+						"since": "2026-09-28T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -332,7 +334,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -466,7 +469,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -549,7 +553,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-10-12T19:00:00.000Z"
+						"since": "2026-10-12T19:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -604,7 +609,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -732,7 +738,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -866,7 +873,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -1000,7 +1008,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -1134,7 +1143,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -1274,7 +1284,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -1414,7 +1425,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -1548,7 +1560,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -1688,7 +1701,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -1822,7 +1836,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -2072,7 +2087,8 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T22:00:00.000Z"
+						"since": "2026-09-24T22:00:00.000Z",
+						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
@@ -2851,7 +2867,8 @@
 				"designation": {
 					"status": "injured_reserve",
 					"as_of": "2026-10-14T02:03:35.613Z",
-					"since": "2026-09-24T22:00:00.000Z"
+					"since": "2026-09-24T22:00:00.000Z",
+					"season_long": true
 				},
 				"played": false,
 				"points_this_week": null,
@@ -2905,7 +2922,8 @@
 				"designation": {
 					"status": "injured_reserve",
 					"as_of": "2026-10-14T02:03:35.613Z",
-					"since": "2026-10-01T22:00:00.000Z"
+					"since": "2026-10-01T22:00:00.000Z",
+					"season_long": true
 				},
 				"played": false,
 				"points_this_week": null,

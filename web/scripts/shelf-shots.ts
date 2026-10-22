@@ -386,7 +386,9 @@ if (!process.env.BYTES_ONLY && lineupScreen !== undefined) {
 				const rank = await rowRank(page, IR_CASE.slug);
 				if (rank !== null) faults.push(`${label}: his row ranks him ${rank}`);
 				const proj = opener(page, IR_CASE.slug).locator('xpath=ancestor::tr[1]').locator('td.proj');
-				if ((await proj.count()) > 0 && (await proj.first().innerText()).trim() !== NONE)
+				// His row draws its Proj cell, and it is "--" (review LOW-2: never passing with no cell).
+				if ((await proj.count()) === 0) faults.push(`${label}: his row draws no Proj cell`);
+				else if ((await proj.first().innerText()).trim() !== NONE)
 					faults.push(`${label}: his row's Proj reads "${await proj.first().innerText()}"`);
 				await openShelf(page, 'pointer', IR_CASE.slug);
 				await check(page, lineupScreen, label, size.width, rank);

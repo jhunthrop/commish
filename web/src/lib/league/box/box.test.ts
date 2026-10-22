@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
+import { onListWords } from '#lib/format/designation.ts';
 import type { LeaguePlayer } from '../api.ts';
 import type { PlayerLine, WeekFacts } from '../inseason/api.ts';
 import {
@@ -244,6 +245,27 @@ void test('a row on a season-long list carries no rank, whatever the API sends (
 		NOW
 	);
 	assert.equal(pup.pill?.rank, null);
+	// The one list (fix round 1, MEDIUM-1): suspended by itself, and an out the API flags as for the
+	// season; his pill says the list ("WR Susp"), his week is not his.
+	const susp = boxRow(
+		line({}, { designation: { status: 'suspended', as_of: asOf } }),
+		'WR',
+		ZONE,
+		true,
+		NOW
+	);
+	assert.deepEqual([susp.pill?.rank, susp.status?.rank, susp.proj], [null, 'Susp', null]);
+	const season = boxRow(
+		line({}, { designation: { status: 'out', as_of: asOf, season_long: true } }),
+		'WR',
+		ZONE,
+		true,
+		NOW
+	);
+	assert.deepEqual([season.pill?.rank, season.status?.rank, season.proj], [null, 'Out', null]);
+	assert.equal(onListWords('Susp'), 'On Susp');
+	assert.equal(onListWords('Out'), 'Out for the season');
+	assert.equal(onListWords('IR'), 'On IR');
 	for (const status of ['questionable', 'doubtful', 'out'] as const) {
 		const week = boxRow(line({}, { designation: { status, as_of: asOf } }), 'QB', ZONE, true, NOW);
 		assert.equal(week.pill?.rank, 7, status);

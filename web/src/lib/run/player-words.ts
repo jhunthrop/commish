@@ -61,19 +61,22 @@ const BELOW_THE_AVAILABLE = 'He sits below the available players.';
 /** A held player's tier box in place of his tier mates (Lane 128, B106): the list he is on and that
  * he is not ranked, since the in-season order never ranks a player on injured reserve as playing.
  * Why (his figure assumes he plays) is said once, in his status note at the top of the page. */
-const HELD_TIER_WORDS: Readonly<Record<DesignationStatus, string>> = {
+const HELD_TIER_WORDS: Readonly<Record<HeldStatus, string>> = {
 	injured_reserve: 'On IR, not ranked',
 	pup: 'On PUP, not ranked',
 	nfi: 'On NFI, not ranked',
 	suspended: 'Suspended, not ranked',
-	out: 'Out for the season, not ranked',
-	// Never a season-long list: a week's designation keeps his tier.
-	doubtful: 'Doubtful, not ranked',
-	questionable: 'Questionable, not ranked'
+	out: 'Out for the season, not ranked'
 };
 
-/** "On IR, not ranked": the tier box of a player on a season-long list. */
+/** The statuses a season-long list can be (format/designation.ts): a week's questionable or doubtful
+ * never is. */
+type HeldStatus = Exclude<DesignationStatus, 'questionable' | 'doubtful'>;
+
+/** "On IR, not ranked": the tier box of a player on a season-long list; a week's status has none. */
 export function heldTierWords(status: DesignationStatus): string {
+	if (status === 'questionable' || status === 'doubtful')
+		throw new Error(`A ${status} player is on no season-long list.`);
 	return HELD_TIER_WORDS[status];
 }
 

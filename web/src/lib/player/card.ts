@@ -71,15 +71,23 @@ export interface RestParts {
 	board: BoardFormat | null;
 }
 
-/** His rank at his position in words: the number in our order, or Lane 63's word for a player on a
- * season-long list, who is never given the rank his figure would earn. */
+/** A listed player's rest-of-season caption in place of his rank: the pill beside it says the list
+ * (Lane 128 fix round 1, LOW-4). */
+const UNRANKED_WHILE_LISTED = 'unranked while on a season-long list';
+
+/** His rank at his position in words: the number in our order, or for a player on a season-long
+ * list, who is never given the rank his figure would earn, that he is unranked. */
 export function restRankWords(position: string, shown: number | string): string {
 	return typeof shown === 'number'
 		? `${position}${String(shown)} in our order`
-		: `${position} ${shown}, unranked while on a season-long list`;
+		: UNRANKED_WHILE_LISTED;
 }
 
 /** The card's words that are not a player's, in one place for the copy guard. */
+/** The Opp rank and change tiles' heads, which the listed basis names too. */
+const OPP_HEAD = 'Opp rank';
+const DELTA_HEAD = 'Δ Proj';
+
 export const CARD = {
 	/** The verbs the league's screens give him (week-words.ts verbOf): starting him, the way to the
 	 * lineup once his game is locked or he starts already (Lane 85 fix round 3, M-D). */
@@ -92,10 +100,10 @@ export const CARD = {
 	readOnOpen: 'Read as the page opens',
 	rest: 'Rest of season',
 	projected: FIGURE.projected,
-	opp: 'Opp rank',
+	opp: OPP_HEAD,
 	avg: FIGURE.avg,
 	last: 'Last',
-	delta: 'Δ Proj',
+	delta: DELTA_HEAD,
 	compare: 'Compare',
 	week: 'Week',
 	/** The season read's stamp, after its day: the page shows that read only before the season's
@@ -131,8 +139,8 @@ export const CARD = {
 	/** The game log's collapsed earlier seasons (review M8). */
 	earlierSeasons: 'Earlier seasons',
 	/** A listed player's basis in place of the week's figures his card does not draw (Lane 128): his
-	 * Wk, Opp rank and Δ Proj tiles say "On IR". */
-	listedWeek: 'Wk, Opp rank and Δ Proj are his once he is back.',
+	 * Wk, Opp rank and Δ Proj tiles say "On IR"; composed from the tiles' heads. */
+	listedWeek: `${FIGURE.week}, ${OPP_HEAD} and ${DELTA_HEAD} are his once he is back.`,
 	/** The waiver verb where we know no page of the platform's: our own screen, named as ours. */
 	findOnWaivers: 'Find him on Waivers'
 } as const;
@@ -150,7 +158,7 @@ export function listedTiles(tiles: readonly CardTile[], word: string | null): Ca
 					...tile,
 					value: NONE,
 					caption: onListWords(word),
-					tone: tile.key === 'opp' ? null : tile.tone
+					tone: tile.key === 'delta' ? 'quiet' : null
 				}
 			: tile
 	);

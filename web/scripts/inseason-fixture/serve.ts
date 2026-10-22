@@ -61,6 +61,7 @@ import {
 	irDropLine,
 	irDropLineup,
 	irDropWaivers,
+	seasonLongLine,
 	waiversHold,
 	listedOnly,
 	restatedBeats,
@@ -677,8 +678,14 @@ function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
 							(a.rest_of_season_points ?? Number.NEGATIVE_INFINITY)
 					)
 					.map((row, i) => ({ ...row, rank: i + 1 }));
+	// Every player on a season-long list after every available one, numbered on from them (order.go
+	// playingFirst, Lane 128 fix round 1).
+	const playingFirst = [
+		...ranked.filter((row) => !seasonLongLine(row.line)),
+		...ranked.filter((row) => seasonLongLine(row.line))
+	].map((row, i) => ({ ...row, rank: i + 1 }));
 	const roster = params.get('roster');
-	const found = ranked.filter(
+	const found = playingFirst.filter(
 		(row) =>
 			(roster === null || row.roster?.kind === roster) &&
 			(q.length < MIN_SEARCH ||

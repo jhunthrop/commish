@@ -14,6 +14,7 @@ import {
 	designationWord,
 	rankWord,
 	seasonLongMark,
+	seasonLongStatus,
 	sitsHim,
 	type DesignationStatus
 } from '#lib/format/designation.ts';
@@ -246,9 +247,6 @@ export interface BoxStarter {
 	row: BoxRow;
 }
 
-/** The season-long lists: their word stands in his rank ("RB IR"), as on the board. */
-const SEASON_LONG = new Set<DesignationStatus>(['injured_reserve', 'pup', 'nfi']);
-
 /** His status as Lane 63's pill draws it, the week's designation first, else the host's injured
  * reserve. A season-long list's chip is the board's (Lane 66n): "IR since Sep 28" from the API's
  * start of his run under it, or "IR" alone when the API knows none (the host's own mark). */
@@ -260,7 +258,8 @@ export function statusOf(
 	const status: DesignationStatus | null =
 		designation?.status ?? (hostIR ? 'injured_reserve' : null);
 	if (status === null) return null;
-	const seasonLong = SEASON_LONG.has(status);
+	// The one season-long list (format/designation.ts), the API's flag for an out for the season.
+	const seasonLong = seasonLongStatus(status, designation?.season_long === true);
 	return {
 		rank: seasonLong ? rankWord(status) : null,
 		// A listing carried over from a game already played says its date (Lane 95), never hidden.

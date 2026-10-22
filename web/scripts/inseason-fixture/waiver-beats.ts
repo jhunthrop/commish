@@ -11,6 +11,7 @@
 // Achane's verb is Stash.
 import type { components } from '../../src/lib/api/types.ts';
 import type { LineupAdvice, WaiverAdvice, WaiverRow } from '../../src/lib/league/inseason/api.ts';
+import { seasonLongStatus } from '../../src/lib/format/designation.ts';
 import { addKey } from '../../src/lib/league/inseason/move.ts';
 import { roundTenth } from './tenths.ts';
 import { seasonStarters } from './week.ts';
@@ -49,15 +50,22 @@ const ACCEPTS: Readonly<Record<string, readonly string[]>> = {
 	DEF: ['DEF']
 };
 
-/** The season-long lists (waiver_beats.go seasonLongLists). */
-const SEASON_LONG = new Set(['injured_reserve', 'pup', 'nfi']);
+/** A line on a season-long list (the API's Facts.SeasonLong, the web's one list, Lane 128): his
+ * status by itself or as the API flags it, or the platform's IR mark. */
+export function seasonLongLine(line: PlayerLine): boolean {
+	const d = line.facts.designation;
+	return (
+		line.player.injured_reserve ||
+		(d !== null && seasonLongStatus(d.status, d.season_long === true))
+	);
+}
 
 /** Whether the table lists a free agent (waiver_stash.go listedAdd; a pending dating is never on the
  * wire, so the stand-in has none). */
 export function listedAdd(line: PlayerLine): boolean {
 	const d = line.facts.designation;
 	if (d === null) return true;
-	if (SEASON_LONG.has(d.status)) return false;
+	if (seasonLongStatus(d.status, d.season_long === true)) return false;
 	return d.status !== 'out' || d.carried_over === true;
 }
 
