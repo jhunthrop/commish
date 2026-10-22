@@ -107,7 +107,7 @@ func (s *Service) customer(ctx context.Context, a auth.Account) (string, error) 
 }
 
 func (s *Service) checkout(w http.ResponseWriter, r *http.Request) {
-	if !s.available(w, r) {
+	if !s.sells(w, r) {
 		return
 	}
 	var in apitypes.CheckoutRequest
