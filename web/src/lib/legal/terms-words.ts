@@ -25,7 +25,7 @@ export const TERMS: LegalDoc = {
 			head: 'What Commish is',
 			paragraphs: [
 				[
-					'Commish is draft prep and in-season research for fantasy football: our rankings and projections, a page for every player, mock drafts, a cheat sheet, and the weekly tools for the leagues you follow. Every figure is our own estimate, worked out to help you decide. None of it is a promise of how a player or a team will do.'
+					'Commish is draft prep and in-season research for fantasy football: our rankings and projections, a page for every player, mock drafts, a cheat sheet, and the weekly tools for the leagues you follow. Our rankings, projections and reads are our own estimates, worked out to help you decide. The other figures are named for what they are: the published projection for the week, ADP, and the stats the season records. None of it is a promise of how a player or a team will do.'
 				]
 			]
 		},
@@ -65,7 +65,7 @@ export const TERMS: LegalDoc = {
 			head: 'Our figures and the data behind them',
 			paragraphs: [
 				[
-					'The site, its rankings, projections and written reads are ours. You may share a link or quote a figure with credit to Commish.'
+					'The site and our rankings, our projections and our written reads are ours. You may share a link or quote a figure with credit to Commish.'
 				],
 				[CREDIT.before, { text: CREDIT.licenceWords, to: 'licence' }, CREDIT.after]
 			]

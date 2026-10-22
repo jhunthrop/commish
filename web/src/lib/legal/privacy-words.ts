@@ -61,10 +61,10 @@ export const PRIVACY: LegalDoc = {
 			head: 'Cookies and your browser',
 			paragraphs: [
 				[
-					'When you sign in we set one session cookie, with a second that guards your requests against forgery. Both last 30 days or until you sign out. While you sign in, a cookie holds your place for ten minutes. A mock draft you start without signing in is kept yours by a cookie for up to 90 days, and moves to your account when you sign in.'
+					'When you sign in we set one session cookie, with a second that guards your requests against forgery. Both last 30 days and renew each day you use the site, until you sign out. While you sign in, a cookie holds your place for ten minutes. A mock draft you start without signing in is kept yours by a cookie for up to 90 days, and moves to your account when you sign in.'
 				],
 				[
-					'Your theme and a copy of your cheat sheet are kept in your browser, not with us. Signed in, your sheet is kept with your account too.'
+					'Your theme, your screen settings and copies of your cheat sheet and your leagues are kept in your browser, not with us. Signed in, your sheet is kept with your account too.'
 				],
 				[
 					'We run no analytics and no ad scripts. We never give or rent your information to anyone for advertising.'
@@ -75,7 +75,7 @@ export const PRIVACY: LegalDoc = {
 			head: 'Who handles it for us',
 			paragraphs: [
 				[
-					'A sign-in service checks your email and password. A cloud runs our servers and the database that keeps your account. An edge network serves the site, its pages and the files you export. Each handles your information only to run Commish for us.'
+					'A sign-in service signs you in, and sees your email, the address you sign in from and your browser. A cloud runs our servers and the database that keeps your account. An edge network serves the site, its pages and the files you export. Each handles your information only to run Commish for us.'
 				],
 				[
 					'Our servers log each request, with the address it came from, to keep the site running and safe.'
@@ -96,7 +96,7 @@ export const PRIVACY: LegalDoc = {
 				[
 					'Write to ',
 					support,
-					' from the email you sign in with, and we delete your account and everything kept with it, your platform connections first, and write back when it is done. A verb to do it yourself on the account page is coming.'
+					' from the email you sign in with, and we delete your account and everything kept with it, your platform connections first, and write back when it is done.'
 				]
 			]
 		},

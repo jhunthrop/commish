@@ -1,6 +1,7 @@
 /** The licence minimum (founder ruling 2026-10-15): the nflverse feeds are CC BY 4.0 and FTN's
  * charting via nflverse is CC BY-SA 4.0, and both licences ask for the licence, the source and the
  * note that the figures were changed, where the data appears. The player page prints this one line
+ * (Credit.svelte, written as markup and held to these words by credit.test.ts)
  * at its foot, where the charted figures are, and the Terms of Service print it where they name our
  * figures (Lane 151). No other page prints a credit. */
 

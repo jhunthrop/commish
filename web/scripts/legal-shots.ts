@@ -3,8 +3,9 @@
 // and the built site, in both themes at 1440, 1280 and 390, the browser on the fixture API's clock.
 // On each legal page it asserts the draft note, the title, the operator and the contact, the copy
 // guard over the page, and no sideways scroll. Under the front door, a player page (its verb pinned
-// on a phone), Our record, the board, the Terms and the account page, signed out and signed in, it
-// asserts one footer with the Terms, the Privacy Policy and the contact, in at most two drawn lines
+// on a phone), Our record, the board, the account page, a followed league's page (its lineup verb
+// pinned on a phone, the page's bottom shot whole), a new mock draft and the not-found page, signed
+// out and signed in where each is read, it asserts one footer with the Terms, the Privacy Policy and the contact, in at most two drawn lines
 // (inside Lane 138's budgets, five at a desk and eight in a hand), nothing drawn over it once the
 // page is scrolled to its end, and the copy guard over it. On the account page it asserts the foot's
 // deletion sentence with the contact. Exits non-zero on any fault.
@@ -18,6 +19,8 @@ import { SUPPORT_EMAIL } from '../src/lib/legal/contact.ts';
 import { DRAFT_NOTE } from '../src/lib/legal/legal-doc.ts';
 import { FOOT } from '../src/lib/legal/foot-words.ts';
 import { ACCOUNT_FOOT } from '../src/lib/account/foot-words.ts';
+import { ERROR_WORDS } from '../src/lib/site/error-words.ts';
+import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { basisLines } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { installFixtureApiClock } from './inseason-fixture/clock.ts';
@@ -49,13 +52,44 @@ const LEGAL: readonly LegalPage[] = [
 	{ name: 'privacy', path: '/privacy', title: 'Privacy Policy' }
 ];
 
-/** The pages the footer is checked under, each with words that say it has drawn. */
-const CLOSED: readonly { name: string; path: string; ready: string }[] = [
-	{ name: 'front', path: '/', ready: 'Commish LLC' },
-	{ name: 'player', path: '/players/puka-nacua', ready: 'Puka Nacua' },
-	{ name: 'record', path: '/record', ready: 'Commish LLC' },
-	{ name: 'board', path: '/board', ready: 'Commish LLC' },
-	{ name: 'account', path: '/account', ready: ACCOUNT_FOOT.before.trim() }
+interface Closed {
+	name: string;
+	path: string;
+	/** Words that say the page has drawn. */
+	ready: string;
+	/** Who reads it. */
+	who: readonly Who[];
+	/** The page pins its verb above the tab bar on a phone (data-pin), so the footer keeps its room. */
+	pinned?: boolean;
+	/** The page's whole length is shot too: its bottom, under the footer. */
+	whole?: boolean;
+}
+
+const BOTH: readonly Who[] = ['signed-out', 'signed-in'];
+
+/** The pages the footer is checked under: prerendered ones, the Worker-drawn league and mock pages,
+ * and the prerendered not-found page. */
+const CLOSED: readonly Closed[] = [
+	{ name: 'front', path: '/', ready: 'Commish LLC', who: BOTH },
+	{ name: 'player', path: '/players/puka-nacua', ready: 'Puka Nacua', who: ['signed-out'] },
+	{ name: 'record', path: '/record', ready: 'Commish LLC', who: ['signed-out'] },
+	{ name: 'board', path: '/board', ready: 'Commish LLC', who: ['signed-out'] },
+	{ name: 'account', path: '/account', ready: ACCOUNT_FOOT.before.trim(), who: BOTH },
+	{
+		name: 'league',
+		path: `/league/${FIXTURE_IDS.league}`,
+		ready: 'Commish LLC',
+		who: ['signed-in'],
+		pinned: true,
+		whole: true
+	},
+	{ name: 'mock', path: '/mock/new', ready: 'Commish LLC', who: BOTH },
+	{
+		name: 'not-found',
+		path: '/no-such-page',
+		ready: ERROR_WORDS.notFound.lead,
+		who: ['signed-out']
+	}
 ];
 
 await mkdir(out, { recursive: true });
@@ -173,17 +207,19 @@ async function shootLegal(theme: Theme, width: number, doc: LegalPage): Promise<
 	await ctx.close();
 }
 
-async function shootClosed(
-	theme: Theme,
-	width: number,
-	who: Who,
-	closed: (typeof CLOSED)[number]
-): Promise<void> {
+async function shootClosed(theme: Theme, width: number, who: Who, closed: Closed): Promise<void> {
 	const where = `${closed.name} ${who} ${theme} ${String(width)}`;
 	const ctx = await context(theme, width, who);
 	const page = await ctx.newPage();
 	await page.goto(`${web}${closed.path}`, { waitUntil: 'networkidle' });
 	await ready(page, closed.ready);
+	if (closed.pinned === true && width <= PHONE_MAX) {
+		// The pin must be drawn for the room under the footer to be tested at all.
+		const pin = page.locator('[data-pin]').filter({ visible: true }).first();
+		await pin.waitFor({ timeout: READY_TIMEOUT_MS }).catch(() => {
+			fault(where, 'no verb pinned above the tab bar was drawn');
+		});
+	}
 	await checkFooter(page, where, width);
 	if (closed.name === 'account') {
 		const foot = await page.locator(`section[aria-label="${ACCOUNT_FOOT.label}"]`).innerText();
@@ -199,6 +235,10 @@ async function shootClosed(
 	const name = `foot-${closed.name}-${who}-${theme}-${String(width)}`;
 	await page.screenshot({ path: file(name) });
 	process.stdout.write(`${file(name)}\n`);
+	if (closed.whole === true) {
+		await page.screenshot({ path: file(`${name}-whole`), fullPage: true });
+		process.stdout.write(`${file(`${name}-whole`)}\n`);
+	}
 	await ctx.close();
 }
 
@@ -206,10 +246,7 @@ for (const theme of THEMES) {
 	for (const width of WIDTHS) {
 		for (const doc of LEGAL) await shootLegal(theme, width, doc);
 		for (const closed of CLOSED) {
-			await shootClosed(theme, width, 'signed-out', closed);
-			if (closed.name === 'account' || closed.name === 'front') {
-				await shootClosed(theme, width, 'signed-in', closed);
-			}
+			for (const who of closed.who) await shootClosed(theme, width, who, closed);
 		}
 	}
 }

@@ -68,3 +68,14 @@ void test('there is no /data page any more, while the data files stay', () => {
 	assert.equal(existsSync(join(built, 'data.html')), false);
 	assert.equal(existsSync(join(built, 'data/run.txt')), true);
 });
+
+void test("Credit.svelte's markup is the credit, word for word, linking the licence", () => {
+	const markup = readFileSync(join(WEB, 'src/lib/site/Credit.svelte'), 'utf8');
+	const body = /<Footnote\s*>([\s\S]*?)<\/Footnote\s*>/.exec(markup)?.[1] ?? '';
+	assert.equal(/<a\s+href="([^"]+)"/.exec(body)?.[1], CREDIT_LICENCE_HREF);
+	const words = body
+		.replace(/<[^>]+>/g, '')
+		.replace(/\s+/g, ' ')
+		.trim();
+	assert.equal(words, creditSentence());
+});
