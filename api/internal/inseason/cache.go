@@ -53,10 +53,12 @@ const (
 	PairMaxAge       = 2 * time.Hour
 )
 
-// The cache keys of the capture alone and of the dated pair.
+// The cache keys of the capture alone, of the dated pair, and of a
+// request's lookup of the shared dating.
 const (
 	captureKey = "designations/capture"
 	datedKey   = "designations"
+	sharedKey  = "designations/shared/"
 )
 
 // Cache keeps the reads for their TTLs, each read once however many
@@ -76,6 +78,10 @@ type Cache struct {
 	// Context is the server's: a refresh behind runs on it, so shutdown
 	// cancels it (main's); nil is context.Background.
 	Context context.Context
+	// Datings is the capture datings every instance shares (Lane 133):
+	// read before a capture is dated, written once one is. Nil dates each
+	// capture in this process alone.
+	Datings Datings
 
 	group   singleflight.Group
 	mu      sync.Mutex
@@ -87,6 +93,10 @@ type Cache struct {
 	draining   bool
 	failed     map[string]time.Time
 	refreshes  sync.WaitGroup
+	// sharedTried is the digest of the last capture whose shared dating a
+	// request looked for, so a capture no instance has dated yet costs the
+	// requests one lookup, not one each.
+	sharedTried string
 }
 
 type entry struct {
@@ -162,75 +172,6 @@ func (c *Cache) Projection(ctx context.Context, season, week int) (boards.WeekPr
 	return cached(c, ctx, fmt.Sprintf("projection/%d/%d", season, week), CaptureTTL, func(ctx context.Context) (boards.WeekProjection, error) {
 		return c.Reads.WeekProjection(ctx, season, week)
 	})
-}
-
-// DatedDesignations is the newest injury capture with each designation's
-// run start (Listed) and each season-long one dated by it: the in-season
-// screens' read and the board route's (solo.DesignationSource), kept for
-// CaptureTTL.
-//
-// A capture and its dating are one value, read together and refreshed
-// behind together (Lane 112 fix round 1): the previous pair answers until
-// the new pair lands, so a request never waits on an hourly capture and is
-// never handed a capture without its own dating. An undated week's status
-// reads as carried over on a turned week (Season.carriedOver), so a status
-// new this hour must never be served undated while its date can be read.
-//
-// No request waits on a dating (Lane 129): with no pair kept, or the one
-// kept past PairMaxAge, the capture alone answers marked DatingPending
-// (Lane 116, B91), so a row says the designation alone, never "still
-// listed" or carried over, while its dating is read behind it; a dating
-// that fails is tried again DatingRetryAfter later, never by each request.
-func (c *Cache) DatedDesignations(ctx context.Context) (map[string]boards.Designation, error) {
-	if e, ok := c.kept(datedKey); ok && c.Now().Sub(e.at) <= PairMaxAge {
-		if c.Now().Sub(e.at) > CaptureTTL {
-			c.dateBehind(c.readDated)
-		}
-		return e.value.(map[string]boards.Designation), nil
-	}
-	capture, err := cached(c, ctx, captureKey, CaptureTTL, c.Reads.Designations)
-	if err != nil {
-		return nil, err
-	}
-	c.dateBehind(func(ctx context.Context) (map[string]boards.Designation, error) {
-		return c.dated(ctx, capture)
-	})
-	return boards.DatingPending(capture), nil
-}
-
-// dateBehind reads the dated pair behind the requests (refreshBehind)
-// under the dating's own bound and retry.
-func (c *Cache) dateBehind(read func(context.Context) (map[string]boards.Designation, error)) {
-	refreshBehind(c, datedKey, refresh{
-		timeout: c.datingTimeout(), retryAfter: DatingRetryAfter,
-		failed: "inseason: the designation runs were not read; the statuses answer pending until the next try",
-	}, read)
-}
-
-// readDated reads the newest capture and then its runs, the capture dated
-// by them. The capture is kept on its own as well, so a pair past
-// PairMaxAge gives way to the newest capture read, not the one the cache
-// started from.
-func (c *Cache) readDated(ctx context.Context) (map[string]boards.Designation, error) {
-	designations, err := c.Reads.Designations(ctx)
-	if err != nil {
-		return nil, err
-	}
-	c.keep(captureKey, designations)
-	return c.dated(ctx, designations)
-}
-
-// dated is the capture dated by its runs; a capture listing nobody has
-// none to read.
-func (c *Cache) dated(ctx context.Context, designations map[string]boards.Designation) (map[string]boards.Designation, error) {
-	if len(designations) == 0 {
-		return designations, nil
-	}
-	runs, err := c.Reads.DesignationRuns(ctx, boards.Newest(designations))
-	if err != nil {
-		return nil, fmt.Errorf("the capture's dating: %w", err)
-	}
-	return boards.WithSince(designations, runs), nil
 }
 
 // cached is the value kept for key while younger than ttl (cachedUnless).
