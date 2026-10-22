@@ -138,5 +138,15 @@
 			--tile-lb: 10px;
 			--tile-cap: 11px;
 		}
+
+		/* The row under the tiles one to a line, so our rate's steps from his Avg have the phone's width
+		   (Lane 139 fix round 1). */
+		.tiles.basis {
+			--across: 1;
+		}
+	}
+
+	.tiles.basis.folded {
+		--across: 1;
 	}
 </style>

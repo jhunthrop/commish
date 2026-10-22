@@ -35,11 +35,21 @@ def named_chance(w: Weather) -> float | None:
     return js_round(chance)
 
 
+# The smallest change the Proj change tile prints (Lane 139, C21, the web's `SHOWN_CHANGE_FROM`): a move under
+# it is noise beside a whole tile, so the tile shows none and a read may not quote one.
+SHOWN_CHANGE_FROM: Final = 0.5
+
+
+def shown_change(change: float | None) -> float | None:
+    """The change as the tile prints it, None for none or a move under `SHOWN_CHANGE_FROM`."""
+    return None if change is None or abs(change) < SHOWN_CHANGE_FROM else change
+
+
 def _projection_cells(sheet: WeekSheet) -> set[float]:
     p = sheet.projection
     if p is None or sheet.bye:
         return set()
-    change = sheet.projection_change
+    change = shown_change(sheet.projection_change)
     return {page_tenth(p.points), *(() if change is None else (page_tenth(abs(change)),))}
 
 

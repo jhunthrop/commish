@@ -59,6 +59,6 @@ void test('a board and a page built on the Eastern clock and said again on the m
 	assert.equal(boardStatusWords(rows, CENTRAL).capture, 'Status read Oct 16.');
 	assert.equal(
 		playerStatusWords({ status: 'doubtful', seasonLong: false, since: null }, CENTRAL).note,
-		'Doubtful on the latest report, which does not move his place on our board. Injury status from the hourly capture, read Fri Oct 16, 10:05 am Central.'
+		'Doubtful on the latest report, which does not move his place on our board. Injury status from the hourly capture, read Fri Oct 16, 10:05 am CT.'
 	);
 });

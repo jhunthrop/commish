@@ -47,14 +47,14 @@ void test('the day is the member’s own', () => {
 });
 
 void test('"read" is said only for a real check, and a stamp names its month and day', () => {
-	assert.equal(stampWords(CHECKED, CENTRAL), 'Fri Oct 16, 9:05 am Central');
+	assert.equal(stampWords(CHECKED, CENTRAL), 'Fri Oct 16, 9:05 am CT');
 	assert.equal(
 		captureLine({ readAt: LISTED, checkedAt: CHECKED }, SOON, CENTRAL),
-		'Injury status from the hourly capture, read Fri Oct 16, 9:05 am Central.'
+		'Injury status from the hourly capture, read Fri Oct 16, 9:05 am CT.'
 	);
 	assert.equal(
 		captureLine({ readAt: LISTED, checkedAt: null }, Date.parse(LISTED) + 1000, CENTRAL),
-		'Injury status from the hourly capture, as the list stood Mon Oct 12, 9:03 pm Central.'
+		'Injury status from the hourly capture, as the list stood Mon Oct 12, 9:03 pm CT.'
 	);
 });
 
@@ -62,7 +62,7 @@ void test('past 36 hours the basis says how old the statuses are, and they stay 
 	const late = Date.parse(CHECKED) + CAPTURE_BEHIND_MS + 1;
 	assert.equal(
 		captureLine({ readAt: LISTED, checkedAt: CHECKED }, late, CENTRAL),
-		'These injury statuses are from the hourly capture, read Fri Oct 16, 9:05 am Central, over a day and a half before now. Players keep them until a newer list is read.'
+		'These injury statuses are from the hourly capture, read Fri Oct 16, 9:05 am CT, over a day and a half before now. Players keep them until a newer list is read.'
 	);
 	assert.match(
 		captureLine(
@@ -70,7 +70,7 @@ void test('past 36 hours the basis says how old the statuses are, and they stay 
 			Date.parse(LISTED) + CAPTURE_BEHIND_MS + 1,
 			CENTRAL
 		),
-		/^These injury statuses are from the hourly capture, as the list stood Mon Oct 12, 9:03 pm Central, over/
+		/^These injury statuses are from the hourly capture, as the list stood Mon Oct 12, 9:03 pm CT, over/
 	);
 	assert.match(
 		captureLine(

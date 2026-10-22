@@ -3,9 +3,10 @@
 // with the verb his own roster's (Open your lineup while a week 6 game is still to kick off, Compare
 // leading once the week's last game has). Each asserts what it shows:
 //   Opp rank reads his week 7 game ("Wk 7 vs GB, ...") and the change tile his week 7 Proj or the day it
-//   is published; the row under the tiles holds Preseason, Preseason pace and vs Avg; the game log draws
-//   no Proj column; the read is one paragraph with no season read's stamp under it; the tier box is
-//   titled by what it holds; and the page's copy passes the one guard (copy-scan.ts).
+//   is published; the row under the tiles holds Preseason pace and Our rate vs his Avg (Lane 139, C08,
+//   C09); the game log draws no Proj column; the read is one paragraph with no season read's stamp under
+//   it; the tier box is titled by what it holds, His tier (C23); and the page's copy passes the one guard
+//   (copy-scan.ts).
 // Beside him (Lane 117, B80) a playing player (Josh Jacobs, GB at DAL in week 6) and an Out one
 // (MarShawn Lloyd, Out on the stand-in capture SATURDAY_OUT=4429023 writes into the Saturday run), each
 // signed out and signed in. For every page: before the week's read answers the card's verb is Compare
@@ -22,6 +23,7 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
 import { copyFault, watchData } from './copy-scan.ts';
+import { BASIS_WORDS } from '../src/lib/player/basis-words.ts';
 import { CARD } from '../src/lib/player/card.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { fixtureApiClock, installFixtureApiClock } from './inseason-fixture/clock.ts';
@@ -142,13 +144,15 @@ function checkSeen(s: Seen, where: string, verb: string): void {
 		`${where}: Wk 7 Proj ${JSON.stringify(next)}`
 	);
 	check(
-		s.basis.join('|') === [CARD.preseason, CARD.preseasonPace, CARD.vsAvg].join('|'),
+		s.basis.join('|') === [BASIS_WORDS.pace, BASIS_WORDS.vsAvg].join('|'),
 		`${where}: the row under the tiles ${s.basis.join(', ')}`
 	);
 	const gap = s.vsAvg;
 	check(
 		/^[+\u2212]\d+\.\d$/.test(gap.value) &&
-			/^\d+\.\d a game vs his \d+\.\d Avg: /.test(gap.caption),
+			/^\d+\.\d Avg in \d+ games?, .+, \d+\.\d a game after the games he may miss$/.test(
+				gap.caption
+			),
 		`${where}: vs Avg ${JSON.stringify(gap)}`
 	);
 	check(!s.projHead, `${where}: the game log draws a Proj column`);
@@ -160,7 +164,7 @@ function checkSeen(s: Seen, where: string, verb: string): void {
 	);
 	check(!s.readClipped, `${where}: a box clips or scrolls the read`);
 	check(!s.stamps.some((st) => st.includes(CARD.writtenFrom)), `${where}: a season read's stamp`);
-	check(s.side === CARD.whyRest, `${where}: the tier box is titled "${s.side}"`);
+	check(s.side === CARD.tier, `${where}: the tier box is titled "${s.side}"`);
 	check(s.verb.startsWith(verb), `${where}: the verb reads "${s.verb}"`);
 }
 

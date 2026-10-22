@@ -28,9 +28,7 @@ void test("the run's weeks still to play until the read, then the read's week in
 	assert.deepEqual(stillToPlay(ahead, { ...next, week: 5 }), ahead);
 });
 
-void test('the projection column shows only once a week holds one (Lane 100, B30)', () => {
-	assert.equal(projShown('--', null, '--'), false);
-	assert.equal(projShown('--', { ...next, proj: '--' }, '--'), false);
-	assert.equal(projShown('--', { ...next, proj: '18.4' }, '--'), true);
-	assert.equal(projShown('21.0', null, '--'), true);
+void test('the projection column shows only once a past week keeps one (Lane 139, C10)', () => {
+	assert.equal(projShown('--', '--'), false);
+	assert.equal(projShown('21.0', '--'), true);
 });

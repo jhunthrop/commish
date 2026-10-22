@@ -233,4 +233,4 @@ def test_no_sentence_shape_sits_on_two_of_the_reads(reads: list[str]) -> None:
 
 def test_the_caption_is_the_write_in_central_time_for_the_week() -> None:
     sheet, _ = _sheet(_NAMES[0])
-    assert written_caption(sheet.written_at, sheet.week) == "Written Sat 1:12 pm Central, for week 6"
+    assert written_caption(sheet.written_at, sheet.week) == "Written Sat Oct 17, 1:12 pm CT, for week 6"

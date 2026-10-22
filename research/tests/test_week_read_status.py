@@ -48,4 +48,4 @@ def test_the_next_hourly_pass_follows_the_capture_schedule(after: datetime, due:
 
 def test_the_caption_names_when_the_new_read_is_due() -> None:
     caption = status_changed_caption(datetime(2026, 10, 17, 2, 0, tzinfo=UTC))
-    assert caption == "His status changed since this read was written. A new read is due by Fri 10:00 pm Central."
+    assert caption == "His status changed since this read was written. A new read is due by Fri Oct 16, 10:00 pm CT."

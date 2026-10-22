@@ -2,7 +2,7 @@
  * screens' week mark, and the board and player pages' status. The statuses are the API's
  * (`DesignationStatus`) and the run's (`designations.json`). */
 import type { components } from '#lib/api/types.ts';
-import { memberZone, monthDay, shortDay, weekdayTime, zoneWord } from './clock.ts';
+import { memberZone, monthDay, shortDay, stampAt, weekdayTime } from './clock.ts';
 
 export type DesignationStatus = components['schemas']['DesignationStatus'];
 
@@ -124,11 +124,10 @@ export interface CaptureStamp {
  * applied: a player on injured reserve ranked as if he plays would be worse than a stale notice. */
 export const CAPTURE_BEHIND_MS = 36 * 60 * 60 * 1000;
 
-/** "Tue Oct 13, 9:03 pm Central": a stamp a static page may print a week or more later, so it names
- * the month and the day. */
+/** "Tue Oct 13, 9:03 pm CT": a stamp a static page may print a week or more later, so it names the
+ * month and the day, in the site's one stamp format (clock.ts stampAt, Lane 139, C12). */
 export function stampWords(iso: string, zone: string = memberZone()): string {
-	const [weekday = '', ...time] = weekdayTime(iso, zone).split(' ');
-	return `${weekday} ${shortDay(iso, zone)}, ${time.join(' ')} ${zoneWord(zone)}`;
+	return stampAt(iso, zone);
 }
 
 /** The capture in the few words a page of board rows has left in its five-line basis (Lane 66n):

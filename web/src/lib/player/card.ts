@@ -7,7 +7,6 @@ import { FIGURE } from '#lib/format/figure-words.ts';
 import { onListWords } from '#lib/format/designation.ts';
 
 export { onListWords };
-import { plural } from '#lib/format/number.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
 
 /** A tile's tone: the accent for this week's projection, the ease of his opponent, quiet for the
@@ -16,9 +15,9 @@ export type TileTone = 'lead' | 'easy' | 'hard' | 'even' | 'quiet' | null;
 
 export type TileKey = 'proj' | 'rest' | 'opp' | 'avg' | 'last' | 'delta';
 
-/** The in-season row under the tiles (Lane 100): the preseason figures the order starts from, and
- * his rest of season a game against his Avg. */
-export type BasisKey = 'preseason' | 'pace' | 'vsAvg';
+/** The in-season row under the tiles (Lane 100; Lane 139, C09): the preseason pace the order starts
+ * from, and our rate a game against his Avg (basis-words.ts). */
+export type BasisKey = 'pace' | 'vsAvg';
 
 export interface BasisTile {
 	key: BasisKey;
@@ -61,6 +60,8 @@ export interface RestParts {
 	/** The week his rest of season starts from as the run says it (run/rest-from.ts): "from week 7",
 	 * "with no game left". */
 	from: string;
+	/** The weeks it counts as the tile says them (run/rest-from.ts restSpanWords): "weeks 7 to 17". */
+	span: string;
 	/** "WR1 in our order", or for a player on a season-long list "RB IR, unranked while on a
 	 * season-long list". */
 	rank: string;
@@ -86,7 +87,7 @@ export function restRankWords(position: string, shown: number | string): string 
 /** The card's words that are not a player's, in one place for the copy guard. */
 /** The Opp rank and change tiles' heads, which the listed basis names too. */
 const OPP_HEAD = 'Opp rank';
-const DELTA_HEAD = 'Δ Proj';
+const DELTA_HEAD = 'Proj change';
 
 export const CARD = {
 	/** The verbs the league's screens give him (week-words.ts verbOf): starting him, the way to the
@@ -109,18 +110,12 @@ export const CARD = {
 	/** The season read's stamp, after its day: the page shows that read only before the season's
 	 * first kickoff, when it was written from his facts through the last full season (Lane 100, B29). */
 	writtenFrom: 'from his facts through last season',
-	/** The tier box in season, titled by what it holds (Lane 100, B30). */
-	whyRest: 'Why his rest-of-season figure',
+	/** The tier box, titled by what it holds (Lane 139, C23). */
+	tier: 'His tier',
 	/** The read's head on his page and in the player shelf (Lane 113). */
 	ourRead: 'Our read',
 	/** In season, the read's place while no week read stands for him (Lane 100, B44). */
 	readNotYet: 'Our read for his next game is not written yet.',
-	/** The in-season row under the tiles (Lane 100, B17 and B51). */
-	preseason: 'Preseason',
-	preseasonPace: 'Preseason pace',
-	vsAvg: 'vs Avg',
-	paceCaption: 'a game, the pace our figure starts from',
-	vsAvgCaption: 'rest of season a game against his Avg',
 	/** The Proj of the week after his bye once its capture time has passed with none read. */
 	nextProjNotIn: 'Not in yet',
 	/** A "--" says why on its tile (review M4). */
@@ -139,7 +134,7 @@ export const CARD = {
 	/** The game log's collapsed earlier seasons (review M8). */
 	earlierSeasons: 'Earlier seasons',
 	/** A listed player's basis in place of the week's figures his card does not draw (Lane 128): his
-	 * Wk, Opp rank and Δ Proj tiles say "On IR"; composed from the tiles' heads. */
+	 * Wk, Opp rank and Proj change tiles say "On IR"; composed from the tiles' heads. */
 	listedWeek: `${FIGURE.week}, ${OPP_HEAD} and ${DELTA_HEAD} are his once he is back.`,
 	/** The waiver verb where we know no page of the platform's: our own screen, named as ours. */
 	findOnWaivers: 'Find him on Waivers'
@@ -166,21 +161,6 @@ export function listedTiles(tiles: readonly CardTile[], word: string | null): Ca
 
 /** The tiles in the card's order. */
 export const TILE_ORDER: readonly TileKey[] = ['proj', 'rest', 'opp', 'avg', 'last', 'delta'];
-
-/** Why his figure a game sits where it does against his Avg, from the order's stored basis: the
- * preseason pace a game it starts from (the Preseason pace tile beside it), weighed against the games
- * he has played (Lane 100, B51), short enough for its phone tile (Lane 117, B80). */
-export function vsAvgReason(games: number): string {
-	return `${plural(games, 'game')} weighed with his preseason pace`;
-}
-
-/** vs Avg's caption once its two figures are read, both named as the card prints them (Lane 100 fix
- * round 1, HIGH-1): "22.0 a game vs his 30.7 Avg", then the stored reason. Its first week is the
- * Rest of season tile's, said there. */
-export function vsAvgCaption(perGame: string, avg: string, reason: string | null): string {
-	const figures = `${perGame} a game vs his ${avg} Avg`;
-	return reason === null ? figures : `${figures}: ${reason}`;
-}
 
 /** Whether Compare is the card's one verb while no league verb stands (Lane 100 fix round 1, M3;
  * Lane 117, B80): in season, with his rest-of-season figure in hand, the sheet's add never leads,

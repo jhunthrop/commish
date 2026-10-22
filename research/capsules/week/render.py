@@ -16,7 +16,8 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.render_depth import slot_word
 from research.capsules.render_season import week_list
 from research.capsules.render_words import IN_OUR_RECORDS, ordinal, signed, week_of
-from research.capsules.week.cells import named_chance
+from research.capsules.week.cells import named_chance, shown_change
+from research.capsules.week.rank_words import rank_words
 from research.capsules.week.report_day import report_words
 from research.capsules.week.sheet import (
     CANNOT_PLAY,
@@ -87,8 +88,9 @@ def _projection_line(sheet: WeekSheet) -> str | None:
         f"scoring{_as_of(p.captured_at)}. It is a projection published for the week, not ours: call it the "
         "published projection, with that figure."
     ]
-    # The change is the card's Δ Proj cell; the figure before it is in no cell (Lane 100, B17).
-    change = sheet.projection_change
+    # The change is the card's Proj change cell, from 0.5 (Lane 139, C21); the figure before it is in no cell
+    # (Lane 100, B17).
+    change = shown_change(sheet.projection_change)
     if change is not None and p.previous_points is not None:
         parts.append(
             f"It moved {signed(change)} points since the published figure before it{_as_of(p.previous_captured_at)}."
@@ -136,8 +138,16 @@ def _allowed_line(sheet: WeekSheet) -> str | None:
     return (
         f"{game.opponent} against {a.position}s in {sheet.season}: {ordinal(a.rank)} of {a.of} through "
         f"{week_of(a.through, sheet.season)} (1st allowed the fewest PPR points a game, {ordinal(a.of)} the most)"
-        f"{_as_of(a.read_at)}."
+        f"{_as_of(a.read_at)}. {_rank_said(a.rank, a.of)}"
     )
+
+
+def _rank_said(rank: int, of: int) -> str:
+    """How the read says the rank (Lane 139, C01): its words from the fewest end or the most, or by its rank."""
+    words = rank_words(rank, of)
+    if words is None:
+        return f"In words, say it by its rank, {ordinal(rank)} of {of}, never most or fewest."
+    return f'In words, say it as "{words}" ({ordinal(rank)} of {of}).'
 
 
 def _depth_line(sheet: WeekSheet) -> str | None:

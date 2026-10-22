@@ -66,8 +66,8 @@
 	let opened = $state(false);
 	/** The run's weeks still to play, the read's week shown once in the accent row (Lane 80). */
 	const toPlay = $derived(stillToPlay(ahead, next));
-	/** No column that is empty in every row (Lane 100, B30). */
-	const showProj = $derived(projShown(pastProj, next, EMPTY_FIGURE));
+	/** No column until a past week keeps its projection (Lane 139, C10). */
+	const showProj = $derived(projShown(pastProj, EMPTY_FIGURE));
 </script>
 
 {#if line}

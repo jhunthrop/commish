@@ -26,7 +26,7 @@ from research.free_agent import run_club
 from research.model.instants import js_iso
 from research.nightly.build.page_club import call_for, last_game_club
 from research.nightly.build.player_season import SeasonContext, prior_seasons, season_block
-from research.nightly.build.tenth import tenth, tenth_or_none
+from research.nightly.build.tenth import percent_or_none, tenth, tenth_or_none
 from research.nightly.config import MARKET_ORDER, PAGE_FORMAT, PROJECTION_ORDER, TEAMS, RunFormat
 from research.nightly.reads.board import BoardEntry, FormatBoard
 from research.nightly.reads.market import MarketEntry
@@ -186,6 +186,12 @@ def numbers_of(entry: BoardEntry, adp: float | None, tier_drop: float | None) ->
             # The preseason pace a game the order starts his figure from (Lane 100), with his preseason
             # figures only.
             "preseasonPerGame": None if before is None else tenth_or_none(row.preseason_per_game),
+            # The share of his rate a game that pace carries, a whole percent (Lane 139, C08).
+            "preseasonShare": None if before is None else percent_or_none(row.preseason_share),
+            # The steps from his Avg to our rate (Lane 139 fix round 1): his season blended with his usage, and
+            # the model's rate a game he plays, before the games he may miss.
+            "blendedPerGame": None if before is None else tenth_or_none(row.blended_per_game),
+            "ratePerGame": tenth_or_none(row.rate_per_game),
             # The week his rest of season starts from: his club's first game still to play (Lane 86).
             "restFromWeek": row.from_week,
             # One more club game at his rate (Lane 96): a league whose title week is past the run's last
@@ -276,6 +282,9 @@ class ServedWeek:
     # Each player's published projection for the board week as the card prints it, by the board's id (None
     # for a player the snapshot leaves out); None when the run read no snapshot for the week (Lane 66v).
     projections: Mapping[str, float] | None = None
+    # When the status read the statuses come from was last read (its check, else its stamp), None without
+    # one: a standing read's caption says it when newer than the write (Lane 139, C13).
+    status_read: datetime | None = None
 
 
 class _Unread:
@@ -285,11 +294,20 @@ class _Unread:
 UNREAD: Final = _Unread()
 
 
+@dataclass(frozen=True, slots=True)
+class ReadClock:
+    """What a read is served at: the run's instant, and when the status read it is judged against was last
+    read (Lane 139, C13), None without one."""
+
+    as_of: datetime
+    status_read: datetime | None = None
+
+
 def week_read_json(
     stored: StoredWeekRead | None,
     status: str | None,
     kicked_off: bool,
-    as_of: datetime,
+    clock: ReadClock,
     projection: float | _Unread | None = UNREAD,
 ) -> Json | None:
     """The board week's read (Lane 72) with the page's caption, its stamps, the status it was written against
@@ -305,9 +323,11 @@ def week_read_json(
     moved = not isinstance(projection, _Unread) and projection_moved(projection, stored.projection_points)
     standing = stored.status == status and not moved
     if stored.status != status:
-        caption = status_changed_caption(as_of)
+        caption = status_changed_caption(clock.as_of)
     else:
-        caption = PROJECTION_MOVED_CAPTION if moved else written_caption(stored.written_at, stored.week)
+        caption = (
+            PROJECTION_MOVED_CAPTION if moved else written_caption(stored.written_at, stored.week, clock.status_read)
+        )
     return {
         "week": stored.week,
         "body": stored.body.strip() if standing else None,
@@ -399,7 +419,9 @@ def _week_read(who: Identity, universe_id: str | None, inputs: PageInputs) -> Js
     kicked_off = _kicked_off(inputs.season.games.get(who.team, ()), stored.week, inputs.week.as_of)
     projections = inputs.week.projections
     projection = UNREAD if projections is None else projections.get(who.id)
-    return week_read_json(stored, inputs.week.statuses.get(who.id), kicked_off, inputs.week.as_of, projection)
+    week = inputs.week
+    clock = ReadClock(week.as_of, week.status_read)
+    return week_read_json(stored, week.statuses.get(who.id), kicked_off, clock, projection)
 
 
 def _index_entry(p: Identity) -> Json:

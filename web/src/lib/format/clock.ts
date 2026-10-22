@@ -132,3 +132,26 @@ export function sameDay(a: Date, b: Date, zone: string = memberZone()): boolean 
 	const day = (date: Date): string => date.toLocaleDateString('en-US', { timeZone: zone });
 	return day(a) === day(b);
 }
+
+/** The zone's short name after a time at an instant, "CT", as the browser names it (its generic short
+ * form, so it reads the same in summer and winter); the zone's id when the browser names none. */
+export function zoneShort(iso: string, zone: string = memberZone()): string {
+	const named = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'shortGeneric' })
+		.formatToParts(new Date(iso))
+		.find((p) => p.type === 'timeZoneName')?.value;
+	return named ?? zone;
+}
+
+/** "Sun 3:25 pm CT": a kickoff with its zone, so a game time never reads as another zone's (Lane 139,
+ * C11). */
+export function kickoffAt(iso: string, zone: string = memberZone()): string {
+	return `${weekdayTime(iso, zone)} ${zoneShort(iso, zone)}`;
+}
+
+/** "Wed Oct 21, 11:12 am CT": the player page's one stamp format (Lane 139, C12), the weekday, the
+ * date and the zone, as the nightly's week read caption says its write (`capsules/week/sheet.py
+ * central_stamp`). */
+export function stampAt(iso: string, zone: string = memberZone()): string {
+	const day = weekdayTime(iso, zone).split(' ')[0] ?? '';
+	return `${day} ${shortDay(iso, zone)}, ${timeOfDay(iso, zone)} ${zoneShort(iso, zone)}`;
+}

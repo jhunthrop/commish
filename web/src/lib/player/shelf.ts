@@ -96,7 +96,7 @@ function over(tile: CardTile, value: number | null, print: (v: number) => string
 }
 
 /** The row's own cells drawn as the card's tiles over his page's tiles as built (the blank six until
- * they are read): Proj, Opp rank with its ease while his game is to come, Avg, Last and Δ Proj are the
+ * they are read): Proj, Opp rank with its ease while his game is to come, Avg, Last and Proj change are the
  * screen's figures, so the shelf opens on what the row showed. */
 export function rowTiles(row: BoxRow, built: readonly CardTile[] | null): CardTile[] {
 	const { evidence } = row;
