@@ -26,3 +26,14 @@ def tenth(n: float) -> float:
 def tenth_or_none(n: float | None) -> float | None:
     """`tenth` for a figure that may be absent (a range the run does not carry, no ADP)."""
     return None if n is None else tenth(n)
+
+
+_WHOLE: Final = Decimal(1)
+_PERCENT: Final = 100
+
+
+def percent_or_none(share: float | None) -> int | None:
+    """A share of one as a whole percent, half away from zero (0.2857 gives 29); None stays None."""
+    if share is None:
+        return None
+    return int((Decimal(repr(share)) * _PERCENT).quantize(_WHOLE, rounding=ROUND_HALF_UP))

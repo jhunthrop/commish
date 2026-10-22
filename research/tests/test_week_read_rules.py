@@ -17,6 +17,7 @@ import pytest
 from research.capsules.season_voice import SeasonClock, time_frame_hits
 from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
+from research.capsules.week.rank_words import rank_words
 from research.capsules.week.render import render_week_facts_block, render_week_sheet
 from research.capsules.week.rules import WEEK_NEVER_WORDS, stated_figures, week_rule_violations
 from research.capsules.week.sheet import (
@@ -32,6 +33,7 @@ from research.capsules.week.sheet import (
 from research.capsules.week.start_advice import start_advice_in
 from research.capsules.week.validate import sentence_shapes, validate_week_read, with_season
 from research.tests.week_read_fixtures import (
+    BEFORE,
     BOARD,
     CAPTURED,
     FIGURES,
@@ -142,9 +144,9 @@ def test_a_fact_stamped_after_the_write_is_refused() -> None:
 @pytest.mark.parametrize(
     ("written_at", "week", "caption"),
     [
-        (WRITTEN_AT, 6, "Written Fri 9:00 pm Central, for week 6"),
-        (datetime(2026, 10, 18, 16, 5, tzinfo=UTC), 6, "Written Sun 11:05 am Central, for week 6"),
-        (datetime(2026, 12, 1, 6, 30, tzinfo=UTC), 13, "Written Tue 12:30 am Central, for week 13"),
+        (WRITTEN_AT, 6, "Written Fri Oct 16, 9:00 pm CT, for week 6"),
+        (datetime(2026, 10, 18, 16, 5, tzinfo=UTC), 6, "Written Sun Oct 18, 11:05 am CT, for week 6"),
+        (datetime(2026, 12, 1, 6, 30, tzinfo=UTC), 13, "Written Tue Dec 1, 12:30 am CT, for week 13"),
     ],
 )
 def test_the_caption_is_the_write_in_central_time_and_the_week(written_at: datetime, week: int, caption: str) -> None:
@@ -543,3 +545,133 @@ def test_a_club_is_named_by_name_never_by_its_code() -> None:
     assert not any(
         "code" in v for v in week_rule_violations("The matchup with Arizona is soft. He is a WR2.", starter())
     )
+
+
+@pytest.mark.parametrize(
+    ("rank", "words"),
+    [
+        (1, "the fewest"),
+        (2, "the second fewest"),
+        (4, "among the fewest"),
+        (5, None),
+        (16, None),
+        (28, None),
+        (29, "among the most"),
+        (31, "the second most"),
+        (32, "the most"),
+    ],
+)
+def test_a_rank_is_said_by_the_footer_s_count_1st_the_fewest(rank: int, words: str | None) -> None:
+    """Lane 139 (C01): "the most" only at 32nd of 32, "the second most" at 31st, "among the most" from 29th."""
+    assert rank_words(rank, 32) == words
+
+
+_GIBBS_OPENER = "Green Bay has {said} PPR points to running backs, 31st of 32 through week 6 of 2026."
+
+
+@pytest.mark.parametrize(
+    ("said", "refused"),
+    [
+        ("allowed the most", True),
+        ("allowed the fewest", True),
+        ("allowed among the fewest", True),
+        ("allowed the second most", False),
+        ("allowed the second-most", False),
+        ("allowed among the most", False),
+    ],
+)
+def test_a_points_superlative_follows_the_opponent_s_rank(said: str, refused: bool) -> None:
+    """Lane 139 (C01): the sentence the verb rests on calls 31st of 32 "the second most", never "the most"."""
+    sheet = replace(starter(), allowed=Allowed(31, 32, 30.2, "RB", 6, LINES))
+    found = [v for v in week_rule_violations(_GIBBS_OPENER.format(said=said), sheet) if "Opp rank counts" in v]
+    assert bool(found) is refused
+    if refused:
+        assert '31 of 32 is "the second most"' in found[0]
+
+
+def test_a_superlative_on_a_rank_between_the_ends_is_refused_with_its_rank() -> None:
+    """A rank between the ends is said by its rank: 26th of 32 is neither the most nor among the fewest."""
+    found = [
+        v
+        for v in week_rule_violations("Arizona has allowed among the most PPR points to receivers.", starter())
+        if "Opp rank counts" in v
+    ]
+    assert found and "26 of 32 is said by its rank" in found[0]
+
+
+def test_the_sheet_hands_the_writer_the_rank_in_words() -> None:
+    """The writer is told the words its rank is said with (Lane 139, C01)."""
+    sheet = replace(starter(), allowed=Allowed(31, 32, 30.2, "WR", 6, LINES))
+    assert 'say it as "the second most"' in render_week_sheet(sheet)
+    assert "say it by its rank" in render_week_sheet(starter())
+
+
+@pytest.mark.parametrize(
+    "opener",
+    [
+        "Gibbs runs into the kind of matchup a manager hopes for: Green Bay ranks 31st of 32 against running backs.",
+        "Sunday brings a fine afternoon for Puka Nacua and the Rams.",
+    ],
+)
+def test_the_read_leads_with_the_call_or_the_fact(opener: str) -> None:
+    """Lane 139 (C25): no scene-setting opener; the first sentence carries the call, a figure or his status."""
+    text = f"{opener} {STARTER_READ}"
+    assert any("opens" in v for v in week_rule_violations(text, starter(), "start"))
+
+
+@pytest.mark.parametrize(
+    "opener",
+    [
+        "Start Puka Nacua this week.",
+        "Arizona ranks 26th of 32 against receivers, the softest matchup he has had.",
+        "Puka Nacua is Questionable on the Tuesday-night list.",
+        "The Lions are off in week 6 of 2026, so Gibbs does not play.",
+    ],
+)
+def test_a_read_that_opens_on_the_call_the_fact_or_his_status_is_taken(opener: str) -> None:
+    assert not any("opens" in v for v in week_rule_violations(opener, starter(), "start"))
+
+
+def test_a_change_under_half_a_point_is_no_cell_a_read_may_quote() -> None:
+    """Lane 139 (C21): the Proj change tile shows no move under 0.5, so neither the sheet nor a read says one."""
+    sheet = replace(starter(), projection=PublishedProjection(18.4, CAPTURED, 18.3, BEFORE))
+    assert "It moved" not in render_week_sheet(sheet)
+    text = "Puka Nacua's published projection is 18.4 points, up 0.1 points since the figure before it."
+    assert any("a figure the page draws in no cell" in v for v in week_rule_violations(text, sheet, "start"))
+    assert not any("no cell" in v for v in week_rule_violations(text.replace("0.1", "0.5"), starter(), "start"))
+
+
+@pytest.mark.parametrize(
+    "opener",
+    [
+        "Nacua is listed Out on Friday's report.",
+        "Puka Nacua is healthy and leads the Rams in targets again.",
+        "Puka Nacua is on injured reserve and does not play.",
+        "Keep him on your bench this week.",
+    ],
+)
+def test_a_status_first_opener_is_taken_for_every_status(opener: str) -> None:
+    """Review MEDIUM-1: the status words are the sheet's own (`STATUS_WORDS`), Out among them."""
+    assert not any("opens" in v for v in week_rule_violations(opener, starter(), "start"))
+
+
+def test_a_loose_call_word_does_not_carry_a_scene_set_opener() -> None:
+    """Review MEDIUM-1: "sits first among" is no call."""
+    text = "Gibbs sits first among Detroit running backs as the week opens."
+    assert any("opens" in v for v in week_rule_violations(text, starter(), "start"))
+    # Review LOW-11: a verb off the call list is no call, even said of a club.
+    text = "The Rams play Arizona at home this week in a game that suits him."
+    assert any("opens" in v for v in week_rule_violations(text, starter(), "start"))
+    assert not any("opens" in v for v in week_rule_violations("Trust Nacua this week.", starter(), "start"))
+
+
+def test_a_superlative_of_his_own_is_not_read_as_the_opponent_s_rank() -> None:
+    """Review LOW-1: only a sentence about what an opponent allows is held to Opp rank."""
+    text = "Nacua has scored the most PPR points of any Rams receiver this season."
+    assert not any("Opp rank counts" in v for v in week_rule_violations(text, starter()))
+
+
+def test_a_short_list_names_the_nearer_end() -> None:
+    """Review LOW-2: 1st of 4 is the fewest, never among the most."""
+    assert rank_words(1, 4) == "the fewest"
+    assert rank_words(4, 4) == "the most"

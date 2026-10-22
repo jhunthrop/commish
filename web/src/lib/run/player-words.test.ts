@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import {
 	draftersWords,
+	FORMATS_FITTED_APART,
 	formatTable,
 	heldTierWords,
 	lineWords,
@@ -107,12 +108,15 @@ void test('the every-format table names the in-season basis in its heading, or b
 		]),
 		{
 			head: 'Rest of season from week 7',
-			labels: ['PPR', 'Half PPR']
+			labels: ['PPR', 'Half PPR'],
+			// Two in-season lines say once why they need not line up (Lane 139, C02).
+			note: FORMATS_FITTED_APART
 		}
 	);
 	assert.deepEqual(formatTable([{ format: PPR, numbers: {}, rest: null }]), {
 		head: 'Projected',
-		labels: ['PPR']
+		labels: ['PPR'],
+		note: null
 	});
 	assert.deepEqual(
 		formatTable([
@@ -121,7 +125,8 @@ void test('the every-format table names the in-season basis in its heading, or b
 		]),
 		{
 			head: 'Projected',
-			labels: ['PPR, rest of season from week 7', 'Standard']
+			labels: ['PPR, rest of season from week 7', 'Standard'],
+			note: null
 		}
 	);
 });

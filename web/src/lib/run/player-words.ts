@@ -3,7 +3,7 @@ import type { DesignationStatus } from '#lib/format/designation.ts';
 import { gapPicks } from '#lib/format/gap-picks.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
 import { fixed } from '#lib/format/number.ts';
-import { playerRestFrom, playerRestWords, restOfSeasonHead } from './rest-from.ts';
+import { playerRestFrom, playerRestWords, RUN_LAST_WEEK, restOfSeasonHead } from './rest-from.ts';
 import { restLead, type FiguresReach } from './rest-words.ts';
 import type { Format, PlayerFormat } from './schema.ts';
 
@@ -79,10 +79,6 @@ export function heldTierWords(status: DesignationStatus): string {
 		throw new Error(`A ${status} player is on no season-long list.`);
 	return HELD_TIER_WORDS[status];
 }
-
-/** The last week the run's rest-of-season points count (the API's LastWeek, the research
- * LAST_FANTASY_WEEK), or the board's own first week once the season is past it. */
-const RUN_LAST_WEEK = 17;
 
 export function lineWords(
 	line: { format: Format; numbers: PlayerFormat; rest: RestFigures | null },
@@ -181,9 +177,17 @@ export function restFigures(
 	return { lead, preseason };
 }
 
+/** Why the formats' rest-of-season figures need not line up (Lane 139, C02): the model's shrinkage of
+ * his season toward his preseason pace is fitted for each position and format on its own
+ * (docs/research/2026-10-14-rest-of-season-preregistration.md), so a back's half PPR figure can sit off
+ * the PPR and Standard midpoint. */
+export const FORMATS_FITTED_APART =
+	'Each format weighs his season against his preseason pace by its own fit, so Half PPR need not sit halfway between PPR and Standard.';
+
 /** The every-format table's points heading and each line's label: "Rest of season from week 7" when
  * every line prints in-season points, "Projected" otherwise, and when the table mixes the two each
- * in-season line names its basis beside its format. */
+ * in-season line names its basis beside its format; with two or more in-season lines, the note that
+ * they are fitted apart. */
 export function formatTable(
 	lines: readonly {
 		format: Format;
@@ -193,24 +197,28 @@ export function formatTable(
 ): {
 	head: string;
 	labels: string[];
+	note: string | null;
 } {
 	// His own first week still to play at the run (Lane 86), the same in every format.
 	const from = (line: (typeof lines)[number]): string =>
 		restOfSeasonHead(playerRestWords(playerRestFrom(line.format, line.numbers)));
 	const rest = lines.filter((line) => line.rest !== null);
+	const note = rest.length > 1 ? FORMATS_FITTED_APART : null;
 	if (rest.length === 0)
-		return { head: FIGURE.projected, labels: lines.map((l) => l.format.label) };
+		return { head: FIGURE.projected, labels: lines.map((l) => l.format.label), note };
 	const [first] = rest;
 	if (first && rest.length === lines.length) {
 		return {
 			head: from(first),
-			labels: lines.map((l) => l.format.label)
+			labels: lines.map((l) => l.format.label),
+			note
 		};
 	}
 	return {
 		head: FIGURE.projected,
 		labels: lines.map((l) =>
 			l.rest === null ? l.format.label : `${l.format.label}, ${from(l).toLowerCase()}`
-		)
+		),
+		note
 	};
 }

@@ -13,6 +13,7 @@ import {
 	easeOf,
 	fitName,
 	oppRankWord,
+	expectedScoreWords,
 	expectedWords,
 	gameOf,
 	heldGame,
@@ -457,4 +458,13 @@ void test('a name too long for its phone line: a player by initial, a defense by
 	assert.equal(fitName({ name: 'Jacory Croskey-Merritt', face }), 'J. Croskey-Merritt');
 	assert.equal(fitName({ name: 'Minnesota Vikings', face: { ...face, mark: true } }), 'Vikings');
 	assert.equal(fitName({ name: 'Chiefs D/ST', face: { ...face, mark: true } }), 'Chiefs');
+});
+
+void test('the labelled expected score names both clubs, his first (Lane 139, C07)', () => {
+	assert.equal(
+		expectedScoreWords(facts(), 'DET'),
+		`Expected score DET 26.5, ${facts().opponent ?? ''} 23`
+	);
+	assert.equal(expectedScoreWords(facts({ game_total: null }), 'DET'), null);
+	assert.equal(expectedScoreWords(facts({ opponent: null }), 'DET'), null);
 });

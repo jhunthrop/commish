@@ -34,7 +34,9 @@ export interface SeasonView {
 	ahead: AheadRow[];
 	/** The one sentence a player with no line gets. */
 	none: string;
-	basis: string;
+	/** What the box leaves unsaid, null with nothing: its source is the page's one credit line and its
+	 * scoring its aside (Lane 139, C22). */
+	basis: string | null;
 	/** His earlier seasons, newest first, collapsed under the box (Lane 66h). */
 	prior: PriorRow[];
 }
@@ -121,14 +123,12 @@ function unnamedAhead(row: GameLogRow, through: number): boolean {
 	);
 }
 
-function basisWords(season: PlayerSeason, position: Position, format: Format): string {
-	const source = `Stats from the NFL's records, scored in ${format.label}`;
-	if (season.games === 0) return `${source}.`;
-	// Avg's tile names his games, so the line says only where the figures come from (review M6).
-	const parts = [`${source}.`];
-	if (position === 'QB' && season.totals.completions === null)
-		parts.push('Completions are not in our records yet.');
-	return parts.join(' ');
+/** The box's own basis: only what neither its aside (the season and scoring) nor the page's credit line
+ * (the stats' source, Lane 139, C22) says. Avg's tile names his games (review M6). */
+function basisWords(season: PlayerSeason, position: Position): string | null {
+	return season.games > 0 && position === 'QB' && season.totals.completions === null
+		? 'Completions are not in our records yet.'
+		: null;
 }
 
 function noneWords(season: PlayerSeason): string {
@@ -229,7 +229,7 @@ export function seasonView(
 			.map((row) => logRow(row, columns)),
 		ahead: ahead.map((row) => aheadRow(row, kickoffOf)),
 		none: noneWords(season),
-		basis: basisWords(season, position, format),
+		basis: basisWords(season, position),
 		prior: prior.map((p) => priorRow(p, columns))
 	};
 }

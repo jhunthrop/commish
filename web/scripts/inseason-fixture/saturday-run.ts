@@ -96,13 +96,29 @@ function sharedTier(numbers: Json, position: unknown): Json {
 
 /** SATURDAY_PACE=1 (Lane 117, B80): a STAND-IN preseason pace a game on every in-season page, his
  * preseason points over the 17 games, so the vs Avg tile draws its reason as a run that stores the
- * pace does (Lane 100's preseasonPerGame); the contract run predates the field. */
+ * pace does (Lane 100's preseasonPerGame), with a STAND-IN share the pace carries (Lane 139's
+ * preseasonShare, a running back's PPR k of 2 over 5 games) and the steps; the contract run predates the fields. */
 const PACE_GAMES = 17;
+const PACE_SHARE = 29;
+/** STAND-IN for the blend (Lane 139 fix round 1), Gibbs-sized; the rate a game played is set from it, the
+ * pace and the share by the model's own step (Lane 139 fix round 2, LOW-10), so the shot's figures close. */
+const PACE_BLEND = 27.1;
+const PERCENT = 100;
+function paceRate(paceAGame: number): number {
+	const share = PACE_SHARE / PERCENT;
+	return tenth(share * paceAGame + (1 - share) * PACE_BLEND);
+}
 const pace = process.env.SATURDAY_PACE === '1';
 function withPace(numbers: Json): Json {
 	const points = numbers.preseasonPoints;
 	return pace && typeof points === 'number'
-		? { ...numbers, preseasonPerGame: tenth(points / PACE_GAMES) }
+		? {
+				...numbers,
+				preseasonPerGame: tenth(points / PACE_GAMES),
+				preseasonShare: PACE_SHARE,
+				blendedPerGame: PACE_BLEND,
+				ratePerGame: paceRate(tenth(points / PACE_GAMES))
+			}
 		: numbers;
 }
 
@@ -123,7 +139,7 @@ const standIn = JSON.parse(await readFile(LONG_READ_FILE, 'utf8')) as {
 const LONG_READ = {
 	week: FIRST_WEEK,
 	body: standIn.body,
-	caption: 'Written Sat 11:12 am Central, for week 6',
+	caption: 'Written Sat Oct 17, 11:12 am CT, for week 6',
 	status: null,
 	call: standIn.call,
 	writtenAt: '2026-10-17T16:12:00.000Z',

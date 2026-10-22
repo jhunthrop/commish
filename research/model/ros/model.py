@@ -176,8 +176,33 @@ def shrunk_rate(prior: float, games: int, form: float | None, opportunity: float
     """m = (k * p + G * u) / (k + G), u = alpha * r + (1 - alpha) * o; with no games, the prior."""
     if games == 0 or form is None or opportunity is None:
         return prior
-    blended = shrink.alpha * form + (1 - shrink.alpha) * opportunity
+    blended = blend(form, opportunity, shrink.alpha)
     return (shrink.k * prior + games * blended) / (shrink.k + games)
+
+
+def blend(form: float, opportunity: float, alpha: float) -> float:
+    """u = alpha * r + (1 - alpha) * o: his season's points a game blended with his usage's."""
+    return alpha * form + (1 - alpha) * opportunity
+
+
+def blended_rate(player: PlayerToDate, format_name: str, priors: RosPriors) -> float | None:
+    """His season blended with his usage (`blend`), the u `per_game` weighs against his prior (Lane 139 fix
+    round 1, HIGH-1: the step the player page names between his Avg and our rate); None before a game."""
+    key = cell(player.position, format_name)
+    form = season_rate(player, format_name)
+    opportunity = opportunity_rate(player, priors.opportunity[key])
+    if form is None or opportunity is None:
+        return None
+    return blend(form, opportunity, priors.shrinkage[key].alpha)
+
+
+def prior_share(player: PlayerToDate, format_name: str, priors: RosPriors) -> float:
+    """The weight his prior rate carries in `per_game`'s shrunk rate, k / (k + G): all of it before a game
+    (Lane 139, C08: the share the player page names beside his preseason pace)."""
+    if not player.played:
+        return 1.0
+    k = priors.shrinkage[cell(player.position, format_name)].k
+    return k / (k + len(player.played))
 
 
 def per_game(player: PlayerToDate, format_name: str, priors: RosPriors) -> float:

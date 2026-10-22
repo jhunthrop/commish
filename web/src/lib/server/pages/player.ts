@@ -103,6 +103,8 @@ export interface PlayerPage {
 	tier: { tier: number; cliff: TierCliff | null; mates: TierMate[] };
 	/** The every-format table's points heading: "Projected", or in season "Rest of season from week 7". */
 	pointsHead: string;
+	/** Under the every-format table in season: why its formats need not line up (Lane 139, C02). */
+	formatsNote: string | null;
 	/** The tier list's caption: what its points are. */
 	tierBasis: string;
 	/** The default format's sentences, as its line carries them. */
@@ -370,7 +372,7 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		(format, numbers) => ({
 			tile: restTile(format, numbers, loaded.position, run.season, listed),
 			parts: restParts(format, numbers, loaded.position, listed),
-			basis: basisTiles(format, numbers, run.season, loaded.season?.games ?? 0)
+			basis: basisTiles(format, numbers, loaded.season?.games ?? 0)
 		})
 	);
 	const [lead] = lines;
@@ -396,6 +398,7 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		lines,
 		tier,
 		pointsHead: formatTable(lines).head,
+		formatsNote: formatTable(lines).note,
 		tierBasis: tierBasisOf(lead, tier.mates.length, run.season),
 		words: lead.words,
 		rest: lead.rest,

@@ -52,10 +52,10 @@ const PROJECTED = 'Projected';
 const REST = 'Rest of season';
 const DIRECTION = /, (among the easiest for|among the toughest for|in the middle for) \w/;
 const ROS_FROM_WEEK = process.env.ROS_FROM_WEEK;
-const REST_CAPTION = /^from week \d+, (\d+\.\d a game, )?[A-Z]{2}\d+ in our order$/;
+const REST_CAPTION = /^(weeks \d+ to \d+|week \d+), (\d+\.\d a game, )?[A-Z]{2}\d+ in our order$/;
 /** The basis's rendered lines at most, by width (review M6). */
 const BASIS_LINES: Readonly<Record<number, number>> = { 1440: 5, 1280: 5, [PHONE_WIDTH]: 8 };
-const WEEK_READ = /Written \w{3} \d{1,2}:\d{2} [ap]m Central, for week \d+/;
+const WEEK_READ = /Written \w{3} \w{3} \d{1,2}, \d{1,2}:\d{2} [ap]m CT, for week \d+/;
 const WITHHELD = 'His status changed since this read was written. A new read is due by';
 
 const web = process.argv[2] ?? 'http://localhost:4173';
@@ -244,7 +244,7 @@ async function read(page: Page): Promise<Card> {
 			pinTop: pinned ? act.getBoundingClientRect().top : null,
 			tilesBottom: firstTiles ? firstTiles.getBoundingClientRect().top + 90 : null
 		};
-	}, CARD.whyRest);
+	}, CARD.tier);
 }
 
 async function openCompare(page: Page, name: string): Promise<void> {

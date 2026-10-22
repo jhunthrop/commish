@@ -86,8 +86,9 @@ export function stillToPlay(ahead: readonly AheadRow[], next: LogNext | null): r
 	return next === null ? ahead : ahead.filter((row) => row.week !== next.week);
 }
 
-/** The projection column shows only once a week holds a figure in it (Lane 100, B30): the log draws
- * no column that is empty in every row. `empty` is the figure a week without one prints. */
-export function projShown(pastProj: string, next: LogNext | null, empty: string): boolean {
-	return pastProj !== empty || (next !== null && next.proj !== empty);
+/** The projection column shows only once a past week keeps the projection we showed for it (Lane 139,
+ * C10): the week ahead's is the card's week tile, so a column of dashes over the weeks played with that
+ * one figure under them is not drawn. `empty` is the figure a week without one prints. */
+export function projShown(pastProj: string, empty: string): boolean {
+	return pastProj !== empty;
 }

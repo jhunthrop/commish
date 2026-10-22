@@ -12,6 +12,7 @@ import {
 	FIGURE_HEADS,
 	ORDER,
 	figureColumns,
+	sortedFigure,
 	moveHref,
 	moveWords,
 	orderBasis,
@@ -211,12 +212,28 @@ void test('a free agent on the Players list reads FA in the club cell and No clu
 	// Every other row keeps its club and its game.
 	const swift = orderView(row('Swift'), ZONE, true, NOW);
 	assert.equal(swift.box.club, 'CHI');
-	assert.deepEqual(swift.box.game, { where: 'at ATL', when: 'Sun 12:00 pm' });
+	// A kickoff still to come says its zone (Lane 139, C11).
+	assert.deepEqual(swift.box.game, { where: 'at ATL', when: 'Sun 12:00 pm CT' });
 });
 
-void test('the big figure is the key the rank sorts on (review 66j H2)', () => {
-	assert.deepEqual(figureColumns('points_over_replacement'), ['por', 'total', 'perGame']);
+void test('the Game cell labels its expected score with both clubs, never a final (Lane 139, C07)', () => {
+	const total = { points: 49.5, team_points: 26.5, read_at: READ };
+	const withTotal = line('Swift', 'RB', { facts: { ...facts, game_total: total } });
+	const view = orderView(row('Swift', { line: withTotal }), ZONE, true, NOW);
+	assert.equal(view.box.expected, 'Expected score CHI 26.5, ATL 23');
+	// Once his game kicks off the cell draws no expected score, as every box score's.
+	const kicked = Date.parse(facts.kickoff ?? '');
+	const after = orderView(row('Swift', { line: withTotal }), ZONE, true, kicked);
+	assert.equal(after.box.expected, null);
+	assert.equal(typeof after.box.game === 'object' ? after.box.game?.when : null, BOX.kickedOff);
+});
+
+void test('the big figure is his projected points, the sort key beside it (Lane 139, C20)', () => {
+	assert.deepEqual(figureColumns('points_over_replacement'), ['total', 'por', 'perGame']);
 	assert.deepEqual(figureColumns('rest_of_season_points'), ['total', 'perGame']);
+	// The head of the column # sorts on is marked (fix round 1, MEDIUM-3).
+	assert.equal(sortedFigure('points_over_replacement'), 'por');
+	assert.equal(sortedFigure('rest_of_season_points'), 'total');
 	assert.equal(FIGURE_HEADS.por, 'Over repl.');
 	assert.equal(FIGURE_HEADS.total, 'Projected');
 });

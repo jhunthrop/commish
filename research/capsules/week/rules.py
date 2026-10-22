@@ -34,8 +34,9 @@ from research.capsules.page_figures import page_tenth
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
 from research.capsules.week.cells import cell_figures, misnamed, misranked
+from research.capsules.week.rank_words import fits, rank_words, superlatives_in
 from research.capsules.week.report_day import report_words
-from research.capsules.week.sheet import WeekSheet, points_text
+from research.capsules.week.sheet import STATUS_WORDS, WeekSheet, points_text
 from research.capsules.week.start_advice import start_advice_in
 
 MIN_SENTENCES: Final = 3
@@ -111,6 +112,27 @@ _UNIT_AFTER: Final = re.compile(
 _WEEK_BEFORE: Final = re.compile(r"\bweeks?\s+(?:\d{1,2}\s*(?:,|and|or|to|through|-)\s*)*$", re.IGNORECASE)
 _CLOCK_AFTER: Final = re.compile(r"^(?::\d\d)?\s*(?:am|pm)\b", re.IGNORECASE)
 _ORDINAL_OF_BEFORE: Final = re.compile(r"\d(?:st|nd|rd|th)\s+of\s+$", re.IGNORECASE)
+
+
+# What a read's first sentence carries (Lane 139, C25): a figure (`stated_figures`) or a rank ("31st of 32"),
+# the call in its own verb ("start him", "sit him", "keep him", "find a fill-in"), his status on the list, or
+# that he does not play.
+_RANK_WORD: Final = re.compile(r"\b\d+(?:st|nd|rd|th)\b", re.IGNORECASE)
+# A call is a verb of the call list said of him ("start him", "sit Gibbs", "keep him on the bench"), never
+# "sits first among" or "play Arizona" (review LOW-11).
+_CALL_WORDS: Final = re.compile(
+    r"\b(?:[Ss]tart|[Ss]it|[Bb]ench|[Kk]eep|[Hh]old|[Dd]rop|[Aa]dd|[Ff]lex|[Tt]rust)(?:s|ed|ing)? (?:him|them|[A-Z]\w+)\b|"
+    r"\bfill-in\b|\b[Pp]ick(?:s|ing)? (?:him )?up\b"
+)
+# His status as the sheet says it (`sheet.STATUS_WORDS`, the one source) and the words for a player with none.
+_STATUS_WORDS: Final = re.compile(
+    r"\b(?:"
+    + "|".join(re.escape(word.removeprefix("on ")) for word in STATUS_WORDS.values())
+    + r"|IR|PUP|designation|designated|healthy|cleared|active|practiced|practice)\b",
+    re.IGNORECASE,
+)
+_SET_UP: Final = ":"
+_ALLOWS: Final = re.compile(r"\b(?:allow\w*|gives? up|giving up|gave up|surrender\w*)\b", re.IGNORECASE)
 
 
 def _sentence_violation(what: str, sentence: str, remedy: str) -> str:
@@ -434,6 +456,66 @@ def _report_day_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[s
     return out
 
 
+def _superlative_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
+    """A points superlative the opponent's rank does not bear out (Lane 139, C01): Opp rank is points
+    allowed, 1st the fewest, so "the most" is the last rank alone (`rank_words`)."""
+    a = sheet.allowed
+    out = []
+    # Only a sentence about what an opponent allows reads as its rank (review LOW-1): "the most points of any
+    # Rams receiver" is his own figure, the cells' rule's to judge.
+    for s in (s for s in sentences if _ALLOWS.search(s)):
+        for raw, said in superlatives_in(s):
+            if a is not None and not sheet.bye and fits(said, a.rank, a.of):
+                continue
+            words = None if a is None or sheet.bye else rank_words(a.rank, a.of)
+            rank = "the facts give no opponent's rank" if a is None or sheet.bye else f"{a.rank} of {a.of} is"
+            remedy = (
+                f'Opp rank counts 1st as the fewest points allowed: {rank} "{words}".'
+                if words is not None
+                else f"Opp rank counts 1st as the fewest points allowed: {rank} said by its rank, never most or fewest."
+            )
+            out.append(_sentence_violation(f'says "{raw}"', s, remedy))
+    return out
+
+
+def _carries_the_point(text: str, season: int) -> bool:
+    """Whether a stretch of a read states a figure, a rank, the call, his status or that he does not play."""
+    return bool(
+        stated_figures(text, season)
+        or _RANK_WORD.search(text)
+        or _CALL_WORDS.search(text)
+        or _STATUS_WORDS.search(text)
+        or _DOES_NOT_PLAY.search(text)
+    )
+
+
+def _opener_violation(sentences: Sequence[str], season: int) -> list[str]:
+    """The read leads with the verb or the fact (Lane 139, C25): its first sentence carries the call, a
+    figure or his status, and opens on no set-up clause ended by a colon before it."""
+    if not sentences:
+        return []
+    first = sentences[0]
+    head, colon, _ = first.partition(_SET_UP)
+    if colon and not _carries_the_point(head, season):
+        return [
+            _sentence_violation(
+                f'opens on a set-up clause ("{head.strip()}")',
+                first,
+                "Lead with the call or the fact that decides his week, and drop the clause before the colon.",
+            )
+        ]
+    if not _carries_the_point(first, season):
+        return [
+            _sentence_violation(
+                "opens without the call, a figure or his status",
+                first,
+                "Open on the call or the fact that decides his week, with its figure or his status, never a scene "
+                "set first.",
+            )
+        ]
+    return []
+
+
 def _season_violation(text: str, season: int) -> list[str]:
     count = len(re.findall(rf"\b{season}\b", text))
     if count <= 1:
@@ -474,6 +556,8 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *_season_violation(text, sheet.season),
         *_wait_violation(text, sheet, call),
         *_code_violations(sentences),
+        *_superlative_violations(sentences, sheet),
+        *_opener_violation(sentences, sheet.season),
     ]
 
 
