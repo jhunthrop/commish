@@ -208,4 +208,21 @@ void test("a free agent's weeks past the records list no row, and his played wee
 		]
 	);
 	assert.deepEqual(view.ahead, []);
+	// Lane 138: his week of offensive snaps with no club edge is a game he played, never "Did not play".
+	const snapped = {
+		...season,
+		log: season.log.map((r) => (r.week === 2 ? { ...r, unnamedGame: true as const } : r))
+	};
+	assert.deepEqual(
+		seasonView(snapped, 'WR', [FORMAT], () => null).rows.map((row) => [
+			row.opponent,
+			row.note,
+			row.tone
+		]),
+		[
+			['vs BUF', '', 'played'],
+			['Played, no line', '', 'quiet'],
+			['Did not play', '', 'quiet']
+		]
+	);
 });

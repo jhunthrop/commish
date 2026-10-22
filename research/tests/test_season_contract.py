@@ -301,6 +301,24 @@ def test_a_week_to_play_that_is_no_clubs_game_is_refused_by_the_gate(tmp_path: P
     )
 
 
+def test_a_week_to_play_naming_an_opponent_no_club_plays_is_refused_while_his_club_plays(tmp_path: Path) -> None:
+    """Lane 138: a false row. KC is at SEA in week 7, so no club plays at KC that week, while his page club
+    DET plays GB: the reader no longer takes DET's game for the row, it refuses the page."""
+    _write_mover(tmp_path)
+    page_path = tmp_path / "runs" / _RUN / "players" / f"{_PLAYER}.json"
+    page = _read(page_path)
+    week = 7
+    log = [{**row, "opponent": "KC", "home": False} if row["week"] == week else row for row in page["season"]["log"]]
+    assert next(row for row in log if row["week"] == week)["status"] == "upcoming"
+    page_path.write_text(json.dumps({**page, "season": {**page["season"], "log": log}}))
+    record = schema_gate(tmp_path, _RUN, contract_dir(os.environ))
+    assert not record.passed
+    assert record.reasons == (
+        f"schema:players/{_PLAYER}.json:players/{_PLAYER}.json has week {week} to play at KC, but no club plays "
+        "that game that week.",
+    )
+
+
 def test_a_newest_line_of_offensive_snaps_and_no_stats_row_passes_the_gate(tmp_path: Path) -> None:
     """Gap 2: his week 5 LAC line is offensive snaps with no stats row (a game with no touches): played, at
     zero, under LAC's game."""
@@ -338,10 +356,13 @@ def test_the_line_winning_over_the_list_read_passes_the_gate_with_writer_made_bo
 
 def test_a_free_agents_snaps_in_a_week_with_no_club_edge_pass_the_gate(tmp_path: Path) -> None:
     """Gap 4: a free agent (the list after his week 6 LAC line names no club) with offensive snaps in week 3
-    and no club edge that week: the run names no club, so the week names no opponent."""
+    and no club edge that week: the run names no club, so the week names no opponent, and says he played
+    a game it cannot name (Lane 138: the log reads "Played, no line", never "Did not play")."""
     season = _write_mover(tmp_path, Mover(dict.fromkeys(_FORMER_WEEKS, _LINE), {3: _OFFENSIVE_SNAPS}, None))
     by_week = {row["week"]: row for row in season["log"]}
-    assert (by_week[3]["status"], by_week[3]["opponent"]) == ("inactive", None)
+    assert (by_week[3]["status"], by_week[3]["opponent"], by_week[3].get("unnamedGame")) == ("inactive", None, True)
+    # His weeks with no line at all are not games he played.
+    assert [by_week[w].get("unnamedGame") for w in (1, 2, 4)] == [None, None, None]
     assert _read(tmp_path / "runs" / _RUN / "players" / f"{_PLAYER}.json")["team"] == FREE_AGENT_CLUB
     record = schema_gate(tmp_path, _RUN, contract_dir(os.environ))
     assert record.passed, record.reasons

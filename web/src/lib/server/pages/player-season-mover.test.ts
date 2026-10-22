@@ -1,7 +1,8 @@
 // A mover's week still to play under the club his line was for (Lane 136): his special-teams snaps in
 // LAC's week 6 game, kicked off and not yet in the records, make the week upcoming at KC, which is his
 // page club DET's bye. The reader takes it as LAC's game and the page draws its day from LAC's slate; a
-// week that is no club's game is still refused, and the page never draws it. The page and the slate are
+// week that is no club's game is still refused, and the page never draws it, even in a week his club
+// plays (Lane 138: a false row). The page and the slate are
 // the in-season contract fixture's (research/nightly/contract/fixture). Run with `npm test`.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -70,5 +71,21 @@ void test("his own club's weeks are drawn from his own club's slate, as before",
 	assert.equal(
 		view.ahead.find((row) => row.week === 7)?.opponent,
 		`${seven.home ? 'vs' : 'at'} ${seven.opponent}`
+	);
+});
+
+void test('a week still to play naming an opponent no club plays is refused while his club plays (Lane 138)', () => {
+	// KC is at SEA in week 7, so no club plays at KC that week; DET plays GB.
+	const log = gibbs.season.log.map((row): GameLogRow =>
+		row.week === 7 ? { ...row, opponent: 'KC', home: false } : row
+	);
+	const page = { ...gibbs, season: { ...gibbs.season, log } };
+	assert.equal(
+		seasonRefusals([page], schedule).get(page.id),
+		`players/${page.id}.json has week 7 to play at KC, but no club plays that game that week.`
+	);
+	assert.throws(
+		() => seasonView(page.season, page.position, formats, kickoffsFrom(schedule.slates, page.team)),
+		/Week 7 against KC has no kickoff\./
 	);
 });

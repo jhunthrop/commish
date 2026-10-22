@@ -15,8 +15,8 @@ import {
 import { countedWeek } from '#lib/run/reach.ts';
 import type { Format, Game, Slate } from '#lib/run/schema.ts';
 import { rowGame } from '#lib/run/row-game.ts';
+import { SEASON_LOG_WORDS } from '#lib/run/season-log-words.ts';
 import { GAME_STATE_WORDS } from '#lib/format/game-facts.ts';
-import { UNKNOWN_CLUB_WEEK } from '#lib/player/club-words.ts';
 import { HELD_PAGE_WORDS } from '#lib/player/held-words.ts';
 import { STAT_COLUMNS, captionFor, type StatColumn } from '#lib/run/stat-columns.ts';
 import type { Position } from '#lib/types/player.ts';
@@ -58,8 +58,10 @@ export function kickoffsFrom(slates: readonly Slate[], team: string): KickoffOf 
 
 function opponentWords(row: GameLogRow): string {
 	if (row.status === 'bye') return 'Bye';
-	// An inactive week of a player who changed clubs before his newest line names no club (Lane 120).
-	if (row.opponent === null) return UNKNOWN_CLUB_WEEK;
+	// An inactive week of a player who changed clubs before his newest line names no club (Lane 120),
+	// nor a free agent's week of offensive snaps with no club edge, which he played (Lane 138).
+	if (row.opponent === null)
+		return row.unnamedGame === true ? SEASON_LOG_WORDS.playedNoLine : SEASON_LOG_WORDS.didNotPlay;
 	return `${row.home === true ? 'vs' : 'at'} ${row.opponent}`;
 }
 
@@ -70,7 +72,7 @@ function logRow(row: GameLogRow, columns: readonly StatColumn[]): LogRow {
 	return {
 		week: row.week,
 		opponent: opponentWords(row),
-		note: row.status === 'inactive' && row.opponent !== null ? 'Did not play' : '',
+		note: row.status === 'inactive' && row.opponent !== null ? SEASON_LOG_WORDS.didNotPlay : '',
 		tone: played ? 'played' : row.status === 'bye' ? 'bye' : 'quiet',
 		points: points === null ? null : fixed(points),
 		cells: played ? columns.map((column) => column.value(row)) : null

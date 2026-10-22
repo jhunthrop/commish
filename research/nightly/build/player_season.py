@@ -13,7 +13,9 @@ feed's own final flag where the stand-in estimated one):
   neither, the week is inactive once his club's game is in the records and upcoming before. A bye
   is a week his club does not play. A week's club is the one his line that week was for, else the page
   club (`page_club`, Lane 120); a mover's week with no line, up to his newest line, names no opponent
-  and is inactive.
+  and is inactive. A free agent's week with a line and no club edge names no opponent either, and says
+  it was a game he played that the run cannot name (`unnamedGame`, Lane 138), so the page never reads
+  it as a week he did not play.
 - The player-week feed lands in two ingests: the stat line (the scoring stats and completions) and
   the usage line (carries, targets, pass attempts and the team totals). Within a played week, a
   stat with no row is zero only when that week has his row from the same ingest and the store holds
@@ -267,8 +269,9 @@ def season_block(player_id: str, run_format: RunFormat, position: Position, cont
             club = call.club
         if club is None:
             # No club the run can name: a mover's week up to his newest line, or a free agent's (Lane 123),
-            # whose snaps with no club line name no game either.
-            log.append({**_empty(), "week": week, "opponent": None, "home": None, "status": "inactive"})
+            # whose snaps with no club line name no game either; that week he played (Lane 138).
+            unnamed = {"unnamedGame": True} if line is not None else {}
+            log.append({**_empty(), "week": week, "opponent": None, "home": None, "status": "inactive", **unnamed})
             continue
         game = next((g for g in context.games.get(club, ()) if g.week == week), None)
         if game is None:

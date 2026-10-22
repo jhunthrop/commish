@@ -64,7 +64,8 @@ function freeAgentRefusal(p: SeasonedPlayer): string | null {
 
 /** Every upcoming week is a game on a club's slate, so it has a kickoff: his club's, or, a mover's week
  * under the club his line was for, that club's game (run/row-game.ts, Lane 136). A week that is no
- * club's game is refused. */
+ * club's game is refused, and so is a row naming an opponent no club plays that week while his club
+ * plays (a false row, Lane 138). */
 const kickoffRefusal: PageRule = (p, slates) => {
 	if (isFreeAgent(p.team)) return freeAgentRefusal(p);
 	if (!slates.has(p.team)) return `players/${p.id}.json's club ${p.team} has no slate.`;
@@ -72,7 +73,11 @@ const kickoffRefusal: PageRule = (p, slates) => {
 		(row) => row.status === 'upcoming' && rowGame(slates, p.team, row) === null
 	);
 	if (!missing) return null;
-	return `players/${p.id}.json has week ${String(missing.week)} to play, but ${p.team}'s slate has no game, so no kickoff, that week.`;
+	const week = String(missing.week);
+	const own = slates.get(p.team)?.games.some((game) => game.week === missing.week) ?? false;
+	if (own && missing.opponent !== null)
+		return `players/${p.id}.json has week ${week} to play ${missing.home === true ? 'vs' : 'at'} ${missing.opponent}, but no club plays that game that week.`;
+	return `players/${p.id}.json has week ${week} to play, but ${p.team}'s slate has no game, so no kickoff, that week.`;
 };
 
 /** Every bye is a week his club does not play. A week it does not play may also be a game he played
