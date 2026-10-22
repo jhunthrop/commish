@@ -305,6 +305,22 @@
 .record td.wide.narrow {
 	display: none;
 }
+/* A week's ESPN sentence under its row, in the basis's words and colour (Lane 147): the row above
+   gives up its rule so the two read as one week. */
+.record .weeks tr.noted td {
+	border-bottom: 0;
+}
+.record .weeks tr.note td {
+	height: auto;
+	padding: 0 var(--s-2) var(--s-2) var(--s-3);
+	font-size: var(--t-sm);
+	line-height: 1.45;
+	color: var(--ink-3);
+	white-space: normal;
+}
+.record .weeks tr.note td.narrow {
+	display: none;
+}
 /* Below a wide screen one figure at a time: Week, Ours and each yardstick. */
 @media (max-width: 1180px) {
 	.record .figure-pick {
@@ -316,8 +332,12 @@
 	.record td.wide.desk {
 		display: none;
 	}
-	.record td.wide.narrow {
+	.record td.wide.narrow,
+	.record .weeks tr.note td.narrow {
 		display: table-cell;
+	}
+	.record .weeks tr.note td.desk {
+		display: none;
 	}
 	.record .weeks:not(.show-agreement) .agreement,
 	.record .weeks:not(.show-placesOff) .placesOff,

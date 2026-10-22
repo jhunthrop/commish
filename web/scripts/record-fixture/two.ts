@@ -9,8 +9,10 @@
 //   before any week of weekly rankings exists. Its figures are not a grade of anything.
 //   `published` is the same STAND-IN with the week's published projection graded beside ESPN (Lane
 //   142): its figures are week 1's ADP lines relabelled, so the front card's two yardsticks can be
-//   shot. They are not a grade of anything either.
+//   shot. They are not a grade of anything either. The graded week 7 carries the run's ESPN sentence
+//   (Lane 147), its yardstick read after the set as the week's real one was.
 import { readFile } from 'node:fs/promises';
+import { RECORDS_WORDS } from '../../src/lib/run/records.ts';
 import type { RecordLine, RecordWeek, RunRecord } from '../../src/lib/run/schema.ts';
 
 export type TwoMode = 'upcoming' | 'graded' | 'published';
@@ -49,7 +51,10 @@ function gradedStandIn(source: RecordWeek, published: readonly RecordLine[] | nu
 		order: 'rest_of_season',
 		orderAsOf: '2026-10-22T09:00:00.000Z',
 		lines: published === null ? lines : lines.map((line) => withPublished(line, published)),
-		players: source.players?.map((p) => ({ ...p, espn: p.adp, adp: null, published: null }))
+		players: source.players?.map((p) => ({ ...p, espn: p.adp, adp: null, published: null })),
+		// Week 7's ESPN yardstick came from a read after the set (Lane 146's hand fill), so the run says
+		// so under its row (Lane 147); week 8 to come says nothing.
+		espnNote: RECORDS_WORDS.espnReadAfter
 	};
 }
 

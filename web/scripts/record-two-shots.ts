@@ -22,6 +22,7 @@
 //   node scripts/record-two-shots.ts <upcoming|graded|published> [web origin] [api origin] [out dir]
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
+import { RECORDS_WORDS } from '../src/lib/run/records.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { basisLines, basisReport } from './basis-lines.ts';
 import { installFixtureApiClock } from './inseason-fixture/clock.ts';
@@ -187,7 +188,12 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 	has(draft, 'of the top 12 QB, 24 RB, 36 WR, 12 TE', where);
 	has(draft, 'ADP by 4', where);
 	has(draft, 'below 0.00 the order runs backwards', where);
+	// Week 7's ESPN sentence (Lane 147): drawn once under its row when the run carries it, nothing
+	// on a run without it.
+	const notes = await page.locator('section#weekly table.weeks tr.note td:visible').allInnerTexts();
 	if (mode === 'upcoming') {
+		if (notes.length > 0) faults.push(`${where}: draws a week's note on a run without one`);
+		lacks(weekly, /ESPN's projection this week was read/u, where);
 		has(weekly, 'Week 7 not graded yet', where);
 		has(weekly, "Grades after Monday's game.", where);
 		has(weekly, 'Set before kickoff Thu Oct 22', where);
@@ -199,6 +205,21 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 		has(weekly, "ESPN's is its own public projection in PPR", where);
 		// The weekly pairs name the leader, ESPN's where it leads (fix round 1, HIGH-1).
 		has(weekly, 'ESPN by 2', where);
+		if (notes.join('|') !== RECORDS_WORDS.espnReadAfter)
+			faults.push(`${where}: week 7's note reads ${JSON.stringify(notes)}`);
+		const after = await page
+			.locator('section#weekly table.weeks tbody tr')
+			.evaluateAll((rows): string[] =>
+				rows.map((row) =>
+					row.classList.contains('note')
+						? 'note'
+						: (row.querySelector('td.wk')?.firstChild?.textContent?.trim() ?? '')
+				)
+			);
+		const at = after.indexOf('Week 7');
+		if (after[at + 1] !== 'note') faults.push(`${where}: week 7's note is not under its row`);
+		if (after.filter((name) => name === 'note').length !== 1)
+			faults.push(`${where}: more than one week carries a note`);
 	}
 	if (who === 'espn') {
 		has(weekly, 'Your ESPN league, as it scores', where);
@@ -245,6 +266,8 @@ async function front(width: number): Promise<void> {
 		has(card, 'Our weekly rankings over week 7', where);
 		has(card, 'ESPN by 2', where);
 		lacks(card, /\bADP\b/u, where);
+		// The front card says nothing of a week's ESPN read (Lane 147).
+		lacks(card, /ESPN's projection this week was read/u, where);
 		// Both yardsticks once the published projection is graded, the leader named per pair (Lane 142).
 		if (mode === 'published') {
 			has(card, 'Published', where);

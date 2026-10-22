@@ -565,3 +565,26 @@ void test('the weekly record names its weeks and its order as weekly rankings, n
 	assert.equal(weeklyOrderWords(gradedSeven), 'Our weekly rankings, set Oct 22');
 	assert.equal(weeklyOrderWords(upcoming(8, '2026-10-30T00:15:00.000Z')), null);
 });
+
+void test("a week carries the run's ESPN sentence as written, and a run before Lane 146 parses without one (Lane 147)", () => {
+	const noted = { ...gradedSeven, espnNote: RECORDS_WORDS.espnReadAfter };
+	const eight = { ...gradedSeven, week: 8 };
+	const shown = weeklyAsRecord(run({ weekly: weekly([noted, eight]) }));
+	assert.ok(shown);
+	assert.equal(shown.weeks[0]?.espnNote, RECORDS_WORDS.espnReadAfter);
+	assert.equal(shown.weeks[1]?.espnNote, undefined);
+	// The previous run has no field: every week parses with nothing to draw (the deploy pair).
+	const old = weeklyAsRecord(run({ weekly: weekly([gradedSeven]) }));
+	assert.ok(old);
+	assert.ok(old.weeks.every((week) => week.espnNote === undefined));
+	// A sentence the web does not know is printed as the run wrote it, never rewritten.
+	const other = weeklyAsRecord(
+		run({ weekly: weekly([{ ...gradedSeven, espnNote: 'Read late.' }]) })
+	);
+	assert.equal(other?.weeks[0]?.espnNote, 'Read late.');
+	assert.throws(() => run({ weekly: weekly([{ ...gradedSeven, espnNote: '' }]) }));
+	for (const words of [RECORDS_WORDS.espnReadAfter, RECORDS_WORDS.espnUnread]) {
+		assert.doesNotMatch(words, bannedPattern(), words);
+		assert.doesNotMatch(words, /—/u, words);
+	}
+});
