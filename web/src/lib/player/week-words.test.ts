@@ -363,6 +363,7 @@ void test('the week ahead is the box row and the cell under his name', () => {
 		weather: { glyph: 'indoors', words: 'Indoors' }
 	});
 	assert.equal(next?.proj, '21.8');
+	assert.equal(next.when, 'Sun 3:05 pm CT');
 	const bye = card(
 		week(
 			{},

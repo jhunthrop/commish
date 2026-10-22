@@ -568,7 +568,8 @@ function nextOf(
 		next: {
 			week: week.week,
 			opponent: game.where,
-			when: game.when,
+			// The log's accent row says the kickoff as the cell does, with its zone (Lane 139, C11).
+			when: cell.when,
 			proj: proj === null ? NONE : printTenth(proj),
 			expected: cell.expected,
 			weather: cell.weather
