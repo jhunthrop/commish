@@ -3553,10 +3553,11 @@ components:
           format: date
           description: >-
             the day the provider expects him back from a season-long list (Lane 153), the daily player list's return
-            date, Eastern. With status questionable it is at or before the addressed week's last game day: he is this
-            week's question (designated to return), ranked as playing, season_long, since and listed absent ("Back Sun
-            Oct 25"). With a season-long status it is after this week's games and the row says when ("IR, back Nov
-            8"). Absent with no date, a date already passed, a week's designation, and from an older answer
+            date, Eastern. With status questionable it is at or before his club's game day in the addressed week: he
+            is this week's question (designated to return), ranked as playing, season_long, since and listed absent
+            ("Due back Sun Oct 25"). With a season-long status it is after his club's game this week, or his club is
+            on a bye, and the row says when ("IR, back Nov 8"). Absent with no date, a date already passed, a week's
+            designation, and from an older answer
     GamePoints:
       type: object
       required: [week, points]

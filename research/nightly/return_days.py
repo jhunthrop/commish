@@ -9,9 +9,9 @@ The status read (`designations.read_statuses`) takes the return rule's two input
   the list names him under the same status, the day is a real one, and it is no earlier than the list's
   own Eastern day (an earlier one is a date the provider let pass). The provider's `injDate` is never
   read. The list is never loaded whole (some 4 MB): the store picks out the dated entries.
-- THE WEEK. The current week's last game day, Eastern: the day of the latest kickoff of the earliest
-  week whose last kickoff falls today or later (the nflverse schedule's kickoff observations), None once
-  no game is left.
+- HIS CLUB'S GAME. The day of his club's kickoff in the current week, Eastern (Lane 153 fix round 1): the
+  earliest week whose last kickoff falls today or later (the nflverse schedule's kickoff observations, the
+  latest per club as the API reads it), his club by the player list's team. A club on a bye this week has none.
 """
 
 from collections.abc import Mapping
@@ -24,6 +24,7 @@ from sqlalchemy import Connection, text
 from research.model.designations import status_of
 from research.nightly.reads.schedule import EASTERN
 from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource
+from research.pipeline.nflverse.team_codes import product_team_code
 
 PLAYER_LIST_SOURCE: Final = "tank01_player_list"
 # The API's maxCaptureEntries: a list dating more players than this is refused, never cut.
@@ -41,6 +42,8 @@ class ListedReturn:
 
     code: str
     date: str
+    # His club in the provider's words (the product's codes: LAR, WSH), "" when the list names none.
+    team: str = ""
 
 
 def eastern_day(instant: datetime) -> date:
@@ -64,7 +67,8 @@ _LISTED: Final = text(
     "with newest as (select payload, captured_at from research.capture_snapshots "
     "where source = :source and captured_at <= :before order by captured_at desc limit 1) "
     "select n.captured_at, jsonb_typeof(n.payload) = 'array' as list, btrim(coalesce(e->>'playerID', '')) as id, "
-    "coalesce(e->'injury'->>'designation', '') as code, btrim(coalesce(e->'injury'->>'injReturnDate', '')) as day "
+    "coalesce(e->'injury'->>'designation', '') as code, btrim(coalesce(e->'injury'->>'injReturnDate', '')) as day, "
+    "upper(btrim(coalesce(e->>'team', ''))) as team "
     "from newest n left join lateral jsonb_array_elements(case when jsonb_typeof(n.payload) = 'array' "
     "then n.payload else '[]'::jsonb end) as e on jsonb_typeof(e) = 'object' and jsonb_typeof(e->'injury') = 'object' "
     "and btrim(coalesce(e->'injury'->>'injReturnDate', '')) <> '' limit :most"
@@ -94,23 +98,28 @@ def listed_returns(conn: Connection, status_at: datetime, window: timedelta) -> 
         raise ReturnDaysError(f"the player list dates over {MAX_DATED} players")
     if listed_at < status_at - window:
         return None
-    entries = {r.id: ListedReturn(r.code, r.day) for r in rows if r.id}
+    entries = {r.id: ListedReturn(r.code, r.day, r.team) for r in rows if r.id}
     return ReturnList(listed_at, entries)
 
 
-_WEEK_ENDS: Final = text(
-    "select max(as_of) as latest from research.team_week_observations "
-    "where source = :source and metric = :metric group by season, week "
-    "having max(as_of) >= :today order by latest limit 1"
+# The current week (the earliest whose latest kickoff is today or later, Eastern) and each club's game in
+# it: each club-week's latest kickoff observation, the API's read (boards.kickoffs).
+_CLUB_DAYS: Final = text(
+    "with kickoffs as (select season, week, team, max(as_of) as as_of "
+    "from research.team_week_observations where source = :source and metric = :metric "
+    "group by season, week, team), "
+    "current_week as (select season, week from kickoffs group by season, week "
+    "having max(as_of) >= :today order by max(as_of) limit 1) "
+    "select k.team, k.as_of from kickoffs k join current_week w using (season, week)"
 )
 
 
-def last_game_day(conn: Connection, now: datetime) -> date | None:
-    """The current week's last game day at `now`, Eastern: the day of the latest kickoff of the earliest
-    week whose last kickoff is today or later; None once no game is left on the schedule."""
+def club_game_days(conn: Connection, now: datetime) -> Mapping[str, date]:
+    """Each club's game day in the current week at `now`, Eastern, by the product's club code (LAR, WSH;
+    Lane 153 fix round 1). A club on a bye this week, or every club once no game is left, is absent."""
     today = datetime.combine(eastern_day(now), datetime.min.time(), EASTERN)
-    latest = conn.execute(
-        _WEEK_ENDS,
+    rows = conn.execute(
+        _CLUB_DAYS,
         {"source": ScheduleSource.KICKOFF, "metric": ScheduleMetric.KICKOFF_INSTANT, "today": today},
-    ).scalar_one_or_none()
-    return None if latest is None else eastern_day(latest)
+    ).all()
+    return {product_team_code(r.team): eastern_day(r.as_of) for r in rows}

@@ -20,8 +20,8 @@ note saying out for the season) puts him below every available player at his pos
 out, doubtful or questionable moves nothing. The provider's codes and the rule are pinned for both
 lanes in `api/testdata/designation-codes.json` (`research/model/designations.py`).
 
-THE RETURN (Lane 153). A season-long code the daily player list dates back at or before the current week's
-last game day (`return_days.py`) is this week's designation: questionable, `returning` its day, not
+THE RETURN (Lane 153). A season-long code the daily player list dates back at or before his club's game
+day this week (`return_days.py`, fix round 1) is this week's designation: questionable, `returning` its day, not
 season-long, no since, so he is ranked as playing. One dated back later keeps his list with `returning`
 carried. A passed date, or none, leaves him as he was.
 
@@ -62,8 +62,8 @@ from research.nightly.published_board import MANIFEST_FILE, driver_line
 from research.nightly.return_days import (
     ReturnDaysError,
     ReturnList,
+    club_game_days,
     eastern_day,
-    last_game_day,
     listed_returns,
     return_day,
 )
@@ -205,9 +205,9 @@ def _return_list(conn: Connection, at: datetime) -> ReturnList | None:
         return None
 
 
-def _with_return(status: PlayerStatus, day: date | None, week_day: date | None, today: date) -> PlayerStatus:
+def _with_return(status: PlayerStatus, day: date | None, game_day: date | None, today: date) -> PlayerStatus:
     """The status under the return rule (`model.designations.returning_of`)."""
-    reading = returning_of(status.status, day, week_day, today)
+    reading = returning_of(status.status, day, game_day, today)
     if reading == RETURNING_THIS_WEEK:
         return PlayerStatus(RETURNING_STATUS, False, None, day, status.status)
     if reading == RETURNING_LATER:
@@ -222,7 +222,7 @@ def _statuses(conn: Connection, source: str, newest: Capture, stored_newest: boo
     outs = by_date and any(status_of(e.designation) == "out" for e in entries.values())
     notes = _sweep_notes(conn, newest.at) if outs else {}
     returns = _return_list(conn, newest.at)
-    week_day, today = last_game_day(conn, now), eastern_day(now)
+    game_days, today = club_game_days(conn, now), eastern_day(now)
     players: dict[str, PlayerStatus] = {}
     for player_id, captured in entries.items():
         status = status_of(captured.designation)
@@ -231,8 +231,10 @@ def _statuses(conn: Connection, source: str, newest: Capture, stored_newest: boo
         note = captured.description if not by_date else notes.get(player_id) if status == "out" else None
         long = season_long(status, note)
         read = PlayerStatus(status, long, runs.get((player_id, status)) if long else None)
-        day = None if returns is None else return_day(returns.entries.get(player_id), status, returns.listed_at)
-        players[player_id] = _with_return(read, day, week_day, today)
+        entry = None if returns is None else returns.entries.get(player_id)
+        day = None if entry is None or returns is None else return_day(entry, status, returns.listed_at)
+        game_day = None if entry is None else game_days.get(entry.team)
+        players[player_id] = _with_return(read, day, game_day, today)
     # The feed's last check is this list's only when it is the newest stored: a check that returned a
     # list the floor refused never vouches for the older list shown.
     checked = _checked(conn, source) if stored_newest else None

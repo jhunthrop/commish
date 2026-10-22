@@ -131,7 +131,7 @@ const SHOTS: readonly Shot[] = [
 		verb: 'Add to my sheet',
 		weekRead: 'none',
 		returning: {
-			chip: 'Back Sun Oct 18',
+			chip: 'Due back Sun Oct 18',
 			note: 'Expected back Sun Oct 18 on the latest report, which does not move his place on our board.'
 		}
 	},

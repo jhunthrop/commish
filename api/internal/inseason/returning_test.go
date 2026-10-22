@@ -89,6 +89,40 @@ func TestADesignatedToReturnPlayerIsThisWeeksQuestion(t *testing.T) {
 	}
 }
 
+// The return day is read against his own club's game (Lane 153 fix round
+// 1): on the Wednesday of week 6, a player dated back Sunday Oct 18 is this
+// week's question on a Sunday club; on a Thursday-night club his only game
+// this week comes first, so he stays on his list with the day carried; on
+// a club with a bye he stays on his list with the day too; dated back on
+// the Thursday itself the Thursday club's player is this week's.
+func TestTheReturnDayIsReadAgainstHisClubsGame(t *testing.T) {
+	var games []boards.TeamWeek
+	games = append(games, game(6, "ARI", "ATL", time.Date(2026, 10, 15, 20, 15, 0, 0, east), false)...)
+	games = append(games, game(6, "BAL", "BUF", time.Date(2026, 10, 18, 13, 0, 0, 0, east), false)...)
+	asOf := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	data := Data{Games: games, Designations: map[string]boards.Designation{
+		"sunday":   {Code: "IR", AsOf: asOf, ReturnOn: eastDay(time.October, 18)},
+		"thursday": {Code: "IR", AsOf: asOf, ReturnOn: eastDay(time.October, 18)},
+		"bye":      {Code: "IR", AsOf: asOf, ReturnOn: eastDay(time.October, 18)},
+		"thu-back": {Code: "IR", AsOf: asOf, ReturnOn: eastDay(time.October, 15)},
+	}}
+	s := NewSeason(data, RulesOf(*fixtureSettings().Scoring.Custom), 6, time.Date(2026, 10, 14, 12, 0, 0, 0, east))
+	for _, tc := range []struct {
+		id, team, status string
+		seasonLong       bool
+	}{
+		{"sunday", "BAL", boards.StatusQuestionable, false},
+		{"thursday", "ARI", boards.StatusInjuredReserve, true},
+		{"bye", "CAR", boards.StatusInjuredReserve, true},
+		{"thu-back", "ATL", boards.StatusQuestionable, false},
+	} {
+		d := s.For(Player{BoardID: tc.id, Team: tc.team}).Designation
+		if d == nil || d.Status != tc.status || d.SeasonLong != tc.seasonLong || d.Returning == nil {
+			t.Errorf("%s (%s): %+v, want %s, season-long %v, the day carried", tc.id, tc.team, d, tc.status, tc.seasonLong)
+		}
+	}
+}
+
 // The rule's week is the Season's, at its clock: on Monday after week
 // 6's Sunday, Oct 18 has passed and says nothing; the day before, it is
 // still this week's.

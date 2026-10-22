@@ -436,14 +436,14 @@ void test('a player designated to return is this week’s question: his day, his
 	);
 	assert.deepEqual(statusOf(back, true, ZONE), {
 		rank: null,
-		mark: 'Back Sun Oct 18',
+		mark: 'Due back Sun Oct 18',
 		sits: false,
 		line: null,
 		question: true
 	});
 	assert.equal(onReserve(mason), false);
 	const drawn = boxRow(mason, 'RB', ZONE, true, NOW);
-	assert.equal(drawn.status?.mark, 'Back Sun Oct 18');
+	assert.equal(drawn.status?.mark, 'Due back Sun Oct 18');
 	assert.equal(drawn.reserve, false);
 	assert.equal(drawn.proj, 11.2);
 	assert.notEqual(drawn.game, null);
@@ -466,8 +466,8 @@ void test('a player designated to return is this week’s question: his day, his
 	});
 	assert.equal(onReserve(line({}, { designation: later })), true);
 	// The day is the provider's calendar day on every clock, never moved by a zone.
-	assert.equal(statusOf(back, false, 'Pacific/Honolulu')?.mark, 'Back Sun Oct 18');
-	assert.equal(statusOf(back, false, 'Asia/Tokyo')?.mark, 'Back Sun Oct 18');
+	assert.equal(statusOf(back, false, 'Pacific/Honolulu')?.mark, 'Due back Sun Oct 18');
+	assert.equal(statusOf(back, false, 'Asia/Tokyo')?.mark, 'Due back Sun Oct 18');
 });
 
 void test('an injured reserve row draws no matchup: the bench one says why he is a drop, the slot no points (Lane 98, B34)', () => {

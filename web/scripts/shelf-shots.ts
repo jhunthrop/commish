@@ -420,7 +420,7 @@ if (!process.env.BYTES_ONLY && lineupScreen !== undefined) {
 // playing and its chip says his day, and his shelf draws his week, no tile saying a list.
 const RETURN_CASE = {
 	slug: 'travis-etienne-jr',
-	chip: 'Back Sun Oct 18',
+	chip: 'Due back Sun Oct 18',
 	listed: onListWords('IR')
 };
 for (const screen of SCREENS.filter((s) => s.name === 'lineup' || s.name === 'players')) {

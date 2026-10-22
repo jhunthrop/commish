@@ -406,7 +406,7 @@ void test('a player designated to return this week starts with his week, his day
 	// fixture league reads him as this week's question, ranked as playing, his Proj his own.
 	const lineup = lineupRows(FIXTURE_WEEK_CLOCK);
 	const etienne = rowOf(lineup, 'travis-etienne-jr');
-	assert.equal(etienne.status?.mark, 'Back Sun Oct 18');
+	assert.equal(etienne.status?.mark, 'Due back Sun Oct 18');
 	assert.equal(etienne.status.rank, null);
 	assert.equal(etienne.reserve, false);
 	assert.equal(typeof etienne.pill?.rank, 'number');

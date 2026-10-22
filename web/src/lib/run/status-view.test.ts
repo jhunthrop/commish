@@ -43,7 +43,7 @@ void test('designated to return: due back this week is the week’s question, a 
 	};
 	assert.deepEqual(statusView(mason, CENTRAL), {
 		rank: null,
-		mark: 'Back Sun Oct 25',
+		mark: 'Due back Sun Oct 25',
 		sits: false,
 		line: null,
 		question: true

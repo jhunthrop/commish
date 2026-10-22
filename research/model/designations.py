@@ -47,10 +47,12 @@ def season_long(status: str, note: str | None) -> bool:
     return status == "out" and OUT_FOR_THE_SEASON in (note or "").lower()
 
 
-# THE RETURN RULE (Lane 153). The daily player list's return date against the week: a season-long code
-# (by itself, never a note's out for the season) due back at or before the current week's last game day
-# is this week's designation, questionable and ranked as playing; one due back later stays season-long
-# with the day carried so a row says when; a day before today has passed and says nothing. The API reads
+# THE RETURN RULE (Lane 153). The daily player list's return date against his club's game this week: a
+# season-long code (by itself, never a note's out for the season) due back at or before his club's game
+# day this week is this week's designation, questionable and ranked as playing; one due back after it,
+# or with his club on a bye, stays season-long this week with the day carried so a row says when (fix
+# round 1: a Thursday club's player dated back Sunday is not this week's); a day before today has passed
+# and says nothing. The API reads
 # the same rule (`api/internal/boards/returning.go ReturnOf`), pinned by `designation-codes.json`.
 RETURNING_STATUS: Final = "questionable"
 NO_RETURN: Final = "none"
@@ -58,11 +60,11 @@ RETURNING_THIS_WEEK: Final = "this_week"
 RETURNING_LATER: Final = "later"
 
 
-def returning_of(status: str, returning: date | None, last_game_day: date | None, today: date) -> str:
+def returning_of(status: str, returning: date | None, club_game_day: date | None, today: date) -> str:
     """What a return day makes of a designation: RETURNING_THIS_WEEK, RETURNING_LATER or NO_RETURN. Days are
-    Eastern; `last_game_day` is the current week's (None with no game left)."""
+    Eastern; `club_game_day` is his club's game day this week (None on a bye)."""
     if returning is None or status not in SEASON_LONG or returning < today:
         return NO_RETURN
-    if last_game_day is not None and returning <= last_game_day:
+    if club_game_day is not None and returning <= club_game_day:
         return RETURNING_THIS_WEEK
     return RETURNING_LATER

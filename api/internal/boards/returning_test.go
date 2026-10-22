@@ -18,7 +18,7 @@ type returningCases struct {
 			Name        string  `json:"name"`
 			Status      string  `json:"status"`
 			Returning   *string `json:"returning"`
-			LastGameDay *string `json:"last_game_day"`
+			ClubGameDay *string `json:"club_game_day"`
 			Today       string  `json:"today"`
 			Reads       string  `json:"reads"`
 		} `json:"cases"`
@@ -58,8 +58,8 @@ func TestReturnOfReadsTheSharedCases(t *testing.T) {
 			on = &day
 		}
 		var weekEnd time.Time
-		if tc.LastGameDay != nil {
-			weekEnd = easternDay(t, *tc.LastGameDay, 1)
+		if tc.ClubGameDay != nil {
+			weekEnd = easternDay(t, *tc.ClubGameDay, 1)
 		}
 		// Noon and the last minute of the day: the rule reads days, never the hour.
 		for _, now := range []time.Time{easternDay(t, tc.Today, 0).Add(12 * time.Hour), easternDay(t, tc.Today, 1).Add(-time.Minute)} {

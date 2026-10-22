@@ -65,16 +65,17 @@ func (s *Season) returnFrom(on *time.Time) *int {
 	return week
 }
 
-// weekEnd is the end of the addressed week's last game day, midnight
-// Eastern after it (the return rule's week, boards.ReturnOf), zero for a
-// week the schedule holds no game in.
-func (s *Season) weekEnd() time.Time {
-	for _, w := range s.weekEnds {
-		if w.week == s.week {
-			return w.end
-		}
+// clubDayEnd is the end of his club's game day in the addressed week,
+// midnight Eastern after its kickoff's day (the return rule's day,
+// boards.ReturnOf, Lane 153 fix round 1), zero when his club has no game
+// that week (a bye) or no club.
+func (s *Season) clubDayEnd(team string) time.Time {
+	g, ok := s.games[teamWeek{s.week, team}]
+	if !ok || team == "" || g.Kickoff.IsZero() {
+		return time.Time{}
 	}
-	return time.Time{}
+	day := g.Kickoff.In(season.Eastern())
+	return time.Date(day.Year(), day.Month(), day.Day()+1, 0, 0, 0, 0, season.Eastern())
 }
 
 // easternDay is a day held as midnight Eastern on the wire (an ISO day,

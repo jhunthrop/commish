@@ -52,7 +52,7 @@ def test_the_return_rule_is_the_apis() -> None:
     assert shared["this_week_status"] == RETURNING_STATUS
     assert shared["cases"]
     for case in shared["cases"]:
-        got = returning_of(case["status"], _day(case["returning"]), _day(case["last_game_day"]), _day(case["today"]))  # type: ignore[arg-type]
+        got = returning_of(case["status"], _day(case["returning"]), _day(case["club_game_day"]), _day(case["today"]))  # type: ignore[arg-type]
         assert got == _READINGS[case["reads"]], case["name"]
 
 
@@ -149,10 +149,11 @@ def engine() -> Any:
         databases.drop(_DATABASE)
 
 
-def _player(player_id: str, code: str, day: str, inj_date: str = "") -> Json:
+def _player(player_id: str, code: str, day: str, inj_date: str = "", team: str = "MIN") -> Json:
     return {
         "playerID": player_id,
         "longName": player_id,
+        "team": team,
         "injury": {"designation": code, "injReturnDate": day, "injDate": inj_date, "description": ""},
     }
 
@@ -161,7 +162,7 @@ def _seed(engine: Engine, player_list: list[Json]) -> None:
     by_date = {
         "injList": [
             {"playerID": p, "designation": "Injured Reserve - Designated to Return" if p == "mason" else "IR"}
-            for p in ("mason", "next", "past", "none")
+            for p in ("mason", "next", "past", "none", "thursday", "bye")
         ]
     }
     kickoffs = [
@@ -214,6 +215,10 @@ def test_the_read_makes_the_mason_shape_this_weeks_question(engine: Engine) -> N
             _player("past", "IR", "20261019", inj_date="20261025"),
             _player("none", "IR", "", inj_date="20261025"),
             _player("healthy", "", ""),
+            # Fix round 1: his club's game, not the week's. A Thursday club's player dated back Sunday has
+            # his only game first; a club on a bye has none. Both stay listed this week, their day carried.
+            _player("thursday", "IR", "20261025", team="LAC"),
+            _player("bye", "IR", "20261025", team="DAL"),
         ],
     )
     with engine.connect() as conn:
@@ -224,6 +229,8 @@ def test_the_read_makes_the_mason_shape_this_weeks_question(engine: Engine) -> N
         "next": PlayerStatus("injured_reserve", True, None, date(2026, 11, 1)),
         "past": PlayerStatus("injured_reserve", True, None),
         "none": PlayerStatus("injured_reserve", True, None),
+        "thursday": PlayerStatus("injured_reserve", True, None, date(2026, 10, 25)),
+        "bye": PlayerStatus("injured_reserve", True, None, date(2026, 10, 25)),
     }
     # On Tuesday after week 8's games, Oct 25 has passed: he reads as listed again, his day said nothing.
     with engine.connect() as conn:

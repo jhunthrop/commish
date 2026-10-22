@@ -464,11 +464,11 @@ func (s *Season) designation(p Player) *Designation {
 
 // read is the capture's designation for him at the Season's week and
 // clock, under the return rule (boards.ReturnOf, Lane 153): a season-long
-// code due back by the week's last game day is this week's question,
-// never a list, never carried over; one due back later keeps its list
-// and carries the day.
+// code due back by his club's game day this week is this week's question,
+// never a list, never carried over; one due back after it, or on a bye
+// week, keeps its list and carries the day.
 func (s *Season) read(d boards.Designation, p Player, status string) *Designation {
-	back := boards.ReturnOf(status, d.ReturnOn, s.weekEnd(), s.now)
+	back := boards.ReturnOf(status, d.ReturnOn, s.clubDayEnd(p.Team), s.now)
 	if back == boards.ReturnThisWeek {
 		return &Designation{Status: boards.ReturningStatus, AsOf: d.AsOf, Returning: d.ReturnOn, Pending: d.DatingPending}
 	}
