@@ -27,7 +27,7 @@
 	import { inSeasonApi, type LineupAdvice, type Scoreboard } from './inseason/api.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
-	import { gamePart } from './box/basis.ts';
+	import { gamePart, unlistedCrowded, unlistedLong } from './box/basis.ts';
 	import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 	import { BENCH_ANCHOR } from './box/lineup.ts';
 	import RosterPanel from './RosterPanel.svelte';
@@ -306,14 +306,15 @@
 							)
 						: null,
 					// The season panel names the zone once, so the read's time does not repeat it. Where the
-					// FFPC teams' sentence carries its pace clause, the Game cell's read alone (the Lineup says
-					// what the cell is), so the phone keeps to eight lines (Lane 127 fix round 3).
-					advice
+					// FFPC teams' words run long (unlistedLong), the Game cell's read alone (the Lineup says
+					// what the cell is), so the phone keeps to eight lines (Lane 127 fix round 3); crowded
+					// (unlistedCrowded), the Lineup says its read too (Lane 137).
+					advice && !unlistedCrowded(unlistedDrawn(bugs))
 						? gamePart(
 								advice.slots.flatMap((s) => (s.host ? [s.host] : [])),
 								{ zone: memberZone(), zoned: false },
 								now.getTime(),
-								unlistedDrawn(bugs).paced ? 'read' : 'full'
+								unlistedLong(unlistedDrawn(bugs)) ? 'read' : 'full'
 							)
 						: null
 				].filter((line): line is string => line !== null)

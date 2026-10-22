@@ -17,6 +17,7 @@ import { hostWords } from '../names.ts';
 import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
 import {
 	AS_OF_KICKOFF,
+	unlistedCrowded,
 	leagueScoringWords,
 	finalNonePart,
 	NONE_UNLISTED,
@@ -983,5 +984,8 @@ export function teamBasis(
 		.join(' ');
 	const final = words === '' ? '' : ` ${words}`;
 	const extra = bonus === null ? '' : ` ${bonus}`;
-	return `A team's ${BOX.proj} adds its starters' published projections${whose}, ${when}${started ? `, ${AS_OF_KICKOFF}` : ''}.${extra} ${BOX.pts} are ${platform}'s so far${team}.${final}`;
+	// Crowded (unlistedCrowded), "as of kickoff" goes too, so the phone keeps to eight lines (Lane 137,
+	// B107): a best lineup is not held at kickoff anyway.
+	const asOf = started && !unlistedCrowded(unlisted);
+	return `A team's ${BOX.proj} adds its starters' published projections${whose}, ${when}${asOf ? `, ${AS_OF_KICKOFF}` : ''}.${extra} ${BOX.pts} are ${platform}'s so far${team}.${final}`;
 }

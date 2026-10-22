@@ -320,12 +320,29 @@ export function ffpcBeforeSunday(
 	const ffpc = ffpcStandIn(week);
 	const { scoreboard, stateOf } = ffpcScoreboard(week, ffpc, moment, recorded);
 	// The Matchup's opponent unlisted as FFPC's read holds him from Thursday night on too (Lane 137,
-	// B107 and its addendum): his Proj the board's best lineup.
+	// B107 and its addendum): his Proj the board's best lineup, both teams' points the board's, as one
+	// read holds them.
 	return {
 		...ffpc,
+		sync: boardPoints(ffpc.sync, scoreboard),
 		matchup: unlistedMatchup(ffpc.matchup, week.sync.me, scoreboard, stateOf),
 		scoreboard
 	};
+}
+
+/** The read's matchup with each team's points as the board holds them at the clock (one FFPC read
+ * gives both), so the Matchup's Pts are the home bug's (Lane 137, the B107 addendum). */
+function boardPoints(sync: LeagueSync, scoreboard: Scoreboard): LeagueSync {
+	const points = new Map(
+		scoreboard.games.flatMap((g) => g.sides).map((s) => [s.roster_id, s.points] as const)
+	);
+	const at = <S extends { roster_id: number; points: number }>(side: S): S => ({
+		...side,
+		points: points.get(side.roster_id) ?? side.points
+	});
+	const m = sync.matchup;
+	if (m === null) return sync;
+	return { ...sync, matchup: { ...m, mine: at(m.mine), opponent: m.opponent && at(m.opponent) } };
 }
 
 /** The Matchup as FFPC's read holds it (ffpcsnap.go ownLineupOnly): the opponent lists no starters, his

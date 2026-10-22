@@ -167,8 +167,8 @@ async function homeBug(page: Page): Promise<BugRead & { points: string }> {
 	};
 }
 
-/** The opponent's big figure on each screen before Sunday, by theme and width: the Matchup's must be
- * the home's, never "--" (Lane 137, B107: one figure per side across screens). */
+/** The opponent's figure on each screen before Sunday, by theme and width: the Matchup's must be the
+ * home's, never "--" (Lane 137, B107: one figure per side across screens). */
 const beforeSundayProj = new Map<string, { matchup?: string; home?: string }>();
 
 /** Every other home bug as it reads (Lane 125, B104): "head: small/big | small/big", the faults of a
@@ -203,8 +203,10 @@ async function otherBugs(
 	return { said, faults, noProjFinal };
 }
 
-/** The home footer's words for the teams FFPC sends no lineup for (basis.ts unlistedPart). */
-const UNLISTED_NAMED = /teams FFPC sends no lineup/gi;
+/** The home footer's words for the teams FFPC sends no lineup for (basis.ts unlistedPart), and its
+ * second sentence for those it sends no roster for either (Lane 137, B107), said once at most. */
+const UNLISTED_NAMED = /teams FFPC sends no lineup for/gi;
+const ROSTERLESS_NAMED = /Teams FFPC sends no lineup or roster for/g;
 const NO_PROJ_FINAL_SAID = 'have no Proj final';
 
 /** How many times the footer names the teams FFPC sends no lineup for, and whether it says they have
@@ -212,10 +214,11 @@ const NO_PROJ_FINAL_SAID = 'have no Proj final';
 async function unlistedSaid(
 	page: Page,
 	basis = '[data-basis="league"]'
-): Promise<{ times: number; noProjFinal: boolean }> {
+): Promise<{ times: number; rosterless: number; noProjFinal: boolean }> {
 	const text = await drawn(page.locator(basis));
 	return {
 		times: [...text.matchAll(UNLISTED_NAMED)].length,
+		rosterless: [...text.matchAll(ROSTERLESS_NAMED)].length,
 		noProjFinal: text.includes(NO_PROJ_FINAL_SAID)
 	};
 }
@@ -269,9 +272,12 @@ for (const theme of THEMES)
 				// Before Sunday the opponent's Proj is his best lineup's on both screens (Lane 137, B107).
 				if (bug !== null && want.opponentFinal === null && screen.name !== 'front') {
 					const key = `${theme} ${String(width)}`;
-					beforeSundayProj.set(key, { ...beforeSundayProj.get(key), [screen.name]: bug.big });
-					if (bug.big === BOX.none || bug.big === '')
-						faults.push(`${at}: the opponent's Proj "${bug.big}" before Sunday`);
+					// The figure he draws in the game's state: his Proj before kickoff, his Proj final after.
+					const figure =
+						bug.opponent === '' ? bug.big : bug.opponent.replace(`${BOX.projFinal} `, '');
+					beforeSundayProj.set(key, { ...beforeSundayProj.get(key), [screen.name]: figure });
+					if (figure === BOX.none || figure === '')
+						faults.push(`${at}: the opponent's figure "${figure}" before Sunday`);
 				}
 				// At the live clock the opponent's Proj final is above his points (his back at pace).
 				if (day === 'monday-live' && screen.name === 'home') {
@@ -303,6 +309,8 @@ for (const theme of THEMES)
 					const said = await unlistedSaid(page);
 					if (said.times !== want.unlistedSaid)
 						faults.push(`${at}: the unlisted teams said ${String(said.times)} times`);
+					if (said.rosterless > 1)
+						faults.push(`${at}: the rosterless teams said ${String(said.rosterless)} times`);
 					if (said.noProjFinal && !others.noProjFinal)
 						faults.push(`${at}: the footer says no Proj final where no game under way draws one`);
 				}
@@ -320,7 +328,9 @@ for (const theme of THEMES)
 		}
 await browser.close();
 for (const [key, proj] of beforeSundayProj) {
-	footers.push(`  ${key}: opponent Proj Matchup ${proj.matchup ?? '?'}, home ${proj.home ?? '?'}`);
+	footers.push(
+		`  ${key}: opponent figure Matchup ${proj.matchup ?? '?'}, home ${proj.home ?? '?'}`
+	);
 	if (proj.matchup !== proj.home)
 		faults.push(
 			`${day} ${key}: Matchup Proj ${proj.matchup ?? '?'} is not the home's ${proj.home ?? '?'}`

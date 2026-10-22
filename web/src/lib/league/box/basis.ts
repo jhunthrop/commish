@@ -96,12 +96,26 @@ export const NONE_UNLISTED: UnlistedDrawn = {
  * players of it with one (Lane 137, B107). */
 const BEST_LINEUP_FROM = {
 	rosters: 'their rosters',
-	projected: `the players with a ${BOX.proj} on their rosters`
+	projected: `the players with a ${BOX.proj}`
 } as const;
 
 /** How a best lineup's in-play player counts where the platform gives no player's points (Lane 127 fix
  * round 3, roster_projection.go inPlayAt): the clause the sentence gains while a Proj final is drawn. */
 export const PACE_CLAUSE = "in-play players at their projection's pace";
+
+/** Whether the teams' words run past the one plain sentence (its pace clause, its "players with a Proj",
+ * or the second sentence for the teams with no roster): the League page's Game cell then says its read
+ * alone, so the phone's basis keeps to eight lines (Lane 127 fix round 3, Lane 137). */
+export function unlistedLong(drawn: UnlistedDrawn): boolean {
+	return drawn.bestLineup && (drawn.paced || drawn.skipped || drawn.noRoster);
+}
+
+/** Whether the teams' words carry their pace clause and another extra beside it (the players with a
+ * Proj, or the teams with no roster): the League page then leaves the Game cell's read to the Lineup,
+ * so the phone's basis keeps to eight lines (Lane 137, B107). */
+export function unlistedCrowded(drawn: UnlistedDrawn): boolean {
+	return unlistedLong(drawn) && drawn.paced && (drawn.skipped || drawn.noRoster);
+}
 
 /** The words for the teams a platform sends no lineup for (Lane 127 fix round 1): one sentence covers
  * their Proj and their Proj final alike, said once, "from the players with a Proj" where a lineup
@@ -606,11 +620,19 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	// What the Team row's small figure is while a starter still plays (Lane 92, B22; once every one is
 	// final the row reads Final, Lane 121 B99, and needs no key).
 	const projFinal = kicked && facts.allFinal !== true;
+	const unlisted = facts.unlisted ?? NONE_UNLISTED;
+	// Where the opponent's figure is our best lineup's, the phone says the Proj final in one sentence,
+	// why a "--" is where one is, else what it adds (projFinalPhone, as the League page does), and while
+	// the teams' words run long the Game cell's read alone, so it keeps to eight lines (Lane 137, B107).
+	const missing = facts.noFinal === true;
 	const final = [
-		...said(projFinalWords(projFinal, facts.noFinal === true)),
+		...(unlisted.bestLineup
+			? deskOrPhone(projFinalWords(projFinal, missing), projFinalPhone(projFinal, missing))
+			: said(projFinalWords(projFinal, missing))),
 		...said(facts.finalNone === true ? finalNonePart(facts.host) : null),
-		...said(unlistedPart(facts.host, facts.unlisted ?? NONE_UNLISTED))
+		...said(unlistedPart(facts.host, unlisted))
 	];
+	const game = gamePart(facts.lines, clock, now, 'full');
 	const { lineup } = facts;
 	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.
 	const team = lineup === null && facts.teamTotal ? 'platform' : 'rows';
@@ -625,7 +647,9 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 			...final,
 			...said(RANK_PART),
 			...said(pts),
-			...said(gamePart(facts.lines, clock, now, 'full')),
+			...(unlistedLong(unlisted)
+				? deskOrPhone(game, gamePart(facts.lines, clock, now, 'read'))
+				: said(game)),
 			...waiting(true)
 		];
 	// The phone Lineup's eight lines (Lane 115, B83): the rule our pick follows said in one clause with

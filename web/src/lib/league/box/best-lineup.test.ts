@@ -19,7 +19,14 @@ import type {
 	WaiverAdvice
 } from '../inseason/api.ts';
 import { bugsOf, teamBasis, unlistedDrawn } from '../home/home.ts';
-import { boxBasisParts, drawnText, NONE_UNLISTED, unlistedPart } from './basis.ts';
+import {
+	boxBasisParts,
+	drawnText,
+	NONE_UNLISTED,
+	unlistedCrowded,
+	unlistedLong,
+	unlistedPart
+} from './basis.ts';
 import { BOX } from './box.ts';
 import { bugFigures, matchupUnlisted, sideBox, standingLine } from './matchup.ts';
 
@@ -49,7 +56,7 @@ const recorded = {
 const FRIDAY = Date.parse(FIXTURE_FRIDAY_CLOCK);
 const BEST = 'Proj for teams FFPC sends no lineup for is our best lineup from their rosters.';
 const BEST_PROJECTED =
-	'Proj for teams FFPC sends no lineup for is our best lineup from the players with a Proj on their rosters.';
+	'Proj for teams FFPC sends no lineup for is our best lineup from the players with a Proj.';
 const NO_ROSTER = 'Teams FFPC sends no lineup or roster for read --.';
 
 /** The FFPC stand-in on its Friday as the stand-in API sends it (serve.ts). */
@@ -198,4 +205,61 @@ void test('a team with neither lineup nor roster is explained beside best-lineup
 	// Only beside a team that draws "--": a board with none says the best lineup's sentence alone.
 	assert.equal(unlistedPart('ffpc', { ...NONE_UNLISTED, bestLineup: true }), BEST);
 	assert.equal(unlistedPart('ffpc', { ...NONE_UNLISTED, noRoster: true }), NO_ROSTER);
+});
+
+void test("the League page's Game cell says its read alone only while the teams' words run past the one plain sentence", () => {
+	const best = { ...NONE_UNLISTED, bestLineup: true };
+	assert.equal(unlistedLong(best), false);
+	assert.equal(unlistedLong({ ...best, skipped: true }), true);
+	assert.equal(unlistedLong({ ...best, noRoster: true }), true);
+	assert.equal(unlistedLong({ ...best, paced: true }), true);
+	assert.equal(unlistedLong({ ...NONE_UNLISTED, noRoster: true }), false);
+	// Crowded: the pace clause and another extra; the League page then leaves the Game read and "as of
+	// kickoff" out (LeaguePage.svelte, teamBasis).
+	assert.equal(unlistedCrowded({ ...best, paced: true }), false);
+	assert.equal(unlistedCrowded({ ...best, paced: true, noRoster: true }), true);
+	assert.equal(unlistedCrowded({ ...best, skipped: true, noRoster: true }), false);
+	const crowded = { ...best, paced: true, skipped: true };
+	const basis = (drawn: typeof best) =>
+		teamBasis(
+			'ffpc',
+			null,
+			friday.scoreboard.projection_scoring,
+			false,
+			ZONE,
+			true,
+			false,
+			true,
+			false,
+			drawn
+		);
+	assert.match(basis(best), /as of kickoff once started/);
+	assert.doesNotMatch(basis(crowded), /as of kickoff/);
+});
+
+void test('the Matchup phone says the Proj final in one sentence and the Game read alone while the teams words run long', () => {
+	const { side, totals } = fridayOpponent();
+	const unlisted = { ...matchupUnlisted(side, totals), noRoster: true };
+	const box = friday.matchup;
+	const parts = boxBasisParts(
+		{
+			projection: { readAt: box.projection_read_at, scoring: box.projection_scoring },
+			lines: box.sides.flatMap((s) => [...s.starters.map((st) => st.line), ...s.bench]),
+			byPlayer: false,
+			teamTotal: true,
+			host: 'ffpc',
+			noFinal: true,
+			unlisted,
+			lineup: null
+		},
+		{ zone: ZONE, zoned: false },
+		Date.parse('2026-10-18T18:30:00.000Z')
+	);
+	const desk = drawnText(parts, 'desk');
+	const phone = drawnText(parts, 'phone');
+	assert.match(desk, /Proj final adds the Pts/);
+	assert.doesNotMatch(phone, /Proj final adds the Pts/);
+	assert.match(phone, /No Proj final while/);
+	assert.match(desk, /Game is each club's expected points/);
+	assert.match(phone, /Game was read/);
 });
