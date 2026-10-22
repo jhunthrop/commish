@@ -1,8 +1,11 @@
 package inseason
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -242,6 +245,8 @@ func TestANewStatusIsNeverServedUndated(t *testing.T) {
 	if d, err := c.DatedDesignations(ctx); err != nil || served(d).CarriedOver || served(d).Status != boards.StatusQuestionable {
 		t.Fatalf("15:00: %+v %v", served(d), err)
 	}
+	// The cold read's dating lands behind it (Lane 129).
+	c.refreshes.Wait()
 	reads.capture(friday.Add(time.Hour), "O")
 	reads.mu.Lock()
 	reads.gate = make(chan struct{})
@@ -275,16 +280,19 @@ func TestANewStatusIsNeverServedUndated(t *testing.T) {
 // A cold start whose dating read fails is never served as if dated (Lane
 // 116, B91): the capture answers marked pending, so on a turned week past
 // his club's last game p2's Out shows alone, neither listed nor carried
-// over (never "still listed"). Nothing is kept, so the next request reads
-// the pair again, and once its dating lands he is Out, listed at its run's
-// start, carried over from the game played after it.
+// over (never "still listed"). The failure stands DatingRetryAfter (Lane
+// 129): the requests inside it answer pending at once and read nothing
+// again; past it the next request starts one dating behind it, and once
+// that lands he is Out, listed at its run's start, carried over from the
+// game played after it.
 func TestAColdStartsFailedDatingIsPendingUntilItLands(t *testing.T) {
 	sunday := time.Date(2026, 10, 18, 17, 0, 0, 0, time.UTC)
 	reads := &movingCaptures{runsDown: true}
 	reads.capture(sunday.Add(-48*time.Hour), "O")
 	reads.capture(sunday.Add(-24*time.Hour), "O")
 	tuesday := sunday.Add(48 * time.Hour)
-	c := &Cache{Reads: reads, Now: func() time.Time { return tuesday }}
+	clock := &lockedClock{now: tuesday}
+	c := &Cache{Reads: reads, Now: clock.Now}
 	ctx := context.Background()
 	games := []boards.TeamWeek{
 		{Team: "BUF", Week: 7, Kickoff: sunday, Final: true},
@@ -302,17 +310,112 @@ func TestAColdStartsFailedDatingIsPendingUntilItLands(t *testing.T) {
 	if !d["p2"].DatingPending {
 		t.Fatalf("cold start, dating down: %+v, want it marked pending", d["p2"])
 	}
+	c.refreshes.Wait()
 	reads.mu.Lock()
 	reads.runsDown = false
 	reads.mu.Unlock()
+	clock.add(DatingRetryAfter - time.Second)
+	for i := 0; i < 5; i++ {
+		if d, err = c.DatedDesignations(ctx); err != nil || !d["p2"].DatingPending {
+			t.Fatalf("inside the retry: %+v %v, want it pending", d["p2"], err)
+		}
+	}
+	c.refreshes.Wait()
+	if n := reads.runs.Load(); n != 1 {
+		t.Fatalf("%d runs reads inside DatingRetryAfter, want the failed one alone", n)
+	}
+	clock.add(time.Second)
+	if d, err = c.DatedDesignations(ctx); err != nil || !d["p2"].DatingPending {
+		t.Fatalf("the request that starts the retry: %+v %v, want it pending, not waiting", d["p2"], err)
+	}
+	c.refreshes.Wait()
 	d, err = c.DatedDesignations(ctx)
 	got = served(d)
 	if err != nil || d["p2"].DatingPending || got == nil || !got.CarriedOver || got.Listed == nil || !got.Listed.Equal(sunday.Add(-48*time.Hour)) {
-		t.Fatalf("next refill, dating up: %+v %+v %v, want Out listed Friday, carried over", got, d["p2"], err)
+		t.Fatalf("once the retry lands: %+v %+v %v, want Out listed Friday, carried over", got, d["p2"], err)
 	}
 	if n := reads.runs.Load(); n != 2 {
-		t.Fatalf("%d runs reads, want the failed one and the refill", n)
+		t.Fatalf("%d runs reads, want the failed one and the retry", n)
 	}
+}
+
+// slowRuns is the production shape of the failure (Lane 129): the runs
+// read takes longer than a request's read bound, and the capture read is
+// quick.
+type slowRuns struct {
+	countingReads
+	took time.Duration
+}
+
+func (r *slowRuns) DesignationRuns(ctx context.Context, newest time.Time) (map[boards.RunKey]time.Time, error) {
+	select {
+	case <-time.After(r.took):
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	return r.countingReads.DesignationRuns(ctx, newest)
+}
+
+// A dating slower than the read bound never holds a request and still
+// lands (Lane 129): the cold request answers the capture pending at once,
+// the dating reads behind it under its own bound, and from then on every
+// request answers the dated pair from the cache.
+func TestASlowDatingNeverHoldsARequest(t *testing.T) {
+	reads := &slowRuns{took: 300 * time.Millisecond}
+	var logged bytes.Buffer
+	c := &Cache{Reads: reads, Now: time.Now, Timeout: 100 * time.Millisecond, DatingTimeout: 5 * time.Second,
+		Log: slog.New(slog.NewTextHandler(&logged, nil))}
+	ctx := context.Background()
+	start := time.Now()
+	d, err := c.DatedDesignations(ctx)
+	if took := time.Since(start); err != nil || took > 100*time.Millisecond || !d["p2"].DatingPending {
+		t.Fatalf("cold: %+v %v in %v, want the capture pending at once", d["p2"], err, took)
+	}
+	c.refreshes.Wait()
+	if strings.Contains(logged.String(), "not read") {
+		t.Fatalf("the dating failed: %s", logged.String())
+	}
+	for i := 0; i < 3; i++ {
+		start = time.Now()
+		d, err = c.DatedDesignations(ctx)
+		if took := time.Since(start); err != nil || took > 10*time.Millisecond || d["p2"].DatingPending || d["p2"].Since == nil {
+			t.Fatalf("warm: %+v %v in %v, want the dated pair at once", d["p2"], err, took)
+		}
+	}
+	if n := reads.runs.Load(); n != 1 {
+		t.Fatalf("%d runs reads, want one", n)
+	}
+}
+
+// A dated pair stands while its refresh fails, up to PairMaxAge: past it
+// the newest capture answers pending, so a status never stays hours old
+// behind a dating that keeps failing (Lane 129).
+func TestAPairPastItsAgeGivesWayToTheNewestCapture(t *testing.T) {
+	friday := time.Date(2026, 10, 23, 15, 0, 0, 0, time.UTC)
+	reads := &movingCaptures{}
+	reads.capture(friday, "Q")
+	clock := &lockedClock{now: friday.Add(time.Minute)}
+	c := &Cache{Reads: reads, Now: clock.Now}
+	ctx := context.Background()
+	if _, err := c.DatedDesignations(ctx); err != nil {
+		t.Fatal(err)
+	}
+	c.refreshes.Wait()
+	reads.mu.Lock()
+	reads.runsDown = true
+	reads.mu.Unlock()
+	reads.capture(friday.Add(time.Hour), "O")
+	clock.add(time.Hour)
+	if d, err := c.DatedDesignations(ctx); err != nil || d["p2"].Code != "Q" || d["p2"].Listed == nil {
+		t.Fatalf("an hour on, dating down: %+v %v, want the dated 15:00 pair", d["p2"], err)
+	}
+	c.refreshes.Wait()
+	clock.add(PairMaxAge)
+	d, err := c.DatedDesignations(ctx)
+	if err != nil || d["p2"].Code != "O" || !d["p2"].DatingPending {
+		t.Fatalf("past PairMaxAge, dating down: %+v %v, want the 16:00 capture pending", d["p2"], err)
+	}
+	c.refreshes.Wait()
 }
 
 // A refresh that fails keeps the value it was refreshing; the next read

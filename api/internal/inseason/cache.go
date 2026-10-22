@@ -2,7 +2,6 @@ package inseason
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -40,6 +39,26 @@ const RetryAfter = 30 * time.Second
 // timeout, and every request waiting on the read waits on it.
 const ReadTimeout = 5 * time.Second
 
+// The capture's dating (Lane 129). It is read only behind the requests,
+// on the server's context, so it has a bound of its own: the runs read
+// walks every capture in its window and outgrew ReadTimeout in
+// production. A dating that fails is tried again DatingRetryAfter later,
+// the capture answering marked DatingPending meanwhile. A dated pair
+// answers while younger than PairMaxAge (two hourly captures); past it,
+// with its dating still failing, the newest capture answers pending, so a
+// status is never hours old.
+const (
+	DatingTimeout    = 30 * time.Second
+	DatingRetryAfter = time.Minute
+	PairMaxAge       = 2 * time.Hour
+)
+
+// The cache keys of the capture alone and of the dated pair.
+const (
+	captureKey = "designations/capture"
+	datedKey   = "designations"
+)
+
 // Cache keeps the reads for their TTLs, each read once however many
 // requests ask for it at the same time, as the board cache does. Past
 // its TTL a read is refreshed behind the value kept (cached).
@@ -48,6 +67,9 @@ type Cache struct {
 	Now   func() time.Time
 	// Timeout bounds each read, ReadTimeout when zero.
 	Timeout time.Duration
+	// DatingTimeout bounds the dating read behind the requests, the
+	// constant DatingTimeout when zero.
+	DatingTimeout time.Duration
 	// Log takes each fill's duration and a read that failed; nil discards
 	// them.
 	Log *slog.Logger
@@ -154,45 +176,59 @@ func (c *Cache) Projection(ctx context.Context, season, week int) (boards.WeekPr
 // reads as carried over on a turned week (Season.carriedOver), so a status
 // new this hour must never be served undated while its date can be read.
 //
-// A dating read that fails is logged. With a pair kept, that pair stands
-// and the next request past the TTL tries again; with none, the capture
-// answers undated and marked DatingPending (Lane 116, B91), so a row says
-// the designation alone rather than the board losing its statuses, never
-// "still listed" or carried over, and nothing is kept, so the next request
-// reads the pair again.
+// No request waits on a dating (Lane 129): with no pair kept, or the one
+// kept past PairMaxAge, the capture alone answers marked DatingPending
+// (Lane 116, B91), so a row says the designation alone, never "still
+// listed" or carried over, while its dating is read behind it; a dating
+// that fails is tried again DatingRetryAfter later, never by each request.
 func (c *Cache) DatedDesignations(ctx context.Context) (map[string]boards.Designation, error) {
-	designations, err := cached(c, ctx, "designations", CaptureTTL, c.readDated)
-	var undated *undatedCapture
-	if errors.As(err, &undated) {
-		if c.Log != nil {
-			c.Log.Warn("inseason: the designation runs were not read; the statuses answer undated", "err", undated.err)
+	if e, ok := c.kept(datedKey); ok && c.Now().Sub(e.at) <= PairMaxAge {
+		if c.Now().Sub(e.at) > CaptureTTL {
+			c.dateBehind(c.readDated)
 		}
-		return boards.DatingPending(undated.designations), nil
+		return e.value.(map[string]boards.Designation), nil
 	}
-	return designations, err
+	capture, err := cached(c, ctx, captureKey, CaptureTTL, c.Reads.Designations)
+	if err != nil {
+		return nil, err
+	}
+	c.dateBehind(func(ctx context.Context) (map[string]boards.Designation, error) {
+		return c.dated(ctx, capture)
+	})
+	return boards.DatingPending(capture), nil
 }
 
-// undatedCapture is a capture read whose dating failed: the capture, and
-// the dating read's error.
-type undatedCapture struct {
-	designations map[string]boards.Designation
-	err          error
+// dateBehind reads the dated pair behind the requests (refreshBehind)
+// under the dating's own bound and retry.
+func (c *Cache) dateBehind(read func(context.Context) (map[string]boards.Designation, error)) {
+	refreshBehind(c, datedKey, refresh{
+		timeout: c.datingTimeout(), retryAfter: DatingRetryAfter,
+		failed: "inseason: the designation runs were not read; the statuses answer pending until the next try",
+	}, read)
 }
-
-func (u *undatedCapture) Error() string { return "the capture's dating: " + u.err.Error() }
-func (u *undatedCapture) Unwrap() error { return u.err }
 
 // readDated reads the newest capture and then its runs, the capture dated
-// by them; a dating that fails is an *undatedCapture, so the pair is not
-// kept.
+// by them. The capture is kept on its own as well, so a pair past
+// PairMaxAge gives way to the newest capture read, not the one the cache
+// started from.
 func (c *Cache) readDated(ctx context.Context) (map[string]boards.Designation, error) {
 	designations, err := c.Reads.Designations(ctx)
-	if err != nil || len(designations) == 0 {
-		return designations, err
+	if err != nil {
+		return nil, err
+	}
+	c.keep(captureKey, designations)
+	return c.dated(ctx, designations)
+}
+
+// dated is the capture dated by its runs; a capture listing nobody has
+// none to read.
+func (c *Cache) dated(ctx context.Context, designations map[string]boards.Designation) (map[string]boards.Designation, error) {
+	if len(designations) == 0 {
+		return designations, nil
 	}
 	runs, err := c.Reads.DesignationRuns(ctx, boards.Newest(designations))
 	if err != nil {
-		return nil, &undatedCapture{designations: designations, err: err}
+		return nil, fmt.Errorf("the capture's dating: %w", err)
 	}
 	return boards.WithSince(designations, runs), nil
 }
@@ -210,7 +246,7 @@ func cached[V any](c *Cache, ctx context.Context, key string, ttl time.Duration,
 func cachedUnless[V any](c *Cache, ctx context.Context, key string, stale func(entry) bool, read func(context.Context) (V, error)) (V, error) {
 	if e, ok := c.kept(key); ok {
 		if stale(e) {
-			refreshBehind(c, key, read)
+			refreshBehind(c, key, c.readRefresh(), read)
 		}
 		return e.value.(V), nil
 	}
@@ -221,7 +257,7 @@ func cachedUnless[V any](c *Cache, ctx context.Context, key string, stale func(e
 			return e.value, nil
 		}
 		// The read is shared: one viewer leaving must not fail the rest.
-		return fill(c, context.WithoutCancel(ctx), key, read, false)
+		return fill(c, context.WithoutCancel(ctx), key, c.timeout(), read, false)
 	})
 	if err != nil {
 		var zero V
@@ -230,16 +266,30 @@ func cachedUnless[V any](c *Cache, ctx context.Context, key string, stale func(e
 	return v.(V), nil
 }
 
+// refresh is how a read behind the requests runs: its bound, how long a
+// failure stands before the next try, and the line a failure logs.
+type refresh struct {
+	timeout    time.Duration
+	retryAfter time.Duration
+	failed     string
+}
+
+// readRefresh is a kept read's refresh: the read's own bound, RetryAfter.
+func (c *Cache) readRefresh() refresh {
+	return refresh{timeout: c.timeout(), retryAfter: RetryAfter, failed: "inseason: a refresh failed; the kept read answers until the next"}
+}
+
 // refreshBehind reads key again in the background unless a refresh of it
-// is already running, or one failed under RetryAfter ago. The refresh runs
-// on the server's context (Context), never a request's: shutdown cancels
-// it and Drain waits for it. A refresh that fails is logged and the kept
-// value stands, so a read past the TTL tries again after RetryAfter.
-func refreshBehind[V any](c *Cache, key string, read func(context.Context) (V, error)) {
+// is already running, or one failed under its retryAfter ago. The refresh
+// runs on the server's context (Context), never a request's: shutdown
+// cancels it and Drain waits for it. A refresh that fails is logged and
+// the kept value stands, so a read past the TTL tries again after
+// retryAfter.
+func refreshBehind[V any](c *Cache, key string, how refresh, read func(context.Context) (V, error)) {
 	c.mu.Lock()
 	// Once shutdown has begun no refresh starts, so Drain never waits on
 	// a refresh added while it waits.
-	if c.draining || c.base().Err() != nil || c.refreshing[key] || c.Now().Sub(c.failed[key]) < RetryAfter {
+	if c.draining || c.base().Err() != nil || c.refreshing[key] || c.Now().Sub(c.failed[key]) < how.retryAfter {
 		c.mu.Unlock()
 		return
 	}
@@ -251,7 +301,7 @@ func refreshBehind[V any](c *Cache, key string, read func(context.Context) (V, e
 	c.mu.Unlock()
 	go func() {
 		defer c.refreshes.Done()
-		_, err := fill(c, c.base(), key, read, true)
+		_, err := fill(c, c.base(), key, how.timeout, read, true)
 		c.mu.Lock()
 		delete(c.refreshing, key)
 		if err != nil {
@@ -261,7 +311,7 @@ func refreshBehind[V any](c *Cache, key string, read func(context.Context) (V, e
 		}
 		c.mu.Unlock()
 		if err != nil && c.Log != nil {
-			c.Log.Warn("inseason: a refresh failed; the kept read answers until the next", "key", key, "err", err)
+			c.Log.Warn(how.failed, "key", key, "err", err)
 		}
 	}()
 }
@@ -287,9 +337,9 @@ func (c *Cache) base() context.Context {
 
 // fill reads key and keeps the answer, logging how long the read took
 // (Lane 112 ruling 4): behind is set for a refresh no request waited on.
-// The read ends within its timeout.
-func fill[V any](c *Cache, ctx context.Context, key string, read func(context.Context) (V, error), behind bool) (any, error) {
-	readCtx, cancel := context.WithTimeout(ctx, c.timeout())
+// The read ends within timeout.
+func fill[V any](c *Cache, ctx context.Context, key string, timeout time.Duration, read func(context.Context) (V, error), behind bool) (any, error) {
+	readCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	start := time.Now()
 	value, err := read(readCtx)
@@ -299,13 +349,18 @@ func fill[V any](c *Cache, ctx context.Context, key string, read func(context.Co
 	if c.Log != nil {
 		c.Log.Info("inseason: cache fill", "key", key, "ms", time.Since(start).Milliseconds(), "behind", behind)
 	}
+	c.keep(key, value)
+	return value, nil
+}
+
+// keep keeps value for key, read now.
+func (c *Cache) keep(key string, value any) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.entries == nil {
 		c.entries = map[string]entry{}
 	}
 	c.entries[key] = entry{value: value, at: c.Now()}
-	c.mu.Unlock()
-	return value, nil
 }
 
 // kept is the value kept for key, however old.
@@ -321,4 +376,11 @@ func (c *Cache) timeout() time.Duration {
 		return c.Timeout
 	}
 	return ReadTimeout
+}
+
+func (c *Cache) datingTimeout() time.Duration {
+	if c.DatingTimeout > 0 {
+		return c.DatingTimeout
+	}
+	return DatingTimeout
 }
