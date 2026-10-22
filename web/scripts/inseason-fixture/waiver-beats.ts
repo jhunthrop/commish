@@ -6,7 +6,7 @@
 // carried over from a game already played aside) is not listed. The strip's drop on injured reserve
 // on the bench (B34) is the fixture's own since Lane 128: Jaxson Dart, on the capture the stand-in run
 // is marked with. FIXTURE_IR_DROP=1 stamps the rest of the sense check's case (B41): two free agents
-// the table no longer lists, De'Von Achane on injured reserve and Tyquan Thornton ruled out, each
+// the table no longer lists, De'Von Achane on injured reserve and Joe Royer ruled out (both as the capture lists them), each
 // dated back (Lane 118, B79: weeks 9 and 8), so they sit in the Stash group; FIXTURE_IR_SLOT=1 opens one injured reserve slot on the member's team, so
 // Achane's verb is Stash.
 import type { components } from '../../src/lib/api/types.ts';
@@ -193,7 +193,8 @@ const STAMPED: Readonly<Record<string, PlayerLine['facts']['designation']>> = {
 		since: '2026-09-28T12:00:00.000Z',
 		return_week: 9
 	},
-	'Tyquan Thornton': { status: 'out', as_of: READ, since: null, return_week: 8 }
+	// Out on the capture the stand-in run is marked with (Lane 132): his return week the case's own.
+	'Joe Royer': { status: 'out', as_of: READ, since: null, return_week: 8 }
 };
 
 /** A line with the case's designation, when the case names him. */

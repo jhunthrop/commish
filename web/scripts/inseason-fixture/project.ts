@@ -9,6 +9,8 @@
 //     standin-designations.json, Lane 128), each such line with no rest-of-season rank, as the API
 //     sends it; and stand-in week designations (Rome Odunze Questionable, Chig Okonkwo out) so a shot
 //     shows the status pill both ways and a spot no one can play;
+//   - Lane 132 (B111): every free agent the capture lists kept in the waiver answer, each line drawn
+//     from the stand-in run by build.ts's line builder (run-lines.ts) with the capture's status;
 //   - projection_scoring on both answers (PPR, the closest to the recorded league's own rules);
 //   - projection_read_at on the lineup, a stand-in stamp of the fixture's own Friday evening, and the
 //     lineup's basis in the API's words since its rows end on the projection;
@@ -46,6 +48,14 @@ import { lastName } from '../../src/lib/format/draft.ts';
 import { designationsSchema } from '../../src/lib/run/schema.ts';
 import { IN_RESERVE, advise } from './advise.ts';
 import {
+	capturedFreeAgents,
+	json,
+	runLines,
+	waiverSentence,
+	type BoardRow,
+	type Game
+} from './run-lines.ts';
+import {
 	accepts,
 	better,
 	CHECK_BASIS,
@@ -67,6 +77,8 @@ import {
 } from './week.ts';
 
 const DATA = new URL('./data/', import.meta.url);
+/** The recorded Sleeper league, whose scoring rules a run's game logs are scored with. */
+const REPLAY = new URL('../../../api/internal/leaguesync/replay/sleeper/', import.meta.url);
 /** The stand-in projection's read: Friday 9:00 pm Central of the fixture's week 6. */
 const PROJECTION_READ_AT = '2026-10-17T02:00:00.000Z';
 /** The read before it: Thursday 9:00 pm Central, the change column's basis. */
@@ -160,6 +172,65 @@ const PLAYING_RANKS = new Map(
 		}
 	).rows.map((row) => [row.id, row.positionRank])
 );
+
+/** The free agents the capture lists (Lane 132, B111): the API reads each free agent's designation,
+ * so the waiver answer keeps every one, listed or held out, each line drawn from the stand-in run by
+ * build.ts's own line builder (run-lines.ts) and carrying the capture's status. A rerun reads this
+ * file back, so a player the answer already holds is not added twice. */
+async function capturedRows(answer: WaiverAdvice): Promise<WaiverAdvice['rows']> {
+	const run = new URL(`${RUN_ID}/`, RUNS);
+	const [board, schedule, manifest, league] = await Promise.all([
+		json<{ rows: BoardRow[] }>(new URL('boards/ppr-12.json', run)),
+		json<{ slates: { abbr: string; games: Game[] }[] }>(new URL('schedule.json', run)),
+		json<{ formats: { id: string; rosFromWeek?: number }[] }>(new URL('manifest.json', run)),
+		json<{ scoring_settings: Record<string, number> }>(new URL('league.json', REPLAY))
+	]);
+	const { boardLine } = await runLines({
+		run,
+		rows: board.rows,
+		slates: schedule.slates,
+		// A full-season run ranks from week 1.
+		fromWeek: manifest.formats.find((f) => f.id === 'ppr-12')?.rosFromWeek ?? 1,
+		week: answer.week,
+		weeksCovered: weeksCovered(answer.week, STANDARD_HORIZON),
+		scoring: league.scoring_settings,
+		gameFacts: games
+	});
+	const kept = new Set(answer.rows.map((r) => r.add.player.board_id));
+	const listed = capturedFreeAgents(
+		board.rows,
+		new Set(Object.keys(CAPTURE.players)),
+		new Set(Object.keys(sync.held_by))
+	).filter((row) => !kept.has(row.id));
+	return Promise.all(
+		listed.map(async (row) => {
+			const status = CAPTURE.players[row.id];
+			const drawn = await boardLine(row);
+			const add: PlayerLine =
+				status === undefined
+					? drawn
+					: {
+							...drawn,
+							facts: {
+								...drawn.facts,
+								designation: { status: status.status, as_of: CAPTURE.readAt }
+							}
+						};
+			return {
+				add,
+				drop: null,
+				gain: 0,
+				starts: false,
+				sentence: waiverSentence(add, null, 0, false),
+				week_gain: 0,
+				pickup: false,
+				beats: null,
+				drops: [],
+				clears: null
+			};
+		})
+	);
+}
 
 /** His designation on the week: a season-long list from the run's capture (with no rest-of-season
  * rank, the in-season order never ranking him as playing), else the fixture's week stand-in, his rank
@@ -494,7 +565,9 @@ function pickupTable(advice: WaiverAdvice): WaiverAdvice {
 	};
 }
 
-const stampedWaivers = pickupTable(stamp(waivers));
+const stampedWaivers = pickupTable(
+	stamp({ ...waivers, rows: [...waivers.rows, ...(await capturedRows(waivers))] })
+);
 const stampedFinder = stamp(trades);
 
 /** Every line the answers carry, by host id: the drafter's from the lineup, the rest from the trade

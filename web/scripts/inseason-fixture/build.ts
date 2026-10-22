@@ -21,17 +21,29 @@
 // (api/internal/inseason words.go and sentences.go): the basis lines, a change's reason (the order,
 // then his last two games only when they beat the player he replaces), a waiver row's sentence and a
 // team's line when every trade with it is a close call for them, so the shots read as members' do.
+// The waiver answer keeps every free agent the run's injury capture lists (designations.json), as the
+// API reads each free agent's designation, besides the top of the order (Lane 132, B111). Every line
+// is drawn by run-lines.ts, the line builder project.ts shares.
 //
 //   node scripts/inseason-fixture/build.ts [roster id]   (reads .runs/runs/<PUBLIC_RUN_ID or latest>)
 // then node scripts/inseason-fixture/project.ts, which stamps the week's projection on the answers
 // and writes the Matchup screen's box answer (Lane 66d).
-import { readFile, readdir, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { format as prettierFormat, resolveConfig } from 'prettier';
 import { FIXTURE_IDS } from './ids.ts';
 import {
+	capturedFreeAgents,
+	json,
+	round,
+	runLines,
+	tenth,
+	waiverSentence,
+	type BoardRow,
+	type Game
+} from './run-lines.ts';
+import {
 	CHECK_BASIS,
-	LAST_FANTASY_WEEK,
 	LINEUP_BASIS,
 	PER_GAME_BASIS,
 	tradesBases,
@@ -52,8 +64,7 @@ import type {
 	TradeRow,
 	TradeTeam,
 	WaiverAdvice,
-	WaiverRow,
-	WeekFacts
+	WaiverRow
 } from '../../src/lib/league/inseason/api.ts';
 
 import type { GameWeek } from '../../src/lib/format/game-facts.ts';
@@ -65,19 +76,17 @@ const FORMAT = 'ppr-12';
 const LAST_WEEK = 18;
 /** The API's line under the copy verb on a platform with no lineup write (hostmoves words.go). */
 const SLEEPER_NO_LINEUP = 'Sleeper does not take lineups from here, so copy the lineup there.';
-const LAST_GAMES = 3;
 const POOL_CANDIDATES = 60;
 const WAIVER_ROWS_UNDER_RULE = 8;
 const TRADES_PER_TEAM = 4;
 const CLOSE_FOR_THEM = 0.5;
 /** The last week the rest-of-season order covers (the API's LastWeek). */
-/** A gain or a points over replacement figure on the wire: one decimal. */
-const TENTH = 10;
 /** The last games a change's reason names. */
 const NAMED_GAMES = 2;
 const SKILL = new Set(['QB', 'RB', 'WR', 'TE']);
 const FLEX = new Set(['RB', 'WR', 'TE']);
 const SUPER_FLEX = new Set(['QB', 'RB', 'WR', 'TE']);
+/** Sleeper sends a roster's points as whole points and hundredths. */
 const DECIMALS = 100;
 /** The one player the fixture's member tags Hold: a sheet tag, not a figure. */
 const HELD_ON_SHEET = 'Christian Kirk';
@@ -92,13 +101,6 @@ const SLOT_OF: Readonly<Record<string, LineupSlot['slot']>> = {
 	K: 'K',
 	DEF: 'DEF'
 };
-
-const round = (n: number): number => Math.round(n * DECIMALS) / DECIMALS;
-const tenth = (n: number): number => Math.round(n * TENTH) / TENTH;
-
-async function json<T>(url: URL): Promise<T> {
-	return JSON.parse(await readFile(url, 'utf8')) as T;
-}
 
 interface SleeperPlayer {
 	full_name?: string;
@@ -143,34 +145,11 @@ interface SleeperLeague {
 	roster_positions: string[];
 	scoring_settings: Record<string, number>;
 }
-interface BoardRow {
-	id: string;
-	slug: string;
-	headshot: string | null;
-	name: string;
-	position: string;
-	team: string;
-	positionRank: number;
-	vor: number;
-	/** His points for the rest of the season on a run that ranks it, null without a projection. */
-	projected: number | null;
-}
 interface RunFormat {
 	id: string;
 	rosFromWeek?: number;
 	refreshedAt?: string;
 }
-interface Game {
-	week: number;
-	opponent: string;
-	home: boolean;
-	kickoff: string;
-}
-interface LogLine extends Record<string, number | string | boolean> {
-	week: number;
-	status: string;
-}
-
 const runId = await (async (): Promise<string> => {
 	const named = process.env.PUBLIC_RUN_ID;
 	if (named && named !== 'latest') return named;
@@ -188,10 +167,15 @@ const [league, rosters, users, matchups, moves, sleeperPlayers, state] = await P
 	json<{ week: number }>(new URL('state.json', REPLAY))
 ]);
 const fields = await leagueFields();
-const [manifest, board, schedule] = await Promise.all([
+const [manifest, board, schedule, capture] = await Promise.all([
 	json<{ runAt: string; formats: RunFormat[] }>(new URL('manifest.json', run)),
 	json<{ rows: BoardRow[] }>(new URL(`boards/${FORMAT}.json`, run)),
-	json<{ slates: { abbr: string; games: Game[] }[] }>(new URL('schedule.json', run))
+	json<{ slates: { abbr: string; games: Game[] }[] }>(new URL('schedule.json', run)),
+	// The run's injury capture, where it carries one: every free agent it lists stays in the waiver
+	// answer (Lane 132, B111).
+	json<{ players: Record<string, unknown> }>(new URL('designations.json', run)).catch(() => ({
+		players: {}
+	}))
 ]);
 const format = manifest.formats.find((f) => f.id === FORMAT);
 if (!format?.rosFromWeek || !format.refreshedAt) {
@@ -231,7 +215,6 @@ function key(name: string): string {
 		.trim();
 }
 const boardByKey = new Map(board.rows.map((r) => [`${key(r.name)}|${r.position}`, r] as const));
-const boardById = new Map(board.rows.map((r) => [r.id, r] as const));
 
 function sleeperName(p: SleeperPlayer): string {
 	return p.full_name ?? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
@@ -244,7 +227,6 @@ function placed(id: string): BoardRow | null {
 	return boardByKey.get(`${key(sleeperName(p))}|${p.position}`) ?? null;
 }
 
-const games = new Map(schedule.slates.map((s) => [s.abbr, s.games] as const));
 const byes: Record<string, number> = Object.fromEntries(
 	schedule.slates.flatMap((s) => {
 		const played = new Set(s.games.map((g) => g.week));
@@ -253,85 +235,16 @@ const byes: Record<string, number> = Object.fromEntries(
 	})
 );
 
-/** Each club's games from the run's first week through the last the order covers (the API's
- * GamesLeft): a bye is no game. */
-const fromWeek = format.rosFromWeek;
-const gamesLeft = new Map(
-	schedule.slates.map(
-		(s) =>
-			[
-				s.abbr,
-				s.games.filter((g) => g.week >= fromWeek && g.week <= LAST_FANTASY_WEEK).length
-			] as const
-	)
-);
-
-/** His rest-of-season points a game, as the API's RestOfSeasonPerGame divides them. */
-function perGameOf(row: BoardRow | null): number | null {
-	const projected = row?.projected ?? null;
-	const left = row === null ? 0 : (gamesLeft.get(row.team) ?? 0);
-	return projected === null || left === 0 ? null : tenth(projected / left);
-}
-
-/** Points under the league's own rules from one game's stat line. Two-point plays are not in the
- * log, so they are not counted. */
-function leaguePoints(line: LogLine): number {
-	const s = league.scoring_settings;
-	const n = (field: string): number => Number(line[field] ?? 0);
-	return round(
-		n('passing_yards') * (s.pass_yd ?? 0) +
-			n('passing_touchdowns') * (s.pass_td ?? 0) +
-			n('interceptions') * (s.pass_int ?? 0) +
-			n('rushing_yards') * (s.rush_yd ?? 0) +
-			n('rushing_touchdowns') * (s.rush_td ?? 0) +
-			n('receptions') * (s.rec ?? 0) +
-			n('receiving_yards') * (s.rec_yd ?? 0) +
-			n('receiving_touchdowns') * (s.rec_td ?? 0) +
-			n('fumbles_lost') * (s.fum_lost ?? 0)
-	);
-}
-
-const playerFiles = new Set(await readdir(new URL('players/', run)));
-async function lastGames(boardId: string | null): Promise<WeekFacts['last_games']> {
-	if (boardId === null || !playerFiles.has(`${boardId}.json`)) return [];
-	const file = await json<{ season: { log: LogLine[] } }>(new URL(`players/${boardId}.json`, run));
-	return file.season.log
-		.filter((g) => g.status === 'played')
-		.slice(-LAST_GAMES)
-		.reverse()
-		.map((g) => ({ week: g.week, points: leaguePoints(g) }));
-}
-
-/** The week's game facts by club, GET /games/week's recorded answer. */
-const gameFacts = new Map(
-	(await json<GameWeek>(new URL('games.json', OUT))).games.map((g) => [g.team, g] as const)
-);
-const NO_FACTS = { game_total: null, spread: null, roof: null, weather: null } as const;
-
-async function factsFor(team: string, boardId: string | null): Promise<WeekFacts> {
-	const game = games.get(team)?.find((g) => g.week === week) ?? null;
-	const held = game === null ? undefined : gameFacts.get(team);
-	return {
-		week,
-		opponent: game?.opponent ?? null,
-		home: game?.home ?? null,
-		kickoff: game?.kickoff ?? null,
-		bye: game === null,
-		designation: null,
-		played: false,
-		points_this_week: null,
-		last_games: await lastGames(boardId),
-		allowed_to_position: null,
-		...(held === undefined
-			? NO_FACTS
-			: {
-					game_total: held.game_total,
-					spread: held.spread,
-					roof: held.roof,
-					weather: held.weather
-				})
-	};
-}
+const { lineOf, boardLine } = await runLines({
+	run,
+	rows: board.rows,
+	slates: schedule.slates,
+	fromWeek: format.rosFromWeek,
+	week,
+	weeksCovered,
+	scoring: league.scoring_settings,
+	gameFacts: await json<GameWeek>(new URL('games.json', OUT))
+});
 
 const reserveOf = new Map(rosters.map((r) => [r.roster_id, new Set(r.reserve ?? [])] as const));
 
@@ -346,38 +259,6 @@ function leaguePlayer(id: string, rosterId: number | null): LeaguePlayer {
 		team: p?.team ?? '',
 		injured_reserve: rosterId !== null && (reserveOf.get(rosterId)?.has(id) ?? false)
 	};
-}
-
-async function lineOf(player: LeaguePlayer): Promise<PlayerLine> {
-	const row = player.board_id === null ? null : (boardById.get(player.board_id) ?? null);
-	return {
-		player,
-		headshot: row?.headshot ?? null,
-		slug: row?.slug ?? null,
-		position_rank: row?.positionRank ?? null,
-		points_over_replacement: row === null ? null : tenth(row.vor / weeksCovered),
-		rest_of_season_per_game: perGameOf(row),
-		// project.ts stamps the week's projection and the evidence after this build.
-		week_projection: null,
-		projection_delta: null,
-		opp_rank: null,
-		season_avg: null,
-		last_points: null,
-		held: false,
-		facts: await factsFor(row?.team ?? player.team, player.board_id)
-	};
-}
-
-async function boardLine(row: BoardRow): Promise<PlayerLine> {
-	return lineOf({
-		// As the API answers an add on Sleeper: no host id (an ESPN league's is its board id, serve.ts).
-		host_id: '',
-		board_id: row.id,
-		name: row.name,
-		position: row.position,
-		team: row.team,
-		injured_reserve: false
-	});
 }
 
 // The lineup stand-in: a slot's eligible players best first, fixed slots before the flexes.
@@ -585,12 +466,12 @@ function head(basis: string): AdviceHead {
 
 // The waiver adds.
 async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
+	const listed = capturedFreeAgents(board.rows, new Set(Object.keys(capture.players)), held);
+	const candidates = board.rows.filter((r) => !held.has(r.id)).slice(0, POOL_CANDIDATES);
 	const pool = await Promise.all(
-		board.rows
-			.filter((r) => !held.has(r.id))
-			.slice(0, POOL_CANDIDATES)
-			.map(boardLine)
+		[...candidates, ...listed.filter((r) => !candidates.includes(r))].map(boardLine)
 	);
+	const kept = new Set(listed.map((r) => r.id));
 	const defenses = myLines.filter((l) => l.player.position === 'DEF').length;
 	const droppable = myLines.filter(
 		(l) => l.player.position !== 'DEF' || defenses > slots.filter((s) => s === 'DEF').length
@@ -622,7 +503,13 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 		};
 	});
 	const gaining = rows.filter((r) => r.gain > 0).sort((a, b) => b.gain - a.gain);
-	const rest = rows.filter((r) => r.gain <= 0).slice(0, WAIVER_ROWS_UNDER_RULE);
+	const still = rows.filter((r) => r.gain <= 0);
+	const rest = [
+		...still.slice(0, WAIVER_ROWS_UNDER_RULE),
+		...still
+			.slice(WAIVER_ROWS_UNDER_RULE)
+			.filter((r) => r.add.player.board_id !== null && kept.has(r.add.player.board_id))
+	];
 	return {
 		...head(WAIVERS_BASIS),
 		// Saturday's answer: no game kicked off, the week order (inseason season_order.go).
@@ -648,31 +535,6 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 		projection_previous_read_at: null,
 		projection_scoring: { format: 'ppr', league_own: false }
 	};
-}
-
-/** A waiver row's sentence in the API's words (sentences.go Waiver): the gain and the drop, the gain
- * from a player who sits this week, or his place on the order behind your starters. */
-function waiverSentence(
-	add: PlayerLine,
-	drop: PlayerLine | null,
-	gain: number,
-	starts: boolean
-): string {
-	const name = add.player.name;
-	const dropped =
-		drop === null
-			? 'Your open roster spot takes him with no drop.'
-			: `${drop.player.name} is the player it costs you least to lose.`;
-	if (gain > 0 && !starts) {
-		return `${name} does not start for you this week, and your lineup still gains ${gain.toFixed(1)} points over replacement a week with him on our rest-of-season order. ${dropped}`;
-	}
-	if (gain > 0) {
-		return `${name} starts for you, and your lineup gains ${gain.toFixed(1)} points over replacement a week on our rest-of-season order. ${dropped}`;
-	}
-	if (add.position_rank !== null) {
-		return `${name} is ${add.player.position}${String(add.position_rank)} in our rest-of-season order and would not start for you.`;
-	}
-	return `${name} is not in our order and would not start for you.`;
 }
 
 // The trades.
