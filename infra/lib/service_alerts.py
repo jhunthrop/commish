@@ -5,6 +5,8 @@ channel, and what `verify` holds the live ones to. Reads its inputs from argv an
 or check lines, and never calls the network.
 """
 
+from __future__ import annotations  # macOS's /usr/bin/python3 is 3.9, where `Json | None` is not a type yet
+
 import json
 import sys
 from typing import Any
@@ -25,6 +27,10 @@ CHECK_UPDATE_MASK = "displayName,httpCheck,period,timeout,selectedRegions"
 # The Cloud Run request policies: each must hold for ten minutes, over five-minute rates.
 ERROR_RATIO = 0.02
 SLOW_P95_MS = 3000
+# The p95 counts only over this many requests in the rate window: with the uptime checks' three and a
+# member's 40 s ESPN connect beside them, one slow request is the p95 of a quiet hour (review H1). At
+# 100, the p95 passes 3 s only when at least five requests are slow.
+SLOW_P95_MIN_REQUESTS = 100
 REQUEST_HOLD = "600s"
 RATE_WINDOW = "5m"
 EVALUATION_INTERVAL = "60s"
@@ -117,8 +123,11 @@ def error_condition(service: str) -> Json:
 
 def latency_condition(service: str) -> Json:
     buckets = run_series("request_latencies_bucket", service)
-    query = f"histogram_quantile(0.95, sum by (le) (rate({buckets}[{RATE_WINDOW}]))) > {SLOW_P95_MS}"
-    return promql_condition(f"{service}'s p95 over {SLOW_P95_MS // 1000} s for 10 minutes", query)
+    slow = f"(histogram_quantile(0.95, sum by (le) (rate({buckets}[{RATE_WINDOW}]))) > {SLOW_P95_MS})"
+    count = f"(sum(increase({run_series('request_count', service)}[{RATE_WINDOW}])) >= {SLOW_P95_MIN_REQUESTS})"
+    query = f"{slow} and on() {count}"
+    display = f"{service}'s p95 over {SLOW_P95_MS // 1000} s for 10 minutes, at {SLOW_P95_MIN_REQUESTS}+ requests"
+    return promql_condition(display, query)
 
 
 def condition(name: str, check_id: str) -> Json:

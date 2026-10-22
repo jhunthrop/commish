@@ -41,7 +41,11 @@ function slow(ms: number, respond: () => Response = () => envelope('late')): typ
 const stalledBody: typeof fetch = (_input, init) => {
 	const body = new ReadableStream<Uint8Array>({
 		start(controller) {
+			// AbortSignal.timeout's timer does not hold Node's event loop open; this one does, until the
+			// abort, as an open connection would.
+			const open = setTimeout(() => undefined, 10_000);
 			init?.signal?.addEventListener('abort', () => {
+				clearTimeout(open);
 				controller.error(init.signal?.reason);
 			});
 		}
@@ -116,15 +120,6 @@ void test(
 	}
 );
 
-void test("the caller's own abort is the caller's, never unreachable", async () => {
-	const controller = new AbortController();
-	const pending = apiClient(ORIGIN, slow(10_000), WAITS).call('/me', { signal: controller.signal });
-	controller.abort();
-	await assert.rejects(pending, (error: unknown) => {
-		return error instanceof DOMException && error.name === 'AbortError';
-	});
-});
-
 void test('an answer in time is the payload', async () => {
 	const client = apiClient(
 		ORIGIN,
@@ -140,10 +135,22 @@ for (const status of [502, 503, 504]) {
 	});
 }
 
-void test('any other answer that is not the envelope still reads as malformed', async () => {
-	await assert.rejects(apiClient(ORIGIN, html(500), WAITS).call('/me'), (error: unknown) => {
+for (const status of [500, 501, 505]) {
+	void test(`a page with ${String(status)}, outside 502 to 504, still reads as malformed`, async () => {
+		await assert.rejects(apiClient(ORIGIN, html(status), WAITS).call('/me'), (error: unknown) => {
+			return (
+				error instanceof ApiError &&
+				error.code === CLIENT_CODES.malformed &&
+				error.status === status
+			);
+		});
+	});
+}
+
+void test('a 200 that is not the envelope reads as malformed', async () => {
+	await assert.rejects(apiClient(ORIGIN, html(200), WAITS).call('/me'), (error: unknown) => {
 		return (
-			error instanceof ApiError && error.code === CLIENT_CODES.malformed && error.status === 500
+			error instanceof ApiError && error.code === CLIENT_CODES.malformed && error.status === 200
 		);
 	});
 });

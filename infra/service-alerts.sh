@@ -85,19 +85,22 @@ watched_check_id() { # policy display name: the id of the check it watches, noth
 }
 
 apply() {
-  local ch name found
+  local ch name found checks policies
+  # Read into variables, not `< <(...)`: set -e sees a spec that fails here (review M2).
+  checks="$(spec checks)"
+  policies="$(spec policies)"
   if [[ "${DRY_RUN}" == "true" ]]; then ch="${DRY_CHANNEL}"; else ch="$(channel)"; fi
   [[ -n "${ch}" ]] || { echo "FAIL no email channel for ${EMAIL}: run infra/research-alerts.sh apply first" >&2; exit 1; }
   echo "channel ${ch} (${EMAIL})"
   while IFS= read -r name; do
     found="$(apply_check "${name}")"
     echo "check ${name}: ${found}"
-  done < <(spec checks)
+  done <<<"${checks}"
   while IFS= read -r name; do
     found="$(watched_check_id "${name}")"
     apply_policy "${name}" "${ch}" "${found}"
     echo "policy ${name}"
-  done < <(spec policies)
+  done <<<"${policies}"
   [[ "${DRY_RUN}" == "true" ]] || verify
 }
 

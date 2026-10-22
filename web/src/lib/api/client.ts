@@ -23,10 +23,6 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 /** Codes the client names itself, for an answer that never arrived or was not the envelope. */
 export const CLIENT_CODES = { offline: 'offline', malformed: 'malformed' } as const;
 
-/** Google's front end answering for a service that is down, cold or past its timeout: its own HTML
- * page and no envelope, so the API never answered (launch audit G2). */
-const GATEWAY_STATUSES = new Set([502, 503, 504]);
-
 export class ApiError extends Error {
 	readonly status: number;
 	readonly code: string;
@@ -61,7 +57,6 @@ export interface RequestOptions {
 	/** A JSON body, or a string sent as is with `contentType`. */
 	body?: unknown;
 	contentType?: string;
-	signal?: AbortSignal;
 	/** How long to wait: a read's or a write's by the method, unless the call reads a platform live. */
 	timeout?: RequestTimeout;
 }
@@ -100,40 +95,6 @@ function unreachable(): ApiError {
 	return new ApiError(0, { code: CLIENT_CODES.offline, message: 'We could not reach Commish' });
 }
 
-/** A signal that aborts when the caller's does or when `ms` pass, and the clearing of its timer.
- * Built by hand: AbortSignal.any is missing before Safari 17.4. */
-function deadline(caller: AbortSignal | undefined, ms: number): [AbortSignal, () => void] {
-	const controller = new AbortController();
-	const stop = (): void => {
-		controller.abort(caller?.reason);
-	};
-	caller?.addEventListener('abort', stop);
-	if (caller?.aborted) stop();
-	const timer = setTimeout(stop, ms);
-	return [controller.signal, () => clearTimeout(timer)];
-}
-
-/** The payload of an answer, read through the envelope. An answer that is not one is "can't reach"
- * when the wait ran out reading it or Google's front end sent it, and malformed otherwise. */
-async function payload<T>(response: Response, wait: AbortSignal, caller?: AbortSignal): Promise<T> {
-	const parsed: unknown = await response.json().catch(() => null);
-	if (!isEnvelope(parsed)) {
-		if (caller?.aborted) throw caller.reason;
-		if (wait.aborted || GATEWAY_STATUSES.has(response.status)) throw unreachable();
-		throw new ApiError(response.status, {
-			code: CLIENT_CODES.malformed,
-			message: 'Commish answered in a way we did not expect'
-		});
-	}
-	if (!parsed.ok || parsed.error) {
-		throw new ApiError(
-			response.status,
-			parsed.error ?? { code: CLIENT_CODES.malformed, message: 'Something went wrong' }
-		);
-	}
-	return parsed.data as T;
-}
-
 /** A client for the API at `origin`. `fetcher` is the window's fetch and `timeouts` the site's
  * waits unless a caller (a test) passes its own. */
 export function apiClient(
@@ -144,26 +105,40 @@ export function apiClient(
 	return {
 		async call<T>(path: string, options: RequestOptions = {}): Promise<T> {
 			const method = options.method ?? 'GET';
-			const kind = options.timeout ?? (SAFE_METHODS.has(method) ? 'read' : 'write');
-			const [wait, clear] = deadline(options.signal, timeouts[kind]);
+			// The wait is the call's only signal: no caller passes its own (the option was dropped).
+			const wait = AbortSignal.timeout(
+				timeouts[options.timeout ?? (SAFE_METHODS.has(method) ? 'read' : 'write')]
+			);
+			let response: Response;
 			try {
-				let response: Response;
-				try {
-					response = await fetcher(`${origin}${path}`, {
-						method,
-						credentials: 'include',
-						headers: headersFor(method, options),
-						body: bodyFor(options),
-						signal: wait
-					});
-				} catch (cause) {
-					if (options.signal?.aborted) throw cause;
-					throw unreachable();
-				}
-				return await payload<T>(response, wait, options.signal);
-			} finally {
-				clear();
+				response = await fetcher(`${origin}${path}`, {
+					method,
+					credentials: 'include',
+					headers: headersFor(method, options),
+					body: bodyFor(options),
+					signal: wait
+				});
+			} catch {
+				throw unreachable();
 			}
+			const { status } = response;
+			const parsed: unknown = await response.json().catch(() => null);
+			if (!isEnvelope(parsed)) {
+				// Past the wait while the body was read, or Google's front end answering 502 to 504 with
+				// its own page for a service that is down, cold or past its timeout (launch audit G2).
+				if (wait.aborted || (status > 501 && status < 505)) throw unreachable();
+				throw new ApiError(status, {
+					code: CLIENT_CODES.malformed,
+					message: 'Commish answered in a way we did not expect'
+				});
+			}
+			if (!parsed.ok || parsed.error) {
+				throw new ApiError(
+					status,
+					parsed.error ?? { code: CLIENT_CODES.malformed, message: 'Something went wrong' }
+				);
+			}
+			return parsed.data as T;
 		},
 		signInUrl(returnTo: string): string {
 			return `${origin}/auth/login?${new URLSearchParams({ return_to: returnTo }).toString()}`;
