@@ -21,6 +21,7 @@ import {
 	recordTwoRunId,
 	SATURDAY_RUN_ID
 } from './inseason-fixture/run-ids.ts';
+import { BOARD_WEEK_VARIABLE } from './inseason-fixture/phases.ts';
 
 /** Environment variables a case or a run sets on a child process. */
 export type Vars = Readonly<Record<string, string | undefined>>;
@@ -34,7 +35,8 @@ export type RunKey =
 	| 'oneboard'
 	| 'record-live'
 	| 'two-upcoming'
-	| 'two-graded';
+	| 'two-graded'
+	| 'two-published';
 
 interface WriteStep {
 	args: readonly string[];
@@ -101,6 +103,11 @@ export const SHOT_RUNS: Readonly<Record<RunKey, ShotRun>> = {
 		id: recordTwoRunId('graded'),
 		write: [{ args: ['scripts/record-fixture/run.ts', 'two', 'graded'] }],
 		scriptRun: true
+	},
+	'two-published': {
+		id: recordTwoRunId('published'),
+		write: [{ args: ['scripts/record-fixture/run.ts', 'two', 'published'] }],
+		scriptRun: true
 	}
 };
 
@@ -159,6 +166,8 @@ function once(script: string, run: RunKey, clock: string, more: Partial<ShotCase
 }
 
 const IR_DROP = { FIXTURE_IR_DROP: '1' };
+/** The fixture API's season naming the board's week 7, for a run that ranks from it (Lane 142). */
+const BOARD_WEEK_7 = { [BOARD_WEEK_VARIABLE]: '7' };
 
 export const SHOT_CASES: readonly ShotCase[] = [
 	// The stand-in run.
@@ -313,12 +322,21 @@ export const SHOT_CASES: readonly ShotCase[] = [
 	once('record-shots', 'record-live', FIXTURE_MONDAY_NIGHT_CLOCK, {
 		args: (o) => [o.web, o.api, o.out]
 	}),
+	// The two records' runs rank from week 7, which the fixture API's season names too (Lane 142), so
+	// a page the Worker draws names the rail's week order as the run's pages do.
 	once('record-two-shots', 'two-upcoming', FIXTURE_WEEK_CLOCK, {
 		name: 'record-two-shots-upcoming',
+		fixture: BOARD_WEEK_7,
 		args: (o) => ['upcoming', o.web, o.api, o.out]
 	}),
 	once('record-two-shots', 'two-graded', FIXTURE_WEEK_CLOCK, {
 		name: 'record-two-shots-graded',
+		fixture: BOARD_WEEK_7,
 		args: (o) => ['graded', o.web, o.api, o.out]
+	}),
+	once('record-two-shots', 'two-published', FIXTURE_WEEK_CLOCK, {
+		name: 'record-two-shots-published',
+		fixture: BOARD_WEEK_7,
+		args: (o) => ['published', o.web, o.api, o.out]
 	})
 ];

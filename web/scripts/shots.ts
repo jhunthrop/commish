@@ -16,7 +16,7 @@
 //                 mover or a free agent
 //   oneboard      inseason-fixture/one-board-run.ts
 //   record-live   record-fixture/run.ts live
-//   two-upcoming, two-graded   record-fixture/run.ts two <mode>
+//   two-upcoming, two-graded, two-published   record-fixture/run.ts two <mode>
 // The dev server (`vite dev`) answers the dev-only system page for the two scripts that shoot it.
 //
 // The scripts on the real API (companion, context, ffpc, league, multi-league, pass, plan-card, room,

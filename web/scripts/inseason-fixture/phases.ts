@@ -220,3 +220,17 @@ export const FIXTURE_SEASON: Account['season'] = {
 	week: 6,
 	basis: 'Week 6 of the 2026 season.'
 };
+
+/** The variable naming the week the site's board ranks from (board_week) on /me and GET /season
+ * (Lane 142): set on a run that ranks from it, so a page the Worker draws names the rail's week
+ * order as the run's pages do. Unset, the season answers none, as before. */
+export const BOARD_WEEK_VARIABLE = 'FIXTURE_BOARD_WEEK';
+
+/** The fixture's season with the board's week when the variable names one. */
+export function fixtureSeason(boardWeek: string | undefined): Account['season'] {
+	if (boardWeek === undefined) return FIXTURE_SEASON;
+	const week = Number(boardWeek);
+	if (!Number.isInteger(week) || week < 1)
+		throw new Error(`${BOARD_WEEK_VARIABLE} is not a week: ${boardWeek}`);
+	return { ...FIXTURE_SEASON, board_week: week };
+}

@@ -11,6 +11,7 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import type OrderScreenComponent from '#lib/order/OrderScreen.svelte';
 	import { PAGE_PURPOSE } from '#lib/order/words.ts';
+	import { PAGE_NAME_WORDS, playersCrumb } from '#lib/run/week-names.ts';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
 
@@ -19,6 +20,9 @@
 	/** The Players screen (Lane 66j): the search first and our order as a box score, read from the
 	 * API with the page's script; the run's lists by position stay the page without one. */
 	let Order = $state<typeof OrderScreenComponent | null>(null);
+	/** In season the page is the week's rankings on every surface that points to it, Players the
+	 * crumb's root (Lane 142, ruling 1); before the season, Players. */
+	const name = $derived(data.run.weekRankings ?? PAGE_NAME_WORDS.players);
 
 	// The league's rosters mark who is held on the lists.
 	onMount(() => {
@@ -29,13 +33,11 @@
 	});
 </script>
 
-<SiteShell title="Players" run={data.run}>
+<SiteShell title={name} heading={playersCrumb(data.run.weekRankings)} run={data.run}>
 	{#snippet tail()}<Quiet href={links.compare()}>Compare two players</Quiet>{/snippet}
 	<main class="players">
-		<!-- In season the page is the week's rankings the rail and the front card link (Lane 140 fix
-		     round 1, MEDIUM-3); the bar keeps Players as its crumb. -->
 		<PageHead
-			title={data.run.weekRankings ?? 'Players'}
+			title={name}
 			lead={Order === null
 				? `Every player on our ${data.format.label} board · by position · our rank overall at the right`
 				: PAGE_PURPOSE.players}
@@ -45,7 +47,11 @@
 			{/snippet}
 		</PageHead>
 		{#if Order}
-			<Order mode="players" label="Players in our rest-of-season order" />
+			<Order
+				mode="players"
+				label="Players in our rest-of-season order"
+				rankHead={data.run.weekRank}
+			/>
 		{:else}
 			<div class="groups">
 				{#each data.groups as group (group.position)}

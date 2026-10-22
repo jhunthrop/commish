@@ -12,8 +12,10 @@ import { frontRecord, type FrontRecord } from '#lib/run/records.ts';
 import { rowFraming, type RowFraming } from '#lib/run/row-framing.ts';
 import type { BoardRowView, Format } from '#lib/run/schema.ts';
 import type { RangeScale } from '#lib/types/player.ts';
-import { sectionHref, weekRankingsWord } from '#lib/ui/nav.ts';
+import { weekNames } from '#lib/run/week-names.ts';
+import { sectionHref } from '#lib/ui/nav.ts';
 import { boardSeason } from '../board-season.ts';
+import { buildSiteRail } from '../site-rail.ts';
 import { boardStatuses, type BoardStatuses } from '../statuses.ts';
 import { unplayedWeeks } from './record.ts';
 import { adp, board, clubByes, defaultFormat, designations, manifest, record } from '../run.ts';
@@ -70,14 +72,17 @@ function heroMeta(format: Format): string[] {
 
 export async function frontPage(now: number): Promise<FrontPage> {
 	const format = await defaultFormat();
-	const [loaded, kept, capture, sources, byes, run] = await Promise.all([
+	const [loaded, kept, capture, sources, byes, run, rail] = await Promise.all([
 		board(format.id),
 		record(),
 		designations(),
 		adp(),
 		clubByes(),
-		manifest()
+		manifest(),
+		buildSiteRail(new Date(now))
 	]);
+	// The week's rankings named as every surface names them, at the page's clock (Lane 142).
+	const names = weekNames(rail, format.rosFromWeek);
 	// A player on a season-long list is never in the top as if he plays (Lane 63): the strip is the
 	// board's own order, which puts him below the available players at his position.
 	const top = withStatuses(loaded.rows, capture).slice(0, STRIP_POOL);
@@ -99,10 +104,7 @@ export async function frontPage(now: number): Promise<FrontPage> {
 			headSaysBoard: true
 		}),
 		meta: heroMeta(format),
-		weekRankings:
-			format.rosFromWeek === undefined
-				? null
-				: { label: weekRankingsWord(format.rosFromWeek), href: sectionHref('players') },
+		weekRankings: names === null ? null : { label: names.rankings, href: sectionHref('players') },
 		gap: showsGap,
 		underway: reach !== null,
 		byes,

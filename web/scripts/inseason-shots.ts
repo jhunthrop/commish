@@ -51,6 +51,8 @@ import { BOX } from '../src/lib/league/box/box.ts';
 import { AS_OF_KICKOFF } from '../src/lib/league/box/basis.ts';
 import { HEAD_BASIS, WAIVERS } from '../src/lib/league/box/waivers.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
+import { RAIL_WITHOUT_LEAGUE } from '../src/lib/ui/rail-order.ts';
+import { railItemLabel } from '../src/lib/run/week-names.ts';
 import { ESPN_STAND_IN_NAME } from './inseason-fixture/espn-sync.ts';
 import { stateAt } from './inseason-fixture/game-state.ts';
 import { LEAGUE_RULES_NOTE, PER_GAME_BASIS, WAIVERS_BASIS } from './inseason-fixture/week.ts';
@@ -1691,8 +1693,15 @@ for (const width of SHOT_WIDTHS) {
 }
 
 /** In season with no league (Lane 83): signed out, the season's rail with no league selected draws
- * League first and none of the four screens, on the phone's five and at a desk. */
+ * League first and none of the four screens, on the phone's five and at a desk. Players is the week's
+ * rankings there (Lane 142); the stand-in run and the fixture's season name no week, so the item is
+ * Players, the page it opens (fix round 1). */
 const NO_LEAGUE_LABELS = ['League', 'Rest of season', 'Players', 'Mock draft', 'Our record'];
+if (
+	NO_LEAGUE_LABELS.join('|') !==
+	RAIL_WITHOUT_LEAGUE.map((item) => railItemLabel(item, null)).join('|')
+)
+	throw new Error('The rail without a league is not the one this shot expects.');
 for (const theme of THEMES) {
 	for (const width of SHOT_WIDTHS) {
 		const ctx = await context(theme, width);

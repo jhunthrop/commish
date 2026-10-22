@@ -14,6 +14,7 @@
 		WEEK_RANKINGS_KEY,
 		railHref,
 		sectionOf,
+		weekRankingsWord,
 		type RailItem,
 		type Section
 	} from './nav.ts';
@@ -37,14 +38,19 @@
 		 * name the selected league's. */
 		league?: string;
 		/** The rail's week order named for the run's week, "Week 7 rankings" (Lane 140, C19), built
-		 * with the page; null before the season and on a page that carries no run. */
+		 * with the page; absent before the season and on a page the Worker draws, which names it from
+		 * the context's week. */
 		weekLabel?: string;
 		children: Snippet;
 	}
 
 	let { title, stamp, active, search, tail, league, weekLabel, children }: Props = $props();
-	const labelOf = (item: RailItem): string =>
-		item.key === WEEK_RANKINGS_KEY ? (weekLabel ?? item.label) : item.label;
+	// The week's order: the page's own name for it, else on a page the Worker draws the context's week
+	// (Lane 142), else Players, the page it opens, while no week is named (fix round 1).
+	const labelOf = (item: RailItem, week = siteContext.season?.board_week): string =>
+		item.key === WEEK_RANKINGS_KEY
+			? (weekLabel ?? (week ? weekRankingsWord(week) : item.label))
+			: item.label;
 
 	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
 	// The site's context: the session's copy at once, then /me. The rail's Board (/board, which

@@ -10,14 +10,22 @@
 // lines at 390, Lane 131, and five at the 1440 desk, Lane 138), its count printed; the record pages are
 // shot in both themes, the budget measured in light.
 //
-//   node scripts/record-two-shots.ts <upcoming|graded> [web origin] [api origin] [out dir]
+// `published` (Lane 142) shoots the front card once the week's published projection is graded beside
+// ESPN: both yardsticks, the leader named per pair. `upcoming` also shoots the week's rankings page
+// and its rail at 1280 and 390, signed out and with the ESPN stand-in, on a run page and on a league
+// page the Worker draws: one name, "Week 7 rankings", on the rail, the bar's crumb after Players, the
+// page's head and its rank column.
+//
+//   node scripts/record-two-shots.ts <upcoming|graded|published> [web origin] [api origin] [out dir]
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { basisLines, basisReport } from './basis-lines.ts';
 import { installFixtureApiClock } from './inseason-fixture/clock.ts';
+import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 
-const mode = process.argv[2] === 'graded' ? 'graded' : 'upcoming';
+const MODES = ['upcoming', 'graded', 'published'] as const;
+const mode = MODES.find((m) => m === process.argv[2]) ?? 'upcoming';
 const web = process.argv[3] ?? 'http://localhost:4114';
 const API_ORIGIN = process.argv[4] ?? 'http://localhost:8814';
 const out = new URL(process.argv[5] ?? '../screenshots/record-114/', import.meta.url);
@@ -26,6 +34,8 @@ const WIDTHS = [1440, 1280, 390] as const;
 /** The front card is shot at 1280 and 390 (Lane 114), and its strip's basis held to the budget at
  * 1440 and 390 too (Lane 140). */
 const FRONT_WIDTHS: readonly number[] = [1440, 1280, 390];
+/** The rail and the week's rankings page are shot at 1280 and 390 (Lane 142). */
+const RAIL_WIDTHS = [1280, 390] as const;
 const PHONE_MAX = 760;
 const SETTLE_MS = 600;
 const READY_TIMEOUT_MS = 30_000;
@@ -148,7 +158,11 @@ async function front(width: number): Promise<void> {
 		has(card, 'Draft record', where);
 		has(card, 'Order matched is how closely an order ranked the players', where);
 		has(card, 'Our draft board through week 5', where);
-		has(card, 'Weekly rankings start week 7.', where);
+		has(
+			card,
+			"Weekly rankings start week 7, against ESPN and the week's published projection.",
+			where
+		);
 		has(card, 'ADP by 4', where);
 		lacks(card, /below it the reverse/u, where);
 	} else {
@@ -157,6 +171,12 @@ async function front(width: number): Promise<void> {
 		has(card, 'Our weekly rankings over week 7', where);
 		has(card, 'ESPN by 2', where);
 		lacks(card, /\bADP\b/u, where);
+		// Both yardsticks once the published projection is graded, the leader named per pair (Lane 142).
+		if (mode === 'published') {
+			has(card, 'Published', where);
+			has(card, 'Published by 2', where);
+			has(card, 'ours by 0.05', where);
+		} else lacks(card, /Published/u, where);
 	}
 	has(card, 'Week 7 rankings', where);
 	// The link lands on a page headed as the link promised (fix round 1, MEDIUM-3).
@@ -186,11 +206,89 @@ async function front(width: number): Promise<void> {
 	}
 }
 
+/** The rail's labels as drawn, the phone's five or the desk's column. */
+async function railLabels(page: Page): Promise<string[]> {
+	return page.evaluate(() =>
+		[...document.querySelectorAll<HTMLElement>('nav.rail .item[data-k]')]
+			.filter((item) => item.getBoundingClientRect().width > 0)
+			.map((item) => item.innerText.trim())
+	);
+}
+
+/** The rail's week item is "Week 7 rankings" as drawn, and shown wherever its rail shows it: every
+ * desk, and the phone's five without a league (a followed league's five are its own pages). No
+ * shown item says Players in season. */
+async function weekItemFaults(page: Page, who: Who, width: number, where: string): Promise<void> {
+	const drawn = await page.evaluate(
+		() => document.querySelector('nav.rail .item[data-k="week"] span')?.textContent.trim() ?? ''
+	);
+	if (drawn !== 'Week 7 rankings') faults.push(`${where}: the week item reads "${drawn}"`);
+	const labels = await railLabels(page);
+	const shown = width > PHONE_MAX || who === 'signed-out';
+	if (shown && !labels.includes('Week 7 rankings'))
+		faults.push(`${where}: the rail shows ${labels.join(', ')}`);
+	if (labels.includes('Players')) faults.push(`${where}: the rail still says Players`);
+}
+
+/** The week's rankings under one name (Lane 142, ruling 1): the rail on the run's page and on a league
+ * page the Worker draws, the bar's crumb, the page's head and its rank column; no rail item says
+ * Players in season. */
+async function rail(who: Who, width: number): Promise<void> {
+	const page = await open(who, width, '/players');
+	const where = `rail ${who} ${String(width)}`;
+	const head = page.locator('table.order th.g-order');
+	// The group row over # folds away on a phone, so the head is read as drawn, not as shown.
+	await head
+		.waitFor({ state: 'attached', timeout: READY_TIMEOUT_MS })
+		.catch(() => faults.push(`${where}: the order table never drew`));
+	await weekItemFaults(page, who, width, where);
+	has(
+		(await page.locator('main h1, main h2').first().textContent()) ?? '',
+		'Week 7 rankings',
+		where
+	);
+	has((await head.textContent()) ?? '', 'Week 7 rank', where);
+	if (width > PHONE_MAX)
+		has(
+			(await page.locator('header.top h1').textContent()) ?? '',
+			'Players / Week 7 rankings',
+			where
+		);
+	await page.screenshot({
+		path: new URL(`rail-players-${who}-${String(width)}.png`, out).pathname
+	});
+	await page.context().close();
+	if (who !== 'espn') return;
+	// A league page the Worker draws names the week from the API's season once the context answers.
+	const league = await open(who, width, `/league/${FIXTURE_IDS.espnDone}`);
+	await league
+		.waitForFunction(
+			() =>
+				document.querySelector('nav.rail .item[data-k="week"] span')?.textContent.trim() ===
+				'Week 7 rankings',
+			undefined,
+			{ timeout: READY_TIMEOUT_MS }
+		)
+		.catch(() => undefined);
+	await weekItemFaults(league, who, width, `${where} league`);
+	await league.screenshot({
+		path: new URL(`rail-league-${who}-${String(width)}.png`, out).pathname
+	});
+	await league.context().close();
+}
+
 for (const width of WIDTHS) {
-	for (const who of ['signed-out', 'espn'] as const) {
-		for (const theme of THEMES) await record(who, width, theme);
+	if (mode !== 'published') {
+		for (const who of ['signed-out', 'espn'] as const) {
+			for (const theme of THEMES) await record(who, width, theme);
+		}
 	}
 	if (FRONT_WIDTHS.includes(width)) await front(width);
+}
+if (mode === 'upcoming') {
+	for (const width of RAIL_WIDTHS) {
+		for (const who of ['signed-out', 'espn'] as const) await rail(who, width);
+	}
 }
 await browser.close();
 process.stdout.write(`shots in ${out.pathname}\n`);

@@ -10,7 +10,8 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
-import { RAIL_KEYS, railItemLabel, type RailKey } from '../src/lib/ui/nav.ts';
+import { RAIL_KEYS, type RailKey } from '../src/lib/ui/nav.ts';
+import { railItemLabel } from '../src/lib/run/week-names.ts';
 import { railShown } from '../src/lib/ui/rail-order.ts';
 import {
 	FIXTURE_PHASES,

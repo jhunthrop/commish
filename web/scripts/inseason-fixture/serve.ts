@@ -31,7 +31,14 @@ import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import { FIXTURE_IDS } from './ids.ts';
 import { leagueRecordAnswer } from './record.ts';
 import { playerWeek, type Sheet } from './player-week.ts';
-import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
+import {
+	BOARD_WEEK_VARIABLE,
+	askedPhase,
+	fixtureSeason,
+	phaseAccount,
+	phaseLeagues,
+	phaseSync
+} from './phases.ts';
 import { ESPN_STAND_IN_NAME, espnMatchup, espnSync } from './espn-sync.ts';
 import { yahooStandIn } from './yahoo.ts';
 import {
@@ -230,6 +237,8 @@ const leaguesNow = (): components['schemas']['ContextLeague'][] => {
 		: [];
 	return [...phased, ...espn];
 };
+/** The site's season on /me and GET /season, with the board's week when the case names one. */
+const SEASON = fixtureSeason(process.env[BOARD_WEEK_VARIABLE]);
 const contextLeague = leaguesNow().find((league) => league.id === LEAGUE);
 if (!contextLeague) throw new Error('The fixture has no in-season league.');
 const account: components['schemas']['Account'] = {
@@ -238,7 +247,7 @@ const account: components['schemas']['Account'] = {
 	league: contextLeague,
 	leagues: [contextLeague],
 	format: contextLeague.format,
-	season: FIXTURE_SEASON,
+	season: SEASON,
 	first_name: null,
 	last_name: null,
 	handle: 'fixture',
@@ -793,7 +802,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		return;
 	}
 	if (url.pathname === '/season') {
-		send(req, res, HTTP.ok, FIXTURE_SEASON);
+		send(req, res, HTTP.ok, SEASON);
 		return;
 	}
 	// The account page's other lists, empty for the fixture account.
