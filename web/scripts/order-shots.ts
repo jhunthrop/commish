@@ -73,6 +73,9 @@ const MOST_TRADE_SHARE = 1 / 3;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const WEEK_HEAD = new RegExp(`^${FIGURE.week} \\d+$`);
 const FIGURE_CELL = /^([-−]?\d+(\.\d)?|\d+(st|nd|rd|th)|--)$/;
+/** A season-long list's short form, the # cell of a player the order places after the available
+ * (Lane 128 review fix round 1): never a number. */
+const LIST_PLACE = /^(IR|PUP|NFI|Susp|Out)$/;
 
 const SCREENS = [
 	{
@@ -190,6 +193,7 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 			adds: [...(table?.querySelectorAll('a.verb.add') ?? [])].length,
 			mine: table?.querySelectorAll('tbody tr.mine').length ?? 0,
 			cells: [...(table?.querySelectorAll('td.n') ?? [])].filter(visible).map(text),
+			places: [...(table?.querySelectorAll('td.rank') ?? [])].map(text),
 			folded: [...(table?.querySelectorAll('.ph-ev') ?? [])].filter(visible).map(text)
 		};
 	});
@@ -213,8 +217,14 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 	if (width < FOLDS_AT && !seen.folded.every((f) => f.includes(FIGURE.avg)))
 		said.push(`${screen.name} at ${String(width)}: the figures do not fold under the name`);
 	for (const cell of seen.cells) {
-		if (!FIGURE_CELL.test(cell)) said.push(`${screen.name}: cell "${cell}"`);
+		if (!FIGURE_CELL.test(cell) && !LIST_PLACE.test(cell))
+			said.push(`${screen.name}: cell "${cell}"`);
 	}
+	// Every listed row sits after every numbered one (Lane 128 review fix round 1).
+	const places = seen.places;
+	const firstListed = places.findIndex((p) => LIST_PLACE.test(p));
+	if (firstListed >= 0 && places.slice(firstListed).some((p) => !LIST_PLACE.test(p)))
+		said.push(`${screen.name}: a numbered row after a listed one (${places.join(' ')})`);
 	if (screen.signedIn) {
 		if (seen.trades === 0 || seen.trades >= seen.rows * MOST_TRADE_SHARE)
 			said.push(`rest: Trade for him on ${String(seen.trades)} of ${String(seen.rows)} rows`);
