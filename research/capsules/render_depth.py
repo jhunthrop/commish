@@ -311,10 +311,20 @@ def _prior_seasons(facts: "PlayerFacts") -> str | None:
     return f"Season by season: {'. '.join(clauses)}."
 
 
+def _no_club(facts: "PlayerFacts") -> str | None:
+    """A free agent's one line (Lane 127, B103): why the record holds no club's facts, his depth chart's
+    among them; None for a player on a club. The sheet's Player line says "a free agent" (render.py
+    player_line), so this line does not say it again (review MEDIUM-3)."""
+    if facts.identity.team is not None:
+        return None
+    return "Club: none, so the record holds no depth chart, play caller, offense or schedule."
+
+
 def render_depth_section(facts: "PlayerFacts") -> str | None:
     """`renderDepthSection`: the record, or None when the store held nothing worth a line."""
     depth = facts.depth
     lines = [
+        _no_club(facts),
         *_season_endings(depth),
         *(_games_missed(record) for record in depth.games_missed),
         _injury_history(depth),

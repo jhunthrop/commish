@@ -22,7 +22,16 @@ func projectedFinal(points *float64, starters []apitypes.PlayerLine, started boo
 	if points == nil || !started || len(starters) == 0 {
 		return nil
 	}
-	sum := *points
+	return pointsPlusLeft(*points, starters, restOfProjection)
+}
+
+// pointsPlusLeft is the points so far plus what each of the lines has
+// left: a player still to play his whole Proj, one in play what inPlay
+// gives (Lane 92's restOfProjection, or the pace for a best lineup, Lane
+// 127), one final or out nothing; nil while one still to play has no
+// Proj.
+func pointsPlusLeft(points float64, starters []apitypes.PlayerLine, inPlay func(apitypes.PlayerLine) float64) *float64 {
+	sum := points
 	for _, l := range starters {
 		f := l.Facts
 		if f.Bye || f.GameState == nil || sitsOut(f) {
@@ -35,7 +44,7 @@ func projectedFinal(points *float64, starters []apitypes.PlayerLine, started boo
 			}
 			sum += roundTenth(*l.WeekProjection)
 		case apitypes.GameStateKickedOff:
-			sum += restOfProjection(l)
+			sum += inPlay(l)
 		}
 	}
 	total := roundTenth(sum)

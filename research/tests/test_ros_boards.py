@@ -22,6 +22,7 @@ from research.model.ros.payload import ARTIFACT_NAME, priors_from
 from research.model.ros.raw_line import RawLine
 from research.model.ros.ship import SHIPPED_ROUND, fit_and_publish
 from research.nightly.build.page_club import NO_ROSTER_READ, club_calls
+from research.nightly.build.pages import numbers_of
 from research.nightly.build.player_season import SeasonContext, SeasonStore
 from research.nightly.build.ros import RosSetup, ros_boards
 from research.nightly.config import RUN_FORMATS
@@ -174,6 +175,24 @@ def test_every_row_carries_its_points_for_one_more_game() -> None:
             row = entry.row
             # No missed run: each counted game is worth what one more is, so the total is that times them.
             assert row.game_points == pytest.approx(row.projected / games)
+
+
+def test_a_free_agents_one_more_game_is_zero_on_the_board_and_the_wire() -> None:
+    """Lane 127 (B103): a free agent (no club, Lane 123) has no game this week or after, so his points for
+    one more club game are 0 on the board row and in the run's numbers, whatever his rate; a player on a
+    club keeps his."""
+    free = "p3"
+    boards = tuple(
+        _board(b.format, [replace(e.row, team=None) if e.row.player_id == free else e.row for e in b.entries])
+        for b in _boards()
+    )
+    result = ros_boards(boards, _context(LINES_THROUGH), FIRST_WEEK_INSTANT, _states(FIRST_WEEK_INSTANT), SETUP)
+    assert result.basis is not None
+    for board in result.boards:
+        by_id = {e.row.player_id: e for e in board.entries}
+        assert by_id[free].row.game_points == 0.0
+        assert numbers_of(by_id[free], None, None)["gamePoints"] == 0.0
+        assert by_id["p1"].row.game_points is not None and by_id["p1"].row.game_points > 0
 
 
 def test_each_row_carries_the_preseason_pace_the_model_starts_him_from() -> None:

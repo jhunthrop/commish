@@ -33,7 +33,7 @@ import {
 	bugsMissFinal,
 	bugsMissListedFinal,
 	bugsOf,
-	bugsUnlisted,
+	unlistedDrawn,
 	lineupSummary,
 	type Bug,
 	type BugSide
@@ -349,13 +349,14 @@ void test("B102: an FFPC opponent with no box keeps his game state from his rost
 	assert.equal(late.homeFinal, false);
 	assert.equal(late.bugHead, KICKOFF.kickedOff);
 	assert.equal(late.column, BOX.projFinal);
-	// The Matchup's head is Kicked off, never Final, and the opponent reads Proj final --.
+	// The Matchup's head is Kicked off, never Final, and the opponent reads his best lineup's Proj
+	// final, his points with nobody of it still to play, on the Matchup and the home alike (Lane 127 fix
+	// round 1).
 	assert.equal(late.headFinal, false);
 	assert.equal(late.matchupHead, KICKOFF.kickedOff);
 	assert.equal(late.teamFinal, false);
-	assert.equal(late.teamSmall, `${BOX.projFinal} ${BOX.none}`);
-	assert.equal(late.homeSmall, BOX.none);
-	assert.equal(late.missFinal, true);
+	assert.equal(late.teamSmall, `${BOX.projFinal} ${late.homeSmall}`);
+	assert.notEqual(late.homeSmall, BOX.none);
 	assert.equal(late.title, BOX.locked);
 	// Monday night, the Monday game under way with a player on each roster: both still play.
 	const night = ffpcScreens(FIXTURE_MONDAY_NIGHT_CLOCK);
@@ -363,7 +364,8 @@ void test("B102: an FFPC opponent with no box keeps his game state from his rost
 	assert.equal(night.schedule, 'kicked_off');
 	assert.equal(night.homeFinal, false);
 	assert.equal(night.matchupHead, KICKOFF.kickedOff);
-	assert.equal(night.teamSmall, `${BOX.projFinal} ${BOX.none}`);
+	assert.equal(night.teamSmall, `${BOX.projFinal} ${night.homeSmall}`);
+	assert.notEqual(night.homeSmall, BOX.none);
 	assert.equal(night.title, BOX.locked);
 });
 
@@ -413,11 +415,15 @@ void test('B104: every other FFPC game reads by the schedule on the home, each s
 			);
 			assert.ok(bug, at);
 			const states = game.sides.map((side) => {
-				// FFPC lists no starters on either side: no count, no Proj, no Proj final, its total.
+				// FFPC lists no starters on either side: no count, its total; its Proj and Proj final our
+				// best lineup's from its roster where the page carries one, none without (Lane 127, fix
+				// round 1): every game of the week has kicked off, so no player of it is still to play.
 				assert.equal(side.starters, 0, at);
 				assert.equal(side.starters_final, undefined, at);
-				assert.equal(side.projection, null, at);
-				assert.equal(side.projected_final, null, at);
+				const roster = !FFPC_ROSTERLESS.has(side.roster_id);
+				assert.equal(side.projection_best_lineup, roster ? true : undefined, at);
+				if (!roster) assert.equal(side.projection, null, at);
+				assert.equal(side.projected_final, roster ? side.points : null, at);
 				assert.equal(side.to_play, null, at);
 				assert.equal(
 					side.schedule_state,
@@ -440,8 +446,10 @@ void test('B104: every other FFPC game reads by the schedule on the home, each s
 				assert.equal(side.final, wire.schedule_state === 'final', at);
 				assert.equal(side.big, pts, at);
 				assert.equal(side.toPlay, '', at);
-				// Final with its total, said Final under a Proj final head; "--" while it plays.
-				const small = final ? pts : side.final ? `${BOX.final} ${pts}` : BOX.none;
+				// Final with its total, said Final under a Proj final head; while it plays its best
+				// lineup's Proj final (its points, nobody still to play), "--" with no roster (Lane 127).
+				const playing = ruleOf(wire.roster_id) === 'roster' ? pts : BOX.none;
+				const small = final ? pts : side.final ? `${BOX.final} ${pts}` : playing;
 				assert.equal(side.small, small, `${at} ${String(wire.roster_id)}`);
 			}
 		}
@@ -454,7 +462,7 @@ void test('B104: every other FFPC game reads by the schedule on the home, each s
 		assert.deepEqual([...forms].sort(), want, at);
 		// The home's footer says the unlisted sides once, by their own sentence, never the starters key:
 		// the member's starters all hold a Proj.
-		assert.equal(bugsUnlisted(bugs), true, at);
+		assert.equal(unlistedDrawn(bugs).noRoster, on.size > 0, at);
 		assert.equal(bugsMissListedFinal(bugs), false, at);
 	}
 });

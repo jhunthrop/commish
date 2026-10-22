@@ -46,10 +46,10 @@ BOARD_MEMO_SECONDS: Final = 60 * 60
 @dataclass(frozen=True, slots=True)
 class ServedBoard:
     """What a single-player read takes from the served board: each player's rank and each board
-    player's team, by universe id."""
+    player's team, by universe id (None for a free agent, Lane 127)."""
 
     ranks: Mapping[str, int]
-    teams: Mapping[str, str]
+    teams: Mapping[str, str | None]
 
 
 @dataclass(slots=True)
@@ -66,7 +66,7 @@ class ServedBoardCache:
             rows = board_rows(conn, PRODUCT_SEASON, as_of)
             self._board = ServedBoard(
                 {row.player_id: row.overall_rank for row in rows},
-                {row.nfl_player_id: row.team for row in rows if row.team is not None},
+                {row.nfl_player_id: row.team for row in rows},
             )
             self._read_at = now
         return self._board
@@ -96,7 +96,7 @@ def collect_player_facts(
     board = served.served(conn, as_of)
     color = collect_color(
         conn,
-        Population(peers, {player_id: gsis}, {} if identity.team is None else {gsis: identity.team}, board.teams),
+        Population(peers, {player_id: gsis}, {gsis: identity.team}, board.teams),
         as_of,
     )
     rank = board.ranks.get(player_id)

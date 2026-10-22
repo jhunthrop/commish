@@ -40,9 +40,9 @@
 		HOME,
 		bugsOf,
 		bugsMissListedFinal,
-		bugsPlaying,
+		bugsPlayingListed,
 		bugsFinalNone,
-		bugsUnlisted,
+		unlistedDrawn,
 		projectedFinalOf,
 		feedRows,
 		lineupSummary,
@@ -300,18 +300,20 @@
 								memberZone(),
 								bugs.some((b) => b.state !== 'upcoming'),
 								bugsMissListedFinal(bugs),
-								bugsPlaying(bugs),
+								bugsPlayingListed(bugs),
 								bugsFinalNone(bugs),
-								bugsUnlisted(bugs)
+								unlistedDrawn(bugs)
 							)
 						: null,
-					// The season panel names the zone once, so the read's time does not repeat it.
+					// The season panel names the zone once, so the read's time does not repeat it. Where the
+					// FFPC teams' sentence carries its pace clause, the Game cell's read alone (the Lineup says
+					// what the cell is), so the phone keeps to eight lines (Lane 127 fix round 3).
 					advice
 						? gamePart(
 								advice.slots.flatMap((s) => (s.host ? [s.host] : [])),
 								{ zone: memberZone(), zoned: false },
 								now.getTime(),
-								'full'
+								unlistedDrawn(bugs).paced ? 'read' : 'full'
 							)
 						: null
 				].filter((line): line is string => line !== null)

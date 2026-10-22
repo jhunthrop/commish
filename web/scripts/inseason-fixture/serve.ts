@@ -34,7 +34,7 @@ import { playerWeek, type Sheet } from './player-week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 import { ESPN_STAND_IN_NAME, espnMatchup, espnSync } from './espn-sync.ts';
 import { yahooStandIn } from './yahoo.ts';
-import { ffpcAfterSunday, ffpcStandIn } from './ffpc.ts';
+import { ffpcAfterSunday, ffpcBeforeSunday } from './ffpc.ts';
 import { afterSundayOf, momentAt, SUNDAY, sundayOf } from './sunday.ts';
 import { linesOf, recordedMatchups, scoreboardAt } from './scoreboard-at.ts';
 import { inSeason, noWeek } from './member-week.ts';
@@ -333,12 +333,14 @@ function ownOpponent(
 	};
 }
 
-/** GET /me/week: every league the front door shows, the Sleeper league first. */
-function memberWeek(): components['schemas']['MemberWeek'] {
+/** GET /me/week: every league the front door shows, the Sleeper league first; the recorded league as
+ * FFPC's where the browser asks for the FFPC stand-in (`ffpc`, Lane 127: its bug's opponent unlisted). */
+function memberWeek(ffpc: StandIn | null = null): components['schemas']['MemberWeek'] {
 	const at = readAt();
 	const when = now();
 	const after = afterSunday();
-	const sleeperWeek = after ? sleeperAfter() : { sync, lineup, scoreboard: scoreboardNow() };
+	const sleeperWeek =
+		ffpc ?? (after ? sleeperAfter() : { sync, lineup, scoreboard: scoreboardNow() });
 	const espnWeek = after
 		? espnAfter()
 		: { sync: espnSync(sync), lineup: espnLineup(), scoreboard: scoreboardLive };
@@ -544,7 +546,6 @@ const yahooAsked = (req: IncomingMessage, id: string): boolean =>
 	id === LEAGUE && YAHOO_PLATFORM.test(req.headers.cookie ?? '');
 /** The recorded league as an FFPC league's (ffpc.ts), by the same cookie: FFPC's seeding and its
  * tight end premium beside the PPR column (Lane 94). */
-const ffpcWeek = ffpcStandIn({ sync, lineup, matchup: matchupBox });
 const FFPC_PLATFORM = /(?:^|; )fixture_platform=ffpc(?:;|$)/;
 const ffpcAsked = (req: IncomingMessage, id: string): boolean =>
 	id === LEAGUE && FFPC_PLATFORM.test(req.headers.cookie ?? '');
@@ -573,10 +574,10 @@ function standInAsked(req: IncomingMessage, id: string): StandIn | null {
 	// opponent's starters unlisted as FFPC's read holds them (Lane 121 fix round 2).
 	if (ffpcAsked(req, id) && afterSunday())
 		return { ...ffpcAfterSunday(sleeperAfter(), momentAt(now()), recordedWeek), readAt: readAt() };
+	// Before it, every side but the member's unlisted too, from Thursday night on (Lane 127, B105).
 	if (ffpcAsked(req, id)) {
-		const board = scoreboardNow();
-		const scoring = ffpcWeek.lineup.projection_scoring;
-		return { ...ffpcWeek, scoreboard: { ...board, projection_scoring: scoring }, readAt: readAt() };
+		const week = { sync, lineup, matchup: matchupBox, scoreboard: scoreboardNow() };
+		return { ...ffpcBeforeSunday(week, momentAt(now()), recordedWeek), readAt: readAt() };
 	}
 	if (!sunday && afterSunday()) {
 		const at = readAt();
@@ -775,7 +776,12 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	// The front door's week (Lane 66k): the Sleeper league, the ESPN stand-in with its Sunday points,
 	// a stand-in whose read failed and the league out of season.
 	if (url.pathname === '/me/week') {
-		send(req, res, HTTP.ok, memberWeek());
+		send(
+			req,
+			res,
+			HTTP.ok,
+			memberWeek(platformAsked(req, LEAGUE) === 'ffpc' ? standInAsked(req, LEAGUE) : null)
+		);
 		return;
 	}
 	// The Account room's platforms (Lane 66k), every connection a stand-in: ESPN connected with

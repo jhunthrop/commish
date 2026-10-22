@@ -136,9 +136,18 @@ func otherGameSides(t *testing.T, f fixture, g apitypes.ScoreboardGame, playing 
 		} else {
 			states[i] = *side.ScheduleState
 		}
-		if side.Starters != 0 || side.Played != 0 || side.StartersFinal != nil || side.ProjectedFinal != nil ||
-			side.Projection != nil || side.ToPlay != nil || (side.InPlay != nil && *side.InPlay != 0) {
+		if side.Starters != 0 || side.Played != 0 || side.StartersFinal != nil ||
+			side.ToPlay != nil || (side.InPlay != nil && *side.InPlay != 0) {
 			t.Errorf("team %d with no starters: %+v", side.RosterId, side)
+		}
+		// Its Proj is its roster's best lineup where FFPC carries the roster, none without (Lane 127); so
+		// is its Proj final, its points once nobody of that lineup is still to play (fix round 1).
+		best := side.ProjectionBestLineup != nil && *side.ProjectionBestLineup
+		if best == ffpcRosterless[side.RosterId] || (!best && (side.Projection != nil || side.ProjectedFinal != nil)) {
+			t.Errorf("team %d Proj %v Proj final %v best lineup %v", side.RosterId, deref(side.Projection), deref(side.ProjectedFinal), side.ProjectionBestLineup)
+		}
+		if best && (side.ProjectedFinal == nil || *side.ProjectedFinal != side.Points) {
+			t.Errorf("team %d Proj final %v, want its %v points: every game of the week has kicked off", side.RosterId, deref(side.ProjectedFinal), side.Points)
 		}
 		if side.Points != 30+float64(side.RosterId) || !side.PointsRead {
 			t.Errorf("team %d points %v read %v, want FFPC's total", side.RosterId, side.Points, side.PointsRead)
@@ -147,18 +156,23 @@ func otherGameSides(t *testing.T, f fixture, g apitypes.ScoreboardGame, playing 
 	return states
 }
 
-// The member's FFPC opponent, listing no starters, has no projected final
-// on the board or the Matchup (Lane 125): with no starter to project, his
-// points so far would read as his final while his roster still plays.
-func TestAnFFPCOpponentWithNoStartersHasNoProjectedFinal(t *testing.T) {
+// The member's FFPC opponent, listing no starters, has his roster's best
+// lineup's projected final on the board and the Matchup alike (Lane 127
+// fix round 1, superseding Lane 125's none): on Monday night his lineup's
+// players in play, FFPC giving no player's points, add their Proj at its
+// pace (fix round 3), so the figure is above his points.
+func TestAnFFPCOpponentsProjectedFinalIsHisBestLineupsOnTheBoardAndTheMatchup(t *testing.T) {
 	f, projection := liveFixture(t)
 	me, them := ffpcBoard(&f)
 	finishWeekBut(&f, map[string]bool{"DAL": true, "DEN": true})
 	s := ffpcService(t, f, projection, mondayNight)
 	_, theirs := sideOf(t, scoreboardOf(t, s), them)
 	box := matchupOf(t, s)
-	if theirs.ProjectedFinal != nil || boxSideOf(t, box, them).ProjectedFinal != nil {
-		t.Errorf("the opponent's projected final: board %v, Matchup %v", theirs.ProjectedFinal, boxSideOf(t, box, them).ProjectedFinal)
+	boxed := boxSideOf(t, box, them)
+	if theirs.ProjectedFinal == nil || *theirs.ProjectedFinal <= theirs.Points || deref(boxed.ProjectedFinal) != *theirs.ProjectedFinal ||
+		boxed.ProjectionBestLineup == nil || !*boxed.ProjectionBestLineup {
+		t.Errorf("the opponent's projected final: board %v, Matchup %v (flag %v), want one figure above his %v points",
+			deref(theirs.ProjectedFinal), deref(boxed.ProjectedFinal), boxed.ProjectionBestLineup, theirs.Points)
 	}
 	if _, mine := sideOf(t, scoreboardOf(t, s), me); mine.ProjectedFinal == nil {
 		t.Error("the member's side, listing starters, lost its projected final")

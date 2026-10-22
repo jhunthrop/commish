@@ -232,11 +232,17 @@ def label_sections(facts: PlayerFacts) -> list[str]:
     return sections
 
 
+def player_line(facts: PlayerFacts) -> str:
+    """The sheet's first line: who he is and his club, "a free agent" for a player with none, the one
+    place the sheet says so (Lane 127, review MEDIUM-3)."""
+    identity = facts.identity
+    return f"Player: {identity.name}, {identity.position}, {club_words(identity.team)}. Season: {facts.product_season}."
+
+
 def render_facts_for_model(facts: PlayerFacts) -> str:
     """`renderFactsForModel`: the whole sheet, plain text, the user message's first half."""
-    identity = facts.identity
     sections = [
-        f"Player: {identity.name}, {identity.position}, {club_words(identity.team)}. Season: {facts.product_season}.",
+        player_line(facts),
         today_line(facts),
         _board_line(facts),
     ]

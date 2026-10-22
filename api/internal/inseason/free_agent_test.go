@@ -6,6 +6,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
+	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/figurewords"
 	"github.com/jhunthrop/commish/api/internal/mock"
 )
@@ -67,5 +68,41 @@ func TestWireClubNamesAFreeAgentFA(t *testing.T) {
 	}
 	if got := boards.WireClub("BUF"); got != "BUF" {
 		t.Fatalf("WireClub(BUF) = %q", got)
+	}
+}
+
+// A free agent's week figure is zero (Lane 127, B103): his club is "" on
+// the board, so a run row still carrying the model's one more game
+// (game_points, written before the nightly zeroed it) or rest-of-season
+// points counts for nothing in the live order, a league whose title week
+// is past the run's included; the Miami back on the same board keeps his
+// run's points and his week 18 game.
+func TestAFreeAgentsWeekFigureIsZero(t *testing.T) {
+	mia, free, game18 := 120.0, 30.0, 9.0
+	raw := &boards.Raw{Format: boards.PPR, Season: 2026, Order: boards.OrderRestOfSeason, FromWeek: 6, AsOf: restRunInstant,
+		Players: []boards.Player{
+			{ID: "mia", Name: "A Dolphin", Position: draft.RB, Team: "MIA", Points: &mia, GamePoints: &game18},
+			{ID: "fa", Name: "A Free Agent", Position: draft.RB, Team: "", Points: &free, GamePoints: &game18},
+			// A run older than game_points (revision 0015) carries his points alone.
+			{ID: "old", Name: "An Older Free Agent", Position: draft.RB, Team: "", Points: &free},
+		}}
+	b, err := boards.For(raw, 12, twelveTeamPPR(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	games := append(restWeekSix(false, false), game(18, "MIA", "NE", restSunday.AddDate(0, 0, 7*12), false)...)
+	rest := RestAt(games, 6, restRunInstant, restRunInstant, Horizon{Last: MaxWeek})
+	live, err := LiveBoard(b, rest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dolphin, _ := live.Player("mia")
+	for _, id := range []string{"fa", "old"} {
+		if fa, _ := live.Player(id); fa.Points == nil || *fa.Points != 0 {
+			t.Fatalf("free agent %s live points %v, want 0", id, fa.Points)
+		}
+	}
+	if dolphin.Points == nil || *dolphin.Points != mia+game18 {
+		t.Fatalf("Miami back live points %v, want %v", dolphin.Points, mia+game18)
 	}
 }

@@ -192,10 +192,16 @@ def _projections(
             projected=projection.projected,
             expected_games=projection.expected_games,
             from_week=start,
-            game_points=projection.game_points,
+            game_points=_one_game(projection.game_points, row.team),
             preseason_per_game=pace,
         )
     return found  # fmt: skip
+
+
+def _one_game(game_points: Mapping[str, float], club: str | None) -> Mapping[str, float]:
+    """His points for one more club game (Lane 96): the model's rate for a player on a club, 0 for a
+    free agent (no club, Lane 123), who has no game this week or any week after (Lane 127, B103)."""
+    return game_points if club is not None else dict.fromkeys(game_points, 0.0)
 
 
 def _reranked(board: FormatBoard, extra: Sequence[StoredRow], found: Projections) -> FormatBoard:
