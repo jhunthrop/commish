@@ -118,18 +118,22 @@ void test('Published names the week it starts only once a set order kept it (B04
 
 void test('the basis defines each measure once and a league replaces the starters sentence', () => {
 	const run = { ...beforePublished, startersBasis: 'Starters right counts the top 12 QBs.' };
-	const published = "From week 7 each week is also graded against the week's published projection.";
+	// A run's own record says its figures' sentences alone (Lane 131): the season-long rule and
+	// Published's start are the weekly record's desk words, and the lead names Published once drawn.
 	assert.deepEqual(recordBasis(run), [
 		run.method,
-		HELD_OUT_METHOD,
 		run.scale,
 		RECORD_WORDS.placesOff,
-		'Starters right counts the top 12 QBs.',
-		published
+		'Starters right counts the top 12 QBs.'
 	]);
-	const league = { starters: 'In your lineup.', benchmark: 'ESPN too.' };
-	assert.deepEqual(recordBasis(run, league).slice(-3), ['In your lineup.', published, 'ESPN too.']);
-	assert.equal(recordBasis(record({})).length, 5, 'no starters sentence with no week graded');
+	assert.equal(
+		recordBasis({ ...withPublished, startersBasis: null }).at(-1),
+		RECORD_WORDS.placesOff
+	);
+	assert.match(recordLead(withPublished, 'PPR'), /the week's published projection/u);
+	const league = { starters: 'In your lineup.', aside: 'No kickers.', benchmark: 'ESPN too.' };
+	assert.deepEqual(recordBasis(run, league).slice(-2), ['In your lineup.', 'ESPN too.']);
+	assert.equal(recordBasis(record({})).length, 3, 'no starters sentence with no week graded');
 	assert.match(HELD_OUT_METHOD, /graded where the order was set\.$/u);
 	for (const sentence of [...recordBasis(beforePublished), ...recordBasis(withPublished)]) {
 		assert.doesNotMatch(sentence, bannedPattern());

@@ -2,7 +2,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
-import { recordSources, weekLines } from './record.ts';
+import type { BasisPart } from './board-basis.ts';
+import {
+	HELD_OUT_METHOD,
+	RECORD_WORDS,
+	publishedWords,
+	recordSources,
+	weekLines
+} from './record.ts';
 import {
 	RECORDS_WORDS,
 	beforeLine,
@@ -11,7 +18,7 @@ import {
 	draftSeries,
 	frontRecord,
 	weeklyAsRecord,
-	weeklyBasisExtra,
+	weeklyBasis,
 	weeklyLines,
 	weeklyOpening,
 	weeklyOrderWords,
@@ -154,9 +161,42 @@ void test('weeks 1 to 6 are one line that names the first week of weekly ranking
 	assert.equal(beforeLine(2, ahead)?.lead, 'Week 1');
 });
 
-void test('the weekly basis says what ESPN is once drawn, and that Yahoo is not graded', () => {
-	assert.deepEqual(weeklyBasisExtra(false), [RECORDS_WORDS.yahooBasis]);
-	assert.deepEqual(weeklyBasisExtra(true), [RECORDS_WORDS.espnBasis, RECORDS_WORDS.yahooBasis]);
+/** A basis's words at a width: a phone draws its phone parts, a desk every part but a phone-only one. */
+const drawnOn = (parts: readonly BasisPart[], width: 'phone' | 'desk'): string[] =>
+	parts
+		.filter((part) => (width === 'phone' ? part.phone : part.desk !== false))
+		.map((part) => part.text);
+
+void test("the weekly basis: a phone says the figures' sentences, a desk the qualifications too (Lane 131)", () => {
+	const record = {
+		...run({}),
+		...weekly([gradedSeven]),
+		startersBasis: 'Starters right counts a standard lineup.'
+	};
+	const phone = [record.scale, RECORD_WORDS.placesOff, 'Starters right counts a standard lineup.'];
+	assert.deepEqual(drawnOn(weeklyBasis(record, null, true), 'phone'), phone);
+	assert.deepEqual(drawnOn(weeklyBasis(record, null, true), 'desk'), [
+		record.method,
+		HELD_OUT_METHOD,
+		...phone,
+		publishedWords(record),
+		RECORDS_WORDS.espnBasis,
+		RECORDS_WORDS.yahooBasis
+	]);
+	assert.ok(!drawnOn(weeklyBasis(record, null, false), 'desk').includes(RECORDS_WORDS.espnBasis));
+	const league = { starters: 'In your lineup.', aside: 'No kickers.', benchmark: 'ESPN too.' };
+	const opened = weeklyBasis(record, league, true);
+	assert.deepEqual(drawnOn(opened, 'phone'), [
+		record.scale,
+		RECORD_WORDS.placesOff,
+		'In your lineup.',
+		RECORDS_WORDS.leagueRow
+	]);
+	for (const qualification of ['No kickers.', 'ESPN too.'])
+		assert.ok(drawnOn(opened, 'desk').includes(qualification), qualification);
+	assert.ok(!drawnOn(opened, 'desk').includes(RECORDS_WORDS.leagueRow), 'the desk says it whole');
+	const noBenchmark = weeklyBasis(record, { ...league, benchmark: null }, true);
+	assert.ok(!drawnOn(noBenchmark, 'phone').includes(RECORDS_WORDS.leagueRow));
 });
 
 void test('the front card shows the draft record until a weekly week is graded, then the weekly one', () => {
@@ -196,10 +236,21 @@ void test('the draft table lists each position, All as its totals, and its chart
 			{ week: 2, value: 0.44 }
 		]
 	});
-	const basis = draftBasis(draft, 'Places off is lower is better.');
-	assert.match(basis[0] ?? '', /^Our draft board is the preseason order we set Tue Sep 8/u);
-	assert.match(basis[0] ?? '', /through week 5 in PPR/u);
-	assert.equal(basis.at(-1), draft.namedBasis);
+});
+
+void test("the draft basis: a phone says the figures' sentences, a desk when the board was set too (Lane 131)", () => {
+	const basis = draftBasis(draft);
+	assert.deepEqual(drawnOn(basis, 'phone'), [
+		RECORDS_WORDS.draftPositions,
+		RECORDS_WORDS.draftScale,
+		RECORD_WORDS.placesOff,
+		draft.namedBasis
+	]);
+	const desk = drawnOn(basis, 'desk');
+	assert.match(desk[0] ?? '', /^Our draft board is the preseason order we set Tue Sep 8/u);
+	assert.match(desk[1] ?? '', /through week 5 in PPR/u);
+	assert.ok(desk.includes(RECORDS_WORDS.draftBye) && desk.includes(RECORDS_WORDS.draftKickers));
+	assert.equal(desk.at(-1), draft.namedBasis);
 });
 
 const league: LeagueRecord = {
@@ -252,8 +303,9 @@ void test('the records say no banned word and no em-dash', () => {
 			typeof value === 'string' ? [value] : []
 		),
 		RECORDS_WORDS.before(7, 'set before kickoff Thu Oct 22'),
-		RECORDS_WORDS.draftBasis('Tue Sep 8', 5),
-		RECORDS_WORDS.draftBasis('Tue Sep 8', null)
+		RECORDS_WORDS.draftSet('Tue Sep 8'),
+		RECORDS_WORDS.draftGraded(5),
+		RECORDS_WORDS.draftGraded(null)
 	];
 	for (const words of said) {
 		assert.doesNotMatch(words, bannedPattern(), words);

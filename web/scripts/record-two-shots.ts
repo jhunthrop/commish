@@ -5,11 +5,14 @@
 // API's weekly record in the league, scripts/inseason-fixture/record.ts, a STAND-IN week). It asserts
 // the rulings' words: each record named by what it grades, ADP only under the draft record, weeks 1 to
 // 6 in one line, the Yahoo sentence, the league's sentence, and the front card's named record. Exits
-// non-zero on any fault.
+// non-zero on any fault. Each record's basis is held to the budget on its own (Lane 131, basis-lines.ts:
+// eight lines at 390), its count printed; the record pages are shot in both themes.
 //
 //   node scripts/record-two-shots.ts <upcoming|graded> [web origin] [api origin] [out dir]
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
+import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
+import { basisLines, basisReport } from './basis-lines.ts';
 import { installFixtureApiClock } from './inseason-fixture/clock.ts';
 
 const mode = process.argv[2] === 'graded' ? 'graded' : 'upcoming';
@@ -22,6 +25,10 @@ const SETTLE_MS = 600;
 const READY_TIMEOUT_MS = 30_000;
 
 type Who = 'signed-out' | 'espn';
+type Theme = 'light' | 'dark';
+const THEMES: readonly Theme[] = ['light', 'dark'];
+/** The two records, each with its own basis block. */
+const RECORDS = ['weekly', 'draft'] as const;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const ESPN = { name: 'fixture_league', value: 'espn' };
 
@@ -29,13 +36,17 @@ await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 const faults: string[] = [];
 
-async function open(who: Who, width: number, path: string): Promise<Page> {
+async function open(who: Who, width: number, path: string, theme: Theme = 'light'): Promise<Page> {
 	const ctx = await browser.newContext({
 		viewport: { width, height: width <= PHONE_MAX ? 844 : 900 },
 		deviceScaleFactor: width <= PHONE_MAX ? 2 : 1,
-		colorScheme: 'light'
+		colorScheme: theme
 	});
 	await installFixtureApiClock(ctx, API_ORIGIN);
+	await ctx.addInitScript(
+		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
+		[THEME_STORAGE_KEY, theme] as const
+	);
 	if (who === 'espn')
 		await ctx.addCookies([SIGNED_IN, ESPN].map((c) => ({ ...c, domain: 'localhost', path: '/' })));
 	const page = await ctx.newPage();
@@ -51,9 +62,21 @@ const lacks = (text: string, never: RegExp, where: string): void => {
 	if (never.test(text)) faults.push(`${where}: says ${String(never)}`);
 };
 
-async function record(who: Who, width: number): Promise<void> {
-	const page = await open(who, width, '/record');
-	const where = `record ${mode} ${who} ${String(width)}`;
+/** Each record's basis against the budget at a width it holds (Lane 131): its line printed, a fault
+ * when over. */
+async function basisFaults(page: Page, who: Who, width: number): Promise<void> {
+	for (const name of RECORDS) {
+		const lines = await basisLines(page, `section#${name} [data-basis]`);
+		const report = basisReport(`record ${mode} ${name} ${who}`, width, lines);
+		if (report === null) continue;
+		process.stdout.write(`${report.line}\n`);
+		if (report.fault !== null) faults.push(report.fault);
+	}
+}
+
+async function record(who: Who, width: number, theme: Theme): Promise<void> {
+	const page = await open(who, width, '/record', theme);
+	const where = `record ${mode} ${who} ${theme} ${String(width)}`;
 	const weekly = (await page.locator('section#weekly').textContent()) ?? '';
 	const draft = (await page.locator('section#draft').textContent()) ?? '';
 	has(weekly, 'Weekly record', where);
@@ -87,8 +110,9 @@ async function record(who: Who, width: number): Promise<void> {
 		);
 		if (mode === 'graded') has(weekly, "Starters right counts your league's lineup", where);
 	}
+	if (theme === 'light') await basisFaults(page, who, width);
 	await page.screenshot({
-		path: new URL(`record-${mode}-${who}-${String(width)}.png`, out).pathname,
+		path: new URL(`record-${mode}-${who}-${theme}-${String(width)}.png`, out).pathname,
 		fullPage: true
 	});
 	await page.context().close();
@@ -115,7 +139,9 @@ async function front(width: number): Promise<void> {
 }
 
 for (const width of WIDTHS) {
-	for (const who of ['signed-out', 'espn'] as const) await record(who, width);
+	for (const who of ['signed-out', 'espn'] as const) {
+		for (const theme of THEMES) await record(who, width, theme);
+	}
 	await front(width);
 }
 await browser.close();

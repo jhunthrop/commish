@@ -41,7 +41,7 @@
 	import {
 		RECORDS_WORDS,
 		beforeLine,
-		weeklyBasisExtra,
+		weeklyBasis,
 		weeklyLines,
 		weeklyOpening,
 		weeklyOrderWords,
@@ -111,12 +111,14 @@
 	const leagueRows = $derived(leagueRecord === null ? [] : leagueRankingRows(leagueRecord));
 	const leagueSentences = $derived(leagueRecord === null ? [] : leagueSentenceWeeks(leagueRecord));
 	const leagueSaid = $derived(leagueToDate(leagueRows));
-	const basis = $derived(
-		[
-			...recordBasis(record, leagueRecord === null ? null : leagueBasis(leagueRecord, lineup)),
-			...(head === null ? [] : weeklyBasisExtra(sourceDrawn(record, 'espn')))
-		].map((text) => ({ text, phone: true }))
-	);
+	/** The weekly record's basis with its desk-only parts (Lane 131); a run's own record before Lane
+	 * 114 says each of its sentences at both widths. */
+	const basis = $derived.by(() => {
+		const league = leagueRecord === null ? null : leagueBasis(leagueRecord, lineup);
+		return head === null
+			? recordBasis(record, league).map((text) => ({ text, phone: true }))
+			: weeklyBasis(record, league, sourceDrawn(record, 'espn'));
+	});
 
 	const capitalized = (words: string): string =>
 		`${words.charAt(0).toUpperCase()}${words.slice(1)}`;

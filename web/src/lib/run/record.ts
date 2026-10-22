@@ -55,9 +55,8 @@ export const RATE_PLACES = 2;
 
 /** The record's words, in one place for the copy guard (Lane 93). */
 export const RECORD_WORDS = {
-	/** Places off in a player's words, said once in the basis (B04). */
-	placesOff:
-		'Places off is the average number of places a player finished from where the order put him, lower is better.',
+	/** Places off in a player's words, its meaning whole, said once in the basis (B04, Lane 131). */
+	placesOff: 'Places off is how many places a player finished from his rank, lower is better.',
 	/** The weeks no order was set for: never graded after the fact (B03). */
 	missedOne: (week: string) => `${week} was not set before kickoff, so it cannot be graded.`,
 	missedMany: (weeks: string) => `${weeks} were not set before kickoff, so they cannot be graded.`,
@@ -421,26 +420,33 @@ export const HELD_OUT_METHOD =
 	'A player moved to a season-long list is graded where the order was set.';
 
 /** What a page opened from a league says in the record's basis in place of the run's own: what the
- * starters figure counts in the league's lineup, and the league's own benchmark. */
+ * starters figure counts in the league's lineup, what that lineup leaves uncounted (a qualification,
+ * said at a desk alone, Lane 131), and the league's own benchmark. */
 export interface LeagueBasis {
 	starters: string | null;
+	aside: string | null;
 	benchmark: string | null;
 }
 
-/** The record's basis, one paragraph's sentences: the run's method, the season-long rule, each
- * measure in a player's words (order matched, places off, starters right in the lineup it counts),
- * and the published projection's start. A league's own sentences replace the starters one and follow
- * the published one. */
+/** A basis's sentences, the empty ones left out. */
+export function saidOnly(texts: readonly (string | null)[]): string[] {
+	return texts.filter((text): text is string => text !== null && text !== '');
+}
+
+/** A run's own record's basis, before Lane 114, every sentence drawn at both widths and held to a
+ * phone's eight lines (Lane 131): the run's method, each measure in a player's words (order matched,
+ * places off, starters right in the lineup it counts). A league's own sentences replace the starters
+ * one and follow. The season-long rule and the published projection's start are qualifications the
+ * weekly record says at a desk alone; the page's lead names the week's published projection once its
+ * column is drawn (recordLead), so the basis does not. */
 export function recordBasis(record: RunRecord, league: LeagueBasis | null = null): string[] {
-	return [
+	return saidOnly([
 		record.method,
-		HELD_OUT_METHOD,
 		record.scale,
 		RECORD_WORDS.placesOff,
 		league?.starters ?? record.startersBasis,
-		publishedWords(record),
 		league?.benchmark ?? null
-	].filter((text): text is string => text !== null && text !== '');
+	]);
 }
 
 /** The order a week graded, in the record's words (review 66j M7). */
