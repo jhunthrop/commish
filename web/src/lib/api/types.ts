@@ -2904,6 +2904,11 @@ export interface components {
 			season_long?: boolean;
 			/** @description the week the provider expects him back (Lane 110, B79): the first week whose last game day is on or after the return date the daily player list gives him under this same status ("IR, eligible week 9"), and only when it is later than the week the designation addresses (a questionable or doubtful date in the coming days says nothing and is omitted; a multi-week out and the season-long statuses keep it); absent when that list dates no return for him, its date does not read or has passed, it is not past the addressed week, or it falls past the schedule's last week, and from an older answer */
 			return_week?: number | null;
+			/**
+			 * Format: date
+			 * @description the day the provider expects him back from a season-long list (Lane 153), the daily player list's return date, Eastern. With status questionable it is at or before the addressed week's last game day: he is this week's question (designated to return), ranked as playing, season_long, since and listed absent ("Back Sun Oct 25"). With a season-long status it is after this week's games and the row says when ("IR, back Nov 8"). Absent with no date, a date already passed, a week's designation, and from an older answer
+			 */
+			returning?: string;
 		};
 		GamePoints: {
 			week: number;

@@ -160,9 +160,44 @@ func TestAStashTakesAnOpenIRSlotThatTakesHim(t *testing.T) {
 	}
 }
 
-// A free agent due back in the week the page addresses (fix round 1,
-// MEDIUM-2): listed with the rows when his move gains, in the Stash group
-// back this week when it does not; never dropped, never counted undated.
+// A free agent designated to return from injured reserve in the week the
+// page addresses (Lane 153) is this week's question: listed with the rows
+// as a questionable player, gaining or not, and never a stash.
+func TestAnIRFreeAgentBackThisWeekIsListedNeverStashed(t *testing.T) {
+	f := restFixture(t)
+	f.league.Snap.Terms.PlayoffFirst, f.league.Snap.Terms.PlayoffLast = 15, 17
+	before := pickupPage(t, f, stashNow, "")
+	gains, flat := *before.Rows[0].Add.Player.BoardId, *before.Rows[len(before.Rows)-1].Add.Player.BoardId
+	stamp := stashNow.Add(-6 * time.Hour)
+	f.data.Designations = map[string]boards.Designation{
+		gains: {Code: "Injured Reserve - Designated to Return", AsOf: stamp, ReturnOn: eastDay(time.October, 25)},
+		flat:  {Code: "IR", AsOf: stamp, ReturnOn: eastDay(time.October, 25)},
+	}
+	page := pickupPage(t, f, stashNow, "")
+	for _, id := range []string{gains, flat} {
+		row, listed := rowOf(page.Rows, id)
+		if !listed {
+			t.Errorf("%s back this week is not in the rows", id)
+			continue
+		}
+		d := row.Add.Facts.Designation
+		if d == nil || d.Status != apitypes.DesignationStatusQuestionable || d.Returning == nil || d.Returning.String() != "2026-10-25" {
+			t.Errorf("%s back this week reads %+v, want questionable returning 2026-10-25", id, d)
+		}
+		if _, in := rowOf(*page.Stash, id); in {
+			t.Errorf("%s back this week is offered as a stash", id)
+		}
+	}
+	if *page.StashUndated != 0 {
+		t.Errorf("undated %d, want none", *page.StashUndated)
+	}
+}
+
+// A free agent ruled out and due back in the week the page addresses (fix
+// round 1, MEDIUM-2): listed with the rows when his move gains, in the
+// Stash group back this week when it does not; never dropped, never
+// counted undated. The return rule (Lane 153) reads season-long codes
+// only, so a week's out keeps this.
 func TestABackThisWeekFreeAgentIsListedOrStashedNeverHidden(t *testing.T) {
 	f := restFixture(t)
 	f.league.Snap.Terms.PlayoffFirst, f.league.Snap.Terms.PlayoffLast = 15, 17
@@ -175,8 +210,8 @@ func TestABackThisWeekFreeAgentIsListedOrStashedNeverHidden(t *testing.T) {
 	// Week 7's last game is Sunday Oct 25, the week the Wednesday page addresses.
 	stamp := stashNow.Add(-6 * time.Hour)
 	f.data.Designations = map[string]boards.Designation{
-		gains: {Code: "IR", AsOf: stamp, ReturnOn: eastDay(time.October, 25)},
-		flat:  {Code: "IR", AsOf: stamp, ReturnOn: eastDay(time.October, 25)},
+		gains: {Code: "O", AsOf: stamp, ReturnOn: eastDay(time.October, 25)},
+		flat:  {Code: "O", AsOf: stamp, ReturnOn: eastDay(time.October, 25)},
 	}
 	page := pickupPage(t, f, stashNow, "")
 	if row, listed := rowOf(page.Rows, gains); !listed || !positive(row.Gain) {
