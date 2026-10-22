@@ -84,8 +84,7 @@ export function heldMoveWords(
 	row: Pick<OrderRow, 'move' | 'roster' | 'line'>,
 	status: BoxRow['status']
 ): string | null {
-	if (row.move !== null || row.roster?.kind !== 'free' || status === null || !status.sits)
-		return null;
+	if (row.move !== null || row.roster?.kind !== 'free' || !status?.sits) return null;
 	const said = onList(status) ? onListWords(status.rank ?? '') : status.mark;
 	const back = row.line.facts.designation?.return_week ?? null;
 	return `${said}, ${back === null ? ORDER.noReturn : ORDER.backLate}`;
