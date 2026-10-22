@@ -38,4 +38,4 @@ def test_the_step_runs_after_the_play_by_play_and_before_the_register() -> None:
     at = STEPS.index(OPPONENT_RATINGS)
     assert STEPS[at - 1] == usage_steps.USAGE_STEPS[-1]
     assert STEPS.index(usage_steps.PLAY_BY_PLAY) < at < STEPS.index("freeze")
-    assert STEPS[-4:] == ("props-snapshot", "grade", "freeze", "scoreboard")
+    assert STEPS[-5:] == ("props-snapshot", "grade", "freeze", "espn-fill", "scoreboard")

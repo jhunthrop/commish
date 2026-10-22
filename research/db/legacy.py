@@ -349,6 +349,11 @@ _ENTRIES: Final = (
                     (),
                     "no legacy freeze kept ESPN's weekly projection (revision 0017)",
                 ),
+                "espn_read_at": Derived(
+                    "NULL::timestamptz",
+                    (),
+                    "no legacy freeze kept an ESPN read, so none names its instant (revision 0019)",
+                ),
             }
         ),
         dropped=_surrogate(),

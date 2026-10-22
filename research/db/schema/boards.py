@@ -128,6 +128,10 @@ REGISTER_FREEZE_ROWS: Final = Table(
     # (revision 0017, Lane 114): a yardstick the weekly record grades beside ours from week 7, NULL
     # where that read lists no row for him, where he has no ESPN id, and on every earlier freeze.
     Column("espn_points", Double(53)),
+    # The instant of the ESPN read `espn_points` came from (revision 0019, Lane 146, Amendment 6): the
+    # freeze's own read, or the first read after it and before the week's first kickoff when the freeze
+    # kept none (`espn-fill`). The grader keeps it beside `frozen_at`. NULL where `espn_points` is.
+    Column("espn_read_at", DateTime(True)),
     one_of("implementation", IMPLEMENTATIONS, "register_freeze_rows_implementation_ck"),
     _player_fk("register_freeze_rows", "RESTRICT"),
 )

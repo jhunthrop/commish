@@ -12,6 +12,11 @@ every yardstick on the same rows under the fill rule (`record.filled_ranks`). Th
 record's own (`record.score_entries`): order matched, places off and starters right in the standard
 12-team lineup. The season to date pools each yardstick over the weeks that graded it, with ours pooled
 again over those weeks beside it, like with like.
+
+ESPN's read is said beside its comparison when it was not the read the order was set with (Amendment 6,
+Lane 146): a freeze whose ESPN read failed takes the first read after it and before the week's first
+kickoff (`espn_read_at` later than the freeze), and a week no read before kickoff reached is graded
+against the published projection alone. A week whose freeze kept ESPN's read says nothing.
 """
 
 from collections.abc import Mapping, Sequence
@@ -53,6 +58,15 @@ _METHOD: Final = (
     "From week {week} we set our weekly rankings before each week's first kickoff and graded them on the "
     "week's points{beside}."
 )
+# Beside the ESPN comparison of a graded week (Amendment 6): the read came after the order was set, or
+# no read before kickoff reached the week.
+ESPN_READ_AFTER_NOTE: Final = (
+    "ESPN's projection this week was read after our weekly rankings were set, still before the first kickoff."
+)
+ESPN_UNREAD_NOTE: Final = (
+    "ESPN's projection was not read before this week's first kickoff, so the week is graded against the "
+    "week's published projection alone."
+)
 _BESIDE_NAMES: Final = {"espn": "ESPN's projection", "published": "the week's published projection"}
 
 
@@ -88,6 +102,8 @@ class WeeklyWeek:
     lines: tuple[WeeklyLine, ...]
     grades_from: datetime | None = None
     placed: tuple[WeeklyPlaced, ...] = ()
+    # The sentence beside a graded week's ESPN comparison (`espn_note`), None when there is nothing to say.
+    espn_note: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,6 +246,21 @@ def first_week(shipped: set[int], kickoffs: Mapping[int, datetime], as_of: datet
     return min(ahead) if ahead else None
 
 
+def espn_note(rows: Sequence[Mapping[str, Any]], frozen_at: datetime) -> str | None:
+    """What a graded week says of ESPN's read (Amendment 6): read after the order was set when any row's
+    figure came from a read later than the freeze, unread when no row carries one but the published
+    projection is there to grade against alone; None when the freeze kept ESPN's own read."""
+    if any(row.get("espn_points") is not None and _later(row.get("espn_read_at"), frozen_at) for row in rows):
+        return ESPN_READ_AFTER_NOTE
+    if rows and all(row.get("espn_points") is None for row in rows):
+        return ESPN_UNREAD_NOTE if any(row.get("published_points") is not None for row in rows) else None
+    return None
+
+
+def _later(read_at: datetime | None, frozen_at: datetime) -> bool:
+    return read_at is not None and read_at > frozen_at
+
+
 def _set_week(
     conn: Connection, season: int, week: int, frozen_at: datetime, grades_from: datetime | None
 ) -> tuple[WeeklyWeek, list[Mapping[str, Any]]]:
@@ -238,7 +269,16 @@ def _set_week(
     if graded_at is None:
         return WeeklyWeek(week, "frozen", frozen_at, board_as_of, None, len(rows), (), grades_from), rows
     built = WeeklyWeek(
-        week, "graded", frozen_at, board_as_of, graded_at, len(rows), week_lines(rows), None, placed_players(rows)
+        week,
+        "graded",
+        frozen_at,
+        board_as_of,
+        graded_at,
+        len(rows),
+        week_lines(rows),
+        None,
+        placed_players(rows),
+        espn_note(rows, frozen_at),
     )
     return built, rows
 
