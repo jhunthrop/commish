@@ -2,6 +2,7 @@ package account_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -126,5 +127,25 @@ func TestViewCarriesTheSiteSeason(t *testing.T) {
 	v.Season = nil
 	if got, err = v.View(ctx, a); err != nil || !got.Season.Phase.Valid() || got.Season.Basis == "" {
 		t.Fatalf("with no season source: %+v (%v)", got.Season, err)
+	}
+}
+
+// In the free season /me lists all ten features for an account with no
+// rows, and still shows no pass and no Membership: nothing was bought or
+// written.
+func TestViewInTheFreeSeasonListsEveryFeature(t *testing.T) {
+	ctx := context.Background()
+	store := &entitlements.Store{Pool: dbtest.Pool(t), Free: entitlements.FreeSeason(season.Of(viewNow))}
+	a := newAccount(t, ctx, store, "user_free_season")
+	v := &account.Viewer{Entitlements: store, Now: func() time.Time { return viewNow }}
+	got, err := v.View(ctx, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got.Features, entitlements.AllFeatures()) || len(got.Features) != 10 {
+		t.Errorf("features = %v, want all ten %v", got.Features, entitlements.AllFeatures())
+	}
+	if got.DraftPass != nil || got.Membership != nil {
+		t.Errorf("free season shows a pass %+v or a Membership %+v, want neither", got.DraftPass, got.Membership)
 	}
 }

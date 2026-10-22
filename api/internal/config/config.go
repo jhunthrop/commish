@@ -192,6 +192,10 @@ type API struct {
 	// routes on (API_BASE_URL's host by default). Any other host, its
 	// run.app URL above all, gets a 404 but for the probes.
 	AllowedHosts []string
+	// FreeSeason is FREE_SEASON, the season year in which every member
+	// holds every feature and checkout stays shut whatever the Stripe
+	// keys; 0, the default, is none.
+	FreeSeason int
 }
 
 // Room is cmd/room's whole configuration.
@@ -471,6 +475,27 @@ func (l *loader) advisor() Advisor {
 	return a
 }
 
+// The season years FREE_SEASON accepts: a guard against a typo, not a
+// rule about which seasons may be free.
+const (
+	minSeasonYear = 2026
+	maxSeasonYear = 2100
+)
+
+// freeSeason is FREE_SEASON, 0 when unset.
+func (l *loader) freeSeason() int {
+	v := strings.TrimSpace(l.get("FREE_SEASON"))
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < minSeasonYear || n > maxSeasonYear {
+		l.invalid("FREE_SEASON", fmt.Sprintf("must be a season year from %d to %d, or empty", minSeasonYear, maxSeasonYear))
+		return 0
+	}
+	return n
+}
+
 // serviceOrigin checks an optional research service's origin.
 func (l *loader) serviceOrigin(name, v string) {
 	if v == "" {
@@ -517,6 +542,7 @@ func LoadAPI(get Getenv) (API, error) {
 	c.Hosts = l.hosts(c.Env)
 	c.Dev = l.dev(c.Env)
 	c.AllowedHosts = l.allowedHosts(c.HTTP.APIBaseURL, c.Env)
+	c.FreeSeason = l.freeSeason()
 	return c, l.err()
 }
 
