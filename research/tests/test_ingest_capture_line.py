@@ -8,10 +8,12 @@ from typing import Any, cast
 import pytest
 
 from research.nightly import steps
+from research.nightly.designation_dating import DatingOutcome
 from research.nightly.steps import IngestContext
 from research.pipeline.tank01.capture import CaptureResult, FeedOutcome
 
 REFUSAL = "Tank01 refused /getNFLBettingOdds: no games on this date"
+DATED = "designation-dating: the capture of 2026-10-16T04:00:00Z is dated already (0123456789ab)"
 
 
 def test_a_failed_feed_is_named_with_its_reason(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -19,9 +21,10 @@ def test_a_failed_feed_is_named_with_its_reason(monkeypatch: pytest.MonkeyPatch)
         [FeedOutcome("tank01_news", "captured", 1), FeedOutcome("tank01_betting_odds", "failed", 1, REFUSAL)]
     )
     monkeypatch.setattr(steps, "run_capture_harvest", lambda *args: result)
+    monkeypatch.setattr(steps, "date_newest_capture", lambda *args: DatingOutcome(DATED))
     engine = cast("Any", type("E", (), {"begin": lambda self: nullcontext(object())})())
     context = IngestContext(engine, cast("Any", None), datetime(2026, 10, 16, 5, tzinfo=UTC), {"TANK01_API_KEY": "k"})
-    assert steps._capture(context) == f"2 feeds, 2 requests, failed: tank01_betting_odds ({REFUSAL})"
+    assert steps._capture(context) == f"2 feeds, 2 requests, failed: tank01_betting_odds ({REFUSAL}); {DATED}"
 
 
 def test_a_long_reason_keeps_its_first_line_within_the_cap() -> None:
