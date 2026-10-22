@@ -70,7 +70,7 @@ void test('designated to return: due back this week is the week’s question, a 
 	assert.equal(playerStatusSchema.safeParse({ ...mason, status: 'out' }).success, false);
 	assert.equal(playerStatusSchema.safeParse({ ...mason, returning: '20261025' }).success, false);
 	// An older file, with no day, reads as before.
-	const { returning: _dropped, ...older } = mason;
+	const older = { status: mason.status, seasonLong: mason.seasonLong, since: mason.since };
 	assert.equal(statusView(older, CENTRAL).mark, 'Questionable');
 });
 
