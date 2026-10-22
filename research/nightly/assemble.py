@@ -271,7 +271,7 @@ def _served_week(
     week = rest.basis.from_week if rest is not None and rest.basis is not None else (pending[0] if pending else None)
     if week is None:
         return pages.ServedWeek({}, {}, as_of)
-    read = read_statuses(conn, as_of)
+    read = read_statuses(conn, as_of, now=as_of)
     statuses = {board_id: status_word(read, board_id) for board_id, _ in ids}
     reads = served_week_reads(conn, PRODUCT_SEASON, week, sorted({uid for _, uid in ids}))
     projections = served_projections(published_projections(conn, PRODUCT_SEASON, [week], as_of), week)

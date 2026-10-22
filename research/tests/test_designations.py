@@ -157,7 +157,7 @@ def test_the_runs_own_build_and_a_missing_token_record_the_set(store: LocalRunSt
 
 
 def test_without_a_store_the_marking_is_skipped_by_name(store: LocalRunStore) -> None:
-    marked = mark_public_runs(None, store)
+    marked = mark_public_runs(None, store, _NOW)
     assert marked.ok and marked.line == "designations: skipped, no store to read the injury capture from"
     assert finish_marks(None, store, marked, _hour(None)) == []
 
@@ -215,7 +215,7 @@ def test_the_read_dates_a_season_long_run_as_the_api_does(engine: Engine) -> Non
         ),
     )
     with engine.connect() as conn:
-        read = read_statuses(conn)
+        read = read_statuses(conn, now=_NOW)
     assert read is not None
     assert (read.read_at, read.source) == (datetime(2026, 10, 13, 14, tzinfo=UTC), _BY_DATE)
 
@@ -236,11 +236,11 @@ def test_the_sweep_stands_in_with_its_note(engine: Engine) -> None:
     sweep = [{"roster": [{"playerID": "p1", "injury": {"designation": "O", "description": "Out for the season"}}]}]
     _captures(engine, ("tank01_injuries", sweep, "2026-10-13T10:00:00+00:00"))
     with engine.connect() as conn:
-        read = read_statuses(conn)
+        read = read_statuses(conn, now=_NOW)
     assert read is not None and dict(read.players) == {"p1": PlayerStatus("out", True, None)}
     _captures(engine)
     with engine.connect() as conn:
-        assert read_statuses(conn) is None
+        assert read_statuses(conn, now=_NOW) is None
 
 
 def test_a_publish_hour_writes_the_file_marks_the_table_and_builds_once(engine: Engine, store: LocalRunStore) -> None:
@@ -251,7 +251,7 @@ def test_a_publish_hour_writes_the_file_marks_the_table_and_builds_once(engine: 
     )
     store.put(LATEST_KEY, encode({"runId": _PRESEASON}), JSON_TYPE)
     store.put(EARLY_KEY, encode({"runId": _IN_SEASON, "publicAt": "2026-10-21T13:00:00.000Z"}), JSON_TYPE)
-    marked = mark_public_runs(engine, store)
+    marked = mark_public_runs(engine, store, _NOW)
     assert marked.ok, marked.line
     for run_id in (_PRESEASON, _IN_SEASON):
         file = json.loads(store.get(f"runs/{run_id}/{DESIGNATIONS_FILE}") or b"{}")
@@ -278,7 +278,7 @@ def test_a_publish_hour_writes_the_file_marks_the_table_and_builds_once(engine: 
         (_GIBBS, "injured_reserve", datetime(2026, 10, 21, 11, tzinfo=UTC)),
     ]
     # The next hour, the same capture: nothing to build.
-    again = finish_marks(engine, store, mark_public_runs(engine, store), _hour(dispatcher))
+    again = finish_marks(engine, store, mark_public_runs(engine, store, _NOW), _hour(dispatcher))
     assert "unchanged since its last build" in again[-1].line and dispatcher.calls == []
 
 
@@ -293,7 +293,7 @@ def test_an_empty_or_cut_short_list_gives_way_and_a_real_drop_reads_on_the_next(
     with engine.begin() as conn:
         record_checks(conn, [FeedOutcome(_BY_DATE, "captured", 1)], datetime(2026, 10, 13, 12, tzinfo=UTC))
     with engine.connect() as conn:
-        read = read_statuses(conn)
+        read = read_statuses(conn, now=_NOW)
     assert read is not None and read.read_at == datetime(2026, 10, 13, 10, tzinfo=UTC)
     assert read.players["p1"] == PlayerStatus("injured_reserve", True, None)
     # The 12:00 check returned the refused list, so it never vouches for the 10:00 one shown.
@@ -314,7 +314,7 @@ def test_an_empty_or_cut_short_list_gives_way_and_a_real_drop_reads_on_the_next(
     with engine.begin() as conn:
         record_checks(conn, [FeedOutcome(_BY_DATE, "captured", 1)], datetime(2026, 10, 13, 13, tzinfo=UTC))
     with engine.connect() as conn:
-        read = read_statuses(conn)
+        read = read_statuses(conn, now=_NOW)
     assert read is not None and dict(read.players) == {"p3": PlayerStatus("doubtful", False, None)}
     assert read.checked_at == datetime(2026, 10, 13, 13, tzinfo=UTC)
 
@@ -332,7 +332,7 @@ def test_the_checks_ride_on_the_read_and_an_out_takes_a_nearby_sweeps_note(engin
         # An older pass never moves the check back.
         record_checks(conn, [FeedOutcome(_BY_DATE, "captured", 1)], checked.replace(hour=12))
     with engine.connect() as conn:
-        read = read_statuses(conn)
+        read = read_statuses(conn, now=_NOW)
         assert conn.execute(select(CAPTURE_CHECKS.c.source)).scalars().all() == [_BY_DATE]
     assert read is not None and read.checked_at == checked
     assert read.players["p2"] == PlayerStatus("out", True, None)
@@ -342,14 +342,14 @@ def test_a_lapsed_designation_clears_from_the_file_and_the_table(engine: Engine,
     store.put(LATEST_KEY, encode({"runId": _IN_SEASON}), JSON_TYPE)
     assert sync_published_board(engine, store, _NOW).ok
     _captures(engine, (_BY_DATE, _listed((_GIBBS, "IR"), (_ALLEN, "Q")), "2026-10-21T10:00:00+00:00"))
-    first = mark_public_runs(engine, store)
+    first = mark_public_runs(engine, store, _NOW)
     finish_marks(engine, store, first, _hour(None))
     _captures(
         engine,
         (_BY_DATE, _listed((_GIBBS, "IR"), (_ALLEN, "Q")), "2026-10-21T10:00:00+00:00"),
         (_BY_DATE, _listed((_ALLEN, "Q"), ("x1", "Q")), "2026-10-21T11:00:00+00:00"),
     )
-    second = mark_public_runs(engine, store)
+    second = mark_public_runs(engine, store, _NOW)
     steps = finish_marks(engine, store, second, _hour(None))
     file = json.loads(store.get(f"runs/{_IN_SEASON}/{DESIGNATIONS_FILE}") or b"{}")
     assert list(file["players"]) == [_ALLEN]

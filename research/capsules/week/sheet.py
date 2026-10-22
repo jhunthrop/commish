@@ -14,7 +14,7 @@ word: the club's expected points are the one game figure it carries.
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from typing import Final
 from zoneinfo import ZoneInfo
 
@@ -39,6 +39,25 @@ STATUS_WORDS: Final[Mapping[str, str]] = {
     "pup": "on the physically unable to perform list",
     "nfi": "on the non-football injury list",
 }
+# A player designated to return this week (Lane 153), by the list he returns from: the one sentence the sheet
+# and the facts block say it in, with his day ("Sun Oct 25").
+RETURNING_FROM_WORDS: Final[Mapping[str, str]] = {
+    "injured_reserve": "Designated to return from injured reserve",
+    "pup": "Designated to return from the physically unable to perform list",
+    "nfi": "Designated to return from the non-football injury list",
+    "suspended": "Back from his suspension",
+}
+
+
+def returning_words(status: "Status") -> str | None:
+    """ "Designated to return from injured reserve, expected back Sun Oct 25.": the sheet's one sentence for a
+    player designated to return this week, None for any other status."""
+    if status.returning is None or status.returning_from is None:
+        return None
+    day = status.returning
+    return f"{RETURNING_FROM_WORDS[status.returning_from]}, expected back {day:%a} {day:%b} {day.day}."
+
+
 # The two orders a board place comes from, and the words a read says it in (the coordinator's M2).
 REST_OF_SEASON: Final = "rest_of_season"
 ORDER_WORDS: Final[Mapping[bool, str]] = {True: "our rest-of-season order", False: "our preseason order"}
@@ -138,6 +157,14 @@ class Status:
     status: str | None
     captured_at: datetime | None
     checked_at: datetime | None = None
+    # Designated to return this week (the return rule, Lane 153): the day he is due back and the season-long
+    # list he returns from. His status is then this week's question (`RETURNING_STATUS`): he may play.
+    returning: date | None = None
+    returning_from: str | None = None
+
+    @property
+    def returning_this_week(self) -> bool:
+        return self.returning is not None and self.returning_from is not None
 
     def seen_at(self, written_at: datetime) -> datetime | None:
         """The newest instant the list is known to have stood, at or before the write: its last check when

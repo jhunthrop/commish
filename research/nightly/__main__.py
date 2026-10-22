@@ -95,7 +95,7 @@ def _publish(args: argparse.Namespace) -> int:
             dispatcher = None if args.no_dispatch else Dispatcher.from_environ(http, os.environ)
             # The injury capture is written beside the public and the early run first (Lane 63), so a
             # build the pointer step dispatches already reads it.
-            marked = mark_public_runs(engine, store)
+            marked = mark_public_runs(engine, store, now)
             _line(marked.line)
             outcome = publish(store, dispatcher, now)
             _line(outcome.line)
@@ -130,7 +130,8 @@ def _mark(args: argparse.Namespace) -> int:
     engine = make_engine(database_url_from_env(DATABASE_VARIABLE))
     try:
         with httpx.Client(timeout=60.0) as http:
-            marked = mark_public_runs(engine, _store(args, http))
+            now = now_ms() if args.at is None else datetime.fromisoformat(args.at)
+            marked = mark_public_runs(engine, _store(args, http), now)
     finally:
         engine.dispose()
     _line(marked.line)
@@ -176,6 +177,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         sub.add_argument("--out", default=None, help="a local directory instead of the R2 bucket")
     marking = commands.add_parser("mark", help="write the newest injury capture beside a local run")
     marking.add_argument("--out", required=True, help="the local directory laid out as the bucket")
+    marking.add_argument("--at", default=None, help="the instant the return rule reads the week at (ISO, development)")
     contract = commands.add_parser("contract", help="the schema gate alone, over a run already written")
     contract.add_argument("--runs", required=True, help="the directory laid out as the bucket (runs/<id>/...)")
     contract.add_argument("--run-id", required=True)

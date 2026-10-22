@@ -46,7 +46,7 @@ from research.model.domain import Position
 from research.nightly.build.page_club import call_for
 from research.nightly.build.player_season import SeasonContext, season_block, season_context
 from research.nightly.config import PAGE_FORMAT
-from research.nightly.designations import read_statuses, status_word
+from research.nightly.designations import StatusRead, listed_status, read_statuses
 from research.nightly.reads.schedule import Game, weeks_left_at
 from research.pipeline.nflverse.team_codes import product_team_code
 from research.pipeline.nws.grid import PRECIPITATION_KINDS
@@ -351,6 +351,14 @@ class WeekFacts:
     board_week: int
 
 
+def _status(read: StatusRead | None, player_id: str, at: datetime | None, checked: datetime | None) -> Status:
+    """His status on the read for the sheet: the word, and a return this week's day and list (Lane 153)."""
+    listed = listed_status(read, player_id)
+    if listed is None:
+        return Status(None, at, checked)
+    return Status(listed.status, at, checked, listed.returning, listed.returning_from)
+
+
 def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], as_of: datetime) -> WeekFacts | None:
     """The night's week facts for `subjects`; None once no game is left to kick off."""
     players = _ranked_players(conn)
@@ -367,9 +375,9 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
     wanted = sorted({cw.week for cw in weeks.values()} | {cw.game.week for cw in weeks.values() if cw.game is not None})
     stamp = _lines_stamp(conn, season, as_of)
     blocks = _blocks(context, players)
-    read = read_statuses(conn, as_of)
+    read = read_statuses(conn, as_of, now=as_of)
     at, checked = (None, None) if read is None else (read.read_at, read.checked_at)
-    statuses = {s.facts.identity.id: Status(status_word(read, s.facts.identity.id), at, checked) for s in subjects}
+    statuses = {s.facts.identity.id: _status(read, s.facts.identity.id, at, checked) for s in subjects}
     return WeekFacts(
         as_of,
         season,
