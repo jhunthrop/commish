@@ -94,7 +94,7 @@ async function weekSeen(page: Page) {
 	return page.evaluate((basisSelector: string) => {
 		const table = document.querySelector('main table.week');
 		const heads = [...(table?.querySelectorAll('thead th') ?? [])].map((th) =>
-			(th.textContent ?? '').trim()
+			th.textContent.trim()
 		);
 		const projAt = heads.indexOf('Proj');
 		const toPlay = [...(table?.querySelectorAll('tbody.to_play tr:not(.sec)') ?? [])].map((tr) =>
@@ -113,9 +113,9 @@ async function weekSeen(page: Page) {
 			over: document.documentElement.scrollWidth - window.innerWidth,
 			pressed: [
 				...document.querySelectorAll('.chips[aria-label="Position"] button[aria-pressed="true"]')
-			].map((b) => (b.textContent ?? '').trim()),
+			].map((b) => b.textContent.trim()),
 			chips: [...document.querySelectorAll('.chips[aria-label="Position"] button')].map((b) =>
-				(b.textContent ?? '').trim()
+				b.textContent.trim()
 			)
 		};
 	}, BASIS);
