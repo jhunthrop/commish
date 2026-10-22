@@ -37,8 +37,10 @@ from research.capsules.rank_basis import rank_basis_violation, ranks_without_bas
 from research.capsules.render import render_facts_for_model
 from research.capsules.season_voice import (
     SeasonClock,
+    calls_special_teams_week_missed,
     missed_weeks_violation,
     names_missed_weeks,
+    special_teams_missed_violation,
     time_frame_hits,
 )
 from research.capsules.sentences import split_sentences
@@ -332,6 +334,8 @@ def _validate(
     violations += own_rate_violations(trimmed, source.own_points_per_game)
     if page_number and not names_missed_weeks(trimmed, source.clock):
         violations.append(missed_weeks_violation(source.clock))
+    if calls_special_teams_week_missed(trimmed, source.clock):
+        violations.append(special_teams_missed_violation(source.clock))
     if tension and source.tension is not None and not cites_tension(trimmed, source.tension):
         figure = js_string(round_half_up(source.tension, 1))
         violations.append(

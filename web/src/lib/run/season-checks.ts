@@ -21,7 +21,7 @@ export interface SeasonedPlayer {
 	id: string;
 	team: string;
 	season: PlayerSeason;
-	lastGameClub?: { club: string; week: number } | null;
+	lastGameClub?: { club: string; week: number; specialTeams?: true } | null;
 }
 
 type Slates = ReadonlyMap<string, Slate>;
@@ -91,7 +91,8 @@ const byeRefusal: PageRule = (p, slates) => {
 
 /** A page that says his newest line was another club's (Lane 120) names a club other than his own and
  * a week his log shows as that club's game. His line that week may carry no stat and no offensive snap
- * (a special-teams game), so the week reads inactive, but it names that club's opponent (Lane 135). */
+ * (a special-teams game), so the week reads inactive, but it names that club's opponent (Lane 135). A week
+ * the writer says was special teams alone reads inactive (Lane 144). */
 const lastGameClubRefusal: PageRule = (p, slates) => {
 	const last = p.lastGameClub;
 	if (!last) return null;
@@ -103,8 +104,11 @@ const lastGameClubRefusal: PageRule = (p, slates) => {
 		row.status !== 'bye' &&
 		row.opponent === game.opponent &&
 		row.home === game.home;
-	if (last.club !== p.team && theirs) return null;
-	return `players/${p.id}.json says his week ${String(last.week)} line was for ${last.club}, but ${last.club === p.team ? 'that is his club' : `his log has no ${last.club} game that week`}.`;
+	if (last.club === p.team || !theirs)
+		return `players/${p.id}.json says his week ${String(last.week)} line was for ${last.club}, but ${last.club === p.team ? 'that is his club' : `his log has no ${last.club} game that week`}.`;
+	if (last.specialTeams === true && row.status !== 'inactive')
+		return `players/${p.id}.json says his week ${String(last.week)} snaps were on special teams, but his log reads that week ${row.status}.`;
+	return null;
 };
 
 const PAGE_RULES: readonly PageRule[] = [kickoffRefusal, byeRefusal, lastGameClubRefusal];

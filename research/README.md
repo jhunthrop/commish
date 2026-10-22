@@ -332,18 +332,18 @@ total counts each tested table per pass and each prerequisite table once, at its
 | nflverse-context | rerun | team_week_observations 16,240; player_week_observations 13,526; nflverse_injuries 11,735; nflverse_roster_weeks 11,028; coaches 944 (setup) | 0 |
 | nflverse-derived-stat-lines | first | player_week_observations 9,212 | 0 |
 | nflverse-derived-stat-lines | rerun | player_week_observations 9,212 | 0 |
-| tank01-roster-and-lines | first | provider_players 1,373; provider_stat_lines 944 | 0 |
-| tank01-roster-and-lines | rerun | provider_players 1,373; provider_stat_lines 944 | 0 |
+| tank01-roster-and-lines | first | provider_players 1,373 (535 declared departures: a free agent's new row holds no club); provider_stat_lines 944 | 0 |
+| tank01-roster-and-lines | rerun | provider_players 1,373 (535 declared departures: a free agent's new row holds no club); provider_stat_lines 944 | 0 |
 | tank01-schedule | first | provider_games 272 | 0 |
 | tank01-schedule | rerun | provider_games 272 | 0 |
 | tank01-schedule | prior | provider_games 272 | 0 |
 | tank01-schedule | later | provider_games 274 (2 declared departures: the moved games retired) | 0 |
-| tank01-adp | first | provider_players 1,373 | 0 |
-| tank01-adp | rerun | provider_players 1,373 | 0 |
-| tank01-headshots | first | provider_players 1,373 | 0 |
-| tank01-headshots | rerun | provider_players 1,373 | 0 |
-| crosswalk | first | players 24,885 (setup); provider_players 1,373 (setup, 1 declared departure); player_crosswalk 1,373 | 0 |
-| crosswalk | rerun | players 24,885 (setup); provider_players 1,373 (setup, 1 declared departure); player_crosswalk 1,373 | 0 |
+| tank01-adp | first | provider_players 1,373 (535 declared departures: a free agent's new row holds no club) | 0 |
+| tank01-adp | rerun | provider_players 1,373 (535 declared departures: a free agent's new row holds no club) | 0 |
+| tank01-headshots | first | provider_players 1,373 (535 declared departures: a free agent's new row holds no club) | 0 |
+| tank01-headshots | rerun | provider_players 1,373 (535 declared departures: a free agent's new row holds no club) | 0 |
+| crosswalk | first | players 24,885 (setup); provider_players 1,373 (setup, 536 declared departures: Estimé's name, and the free agents' clubs); player_crosswalk 1,373 | 0 |
+| crosswalk | rerun | players 24,885 (setup); provider_players 1,373 (setup, 536 declared departures: Estimé's name, and the free agents' clubs); player_crosswalk 1,373 | 0 |
 | tank01-capture-all | first | capture_snapshots 11 | 0 |
 | tank01-capture-all | rerun | capture_snapshots 11 | 0 |
 | tank01-capture-harvest | first | capture_snapshots 6; provider_players 6 (Sharpe, a free agent, cleared to NULL) | 0 |
@@ -707,7 +707,11 @@ uv run python -m research.model.fit_inputs
    them if fewer, each shown from the newest passed run's copy (`held/<id>.json`, with that run's
    stamp) or as its board figures alone, named in `held.json`, the gate's summary and one
    `nightly HELD:` line the research alerts email; past the line, or on any refusal that is not one
-   page's, the run fails as before.
+   page's, the run fails as before. **No CI run of the gate over real pages** (the coordinator's
+   ruling, Lane 144, B117): CI runs it over the committed contract fixtures (`nightly/contract/fixture`)
+   and the writer-made cases of `tests/test_season_contract.py`; the nightly's own gate run is the run over
+   real pages, every night, and the held page is its safety net. No recorded night is kept in the
+   repository or fetched in CI.
 6. **headshots** (`nightly/headshots.py`): every face mirrored into R2 by content
    (`headshots/<sha256>.<ext>`), fetched conditionally, with the run's map `headshots.json`.
 7. **write**: every artifact, `report.json` (steps, gates and their reasons, the held-out scores,

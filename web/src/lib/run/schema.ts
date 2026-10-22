@@ -266,9 +266,15 @@ export const playerSchema = z.object({
 	priorSeasons: z.array(priorSeasonSchema).optional(),
 	/** The club his newest game line was for and its week, when it is not `team` (Lane 120): the
 	 * provider's list read after that game moved him. Null when it is his club; absent on a run from
-	 * before the nightly wrote it. */
+	 * before the nightly wrote it. `specialTeams` (Lane 144): that week he was on the field for special
+	 * teams alone, the writer's one fact (page_club.py `special_teams_week`); absent otherwise and on a run
+	 * from before it. */
 	lastGameClub: z
-		.object({ club, week: z.number().int().min(1) })
+		.object({
+			club,
+			week: z.number().int().min(1),
+			specialTeams: z.literal(true).optional()
+		})
 		.nullable()
 		.optional()
 });

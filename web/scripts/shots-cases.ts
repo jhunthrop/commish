@@ -32,6 +32,7 @@ export type RunKey =
 	| 'saturday'
 	| 'mover'
 	| 'free-agent'
+	| 'special-teams'
 	| 'oneboard'
 	| 'record-live'
 	| 'two-upcoming'
@@ -82,6 +83,11 @@ export const SHOT_RUNS: Readonly<Record<RunKey, ShotRun>> = {
 	'free-agent': {
 		id: clubRunId('free-agent'),
 		write: [{ args: ['scripts/inseason-fixture/mover-run.ts', 'free-agent'] }],
+		fixtureRun: true
+	},
+	'special-teams': {
+		id: clubRunId('special-teams'),
+		write: [{ args: ['scripts/inseason-fixture/mover-run.ts', 'special-teams'] }],
 		fixtureRun: true
 	},
 	oneboard: {
@@ -302,6 +308,10 @@ export const SHOT_CASES: readonly ShotCase[] = [
 	// The contract run with Gibbs rewritten (mover-run.ts).
 	once('club-move-shots', 'mover', FIXTURE_WEEK_CLOCK),
 	once('free-agent-shots', 'free-agent', FIXTURE_WEEK_CLOCK),
+	once('club-move-shots', 'special-teams', FIXTURE_WEEK_CLOCK, {
+		name: 'club-move-shots-special-teams',
+		env: { MOVE: 'special-teams' }
+	}),
 	// The Saturday run.
 	once('horizon-shots', 'saturday', FIXTURE_WEEK_CLOCK, {
 		fixture: { FIXTURE_TITLE_WEEK: '18:2' }

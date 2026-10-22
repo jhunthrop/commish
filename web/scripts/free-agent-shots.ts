@@ -36,7 +36,7 @@ const SETTLE_MS = 400;
 const SLUG = 'jahmyr-gibbs';
 const GIBBS = '4429795';
 /** The page's line under the card, as the build words it from the run's clubs (Lions). */
-const NOTE = lastGameClubWords(null, 5, { nickname: 'Lions' });
+const NOTE = lastGameClubWords(null, 5, { nickname: 'Lions' }, 'game');
 /** The run's records reach week 5: no later week is a row. */
 const THROUGH = 5;
 /** His week of offensive snaps with no club edge (mover-run.ts). */

@@ -156,3 +156,25 @@ def last_game_club(call: ClubCall) -> dict[str, Any] | None:
     if not call.line_elsewhere or call.latest_week is None:
         return None
     return {"club": call.latest_club, "week": call.latest_week}
+
+
+def special_teams_week(call: ClubCall, log: Sequence[Mapping[str, Any]]) -> int | None:
+    """THE SPECIAL-TEAMS WEEK (Lane 144, B117): his newest line's week, for another club than the page's,
+    when his log reads it inactive under that club's game (an opponent named). The club edge comes from
+    the snap release, which lists every snap, and inactive means no stat line and no offensive snap, so
+    he was on the field for special teams alone. One fact: the page carries it (`lastGameClub.specialTeams`,
+    read by the web) and the writer's sheet says it, never "did not play" nor a missed week."""
+    last = last_game_club(call)
+    if last is None:
+        return None
+    row = next((r for r in log if r["week"] == last["week"]), None)
+    on_field = row is not None and row["status"] == "inactive" and row["opponent"] is not None
+    return int(last["week"]) if on_field else None
+
+
+def page_last_game_club(call: ClubCall, log: Sequence[Mapping[str, Any]]) -> dict[str, Any] | None:
+    """The page's `lastGameClub`, with `specialTeams: true` on a special-teams week."""
+    last = last_game_club(call)
+    if last is None or special_teams_week(call, log) is None:
+        return last
+    return {**last, "specialTeams": True}

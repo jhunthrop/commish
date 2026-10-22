@@ -11,6 +11,10 @@
 // API with FIXTURE_RUN_ID=2026-10-21T12-mover and FIXTURE_CLOCK at the clock to shoot:
 //
 //   node scripts/club-move-shots.ts [web origin] [out dir]
+//
+// With MOVE=special-teams it shoots the special-teams run (`mover-run.ts special-teams`, Lane 144, B117)
+// instead: his newest line the Chargers' week 5 game on special teams alone, so the line under the card
+// says his week 5 snaps were on special teams, and that week's row says so beside its opponent.
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { copyFault, watchData } from './copy-scan.ts';
@@ -25,10 +29,23 @@ const VIEWPORT_HEIGHT = 900;
 const ZONE = 'America/Chicago';
 const READY_TIMEOUT_MS = 30_000;
 const SLUG = 'jahmyr-gibbs';
+const MOVE = process.env.MOVE ?? 'mover';
+if (MOVE !== 'mover' && MOVE !== 'special-teams')
+	throw new Error(`MOVE is mover or special-teams, not ${MOVE}.`);
+/** The special-teams run's newest line: the Chargers' week 5 game (mover-run.ts). */
+const SPECIAL_TEAMS_WEEK = 5;
 /** The page's line, as the build words it from the run's clubs (Lions, Chargers). */
-const NOTE = lastGameClubWords({ nickname: 'Lions' }, 6, { nickname: 'Chargers' });
+const NOTE =
+	MOVE === 'mover'
+		? lastGameClubWords({ nickname: 'Lions' }, 6, { nickname: 'Chargers' }, 'game')
+		: lastGameClubWords(
+				{ nickname: 'Lions' },
+				SPECIAL_TEAMS_WEEK,
+				{ nickname: 'Chargers' },
+				'specialTeams'
+			);
 /** His weeks with no line before his first one. */
-const UNKNOWN_WEEKS = [1, 2, 3, 4];
+const UNKNOWN_WEEKS = MOVE === 'mover' ? [1, 2, 3, 4] : [1, 2, 3];
 
 const web = process.argv[2] ?? 'http://localhost:4173';
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
@@ -39,7 +56,7 @@ await mkdir(out, { recursive: true });
 
 interface Seen {
 	team: string;
-	rows: { week: string; opponent: string }[];
+	rows: { week: string; opponent: string; text: string }[];
 }
 
 const browser = await chromium.launch();
@@ -66,7 +83,8 @@ try {
 				team: document.querySelector('main .card')?.textContent ?? '',
 				rows: [...document.querySelectorAll('main table tbody tr')].map((tr) => ({
 					week: tr.querySelector('td, th')?.textContent.trim() ?? '',
-					opponent: tr.querySelector('.opp')?.textContent.trim() ?? ''
+					opponent: tr.querySelector('.opp')?.textContent.trim() ?? '',
+					text: tr.textContent.trim()
 				}))
 			}));
 			const where = `${theme} ${String(width)}`;
@@ -76,10 +94,17 @@ try {
 				if (row?.opponent !== SEASON_LOG_WORDS.didNotPlay)
 					faults.push(`${where}: week ${String(week)} reads "${row?.opponent ?? 'nothing'}"`);
 			}
+			if (MOVE === 'special-teams') {
+				const row = seen.rows.find((r) => r.week === String(SPECIAL_TEAMS_WEEK));
+				if (!row?.text.includes(SEASON_LOG_WORDS.specialTeams))
+					faults.push(`${where}: week 5 reads "${row?.text ?? 'nothing'}"`);
+				if (row?.text.includes(SEASON_LOG_WORDS.didNotPlay))
+					faults.push(`${where}: week 5 says ${SEASON_LOG_WORDS.didNotPlay}`);
+			}
 			const copy = await copyFault(page, undefined, 'body');
 			if (copy !== null) faults.push(`${where}: says ${copy}`);
 			await page.screenshot({
-				path: new URL(`${SLUG}-${theme}-${String(width)}.png`, out).pathname,
+				path: new URL(`${SLUG}-${MOVE}-${theme}-${String(width)}.png`, out).pathname,
 				fullPage: true
 			});
 			await ctx.close();

@@ -17,7 +17,7 @@ from research.capsules.claims import CLAIM_RULES
 from research.capsules.multiples import MULTIPLE_VIOLATION
 from research.capsules.own_rate import OWN_RATE_VIOLATION
 from research.capsules.prose_checks import LABEL_VIOLATION, UNFINISHED_VIOLATION
-from research.capsules.season_voice import MISSED_WEEKS_UNNAMED
+from research.capsules.season_voice import MISSED_WEEKS_UNNAMED, SPECIAL_TEAMS_CALLED_MISSED
 from research.capsules.validate import (
     ADP_FIGURE_VIOLATION,
     COST_WORDS_SHOWN,
@@ -85,8 +85,9 @@ def _page_correction(violation: str) -> str | None:
             "Work one of these numbers into one sentence, printed exactly as written here, in your own words: "
             f"{choices}. Leave everything else as it is."
         )
-    if violation.startswith(MISSED_WEEKS_UNNAMED):
-        return f"{violation.removeprefix(MISSED_WEEKS_UNNAMED + ': ')} Leave everything else as it is."
+    for prefix in (MISSED_WEEKS_UNNAMED, SPECIAL_TEAMS_CALLED_MISSED):
+        if violation.startswith(prefix):
+            return f"{violation.removeprefix(prefix + ': ')} Leave everything else as it is."
     if violation.startswith((UNFINISHED_VIOLATION, LABEL_VIOLATION, MULTIPLE_VIOLATION, OWN_RATE_VIOLATION)):
         return f"{violation} Leave everything else as it is."
     rule = next((rule for rule in CLAIM_RULES if violation.startswith(f"{rule}: ")), None)

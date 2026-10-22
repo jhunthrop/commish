@@ -6,9 +6,11 @@ roster-and-lines case runs the seed with the provider's last week set to 2, whic
 seed with a shorter loop; every other method is the provider's own.
 """
 
+import gzip
 import json
 import os
 from datetime import UTC, datetime
+from functools import cache
 
 from sqlalchemy import Connection
 
@@ -25,11 +27,12 @@ from research.parity.cases.tables import (
 )
 from research.parity.diff import Departure
 from research.parity.record import RecordSpec
+from research.parity.replay import FIXTURES_ROOT
 from research.pipeline.budget import UnmeteredBudget
 from research.pipeline.http import Fetcher
 from research.pipeline.tank01.client import API_KEY_ENV, Paths, Tank01Client
 from research.pipeline.tank01.ingest import backfill_headshots, ingest_adp, ingest_roster_and_lines, ingest_schedule
-from research.pipeline.tank01.mapping import ADP_TYPE, SEASON_TYPE, WEEKS_LAST, map_games
+from research.pipeline.tank01.mapping import ADP_TYPE, SEASON_TYPE, WEEKS_LAST, map_games, map_player_list
 from research.pipeline.tank01.provider import Tank01Provider
 
 SEASON = 2026
@@ -126,6 +129,20 @@ ESTIME_AS_HE_SPELLS_IT = Departure(
     ("4569682",), "name", "Audric Estime", "Audric Estimé", "a name prints as he spells it (Lane 78)"
 )
 
+
+@cache
+def free_agents_seeded_clubless() -> tuple[Departure, ...]:
+    """Lane 144 (B103): a row the seed creates takes the daily list's club, none for a player the list marks
+    a free agent; the oracle's seed writes his last club. One departure per such player in the recorded
+    list, the oracle's value his listed club."""
+    recorded = json.loads(gzip.decompress((FIXTURES_ROOT / "tank01-2026" / "player_list.json.gz").read_bytes()))
+    return tuple(
+        Departure((player.id,), "team", player.nfl_team, None, "a free agent's new row holds no club (Lane 144)")
+        for player in map_player_list(recorded.get("body"))
+        if player.free_agent
+    )
+
+
 # Lane 116 (B77b): the moved-game pass. An earlier week 18 lists two games a day earlier; the recording then
 # lists them under their real ids, so the ingest retires each earlier row (superseded_by the new id, never
 # deleted). The legacy schedule never marked a moved game, so only the later pass departs, on those two rows.
@@ -141,7 +158,7 @@ CASES: tuple[Case, ...] = (
         name="tank01-roster-and-lines",
         summary="the provider roster into provider_players, then weeks 1-2 of box scores into provider_stat_lines (seedPlayers)",
         fixture_sets=("tank01-2026",),
-        tables=(PROVIDER_PLAYERS, PROVIDER_STAT_LINES),
+        tables=(PROVIDER_PLAYERS.departing(*free_agents_seeded_clubless()), PROVIDER_STAT_LINES),
         run_python=_roster_and_lines,
         now=NOW,
         recordings=(TANK01,),
@@ -161,7 +178,7 @@ CASES: tuple[Case, ...] = (
         name="tank01-adp",
         summary="the PPR ADP feed onto players.adp and pos_adp (an update, never an insert)",
         fixture_sets=("tank01-2026",),
-        tables=(PROVIDER_PLAYERS,),
+        tables=(PROVIDER_PLAYERS.departing(*free_agents_seeded_clubless()),),
         run_python=_adp,
         now=NOW,
     ),
@@ -169,7 +186,7 @@ CASES: tuple[Case, ...] = (
         name="tank01-headshots",
         summary="backfill-headshots.ts RE-ASSEMBLED (its provider needs Redis): headshot URLs onto existing players rows",
         fixture_sets=("tank01-2026",),
-        tables=(PROVIDER_PLAYERS,),
+        tables=(PROVIDER_PLAYERS.departing(*free_agents_seeded_clubless()),),
         run_python=_headshots,
         now=NOW,
     ),
@@ -177,7 +194,11 @@ CASES: tuple[Case, ...] = (
         name="crosswalk",
         summary="build-crosswalk.ts run as is: the provider roster against the universe, defenses seeded",
         fixture_sets=("nflverse-universe", "tank01-2026"),
-        tables=(PLAYERS.as_setup(), PROVIDER_PLAYERS.as_setup().departing(ESTIME_AS_HE_SPELLS_IT), PLAYER_CROSSWALK),
+        tables=(
+            PLAYERS.as_setup(),
+            PROVIDER_PLAYERS.as_setup().departing(ESTIME_AS_HE_SPELLS_IT, *free_agents_seeded_clubless()),
+            PLAYER_CROSSWALK,
+        ),
         ts_scripts=(Script("research-ts/scripts/build-crosswalk.ts"),),
         run_python=_crosswalk,
         now=datetime(2026, 10, 12, 5, 0, tzinfo=UTC),

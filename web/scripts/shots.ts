@@ -12,8 +12,8 @@
 //   contract      the nightly's contract fixture run (research/nightly/contract/fixture), copied as is
 //   saturday      inseason-fixture/saturday-run.ts with its three stand-ins (an Out player, the pace, the
 //                 long read), the contract run moved to the fixture week's Saturday
-//   mover, free-agent   inseason-fixture/mover-run.ts, the contract run with Jahmyr Gibbs as a club
-//                 mover or a free agent
+//   mover, free-agent, special-teams   inseason-fixture/mover-run.ts, the contract run with Jahmyr
+//                 Gibbs as a club mover, a free agent, or a mover whose newest line was special teams
 //   oneboard      inseason-fixture/one-board-run.ts
 //   record-live   record-fixture/run.ts live
 //   two-upcoming, two-graded, two-published   record-fixture/run.ts two <mode>

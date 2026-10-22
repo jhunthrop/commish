@@ -8,5 +8,10 @@ export const SEASON_LOG_WORDS = {
 	 * betting word the copy guard refuses (banned-words.json `line`), so the table says stats (Lane 138).
 	 * The week counts as a game: the season head's "through week N" reaches it, past the records too
 	 * (reach.ts countedWeek, Lane 141, B120). */
-	playedNoStats: 'Played, no stats'
+	playedNoStats: 'Played, no stats',
+	/** His newest game line's week under that club's game with no stat line and no offensive snap: the
+	 * club edge comes from the snap release, which lists special teams too, so he was on the field for
+	 * special teams alone (Lane 135's Deguara, Lane 144, B117). Only that week is known to be one; the
+	 * page's club line says it in words (player/club-words.ts). */
+	specialTeams: 'Special teams only'
 } as const;
