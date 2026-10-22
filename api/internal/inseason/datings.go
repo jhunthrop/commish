@@ -20,7 +20,11 @@ import (
 // Datings is the capture datings every API instance shares (Lane 133,
 // B110): the first instance to date a capture keeps the dating, and every
 // instance after it reads it instead of dating the capture again, so a
-// fresh instance serves dated statuses at once. *PGDatings implements it.
+// fresh instance serves dated statuses at once. The hourly capture job
+// writes each capture's row right after storing it (Lane 134, B115,
+// research/nightly/designation_dating.py), so an instance only reads it;
+// its own dating is the fallback when no row exists. *PGDatings
+// implements it.
 type Datings interface {
 	// Dating is the runs kept for the capture digest, found false when no
 	// instance has dated that capture yet.
@@ -39,14 +43,14 @@ type Dating struct {
 	DatedAt   time.Time
 }
 
-// datingVersion is the digest's version: a change to what the runs read
-// answers for a capture (boards.DesignationRuns) bumps it, so an instance
-// on the new reading never takes a dating kept by one on the old.
-const datingVersion = "runs-v1"
-
-// DatingDigest is the capture's digest: the dating's version, the
+// DatingDigest is the capture's digest: the dating's version
+// (boards.RunsVersion, derived from the run read's own inputs, so an
+// instance on a new reading never takes a dating kept under the old), the
 // capture's stamp (boards.Newest, the runs read's only input from the
-// capture) and each listed player under his status, in id order.
+// capture) and each listed player under his status, in id order. The
+// capture job digests the capture it dates the same way
+// (research/nightly/designation_dating.py, Lane 134), pinned with this by
+// api/testdata/designation-dating.json.
 func DatingDigest(designations map[string]boards.Designation) string {
 	ids := make([]string, 0, len(designations))
 	for id := range designations {
@@ -54,7 +58,7 @@ func DatingDigest(designations map[string]boards.Designation) string {
 	}
 	sort.Strings(ids)
 	var b strings.Builder
-	b.WriteString(datingVersion + "\n" + boards.Newest(designations).UTC().Format(time.RFC3339Nano) + "\n")
+	b.WriteString(boards.RunsVersion() + "\n" + boards.Newest(designations).UTC().Format(time.RFC3339Nano) + "\n")
 	for _, id := range ids {
 		b.WriteString(id + "\t" + designations[id].Status() + "\n")
 	}
@@ -80,6 +84,27 @@ type keptRun struct {
 	Player string    `json:"player"`
 	Status string    `json:"status"`
 	Since  time.Time `json:"since"`
+}
+
+// encodeRuns is the runs as the table keeps them: a JSON array of
+// {player, status, since} in player then status order, since in UTC. The
+// capture job writes the same bytes (research/nightly/designation_dating.py).
+func encodeRuns(runs map[boards.RunKey]time.Time) ([]byte, error) {
+	kept := make([]keptRun, 0, len(runs))
+	for k, since := range runs {
+		kept = append(kept, keptRun{Player: k.PlayerID, Status: k.Status, Since: since.UTC()})
+	}
+	sort.Slice(kept, func(i, j int) bool {
+		if kept[i].Player != kept[j].Player {
+			return kept[i].Player < kept[j].Player
+		}
+		return kept[i].Status < kept[j].Status
+	})
+	raw, err := json.Marshal(kept)
+	if err != nil {
+		return nil, fmt.Errorf("inseason: encode the dating: %w", err)
+	}
+	return raw, nil
 }
 
 // Dating is the runs kept for digest.
@@ -109,19 +134,9 @@ func (s *PGDatings) Dating(ctx context.Context, digest string) (map[boards.RunKe
 // KeepDating keeps d unless its digest is kept already, and deletes the
 // datings of captures over DatingsKept older than d's.
 func (s *PGDatings) KeepDating(ctx context.Context, d Dating) error {
-	kept := make([]keptRun, 0, len(d.Runs))
-	for k, since := range d.Runs {
-		kept = append(kept, keptRun{Player: k.PlayerID, Status: k.Status, Since: since.UTC()})
-	}
-	sort.Slice(kept, func(i, j int) bool {
-		if kept[i].Player != kept[j].Player {
-			return kept[i].Player < kept[j].Player
-		}
-		return kept[i].Status < kept[j].Status
-	})
-	raw, err := json.Marshal(kept)
+	raw, err := encodeRuns(d.Runs)
 	if err != nil {
-		return fmt.Errorf("inseason: encode the dating: %w", err)
+		return err
 	}
 	batch := &pgx.Batch{}
 	batch.Queue(`insert into app.designation_datings (capture_digest, capture_at, runs, dated_at)

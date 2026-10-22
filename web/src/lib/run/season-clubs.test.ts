@@ -1,6 +1,6 @@
 // A page whose club is not the one his lines were for (Lane 120, B100). A week with no line of a
 // player who changed clubs before his newest line names no opponent (the run cannot say whose he was),
-// and the page's `lastGameClub` names a club other than his own and a week he played. The page and the
+// and the page's `lastGameClub` names a club other than his own and a week of its game. The page and the
 // slate are the in-season contract fixture's (research/nightly/contract/fixture). Run with `npm test`.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -106,16 +106,27 @@ void test('a played or upcoming week naming no opponent is refused, and so is a 
 	);
 });
 
-void test('the last game club names another club and a week he played', () => {
-	assert.equal(refusal(page.season, { club: 'LAC', week: 5 }), null);
+void test("the last game club names another club and a week his log shows as that club's game", () => {
+	// LAC's week 5 game: home to DEN.
+	const lacWeek5 = { opponent: 'DEN', home: true };
+	const lac = { club: 'LAC', week: 5 };
+	assert.equal(refusal(withRows({ 5: lacWeek5 }), lac), null);
 	assert.equal(refusal(page.season, null), null);
+	// Lane 135: a special-teams game, his line with no stat and no offensive snap, reads inactive
+	// under that club's opponent, and his page still says whose game it was (Josiah Deguara, PHI week 4).
+	assert.equal(refusal(withRows({ 5: { ...unknown, ...lacWeek5 } }), lac), null);
 	assert.equal(
 		refusal(page.season, { club: 'DET', week: 5 }),
 		`players/${page.id}.json says his week 5 line was for DET, but that is his club.`
 	);
+	const noLacGame = `players/${page.id}.json says his week 5 line was for LAC, but his log has no LAC game that week.`;
+	// His week 5 row is DET's game at ARI, or names no club at all: neither is LAC's game.
+	assert.equal(refusal(page.season, lac), noLacGame);
+	assert.equal(refusal(withRows({ 5: unknown }), lac), noLacGame);
+	// LAC's week 7 is its bye.
 	assert.equal(
 		refusal(page.season, { club: 'LAC', week: 7 }),
-		`players/${page.id}.json says his week 7 line was for LAC, but his log has no game that week.`
+		`players/${page.id}.json says his week 7 line was for LAC, but his log has no LAC game that week.`
 	);
 });
 
