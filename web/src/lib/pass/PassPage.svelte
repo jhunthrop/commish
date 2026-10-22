@@ -39,6 +39,13 @@
 	import { draftPassFacts, groupFacts, hostCells, membershipFacts } from './plan-facts.ts';
 	import FactStrip from '#lib/ui/FactStrip.svelte';
 
+	interface Props {
+		/** The rail's week item, named at build in season (server/build-week.ts, Lane 143, B126). */
+		weekLabel?: string | undefined;
+	}
+
+	let { weekLabel }: Props = $props();
+
 	/** The pass page: the Draft Pass, the Membership and the Group Draft Pass with what each unlocks,
 	 * read from the API (the prices from Stripe, the features from the table Can reads), which
 	 * platforms a live draft is read from and a league is followed from, and what is free whatever you
@@ -122,7 +129,7 @@
 	/>
 </svelte:head>
 
-<Shell title="Passes and Membership" active="account">
+<Shell title="Passes and Membership" active="account" {weekLabel}>
 	<main class="pass" aria-busy={catalog === null && !unreachable}>
 		<PageHead title="Passes and Membership" />
 		{#if catalog && !catalog.checkout_open}

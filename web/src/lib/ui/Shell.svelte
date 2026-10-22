@@ -38,8 +38,9 @@
 		 * name the selected league's. */
 		league?: string;
 		/** The rail's week order named for the run's week, "Week 7 rankings" (Lane 140, C19), built
-		 * with the page; absent before the season and on a page the Worker draws, which names it from
-		 * the context's week. */
+		 * with the page (a prerendered one, server/build-week.ts); absent outside the season and on a
+		 * page the Worker draws in the browser, which names it from the context's week, read before
+		 * its first render (context/first-season.ts, Lane 143, B126). */
 		weekLabel?: string;
 		children: Snippet;
 	}

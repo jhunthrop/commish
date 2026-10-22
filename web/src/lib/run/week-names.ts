@@ -7,11 +7,14 @@
 import {
 	PLAYERS_NAME,
 	WEEK_RANKINGS_KEY,
-	railInSeason,
 	weekRankingsWord,
 	type RailItem,
 	type RailKey
 } from '#lib/ui/nav.ts';
+
+/** The one site rail whose pages name the week: the regular season, the run's kickoffs placing it
+ * (site-season.ts). The site's playoffs rail is the NFL's postseason, after the schedule's last game. */
+const SITE_RANKS_WEEKS: RailKey = 'in_season';
 
 /** Both forms' words, in one place for the copy guard. */
 export const PAGE_NAME_WORDS = {
@@ -33,10 +36,14 @@ export interface WeekNames {
 	rank: string;
 }
 
-/** The in-season names at a rail and a run's week; null before the season, after it, and on a run
- * that ranks from no week. */
-export function weekNames(rail: RailKey, week: number | undefined): WeekNames | null {
-	if (!railInSeason(rail) || week === undefined) return null;
+/** The in-season names at the site's rail (siteRailAt, the season at the page's clock, no league)
+ * and a run's week; null before the season, after it, and on a run that ranks from no week. The
+ * season ends with the schedule's last regular-season game day (Lane 143, B126): the fantasy playoffs
+ * are weeks the run still ranks (a run that names week 18 reads "Week 18 rankings" through its last
+ * game), and the NFL's postseason, the site's playoffs rail, is Players, as the API's board_week is
+ * absent outside the regular season. */
+export function weekNames(siteRail: RailKey, week: number | undefined): WeekNames | null {
+	if (siteRail !== SITE_RANKS_WEEKS || week === undefined) return null;
 	return { rankings: PAGE_NAME_WORDS.rankings(week), rank: PAGE_NAME_WORDS.rank(week) };
 }
 

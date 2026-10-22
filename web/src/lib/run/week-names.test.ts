@@ -78,6 +78,23 @@ void test('a league drafted before week 1 sits on the in-season rail, its week i
 	assert.equal(namesAt(kickoff, 1)?.rankings, 'Week 1 rankings');
 });
 
+void test('the season ends with the last regular-season game, never the NFL postseason (Lane 143, B126)', () => {
+	// The last game day, the evening after its last kickoff on the Eastern clock: week 18 is still ranked.
+	const lastGameEvening = new Date('2027-01-11T03:30:00.000Z');
+	assert.equal(namesAt(lastGameEvening, 18)?.rankings, 'Week 18 rankings');
+	// The first instant after the last game day is the NFL's postseason: the page is Players again,
+	// whatever week the run still carries.
+	const postseason = new Date('2027-01-11T05:00:00.000Z');
+	assert.equal(siteRailAt(postseason, KICKOFFS), 'playoffs');
+	assert.equal(namesAt(postseason, 18), null);
+	assert.equal(namesAt(new Date('2027-01-20T12:00:00.000Z'), 18), null);
+	// The site's postseason rail still draws the week item, labelled the page it opens.
+	const week = railShown('playoffs', false).find((item) => item.key === 'week');
+	assert.ok(week);
+	assert.equal(railItemLabel(week, null), PAGE_NAME_WORDS.players);
+	assert.equal(playersCrumb(undefined), PAGE_NAME_WORDS.players);
+});
+
 void test('the names are clean copy', () => {
 	for (const words of [
 		PAGE_NAME_WORDS.players,

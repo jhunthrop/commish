@@ -58,6 +58,13 @@
 		sheetLine
 	} from './words.ts';
 
+	interface Props {
+		/** The rail's week item, named at build in season (server/build-week.ts, Lane 143, B126). */
+		weekLabel?: string | undefined;
+	}
+
+	let { weekLabel }: Props = $props();
+
 	/** Your account: who you are, your sheets and mocks, your pass or membership with its one-click
 	 * cancel, and sign out. Signed out, the sign-in verb and what an account keeps. The shell is
 	 * prerendered and everything inside it is read from the API in the browser. */
@@ -202,7 +209,7 @@
 
 <!-- No bar parts, so the phone bar is its one row (Lane 87). The page's way to a mock is its Next
      draft row; the bottom bar carries Mock draft only on a rail without a league's screens. -->
-<Shell title="Account">
+<Shell title="Account" {weekLabel}>
 	<main class="account" aria-busy={view === null}>
 		{#if view === null}
 			<!-- The shell is drawn; the account arrives in a moment and takes this place. -->
