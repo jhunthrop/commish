@@ -34,6 +34,11 @@ class RecordingFetcher:
         self._fetcher = fetcher
         self._answers: dict[str, list[_Answer]] = {}
 
+    @property
+    def asked(self) -> int:
+        """How many reads reached the provider, answered or not: what the pass really spent."""
+        return sum(len(answers) for answers in self._answers.values())
+
     def get(self, url: str, headers: Mapping[str, str] | None = None) -> HttpResponse:
         try:
             response = self._fetcher.get(url, headers)

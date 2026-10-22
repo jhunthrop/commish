@@ -75,3 +75,16 @@ def test_each_replay_starts_from_the_first_answer() -> None:
     recording.get(_URL)
     assert recording.replay().get(_URL) == answer
     assert recording.replay().get(_URL) == answer
+
+
+def test_asked_counts_every_live_read_and_never_a_replayed_one() -> None:
+    # The pass's budget comes from this count (Lane 143 fix round 1): a burst retry's two reads, an
+    # error, and nothing the replay answers.
+    answers = [HttpResponse(HTTPStatus.TOO_MANY_REQUESTS, b""), HttpResponse(HTTPStatus.OK, b"{}")]
+    recording = RecordingFetcher(_Scripted([*answers, httpx.ReadTimeout("read timed out")]))
+    recording.get(_URL)
+    recording.get(_URL)
+    with pytest.raises(httpx.ReadTimeout):
+        recording.get("https://tank01.example/getNFLTeams")
+    recording.replay().get(_URL)
+    assert recording.asked == len(answers) + 1

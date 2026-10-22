@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
-import { RAIL_KEYS, railInSeason } from '#lib/ui/nav.ts';
+import { HELD_WEEK_LABEL, NFL_REGULAR_WEEKS, RAIL_KEYS, railInSeason } from '#lib/ui/nav.ts';
 import { railShown } from '#lib/ui/rail-order.ts';
 import { siteRailAt } from './site-season.ts';
 import { PAGE_NAME_WORDS, playersCrumb, railItemLabel, weekNames } from './week-names.ts';
@@ -93,6 +93,18 @@ void test('the season ends with the last regular-season game, never the NFL post
 	assert.ok(week);
 	assert.equal(railItemLabel(week, null), PAGE_NAME_WORDS.players);
 	assert.equal(playersCrumb(undefined), PAGE_NAME_WORDS.players);
+});
+
+void test('the held label is the longest in-season form, so its room holds every week (Lane 143 fix round 1)', () => {
+	const forms = Array.from({ length: NFL_REGULAR_WEEKS }, (_, i) =>
+		PAGE_NAME_WORDS.rankings(i + 1)
+	);
+	const longest = Math.max(...forms.map((form) => form.length));
+	assert.equal(HELD_WEEK_LABEL.length, longest);
+	assert.ok(forms.includes(HELD_WEEK_LABEL));
+	// Its words wrap where every form's do: the same word count, the week's number never longer.
+	for (const form of forms)
+		assert.equal(form.split(' ').length, HELD_WEEK_LABEL.split(' ').length, form);
 });
 
 void test('the names are clean copy', () => {

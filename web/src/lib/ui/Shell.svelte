@@ -7,6 +7,7 @@
 	import Stamp from './Stamp.svelte';
 	import { barRows } from './bar-rows.ts';
 	import {
+		HELD_WEEK_LABEL,
 		HOME_HREF,
 		PHONE_RAIL_ITEMS,
 		RAIL_FOOT,
@@ -81,7 +82,9 @@
 		aria-current={item.section === current ? 'page' : undefined}
 	>
 		<RailIcon name={item.icon} />
-		<span class:held={held(item)}>{labelOf(item)}</span>
+		<!-- Held, the label keeps the room of the longest in-season form (nav.ts HELD_WEEK_LABEL), so
+		     nothing below it moves when the season names it (Lane 143 fix round 1). -->
+		<span class:held={held(item)}>{held(item) ? HELD_WEEK_LABEL : labelOf(item)}</span>
 	</a>
 {/snippet}
 

@@ -47,7 +47,7 @@ from research.nightly.designations import newest_readable
 from research.parity import databases
 from research.pipeline.http import Fetcher, HttpResponse
 from research.pipeline.recording_fetcher import RecordingFetcher
-from research.pipeline.tank01.capture import CaptureResult, FeedOutcome
+from research.pipeline.tank01.capture import CAPTURE_HARVEST_REQUEST_BUDGET, CaptureResult, FeedOutcome
 from research.pipeline.tank01.client import Tank01Client
 
 _API = Path(__file__).resolve().parents[2] / "api"
@@ -345,6 +345,34 @@ def test_a_live_connection_commits_once_and_dates(recorded: Engine, capsys: pyte
     assert dated_ok and provider.asked == 1
     assert _stored(recorded, _LATER) == (True, [_LATER])
     assert inseason.CONNECTION_LOST_LINE not in capsys.readouterr().out
+
+
+def test_a_retry_that_chooses_fewer_feeds_still_counts_what_the_provider_served(
+    recorded: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The first commit landed and only its acknowledgement was lost (fix round 1, HIGH-1): the retry
+    # reads the stored projection and drops that feed, so it reports one request fewer than were made.
+    monkeypatch.setattr(inseason, "date_newest_capture", _killed(recorded))
+    feeds = ("/getNFLTeams", "/getNFLProjections")
+
+    def capture(conn: Connection, answers: Fetcher) -> CaptureResult:
+        client = Tank01Client(answers, "key")
+        due = feeds if isinstance(answers, RecordingFetcher) else feeds[:1]
+        for path in due:
+            client.get(path)
+        conn.execute(insert(CAPTURE_SNAPSHOTS), [_later_capture(_LATER)])
+        return CaptureResult([FeedOutcome(path, "captured", 1) for path in due])
+
+    provider = _OneAnswer()
+    answers = RecordingFetcher(provider)
+    result, _ = inseason._capture_dated(recorded, capture, answers, _NOW)
+    reported = sum(feed.requests for feed in result.feeds)
+    assert (provider.asked, answers.asked, reported) == (len(feeds), len(feeds), 1)
+    # The budget left is the ceiling less what the provider served, so the pass stays at the ceiling
+    # whatever the later reads spend of it.
+    left = inseason.requests_left(answers)
+    assert left == CAPTURE_HARVEST_REQUEST_BUDGET - len(feeds)
+    assert provider.asked + left == CAPTURE_HARVEST_REQUEST_BUDGET
 
 
 def test_a_statement_error_in_the_capture_is_never_retried(recorded: Engine) -> None:

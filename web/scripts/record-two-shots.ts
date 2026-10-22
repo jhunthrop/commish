@@ -44,6 +44,8 @@ const SETTLE_MS = 600;
 const READY_TIMEOUT_MS = 30_000;
 /** A 3G-like round trip, added to each API answer on the league page's waterfall (Lane 143). */
 const API_LATENCY_MS = 300;
+/** How many round trips late the season answers on that waterfall (fix round 1). */
+const SEASON_LATE = 2;
 
 type Who = 'signed-out' | 'espn';
 type Theme = 'light' | 'dark';
@@ -89,7 +91,19 @@ async function open(
  * B126): a page that paints one name and then another shows two. Runs in the page before its HTML. */
 function watchWeekItem(): void {
 	const drawn: string[] = [];
-	Object.assign(window, { weekItemDrawn: drawn });
+	// The week item's heights, held and named: the held room is the named label's (fix round 1).
+	const heights: { held: number[]; named: number[] } = { held: [], named: [] };
+	Object.assign(window, { weekItemDrawn: drawn, weekItemHeights: heights });
+	// Each frame, while the label is held and once it is named, the item's height as drawn (a
+	// slot the rail holds blank draws none).
+	const sample = (): void => {
+		const span = document.querySelector('nav.rail .item[data-k="week"] span');
+		const height = span?.closest('a')?.getBoundingClientRect().height ?? 0;
+		if (span && height > 0)
+			heights[span.classList.contains('held') ? 'held' : 'named'].push(height);
+		requestAnimationFrame(sample);
+	};
+	requestAnimationFrame(sample);
 	const read = (): void => {
 		const span = document.querySelector('nav.rail .item[data-k="week"] span');
 		// A label held unpainted while the season is read (Shell's held) is not drawn.
@@ -289,6 +303,22 @@ async function weekItemFaults(page: Page, who: Who, width: number, where: string
 	);
 	if (history.join() !== 'Week 7 rankings')
 		faults.push(`${where}: the week item was drawn as ${history.join(', then ')}`);
+	// Nothing below it moves when the label lands: every held height is the named label's.
+	const heights = await page.evaluate(
+		() =>
+			(window as unknown as { weekItemHeights: { held: number[]; named: number[] } })
+				.weekItemHeights
+	);
+	const named = heights.named.at(-1);
+	const moved = heights.held.filter((height) => named !== undefined && height !== named);
+	if (heights.held.length > 0)
+		process.stdout.write(
+			`held ${where}: ${String(heights.held.length)} held frames at ${[...new Set(heights.held)].join(', ')} px, named ${String(named)} px\n`
+		);
+	if (moved.length > 0)
+		faults.push(
+			`${where}: the held week item is ${[...new Set(moved)].join(', ')} px, named ${String(named)} px`
+		);
 	const labels = await railLabels(page);
 	const shown = width > PHONE_MAX || who === 'signed-out';
 	if (shown && !labels.includes('Week 7 rankings'))
@@ -339,9 +369,11 @@ async function rail(who: Who, width: number): Promise<void> {
 	// The season read runs alongside the league's own first read, never before it (Lane 143): the
 	// two spans overlap, so the season adds no round trip before the page paints.
 	const league = await open(who, width, 'about:blank', 'light', true);
-	// Every API answer a 3G-like round trip late, so a read held behind another shows as a gap.
+	// Every API answer a 3G-like round trip late, so a read held behind another shows as a gap; the
+	// season's twice that, so the rail draws the held label after /me answers and its room is measured.
 	await league.route(`${API_ORIGIN}/**`, async (route) => {
-		await new Promise((done) => setTimeout(done, API_LATENCY_MS));
+		const late = route.request().url().endsWith('/season') ? SEASON_LATE : 1;
+		await new Promise((done) => setTimeout(done, API_LATENCY_MS * late));
 		await route.continue();
 	});
 	const spans = waterfall(league, {
@@ -367,6 +399,12 @@ async function rail(who: Who, width: number): Promise<void> {
 		.waitFor({ state: 'attached', timeout: READY_TIMEOUT_MS })
 		.catch(() => faults.push(`${where} league: the rail never drew`));
 	await weekItemFaults(league, who, width, `${where} league`);
+	// The desk rail shows the item while the season is read, so its held room was measured above.
+	const held = await league.evaluate(
+		() => (window as unknown as { weekItemHeights: { held: number[] } }).weekItemHeights.held
+	);
+	if (width > PHONE_MAX && held.length === 0)
+		faults.push(`${where} league: the held label was never drawn, its room not measured`);
 	await league.screenshot({
 		path: new URL(`rail-league-${who}-${String(width)}.png`, out).pathname
 	});

@@ -225,16 +225,17 @@ def _capture_harvest(now: datetime) -> bool:
     engine = make_engine(database_url_from_env())
     fetcher = LiveFetcher()
     season = int(os.environ.get(SEASON_ENV, DEFAULT_SEASON))
+    answers = RecordingFetcher(fetcher)
     try:
         result, dated_ok = _capture_dated(
             engine,
-            lambda conn, answers: run_capture_harvest(conn, Tank01Client(answers, key), now, season),
-            RecordingFetcher(fetcher),
+            lambda conn, read: run_capture_harvest(conn, Tank01Client(read, key), now, season),
+            answers,
             now,
         )
         facts_ok = _game_facts(engine, fetcher, result, now)
         # On what the harvest left of its request budget this pass (Lane 80).
-        left = CAPTURE_HARVEST_REQUEST_BUDGET - sum(feed.requests for feed in result.feeds)
+        left = requests_left(answers)
         status = _game_status(engine, Tank01Client(fetcher, key), now, season, FixedBudget(left))
         # Last, on what the status left: the day's player list, for the return dates (Lane 110, B79).
         returns_ok = _return_dates(engine, Tank01Client(fetcher, key), now, season, FixedBudget(left - status.requests))
@@ -255,6 +256,13 @@ def _capture_harvest(now: datetime) -> bool:
     charts = _slot_depth_charts(now, season)
     _week_reads(now)
     return not failed and dated_ok and facts_ok and status.ok and returns_ok and parsed and market and charts
+
+
+def requests_left(answers: RecordingFetcher) -> int:
+    """The pass's requests left after the capture: the ceiling less what the provider was really asked
+    (Lane 143 fix round 1). Never the feeds' own count: a retry after a commit that landed (only its
+    acknowledgement lost) chooses its feeds again and drops one the provider already served."""
+    return CAPTURE_HARVEST_REQUEST_BUDGET - answers.asked
 
 
 def _capture_dated(
