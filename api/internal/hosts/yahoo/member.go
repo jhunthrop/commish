@@ -97,15 +97,7 @@ func (m *Member) Leagues(ctx context.Context, accountID uuid.UUID) ([]MyLeague, 
 func (m *Member) ReadLeague(ctx context.Context, accountID uuid.UUID, season int, leagueID string) (League, error) {
 	var out League
 	err := m.as(ctx, accountID, func(access string) error {
-		gameKey := currentGame
-		if season != 0 {
-			key, err := m.gameKey(ctx, access, season)
-			if err != nil {
-				return err
-			}
-			gameKey = key
-		}
-		key, err := LeagueKey(gameKey, leagueID)
+		key, err := m.leagueKey(ctx, access, season, leagueID)
 		if err != nil {
 			return err
 		}
@@ -117,6 +109,20 @@ func (m *Member) ReadLeague(ctx context.Context, accountID uuid.UUID, season int
 		return err
 	})
 	return out, err
+}
+
+// leagueKey is the league's key in the season's game; season 0 is the
+// current season's game.
+func (m *Member) leagueKey(ctx context.Context, access string, season int, leagueID string) (string, error) {
+	gameKey := currentGame
+	if season != 0 {
+		key, err := m.gameKey(ctx, access, season)
+		if err != nil {
+			return "", err
+		}
+		gameKey = key
+	}
+	return LeagueKey(gameKey, leagueID)
 }
 
 // gameKey is the season's game key, read once a process.

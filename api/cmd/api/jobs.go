@@ -51,6 +51,9 @@ func jobTable() map[string]job {
 		// espn-week-reads runs Wednesday evening and Thursday afternoon: every
 		// attached ESPN league's projection and points (espnweekjob.go).
 		"espn-week-reads": runESPNWeekReads,
+		// yahoo-probe runs by hand once (Lane 130): the shapes of Yahoo's
+		// rank, week stats and projected points answers (yahooprobejob.go).
+		"yahoo-probe": runYahooProbe,
 		// re-encrypt-host-connections runs by hand during a key rotation:
 		// every connection's data key re-wrapped under the current key.
 		"re-encrypt-host-connections": runRekey,
