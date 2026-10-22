@@ -61,20 +61,7 @@ const (
 // team 4 plays it with nobody yet played, 34 plus its 85 (Lane 127 fix
 // round 1). The rosterless teams have none.
 func TestAnFFPCSideWithNoStartersProjectsItsRostersBestLineup(t *testing.T) {
-	f := pairedFixture(t)
-	projection := weekProjection(f)
-	for i := range f.data.Games {
-		g := &f.data.Games[i]
-		if g.Week != 6 {
-			continue
-		}
-		if g.Team == "CIN" || g.Team == "CLE" {
-			g.Kickoff, g.Final = ffpcThursday, true
-		}
-	}
-	// The fixture's last two clubs are on bye in week 6: here they play, so every spot can.
-	f.data.Games = append(f.data.Games, game(6, "TEN", "WSH", liveSunday, false)...)
-	me, them := ffpcBoard(&f)
+	f, projection, me, them := ffpcWeekBeforeSunday(t)
 	rosterOf(&f, projection, 3, false)
 	rosterOf(&f, projection, 4, true)
 	s := ffpcService(t, f, projection, ffpcFriday)
@@ -110,6 +97,25 @@ func TestAnFFPCSideWithNoStartersProjectsItsRostersBestLineup(t *testing.T) {
 	}
 }
 
+// ffpcWeekBeforeSunday is the FFPC board's week before its Sunday: the
+// fixture paired, Thursday's CIN at CLE final, TEN and WSH playing Sunday
+// so every spot can, every side but the member's listing no starters.
+func ffpcWeekBeforeSunday(t *testing.T) (f fixture, projection boards.WeekProjection, me, them int) {
+	t.Helper()
+	f = pairedFixture(t)
+	projection = weekProjection(f)
+	for i := range f.data.Games {
+		g := &f.data.Games[i]
+		if g.Week == 6 && (g.Team == "CIN" || g.Team == "CLE") {
+			g.Kickoff, g.Final = ffpcThursday, true
+		}
+	}
+	// The fixture's last two clubs are on bye in week 6: here they play, so every spot can.
+	f.data.Games = append(f.data.Games, game(6, "TEN", "WSH", liveSunday, false)...)
+	me, them = ffpcBoard(&f)
+	return f, projection, me, them
+}
+
 // The lineup rule fills each position's own slots before the flex, the
 // better of two quarterbacks in a one-QB league, nobody who cannot play:
 // a back out this week gives his place to the next.
@@ -123,7 +129,7 @@ func TestTheBestLineupTakesTheBetterQuarterbackAndLeavesAnEmptySlotEmpty(t *test
 		t.Fatal(err)
 	}
 	team, _ := f.league.Snap.TeamByRoster(4)
-	lines := bestLineup(a.config, a.active(team))
+	lines := bestLineup(a.config, a.active(team)).lines
 	var positions []string
 	for _, l := range lines {
 		positions = append(positions, l.Player.Position)
@@ -145,7 +151,7 @@ func TestTheBestLineupTakesTheBetterQuarterbackAndLeavesAnEmptySlotEmpty(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, l := range bestLineup(b.config, b.active(team)) {
+	for _, l := range bestLineup(b.config, b.active(team)).lines {
 		if l.Player.Position == "QB" || l.WeekProjection == nil {
 			t.Fatalf("a starter with no Proj: %s %v", l.Player.Position, deref(l.WeekProjection))
 		}
