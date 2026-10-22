@@ -8,7 +8,9 @@
 //     column is not used: nothing in the store dates it)
 //   docs/design/mocks/2026-10-12-commish/data/capsules.csv    the written capsules, where the store holds none
 //   the local dev database (STANDIN_DATABASE_URL, the compose dev database by default):
-//     adp_snapshots: the PPR 12-team captures taken before the season's first kickoff, averaged
+//     adp_snapshots: the PPR 12-team captures taken before the season's first kickoff, averaged,
+//       the kickers' and defenses' too, their names, clubs and faces from research.provider_players
+//       (standin-market.ts, Lane 132: the board's K and DST market rows)
 //     nfl_games: the 2026 slate, the byes and the first kickoff
 //     team_week_observations (vegas_win_totals): each club's latest published season win total
 //     register_freeze_rows and register_grade_rows: the record as it stands
@@ -66,6 +68,8 @@ import {
 	type Game,
 	type IndexEntry,
 	type Manifest,
+	type MarketEntry,
+	type MarketRow,
 	type Player,
 	type RecordWeek,
 	type RunRecord,
@@ -79,6 +83,7 @@ import { bucketUrl, credentialsFromToken } from './r2.ts';
 import { dropBetween, gapOf, tenth } from './tenth.ts';
 import { checkRunSeasons } from '../src/lib/run/season-checks.ts';
 import { GAME_LENGTH_MS, priorSeasonBlocks, seasonBlocks } from './standin-season.ts';
+import { marketRows, slugOf } from './standin-market.ts';
 import type { PlayerSeason, PriorSeason } from '../src/lib/run/season.ts';
 
 const RUN_ID = '2026-10-12T00-standin';
@@ -172,15 +177,6 @@ function round(value: number, places = 2): number {
 
 function isPosition(value: string): value is Position {
 	return (POSITIONS as readonly string[]).includes(value);
-}
-
-function slugOf(name: string): string {
-	return name
-		.normalize('NFD')
-		.replace(/\p{M}/gu, '')
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-|-$/g, '');
 }
 
 /** Slugs from names, with the position and club added only where two players share a name. */
@@ -562,14 +558,17 @@ function scheduleFrom(
 	return {
 		season: SEASON,
 		opponentValues: Object.fromEntries(codes.map((abbr) => [abbr, value(abbr)])),
-		opponentBasis: 'Published season win total',
-		unit: "opponents' average win total",
+		// The nightly's words (research/nightly/reads/schedule.py, Lane 132): an opponent's value is his
+		// expected wins, never a "total", a betting word on the copy guard's list.
+		opponentBasis: 'Expected wins, set before the season',
+		unit: "opponents' average expected wins",
 		slates: unranked.map(({ abbr, games: slate, mean: strength, rest }) => ({
 			abbr,
 			games: slate,
 			strength: tenth(strength),
 			rank: ordered.findIndex((other) => other.abbr === abbr) + 1,
-			method: "the average of its opponents' published season win totals",
+			method:
+				"the average of its opponents' expected wins for the season, one per game, set before the first kickoff",
 			window: winTotals.window,
 			rest:
 				rest === null
@@ -578,7 +577,7 @@ function scheduleFrom(
 							strength: tenth(rest),
 							rank: restRanks.get(abbr) ?? 0,
 							method:
-								"the average of its remaining opponents' published season win totals, one per game still to play"
+								"the average of each club's remaining opponents' expected wins, one per game still to play, set before the first kickoff"
 						}
 		}))
 	};
@@ -690,11 +689,11 @@ function sourcesFor(adpWindow: Window, winTotals: Window): Source[] {
 /** Every artifact, validated with the schema the build reads it with, keyed by its path in the run. */
 function artifacts(parts: {
 	manifest: Manifest;
-	rows: BoardRow[];
+	rows: (BoardRow | MarketRow)[];
 	players: Player[];
 	adp: Adp;
 	record: RunRecord;
-	index: IndexEntry[];
+	index: (IndexEntry | MarketEntry)[];
 	clubs: Club[];
 	schedule: Schedule;
 	designations: Designations;
@@ -810,6 +809,13 @@ async function main(): Promise<void> {
 				season: { games: season.games, pointsPerGame: season.pointsPerGame }
 			};
 		});
+		const market = await marketRows(sql, {
+			feed: ADP_FEED,
+			kickoff: firstKickoff(games),
+			canonicalClub,
+			ranked: rows.length,
+			taken: new Set(rows.map((row) => row.slug))
+		});
 		const files = artifacts({
 			manifest: {
 				runId: RUN_ID,
@@ -821,11 +827,11 @@ async function main(): Promise<void> {
 				players: players.length,
 				sources: sourcesFor(adp.window, winTotals.window)
 			},
-			rows,
+			rows: [...rows, ...market.rows],
 			players,
 			adp: adpFrom(rows, adp.window),
 			record,
-			index,
+			index: [...index, ...market.index],
 			clubs,
 			schedule,
 			designations
