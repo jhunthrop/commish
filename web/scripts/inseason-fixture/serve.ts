@@ -680,6 +680,13 @@ function leagueOrderRow(row: OrderRow): OrderRow {
 	return { ...row, line, move };
 }
 
+/** The week the order's Game cell and Proj are for: the board's when the case names one (Lane 143,
+ * B126), so the stand-in reads one week beside a run ranked from it. STAND-IN, named so: week 6's
+ * recorded games and projections, headed as the board's week; unset, the recorded week. */
+function orderWeek(recorded: number): number {
+	return SEASON.board_week ?? recorded;
+}
+
 /** The order's view as the API answers it (order.ts): one position ranked by its total (a stand-in
  * place: the fixture's own order of its stand-in totals, 1 to n among the players it holds), or every
  * position in order.json's order; a search's letters in the name or club;
@@ -721,6 +728,7 @@ function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
 		.map((row) => (league ? leagueOrderRow(row) : { ...row, roster: null, move: null }));
 	return {
 		...live,
+		week: orderWeek(live.week),
 		// A league's order runs to its last week (words.go OrderScreenBasis, Lane 96); the read with no
 		// league keeps the run's.
 		basis: league

@@ -14,7 +14,10 @@
 // ESPN: both yardsticks, the leader named per pair. `upcoming` also shoots the week's rankings page
 // and its rail at 1280 and 390, signed out and with the ESPN stand-in, on a run page and on a league
 // page the Worker draws: one name, "Week 7 rankings", on the rail, the bar's crumb after Players, the
-// page's head and its rank column.
+// page's head and its rank column. Lane 143 (B126): the week item is drawn with that one name from the
+// first paint, never another first, on the run's page, the account page (its shell prerendered) and the
+// league page the Worker draws; and the week's projection column beside it heads the same week, "Wk 7"
+// (the fixture's order re-dated to the board's week, inseason-fixture/serve.ts orderWeek).
 //
 //   node scripts/record-two-shots.ts <upcoming|graded|published> [web origin] [api origin] [out dir]
 import { mkdir } from 'node:fs/promises';
@@ -59,6 +62,7 @@ async function open(who: Who, width: number, path: string, theme: Theme = 'light
 		colorScheme: theme
 	});
 	await installFixtureApiClock(ctx, API_ORIGIN);
+	await ctx.addInitScript(watchWeekItem);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
 		[THEME_STORAGE_KEY, theme] as const
@@ -69,6 +73,22 @@ async function open(who: Who, width: number, path: string, theme: Theme = 'light
 	await page.goto(`${web}${path}`, { waitUntil: 'networkidle', timeout: READY_TIMEOUT_MS });
 	await page.waitForTimeout(SETTLE_MS);
 	return page;
+}
+
+/** Every label the rail's week item is drawn with, in order, from the first parsed node on (Lane 143,
+ * B126): a page that paints one name and then another shows two. Runs in the page before its HTML. */
+function watchWeekItem(): void {
+	const drawn: string[] = [];
+	Object.assign(window, { weekItemDrawn: drawn });
+	const read = (): void => {
+		const label = document.querySelector('nav.rail .item[data-k="week"] span')?.textContent.trim();
+		if (label !== undefined && label !== '' && drawn.at(-1) !== label) drawn.push(label);
+	};
+	new MutationObserver(read).observe(document, {
+		subtree: true,
+		childList: true,
+		characterData: true
+	});
 }
 
 const has = (text: string, want: string, where: string): void => {
@@ -223,6 +243,12 @@ async function weekItemFaults(page: Page, who: Who, width: number, where: string
 		() => document.querySelector('nav.rail .item[data-k="week"] span')?.textContent.trim() ?? ''
 	);
 	if (drawn !== 'Week 7 rankings') faults.push(`${where}: the week item reads "${drawn}"`);
+	// One name from the first paint: never Players first and renamed once the season answers.
+	const history = await page.evaluate(
+		() => (window as unknown as { weekItemDrawn: string[] }).weekItemDrawn
+	);
+	if (history.join() !== 'Week 7 rankings')
+		faults.push(`${where}: the week item was drawn as ${history.join(', then ')}`);
 	const labels = await railLabels(page);
 	const shown = width > PHONE_MAX || who === 'signed-out';
 	if (shown && !labels.includes('Week 7 rankings'))
@@ -248,6 +274,8 @@ async function rail(who: Who, width: number): Promise<void> {
 		where
 	);
 	has((await head.textContent()) ?? '', 'Week 7 rank', where);
+	// The week's projection column is the same week's (Lane 143, B126: the fixture re-dated to week 7).
+	has((await page.locator('table.order th.proj').textContent()) ?? '', 'Wk 7', where);
 	if (width > PHONE_MAX)
 		has(
 			(await page.locator('header.top h1').textContent()) ?? '',
@@ -258,18 +286,21 @@ async function rail(who: Who, width: number): Promise<void> {
 		path: new URL(`rail-players-${who}-${String(width)}.png`, out).pathname
 	});
 	await page.context().close();
+	// A user page whose shell is prerendered names the week from its build, as the run's pages do.
+	const account = await open(who, width, '/account');
+	await weekItemFaults(account, who, width, `${where} account`);
+	await account.screenshot({
+		path: new URL(`rail-account-${who}-${String(width)}.png`, out).pathname
+	});
+	await account.context().close();
 	if (who !== 'espn') return;
-	// A league page the Worker draws names the week from the API's season once the context answers.
+	// A league page the Worker draws names the week from the API's season, read before its first
+	// render (context/first-season.ts), so it never paints another name first.
 	const league = await open(who, width, `/league/${FIXTURE_IDS.espnDone}`);
 	await league
-		.waitForFunction(
-			() =>
-				document.querySelector('nav.rail .item[data-k="week"] span')?.textContent.trim() ===
-				'Week 7 rankings',
-			undefined,
-			{ timeout: READY_TIMEOUT_MS }
-		)
-		.catch(() => undefined);
+		.locator('nav.rail .item[data-k="week"] span')
+		.waitFor({ state: 'attached', timeout: READY_TIMEOUT_MS })
+		.catch(() => faults.push(`${where} league: the rail never drew`));
 	await weekItemFaults(league, who, width, `${where} league`);
 	await league.screenshot({
 		path: new URL(`rail-league-${who}-${String(width)}.png`, out).pathname
