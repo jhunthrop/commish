@@ -1,10 +1,11 @@
 /** The Rest of season and Players screens as a box score (Lane 66j): our order's rows in columns, each
- * player's place in our order and the key it sorts on as the big figure (the rest-of-season total at
- * a position, points over replacement across positions), his week (the Game cell, Proj, Avg, Last,
+ * player's place in our order, his projected rest-of-season points as the big figure (Lane 139, C20, as
+ * the front board draws them) with the key it sorts on beside it across positions (points over
+ * replacement), his week (the Game cell, Proj, Avg, Last,
  * Opp rank), in a league whose roster holds him and the one move his row admits. Pure functions over
  * the API's answer, so every word the screens print is tested here; every figure is the API's,
  * printed as it comes. */
-import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
+import { kickoffAt, memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { onListWords } from '#lib/format/designation.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import {
@@ -21,8 +22,8 @@ import {
 	type BasisPart,
 	type ProjFacts
 } from '#lib/league/box/basis.ts';
-import { BOX, boxRow, onList, type BoxRow } from '#lib/league/box/box.ts';
-import { lineState } from '#lib/league/box/kickoff.ts';
+import { BOX, boxRow, expectedScoreWords, onList, type BoxRow } from '#lib/league/box/box.ts';
+import { lineState, toPlay } from '#lib/league/box/kickoff.ts';
 import { addVerbWords } from '#lib/league/box/waivers.ts';
 import { hostWords } from '#lib/league/names.ts';
 import { askedHref } from '#lib/league/box/asked.ts';
@@ -39,13 +40,14 @@ export const ORDER_POSITIONS: readonly OrderPosition[] = ['QB', 'RB', 'WR', 'TE'
 /** A roster chip: every player, the free ones, or the member's own. */
 export type RosterView = 'everyone' | 'free' | 'yours';
 
-/** The figure columns of a view: the key first and big, then the others (review 66j H2). */
+/** The figure columns of a view: his projected points first and big, then the others (Lane 139, C20). */
 export type FigureKey = 'por' | 'total' | 'perGame';
 
-/** The view's figure columns from what its rank sorts on: across positions Over repl., Projected and
- * A game; at a position Projected and A game. */
+/** The view's figure columns from what its rank sorts on: Projected always first, the row's biggest
+ * figure as on the front board (Lane 139, C20, B46); across positions Over repl., the key the # sorts
+ * on, beside it, then A game. */
 export function figureColumns(rankBy: OrderAdvice['rank_by']): readonly FigureKey[] {
-	return rankBy === 'points_over_replacement' ? ['por', 'total', 'perGame'] : ['total', 'perGame'];
+	return rankBy === 'points_over_replacement' ? ['total', 'por', 'perGame'] : ['total', 'perGame'];
 }
 
 /** A figure column's head. */
@@ -107,7 +109,7 @@ export function orderView(row: OrderRow, zone: string, pillRank: boolean, now: n
 		key,
 		position: row.line.player.position,
 		hostId: row.line.player.host_id,
-		box: { ...box, key },
+		box: { ...box, key, ...orderGame(box, row.line, zone, now) },
 		week: onList(box.status) ? null : weekFigure(row.line, now),
 		rank: row.rank,
 		// A player on a season-long list sits after every available one with no number (Lane 128 fix
@@ -121,6 +123,25 @@ export function orderView(row: OrderRow, zone: string, pillRank: boolean, now: n
 		roster: row.roster === null ? null : { kind: row.roster.kind, words: rosterWords(row.roster) },
 		move: row.move,
 		held: heldMoveWords(row, box.status)
+	};
+}
+
+/** His Game cell on the order (Lane 139, C07, C11): a kickoff still to come with its zone, so it never
+ * reads as another zone's, and the expected score labelled with both clubs, so it never reads as a
+ * final. */
+function orderGame(
+	box: BoxRow,
+	line: OrderRow['line'],
+	zone: string,
+	now: number
+): Pick<BoxRow, 'game' | 'expected'> {
+	const { facts } = line;
+	const { game } = box;
+	const ahead = typeof game === 'object' && game !== null && toPlay(facts, now);
+	return {
+		game:
+			ahead && facts.kickoff !== null ? { ...game, when: kickoffAt(facts.kickoff, zone) } : game,
+		expected: box.expected === null ? null : expectedScoreWords(facts, line.player.team)
 	};
 }
 

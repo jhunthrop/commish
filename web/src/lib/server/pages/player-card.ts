@@ -8,14 +8,14 @@ import { countedWeek } from '#lib/run/reach.ts';
 import type { GameLogRow, PlayerSeason } from '#lib/run/season.ts';
 import { apiFormatOf } from '#lib/run/format-ids.ts';
 import { positionRankShown } from '#lib/run/held-places.ts';
-import { playerRestFrom, playerRestWords } from '#lib/run/rest-from.ts';
+import { playerRestFrom, playerRestWords, restSpanWords } from '#lib/run/rest-from.ts';
 import type { Capsule, Format, PlayerFormat, PlayerStatus } from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
+import { BASIS_WORDS, vsAvgReason } from '#lib/player/basis-words.ts';
 import {
 	CARD,
 	NONE,
 	restRankWords,
-	vsAvgReason,
 	type BasisTile,
 	type CardHead,
 	type CardTile,
@@ -84,7 +84,7 @@ export function restTile(
 		key: 'rest',
 		label: CARD.rest,
 		value: fixed(numbers.projected),
-		caption: `${playerRestWords(playerRestFrom(format, numbers))}, ${rank}`,
+		caption: `${restSpanWords(playerRestFrom(format, numbers))}, ${rank}`,
 		tone: null
 	};
 }
@@ -99,6 +99,7 @@ export function restParts(
 	if (format.rosFromWeek === undefined) return null;
 	return {
 		from: playerRestWords(playerRestFrom(format, numbers)),
+		span: restSpanWords(playerRestFrom(format, numbers)),
 		board: apiFormatOf(format),
 		rank: rankIn(numbers, position, status),
 		scoring: scoringOf(format),
@@ -106,44 +107,34 @@ export function restParts(
 	};
 }
 
-/** The in-season row under the tiles in a format (Lane 100, B17 and B51): his preseason figure for the
- * full season and the pace a game the order starts from, as the run stores them, and his rest of season
- * a game against his Avg, which the week's read fills. None preseason or for a player the preseason
- * board did not rank. The reason beside vs Avg is said only with the stored pace it rests on. */
-export function basisTiles(
-	format: Format,
-	numbers: PlayerFormat,
-	year: number,
-	games: number
-): BasisTile[] {
+/** The in-season row under the tiles in a format (Lane 100, B17 and B51): the pace a game the order
+ * starts from, as the run stores it, and our rest-of-season rate a game against his Avg, which the
+ * week's read fills (Lane 139, C08). His preseason figure for the full season is not drawn beside the
+ * pace (C09): it is the served board's over its own games, the pace the raw line's, so the two never
+ * reconcile on the card. None preseason or for a player the preseason board did not rank. The reason
+ * beside the rate is said only with the stored pace it rests on, its share when the run says it. */
+export function basisTiles(format: Format, numbers: PlayerFormat, games: number): BasisTile[] {
 	const points = numbers.preseasonPoints ?? null;
 	if (format.rosFromWeek === undefined || points === null) return [];
 	const pace = numbers.preseasonPerGame ?? null;
 	return [
-		{
-			key: 'preseason',
-			label: CARD.preseason,
-			value: fixed(points),
-			caption: `${format.label} points for ${String(year)}, the full season`,
-			reason: null
-		},
 		...(pace === null
 			? []
 			: [
 					{
 						key: 'pace' as const,
-						label: CARD.preseasonPace,
+						label: BASIS_WORDS.pace,
 						value: fixed(pace),
-						caption: CARD.paceCaption,
+						caption: BASIS_WORDS.paceCaption,
 						reason: null
 					}
 				]),
 		{
 			key: 'vsAvg',
-			label: CARD.vsAvg,
+			label: BASIS_WORDS.vsAvg,
 			value: NONE,
-			caption: CARD.vsAvgCaption,
-			reason: pace === null ? null : vsAvgReason(games)
+			caption: BASIS_WORDS.vsAvgCaption,
+			reason: pace === null ? null : vsAvgReason(games, numbers.preseasonShare ?? null)
 		}
 	];
 }

@@ -96,13 +96,15 @@ function sharedTier(numbers: Json, position: unknown): Json {
 
 /** SATURDAY_PACE=1 (Lane 117, B80): a STAND-IN preseason pace a game on every in-season page, his
  * preseason points over the 17 games, so the vs Avg tile draws its reason as a run that stores the
- * pace does (Lane 100's preseasonPerGame); the contract run predates the field. */
+ * pace does (Lane 100's preseasonPerGame), with a STAND-IN share the pace carries (Lane 139's
+ * preseasonShare, a running back's PPR k of 2 over 5 games); the contract run predates both fields. */
 const PACE_GAMES = 17;
+const PACE_SHARE = 29;
 const pace = process.env.SATURDAY_PACE === '1';
 function withPace(numbers: Json): Json {
 	const points = numbers.preseasonPoints;
 	return pace && typeof points === 'number'
-		? { ...numbers, preseasonPerGame: tenth(points / PACE_GAMES) }
+		? { ...numbers, preseasonPerGame: tenth(points / PACE_GAMES), preseasonShare: PACE_SHARE }
 		: numbers;
 }
 
@@ -123,7 +125,7 @@ const standIn = JSON.parse(await readFile(LONG_READ_FILE, 'utf8')) as {
 const LONG_READ = {
 	week: FIRST_WEEK,
 	body: standIn.body,
-	caption: 'Written Sat 11:12 am Central, for week 6',
+	caption: 'Written Sat Oct 17, 11:12 am CT, for week 6',
 	status: null,
 	call: standIn.call,
 	writtenAt: '2026-10-17T16:12:00.000Z',

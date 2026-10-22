@@ -20,8 +20,8 @@
 	} from './order.ts';
 
 	/** Our order as a box score (Lane 66j): #, the player, in a league his roster, his game, Proj, then
-	 * Rest of season with the key the # sorts on first and big (Over repl. across positions, Points at a
-	 * position), Avg, Last and Opp rank, and the one move his row admits. Your players are tinted. Below
+	 * Rest of season with his projected points first and big (Lane 139, C20), Over repl. beside it across
+	 * positions (the key the # sorts on), Avg, Last and Opp rank, and the one move his row admits. Your players are tinted. Below
 	 * 1100 px the figures after the key fold under the name in one short line; on a phone the game folds
 	 * too, the roster mark onto his club line. */
 	interface Props {

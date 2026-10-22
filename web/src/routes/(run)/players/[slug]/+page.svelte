@@ -214,7 +214,7 @@
 		...(live === null
 			? [unreadBasis(failed, weekTileHead, page.status?.words.view.rank ?? null)]
 			: live.basis),
-		page.season.basis
+		...(page.season.basis === null ? [] : [page.season.basis])
 	]);
 </script>
 
@@ -357,9 +357,9 @@
 				{/if}
 			</article>
 			<aside class="side">
-				<div aria-label={page.underway ? CARD.whyRest : 'His tier'}>
-					<!-- In season the tier box is why his rest-of-season figure sits where it does (Lane 100, B30). -->
-					{#if page.underway}<h3 class="why"><Label>{CARD.whyRest}</Label></h3>{/if}
+				<div aria-label={CARD.tier}>
+					<!-- In season the box is titled by what it holds, his tier (Lane 139, C23). -->
+					{#if page.underway}<h3 class="why"><Label>{CARD.tier}</Label></h3>{/if}
 					{#if page.heldTier !== null}
 						<PanelHead title={page.heldTier} />
 					{:else}
@@ -401,6 +401,7 @@
 						</tr>
 					{/each}
 				</Table>
+				{#if page.formatsNote}<Footnote>{page.formatsNote}</Footnote>{/if}
 			</section>
 		{/if}
 

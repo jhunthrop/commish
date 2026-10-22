@@ -139,6 +139,9 @@ export const boardRowSchema = z.object({
 	 * format's scoring (Lane 100): null for a player the preseason board did not rank, absent on a run
 	 * older than the field. */
 	preseasonPerGame: points.nullable().optional(),
+	/** In season, the share of his rate a game that pace carries, a whole percent (Lane 139, C08): null
+	 * with the pace, absent on a run older than the field. */
+	preseasonShare: z.number().int().min(0).max(100).nullable().optional(),
 	/** In season, the week his rest of season starts from: his club's first game still to play at the
 	 * run (Lane 86), null with none left. Absent preseason and on a run older than the field, where the
 	 * format's rosFromWeek stands. */

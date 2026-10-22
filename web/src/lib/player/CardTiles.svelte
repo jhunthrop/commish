@@ -138,5 +138,15 @@
 			--tile-lb: 10px;
 			--tile-cap: 11px;
 		}
+
+		/* The row under the tiles keeps its own count across, so our rate's reason has the room for its
+		   share (Lane 139, C08). */
+		.tiles.basis {
+			--across: var(--n);
+		}
+	}
+
+	.tiles.basis.folded {
+		--across: var(--n);
 	}
 </style>

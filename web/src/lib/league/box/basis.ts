@@ -259,6 +259,15 @@ export function projMatchupParts(proj: ProjFacts, clock: Clock): BasisPart[] {
 	];
 }
 
+/** projPart with no read time (Lane 139, C12): where the tile itself says when the projection was
+ * read, as the player card's week tile does. */
+export function projUnstampedPart(proj: ProjFacts, clock: Clock): string {
+	return withBonus(
+		`${proj.head ?? BOX.proj} is ${projWhat(proj, clock, { ...DESK_SAYS, read: false })}.`,
+		proj
+	);
+}
+
 /** projPart in a phone's words (Lane 115): the defenses' scoring left to the desk. */
 export function projPhonePart(proj: ProjFacts, clock: Clock): string {
 	return withBonus(`${proj.head ?? BOX.proj} is ${projWhat(proj, clock, PHONE_SAYS)}.`, proj);

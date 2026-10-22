@@ -333,6 +333,21 @@ export function expectedWords(facts: Pick<WeekFacts, 'game_total'>): string | nu
 	return `${halves(total.team_points)} to ${halves(total.points - total.team_points)}`;
 }
 
+/** The expected score's label (Lane 139, C07). */
+const EXPECTED_SCORE = 'Expected score';
+
+/** The expected score labelled, each club named (Lane 139, C07): "Expected score DET 28.5, GB 25", so
+ * it never reads as a final; null without one or without an opponent to name. */
+export function expectedScoreWords(
+	facts: Pick<WeekFacts, 'game_total' | 'opponent'>,
+	club: string
+): string | null {
+	const total = facts.game_total;
+	if (total === null || facts.opponent === null) return null;
+	const theirs = total.points - total.team_points;
+	return `${EXPECTED_SCORE} ${club} ${halves(total.team_points)}, ${facts.opponent} ${halves(theirs)}`;
+}
+
 /** The kickoff weather in two or three words with its glyph: "63°, 13 mph", "Indoors", "Roof TBD",
  * "Abroad, no forecast", with the chance of rain or snow when it is worth naming; null when the venue
  * is not confirmed and no forecast is held. */

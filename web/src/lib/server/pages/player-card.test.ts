@@ -65,7 +65,7 @@ void test('rest of season is his points from the first week and his rank in our 
 		key: 'rest',
 		label: 'Rest of season',
 		value: '254.1',
-		caption: 'from week 6, WR1 in our order',
+		caption: 'weeks 6 to 17, WR1 in our order',
 		tone: null
 	});
 	const preseason = restTile(PRESEASON, NUMBERS, 'WR', 2026, undefined);
@@ -76,7 +76,7 @@ void test('rest of season is his points from the first week and his rank in our 
 void test("a held player's tile gives no rank his figure would earn, the pill saying the list (Lane 63, 128)", () => {
 	assert.equal(
 		restTile(IN_SEASON, NUMBERS, 'RB', 2026, HELD).caption,
-		'from week 6, unranked while on a season-long list'
+		'weeks 6 to 17, unranked while on a season-long list'
 	);
 	assert.equal(
 		restTile(PRESEASON, NUMBERS, 'RB', 2026, HELD).caption,
@@ -85,13 +85,14 @@ void test("a held player's tile gives no rank his figure would earn, the pill sa
 	// A designation for the week is no season-long list: the rank stands.
 	assert.equal(
 		restTile(IN_SEASON, NUMBERS, 'RB', 2026, QUESTIONABLE).caption,
-		'from week 6, RB1 in our order'
+		'weeks 6 to 17, RB1 in our order'
 	);
 });
 
 void test("the rest tile's parts carry its first week, its rank words and its scoring", () => {
 	assert.deepEqual(restParts(IN_SEASON, NUMBERS, 'WR', undefined), {
 		from: 'from week 6',
+		span: 'weeks 6 to 17',
 		rank: 'WR1 in our order',
 		scoring: 'ppr',
 		label: 'PPR',
@@ -103,7 +104,7 @@ void test("the rest tile's parts carry its first week, its rank words and its sc
 	assert.equal(restParts(IN_SEASON, played, 'WR', undefined)?.from, 'from week 7');
 	assert.equal(
 		restTile(IN_SEASON, played, 'WR', 2026, undefined).caption,
-		'from week 7, WR1 in our order'
+		'weeks 7 to 17, WR1 in our order'
 	);
 	assert.equal(
 		restParts(IN_SEASON, { ...NUMBERS, restFromWeek: null }, 'WR', undefined)?.from,
@@ -164,33 +165,37 @@ void test("the read's stamp is its day and what it was written from", () => {
 	assert.equal(readStamp({ body: 'A read.', pulls: [] }), null);
 });
 
-void test('in season the row under the tiles is his preseason figures as stored and vs Avg (Lane 100, B17, B51)', () => {
-	const stored = { ...NUMBERS, preseasonPoints: 262.1, preseasonPerGame: 17.5 };
+void test('in season the row under the tiles is the pace as stored and our rate vs his Avg (Lane 139, C08, C09)', () => {
+	const stored = { ...NUMBERS, preseasonPoints: 262.1, preseasonPerGame: 17.5, preseasonShare: 29 };
 	assert.deepEqual(
-		basisTiles(IN_SEASON, stored, 2026, 5).map((t) => [t.key, t.value, t.caption, t.reason]),
+		basisTiles(IN_SEASON, stored, 5).map((t) => [t.key, t.label, t.value, t.caption, t.reason]),
 		[
-			['preseason', '262.1', 'PPR points for 2026, the full season', null],
-			['pace', '17.5', 'a game, the pace our figure starts from', null],
+			['pace', 'Preseason pace', '17.5', 'a game, the pace our rate starts from', null],
 			[
 				'vsAvg',
+				'Our rate vs his Avg',
 				'--',
-				'rest of season a game against his Avg',
-				'5 games weighed with his preseason pace'
+				'our rest-of-season rate a game against his Avg',
+				'5 games weighted with his preseason pace at 29%, less missed games'
 			]
 		]
 	);
+	// The preseason total is not drawn beside the pace: the two never reconcile (C09).
+	assert.ok(!basisTiles(IN_SEASON, stored, 5).some((t) => t.value === '262.1'));
+	// A run older than the share says the weighting without it.
+	assert.equal(
+		basisTiles(IN_SEASON, { ...stored, preseasonShare: undefined }, 5).at(-1)?.reason,
+		'5 games weighted with his preseason pace, less missed games'
+	);
 	// With no stored pace there is no reason to give: the cell alone.
 	assert.deepEqual(
-		basisTiles(IN_SEASON, { ...stored, preseasonPerGame: undefined }, 2026, 5).map((t) => [
+		basisTiles(IN_SEASON, { ...stored, preseasonPerGame: undefined }, 5).map((t) => [
 			t.key,
 			t.reason
 		]),
-		[
-			['preseason', null],
-			['vsAvg', null]
-		]
+		[['vsAvg', null]]
 	);
 	// Preseason, or a player the preseason board did not rank: no row.
-	assert.deepEqual(basisTiles(PRESEASON, stored, 2026, 5), []);
-	assert.deepEqual(basisTiles(IN_SEASON, { ...stored, preseasonPoints: null }, 2026, 5), []);
+	assert.deepEqual(basisTiles(PRESEASON, stored, 5), []);
+	assert.deepEqual(basisTiles(IN_SEASON, { ...stored, preseasonPoints: null }, 5), []);
 });

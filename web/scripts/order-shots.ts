@@ -1,6 +1,6 @@
 // Screenshots of the Rest of season, Players and Our record screens as box scores (Lane 66j), against
 // the fixture API (scripts/inseason-fixture/serve.ts, whose order.json names its stand-ins) and the
-// built site, dark and light at 1440 and dark at 390 (with its first screen). Rest of season is the
+// built site, dark and light at 1440, 1280 and 390 (with its first screen). Rest of season is the
 // board in season, signed in with the recorded Sleeper league selected; Players is signed out; Our
 // record reads the run the site was built from. At 1440, 1024, 800, 768 and 390 it asserts the page
 // never scrolls sideways, and that every screen's basis draws at most five rendered lines at 1440 and
@@ -45,7 +45,11 @@ const WIDTHS = [1440, 1024, 800, 768, 390] as const;
 const SHOTS: readonly (readonly ['dark' | 'light', number])[] = [
 	['dark', 1440],
 	['light', 1440],
-	['dark', 390]
+	// The Players list at 1280 and 390 in both themes (Lane 139, C20).
+	['dark', 1280],
+	['light', 1280],
+	['dark', 390],
+	['light', 390]
 ];
 const VIEWPORT_HEIGHT = 900;
 const PHONE_HEIGHT = 844;

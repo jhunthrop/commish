@@ -10,12 +10,11 @@ import {
 	printTenth,
 	publishedOn,
 	unreadBasis,
-	vsAvgReason,
-	vsAvgCaption,
 	compareLeadsWithoutVerb,
 	type BasisTile,
 	type CardTile
 } from './card.ts';
+import { BASIS_WORDS, vsAvgCaption, vsAvgReason } from './basis-words.ts';
 import {
 	compareSay,
 	liveCard,
@@ -39,6 +38,7 @@ const href: ScreenHref = (screen, query) =>
 	`/league/league-1/${screen}?${new URLSearchParams(query).toString()}`;
 const REST = {
 	from: 'from week 6',
+	span: 'weeks 6 to 17',
 	rank: 'WR1 in our order',
 	scoring: 'ppr' as const,
 	label: 'PPR',
@@ -104,7 +104,7 @@ const BUILT: CardTile[] = [
 		key: 'rest',
 		label: CARD.rest,
 		value: '182.2',
-		caption: 'from week 6, WR1 in our order',
+		caption: 'weeks 6 to 17, WR1 in our order',
 		tone: null
 	},
 	{ key: 'opp', label: CARD.opp, value: NONE, caption: 'vs ARI', tone: null },
@@ -143,22 +143,32 @@ void test('the read fills the week tiles and keeps the rest of season as built',
 			['opp', '26th'],
 			['avg', '25.9'],
 			['last', '37.7'],
-			['delta', '+0.4']
+			// A move under half a point is not drawn (Lane 139, C21).
+			['delta', NONE]
 		]
 	);
-	// Beside the season's Projected the week's projection is headed by the API's week (the ruling).
+	// Beside the season's Projected the week's projection is headed by the API's week (the ruling), and
+	// named as the published projection with its read, so it is never read as ours (Lane 139, C06).
 	assert.equal(tile(tiles, 'proj').label, 'Wk 6');
-	assert.equal(tile(tiles, 'proj').caption, 'PPR');
+	assert.equal(tile(tiles, 'proj').caption, 'published projection, read Fri Oct 16, 9:00 pm CT');
 	assert.equal(tile(tiles, 'opp').caption, 'ARI, among the easiest for receivers');
 	assert.equal(tile(tiles, 'opp').tone, 'easy');
 	assert.equal(tile(tiles, 'last').caption, 'week 5 vs BUF');
-	assert.equal(tile(tiles, 'delta').caption, 'since Thu 9:00 pm');
-	assert.equal(tile(tiles, 'rest').caption, 'from week 6, WR1 in our order');
+	assert.equal(tile(tiles, 'delta').caption, 'Moved under 0.5 since the earlier read');
+	assert.equal(tile(tiles, 'delta').label, 'Proj change');
+	assert.equal(tile(tiles, 'rest').caption, 'weeks 6 to 17, WR1 in our order');
+	// A move of half a point or more is drawn, its caption without a stamp (C12).
+	const moved = card(week({}, { projection_delta: 0.5 })).tiles;
+	assert.deepEqual(
+		[tile(moved, 'delta').value, tile(moved, 'delta').caption],
+		['+0.5', 'since the earlier read']
+	);
+	assert.equal(tile(card(week({}, { projection_delta: -1.2 })).tiles, 'delta').value, '\u22121.2');
 });
 
 void test("rest of season's figure a game is the API's, one source with the league's rows", () => {
 	const { tiles } = card(week({}, { rest_of_season_per_game: 23.1 }));
-	assert.equal(tile(tiles, 'rest').caption, 'from week 6, 23.1 a game, WR1 in our order');
+	assert.equal(tile(tiles, 'rest').caption, 'weeks 6 to 17, 23.1 a game, WR1 in our order');
 	assert.equal(tile(tiles, 'rest').value, '182.2');
 });
 
@@ -171,7 +181,7 @@ void test("the rest tile stays in one scoring: the read's figure a game only whe
 		),
 		LEAGUE
 	);
-	assert.equal(tile(half.tiles, 'rest').caption, 'from week 6, WR1 in our order, in PPR scoring');
+	assert.equal(tile(half.tiles, 'rest').caption, 'weeks 6 to 17, WR1 in our order, in PPR scoring');
 	assert.equal(tile(half.tiles, 'rest').value, '182.2');
 });
 
@@ -203,12 +213,12 @@ void test("on Sunday evening the read's rest of season replaces the run's: his g
 		)
 	);
 	assert.equal(tile(live.tiles, 'rest').value, '167.5');
-	assert.equal(tile(live.tiles, 'rest').caption, 'from week 7, 16.8 a game, WR1 in our order');
+	assert.equal(tile(live.tiles, 'rest').caption, 'weeks 7 to 17, 16.8 a game, WR1 in our order');
 	assert.deepEqual(live.rest, { points: 167.5, from: 'from week 7' });
 	// A read older than the fields keeps the run's figure and the run's week.
 	const older = card(week());
 	assert.equal(older.rest, null);
-	assert.equal(tile(older.tiles, 'rest').caption, 'from week 6, WR1 in our order');
+	assert.equal(tile(older.tiles, 'rest').caption, 'weeks 6 to 17, WR1 in our order');
 });
 
 void test("review H1: in another scoring the tile's week follows the figure it prints", () => {
@@ -225,7 +235,7 @@ void test("review H1: in another scoring the tile's week follows the figure it p
 		LEAGUE
 	);
 	assert.equal(tile(half.tiles, 'rest').value, '167.5');
-	assert.equal(tile(half.tiles, 'rest').caption, 'from week 7, WR1 in our order, in PPR scoring');
+	assert.equal(tile(half.tiles, 'rest').caption, 'weeks 7 to 17, WR1 in our order, in PPR scoring');
 	// A read with no figure for the tile's format leaves the run's figure under the run's week.
 	const without = card(
 		week(
@@ -241,7 +251,7 @@ void test("review H1: in another scoring the tile's week follows the figure it p
 	assert.equal(tile(without.tiles, 'rest').value, '182.2');
 	assert.equal(
 		tile(without.tiles, 'rest').caption,
-		'from week 6, WR1 in our order, in PPR scoring'
+		'weeks 6 to 17, WR1 in our order, in PPR scoring'
 	);
 	assert.equal(without.rest, null);
 });
@@ -345,10 +355,11 @@ void test('a figure not held is "--", and its tile says why', () => {
 
 void test('the week ahead is the box row and the cell under his name', () => {
 	const { cell, next } = card(week());
+	// The kickoff says its zone, the expected score its label and both clubs (Lane 139, C07, C11).
 	assert.deepEqual(cell, {
 		where: 'vs ARI',
-		when: 'Sun 3:05 pm',
-		expected: '32.5 to 20',
+		when: 'Sun 3:05 pm CT',
+		expected: 'Expected score LAR 32.5, ARI 20',
 		weather: { glyph: 'indoors', words: 'Indoors' }
 	});
 	assert.equal(next?.proj, '21.8');
@@ -471,24 +482,23 @@ void test('with no league the basis names PPR and no league, and there is no ver
 		week({ verb: { kind: 'trade', holder: 'Nacua Matata', host_url: null, note: null } })
 	);
 	assert.equal(verb, null);
+	// No stamp in the basis (Lane 139, C12): the week tile says when the projection was read.
 	assert.equal(
 		basis[0],
-		"Proj is this week's published projection in PPR, read Fri 9:00 pm Central. Δ Proj is its change since Thu 9:00 pm Central."
+		"Wk 6 is this week's published projection in PPR. Proj change is its move since the earlier read, shown from 0.5."
 	);
-	assert.match(
-		basis[1] ?? '',
-		/PPR scoring\. His next game's expected points and weather were read Fri 9:00 pm Central\.$/
-	);
+	assert.match(basis[1] ?? '', /PPR scoring\.$/);
 	assert.equal(basis.length, 2);
 	assert.ok(basis.every((line) => !line.includes('league') && !line.includes('your')));
 });
 
-void test("the game facts' read is said only while his game is still to be played", () => {
+void test('the basis stamps no game facts read, and from his kickoff says when the stats land', () => {
 	const kickoff = Date.parse(facts().kickoff ?? '');
 	const before = card(week(), null, kickoff - 1).basis[1] ?? '';
 	const after = card(week(), null, kickoff).basis[1] ?? '';
-	assert.match(before, /weather were read Fri 9:00 pm Central\.$/);
-	assert.ok(!after.includes('were read'), after);
+	// The Game cell labels its expected score (Lane 139, C07): no read stamp beside it (C12).
+	assert.ok(!before.includes('read'), before);
+	assert.ok(!before.includes(KICKED_OFF_PART), before);
 	// At his kickoff the one rule reads his game kicked off (kickoff.ts lineState, Lane 85 fix round 2),
 	// so the card says when Final and the stats land, as the boards and the league screens do.
 	assert.ok(after.endsWith(KICKED_OFF_PART), after);
@@ -535,7 +545,7 @@ void test("with a league the verb is the league screens', the platform named", (
 		week({ verb: { kind: 'start', holder: null, host_url: null, note: null } }),
 		LEAGUE
 	);
-	assert.match(basis[0] ?? '', /, PPR nearest your rules, /);
+	assert.match(basis[0] ?? '', /, PPR nearest your rules\. /);
 	assert.match(basis[1] ?? '', /your scoring/);
 });
 
@@ -654,21 +664,21 @@ void test('signed out in season Compare leads, and preseason the sheet add stays
 	assert.equal(preseason.compareLeads, false);
 });
 
-void test('vs Avg is his rest of season a game less his Avg, from the two printed tenths (Lane 100, B51)', () => {
+void test('our rate vs his Avg is the rest of season a game less his Avg, from the two printed tenths (Lane 100, B51)', () => {
 	const built: BasisTile[] = [
 		{
-			key: 'preseason',
-			label: CARD.preseason,
-			value: '262.1',
-			caption: 'PPR points for 2026, the full season',
+			key: 'pace',
+			label: BASIS_WORDS.pace,
+			value: '16.7',
+			caption: BASIS_WORDS.paceCaption,
 			reason: null
 		},
 		{
 			key: 'vsAvg',
-			label: CARD.vsAvg,
+			label: BASIS_WORDS.vsAvg,
 			value: NONE,
-			caption: CARD.vsAvgCaption,
-			reason: vsAvgReason(5)
+			caption: BASIS_WORDS.vsAvgCaption,
+			reason: vsAvgReason(5, 29)
 		}
 	];
 	const at = (perGame: number | null, format: 'ppr' | 'half_ppr' = 'ppr') =>
@@ -692,21 +702,25 @@ void test('vs Avg is his rest of season a game less his Avg, from the two printe
 	assert.equal(filled.find((t) => t.key === 'vsAvg')?.value, '\u22128.7');
 	assert.equal(
 		filled.find((t) => t.key === 'vsAvg')?.caption,
-		'22.0 a game vs his 30.7 Avg: 5 games weighed with his preseason pace'
+		'22.0 a game vs his 30.7 Avg: 5 games weighted with his preseason pace at 29%, less missed games'
 	);
 	// "--" stands with the plain caption: no reason beside a figure not drawn (fix round 1, M4).
-	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.caption, CARD.vsAvgCaption);
-	assert.equal(filled.find((t) => t.key === 'preseason')?.value, '262.1');
+	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.caption, BASIS_WORDS.vsAvgCaption);
+	assert.equal(filled.find((t) => t.key === 'pace')?.value, '16.7');
 	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.value, NONE);
 	// In another scoring than the tile's the figure a game is not the tile's: no gap is drawn.
 	assert.equal(at(22.0, 'half_ppr').find((t) => t.key === 'vsAvg')?.value, NONE);
 });
 
-void test('vs Avg names both figures and the preseason pace, as its tile beside it does (Lane 117)', () => {
-	// Its four phone lines are the shot script's to count (player-bye-shots.ts), never a character proxy.
-	const caption = vsAvgCaption('22.0', '30.7', vsAvgReason(5));
-	assert.equal(caption, '22.0 a game vs his 30.7 Avg: 5 games weighed with his preseason pace');
-	assert.match(caption, new RegExp(CARD.preseasonPace.toLowerCase()));
+void test('our rate vs his Avg names both figures, the pace and its share, as its tile beside it does (Lane 139, C08)', () => {
+	// Its phone lines are the shot script's to count (player-bye-shots.ts), never a character proxy.
+	const caption = vsAvgCaption('22.0', '30.7', vsAvgReason(5, 29));
+	assert.equal(
+		caption,
+		'22.0 a game vs his 30.7 Avg: 5 games weighted with his preseason pace at 29%, less missed games'
+	);
+	assert.match(caption, new RegExp(BASIS_WORDS.pace.toLowerCase()));
+	assert.match(BASIS_WORDS.vsAvg, /^Our rate/u);
 });
 
 void test('in season with no league verb Compare leads before the read answers, preseason the sheet (Lane 117, B80)', () => {
@@ -741,14 +755,10 @@ void test('copy guard: no card word uses a betting or trading word, the word hos
 		...live.basis,
 		live.verb?.label ?? '',
 		live.verb?.note ?? '',
-		CARD.whyRest,
+		CARD.tier,
 		CARD.readNotYet,
-		CARD.preseason,
-		CARD.preseasonPace,
-		CARD.vsAvg,
-		CARD.paceCaption,
-		CARD.vsAvgCaption,
-		vsAvgReason(5),
+		...Object.values(BASIS_WORDS),
+		vsAvgReason(5, 29),
 		publishedOn('Thursday'),
 		CARD.writtenFrom,
 		CARD.startHim,
@@ -812,7 +822,10 @@ void test("a listed player's week is not his: Proj, Opp rank and the change say 
 	// The bye week's change tile keeps its head (his next game's Proj), "--" with the list.
 	assert.equal(tile(listed(byeWeek(18.4, null)), 'delta').label, 'Wk 7 Proj');
 	// No list: the week's own figures.
-	assert.equal(tile(card(week()).tiles, 'proj').caption, 'PPR');
+	assert.equal(
+		tile(card(week()).tiles, 'proj').caption,
+		'published projection, read Fri Oct 16, 9:00 pm CT'
+	);
 	// His basis says only what the card shows: one sentence for the On IR tiles, then Avg and Last
 	// (fix round 2); his game's expected score, weather and Proj are not drawn.
 	const whole = liveCard({
