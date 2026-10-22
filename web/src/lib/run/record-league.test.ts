@@ -58,7 +58,12 @@ void test("the league's basis names its lineup across its teams and its own benc
 	const said = leagueBasis(espn, pageLineup(live, espn, players));
 	assert.equal(
 		said.starters,
-		"Starters right counts your league's lineup, QB, 2 RB, 2 WR, TE and a flex across 12 teams, and how many of the week's starters there the order also put there."
+		"Starters right counts the week's starters the order also put in your league's lineup, QB, 2 RB, 2 WR, TE and a flex across 12 teams, kickers and defenses not counted."
+	);
+	const noKickers = { ...espn, lineup: { ...espn.lineup, k: 0, def: 0 } };
+	assert.match(
+		leagueBasis(noKickers, pageLineup(live, noKickers, players)).starters ?? '',
+		/a flex across 12 teams\.$/u
 	);
 	assert.match(
 		said.benchmark ?? '',

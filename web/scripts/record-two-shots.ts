@@ -112,7 +112,14 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 			'Following us instead of ESPN would have scored 8.4 more points over 1 week.',
 			where
 		);
-		if (mode === 'graded') has(weekly, "Starters right counts your league's lineup", where);
+		if (mode === 'graded') {
+			has(
+				weekly,
+				"Starters right counts the week's starters the order also put in your league's lineup",
+				where
+			);
+			has(weekly, 'kickers and defenses not counted', where);
+		}
 	}
 	if (theme === 'light') await basisFaults(page, who, width);
 	await page.screenshot({

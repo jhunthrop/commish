@@ -80,7 +80,7 @@ async function record(who: Who, width: number): Promise<void> {
 		// Fix round 1: every starters figure and sentence on a league page reads the league's lineup.
 		has(
 			main,
-			"Starters right counts your league's lineup, QB, 2 RB, 2 WR, TE and a flex across 12 teams",
+			"Starters right counts the week's starters the order also put in your league's lineup, QB, 2 RB, 2 WR, TE and a flex across 12 teams",
 			where
 		);
 		has(main, "ADP had more of the week's starters right, 107 of 168 against our 101.", where);
