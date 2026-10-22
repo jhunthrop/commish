@@ -1013,9 +1013,12 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 	const seen = await page.evaluate(() => {
 		const table = document.querySelector('main table.pool');
 		const text = (el: Element): string => (el as HTMLElement).innerText.trim();
-		// The player rows: not the drop panel, nor the no-gain divider (Lane 98).
+		// The player rows: not the drop panel, nor the no-gain or Stash divider (Lane 98), nor the Stash
+		// group's line (Lane 118), which the capture's undated IR free agents draw (Lane 128).
 		const rows = [
-			...(table?.querySelectorAll('tbody tr:not(.dsect):not(.dgo):not(.divider)') ?? [])
+			...(table?.querySelectorAll(
+				'tbody tr:not(.dsect):not(.dgo):not(.divider):not(.stash-basis)'
+			) ?? [])
 		];
 		return {
 			heads: [...(table?.querySelectorAll('thead th') ?? [])].map(text).filter((h) => h !== ''),

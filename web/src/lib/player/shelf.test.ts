@@ -26,6 +26,7 @@ import {
 	rowTiles,
 	SHELF,
 	shelfHead,
+	shelfSource,
 	shelfVerb,
 	type ShelfVerb
 } from './shelf.ts';
@@ -64,6 +65,13 @@ function lineupRows(clock: string): BoxRow[] {
 	const now = Date.parse(clock);
 	const box = lineupBox(heldLineup(data('lineup', clock) as LineupAdvice, now), ZONE, now);
 	return [...box.starters.map((e) => e.row), ...box.bench.map((e) => e.row), ...box.reserve];
+}
+
+/** The card's source from a row, failing the test for a row our board does not place. */
+function rowSourceOf(row: BoxRow): NonNullable<ReturnType<typeof rowSource>> {
+	const source = rowSource(row);
+	if (source === null) throw new Error(`${row.name} has no source.`);
+	return source;
 }
 
 function rowOf(rows: readonly BoxRow[], slug: string): BoxRow {
@@ -153,8 +161,8 @@ void test('Trades builds a trade, Players compares, and a screen with no offer g
 });
 
 void test("the shelf opens on the row's own cells, Proj while his game is to come and Pts after", () => {
-	const dart = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'jaxson-dart');
-	const tiles = gameTiles(rowTiles(dart, null), dart.state, dart.pts);
+	const gainwell = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'kenny-gainwell');
+	const tiles = gameTiles(rowTiles(gainwell, null), gainwell.state, gainwell.pts);
 	assert.deepEqual(
 		tiles.map((t) => t.key),
 		['proj', 'rest', 'opp', 'avg', 'last', 'delta']
@@ -165,7 +173,7 @@ void test("the shelf opens on the row's own cells, Proj while his game is to com
 	assert.notEqual(proj.value, NONE);
 	assert.equal(tiles.find((t) => t.key === 'rest')?.value, NONE);
 
-	const sunday = rowOf(lineupRows(FIXTURE_SUNDAY_CLOCK), 'jaxson-dart');
+	const sunday = rowOf(lineupRows(FIXTURE_SUNDAY_CLOCK), 'kenny-gainwell');
 	const live = gameTiles(rowTiles(sunday, null), sunday.state, 14.2);
 	assert.deepEqual(
 		live.find((t) => t.key === 'proj'),
@@ -410,6 +418,17 @@ void test('an IR row carries no rank: the shelf says the list where the rank wou
 	);
 	const tiles = rankedTiles(rest, 'QB', 31, head.rank);
 	assert.equal(tiles.find((t) => t.key === 'rest')?.caption, 'PPR points for 2026');
+	// His week is not his (fix round 1): no Proj on the row, and his tiles say the list.
+	assert.equal(dart.proj, null);
+	assert.equal(dart.evidence.oppRank, null);
+	for (const key of ['proj', 'opp', 'delta'] as const) {
+		const t = rowTiles(dart, null).find((x) => x.key === key);
+		assert.deepEqual([t?.value, t?.caption], [NONE, 'On IR'], key);
+	}
+	// The shelf reads his week with the row's list, never the build's beside it.
+	const fromBuild = { ...rowSourceOf(dart), held: null };
+	assert.equal(shelfSource(fromBuild, dart).held, 'IR');
+	assert.equal(shelfSource(fromBuild, null).held, null);
 	// The platform's own IR spot (Tank Bigsby) carries none either.
 	const bigsby = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'tank-bigsby');
 	assert.equal(bigsby.pill?.rank, null);

@@ -20,7 +20,7 @@ import {
 	type BasisPart,
 	type ProjFacts
 } from '#lib/league/box/basis.ts';
-import { BOX, boxRow, type BoxRow } from '#lib/league/box/box.ts';
+import { BOX, boxRow, onList, type BoxRow } from '#lib/league/box/box.ts';
 import { lineState } from '#lib/league/box/kickoff.ts';
 import { addVerbWords } from '#lib/league/box/waivers.ts';
 import { hostWords } from '#lib/league/names.ts';
@@ -88,7 +88,7 @@ export function orderView(row: OrderRow, zone: string, pillRank: boolean, now: n
 		position: row.line.player.position,
 		hostId: row.line.player.host_id,
 		box: { ...box, key },
-		week: weekFigure(row.line, now),
+		week: onList(box.status) ? null : weekFigure(row.line, now),
 		rank: row.rank,
 		figures: {
 			por: row.points_over_replacement,

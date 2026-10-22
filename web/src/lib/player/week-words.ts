@@ -40,6 +40,7 @@ import { hostWords } from '#lib/league/names.ts';
 import type { LogNext } from '#lib/ui/game-log.ts';
 import {
 	CARD,
+	listedTiles,
 	NONE,
 	printTenth,
 	publishedOn,
@@ -543,6 +544,9 @@ export interface LiveInput {
 	basisTiles?: readonly BasisTile[];
 	/** Each week's last kickoff on the run's schedule, the moment its lineup can no longer be set. */
 	lastKickoffs?: Readonly<Record<number, string>>;
+	/** The season-long list's word ("IR") his card's pill shows, null when he is on none: his week's
+	 * tiles then say the list in place of a Proj, an Opp rank or a change (Lane 128 fix round 1). */
+	held?: string | null;
 	screenHref: ScreenHref;
 	zone?: string;
 	/** The time the card is drawn at, in ms: a game kicked off by then says no facts read. */
@@ -589,6 +593,7 @@ export function liveCard({
 	tier = null,
 	basisTiles = [],
 	lastKickoffs = {},
+	held: listed = null,
 	screenHref,
 	zone = memberZone(),
 	now
@@ -617,7 +622,7 @@ export function liveCard({
 	return {
 		week: week.week,
 		head: headOf(week, zone, now),
-		tiles: updated,
+		tiles: listedTiles(updated, listed),
 		basisTiles: basisTiles.map((tile) =>
 			tile.key === 'vsAvg' ? vsAvgTile(week, rest, tile) : tile
 		),

@@ -318,7 +318,7 @@ export function onReserve(line: Pick<PlayerLine, 'player' | 'facts'>): boolean {
  * ruling); his status chip says the list, so the pill and the shelf show its word where the rank
  * would be. */
 export function playingRank(rank: number | null, status: StatusView | null): number | null {
-	return (status?.rank ?? null) === null ? rank : null;
+	return onList(status) ? null : rank;
 }
 
 /** His position pill: the board's position (a defense has none, the club mark names it). */
@@ -416,22 +416,29 @@ export function boxRow(
 		game: gameOf(facts, player.team, zone, now),
 		expected: ahead ? expectedWords(facts) : null,
 		weather: ahead ? weatherCell(facts) : null,
-		proj: line.week_projection,
+		proj: onList(status) ? null : line.week_projection,
 		pts: facts.points_this_week,
 		toCome: ahead,
 		state: lineState(facts, now),
-		evidence: evidenceOf(line)
+		evidence: evidenceOf(line, onList(status))
 	};
 }
 
-/** A row's evidence from his line. */
-function evidenceOf(line: PlayerLine): RowEvidence {
+/** He is on a season-long list (IR, PUP, NFI): his status carries the list's word. In season his
+ * week is not his (Lane 128 fix round 1): no week Proj, no Opp rank and no change in either, on every
+ * screen and on his card. */
+export function onList(status: Pick<StatusView, 'rank'> | null): boolean {
+	return (status?.rank ?? null) !== null;
+}
+
+/** A row's evidence from his line; a listed player's has no Opp rank and no change in his Proj. */
+function evidenceOf(line: PlayerLine, listed: boolean): RowEvidence {
 	return {
-		oppRank: line.opp_rank,
-		oppOf: line.facts.allowed_to_position?.of ?? null,
+		oppRank: listed ? null : line.opp_rank,
+		oppOf: listed ? null : (line.facts.allowed_to_position?.of ?? null),
 		avg: line.season_avg,
 		last: line.last_points,
-		delta: line.projection_delta,
+		delta: listed ? null : line.projection_delta,
 		season: line.rest_of_season_per_game
 	};
 }

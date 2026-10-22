@@ -50,9 +50,9 @@ const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const LEAGUE = `/league/${FIXTURE_IDS.league}`;
 /** The fixture case's players (waiver-beats.ts). */
-const DROP = 'Roschon Johnson';
-/** His Beats name: Theo Johnson is a row on the same screen (review M2). */
-const DROP_BEATS = 'R. Johnson';
+const DROP = 'Jaxson Dart';
+/** His Beats name: his last name, no other Dart on the screen (review M2). */
+const DROP_BEATS = 'Dart';
 const UNLISTED = ["De'Von Achane", 'Tyquan Thornton'];
 /** The week each is back (waiver-beats.ts STAMPED). */
 const BACK: Readonly<Record<string, number>> = { "De'Von Achane": 9, 'Tyquan Thornton': 8 };
@@ -171,13 +171,14 @@ async function checkWaivers(page: Page, where: string, text: string): Promise<vo
 	}
 	if (!groups.line.includes(STASH.line)) fault(where, `the Stash line reads "${groups.line}"`);
 	const moves = await page.locator('main [data-strip="waivers"] .pickup .move').allInnerTexts();
-	const card = moves.find((m) => m.includes(DROP)) ?? null;
+	// The card names its drop as Beats does: his last name, the full name only where two share it.
+	const card = moves.find((m) => m.includes(`drop ${DROP_BEATS}`)) ?? null;
 	if (card === null) {
 		fault(where, `no card drops ${DROP}: ${JSON.stringify(moves)}`);
 		return;
 	}
 	if (!card.includes(`(${WAIVERS.irBench})`)) fault(where, `the card "${card}" does not say why`);
-	// The card's row names its drop in Beats (B14), Johnson by his last name.
+	// The card's row names its drop in Beats (B14), by his last name.
 	if (!rows.some((r) => r.named && r.who === DROP_BEATS))
 		fault(where, `no tinted row names ${DROP} in Beats`);
 }

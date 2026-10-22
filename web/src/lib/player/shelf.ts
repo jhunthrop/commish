@@ -9,6 +9,7 @@ import type { Position } from '#lib/types/player.ts';
 import type { CardSource } from './card-source.ts';
 import {
 	CARD,
+	listedTiles,
 	NONE,
 	printTenth,
 	restRankWords,
@@ -100,7 +101,7 @@ function over(tile: CardTile, value: number | null, print: (v: number) => string
 export function rowTiles(row: BoxRow, built: readonly CardTile[] | null): CardTile[] {
 	const { evidence } = row;
 	const rank = evidence.oppRank;
-	return (built ?? blankTiles()).map((tile) => {
+	const tiles = (built ?? blankTiles()).map((tile) => {
 		switch (tile.key) {
 			case 'proj':
 				return over(tile, row.proj, printTenth);
@@ -122,6 +123,8 @@ export function rowTiles(row: BoxRow, built: readonly CardTile[] | null): CardTi
 				return tile;
 		}
 	});
+	// A listed player's week is not his: his list stands in its tiles (Lane 128 fix round 1).
+	return listedTiles(tiles, row.status?.rank ?? null);
 }
 
 /** The week tile by the screen's game-state rule: Proj while his game is to come, his Pts once it has
@@ -213,8 +216,15 @@ export function rowSource(row: BoxRow): CardSource | null {
 		rest: null,
 		tier: null,
 		basisTiles: [],
-		lastKickoffs: {}
+		lastKickoffs: {},
+		held: row.status?.rank ?? null
 	};
+}
+
+/** The card's build as the shelf reads it: the tapped row's list, never the build's beside it (one
+ * player, one status on one screen, fix round 1 HIGH-1); the build's own with no row. */
+export function shelfSource(source: CardSource, row: BoxRow | null): CardSource {
+	return row === null ? source : { ...source, held: row.status?.rank ?? null };
 }
 
 /** The rest-of-season tile's caption names his rank in our order as the build had it ("QB12 in our

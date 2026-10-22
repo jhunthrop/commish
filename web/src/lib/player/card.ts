@@ -131,6 +131,31 @@ export const CARD = {
 	findOnWaivers: 'Find him on Waivers'
 } as const;
 
+/** The week's own tiles, which a listed player's list stands in for. */
+const WEEK_KEYS: ReadonlySet<TileKey> = new Set(['proj', 'opp', 'delta']);
+
+/** "On IR": a listed player's week tiles say his list in place of a Proj, an Opp rank or a change
+ * (Lane 128 fix round 1): his game is not his. */
+export function onListWords(word: string): string {
+	return `On ${word}`;
+}
+
+/** The week's tiles of a player on a season-long list ("IR", the list's word): Proj, Opp rank and
+ * the change are "--" with the list as their reason; null keeps the tiles. */
+export function listedTiles(tiles: readonly CardTile[], word: string | null): CardTile[] {
+	if (word === null) return [...tiles];
+	return tiles.map((tile) =>
+		WEEK_KEYS.has(tile.key)
+			? {
+					...tile,
+					value: NONE,
+					caption: onListWords(word),
+					tone: tile.key === 'opp' ? null : tile.tone
+				}
+			: tile
+	);
+}
+
 /** The tiles in the card's order. */
 export const TILE_ORDER: readonly TileKey[] = ['proj', 'rest', 'opp', 'avg', 'last', 'delta'];
 

@@ -3,11 +3,11 @@
 // other row the player his move takes out of the rest-of-season lineup the Gain is measured on (the
 // fixture's stand-in: the starter with the least points over replacement at a slot he can fill, whom
 // he tops, on a row that gains); a free agent on a season-long list or ruled out (a week's out
-// carried over from a game already played aside) is not listed. FIXTURE_IR_DROP=1 stamps the
-// fixture with the sense check's case (B34, B41): the strip's drop, Roschon Johnson, on injured
-// reserve on the bench, and two free agents the table no longer lists, De'Von Achane on injured
-// reserve and Tyquan Thornton ruled out, each dated back (Lane 118, B79: weeks 9 and 8), so they sit
-// in the Stash group; FIXTURE_IR_SLOT=1 opens one injured reserve slot on the member's team, so
+// carried over from a game already played aside) is not listed. The strip's drop on injured reserve
+// on the bench (B34) is the fixture's own since Lane 128: Jaxson Dart, on the capture the stand-in run
+// is marked with. FIXTURE_IR_DROP=1 stamps the rest of the sense check's case (B41): two free agents
+// the table no longer lists, De'Von Achane on injured reserve and Tyquan Thornton ruled out, each
+// dated back (Lane 118, B79: weeks 9 and 8), so they sit in the Stash group; FIXTURE_IR_SLOT=1 opens one injured reserve slot on the member's team, so
 // Achane's verb is Stash.
 import type { components } from '../../src/lib/api/types.ts';
 import type { LineupAdvice, WaiverAdvice, WaiverRow } from '../../src/lib/league/inseason/api.ts';
@@ -168,12 +168,10 @@ export function listedOnly(answer: WaiverAdvice, irSlot = false): WaiverAdvice {
 	};
 }
 
-/** The sense check's case on a fixture line: the strip's drop on injured reserve, two free agents on a
- * list the table does not show. */
-const IR_SINCE = '2026-09-22T12:00:00.000Z';
+/** The sense check's case on a fixture line: two free agents on a list the table does not show, each
+ * dated back (the strip's IR drop is the fixture's own, Dart on the capture). */
 const READ = '2026-10-16T21:00:00.000Z';
 const STAMPED: Readonly<Record<string, PlayerLine['facts']['designation']>> = {
-	'Roschon Johnson': { status: 'injured_reserve', as_of: READ, since: IR_SINCE },
 	"De'Von Achane": {
 		status: 'injured_reserve',
 		as_of: READ,

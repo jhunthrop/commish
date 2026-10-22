@@ -20,7 +20,7 @@
 import { mkdir } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import { chromium, type BrowserContext, type Page } from 'playwright';
-import { CARD } from '../src/lib/player/card.ts';
+import { CARD, NONE, onListWords } from '../src/lib/player/card.ts';
 import { SHELF } from '../src/lib/player/shelf.ts';
 import { SHELF_PARAM } from '../src/lib/player/shelf-state.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
@@ -369,7 +369,9 @@ for (const screen of shotScreens) {
 const IR_CASE = {
 	slug: 'jaxson-dart',
 	pill: 'QB IR',
-	rest: 'unranked while on a season-long list'
+	rest: 'unranked while on a season-long list',
+	week: onListWords('IR'),
+	weekTiles: 3
 };
 const lineupScreen = SCREENS.find((s) => s.name === 'lineup');
 if (!process.env.BYTES_ONLY && lineupScreen !== undefined) {
@@ -383,12 +385,19 @@ if (!process.env.BYTES_ONLY && lineupScreen !== undefined) {
 				await ready(page, lineupScreen);
 				const rank = await rowRank(page, IR_CASE.slug);
 				if (rank !== null) faults.push(`${label}: his row ranks him ${rank}`);
+				const proj = opener(page, IR_CASE.slug).locator('xpath=ancestor::tr[1]').locator('td.proj');
+				if ((await proj.count()) > 0 && (await proj.first().innerText()).trim() !== NONE)
+					faults.push(`${label}: his row's Proj reads "${await proj.first().innerText()}"`);
 				await openShelf(page, 'pointer', IR_CASE.slug);
 				await check(page, lineupScreen, label, size.width, rank);
 				const head = await shelf(page).locator('.sub').first().innerText();
 				if (!head.includes(IR_CASE.pill)) faults.push(`${label}: the pill reads "${head}"`);
 				const card = await shelf(page).locator('.tiles').first().innerText();
 				if (!card.includes(IR_CASE.rest)) faults.push(`${label}: the rest tile reads "${card}"`);
+				// His week is not his (fix round 1): Proj, Opp rank and the change say his list.
+				const listed = await shelf(page).locator('.tile').filter({ hasText: IR_CASE.week }).count();
+				if (listed !== IR_CASE.weekTiles)
+					faults.push(`${label}: ${String(listed)} tiles say "${IR_CASE.week}"`);
 				await page.screenshot({
 					path: new URL(`shelf-lineup-ir-${theme}-${String(size.width)}.png`, out).pathname
 				});

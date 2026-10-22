@@ -74,8 +74,23 @@ async function common(page: Page, where: string): Promise<void> {
 async function checkStash(page: Page, where: string): Promise<void> {
 	const group = page.locator('main table.pool tr.divider', { hasText: STASH.head });
 	const drawn = (await group.count()) > 0;
-	if (drawn !== expectStash) fault(where, `the Stash group drawn ${String(drawn)}`);
-	if (!expectStash) return;
+	const stashed = await page
+		.locator('main table.pool tr', {
+			hasText: new RegExp(`${STASH.backNow}|Back week \\d+`)
+		})
+		.count();
+	if (!expectStash) {
+		// The capture the stand-in run is marked with lists free agents on IR with no return date
+		// (Lane 128): the group may say they are left out, and holds no stash of its own.
+		if (stashed > 0) fault(where, `${String(stashed)} stash rows drawn`);
+		if (drawn) {
+			const said = await page.locator('main table.pool tr.stash-basis').innerText();
+			if (said.includes(STASH.line) || !said.includes(STASH.undated))
+				fault(where, `the Stash group with no stash reads "${said}"`);
+		}
+		return;
+	}
+	if (!drawn) fault(where, 'the Stash group is not drawn');
 	const line = await page.locator('main table.pool tr.stash-basis').innerText();
 	if (!line.includes(STASH.line)) fault(where, `the Stash line reads "${line}"`);
 	if (line.includes(STASH.taken(TAKEN_LAST)) !== expectTaken)

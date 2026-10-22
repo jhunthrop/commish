@@ -228,6 +228,14 @@ void test('a row on a season-long list carries no rank, whatever the API sends (
 	const hostIr = boxRow(line({ player: player({ injured_reserve: true }) }), 'BN', ZONE, true, NOW);
 	assert.equal(hostIr.pill?.rank, null);
 	// A PUP or NFI list too; a week's designation keeps his rank.
+	// His week is not his (fix round 1): no Proj, no Opp rank and no change in either, on any screen.
+	assert.equal(listed.proj, null);
+	assert.deepEqual(
+		[listed.evidence.oppRank, listed.evidence.oppOf, listed.evidence.delta],
+		[null, null, null]
+	);
+	assert.equal(listed.evidence.avg, 17.94, 'his season stands');
+	assert.equal(hostIr.proj, null);
 	const pup = boxRow(
 		line({}, { designation: { status: 'pup', as_of: asOf } }),
 		'QB',
@@ -239,6 +247,8 @@ void test('a row on a season-long list carries no rank, whatever the API sends (
 	for (const status of ['questionable', 'doubtful', 'out'] as const) {
 		const week = boxRow(line({}, { designation: { status, as_of: asOf } }), 'QB', ZONE, true, NOW);
 		assert.equal(week.pill?.rank, 7, status);
+		assert.equal(week.proj, 19.44, status);
+		assert.equal(week.evidence.oppRank, 24, status);
 	}
 });
 

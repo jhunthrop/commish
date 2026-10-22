@@ -31,7 +31,7 @@ import { copyFault, watchData } from './copy-scan.ts';
 import { readFace } from './read-face.ts';
 import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
-import { CARD } from '../src/lib/player/card.ts';
+import { CARD, onListWords } from '../src/lib/player/card.ts';
 import { heldTierWords } from '../src/lib/run/player-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
@@ -256,13 +256,19 @@ const WEEK_TILE = new RegExp(`^${FIGURE.week}( \\d+)?$`);
 /** The tile after a bye: his next game's Proj, "Wk 7 Proj". */
 const AFTER_BYE_TILE = new RegExp(`^${FIGURE.week} \\d+ ${CARD.proj}$`);
 
+/** His week is a bye: the week tile says so, or for a listed player, whose week tile says his list
+ * (Lane 128 fix round 1), the card's head names the bye. */
+function onBye(card: Card): boolean {
+	return card.captions[card.labels[0] ?? ''] === CARD.byeWeek || /^bye$/iu.test(card.head.opponent);
+}
+
 /** The tiles, each "--" with its reason, and rest of season's label as the run covers it. */
 function checkTiles(card: Card, where: string): void {
 	const rest = ROS_FROM_WEEK === undefined ? PROJECTED : REST;
 	// The week tile is headed by its week beside the season's Projected ("Wk 6", the ruling).
 	const [weekTile = '', ...others] = card.labels;
 	// On his bye the change's tile gives his next game's Proj instead (Lane 100, B30).
-	const bye = card.captions[weekTile] === CARD.byeWeek;
+	const bye = onBye(card);
 	const [last = ''] = others.slice(-1);
 	const change = bye && AFTER_BYE_TILE.test(last) ? last : CARD.delta;
 	const want = [rest, 'Opp rank', 'Avg', 'Last', change];
@@ -308,6 +314,13 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 				!/\d+ in our order/.test(rest),
 			`${where}: the rest tile ranks a held player: "${rest}"`
 		);
+		// His week is not his (Lane 128 fix round 1): Proj, Opp rank and the change say his list.
+		const weekTiles = [card.labels[0] ?? '', CARD.opp, card.labels.at(-1) ?? ''];
+		for (const label of weekTiles)
+			check(
+				card.values[label] === NONE && card.captions[label] === onListWords('IR'),
+				`${where}: ${label} reads "${card.values[label] ?? ''}", "${card.captions[label] ?? ''}"`
+			);
 		check(
 			card.tierBox.includes(heldTierWords('injured_reserve')) && !/\bTier \d/.test(card.tierBox),
 			`${where}: the tier box places a held player: "${card.tierBox}"`
@@ -323,8 +336,7 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 			`${where}: the season read's stamp`
 		);
 	// A week on bye has no game ahead to draw, and the week tile says so.
-	if (card.captions[card.labels[0] ?? ''] !== 'Bye this week')
-		check(card.nextRow !== '', `${where}: no week ahead row in the game log`);
+	if (!onBye(card)) check(card.nextRow !== '', `${where}: no week ahead row in the game log`);
 	if (!ROS)
 		check(/earlier seasons/i.test(card.earlier) && !card.earlierOpen, `${where}: earlier seasons`);
 	const most = BASIS_LINES[width] ?? 0;
