@@ -9,20 +9,29 @@ import type { GameLogRow, PlayerSeason } from './season.ts';
 
 /** What a season's reach reads of a season block: its through week and its log's statuses. */
 export type CountedSeason = Pick<PlayerSeason, 'through'> & {
-	/** Each week's status, and its opponent where the caller has it (none named: no game). */
-	log: readonly (Pick<GameLogRow, 'week' | 'status'> & { opponent?: GameLogRow['opponent'] })[];
+	/** Each week's status, its opponent where the caller has it (none named: no game), and whether a
+	 * week naming none is one he played (unnamedGame, Lane 138). */
+	log: readonly (Pick<GameLogRow, 'week' | 'status'> & {
+		opponent?: GameLogRow['opponent'];
+		unnamedGame?: GameLogRow['unnamedGame'];
+	})[];
 };
 
+/** A week holding a game of his: played, inactive with his club's game named, or one he played that
+ * the run cannot name (the log's "Played, no stats", Lane 138). */
+function holdsAGame(row: CountedSeason['log'][number]): boolean {
+	if (row.status === 'played') return true;
+	return row.status === 'inactive' && (row.opponent !== null || row.unnamedGame === true);
+}
+
 /** The week his season's figures reach (the ruling on the sweep's X3): the run's through week, or his
- * own later game already in the records (played, or inactive once his club's game is in), as a
- * Thursday game is before Sunday's are. A player page's head says it as his own ("through week 5"). A
- * week naming no opponent holds no game (a free agent's, Lane 123), so it reaches nothing. */
+ * own later game already in the records (holdsAGame), as a Thursday game is before Sunday's are. A
+ * player page's head says it as his own ("through week 5"). A week naming no opponent holds no game (a
+ * free agent's, Lane 123), so it reaches nothing, unless he played it: then it counts, so the head
+ * never says week 5 over a log listing his week 6 "Played, no stats" (Lane 141, B120). */
 export function countedWeek(season: CountedSeason): number {
 	return season.log.reduce(
-		(week, row) =>
-			row.status === 'played' || (row.status === 'inactive' && row.opponent !== null)
-				? Math.max(week, row.week)
-				: week,
+		(week, row) => (holdsAGame(row) ? Math.max(week, row.week) : week),
 		season.through
 	);
 }
