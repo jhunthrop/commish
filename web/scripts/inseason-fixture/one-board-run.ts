@@ -51,7 +51,10 @@ const order = (await readJson(new URL('./data/order.json', import.meta.url))) as
 };
 const boardUrl = new URL(`boards/${FORMAT}.json`, OUT);
 const board = await readJson(boardUrl);
-const rows = board.rows as Json[];
+// The kickers' and defenses' market rows stay as the stand-in writes them, after every ranked row.
+const MARKET = 'market';
+const market = (board.rows as Json[]).filter((row) => row.orderBasis === MARKET);
+const rows = (board.rows as Json[]).filter((row) => row.orderBasis !== MARKET);
 const byId = new Map(rows.map((row) => [String(row.id), row]));
 const led: Json[] = [];
 let thursday: Json | null = null;
@@ -97,11 +100,12 @@ const rest = rows
 		preseasonPoints: row.projected,
 		restFromWeek: FIRST_WEEK
 	}));
-board.rows = [...led, ...rest].map((row, i) => ({
+const ranked = [...led, ...rest].map((row, i) => ({
 	...row,
 	ourRank: i + 1,
 	vorRound: Math.ceil((i + 1) / TEAMS)
 }));
+board.rows = [...ranked, ...market.map((row, i) => ({ ...row, ourRank: ranked.length + i + 1 }))];
 await writeFile(boardUrl, JSON.stringify(board));
 
 // Each player page's PPR numbers in season: his preseason place beside them, as the board's rows.

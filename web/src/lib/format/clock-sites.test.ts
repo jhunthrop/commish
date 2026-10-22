@@ -107,6 +107,7 @@ const ALLOWED: Readonly<Record<string, Site>> = {
 	},
 	'scripts/room-shots.ts': { reads: 2, why: 'a wait deadline, nothing drawn' },
 	'scripts/week-order-shots.ts': { reads: 2, why: 'a wait deadline, nothing drawn' },
+	'scripts/shots.ts': { reads: 2, why: 'a server start deadline, nothing drawn' },
 	'scripts/run-from-mock-data.ts': {
 		reads: 1,
 		why: "the stand-in run's stamp, the stand-in build's own clock"
