@@ -59,21 +59,15 @@ export const REST_OF_SEASON = 'Rest of season';
  * order in your league's view. */
 export const REST_IN_YOUR_LEAGUE = `${REST_OF_SEASON}, your league`;
 
-/** The week's order (Lane 140, C19): the season's rail with no league selected and the front card
- * link our order with this week's figures beside it, named for the week the board ranks from. */
+/** The week's order (Lane 140, C19; Lane 142): in season the Players page under the week's name, on
+ * every season rail, a league followed or not. Its label is built with the page (run/week-names.ts),
+ * so no page's script carries it. */
 export const WEEK_RANKINGS_KEY = 'week';
 /** The item's label before the run names its week. */
 const WEEK_RANKINGS = "This week's rankings";
-/** "Week 7 rankings": built on the server with the page (the rail's label and the front card's link),
- * so no page's script carries it. */
-export function weekRankingsWord(week: number): string {
-	return `Week ${String(week)} rankings`;
-}
-
-/** A rail item's label as the shell draws it: the week's order named for the run's week. */
-export function railItemLabel(item: Pick<RailItem, 'key' | 'label'>, week: number | null): string {
-	return item.key === WEEK_RANKINGS_KEY && week !== null ? weekRankingsWord(week) : item.label;
-}
+/** "Week 7 rankings": the page's name in season (run/week-names.ts), and the rail's on a page the
+ * Worker draws, from the context's week. */
+export const weekRankingsWord = (week: number): string => `Week ${String(week)} rankings`;
 
 /** Where a mock draft starts: the room's setup. */
 const MOCK_SETUP = '/mock/new';
@@ -160,15 +154,15 @@ export const RAIL_ITEMS: readonly RailItem[] = [
 	{ ...BOARD, key: 'rest_first', label: REST_OF_SEASON },
 	{ ...ADVISOR, key: 'advisor_first' },
 	BOARD,
-	// The week's order, on the season's rail with no league selected (rail-order.ts): Players, our
-	// order with the week's Proj and game beside each player, headed with the week in season. It is
-	// Players' section, so the page lights it.
+	// The week's order, on every season rail (rail-order.ts): Players, our order with the week's Proj
+	// and game beside each player, named for the week in season. Players' glyph and Players' section,
+	// so the page lights it and it never wears Lineup's glyph beside Lineup (Lane 142).
 	{
 		key: WEEK_RANKINGS_KEY,
 		section: 'players',
 		label: WEEK_RANKINGS,
 		href: '/players',
-		icon: 'lineup',
+		icon: 'players',
 		owns: []
 	},
 	{

@@ -34,6 +34,7 @@ import type { BoardFormat, ContextLeague } from './words.ts';
 
 type Account = components['schemas']['Account'];
 type Feature = components['schemas']['Feature'];
+type SiteSeason = Account['season'];
 
 /** What the browser keeps of the context, with the session it is for (null: signed out, a format
  * this browser chose and never a league) and the account /me named, and the rail it shows, which
@@ -44,7 +45,7 @@ interface Kept {
 	league: ContextLeague | null;
 	leagues: readonly ContextLeague[];
 	format: BoardFormat | null;
-	season: SitePhase | null;
+	season: SiteSeason | null;
 	rail: RailKey;
 }
 
@@ -102,10 +103,12 @@ class SiteContext {
 	heldFor: string | null = null;
 	/** The switch's menu is open: its own tap opens it, and a refused choice opens it again. */
 	open = $state(false);
-	/** The site's own season from /me, null signed out or before /me answers. */
-	season = $state<SitePhase | null>(null);
+	/** The site's own season from /me or GET /season, null before either answers: its phase, and in
+	 * season the week its board ranks from (board_week), which names the rail's week order on a page
+	 * the Worker draws (Lane 142). */
+	season = $state<SiteSeason | null>(null);
 	/** The rail the shell shows: the selected league's phase, else the site's season (nav.ts). */
-	rail = $derived(railOf(this.league, this.season, siteRail()));
+	rail = $derived(railOf(this.league, this.season?.phase ?? null, siteRail()));
 	/** How many choices the switch has made in this page load: a format page follows the context
 	 * only after one (follow.svelte.ts), and a choice's answer counts only while it is the latest. */
 	choices = $state(0);
@@ -153,8 +156,7 @@ class SiteContext {
 			this.features = [];
 			// The site's season for a visitor with no account (GET /season, public): it corrects the
 			// rail the page was built with. Unanswered, the build's stands.
-			this.season =
-				(await client.call<Account['season']>('/season').catch(() => null))?.phase ?? null;
+			this.season = await client.call<SiteSeason>('/season').catch(() => null);
 		} else {
 			try {
 				this.take(await client.call<Account>('/me'));
@@ -187,7 +189,7 @@ class SiteContext {
 		}
 		this.features = me.features;
 		// An API from before the season answers none: the build's stands.
-		this.season = (me as Partial<Account>).season?.phase ?? null;
+		this.season = (me as Partial<Account>).season ?? null;
 		// An API from before the context answers neither; read it as no league.
 		const leagues = Array.isArray(me.leagues) ? me.leagues : [];
 		this.#show(me.league ?? null, leagues, me.format ?? null);

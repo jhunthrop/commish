@@ -24,8 +24,9 @@ const LEAGUE_PAGES = ['league', 'lineup', 'matchup', 'waivers', 'trades'];
 const RAIL_ORDER: Readonly<Record<LeaguePhase, readonly string[]>> = {
 	pre_draft: ['board', 'players', 'mock', 'sheet', 'advisor', 'record'],
 	draft_day: ['advisor_first', 'board', 'players', 'sheet', 'mock_late', 'record'],
-	in_season: [...LEAGUE_PAGES, 'players', 'rest', 'record'],
-	playoffs: [...LEAGUE_PAGES, 'players', 'rest', 'record'],
+	// The season's Players is the week's rankings under the week's name (Lane 142, ruling 1).
+	in_season: [...LEAGUE_PAGES, 'week', 'rest', 'record'],
+	playoffs: [...LEAGUE_PAGES, 'week', 'rest', 'record'],
 	offseason: ['board', 'players', 'mock', 'sheet', 'advisor', 'record']
 };
 

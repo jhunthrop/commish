@@ -98,7 +98,9 @@ export const RECORDS_WORDS = {
 	frontWeekly: (span: string, players: string) => `Our weekly rankings over ${span}, ${players}.`,
 	frontDraft: (through: number, players: string) =>
 		`Our draft board through week ${String(through)}, ${players}.`,
-	frontWeeklyNext: (week: number) => `Weekly rankings start week ${String(week)}.`,
+	/** Before a yardstick is graded, what the weekly card will compare against (Lane 142). */
+	frontWeeklyNext: (week: number) =>
+		`Weekly rankings start week ${String(week)}, against ${YARDSTICKS}.`,
 	/** The weekly record's upcoming weeks (fix round 1, M4): the next one on its own line, the rest
 	 * said once. */
 	setEach: 'set each week before kickoff',
@@ -358,14 +360,16 @@ export function draftKeys(
 	};
 }
 
-/** A pair on the front card, its figure's head beside it. */
+/** A pair on the front card, its figure's head over the first yardstick's pair and none over the
+ * next (Lane 142). */
 export interface FrontPair extends FigurePair {
-	label: string;
+	label: string | null;
 }
 
-/** The front door's record card (ruling 4): the weekly record once a week of it is graded, the
- * draft record until then, named either way. Each draws ours and its yardstick as pairs at one
- * size (C05): ADP on the draft record, the first yardstick drawn on the weekly one. */
+/** The front door's record card (ruling 4): the weekly record once a yardstick of it is graded, the
+ * draft record until then, named either way. Each draws ours and its yardsticks as pairs at one
+ * size (C05): ADP on the draft record; on the weekly one each yardstick graded, ESPN and the week's
+ * published projection, the leader named per pair (Lane 142, ruling 2). */
 export interface FrontRecord {
 	name: string;
 	/** Ours beside the yardstick, at one size, each naming its leader (C05, fix round 1 MEDIUM-2). */
@@ -411,12 +415,15 @@ function weeklyFront(weekly: RunRecord): FrontRecord | null {
 	const last = graded.at(-1)?.week ?? first;
 	const span =
 		first === last ? `week ${String(first)}` : `weeks ${String(first)} to ${String(last)}`;
-	// The card's yardstick: the first the weekly record drew, ours at its size with the leader (MEDIUM-2).
-	const yardstick = (['espn', 'published'] as const).find((source) => all[source] !== null);
-	const pair = (figure: RecordFigure, label: string): FrontPair[] => {
-		const [found] = weeklyPairs(all, figure, yardstick === undefined ? [] : [yardstick]);
-		return found === undefined ? [] : [{ ...found, label }];
-	};
+	// The card's yardsticks: each the weekly record grades, ours at its size beside each with the
+	// leader (Lane 142, ruling 2). With none graded yet the draft card says what it will compare against.
+	const yardsticks = (['espn', 'published'] as const).filter((source) => all[source] !== null);
+	if (yardsticks.length === 0) return null;
+	const pair = (figure: RecordFigure, label: string): FrontPair[] =>
+		weeklyPairs(all, figure, yardsticks).map((found, i) => ({
+			...found,
+			label: i === 0 ? label : null
+		}));
 	return {
 		name: RECORDS_WORDS.weekly,
 		pairs: [

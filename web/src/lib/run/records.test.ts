@@ -263,7 +263,7 @@ void test('the front card shows the draft record until a weekly week is graded, 
 		scale: RECORDS_WORDS.draftScale,
 		caption: 'Our draft board through week 5, 214 players.',
 		second: null,
-		note: 'Weekly rankings start week 7.'
+		note: "Weekly rankings start week 7, against ESPN and the week's published projection."
 	});
 	assert.match(RECORDS_WORDS.draftScale, /below 0\.00 the order runs backwards\.$/u);
 	const after = frontRecord(run({ draft, weekly: weekly([gradedSeven]) }));
@@ -337,6 +337,42 @@ void test('the weekly record never accents ours where ESPN or the published proj
 		})
 	);
 	assert.equal(card?.pairs.find((pair) => pair.label === 'Starters right')?.lead, 'ESPN by 2');
+});
+
+void test('once the published projection is graded the front card draws both yardsticks, each pair naming its leader (Lane 142)', () => {
+	const line = {
+		position: 'All' as const,
+		ours: score(0.62, 50),
+		adp: null,
+		espn: score(0.32, 52),
+		oursOnEspn: null,
+		published: score(0.7, 49),
+		oursOnPublished: score(0.6, 50)
+	};
+	const card = frontRecord(run({ draft, weekly: weekly([gradedSeven], [line]) }));
+	assert.deepEqual(
+		card?.pairs.map((pair) => [pair.label, pair.name, pair.ours, pair.theirs, pair.lead]),
+		[
+			['Order matched', 'ESPN', '0.62', '0.32', 'ours by 0.30'],
+			[null, 'Published', '0.60', '0.70', 'Published by 0.10'],
+			['Starters right', 'ESPN', '50 of 84', '52 of 84', 'ESPN by 2'],
+			[null, 'Published', '50 of 84', '49 of 84', 'ours by 1']
+		]
+	);
+	assert.ok(card);
+	assert.equal(card.name, 'Weekly record');
+	assert.equal(card.note, null);
+});
+
+void test('before either yardstick is graded the front card says what the weekly rankings will compare against (Lane 142)', () => {
+	const unread = { ...gradedSeven.lines[0], espn: null } as RecordWeek['lines'][number];
+	const card = frontRecord(run({ draft, weekly: weekly([gradedSeven], [unread]) }));
+	assert.ok(card);
+	assert.equal(card.name, 'Draft record');
+	assert.equal(
+		card.note,
+		"Weekly rankings start week 7, against ESPN and the week's published projection."
+	);
 });
 
 void test('the draft table lists each position, All as its totals, and its chart skips a missing point', () => {

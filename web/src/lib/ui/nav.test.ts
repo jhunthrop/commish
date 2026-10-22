@@ -28,6 +28,10 @@ const wide = (items: readonly RailEntry[]): string[] =>
 	labels(items.filter((item) => item.wideOnly));
 
 /** §2's table: the phone's five in order, then what the wide rail adds above the Account foot. */
+/** In season Players is the week's rankings on every rail, a league followed or not (Lane 142); its
+ * label before the run names the week. */
+const WEEK_ITEM = "This week's rankings";
+
 const TABLE: Readonly<Record<LeaguePhase, { phone: string[]; wide: string[] }>> = {
 	pre_draft: {
 		phone: ['Board', 'Players', 'Mock draft', 'Cheat sheet', 'Advisor'],
@@ -39,10 +43,10 @@ const TABLE: Readonly<Record<LeaguePhase, { phone: string[]; wide: string[] }>> 
 	},
 	in_season: {
 		phone: ['League', 'Lineup', 'Matchup', 'Waivers', 'Trades'],
-		wide: ['Players', 'Rest of season, your league', 'Our record']
+		wide: [WEEK_ITEM, 'Rest of season, your league', 'Our record']
 	},
 	playoffs: {
-		phone: ['League', 'Lineup', 'Matchup', 'Trades', 'Players'],
+		phone: ['League', 'Lineup', 'Matchup', 'Trades', WEEK_ITEM],
 		wide: ['Rest of season, your league', 'Our record']
 	},
 	offseason: {
@@ -140,7 +144,7 @@ void test("the in-season items open the selected league's screens, else the foll
 	assert.equal(href('Lineup', null), `/league/new?${SCREEN_PARAM}=start`);
 	assert.equal(href('Trades', null), `/league/new?${SCREEN_PARAM}=trades`);
 	// The rest keep their pages, a league or none.
-	assert.equal(href('Players', id), '/players');
+	assert.equal(href(WEEK_ITEM, id), '/players');
 	assert.equal(href('Rest of season, your league', id), '/board');
 });
 

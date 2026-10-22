@@ -10,7 +10,7 @@
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import { readFigures } from '#lib/run/read-figures.ts';
 	import { liveStatusClock, type LiveStatus } from '#lib/run/live-status.ts';
-	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
+	import { UNWRITTEN_READ } from '#lib/run/unwritten-words.ts';
 	import { CARD, compareLeadsWithoutVerb, unreadBasis, type CardTile } from '#lib/player/card.ts';
 	import type { CardLeague, LiveCard } from '#lib/player/week-words.ts';
 	import { shownWeekRead, weekReadLabel } from '#lib/player/week-read.ts';
@@ -138,19 +138,9 @@
 		if (ready) void readLive(at);
 	});
 
-	/** What the read will be built from, on a page whose written read is not ready. */
-	const unwritten = $derived(
-		unwrittenLines({
-			position: page.position,
-			numbers: n,
-			boardSize: lead.boardSize,
-			label: scoring,
-			unit,
-			year: season,
-			restOfSeason: lead.rest !== null,
-			held: page.status?.words.view.rank ?? null
-		})
-	);
+	/** What the read will be built from in the lead format, on a page whose written read is not ready:
+	 * built with the page (Lane 142). */
+	const unwritten = $derived(page.unwritten[lead.format.id] ?? []);
 	/** The figures beside our read, each naming its basis. */
 	const readPulls = $derived(
 		readFigures(page.capsule?.pulls ?? [], {

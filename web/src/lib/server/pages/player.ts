@@ -20,6 +20,7 @@ import type {
 } from '#lib/run/schema.ts';
 import { lastGameClubWords } from '#lib/player/club-words.ts';
 import type { Position } from '#lib/types/player.ts';
+import { unwrittenLines, type UnwrittenLine } from '#lib/run/unwritten-words.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
 import type { CaptureStamp } from '#lib/format/designation.ts';
 import { playerStatusWords, type PlayerStatusWords } from '#lib/run/status-view.ts';
@@ -144,6 +145,10 @@ export interface PlayerPage {
 	/** A page the nightly held back (Lane 136) shown from an earlier run's copy: that run, whose stamp
 	 * the page carries; null for tonight's own page and for the board's figures alone. */
 	copyOf: { runId: string; runAt: string } | null;
+	/** What his written read will be built from, by format id, on a page before the season with no
+	 * read yet; empty otherwise. Built here so the page's script carries none of its words (Lane 142,
+	 * the player page's budget). */
+	unwritten: Record<string, UnwrittenLine[]>;
 }
 
 /** What a page is built from (run.ts playerRead): his own fields and formats, and what only a page of
@@ -347,6 +352,30 @@ async function seasonOf(
 	);
 }
 
+/** What his written read will be built from in each format that ranks him (run/unwritten-words.ts). */
+function unwrittenByFormat(
+	lines: readonly FormatLine[],
+	position: Position,
+	year: number,
+	held: string | null
+): Record<string, UnwrittenLine[]> {
+	return Object.fromEntries(
+		lines.map((line) => [
+			line.format.id,
+			unwrittenLines({
+				position,
+				numbers: line.numbers,
+				boardSize: line.boardSize,
+				label: line.format.label,
+				unit: line.format.unit,
+				year,
+				restOfSeason: line.rest !== null,
+				held
+			})
+		])
+	);
+}
+
 export async function playerPage(slug: string, now: number): Promise<PlayerPage> {
 	const entry = await entryBySlug(slug);
 	const [read, run, sources, underway, capture, clubList, lastKickoffs] = await Promise.all([
@@ -417,6 +446,10 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		basisTiles: lead.basisTiles,
 		weekRead: loaded.weekRead,
 		lastKickoffs,
-		copyOf: loaded.copyOf
+		copyOf: loaded.copyOf,
+		unwritten:
+			underway || loaded.capsule !== null
+				? {}
+				: unwrittenByFormat(lines, loaded.position, run.season, status?.words.view.rank ?? null)
 	};
 }

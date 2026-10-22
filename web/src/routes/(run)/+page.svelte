@@ -250,10 +250,10 @@
 					<PanelHead title="Our record" aside={page.record.season.toString()} />
 					{#if page.front}
 						<p class="standing">{page.front.name}</p>
-						<!-- Ours and its yardstick at one size, each pair's leader named (C05). -->
+						<!-- Ours and each yardstick at one size, each pair's leader named (C05, Lane 142). -->
 						<p class="record-note">{page.front.caption}</p>
 						<div class="figures pairs">
-							{#each page.front.pairs as pair (pair.label)}
+							{#each page.front.pairs as pair, i (i)}
 								<PairTile label={pair.label} {pair} size="md" />
 							{/each}
 						</div>
