@@ -280,7 +280,10 @@ function deguara(): PlayerSeason {
 
 void test("his newest line's week on special teams alone reads its own word, no other quiet week does (Lane 144)", () => {
 	const season = deguara();
-	const view = seasonView(season, 'TE', [FORMAT], () => null, [], { week: 4 });
+	const view = seasonView(season, 'TE', [FORMAT], () => null, [], {
+		week: 4,
+		specialTeams: true
+	});
 	assert.deepEqual(
 		view.rows.map((row) => [row.week, row.opponent, row.note]),
 		[
@@ -292,27 +295,15 @@ void test("his newest line's week on special teams alone reads its own word, no 
 			[6, 'at ARI', SEASON_LOG_WORDS.didNotPlay]
 		]
 	);
-	// With no lastGameClub (his own club's week, or a run before the field) the week is a week he sat.
-	const plain = seasonView(season, 'TE', [FORMAT], () => null);
-	assert.equal(plain.rows.find((row) => row.week === 4)?.note, SEASON_LOG_WORDS.didNotPlay);
+	// Without the writer's fact (his own club's week, or a run from before it) the week is a week he sat.
+	for (const last of [null, { week: 4 }]) {
+		const plain = seasonView(season, 'TE', [FORMAT], () => null, [], last);
+		assert.equal(plain.rows.find((row) => row.week === 4)?.note, SEASON_LOG_WORDS.didNotPlay);
+	}
 });
 
-void test("only an inactive row under the club's game is a special-teams week (Lane 144)", () => {
-	const season = deguara();
-	assert.equal(specialTeamsWeek(season, { week: 4 }), 4);
-	assert.equal(specialTeamsWeek(season, null), null);
-	assert.equal(specialTeamsWeek(null, { week: 4 }), null);
-	// A played newest line is a game, and a row naming no club is no club's game.
-	const playedFour = {
-		...season,
-		log: season.log.map((row) => (row.week === 4 ? played(4, 3.5) : row))
-	};
-	assert.equal(specialTeamsWeek(playedFour, { week: 4 }), null);
-	assert.equal(specialTeamsWeek(season, { week: 3 }), null);
-	// An edge in a game not final yet reads upcoming, and is not said to be special teams.
-	const upcoming = {
-		...season,
-		log: season.log.map((row) => (row.week === 4 ? { ...row, status: 'upcoming' as const } : row))
-	};
-	assert.equal(specialTeamsWeek(upcoming, { week: 4 }), null);
+void test("the special-teams week is the writer's fact, read from the page (Lane 144)", () => {
+	assert.equal(specialTeamsWeek({ week: 4, specialTeams: true }), 4);
+	assert.equal(specialTeamsWeek({ week: 4 }), null);
+	assert.equal(specialTeamsWeek(null), null);
 });

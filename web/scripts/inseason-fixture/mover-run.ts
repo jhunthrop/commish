@@ -143,7 +143,7 @@ function specialTeams(page: Json, schedule: ReturnType<typeof scheduleSchema.par
 	return {
 		...page,
 		season: withRows(season, rows),
-		lastGameClub: { club: MOVED_TO, week: SPECIAL_TEAMS_WEEK }
+		lastGameClub: { club: MOVED_TO, week: SPECIAL_TEAMS_WEEK, specialTeams: true }
 	};
 }
 

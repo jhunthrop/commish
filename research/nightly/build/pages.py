@@ -24,7 +24,7 @@ from research.capsules.week.caption import PROJECTION_MOVED_CAPTION, status_chan
 from research.capsules.week.store import StoredWeekRead
 from research.free_agent import run_club
 from research.model.instants import js_iso
-from research.nightly.build.page_club import call_for, last_game_club
+from research.nightly.build.page_club import call_for, page_last_game_club
 from research.nightly.build.player_season import SeasonContext, prior_seasons, season_block
 from research.nightly.build.tenth import percent_or_none, tenth, tenth_or_none
 from research.nightly.config import MARKET_ORDER, PAGE_FORMAT, PROJECTION_ORDER, TEAMS, RunFormat
@@ -407,8 +407,11 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
         "weekRead": _week_read(who, universe_id, inputs),
         "season": season,
         "priorSeasons": prior,
-        # The club his newest game line was for, when it is not the page's (Lane 120).
-        "lastGameClub": last_game_club(call_for(inputs.season.clubs, who.id)),
+        # The club his newest game line was for, when it is not the page's (Lane 120), and whether that
+        # week was special teams alone (Lane 144).
+        "lastGameClub": page_last_game_club(
+            call_for(inputs.season.clubs, who.id), () if season is None else season["log"]
+        ),
     }
 
 

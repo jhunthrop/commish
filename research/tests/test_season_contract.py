@@ -33,7 +33,7 @@ from typing import Any, Final
 import pytest
 
 from research.free_agent import FREE_AGENT_CLUB, run_club
-from research.nightly.build.page_club import LIST_CATCH_UP, RosterRead, club_calls, last_game_club, with_page_clubs
+from research.nightly.build.page_club import LIST_CATCH_UP, RosterRead, club_calls, page_last_game_club, with_page_clubs
 from research.nightly.build.pages import identities
 from research.nightly.build.player_season import SeasonContext, SeasonStore, season_block
 from research.nightly.config import EARLY_KEY, PAGE_FORMAT
@@ -135,7 +135,8 @@ def _write_mover(root: Path, mover: Mover = _PLAYED_BOTH) -> Json:
     call = context.clubs[_PLAYER]
     team = _writer_team(context)
     assert team == run_club(call.club)
-    page_path.write_text(json.dumps({**page, "team": team, "season": season, "lastGameClub": last_game_club(call)}))
+    last = page_last_game_club(call, season["log"])
+    page_path.write_text(json.dumps({**page, "team": team, "season": season, "lastGameClub": last}))
     index = [
         {**entry, "team": team, "season": {"games": season["games"], "pointsPerGame": season["pointsPerGame"]}}
         if entry["id"] == _PLAYER
@@ -214,10 +215,27 @@ def test_a_newest_line_on_special_teams_only_passes_the_gate(tmp_path: Path) -> 
     assert (by_week[4]["status"], by_week[5]["status"]) == ("played", "inactive")
     assert (by_week[5]["opponent"], by_week[5]["home"]) == ("DEN", True)
     page = _read(tmp_path / "runs" / _RUN / "players" / f"{_PLAYER}.json")
-    assert (page["team"], page["lastGameClub"]) == (_PAGE_CLUB, {"club": _FORMER_CLUB, "week": 5})
+    # Lane 144: the writer says the week was special teams alone, the one fact page and sheet read.
+    assert (page["team"], page["lastGameClub"]) == (
+        _PAGE_CLUB,
+        {"club": _FORMER_CLUB, "week": 5, "specialTeams": True},
+    )
     record = schema_gate(tmp_path, _RUN, contract_dir(os.environ))
     assert record.passed, record.reasons
     assert "4 of 4 player pages parsed" in record.summary
+
+
+def test_a_special_teams_week_on_a_played_row_is_refused_by_the_gate(tmp_path: Path) -> None:
+    """Lane 144: the reader holds the writer's special-teams week to an inactive row."""
+    _write_mover(tmp_path)
+    page_path = tmp_path / "runs" / _RUN / "players" / f"{_PLAYER}.json"
+    page = _read(page_path)
+    week = max(_FORMER_WEEKS)
+    page_path.write_text(json.dumps({**page, "lastGameClub": {**page["lastGameClub"], "specialTeams": True}}))
+    record = schema_gate(tmp_path, _RUN, contract_dir(os.environ))
+    assert not record.passed
+    refusal = f"says his week {week} snaps were on special teams, but his log reads that week played"
+    assert any(refusal in r for r in record.reasons), record.reasons
 
 
 def test_a_free_agent_after_his_last_line_passes_the_gate(tmp_path: Path) -> None:

@@ -66,7 +66,7 @@ function withRows(rows: Readonly<Record<number, Partial<GameLogRow>>>): unknown 
 
 function refusal(
 	season: unknown,
-	lastGameClub?: { club: string; week: number } | null
+	lastGameClub?: { club: string; week: number; specialTeams?: true } | null
 ): string | null {
 	const parsed = seasonSchema.safeParse(season);
 	if (!parsed.success) return parsed.error.issues.map((issue) => issue.message).join(' ');
@@ -151,6 +151,20 @@ void test('a run from before the field parses, and the field reads', () => {
 	assert.equal(playerSchema.parse(base).lastGameClub, undefined);
 	const moved = playerSchema.parse({ ...base, lastGameClub: { club: 'LAC', week: 5 } });
 	assert.deepEqual(moved.lastGameClub, { club: 'LAC', week: 5 });
+});
+
+void test("the writer's special-teams week reads only on an inactive row under that club's game (Lane 144)", () => {
+	const lacWeek5 = { opponent: 'DEN', home: true };
+	const special = { club: 'LAC', week: 5, specialTeams: true } as const;
+	assert.equal(refusal(withRows({ 5: { ...unknown, ...lacWeek5 } }), special), null);
+	assert.equal(
+		refusal(withRows({ 5: lacWeek5 }), special),
+		`players/${page.id}.json says his week 5 snaps were on special teams, but his log reads that week played.`
+	);
+	// Its club rule comes first: no LAC game that week is said as before.
+	assert.match(refusal(page.season, special) ?? '', /his log has no LAC game that week/);
+	const base = read('players/4429795.json') as Record<string, unknown>;
+	assert.deepEqual(playerSchema.parse({ ...base, lastGameClub: special }).lastGameClub, special);
 });
 
 void test('the page says where he is now and whose his last game was', () => {

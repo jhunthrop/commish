@@ -18,10 +18,19 @@ from research.model.domain import Position, snake_to_camel
 _JS_NAMES: Final = MappingProxyType({"from_": "from"})
 
 
+# Facts added after the oracle that are absent from the JSON while empty, so a player without one keeps
+# the facts hash he had and his capsule is not rewritten for nothing (Lane 144: the special-teams week).
+_ABSENT_WHEN_NONE: Final = frozenset({"special_teams_week"})
+
+
 def to_js(value: object) -> Any:
     """The oracle's JSON value for a fact: dataclasses as objects, tuples as arrays."""
     if is_dataclass(value) and not isinstance(value, type):
-        return {_JS_NAMES.get(f.name, snake_to_camel(f.name)): to_js(getattr(value, f.name)) for f in fields(value)}
+        return {
+            _JS_NAMES.get(f.name, snake_to_camel(f.name)): to_js(getattr(value, f.name))
+            for f in fields(value)
+            if not (f.name in _ABSENT_WHEN_NONE and getattr(value, f.name) is None)
+        }
     if isinstance(value, tuple | list):
         return [to_js(item) for item in value]
     if isinstance(value, Mapping):
@@ -185,10 +194,13 @@ class SeasonSoFar:
     totals: SeasonTotals
     weeks: tuple[SeasonWeek, ...]
     injury_from_week: int | None
+    # His newest line's week when he was on the field for special teams alone (`page_club.special_teams_week`,
+    # the fact the page carries as `lastGameClub.specialTeams`): never a missed week (Lane 144, B117).
+    special_teams_week: int | None = None
 
     @property
     def missed_weeks(self) -> tuple[int, ...]:
-        return tuple(w.week for w in self.weeks if w.status == "inactive")
+        return tuple(w.week for w in self.weeks if w.status == "inactive" and w.week != self.special_teams_week)
 
 
 @dataclass(frozen=True, slots=True)

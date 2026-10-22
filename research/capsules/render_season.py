@@ -62,10 +62,17 @@ def _next_week(season: SeasonSoFar) -> str:
     return f", and {week_of(following, season.season)} {'is under way' if played else NEXT_TO_PLAY}"
 
 
-def _week_line(week: SeasonWeek, season: int) -> str:
+# The sheet's word for the week he was on the field for special teams alone, as the page's log row says it
+# ("Special teams only", web season-log-words.ts): a week he played, never one he missed (Lane 144, B117).
+SPECIAL_TEAMS_ONLY: Final = "special teams only, no offensive snap"
+
+
+def _week_line(week: SeasonWeek, season: int, special_teams: int | None) -> str:
     named = week_of(week.week, season)
     if week.status == "bye":
         return f"{named}, his club's bye"
+    if week.week == special_teams:
+        return f"{named}, {SPECIAL_TEAMS_ONLY}"
     if week.status == "inactive":
         return f"{named}, did not play"
     points = "points not recorded" if week.points is None else f"{page_tenth_text(week.points)} points"
@@ -97,7 +104,9 @@ def season_section(facts: "PlayerFacts") -> str:
     per_game = "" if season.points_per_game is None else f", {js_to_fixed(season.points_per_game, 1)} points a game"
     lines = [f"This season so far ({year}, PPR, {AS_THE_PAGE_PRINTS}): {season.games_played} {games} played{per_game}."]
     if season.weeks:
-        lines.append("Week by week: " + ". ".join(_week_line(w, year) for w in season.weeks) + ".")
+        lines.append(
+            "Week by week: " + ". ".join(_week_line(w, year, season.special_teams_week) for w in season.weeks) + "."
+        )
     missed = season.missed_weeks
     lines.append(
         "He has not missed a game this season."

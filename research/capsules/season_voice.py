@@ -24,6 +24,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Final
 
 from research.capsules.render_season import week_list
+from research.capsules.render_words import week_of
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import NamedPattern, VoiceRuleHit, named_rule
 
@@ -79,6 +80,7 @@ _MISSED_WORDS: Final = re.compile(
     re.IGNORECASE,
 )
 MISSED_WEEKS_UNNAMED: Final = "The long note never names the weeks he has missed this season"
+SPECIAL_TEAMS_CALLED_MISSED: Final = "The note calls his special-teams week a week he missed"
 # A month places a capsule on a calendar a reader reads on another day (H2: "back by October"). "May"
 # is a verb far more often than a month, and no season runs through it.
 MONTHS: Final = named_rule(
@@ -137,6 +139,8 @@ class SeasonClock:
     through: int | None = None
     played: tuple[int, ...] = ()
     missed: tuple[int, ...] = ()
+    # The week he was on the field for special teams alone (Lane 144): a read may not call it missed.
+    special_teams: int | None = None
 
     @property
     def in_season(self) -> bool:
@@ -148,7 +152,7 @@ def clock_of(facts: "PlayerFacts") -> SeasonClock:
     if season is None:
         return SeasonClock(facts.product_season)
     played = tuple(w.week for w in season.weeks if w.status == "played")
-    return SeasonClock(season.season, season.through, played, season.missed_weeks)
+    return SeasonClock(season.season, season.through, played, season.missed_weeks, season.special_teams_week)
 
 
 def _week_numbers(raw: str) -> tuple[int, ...]:
@@ -309,6 +313,26 @@ def names_missed_weeks(text: str, clock: SeasonClock) -> bool:
         _MISSED_WORDS.search(sentence)
         and any(re.search(rf"\b{word}\b", sentence, re.IGNORECASE) for word in count_words)
         for sentence in split_sentences(text)
+    )
+
+
+def calls_special_teams_week_missed(text: str, clock: SeasonClock) -> bool:
+    """A sentence that names his special-teams week (this season's, or no season named) beside a word for
+    missing it: the page says he was on the field that week (Lane 144, B117)."""
+    week = clock.special_teams
+    if not clock.in_season or week is None:
+        return False
+    return any(
+        _MISSED_WORDS.search(sentence)
+        and any(r.season in (None, clock.season) and week in r.weeks for r in week_references(sentence))
+        for sentence in split_sentences(text)
+    )
+
+
+def special_teams_missed_violation(clock: SeasonClock) -> str:
+    return (
+        f"{SPECIAL_TEAMS_CALLED_MISSED}: {week_of(clock.special_teams or 0, clock.season)} he was on the field for "
+        "special teams only, with no offensive snap. Never call it a week he missed or did not play."
     )
 
 

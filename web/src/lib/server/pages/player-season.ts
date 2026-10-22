@@ -67,22 +67,19 @@ function opponentWords(row: GameLogRow): string {
 	return `${row.home === true ? 'vs' : 'at'} ${row.opponent}`;
 }
 
-/** The page's `lastGameClub`: the week of his newest game line, for another club than his page's. */
+/** The page's `lastGameClub`: the week of his newest game line, for another club than his page's, and
+ * whether he was on the field for special teams alone that week. */
 export interface LastGame {
 	week: number;
+	specialTeams?: true;
 }
 
-/** His newest game line's week when he was on the field for special teams alone, else null: the page's
- * `lastGameClub` week, which the reader holds to that club's game (season-checks.ts checkLastGameClub,
- * Lane 135), read inactive, no stat line and no offensive snap. The edge comes from the snap release,
- * which lists special teams, so that week is one he played on special teams (Lane 144, B117). */
-export function specialTeamsWeek(
-	season: PlayerSeason | null,
-	lastGame: LastGame | null
-): number | null {
-	if (season === null || lastGame === null) return null;
-	const row = season.log.find((candidate) => candidate.week === lastGame.week);
-	return row?.status === 'inactive' && row.opponent !== null ? lastGame.week : null;
+/** His newest game line's week when he was on the field for special teams alone, else null. The writer
+ * decides it once (page_club.py `special_teams_week`, the same fact its capsule sheet reads) and the page
+ * carries it as `lastGameClub.specialTeams`; the reader holds that week inactive under the club's game
+ * (season-checks.ts checkLastGameClub, Lanes 135 and 144). */
+export function specialTeamsWeek(lastGame: LastGame | null): number | null {
+	return lastGame?.specialTeams === true ? lastGame.week : null;
 }
 
 function inactiveNote(row: GameLogRow, specialTeams: number | null): string {
@@ -246,7 +243,7 @@ export function seasonView(
 	// The head never says week 5 over a table that has his week 6 (the sweep's X3).
 	const through = countedWeek(season);
 	const reach = through === 0 ? '' : `, through week ${String(through)}`;
-	const specialTeams = specialTeamsWeek(season, lastGame);
+	const specialTeams = specialTeamsWeek(lastGame);
 	return {
 		season: season.season,
 		aside: `${String(season.season)}, ${format.label}${reach}`,
