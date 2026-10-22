@@ -7,6 +7,7 @@ week-W `points_allowed` are refused with `InputRuleError`."""
 import json
 import os
 from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -27,14 +28,15 @@ from research.db.schema import (
 from research.db.schema.nflverse import DEFENSE_COUNT_COLUMNS, KICKING_COLUMNS
 from research.db.url import sqlalchemy_url
 from research.errors import SchemaDriftError
+from research.model.weekly3 import ledger
 from research.model.weekly3.ledger import InputRuleError, ReadKind
-from research.model.weekly4.features import kdef_weeks
+from research.model.weekly4.features import admitted, kdef_weeks
 from research.model.weekly4.features.admitted import (
     ADMITTED,
     DEFENSE_WEEKS,
     KICKING_WEEKS,
     PLAYS,
-    admit_observations,
+    Pair,
     admit_read,
 )
 from research.model.weekly4.features.charted import wednesday_pass_after
@@ -51,7 +53,6 @@ from research.pipeline.nflverse.team_codes import (
     team_defense_espn_id,
     team_defense_universe_ids,
 )
-from research.pipeline.observations import PlayerWeekObservation, TeamWeekObservation
 from research.tests.nflverse_fixtures import FixtureFetcher, fixture_rows
 
 _POOL: Final = Path(__file__).parent / "testdata" / "espn" / "pool_2026_w7.json"
@@ -275,28 +276,80 @@ def test_every_new_kind_has_its_list_and_none_admits_the_kickoffs_outcomes() -> 
     assert (PLAYS, "kick_distance") in ADMITTED["kicks"]
 
 
-@pytest.mark.parametrize("kind", _NEW_KINDS)
-def test_a_week_w_kicking_row_is_refused_through_every_new_kind(kind: ReadKind) -> None:
-    for as_of in (_T - timedelta(days=3), _T, _KICKOFF + timedelta(hours=30)):
-        table_row = _row(KICKING_WEEKS, 7, as_of)
-        with pytest.raises(InputRuleError):
-            admit_read(kind, [(KICKING_WEEKS, "fg_made")], [table_row], 2023, 7, _T)
-        line = PlayerWeekObservation(2023, 7, _KICKER, KDEF_LINE_SOURCE, "field_goals_made", 2.0, as_of)
-        with pytest.raises(InputRuleError):
-            admit_observations(kind, [line], 2023, 7, _T)
+@dataclass(frozen=True)
+class _Guard:
+    """One guard case: a week-W row fed through one new kind with the pair it carries. `own` is a case
+    whose pair the kind's list admits, so only the week and stamp rule refuses it; every other case is
+    refused by the allow-list first."""
+
+    name: str
+    kind: ReadKind
+    pair: Pair
+    own: bool
 
 
-@pytest.mark.parametrize("kind", _NEW_KINDS)
-def test_a_week_w_points_allowed_is_refused_through_every_new_kind(kind: ReadKind) -> None:
-    for as_of in (_T - timedelta(days=3), _T, _KICKOFF + timedelta(hours=30)):
-        with pytest.raises(InputRuleError):
-            admit_read(kind, [(DEFENSE_WEEKS, "points_allowed")], [_row(DEFENSE_WEEKS, 7, as_of)], 2023, 7, _T)
-        line = PlayerWeekObservation(2023, 7, "team-def:KC", KDEF_LINE_SOURCE, "points_allowed", 17.0, as_of)
-        with pytest.raises(InputRuleError):
-            admit_observations(kind, [line], 2023, 7, _T)
-        kickoff = TeamWeekObservation(2023, 7, "KC", "nflverse_kickoff", "points_allowed", 17.0, as_of)
-        with pytest.raises(InputRuleError, match="allow-list refuses"):
-            admit_observations(kind, [kickoff], 2023, 7, _T)
+# A week-W kicking row (the table's and the live line's), a week-W points allowed (the table's, the live
+# line's, the kickoff's), and the kick play's own week-W pair, each through each new kind.
+_WEEK_W_PAIRS: Final[tuple[tuple[str, Pair], ...]] = (
+    ("kicking-row", (KICKING_WEEKS, "fg_made")),
+    ("kicking-line", (KDEF_LINE_SOURCE, "field_goals_made")),
+    ("points-allowed-row", (DEFENSE_WEEKS, "points_allowed")),
+    ("points-allowed-line", (KDEF_LINE_SOURCE, "points_allowed")),
+    ("points-allowed-kickoff", ("nflverse_kickoff", "points_allowed")),
+    ("kick-play", (PLAYS, "field_goal_result")),
+)
+_GUARDS: Final = tuple(
+    _Guard(f"{name}-through-{kind}", kind, pair, pair in ADMITTED[kind])
+    for kind in _NEW_KINDS
+    for name, pair in _WEEK_W_PAIRS
+)
+_AS_OFS: Final = (_T - timedelta(days=3), _T, _KICKOFF + timedelta(hours=30))
+
+
+def _feed(guard: _Guard, as_of: datetime) -> None:
+    admit_read(guard.kind, [guard.pair], [_row(guard.pair[0], 7, as_of)], 2023, 7, _T)
+
+
+def _rule_off(monkeypatch: pytest.MonkeyPatch, kind: ReadKind, *, allow_list: bool) -> None:
+    """The mutation: the week and stamp rule switched off for one kind, and with `allow_list` its list too."""
+    rule = ledger._row_breaks
+    monkeypatch.setattr(ledger, "_row_breaks", lambda k, *a: None if k == kind else rule(k, *a))
+    if allow_list:
+        refused = admitted.refused_pairs
+        monkeypatch.setattr(admitted, "refused_pairs", lambda k, p: [] if k == kind else refused(k, p))
+
+
+def test_every_new_kind_has_an_own_week_w_case() -> None:
+    assert {g.kind for g in _GUARDS if g.own} == set(_NEW_KINDS)
+
+
+@pytest.mark.parametrize("guard", _GUARDS, ids=lambda g: g.name)
+def test_a_week_w_row_is_refused_through_every_new_kind(guard: _Guard) -> None:
+    for as_of in _AS_OFS:
+        with pytest.raises(InputRuleError, match=None if guard.own else "allow-list refuses"):
+            _feed(guard, as_of)
+
+
+@pytest.mark.parametrize("guard", _GUARDS, ids=lambda g: g.name)
+def test_each_guard_case_fails_once_its_kinds_rule_is_off(guard: _Guard, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The guard proves itself: with the rule off for its kind alone it admits the row (so the case above
+    would fail), and the rule of every other kind still refuses it."""
+    _rule_off(monkeypatch, guard.kind, allow_list=not guard.own)
+    for as_of in _AS_OFS:
+        _feed(guard, as_of)
+        for other in _NEW_KINDS:
+            if other != guard.kind:
+                with pytest.raises(InputRuleError):
+                    _feed(_Guard(guard.name, other, guard.pair, own=False), as_of)
+
+
+@pytest.mark.parametrize("guard", [g for g in _GUARDS if g.own], ids=lambda g: g.name)
+def test_an_own_case_is_held_by_the_week_rule_not_the_list(guard: _Guard, monkeypatch: pytest.MonkeyPatch) -> None:
+    refused = admitted.refused_pairs
+    monkeypatch.setattr(admitted, "refused_pairs", lambda k, p: [] if k == guard.kind else refused(k, p))
+    for as_of in _AS_OFS:
+        with pytest.raises(InputRuleError, match="input rule refuses"):
+            _feed(guard, as_of)
 
 
 def test_an_earlier_weeks_rows_are_admitted_by_their_own_kind() -> None:
