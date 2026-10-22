@@ -858,3 +858,36 @@ void test("the page's rest caption takes the read's rank once read (Lane 128 fix
 	// The read places him nowhere: the run's rank stands.
 	assert.match(tile(rb({ position_rank: null }), 'rest').caption, /RB2 in our order$/u);
 });
+
+void test("the page's pill and rest caption name one rank, before the read and after (Lane 128 fix round 4)", () => {
+	const RUN_RANK = 2;
+	const rest = { ...REST, rank: `RB${String(RUN_RANK)} in our order` };
+	const read = (line: Partial<PlayerWeek['line']>) =>
+		liveCard({
+			week: week({}, line),
+			player: RB,
+			league: null,
+			tiles: BUILT,
+			opponents: {},
+			games: 5,
+			rest,
+			screenHref: href,
+			zone: ZONE,
+			now: NOW
+		});
+	// What the page passes its pill (players/[slug]/+page.svelte): the read's, else the run's.
+	const pillRank = (card: ReturnType<typeof read> | null): number => card?.positionRank ?? RUN_RANK;
+	const captionRank = (caption: string): number =>
+		Number(/RB(\d+) in our order/u.exec(caption)?.[1]);
+	// Before the read: the run's rank on both.
+	assert.equal(pillRank(null), captionRank(rest.rank));
+	// After it: the read's on both, and the run's where the read places him nowhere.
+	for (const line of [{ position_rank: 1 }, { position_rank: null }]) {
+		const card = read(line);
+		assert.equal(
+			pillRank(card),
+			captionRank(tile(card.tiles, 'rest').caption),
+			JSON.stringify(line)
+		);
+	}
+});

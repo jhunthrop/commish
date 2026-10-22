@@ -119,6 +119,9 @@ export interface LiveCard {
 	formats: LiveFormats | null;
 	/** The tier box's figures at the read's clock, null where the run's stand. */
 	tier: LiveTier | null;
+	/** His position rank as the read places him, which the rest caption names (restTile): the
+	 * page's pill takes it, null where the run's stands (Lane 128 fix round 4). */
+	positionRank: number | null;
 }
 
 /** His rest-of-season points at the read's clock and the week they start from, as words. */
@@ -656,6 +659,7 @@ export function liveCard({
 		rest: restAtClock,
 		formats: formatsOf(week, restAtClock),
 		tier: tierOf(week, restAtClock, tier),
+		positionRank: rest === null ? null : week.line.position_rank,
 		projection: {
 			week: week.week,
 			scoring: week.projection_scoring.format,

@@ -257,7 +257,7 @@
 			club={isFreeAgent(page.team) ? null : { name: page.clubName, href: links.club(page.team) }}
 			position={page.position}
 			status={listed}
-			positionRank={n.positionRank}
+			positionRank={live?.positionRank ?? n.positionRank}
 			holder={rostered}
 			holdRoom={league !== null}
 			next={live === null ? page.card.next : live.head}
