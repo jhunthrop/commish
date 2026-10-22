@@ -659,6 +659,10 @@ def test_a_loose_call_word_does_not_carry_a_scene_set_opener() -> None:
     """Review MEDIUM-1: "sits first among" is no call."""
     text = "Gibbs sits first among Detroit running backs as the week opens."
     assert any("opens" in v for v in week_rule_violations(text, starter(), "start"))
+    # Review LOW-11: a verb off the call list is no call, even said of a club.
+    text = "The Rams play Arizona at home this week in a game that suits him."
+    assert any("opens" in v for v in week_rule_violations(text, starter(), "start"))
+    assert not any("opens" in v for v in week_rule_violations("Trust Nacua this week.", starter(), "start"))
 
 
 def test_a_superlative_of_his_own_is_not_read_as_the_opponent_s_rank() -> None:

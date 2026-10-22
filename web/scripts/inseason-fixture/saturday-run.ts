@@ -100,9 +100,14 @@ function sharedTier(numbers: Json, position: unknown): Json {
  * preseasonShare, a running back's PPR k of 2 over 5 games) and the steps; the contract run predates the fields. */
 const PACE_GAMES = 17;
 const PACE_SHARE = 29;
-/** STAND-INS for the steps (Lane 139 fix round 1): the blend and the rate a game played, Gibbs-sized. */
+/** STAND-IN for the blend (Lane 139 fix round 1), Gibbs-sized; the rate a game played is set from it, the
+ * pace and the share by the model's own step (Lane 139 fix round 2, LOW-10), so the shot's figures close. */
 const PACE_BLEND = 27.1;
-const PACE_RATE = 24.1;
+const PERCENT = 100;
+function paceRate(paceAGame: number): number {
+	const share = PACE_SHARE / PERCENT;
+	return tenth(share * paceAGame + (1 - share) * PACE_BLEND);
+}
 const pace = process.env.SATURDAY_PACE === '1';
 function withPace(numbers: Json): Json {
 	const points = numbers.preseasonPoints;
@@ -112,7 +117,7 @@ function withPace(numbers: Json): Json {
 				preseasonPerGame: tenth(points / PACE_GAMES),
 				preseasonShare: PACE_SHARE,
 				blendedPerGame: PACE_BLEND,
-				ratePerGame: PACE_RATE
+				ratePerGame: paceRate(tenth(points / PACE_GAMES))
 			}
 		: numbers;
 }

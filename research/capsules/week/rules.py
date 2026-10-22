@@ -118,9 +118,10 @@ _ORDINAL_OF_BEFORE: Final = re.compile(r"\d(?:st|nd|rd|th)\s+of\s+$", re.IGNOREC
 # the call in its own verb ("start him", "sit him", "keep him", "find a fill-in"), his status on the list, or
 # that he does not play.
 _RANK_WORD: Final = re.compile(r"\b\d+(?:st|nd|rd|th)\b", re.IGNORECASE)
-# A call is a verb said of him ("start him", "sit Gibbs", "keep him on the bench"), never "sits first among".
+# A call is a verb of the call list said of him ("start him", "sit Gibbs", "keep him on the bench"), never
+# "sits first among" or "play Arizona" (review LOW-11).
 _CALL_WORDS: Final = re.compile(
-    r"\b(?:[Ss]tart|[Ss]it|[Bb]ench|[Kk]eep|[Hh]old|[Dd]rop|[Aa]dd|[Pp]lay)(?:s|ed|ing)? (?:him|them|[A-Z]\w+)\b|"
+    r"\b(?:[Ss]tart|[Ss]it|[Bb]ench|[Kk]eep|[Hh]old|[Dd]rop|[Aa]dd|[Ff]lex|[Tt]rust)(?:s|ed|ing)? (?:him|them|[A-Z]\w+)\b|"
     r"\bfill-in\b|\b[Pp]ick(?:s|ing)? (?:him )?up\b"
 )
 # His status as the sheet says it (`sheet.STATUS_WORDS`, the one source) and the words for a player with none.

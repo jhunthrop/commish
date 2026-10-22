@@ -703,7 +703,7 @@ void test('our rate vs his Avg is the rest of season a game less his Avg, from t
 	assert.equal(filled.find((t) => t.key === 'vsAvg')?.value, '\u22128.7');
 	assert.equal(
 		filled.find((t) => t.key === 'vsAvg')?.caption,
-		'30.7 Avg in 5 games, blended with his usage 27.1, weighted 29% to his preseason pace 24.1, games he may miss taken out: 22.0 a game'
+		'30.7 Avg in 5 games, 27.1 blended with his usage, 24.1 weighted 29% to his preseason pace, 22.0 a game after the games he may miss'
 	);
 	// "--" stands with the plain caption: no reason beside a figure not drawn (fix round 1, M4).
 	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.caption, BASIS_WORDS.vsAvgCaption);
@@ -723,7 +723,7 @@ void test('our rate vs his Avg names both figures, the pace and its share, as it
 	// Each step in order, from his Avg to our rate, each figure the run's (Lane 139 fix round 1).
 	assert.equal(
 		caption,
-		'30.7 Avg in 5 games, blended with his usage 27.1, weighted 29% to his preseason pace 24.1, games he may miss taken out: 22.0 a game'
+		'30.7 Avg in 5 games, 27.1 blended with his usage, 24.1 weighted 29% to his preseason pace, 22.0 a game after the games he may miss'
 	);
 	assert.doesNotMatch(caption, /\bless\b/u);
 	assert.equal(vsAvgCaption('22.0', '30.7', null), '22.0 a game vs his 30.7 Avg');

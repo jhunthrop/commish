@@ -22,24 +22,23 @@ export interface RateSteps {
 	rate: number | null;
 }
 
-/** The steps our rate a game takes from his Avg, in order and each with the run's figure (Lane 139 fix
- * round 1, HIGH-1): "in 5 games, blended with his usage 27.1, weighted 29% to his preseason pace 24.1,
- * games he may miss taken out". The last step is the figure the caption ends on, the API's rate a club
- * game. A run without the figures names the steps without them. */
+/** The steps our rate a game takes from his Avg, in order, each result before the step that made it so
+ * no figure reads as the thing it was blended with (Lane 139 fix round 2): "in 5 games, 27.1 blended with
+ * his usage, 24.1 weighted 29% to his preseason pace". The caption ends on the last step, the API's rate a
+ * club game after the games he may miss (vsAvgCaption). A run without the figures names the step alone. */
 export function vsAvgReason(steps: RateSteps): string {
 	const { games, blended, share, rate } = steps;
 	const played = `in ${plural(games, 'game')}`;
-	const missed = 'games he may miss taken out';
 	if (blended === null || share === null || rate === null)
-		return `${played}, weighted with his preseason pace, ${missed}`;
-	return `${played}, blended with his usage ${fixed(blended)}, weighted ${String(share)}% to his preseason pace ${fixed(rate)}, ${missed}`;
+		return `${played}, weighted with his preseason pace`;
+	return `${played}, ${fixed(blended)} blended with his usage, ${fixed(rate)} weighted ${String(share)}% to his preseason pace`;
 }
 
 /** The tile's caption once its two figures are read, from his Avg through the stored steps to our rate:
- * "30.7 Avg in 5 games, ...: 22.0 a game"; without the steps "22.0 a game vs his 30.7 Avg". Its first
- * week is the Rest of season tile's, said there. */
+ * "30.7 Avg in 5 games, ..., 22.0 a game after the games he may miss"; without the steps "22.0 a game vs
+ * his 30.7 Avg". Its first week is the Rest of season tile's, said there. */
 export function vsAvgCaption(perGame: string, avg: string, reason: string | null): string {
 	return reason === null
 		? `${perGame} a game vs his ${avg} Avg`
-		: `${avg} Avg ${reason}: ${perGame} a game`;
+		: `${avg} Avg ${reason}, ${perGame} a game after the games he may miss`;
 }

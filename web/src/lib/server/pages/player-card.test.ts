@@ -184,7 +184,7 @@ void test('in season the row under the tiles is the pace as stored and our rate 
 				'Our rate vs his Avg',
 				'--',
 				'our rest-of-season rate a game against his Avg',
-				'in 5 games, blended with his usage 27.1, weighted 29% to his preseason pace 24.1, games he may miss taken out'
+				'in 5 games, 27.1 blended with his usage, 24.1 weighted 29% to his preseason pace'
 			]
 		]
 	);
@@ -193,7 +193,7 @@ void test('in season the row under the tiles is the pace as stored and our rate 
 	// A run older than the fields names the steps without their figures.
 	assert.equal(
 		basisTiles(IN_SEASON, { ...stored, ratePerGame: undefined }, 5).at(-1)?.reason,
-		'in 5 games, weighted with his preseason pace, games he may miss taken out'
+		'in 5 games, weighted with his preseason pace'
 	);
 	// With no stored pace there is no reason to give: the cell alone.
 	assert.deepEqual(
