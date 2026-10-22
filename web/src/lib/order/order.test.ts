@@ -77,6 +77,59 @@ const row = (name: string, over: Partial<OrderRow> = {}): OrderRow => ({
 	...over
 });
 
+void test('a free agent on IR with no move says why in the verb cell, his week not his (Lane 128)', () => {
+	const ir = { status: 'injured_reserve', as_of: READ } as const;
+	const listed = line('Achane', 'RB', { facts: { ...facts, designation: ir } });
+	const free = { kind: 'free', team: null } as const;
+	const undated = orderView(
+		row('Achane', { line: listed, roster: free, move: null }),
+		ZONE,
+		true,
+		NOW
+	);
+	assert.equal(undated.held, 'On IR, no return date');
+	assert.equal(undated.week, null, 'no week figure for a player on a list');
+	assert.equal(undated.box.proj, null);
+	// Due back (the API keeps his add): the verb, no words.
+	const dated = orderView(
+		row('Achane', { line: listed, roster: free, move: 'add' }),
+		ZONE,
+		true,
+		NOW
+	);
+	assert.equal(dated.held, null);
+	// A free agent on no list, and a rostered player on one, carry none either.
+	assert.equal(orderView(row('Hall', { roster: free, move: 'add' }), ZONE, true, NOW).held, null);
+	const yours = { kind: 'yours', team: null } as const;
+	assert.equal(orderView(row('Dart', { line: listed, roster: yours }), ZONE, true, NOW).held, null);
+	assert.doesNotMatch(undated.held, bannedPattern());
+	// The # cell reads the list's short form for him, his place for anyone else (fix round 1).
+	assert.equal(undated.place, 'IR');
+	assert.equal(orderView(row('Hall', { roster: free, move: 'add' }), ZONE, true, NOW).place, '4');
+});
+
+void test('every case the API holds an add back says why in the verb cell (Lane 128 fix round 1)', () => {
+	const free = { kind: 'free', team: null } as const;
+	const said = (designation: PlayerLine['facts']['designation']): string | null =>
+		orderView(
+			row('X', { line: line('X', 'RB', { facts: { ...facts, designation } }), roster: free }),
+			ZONE,
+			true,
+			NOW
+		).held;
+	// A week's out with no return week: no list, his status and no return date.
+	assert.equal(said({ status: 'out', as_of: READ }), 'Out, no return date');
+	// Suspended: his list.
+	assert.equal(said({ status: 'suspended', as_of: READ }), 'On Susp, no return date');
+	// On IR due back after the regular season (the API withholds the add): never "no return date".
+	assert.equal(
+		said({ status: 'injured_reserve', as_of: READ, return_week: 16 }),
+		'On IR, back after the regular season'
+	);
+	// A week's questionable plays: no words.
+	assert.equal(said({ status: 'questionable', as_of: READ }), null);
+});
+
 const advice = (rows: OrderRow[], over: Partial<OrderAdvice> = {}): OrderAdvice => ({
 	week: 6,
 	basis: 'Our rest-of-season order from week 7.',

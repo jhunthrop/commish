@@ -41,8 +41,8 @@ import {
 	seasonUnderway
 } from '../run.ts';
 import {
-	HELD_TIER_WORDS,
 	formatTable,
+	heldTierWords,
 	lineWords,
 	restFigures,
 	type LineWords,
@@ -111,7 +111,8 @@ export interface PlayerPage {
 	/** His designation on the run's injury capture, null when it does not list him or the run
 	 * carries no capture; with when the capture was read. */
 	status: { status: PlayerStatus; capture: CaptureStamp; words: PlayerStatusWords } | null;
-	/** In place of his tier mates for a player on a season-long list, null otherwise. */
+	/** In place of his tier mates for a player on a season-long list ("On IR, not ranked"), null
+	 * otherwise. */
 	heldTier: string | null;
 	/** His club's city and nickname, "Los Angeles Rams". */
 	clubName: string;
@@ -337,7 +338,7 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		),
 		underway,
 		status,
-		heldTier: listed?.seasonLong === true ? HELD_TIER_WORDS : null,
+		heldTier: listed?.seasonLong === true ? heldTierWords(listed.status) : null,
 		clubName: clubNameOf(clubList, loaded.team),
 		clubNote: clubNoteOf(clubList, loaded),
 		card: cardBuild(loaded.season, loaded.capsule),

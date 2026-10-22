@@ -21,7 +21,9 @@
 // record shots run, scripts/record-fixture/run.ts, is live's shape).
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
+import { onListWords } from '../src/lib/format/designation.ts';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
+import { ORDER } from '../src/lib/order/words.ts';
 import { locationFor, parseBaseUrl, parseRunId } from '../src/lib/run/config.ts';
 import { RECORD_BOX, publishedDrawn, recordBasis } from '../src/lib/run/record.ts';
 import { RUN_PATHS, recordSchema, type RunRecord } from '../src/lib/run/schema.ts';
@@ -71,6 +73,9 @@ const MOST_TRADE_SHARE = 1 / 3;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const WEEK_HEAD = new RegExp(`^${FIGURE.week} \\d+$`);
 const FIGURE_CELL = /^([-−]?\d+(\.\d)?|\d+(st|nd|rd|th)|--)$/;
+/** A season-long list's short form, the # cell of a player the order places after the available
+ * (Lane 128 review fix round 1): never a number. */
+const LIST_PLACE = /^(IR|PUP|NFI|Susp|Out)$/;
 
 const SCREENS = [
 	{
@@ -141,7 +146,10 @@ async function context(theme: string, width: number, signedIn: boolean): Promise
 	return ctx;
 }
 
-async function open(page: Page, screen: Screen): Promise<void> {
+async function open(
+	page: Page,
+	screen: Pick<Screen, 'table' | 'ready'> & { path: string }
+): Promise<void> {
 	await page.goto(`${web}${screen.path}`);
 	await page.locator(screen.table).first().waitFor({ timeout: READY_TIMEOUT_MS });
 	await page
@@ -185,6 +193,7 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 			adds: [...(table?.querySelectorAll('a.verb.add') ?? [])].length,
 			mine: table?.querySelectorAll('tbody tr.mine').length ?? 0,
 			cells: [...(table?.querySelectorAll('td.n') ?? [])].filter(visible).map(text),
+			places: [...(table?.querySelectorAll('td.rank') ?? [])].map(text),
 			folded: [...(table?.querySelectorAll('.ph-ev') ?? [])].filter(visible).map(text)
 		};
 	});
@@ -208,8 +217,14 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 	if (width < FOLDS_AT && !seen.folded.every((f) => f.includes(FIGURE.avg)))
 		said.push(`${screen.name} at ${String(width)}: the figures do not fold under the name`);
 	for (const cell of seen.cells) {
-		if (!FIGURE_CELL.test(cell)) said.push(`${screen.name}: cell "${cell}"`);
+		if (!FIGURE_CELL.test(cell) && !LIST_PLACE.test(cell))
+			said.push(`${screen.name}: cell "${cell}"`);
 	}
+	// Every listed row sits after every numbered one (Lane 128 review fix round 1).
+	const places = seen.places;
+	const firstListed = places.findIndex((p) => LIST_PLACE.test(p));
+	if (firstListed >= 0 && places.slice(firstListed).some((p) => !LIST_PLACE.test(p)))
+		said.push(`${screen.name}: a numbered row after a listed one (${places.join(' ')})`);
 	if (screen.signedIn) {
 		if (seen.trades === 0 || seen.trades >= seen.rows * MOST_TRADE_SHARE)
 			said.push(`rest: Trade for him on ${String(seen.trades)} of ${String(seen.rows)} rows`);
@@ -385,7 +400,17 @@ async function addFaults(): Promise<string[]> {
 	const said: string[] = [];
 	const ctx = await context('dark', BASIS_WIDTH, true);
 	const page = await ctx.newPage();
+	// The backs' view: its one free back is on IR with no return date (the capture, Lane 128), so his
+	// row draws the IR words in the verb's place and no add, and the add followed is the whole order's first.
 	await open(page, SCREENS[0]);
+	const held = page.locator('main table.order tr', { has: page.locator('.held') });
+	if ((await held.count()) === 0) said.push('rest: no free back on IR draws the IR words');
+	for (const text of await held.allInnerTexts()) {
+		if (!text.includes(`${onListWords('IR')}, ${ORDER.noReturn}`))
+			said.push(`rest: an IR free agent's row reads "${text}"`);
+	}
+	if ((await held.locator('a.verb').count()) > 0) said.push('rest: an IR free agent has a verb');
+	await open(page, { ...SCREENS[0], path: '/board/ppr-12' });
 	const add = page.locator('main table.order a.verb.add').first();
 	if ((await add.count()) === 0) {
 		await ctx.close();

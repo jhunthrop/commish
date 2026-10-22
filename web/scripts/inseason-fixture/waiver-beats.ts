@@ -3,14 +3,15 @@
 // other row the player his move takes out of the rest-of-season lineup the Gain is measured on (the
 // fixture's stand-in: the starter with the least points over replacement at a slot he can fill, whom
 // he tops, on a row that gains); a free agent on a season-long list or ruled out (a week's out
-// carried over from a game already played aside) is not listed. FIXTURE_IR_DROP=1 stamps the
-// fixture with the sense check's case (B34, B41): the strip's drop, Roschon Johnson, on injured
-// reserve on the bench, and two free agents the table no longer lists, De'Von Achane on injured
-// reserve and Tyquan Thornton ruled out, each dated back (Lane 118, B79: weeks 9 and 8), so they sit
-// in the Stash group; FIXTURE_IR_SLOT=1 opens one injured reserve slot on the member's team, so
+// carried over from a game already played aside) is not listed. The strip's drop on injured reserve
+// on the bench (B34) is the fixture's own since Lane 128: Jaxson Dart, on the capture the stand-in run
+// is marked with. FIXTURE_IR_DROP=1 stamps the rest of the sense check's case (B41): two free agents
+// the table no longer lists, De'Von Achane on injured reserve and Tyquan Thornton ruled out, each
+// dated back (Lane 118, B79: weeks 9 and 8), so they sit in the Stash group; FIXTURE_IR_SLOT=1 opens one injured reserve slot on the member's team, so
 // Achane's verb is Stash.
 import type { components } from '../../src/lib/api/types.ts';
 import type { LineupAdvice, WaiverAdvice, WaiverRow } from '../../src/lib/league/inseason/api.ts';
+import { seasonLongStatus } from '../../src/lib/format/designation.ts';
 import { addKey } from '../../src/lib/league/inseason/move.ts';
 import { roundTenth } from './tenths.ts';
 import { seasonStarters } from './week.ts';
@@ -49,15 +50,22 @@ const ACCEPTS: Readonly<Record<string, readonly string[]>> = {
 	DEF: ['DEF']
 };
 
-/** The season-long lists (waiver_beats.go seasonLongLists). */
-const SEASON_LONG = new Set(['injured_reserve', 'pup', 'nfi']);
+/** A line on a season-long list (the API's Facts.SeasonLong, the web's one list, Lane 128): his
+ * status by itself or as the API flags it, or the platform's IR mark. */
+export function seasonLongLine(line: PlayerLine): boolean {
+	const d = line.facts.designation;
+	return (
+		line.player.injured_reserve ||
+		(d !== null && seasonLongStatus(d.status, d.season_long === true))
+	);
+}
 
 /** Whether the table lists a free agent (waiver_stash.go listedAdd; a pending dating is never on the
  * wire, so the stand-in has none). */
 export function listedAdd(line: PlayerLine): boolean {
 	const d = line.facts.designation;
 	if (d === null) return true;
-	if (SEASON_LONG.has(d.status)) return false;
+	if (seasonLongStatus(d.status, d.season_long === true)) return false;
 	return d.status !== 'out' || d.carried_over === true;
 }
 
@@ -132,6 +140,13 @@ function returnHeld(line: PlayerLine): boolean {
 	return !listedAdd(line) && (status === 'injured_reserve' || status === 'out');
 }
 
+/** Whether Waivers holds a free agent, listed or in its Stash group (waiver_stash.go unlistedAdd's
+ * converse, Lane 128): the order offers an add only on such a player. */
+export function waiversHold(line: PlayerLine): boolean {
+	const back = line.facts.designation?.return_week ?? null;
+	return listedAdd(line) || (returnHeld(line) && back !== null && back <= LAST_REGULAR_WEEK);
+}
+
 /** One stash (waiver_stash.go stashRow): no week figure and no Beats, his rate the figure his player
  * page shows, the drop the gaining rows' rule names (the stand-in's member has no bench spot open). */
 function stashRow(row: WaiverRow, back: number, irSlot: boolean): WaiverRow {
@@ -168,12 +183,10 @@ export function listedOnly(answer: WaiverAdvice, irSlot = false): WaiverAdvice {
 	};
 }
 
-/** The sense check's case on a fixture line: the strip's drop on injured reserve, two free agents on a
- * list the table does not show. */
-const IR_SINCE = '2026-09-22T12:00:00.000Z';
+/** The sense check's case on a fixture line: two free agents on a list the table does not show, each
+ * dated back (the strip's IR drop is the fixture's own, Dart on the capture). */
 const READ = '2026-10-16T21:00:00.000Z';
 const STAMPED: Readonly<Record<string, PlayerLine['facts']['designation']>> = {
-	'Roschon Johnson': { status: 'injured_reserve', as_of: READ, since: IR_SINCE },
 	"De'Von Achane": {
 		status: 'injured_reserve',
 		as_of: READ,

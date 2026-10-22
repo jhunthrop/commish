@@ -5,6 +5,7 @@
  * the API's answer, so every word the screens print is tested here; every figure is the API's,
  * printed as it comes. */
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
+import { onListWords } from '#lib/format/designation.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import {
 	anyKicked,
@@ -20,7 +21,7 @@ import {
 	type BasisPart,
 	type ProjFacts
 } from '#lib/league/box/basis.ts';
-import { BOX, boxRow, type BoxRow } from '#lib/league/box/box.ts';
+import { BOX, boxRow, onList, type BoxRow } from '#lib/league/box/box.ts';
 import { lineState } from '#lib/league/box/kickoff.ts';
 import { addVerbWords } from '#lib/league/box/waivers.ts';
 import { hostWords } from '#lib/league/names.ts';
@@ -64,10 +65,29 @@ export interface OrderView {
 	/** The week column (Lane 92, B36): his Pts once his game is final, his Proj before (weekFigure). */
 	week: number | null;
 	rank: number;
+	/** The # cell: his place, or the list's short form ("IR") for a player on a season-long list. */
+	place: string;
 	figures: Readonly<Record<FigureKey, number | null>>;
 	/** Whose roster holds him in words, with its kind for the chip; null without a league. */
 	roster: { kind: RosterMark['kind']; words: string } | null;
 	move: OrderRow['move'];
+	/** In the verb's place, a free agent on a list the API gives no move ("On IR, no return date",
+	 * Lane 128); null otherwise. */
+	held: string | null;
+}
+
+/** The verb cell's words for a free agent the order gives no move (Lane 128): Waivers neither lists
+ * nor stashes him, so the cell says why, his list or his week's Out, then that no return date is
+ * read, or, with one the API left the add off, that it falls after the regular season (Waivers'
+ * stash_late). Null for anyone the order moves or who is not free. */
+export function heldMoveWords(
+	row: Pick<OrderRow, 'move' | 'roster' | 'line'>,
+	status: BoxRow['status']
+): string | null {
+	if (row.move !== null || row.roster?.kind !== 'free' || !status?.sits) return null;
+	const said = onList(status) ? onListWords(status.rank ?? '') : status.mark;
+	const back = row.line.facts.designation?.return_week ?? null;
+	return `${said}, ${back === null ? ORDER.noReturn : ORDER.backLate}`;
 }
 
 /** A roster mark in words: Yours, Free, or the holding team's name. */
@@ -88,15 +108,19 @@ export function orderView(row: OrderRow, zone: string, pillRank: boolean, now: n
 		position: row.line.player.position,
 		hostId: row.line.player.host_id,
 		box: { ...box, key },
-		week: weekFigure(row.line, now),
+		week: onList(box.status) ? null : weekFigure(row.line, now),
 		rank: row.rank,
+		// A player on a season-long list sits after every available one with no number (Lane 128 fix
+		// round 1): his # cell reads the list's short form.
+		place: onList(box.status) ? (box.status?.rank ?? '') : String(row.rank),
 		figures: {
 			por: row.points_over_replacement,
 			total: row.rest_of_season_points,
 			perGame: row.line.rest_of_season_per_game
 		},
 		roster: row.roster === null ? null : { kind: row.roster.kind, words: rosterWords(row.roster) },
-		move: row.move
+		move: row.move,
+		held: heldMoveWords(row, box.status)
 	};
 }
 

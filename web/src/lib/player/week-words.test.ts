@@ -785,3 +785,109 @@ void test('Compare answers the start or sit question from the figures both rows 
 	);
 	assert.equal(compareSay(row('A', {}), row('B', {})), null);
 });
+
+void test("a listed player's week is not his: Proj, Opp rank and the change say On IR (Lane 128)", () => {
+	const listed = (w: PlayerWeek) =>
+		liveCard({
+			week: w,
+			player: RB,
+			league: null,
+			tiles: BUILT,
+			opponents: {},
+			games: 5,
+			rest: REST,
+			held: 'IR',
+			screenHref: href,
+			zone: ZONE,
+			now: NOW
+		}).tiles;
+	for (const tiles of [listed(week()), listed(byeWeek(18.4, null))]) {
+		for (const key of ['proj', 'opp', 'delta'] as const) {
+			assert.deepEqual([tile(tiles, key).value, tile(tiles, key).caption], [NONE, 'On IR'], key);
+		}
+		assert.equal(tile(tiles, 'opp').tone, null, 'no ease is drawn for a game that is not his');
+		// His season stands: Avg and Last are his.
+		assert.notEqual(tile(tiles, 'avg').value, NONE);
+	}
+	// The bye week's change tile keeps its head (his next game's Proj), "--" with the list.
+	assert.equal(tile(listed(byeWeek(18.4, null)), 'delta').label, 'Wk 7 Proj');
+	// No list: the week's own figures.
+	assert.equal(tile(card(week()).tiles, 'proj').caption, 'PPR');
+	// His basis says only what the card shows: one sentence for the On IR tiles, then Avg and Last
+	// (fix round 2); his game's expected score, weather and Proj are not drawn.
+	const whole = liveCard({
+		week: week(),
+		player: RB,
+		league: null,
+		tiles: BUILT,
+		opponents: {},
+		games: 5,
+		rest: REST,
+		held: 'IR',
+		screenHref: href,
+		zone: ZONE,
+		now: NOW
+	});
+	assert.equal(whole.basis.length, 1);
+	assert.ok(whole.basis[0]?.startsWith(CARD.listedWeek), whole.basis[0]);
+	assert.doesNotMatch(whole.basis.join(' '), /published projection|Opp rank is|expected points/u);
+	assert.deepEqual(
+		[whole.cell?.expected, whole.cell?.weather, whole.next?.proj],
+		[null, null, NONE]
+	);
+	assert.equal(unreadBasis(false, 'Wk 6', 'IR'), CARD.listedWeek);
+	assert.notEqual(unreadBasis(false, 'Wk 6', null), CARD.listedWeek);
+});
+
+void test("the page's rest caption takes the read's rank once read (Lane 128 fix round 3)", () => {
+	const rb = (line: Partial<PlayerWeek['line']>) =>
+		liveCard({
+			week: week({}, line),
+			player: RB,
+			league: null,
+			tiles: BUILT,
+			opponents: {},
+			games: 5,
+			rest: { ...REST, rank: 'RB2 in our order' },
+			screenHref: href,
+			zone: ZONE,
+			now: NOW
+		}).tiles;
+	// The run ranks him RB 2 (a listed back above him); the read, playing first, RB 1.
+	assert.match(tile(rb({ position_rank: 1 }), 'rest').caption, /RB1 in our order$/u);
+	// The read places him nowhere: the run's rank stands.
+	assert.match(tile(rb({ position_rank: null }), 'rest').caption, /RB2 in our order$/u);
+});
+
+void test("the page's pill and rest caption name one rank, before the read and after (Lane 128 fix round 4)", () => {
+	const RUN_RANK = 2;
+	const rest = { ...REST, rank: `RB${String(RUN_RANK)} in our order` };
+	const read = (line: Partial<PlayerWeek['line']>) =>
+		liveCard({
+			week: week({}, line),
+			player: RB,
+			league: null,
+			tiles: BUILT,
+			opponents: {},
+			games: 5,
+			rest,
+			screenHref: href,
+			zone: ZONE,
+			now: NOW
+		});
+	// What the page passes its pill (players/[slug]/+page.svelte): the read's, else the run's.
+	const pillRank = (card: ReturnType<typeof read> | null): number => card?.positionRank ?? RUN_RANK;
+	const captionRank = (caption: string): number =>
+		Number(/RB(\d+) in our order/u.exec(caption)?.[1]);
+	// Before the read: the run's rank on both.
+	assert.equal(pillRank(null), captionRank(rest.rank));
+	// After it: the read's on both, and the run's where the read places him nowhere.
+	for (const line of [{ position_rank: 1 }, { position_rank: null }]) {
+		const card = read(line);
+		assert.equal(
+			pillRank(card),
+			captionRank(tile(card.tiles, 'rest').caption),
+			JSON.stringify(line)
+		);
+	}
+});

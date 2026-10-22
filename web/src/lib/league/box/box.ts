@@ -14,6 +14,7 @@ import {
 	designationWord,
 	rankWord,
 	seasonLongMark,
+	seasonLongStatus,
 	sitsHim,
 	type DesignationStatus
 } from '#lib/format/designation.ts';
@@ -246,9 +247,6 @@ export interface BoxStarter {
 	row: BoxRow;
 }
 
-/** The season-long lists: their word stands in his rank ("RB IR"), as on the board. */
-const SEASON_LONG = new Set<DesignationStatus>(['injured_reserve', 'pup', 'nfi']);
-
 /** His status as Lane 63's pill draws it, the week's designation first, else the host's injured
  * reserve. A season-long list's chip is the board's (Lane 66n): "IR since Sep 28" from the API's
  * start of his run under it, or "IR" alone when the API knows none (the host's own mark). */
@@ -260,7 +258,8 @@ export function statusOf(
 	const status: DesignationStatus | null =
 		designation?.status ?? (hostIR ? 'injured_reserve' : null);
 	if (status === null) return null;
-	const seasonLong = SEASON_LONG.has(status);
+	// The one season-long list (format/designation.ts), the API's flag for an out for the season.
+	const seasonLong = seasonLongStatus(status, designation?.season_long === true);
 	return {
 		rank: seasonLong ? rankWord(status) : null,
 		// A listing carried over from a game already played says its date (Lane 95), never hidden.
@@ -311,6 +310,14 @@ export function reserveRow(row: BoxRow, reserve: 'bench' | 'slot' | null): BoxRo
 /** Whether he carries an injured reserve tag: the report lists him so, or the platform marks him. */
 export function onReserve(line: Pick<PlayerLine, 'player' | 'facts'>): boolean {
 	return line.player.injured_reserve || line.facts.designation?.status === 'injured_reserve';
+}
+
+/** His rest-of-season rank as a row carries it: none while he is on a season-long list (Lane 128,
+ * B106), since the in-season order never ranks a player on injured reserve as playing (the 2026-10-16
+ * ruling); his status chip says the list, so the pill and the shelf show its word where the rank
+ * would be. */
+export function playingRank(rank: number | null, status: StatusView | null): number | null {
+	return onList(status) ? null : rank;
 }
 
 /** His position pill: the board's position (a defense has none, the club mark names it). */
@@ -391,6 +398,7 @@ export function boxRow(
 ): BoxRow {
 	const { facts, player } = line;
 	const ahead = toPlay(facts, now);
+	const status = rowStatus(facts.designation, player.injured_reserve, ahead, zone);
 	return {
 		key: player.host_id,
 		boardId: player.board_id,
@@ -401,28 +409,35 @@ export function boxRow(
 		face: faceOf(player, line.headshot),
 		club: player.team,
 		position: positionWord(player.position),
-		pill: pillOf(player.position, line.position_rank, ranked),
-		status: rowStatus(facts.designation, player.injured_reserve, ahead, zone),
+		pill: pillOf(player.position, playingRank(line.position_rank, status), ranked),
+		status,
 		reserve: onReserve(line),
 		game: gameOf(facts, player.team, zone, now),
 		expected: ahead ? expectedWords(facts) : null,
 		weather: ahead ? weatherCell(facts) : null,
-		proj: line.week_projection,
+		proj: onList(status) ? null : line.week_projection,
 		pts: facts.points_this_week,
 		toCome: ahead,
 		state: lineState(facts, now),
-		evidence: evidenceOf(line)
+		evidence: evidenceOf(line, onList(status))
 	};
 }
 
-/** A row's evidence from his line. */
-function evidenceOf(line: PlayerLine): RowEvidence {
+/** He is on a season-long list (IR, PUP, NFI): his status carries the list's word. In season his
+ * week is not his (Lane 128 fix round 1): no week Proj, no Opp rank and no change in either, on every
+ * screen and on his card. */
+export function onList(status: Pick<StatusView, 'rank'> | null): boolean {
+	return (status?.rank ?? null) !== null;
+}
+
+/** A row's evidence from his line; a listed player's has no Opp rank and no change in his Proj. */
+function evidenceOf(line: PlayerLine, listed: boolean): RowEvidence {
 	return {
-		oppRank: line.opp_rank,
-		oppOf: line.facts.allowed_to_position?.of ?? null,
+		oppRank: listed ? null : line.opp_rank,
+		oppOf: listed ? null : (line.facts.allowed_to_position?.of ?? null),
 		avg: line.season_avg,
 		last: line.last_points,
-		delta: line.projection_delta,
+		delta: listed ? null : line.projection_delta,
 		season: line.rest_of_season_per_game
 	};
 }

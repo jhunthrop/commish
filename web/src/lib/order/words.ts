@@ -18,6 +18,11 @@ export const ORDER = {
 	yours: 'Yours',
 	free: 'Free',
 	tradeFor: 'Trade for him',
+	/** A free agent on a list with no return week, whom Waivers neither lists nor stashes: his verb
+	 * cell says why he has none (Lane 128), after the list's word ("On IR"). */
+	noReturn: 'no return date',
+	/** The same, his return falling after the regular season (Waivers' stash_late). */
+	backLate: 'back after the regular season',
 	every: 'All',
 	everyone: 'Everyone',
 	search: 'Find a player or a club',

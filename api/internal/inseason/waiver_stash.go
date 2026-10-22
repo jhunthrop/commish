@@ -17,13 +17,6 @@ import (
 // MaxStashRows is the most rows the Stash group carries.
 const MaxStashRows = 10
 
-// seasonLongLists are the designations that keep a player out for weeks.
-var seasonLongLists = map[string]bool{
-	boards.StatusInjuredReserve: true,
-	boards.StatusPUP:            true,
-	boards.StatusNFI:            true,
-}
-
 // listedAdd is whether the table lists a free agent by his designation
 // alone (B41): not one on a season-long list or ruled out, who is no
 // pickup this week. A week's out carried over from a game already played
@@ -36,7 +29,7 @@ func listedAdd(p person) bool {
 	if d == nil {
 		return true
 	}
-	if seasonLongLists[d.Status] {
+	if d.SeasonLong {
 		return false
 	}
 	return d.Status != boards.StatusOut || d.CarriedOver || d.Pending
@@ -122,6 +115,18 @@ func (a *advisor) stashWeek(p person) (int, bool) {
 		return 0, false
 	}
 	return *back, true
+}
+
+// unlistedAdd is a free agent neither Waivers' table nor its Stash group
+// holds (Lane 128): one listedAdd leaves out whom stashWeek does not hold,
+// on injured reserve with no return week among them. The order offers him
+// no move.
+func (a *advisor) unlistedAdd(p person) bool {
+	if listedAdd(p) {
+		return false
+	}
+	_, held := a.stashWeek(p)
+	return !held
 }
 
 // irSlotOpen is whether the member's team has an injured reserve slot

@@ -37,6 +37,32 @@ export function rankWord(status: DesignationStatus): string {
 	return RANK_WORDS[status];
 }
 
+/** The statuses that are season-long by themselves (Lane 128 fix round 1), the API's list
+ * (boards.SeasonLong): an out is season-long only when the API or the capture says so (its note says
+ * out for the season), which `season_long` and `seasonLong` carry. The one list every web surface
+ * reads. */
+export const SEASON_LONG_STATUSES: ReadonlySet<DesignationStatus> = new Set([
+	'injured_reserve',
+	'pup',
+	'nfi',
+	'suspended'
+]);
+
+/** Whether a status keeps him off the field for weeks: by itself, or as the API flags it. */
+export function seasonLongStatus(status: DesignationStatus, flagged = false): boolean {
+	return flagged || SEASON_LONG_STATUSES.has(status);
+}
+
+/** A list's words where a figure of his week would be, by its short form, where "On" and the short
+ * form do not read. */
+const ON_LIST_WORDS: Readonly<Record<string, string>> = { Out: 'Out for the season' };
+
+/** "On IR", "On Susp", "Out for the season": a listed player's word where a figure of his week would
+ * be (Lane 128): his week tiles, and the order's verb cell for a free agent Waivers does not hold. */
+export function onListWords(word: string): string {
+	return ON_LIST_WORDS[word] ?? `On ${word}`;
+}
+
 /** "Questionable as of Thu 4:10 pm": the designation with when the report said so. */
 export function designationMark(
 	status: DesignationStatus,

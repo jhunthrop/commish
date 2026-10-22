@@ -17,10 +17,10 @@
 // fixture, PUBLIC_RUN_ID=2026-10-21T12-ros) and one signed-out page is shot with the tile held to
 // "Rest of season ... in our order"; that run predates the reads' stamps and the earlier seasons, so
 // those two are not asked of it. Otherwise the tile is held to "Projected".
-// A season-long player (De'Von Achane on injured reserve) needs the run's designations: after
-// `npm run standin`, `uv run python -m research.nightly mark --out ../web/.runs` (from research/,
-// RESEARCH_DATABASE_URL the dev store, read only) writes the newest capture beside it; his pill and
-// his rest tile are held to Lane 63's word.
+// A season-long player (De'Von Achane on injured reserve) reads the run's designations, which
+// `npm run standin` writes from the recorded capture (scripts/standin-designations.json, Lane 128):
+// the one run every shot script uses, nothing read from dev at shot time. His pill, his rest tile and
+// his tier box ("On IR, not ranked") are held to Lane 63's word.
 // Against the built site served by the Worker and the fixture API (scripts/inseason-fixture/serve.ts).
 //
 //   [ROS_FROM_WEEK=6] node scripts/player-card-shots.ts [web origin] [out dir]
@@ -31,7 +31,8 @@ import { copyFault, watchData } from './copy-scan.ts';
 import { readFace } from './read-face.ts';
 import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
-import { CARD } from '../src/lib/player/card.ts';
+import { CARD, onListWords } from '../src/lib/player/card.ts';
+import { heldTierWords } from '../src/lib/run/player-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
 
@@ -89,7 +90,7 @@ const SHOTS: readonly Shot[] = [
 		weekRead: 'shown'
 	},
 	{ name: 'trade', slug: 'puka-nacua', signedIn: true, verb: 'Trade for him', weekRead: 'shown' },
-	{ name: 'start', slug: 'jaxson-dart', signedIn: true, verb: 'Start him', weekRead: 'none' },
+	{ name: 'start', slug: 'patrick-mahomes', signedIn: true, verb: 'Start him', weekRead: 'none' },
 	{
 		name: 'waivers',
 		slug: 'xavier-hutchinson',
@@ -174,6 +175,8 @@ interface Card {
 	pill: string;
 	verbs: string[];
 	readText: string;
+	/** The side box's text: his tier mates, or a held player's "On IR, not ranked". */
+	tierBox: string;
 	basis: string[];
 	basisLines: number;
 	nextRow: string;
@@ -212,6 +215,7 @@ async function read(page: Page): Promise<Card> {
 				(el as HTMLElement).innerText.trim()
 			),
 			readText: document.querySelector<HTMLElement>('main .read')?.innerText ?? '',
+			tierBox: document.querySelector<HTMLElement>('main .side')?.innerText ?? '',
 			// In season the tier box is headed by why his rest-of-season figure sits there (CARD.whyRest,
 			// Lane 100, B30), and the read is the week's alone: the season read and its stamp are the
 			// draft's.
@@ -252,13 +256,19 @@ const WEEK_TILE = new RegExp(`^${FIGURE.week}( \\d+)?$`);
 /** The tile after a bye: his next game's Proj, "Wk 7 Proj". */
 const AFTER_BYE_TILE = new RegExp(`^${FIGURE.week} \\d+ ${CARD.proj}$`);
 
+/** His week is a bye: the week tile says so, or for a listed player, whose week tile says his list
+ * (Lane 128 fix round 1), the card's head names the bye. */
+function onBye(card: Card): boolean {
+	return card.captions[card.labels[0] ?? ''] === CARD.byeWeek || /^bye$/iu.test(card.head.opponent);
+}
+
 /** The tiles, each "--" with its reason, and rest of season's label as the run covers it. */
 function checkTiles(card: Card, where: string): void {
 	const rest = ROS_FROM_WEEK === undefined ? PROJECTED : REST;
 	// The week tile is headed by its week beside the season's Projected ("Wk 6", the ruling).
 	const [weekTile = '', ...others] = card.labels;
 	// On his bye the change's tile gives his next game's Proj instead (Lane 100, B30).
-	const bye = card.captions[weekTile] === CARD.byeWeek;
+	const bye = onBye(card);
 	const [last = ''] = others.slice(-1);
 	const change = bye && AFTER_BYE_TILE.test(last) ? last : CARD.delta;
 	const want = [rest, 'Opp rank', 'Avg', 'Last', change];
@@ -300,9 +310,28 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 		check(card.pill.includes(shot.held), `${where}: the pill does not say ${shot.held}`);
 		const rest = card.captions[PROJECTED] ?? card.captions[REST] ?? '';
 		check(
-			rest.includes(`${shot.held}, unranked while on a season-long list`) &&
+			// Unranked, the list left to the pill beside it (Lane 128 fix round 1, LOW-4).
+			rest.includes('unranked while on a season-long list') &&
+				!rest.includes(shot.held) &&
 				!/\d+ in our order/.test(rest),
 			`${where}: the rest tile ranks a held player: "${rest}"`
+		);
+		// His week is not his (Lane 128 fix round 1): Proj, Opp rank and the change say his list.
+		const weekTiles = [card.labels[0] ?? '', CARD.opp, card.labels.at(-1) ?? ''];
+		for (const label of weekTiles)
+			check(
+				card.values[label] === NONE && card.captions[label] === onListWords('IR'),
+				`${where}: ${label} reads "${card.values[label] ?? ''}", "${card.captions[label] ?? ''}"`
+			);
+		// His basis says only what his card shows (fix round 2).
+		check(
+			(card.basis[0] ?? '').startsWith(CARD.listedWeek) &&
+				!/published projection|Opp rank is/u.test(card.basis.join(' ')),
+			`${where}: the basis reads "${card.basis.join(' ')}"`
+		);
+		check(
+			card.tierBox.includes(heldTierWords('injured_reserve')) && !/\bTier \d/.test(card.tierBox),
+			`${where}: the tier box places a held player: "${card.tierBox}"`
 		);
 	}
 	check(card.verbs.includes(shot.verb), `${where}: verbs ${card.verbs.join(', ')}`);
@@ -315,8 +344,7 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 			`${where}: the season read's stamp`
 		);
 	// A week on bye has no game ahead to draw, and the week tile says so.
-	if (card.captions[card.labels[0] ?? ''] !== 'Bye this week')
-		check(card.nextRow !== '', `${where}: no week ahead row in the game log`);
+	if (!onBye(card)) check(card.nextRow !== '', `${where}: no week ahead row in the game log`);
 	if (!ROS)
 		check(/earlier seasons/i.test(card.earlier) && !card.earlierOpen, `${where}: earlier seasons`);
 	const most = BASIS_LINES[width] ?? 0;

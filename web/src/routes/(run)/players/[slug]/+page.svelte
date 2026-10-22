@@ -211,7 +211,9 @@
 	const weekTileHead = $derived(tiles.find((tile) => tile.key === 'proj')?.label ?? CARD.proj);
 	/** Every number's basis, once: the week's, the rest of season's, the season's. */
 	const basis = $derived([
-		...(live === null ? [unreadBasis(failed, weekTileHead)] : live.basis),
+		...(live === null
+			? [unreadBasis(failed, weekTileHead, page.status?.words.view.rank ?? null)]
+			: live.basis),
 		page.season.basis
 	]);
 </script>
@@ -255,7 +257,7 @@
 			club={isFreeAgent(page.team) ? null : { name: page.clubName, href: links.club(page.team) }}
 			position={page.position}
 			status={listed}
-			positionRank={n.positionRank}
+			positionRank={live?.positionRank ?? n.positionRank}
 			holder={rostered}
 			holdRoom={league !== null}
 			next={live === null ? page.card.next : live.head}
@@ -359,8 +361,7 @@
 					<!-- In season the tier box is why his rest-of-season figure sits where it does (Lane 100, B30). -->
 					{#if page.underway}<h3 class="why"><Label>{CARD.whyRest}</Label></h3>{/if}
 					{#if page.heldTier !== null}
-						<PanelHead title="Tier" />
-						<Footnote>{page.heldTier}</Footnote>
+						<PanelHead title={page.heldTier} />
 					{:else}
 						<TierMates
 							tier={page.tier.tier}

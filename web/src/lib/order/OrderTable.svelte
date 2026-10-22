@@ -96,7 +96,7 @@
 			{@const href = moveHref(row, league?.id ?? null, tabHref)}
 			{@const rank = row.box.evidence.oppRank}
 			<tr class:mine={row.roster?.kind === 'yours'}>
-				<td class="n rank">{row.rank}</td>
+				<td class="n rank">{row.place}</td>
 				<td class="player">
 					<BoxPlayer row={row.box} tags={tagsOf(row.box.boardId)}>
 						{#snippet after()}<span class="ph-mark">{@render mark(row, 'fold')}</span>{/snippet}
@@ -126,6 +126,7 @@
 								said={moveWords(row, league.moves, league.host)}
 								name={row.box.name}
 							/>
+						{:else if league !== null && row.held !== null}<span class="held">{row.held}</span>
 						{:else if end}{@render end(row)}{/if}
 					</td>
 				{/if}
@@ -301,6 +302,12 @@
 		white-space: nowrap;
 	}
 
+	/* The verb's place for a free agent with no return date: the IR words, quiet, as a caption. */
+	.held {
+		font-size: var(--t-xs);
+		color: var(--ink-3);
+	}
+
 	.ph-mark,
 	.ph-ev {
 		display: none;
@@ -348,6 +355,11 @@
 		/* The verb keeps its glyph (MoveLink), its printed words giving their width away. */
 		.cols .act {
 			width: 40px;
+		}
+
+		/* No room for the IR words in the glyph's column: his status chip says IR on his name's line. */
+		.held {
+			display: none;
 		}
 	}
 

@@ -2606,6 +2606,9 @@ type InjuryDesignation struct {
 	// ReturnWeek the week the provider expects him back (Lane 110, B79): the first week whose last game day is on or after the return date the daily player list gives him under this same status ("IR, eligible week 9"), and only when it is later than the week the designation addresses (a questionable or doubtful date in the coming days says nothing and is omitted; a multi-week out and the season-long statuses keep it); absent when that list dates no return for him, its date does not read or has passed, it is not past the addressed week, or it falls past the schedule's last week, and from an older answer
 	ReturnWeek *int `json:"return_week,omitempty"`
 
+	// SeasonLong true when the status keeps him off the field for weeks the rest-of-season figure counts (injured reserve, PUP, NFI, suspended, out with the capture's note saying out for the season, the platform's own IR mark): the in-season order places him after every available player, his line carries no rank and no week figure is his (Lane 128); absent otherwise and from an older answer
+	SeasonLong *bool `json:"season_long,omitempty"`
+
 	// Since when his unbroken run under a season-long status began, the first capture that lists it (boards.WithSince, the nightly's designations.json since); null for a week's designation, the host's own IR mark, or a run older than the captures read. The site's status chip says it ("IR since Sep 28") and keeps the read for the basis
 	Since  *time.Time        `json:"since,omitempty"`
 	Status DesignationStatus `json:"status"`
@@ -3434,7 +3437,7 @@ type OrderBasis string
 type OrderRow struct {
 	Line PlayerLine `json:"line"`
 
-	// Move the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players)
+	// Move the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players, and for a free agent Waivers neither lists nor stashes, one on injured reserve with no return week among them)
 	Move *OrderRowMove `json:"move"`
 
 	// PointsOverReplacement the key across positions, one decimal: his points over replacement for the league over the weeks the order covers; null at a position the league starts nobody at
@@ -3450,7 +3453,7 @@ type OrderRow struct {
 	Roster *RosterMark `json:"roster"`
 }
 
-// OrderRowMove the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players)
+// OrderRowMove the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players, and for a free agent Waivers neither lists nor stashes, one on injured reserve with no return week among them)
 type OrderRowMove string
 
 // OutcomeRange defines model for OutcomeRange.
@@ -3563,7 +3566,7 @@ type PlayerLine struct {
 	// PointsOverReplacement points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over its own first week, the league's when the run does not say, through the league's last playoff week as its platform states it, week 17 when it states none), as the basis says; null without a projection
 	PointsOverReplacement *float64 `json:"points_over_replacement"`
 
-	// PositionRank his place at his position in our order
+	// PositionRank his place at his position in our order, null when unranked and for a player on a season-long list (injured reserve, PUP, NFI, suspended, the platform's IR mark included), whom the in-season order never ranks as playing
 	PositionRank *int `json:"position_rank"`
 
 	// ProjectionDelta week_projection's change since the week's snapshot before the one it is read from (the newest, or once his game has kicked off the one as of kickoff), to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null

@@ -42,7 +42,7 @@ void test('no trade in the fixture drops a starter the Lineup screen sets withou
 	assert.equal(said.length, 1, 'the fixture has no starter drop to show its sentence');
 	assert.equal(
 		said[0]?.drop_reason,
-		'Williams starts at WR3 for you this week. After the trade Tucker starts at Flex 1 and your lineup stays full.'
+		'Johnson starts at Flex 2 for you this week. After the trade Tucker starts at Flex 1 and your lineup stays full.'
 	);
 });
 

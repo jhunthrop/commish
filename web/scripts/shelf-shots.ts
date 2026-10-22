@@ -7,17 +7,20 @@
 // add on Waivers, Compare on Players), the copy passes the one guard (copy-scan.ts), nothing scrolls
 // sideways, Escape closes it and gives the focus back to the name, the back button closes it, a reload
 // reopens it and the close button then clears the address. A player with a written read, opened from
-// the address on Players, shows the read in the UI face at the rows' body size (Lane 126). It prints each screen's script on load,
+// the address on Players, shows the read in the UI face at the rows' body size (Lane 126). The Lineup's
+// IR case (Lane 128) opens a player on injured reserve: no rank on his row, "QB IR" on the shelf. It prints each screen's script on load,
 // gzipped, before any tap (the shelf's script waits for the first). Exits non-zero on any fault.
 //
 //   [BYTES_ONLY=1] node scripts/shelf-shots.ts [web origin] [out dir]
 // BYTES_ONLY prints the screens' script and stops, for a build from before the shelf.
 // with the site built against PUBLIC_API_URL naming the fixture API, which runs on the fixture week's
 // clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z) at API_ORIGIN.
+// The site is built from the one stand-in run `npm run standin` writes, marked with the recorded
+// injury capture (scripts/standin-designations.json, Lane 128), the run player-card-shots.ts uses.
 import { mkdir } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import { chromium, type BrowserContext, type Page } from 'playwright';
-import { CARD } from '../src/lib/player/card.ts';
+import { CARD, NONE, onListWords } from '../src/lib/player/card.ts';
 import { SHELF } from '../src/lib/player/shelf.ts';
 import { SHELF_PARAM } from '../src/lib/player/shelf-state.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
@@ -176,17 +179,26 @@ async function scriptBytes(screen: Screen): Promise<Bytes> {
 	return { load, tap };
 }
 
-/** The first row's name that opens the shelf. */
-function opener(page: Page): ReturnType<Page['locator']> {
-	return page.locator('a[aria-haspopup="dialog"]').filter({ visible: true }).first();
+/** The name that opens the shelf: the first row's, or the row of the player named by his slug. */
+function opener(page: Page, slug?: string): ReturnType<Page['locator']> {
+	const names = page.locator(
+		slug === undefined
+			? 'a[aria-haspopup="dialog"]'
+			: `a[aria-haspopup="dialog"][href*="/players/${slug}#"]`
+	);
+	return names.filter({ visible: true }).first();
 }
 
 const shelf = (page: Page): ReturnType<Page['locator']> => page.locator('dialog.shelf[open]');
 
 /** Opens the first row's card. By the pointer it is a click; for the script's measure it is the
  * click alone, so no link the shelf draws under a resting pointer is preloaded on hover. */
-async function openShelf(page: Page, by: 'pointer' | 'event' = 'pointer'): Promise<string> {
-	const name = opener(page);
+async function openShelf(
+	page: Page,
+	by: 'pointer' | 'event' = 'pointer',
+	slug?: string
+): Promise<string> {
+	const name = opener(page, slug);
 	const href = (await name.getAttribute('href')) ?? '';
 	if (by === 'pointer') await name.click();
 	else await name.dispatchEvent('click');
@@ -205,9 +217,10 @@ const cardOf = (page: Page): string | null => new URL(page.url()).searchParams.g
 /** A rank the rest-of-season caption names: "QB12 in our order". */
 const CAPTION_RANK = /[A-Z]{1,3}(\d+) in our order/;
 
-/** The rank the first row draws, its digits alone, null when it draws none (Waivers, Trades). */
-async function rowRank(page: Page): Promise<string | null> {
-	const row = opener(page).locator('xpath=ancestor::tr[1]');
+/** The rank the first row (or the named player's) draws, its digits alone, null when it draws none
+ * (Waivers, Trades, a season-long list's row). */
+async function rowRank(page: Page, slug?: string): Promise<string | null> {
+	const row = opener(page, slug).locator('xpath=ancestor::tr[1]');
 	const cell = row.locator('.rank-n, .pos').first();
 	if ((await cell.count()) === 0) return null;
 	return (await cell.innerText()).replace(/\D/g, '') || null;
@@ -342,6 +355,58 @@ for (const screen of shotScreens) {
 					await shelf(page).waitFor({ state: 'detached', timeout: READY_TIMEOUT_MS });
 					await behave(page, screen, label);
 				}
+			} catch (error: unknown) {
+				faults.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+			} finally {
+				await ctx.close();
+			}
+		}
+	}
+}
+// The Lineup's IR case (Lane 128, B106): Jaxson Dart is on injured reserve on the capture the run is
+// marked with and the fixture league reads, so his row draws no rest-of-season rank and the shelf's
+// pill says "QB IR" where the rank would be, its rest tile naming none.
+const IR_CASE = {
+	slug: 'jaxson-dart',
+	pill: 'QB IR',
+	rest: 'unranked while on a season-long list',
+	week: onListWords('IR'),
+	weekTiles: 3
+};
+const lineupScreen = SCREENS.find((s) => s.name === 'lineup');
+if (!process.env.BYTES_ONLY && lineupScreen !== undefined) {
+	for (const theme of THEMES) {
+		for (const size of SIZES) {
+			const label = `lineup IR ${theme} ${String(size.width)}`;
+			const ctx = await context(theme, size, lineupScreen.signedIn);
+			const page = await ctx.newPage();
+			try {
+				await page.goto(`${web}${lineupScreen.path}`);
+				await ready(page, lineupScreen);
+				const rank = await rowRank(page, IR_CASE.slug);
+				if (rank !== null) faults.push(`${label}: his row ranks him ${rank}`);
+				const proj = opener(page, IR_CASE.slug).locator('xpath=ancestor::tr[1]').locator('td.proj');
+				// His row draws its Proj cell, and it is "--" (review LOW-2: never passing with no cell).
+				if ((await proj.count()) === 0) faults.push(`${label}: his row draws no Proj cell`);
+				else if ((await proj.first().innerText()).trim() !== NONE)
+					faults.push(`${label}: his row's Proj reads "${await proj.first().innerText()}"`);
+				await openShelf(page, 'pointer', IR_CASE.slug);
+				await check(page, lineupScreen, label, size.width, rank);
+				const head = await shelf(page).locator('.sub').first().innerText();
+				if (!head.includes(IR_CASE.pill)) faults.push(`${label}: the pill reads "${head}"`);
+				const card = await shelf(page).locator('.tiles').first().innerText();
+				if (!card.includes(IR_CASE.rest)) faults.push(`${label}: the rest tile reads "${card}"`);
+				// His week is not his (fix round 1): Proj, Opp rank and the change say his list.
+				const listed = await shelf(page).locator('.tile').filter({ hasText: IR_CASE.week }).count();
+				if (listed !== IR_CASE.weekTiles)
+					faults.push(`${label}: ${String(listed)} tiles say "${IR_CASE.week}"`);
+				// His basis says only what his card shows (fix round 2).
+				const basis = await shelf(page).locator('.basis').innerText();
+				if (!basis.startsWith(CARD.listedWeek) || /published projection|Opp rank is/u.test(basis))
+					faults.push(`${label}: the basis reads "${basis}"`);
+				await page.screenshot({
+					path: new URL(`shelf-lineup-ir-${theme}-${String(size.width)}.png`, out).pathname
+				});
 			} catch (error: unknown) {
 				faults.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
 			} finally {

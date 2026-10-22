@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
+import { onListWords } from '#lib/format/designation.ts';
 import type { LeaguePlayer } from '../api.ts';
 import type { PlayerLine, WeekFacts } from '../inseason/api.ts';
 import {
@@ -216,6 +217,61 @@ void test("a status is Lane 63's pill: the week's word, a season-long list's wor
 		rank: null,
 		ranked: false
 	});
+});
+
+void test('a row on a season-long list carries no rank, whatever the API sends (Lane 128, B106)', () => {
+	const asOf = '2026-10-14T02:03:35.613Z';
+	const ir = { status: 'injured_reserve', as_of: asOf, since: '2026-09-24T22:00:00.000Z' } as const;
+	const listed = boxRow(line({}, { designation: ir }), 'QB', ZONE, true, NOW);
+	assert.deepEqual(listed.pill, { position: 'QB', rank: null, ranked: true });
+	assert.equal(listed.status?.rank, 'IR');
+	// The platform's own IR mark is the same list.
+	const hostIr = boxRow(line({ player: player({ injured_reserve: true }) }), 'BN', ZONE, true, NOW);
+	assert.equal(hostIr.pill?.rank, null);
+	// A PUP or NFI list too; a week's designation keeps his rank.
+	// His week is not his (fix round 1): no Proj, no Opp rank and no change in either, on any screen.
+	assert.equal(listed.proj, null);
+	assert.deepEqual(
+		[listed.evidence.oppRank, listed.evidence.oppOf, listed.evidence.delta],
+		[null, null, null]
+	);
+	assert.equal(listed.evidence.avg, 17.94, 'his season stands');
+	assert.equal(hostIr.proj, null);
+	const pup = boxRow(
+		line({}, { designation: { status: 'pup', as_of: asOf } }),
+		'QB',
+		ZONE,
+		true,
+		NOW
+	);
+	assert.equal(pup.pill?.rank, null);
+	// The one list (fix round 1, MEDIUM-1): suspended by itself, and an out the API flags as for the
+	// season; his pill says the list ("WR Susp"), his week is not his.
+	const susp = boxRow(
+		line({}, { designation: { status: 'suspended', as_of: asOf } }),
+		'WR',
+		ZONE,
+		true,
+		NOW
+	);
+	assert.deepEqual([susp.pill?.rank, susp.status?.rank, susp.proj], [null, 'Susp', null]);
+	const season = boxRow(
+		line({}, { designation: { status: 'out', as_of: asOf, season_long: true } }),
+		'WR',
+		ZONE,
+		true,
+		NOW
+	);
+	assert.deepEqual([season.pill?.rank, season.status?.rank, season.proj], [null, 'Out', null]);
+	assert.equal(onListWords('Susp'), 'On Susp');
+	assert.equal(onListWords('Out'), 'Out for the season');
+	assert.equal(onListWords('IR'), 'On IR');
+	for (const status of ['questionable', 'doubtful', 'out'] as const) {
+		const week = boxRow(line({}, { designation: { status, as_of: asOf } }), 'QB', ZONE, true, NOW);
+		assert.equal(week.pill?.rank, 7, status);
+		assert.equal(week.proj, 19.44, status);
+		assert.equal(week.evidence.oppRank, 24, status);
+	}
 });
 
 void test('a row carries the projection, not the points a game, and no facts once kicked off', () => {

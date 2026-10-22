@@ -264,9 +264,11 @@ func TestListedAddKeepsACarriedOverOrPendingOut(t *testing.T) {
 		{"out this week", &Designation{Status: boards.StatusOut}, false},
 		{"out, carried over", &Designation{Status: boards.StatusOut, CarriedOver: true}, true},
 		{"out, dating pending", &Designation{Status: boards.StatusOut, Pending: true}, true},
-		{"injured reserve", &Designation{Status: boards.StatusInjuredReserve}, false},
-		{"injured reserve, dating pending", &Designation{Status: boards.StatusInjuredReserve, Pending: true}, false},
-		{"physically unable", &Designation{Status: boards.StatusPUP}, false},
+		// A season-long list is the one flag Season.designation sets (Lane 128).
+		{"injured reserve", &Designation{Status: boards.StatusInjuredReserve, SeasonLong: true}, false},
+		{"injured reserve, dating pending", &Designation{Status: boards.StatusInjuredReserve, Pending: true, SeasonLong: true}, false},
+		{"physically unable", &Designation{Status: boards.StatusPUP, SeasonLong: true}, false},
+		{"suspended", &Designation{Status: boards.StatusSuspended, SeasonLong: true}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

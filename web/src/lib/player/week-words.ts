@@ -40,6 +40,8 @@ import { hostWords } from '#lib/league/names.ts';
 import type { LogNext } from '#lib/ui/game-log.ts';
 import {
 	CARD,
+	listedTiles,
+	restRankWords,
 	NONE,
 	printTenth,
 	publishedOn,
@@ -117,6 +119,9 @@ export interface LiveCard {
 	formats: LiveFormats | null;
 	/** The tier box's figures at the read's clock, null where the run's stand. */
 	tier: LiveTier | null;
+	/** His position rank as the read places him, which the rest caption names (restTile): the
+	 * page's pill takes it, null where the run's stands (Lane 128 fix round 4). */
+	positionRank: number | null;
 }
 
 /** His rest-of-season points at the read's clock and the week they start from, as words. */
@@ -439,8 +444,17 @@ function restNow(week: PlayerWeek, rest: RestParts | null): LiveRest | null {
  * caption names the tile's (review N2). In that scoring the read's points replace the run's, and in
  * any its week: a game kicked off since the run is no longer counted (Lane 86). The tile as built on a
  * preseason board. */
-function restTile(week: PlayerWeek, rest: RestParts | null, fallback: CardTile): CardTile {
+function restTile(
+	week: PlayerWeek,
+	rest: RestParts | null,
+	fallback: CardTile,
+	position: string
+): CardTile {
 	if (rest === null) return fallback;
+	// His rank as the read places him (the API's line, the one every league screen says), over the
+	// run's once read (Lane 128 fix round 3); the run's while the read places him nowhere.
+	const ranked = week.line.position_rank;
+	const rank = ranked === null ? rest.rank : restRankWords(position, ranked);
 	const same = week.projection_scoring.format === rest.scoring;
 	const now = restNow(week, rest);
 	const perGame = week.line.rest_of_season_per_game;
@@ -451,14 +465,25 @@ function restTile(week: PlayerWeek, rest: RestParts | null, fallback: CardTile):
 	return {
 		...fallback,
 		...(now === null ? {} : { value: printTenth(now.points) }),
-		caption: `${from}${game}, ${rest.rank}${scoring}`
+		caption: `${from}${game}, ${rank}${scoring}`
 	};
 }
 
 /** The basis lines the week's read says, once each and short (the Waivers forms): the projection's
  * with its change's, then the evidence columns' scoring with the game facts' read while his game is
  * still to be played at `now`. A "--" says why on its own tile. */
-export function liveBasis(week: PlayerWeek, league: boolean, zone: string, now: number): string[] {
+export function liveBasis(
+	week: PlayerWeek,
+	league: boolean,
+	zone: string,
+	now: number,
+	listed = false
+): string[] {
+	const scoringWords = league
+		? 'your scoring'
+		: `${SCORING_WORDS[week.projection_scoring.format]} scoring`;
+	// A listed player's card draws no week figure (Lane 128): his basis says only what it shows.
+	if (listed) return [`${CARD.listedWeek} ${avgLastPart(scoringWords)}`];
 	// The card's page names no zone elsewhere, so each time says it (basis.ts, the one source).
 	const clock = { zone, zoned: true };
 	const proj = [
@@ -476,10 +501,7 @@ export function liveBasis(week: PlayerWeek, league: boolean, zone: string, now: 
 	]
 		.filter((said) => said !== null)
 		.join(' ');
-	const scoring = league
-		? 'your scoring'
-		: `${SCORING_WORDS[week.projection_scoring.format]} scoring`;
-	const evidence = `${OPP_PART} ${avgLastPart(scoring)}`;
+	const evidence = `${OPP_PART} ${avgLastPart(scoringWords)}`;
 	const facts = gamePart([week.line], clock, now, 'next') ?? kickedOffPartAt([week.line], now);
 	return [proj, facts === null ? evidence : `${evidence} ${facts}`];
 }
@@ -498,19 +520,21 @@ function headOf(week: PlayerWeek, zone: string, now: number): CardHead {
 function nextOf(
 	week: PlayerWeek,
 	zone: string,
-	now: number
+	now: number,
+	listed = false
 ): { cell: NextCell | null; next: LogNext | null } {
 	const { facts } = week.line;
 	const game = heldGame(gameOf(facts, week.line.player.team, zone, now));
 	if (game === null) return { cell: null, next: null };
-	const ahead = toPlay(facts, now);
+	// A listed player's game is not his (Lane 128): its expected score, weather and Proj are not drawn.
+	const ahead = toPlay(facts, now) && !listed;
 	const cell: NextCell = {
 		where: game.where,
 		when: game.when,
 		expected: ahead ? expectedWords(facts) : null,
 		weather: ahead ? weatherCell(facts) : null
 	};
-	const proj = week.line.week_projection;
+	const proj = listed ? null : week.line.week_projection;
 	return {
 		cell,
 		next: {
@@ -543,6 +567,9 @@ export interface LiveInput {
 	basisTiles?: readonly BasisTile[];
 	/** Each week's last kickoff on the run's schedule, the moment its lineup can no longer be set. */
 	lastKickoffs?: Readonly<Record<number, string>>;
+	/** The season-long list's word ("IR") his card's pill shows, null when he is on none: his week's
+	 * tiles then say the list in place of a Proj, an Opp rank or a change (Lane 128 fix round 1). */
+	held?: string | null;
 	screenHref: ScreenHref;
 	zone?: string;
 	/** The time the card is drawn at, in ms: a game kicked off by then says no facts read. */
@@ -589,6 +616,7 @@ export function liveCard({
 	tier = null,
 	basisTiles = [],
 	lastKickoffs = {},
+	held: listed = null,
 	screenHref,
 	zone = memberZone(),
 	now
@@ -601,13 +629,13 @@ export function liveCard({
 	};
 	const updated = [
 		projTile(week),
-		restTile(week, rest, fallback('rest')),
+		restTile(week, rest, fallback('rest'), player.position),
 		oppTile(week, player.position),
 		avgTile(week, games, fallback('avg')),
 		lastTile(week, opponents, fallback('last')),
 		deltaTile(week, zone, now)
 	].reduce<CardTile[]>((all, tile) => withTile(all, tile), [...tiles]);
-	const { cell, next } = nextOf(week, zone, now);
+	const { cell, next } = nextOf(week, zone, now, listed !== null);
 	const leagueVerb = league !== null && week.verb !== null ? week.verb : null;
 	const held = leagueVerb !== null && !verbFits(leagueVerb, lastKickoffs[week.week] ?? null, now);
 	const verb =
@@ -617,7 +645,7 @@ export function liveCard({
 	return {
 		week: week.week,
 		head: headOf(week, zone, now),
-		tiles: updated,
+		tiles: listedTiles(updated, listed),
 		basisTiles: basisTiles.map((tile) =>
 			tile.key === 'vsAvg' ? vsAvgTile(week, rest, tile) : tile
 		),
@@ -627,10 +655,11 @@ export function liveCard({
 		// Signed out in season no lineup or league verb fits either: Compare leads, not the sheet's add
 		// (Lane 100 fix round 1, M3).
 		compareLeads: held || (league === null && compareLeadsWithoutVerb(rest)),
-		basis: liveBasis(week, leagueVerb !== null, zone, now),
+		basis: liveBasis(week, leagueVerb !== null, zone, now, listed !== null),
 		rest: restAtClock,
 		formats: formatsOf(week, restAtClock),
 		tier: tierOf(week, restAtClock, tier),
+		positionRank: rest === null ? null : week.line.position_rank,
 		projection: {
 			week: week.week,
 			scoring: week.projection_scoring.format,

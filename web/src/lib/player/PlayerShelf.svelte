@@ -23,6 +23,7 @@
 		rowTiles,
 		SHELF,
 		shelfHead,
+		shelfSource,
 		shelfVerb
 	} from './shelf.ts';
 	import type { ShelfHost } from './shelf-state.ts';
@@ -82,7 +83,13 @@
 		built?.weekRead ? shownWeekRead(built.weekRead, live?.projection ?? null) : null
 	);
 	const basis = $derived(
-		live?.basis ?? [unreadBasis(failed, tiles.find((t) => t.key === 'proj')?.label ?? CARD.proj)]
+		live?.basis ?? [
+			unreadBasis(
+				failed,
+				tiles.find((t) => t.key === 'proj')?.label ?? CARD.proj,
+				shown.status?.rank ?? null
+			)
+		]
 	);
 	const verb = $derived(shelfVerb(host.options.screen, game, row && host.options.offer(row)));
 	/** His page's build, null when it cannot be read: the row's cells and the week read still stand. */
@@ -106,7 +113,7 @@
 				? row === null
 					? null
 					: rowSource(row)
-				: cardSource(page, contextLine(page.lines) ?? page, null);
+				: shelfSource(cardSource(page, contextLine(page.lines) ?? page, null), row);
 		try {
 			if (source === null) throw new Error('Neither his card nor his row is held.');
 			// The screen's clock: the card's week is drawn at the instant the screen's rows are.

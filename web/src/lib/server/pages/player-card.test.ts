@@ -73,14 +73,14 @@ void test('rest of season is his points from the first week and his rank in our 
 	assert.equal(preseason.caption, 'PPR points for 2026, WR1 in our order');
 });
 
-void test("a held player's tile gives the word, never the rank his figure would earn (Lane 63)", () => {
+void test("a held player's tile gives no rank his figure would earn, the pill saying the list (Lane 63, 128)", () => {
 	assert.equal(
 		restTile(IN_SEASON, NUMBERS, 'RB', 2026, HELD).caption,
-		'from week 6, RB IR, unranked while on a season-long list'
+		'from week 6, unranked while on a season-long list'
 	);
 	assert.equal(
 		restTile(PRESEASON, NUMBERS, 'RB', 2026, HELD).caption,
-		'PPR points for 2026, RB IR, unranked while on a season-long list'
+		'PPR points for 2026, unranked while on a season-long list'
 	);
 	// A designation for the week is no season-long list: the rank stands.
 	assert.equal(

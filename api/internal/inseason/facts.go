@@ -87,6 +87,11 @@ type Designation struct {
 	// leaves out. Never on the wire; the Stash group reads it (Lane 118
 	// fix round 1).
 	Back *int
+	// SeasonLong is a status that keeps him off the field for weeks:
+	// boards.Designation.SeasonLong (its note read, so out for the season
+	// counts), and the host's IR mark. The one list the line's rank, the
+	// order and the week's figures read (Lane 128).
+	SeasonLong bool
 	// Pending is a designation whose dating is still pending
 	// (boards.DatingPending, a cold start's failed runs read): not yet
 	// known, so never on the wire and never carried over (Lane 116, B91).
@@ -139,6 +144,14 @@ func (f Facts) Tier() Tier {
 // InjuredReserve is a player listed on injured reserve.
 func (f Facts) InjuredReserve() bool {
 	return f.Designation != nil && f.Designation.Status == boards.StatusInjuredReserve
+}
+
+// SeasonLong is a player on a season-long list (Designation.SeasonLong):
+// the in-season order never ranks him as playing (the 2026-10-16 ruling),
+// so his line carries no rest-of-season rank (Lane 128, B106) and the
+// order places him after every available player.
+func (f Facts) SeasonLong() bool {
+	return f.Designation != nil && f.Designation.SeasonLong
 }
 
 type teamWeek struct {
@@ -436,11 +449,11 @@ func (s *Season) designation(p Player) *Designation {
 		if status := boards.StatusOf(d.Code); status != "" {
 			return &Designation{Status: status, AsOf: d.AsOf, Since: d.Since, Listed: d.Listed,
 				CarriedOver: s.carriedOver(d, p.Team), ReturnWeek: s.returnAfter(d.ReturnOn), Back: s.returnFrom(d.ReturnOn),
-				Pending: d.DatingPending}
+				Pending: d.DatingPending, SeasonLong: d.SeasonLong()}
 		}
 	}
 	if p.HostIR {
-		return &Designation{Status: boards.StatusInjuredReserve, AsOf: p.ReadAt}
+		return &Designation{Status: boards.StatusInjuredReserve, AsOf: p.ReadAt, SeasonLong: true}
 	}
 	return nil
 }

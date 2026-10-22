@@ -5,8 +5,10 @@
 //     his club, a kicker with no row of his own by his club's one kicker, the PPR column (the league
 //     scores most like PPR); null without a row, and null for a club with no game this week (a bye),
 //     whatever the snapshot holds;
-//   - stand-in designations (Rome Odunze Questionable, Tank Bigsby on injured reserve, Chig Okonkwo
-//     out) so a shot shows the status pill both ways and a spot no one can play;
+//   - the season-long lists of the capture the stand-in run is marked with (scripts/
+//     standin-designations.json, Lane 128), each such line with no rest-of-season rank, as the API
+//     sends it; and stand-in week designations (Rome Odunze Questionable, Chig Okonkwo out) so a shot
+//     shows the status pill both ways and a spot no one can play;
 //   - projection_scoring on both answers (PPR, the closest to the recorded league's own rules);
 //   - projection_read_at on the lineup, a stand-in stamp of the fixture's own Friday evening, and the
 //     lineup's basis in the API's words since its rows end on the projection;
@@ -41,6 +43,7 @@ import type {
 	WaiverAdvice
 } from '../../src/lib/league/inseason/api.ts';
 import { lastName } from '../../src/lib/format/draft.ts';
+import { designationsSchema } from '../../src/lib/run/schema.ts';
 import { IN_RESERVE, advise } from './advise.ts';
 import {
 	accepts,
@@ -124,21 +127,65 @@ function weekProjection(line: PlayerLine): number | null {
 
 /** Every player line in an answer, stamped, however deep. */
 /** Two stand-in designations, so a shot shows Lane 63's pill both ways (review M2): one starter
- * Questionable on the week's report, one bench player on injured reserve. The run holds no
- * designations for the recorded week; these are the fixture's own. */
+ * Questionable on the week's report, and the bench's one tight end out. These week designations are
+ * the fixture's own. */
 const DESIGNATED_AS_OF = '2026-10-16T21:00:00.000Z';
 const DESIGNATIONS: Readonly<Record<string, DesignationStatus>> = {
 	'Rome Odunze': 'questionable',
-	'Tank Bigsby': 'injured_reserve',
 	// Lane 66e: the bench's one tight end is out while the starter is on bye, so the TE spot has no
 	// one who can play and a shot shows its chip and its row.
 	'Chig Okonkwo': 'out'
 };
 
+/** The season-long lists the stand-in run is marked with (scripts/standin-designations.json, Lane
+ * 128): the league reads the one capture the run's pages read, so a row and his card never disagree
+ * on who is on injured reserve. A week's status there is left to the fixture's own week above. */
+const CAPTURE = designationsSchema.parse(
+	JSON.parse(await readFile(new URL('../standin-designations.json', import.meta.url), 'utf8'))
+);
+const SEASON_LONG = new Map(
+	Object.entries(CAPTURE.players).filter(([, status]) => status.seasonLong)
+);
+
+/** The stand-in run's position ranks, playing first (run-from-mock-data.ts playingFirst, the API's
+ * PlayingRanks, Lane 128 review fix round 2): one position rank per player on every screen. */
+const RUNS = new URL('../../.runs/runs/', import.meta.url);
+const RUN_ID = (
+	JSON.parse(await readFile(new URL('latest.json', RUNS), 'utf8')) as { runId: string }
+).runId;
+const PLAYING_RANKS = new Map(
+	(
+		JSON.parse(await readFile(new URL(`${RUN_ID}/boards/ppr-12.json`, RUNS), 'utf8')) as {
+			rows: { id: string; positionRank: number }[];
+		}
+	).rows.map((row) => [row.id, row.positionRank])
+);
+
+/** His designation on the week: a season-long list from the run's capture (with no rest-of-season
+ * rank, the in-season order never ranking him as playing), else the fixture's week stand-in, his rank
+ * the run's playing-first one. */
 function designated(line: PlayerLine): PlayerLine {
+	const listed = line.player.board_id === null ? undefined : SEASON_LONG.get(line.player.board_id);
+	if (listed !== undefined) {
+		const designation = {
+			status: listed.status,
+			as_of: CAPTURE.readAt,
+			since: listed.since,
+			season_long: true
+		};
+		return { ...line, position_rank: null, facts: { ...line.facts, designation } };
+	}
+	const ranked = playingRank(line);
 	const status = DESIGNATIONS[line.player.name];
-	if (status === undefined) return line;
-	return { ...line, facts: { ...line.facts, designation: { status, as_of: DESIGNATED_AS_OF } } };
+	if (status === undefined) return ranked;
+	return { ...ranked, facts: { ...line.facts, designation: { status, as_of: DESIGNATED_AS_OF } } };
+}
+
+/** His line with the run's playing-first position rank, where it ranks him. */
+function playingRank(line: PlayerLine): PlayerLine {
+	const id = line.player.board_id;
+	const rank = id === null || line.position_rank === null ? undefined : PLAYING_RANKS.get(id);
+	return rank === undefined ? line : { ...line, position_rank: rank };
 }
 
 /** A small stable number from words, for the stand-in evidence: the same line stamps alike on every

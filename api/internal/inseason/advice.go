@@ -65,6 +65,9 @@ type advisor struct {
 	// league's (Snap.Week), or the week after on an action screen once the
 	// member's lineup has played its week (Lane 95, turnTo).
 	week int
+	// playing is the read's playing-first position ranks (playingRanks),
+	// computed once.
+	playing map[string]int
 	// data is the season's facts the Season indexes, kept for turnTo.
 	data Data
 	// platform is the league platform's points for its week (Lane 111),
@@ -306,11 +309,15 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 		position, team = bp.Position, bp.Team
 	}
 	facts := a.season.For(Player{BoardID: boardID, Team: team, Position: position, HostIR: lp.InjuredReserve, ReadAt: a.Snap.ReadAt})
-	c := Candidate{ID: id, Position: position, Rank: a.Board.PositionRanks[boardID], Tier: facts.Tier(),
+	// His place among the players who play (PlayingRanks, Lane 128): the one
+	// position rank the line, the badge, the caption and the order's # say.
+	c := Candidate{ID: id, Position: position, Rank: a.playingRanks()[boardID], Tier: facts.Tier(),
 		Locked: facts.Locked, InjuredReserve: facts.InjuredReserve()}
 	line := apitypes.PlayerLine{Player: lp, Held: boardID != "" && a.held[boardID], Facts: wireFacts(facts, thisWeek(a.Snap.Ref.Host, side, id, facts))}
 	words := Line{Name: lp.Name, Position: position, Rank: c.Rank, Facts: facts}
-	if c.Rank > 0 {
+	// A player on a season-long list is not ranked as playing: his line
+	// draws no rank (Lane 128), while the engine still orders him by it.
+	if c.Rank > 0 && !facts.SeasonLong() {
 		rank := c.Rank
 		line.PositionRank = &rank
 	}
@@ -333,7 +340,8 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 	if placed {
 		// A kicker or defense has no page, so no link (founder ruling 2026-10-17).
 		if cardPositions[position] {
-			line.Slug = a.pages.of(bp.Name, c.Rank > 0)
+			// His page stands while a list holds him (the board still places him).
+			line.Slug = a.pages.of(bp.Name, a.Board.PositionRanks[boardID] > 0)
 		}
 		line.RestOfSeasonPerGame = RestOfSeasonPerGame(a.Board, bp, a.gamesLeft)
 	}
@@ -489,6 +497,10 @@ func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
 		if d.CarriedOver {
 			carried := true
 			out.Designation.CarriedOver = &carried
+		}
+		if d.SeasonLong {
+			long := true
+			out.Designation.SeasonLong = &long
 		}
 	}
 	for _, g := range f.LastGames {
