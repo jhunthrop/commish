@@ -3190,6 +3190,9 @@ type MatchupBoxSide struct {
 	// Bench the side's other active players, by our order (injured reserve and taxi spots left out)
 	Bench []PlayerLine `json:"bench"`
 
+	// BestLineupSkipped true where our best lineup (projection_best_lineup) passed over a player with no week projection who can play and would start in it were he counted (Lane 137, B107): his slot takes the next best player with a Proj and stays empty only where none can fill it, the Proj summed from the slots filled. Absent otherwise and from an older answer
+	BestLineupSkipped *bool `json:"best_lineup_skipped,omitempty"`
+
 	// PlayerPoints the host gives each player's points for this side; false where it gives the side's total alone
 	PlayerPoints bool `json:"player_points"`
 
@@ -3199,7 +3202,10 @@ type MatchupBoxSide struct {
 	// ProjectedFinalPaced true where projected_final counts a player of our best lineup in play at his projection's pace (the read gives no player's points and some of his game is left, Lane 127 fix round 3); absent otherwise and from an older answer
 	ProjectedFinalPaced *bool `json:"projected_final_paced,omitempty"`
 
-	// ProjectionBestLineup true where projected_final is our best lineup's from the side's roster (Lane 127): a side the platform lists no starters for whose roster the league read carries. Absent otherwise and from an older answer
+	// Projection for a side the platform lists no starters for whose roster the league read carries (projection_best_lineup), our best lineup's week projection from that roster, the figure ScoreboardSide.projection gives the same side (Lane 137, B107: one figure per side across screens); null where that lineup fills no slot. Absent for a side that lists starters, whose Proj its starters' rows add, for one with no roster read, and from an older answer
+	Projection *float64 `json:"projection,omitempty"`
+
+	// ProjectionBestLineup true where projection and projected_final are our best lineup's from the side's roster (Lane 127, Lane 137): a side the platform lists no starters for whose roster the league read carries. Absent otherwise and from an older answer
 	ProjectionBestLineup *bool `json:"projection_best_lineup,omitempty"`
 	RosterId             int   `json:"roster_id"`
 
@@ -4004,6 +4010,9 @@ type ScoreboardGameState string
 
 // ScoreboardSide defines model for ScoreboardSide.
 type ScoreboardSide struct {
+	// BestLineupSkipped true where our best lineup (projection_best_lineup) passed over a player with no week projection who can play and would start in it were he counted (Lane 137, B107): his slot takes the next best player with a Proj and stays empty only where none can fill it, the Proj summed from the slots filled. Absent otherwise and from an older answer
+	BestLineupSkipped *bool `json:"best_lineup_skipped,omitempty"`
+
 	// InPlay the side's starters whose own game has kicked off and is not final at the read's clock (gameStateAt), an out starter not counted: 0 before kickoff, between games (a Thursday starter final, Sunday's still to come) and once every starter is final; absent from an older answer, which reads as none in play
 	InPlay *int `json:"in_play,omitempty"`
 

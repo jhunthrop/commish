@@ -17,6 +17,8 @@ import { hostWords } from '../names.ts';
 import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
 import {
 	AS_OF_KICKOFF,
+	unlistedLong,
+	unlistedPhoneForm,
 	leagueScoringWords,
 	finalNonePart,
 	NONE_UNLISTED,
@@ -119,6 +121,8 @@ export interface BugSide {
 	/** Its Proj final counts a player in play at his projection's pace (projected_final_paced, Lane 127
 	 * fix round 3). */
 	paced: boolean;
+	/** Its best lineup passed over a player with no Proj (best_lineup_skipped, Lane 137 B107). */
+	skipped: boolean;
 	/** The big figure (Lane 92, B22): its Proj before the first kickoff, its Pts from it. */
 	big: string;
 	/** "3 to play", "2 playing" while the game is under way (the API's to_play), else empty. */
@@ -310,6 +314,7 @@ export function bugsOf(
 					unlisted: side.schedule_state !== undefined,
 					bestLineup: side.projection_best_lineup === true,
 					paced: side.projected_final_paced === true,
+					skipped: side.best_lineup_skipped === true,
 					...sideFigures(side, head.state, final, columns.small === BOX.final),
 					toPlay: head.state === 'kicked_off' ? (side.to_play ?? '') : '',
 					stands: standsOf(game, side, started)
@@ -380,9 +385,12 @@ export function unlistedDrawn(bugs: readonly Bug[]): UnlistedDrawn {
 			.map((s) => ({ s, figure: drawnFigure(b.state, s) }))
 			.filter(({ figure }) => figure !== null)
 	);
+	const best = drawn.filter(({ s, figure }) => s.bestLineup && figure !== BOX.none);
 	return {
-		bestLineup: drawn.some(({ s, figure }) => s.bestLineup && figure !== BOX.none),
+		bestLineup: best.length > 0,
 		noRoster: drawn.some(({ s, figure }) => !s.bestLineup && figure === BOX.none),
+		// A best lineup drawn that passed over a player with no Proj (Lane 137, B107).
+		skipped: best.some(({ s }) => s.skipped),
 		// A Proj final drawn from a best lineup: a game under way, the side not final (fix round 3).
 		paced: bugs.some(
 			(b) =>
@@ -956,11 +964,16 @@ export function teamBasis(
 	/** A final side draws "--" for its total (bugsFinalNone): why is said. */
 	finalNone = false,
 	/** What the sides the platform lists no starters for draw (unlistedDrawn): each said once. */
-	unlisted: UnlistedDrawn = NONE_UNLISTED
+	unlisted: UnlistedDrawn = NONE_UNLISTED,
+	/** The width it is said at: a phone with the teams' words long (unlistedLong) leaves FFPC's tight
+	 * end extra and "as of kickoff" to the desk and says the teams' words short (unlistedPhoneForm),
+	 * never a drawn figure's sentence (Lane 137 fix round 1, HIGH-2). */
+	width: 'desk' | 'phone' = 'desk'
 ): string {
 	const platform = hostWords(host);
 	const team = byPlayer ? `, ${BOX.totals} adds the rows` : '';
-	const bonus = scoring.league_own ? null : teBonusSentence(scoring.te_bonus, host);
+	const crowded = width === 'phone' && unlistedLong(unlisted);
+	const bonus = scoring.league_own || crowded ? null : teBonusSentence(scoring.te_bonus, host);
 	const whose = leagueScoringWords(scoring, host);
 	const when =
 		readAt === null
@@ -971,11 +984,12 @@ export function teamBasis(
 	const words = [
 		projFinalPhone(projFinal, missing),
 		finalNone ? finalNonePart(host) : '',
-		unlistedPart(host, unlisted)
+		unlistedPart(host, unlisted, crowded ? unlistedPhoneForm(unlisted) : 'full')
 	]
 		.filter((w) => w !== '')
 		.join(' ');
 	const final = words === '' ? '' : ` ${words}`;
 	const extra = bonus === null ? '' : ` ${bonus}`;
-	return `A team's ${BOX.proj} adds its starters' published projections${whose}, ${when}${started ? `, ${AS_OF_KICKOFF}` : ''}.${extra} ${BOX.pts} are ${platform}'s so far${team}.${final}`;
+	const asOf = started && !crowded;
+	return `A team's ${BOX.proj} adds its starters' published projections${whose}, ${when}${asOf ? `, ${AS_OF_KICKOFF}` : ''}.${extra} ${BOX.pts} are ${platform}'s so far${team}.${final}`;
 }

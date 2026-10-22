@@ -175,9 +175,9 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 	rostered := make([]bool, len(sides))
 	for i, s := range sides {
 		unlisted[i] = a.scheduleRead(s)
-		if lineup, ok := a.rosterLineup(s); ok {
-			lineups[i], rostered[i] = lineup, true
-			out.Sides[i].Projection, out.Sides[i].ProjectionBestLineup = printedLines(lineup), &ok
+		if best, ok := a.rosterLineup(s); ok {
+			lineups[i], rostered[i] = best.lines, true
+			out.Sides[i].Projection, out.Sides[i].ProjectionBestLineup, out.Sides[i].BestLineupSkipped = rosterProjection(best)
 		}
 	}
 	out.State, out.NextKickoff = gameState(game, unlisted)

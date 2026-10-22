@@ -3283,8 +3283,15 @@ export interface components {
 			 * @description the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far, the rest of the Proj of its starters in play and the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, for a side the platform lists no starters for and whose roster the read does not carry, or absent from an older answer. For a side listing no starters whose roster the read carries (projection_best_lineup), its score so far plus the Proj of our best lineup's players still to play and the rest of the Proj of one in play where the read gives his points (Lane 92), else his Proj times the share of his game left (3 h 15 m from kickoff, held between 0 and 1), one final adding nothing (Lane 127)
 			 */
 			projected_final?: number | null;
-			/** @description true where projected_final is our best lineup's from the side's roster (Lane 127): a side the platform lists no starters for whose roster the league read carries. Absent otherwise and from an older answer */
+			/** @description true where projection and projected_final are our best lineup's from the side's roster (Lane 127, Lane 137): a side the platform lists no starters for whose roster the league read carries. Absent otherwise and from an older answer */
 			projection_best_lineup?: boolean;
+			/**
+			 * Format: double
+			 * @description for a side the platform lists no starters for whose roster the league read carries (projection_best_lineup), our best lineup's week projection from that roster, the figure ScoreboardSide.projection gives the same side (Lane 137, B107: one figure per side across screens); null where that lineup fills no slot. Absent for a side that lists starters, whose Proj its starters' rows add, for one with no roster read, and from an older answer
+			 */
+			projection?: number | null;
+			/** @description true where our best lineup (projection_best_lineup) passed over a player with no week projection who can play and would start in it were he counted (Lane 137, B107): his slot takes the next best player with a Proj and stays empty only where none can fill it, the Proj summed from the slots filled. Absent otherwise and from an older answer */
+			best_lineup_skipped?: boolean;
 			/** @description true where projected_final counts a player of our best lineup in play at his projection's pace (the read gives no player's points and some of his game is left, Lane 127 fix round 3); absent otherwise and from an older answer */
 			projected_final_paced?: boolean;
 			/** @description the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents) */
@@ -3324,6 +3331,8 @@ export interface components {
 			projection: number | null;
 			/** @description true where projection is our best lineup from the side's roster (Lane 127, B105): a side the platform lists no starters for whose roster the league read carries. Absent for a side that lists starters, for one with no roster read, and from an older answer, whose projection for such a side is null */
 			projection_best_lineup?: boolean;
+			/** @description true where our best lineup (projection_best_lineup) passed over a player with no week projection who can play and would start in it were he counted (Lane 137, B107): his slot takes the next best player with a Proj and stays empty only where none can fill it, the Proj summed from the slots filled. Absent otherwise and from an older answer */
+			best_lineup_skipped?: boolean;
 			/** @description true where projected_final counts a player of our best lineup in play at his projection's pace (the read gives no player's points and some of his game is left, Lane 127 fix round 3); absent otherwise and from an older answer */
 			projected_final_paced?: boolean;
 			/** @description the starters the host lists for the side */
