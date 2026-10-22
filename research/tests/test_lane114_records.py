@@ -235,7 +235,7 @@ def test_the_draft_record_grades_the_first_freeze_on_the_complete_weeks(engine: 
     assert out["throughWeek"] == _COUNTED_THROUGH
     assert out["honest"] is None  # ours led on every figure
     assert out["namedBasis"] == (
-        "Top named counts the season's top 36 WRs so far, and how many of them the order also put in its top 36."
+        "Top named counts how many of the season's top 36 WRs so far the order also ranked that high."
     )
 
 

@@ -38,7 +38,6 @@ import {
 	round,
 	runLines,
 	tenth,
-	waiverSentence,
 	type BoardRow,
 	type Game
 } from './run-lines.ts';
@@ -54,6 +53,7 @@ import {
 	STANDARD_HORIZON
 } from './week.ts';
 import { leagueFields } from './league-fields.ts';
+import { eligible, rankOf, standInLineup, vorOf } from './stand-in-lineup.ts';
 import type { LeaguePlayer, LeagueSync, MatchupSide } from '../../src/lib/league/api.ts';
 import type {
 	AdviceHead,
@@ -84,8 +84,6 @@ const CLOSE_FOR_THEM = 0.5;
 /** The last games a change's reason names. */
 const NAMED_GAMES = 2;
 const SKILL = new Set(['QB', 'RB', 'WR', 'TE']);
-const FLEX = new Set(['RB', 'WR', 'TE']);
-const SUPER_FLEX = new Set(['QB', 'RB', 'WR', 'TE']);
 /** Sleeper sends a roster's points as whole points and hundredths. */
 const DECIMALS = 100;
 /** The one player the fixture's member tags Hold: a sheet tag, not a figure. */
@@ -261,57 +259,8 @@ function leaguePlayer(id: string, rosterId: number | null): LeaguePlayer {
 	};
 }
 
-// The lineup stand-in: a slot's eligible players best first, fixed slots before the flexes.
-const slots = league.roster_positions.filter((s) => s !== 'BN');
-
-function eligible(slot: string, position: string): boolean {
-	if (slot === 'FLEX') return FLEX.has(position);
-	if (slot === 'SUPER_FLEX') return SUPER_FLEX.has(position);
-	return slot === position;
-}
-
-const vorOf = (line: PlayerLine): number => line.points_over_replacement ?? 0;
-const rankOf = (line: PlayerLine): number => line.position_rank ?? Number.POSITIVE_INFINITY;
-
-/** Fills the slots. thisWeek: a player on bye is never started over one who plays. preferred: the
- * host's starters win a tie (two unranked defenses keep the one the host has in). */
-function fill(
-	lines: readonly PlayerLine[],
-	thisWeek: boolean,
-	preferred: ReadonlySet<string> = new Set()
-): (PlayerLine | null)[] {
-	const out: (PlayerLine | null)[] = slots.map(() => null);
-	const used = new Set<string>();
-	const plays = (l: PlayerLine): number => (thisWeek && l.facts.bye ? 1 : 0);
-	const pick = (i: number, flex: boolean): void => {
-		const slot = slots[i] ?? '';
-		const best = lines
-			.filter((l) => !used.has(l.player.host_id) && eligible(slot, l.player.position))
-			.sort(
-				(a, b) =>
-					plays(a) - plays(b) ||
-					(flex ? 0 : rankOf(a) - rankOf(b)) ||
-					vorOf(b) - vorOf(a) ||
-					Number(preferred.has(b.player.host_id)) - Number(preferred.has(a.player.host_id))
-			)[0];
-		if (best) {
-			used.add(best.player.host_id);
-			out[i] = best;
-		}
-	};
-	slots.forEach((slot, i) => {
-		if (!slot.includes('FLEX')) pick(i, false);
-	});
-	slots.forEach((slot, i) => {
-		if (slot.includes('FLEX')) pick(i, true);
-	});
-	return out;
-}
-
-const strength = (filled: readonly (PlayerLine | null)[]): number =>
-	filled.reduce((sum, l) => sum + (l ? vorOf(l) : 0), 0);
-const fillsEvery = (filled: readonly (PlayerLine | null)[]): boolean =>
-	filled.every((l, i) => l !== null || slots[i] === 'DEF');
+// The lineup stand-in (stand-in-lineup.ts), shared with project.ts's added waiver rows.
+const { slots, fill, strength, fillsEvery, waiverAdd } = standInLineup(league.roster_positions);
 
 const usersById = new Map(users.map((u) => [u.user_id, u] as const));
 const teamName = (r: SleeperRoster): string =>
@@ -472,36 +421,16 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 		[...candidates, ...listed.filter((r) => !candidates.includes(r))].map(boardLine)
 	);
 	const kept = new Set(listed.map((r) => r.id));
-	const defenses = myLines.filter((l) => l.player.position === 'DEF').length;
-	const droppable = myLines.filter(
-		(l) => l.player.position !== 'DEF' || defenses > slots.filter((s) => s === 'DEF').length
-	);
-	const base = strength(fill(myLines, false));
-	const thisWeek = fill(myLines, true);
-	const rows = pool.map((add): WaiverRow => {
-		const options = droppable.map((drop) => {
-			const roster = [...myLines.filter((l) => l !== drop), add];
-			return { drop, after: strength(fill(roster, false)), roster };
-		});
-		const best = options.sort((a, b) => b.after - a.after || vorOf(a.drop) - vorOf(b.drop))[0];
-		const week = best ? fill(best.roster, true) : thisWeek;
-		const at = week.findIndex((l) => l === add);
-		const gain = best ? tenth(best.after - base) : 0;
-		return {
-			add,
-			drop: best?.drop ?? null,
-			gain,
-			// As the API answers: he starts for you only with a gain to show.
-			starts: at >= 0 && gain > 0,
-			sentence: waiverSentence(add, best?.drop ?? null, gain, at >= 0),
-			// The week's figures (Lane 66f) need the projection: project.ts stamps them.
-			week_gain: 0,
-			pickup: false,
-			beats: null,
-			drops: [],
-			clears: null
-		};
-	});
+	const rows = pool.map((add): WaiverRow => ({
+		add,
+		...waiverAdd(add, myLines),
+		// The week's figures (Lane 66f) need the projection: project.ts stamps them.
+		week_gain: 0,
+		pickup: false,
+		beats: null,
+		drops: [],
+		clears: null
+	}));
 	const gaining = rows.filter((r) => r.gain > 0).sort((a, b) => b.gain - a.gain);
 	const still = rows.filter((r) => r.gain <= 0);
 	const rest = [

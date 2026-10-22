@@ -2,6 +2,7 @@
 // API's clock: his player page and his row on the Players list. Each asserts what it shows: the card's
 // club cell reads "FA" with no club link and no mark, the card's week says "No club", the line under the
 // card says he is now a free agent and whose his last game was, the log lists no week past the records,
+// his week of offensive snaps with no club edge reads "Played, no stats" (Lane 138),
 // the Players row's club cell reads "FA" and its game cell "No club", and the page's copy passes the one
 // guard (copy-scan.ts).
 // STAND-INS, named here and in the lane's report:
@@ -22,6 +23,7 @@ import { copyFault, watchData } from './copy-scan.ts';
 import { FREE_AGENT_CLUB } from '../src/lib/format/free-agent.ts';
 import { BOX } from '../src/lib/league/box/box.ts';
 import { lastGameClubWords } from '../src/lib/player/club-words.ts';
+import { SEASON_LOG_WORDS } from '../src/lib/run/season-log-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { fixtureApiClock, installFixtureApiClock } from './inseason-fixture/clock.ts';
 
@@ -37,6 +39,8 @@ const GIBBS = '4429795';
 const NOTE = lastGameClubWords(null, 5, { nickname: 'Lions' });
 /** The run's records reach week 5: no later week is a row. */
 const THROUGH = 5;
+/** His week of offensive snaps with no club edge (mover-run.ts). */
+const UNNAMED_GAME_WEEK = 3;
 
 const web = process.argv[2] ?? 'http://localhost:4173';
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
@@ -126,9 +130,19 @@ try {
 						head?.querySelector('.club img') !== undefined,
 					weeks: [...document.querySelectorAll('main table tbody tr')]
 						.map((tr) => Number(tr.querySelector('td, th')?.textContent.trim() ?? ''))
-						.filter((week) => Number.isFinite(week) && week > 0)
+						.filter((week) => Number.isFinite(week) && week > 0),
+					rows: [...document.querySelectorAll('main table tbody tr')].map((tr) => ({
+						week: Number(tr.querySelector('td, th')?.textContent.trim() ?? ''),
+						text: tr.textContent.replace(/\s+/g, ' ').trim()
+					}))
 				};
 			});
+			const unnamed = card.rows.find((r) => r.week === UNNAMED_GAME_WEEK)?.text ?? '';
+			if (
+				!unnamed.includes(SEASON_LOG_WORDS.playedNoStats) ||
+				unnamed.includes(SEASON_LOG_WORDS.didNotPlay)
+			)
+				faults.push(`${where}: his week ${String(UNNAMED_GAME_WEEK)} row reads "${unnamed}"`);
 			if (card.club !== FREE_AGENT_CLUB)
 				faults.push(`${where}: the card's club reads "${card.club}"`);
 			if (card.link || card.mark) faults.push(`${where}: the card links or marks a club`);

@@ -8,8 +8,10 @@
 //               newest line is the Chargers' (`lastGameClub` LAC, week 6); weeks 1 to 4, before his
 //               first line with a club the run can name, name no opponent.
 //   free-agent  (free-agent-shots.ts, Lane 123): STAND-IN, a constructed free agent. His club is "FA";
-//               his Lions lines of weeks 1 to 5 kept; every later week names no opponent; his newest
-//               line is the Lions' (`lastGameClub` DET, week 5).
+//               his Lions lines of weeks 1, 2, 4 and 5 kept; week 3 his offensive snaps with no club edge,
+//               which names no opponent and is a game he played the run cannot name (`unnamedGame`, Lane
+//               138); every later week names no opponent; his newest line is the Lions' (`lastGameClub`
+//               DET, week 5).
 //
 //   node scripts/inseason-fixture/mover-run.ts mover|free-agent
 // then build with PUBLIC_RUN_ID=<the run's id> PUBLIC_RUN_BASE_URL=.runs and start the fixture API
@@ -35,6 +37,8 @@ const UNPLACED_WEEKS = [1, 2, 3, 4];
 const STAND_IN_WEEK = 4;
 /** The free agent's last week with a club. */
 const LAST_CLUB_WEEK = 5;
+/** The free agent's week of offensive snaps with no club edge (Lane 138). */
+const UNNAMED_GAME_WEEK = 3;
 
 const kind = process.argv[2];
 if (kind !== 'mover' && kind !== 'free-agent')
@@ -118,7 +122,10 @@ function moved(page: Json, schedule: ReturnType<typeof scheduleSchema.parse>): J
 function freeAgent(page: Json): Json {
 	const season = page.season as PlayerSeason;
 	const later = season.log.filter((row) => row.week > LAST_CLUB_WEEK);
-	const rows = Object.fromEntries(later.map((row) => [row.week, UNPLACED]));
+	const rows = {
+		...Object.fromEntries(later.map((row) => [row.week, UNPLACED])),
+		[UNNAMED_GAME_WEEK]: { ...UNPLACED, unnamedGame: true as const }
+	};
 	return {
 		...page,
 		team: FREE_AGENT_CLUB,
