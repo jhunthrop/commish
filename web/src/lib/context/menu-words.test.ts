@@ -50,6 +50,6 @@ void test("the menu's last row follows another league only for an account that m
 	assert.equal(FOLLOW_ANOTHER, 'Follow another league');
 	assert.equal(menuLast(0, false), 'follow-first');
 	assert.equal(menuLast(2, true), 'follow-another');
-	// A free account with its one league reads what more leagues come with, last.
-	assert.equal(menuLast(1, false), 'one-league-free');
+	// An account that may follow no more gets no row, and nothing says what more leagues come with.
+	assert.equal(menuLast(1, false), null);
 });

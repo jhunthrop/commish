@@ -8,7 +8,7 @@
 	interface Props {
 		leagues: readonly League[];
 		busy: boolean;
-		/** The account drafts a league's own scoring rules (the Draft Pass's custom_scoring). */
+		/** The account drafts a league's own scoring rules (custom_scoring). */
 		exactRules: boolean;
 		onmock: (league: League) => void;
 	}

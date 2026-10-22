@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, type Snippet } from 'svelte';
+	import { onMount } from 'svelte';
 	import { hostWords } from '#lib/league/names.ts';
 	import ESPNConnect from './ESPNConnect.svelte';
 	import LeagueChoice from './LeagueChoice.svelte';
@@ -30,11 +30,9 @@
 		most?: number;
 		/** Leagues already followed, by the host's league id, to our league's page. */
 		followed?: ReadonlyMap<string, string>;
-		/** A line under the chips, like what more leagues come with. */
-		limit?: Snippet;
 	}
 
-	let { host, verb, onpick, most = 1, followed = new Map(), limit }: Props = $props();
+	let { host, verb, onpick, most = 1, followed = new Map() }: Props = $props();
 
 	type View = 'loading' | 'off' | 'connect' | 'again' | 'leagues' | 'unreachable';
 
@@ -118,16 +116,7 @@
 	</p>
 {:else}
 	{#if note}<p class="line note" role="status">{note}</p>{/if}
-	<LeagueChoice
-		host={name}
-		{leagues}
-		{verb}
-		{onpick}
-		{most}
-		{followed}
-		{limit}
-		onfailure={connectAgain}
-	/>
+	<LeagueChoice host={name} {leagues} {verb} {onpick} {most} {followed} onfailure={connectAgain} />
 {/if}
 
 <style>

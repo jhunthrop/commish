@@ -12,7 +12,6 @@
 	import { followedCount, followingWords } from './follow-many.ts';
 	import { followedName } from './model.ts';
 	import { ATTACHED_WORDS, attachedRow } from './attached-rows.ts';
-	import OneLeagueFree from './OneLeagueFree.svelte';
 
 	interface Props {
 		/** What the account may use (/me, Can): many_leagues follows more than one league. */
@@ -37,8 +36,6 @@
 	/** How many leagues were just followed, when the attach page sent the reader here to see them. */
 	let followed = $state<number | null>(null);
 	const many = $derived(hasFeature(features, 'many_leagues'));
-	/** The leagues still followed, the ones detached a moment ago left out. */
-	const live = $derived((leagues ?? []).filter((l) => !detached.has(l.id)).length);
 
 	/** How long a detached league stays on the list with its undo. */
 	const UNDO_MS = 10_000;
@@ -141,8 +138,6 @@
 		<div class="tfoot">
 			{#if many}
 				<Quiet size="sm" href={links.leagueNew()}>Follow another league</Quiet>
-			{:else if live > 0}
-				<OneLeagueFree />
 			{/if}
 		</div>
 	{:else if leagues}

@@ -1,5 +1,4 @@
-/** A saved league with its own scoring rules, drafted by an account without the Draft Pass's exact
- * rules: the preset the rules score most like, and the line that says so. The rule matches the API's
+/** A saved league with its own scoring rules, drafted by an account without custom_scoring: the preset the rules score most like, and the line that says so. The rule matches the API's
  * (api/internal/leaguesync/rules.go NearestPreset): by reception points, TE premium when a tight end's
  * catch counts more. A league attached from another host saves ScoringRules' names; an older custom
  * league may carry Sleeper's. */
@@ -39,14 +38,14 @@ export interface Rerun {
 	line: string | null;
 }
 
-/** The league as this account's mock drafts it: its own rules with the Draft Pass, the nearest
- * preset without. */
+/** The league as this account's mock drafts it: its own rules with custom_scoring, the nearest
+ * preset without, said as a fact and nothing about what the exact rules come with (Lane 150). */
 export function rerunOf(settings: LeagueSettings, exactRules: boolean): Rerun {
 	const custom = settings.scoring.custom;
 	if (exactRules || !custom) return { settings, line: null };
 	const preset = nearestPreset(custom);
 	return {
 		settings: { ...settings, scoring: { preset, custom: null } },
-		line: `Your league scores like ${presetWords(preset)}, the exact rules come with the Draft Pass`
+		line: `Your league scores like ${presetWords(preset)}, so the mock drafts on it`
 	};
 }

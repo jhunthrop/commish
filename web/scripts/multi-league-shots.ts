@@ -136,7 +136,7 @@ await detachAll(member);
 await detachAll(free);
 
 await shoot({ name: 'picker-membership', who: member, path: PICKER, ready: 'Follow my leagues' });
-await shoot({ name: 'picker-free', who: free, path: PICKER, ready: 'One league is free' });
+await shoot({ name: 'picker-free', who: free, path: PICKER, ready: 'Follow my league' });
 await shoot({
 	name: 'done',
 	who: member,
@@ -172,7 +172,7 @@ await shoot({
 });
 
 await call(free, 'POST', '/leagues/attach', { host: 'ffpc', link: FFPC_LEAGUE, me: {} });
-await shoot({ name: 'account-free', who: free, path: '/account', ready: 'One league is free' });
+await shoot({ name: 'account-free', who: free, path: '/account', ready: 'Your leagues' });
 await shoot({ name: 'picker-free-following', who: free, path: PICKER, ready: 'following' });
 await shoot({ name: 'ir-mark', who: free, path: '/system', ready: 'Face, on injured reserve' });
 await browser.close();

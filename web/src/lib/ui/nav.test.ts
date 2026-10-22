@@ -19,7 +19,8 @@ import {
 } from './nav.ts';
 import { leagueScreenOf, screenSection } from './rail-league.ts';
 import { BANNED_MARKS, BANNED_WORDS } from '#lib/format/copy-guard.ts';
-import { railFor, type RailEntry } from './rail-order.ts';
+import { railFor, railShown, type RailEntry } from './rail-order.ts';
+import { siteRailAt } from '#lib/run/site-season.ts';
 
 const labels = (items: readonly RailEntry[]): string[] => items.map((item) => item.label);
 const phone = (items: readonly RailEntry[]): string[] =>
@@ -187,4 +188,19 @@ void test('every rail word passes the copy guard', () => {
 		assert.ok(!BANNED_MARKS.test(item.label), item.label);
 	}
 	assert.ok(RAIL_ITEMS.some((item) => item.label === 'League'));
+});
+
+void test("the Advisor, a draft-day tool, is off the site's rail in season and back from the offseason, by the week names' clock rule (Lane 150)", () => {
+	// A season of two game days: week 1's kickoff and the last regular-season game (site-season.ts).
+	const kickoffs = ['2026-09-10T00:20:00Z', '2027-01-03T18:00:00Z'];
+	const advisorOn = (now: string, league: boolean): boolean =>
+		railShown(siteRailAt(new Date(now), kickoffs), league).some(
+			(item) => item.section === 'advisor'
+		);
+	for (const league of [false, true]) {
+		assert.equal(advisorOn('2026-08-20T12:00:00Z', league), true, 'preseason');
+		assert.equal(advisorOn('2026-10-22T16:00:00Z', league), false, 'week 7');
+		assert.equal(advisorOn('2027-01-20T16:00:00Z', league), false, 'the NFL playoffs');
+		assert.equal(advisorOn('2027-03-01T16:00:00Z', league), true, 'the offseason');
+	}
 });

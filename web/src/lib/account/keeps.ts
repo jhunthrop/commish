@@ -14,7 +14,7 @@ export function leaguesKeptText(open: OpenHosts): string {
 export interface KeepLine {
 	lead: string;
 	text: string;
-	link?: 'leagueNew' | 'pass';
+	link?: 'leagueNew';
 }
 
 /** The signed-out page's heading: in season the leagues are why to sign in, before the draft the prep. */
@@ -36,12 +36,7 @@ export function keeps(open: OpenHosts, inSeason: boolean): readonly KeepLine[] {
 		},
 		{ lead: 'Your mock drafts', text: 'and the report on each one' }
 	];
-	const pass: KeepLine = {
-		lead: 'Your Draft Pass or Membership',
-		text: 'and the receipts for it',
-		link: 'pass'
-	};
-	return inSeason ? [leagues, ...prep, pass] : [...prep, leagues, pass];
+	return inSeason ? [leagues, ...prep] : [...prep, leagues];
 }
 
 /** A host read as the member: a row whose verb signs in, then returns to the account page. */

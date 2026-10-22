@@ -226,6 +226,11 @@ export const FIXTURE_SEASON: Account['season'] = {
  * order as the run's pages do. Unset, the season answers none, as before. */
 export const BOARD_WEEK_VARIABLE = 'FIXTURE_BOARD_WEEK';
 
+/** The variable that has /billing/plans name the free season (Lane 149's `free_season`): "1" answers
+ * it true, "0" false (the founder ended it). Unset, the catalog answers without the field, as an API
+ * before Lane 149 does. */
+export const FREE_SEASON_VARIABLE = 'FIXTURE_FREE_SEASON';
+
 /** The fixture's season with the board's week when the variable names one. */
 export function fixtureSeason(boardWeek: string | undefined): Account['season'] {
 	if (boardWeek === undefined) return FIXTURE_SEASON;

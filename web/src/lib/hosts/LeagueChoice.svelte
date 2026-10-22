@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack, type Snippet } from 'svelte';
+	import { untrack } from 'svelte';
 	import ActionBar from '#lib/ui/ActionBar.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -25,8 +25,6 @@
 		most?: number;
 		/** Leagues already followed, by the host's league id, to our league's page. */
 		followed?: ReadonlyMap<string, string>;
-		/** A line under the chips, like what more leagues come with. */
-		limit?: Snippet;
 		/** A league number typed by hand too, labelled so, read into a league by typedLeague. */
 		typed?: { readonly label: string; readonly league: (number: string) => HostLeague | null };
 		/** A failure the caller answers itself (a host that asks for a sign-in again), true when it did. */
@@ -40,7 +38,6 @@
 		onpick,
 		most = 1,
 		followed = new Map(),
-		limit,
 		typed,
 		onfailure
 	}: Props = $props();
@@ -129,7 +126,6 @@
 		{/if}
 	{/each}
 </ChipGroup>
-{#if limit && open.length > most}{@render limit()}{/if}
 {#if typed}
 	<Field label={typed.label} bind:value={number} maxlength={12} onenter={() => void go()} />
 {/if}

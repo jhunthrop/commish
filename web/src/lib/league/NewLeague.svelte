@@ -46,7 +46,6 @@
 		hostsLine
 	} from './model.ts';
 	import { FLAGS } from '#lib/site/flags.ts';
-	import OneLeagueFree from './OneLeagueFree.svelte';
 	import { FOLLOW_FOR } from './phase-words.ts';
 	import { LEAGUE_HOME, SCREEN_PARAM } from '#lib/ui/nav.ts';
 	import { leagueScreenOf, screenSection } from '#lib/ui/rail-league.ts';
@@ -266,7 +265,6 @@
 					onpick={(leagues: HostLeague[]) => followOn('ffpc', leagues)}
 					most={room}
 					followed={followedOn('ffpc')}
-					limit={many ? undefined : oneLeagueFree}
 				/>
 			{:else if (yahooOn && way === 'yahoo') || (espnOn && way === 'espn')}
 				{@const host = way === 'yahoo' ? 'yahoo' : 'espn'}
@@ -277,7 +275,6 @@
 						onpick={(leagues: HostLeague[]) => followOn(host, leagues)}
 						most={room}
 						followed={followedOn(host)}
-						limit={many ? undefined : oneLeagueFree}
 					/>
 				{/key}
 			{:else}
@@ -329,10 +326,7 @@
 						</div>
 					{/if}
 				</div>
-				<ActionBar
-					alert={problem ? alert : undefined}
-					note={room === 0 ? oneLeagueFree : undefined}
-				>
+				<ActionBar alert={problem ? alert : undefined}>
 					<Verb disabled={!ready} onclick={() => void follow()}>Follow my league</Verb>
 				</ActionBar>
 			{/if}
@@ -356,10 +350,6 @@
 		{#if FLAGS.in_season_tools}{IN_SEASON_TOOLS_LINE}{/if}
 	</p>
 	<p class="hosts">{hostsLine({ ffpc: ffpcOn, yahoo: yahooOn, espn: espnOn })}</p>
-{/snippet}
-
-{#snippet oneLeagueFree()}
-	<OneLeagueFree />
 {/snippet}
 
 {#snippet alert()}

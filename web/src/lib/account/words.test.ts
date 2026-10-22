@@ -3,7 +3,8 @@
 // the preseason. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { draftToolsRecede } from './words.ts';
+import type { Account } from './account-api.ts';
+import { FREE_SEASON_PLAN, draftToolsRecede, planWords } from './words.ts';
 
 void test('the draft tools recede in the regular season and the NFL playoffs', () => {
 	assert.equal(draftToolsRecede({ phase: 'in_season' }), true);
@@ -13,4 +14,18 @@ void test('the draft tools recede in the regular season and the NFL playoffs', (
 void test('the draft tools return in the offseason and the preseason', () => {
 	assert.equal(draftToolsRecede({ phase: 'offseason' }), false);
 	assert.equal(draftToolsRecede({ phase: 'preseason' }), false);
+});
+
+/** An account with no plan, as /me answers a drafter who holds nothing. */
+const PLAIN = { membership: null, draft_pass: null } as unknown as Account;
+
+void test("the plan card follows the free season the catalog's flag says, and the not-free card promises no price (Lane 150 fix round 1)", () => {
+	assert.deepEqual(planWords(PLAIN, true), FREE_SEASON_PLAN);
+	const notFree = planWords(PLAIN, false);
+	assert.deepEqual(notFree, {
+		title: 'Free',
+		line: 'The board, every player, ADP and our record, mock drafts and your cheat sheet stay free.',
+		action: null
+	});
+	assert.doesNotMatch(`${notFree.title} ${notFree.line}`, /\$|price|paid|Draft Pass|Membership/i);
 });

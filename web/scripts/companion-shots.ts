@@ -1,12 +1,12 @@
 // Screenshots of the live-draft companion against a local api run with COMPANION_REPLAY=true and
-// BILLING_FAKE=true, in both themes at 1440 and 390: the start page with and without the pass, the
+// BILLING_FAKE=true, in both themes at 1440 and 390: the start page, the
 // recorded Sleeper draft replayed at the drafter's turn for a pass holder and for a member (the why on
 // every row, the range of outcomes and the synced sheet), between turns, and the report on the
 // finished draft.
 //
 //   node scripts/companion-shots.ts [web origin] [out dir]
 //
-// FRESH (no pass), PASS (the Draft Pass) and MEMBER are session:csrf pairs from
+// PASS (a pass holder) and MEMBER are session:csrf pairs from
 // `go run ./tools/roommeasure session -handle <name>` in api/. The member's sheet is set to our board's
 // top 40 so the synced sheet has rows to strike.
 import { mkdir } from 'node:fs/promises';
@@ -40,7 +40,6 @@ function drafter(name: string): Drafter {
 	return { session, csrf };
 }
 
-const fresh = drafter('FRESH');
 const holder = drafter('PASS');
 const member = drafter('MEMBER');
 
@@ -146,12 +145,6 @@ const live = await call<Made>(holder, 'POST', '/companions', {
 });
 const at = (made: Made): string => `/companion/${made.id}`;
 await shoot('new-form', member, () => Promise.resolve('/companion/new'), 'Follow my draft');
-await shoot(
-	'new-no-pass',
-	fresh,
-	() => Promise.resolve('/companion/new'),
-	'comes with the Draft Pass'
-);
 await shoot('turn-pass', holder, async () => at(await replay(holder)), 'Make the pick on Sleeper');
 await shoot(
 	'turn-member',

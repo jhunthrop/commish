@@ -73,10 +73,10 @@ void test('in season the signed-out page leads with your leagues, before the dra
 	assert.equal(signedOutTitle(false), 'Sign in to keep your prep');
 	assert.deepEqual(
 		keeps(ALL_OPEN, true).map((k) => k.lead),
-		['Your leagues', 'Your cheat sheets', 'Your mock drafts', 'Your Draft Pass or Membership']
+		['Your leagues', 'Your cheat sheets', 'Your mock drafts']
 	);
 	assert.deepEqual(
 		keeps(ALL_OPEN, false).map((k) => k.lead),
-		['Your cheat sheets', 'Your mock drafts', 'Your leagues', 'Your Draft Pass or Membership']
+		['Your cheat sheets', 'Your mock drafts', 'Your leagues']
 	);
 });

@@ -156,7 +156,7 @@
 		players = (await rooms.board(boardFormat)).players;
 	}
 
-	/** A saved league's mock: its own rules with the Draft Pass, the nearest preset without, from
+	/** A saved league's mock: its own rules with custom_scoring, the nearest preset without, from
 	 * its own slot or the one chosen on the form. A chosen slot drafts its settings rather than the
 	 * saved league, since the API takes a league or settings, not both. */
 	async function mockLeague(

@@ -12,7 +12,7 @@
 		/** A short fact that always fits one line: it keeps one line's room whatever the basis line
 		 * takes on a phone. */
 		short?: boolean;
-		/** The one link the line ends on: where a Draft Pass holder's exact board lives. */
+		/** The one link the line ends on: where an account with custom_scoring finds its exact board. */
 		link?: LeagueLine['link'];
 	}
 

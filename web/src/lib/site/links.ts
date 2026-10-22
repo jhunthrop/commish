@@ -53,12 +53,11 @@ export const links = {
 	 * just followed when it is told. */
 	accountLeagues: (followed?: number): string =>
 		`${resolve('/account')}${followed === undefined ? '' : `?${new URLSearchParams({ [FOLLOWED_PARAM]: String(followed) }).toString()}`}#${LEAGUES_ANCHOR}`,
-	/** The Draft Pass, the Membership and the Group Draft Pass. */
+	/** What every account has free (Lane 150). */
 	pass: (): string => resolve('/pass'),
 	/** Where a live draft starts being followed. */
 	companionNew: (): string => resolve(COMPANION_START),
 	companion: (id: string): string => resolve('/companion/[id]', { id }),
-	claim: (code: string): string => resolve('/claim/[code]', { code }),
 	/** Where a league on another host is attached, opened on a member host's way in when asked. */
 	leagueNew: (host?: MemberWay): string =>
 		host === undefined

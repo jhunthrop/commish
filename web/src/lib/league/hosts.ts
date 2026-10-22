@@ -1,13 +1,13 @@
 /** The platforms, in the order every page names them, with what each does here (the sweep's C13): a
  * live draft read from it, a league followed from it always or once its switch is open. The follow
- * page, the signed-out account page and the pass page all name them from this one module, so they
+ * page, the signed-out account page and the free page all name them from this one module, so they
  * never read against each other. Apart from model.ts so the account and pass pages carry only this. */
 import type { components } from '#lib/api/types.ts';
 import { hostWords } from './names.ts';
 
 type LeagueHost = components['schemas']['LeagueHost'];
 
-/** What a platform does here: its live draft is read (the Draft Pass's companion, by the draft's
+/** What a platform does here: its live draft is read (the live draft companion, by the draft's
  * link), and its league is followed always or only while its switch is open. */
 export interface Platform {
 	readonly liveDraft: boolean;

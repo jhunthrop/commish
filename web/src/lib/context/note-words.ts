@@ -19,7 +19,7 @@ export function leagueScores(league: ContextLeague): string {
 	return scoresSentence(league.scoring);
 }
 
-/** Where the line sends a Draft Pass holder for the league's exact board: its saved league's mock
+/** Where the line sends an account with custom_scoring for the league's exact board: its saved league's mock
  * (the setup with the league filled in), or the mock setup to enter its rules when no saved league
  * exists yet. note-line.ts turns it into an href. */
 export interface NoteLink {
@@ -36,10 +36,11 @@ export interface LeagueNote {
 
 const plain = (text: string): LeagueNote => ({ text, link: null });
 
-/** A TE premium league on its plain PPR figures: where its exact rules rank it. Without
- * custom_scoring the Draft Pass does; with it, the league's own mock draft, as a link. */
+/** A TE premium league on its plain PPR figures: with custom_scoring, where its exact rules rank it,
+ * the league's own mock draft, as a link; without, the figures' basis alone (Lane 150: nothing says
+ * what the exact rules come with). */
 function exactNote(league: ContextLeague, exactRules: boolean, opening: string): LeagueNote {
-	if (!exactRules) return plain(`${opening} The Draft Pass ranks it by your league's exact rules.`);
+	if (!exactRules) return plain(opening);
 	const saved = league.settings_league_id;
 	return {
 		text: opening,

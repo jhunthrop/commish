@@ -33,6 +33,7 @@ import { leagueRecordAnswer } from './record.ts';
 import { playerWeek, type Sheet } from './player-week.ts';
 import {
 	BOARD_WEEK_VARIABLE,
+	FREE_SEASON_VARIABLE,
 	askedPhase,
 	fixtureSeason,
 	phaseAccount,
@@ -811,6 +812,23 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	}
 	if (url.pathname === '/season') {
 		send(req, res, HTTP.ok, SEASON);
+		return;
+	}
+	// The catalog as the API answers it with checkout closed (Lane 150): `free_season` only when the
+	// case asks for it, so the free page is shot both on an API before Lane 149 and after it.
+	if (url.pathname === '/billing/plans') {
+		send(req, res, HTTP.ok, {
+			season: 2027,
+			pass_ends_at: '2028-03-01T00:00:00Z',
+			checkout_open: false,
+			draft_pass: null,
+			membership: [],
+			group_pass: null,
+			features: { draft_pass: [], membership: [] },
+			...(process.env[FREE_SEASON_VARIABLE] === undefined
+				? {}
+				: { free_season: process.env[FREE_SEASON_VARIABLE] === '1' })
+		});
 		return;
 	}
 	// The account page's other lists, empty for the fixture account.
