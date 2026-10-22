@@ -3,7 +3,8 @@
  * LiveBoard), in its order and to its tenth. A reader who is signed out, or whose read fails, keeps
  * the run's figures, said with the run's time beside them. Pure, so the tests read every figure and
  * word the strip prints. */
-import { dayTimeStamp, timeOfDay, zoneWord } from '#lib/format/clock.ts';
+import { timeOfDay, zoneWord } from '#lib/format/clock.ts';
+import { dayTimeStamp } from '#lib/format/day-time.ts';
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { BoardRowView } from '#lib/run/schema.ts';

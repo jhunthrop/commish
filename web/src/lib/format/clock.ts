@@ -122,13 +122,6 @@ export function shortDay(iso: string, zone: string = memberZone()): string {
 	return made.format(new Date(iso));
 }
 
-/** "Thu Oct 22, 2:38 am Central": a stamp with its day, its time and its zone, the one form a
- * screen's run or set time takes (Lane 140, C14 and C24). */
-export function dayTimeStamp(iso: string, zone: string = memberZone()): string {
-	const [weekday = ''] = weekdayTime(iso, zone).split(' ');
-	return `${weekday} ${shortDay(iso, zone)}, ${timeOfDay(iso, zone)} ${zoneWord(zone)}`;
-}
-
 /** "7:00 pm": a time of day on the member's clock. */
 export function timeOfDay(iso: string, zone: string = memberZone()): string {
 	return weekdayTime(iso, zone).replace(/^\S+ /, '');

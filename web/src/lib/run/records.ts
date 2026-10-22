@@ -2,7 +2,7 @@
  * rankings against ESPN and the week's published projection (from week 7), and the draft record,
  * our draft board against ADP on the season's points so far. Each is named by what it grades; ADP appears on the draft record alone. The weekly record is in the record's
  * own shape, so the page reads it with the record's functions (record.ts). */
-import { dayTimeStamp } from '#lib/format/clock.ts';
+import { dayTimeStamp } from '#lib/format/day-time.ts';
 import { dayLabel, weekdayLabel, weekdayWord } from '#lib/format/date.ts';
 import { plural } from '#lib/format/number.ts';
 import { BUILD_ZONE } from '#lib/front/live-board.ts';

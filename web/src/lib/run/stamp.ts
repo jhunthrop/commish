@@ -16,6 +16,8 @@ export interface RunStamp {
 	/** The week the default board ranks the rest of the season from, in season; absent before it
 	 * (Lane 140: the rail's week order is named for it). */
 	week?: number;
+	/** That week's order as the rail names it, "Week 7 rankings", built by the layout. */
+	weekRankings?: string;
 }
 
 /** The stamp's words: "run" is our word, never the page's (B53). */

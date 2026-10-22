@@ -25,7 +25,7 @@
 	<title>{title} · Commish</title>
 </svelte:head>
 
-<Shell title={heading ?? title} {stamp} {tail} week={run.week ?? null}>
+<Shell title={heading ?? title} {stamp} {tail} weekLabel={run.weekRankings}>
 	{#snippet search()}<PlayerSearch placeholder={run.search} />{/snippet}
 	{@render children()}
 </Shell>

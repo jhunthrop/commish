@@ -62,14 +62,18 @@ export const REST_IN_YOUR_LEAGUE = `${REST_OF_SEASON}, your league`;
 
 /** The week's order (Lane 140, C19): the season's rail with no league selected and the front card
  * link our order with this week's figures beside it, named for the week the board ranks from. */
-export const WEEK_RANKINGS_KEY = 'week';
-export function weekRankingsWord(week: number | null): string {
-	return week === null ? "This week's rankings" : `Week ${String(week)} rankings`;
+export const WEEK_RANKINGS_KEY: Section = 'week';
+/** The item's label before the run names its week. */
+const WEEK_RANKINGS = "This week's rankings";
+/** "Week 7 rankings": built on the server with the page (the rail's label and the front card's link),
+ * so no page's script carries it. */
+export function weekRankingsWord(week: number): string {
+	return `Week ${String(week)} rankings`;
 }
 
 /** A rail item's label as the shell draws it: the week's order named for the run's week. */
 export function railItemLabel(item: Pick<RailItem, 'key' | 'label'>, week: number | null): string {
-	return item.key === WEEK_RANKINGS_KEY ? weekRankingsWord(week) : item.label;
+	return item.key === WEEK_RANKINGS_KEY && week !== null ? weekRankingsWord(week) : item.label;
 }
 
 /** Where a mock draft starts: the room's setup. */
@@ -161,8 +165,8 @@ export const RAIL_ITEMS: readonly RailItem[] = [
 	// the week's Proj and game beside each player, on Players. It lights no page of its own.
 	{
 		key: WEEK_RANKINGS_KEY,
-		section: 'week',
-		label: weekRankingsWord(null),
+		section: WEEK_RANKINGS_KEY,
+		label: WEEK_RANKINGS,
 		href: '/players',
 		icon: 'lineup',
 		owns: []

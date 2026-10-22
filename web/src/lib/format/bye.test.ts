@@ -1,7 +1,7 @@
 // A bye on a rest-of-season board (Lane 140, C26): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dayTimeStamp } from './clock.ts';
+import { dayTimeStamp } from './day-time.ts';
 import { BYE_WORDS, byeCell } from './bye.ts';
 import { EMPTY_FIGURE } from './empty.ts';
 
