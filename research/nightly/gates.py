@@ -17,7 +17,8 @@ so the site keeps building from the last clean run. Every failure is a named rea
    the manifest a source for every feed.
 5. `adp`: every format has an ADP source with a stamped capture and players in it.
 6. `schema` (`schema_gate.py`): the web's own reader and schema over the whole run, so a run the
-   build would refuse never moves a pointer.
+   build would refuse never moves a pointer. A refused player page is held, not the run, up to the
+   line (`held_pages.py`, Lane 136).
 7. `clubs` (Lane 120): at most `GATES.max_club_elsewhere_pages` pages whose club is not the club of
    their newest game line; the summary names every one.
 """

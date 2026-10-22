@@ -8,17 +8,23 @@ reader from the repository at build, with the web's own zod and aws4fetch, into 
 image carrying it deploys, with no change here.
 
 The gate fails, naming each refusal `schema:<file>:<message>`, when the reader refuses anything, and
-also when it cannot run at all (no node, no web contract): a run is never promoted unchecked.
+also when it cannot run at all (no node, no web contract): a run is never promoted unchecked. Each
+player page the reader refuses is a line of its own (`schema:players/<id>.json:...`, Lane 136), which
+the nightly's gate (`held_pages.py`) may hold back instead of failing the run.
 """
 
+import re
 import shutil
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
 from research.nightly.gates import GateRecord, gate_record
 
 _SCRIPT: Final = Path(__file__).resolve().parent / "contract" / "run-contract.ts"
+# One player file the reader refused (Lane 136): the run's own page, or a held page's earlier copy.
+_PAGE_LINE: Final = re.compile(r"^schema:(?P<where>players|held)/(?P<id>[\w-]+)\.json:(?P<message>.*)$")
 _TIMEOUT_SECONDS: Final = 600
 # The head of a failed reader's stderr the reason carries: node prints the failing source line, a caret,
 # then the error itself (`Error [ERR_MODULE_NOT_FOUND]: Cannot find module ...`), so five lines reach it.
@@ -26,8 +32,27 @@ _STDERR_LINES: Final = 5
 _STDERR_CHARACTERS: Final = 600
 
 
-def schema_gate(runs_root: Path, run_id: str, web_dir: Path) -> GateRecord:
-    """Run the web's reader over `runs_root/runs/<run_id>`; every refusal is a reason."""
+@dataclass(frozen=True, slots=True)
+class ReaderRead:
+    """One pass of the web's reader over a run: every refusal line, and its summary line."""
+
+    reasons: tuple[str, ...]
+    summary: str
+
+    def refused(self, where: str) -> dict[str, str]:
+        """The player files under `where` (`players` for the run's own pages, `held` for the copies of its
+        held ones) the reader refused, by player id, each with what it said (Lane 136)."""
+        found = (_PAGE_LINE.match(reason) for reason in self.reasons)
+        return {m["id"]: m["message"] for m in found if m is not None and m["where"] == where}
+
+    @property
+    def run_reasons(self) -> tuple[str, ...]:
+        """Every refusal that is not one player file's: the run's own, which no page can be held for."""
+        return tuple(reason for reason in self.reasons if _PAGE_LINE.match(reason) is None)
+
+
+def read_run(runs_root: Path, run_id: str, web_dir: Path) -> ReaderRead:
+    """Run the web's reader over `runs_root/runs/<run_id>` once."""
     node = shutil.which("node")
     missing = [
         what
@@ -40,7 +65,7 @@ def schema_gate(runs_root: Path, run_id: str, web_dir: Path) -> GateRecord:
         if not present
     ]
     if missing or node is None:
-        return gate_record("schema", [f"schema_unchecked:{', '.join(missing)}"], "the web's reader could not run")
+        return ReaderRead((f"schema_unchecked:{', '.join(missing)}",), "the web's reader could not run")
     try:
         completed = subprocess.run(
             [node, "--experimental-strip-types", "--no-warnings", str(_SCRIPT), str(web_dir), str(runs_root), run_id],
@@ -51,11 +76,17 @@ def schema_gate(runs_root: Path, run_id: str, web_dir: Path) -> GateRecord:
         )
     except subprocess.TimeoutExpired:
         # Review N11: a reader that never answers is an unchecked run, never a crashed one.
-        return gate_record(
-            "schema", [f"schema_unchecked:timeout after {_TIMEOUT_SECONDS} s"], "the web's reader timed out"
-        )
+        return ReaderRead((f"schema_unchecked:timeout after {_TIMEOUT_SECONDS} s",), "the web's reader timed out")
     reasons, summary = reader_outcome(completed.returncode, completed.stdout, completed.stderr)
-    return gate_record("schema", reasons, summary)
+    return ReaderRead(tuple(reasons), summary)
+
+
+def schema_gate(runs_root: Path, run_id: str, web_dir: Path) -> GateRecord:
+    """Run the web's reader over `runs_root/runs/<run_id>`; every refusal is a reason. A run that holds
+    pages (`held.json`) is read as the build reads it; the nightly's own gate, which may hold a refused
+    page, is `held_pages.hold_refused_pages`."""
+    read = read_run(runs_root, run_id, web_dir)
+    return gate_record("schema", read.reasons, read.summary)
 
 
 def reader_outcome(returncode: int, stdout: str, stderr: str) -> tuple[list[str], str]:

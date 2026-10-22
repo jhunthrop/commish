@@ -28,6 +28,7 @@ from research.nightly.assemble import Assembled, assemble
 from research.nightly.capsule_demotion import DEMOTED_KEY, carried_demotions
 from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan
 from research.nightly.config import HELD_OUT_BASELINE_KEY
+from research.nightly.held_pages import HeldPage, alert_line, hold_refused_pages
 from research.nightly.publish import ArtifactWriter, encode, promote_early, read_json, run_key, take_run_id
 from research.nightly.reads.record import frozen_weeks
 from research.nightly.register_log import FrozenBy, carry_forward, read_frozen_by, save_frozen_by
@@ -40,7 +41,6 @@ from research.nightly.run_parts import (
     run_steps,
 )
 from research.nightly.run_store import LocalRunStore, RunStore
-from research.nightly.schema_gate import schema_gate
 from research.nightly.week_reads import ADVISORY
 from research.nightly.week_reads import STEP as WEEK_READS
 from research.pipeline.http import Fetcher
@@ -127,6 +127,8 @@ def _failed(deps: RunDeps, run_id: str, steps: list[StepOutcome], error: BaseExc
 class Judged:
     gates: list[gates.GateRecord]
     held_out: list[HeldOutScore]
+    # The pages the schema gate held back (Lane 136), none on a run that failed it.
+    held: tuple[HeldPage, ...] = ()
 
 
 def _judge(deps: RunDeps, assembled: Assembled, steps: list[StepOutcome], draft: Json) -> Judged:
@@ -206,7 +208,12 @@ def _finish(  # noqa: PLR0913, PLR0917 - the run's parts, handed on from `run_ni
         encode(manifest_of(run_id, finished, assembled, "pending", deps.store, frozen_by)),
         "application/json",
     )
-    judged.gates.append(schema_gate(root, run_id, contract_dir(dict(deps.environ))))
+    schema = hold_refused_pages(
+        root, run_id, contract_dir(dict(deps.environ)), deps.store, len(assembled.people), deps.log
+    )
+    judged = replace(judged, gates=[*judged.gates, schema.record], held=schema.held)
+    for path, value in schema.files().items():
+        writer.write(path, value)
     for gate in judged.gates:
         deps.log(f"gate {gate.gate}: {'passed' if gate.passed else 'FAILED'}, {gate.summary}")
     # An advisory step's failure is in the report and never holds the board back (`week_reads.ADVISORY`).
@@ -226,6 +233,7 @@ def _finish(  # noqa: PLR0913, PLR0917 - the run's parts, handed on from `run_ni
         "headshots": headshot_line,
         "formatsNotCarried": list(assembled.dropped),
         "restOfSeason": assembled.rest_status,
+        "held": [h.json() for h in judged.held],
         "artifacts": writer.records,
     }  # fmt: skip
     writer.write("report.json", report)
@@ -256,6 +264,8 @@ def _promote(  # noqa: PLR0913, PLR0917 - the verdict and what it moves
     if passed:
         save_frozen_by(deps.store, frozen_by, PRODUCT_SEASON)
         line += f"; early access now, public at {js_iso(promote_early(deps.store, run_id, finished))}"
+        if judged.held:
+            deps.log(alert_line(run_id, judged.held))
     else:
         failed = [g.gate for g in judged.gates if not g.passed] + [
             s.record.name for s in steps if s.record.status == "failed" and s.record.name not in ADVISORY
