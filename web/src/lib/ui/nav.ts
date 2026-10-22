@@ -63,8 +63,10 @@ export const REST_IN_YOUR_LEAGUE = `${REST_OF_SEASON}, your league`;
  * every season rail, a league followed or not. Its label is built with the page (run/week-names.ts),
  * so no page's script carries it. */
 export const WEEK_RANKINGS_KEY = 'week';
-/** The item's label before the run names its week. */
-const WEEK_RANKINGS = "This week's rankings";
+/** The page's name with no week named (before the first kickoff, or while the season has not
+ * answered), the Players item's label and the week item's until a week is known, so the label never
+ * promises a page it does not open (Lane 142 fix round 1). The word table's root (run/week-names.ts). */
+export const PLAYERS_NAME = 'Players';
 /** "Week 7 rankings": the page's name in season (run/week-names.ts), and the rail's on a page the
  * Worker draws, from the context's week. */
 export const weekRankingsWord = (week: number): string => `Week ${String(week)} rankings`;
@@ -160,7 +162,7 @@ export const RAIL_ITEMS: readonly RailItem[] = [
 	{
 		key: WEEK_RANKINGS_KEY,
 		section: 'players',
-		label: WEEK_RANKINGS,
+		label: PLAYERS_NAME,
 		href: '/players',
 		icon: 'players',
 		owns: []
@@ -168,7 +170,7 @@ export const RAIL_ITEMS: readonly RailItem[] = [
 	{
 		key: 'players',
 		section: 'players',
-		label: 'Players',
+		label: PLAYERS_NAME,
 		href: '/players',
 		icon: 'players',
 		owns: ['players', 'clubs', 'compare']

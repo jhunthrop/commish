@@ -1694,15 +1694,9 @@ for (const width of SHOT_WIDTHS) {
 
 /** In season with no league (Lane 83): signed out, the season's rail with no league selected draws
  * League first and none of the four screens, on the phone's five and at a desk. Players is the week's
- * rankings there (Lane 142); the stand-in run and the fixture's season name no week, so the item
- * keeps its label. */
-const NO_LEAGUE_LABELS = [
-	'League',
-	'Rest of season',
-	"This week's rankings",
-	'Mock draft',
-	'Our record'
-];
+ * rankings there (Lane 142); the stand-in run and the fixture's season name no week, so the item is
+ * Players, the page it opens (fix round 1). */
+const NO_LEAGUE_LABELS = ['League', 'Rest of season', 'Players', 'Mock draft', 'Our record'];
 if (
 	NO_LEAGUE_LABELS.join('|') !==
 	RAIL_WITHOUT_LEAGUE.map((item) => railItemLabel(item, null)).join('|')

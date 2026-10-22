@@ -46,7 +46,7 @@
 
 	let { title, stamp, active, search, tail, league, weekLabel, children }: Props = $props();
 	// The week's order: the page's own name for it, else on a page the Worker draws the context's week
-	// (Lane 142), else its label.
+	// (Lane 142), else Players, the page it opens, while no week is named (fix round 1).
 	const labelOf = (item: RailItem, week = siteContext.season?.board_week): string =>
 		item.key === WEEK_RANKINGS_KEY
 			? (weekLabel ?? (week ? weekRankingsWord(week) : item.label))

@@ -57,7 +57,7 @@ for (const key of RAIL_KEYS.filter(railInSeason)) {
 		const labels = (keys: string[]): string[] =>
 			keys.map((k) => RAIL_ITEMS.find((item) => item.key === k)?.label ?? k);
 		// The week's order is Players under the week's name (Lane 140, C19 and fix round 1).
-		const five = ['League', 'Rest of season', "This week's rankings", 'Mock draft', 'Our record'];
+		const five = ['League', 'Rest of season', 'Players', 'Mock draft', 'Our record'];
 		assert.deepEqual(labels(shown(root, false)), five);
 		assert.deepEqual(labels(shown(root, true)), five);
 		assert.deepEqual(

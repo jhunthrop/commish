@@ -29,8 +29,8 @@ const wide = (items: readonly RailEntry[]): string[] =>
 
 /** §2's table: the phone's five in order, then what the wide rail adds above the Account foot. */
 /** In season Players is the week's rankings on every rail, a league followed or not (Lane 142); its
- * label before the run names the week. */
-const WEEK_ITEM = "This week's rankings";
+ * label is Players until a week is named (fix round 1). */
+const WEEK_ITEM = 'Players';
 
 const TABLE: Readonly<Record<LeaguePhase, { phone: string[]; wide: string[] }>> = {
 	pre_draft: {

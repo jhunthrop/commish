@@ -62,6 +62,22 @@ void test('every season rail, a league followed or not, draws the week item and 
 	assert.ok(!followed.some((item) => item.key !== 'lineup' && item.icon === 'lineup'));
 });
 
+void test('a league drafted before week 1 sits on the in-season rail, its week item Players, the page it opens (fix round 1)', () => {
+	// The league's phase puts it on the in-season rail while the site's clock is before the first kickoff.
+	const names = namesAt(CLOCK.preseason, WEEK);
+	assert.equal(names, null);
+	const week = railShown('in_season', true).find((item) => item.key === 'week');
+	assert.ok(week);
+	// No week is named, so the shell draws the item with none.
+	const label = railItemLabel(week, null);
+	assert.equal(label, PAGE_NAME_WORDS.players);
+	// The page it opens heads and crumbs the same name.
+	assert.equal(playersCrumb(undefined), label);
+	// The first kickoff's instant names the week.
+	const kickoff = new Date(KICKOFFS[0] ?? '');
+	assert.equal(namesAt(kickoff, 1)?.rankings, 'Week 1 rankings');
+});
+
 void test('the names are clean copy', () => {
 	for (const words of [
 		PAGE_NAME_WORDS.players,

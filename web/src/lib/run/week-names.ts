@@ -5,6 +5,7 @@
  * week the run ranks from; the server builds the words with the page, so no page's script carries
  * them. */
 import {
+	PLAYERS_NAME,
 	WEEK_RANKINGS_KEY,
 	railInSeason,
 	weekRankingsWord,
@@ -15,7 +16,7 @@ import {
 /** Both forms' words, in one place for the copy guard. */
 export const PAGE_NAME_WORDS = {
 	/** The page's name before the season, and the crumb's root in season. */
-	players: 'Players',
+	players: PLAYERS_NAME,
 	/** The page's name in season: the rail's item, the front card's link, the page's head. */
 	rankings: weekRankingsWord,
 	/** The rank column's head in season: our order as set for the week. */
