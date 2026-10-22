@@ -4076,8 +4076,26 @@ components:
         projection_best_lineup:
           type: boolean
           description: >-
-            true where projected_final is our best lineup's from the side's roster (Lane 127): a side the platform
-            lists no starters for whose roster the league read carries. Absent otherwise and from an older answer
+            true where projection and projected_final are our best lineup's from the side's roster (Lane 127, Lane
+            137): a side the platform lists no starters for whose roster the league read carries. Absent otherwise and
+            from an older answer
+        projection:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            for a side the platform lists no starters for whose roster the league read carries (projection_best_lineup),
+            our best lineup's week projection from that roster, the figure ScoreboardSide.projection gives the same side
+            (Lane 137, B107: one figure per side across screens); null where that lineup fills no slot. Absent for a
+            side that lists starters, whose Proj its starters' rows add, for one with no roster read, and from an older
+            answer
+        best_lineup_skipped:
+          type: boolean
+          description: >-
+            true where our best lineup (projection_best_lineup) passed over a player with no week projection who can
+            play and would start in it were he counted (Lane 137, B107): his slot takes the next best player with a
+            Proj and stays empty only where none can fill it, the Proj summed from the slots filled. Absent otherwise
+            and from an older answer
         projected_final_paced:
           type: boolean
           description: >-
@@ -4151,6 +4169,13 @@ components:
             true where projection is our best lineup from the side's roster (Lane 127, B105): a side the platform lists
             no starters for whose roster the league read carries. Absent for a side that lists starters, for one with
             no roster read, and from an older answer, whose projection for such a side is null
+        best_lineup_skipped:
+          type: boolean
+          description: >-
+            true where our best lineup (projection_best_lineup) passed over a player with no week projection who can
+            play and would start in it were he counted (Lane 137, B107): his slot takes the next best player with a
+            Proj and stays empty only where none can fill it, the Proj summed from the slots filled. Absent otherwise
+            and from an older answer
         projected_final_paced:
           type: boolean
           description: >-

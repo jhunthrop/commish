@@ -27,7 +27,7 @@
 	import { inSeasonApi, type LineupAdvice, type Scoreboard } from './inseason/api.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
-	import { gamePart } from './box/basis.ts';
+	import { gamePart, unlistedLong } from './box/basis.ts';
 	import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 	import { BENCH_ANCHOR } from './box/lineup.ts';
 	import RosterPanel from './RosterPanel.svelte';
@@ -286,39 +286,44 @@
 	/** What every number on the in-season page is, said once in one paragraph, at most five lines at a
 	 * desk and eight on a phone (Lane 108, B82: merged so no sentence ends a short line): the standings,
 	 * a team's projection and points, the game facts. A feed the platform gives us none of is not
-	 * drawn, so the basis says nothing of it (Lane 104, B54). */
-	const weekBasis = $derived(
-		sync
-			? [
-					standingsBasis(sync.host, sync.terms),
-					scoreboard
-						? teamBasis(
-								sync.host,
-								scoreboard.projection_read_at,
-								scoreboard.projection_scoring,
-								advice?.player_points ?? false,
-								memberZone(),
-								bugs.some((b) => b.state !== 'upcoming'),
-								bugsMissListedFinal(bugs),
-								bugsPlayingListed(bugs),
-								bugsFinalNone(bugs),
-								unlistedDrawn(bugs)
-							)
-						: null,
-					// The season panel names the zone once, so the read's time does not repeat it. Where the
-					// FFPC teams' sentence carries its pace clause, the Game cell's read alone (the Lineup says
-					// what the cell is), so the phone keeps to eight lines (Lane 127 fix round 3).
-					advice
-						? gamePart(
-								advice.slots.flatMap((s) => (s.host ? [s.host] : [])),
-								{ zone: memberZone(), zoned: false },
-								now.getTime(),
-								unlistedDrawn(bugs).paced ? 'read' : 'full'
-							)
-						: null
-				].filter((line): line is string => line !== null)
-			: []
-	);
+	 * drawn, so the basis says nothing of it (Lane 104, B54). A desk's and a phone's (Lane 137 fix
+	 * round 1): the phone says qualifications short where the FFPC teams' words run long. */
+	function weekBasisAt(width: 'desk' | 'phone'): string {
+		if (!sync) return '';
+		const unlisted = unlistedDrawn(bugs);
+		return [
+			standingsBasis(sync.host, sync.terms),
+			scoreboard
+				? teamBasis(
+						sync.host,
+						scoreboard.projection_read_at,
+						scoreboard.projection_scoring,
+						advice?.player_points ?? false,
+						memberZone(),
+						bugs.some((b) => b.state !== 'upcoming'),
+						bugsMissListedFinal(bugs),
+						bugsPlayingListed(bugs),
+						bugsFinalNone(bugs),
+						unlisted,
+						width
+					)
+				: null,
+			// The season panel names the zone once, so the read's time does not repeat it. Where the FFPC
+			// teams' words carry the pace clause, the Game cell's read alone (the Lineup says what the cell
+			// is, Lane 127 fix round 3); on a phone too where they run long (Lane 137 fix round 1).
+			advice
+				? gamePart(
+						advice.slots.flatMap((s) => (s.host ? [s.host] : [])),
+						{ zone: memberZone(), zoned: false },
+						now.getTime(),
+						unlisted.paced || (width === 'phone' && unlistedLong(unlisted)) ? 'read' : 'full'
+					)
+				: null
+		]
+			.filter((line): line is string => line !== null)
+			.join(' ');
+	}
+	const weekBasis = $derived({ desk: weekBasisAt('desk'), phone: weekBasisAt('phone') });
 	/** Before the draft and after the season: the scoring the board's figures are in. */
 	const boardBasis = $derived(
 		board && sync
@@ -482,7 +487,10 @@
 					<!-- In season the page carries no draft plumbing: the mock draft lives under Account and
 					     the rail's Mock draft (Lane 104, B54). -->
 					<div class="basis" data-basis="league">
-						<p>{weekBasis.join(' ')}</p>
+						{#if weekBasis.desk === weekBasis.phone}<p>{weekBasis.desk}</p>{:else}<p class="desk">
+								{weekBasis.desk}
+							</p>
+							<p class="phone">{weekBasis.phone}</p>{/if}
 					</div>
 				{:else if board}
 					<SeasonPanel
@@ -588,6 +596,11 @@
 		line-height: 1.5;
 	}
 
+	/* The basis's desk and phone forms, where they differ (Lane 137 fix round 1). */
+	.basis p.phone {
+		display: none;
+	}
+
 	.pad {
 		padding: var(--s-4) var(--s-5) 0;
 	}
@@ -657,6 +670,14 @@
 		.basis-line {
 			font-size: var(--t-xs);
 			line-height: 1.45;
+		}
+
+		.basis p.desk {
+			display: none;
+		}
+
+		.basis p.phone {
+			display: block;
 		}
 
 		.league {

@@ -8,24 +8,47 @@ import (
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
+// rosterBest is our best lineup this week from a side's roster (bestLineup)
+// and whether it passed over a player with no Proj to make it: one who can
+// play and would start in it were he counted (Lane 137, B107), so the
+// screens say the lineup is from the players with a Proj.
+type rosterBest struct {
+	lines   []apitypes.PlayerLine
+	skipped bool
+}
+
 // rosterLineup is our best lineup this week from the roster of a side the
 // platform lists no starters for (every FFPC side but the member's), where
 // the league read carries that roster (FFPC's rosters page; Lane 127,
 // B105). ok is false for a side that lists starters and for one with no
 // roster read: its Proj and Proj final stay none.
-func (a *advisor) rosterLineup(s *leaguesync.Side) ([]apitypes.PlayerLine, bool) {
+func (a *advisor) rosterLineup(s *leaguesync.Side) (rosterBest, bool) {
 	if s == nil || len(s.Starters) > 0 {
-		return nil, false
+		return rosterBest{}, false
 	}
 	t, ok := a.Snap.TeamByRoster(s.RosterID)
 	if !ok {
-		return nil, false
+		return rosterBest{}, false
 	}
 	people := a.active(t)
 	if len(people) == 0 {
-		return nil, false
+		return rosterBest{}, false
 	}
 	return bestLineup(a.config, people), true
+}
+
+// rosterProjection is the Proj every screen draws for a side whose Proj is
+// our best lineup from its roster, the scoreboard's and the Matchup's
+// alike (Lane 137, B107: one figure per side across screens): the lineup's
+// printed Proj summed, from the slots it fills, none where it fills none;
+// with the flag that says so and, where it passed over a player with no
+// Proj, the flag that says that.
+func rosterProjection(best rosterBest) (projection *float64, bestLineup, skipped *bool) {
+	yes := true
+	if best.skipped {
+		skipped = &yes
+	}
+	return printedLines(best.lines), &yes, skipped
 }
 
 // bestLineup is the roster's best lineup this week under the league's
@@ -33,25 +56,51 @@ func (a *advisor) rosterLineup(s *leaguesync.Side) ([]apitypes.PlayerLine, bool)
 // waiver search fill: each position's own slots, then the shared ones, by
 // the week's keys), from every player who can play this week and has a
 // Proj. A player whose game has kicked off is placed like any other: no
-// platform lineup holds him anywhere to keep. A slot nobody eligible fills
-// is left empty.
-func bestLineup(config []draft.SlotConfig, people []person) []apitypes.PlayerLine {
+// platform lineup holds him anywhere to keep. A slot nobody with a Proj
+// can fill is left empty, and the lineup is still the slots it fills
+// (Lane 137, B107); skipped says a player with no Proj who can play was
+// passed over for it.
+func bestLineup(config []draft.SlotConfig, people []person) rosterBest {
 	pool := make([]*Candidate, len(people))
-	taken := make([]bool, len(people))
 	for i := range people {
 		pool[i] = &people[i].cand
-		// A bye or a designation that keeps him out never starts (Lane 66e), and
-		// a player we hold no Proj for is no part of a lineup we project (Lane
-		// 127 fix round 3): he would add nothing to its Proj and void its Proj
-		// final.
-		taken[i] = people[i].cand.Tier != Available || !people[i].cand.HasProj
+	}
+	// A bye or a designation that keeps him out never starts (Lane 66e), and
+	// a player we hold no Proj for is no part of a lineup we project (Lane
+	// 127 fix round 3): he would add nothing to its Proj and void its Proj
+	// final.
+	playing := func(c *Candidate) bool { return c.Tier == Available }
+	projected := func(c *Candidate) bool { return playing(c) && c.HasProj }
+	var out rosterBest
+	for _, p := range slotFill(config, pool, projected, true) {
+		out.lines = append(out.lines, people[p].line)
+	}
+	// Passed over: a player with no Proj who can play starts in the fill
+	// that counts him, by the week's order (a slot the lineup leaves empty)
+	// or by the rest of season's (a better player than the one his slot
+	// took).
+	for _, week := range []bool{true, false} {
+		for _, p := range slotFill(config, pool, playing, week) {
+			out.skipped = out.skipped || !pool[p].HasProj
+		}
+	}
+	return out
+}
+
+// slotFill is the engine's fill of the league's slots from the players of
+// pool that may start, by the week's order or the rest of season's, their
+// pool indexes, an empty slot left out.
+func slotFill(config []draft.SlotConfig, pool []*Candidate, may func(*Candidate) bool, week bool) []int {
+	taken := make([]bool, len(pool))
+	for i, c := range pool {
+		taken[i] = !may(c)
 	}
 	f := newFiller(Slots(config), SeasonGames)
-	f.week = true
-	var out []apitypes.PlayerLine
+	f.week = week
+	var out []int
 	for _, p := range f.fill(f.open, pool, taken) {
 		if p >= 0 {
-			out = append(out, people[p].line)
+			out = append(out, p)
 		}
 	}
 	return out

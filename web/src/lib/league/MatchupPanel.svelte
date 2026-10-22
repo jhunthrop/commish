@@ -9,6 +9,7 @@
 		decidedHead,
 		matchupFinal,
 		matchupStarted,
+		matchupUnlisted,
 		nextKickoff,
 		sideBox,
 		standingLine,
@@ -59,26 +60,19 @@
 		return !scoreUnread(s) && (hasStarted(s) || sync.week_all_play);
 	}
 
+	/** Both sides' starters' lines, the game's by the one rule: a side listing none (an FFPC opponent)
+	 * reads by the schedule (unlisted), never by his bench's games (Lane 137, B107). */
+	const starterLines = $derived((box?.sides ?? []).flatMap((s) => s.starters.map((st) => st.line)));
+
 	/** The game has kicked off by both sides' starters (Lane 92): the Pts are the big figures. */
-	const started = $derived(
-		matchupStarted(
-			(box?.sides ?? []).flatMap((s) => s.starters.map((st) => st.line)),
-			now.getTime()
-		)
-	);
+	const started = $derived(matchupStarted(starterLines, now.getTime()));
 
 	/** The states by the schedule of the sides the platform lists no starters for (Lane 124, B102). */
 	const unlisted = $derived(unlistedStates(box));
 
 	/** Every starter the screen holds a line for is final and every side listing none is by the
 	 * schedule (Lane 124, B102): a side with no box follows it. */
-	const headFinal = $derived(
-		matchupFinal(
-			(box?.sides ?? []).flatMap((s) => s.starters.map((st) => st.line)),
-			now.getTime(),
-			unlisted
-		)
-	);
+	const headFinal = $derived(matchupFinal(starterLines, now.getTime(), unlisted));
 
 	function boxOf(s: MatchupSide): SideBox {
 		const answered = box?.sides.find((b) => b.roster_id === s.roster_id) ?? null;
@@ -103,7 +97,7 @@
 	/** The bug's middle, "Decided" while the side behind has nobody left (the API's, Lane 99 B31). */
 	const kickoff = $derived(
 		decidedHead(
-			nextKickoff(lines, now.getTime(), undefined, unlisted),
+			nextKickoff(starterLines, now.getTime(), undefined, unlisted),
 			box?.decided === true,
 			started
 		)
@@ -210,19 +204,18 @@
 			host={sync.host}
 			projection={box ? { readAt: box.projection_read_at, scoring: box.projection_scoring } : null}
 			{lines}
+			kicked={started}
 			noFinal={[mine, theirs].some((s) => s !== null && s.totals.live && s.totals.final === null)}
 			allFinal={[mine, theirs].every((s) => s === null || s.totals.allFinal)}
 			finalNone={[mine, theirs].some(
 				(s) => s !== null && s.totals.live && s.totals.allFinal && s.totals.pts === null
 			)}
-			bestLineup={theirs !== null &&
-				theirs.totals.live &&
-				!theirs.totals.allFinal &&
-				theirs.totals.final !== null &&
-				box?.sides.find((b) => b.roster_id === matchup.opponent?.roster_id)
-					?.projection_best_lineup === true}
-			paced={box?.sides.find((b) => b.roster_id === matchup.opponent?.roster_id)
-				?.projected_final_paced === true}
+			unlisted={theirs === null
+				? undefined
+				: matchupUnlisted(
+						box?.sides.find((b) => b.roster_id === matchup.opponent?.roster_id) ?? null,
+						theirs.totals
+					)}
 			lineup={null}
 			now={now.getTime()}
 		/>
