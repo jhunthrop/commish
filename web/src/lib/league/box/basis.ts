@@ -585,6 +585,9 @@ export interface BoxBasisFacts {
 	byPlayer: boolean;
 	/** The platform sends the side's own total, which the Matchup's Team row prints (team_total). */
 	teamTotal: boolean;
+	/** The game has kicked off by the screen's head (the Matchup's matchupStarted, its starters' games
+	 * only, Lane 137); absent, by any row's game, a bench's too. */
+	kicked?: boolean;
 	/** A Team row draws its Proj final "--" (no figure from the API while the game is live). */
 	noFinal?: boolean;
 	/** Every Team row reads Final (BoxTotals.allFinal, Lane 121 B99): no Proj final is drawn, so the
@@ -610,7 +613,7 @@ export interface BoxBasisFacts {
  * Last leave out; on the Matchup Proj, Our rank, Pts and the Game cell, the columns it draws. */
 export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): BasisPart[] {
 	const defense = facts.lines.some((l) => l.player.position === 'DEF');
-	const kicked = anyKicked(facts.lines, now);
+	const kicked = facts.kicked ?? anyKicked(facts.lines, now);
 	const projFacts: ProjFacts | null = facts.projection
 		? { ...facts.projection, defense, league: true, kicked, host: facts.host }
 		: null;

@@ -28,7 +28,15 @@ import {
 	unlistedPart
 } from './basis.ts';
 import { BOX } from './box.ts';
-import { bugFigures, matchupUnlisted, sideBox, standingLine } from './matchup.ts';
+import { KICKOFF } from './kickoff.ts';
+import {
+	bugFigures,
+	matchupUnlisted,
+	nextKickoff,
+	sideBox,
+	standingLine,
+	unlistedStates
+} from './matchup.ts';
 
 const data = (name: string): unknown =>
 	inTenths(
@@ -262,4 +270,28 @@ void test('the Matchup phone says the Proj final in one sentence and the Game re
 	assert.match(phone, /No Proj final while/);
 	assert.match(desk, /Game is each club's expected points/);
 	assert.match(phone, /Game was read/);
+});
+
+void test("the Matchup's head and its Proj final key read the starters' games, never the unlisted opponent's bench (B107 addendum)", () => {
+	const box = friday.matchup;
+	const starters = box.sides.flatMap((s) => s.starters.map((st) => st.line));
+	const bench = box.sides.flatMap((s) => s.bench);
+	// The member's starters play Sunday; the opponent's Thursday player sits on his bench only.
+	assert.ok(bench.some((l) => l.facts.kickoff !== null && Date.parse(l.facts.kickoff) < FRIDAY));
+	const head = nextKickoff(starters, FRIDAY, ZONE, unlistedStates(box))?.head;
+	assert.equal(head, KICKOFF.first);
+	const parts = boxBasisParts(
+		{
+			projection: { readAt: box.projection_read_at, scoring: box.projection_scoring },
+			lines: [...starters, ...bench],
+			kicked: false,
+			byPlayer: false,
+			teamTotal: true,
+			host: 'ffpc',
+			lineup: null
+		},
+		{ zone: ZONE, zoned: false },
+		FRIDAY
+	);
+	assert.doesNotMatch(drawnText(parts, 'desk'), /Proj final/);
 });
