@@ -87,6 +87,22 @@ void test('an inactive week naming no opponent is read', () => {
 	assert.equal(refusal(season), null, JSON.stringify(seasonSchema.safeParse(season).error?.issues));
 });
 
+void test('a game the run cannot name is read on an inactive week naming none, refused elsewhere (Lane 138)', () => {
+	const unnamed = { ...unknown, unnamedGame: true } as const;
+	assert.equal(refusal(withRows({ 1: unnamed })), null);
+	assert.equal(seasonSchema.parse(withRows({ 1: unnamed })).log[0]?.unnamedGame, true);
+	assert.match(
+		refusal(withRows({ 1: { ...unnamed, opponent: 'GB', home: true } })) ?? '',
+		/Week 1 is a game the run cannot name, but it is inactive or names an opponent\./
+	);
+	assert.match(
+		refusal(withRows({ 3: { unnamedGame: true } })) ?? '',
+		/Week 3 is a game the run cannot name, but it is played or names an opponent\./
+	);
+	// A run before the field reads as before.
+	assert.equal(seasonSchema.parse(page.season).log[0]?.unnamedGame, undefined);
+});
+
 void test('a played or upcoming week naming no opponent is refused, and so is a bye naming one', () => {
 	assert.match(
 		refusal(withRows({ 3: { opponent: null, home: null } })) ?? '',

@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import {
-	HELD_OUT_METHOD,
 	RECORD_WORDS,
 	chartSeries,
 	chartWeeks,
@@ -131,10 +130,9 @@ void test('the basis defines each measure once and a league replaces the starter
 		RECORD_WORDS.placesOff
 	);
 	assert.match(recordLead(withPublished, 'PPR'), /the week's published projection/u);
-	const league = { starters: 'In your lineup.', aside: 'No kickers.', benchmark: 'ESPN too.' };
+	const league = { starters: 'In your lineup.', benchmark: 'ESPN too.' };
 	assert.deepEqual(recordBasis(run, league).slice(-2), ['In your lineup.', 'ESPN too.']);
 	assert.equal(recordBasis(record({})).length, 3, 'no starters sentence with no week graded');
-	assert.match(HELD_OUT_METHOD, /graded where the order was set\.$/u);
 	for (const sentence of [...recordBasis(beforePublished), ...recordBasis(withPublished)]) {
 		assert.doesNotMatch(sentence, bannedPattern());
 		assert.doesNotMatch(sentence, /Rates print|froze|freeze/u);

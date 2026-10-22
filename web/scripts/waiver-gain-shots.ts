@@ -12,6 +12,8 @@
 // saying the week he is back (Lane 118, B79), and the drop panel's IR bench row says why he is a drop. On the Lineup
 // (saturday) the IR bench row says so and the IR slot row draws no game. Every page: nothing scrolls
 // sideways and the copy passes the one guard (copy-scan.ts). Exits non-zero on any fault.
+// STAND-INS (B118): 36 of the Waivers rows are the stand-in run's preseason lines the fixture adds
+// (waivers.json rows labelled `standin`, inseason-fixture/project.ts), their gain the fixture's one rule.
 //
 //   CLOCK=saturday|monday-night node scripts/waiver-gain-shots.ts [web origin] [out dir]
 // with the site built against PUBLIC_API_URL at the fixture API, started on the same clock

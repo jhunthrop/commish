@@ -5,8 +5,9 @@
 // API's weekly record in the league, scripts/inseason-fixture/record.ts, a STAND-IN week). It asserts
 // the rulings' words: each record named by what it grades, ADP only under the draft record, weeks 1 to
 // 6 in one line, the Yahoo sentence, the league's sentence, and the front card's named record. Exits
-// non-zero on any fault. Each record's basis is held to the budget on its own (Lane 131, basis-lines.ts:
-// eight lines at 390), its count printed; the record pages are shot in both themes.
+// non-zero on any fault. Each record's basis is held to the budget on its own (basis-lines.ts: eight
+// lines at 390, Lane 131, and five at the 1440 desk, Lane 138), its count printed; the record pages are
+// shot in both themes, the budget measured in light.
 //
 //   node scripts/record-two-shots.ts <upcoming|graded> [web origin] [api origin] [out dir]
 import { mkdir } from 'node:fs/promises';
@@ -19,7 +20,10 @@ const mode = process.argv[2] === 'graded' ? 'graded' : 'upcoming';
 const web = process.argv[3] ?? 'http://localhost:4114';
 const API_ORIGIN = process.argv[4] ?? 'http://localhost:8814';
 const out = new URL(process.argv[5] ?? '../screenshots/record-114/', import.meta.url);
-const WIDTHS = [1280, 390] as const;
+/** The shot widths; 1440 is where the desk budget is measured (basis-lines.ts BASIS_BUDGET). */
+const WIDTHS = [1440, 1280, 390] as const;
+/** The front card is shot at the widths it was before the desk budget joined (Lane 114). */
+const FRONT_WIDTHS: readonly number[] = [1280, 390];
 const PHONE_MAX = 760;
 const SETTLE_MS = 600;
 const READY_TIMEOUT_MS = 30_000;
@@ -89,7 +93,7 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 	has(draft, 'Draft record', where);
 	has(draft, "Our draft board against ADP, on the season's points so far", where);
 	has(draft, 'Season points through week 5', where);
-	has(draft, 'Top named counts the season', where);
+	has(draft, "Top named counts how many of the season's top", where);
 	has(draft, 'ADP named more of the season', where);
 	has(draft, 'Each position is graded on its own', where);
 	if (mode === 'upcoming') {
@@ -108,7 +112,14 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 			'Following us instead of ESPN would have scored 8.4 more points over 1 week.',
 			where
 		);
-		if (mode === 'graded') has(weekly, "Starters right counts your league's lineup", where);
+		if (mode === 'graded') {
+			has(
+				weekly,
+				"Starters right counts the week's starters the order also put in your league's lineup",
+				where
+			);
+			has(weekly, 'kickers and defenses not counted', where);
+		}
 	}
 	if (theme === 'light') await basisFaults(page, who, width);
 	await page.screenshot({
@@ -142,7 +153,7 @@ for (const width of WIDTHS) {
 	for (const who of ['signed-out', 'espn'] as const) {
 		for (const theme of THEMES) await record(who, width, theme);
 	}
-	await front(width);
+	if (FRONT_WIDTHS.includes(width)) await front(width);
 }
 await browser.close();
 process.stdout.write(`shots in ${out.pathname}\n`);

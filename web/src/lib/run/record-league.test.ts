@@ -54,15 +54,16 @@ void test("on a league page the honest sentence counts the league's starters, as
 	assert.match(live.honest ?? '', /in the standard lineup, 104 of 168 against our 100/u);
 });
 
-void test("the league's basis names its lineup across its teams and says the kickers are not counted", () => {
+void test("the league's basis names its lineup across its teams and its own benchmark", () => {
 	const said = leagueBasis(espn, pageLineup(live, espn, players));
 	assert.equal(
 		said.starters,
-		"Starters right counts your league's lineup, QB, 2 RB, 2 WR, TE and a flex across 12 teams, and how many of the week's starters there the order also put there."
+		"Starters right counts the week's starters the order also put in your league's lineup, QB, 2 RB, 2 WR, TE and a flex across 12 teams, kickers and defenses not counted."
 	);
-	assert.equal(
-		said.aside,
-		'Its kickers and defenses are not counted: the record grades neither in season.'
+	const noKickers = { ...espn, lineup: { ...espn.lineup, k: 0, def: 0 } };
+	assert.match(
+		leagueBasis(noKickers, pageLineup(live, noKickers, players)).starters ?? '',
+		/a flex across 12 teams\.$/u
 	);
 	assert.match(
 		said.benchmark ?? '',

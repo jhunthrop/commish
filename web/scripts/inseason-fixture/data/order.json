@@ -3479,6 +3479,68 @@
 			"line": {
 				"player": {
 					"host_id": "",
+					"board_id": "4362249",
+					"name": "Jayden Reed",
+					"position": "WR",
+					"team": "GB",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4362249.png",
+				"slug": "jayden-reed",
+				"position_rank": null,
+				"points_over_replacement": -2,
+				"rest_of_season_per_game": 9.1,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 1,
+				"season_avg": 3.2,
+				"last_points": 1.4,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "DAL",
+					"home": true,
+					"kickoff": "2026-10-19T00:20:00.000Z",
+					"bye": false,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-30T23:00:00.000Z",
+						"season_long": true
+					},
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 2, "points": 1.4 },
+						{ "week": 1, "points": 5 }
+					],
+					"allowed_to_position": { "points_a_game": 29.4, "rank": 1, "of": 32, "position": "WR" },
+					"game_total": {
+						"points": 52.5,
+						"team_points": 27,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "outdoors", "abroad": false },
+					"weather": {
+						"temperature_f": 55,
+						"wind_mph": 9.2,
+						"precipitation_chance": 0,
+						"precipitation_kind": "none",
+						"read_at": "2026-10-16T21:01:34.611Z"
+					}
+				}
+			},
+			"rest_of_season_points": 100.1,
+			"points_over_replacement": -24,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 64,
+			"line": {
+				"player": {
+					"host_id": "",
 					"board_id": "3917792",
 					"name": "Daniel Jones",
 					"position": "QB",
@@ -3533,7 +3595,69 @@
 			"move": "add"
 		},
 		{
-			"rank": 64,
+			"rank": 65,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "3123076",
+					"name": "David Njoku",
+					"position": "TE",
+					"team": "LAC",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3123076.png",
+				"slug": "david-njoku",
+				"position_rank": null,
+				"points_over_replacement": -2.1,
+				"rest_of_season_per_game": 6.5,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 12,
+				"season_avg": 6.4,
+				"last_points": 1.9,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "KC",
+					"home": false,
+					"kickoff": "2026-10-18T20:25:00.000Z",
+					"bye": false,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-24T16:00:00.000Z",
+						"season_long": true
+					},
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 2, "points": 1.9 },
+						{ "week": 1, "points": 10.8 }
+					],
+					"allowed_to_position": { "points_a_game": 22.8, "rank": 12, "of": 32, "position": "TE" },
+					"game_total": {
+						"points": 42.5,
+						"team_points": 17,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "lose", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "outdoors", "abroad": false },
+					"weather": {
+						"temperature_f": 66,
+						"wind_mph": 10.4,
+						"precipitation_chance": 0,
+						"precipitation_kind": "none",
+						"read_at": "2026-10-16T21:01:34.611Z"
+					}
+				}
+			},
+			"rest_of_season_points": 71.5,
+			"points_over_replacement": -25.2,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 66,
 			"line": {
 				"player": {
 					"host_id": "",
@@ -3585,7 +3709,7 @@
 			"move": "add"
 		},
 		{
-			"rank": 65,
+			"rank": 67,
 			"line": {
 				"player": {
 					"host_id": "13301",
@@ -3643,7 +3767,7 @@
 			"move": null
 		},
 		{
-			"rank": 66,
+			"rank": 68,
 			"line": {
 				"player": {
 					"host_id": "7543",
@@ -3706,7 +3830,7 @@
 			"move": null
 		},
 		{
-			"rank": 67,
+			"rank": 69,
 			"line": {
 				"player": {
 					"host_id": "",
@@ -3764,7 +3888,7 @@
 			"move": "add"
 		},
 		{
-			"rank": 68,
+			"rank": 70,
 			"line": {
 				"player": {
 					"host_id": "",
@@ -3822,69 +3946,7 @@
 			"move": "add"
 		},
 		{
-			"rank": 69,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4362249",
-					"name": "Jayden Reed",
-					"position": "WR",
-					"team": "GB",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4362249.png",
-				"slug": "jayden-reed",
-				"position_rank": null,
-				"points_over_replacement": -2.8,
-				"rest_of_season_per_game": 9.1,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 1,
-				"season_avg": 3.2,
-				"last_points": 1.4,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "DAL",
-					"home": true,
-					"kickoff": "2026-10-19T00:20:00.000Z",
-					"bye": false,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-30T23:00:00.000Z",
-						"season_long": true
-					},
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 2, "points": 1.4 },
-						{ "week": 1, "points": 5 }
-					],
-					"allowed_to_position": { "points_a_game": 29.4, "rank": 1, "of": 32, "position": "WR" },
-					"game_total": {
-						"points": 52.5,
-						"team_points": 27,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "outdoors", "abroad": false },
-					"weather": {
-						"temperature_f": 55,
-						"wind_mph": 9.2,
-						"precipitation_chance": 0,
-						"precipitation_kind": "none",
-						"read_at": "2026-10-16T21:01:34.611Z"
-					}
-				}
-			},
-			"rest_of_season_points": 100.1,
-			"points_over_replacement": -33.6,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 70,
+			"rank": 71,
 			"line": {
 				"player": {
 					"host_id": "",
@@ -3937,68 +3999,6 @@
 				"last_points": 7.4
 			},
 			"rest_of_season_points": 59.4,
-			"points_over_replacement": -36,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 71,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "3123076",
-					"name": "David Njoku",
-					"position": "TE",
-					"team": "LAC",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3123076.png",
-				"slug": "david-njoku",
-				"position_rank": null,
-				"points_over_replacement": -3,
-				"rest_of_season_per_game": 6.5,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 12,
-				"season_avg": 6.4,
-				"last_points": 1.9,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "KC",
-					"home": false,
-					"kickoff": "2026-10-18T20:25:00.000Z",
-					"bye": false,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T16:00:00.000Z",
-						"season_long": true
-					},
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 2, "points": 1.9 },
-						{ "week": 1, "points": 10.8 }
-					],
-					"allowed_to_position": { "points_a_game": 22.8, "rank": 12, "of": 32, "position": "TE" },
-					"game_total": {
-						"points": 42.5,
-						"team_points": 17,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "lose", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "outdoors", "abroad": false },
-					"weather": {
-						"temperature_f": 66,
-						"wind_mph": 10.4,
-						"precipitation_chance": 0,
-						"precipitation_kind": "none",
-						"read_at": "2026-10-16T21:01:34.611Z"
-					}
-				}
-			},
-			"rest_of_season_points": 71.5,
 			"points_over_replacement": -36,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
@@ -4065,6 +4065,58 @@
 			"rank": 73,
 			"line": {
 				"player": {
+					"host_id": "",
+					"board_id": "4382466",
+					"name": "Jalen Nailor",
+					"position": "WR",
+					"team": "LV",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4382466.png",
+				"slug": "jalen-nailor",
+				"position_rank": 56,
+				"points_over_replacement": -3.2,
+				"rest_of_season_per_game": 7.9,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 27,
+				"season_avg": 1.5,
+				"last_points": 0,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "BUF",
+					"home": true,
+					"kickoff": "2026-10-18T20:25:00.000Z",
+					"bye": false,
+					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 4, "points": 0 },
+						{ "week": 3, "points": 2.6 },
+						{ "week": 2, "points": 1.9 }
+					],
+					"allowed_to_position": { "points_a_game": 13.8, "rank": 27, "of": 32, "position": "WR" },
+					"game_total": {
+						"points": 52.5,
+						"team_points": 23.5,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "dome", "abroad": false },
+					"weather": null
+				}
+			},
+			"rest_of_season_points": 86.9,
+			"points_over_replacement": -38.4,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 74,
+			"line": {
+				"player": {
 					"host_id": "11635",
 					"board_id": "4612826",
 					"name": "Ladd McConkey",
@@ -4120,7 +4172,7 @@
 			"move": null
 		},
 		{
-			"rank": 74,
+			"rank": 75,
 			"line": {
 				"player": {
 					"host_id": "9756",
@@ -4168,7 +4220,7 @@
 			"move": null
 		},
 		{
-			"rank": 75,
+			"rank": 76,
 			"line": {
 				"player": {
 					"host_id": "",
@@ -4226,58 +4278,6 @@
 			"move": "add"
 		},
 		{
-			"rank": 76,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4382466",
-					"name": "Jalen Nailor",
-					"position": "WR",
-					"team": "LV",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4382466.png",
-				"slug": "jalen-nailor",
-				"position_rank": 56,
-				"points_over_replacement": -4.5,
-				"rest_of_season_per_game": 7.9,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 27,
-				"season_avg": 1.5,
-				"last_points": 0,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "BUF",
-					"home": true,
-					"kickoff": "2026-10-18T20:25:00.000Z",
-					"bye": false,
-					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 4, "points": 0 },
-						{ "week": 3, "points": 2.6 },
-						{ "week": 2, "points": 1.9 }
-					],
-					"allowed_to_position": { "points_a_game": 13.8, "rank": 27, "of": 32, "position": "WR" },
-					"game_total": {
-						"points": 52.5,
-						"team_points": 23.5,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "dome", "abroad": false },
-					"weather": null
-				}
-			},
-			"rest_of_season_points": 86.9,
-			"points_over_replacement": -54,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
 			"rank": 77,
 			"line": {
 				"player": {
@@ -4291,7 +4291,7 @@
 				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5081397.png",
 				"slug": "dylan-sampson",
 				"position_rank": null,
-				"points_over_replacement": -5,
+				"points_over_replacement": -3.5,
 				"rest_of_season_per_game": 5.5,
 				"week_projection": null,
 				"projection_delta": null,
@@ -4332,12 +4332,670 @@
 				}
 			},
 			"rest_of_season_points": 60.5,
-			"points_over_replacement": -60,
+			"points_over_replacement": -42,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
 		{
 			"rank": 78,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "4430834",
+					"name": "Jalen McMillan",
+					"position": "WR",
+					"team": "TB",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4430834.png",
+				"slug": "jalen-mcmillan",
+				"position_rank": null,
+				"points_over_replacement": -4,
+				"rest_of_season_per_game": 7,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 29,
+				"season_avg": 0,
+				"last_points": 0,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "PIT",
+					"home": true,
+					"kickoff": "2026-10-18T17:00:00.000Z",
+					"bye": false,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-30T16:00:00.000Z",
+						"season_long": true
+					},
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 0 },
+						{ "week": 2, "points": 0 }
+					],
+					"allowed_to_position": { "points_a_game": 12.6, "rank": 29, "of": 32, "position": "WR" },
+					"game_total": {
+						"points": 40.5,
+						"team_points": 19,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "outdoors", "abroad": false },
+					"weather": {
+						"temperature_f": 74,
+						"wind_mph": 15,
+						"precipitation_chance": 0,
+						"precipitation_kind": "none",
+						"read_at": "2026-10-16T21:01:34.611Z"
+					}
+				}
+			},
+			"rest_of_season_points": 77,
+			"points_over_replacement": -48,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 79,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "4431574",
+					"name": "Eli Stowers",
+					"position": "TE",
+					"team": "PHI",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4431574.png",
+				"slug": "eli-stowers",
+				"position_rank": null,
+				"points_over_replacement": -4.5,
+				"rest_of_season_per_game": 4,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 8,
+				"season_avg": null,
+				"last_points": null,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "CAR",
+					"home": true,
+					"kickoff": "2026-10-18T17:00:00.000Z",
+					"bye": false,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-24T20:00:00.000Z",
+						"season_long": true
+					},
+					"played": false,
+					"points_this_week": null,
+					"last_games": [],
+					"allowed_to_position": { "points_a_game": 25.2, "rank": 8, "of": 32, "position": "TE" },
+					"game_total": {
+						"points": 41.5,
+						"team_points": 21.5,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "outdoors", "abroad": false },
+					"weather": {
+						"temperature_f": 52,
+						"wind_mph": 6.9,
+						"precipitation_chance": 0,
+						"precipitation_kind": "none",
+						"read_at": "2026-10-16T21:01:34.611Z"
+					}
+				}
+			},
+			"rest_of_season_points": 44,
+			"points_over_replacement": -54,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 80,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "3916945",
+					"name": "Darius Slayton",
+					"position": "WR",
+					"team": "NYG",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3916945.png",
+				"slug": "darius-slayton",
+				"position_rank": 68,
+				"points_over_replacement": -4.6,
+				"rest_of_season_per_game": 6.4,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 13,
+				"season_avg": null,
+				"last_points": null,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "NO",
+					"home": true,
+					"kickoff": "2026-10-18T17:00:00.000Z",
+					"bye": false,
+					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
+					"played": false,
+					"points_this_week": null,
+					"last_games": [],
+					"allowed_to_position": { "points_a_game": 22.2, "rank": 13, "of": 32, "position": "WR" },
+					"game_total": {
+						"points": 45.5,
+						"team_points": 23.5,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "outdoors", "abroad": false },
+					"weather": {
+						"temperature_f": 54,
+						"wind_mph": 6.9,
+						"precipitation_chance": 0,
+						"precipitation_kind": "none",
+						"read_at": "2026-10-16T21:01:34.611Z"
+					}
+				}
+			},
+			"rest_of_season_points": 70.4,
+			"points_over_replacement": -55.2,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 81,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "4430034",
+					"name": "Xavier Legette",
+					"position": "WR",
+					"team": "CAR",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4430034.png",
+				"slug": "xavier-legette",
+				"position_rank": null,
+				"points_over_replacement": -4.7,
+				"rest_of_season_per_game": 6.2,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 7,
+				"season_avg": 4.2,
+				"last_points": 8.4,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "PHI",
+					"home": false,
+					"kickoff": "2026-10-18T17:00:00.000Z",
+					"bye": false,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-10-03T22:00:00.000Z",
+						"season_long": true
+					},
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 2, "points": 8.4 },
+						{ "week": 1, "points": 0 }
+					],
+					"allowed_to_position": { "points_a_game": 25.8, "rank": 7, "of": 32, "position": "WR" },
+					"game_total": {
+						"points": 41.5,
+						"team_points": 20,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "outdoors", "abroad": false },
+					"weather": {
+						"temperature_f": 52,
+						"wind_mph": 6.9,
+						"precipitation_chance": 0,
+						"precipitation_kind": "none",
+						"read_at": "2026-10-16T21:01:34.611Z"
+					}
+				}
+			},
+			"rest_of_season_points": 74.4,
+			"points_over_replacement": -56.4,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 82,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "4361529",
+					"name": "Isiah Pacheco",
+					"position": "RB",
+					"team": "DET",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4361529.png",
+				"slug": "isiah-pacheco",
+				"position_rank": null,
+				"points_over_replacement": -4.8,
+				"rest_of_season_per_game": 4.1,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": null,
+				"season_avg": null,
+				"last_points": null,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": null,
+					"home": null,
+					"kickoff": null,
+					"bye": true,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-22T19:00:00.000Z",
+						"season_long": true
+					},
+					"played": false,
+					"points_this_week": null,
+					"last_games": [],
+					"allowed_to_position": null,
+					"game_total": null,
+					"spread": null,
+					"roof": null,
+					"weather": null
+				}
+			},
+			"rest_of_season_points": 45.1,
+			"points_over_replacement": -57.6,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 83,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "3045147",
+					"name": "James Conner",
+					"position": "RB",
+					"team": "ARI",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3045147.png",
+				"slug": "james-conner",
+				"position_rank": null,
+				"points_over_replacement": -4.9,
+				"rest_of_season_per_game": 4.1,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 6,
+				"season_avg": null,
+				"last_points": null,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "LAR",
+					"home": false,
+					"kickoff": "2026-10-18T20:05:00.000Z",
+					"bye": false,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-22T22:00:00.000Z",
+						"season_long": true
+					},
+					"played": false,
+					"points_this_week": null,
+					"last_games": [],
+					"allowed_to_position": { "points_a_game": 26.4, "rank": 6, "of": 32, "position": "RB" },
+					"game_total": {
+						"points": 52.5,
+						"team_points": 20,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "dome", "abroad": false },
+					"weather": null
+				}
+			},
+			"rest_of_season_points": 45.1,
+			"points_over_replacement": -58.8,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 84,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "3921690",
+					"name": "Josh Oliver",
+					"position": "TE",
+					"team": "MIN",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3921690.png",
+				"slug": "josh-oliver",
+				"position_rank": null,
+				"points_over_replacement": -4.9,
+				"rest_of_season_per_game": 3.6,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": null,
+				"season_avg": 2.5,
+				"last_points": 0,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": null,
+					"home": null,
+					"kickoff": null,
+					"bye": true,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-30T00:00:00.000Z",
+						"season_long": true
+					},
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 0 },
+						{ "week": 2, "points": 3.4 },
+						{ "week": 1, "points": 4.2 }
+					],
+					"allowed_to_position": null,
+					"game_total": null,
+					"spread": null,
+					"roof": null,
+					"weather": null
+				}
+			},
+			"rest_of_season_points": 39.6,
+			"points_over_replacement": -58.8,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 85,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "4259147",
+					"name": "Jake Tonges",
+					"position": "TE",
+					"team": "SF",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4259147.png",
+				"slug": "jake-tonges",
+				"position_rank": null,
+				"points_over_replacement": -5.3,
+				"rest_of_season_per_game": 3.2,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 27,
+				"season_avg": 0,
+				"last_points": 0,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "WSH",
+					"home": true,
+					"kickoff": "2026-10-20T00:15:00.000Z",
+					"bye": false,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-22T22:00:00.000Z",
+						"season_long": true
+					},
+					"played": false,
+					"points_this_week": null,
+					"last_games": [{ "week": 1, "points": 0 }],
+					"allowed_to_position": { "points_a_game": 13.8, "rank": 27, "of": 32, "position": "TE" },
+					"game_total": {
+						"points": 50.5,
+						"team_points": 29,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "win", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "outdoors", "abroad": false },
+					"weather": {
+						"temperature_f": 63,
+						"wind_mph": 12.7,
+						"precipitation_chance": 2,
+						"precipitation_kind": "none",
+						"read_at": "2026-10-16T21:01:34.611Z"
+					}
+				}
+			},
+			"rest_of_season_points": 35.2,
+			"points_over_replacement": -63.6,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 86,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "4912052",
+					"name": "Justin Joly",
+					"position": "TE",
+					"team": "MIA",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4912052.png",
+				"slug": "justin-joly",
+				"position_rank": 66,
+				"points_over_replacement": -5.3,
+				"rest_of_season_per_game": 3.2,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": null,
+				"season_avg": null,
+				"last_points": null,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": null,
+					"home": null,
+					"kickoff": null,
+					"bye": true,
+					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
+					"played": false,
+					"points_this_week": null,
+					"last_games": [],
+					"allowed_to_position": null,
+					"game_total": null,
+					"spread": null,
+					"roof": null,
+					"weather": null
+				}
+			},
+			"rest_of_season_points": 35.2,
+			"points_over_replacement": -63.6,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 87,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "4565859",
+					"name": "Joe Royer",
+					"position": "TE",
+					"team": "CLE",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4565859.png",
+				"slug": "joe-royer",
+				"position_rank": 73,
+				"points_over_replacement": -5.5,
+				"rest_of_season_per_game": 2.9,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 2,
+				"season_avg": null,
+				"last_points": null,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "BAL",
+					"home": true,
+					"kickoff": "2026-10-18T17:00:00.000Z",
+					"bye": false,
+					"designation": { "status": "out", "as_of": "2026-10-14T02:03:35.613Z" },
+					"played": false,
+					"points_this_week": null,
+					"last_games": [],
+					"allowed_to_position": { "points_a_game": 28.8, "rank": 2, "of": 32, "position": "TE" },
+					"game_total": {
+						"points": 40.5,
+						"team_points": 18,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "lose", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "outdoors", "abroad": false },
+					"weather": {
+						"temperature_f": 57,
+						"wind_mph": 6.9,
+						"precipitation_chance": 0,
+						"precipitation_kind": "none",
+						"read_at": "2026-10-16T21:01:34.611Z"
+					}
+				}
+			},
+			"rest_of_season_points": 31.9,
+			"points_over_replacement": -66,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 88,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "4368003",
+					"name": "Andrei Iosivas",
+					"position": "WR",
+					"team": "CIN",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4368003.png",
+				"slug": "andrei-iosivas",
+				"position_rank": null,
+				"points_over_replacement": -5.5,
+				"rest_of_season_per_game": 5.4,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": null,
+				"season_avg": 2.5,
+				"last_points": 1.7,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": null,
+					"home": null,
+					"kickoff": null,
+					"bye": true,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-26T22:00:00.000Z",
+						"season_long": true
+					},
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 2, "points": 1.7 },
+						{ "week": 1, "points": 3.2 }
+					],
+					"allowed_to_position": null,
+					"game_total": null,
+					"spread": null,
+					"roof": null,
+					"weather": null
+				}
+			},
+			"rest_of_season_points": 59.4,
+			"points_over_replacement": -66,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 89,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "4239944",
+					"name": "Hunter Long",
+					"position": "TE",
+					"team": "ARI",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4239944.png",
+				"slug": "hunter-long",
+				"position_rank": null,
+				"points_over_replacement": -5.6,
+				"rest_of_season_per_game": 2.8,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 7,
+				"season_avg": 1.2,
+				"last_points": 2,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "LAR",
+					"home": false,
+					"kickoff": "2026-10-18T20:05:00.000Z",
+					"bye": false,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-10-06T22:00:00.000Z",
+						"season_long": true
+					},
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 4, "points": 2 },
+						{ "week": 3, "points": 1.5 },
+						{ "week": 2, "points": 0 }
+					],
+					"allowed_to_position": { "points_a_game": 25.8, "rank": 7, "of": 32, "position": "TE" },
+					"game_total": {
+						"points": 52.5,
+						"team_points": 20,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "dome", "abroad": false },
+					"weather": null
+				}
+			},
+			"rest_of_season_points": 30.8,
+			"points_over_replacement": -67.2,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 90,
 			"line": {
 				"player": {
 					"host_id": "9753",
@@ -4385,7 +5043,7 @@
 			"move": null
 		},
 		{
-			"rank": 79,
+			"rank": 91,
 			"line": {
 				"player": {
 					"host_id": "9225",
@@ -4448,69 +5106,118 @@
 			"move": null
 		},
 		{
-			"rank": 80,
+			"rank": 92,
 			"line": {
 				"player": {
 					"host_id": "",
-					"board_id": "4430834",
-					"name": "Jalen McMillan",
-					"position": "WR",
-					"team": "TB",
+					"board_id": "4696700",
+					"name": "Tip Reiman",
+					"position": "TE",
+					"team": "ARI",
 					"injured_reserve": false
 				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4430834.png",
-				"slug": "jalen-mcmillan",
-				"position_rank": null,
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4696700.png",
+				"slug": "tip-reiman",
+				"position_rank": 81,
 				"points_over_replacement": -5.7,
-				"rest_of_season_per_game": 7,
+				"rest_of_season_per_game": 2.7,
 				"week_projection": null,
 				"projection_delta": null,
-				"opp_rank": 29,
-				"season_avg": 0,
-				"last_points": 0,
+				"opp_rank": 7,
+				"season_avg": null,
+				"last_points": null,
 				"held": false,
 				"facts": {
 					"week": 6,
-					"opponent": "PIT",
+					"opponent": "LAR",
+					"home": false,
+					"kickoff": "2026-10-18T20:05:00.000Z",
+					"bye": false,
+					"designation": { "status": "out", "as_of": "2026-10-14T02:03:35.613Z" },
+					"played": false,
+					"points_this_week": null,
+					"last_games": [],
+					"allowed_to_position": { "points_a_game": 25.8, "rank": 7, "of": 32, "position": "TE" },
+					"game_total": {
+						"points": 52.5,
+						"team_points": 20,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "dome", "abroad": false },
+					"weather": null
+				}
+			},
+			"rest_of_season_points": 29.7,
+			"points_over_replacement": -68.4,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 93,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "3149687",
+					"name": "Chris Brooks",
+					"position": "RB",
+					"team": "GB",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3149687.png",
+				"slug": "chris-brooks",
+				"position_rank": null,
+				"points_over_replacement": -6,
+				"rest_of_season_per_game": 2.9,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 22,
+				"season_avg": 3.2,
+				"last_points": 4.5,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "DAL",
 					"home": true,
-					"kickoff": "2026-10-18T17:00:00.000Z",
+					"kickoff": "2026-10-19T00:20:00.000Z",
 					"bye": false,
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-30T16:00:00.000Z",
+						"since": "2026-10-10T22:00:00.000Z",
 						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 0 },
-						{ "week": 2, "points": 0 }
+						{ "week": 4, "points": 4.5 },
+						{ "week": 3, "points": 1.4 },
+						{ "week": 2, "points": 3.6 }
 					],
-					"allowed_to_position": { "points_a_game": 12.6, "rank": 29, "of": 32, "position": "WR" },
+					"allowed_to_position": { "points_a_game": 16.8, "rank": 22, "of": 32, "position": "RB" },
 					"game_total": {
-						"points": 40.5,
-						"team_points": 19,
+						"points": 52.5,
+						"team_points": 27,
 						"read_at": "2026-10-16T21:01:26.774Z"
 					},
-					"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+					"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
 					"roof": { "kind": "outdoors", "abroad": false },
 					"weather": {
-						"temperature_f": 74,
-						"wind_mph": 15,
+						"temperature_f": 55,
+						"wind_mph": 9.2,
 						"precipitation_chance": 0,
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
 				}
 			},
-			"rest_of_season_points": 77,
-			"points_over_replacement": -68.4,
+			"rest_of_season_points": 31.9,
+			"points_over_replacement": -72,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
 		{
-			"rank": 81,
+			"rank": 94,
 			"line": {
 				"player": {
 					"host_id": "10235",
@@ -4568,52 +5275,56 @@
 			"move": null
 		},
 		{
-			"rank": 82,
+			"rank": 95,
 			"line": {
 				"player": {
 					"host_id": "",
-					"board_id": "4431574",
-					"name": "Eli Stowers",
+					"board_id": "3052897",
+					"name": "Durham Smythe",
 					"position": "TE",
-					"team": "PHI",
+					"team": "BAL",
 					"injured_reserve": false
 				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4431574.png",
-				"slug": "eli-stowers",
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3052897.png",
+				"slug": "durham-smythe",
 				"position_rank": null,
 				"points_over_replacement": -6.3,
-				"rest_of_season_per_game": 4,
+				"rest_of_season_per_game": 2,
 				"week_projection": null,
 				"projection_delta": null,
-				"opp_rank": 8,
-				"season_avg": null,
-				"last_points": null,
+				"opp_rank": 16,
+				"season_avg": 0,
+				"last_points": 0,
 				"held": false,
 				"facts": {
 					"week": 6,
-					"opponent": "CAR",
-					"home": true,
+					"opponent": "CLE",
+					"home": false,
 					"kickoff": "2026-10-18T17:00:00.000Z",
 					"bye": false,
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-24T20:00:00.000Z",
+						"since": "2026-10-07T23:00:00.000Z",
 						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
-					"last_games": [],
-					"allowed_to_position": { "points_a_game": 25.2, "rank": 8, "of": 32, "position": "TE" },
+					"last_games": [
+						{ "week": 4, "points": 0 },
+						{ "week": 3, "points": 0 },
+						{ "week": 2, "points": 0 }
+					],
+					"allowed_to_position": { "points_a_game": 20.4, "rank": 16, "of": 32, "position": "TE" },
 					"game_total": {
-						"points": 41.5,
-						"team_points": 21.5,
+						"points": 40.5,
+						"team_points": 22.5,
 						"read_at": "2026-10-16T21:01:26.774Z"
 					},
-					"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"spread": { "side": "win", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
 					"roof": { "kind": "outdoors", "abroad": false },
 					"weather": {
-						"temperature_f": 52,
+						"temperature_f": 57,
 						"wind_mph": 6.9,
 						"precipitation_chance": 0,
 						"precipitation_kind": "none",
@@ -4621,67 +5332,129 @@
 					}
 				}
 			},
-			"rest_of_season_points": 44,
+			"rest_of_season_points": 22,
 			"points_over_replacement": -75.6,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
 		{
-			"rank": 83,
+			"rank": 96,
 			"line": {
 				"player": {
 					"host_id": "",
-					"board_id": "3916945",
-					"name": "Darius Slayton",
-					"position": "WR",
-					"team": "NYG",
+					"board_id": "4240603",
+					"name": "Malik Davis",
+					"position": "RB",
+					"team": "DAL",
 					"injured_reserve": false
 				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3916945.png",
-				"slug": "darius-slayton",
-				"position_rank": 68,
-				"points_over_replacement": -6.5,
-				"rest_of_season_per_game": 6.4,
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4240603.png",
+				"slug": "malik-davis",
+				"position_rank": null,
+				"points_over_replacement": -6.4,
+				"rest_of_season_per_game": 2.5,
 				"week_projection": null,
 				"projection_delta": null,
-				"opp_rank": 13,
+				"opp_rank": 10,
 				"season_avg": null,
 				"last_points": null,
 				"held": false,
 				"facts": {
 					"week": 6,
-					"opponent": "NO",
-					"home": true,
-					"kickoff": "2026-10-18T17:00:00.000Z",
+					"opponent": "GB",
+					"home": false,
+					"kickoff": "2026-10-19T00:20:00.000Z",
 					"bye": false,
-					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-22T22:00:00.000Z",
+						"season_long": true
+					},
 					"played": false,
 					"points_this_week": null,
 					"last_games": [],
-					"allowed_to_position": { "points_a_game": 22.2, "rank": 13, "of": 32, "position": "WR" },
+					"allowed_to_position": { "points_a_game": 24, "rank": 10, "of": 32, "position": "RB" },
 					"game_total": {
-						"points": 45.5,
-						"team_points": 23.5,
+						"points": 52.5,
+						"team_points": 25.5,
 						"read_at": "2026-10-16T21:01:26.774Z"
 					},
-					"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
 					"roof": { "kind": "outdoors", "abroad": false },
 					"weather": {
-						"temperature_f": 54,
-						"wind_mph": 6.9,
+						"temperature_f": 55,
+						"wind_mph": 9.2,
 						"precipitation_chance": 0,
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
 				}
 			},
-			"rest_of_season_points": 70.4,
-			"points_over_replacement": -78,
+			"rest_of_season_points": 27.5,
+			"points_over_replacement": -76.8,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
 		{
-			"rank": 84,
+			"rank": 97,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "4603186",
+					"name": "Jack Bech",
+					"position": "WR",
+					"team": "LV",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4603186.png",
+				"slug": "jack-bech",
+				"position_rank": null,
+				"points_over_replacement": -6.6,
+				"rest_of_season_per_game": 4.2,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 27,
+				"season_avg": 5.3,
+				"last_points": 0,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "BUF",
+					"home": true,
+					"kickoff": "2026-10-18T20:25:00.000Z",
+					"bye": false,
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-29T22:00:00.000Z",
+						"season_long": true
+					},
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 0 },
+						{ "week": 2, "points": 4.5 },
+						{ "week": 1, "points": 11.3 }
+					],
+					"allowed_to_position": { "points_a_game": 13.8, "rank": 27, "of": 32, "position": "WR" },
+					"game_total": {
+						"points": 52.5,
+						"team_points": 23.5,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "dome", "abroad": false },
+					"weather": null
+				}
+			},
+			"rest_of_season_points": 46.2,
+			"points_over_replacement": -79.2,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 98,
 			"line": {
 				"player": {
 					"host_id": "4950",
@@ -4735,52 +5508,44 @@
 			"move": null
 		},
 		{
-			"rank": 85,
+			"rank": 99,
 			"line": {
 				"player": {
 					"host_id": "",
-					"board_id": "4430034",
-					"name": "Xavier Legette",
+					"board_id": "4241372",
+					"name": "Hollywood Brown",
 					"position": "WR",
-					"team": "CAR",
+					"team": "PHI",
 					"injured_reserve": false
 				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4430034.png",
-				"slug": "xavier-legette",
-				"position_rank": null,
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4241372.png",
+				"slug": "hollywood-brown",
+				"position_rank": 92,
 				"points_over_replacement": -6.7,
-				"rest_of_season_per_game": 6.2,
+				"rest_of_season_per_game": 4.1,
 				"week_projection": null,
 				"projection_delta": null,
-				"opp_rank": 7,
-				"season_avg": 4.2,
-				"last_points": 8.4,
+				"opp_rank": 18,
+				"season_avg": 1.2,
+				"last_points": 1.2,
 				"held": false,
 				"facts": {
 					"week": 6,
-					"opponent": "PHI",
-					"home": false,
+					"opponent": "CAR",
+					"home": true,
 					"kickoff": "2026-10-18T17:00:00.000Z",
 					"bye": false,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-10-03T22:00:00.000Z",
-						"season_long": true
-					},
+					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
 					"played": false,
 					"points_this_week": null,
-					"last_games": [
-						{ "week": 2, "points": 8.4 },
-						{ "week": 1, "points": 0 }
-					],
-					"allowed_to_position": { "points_a_game": 25.8, "rank": 7, "of": 32, "position": "WR" },
+					"last_games": [{ "week": 2, "points": 1.2 }],
+					"allowed_to_position": { "points_a_game": 19.2, "rank": 18, "of": 32, "position": "WR" },
 					"game_total": {
 						"points": 41.5,
-						"team_points": 20,
+						"team_points": 21.5,
 						"read_at": "2026-10-16T21:01:26.774Z"
 					},
-					"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
 					"roof": { "kind": "outdoors", "abroad": false },
 					"weather": {
 						"temperature_f": 52,
@@ -4791,187 +5556,84 @@
 					}
 				}
 			},
-			"rest_of_season_points": 74.4,
+			"rest_of_season_points": 45.1,
 			"points_over_replacement": -80.4,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
 		{
-			"rank": 86,
+			"rank": 100,
 			"line": {
 				"player": {
 					"host_id": "",
-					"board_id": "4361529",
-					"name": "Isiah Pacheco",
-					"position": "RB",
-					"team": "DET",
+					"board_id": "4242433",
+					"name": "Joshua Palmer",
+					"position": "WR",
+					"team": "BUF",
 					"injured_reserve": false
 				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4361529.png",
-				"slug": "isiah-pacheco",
-				"position_rank": null,
-				"points_over_replacement": -6.9,
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4242433.png",
+				"slug": "joshua-palmer",
+				"position_rank": 94,
+				"points_over_replacement": -6.7,
 				"rest_of_season_per_game": 4.1,
 				"week_projection": null,
 				"projection_delta": null,
-				"opp_rank": null,
-				"season_avg": null,
-				"last_points": null,
+				"opp_rank": 31,
+				"season_avg": 4.2,
+				"last_points": 1.3,
 				"held": false,
 				"facts": {
 					"week": 6,
-					"opponent": null,
-					"home": null,
-					"kickoff": null,
-					"bye": true,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-22T19:00:00.000Z",
-						"season_long": true
-					},
-					"played": false,
-					"points_this_week": null,
-					"last_games": [],
-					"allowed_to_position": null,
-					"game_total": null,
-					"spread": null,
-					"roof": null,
-					"weather": null
-				}
-			},
-			"rest_of_season_points": 45.1,
-			"points_over_replacement": -82.8,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 87,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "3045147",
-					"name": "James Conner",
-					"position": "RB",
-					"team": "ARI",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3045147.png",
-				"slug": "james-conner",
-				"position_rank": null,
-				"points_over_replacement": -6.9,
-				"rest_of_season_per_game": 4.1,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 6,
-				"season_avg": null,
-				"last_points": null,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "LAR",
+					"opponent": "LV",
 					"home": false,
-					"kickoff": "2026-10-18T20:05:00.000Z",
+					"kickoff": "2026-10-18T20:25:00.000Z",
 					"bye": false,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-22T22:00:00.000Z",
-						"season_long": true
-					},
+					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
 					"played": false,
 					"points_this_week": null,
-					"last_games": [],
-					"allowed_to_position": { "points_a_game": 26.4, "rank": 6, "of": 32, "position": "RB" },
+					"last_games": [
+						{ "week": 4, "points": 1.3 },
+						{ "week": 3, "points": 0 },
+						{ "week": 2, "points": 11.3 }
+					],
+					"allowed_to_position": { "points_a_game": 11.4, "rank": 31, "of": 32, "position": "WR" },
 					"game_total": {
 						"points": 52.5,
-						"team_points": 20,
+						"team_points": 29.5,
 						"read_at": "2026-10-16T21:01:26.774Z"
 					},
-					"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"spread": { "side": "win", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
 					"roof": { "kind": "dome", "abroad": false },
 					"weather": null
 				}
 			},
 			"rest_of_season_points": 45.1,
-			"points_over_replacement": -82.8,
+			"points_over_replacement": -80.4,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
 		{
-			"rank": 88,
+			"rank": 101,
 			"line": {
 				"player": {
 					"host_id": "",
-					"board_id": "3921690",
-					"name": "Josh Oliver",
-					"position": "TE",
-					"team": "MIN",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3921690.png",
-				"slug": "josh-oliver",
-				"position_rank": null,
-				"points_over_replacement": -6.9,
-				"rest_of_season_per_game": 3.6,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": null,
-				"season_avg": 2.5,
-				"last_points": 0,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": null,
-					"home": null,
-					"kickoff": null,
-					"bye": true,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-30T00:00:00.000Z",
-						"season_long": true
-					},
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 3, "points": 0 },
-						{ "week": 2, "points": 3.4 },
-						{ "week": 1, "points": 4.2 }
-					],
-					"allowed_to_position": null,
-					"game_total": null,
-					"spread": null,
-					"roof": null,
-					"weather": null
-				}
-			},
-			"rest_of_season_points": 39.6,
-			"points_over_replacement": -82.8,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 89,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4259147",
-					"name": "Jake Tonges",
-					"position": "TE",
+					"board_id": "3043116",
+					"name": "Demarcus Robinson",
+					"position": "WR",
 					"team": "SF",
 					"injured_reserve": false
 				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4259147.png",
-				"slug": "jake-tonges",
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3043116.png",
+				"slug": "demarcus-robinson",
 				"position_rank": null,
-				"points_over_replacement": -7.5,
-				"rest_of_season_per_game": 3.2,
+				"points_over_replacement": -6.8,
+				"rest_of_season_per_game": 4,
 				"week_projection": null,
 				"projection_delta": null,
-				"opp_rank": 27,
-				"season_avg": 0,
-				"last_points": 0,
+				"opp_rank": 5,
+				"season_avg": 9.7,
+				"last_points": 6.4,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -4982,13 +5644,16 @@
 					"designation": {
 						"status": "injured_reserve",
 						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-22T22:00:00.000Z",
+						"since": "2026-09-26T23:00:00.000Z",
 						"season_long": true
 					},
 					"played": false,
 					"points_this_week": null,
-					"last_games": [{ "week": 1, "points": 0 }],
-					"allowed_to_position": { "points_a_game": 13.8, "rank": 27, "of": 32, "position": "TE" },
+					"last_games": [
+						{ "week": 2, "points": 6.4 },
+						{ "week": 1, "points": 13 }
+					],
+					"allowed_to_position": { "points_a_game": 27, "rank": 5, "of": 32, "position": "WR" },
 					"game_total": {
 						"points": 50.5,
 						"team_points": 29,
@@ -5005,188 +5670,100 @@
 					}
 				}
 			},
-			"rest_of_season_points": 35.2,
-			"points_over_replacement": -90,
+			"rest_of_season_points": 44,
+			"points_over_replacement": -81.6,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
 		{
-			"rank": 90,
+			"rank": 102,
 			"line": {
 				"player": {
 					"host_id": "",
-					"board_id": "4912052",
-					"name": "Justin Joly",
-					"position": "TE",
-					"team": "MIA",
+					"board_id": "4429105",
+					"name": "Arian Smith",
+					"position": "WR",
+					"team": "NYJ",
 					"injured_reserve": false
 				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4912052.png",
-				"slug": "justin-joly",
-				"position_rank": 66,
-				"points_over_replacement": -7.5,
-				"rest_of_season_per_game": 3.2,
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429105.png",
+				"slug": "arian-smith",
+				"position_rank": null,
+				"points_over_replacement": -7.1,
+				"rest_of_season_per_game": 3.7,
 				"week_projection": null,
 				"projection_delta": null,
-				"opp_rank": null,
-				"season_avg": null,
-				"last_points": null,
+				"opp_rank": 24,
+				"season_avg": 0,
+				"last_points": 0,
 				"held": false,
 				"facts": {
 					"week": 6,
-					"opponent": null,
-					"home": null,
-					"kickoff": null,
-					"bye": true,
-					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
-					"played": false,
-					"points_this_week": null,
-					"last_games": [],
-					"allowed_to_position": null,
-					"game_total": null,
-					"spread": null,
-					"roof": null,
-					"weather": null
-				}
-			},
-			"rest_of_season_points": 35.2,
-			"points_over_replacement": -90,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 91,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4565859",
-					"name": "Joe Royer",
-					"position": "TE",
-					"team": "CLE",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4565859.png",
-				"slug": "joe-royer",
-				"position_rank": 73,
-				"points_over_replacement": -7.8,
-				"rest_of_season_per_game": 2.9,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 2,
-				"season_avg": null,
-				"last_points": null,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "BAL",
-					"home": true,
+					"opponent": "NE",
+					"home": false,
 					"kickoff": "2026-10-18T17:00:00.000Z",
 					"bye": false,
-					"designation": { "status": "out", "as_of": "2026-10-14T02:03:35.613Z" },
+					"designation": {
+						"status": "injured_reserve",
+						"as_of": "2026-10-14T02:03:35.613Z",
+						"since": "2026-09-23T01:00:00.000Z",
+						"season_long": true
+					},
 					"played": false,
 					"points_this_week": null,
-					"last_games": [],
-					"allowed_to_position": { "points_a_game": 28.8, "rank": 2, "of": 32, "position": "TE" },
+					"last_games": [
+						{ "week": 2, "points": 0 },
+						{ "week": 1, "points": 0 }
+					],
+					"allowed_to_position": { "points_a_game": 15.6, "rank": 24, "of": 32, "position": "WR" },
 					"game_total": {
-						"points": 40.5,
-						"team_points": 18,
+						"points": 43.5,
+						"team_points": 18.5,
 						"read_at": "2026-10-16T21:01:26.774Z"
 					},
-					"spread": { "side": "lose", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"spread": { "side": "lose", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
 					"roof": { "kind": "outdoors", "abroad": false },
 					"weather": {
-						"temperature_f": 57,
-						"wind_mph": 6.9,
+						"temperature_f": 48,
+						"wind_mph": 4.6,
 						"precipitation_chance": 0,
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
 				}
 			},
-			"rest_of_season_points": 31.9,
-			"points_over_replacement": -93.6,
+			"rest_of_season_points": 40.7,
+			"points_over_replacement": -85.2,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
 		{
-			"rank": 92,
+			"rank": 103,
 			"line": {
 				"player": {
 					"host_id": "",
-					"board_id": "4368003",
-					"name": "Andrei Iosivas",
+					"board_id": "4602667",
+					"name": "Jaylin Lane",
 					"position": "WR",
-					"team": "CIN",
+					"team": "WSH",
 					"injured_reserve": false
 				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4368003.png",
-				"slug": "andrei-iosivas",
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4602667.png",
+				"slug": "jaylin-lane",
 				"position_rank": null,
-				"points_over_replacement": -7.9,
-				"rest_of_season_per_game": 5.4,
+				"points_over_replacement": -7.2,
+				"rest_of_season_per_game": 3.6,
 				"week_projection": null,
 				"projection_delta": null,
-				"opp_rank": null,
-				"season_avg": 2.5,
-				"last_points": 1.7,
+				"opp_rank": 25,
+				"season_avg": 1,
+				"last_points": 0,
 				"held": false,
 				"facts": {
 					"week": 6,
-					"opponent": null,
-					"home": null,
-					"kickoff": null,
-					"bye": true,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-26T22:00:00.000Z",
-						"season_long": true
-					},
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 2, "points": 1.7 },
-						{ "week": 1, "points": 3.2 }
-					],
-					"allowed_to_position": null,
-					"game_total": null,
-					"spread": null,
-					"roof": null,
-					"weather": null
-				}
-			},
-			"rest_of_season_points": 59.4,
-			"points_over_replacement": -94.8,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 93,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4239944",
-					"name": "Hunter Long",
-					"position": "TE",
-					"team": "ARI",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4239944.png",
-				"slug": "hunter-long",
-				"position_rank": null,
-				"points_over_replacement": -8,
-				"rest_of_season_per_game": 2.8,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 7,
-				"season_avg": 1.2,
-				"last_points": 2,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "LAR",
+					"opponent": "SF",
 					"home": false,
-					"kickoff": "2026-10-18T20:05:00.000Z",
+					"kickoff": "2026-10-20T00:15:00.000Z",
 					"bye": false,
 					"designation": {
 						"status": "injured_reserve",
@@ -5197,76 +5774,241 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 4, "points": 2 },
-						{ "week": 3, "points": 1.5 },
+						{ "week": 4, "points": 0 },
+						{ "week": 3, "points": 3.1 },
 						{ "week": 2, "points": 0 }
 					],
-					"allowed_to_position": { "points_a_game": 25.8, "rank": 7, "of": 32, "position": "TE" },
+					"allowed_to_position": { "points_a_game": 15, "rank": 25, "of": 32, "position": "WR" },
 					"game_total": {
-						"points": 52.5,
-						"team_points": 20,
+						"points": 50.5,
+						"team_points": 21.5,
 						"read_at": "2026-10-16T21:01:26.774Z"
 					},
-					"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "dome", "abroad": false },
-					"weather": null
+					"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "outdoors", "abroad": false },
+					"weather": {
+						"temperature_f": 63,
+						"wind_mph": 12.7,
+						"precipitation_chance": 2,
+						"precipitation_kind": "none",
+						"read_at": "2026-10-16T21:01:34.611Z"
+					}
 				}
 			},
-			"rest_of_season_points": 30.8,
-			"points_over_replacement": -96,
+			"rest_of_season_points": 39.6,
+			"points_over_replacement": -86.4,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
 		{
-			"rank": 94,
+			"rank": 104,
 			"line": {
 				"player": {
 					"host_id": "",
-					"board_id": "4696700",
-					"name": "Tip Reiman",
-					"position": "TE",
-					"team": "ARI",
+					"board_id": "4685553",
+					"name": "Brenen Thompson",
+					"position": "WR",
+					"team": "LAC",
 					"injured_reserve": false
 				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4696700.png",
-				"slug": "tip-reiman",
-				"position_rank": 81,
-				"points_over_replacement": -8.1,
-				"rest_of_season_per_game": 2.7,
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4685553.png",
+				"slug": "brenen-thompson",
+				"position_rank": 106,
+				"points_over_replacement": -7.6,
+				"rest_of_season_per_game": 3.1,
 				"week_projection": null,
 				"projection_delta": null,
-				"opp_rank": 7,
+				"opp_rank": 22,
+				"season_avg": 1.2,
+				"last_points": 2.3,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "KC",
+					"home": false,
+					"kickoff": "2026-10-18T20:25:00.000Z",
+					"bye": false,
+					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 2, "points": 2.3 },
+						{ "week": 1, "points": 0 }
+					],
+					"allowed_to_position": { "points_a_game": 16.8, "rank": 22, "of": 32, "position": "WR" },
+					"game_total": {
+						"points": 42.5,
+						"team_points": 17,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "lose", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "outdoors", "abroad": false },
+					"weather": {
+						"temperature_f": 66,
+						"wind_mph": 10.4,
+						"precipitation_chance": 0,
+						"precipitation_kind": "none",
+						"read_at": "2026-10-16T21:01:34.611Z"
+					}
+				}
+			},
+			"rest_of_season_points": 34.1,
+			"points_over_replacement": -91.2,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 105,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "4241476",
+					"name": "Tyrell Shavers",
+					"position": "WR",
+					"team": "BUF",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4241476.png",
+				"slug": "tyrell-shavers",
+				"position_rank": 108,
+				"points_over_replacement": -7.7,
+				"rest_of_season_per_game": 3.1,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 31,
 				"season_avg": null,
 				"last_points": null,
 				"held": false,
 				"facts": {
 					"week": 6,
-					"opponent": "LAR",
+					"opponent": "LV",
 					"home": false,
-					"kickoff": "2026-10-18T20:05:00.000Z",
+					"kickoff": "2026-10-18T20:25:00.000Z",
 					"bye": false,
 					"designation": { "status": "out", "as_of": "2026-10-14T02:03:35.613Z" },
 					"played": false,
 					"points_this_week": null,
 					"last_games": [],
-					"allowed_to_position": { "points_a_game": 25.8, "rank": 7, "of": 32, "position": "TE" },
+					"allowed_to_position": { "points_a_game": 11.4, "rank": 31, "of": 32, "position": "WR" },
 					"game_total": {
 						"points": 52.5,
-						"team_points": 20,
+						"team_points": 29.5,
 						"read_at": "2026-10-16T21:01:26.774Z"
 					},
-					"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"spread": { "side": "win", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
 					"roof": { "kind": "dome", "abroad": false },
 					"weather": null
 				}
 			},
-			"rest_of_season_points": 29.7,
+			"rest_of_season_points": 34.1,
+			"points_over_replacement": -92.4,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 106,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "5092508",
+					"name": "Colbie Young",
+					"position": "WR",
+					"team": "CIN",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5092508.png",
+				"slug": "colbie-young",
+				"position_rank": 118,
+				"points_over_replacement": -8.1,
+				"rest_of_season_per_game": 2.6,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": null,
+				"season_avg": 1,
+				"last_points": 1.2,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": null,
+					"home": null,
+					"kickoff": null,
+					"bye": true,
+					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 1.2 },
+						{ "week": 2, "points": 1.7 },
+						{ "week": 1, "points": 0 }
+					],
+					"allowed_to_position": null,
+					"game_total": null,
+					"spread": null,
+					"roof": null,
+					"weather": null
+				}
+			},
+			"rest_of_season_points": 28.6,
 			"points_over_replacement": -97.2,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
 		{
-			"rank": 95,
+			"rank": 107,
+			"line": {
+				"player": {
+					"host_id": "",
+					"board_id": "4573697",
+					"name": "Mason Tipton",
+					"position": "WR",
+					"team": "NO",
+					"injured_reserve": false
+				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4573697.png",
+				"slug": "mason-tipton",
+				"position_rank": 120,
+				"points_over_replacement": -8.1,
+				"rest_of_season_per_game": 2.6,
+				"week_projection": null,
+				"projection_delta": null,
+				"opp_rank": 5,
+				"season_avg": null,
+				"last_points": null,
+				"held": false,
+				"facts": {
+					"week": 6,
+					"opponent": "NYG",
+					"home": false,
+					"kickoff": "2026-10-18T17:00:00.000Z",
+					"bye": false,
+					"designation": { "status": "out", "as_of": "2026-10-14T02:03:35.613Z" },
+					"played": false,
+					"points_this_week": null,
+					"last_games": [],
+					"allowed_to_position": { "points_a_game": 27, "rank": 5, "of": 32, "position": "WR" },
+					"game_total": {
+						"points": 45.5,
+						"team_points": 22,
+						"read_at": "2026-10-16T21:01:26.774Z"
+					},
+					"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+					"roof": { "kind": "outdoors", "abroad": false },
+					"weather": {
+						"temperature_f": 54,
+						"wind_mph": 6.9,
+						"precipitation_chance": 0,
+						"precipitation_kind": "none",
+						"read_at": "2026-10-16T21:01:34.611Z"
+					}
+				}
+			},
+			"rest_of_season_points": 28.6,
+			"points_over_replacement": -97.2,
+			"roster": { "kind": "free", "team": null },
+			"move": "add"
+		},
+		{
+			"rank": 108,
 			"line": {
 				"player": {
 					"host_id": "12508",
@@ -5328,748 +6070,6 @@
 			"move": null
 		},
 		{
-			"rank": 96,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "3149687",
-					"name": "Chris Brooks",
-					"position": "RB",
-					"team": "GB",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3149687.png",
-				"slug": "chris-brooks",
-				"position_rank": null,
-				"points_over_replacement": -8.5,
-				"rest_of_season_per_game": 2.9,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 22,
-				"season_avg": 3.2,
-				"last_points": 4.5,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "DAL",
-					"home": true,
-					"kickoff": "2026-10-19T00:20:00.000Z",
-					"bye": false,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-10-10T22:00:00.000Z",
-						"season_long": true
-					},
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 4, "points": 4.5 },
-						{ "week": 3, "points": 1.4 },
-						{ "week": 2, "points": 3.6 }
-					],
-					"allowed_to_position": { "points_a_game": 16.8, "rank": 22, "of": 32, "position": "RB" },
-					"game_total": {
-						"points": 52.5,
-						"team_points": 27,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "outdoors", "abroad": false },
-					"weather": {
-						"temperature_f": 55,
-						"wind_mph": 9.2,
-						"precipitation_chance": 0,
-						"precipitation_kind": "none",
-						"read_at": "2026-10-16T21:01:34.611Z"
-					}
-				}
-			},
-			"rest_of_season_points": 31.9,
-			"points_over_replacement": -102,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 97,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "3052897",
-					"name": "Durham Smythe",
-					"position": "TE",
-					"team": "BAL",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3052897.png",
-				"slug": "durham-smythe",
-				"position_rank": null,
-				"points_over_replacement": -9,
-				"rest_of_season_per_game": 2,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 16,
-				"season_avg": 0,
-				"last_points": 0,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "CLE",
-					"home": false,
-					"kickoff": "2026-10-18T17:00:00.000Z",
-					"bye": false,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-10-07T23:00:00.000Z",
-						"season_long": true
-					},
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 4, "points": 0 },
-						{ "week": 3, "points": 0 },
-						{ "week": 2, "points": 0 }
-					],
-					"allowed_to_position": { "points_a_game": 20.4, "rank": 16, "of": 32, "position": "TE" },
-					"game_total": {
-						"points": 40.5,
-						"team_points": 22.5,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "win", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "outdoors", "abroad": false },
-					"weather": {
-						"temperature_f": 57,
-						"wind_mph": 6.9,
-						"precipitation_chance": 0,
-						"precipitation_kind": "none",
-						"read_at": "2026-10-16T21:01:34.611Z"
-					}
-				}
-			},
-			"rest_of_season_points": 22,
-			"points_over_replacement": -108,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 98,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4240603",
-					"name": "Malik Davis",
-					"position": "RB",
-					"team": "DAL",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4240603.png",
-				"slug": "malik-davis",
-				"position_rank": null,
-				"points_over_replacement": -9,
-				"rest_of_season_per_game": 2.5,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 10,
-				"season_avg": null,
-				"last_points": null,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "GB",
-					"home": false,
-					"kickoff": "2026-10-19T00:20:00.000Z",
-					"bye": false,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-22T22:00:00.000Z",
-						"season_long": true
-					},
-					"played": false,
-					"points_this_week": null,
-					"last_games": [],
-					"allowed_to_position": { "points_a_game": 24, "rank": 10, "of": 32, "position": "RB" },
-					"game_total": {
-						"points": 52.5,
-						"team_points": 25.5,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "outdoors", "abroad": false },
-					"weather": {
-						"temperature_f": 55,
-						"wind_mph": 9.2,
-						"precipitation_chance": 0,
-						"precipitation_kind": "none",
-						"read_at": "2026-10-16T21:01:34.611Z"
-					}
-				}
-			},
-			"rest_of_season_points": 27.5,
-			"points_over_replacement": -108,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 99,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4603186",
-					"name": "Jack Bech",
-					"position": "WR",
-					"team": "LV",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4603186.png",
-				"slug": "jack-bech",
-				"position_rank": null,
-				"points_over_replacement": -9.4,
-				"rest_of_season_per_game": 4.2,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 27,
-				"season_avg": 5.3,
-				"last_points": 0,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "BUF",
-					"home": true,
-					"kickoff": "2026-10-18T20:25:00.000Z",
-					"bye": false,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-29T22:00:00.000Z",
-						"season_long": true
-					},
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 3, "points": 0 },
-						{ "week": 2, "points": 4.5 },
-						{ "week": 1, "points": 11.3 }
-					],
-					"allowed_to_position": { "points_a_game": 13.8, "rank": 27, "of": 32, "position": "WR" },
-					"game_total": {
-						"points": 52.5,
-						"team_points": 23.5,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "dome", "abroad": false },
-					"weather": null
-				}
-			},
-			"rest_of_season_points": 46.2,
-			"points_over_replacement": -112.8,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 100,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4241372",
-					"name": "Hollywood Brown",
-					"position": "WR",
-					"team": "PHI",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4241372.png",
-				"slug": "hollywood-brown",
-				"position_rank": 92,
-				"points_over_replacement": -9.5,
-				"rest_of_season_per_game": 4.1,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 18,
-				"season_avg": 1.2,
-				"last_points": 1.2,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "CAR",
-					"home": true,
-					"kickoff": "2026-10-18T17:00:00.000Z",
-					"bye": false,
-					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
-					"played": false,
-					"points_this_week": null,
-					"last_games": [{ "week": 2, "points": 1.2 }],
-					"allowed_to_position": { "points_a_game": 19.2, "rank": 18, "of": 32, "position": "WR" },
-					"game_total": {
-						"points": 41.5,
-						"team_points": 21.5,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "outdoors", "abroad": false },
-					"weather": {
-						"temperature_f": 52,
-						"wind_mph": 6.9,
-						"precipitation_chance": 0,
-						"precipitation_kind": "none",
-						"read_at": "2026-10-16T21:01:34.611Z"
-					}
-				}
-			},
-			"rest_of_season_points": 45.1,
-			"points_over_replacement": -114,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 101,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4242433",
-					"name": "Joshua Palmer",
-					"position": "WR",
-					"team": "BUF",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4242433.png",
-				"slug": "joshua-palmer",
-				"position_rank": 94,
-				"points_over_replacement": -9.6,
-				"rest_of_season_per_game": 4.1,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 31,
-				"season_avg": 4.2,
-				"last_points": 1.3,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "LV",
-					"home": false,
-					"kickoff": "2026-10-18T20:25:00.000Z",
-					"bye": false,
-					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 4, "points": 1.3 },
-						{ "week": 3, "points": 0 },
-						{ "week": 2, "points": 11.3 }
-					],
-					"allowed_to_position": { "points_a_game": 11.4, "rank": 31, "of": 32, "position": "WR" },
-					"game_total": {
-						"points": 52.5,
-						"team_points": 29.5,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "win", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "dome", "abroad": false },
-					"weather": null
-				}
-			},
-			"rest_of_season_points": 45.1,
-			"points_over_replacement": -115.2,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 102,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "3043116",
-					"name": "Demarcus Robinson",
-					"position": "WR",
-					"team": "SF",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3043116.png",
-				"slug": "demarcus-robinson",
-				"position_rank": null,
-				"points_over_replacement": -9.7,
-				"rest_of_season_per_game": 4,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 5,
-				"season_avg": 9.7,
-				"last_points": 6.4,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "WSH",
-					"home": true,
-					"kickoff": "2026-10-20T00:15:00.000Z",
-					"bye": false,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-26T23:00:00.000Z",
-						"season_long": true
-					},
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 2, "points": 6.4 },
-						{ "week": 1, "points": 13 }
-					],
-					"allowed_to_position": { "points_a_game": 27, "rank": 5, "of": 32, "position": "WR" },
-					"game_total": {
-						"points": 50.5,
-						"team_points": 29,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "win", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "outdoors", "abroad": false },
-					"weather": {
-						"temperature_f": 63,
-						"wind_mph": 12.7,
-						"precipitation_chance": 2,
-						"precipitation_kind": "none",
-						"read_at": "2026-10-16T21:01:34.611Z"
-					}
-				}
-			},
-			"rest_of_season_points": 44,
-			"points_over_replacement": -116.4,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 103,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4429105",
-					"name": "Arian Smith",
-					"position": "WR",
-					"team": "NYJ",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429105.png",
-				"slug": "arian-smith",
-				"position_rank": null,
-				"points_over_replacement": -10.1,
-				"rest_of_season_per_game": 3.7,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 24,
-				"season_avg": 0,
-				"last_points": 0,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "NE",
-					"home": false,
-					"kickoff": "2026-10-18T17:00:00.000Z",
-					"bye": false,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-09-23T01:00:00.000Z",
-						"season_long": true
-					},
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 2, "points": 0 },
-						{ "week": 1, "points": 0 }
-					],
-					"allowed_to_position": { "points_a_game": 15.6, "rank": 24, "of": 32, "position": "WR" },
-					"game_total": {
-						"points": 43.5,
-						"team_points": 18.5,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "lose", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "outdoors", "abroad": false },
-					"weather": {
-						"temperature_f": 48,
-						"wind_mph": 4.6,
-						"precipitation_chance": 0,
-						"precipitation_kind": "none",
-						"read_at": "2026-10-16T21:01:34.611Z"
-					}
-				}
-			},
-			"rest_of_season_points": 40.7,
-			"points_over_replacement": -121.2,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 104,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4602667",
-					"name": "Jaylin Lane",
-					"position": "WR",
-					"team": "WSH",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4602667.png",
-				"slug": "jaylin-lane",
-				"position_rank": null,
-				"points_over_replacement": -10.2,
-				"rest_of_season_per_game": 3.6,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 25,
-				"season_avg": 1,
-				"last_points": 0,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "SF",
-					"home": false,
-					"kickoff": "2026-10-20T00:15:00.000Z",
-					"bye": false,
-					"designation": {
-						"status": "injured_reserve",
-						"as_of": "2026-10-14T02:03:35.613Z",
-						"since": "2026-10-06T22:00:00.000Z",
-						"season_long": true
-					},
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 4, "points": 0 },
-						{ "week": 3, "points": 3.1 },
-						{ "week": 2, "points": 0 }
-					],
-					"allowed_to_position": { "points_a_game": 15, "rank": 25, "of": 32, "position": "WR" },
-					"game_total": {
-						"points": 50.5,
-						"team_points": 21.5,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "outdoors", "abroad": false },
-					"weather": {
-						"temperature_f": 63,
-						"wind_mph": 12.7,
-						"precipitation_chance": 2,
-						"precipitation_kind": "none",
-						"read_at": "2026-10-16T21:01:34.611Z"
-					}
-				}
-			},
-			"rest_of_season_points": 39.6,
-			"points_over_replacement": -122.4,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 105,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4685553",
-					"name": "Brenen Thompson",
-					"position": "WR",
-					"team": "LAC",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4685553.png",
-				"slug": "brenen-thompson",
-				"position_rank": 106,
-				"points_over_replacement": -10.8,
-				"rest_of_season_per_game": 3.1,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 22,
-				"season_avg": 1.2,
-				"last_points": 2.3,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "KC",
-					"home": false,
-					"kickoff": "2026-10-18T20:25:00.000Z",
-					"bye": false,
-					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 2, "points": 2.3 },
-						{ "week": 1, "points": 0 }
-					],
-					"allowed_to_position": { "points_a_game": 16.8, "rank": 22, "of": 32, "position": "WR" },
-					"game_total": {
-						"points": 42.5,
-						"team_points": 17,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "lose", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "outdoors", "abroad": false },
-					"weather": {
-						"temperature_f": 66,
-						"wind_mph": 10.4,
-						"precipitation_chance": 0,
-						"precipitation_kind": "none",
-						"read_at": "2026-10-16T21:01:34.611Z"
-					}
-				}
-			},
-			"rest_of_season_points": 34.1,
-			"points_over_replacement": -129.6,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 106,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4241476",
-					"name": "Tyrell Shavers",
-					"position": "WR",
-					"team": "BUF",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4241476.png",
-				"slug": "tyrell-shavers",
-				"position_rank": 108,
-				"points_over_replacement": -10.9,
-				"rest_of_season_per_game": 3.1,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 31,
-				"season_avg": null,
-				"last_points": null,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "LV",
-					"home": false,
-					"kickoff": "2026-10-18T20:25:00.000Z",
-					"bye": false,
-					"designation": { "status": "out", "as_of": "2026-10-14T02:03:35.613Z" },
-					"played": false,
-					"points_this_week": null,
-					"last_games": [],
-					"allowed_to_position": { "points_a_game": 11.4, "rank": 31, "of": 32, "position": "WR" },
-					"game_total": {
-						"points": 52.5,
-						"team_points": 29.5,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "win", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "dome", "abroad": false },
-					"weather": null
-				}
-			},
-			"rest_of_season_points": 34.1,
-			"points_over_replacement": -130.8,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 107,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "5092508",
-					"name": "Colbie Young",
-					"position": "WR",
-					"team": "CIN",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5092508.png",
-				"slug": "colbie-young",
-				"position_rank": 118,
-				"points_over_replacement": -11.5,
-				"rest_of_season_per_game": 2.6,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": null,
-				"season_avg": 1,
-				"last_points": 1.2,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": null,
-					"home": null,
-					"kickoff": null,
-					"bye": true,
-					"designation": { "status": "questionable", "as_of": "2026-10-14T02:03:35.613Z" },
-					"played": false,
-					"points_this_week": null,
-					"last_games": [
-						{ "week": 3, "points": 1.2 },
-						{ "week": 2, "points": 1.7 },
-						{ "week": 1, "points": 0 }
-					],
-					"allowed_to_position": null,
-					"game_total": null,
-					"spread": null,
-					"roof": null,
-					"weather": null
-				}
-			},
-			"rest_of_season_points": 28.6,
-			"points_over_replacement": -138,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
-			"rank": 108,
-			"line": {
-				"player": {
-					"host_id": "",
-					"board_id": "4573697",
-					"name": "Mason Tipton",
-					"position": "WR",
-					"team": "NO",
-					"injured_reserve": false
-				},
-				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4573697.png",
-				"slug": "mason-tipton",
-				"position_rank": 120,
-				"points_over_replacement": -11.5,
-				"rest_of_season_per_game": 2.6,
-				"week_projection": null,
-				"projection_delta": null,
-				"opp_rank": 5,
-				"season_avg": null,
-				"last_points": null,
-				"held": false,
-				"facts": {
-					"week": 6,
-					"opponent": "NYG",
-					"home": false,
-					"kickoff": "2026-10-18T17:00:00.000Z",
-					"bye": false,
-					"designation": { "status": "out", "as_of": "2026-10-14T02:03:35.613Z" },
-					"played": false,
-					"points_this_week": null,
-					"last_games": [],
-					"allowed_to_position": { "points_a_game": 27, "rank": 5, "of": 32, "position": "WR" },
-					"game_total": {
-						"points": 45.5,
-						"team_points": 22,
-						"read_at": "2026-10-16T21:01:26.774Z"
-					},
-					"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
-					"roof": { "kind": "outdoors", "abroad": false },
-					"weather": {
-						"temperature_f": 54,
-						"wind_mph": 6.9,
-						"precipitation_chance": 0,
-						"precipitation_kind": "none",
-						"read_at": "2026-10-16T21:01:34.611Z"
-					}
-				}
-			},
-			"rest_of_season_points": 28.6,
-			"points_over_replacement": -138,
-			"roster": { "kind": "free", "team": null },
-			"move": "add"
-		},
-		{
 			"rank": 109,
 			"line": {
 				"player": {
@@ -6083,7 +6083,7 @@
 				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4241424.png",
 				"slug": "tylan-wallace",
 				"position_rank": 125,
-				"points_over_replacement": -12,
+				"points_over_replacement": -8.4,
 				"rest_of_season_per_game": 2.3,
 				"week_projection": null,
 				"projection_delta": null,
@@ -6123,7 +6123,7 @@
 				}
 			},
 			"rest_of_season_points": 25.3,
-			"points_over_replacement": -144,
+			"points_over_replacement": -100.8,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
@@ -6141,7 +6141,7 @@
 				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4430870.png",
 				"slug": "keandre-lambert-smith",
 				"position_rank": null,
-				"points_over_replacement": -12.2,
+				"points_over_replacement": -8.6,
 				"rest_of_season_per_game": 2.1,
 				"week_projection": null,
 				"projection_delta": null,
@@ -6182,7 +6182,7 @@
 				}
 			},
 			"rest_of_season_points": 23.1,
-			"points_over_replacement": -146.4,
+			"points_over_replacement": -103.2,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
@@ -6200,7 +6200,7 @@
 				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4061956.png",
 				"slug": "ashton-dulin",
 				"position_rank": 134,
-				"points_over_replacement": -12.4,
+				"points_over_replacement": -8.8,
 				"rest_of_season_per_game": 1.9,
 				"week_projection": null,
 				"projection_delta": null,
@@ -6239,7 +6239,7 @@
 				}
 			},
 			"rest_of_season_points": 20.9,
-			"points_over_replacement": -148.8,
+			"points_over_replacement": -105.6,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
@@ -6257,7 +6257,7 @@
 				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4035656.png",
 				"slug": "ben-skowronek",
 				"position_rank": 138,
-				"points_over_replacement": -12.8,
+				"points_over_replacement": -9,
 				"rest_of_season_per_game": 1.7,
 				"week_projection": null,
 				"projection_delta": null,
@@ -6297,7 +6297,7 @@
 				}
 			},
 			"rest_of_season_points": 18.7,
-			"points_over_replacement": -153.6,
+			"points_over_replacement": -108,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
@@ -6315,7 +6315,7 @@
 				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4360423.png",
 				"slug": "michael-penix-jr",
 				"position_rank": 42,
-				"points_over_replacement": -17.1,
+				"points_over_replacement": -12.1,
 				"rest_of_season_per_game": 2.9,
 				"week_projection": null,
 				"projection_delta": null,
@@ -6355,7 +6355,7 @@
 				}
 			},
 			"rest_of_season_points": 31.9,
-			"points_over_replacement": -205.2,
+			"points_over_replacement": -145.2,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},
@@ -6373,7 +6373,7 @@
 				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/2576980.png",
 				"slug": "marcus-mariota",
 				"position_rank": 44,
-				"points_over_replacement": -17.3,
+				"points_over_replacement": -12.2,
 				"rest_of_season_per_game": 2.8,
 				"week_projection": null,
 				"projection_delta": null,
@@ -6413,7 +6413,7 @@
 				}
 			},
 			"rest_of_season_points": 30.8,
-			"points_over_replacement": -207.6,
+			"points_over_replacement": -146.4,
 			"roster": { "kind": "free", "team": null },
 			"move": "add"
 		},

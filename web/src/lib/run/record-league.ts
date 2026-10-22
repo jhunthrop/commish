@@ -185,18 +185,17 @@ export function lineupWords(lineup: StartingLineup): string {
  * on an ESPN league. */
 export function leagueBasis(record: LeagueRecord, shown: PageLineup): LeagueBasis {
 	const { lineup } = shown;
+	// A lineup that starts kickers or defenses says they are not counted in the same sentence (Lane 138
+	// review MEDIUM-1), so the lineup it names is the commissioner's own.
+	const uncounted = lineup.k + lineup.def > 0 ? ', kickers and defenses not counted' : '';
 	const starters = shown.league
-		? `Starters right counts your league's lineup, ${lineupWords(lineup)} across ${plural(lineup.teams, 'team')}, and how many of the week's starters there the order also put there.`
+		? `Starters right counts the week's starters the order also put in your league's lineup, ${lineupWords(lineup)} across ${plural(lineup.teams, 'team')}${uncounted}.`
 		: null;
-	const aside =
-		shown.league && lineup.k + lineup.def > 0
-			? 'Its kickers and defenses are not counted: the record grades neither in season.'
-			: null;
 	const benchmark =
 		record.host === 'espn'
 			? `In your ESPN league, from week ${String(LEAGUE_BENCHMARK_FROM_WEEK)} each graded week also grades our order and ESPN's own projection on the league's rostered players as your league scores, and scores the lineup each picks from your roster.`
 			: null;
-	return { starters, aside, benchmark };
+	return { starters, benchmark };
 }
 
 const BENCHMARK_NAMES: Readonly<Record<LeagueRecordWeek['benchmark'], string>> = {

@@ -7,12 +7,12 @@ import { dayLabel, weekdayLabel } from '#lib/format/date.ts';
 import { plural } from '#lib/format/number.ts';
 import type { BasisPart } from './board-basis.ts';
 import {
-	HELD_OUT_METHOD,
 	RATE_PLACES,
 	RECORD_BOX,
 	RECORD_WORDS,
 	figureWords,
 	printPlaces,
+	publishedDrawn,
 	publishedWords,
 	saidOnly,
 	weekLines,
@@ -58,7 +58,7 @@ export const RECORDS_WORDS = {
 			through === null
 				? 'It is graded on the season points of the weeks played once the first week is complete'
 				: `It is graded on each player's season points through week ${String(through)}`
-		} in PPR, on the players both rank who have played, refreshed each week as the stats land.`,
+		} in PPR, on the players both rank who have played.`,
 	draftPositions: 'Each position is graded on its own, All by players graded.',
 	draftBye: 'A player past his bye has one game fewer counted.',
 	draftKickers: 'Kickers and defenses are left out: the board takes their order from ADP.',
@@ -69,7 +69,7 @@ export const RECORDS_WORDS = {
 	rostered: 'Rostered',
 	lineupOurs: 'Our picks',
 	lineupEspn: "ESPN's picks",
-	/** The league row's figures on a phone, the desk's benchmark sentence short (review MEDIUM-1). */
+	/** What the league row's figures are, at both widths (Lane 131 review MEDIUM-1, Lane 138). */
 	leagueRow:
 		"Your league's row grades its rostered players as it scores, and the lineup each picks.",
 	frontWeekly: (span: string, players: string, beside: string) =>
@@ -147,35 +147,31 @@ export function beforeLine(
  * the figures' own sentences (Lane 131). */
 const both = (text: string): BasisPart => ({ text, phone: true });
 const deskOnly = (text: string): BasisPart => ({ text, phone: false });
-/** The short form a phone draws of a sentence a desk says whole (Lane 111). */
-const phoneOnly = (text: string): BasisPart => ({ text, phone: true, desk: false });
 
-/** The weekly record's basis (Lane 131). Both widths say what each figure is: order matched, places
- * off and starters right in the lineup it counts. A desk also says the qualifications: how the
- * rankings are set (the week table says it on a phone), the season-long rule, what the league's
- * lineup leaves uncounted, the published projection's start (the section's head names it), the
- * league's own benchmark, what ESPN's projection is once drawn, and Yahoo's absence. A phone says
- * the benchmark's short form, what the league row's figures are (review MEDIUM-1). */
+/** The weekly record's basis (Lanes 131, 138). Both widths say what each figure is: order matched,
+ * places off, starters right in the lineup it counts, and, opened from a league, what the league row's
+ * figures are. A desk also says what ESPN's projection is once drawn, when the published projection's
+ * column starts once drawn, and Yahoo's absence. The rest are qualifications other parts of the page
+ * say, so the desk holds five lines (Lane 138): how the rankings are set (the week table's lines), the
+ * season-long rule, what the league's lineup leaves uncounted (its starters sentence names the lineup
+ * it counts), and the published projection's start before it is drawn (the section's head names it). */
 export function weeklyBasis(
 	record: RunRecord,
 	league: LeagueBasis | null,
 	espnDrawn: boolean
 ): BasisPart[] {
 	return [
-		...saidOnly([record.method, HELD_OUT_METHOD]).map(deskOnly),
 		...saidOnly([
 			record.scale,
 			RECORD_WORDS.placesOff,
-			league?.starters ?? record.startersBasis
+			league?.starters ?? record.startersBasis,
+			league?.benchmark ? RECORDS_WORDS.leagueRow : null
 		]).map(both),
 		...saidOnly([
-			league?.aside ?? null,
-			publishedWords(record),
-			league?.benchmark ?? null,
 			espnDrawn ? RECORDS_WORDS.espnBasis : null,
+			publishedDrawn(record) ? publishedWords(record) : null,
 			RECORDS_WORDS.yahooBasis
-		]).map(deskOnly),
-		...(league?.benchmark ? [phoneOnly(RECORDS_WORDS.leagueRow)] : [])
+		]).map(deskOnly)
 	];
 }
 

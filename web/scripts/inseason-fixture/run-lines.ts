@@ -12,7 +12,12 @@
 // The week's projection, the evidence and any designation are project.ts's to stamp.
 import { readFile, readdir } from 'node:fs/promises';
 import type { LeaguePlayer } from '../../src/lib/league/api.ts';
-import type { PlayerLine, WeekFacts } from '../../src/lib/league/inseason/api.ts';
+import type {
+	PlayerLine,
+	WaiverAdvice,
+	WaiverRow,
+	WeekFacts
+} from '../../src/lib/league/inseason/api.ts';
 import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import { LAST_FANTASY_WEEK } from './week.ts';
 
@@ -222,4 +227,26 @@ export function capturedFreeAgents(
 	held: ReadonlySet<string>
 ): BoardRow[] {
 	return rows.filter((r) => r.orderBasis !== 'market' && listed.has(r.id) && !held.has(r.id));
+}
+
+/** A waiver row project.ts adds from the stand-in run's capture (B118): labelled in the fixture so a
+ * script can tell it from the answer's own rows, and never served, so never drawn. Its line is the
+ * stand-in run's (a preseason order, its points over replacement a week over that run's own weeks),
+ * its gain the one rule over the member's lines (stand-in-lineup.ts). */
+export type FixtureWaiverRow = WaiverRow & { standin?: true };
+const STANDIN_LABEL = 'standin';
+
+export const isStandInRow = (row: WaiverRow): boolean => (row as FixtureWaiverRow).standin === true;
+
+/** The answer as the API would send it: every row without the fixture's label. */
+export function servedWaivers(answer: WaiverAdvice): WaiverAdvice {
+	return {
+		...answer,
+		rows: answer.rows.map(
+			(row) =>
+				Object.fromEntries(
+					Object.entries(row).filter(([key]) => key !== STANDIN_LABEL)
+				) as WaiverRow
+		)
+	};
 }

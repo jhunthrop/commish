@@ -189,22 +189,15 @@ def read_draft(conn: Connection, season: int, as_of: datetime) -> DraftRecord | 
 
 
 def named_basis(lines: Sequence[DraftLine]) -> str | None:
-    """What "top named" counts, from the positions graded: "Top named counts the season's top 12 QBs, 24
-    RBs, 36 WRs and 12 TEs so far, and how many of them the order also put in its top 12, 24, 36 and
-    12." None before a week is counted."""
+    """What "top named" counts, from the positions graded: "Top named counts how many of the season's top
+    12 QBs, 24 RBs, 36 WRs and 12 TEs so far the order also ranked that high." The tops are said once, so
+    the sentence never ends on their list again (Lane 138). None before a week is counted."""
     graded = [p for p in DRAFT_POSITIONS if any(line.position == p and line.ours.starters_of > 0 for line in lines)]
     if not graded:
         return None
     counts = [f"{STARTERS_A_TEAM[p] * LEAGUE_TEAMS} {_WORDS[p]}" for p in graded]
-    tops = [str(STARTERS_A_TEAM[p] * LEAGUE_TEAMS) for p in graded]
-
-    def listed(items: Sequence[str]) -> str:
-        return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} and {items[-1]}"
-
-    return (
-        f"Top named counts the season's top {listed(counts)} so far, and how many of them the order "
-        f"also put in its top {listed(tops)}."
-    )
+    listed = counts[0] if len(counts) == 1 else f"{', '.join(counts[:-1])} and {counts[-1]}"
+    return f"Top named counts how many of the season's top {listed} so far the order also ranked that high."
 
 
 def honest_line(lines: Sequence[DraftLine]) -> str | None:
