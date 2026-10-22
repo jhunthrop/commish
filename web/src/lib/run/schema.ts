@@ -633,6 +633,22 @@ export const designationsSchema = z.object({
 });
 
 export type Format = z.infer<typeof formatSchema>;
+/** The pages the nightly's schema gate held back (Lane 136): the reader refused each one, and the run
+ * published because few enough did. A held page is never read from its own document: it is an earlier
+ * run's copy beside the run (`held/<id>.json`), stamped with that run, or, with no copy, the board's
+ * figures alone. Absent on a run that held none, and on every run from before. */
+export const heldPageSchema = z.object({
+	id: playerId,
+	/** What the reader said of his page tonight, for the run's report; never printed on a screen. */
+	refusal: phrase,
+	/** The run his copy is from and when that run was written; null when no earlier run had a page of
+	 * his the reader takes. */
+	copy: z.object({ runId: runIdSchema, runAt: isoTime }).nullable()
+});
+
+export const heldSchema = z.object({ pages: z.array(heldPageSchema).min(1) });
+
+export type HeldPage = z.infer<typeof heldPageSchema>;
 export type Manifest = z.infer<typeof manifestSchema>;
 export type Source = z.infer<typeof sourceSchema>;
 export type Window = z.infer<typeof windowSchema>;
@@ -690,7 +706,13 @@ export const RUN_PATHS = {
 	index: 'index.json',
 	clubs: 'clubs.json',
 	schedule: 'schedule.json',
-	designations: 'designations.json'
+	designations: 'designations.json',
+	held: 'held.json',
+	/** A held page's copy from an earlier run (Lane 136). */
+	heldCopy: (id: string) => {
+		if (!PLAYER_ID.test(id)) throw new Error(`"${id}" is not a player id.`);
+		return `held/${id}.json`;
+	}
 } as const;
 
 /** The object a run's writer moves to point the site at its newest valid run. */

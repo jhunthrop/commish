@@ -16,6 +16,7 @@ import { countedWeek } from '#lib/run/reach.ts';
 import type { Format, Game } from '#lib/run/schema.ts';
 import { GAME_STATE_WORDS } from '#lib/format/game-facts.ts';
 import { UNKNOWN_CLUB_WEEK } from '#lib/player/club-words.ts';
+import { HELD_PAGE_WORDS } from '#lib/player/held-words.ts';
 import { STAT_COLUMNS, captionFor, type StatColumn } from '#lib/run/stat-columns.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { AheadRow, LogHead, LogRow, PriorRow, SeasonLine } from '#lib/ui/game-log.ts';
@@ -161,6 +162,23 @@ function priorRow(prior: PriorSeason, columns: readonly StatColumn[]): PriorRow 
 		sub: `${plural(prior.games, 'game')}${perGame}`,
 		total: prior.totals.points === null ? '' : fixed(prior.totals.points),
 		cells: columns.map((column) => column.value(prior.totals))
+	};
+}
+
+/** The block of a page held back with no earlier copy (Lane 136): no line, no log, the one sentence in
+ * the log's place, in the format the page leads with. */
+export function heldSeasonView(year: number, position: Position, format: Format): SeasonView {
+	return {
+		season: year,
+		aside: `${String(year)}, ${format.label}`,
+		heads: STAT_COLUMNS[position].map(({ short, full }) => ({ short, full })),
+		pointsHead: { short: 'Pts', full: `${format.label} points` },
+		line: null,
+		rows: [],
+		ahead: [],
+		none: HELD_PAGE_WORDS.log,
+		basis: HELD_PAGE_WORDS.basis,
+		prior: []
 	};
 }
 

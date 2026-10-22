@@ -4,7 +4,7 @@ import { rangeScale, rowsAt } from '#lib/run/derive.ts';
 import type { BoardRow, IndexEntry, RunRecord } from '#lib/run/schema.ts';
 import type { RangeScale } from '#lib/types/player.ts';
 import type { ScheduleRow } from '#lib/ui/schedule-grid.ts';
-import { board, defaultFormat, player, record } from '../run.ts';
+import { board, defaultFormat, ownPages, record } from '../run.ts';
 import { schedulePage } from './clubs.ts';
 import { formatChips, type FormatChip } from './format-route.ts';
 import { playerPage, type PlayerPage } from './player.ts';
@@ -27,14 +27,14 @@ export interface SystemNightly {
 	record: RunRecord;
 }
 
+/** Tonight's own pages only: a held page (Lane 136) is never the specimen. */
 async function specimenSlug(rows: readonly BoardRow[]): Promise<string> {
-	for (const row of rows) {
-		const loaded = await player(row.id);
-		if (loaded.capsule && loaded.capsule.pulls.length > 0) return row.slug;
-	}
-	const [first] = rows;
-	if (!first) throw new Error('The default board is empty.');
-	return first.slug;
+	const pages = new Map((await ownPages()).map((page) => [page.id, page] as const));
+	const own = rows.filter((row) => pages.has(row.id));
+	const written = own.find((row) => (pages.get(row.id)?.capsule?.pulls.length ?? 0) > 0);
+	const [first] = own;
+	if (!first) throw new Error('The default board has no page the reader took.');
+	return (written ?? first).slug;
 }
 
 export async function systemNightly(now: number): Promise<SystemNightly> {

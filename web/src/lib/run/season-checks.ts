@@ -6,10 +6,14 @@
  * A bye in a log is a week his club's slate has no game (Lane 119), the only place the run can say it.
  * A page that says his newest line was another club's names that club and a week of its game in his log
  * (Lanes 120, 135).
+ *
+ * Each rule names the page that breaks it (Lane 136): the nightly holds a refused page back and
+ * publishes the rest when few enough are refused, so a rule says which page, never only that the run
+ * is wrong. The one basis is the one most blocks share, so the odd page is the one named.
  */
 import { FREE_AGENT_WORDS, isFreeAgent } from '#lib/format/free-agent.ts';
 import type { PlayerSeason } from './season.ts';
-import type { Schedule } from './schema.ts';
+import type { Schedule, Slate } from './schema.ts';
 
 /** What the checks read of a player file. */
 export interface SeasonedPlayer {
@@ -19,93 +23,105 @@ export interface SeasonedPlayer {
 	lastGameClub?: { club: string; week: number } | null;
 }
 
-/** Every season block shares one format and one through week. */
-function checkOneBasis(players: readonly SeasonedPlayer[]): void {
-	const [first] = players;
-	if (!first) return;
-	const odd = players.find(
-		(p) => p.season.format !== first.season.format || p.season.through !== first.season.through
-	);
-	if (odd) {
-		throw new Error(
-			`Season blocks disagree: ${first.season.format} through week ${String(first.season.through)}, but players/${odd.id}.json is ${odd.season.format} through week ${String(odd.season.through)}.`
-		);
+type Slates = ReadonlyMap<string, Slate>;
+/** One rule over one page: what it says is wrong, or null. */
+type PageRule = (p: SeasonedPlayer, slates: Slates) => string | null;
+
+interface Basis {
+	format: string;
+	through: number;
+}
+
+/** The format and through week most blocks share; on a tie, the first page's. */
+function sharedBasis(players: readonly SeasonedPlayer[]): Basis | null {
+	const counts = new Map<string, { basis: Basis; count: number }>();
+	for (const { season } of players) {
+		const key = `${season.format}:${String(season.through)}`;
+		counts.set(key, {
+			basis: { format: season.format, through: season.through },
+			count: (counts.get(key)?.count ?? 0) + 1
+		});
 	}
+	let best: { basis: Basis; count: number } | null = null;
+	for (const entry of counts.values()) if (best === null || entry.count > best.count) best = entry;
+	return best?.basis ?? null;
+}
+
+/** Every season block shares one format and one through week. */
+function basisRefusal(p: SeasonedPlayer, basis: Basis): string | null {
+	if (p.season.format === basis.format && p.season.through === basis.through) return null;
+	return `Season blocks disagree: ${basis.format} through week ${String(basis.through)}, but players/${p.id}.json is ${p.season.format} through week ${String(p.season.through)}.`;
 }
 
 /** A free agent (Lane 123) has no club, so no slate: no week of his is still to play and none is a bye.
  * A week he played keeps the club his line was for. */
-function checkFreeAgent(p: SeasonedPlayer): void {
+function freeAgentRefusal(p: SeasonedPlayer): string | null {
 	const wrong = p.season.log.find((row) => row.status === 'upcoming' || row.status === 'bye');
-	if (wrong) {
-		throw new Error(
-			`players/${p.id}.json is ${FREE_AGENT_WORDS}, but his week ${String(wrong.week)} is ${wrong.status === 'bye' ? 'a bye' : 'still to play'}.`
-		);
-	}
+	if (!wrong) return null;
+	return `players/${p.id}.json is ${FREE_AGENT_WORDS}, but his week ${String(wrong.week)} is ${wrong.status === 'bye' ? 'a bye' : 'still to play'}.`;
 }
 
 /** Every upcoming week is a game on his club's slate, so it has a kickoff. */
-function checkKickoffs(players: readonly SeasonedPlayer[], schedule: Schedule): void {
-	const slates = new Map(schedule.slates.map((slate) => [slate.abbr, slate] as const));
-	for (const p of players) {
-		if (isFreeAgent(p.team)) {
-			checkFreeAgent(p);
-			continue;
-		}
-		const slate = slates.get(p.team);
-		if (!slate) throw new Error(`players/${p.id}.json's club ${p.team} has no slate.`);
-		const weeks = new Set(slate.games.map((game) => game.week));
-		const missing = p.season.log.find((row) => row.status === 'upcoming' && !weeks.has(row.week));
-		if (missing) {
-			throw new Error(
-				`players/${p.id}.json has week ${String(missing.week)} to play, but ${p.team}'s slate has no game, so no kickoff, that week.`
-			);
-		}
-	}
-}
+const kickoffRefusal: PageRule = (p, slates) => {
+	if (isFreeAgent(p.team)) return freeAgentRefusal(p);
+	const slate = slates.get(p.team);
+	if (!slate) return `players/${p.id}.json's club ${p.team} has no slate.`;
+	const weeks = new Set(slate.games.map((game) => game.week));
+	const missing = p.season.log.find((row) => row.status === 'upcoming' && !weeks.has(row.week));
+	if (!missing) return null;
+	return `players/${p.id}.json has week ${String(missing.week)} to play, but ${p.team}'s slate has no game, so no kickoff, that week.`;
+};
 
 /** Every bye is a week his club does not play. A week it does not play may also be a game he played
  * for the club he was with, so the log need not carry the bye (season.ts allows at most one). */
-function checkByes(players: readonly SeasonedPlayer[], schedule: Schedule): void {
-	const slates = new Map(schedule.slates.map((slate) => [slate.abbr, slate] as const));
-	for (const p of players) {
-		const weeks = new Set(slates.get(p.team)?.games.map((game) => game.week));
-		const wrong = p.season.log.find((row) => row.status === 'bye' && weeks.has(row.week));
-		if (wrong) {
-			throw new Error(
-				`players/${p.id}.json has a bye in week ${String(wrong.week)}, but ${p.team} plays that week.`
-			);
-		}
-	}
-}
+const byeRefusal: PageRule = (p, slates) => {
+	const weeks = new Set(slates.get(p.team)?.games.map((game) => game.week));
+	const wrong = p.season.log.find((row) => row.status === 'bye' && weeks.has(row.week));
+	if (!wrong) return null;
+	return `players/${p.id}.json has a bye in week ${String(wrong.week)}, but ${p.team} plays that week.`;
+};
 
 /** A page that says his newest line was another club's (Lane 120) names a club other than his own and
  * a week his log shows as that club's game. His line that week may carry no stat and no offensive snap
  * (a special-teams game), so the week reads inactive, but it names that club's opponent (Lane 135). */
-function checkLastGameClub(players: readonly SeasonedPlayer[], schedule: Schedule): void {
+const lastGameClubRefusal: PageRule = (p, slates) => {
+	const last = p.lastGameClub;
+	if (!last) return null;
+	const game = slates.get(last.club)?.games.find((g) => g.week === last.week);
+	const row = p.season.log.find((r) => r.week === last.week);
+	const theirs =
+		game !== undefined &&
+		row !== undefined &&
+		row.status !== 'bye' &&
+		row.opponent === game.opponent &&
+		row.home === game.home;
+	if (last.club !== p.team && theirs) return null;
+	return `players/${p.id}.json says his week ${String(last.week)} line was for ${last.club}, but ${last.club === p.team ? 'that is his club' : `his log has no ${last.club} game that week`}.`;
+};
+
+const PAGE_RULES: readonly PageRule[] = [kickoffRefusal, byeRefusal, lastGameClubRefusal];
+
+/** Each page the rules refuse, by id, with the first rule it breaks, in the players' order. `basis:
+ * false` leaves the one basis out: a held page's copy is an earlier run's, through an earlier week. */
+export function seasonRefusals(
+	players: readonly SeasonedPlayer[],
+	schedule: Schedule,
+	options: { basis: boolean } = { basis: true }
+): Map<string, string> {
 	const slates = new Map(schedule.slates.map((slate) => [slate.abbr, slate] as const));
+	const basis = options.basis ? sharedBasis(players) : null;
+	const refusals = new Map<string, string>();
 	for (const p of players) {
-		const last = p.lastGameClub;
-		if (!last) continue;
-		const game = slates.get(last.club)?.games.find((g) => g.week === last.week);
-		const row = p.season.log.find((r) => r.week === last.week);
-		const theirs =
-			game !== undefined &&
-			row !== undefined &&
-			row.status !== 'bye' &&
-			row.opponent === game.opponent &&
-			row.home === game.home;
-		if (last.club === p.team || !theirs) {
-			throw new Error(
-				`players/${p.id}.json says his week ${String(last.week)} line was for ${last.club}, but ${last.club === p.team ? 'that is his club' : `his log has no ${last.club} game that week`}.`
-			);
-		}
+		const refusal =
+			(basis === null ? null : basisRefusal(p, basis)) ??
+			PAGE_RULES.reduce<string | null>((found, rule) => found ?? rule(p, slates), null);
+		if (refusal !== null) refusals.set(p.id, refusal);
 	}
+	return refusals;
 }
 
+/** Every rule over every page, the first refusal thrown: the stand-in's writer, which holds nothing. */
 export function checkRunSeasons(players: readonly SeasonedPlayer[], schedule: Schedule): void {
-	checkOneBasis(players);
-	checkKickoffs(players, schedule);
-	checkByes(players, schedule);
-	checkLastGameClub(players, schedule);
+	const [first] = seasonRefusals(players, schedule).values();
+	if (first !== undefined) throw new Error(first);
 }

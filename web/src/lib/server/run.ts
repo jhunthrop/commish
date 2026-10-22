@@ -11,6 +11,7 @@ import {
 	boardSchema,
 	clubsSchema,
 	designationsSchema,
+	heldSchema,
 	indexSchema,
 	manifestSchema,
 	playerSchema,
@@ -21,14 +22,19 @@ import {
 	type Club,
 	type Designations,
 	type Format,
+	type HeldPage,
 	type IndexEntry,
 	type Manifest,
 	type Player,
+	type PlayerFormat,
 	type RunRecord,
 	type Schedule
 } from '#lib/run/schema.ts';
 import { splitBoard, splitIndex, unindexedMarketRow, type RunIndex } from '#lib/run/market.ts';
-import { checkRunSeasons } from '#lib/run/season-checks.ts';
+import { RefusedPages, boardFormats } from '#lib/run/held.ts';
+// The schema gate's script (research/nightly/contract/run-contract.ts) names each refused page by it.
+export { RefusedPages } from '#lib/run/held.ts';
+import { seasonRefusals } from '#lib/run/season-checks.ts';
 import { countedReach, finalsReach, reachWords, type Reach } from '#lib/run/reach.ts';
 import { openRun, type RunReader } from '#lib/run/source.ts';
 import type { RunStamp } from '#lib/run/stamp.ts';
@@ -141,24 +147,128 @@ function readPlayer(id: string): Promise<Player> {
 	});
 }
 
-/** Pages prerender one at a time, so the first player read starts every player's read at once,
- * through the reader's gate. Hundreds of pages then wait on one parallel fetch, not a serial one.
- * With every file in, the rules across season blocks are checked (season-checks.ts), so the first
- * player read fails on a run that breaks one, whichever page asks. */
-function warmPlayers(): Promise<void> {
-	return once('players:warm', async () => {
-		const entries = await index();
-		const [players, slate] = await Promise.all([
-			Promise.all(entries.map((entry) => readPlayer(entry.id))),
-			schedule()
-		]);
-		checkRunSeasons(players, slate);
+/** The pages the nightly held back (Lane 136, run/held.ts), by id; none on a run that holds none and on
+ * every run from before. Each is a page the index lists, held once. */
+export function held(): Promise<ReadonlyMap<string, HeldPage>> {
+	return once('held', async () => {
+		const [open, entries] = await Promise.all([reader(), index()]);
+		const loaded = await open.readOptional(RUN_PATHS.held, heldSchema);
+		const pages = loaded?.pages ?? [];
+		const byId = new Map(pages.map((page) => [page.id, page] as const));
+		if (byId.size !== pages.length) throw new Error('held.json holds one page twice.');
+		const indexed = new Set(entries.map((entry) => entry.id));
+		const stray = pages.find((page) => !indexed.has(page.id));
+		if (stray !== undefined)
+			throw new Error(`held.json holds ${stray.id}, who has no page in index.json.`);
+		return byId;
 	});
 }
 
-export async function player(id: string): Promise<Player> {
-	await warmPlayers();
-	return readPlayer(id);
+/** A held page's copy (Lane 136): an earlier run's page of his, its log the schedule's weeks. Its
+ * season is that run's, so the index's numbers and the one basis are not held to it. */
+function readCopy(id: string): Promise<Player> {
+	return once(`copy:${id}`, async () => {
+		const [loaded, weeks] = await Promise.all([
+			read(RUN_PATHS.heldCopy(id), playerSchema),
+			seasonWeeks()
+		]);
+		if (loaded.id !== id) throw new Error(`held/${id}.json is the page of ${loaded.id}.`);
+		if (loaded.season.weeks !== weeks) {
+			throw new Error(
+				`held/${id}.json logs ${String(loaded.season.weeks)} weeks, the schedule runs ${String(weeks)}.`
+			);
+		}
+		return loaded;
+	});
+}
+
+type Settled = { id: string; player: Player } | { id: string; refusal: string };
+
+async function settle(id: string, pending: Promise<Player>): Promise<Settled> {
+	try {
+		return { id, player: await pending };
+	} catch (error) {
+		return { id, refusal: error instanceof Error ? error.message : String(error) };
+	}
+}
+
+/** Each read's player and refusal, apart, a season rule's refusal added to the file's own. */
+function sorted(
+	reads: readonly Settled[],
+	rules: (players: Player[]) => Map<string, string>
+): { players: Map<string, Player>; refusals: Map<string, string> } {
+	const players = reads.flatMap((read) => ('player' in read ? [read.player] : []));
+	const refusals = new Map([
+		...reads.flatMap((read) => ('refusal' in read ? [[read.id, read.refusal] as const] : [])),
+		...rules(players)
+	]);
+	return {
+		players: new Map(players.filter((p) => !refusals.has(p.id)).map((p) => [p.id, p] as const)),
+		refusals
+	};
+}
+
+interface PlayerReads {
+	/** Tonight's own pages, every one the reader took. */
+	pages: ReadonlyMap<string, Player>;
+	/** The held pages' copies from earlier runs. */
+	copies: ReadonlyMap<string, Player>;
+	held: ReadonlyMap<string, HeldPage>;
+}
+
+/** Pages prerender one at a time, so the first player read starts every player's read at once,
+ * through the reader's gate. Hundreds of pages then wait on one parallel fetch, not a serial one.
+ * With every file in, the rules across season blocks are checked (season-checks.ts), so the first
+ * player read fails on a run that breaks one, whichever page asks: every page refused is named
+ * (run/held.ts), so the nightly can hold them. A held page's own document is never read. */
+function warmPlayers(): Promise<PlayerReads> {
+	return once('players:warm', async () => {
+		const [entries, holds, slate] = await Promise.all([index(), held(), schedule()]);
+		const copied = [...holds.values()].filter((page) => page.copy !== null);
+		const [own, earlier] = await Promise.all([
+			Promise.all(
+				entries
+					.filter((entry) => !holds.has(entry.id))
+					.map((entry) => settle(entry.id, readPlayer(entry.id)))
+			),
+			Promise.all(copied.map((page) => settle(page.id, readCopy(page.id))))
+		]);
+		const pages = sorted(own, (players) => seasonRefusals(players, slate));
+		const copies = sorted(earlier, (players) => seasonRefusals(players, slate, { basis: false }));
+		if (pages.refusals.size > 0 || copies.refusals.size > 0) {
+			throw new RefusedPages(pages.refusals, copies.refusals);
+		}
+		return { pages: pages.players, copies: copies.players, held: holds };
+	});
+}
+
+/** What a player's page is read from: tonight's page; a held page's copy from an earlier run, with the
+ * run it is from; or, held with no copy, the board's figures alone (Lane 136). */
+export type PlayerRead =
+	| { kind: 'page'; player: Player }
+	| { kind: 'copy'; player: Player; from: { runId: string; runAt: string } }
+	| { kind: 'facts'; entry: IndexEntry; formats: Record<string, PlayerFormat> };
+
+export async function playerRead(id: string): Promise<PlayerRead> {
+	const reads = await warmPlayers();
+	const page = reads.pages.get(id);
+	if (page) return { kind: 'page', player: page };
+	const hold = reads.held.get(id);
+	if (!hold) throw new Error(`The run has no page for ${id}.`);
+	const copy = reads.copies.get(id);
+	if (copy && hold.copy) return { kind: 'copy', player: copy, from: hold.copy };
+	const [entries, run] = await Promise.all([index(), manifest()]);
+	const entry = entries.find((candidate) => candidate.id === id);
+	if (!entry) throw new Error(`The run has no page for ${id}.`);
+	const boards = await Promise.all(
+		run.formats.map(async (format) => ({ id: format.id, board: await board(format.id) }))
+	);
+	return { kind: 'facts', entry, formats: boardFormats(boards, id) };
+}
+
+/** Tonight's own pages, every one the reader took: a held page is not among them. */
+export async function ownPages(): Promise<Player[]> {
+	return [...(await warmPlayers()).pages.values()];
 }
 
 /** What every player's season figures are: the format they are scored in, which every season block
@@ -177,14 +287,11 @@ export interface SeasonReach {
 
 export function seasonReach(): Promise<SeasonReach> {
 	return once('season:reach', async () => {
-		const entries = await index();
-		const [first] = entries;
-		if (!first) throw new Error('The run indexes no players.');
-		const [players, slate] = await Promise.all([
-			Promise.all(entries.map((entry) => player(entry.id))),
-			schedule()
-		]);
-		const { season } = await player(first.id);
+		// Tonight's own pages: a held page's copy is an earlier run's season (Lane 136).
+		const [players, slate] = await Promise.all([ownPages(), schedule()]);
+		const [first] = players;
+		if (!first) throw new Error('The run has no page the reader took.');
+		const { season } = first;
 		const { label } = await formatById(season.format);
 		// Counted games only (review finding 1): his club's game, by his log, never a status final alone.
 		const counted = players.map((loaded) => ({ ...loaded.season, team: loaded.team }));

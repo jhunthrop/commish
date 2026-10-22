@@ -171,14 +171,19 @@ function weekAhead(season: PlayerSeason): GameLogRow | null {
 	);
 }
 
-export function cardBuild(season: PlayerSeason, capsule: Capsule | null): CardBuild {
-	const upcoming = weekAhead(season);
-	const last = lastPlayed(season);
+/** The card as built; with no season (a page held back with no copy, Lane 136) Avg and Last are empty
+ * and no week heads it. */
+export function cardBuild(season: PlayerSeason | null, capsule: Capsule | null): CardBuild {
+	const upcoming = season === null ? null : weekAhead(season);
+	const last = season === null ? null : lastPlayed(season);
 	const opponents = Object.fromEntries(
-		season.log.filter((row) => row.status === 'played').map((row) => [row.week, opponentWords(row)])
+		(season?.log ?? [])
+			.filter((row) => row.status === 'played')
+			.map((row) => [row.week, opponentWords(row)])
 	);
 	const next = upcoming ? { week: upcoming.week, opponent: opponentWords(upcoming) } : null;
-	const avg = season.pointsPerGame;
+	const avg = season?.pointsPerGame ?? null;
+	const games = season?.games ?? 0;
 	const tiles: CardTile[] = [
 		{
 			key: 'proj',
@@ -193,7 +198,7 @@ export function cardBuild(season: PlayerSeason, capsule: Capsule | null): CardBu
 			key: 'avg',
 			label: CARD.avg,
 			value: avg === null ? NONE : fixed(avg),
-			caption: avg === null ? '' : `a game in ${plural(season.games, 'game')}`,
+			caption: avg === null ? '' : `a game in ${plural(games, 'game')}`,
 			tone: null
 		},
 		{
@@ -205,5 +210,5 @@ export function cardBuild(season: PlayerSeason, capsule: Capsule | null): CardBu
 		},
 		{ key: 'delta', label: CARD.delta, value: NONE, caption: '', tone: 'quiet' }
 	];
-	return { tiles, next, opponents, readStamp: readStamp(capsule), games: season.games };
+	return { tiles, next, opponents, readStamp: readStamp(capsule), games };
 }
