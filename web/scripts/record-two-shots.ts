@@ -18,6 +18,8 @@
 // first paint, never another first, on the run's page, the account page (its shell prerendered) and the
 // league page the Worker draws; and the week's projection column beside it heads the same week, "Wk 7"
 // (the fixture's order re-dated to the board's week, inseason-fixture/serve.ts orderWeek).
+// The held week item keeps the named label's room at 390 as well as at the desk (Lane 148, B127): a
+// signed-out room page the Worker draws, opened in a new tab after a prerendered page, measures it.
 //
 //   node scripts/record-two-shots.ts <upcoming|graded|published> [web origin] [api origin] [out dir]
 import { mkdir } from 'node:fs/promises';
@@ -217,7 +219,8 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 				)
 			);
 		const at = after.indexOf('Week 7');
-		if (after[at + 1] !== 'note') faults.push(`${where}: week 7's note is not under its row`);
+		if (at < 0) faults.push(`${where}: the weekly table draws no Week 7 row`);
+		else if (after[at + 1] !== 'note') faults.push(`${where}: week 7's note is not under its row`);
 		if (after.filter((name) => name === 'note').length !== 1)
 			faults.push(`${where}: more than one week carries a note`);
 	}
@@ -386,28 +389,28 @@ async function rail(who: Who, width: number): Promise<void> {
 		path: new URL(`rail-account-${who}-${String(width)}.png`, out).pathname
 	});
 	await account.context().close();
-	if (who !== 'espn') return;
+	if (who === 'signed-out') {
+		// The phone's five without a league draw the week item as a tab, so its held room is
+		// measured at 390 on a page the Worker draws as well as at the desk (Lane 148, B127).
+		// A visitor who has read a prerendered page keeps its build's rail (context/boot.ts), so the
+		// room's rail draws the week item, held, while its season is read.
+		const { page: mock } = await lateSeason(who, width, '/mock/new', {}, '/players');
+		await weekItemFaults(mock, who, width, `${where} mock`);
+		await heldMeasured(mock, `${where} mock`);
+		await mock.screenshot({
+			path: new URL(`rail-mock-${who}-${String(width)}.png`, out).pathname
+		});
+		await mock.context().close();
+		return;
+	}
 	// A league page the Worker draws names the week from the API's season, read before its first
 	// render (context/first-season.ts), so it never paints another name first.
 	// The season read runs alongside the league's own first read, never before it (Lane 143): the
 	// two spans overlap, so the season adds no round trip before the page paints.
-	const league = await open(who, width, 'about:blank', 'light', true);
-	// Every API answer a 3G-like round trip late, so a read held behind another shows as a gap; the
-	// season's twice that, so the rail draws the held label after /me answers and its room is measured.
-	await league.route(`${API_ORIGIN}/**`, async (route) => {
-		const late = route.request().url().endsWith('/season') ? SEASON_LATE : 1;
-		await new Promise((done) => setTimeout(done, API_LATENCY_MS * late));
-		await route.continue();
-	});
-	const spans = waterfall(league, {
+	const { page: league, spans } = await lateSeason(who, width, `/league/${FIXTURE_IDS.espnDone}`, {
 		season: /\/season$/u,
 		sync: /\/leagues\/attached\/[^/]+\/sync$/u
 	});
-	await league.goto(`${web}/league/${FIXTURE_IDS.espnDone}`, {
-		waitUntil: 'networkidle',
-		timeout: READY_TIMEOUT_MS
-	});
-	await league.waitForTimeout(SETTLE_MS);
 	const season = spans.get('season');
 	const sync = spans.get('sync');
 	const line = (span: Span | undefined): string =>
@@ -417,21 +420,53 @@ async function rail(who: Who, width: number): Promise<void> {
 	);
 	if (!season || !sync || !(season.start < sync.end && sync.start < season.end))
 		faults.push(`${where} league: the season read and the league's read do not overlap`);
-	await league
-		.locator('nav.rail .item[data-k="week"] span')
-		.waitFor({ state: 'attached', timeout: READY_TIMEOUT_MS })
-		.catch(() => faults.push(`${where} league: the rail never drew`));
 	await weekItemFaults(league, who, width, `${where} league`);
-	// The desk rail shows the item while the season is read, so its held room was measured above.
-	const held = await league.evaluate(
-		() => (window as unknown as { weekItemHeights: { held: number[] } }).weekItemHeights.held
-	);
-	if (width > PHONE_MAX && held.length === 0)
-		faults.push(`${where} league: the held label was never drawn, its room not measured`);
+	// The desk rail shows the item while the season is read, so its held room was measured above; a
+	// followed league's phone five are its own pages, so at 390 the item is not drawn to measure.
+	if (width > PHONE_MAX) await heldMeasured(league, `${where} league`);
 	await league.screenshot({
 		path: new URL(`rail-league-${who}-${String(width)}.png`, out).pathname
 	});
 	await league.context().close();
+}
+
+/** A page the Worker draws, opened with every API answer a 3G-like round trip late and the season's
+ * twice that, so the rail draws the held label after /me answers and its room is measured. `read`
+ * is a page opened first in the same browser, closed before the page the Worker draws opens in a
+ * new tab. The named reads' spans are kept. */
+async function lateSeason(
+	who: Who,
+	width: number,
+	path: string,
+	names: Readonly<Record<string, RegExp>> = {},
+	read: string | null = null
+): Promise<{ page: Page; spans: Map<string, Span> }> {
+	const page = await open(who, width, read ?? 'about:blank', 'light', read === null);
+	// The page read first keeps only what a new tab keeps (localStorage), never this tab's session copy.
+	if (read !== null) await page.close();
+	const late = read === null ? page : await page.context().newPage();
+	await late.route(`${API_ORIGIN}/**`, async (route) => {
+		const times = route.request().url().endsWith('/season') ? SEASON_LATE : 1;
+		await new Promise((done) => setTimeout(done, API_LATENCY_MS * times));
+		await route.continue();
+	});
+	const spans = waterfall(late, names);
+	await late.goto(`${web}${path}`, { waitUntil: 'networkidle', timeout: READY_TIMEOUT_MS });
+	await late.waitForTimeout(SETTLE_MS);
+	await late
+		.locator('nav.rail .item[data-k="week"] span')
+		.waitFor({ state: 'attached', timeout: READY_TIMEOUT_MS })
+		.catch(() => faults.push(`${path}: the rail never drew`));
+	return { page: late, spans };
+}
+
+/** The held label was drawn at least once, so weekItemFaults measured its room against the named. */
+async function heldMeasured(page: Page, where: string): Promise<void> {
+	const held = await page.evaluate(
+		() => (window as unknown as { weekItemHeights: { held: number[] } }).weekItemHeights.held
+	);
+	if (held.length === 0)
+		faults.push(`${where}: the held label was never drawn, its room not measured`);
 }
 
 for (const width of WIDTHS) {
