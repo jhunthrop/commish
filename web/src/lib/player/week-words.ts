@@ -41,6 +41,7 @@ import type { LogNext } from '#lib/ui/game-log.ts';
 import {
 	CARD,
 	listedTiles,
+	restRankWords,
 	NONE,
 	printTenth,
 	publishedOn,
@@ -440,8 +441,17 @@ function restNow(week: PlayerWeek, rest: RestParts | null): LiveRest | null {
  * caption names the tile's (review N2). In that scoring the read's points replace the run's, and in
  * any its week: a game kicked off since the run is no longer counted (Lane 86). The tile as built on a
  * preseason board. */
-function restTile(week: PlayerWeek, rest: RestParts | null, fallback: CardTile): CardTile {
+function restTile(
+	week: PlayerWeek,
+	rest: RestParts | null,
+	fallback: CardTile,
+	position: string
+): CardTile {
 	if (rest === null) return fallback;
+	// His rank as the read places him (the API's line, the one every league screen says), over the
+	// run's once read (Lane 128 fix round 3); the run's while the read places him nowhere.
+	const ranked = week.line.position_rank;
+	const rank = ranked === null ? rest.rank : restRankWords(position, ranked);
 	const same = week.projection_scoring.format === rest.scoring;
 	const now = restNow(week, rest);
 	const perGame = week.line.rest_of_season_per_game;
@@ -452,7 +462,7 @@ function restTile(week: PlayerWeek, rest: RestParts | null, fallback: CardTile):
 	return {
 		...fallback,
 		...(now === null ? {} : { value: printTenth(now.points) }),
-		caption: `${from}${game}, ${rest.rank}${scoring}`
+		caption: `${from}${game}, ${rank}${scoring}`
 	};
 }
 
@@ -616,7 +626,7 @@ export function liveCard({
 	};
 	const updated = [
 		projTile(week),
-		restTile(week, rest, fallback('rest')),
+		restTile(week, rest, fallback('rest'), player.position),
 		oppTile(week, player.position),
 		avgTile(week, games, fallback('avg')),
 		lastTile(week, opponents, fallback('last')),

@@ -254,10 +254,12 @@ function withTierDrops(rows: readonly BoardRow[]): BoardRow[] {
 	});
 }
 
-/** The board's position ranks as the nightly publishes them in season (research/model/designations.py,
- * Lane 128 review fix round 2): a player on a season-long list sits below every available player at
- * his position, so the available are numbered first, in the board's order, and the listed after. The
- * API's PlayingRanks numbers the same way, so a player has one position rank on every screen. */
+/** The board's position ranks as the API's in-season read gives them (inseason PlayingRanks, Lane 128
+ * review fix round 2), not as the nightly publishes them: the nightly keeps the store's ranks (its
+ * designations step writes statuses only), and a player page restates its rank from the API's read
+ * once read (fix round 3). The available are numbered first at each position, in the board's order,
+ * and a player on a season-long list after them, so the stand-in's pages and the fixture's league
+ * screens say one rank. */
 function playingFirst(rows: readonly BoardRow[], designations: Designations): BoardRow[] {
 	const listed = (row: BoardRow): boolean => designations.players[row.id]?.seasonLong === true;
 	const ranks = new Map<string, number>();

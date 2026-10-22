@@ -838,3 +838,23 @@ void test("a listed player's week is not his: Proj, Opp rank and the change say 
 	assert.equal(unreadBasis(false, 'Wk 6', 'IR'), CARD.listedWeek);
 	assert.notEqual(unreadBasis(false, 'Wk 6', null), CARD.listedWeek);
 });
+
+void test("the page's rest caption takes the read's rank once read (Lane 128 fix round 3)", () => {
+	const rb = (line: Partial<PlayerWeek['line']>) =>
+		liveCard({
+			week: week({}, line),
+			player: RB,
+			league: null,
+			tiles: BUILT,
+			opponents: {},
+			games: 5,
+			rest: { ...REST, rank: 'RB2 in our order' },
+			screenHref: href,
+			zone: ZONE,
+			now: NOW
+		}).tiles;
+	// The run ranks him RB 2 (a listed back above him); the read, playing first, RB 1.
+	assert.match(tile(rb({ position_rank: 1 }), 'rest').caption, /RB1 in our order$/u);
+	// The read places him nowhere: the run's rank stands.
+	assert.match(tile(rb({ position_rank: null }), 'rest').caption, /RB2 in our order$/u);
+});
