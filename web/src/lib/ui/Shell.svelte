@@ -328,7 +328,8 @@
 		   grows as a page loads, and no row stands empty under the switch (Lane 87). */
 		.top {
 			display: grid;
-			grid-template-columns: auto minmax(0, 1fr) auto;
+			/* The verb's cells take their width first; the stamp's cell takes what is left (Lane 132). */
+			grid-template-columns: minmax(0, 1fr) auto auto;
 			align-items: center;
 			padding: var(--s-2) var(--s-4);
 			gap: var(--s-2);
@@ -382,9 +383,15 @@
 			display: none;
 		}
 
+		/* The stamp gives way to the verb beside it: on the narrowest phone it wraps within its row
+		   rather than push the verb past the edge (Lane 132, rail-shots at 360). */
 		.stamp {
 			grid-area: stamp;
 			margin-left: 0;
+		}
+
+		.stamp :global(.stamp) {
+			white-space: normal;
 		}
 
 		.account {
