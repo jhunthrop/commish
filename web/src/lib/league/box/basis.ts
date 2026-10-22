@@ -139,12 +139,12 @@ export function unlistedPart(
 	const from = drawn.skipped ? BEST_LINEUP_FROM.projected : BEST_LINEUP_FROM.rosters;
 	const pace = drawn.paced ? `, ${form === 'full' ? PACE_CLAUSE : PACE_CLAUSE_SHORT}` : '';
 	if (form === 'one' && drawn.bestLineup && drawn.noRoster)
-		return `Teams ${platform} sends no lineup for read our best lineup from ${from}${pace}, or ${BOX.none} with none.`;
+		return `Teams ${platform} sends no lineup for show our best lineup from ${from}${pace}, or ${BOX.none} with none.`;
 	const best = drawn.bestLineup
 		? `${BOX.proj} for teams ${platform} sends no lineup for is our best lineup from ${from}${pace}.`
 		: '';
 	const none = drawn.noRoster
-		? `Teams ${platform} sends no lineup or roster for read ${BOX.none}.`
+		? `Teams ${platform} sends no lineup or roster for show ${BOX.none}.`
 		: '';
 	return [best, none].filter((w) => w !== '').join(' ');
 }

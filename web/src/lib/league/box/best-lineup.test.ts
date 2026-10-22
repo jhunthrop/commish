@@ -66,7 +66,7 @@ const FRIDAY = Date.parse(FIXTURE_FRIDAY_CLOCK);
 const BEST = 'Proj for teams FFPC sends no lineup for is our best lineup from their rosters.';
 const BEST_PROJECTED =
 	'Proj for teams FFPC sends no lineup for is our best lineup from the players with a Proj.';
-const NO_ROSTER = 'Teams FFPC sends no lineup or roster for read --.';
+const NO_ROSTER = 'Teams FFPC sends no lineup or roster for show --.';
 
 /** The FFPC stand-in on its Friday as the stand-in API sends it (serve.ts). */
 const friday = ffpcBeforeSunday({ sync, lineup, matchup, scoreboard }, momentAt(FRIDAY), recorded);
@@ -229,7 +229,7 @@ void test('a crowded phone cuts qualifications, never the Game or Proj final sen
 	assert.equal(unlistedPhoneForm({ ...best, noRoster: true, paced: true }), 'one');
 	assert.equal(
 		unlistedPart('ffpc', { ...best, noRoster: true }, 'one'),
-		'Teams FFPC sends no lineup for read our best lineup from their rosters, or -- with none.'
+		'Teams FFPC sends no lineup for show our best lineup from their rosters, or -- with none.'
 	);
 	assert.match(
 		unlistedPart('ffpc', { ...best, paced: true }, 'short'),

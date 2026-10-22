@@ -56,7 +56,7 @@ const recorded = {
 	}),
 	rosterless: ffpcRosterless(opponentId, true)
 };
-const NO_ROSTER = 'Teams FFPC sends no lineup or roster for read --.';
+const NO_ROSTER = 'Teams FFPC sends no lineup or roster for show --.';
 const READ_MS_AGO = 4 * 60_000;
 
 /** The Matchup at a clock as MatchupPanel.svelte reads it: both sides' totals, the opponent's

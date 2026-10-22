@@ -327,7 +327,7 @@ void test('a side FFPC lists no starters or roster for draws "--", said once by 
 		false,
 		unlistedDrawn(bugs)
 	);
-	assert.match(said, / Teams FFPC sends no lineup or roster for read --\.$/);
+	assert.match(said, / Teams FFPC sends no lineup or roster for show --\.$/);
 	assert.doesNotMatch(said, /No Proj final while|Proj final adds|have no Proj final/);
 	assert.doesNotMatch(said, BANNED);
 	assert.equal(said.split('FFPC sends no lineup').length, 2, 'said once');
@@ -370,7 +370,7 @@ void test("a side FFPC sends no lineup for draws its roster's best lineup before
 	// The team with no roster's "--" beside it, its own second sentence (Lane 137, B107 ruling 3).
 	assert.match(
 		said,
-		new RegExp(`${best.source} Teams FFPC sends no lineup or roster for read --\\.$`)
+		new RegExp(`${best.source} Teams FFPC sends no lineup or roster for show --\\.$`)
 	);
 	assert.doesNotMatch(said, /Proj final/);
 	assert.doesNotMatch(said, BANNED);

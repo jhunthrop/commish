@@ -24,7 +24,7 @@
 // ROSTERLESS=1, on a fixture API under FIXTURE_FFPC_ROSTERLESS_OPPONENT=1 (Lane 141, B121): the
 // member's opponent has no roster read either, so he draws "--" (Proj "--" before kickoff, "Proj final
 // --" under way) on the Matchup and the home, and each footer says why in its own sentence ("Teams FFPC
-// sends no lineup or roster for read --."), never the starters' "No Proj final while...".
+// sends no lineup or roster for show --."), never the starters' "No Proj final while...".
 //
 //   FIXTURE_CLOCK=<the clock's instant> [FIXTURE_LATE_FINAL=LV,BUF] PORT=8924 node scripts/inseason-fixture/serve.ts
 //   CLOCK=monday|tuesday|... API_ORIGIN=http://localhost:8924 node scripts/ffpc-no-box-shots.ts [web origin] [out dir]
