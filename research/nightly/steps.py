@@ -27,6 +27,7 @@ from research.model.fit_inputs import fit_readiness
 from research.model.priors import ModelArtifacts, load_model_artifacts
 from research.model.reads.teams import first_kickoff_for
 from research.model.ros.raw_line import keep_raw_line
+from research.nightly.designation_dating import date_newest_capture
 from research.pipeline import vegas
 from research.pipeline.host_ids import ingest_host_ids
 from research.pipeline.http import Fetcher
@@ -91,8 +92,20 @@ def _capture(context: IngestContext) -> str:
     return (
         f"{len(result.feeds)} feeds, {sum(f.requests for f in result.feeds)} requests"
         + (f", failed: {', '.join(failed)}" if failed else "")
+        + _dating(context)
         + _lines(context, result)
     )
+
+
+def _dating(context: IngestContext) -> str:
+    """The newest injury capture dated for the API (Lane 134), as the hourly harvest does, in its own
+    transaction so a refused write keeps the capture."""
+    try:
+        with context.engine.begin() as conn:
+            outcome = date_newest_capture(conn, context.now)
+    except Exception as error:
+        return f"; designation-dating FAILED, {_short_reason(str(error))}"
+    return f"; {outcome.line}"
 
 
 def _lines(context: IngestContext, harvest: CaptureResult) -> str:

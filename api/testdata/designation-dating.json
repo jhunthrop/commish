@@ -1,0 +1,510 @@
+{
+	"note": "The shared capture dating (Lane 134): the API's dating of designation-dating-captures.json.gz, which the capture job must equal byte for byte. Rewrite with go test ./internal/inseason -run TestTheDatingGolden -update-dating-golden after any change to the run read.",
+	"table": "app.designation_datings",
+	"kept_hours": 48,
+	"version": "runs-f50a1b6bd4e56bf1",
+	"capture_at": "2026-10-12T06:00:00.123Z",
+	"digest": "27b3186206df025a80eea434940038b83aec7e3b880b81fc548fa587d8ecebfc",
+	"runs": [
+		{
+			"player": "16002",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "2575788",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "2971622",
+			"status": "questionable",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "2991662",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "3051890",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "3052587",
+			"status": "out",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "3052743",
+			"status": "out",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "3052897",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "3071353",
+			"status": "out",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "3129307",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "3873935",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "3916409",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "3916923",
+			"status": "out",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "3918331",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "3921690",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "3925350",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "3929850",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4035624",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4035656",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4036275",
+			"status": "questionable",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4038843",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4039303",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4043089",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4044138",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4046536",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4046545",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4047365",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4047646",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4239996",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4240059",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4240619",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4240824",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4241250",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4241476",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4241478",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4241807",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4242390",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4242442",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4243003",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4243541",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4250510",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4259147",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4360978",
+			"status": "out",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4361093",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4361691",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4361748",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4362088",
+			"status": "out",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4362636",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4371946",
+			"status": "out",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4372012",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4372051",
+			"status": "questionable",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4372561",
+			"status": "out",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4373471",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4384549",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4426403",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4426646",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4427238",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4428209",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4428331",
+			"status": "questionable",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4429005",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4429040",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4429160",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4429275",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4429511",
+			"status": "out",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4430191",
+			"status": "questionable",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4430560",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4430870",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4430878",
+			"status": "questionable",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4432775",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4567826",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4569323",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4571162",
+			"status": "questionable",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4573697",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4575003",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4588298",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4591008",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4612826",
+			"status": "questionable",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4683059",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4685347",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4685512",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4685553",
+			"status": "out",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4685617",
+			"status": "questionable",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4686104",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4692555",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4700136",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4723820",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4870847",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4875266",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4876319",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "4879212",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4887255",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "4921249",
+			"status": "questionable",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "5083315",
+			"status": "questionable",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "5083656",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "5091739",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "5091793",
+			"status": "out",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "5092508",
+			"status": "out",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "5121433",
+			"status": "injured_reserve",
+			"since": "2026-10-12T06:00:00.123Z"
+		},
+		{
+			"player": "5192448",
+			"status": "injured_reserve",
+			"since": "2026-10-12T04:00:00.123Z"
+		},
+		{
+			"player": "5209589",
+			"status": "out",
+			"since": "2026-10-12T04:00:00.123Z"
+		}
+	]
+}
