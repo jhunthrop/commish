@@ -9,6 +9,7 @@ import {
 	weekNote,
 	type Saying
 } from './status-view.ts';
+import { playerStatusSchema } from './schema.ts';
 
 const LISTED = '2026-10-16T14:05:00.000Z';
 const CENTRAL: Saying = {
@@ -33,6 +34,46 @@ void test('a season-long status shows as his rank, its chip says since when, its
 	);
 });
 
+void test('designated to return: due back this week is the week’s question, a later day is said on the list (Lane 153)', () => {
+	const mason = {
+		status: 'questionable' as const,
+		seasonLong: false,
+		since: null,
+		returning: '2026-10-25'
+	};
+	assert.deepEqual(statusView(mason, CENTRAL), {
+		rank: null,
+		mark: 'Back Sun Oct 25',
+		sits: false,
+		line: null,
+		question: true
+	});
+	assert.equal(
+		weekNote(mason),
+		'Expected back Sun Oct 25 on the latest report, which does not move his place on our board.'
+	);
+	const later = {
+		status: 'injured_reserve' as const,
+		seasonLong: true,
+		since: '2026-09-22T15:00:00.000Z',
+		returning: '2026-11-08'
+	};
+	const view = statusView(later, CENTRAL);
+	assert.equal(view.mark, 'IR, back Nov 8');
+	assert.equal(view.rank, 'IR');
+	assert.ok(
+		playerStatusWords(later, CENTRAL).note.startsWith('On injured reserve since September 22.')
+	);
+	// The file carries the day only for a return the rule read: questionable this week, else a list.
+	assert.equal(playerStatusSchema.safeParse(mason).success, true);
+	assert.equal(playerStatusSchema.safeParse(later).success, true);
+	assert.equal(playerStatusSchema.safeParse({ ...mason, status: 'out' }).success, false);
+	assert.equal(playerStatusSchema.safeParse({ ...mason, returning: '20261025' }).success, false);
+	// An older file, with no day, reads as before.
+	const { returning: _dropped, ...older } = mason;
+	assert.equal(statusView(older, CENTRAL).mark, 'Questionable');
+});
+
 void test('a week’s designation keeps his rank and its chip is the word, as the league rows say it', () => {
 	assert.deepEqual(statusView({ status: 'doubtful', seasonLong: false, since: null }, CENTRAL), {
 		rank: null,
@@ -42,7 +83,7 @@ void test('a week’s designation keeps his rank and its chip is the word, as th
 	});
 	assert.equal(statusView({ status: 'out', seasonLong: false, since: null }, CENTRAL).sits, true);
 	assert.equal(
-		weekNote('doubtful'),
+		weekNote({ status: 'doubtful', seasonLong: false, since: null }),
 		'Doubtful on the latest report, which does not move his place on our board.'
 	);
 });

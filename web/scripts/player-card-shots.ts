@@ -80,6 +80,8 @@ interface Shot {
 	follow?: boolean;
 	/** On a season-long list: the pill and the rest tile show Lane 63's word, never a rank. */
 	held?: string;
+	/** Designated to return this week (Lane 153): his chip's day and his note, his rank and week his. */
+	returning?: { chip: string; note: string };
 }
 
 const SHOTS: readonly Shot[] = [
@@ -121,6 +123,17 @@ const SHOTS: readonly Shot[] = [
 		verb: 'Add to my sheet',
 		weekRead: 'none',
 		held: 'RB IR'
+	},
+	{
+		name: 'returning',
+		slug: 'travis-etienne-jr',
+		signedIn: false,
+		verb: 'Add to my sheet',
+		weekRead: 'none',
+		returning: {
+			chip: 'Back Sun Oct 18',
+			note: 'Expected back Sun Oct 18 on the latest report, which does not move his place on our board.'
+		}
 	},
 	{
 		name: 'claim',
@@ -180,6 +193,8 @@ interface Card {
 	pill: string;
 	verbs: string[];
 	readText: string;
+	/** The page's main text, for his status chip and its note. */
+	main: string;
 	/** The side box's text: his tier mates, or a held player's "On IR, not ranked". */
 	tierBox: string;
 	basis: string[];
@@ -223,6 +238,7 @@ async function read(page: Page): Promise<Card> {
 				(el as HTMLElement).innerText.trim()
 			),
 			readText: document.querySelector<HTMLElement>('main .read')?.innerText ?? '',
+			main: document.querySelector<HTMLElement>('main')?.innerText ?? '',
 			tierBox: document.querySelector<HTMLElement>('main .side')?.innerText ?? '',
 			// In season the tier box is headed by why his rest-of-season figure sits there (CARD.whyRest,
 			// Lane 100, B30), and the read is the week's alone: the season read and its stamp are the
@@ -341,6 +357,14 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 			card.tierBox.includes(heldTierWords('injured_reserve')) && !/\bTier \d/.test(card.tierBox),
 			`${where}: the tier box places a held player: "${card.tierBox}"`
 		);
+	}
+	if (shot.returning !== undefined) {
+		check(/\bRB \d+\b/.test(card.pill), `${where}: the pill does not rank him: "${card.pill}"`);
+		check(card.main.includes(shot.returning.chip), `${where}: no "${shot.returning.chip}" chip`);
+		check(card.main.includes(shot.returning.note), `${where}: no note "${shot.returning.note}"`);
+		check(!/\bIR since\b/u.test(card.main), `${where}: the page still says IR since`);
+		for (const label of card.labels)
+			check(card.captions[label] !== onListWords('IR'), `${where}: ${label} says his list`);
 	}
 	check(card.verbs.includes(shot.verb), `${where}: verbs ${card.verbs.join(', ')}`);
 	check(card.verbs.includes('Compare'), `${where}: no Compare`);

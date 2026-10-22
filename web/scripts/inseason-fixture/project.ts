@@ -160,6 +160,12 @@ const CAPTURE = designationsSchema.parse(
 const SEASON_LONG = new Map(
 	Object.entries(CAPTURE.players).filter(([, status]) => status.seasonLong)
 );
+/** The capture's players designated to return this week (Lane 153): Travis Etienne, back Sunday. */
+const RETURNING = new Map(
+	Object.entries(CAPTURE.players).filter(
+		([, status]) => !status.seasonLong && status.returning !== undefined
+	)
+);
 
 /** The stand-in run's position ranks, playing first (run-from-mock-data.ts playingFirst, the API's
  * PlayingRanks, Lane 128 review fix round 2): one position rank per player on every screen. */
@@ -235,7 +241,11 @@ async function capturedRows(answer: WaiverAdvice): Promise<FixtureWaiverRow[]> {
 							...drawn,
 							facts: {
 								...drawn.facts,
-								designation: { status: status.status, as_of: CAPTURE.readAt }
+								designation: {
+									status: status.status,
+									as_of: CAPTURE.readAt,
+									...(status.returning === undefined ? {} : { returning: status.returning })
+								}
 							}
 						};
 			return {
@@ -267,6 +277,15 @@ function designated(line: PlayerLine): PlayerLine {
 		return { ...line, position_rank: null, facts: { ...line.facts, designation } };
 	}
 	const ranked = playingRank(line);
+	// Designated to return this week (Lane 153): the capture's week question with his day, ranked as
+	// playing, as the API sends it.
+	const back = line.player.board_id === null ? undefined : RETURNING.get(line.player.board_id);
+	const id = line.player.board_id;
+	if (id !== null && back?.returning !== undefined) {
+		const designation = { status: back.status, as_of: CAPTURE.readAt, returning: back.returning };
+		const rank = PLAYING_RANKS.get(id) ?? ranked.position_rank;
+		return { ...ranked, position_rank: rank, facts: { ...line.facts, designation } };
+	}
 	const status = DESIGNATIONS[line.player.name];
 	if (status === undefined) return ranked;
 	return { ...ranked, facts: { ...line.facts, designation: { status, as_of: DESIGNATED_AS_OF } } };

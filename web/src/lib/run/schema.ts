@@ -632,11 +632,20 @@ export const playerStatusSchema = z
 		seasonLong: z.boolean(),
 		/** The first capture of his unbroken run under a season-long status; null for a week's
 		 * designation and for a run older than the captures read, whose start we do not know. */
-		since: isoTime.nullable()
+		since: isoTime.nullable(),
+		/** The day he is due back from a season-long list (Lane 153), absent without one and from an
+		 * older file: on a questionable status he is designated to return this week, ranked as playing;
+		 * on a season-long one, after this week's games. */
+		returning: z.iso.date().optional()
 	})
 	.refine(
 		(status) => status.seasonLong || status.since === null,
 		'Only a season-long status has a since.'
+	)
+	.refine(
+		(status) =>
+			status.returning === undefined || status.seasonLong || status.status === 'questionable',
+		'A return day this week is on a questionable status.'
 	);
 
 export const designationsSchema = z.object({

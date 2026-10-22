@@ -401,6 +401,27 @@ void test("the tapped row's facts stay over his page's build: its IR words and i
 	assert.deepEqual(shelfHead(null, built), { position: 'TE', rank: 12, status: null, note: null });
 });
 
+void test('a player designated to return this week starts with his week, his day on the pill (Lane 153)', () => {
+	// Travis Etienne is due back Sunday Oct 18 on the capture the stand-in run is marked with: the
+	// fixture league reads him as this week's question, ranked as playing, his Proj his own.
+	const lineup = lineupRows(FIXTURE_WEEK_CLOCK);
+	const etienne = rowOf(lineup, 'travis-etienne-jr');
+	assert.equal(etienne.status?.mark, 'Back Sun Oct 18');
+	assert.equal(etienne.status.rank, null);
+	assert.equal(etienne.reserve, false);
+	assert.equal(typeof etienne.pill?.rank, 'number');
+	assert.equal(etienne.proj, 14.2);
+	assert.notEqual(etienne.evidence.oppRank, null);
+	assert.notEqual(etienne.slot, 'Bench', 'a week’s designation moves nothing: he starts');
+	const head = shelfHead({ row: etienne, note: null }, { position: 'RB', rank: 30, status: null });
+	assert.equal(head.rank, etienne.pill?.rank);
+	assert.equal(head.status, etienne.status);
+	for (const key of ['proj', 'opp', 'delta'] as const) {
+		const t = rowTiles(etienne, null).find((x) => x.key === key);
+		assert.notEqual(t?.caption, 'On IR', key);
+	}
+});
+
 void test('an IR row carries no rank: the shelf says the list where the rank would be (Lane 128)', () => {
 	// Jaxson Dart is on injured reserve on the capture the stand-in run is marked with, and the
 	// fixture league reads the same capture: his row draws no rest-of-season rank.

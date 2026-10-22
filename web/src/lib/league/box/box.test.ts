@@ -181,7 +181,8 @@ void test("a status is Lane 63's pill: the week's word, a season-long list's wor
 		rank: null,
 		mark: 'Questionable',
 		sits: false,
-		line: null
+		line: null,
+		question: true
 	});
 	assert.deepEqual(statusOf({ status: 'out', as_of: asOf }, false), {
 		rank: null,
@@ -424,6 +425,49 @@ void test('copy guard: every box word is fantasy words, with no dash or semicolo
 	for (const text of said) {
 		assert.doesNotMatch(text, BANNED, text);
 	}
+});
+
+void test('a player designated to return is this week’s question: his day, his rank, his week (Lane 153)', () => {
+	// The Mason shape: questionable with Sunday's return day, the platform still marking him IR.
+	const back = { status: 'questionable' as const, as_of: READ, returning: '2026-10-18' };
+	const mason = line(
+		{ player: player({ injured_reserve: true }), position_rank: 14, week_projection: 11.2 },
+		{ designation: back, kickoff: SUNDAY_NOON }
+	);
+	assert.deepEqual(statusOf(back, true, ZONE), {
+		rank: null,
+		mark: 'Back Sun Oct 18',
+		sits: false,
+		line: null,
+		question: true
+	});
+	assert.equal(onReserve(mason), false);
+	const drawn = boxRow(mason, 'RB', ZONE, true, NOW);
+	assert.equal(drawn.status?.mark, 'Back Sun Oct 18');
+	assert.equal(drawn.reserve, false);
+	assert.equal(drawn.proj, 11.2);
+	assert.notEqual(drawn.game, null);
+	// Once his game kicks off the week's word drops, and the platform's IR mark does not come back.
+	const kicked = boxRow(mason, 'RB', ZONE, true, Date.parse(SUNDAY_NOON) + 60_000);
+	assert.equal(kicked.status, null);
+	// Due back after this week: still on his list, the day said in place of the since.
+	const later = {
+		status: 'injured_reserve' as const,
+		as_of: READ,
+		since: '2026-09-22T15:00:00.000Z',
+		season_long: true,
+		returning: '2026-11-08'
+	};
+	assert.deepEqual(statusOf(later, false, ZONE), {
+		rank: 'IR',
+		mark: 'IR, back Nov 8',
+		sits: true,
+		line: null
+	});
+	assert.equal(onReserve(line({}, { designation: later })), true);
+	// The day is the provider's calendar day on every clock, never moved by a zone.
+	assert.equal(statusOf(back, false, 'Pacific/Honolulu')?.mark, 'Back Sun Oct 18');
+	assert.equal(statusOf(back, false, 'Asia/Tokyo')?.mark, 'Back Sun Oct 18');
 });
 
 void test('an injured reserve row draws no matchup: the bench one says why he is a drop, the slot no points (Lane 98, B34)', () => {

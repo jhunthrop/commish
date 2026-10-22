@@ -5,7 +5,6 @@
  * swap built from the row's own columns. Pure, tested in lineup.test.ts. */
 import { FREE_AGENT_WORDS } from '#lib/format/free-agent.ts';
 import { lastName } from '#lib/format/draft.ts';
-import { designationWord } from '#lib/format/designation.ts';
 import { fixed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
 import type { LineupAdvice, LineupSlot, PlayerLine, WeekDoneState } from '../inseason/api.ts';
@@ -220,7 +219,7 @@ export function whyLine(into: BoxRow, out: BoxRow | null, slot: string): string 
 	if (out.game === 'no-club') return `${sat} is ${FREE_AGENT_WORDS}. ${next}`;
 	if (out.status?.rank != null)
 		return `${sat} is on a season-long list, ${out.status.mark}. ${next}`;
-	if (out.status !== null && out.status.mark !== designationWord('questionable'))
+	if (out.status !== null && out.status.question !== true)
 		return `${sat} is listed ${inSentence(out.status.mark)}. ${next}`;
 	if (into.proj === null || out.proj === null) return next;
 	const parts = [`${boxNumber(into.proj)} ${BOX.proj} against ${sat}'s ${boxNumber(out.proj)}`];

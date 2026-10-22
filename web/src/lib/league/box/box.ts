@@ -12,7 +12,9 @@ import { isFreeAgent } from '#lib/format/free-agent.ts';
 import { lastName } from '#lib/format/draft.ts';
 import {
 	designationWord,
+	dueBackThisWeek,
 	rankWord,
+	returningMark,
 	seasonLongMark,
 	seasonLongStatus,
 	sitsHim,
@@ -260,15 +262,30 @@ export function statusOf(
 	if (status === null) return null;
 	// The one season-long list (format/designation.ts), the API's flag for an out for the season.
 	const seasonLong = seasonLongStatus(status, designation?.season_long === true);
+	const returning = designation?.returning ?? null;
 	return {
 		rank: seasonLong ? rankWord(status) : null,
-		// A listing carried over from a game already played says its date (Lane 95), never hidden.
+		// A listing carried over from a game already played says its date (Lane 95), never hidden; one
+		// due back this week says his day (Lane 153).
 		mark: seasonLong
-			? seasonLongMark({ status, since: designation?.since ?? null }, zone)
-			: (carriedMark(designation, zone) ?? designationWord(status)),
+			? seasonLongMark({ status, since: designation?.since ?? null, returning }, zone)
+			: returning !== null && dueBackThisWeek(status, false, returning)
+				? returningMark(returning)
+				: (carriedMark(designation, zone) ?? designationWord(status)),
 		sits: sitsHim(status),
-		line: null
+		line: null,
+		...(status === 'questionable' ? { question: true as const } : {})
 	};
+}
+
+/** Whether the API's designation has him due back this week (Lane 153): this week's question, so the
+ * platform's own IR mark beside his name gives way to it. */
+function dueBack(designation: WeekFacts['designation']): boolean {
+	return (
+		designation !== undefined &&
+		designation !== null &&
+		dueBackThisWeek(designation.status, designation.season_long === true, designation.returning)
+	);
 }
 
 /** His status as a row draws it at the page's clock (Lane 104, B57): Questionable and Doubtful are
@@ -282,7 +299,7 @@ export function rowStatus(
 ): StatusView | null {
 	const status = statusOf(designation, hostIR, zone);
 	if (status === null || status.sits || toCome) return status;
-	return statusOf(null, hostIR, zone);
+	return statusOf(null, hostIR && !dueBack(designation), zone);
 }
 
 /** A row as an injured reserve row draws it (Lane 98, B34): no game, expected score or weather and no
@@ -307,9 +324,14 @@ export function reserveRow(row: BoxRow, reserve: 'bench' | 'slot' | null): BoxRo
 	};
 }
 
-/** Whether he carries an injured reserve tag: the report lists him so, or the platform marks him. */
+/** Whether he carries an injured reserve tag: the report lists him so, or the platform marks him and
+ * the report does not have him due back this week (Lane 153). */
 export function onReserve(line: Pick<PlayerLine, 'player' | 'facts'>): boolean {
-	return line.player.injured_reserve || line.facts.designation?.status === 'injured_reserve';
+	const { designation } = line.facts;
+	return (
+		(line.player.injured_reserve && !dueBack(designation)) ||
+		designation?.status === 'injured_reserve'
+	);
 }
 
 /** His rest-of-season rank as a row carries it: none while he is on a season-long list (Lane 128,
