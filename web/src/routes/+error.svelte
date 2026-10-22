@@ -1,52 +1,25 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import PageHead from '#lib/ui/PageHead.svelte';
-	import Shell from '#lib/ui/Shell.svelte';
-	import Verb from '#lib/ui/Verb.svelte';
-	import { sectionHref } from '#lib/ui/nav.ts';
+	import { siteContext } from '#lib/context/context.svelte.ts';
+	import ErrorView from '#lib/site/ErrorView.svelte';
+	import { ERROR_WORDS } from '#lib/site/error-words.ts';
 
 	const NOT_FOUND = 404;
 
-	const missing = $derived(page.status === NOT_FOUND);
-	const title = $derived(missing ? 'Page not found' : 'Something broke');
-	const lead = $derived(
-		missing ? 'Nothing lives at this address.' : 'This page did not load. Try it again in a moment.'
-	);
+	// The Worker's error page: every failure that is not a missing page the Worker serves from the
+	// prerendered one (routes/404), and a 404 where no build is behind it (the dev server, a page the
+	// Worker draws that finds nothing). With no build to name the week from, it holds the week item's
+	// label from its first paint, on the server too, until the site's season is read (context
+	// firstSeason), as the pages the Worker draws do (Lane 148).
+	let waiting = $state(true);
+	onMount(() => {
+		siteContext.firstSeason();
+		waiting = false;
+	});
 </script>
 
-<svelte:head>
-	<title>{title} · Commish</title>
-	<meta name="robots" content="noindex" />
-</svelte:head>
-
-<Shell {title} active={null}>
-	<main class="error">
-		<PageHead title={missing ? 'Not found' : 'Error'} {lead} />
-		<div class="ways">
-			<!-- One way on (the sweep's C14): the board, where every other page is a tap away. -->
-			<Verb href={sectionHref('board')}>Go to the board</Verb>
-		</div>
-	</main>
-</Shell>
-
-<style>
-	.error {
-		padding: var(--s-6) var(--s-5);
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-5);
-		max-width: 720px;
-	}
-
-	.ways {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--s-3);
-	}
-
-	@media (max-width: 760px) {
-		.error {
-			padding: var(--s-5) var(--s-4);
-		}
-	}
-</style>
+<ErrorView
+	words={page.status === NOT_FOUND ? ERROR_WORDS.notFound : ERROR_WORDS.broke}
+	holdWeek={waiting}
+/>

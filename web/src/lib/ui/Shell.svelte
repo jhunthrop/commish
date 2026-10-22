@@ -43,10 +43,23 @@
 		 * page the Worker draws in the browser, which names it from the context's week, read before
 		 * its first render (context/first-season.ts, Lane 143, B126). */
 		weekLabel?: string;
+		/** The page holds the week item's label before its season read starts: the Worker's error
+		 * page, drawn on the server where no read runs (Lane 148). */
+		holdWeek?: boolean;
 		children: Snippet;
 	}
 
-	let { title, stamp, active, search, tail, league, weekLabel, children }: Props = $props();
+	let {
+		title,
+		stamp,
+		active,
+		search,
+		tail,
+		league,
+		weekLabel,
+		holdWeek = false,
+		children
+	}: Props = $props();
 	// The week's order: the page's own name for it, else on a page the Worker draws the context's week
 	// (Lane 142), else Players, the page it opens, while no week is named (fix round 1).
 	const labelOf = (item: RailItem, week = siteContext.season?.board_week): string =>
@@ -57,7 +70,9 @@
 	// The week item's label is held unpainted while a page the Worker draws reads the site's season
 	// (context/first-season.ts), so it paints once, named (Lane 143).
 	const held = (item: RailItem): boolean =>
-		item.key === WEEK_RANKINGS_KEY && weekLabel === undefined && siteContext.seasonPending;
+		item.key === WEEK_RANKINGS_KEY &&
+		weekLabel === undefined &&
+		(holdWeek || siteContext.seasonPending);
 
 	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
 	// The site's context: the session's copy at once, then /me. The rail's Board (/board, which

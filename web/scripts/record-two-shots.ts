@@ -20,11 +20,13 @@
 // (the fixture's order re-dated to the board's week, inseason-fixture/serve.ts orderWeek).
 // The held week item keeps the named label's room at 390 as well as at the desk (Lane 148, B127): a
 // signed-out room page the Worker draws, opened in a new tab after a prerendered page, measures it.
+// A missing page is the prerendered not-found page with a 404, its week item named once from the build.
 //
 //   node scripts/record-two-shots.ts <upcoming|graded|published> [web origin] [api origin] [out dir]
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
 import { RECORDS_WORDS } from '../src/lib/run/records.ts';
+import { ERROR_WORDS } from '../src/lib/site/error-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { basisLines, basisReport } from './basis-lines.ts';
 import { installFixtureApiClock } from './inseason-fixture/clock.ts';
@@ -43,6 +45,7 @@ const FRONT_WIDTHS: readonly number[] = [1440, 1280, 390];
 /** The rail and the week's rankings page are shot at 1280 and 390 (Lane 142). */
 const RAIL_WIDTHS = [1280, 390] as const;
 const PHONE_MAX = 760;
+const NOT_FOUND = 404;
 const SETTLE_MS = 600;
 const READY_TIMEOUT_MS = 30_000;
 /** A 3G-like round trip, added to each API answer on the league page's waterfall (Lane 143). */
@@ -389,6 +392,7 @@ async function rail(who: Who, width: number): Promise<void> {
 		path: new URL(`rail-account-${who}-${String(width)}.png`, out).pathname
 	});
 	await account.context().close();
+	await notFound(who, width, where);
 	if (who === 'signed-out') {
 		// The phone's five without a league draw the week item as a tab, so its held room is
 		// measured at 390 on a page the Worker draws as well as at the desk (Lane 148, B127).
@@ -428,6 +432,29 @@ async function rail(who: Who, width: number): Promise<void> {
 		path: new URL(`rail-league-${who}-${String(width)}.png`, out).pathname
 	});
 	await league.context().close();
+}
+
+/** A page that does not exist (Lane 148): the Worker answers the prerendered not-found page with a
+ * 404, its words from the word table and its week item named at build, once, never renamed. */
+async function notFound(who: Who, width: number, where: string): Promise<void> {
+	const page = await open(who, width, 'about:blank', 'light', true);
+	const answer = await page.goto(`${web}/no-such-page`, {
+		waitUntil: 'networkidle',
+		timeout: READY_TIMEOUT_MS
+	});
+	await page.waitForTimeout(SETTLE_MS);
+	const at = `${where} not found`;
+	if (answer?.status() !== NOT_FOUND)
+		faults.push(`${at}: answered ${String(answer?.status())}, not ${String(NOT_FOUND)}`);
+	const main = (await page.locator('main').textContent()) ?? '';
+	has(main, ERROR_WORDS.notFound.head, at);
+	has(main, ERROR_WORDS.notFound.lead, at);
+	has(main, ERROR_WORDS.toBoard, at);
+	await weekItemFaults(page, who, width, at);
+	await page.screenshot({
+		path: new URL(`not-found-${who}-${String(width)}.png`, out).pathname
+	});
+	await page.context().close();
 }
 
 /** A page the Worker draws, opened with every API answer a 3G-like round trip late and the season's
