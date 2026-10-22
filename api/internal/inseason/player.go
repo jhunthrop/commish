@@ -58,7 +58,13 @@ func publicLine(d Data, projection boards.WeekProjection, b boards.Board, rest R
 	id := boardID
 	line := apitypes.PlayerLine{Player: apitypes.LeaguePlayer{BoardId: &id, Name: bp.Name, Position: string(position), Team: boards.WireClub(team)},
 		Facts: wireFacts(facts, nil), RestOfSeasonPerGame: RestOfSeasonPerGame(b, bp, rest.Left)}
-	if rank, ok := b.PositionRanks[boardID]; ok && rank > 0 {
+	// His place among the players who play, the one a league's lines say
+	// (PlayingRanks, Lane 128); none while a season-long list holds him.
+	listed := func(p boards.Player) bool {
+		d := season.designation(Player{BoardID: p.ID, Team: p.Team, Position: p.Position})
+		return d != nil && d.SeasonLong
+	}
+	if rank, ok := PlayingRanks(b, listed)[boardID]; ok {
 		line.PositionRank = &rank
 	}
 	if facts.Opponent != "" {

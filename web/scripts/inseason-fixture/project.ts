@@ -147,8 +147,23 @@ const SEASON_LONG = new Map(
 	Object.entries(CAPTURE.players).filter(([, status]) => status.seasonLong)
 );
 
+/** The stand-in run's position ranks, playing first (run-from-mock-data.ts playingFirst, the API's
+ * PlayingRanks, Lane 128 review fix round 2): one position rank per player on every screen. */
+const RUNS = new URL('../../.runs/runs/', import.meta.url);
+const RUN_ID = (
+	JSON.parse(await readFile(new URL('latest.json', RUNS), 'utf8')) as { runId: string }
+).runId;
+const PLAYING_RANKS = new Map(
+	(
+		JSON.parse(await readFile(new URL(`${RUN_ID}/boards/ppr-12.json`, RUNS), 'utf8')) as {
+			rows: { id: string; positionRank: number }[];
+		}
+	).rows.map((row) => [row.id, row.positionRank])
+);
+
 /** His designation on the week: a season-long list from the run's capture (with no rest-of-season
- * rank, the in-season order never ranking him as playing), else the fixture's week stand-in. */
+ * rank, the in-season order never ranking him as playing), else the fixture's week stand-in, his rank
+ * the run's playing-first one. */
 function designated(line: PlayerLine): PlayerLine {
 	const listed = line.player.board_id === null ? undefined : SEASON_LONG.get(line.player.board_id);
 	if (listed !== undefined) {
@@ -160,9 +175,17 @@ function designated(line: PlayerLine): PlayerLine {
 		};
 		return { ...line, position_rank: null, facts: { ...line.facts, designation } };
 	}
+	const ranked = playingRank(line);
 	const status = DESIGNATIONS[line.player.name];
-	if (status === undefined) return line;
-	return { ...line, facts: { ...line.facts, designation: { status, as_of: DESIGNATED_AS_OF } } };
+	if (status === undefined) return ranked;
+	return { ...ranked, facts: { ...line.facts, designation: { status, as_of: DESIGNATED_AS_OF } } };
+}
+
+/** His line with the run's playing-first position rank, where it ranks him. */
+function playingRank(line: PlayerLine): PlayerLine {
+	const id = line.player.board_id;
+	const rank = id === null || line.position_rank === null ? undefined : PLAYING_RANKS.get(id);
+	return rank === undefined ? line : { ...line, position_rank: rank };
 }
 
 /** A small stable number from words, for the stand-in evidence: the same line stamps alike on every

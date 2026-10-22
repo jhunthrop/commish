@@ -46,6 +46,11 @@ func TestTheOrderPlacesSeasonLongPlayersAfterTheAvailable(t *testing.T) {
 			if foot {
 				t.Fatalf("%q: available %s at %d after a season-long player", position, id, row.Rank)
 			}
+			// One position rank per player per read (fix round 2, MEDIUM-3): at a position the #
+			// is his line's rank, the one his pill, caption and shelf say.
+			if position != "" && (row.Line.PositionRank == nil || *row.Line.PositionRank != row.Rank) {
+				t.Fatalf("%q: %s is #%d, his line says %v", position, id, row.Rank, row.Line.PositionRank)
+			}
 		}
 		want := map[draft.Position]int{draft.RB: 1, draft.WR: 2, "": 3}[position]
 		if seen != want {

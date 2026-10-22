@@ -390,9 +390,9 @@ void test('the address field is its own, never the asked player', () => {
 
 void test("the tapped row's facts stay over his page's build: its IR words and its rank", () => {
 	const laporta = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'sam-laporta');
-	assert.equal(laporta.pill?.rank, 5);
+	assert.equal(laporta.pill?.rank, 11, "the run's playing-first rank, one on every screen");
 	const built = { position: 'TE' as const, rank: 12, status: null };
-	assert.equal(shelfHead({ row: laporta, note: null }, built).rank, 5);
+	assert.equal(shelfHead({ row: laporta, note: null }, built).rank, 11);
 	// A tag the row drops once his game kicks off (Lane 104) stays dropped: the build's never returns.
 	const dart = rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'jaxson-dart');
 	const tagged = { position: 'TE' as const, rank: 12, status: dart.status };
