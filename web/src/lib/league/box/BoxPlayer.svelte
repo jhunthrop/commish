@@ -181,6 +181,13 @@
 		color: var(--ink-3);
 	}
 
+	/* A long chip ("Due back Sun Oct 18", Lane 153) wraps inside itself before it widens the table. */
+	.club :global(.status-chip) {
+		height: auto;
+		min-height: 20px;
+		white-space: normal;
+	}
+
 	.short,
 	.fit-short {
 		display: none;

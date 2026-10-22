@@ -326,7 +326,10 @@ void test('each chip names the fact and opens the screen that acts on it', () =>
 		...odunze,
 		line: { ...odunze.line, facts: { ...odunze.line.facts, designation } }
 	};
-	assert.equal(chipsOf({ ...SUCK, chips: [back] }, href, ZONE, NOW)[0]?.label, 'Due back Sun Oct 18');
+	assert.equal(
+		chipsOf({ ...SUCK, chips: [back] }, href, ZONE, NOW)[0]?.label,
+		'Due back Sun Oct 18'
+	);
 	const starterBye = chipsOf({ ...SUCK, chips: [{ ...BYE, idle: false }] }, href, ZONE, NOW);
 	assert.deepEqual(
 		starterBye.map((c) => [c.line, c.go]),
