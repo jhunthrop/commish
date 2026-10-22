@@ -25,6 +25,7 @@ from research.model.designations import CODES, status_of
 from research.nightly.designation_dating import (
     DATINGS_KEPT,
     DATINGS_TABLE,
+    RUNS_STATEMENT_TIMEOUT,
     date_newest_capture,
     dating_digest,
     encode_runs,
@@ -170,6 +171,10 @@ def test_the_job_keeps_the_row_the_api_would_and_only_once(recorded: Engine) -> 
             stale,
         )
         first = date_newest_capture(conn, _NOW)
+        # The run read was bounded, for this transaction only.
+        assert conn.execute(text("show statement_timeout")).scalar_one() == RUNS_STATEMENT_TIMEOUT
+    with recorded.connect() as conn:
+        assert conn.execute(text("show statement_timeout")).scalar_one() != RUNS_STATEMENT_TIMEOUT
     assert first.dated
     assert first.line.startswith("designation-dating: the capture of 2026-10-12T06:00:00.123Z dated, 100 runs read")
     assert first.line.endswith(f"kept in {DATINGS_TABLE} ({_GOLDEN['digest'][:12]})")

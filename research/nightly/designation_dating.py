@@ -51,6 +51,9 @@ _KEEP: Final = text(
     f"insert into {DATINGS_TABLE} (capture_digest, capture_at, runs, dated_at) "
     "values (:digest, :capture_at, cast(:runs as jsonb), :dated_at) on conflict (capture_digest) do nothing"
 )
+# The run read's bound (the API's DatingTimeout), for the rest of the caller's transaction only.
+RUNS_STATEMENT_TIMEOUT: Final = "30s"
+_BOUND: Final = text(f"set local statement_timeout = '{RUNS_STATEMENT_TIMEOUT}'")
 _FORGET: Final = text(f"delete from {DATINGS_TABLE} where capture_at < :cutoff")
 
 
@@ -100,6 +103,8 @@ def date_newest_capture(conn: Connection, now: datetime) -> DatingOutcome:
     stamp = go_instant(capture.at)
     if conn.execute(_KEPT, {"digest": digest}).first() is not None:
         return DatingOutcome(f"designation-dating: the capture of {stamp} is dated already ({digest[:12]})")
+    # The run read is bounded, so a pathological plan costs this step, never the job's whole task.
+    conn.execute(_BOUND)
     started = time.monotonic()
     runs = designation_runs(conn, capture.at)
     took = round((time.monotonic() - started) * 1000)

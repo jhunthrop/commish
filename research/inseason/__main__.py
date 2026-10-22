@@ -43,6 +43,7 @@ from datetime import datetime
 from typing import Final
 
 import httpx
+from psycopg.errors import InsufficientPrivilege
 from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -64,7 +65,6 @@ from research.inseason.step_result import StepResult
 from research.logging_setup import configure_logging
 from research.nightly.capsule_step import night_facts
 from research.nightly.designation_dating import date_newest_capture
-from research.nightly.designations import DesignationsError
 from research.nightly.publish import take_run_id
 from research.nightly.published_board import driver_line
 from research.nightly.r2 import run_store
@@ -250,17 +250,22 @@ def _capture_harvest(now: datetime) -> bool:
 def _date_designations(engine: Engine, now: datetime) -> bool:
     """Right after the capture, the newest injury capture dated for the API (Lane 134,
     `nightly/designation_dating.py`) in a transaction of its own, so a refused write never rolls back
-    the capture. A failure is its own line and fails the job (the API dates the capture itself
-    meanwhile, as before)."""
+    the capture. Any failure is its own line and the hour goes on (the API dates the capture itself
+    meanwhile, as before); only a missing grant fails the job, since it fails every hour until an
+    operator grants it."""
     try:
         with engine.begin() as conn:
             outcome = date_newest_capture(conn, now)
-    except DesignationsError as error:
-        _line(f"  designation-dating: FAILED, {error}")
-        return False
     except SQLAlchemyError as error:
+        LOG.exception("the designation dating failed")
+        denied = isinstance(getattr(error, "orig", None), InsufficientPrivilege)
         _line(f"  designation-dating: FAILED, {driver_line(error)}; the API dates the capture itself")
-        return False
+        return not denied
+    # An aid to the API, never the hour's verdict; named, not swallowed.
+    except Exception as error:
+        LOG.exception("the designation dating failed")
+        _line(f"  designation-dating: FAILED, {type(error).__name__}: {error}; the API dates the capture itself")
+        return True
     _line(f"  {outcome.line}")
     return True
 
