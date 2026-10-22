@@ -100,7 +100,7 @@ Thursday pass, in the 12 hours before the first kickoff):
    `espn-fill` step fills the freeze's empty rows from the first read after it, keeping the read's
    instant in `espn_read_at` (Amendment 6, Lane 146). A read at or after the first kickoff never fills.
 3. 19:00 `inseason-capture`: the first pass inside the Thursday slot's two hours (18:15 to 20:15 for
-   a 20:15 kickoff) reads the slot's projection; it is after the freeze and never changes it.
+   a 20:15 kickoff) reads the slot's projection; it is after the freeze and never changes it. No scheduled pass runs between the Thursday 14:00 Eastern pass and the first kickoff, so when that pass's own ESPN read fails the fill needs a hand re-run of `season-week` before kickoff (`gcloud run jobs execute inseason --region us-east1 --wait`); it does not heal on its own.
 
 `research.pipeline history` re-creates the seasons the store lost (an operator command, run once
 per store; `pipeline/history.py`).
