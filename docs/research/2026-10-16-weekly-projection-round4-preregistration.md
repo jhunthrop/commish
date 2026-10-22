@@ -1244,3 +1244,107 @@ claims.
    such a freeze itself on its next pass before kickoff and the fill is logged.
 3. **What stays.** A read taken after the first kickoff never fills a freeze; such a week is graded against
    the published projection alone and the record says so.
+
+### Amendment 7, 2026-10-23, before any fit of it: weekly kicker and team-defense numbers
+
+Recorded by the coordinator on Lane 154's design (`docs/superpowers/specs/2026-10-23-weekly-defense-kicker-design.md`),
+on the founder's request of 2026-10-22 ("we still don't have rankings for D/ST"), before any feature
+row, fit or check of what it names. It adds a sub-round for kickers (K) and team defenses (DEF) to
+this document. It changes no model, input, fit, gate, threshold, seed, population or judged week of
+the skill positions, whose round ended at its development check (results §2), and it rewrites no
+graded figure. The September K and DEF ruling (`2026-09-05-kicker-defense-preregistration-results.md`)
+stands for the preseason board and is neither re-read nor re-run; nothing here reads a 2025 or 2026
+outcome.
+
+1. **Scope.** A weekly number for each club's kicker and each team defense: the week's points in the
+   league's scoring with floor, median and ceiling, and the reasons. The design's §5 is the model, its
+   §6 the grading, and the items below fix every choice a fit or a gate turns on.
+2. **What it reuses, unchanged.** The game figures and their live default (§2.5, §2.10), the kickoff
+   weather and roof as Amendment 1 item 3 admits them, the stadium table, the filings and their live
+   source (Amendment 2 item 7), the team model's code, grid, tie rule and monotone constraints
+   (§2.5, §2.6), round 4's empirical Bayes shrinkage forms (§2.3), its forward-chaining and tuning
+   rules (§2.6), its seeding rule (§2.6, with ":kdef" appended to the hashed text), and §5's input
+   rule with Amendments 1 to 3.
+3. **New admitted inputs (§5).** (a) The kicking and team-defense weeks of weeks before W
+   (`nflverse_kicking_weeks`, `nflverse_team_defense_weeks`), stamped in replay at the Wednesday
+   18:00 ET pass after their week, as item 8 stamps NGS and PFR, and live at their `nflverse_kdef_week`
+   stamp. (b) The play table's new kick columns (`kick_distance`, `field_goal_result`,
+   `extra_point_result`, `two_point_conv_result`, `kicker_player_id`, `td_team`, the block and return
+   flags), stamped per game as item 7 stamps the play table. No week-W outcome of either table is
+   admitted, and the guard test feeds a week-W kicking row and a week-W `points_allowed` through each
+   new read kind and expects `InputRuleError`.
+4. **Components and models.** As the design's §5.2 (defense) and §5.3 (kicker): the opponent's points
+   as a kernel over the fit club-games' scores (bandwidth from {1.0, 1.5, 2.0, 3.0}) tilted to a
+   boosted Poisson mean; yards allowed from the team model's plays and shrunk yards per play with
+   empirical residual quantiles; sacks from the team model; interceptions and fumble recoveries as
+   boosted Poisson models; defensive touchdowns per takeaway; return touchdowns, safeties and blocks at
+   shrunk league rates; field-goal attempts as a boosted Poisson with a boosted multinomial over the
+   six distance bands; field-goal and extra-point make probabilities from a play-level boosted
+   classifier with the kicker's beta-binomial shrunk accuracy over expected; extra-point attempts from
+   the team model's touchdowns and the shrunk two-point rate. The joint is §5.4's, 2,000 draws per
+   club-game with three bands. The why is §5.7's, four groups, exact Shapley.
+5. **Who kicks.** §5.3's rule. A kicker listed Out or Doubtful at t_g has no number; with no other
+   kicker evidenced, the club has no kicker number, counted.
+6. **Defaults.** §2.10's rows apply to the shared inputs. New: a kicker with no fit-history attempt
+   takes the position prior (`no_kicker_history` 1); a club-week with no prior kicking or defense week
+   this season reads last season's shrunk rates, else the prior (`no_prior_unit` 1); an opposing
+   starter with no passing history takes the position prior (`no_passer_history` 1). Each is counted
+   in the results.
+7. **Fit, check, judgment.** Component models fitted 2016 to 2022 for the development check and 2016
+   to 2023 for the judgment, forward-chained by season; shrinkage priors may read 2013 onward as prior
+   seasons. **Development check: 2023 weeks 3 to 17, once. Judgment: 2024 weeks 3 to 17, once,**
+   claimed by an exclusive file, on a clean tree descending from this amendment's commit.
+8. **Population, statistics, scoring.** Defenses: every club with a game in the week. Kickers: each
+   club's projected kicker with a stat line that week. Round 4's fill rule. S1 Spearman per week within
+   position, pooled as the mean over weeks, week-block bootstrap 10,000 resamples with
+   `default_rng(42)`; S2 the mean realised points of each source's first 12 rows a week, pooled; S3 the
+   range shares, a value equal to a quantile counting half. Scoring: `research/model/domain.py`'s
+   points-allowed and yards-allowed bands and defensive values, field goals 0-39 3, 40-49 4, 50 plus
+   5, a missed field goal -1, an extra point 1, a missed extra point -1.
+9. **Benchmarks.** Recent form (points a game this season before W, else last season's); the
+   streamer's sheet (defenses by the opponent's implied points, fewest first; kickers by the club's
+   implied points, most first; ties by form); ESPN's archived weekly projection for 2023 and 2024,
+   re-scored from its components under item 8's scoring where they map, else its total, ingested once,
+   never an input, its stamp taken as its last pre-game version; the published projection's archive
+   only if stamped at or before t_g, else refused by name.
+10. **Gates, per position, all must pass, a gate that cannot answer fails** (`KDEF_WEEKLY`, a test at
+    each threshold):
+    - KD1 model minus form pooled >= +0.05, lower bound > 0;
+    - KD2 model minus the streamer's sheet pooled >= +0.02, lower bound > 0;
+    - KD3 model minus ESPN pooled >= 0.000, a point comparison;
+    - KD4 the model's S2 at least the sheet's, ESPN's and form's;
+    - KD5 below the floor and above the ceiling each within [0.06, 0.14], below the median within
+      [0.44, 0.56];
+    - KD6 isolation: item 3's rule and §5's per-game clause for every fit and judged game, the readers
+      on their seasons and refusing 2025 and 2026, and `preseason_projections`,
+      `preseason_board_reasons`, `published_boards`, `register_freeze_rows`, `register_grade_rows`
+      and `model_artifacts` outside this sub-round's keys digesting the same before and after.
+    Each lower bound is the 2.5th percentile (two bootstrapped comparisons per position, one-sided
+    0.05 / 2). 12 lines per position.
+11. **Decision and stop rules.** Per position: every line passes on the 2024 judgment and that
+    position's number ships; otherwise nothing ships for it. A position failing KD1 pooled or KD2
+    pooled on the 2023 check ends there and its 2024 is not judged; any other failing line is examined
+    for a defect only. Thresholds never move.
+12. **What the judgment prints.** The K and DEF gate lines and the reported views of the design's
+    §6.3, and nothing club-level of 2024: no team-model residual, no club's points or sacks. Round 5's
+    preregistration, if locked, lists this judgment in its 2024 exposure.
+13. **On a pass: the served version and the switch.** The passing procedure is refitted once on 2016
+    to 2024 with the judged hyperparameters, bandwidth and cells and no selection, pinned in
+    `model_artifacts`, the judged artifacts kept beside it. The planned switch week is **week 9**
+    (the Thursday 2026-11-05 pass); it yields to the live board: the number replaces the published
+    projection for that position on the first in-season pass after the pin, any day, never before the
+    pass. Rows whose game has kicked off keep the figure they had. The run publishes the expected
+    components and 2,000 joint draws per club-week; the API scores them under each league's own rules,
+    held to the research scorer by a parity test.
+14. **The record (Amendments 4 and 5).** From the first freeze the pinned version makes, the pass
+    freezes K and DEF rows under `commish_week_kdef_v1` with `espn_points` (through the D/ST crosswalk,
+    ESPN's `-16000 - club` id to `team-def:<club>`, and the kickers' ESPN ids) and `published_points`,
+    graded in item 8's scoring, and the weekly record draws K and D/ST lines beside the skill lines.
+    A week counts only if the switch landed before its Thursday freeze. "Leads" follows §3.3's two fixed
+    looks. Freezes of any other version are shadows, internal only. Before a pass the record draws no K
+    or DEF line, and the interim order (the published projection's) is never graded against itself.
+15. **On a fail.** For that position: no number of ours in 2026, the published projection's order stays
+    on every screen under its own label, the record draws no line, 2024 is spent for it, and a 2027
+    round preregisters anew.
+
+11. **Coordinator rulings, 2026-10-22 (design §9), recorded before any fit.** (1) This sub-round's 2024 judgment may run before round 5's and prints only its own K and DEF lines; round 5's exposure list names it. (2) Gate KD2 (a lead over the streamer's sheet) stays as written: a number that cannot be told from the rule of thumb does not ship, and the interim order stands. (3) ESPN's archived projection is a point comparison (KD3) with the stamp caveat printed beside the verdict, never a gate on its own. (4) Whether the Waivers strip offers K and D/ST adds once the number ships is the founder's call (it reverses the 2026-10-16 narrowing); until ruled, no. (5) No floor-to-ceiling range on the K and D/ST rows while the skill rows carry none: one row shape across positions; the range ships for every position together or not at all. (6) The first week with our number is week 9 (the Thursday Nov 5 pass) if the judgment passes; the week 8 shortcut that cuts the serving lanes' review is refused; the switch rule in item 10 stands (ready means live).
