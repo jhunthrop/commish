@@ -1,5 +1,6 @@
 <script lang="ts">
 	import BasisBlock from '#lib/ui/BasisBlock.svelte';
+	import BasisLine from '#lib/ui/BasisLine.svelte';
 	import { onMount, untrack } from 'svelte';
 	import { hitsWords } from '#lib/format/pool-words.ts';
 	import { memberZone } from '#lib/format/clock.ts';
@@ -14,16 +15,22 @@
 	import { MIN_SEARCH } from './path.ts';
 	import {
 		ORDER,
-		ORDER_POSITIONS,
+		PLAYERS_CHIPS,
 		orderBasis,
 		moveHref,
 		moveWords,
 		orderView,
 		rosterFilter,
+		isWeekChip,
+		weekChip,
+		type PlayersChip,
 		type OrderView,
 		type RosterView
 	} from './order.ts';
 	import OrderTable from './OrderTable.svelte';
+	import type { WeekSaid } from './week.ts';
+	import { weekReadKey } from './week-head.ts';
+	import WeekScreen from './WeekScreen.svelte';
 	import type { BoxRow } from '#lib/league/box/box.ts';
 	import { tabHref } from '#lib/league/inseason/tabs.ts';
 	import { links } from '#lib/site/links.ts';
@@ -46,9 +53,18 @@
 		/** The rank's head over #: the Players page's "Week 7 rank" in season (Lane 142), else our
 		 * rest-of-season order's. */
 		rankHead?: string;
+		/** The scoring the Players page's kickers and defenses are named in ("PPR", Lane 155). */
+		boardScoring?: string;
 	}
 
-	let { mode, position: opened = null, league = null, label, rankHead }: Props = $props();
+	let {
+		mode,
+		position: opened = null,
+		league = null,
+		label,
+		rankHead,
+		boardScoring = ''
+	}: Props = $props();
 
 	/** The rows one read asks for, and how many more Show more adds, up to the API's limit. */
 	const PAGE_ROWS = 100;
@@ -57,7 +73,7 @@
 	const SEARCH_PAUSE_MS = 250;
 
 	// svelte-ignore state_referenced_locally
-	let position = $state<OrderPosition | null>(opened);
+	let position = $state<PlayersChip | null>(opened);
 	// The page's position chips are links on the same route: when the page moves to another position
 	// the table reads it (review 66j H1).
 	$effect(() => {
@@ -81,6 +97,13 @@
 	let pause: ReturnType<typeof setTimeout> | undefined;
 
 	const leagueId = $derived(mode === 'rest' ? (league?.id ?? null) : null);
+	/** The Players page's K or D/ST chip (Lane 155): the week's box score in the order's place, read
+	 * by its own screen for no league, as the page reads our order. */
+	const week = $derived(mode === 'players' ? weekChip(position) : null);
+	let weekSaid = $state<WeekSaid | null>(null);
+	const weekShown = $derived(
+		week !== null && weekSaid?.key === weekReadKey(week, null) ? weekSaid : null
+	);
 	const views = $derived(
 		advice?.rows.map((row) => orderView(row, memberZone(), position === null, now)) ?? []
 	);
@@ -138,10 +161,16 @@
 
 	async function read(): Promise<void> {
 		const mine = (latest += 1);
+		const asked = position;
+		// The week's chips read the week (WeekScreen); an order read still out is dropped.
+		if (asked !== null && isWeekChip(asked)) {
+			reading = false;
+			return;
+		}
 		reading = true;
 		try {
 			const answer = await orderApi.read(leagueId, {
-				position,
+				position: asked,
 				q: q.trim().length >= MIN_SEARCH ? q : null,
 				roster: rosterFilter(roster),
 				limit
@@ -170,7 +199,7 @@
 		pause = setTimeout(() => void read(), SEARCH_PAUSE_MS);
 	}
 
-	function choose(next: OrderPosition | null): void {
+	function choose(next: PlayersChip | null): void {
 		position = next;
 		limit = PAGE_ROWS;
 		void read();
@@ -214,7 +243,8 @@
 				value={q}
 				oninput={(event) => search(event.currentTarget.value)}
 			/>
-			{#if advice}<span class="hits">{hitsWords(advice.total, filtered)}</span>{/if}
+			{#if advice && week === null}<span class="hits">{hitsWords(advice.total, filtered)}</span
+				>{/if}
 		</label>
 	{/if}
 	<div class="filters">
@@ -223,7 +253,7 @@
 				<button type="button" aria-pressed={position === null} onclick={() => choose(null)}
 					>{ORDER.every}</button
 				>
-				{#each ORDER_POSITIONS as p (p)}
+				{#each PLAYERS_CHIPS as p (p)}
 					<button type="button" aria-pressed={position === p} onclick={() => choose(p)}
 						>{positionWord(p)}</button
 					>
@@ -251,33 +281,54 @@
 		{/if}
 	</div>
 
-	{#if problem}
-		<p class="problem" role="alert">{problem}</p>
-	{/if}
-	{#if advice === null}
-		<p class="reading" aria-live="polite">{reading ? ORDER.reading : ''}</p>
-	{:else if advice.total === 0}
-		<p class="reading">{ORDER.none}</p>
-	{:else}
-		<div class:dim={reading}>
-			<OrderTable
-				{label}
-				{rankHead}
-				rows={views}
-				rankBy={advice.rank_by}
-				week={advice.week}
-				league={tableLeague}
-				tagsOf={sheetTags}
-				end={mode === 'players' ? sheetMark : undefined}
+	{#if week !== null}
+		<!-- The week's basis said once over its rows, as the board's tab says it: the order is the
+		     published projection's, never ours (Lane 155). -->
+		{#if weekShown}
+			{@const rules = weekShown.rules}
+			<BasisLine parts={weekShown.basis}>
+				{#snippet after()}{#if rules}{rules}{/if}{/snippet}
+			</BasisLine>
+		{/if}
+		{#key week}
+			<WeekScreen
+				position={week}
+				{boardScoring}
+				search={q}
+				onread={(read: WeekSaid) => {
+					weekSaid = read;
+				}}
 			/>
-		</div>
-	{/if}
-	{#if more}
-		<button type="button" class="more" onclick={showMore}>{ORDER.moreRows}</button>
-	{/if}
+		{/key}
+	{:else}
+		{#if problem}
+			<p class="problem" role="alert">{problem}</p>
+		{/if}
+		{#if advice === null}
+			<p class="reading" aria-live="polite">{reading ? ORDER.reading : ''}</p>
+		{:else if advice.total === 0}
+			<p class="reading">{ORDER.none}</p>
+		{:else}
+			<div class:dim={reading}>
+				<OrderTable
+					{label}
+					{rankHead}
+					rows={views}
+					rankBy={advice.rank_by}
+					week={advice.week}
+					league={tableLeague}
+					tagsOf={sheetTags}
+					end={mode === 'players' ? sheetMark : undefined}
+				/>
+			</div>
+		{/if}
+		{#if more}
+			<button type="button" class="more" onclick={showMore}>{ORDER.moreRows}</button>
+		{/if}
 
-	<!-- One paragraph; a sentence about a column the phone does not draw is not said there. -->
-	<BasisBlock parts={basis} />
+		<!-- One paragraph; a sentence about a column the phone does not draw is not said there. -->
+		<BasisBlock parts={basis} />
+	{/if}
 	<PlayerShelfLayer host={shelf} />
 </div>
 
