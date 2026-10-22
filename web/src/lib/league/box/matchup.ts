@@ -3,6 +3,7 @@
  * Pure functions, tested in matchup.test.ts. */
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 import { gameHead, KICKOFF, linesRead, type GameRead } from './kickoff.ts';
+import { NONE_UNLISTED, type UnlistedDrawn } from './basis.ts';
 import type { MatchupSide } from '../api.ts';
 import type { GameState, MatchupBox, MatchupBoxSide, PlayerLine } from '../inseason/api.ts';
 import {
@@ -134,6 +135,40 @@ export function sideScore(
 	return totalsPts(rows, side.player_points && !side.team_total, hostTotal);
 }
 
+/** A box side's Proj: its starters' rows added, or for a side the platform lists no starters for whose
+ * Proj is our best lineup from its roster (an FFPC opponent), the API's figure, the one the League
+ * page's bug draws for him (Lane 137, B107); none from an answer without it. */
+function sideProj(
+	box: Pick<MatchupBoxSide, 'starters' | 'projection' | 'projection_best_lineup'>,
+	rows: readonly BoxRow[]
+): number | null {
+	if (box.starters.length > 0 || box.projection_best_lineup !== true) return projTotal(rows);
+	return box.projection ?? null;
+}
+
+/** What a box side the platform lists no starters for draws from our best lineup of its roster (an
+ * FFPC opponent; basis.ts UnlistedDrawn): its Proj before kickoff (Lane 137, B107), its Proj final
+ * while it plays (Lane 127 fix round 1), said once in the basis; nothing once it is final, where it
+ * draws "--", or for a side listing starters. */
+export function matchupUnlisted(
+	box: Pick<
+		MatchupBoxSide,
+		'starters' | 'projection_best_lineup' | 'best_lineup_skipped' | 'projected_final_paced'
+	> | null,
+	totals: Pick<BoxTotals, 'proj' | 'final' | 'live' | 'allFinal'>
+): UnlistedDrawn {
+	if (box === null || box.starters.length > 0 || box.projection_best_lineup !== true)
+		return NONE_UNLISTED;
+	const figure = !totals.live ? totals.proj : totals.allFinal ? null : totals.final;
+	if (figure === null) return NONE_UNLISTED;
+	return {
+		bestLineup: true,
+		noRoster: false,
+		paced: totals.live && box.projected_final_paced === true,
+		skipped: box.best_lineup_skipped === true
+	};
+}
+
 /** A side's box: the API's rows when it answered for the side, else the league read's starters with
  * their points so far when the host gives them. Totals' Pts is the side's score (sideScore), the bug's
  * figure too. */
@@ -152,7 +187,7 @@ export function sideBox(
 			starters,
 			bench: box.bench.map((line) => boxRow(line, '', zone, true, read.now)),
 			totals: {
-				proj: projTotal(rows),
+				proj: sideProj(box, rows),
 				pts: sideScore(rows, box, read.hostTotal),
 				final: box.projected_final ?? null,
 				live: read.started,

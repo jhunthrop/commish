@@ -463,14 +463,14 @@ void test("the front door's FFPC bug says the opponent's figures as the home doe
 	assert.doesNotMatch(rosterless ?? '', /No Proj final while/);
 	for (const said of [friday, sunday, rosterless]) assert.doesNotMatch(said ?? '', bannedPattern());
 	// The opponent's Proj is our best lineup, not his starters as set: that sentence goes (fix round 3).
-	const best = { bestLineup: true, noRoster: false, paced: false };
+	const best = { bestLineup: true, noRoster: false, paced: false, skipped: false };
 	assert.doesNotMatch(
 		weekBasis(SUCK, false, ZONE, false, false, false, best)[0] ?? '',
 		/as set on/
 	);
 	assert.match(weekBasis(SUCK, false, ZONE)[0] ?? '', /as set on Sleeper/);
 	// While the pace clause is said the other leagues' line drops its qualification (fix round 3).
-	const paced = { bestLineup: true, noRoster: false, paced: true };
+	const paced = { bestLineup: true, noRoster: false, paced: true, skipped: false };
 	assert.match(
 		weekBasis(SUCK, true, ZONE, true, false, true, paced)[0] ?? '',
 		/ Your other leagues read the same way\.$/

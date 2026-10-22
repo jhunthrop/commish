@@ -80,23 +80,44 @@ export interface UnlistedDrawn {
 	/** A best-lineup side draws a Proj final that counts a player in play at his projection's pace (the
 	 * API's projected_final_paced, Lane 127 fix round 3), said in the same sentence. */
 	paced: boolean;
+	/** A best-lineup side's figure passed over a player with no Proj (the API's best_lineup_skipped, Lane
+	 * 137, B107): the sentence says the lineup is from the players with a Proj. */
+	skipped: boolean;
 }
 
-export const NONE_UNLISTED: UnlistedDrawn = { bestLineup: false, noRoster: false, paced: false };
+export const NONE_UNLISTED: UnlistedDrawn = {
+	bestLineup: false,
+	noRoster: false,
+	paced: false,
+	skipped: false
+};
+
+/** Where a best lineup is drawn from: the roster, or where it passed over a player with no Proj, the
+ * players of it with one (Lane 137, B107). */
+const BEST_LINEUP_FROM = {
+	rosters: 'their rosters',
+	projected: `the players with a ${BOX.proj} on their rosters`
+} as const;
 
 /** How a best lineup's in-play player counts where the platform gives no player's points (Lane 127 fix
  * round 3, roster_projection.go inPlayAt): the clause the sentence gains while a Proj final is drawn. */
 export const PACE_CLAUSE = "in-play players at their projection's pace";
 
 /** The words for the teams a platform sends no lineup for (Lane 127 fix round 1): one sentence covers
- * their Proj and their Proj final alike, said once, the "--" of a team with no roster read beside it
- * (the coordinator's ruling: one sentence); a board whose every such team draws "--" (no roster read,
- * or an answer before Lane 127) says why. Empty with none drawn. */
+ * their Proj and their Proj final alike, said once, "from the players with a Proj" where a lineup
+ * passed over one (Lane 137, B107); the "--" of a team with no roster read is said as a second
+ * sentence where one is drawn (Lane 137), and alone on a board whose every such team draws "--" (no
+ * roster read, or an answer before Lane 127). Empty with none drawn. */
 export function unlistedPart(host: LeagueHost, drawn: UnlistedDrawn): string {
 	const platform = hostWords(host);
-	if (drawn.bestLineup)
-		return `${BOX.proj} for teams ${platform} sends no lineup for is our best lineup from their rosters${drawn.paced ? `, ${PACE_CLAUSE}` : ''}.`;
-	return drawn.noRoster ? `Teams ${platform} sends no lineup or roster for read ${BOX.none}.` : '';
+	const from = drawn.skipped ? BEST_LINEUP_FROM.projected : BEST_LINEUP_FROM.rosters;
+	const best = drawn.bestLineup
+		? `${BOX.proj} for teams ${platform} sends no lineup for is our best lineup from ${from}${drawn.paced ? `, ${PACE_CLAUSE}` : ''}.`
+		: '';
+	const none = drawn.noRoster
+		? `Teams ${platform} sends no lineup or roster for read ${BOX.none}.`
+		: '';
+	return [best, none].filter((w) => w !== '').join(' ');
 }
 
 /** The Proj final's sentences: what it is once a game has kicked off, and why one is "--" where one
@@ -557,11 +578,10 @@ export interface BoxBasisFacts {
 	allFinal?: boolean;
 	/** A Team row reads Final with no total (an FFPC opponent with no box, Lane 121 fix round 1). */
 	finalNone?: boolean;
-	/** A Team row draws its Proj final from our best lineup of its roster (an FFPC opponent, the
-	 * API's projection_best_lineup, Lane 127 fix round 1): said once, as the League page says it. */
-	bestLineup?: boolean;
-	/** That Proj final counts a player in play at his projection's pace (projected_final_paced). */
-	paced?: boolean;
+	/** What a Team row the platform sends no lineup for draws (an FFPC opponent, matchup.ts
+	 * matchupUnlisted): its Proj or Proj final from our best lineup of its roster (Lane 127 fix round
+	 * 1; before kickoff too, Lane 137 B107), said once, as the League page says it. */
+	unlisted?: UnlistedDrawn;
 	host: LeagueHost;
 	/** The Lineup's: the read the change counts from, and the API's sentence naming the rules our
 	 * stats lack; null on the Matchup, which draws no evidence columns. */
@@ -589,15 +609,7 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	const final = [
 		...said(projFinalWords(projFinal, facts.noFinal === true)),
 		...said(facts.finalNone === true ? finalNonePart(facts.host) : null),
-		...said(
-			projFinal && facts.bestLineup === true
-				? unlistedPart(facts.host, {
-						bestLineup: true,
-						noRoster: false,
-						paced: facts.paced === true
-					})
-				: null
-		)
+		...said(unlistedPart(facts.host, facts.unlisted ?? NONE_UNLISTED))
 	];
 	const { lineup } = facts;
 	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.

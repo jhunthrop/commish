@@ -119,6 +119,8 @@ export interface BugSide {
 	/** Its Proj final counts a player in play at his projection's pace (projected_final_paced, Lane 127
 	 * fix round 3). */
 	paced: boolean;
+	/** Its best lineup passed over a player with no Proj (best_lineup_skipped, Lane 137 B107). */
+	skipped: boolean;
 	/** The big figure (Lane 92, B22): its Proj before the first kickoff, its Pts from it. */
 	big: string;
 	/** "3 to play", "2 playing" while the game is under way (the API's to_play), else empty. */
@@ -310,6 +312,7 @@ export function bugsOf(
 					unlisted: side.schedule_state !== undefined,
 					bestLineup: side.projection_best_lineup === true,
 					paced: side.projected_final_paced === true,
+					skipped: side.best_lineup_skipped === true,
 					...sideFigures(side, head.state, final, columns.small === BOX.final),
 					toPlay: head.state === 'kicked_off' ? (side.to_play ?? '') : '',
 					stands: standsOf(game, side, started)
@@ -380,9 +383,12 @@ export function unlistedDrawn(bugs: readonly Bug[]): UnlistedDrawn {
 			.map((s) => ({ s, figure: drawnFigure(b.state, s) }))
 			.filter(({ figure }) => figure !== null)
 	);
+	const best = drawn.filter(({ s, figure }) => s.bestLineup && figure !== BOX.none);
 	return {
-		bestLineup: drawn.some(({ s, figure }) => s.bestLineup && figure !== BOX.none),
+		bestLineup: best.length > 0,
 		noRoster: drawn.some(({ s, figure }) => !s.bestLineup && figure === BOX.none),
+		// A best lineup drawn that passed over a player with no Proj (Lane 137, B107).
+		skipped: best.some(({ s }) => s.skipped),
 		// A Proj final drawn from a best lineup: a game under way, the side not final (fix round 3).
 		paced: bugs.some(
 			(b) =>

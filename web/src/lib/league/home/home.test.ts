@@ -302,7 +302,12 @@ void test('a side FFPC lists no starters or roster for draws "--", said once by 
 			[true, true, `${BOX.final} 71.4`]
 		]
 	);
-	assert.deepEqual(unlistedDrawn(bugs), { bestLineup: false, noRoster: true, paced: false });
+	assert.deepEqual(unlistedDrawn(bugs), {
+		bestLineup: false,
+		noRoster: true,
+		paced: false,
+		skipped: false
+	});
 	// The "--" is the side's with no roster: the starters keys stay unsaid, its own sentence says it,
 	// on the League page and the front door alike.
 	assert.equal(bugsMissFinal(bugs), true);
@@ -330,7 +335,8 @@ void test('a side FFPC lists no starters or roster for draws "--", said once by 
 	assert.deepEqual(unlistedDrawn(bugsOf(board('playing'), SYNC, SATURDAY, ZONE)), {
 		bestLineup: false,
 		noRoster: false,
-		paced: false
+		paced: false,
+		skipped: false
 	});
 });
 
@@ -359,9 +365,13 @@ void test("a side FFPC sends no lineup for draws its roster's best lineup before
 		]
 	);
 	const drawn = unlistedDrawn(bugs);
-	assert.deepEqual(drawn, { bestLineup: true, noRoster: true, paced: false });
+	assert.deepEqual(drawn, { bestLineup: true, noRoster: true, paced: false, skipped: false });
 	const said = teamBasis('ffpc', read, scoring, false, ZONE, false, false, false, false, drawn);
-	assert.match(said, new RegExp(`${best.source}$`));
+	// The team with no roster's "--" beside it, its own second sentence (Lane 137, B107 ruling 3).
+	assert.match(
+		said,
+		new RegExp(`${best.source} Teams FFPC sends no lineup or roster for read --\\.$`)
+	);
 	assert.doesNotMatch(said, /Proj final/);
 	assert.doesNotMatch(said, BANNED);
 	// Under way: its Proj final is the best lineup's too, the same sentence, the key for what it adds.
@@ -379,7 +389,12 @@ void test("a side FFPC sends no lineup for draws its roster's best lineup before
 	}));
 	const under = bugsOf(night, SYNC, SATURDAY, ZONE);
 	assert.equal(under[0]?.sides[0]?.small, '80.1');
-	assert.deepEqual(unlistedDrawn(under), { bestLineup: true, noRoster: false, paced: true });
+	assert.deepEqual(unlistedDrawn(under), {
+		bestLineup: true,
+		noRoster: false,
+		paced: true,
+		skipped: false
+	});
 	// Both sides are the best lineup's: its sentence says their Proj final, its pace clause with it, and
 	// the listed sides' key stays unsaid (fix round 3).
 	assert.equal(bugsPlayingListed(under), false);
@@ -414,7 +429,8 @@ void test("a side FFPC sends no lineup for draws its roster's best lineup before
 	assert.deepEqual(unlistedDrawn(bugsOf(older, SYNC, SATURDAY, ZONE)), {
 		bestLineup: false,
 		noRoster: true,
-		paced: false
+		paced: false,
+		skipped: false
 	});
 });
 

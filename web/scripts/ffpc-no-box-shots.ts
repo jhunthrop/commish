@@ -14,7 +14,8 @@
 // a game under way draws one "--".
 //   thursday-night,    before the week's Sunday (Lane 127, B105): Thursday's game under way, then
 //   friday, saturday,  final, every other side unlisted, its Proj our best lineup from its roster or
-//   sunday             "--" with none; the Matchup's opponent listed as the stand-in reads him;
+//   sunday             "--" with none; the Matchup's opponent unlisted too, his Proj the home bug's
+//                      best lineup (Lane 137, B107), never "--";
 //   monday             Monday night, the Monday game under way with a player on each roster: Kicked off;
 //   tuesday            every week 6 game final: Final on both sides;
 //   tuesday-late       Tuesday with LV at BUF's final not held (FIXTURE_LATE_FINAL=LV,BUF): every
@@ -137,24 +138,38 @@ async function drawn(at: Locator): Promise<string> {
 	return (await at.allTextContents()).join(' ').trim();
 }
 
-/** The Matchup bug's head and the opponent's small figure there. */
-async function matchupBug(page: Page): Promise<{ head: string; opponent: string }> {
+/** A bug's head, the opponent's small figure and his big one (his Proj before kickoff, Lane 92). */
+interface BugRead {
+	head: string;
+	opponent: string;
+	big: string;
+}
+
+/** The Matchup bug's head and the opponent's figures there. */
+async function matchupBug(page: Page): Promise<BugRead> {
 	const bug = page.locator('main section.bug').first();
 	return {
 		head: await drawn(bug.locator('.mid b')),
-		opponent: await drawn(bug.locator('.sd:not(.me) .sc small'))
+		opponent: await drawn(bug.locator('.sd:not(.me) .sc small')),
+		big: await drawn(bug.locator('.sd:not(.me) .sc .big'))
 	};
 }
 
-/** The member's home bug: its head, the opponent's small figure and his points. */
-async function homeBug(page: Page): Promise<{ head: string; opponent: string; points: string }> {
+/** The member's home bug: its head, the opponent's small figure and his big one (his points). */
+async function homeBug(page: Page): Promise<BugRead & { points: string }> {
 	const bug = page.locator('main a.bug.mine').first();
+	const big = await drawn(bug.locator('.bt:not(.me) .pts'));
 	return {
 		head: await drawn(bug.locator('.bh .st')),
 		opponent: await drawn(bug.locator('.bt:not(.me) .proj')),
-		points: await drawn(bug.locator('.bt:not(.me) .pts'))
+		big,
+		points: big
 	};
 }
+
+/** The opponent's big figure on each screen before Sunday, by theme and width: the Matchup's must be
+ * the home's, never "--" (Lane 137, B107: one figure per side across screens). */
+const beforeSundayProj = new Map<string, { matchup?: string; home?: string }>();
 
 /** Every other home bug as it reads (Lane 125, B104): "head: small/big | small/big", the faults of a
  * bug whose head reads Final with a side still at "--", and whether a game under way draws a side's
@@ -251,6 +266,13 @@ for (const theme of THEMES)
 				)
 					faults.push(`${at}: head "${bug.head}", want "${want.head}"`);
 				if (bug !== null) faults.push(...opponentFaults(bug.opponent, at));
+				// Before Sunday the opponent's Proj is his best lineup's on both screens (Lane 137, B107).
+				if (bug !== null && want.opponentFinal === null && screen.name !== 'front') {
+					const key = `${theme} ${String(width)}`;
+					beforeSundayProj.set(key, { ...beforeSundayProj.get(key), [screen.name]: bug.big });
+					if (bug.big === BOX.none || bug.big === '')
+						faults.push(`${at}: the opponent's Proj "${bug.big}" before Sunday`);
+				}
 				// At the live clock the opponent's Proj final is above his points (his back at pace).
 				if (day === 'monday-live' && screen.name === 'home') {
 					const home = await homeBug(page);
@@ -262,7 +284,8 @@ for (const theme of THEMES)
 				// The Matchup says the opponent's best-lineup Proj final once while he plays (Lane 127).
 				if (screen.name === 'matchup') {
 					const said = await unlistedSaid(page, 'main [data-basis]');
-					const wantSaid = want.opponentFinal === false ? 1 : 0;
+					// Before Sunday his best lineup's Proj is drawn and said too (Lane 137, B107).
+					const wantSaid = want.opponentFinal === true ? 0 : 1;
 					if (said.times !== wantSaid)
 						faults.push(`${at}: the Matchup names the unlisted teams ${String(said.times)} times`);
 				}
@@ -296,6 +319,13 @@ for (const theme of THEMES)
 			}
 		}
 await browser.close();
+for (const [key, proj] of beforeSundayProj) {
+	footers.push(`  ${key}: opponent Proj Matchup ${proj.matchup ?? '?'}, home ${proj.home ?? '?'}`);
+	if (proj.matchup !== proj.home)
+		faults.push(
+			`${day} ${key}: Matchup Proj ${proj.matchup ?? '?'} is not the home's ${proj.home ?? '?'}`
+		);
+}
 process.stdout.write(`${footers.join('\n')}\n`);
 if (faults.length > 0) {
 	process.stderr.write(`${faults.join('\n')}\n`);
