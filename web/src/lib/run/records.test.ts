@@ -26,7 +26,8 @@ import {
 	weeklyPairs,
 	weeklyPending,
 	weeklySources,
-	weeklySpan
+	weeklySpan,
+	weekNote
 } from './records.ts';
 import {
 	leagueRankingRows,
@@ -585,7 +586,11 @@ void test("a week carries the run's ESPN sentence as written, and a run before L
 	);
 	assert.equal(other?.weeks[0]?.espnNote, 'Read late.');
 	assert.throws(() => run({ weekly: weekly([{ ...gradedSeven, espnNote: '' }]) }));
-	for (const words of [RECORDS_WORDS.espnReadAfter, RECORDS_WORDS.espnUnread]) {
+	for (const words of [
+		RECORDS_WORDS.espnReadAfter,
+		RECORDS_WORDS.espnUnread,
+		RECORDS_WORDS.noYardstick
+	]) {
 		assert.doesNotMatch(words, bannedPattern(), words);
 		assert.doesNotMatch(words, /—/u, words);
 	}
@@ -605,4 +610,37 @@ void test("the word table's ESPN sentences are the run's own, word for word (Lan
 	);
 	assert.equal(pythonConstant(source, 'ESPN_READ_AFTER_NOTE'), RECORDS_WORDS.espnReadAfter);
 	assert.equal(pythonConstant(source, 'ESPN_UNREAD_NOTE'), RECORDS_WORDS.espnUnread);
+	assert.equal(pythonConstant(source, 'NO_YARDSTICK_NOTE'), RECORDS_WORDS.noYardstick);
+});
+
+void test("a week's note is drawn on a graded row only, never on a week not yet graded (Lane 148)", () => {
+	const note = RECORDS_WORDS.espnReadAfter;
+	const frozen: RecordWeek = {
+		...gradedSeven,
+		status: 'frozen',
+		gradedAt: null,
+		population: 0,
+		lines: [],
+		espnNote: note
+	};
+	const shown = weeklyAsRecord(
+		run({
+			weekly: weekly([
+				{ ...gradedSeven, espnNote: note },
+				{ ...frozen, week: 8 },
+				{ ...upcoming(9, '2026-11-06T01:15:00.000Z'), espnNote: note }
+			])
+		})
+	);
+	assert.ok(shown);
+	assert.deepEqual(
+		shown.weeks.map((week) => [week.week, week.status, weekNote(week)]),
+		[
+			[7, 'graded', note],
+			[8, 'frozen', undefined],
+			[9, 'upcoming', undefined]
+		]
+	);
+	assert.equal(weekNote({ ...gradedSeven }), undefined);
+	assert.equal(weekNote(null), undefined);
 });
