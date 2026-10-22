@@ -47,8 +47,8 @@ void test('each page opens with the draft note and names the operator, the law a
 });
 
 void test('the contact is the support mailbox on the domain', () => {
-	assert.equal(SUPPORT_EMAIL, 'support@trycommish.app');
-	assert.equal(SUPPORT_HREF, 'mailto:support@trycommish.app');
+	assert.equal(SUPPORT_EMAIL, 'help@trycommish.app');
+	assert.equal(SUPPORT_HREF, 'mailto:help@trycommish.app');
 });
 
 void test('the Privacy Policy says each platform in the consent its member agreed to', () => {

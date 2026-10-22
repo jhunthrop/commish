@@ -8,7 +8,7 @@
 	<span>Commish LLC</span>
 	<a href="/terms">Terms</a>
 	<a href="/privacy">Privacy</a>
-	<a href="mailto:support@trycommish.app">support@trycommish.app</a>
+	<a href="mailto:help@trycommish.app">help@trycommish.app</a>
 </footer>
 
 <style>
