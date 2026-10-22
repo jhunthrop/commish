@@ -189,10 +189,14 @@ void test("the weekly basis: a phone says the figures' sentences, a desk the qua
 	assert.deepEqual(drawnOn(opened, 'phone'), [
 		record.scale,
 		RECORD_WORDS.placesOff,
-		'In your lineup.'
+		'In your lineup.',
+		RECORDS_WORDS.leagueRow
 	]);
 	for (const qualification of ['No kickers.', 'ESPN too.'])
 		assert.ok(drawnOn(opened, 'desk').includes(qualification), qualification);
+	assert.ok(!drawnOn(opened, 'desk').includes(RECORDS_WORDS.leagueRow), 'the desk says it whole');
+	const noBenchmark = weeklyBasis(record, { ...league, benchmark: null }, true);
+	assert.ok(!drawnOn(noBenchmark, 'phone').includes(RECORDS_WORDS.leagueRow));
 });
 
 void test('the front card shows the draft record until a weekly week is graded, then the weekly one', () => {
