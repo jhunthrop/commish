@@ -1,6 +1,6 @@
 <script lang="ts">
 	import BasisBlock from '#lib/ui/BasisBlock.svelte';
-	import { RECORD_BOX, RECORD_WORDS, type RecordFigure } from '#lib/run/record.ts';
+	import { RECORD_BOX, type RecordFigure } from '#lib/run/record.ts';
 	import {
 		DRAFT_FIGURES,
 		DRAFT_SOURCES,
@@ -29,11 +29,7 @@
 	const rows = $derived(draft === undefined ? null : draftRows(draft));
 	const series = $derived(draft === undefined ? {} : draftSeries(draft));
 	const weeks = $derived(draft?.progress.map((point) => point.week) ?? []);
-	const basis = $derived(
-		draft === undefined
-			? []
-			: draftBasis(draft, RECORD_WORDS.placesOff).map((text) => ({ text, phone: true }))
-	);
+	const basis = $derived(draft === undefined ? [] : draftBasis(draft));
 
 	const capitalized = (words: string): string =>
 		`${words.charAt(0).toUpperCase()}${words.slice(1)}`;

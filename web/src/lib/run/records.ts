@@ -5,12 +5,18 @@
  * own shape, so the page reads it with the record's functions (record.ts). */
 import { dayLabel, weekdayLabel } from '#lib/format/date.ts';
 import { plural } from '#lib/format/number.ts';
+import type { BasisPart } from './board-basis.ts';
 import {
+	HELD_OUT_METHOD,
 	RATE_PLACES,
 	RECORD_BOX,
+	RECORD_WORDS,
 	figureWords,
 	printPlaces,
+	publishedWords,
+	saidOnly,
 	weekLines,
+	type LeagueBasis,
 	type RecordFigure,
 	type RecordSource,
 	type WeekLine
@@ -44,12 +50,18 @@ export const RECORDS_WORDS = {
 	draftSpan: (through: number | null) =>
 		through === null ? 'No week counted yet' : `Season points through week ${String(through)}`,
 	draftPlayers: (n: number) => plural(n, 'player'),
-	draftBasis: (set: string, through: number | null) =>
-		`Our draft board is the preseason order we set ${set}, before the season's first kickoff, beside ADP as it stood then. ${
+	/** The draft record's basis, a sentence a part so a phone draws the figures' own (Lane 131). */
+	draftSet: (set: string) =>
+		`Our draft board is the preseason order we set ${set}, before the season's first kickoff, beside ADP as it stood then.`,
+	draftGraded: (through: number | null) =>
+		`${
 			through === null
 				? 'It is graded on the season points of the weeks played once the first week is complete'
 				: `It is graded on each player's season points through week ${String(through)}`
-		} in PPR, on the players both rank who have played, refreshed each week as the stats land. Each position is graded on its own, our board's order among its players against their finish and ADP's likewise, and All combines the positions by players graded. A player whose bye has passed has one game fewer counted than one whose bye is ahead. Kickers and defenses are left out: the board takes their order from ADP.`,
+		} in PPR, on the players both rank who have played, refreshed each week as the stats land.`,
+	draftPositions: 'Each position is graded on its own, All by players graded.',
+	draftBye: 'A player past his bye has one game fewer counted.',
+	draftKickers: 'Kickers and defenses are left out: the board takes their order from ADP.',
 	draftScale:
 		'Order matched is how closely an order ranked the players as they finished the season so far: 1.00 is the same order, 0.00 no closer than chance, below it the reverse.',
 	draftChart: 'Order matched, season to date, through each week',
@@ -128,10 +140,37 @@ export function beforeLine(
 	return { lead: RECORDS_WORDS.beforeLead(fromWeek), text: RECORDS_WORDS.before(fromWeek, set) };
 }
 
-/** The weekly record's basis sentences after the record's own: ESPN's projection said once it is
- * drawn, and Yahoo's absence. */
-export function weeklyBasisExtra(espnDrawn: boolean): string[] {
-	return [...(espnDrawn ? [RECORDS_WORDS.espnBasis] : []), RECORDS_WORDS.yahooBasis];
+/** A sentence drawn at both widths, and one a desk alone draws: a phone holds eight lines of basis,
+ * the figures' own sentences (Lane 131). */
+const both = (text: string): BasisPart => ({ text, phone: true });
+const deskOnly = (text: string): BasisPart => ({ text, phone: false });
+
+/** The weekly record's basis (Lane 131). Both widths say what each figure is: order matched, places
+ * off and starters right in the lineup it counts. A desk also says the qualifications: how the
+ * rankings are set (the week table says it on a phone), the season-long rule, what the league's
+ * lineup leaves uncounted, the published projection's start (the section's head names it), the
+ * league's own benchmark (its head says "as it scores"), what ESPN's projection is once drawn, and
+ * Yahoo's absence. */
+export function weeklyBasis(
+	record: RunRecord,
+	league: LeagueBasis | null,
+	espnDrawn: boolean
+): BasisPart[] {
+	return [
+		...saidOnly([record.method, HELD_OUT_METHOD]).map(deskOnly),
+		...saidOnly([
+			record.scale,
+			RECORD_WORDS.placesOff,
+			league?.starters ?? record.startersBasis
+		]).map(both),
+		...saidOnly([
+			league?.aside ?? null,
+			publishedWords(record),
+			league?.benchmark ?? null,
+			espnDrawn ? RECORDS_WORDS.espnBasis : null,
+			RECORDS_WORDS.yahooBasis
+		]).map(deskOnly)
+	];
 }
 
 /** "Week 7", "Weeks 8 to 18". */
@@ -227,14 +266,25 @@ export function draftSeries(
 	return { ours: of('ours'), adp: of('adp') };
 }
 
-/** The draft record's basis, one paragraph's sentences. */
-export function draftBasis(draft: DraftRecord, placesOff: string): string[] {
+/** The draft record's basis (Lane 131). A desk says when the board was set and what it is graded on
+ * (the section's head and the bug say both on a phone), the bye and the kickers left out; both widths
+ * say how All combines the positions and what each figure is: order matched, places off and top
+ * named. */
+export function draftBasis(draft: DraftRecord): BasisPart[] {
 	return [
-		RECORDS_WORDS.draftBasis(weekdayLabel(draft.setAt), draft.throughWeek),
-		RECORDS_WORDS.draftScale,
-		placesOff,
-		draft.namedBasis
-	].filter((text): text is string => text !== null);
+		...[
+			RECORDS_WORDS.draftSet(weekdayLabel(draft.setAt)),
+			RECORDS_WORDS.draftGraded(draft.throughWeek),
+			RECORDS_WORDS.draftBye,
+			RECORDS_WORDS.draftKickers
+		].map(deskOnly),
+		...saidOnly([
+			RECORDS_WORDS.draftPositions,
+			RECORDS_WORDS.draftScale,
+			RECORD_WORDS.placesOff,
+			draft.namedBasis
+		]).map(both)
+	];
 }
 
 /** The front door's record card (ruling 4): the weekly record once a week of it is graded, the
