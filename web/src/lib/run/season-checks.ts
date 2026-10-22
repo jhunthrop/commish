@@ -4,7 +4,8 @@
  * player's club slate with a kickoff (his page prints its day). The stand-in's writer and the build's
  * reader (server/run.ts) both run them, so a run that breaks one fails before any page renders.
  * A bye in a log is a week his club's slate has no game (Lane 119), the only place the run can say it.
- * A page that says his newest line was another club's names that club and a week he played (Lane 120).
+ * A page that says his newest line was another club's names that club and a week of its game in his log
+ * (Lanes 120, 135).
  */
 import { FREE_AGENT_WORDS, isFreeAgent } from '#lib/format/free-agent.ts';
 import type { PlayerSeason } from './season.ts';
@@ -79,15 +80,24 @@ function checkByes(players: readonly SeasonedPlayer[], schedule: Schedule): void
 }
 
 /** A page that says his newest line was another club's (Lane 120) names a club other than his own and
- * a week his log has him play. */
-function checkLastGameClub(players: readonly SeasonedPlayer[]): void {
+ * a week his log shows as that club's game. His line that week may carry no stat and no offensive snap
+ * (a special-teams game), so the week reads inactive, but it names that club's opponent (Lane 135). */
+function checkLastGameClub(players: readonly SeasonedPlayer[], schedule: Schedule): void {
+	const slates = new Map(schedule.slates.map((slate) => [slate.abbr, slate] as const));
 	for (const p of players) {
 		const last = p.lastGameClub;
 		if (!last) continue;
-		const played = p.season.log.some((row) => row.week === last.week && row.status === 'played');
-		if (last.club === p.team || !played) {
+		const game = slates.get(last.club)?.games.find((g) => g.week === last.week);
+		const row = p.season.log.find((r) => r.week === last.week);
+		const theirs =
+			game !== undefined &&
+			row !== undefined &&
+			row.status !== 'bye' &&
+			row.opponent === game.opponent &&
+			row.home === game.home;
+		if (last.club === p.team || !theirs) {
 			throw new Error(
-				`players/${p.id}.json says his week ${String(last.week)} line was for ${last.club}, but ${last.club === p.team ? 'that is his club' : 'his log has no game that week'}.`
+				`players/${p.id}.json says his week ${String(last.week)} line was for ${last.club}, but ${last.club === p.team ? 'that is his club' : `his log has no ${last.club} game that week`}.`
 			);
 		}
 	}
@@ -97,5 +107,5 @@ export function checkRunSeasons(players: readonly SeasonedPlayer[], schedule: Sc
 	checkOneBasis(players);
 	checkKickoffs(players, schedule);
 	checkByes(players, schedule);
-	checkLastGameClub(players);
+	checkLastGameClub(players, schedule);
 }
