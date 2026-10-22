@@ -2,10 +2,15 @@ package boards
 
 import (
 	"context"
+	"crypto/sha256"
+	_ "embed" // the run read's text, designation_runs.sql
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -394,6 +399,70 @@ const (
 	maxRunCaptures = 2000
 )
 
+// runsQuery is the run read (DesignationRuns), one text for both lanes:
+// research/nightly/designation_runs.py holds the same text, pinned to this
+// file by its tests, so the capture job dates a capture as the API does
+// (Lane 134). The capture table is {{capture_snapshots}}; the parameters
+// are named (:source and the like), made positional by runsSQL.
+//
+//go:embed designation_runs.sql
+var runsQuery string
+
+// runsBinds is the run read's parameters in the order DesignationRuns
+// passes them.
+var runsBinds = []string{"source", "newest", "oldest", "most", "codes", "statuses"}
+
+// runsBind is a named parameter in runsQuery (the text holds no "::"
+// cast, so every colon before a name is one).
+var runsBind = regexp.MustCompile(`:[a-z_]+`)
+
+// runsSQL is runsQuery over table with its parameters positional ($1 for
+// :source and so on). A name runsBinds does not hold panics: the text is
+// embedded, so the first read in any test shows it.
+func runsSQL(table string) string {
+	position := make(map[string]string, len(runsBinds))
+	for i, name := range runsBinds {
+		position[":"+name] = "$" + strconv.Itoa(i+1)
+	}
+	query := runsBind.ReplaceAllStringFunc(runsQuery, func(name string) string {
+		p, ok := position[name]
+		if !ok {
+			panic("boards: the run read names an unknown parameter " + name)
+		}
+		return p
+	})
+	return strings.ReplaceAll(query, "{{capture_snapshots}}", table)
+}
+
+// RunsVersion names what DesignationRuns answers for a capture: a digest
+// of everything it reads by besides the captures (the query's text, the
+// window, the capture cap and the code table), so a change to any of them
+// is a new version without anyone bumping it (B114) and a dating kept
+// under an old reading is never taken for the new one. The capture job
+// derives the same version from the same inputs
+// (research/nightly/designation_runs.py); both are pinned by
+// api/testdata/designation-dating.json.
+func RunsVersion() string { return runsVersion }
+
+var runsVersion = runsVersionOf(runsQuery, runWindow, maxRunCaptures)
+
+// runsVersionOf is "runs-" and the first 16 hex of the sha256 of the
+// inputs' canonical lines: the query's sha256, the window in seconds, the
+// capture cap, then each code and its status in code order.
+func runsVersionOf(query string, window time.Duration, captures int) string {
+	sum := sha256.Sum256([]byte(query))
+	var b strings.Builder
+	b.WriteString("query " + hex.EncodeToString(sum[:]) + "\n")
+	b.WriteString("window_seconds " + strconv.FormatInt(int64(window/time.Second), 10) + "\n")
+	b.WriteString("captures " + strconv.Itoa(captures) + "\n")
+	codes, statuses := runCodes()
+	for i, code := range codes {
+		b.WriteString("code " + code + "\t" + statuses[i] + "\n")
+	}
+	version := sha256.Sum256([]byte(b.String()))
+	return "runs-" + hex.EncodeToString(version[:])[:16]
+}
+
 // RunKey is a player under a status.
 type RunKey struct {
 	PlayerID string
@@ -413,33 +482,7 @@ type RunKey struct {
 // seconds in production from 2026-10-18 on.
 func (s *PGSource) DesignationRuns(ctx context.Context, newest time.Time) (map[RunKey]time.Time, error) {
 	codes, statuses := runCodes()
-	query := `with listed_caps as materialized (
-  select payload, captured_at, (
-    select count(distinct btrim(e->>'playerID')) from jsonb_array_elements(payload->'injList') as e
-    where btrim(coalesce(e->>'playerID', '')) <> '' and btrim(coalesce(e->>'designation', '')) <> ''
-  ) as n_listed
-  from ` + s.table("capture_snapshots") + `
-  where source = $1 and captured_at <= $2 and captured_at > $3 and jsonb_typeof(payload->'injList') = 'array'
-), floored as (
-  select payload, captured_at, n_listed, lead(n_listed) over (order by captured_at desc) as n_before
-  from listed_caps where n_listed > 0
-), caps as (
-  select payload, captured_at, row_number() over (order by captured_at desc) as n
-  from floored
-  where n_before is null or 2 * n_listed >= n_before
-  order by captured_at desc limit $4
-), listed as (
-  select c.n, c.captured_at, btrim(e->>'playerID') as player_id, m.status
-  from caps c cross join lateral jsonb_array_elements(c.payload->'injList') as e
-  join unnest($5::text[], $6::text[]) as m(code, status) on m.code = upper(btrim(e->>'designation'))
-), runs as (
-  select player_id, status, n, captured_at, n - row_number() over (partition by player_id, status order by n) as gap
-  from listed
-)
-select player_id, status, min(captured_at)
-from runs where gap = 0 group by player_id, status
-having max(n) < (select count(*) from caps)`
-	rows, err := s.Pool.Query(ctx, query, injuriesByDate, newest, newest.Add(-runWindow), maxRunCaptures, codes, statuses)
+	rows, err := s.Pool.Query(ctx, runsSQL(s.table("capture_snapshots")), injuriesByDate, newest, newest.Add(-runWindow), maxRunCaptures, codes, statuses)
 	if err != nil {
 		return nil, fmt.Errorf("boards: read injury runs: %w", err)
 	}

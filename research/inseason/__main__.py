@@ -4,7 +4,8 @@
     uv run python -m research.inseason --task usage-backfill [--season 2026]
     uv run python -m research.inseason --task capture-harvest
 
-`capture-harvest` takes the hourly provider capture, then reads the hour's game figures from it into
+`capture-harvest` takes the hourly provider capture, dates the newest injury capture for the API into
+`app.designation_datings` (Lane 134, `nightly/designation_dating.py`), then reads the hour's game figures from it into
 `tank01_lines` and the weather service's kickoff forecasts into `nws_forecast` (Lane 66a). While a game
 of the current week that kicked off has no final, up to four days past its kickoff (Lane 84), it asks
 Tank01's week of games once for their statuses (Lane 80, `pipeline/tank01/game_status.py`, at most two
@@ -43,6 +44,7 @@ from typing import Final
 
 import httpx
 from sqlalchemy import Engine
+from sqlalchemy.exc import SQLAlchemyError
 
 from research.cli import log_line as _line
 from research.db.engine import make_engine
@@ -61,7 +63,10 @@ from research.inseason.season_week import STEPS, SeasonWeekContext, run_season_w
 from research.inseason.step_result import StepResult
 from research.logging_setup import configure_logging
 from research.nightly.capsule_step import night_facts
+from research.nightly.designation_dating import date_newest_capture
+from research.nightly.designations import DesignationsError
 from research.nightly.publish import take_run_id
+from research.nightly.published_board import driver_line
 from research.nightly.r2 import run_store
 from research.nightly.register_log import WEEKLY_SUFFIX, record_freeze, record_pass
 from research.nightly.week_reads import run_week_read_step
@@ -216,6 +221,7 @@ def _capture_harvest(now: datetime) -> bool:
     try:
         with engine.begin() as conn:
             result = run_capture_harvest(conn, Tank01Client(fetcher, key), now, season)
+        dated_ok = _date_designations(engine, now)
         facts_ok = _game_facts(engine, fetcher, result, now)
         # On what the harvest left of its request budget this pass (Lane 80).
         left = CAPTURE_HARVEST_REQUEST_BUDGET - sum(feed.requests for feed in result.feeds)
@@ -238,7 +244,25 @@ def _capture_harvest(now: datetime) -> bool:
     market = _touchdown_market(now, season)
     charts = _slot_depth_charts(now, season)
     _week_reads(now)
-    return not failed and facts_ok and status.ok and returns_ok and parsed and market and charts
+    return not failed and dated_ok and facts_ok and status.ok and returns_ok and parsed and market and charts
+
+
+def _date_designations(engine: Engine, now: datetime) -> bool:
+    """Right after the capture, the newest injury capture dated for the API (Lane 134,
+    `nightly/designation_dating.py`) in a transaction of its own, so a refused write never rolls back
+    the capture. A failure is its own line and fails the job (the API dates the capture itself
+    meanwhile, as before)."""
+    try:
+        with engine.begin() as conn:
+            outcome = date_newest_capture(conn, now)
+    except DesignationsError as error:
+        _line(f"  designation-dating: FAILED, {error}")
+        return False
+    except SQLAlchemyError as error:
+        _line(f"  designation-dating: FAILED, {driver_line(error)}; the API dates the capture itself")
+        return False
+    _line(f"  {outcome.line}")
+    return True
 
 
 @dataclass(frozen=True)

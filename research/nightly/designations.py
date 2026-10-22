@@ -39,24 +39,23 @@ from sqlalchemy.types import DateTime, Text
 from research.capsules.facts.depth_absence import CapturedDesignation
 from research.capsules.facts.depth_reads import ROSTER_SWEEP_SOURCE, designations_in
 from research.errors import ResearchError
-from research.model.designations import CODES, SEASON_LONG, season_long, status_of
+from research.model.designations import SEASON_LONG, season_long, status_of
 from research.model.instants import js_iso, ms_instant
 from research.nightly.config import EARLY_KEY, LATEST_KEY
+from research.nightly.designation_runs import BY_DATE_SOURCE, designation_runs
 from research.nightly.publish import Dispatcher, PublishOutcome, encode, read_json, run_key
 from research.nightly.published_board import MANIFEST_FILE, driver_line
 from research.nightly.run_store import JSON_TYPE, RunStore
 
 Json = dict[str, Any]
 
-BY_DATE_SOURCE: Final = "tank01_injuries_by_date"
 DESIGNATIONS_FILE: Final = "designations.json"
 BUILD_FILE: Final = "designations-build.json"
 
-# The reads' bounds, the API's: the newest captures tried, the byte cap, the run window.
+# The reads' bounds, the API's: the newest captures tried, the byte cap (the run window is the run
+# read's, `designation_runs.py`).
 CAPTURES_TRIED: Final = 5
 MAX_CAPTURE_BYTES: Final = 4 << 20
-RUN_WINDOW: Final = timedelta(days=60)
-MAX_RUN_CAPTURES: Final = 2000
 
 
 class DesignationsError(ResearchError):
@@ -86,9 +85,21 @@ NOTE_WINDOW: Final = timedelta(hours=48)
 
 
 @dataclass(frozen=True, slots=True)
-class _Capture:
+class Capture:
+    """One stored capture: its stamp and its entries, None when it does not parse."""
+
     at: datetime
     entries: Mapping[str, CapturedDesignation] | None
+
+
+@dataclass(frozen=True, slots=True)
+class Readable:
+    """The capture the status read takes (`newest_readable`): its feed, the capture, and whether it is
+    the newest the feed stores."""
+
+    source: str
+    capture: Capture
+    stored_newest: bool
 
 
 def _parsed(source: str, payload: object) -> Mapping[str, CapturedDesignation] | None:
@@ -104,7 +115,7 @@ def _parsed(source: str, payload: object) -> Mapping[str, CapturedDesignation] |
     return designations_in(source, payload) if shaped else None
 
 
-def readable_at(captures: Sequence[_Capture], i: int) -> bool:
+def readable_at(captures: Sequence[Capture], i: int) -> bool:
     """The API's floor (boards.readableAt): it parses, lists someone, and lists at least half as many
     as the newest list before it that does, so an empty or cut-short list is a glitch."""
     entries = captures[i].entries
@@ -121,57 +132,16 @@ _CAPTURES: Final = text(
 )
 
 
-def _captures(conn: Connection, source: str, n: int, before: datetime | None = None) -> list[_Capture]:
+def _captures(conn: Connection, source: str, n: int, before: datetime | None = None) -> list[Capture]:
     rows = conn.execute(_CAPTURES, {"cap": MAX_CAPTURE_BYTES, "source": source, "before": before, "n": n})
-    return [_Capture(r.captured_at, _parsed(source, r.payload)) for r in rows]
-
-
-# Each season-long status's unbroken run back from the newest capture, as the API reads it, over the
-# captures that pass the floor.
-_RUNS: Final = text(
-    """with listed_caps as (
-  select payload, captured_at, (
-    select count(distinct btrim(e->>'playerID')) from jsonb_array_elements(payload->'injList') as e
-    where btrim(coalesce(e->>'playerID', '')) <> '' and btrim(coalesce(e->>'designation', '')) <> ''
-  ) as n_listed
-  from research.capture_snapshots
-  where source = :source and captured_at <= :newest and captured_at > :oldest
-    and jsonb_typeof(payload->'injList') = 'array'
-), floored as (
-  select payload, captured_at, n_listed, lead(n_listed) over (order by captured_at desc) as n_before
-  from listed_caps where n_listed > 0
-), caps as (
-  select payload, captured_at, row_number() over (order by captured_at desc) as n
-  from floored
-  where n_before is null or 2 * n_listed >= n_before
-  order by captured_at desc limit :most
-), listed as (
-  select c.n, c.captured_at, btrim(e->>'playerID') as player_id, m.status
-  from caps c cross join lateral jsonb_array_elements(c.payload->'injList') as e
-  join unnest(:codes, :statuses) as m(code, status) on m.code = upper(btrim(e->>'designation'))
-), runs as (
-  select player_id, status, n, captured_at, n - row_number() over (partition by player_id, status order by n) as gap
-  from listed
-)
-select player_id, status, min(captured_at) as since, max(n) < (select count(*) from caps) as bounded
-from runs where gap = 0 group by player_id, status"""
-).bindparams(bindparam("codes", type_=ARRAY(Text)), bindparam("statuses", type_=ARRAY(Text)))
+    return [Capture(r.captured_at, _parsed(source, r.payload)) for r in rows]
 
 
 def _season_runs(conn: Connection, newest: datetime) -> dict[tuple[str, str], datetime]:
-    codes = sorted(code for code, status in CODES.items() if status in SEASON_LONG)
-    rows = conn.execute(
-        _RUNS,
-        {
-            "source": BY_DATE_SOURCE,
-            "newest": newest,
-            "oldest": newest - RUN_WINDOW,
-            "most": MAX_RUN_CAPTURES,
-            "codes": codes,
-            "statuses": [CODES[code] for code in codes],
-        },
-    )
-    return {(r.player_id, r.status): ms_instant(r.since) for r in rows if r.bounded}
+    """Each season-long status's unbroken run back from the newest capture: the API's run read
+    (`designation_runs`), to the millisecond."""
+    runs = designation_runs(conn, newest)
+    return {key: ms_instant(since) for key, since in runs.items() if key[1] in SEASON_LONG}
 
 
 # The capture job's last check (revision 0008): to_regclass keeps a store that predates it readable,
@@ -195,7 +165,7 @@ def _sweep_notes(conn: Connection, at: datetime) -> Mapping[str, str]:
     return {i: e.description for i, e in sweeps[0].entries.items() if e.description}
 
 
-def _statuses(conn: Connection, source: str, newest: _Capture, stored_newest: bool) -> StatusRead:
+def _statuses(conn: Connection, source: str, newest: Capture, stored_newest: bool) -> StatusRead:
     entries = newest.entries or {}
     by_date = source == BY_DATE_SOURCE
     runs = _season_runs(conn, newest.at) if by_date else {}
@@ -223,11 +193,21 @@ def read_statuses(conn: Connection, before: datetime | None = None) -> StatusRea
     A newest capture over the byte cap, of the wrong shape or under the floor (readable_at) gives way
     to the next newest; a source whose newest few all fail is an error, never a silent fall to an
     older list. A by-date out takes the note of the newest roster sweep near it."""
+    readable = newest_readable(conn, before)
+    if readable is None:
+        return None
+    return _statuses(conn, readable.source, readable.capture, readable.stored_newest)
+
+
+def newest_readable(conn: Connection, before: datetime | None = None) -> Readable | None:
+    """The capture the API's `Designations` reads: the newest by-date capture that reads (at or before
+    `before`, when given), else the roster sweep's; None when neither feed stores one. A source whose
+    newest few all fail is an error (DesignationsError), never a silent fall to an older list."""
     for source in (BY_DATE_SOURCE, ROSTER_SWEEP_SOURCE):
         captures = _captures(conn, source, CAPTURES_TRIED + 1, before)
         for i in range(min(len(captures), CAPTURES_TRIED)):
             if readable_at(captures, i):
-                return _statuses(conn, source, captures[i], stored_newest=i == 0)
+                return Readable(source, captures[i], stored_newest=i == 0)
         if captures:
             raise DesignationsError(
                 f"none of the {min(len(captures), CAPTURES_TRIED)} newest injury captures {source} reads"
