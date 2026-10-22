@@ -50,6 +50,7 @@ from research.db.schema.observations import PLAYER_WEEK_OBSERVATIONS, PLAYER_WEE
 from research.db.schema.provider import (
     CAPTURE_CHECKS,
     CAPTURE_SNAPSHOTS,
+    ESPN_KDEF_ARCHIVE_ROWS,
     ESPN_PROJECTION_ROWS,
     PLAYER_PROP_OBSERVATIONS,
     PLAYER_TD_PROP_OBSERVATIONS,
@@ -69,6 +70,7 @@ __all__ = [
     "CLUB_WEEK_FINALS",
     "COACHES",
     "CUSTOM_BOARDS",
+    "ESPN_KDEF_ARCHIVE_ROWS",
     "ESPN_PROJECTION_ROWS",
     "GAME_WEATHER",
     "METADATA",

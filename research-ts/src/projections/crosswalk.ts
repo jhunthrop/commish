@@ -3,6 +3,7 @@ import type { Db, ReadonlyDb } from "@research-ts/db/client";
 import { nflPlayers, playerCrosswalk, players } from "@research-ts/db/schema";
 import {
   TEAM_DEFENSE_UNIVERSE_PREFIX,
+  teamDefenseEspnId,
   teamDefenseUniverseIdForProviderId,
   teamDefenseUniverseIds as everyTeamDefenseUniverseId,
 } from "./nflverse/team-codes";
@@ -346,17 +347,27 @@ export async function crosswalkInputs(db: ReadonlyDb): Promise<{
  * no-op and reports 0.
  */
 export async function seedTeamDefenseUniverse(db: Db): Promise<number> {
+  // Each row with its D/ST's ESPN id (Lane 156); a stored row keeps every column but takes its ESPN id
+  // where it holds none, so the seed is also the ids' backfill (`crosswalk.py`'s twin).
   const rows = everyTeamDefenseUniverseId().map((id) => ({
     id,
     pfrId: null,
-    espnId: null,
+    espnId: teamDefenseEspnId(id.slice(TEAM_DEFENSE_UNIVERSE_PREFIX.length)),
     name: id,
     position: TEAM_DEFENSE_POSITION,
     latestTeam: id.slice(TEAM_DEFENSE_UNIVERSE_PREFIX.length),
     rookieSeason: null,
     lastSeason: null,
   }));
-  const written = await db.insert(nflPlayers).values(rows).onConflictDoNothing().returning({ id: nflPlayers.id });
+  const written = await db
+    .insert(nflPlayers)
+    .values(rows)
+    .onConflictDoUpdate({
+      target: nflPlayers.id,
+      set: { espnId: sql`excluded.espn_id` },
+      setWhere: sql`${nflPlayers.espnId} is null`,
+    })
+    .returning({ id: nflPlayers.id });
   return written.length;
 }
 

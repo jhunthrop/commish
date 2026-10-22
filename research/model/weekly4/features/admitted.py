@@ -28,6 +28,18 @@ Item by item:
    box-score rows of earlier weeks (`box`), round 3's;
 8. NGS and PFR rows of earlier weeks (`charted`), admitted at the Wednesday 18:00 ET pass after
    their week.
+
+Amendment 7 item 3 (the weekly kicker and team-defense sub-round, Lane 156):
+
+3a. the kicking weeks (`kicking`: `nflverse_kicking_weeks`, and live the kicker lines of
+   `nflverse_kdef_week`) and the team-defense weeks (`team_defense`: `nflverse_team_defense_weeks`, its
+   points allowed among them, and live the defense lines of `nflverse_kdef_week`) of weeks before W,
+   stamped in replay at the Wednesday 18:00 ET pass after their week and live at their stored stamp
+   (`kdef_weeks.py`). A week-W row of either is refused by the week rule, so no week-W kicking line and
+   no week-W `points_allowed` reaches a feature; the kickoff's `points_allowed` stays in no list;
+3b. the play table's kick columns of earlier weeks (`kicks`), stamped per game as item 7's plays.
+
+The prior season's reads (`prior`) admit the same pairs, as they admit the plays.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -35,6 +47,7 @@ from datetime import datetime
 from types import MappingProxyType
 from typing import Final, Protocol
 
+from research.db.schema.nflverse import DEFENSE_COUNT_COLUMNS, KICKING_COLUMNS
 from research.model.weekly3.ledger import InputRuleError, ReadKind, Stamp, Stamped, admit
 from research.model.weekly3.snapshot import TEAM_METRICS
 from research.model.weekly3.work import USAGE_ROWS
@@ -42,8 +55,17 @@ from research.model.weekly4.features.plays import PLAY_COLUMNS
 from research.pipeline.game_figures import FigureMetric
 from research.pipeline.nflverse.games import GAME_FIGURES_SOURCE
 from research.pipeline.nflverse.injury_reports import INJURY_SOURCE, InjuryMetric
+from research.pipeline.nflverse.kdef_lines import (
+    BLOCKED_KICKS,
+    DEFENSE_METRICS,
+    KDEF_LINE_SOURCE,
+    KICKING_METRICS,
+    POINTS_ALLOWED,
+    YARDS_ALLOWED,
+)
 from research.pipeline.nflverse.ngs import NGS_SOURCE
 from research.pipeline.nflverse.pbp import PBP_SOURCE, PbpMetric
+from research.pipeline.nflverse.pbp_plays import KICK_COLUMNS
 from research.pipeline.nflverse.pfr_advstats import PFR_SOURCE
 from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource
 from research.pipeline.nws.forecast import FORECAST_SOURCE, ForecastMetric
@@ -122,6 +144,34 @@ PFR_METRICS: Final = ("receiving_broken_tackles", "rushing_broken_tackles", PRES
 # Round 3's club rows (`snapshot.TEAM_METRICS`) and the pass rate over expectation round 4 adds (2.4).
 BOX_TEAM_METRICS: Final = (*TEAM_METRICS, PbpMetric.PASS_RATE_OVER_EXPECTED)
 
+# Amendment 7 item 3: the kicking and team-defense weeks, their live lines, and the plays' kick columns.
+KICKING_WEEKS: Final = "nflverse_kicking_weeks"
+DEFENSE_WEEKS: Final = "nflverse_team_defense_weeks"
+KICKING_SELECTED: Final = ("season", "week", "player_id", "team", *KICKING_COLUMNS)
+DEFENSE_SELECTED: Final = (
+    "season",
+    "week",
+    "team",
+    "opponent_team",
+    "def_sacks",
+    *DEFENSE_COUNT_COLUMNS,
+    POINTS_ALLOWED,
+    "sack_yards_lost_allowed",
+)
+KICK_SELECTED: Final = (
+    "game_id",
+    "play_id",
+    "season",
+    "week",
+    "as_of",
+    "posteam",
+    "defteam",
+    "play_type",
+    *KICK_COLUMNS,
+)
+LIVE_KICKING_METRICS: Final = tuple(KICKING_METRICS.values())
+LIVE_DEFENSE_METRICS: Final = (*DEFENSE_METRICS.values(), BLOCKED_KICKS, YARDS_ALLOWED, POINTS_ALLOWED)
+
 _EXPLICIT_REFUSALS: Final = frozenset(
     {(ScheduleSource.KICKOFF, ScheduleMetric.GAME_RESULT), (ScheduleSource.KICKOFF, ScheduleMetric.POINTS_ALLOWED)}
 )
@@ -150,7 +200,16 @@ ADMITTED: Final[Mapping[ReadKind, frozenset[Pair]]] = MappingProxyType(
         "box": frozenset(USAGE_ROWS)
         | _pairs(PBP_SOURCE, BOX_TEAM_METRICS)
         | {(CLUB_EDGES, "team"), (INJURY_SOURCE, InjuryMetric.REPORT_STATUS)},
-        "prior": frozenset(USAGE_ROWS) | {(CLUB_EDGES, "team")} | _pairs(PLAYS, PLAY_COLUMNS),
+        "kicking": _pairs(KICKING_WEEKS, KICKING_SELECTED) | _pairs(KDEF_LINE_SOURCE, LIVE_KICKING_METRICS),
+        "team_defense": _pairs(DEFENSE_WEEKS, DEFENSE_SELECTED) | _pairs(KDEF_LINE_SOURCE, LIVE_DEFENSE_METRICS),
+        "kicks": _pairs(PLAYS, KICK_SELECTED),
+        "prior": frozenset(USAGE_ROWS)
+        | {(CLUB_EDGES, "team")}
+        | _pairs(PLAYS, PLAY_COLUMNS)
+        | _pairs(KICKING_WEEKS, KICKING_SELECTED)
+        | _pairs(DEFENSE_WEEKS, DEFENSE_SELECTED)
+        | _pairs(KDEF_LINE_SOURCE, (*LIVE_KICKING_METRICS, *LIVE_DEFENSE_METRICS))
+        | _pairs(PLAYS, KICK_SELECTED),
     }
 )
 

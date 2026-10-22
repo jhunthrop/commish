@@ -176,7 +176,7 @@ def test_a_read_is_kept_and_the_freeze_takes_the_newest_at_or_before_it(engine: 
     with engine.connect() as conn:
         pool = _Pool()
         read = projections.read_week(conn, pool, _SEASON, 7, early)
-        assert (read.listed, read.written, read.published) == (4, 4, True)
+        assert (read.listed, read.written, read.published) == (6, 6, True)  # four skill players, a K, a D/ST
         conn.execute(
             insert(ESPN_PROJECTION_ROWS),
             [{"season": _SEASON, "week": 7, "read_at": at, "espn_id": espn, "ppr_points": points}

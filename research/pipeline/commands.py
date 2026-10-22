@@ -26,6 +26,7 @@ from research.errors import ConfigurationError
 from research.pipeline import coaches, crosswalk, history, host_ids, stadiums, vegas
 from research.pipeline.budget import FixedBudget
 from research.pipeline.checkpoint import Checkpoint
+from research.pipeline.espn import kdef_archive
 from research.pipeline.http import Fetcher
 from research.pipeline.nflverse import (
     context,
@@ -289,7 +290,9 @@ COMMANDS: Final = MappingProxyType({
     "props-backfill": Command("the historical props archive, budgeted", _props_backfill, atomic=False),
     "win-totals-seed": Command("the committed win-totals CSV", lambda c, i: vegas.ingest_win_totals_csv(c, RESEARCH_ROOT / vegas.WIN_TOTALS_CSV_PATH, i.now)),
     "win-totals": Command("the publisher's win totals before kickoff", _win_totals),
-    "pbp-plays": Command("the play-level play-by-play per season into nflverse_pbp_plays", _pbp_plays, atomic=False),
+    "pbp-plays": Command("the play-level play-by-play per season into nflverse_pbp_plays, filling the kick columns of stored plays (the Lane 156 backfill)", _pbp_plays, atomic=False),
+    "espn-kdef-archive": Command("ESPN's archived 2023 and 2024 weekly kicker and D/ST projections into espn_kdef_archive_rows, each week once (the Lane 156 benchmark)", lambda c, i: kdef_archive.ingest_archive(c, i.fetcher, i.now, i.checkpoint), atomic=False),
+    "team-defense-ids": Command("the 32 synthetic defenses, each given its D/ST's ESPN id where it has none (the Lane 156 one-shot)", lambda c, i: f"{crosswalk.seed_team_defense_universe(c)} team defense rows inserted or given their ESPN id"),
     "depth-chart-weeks": Command("nflverse's weekly depth charts per season into nflverse_depth_chart_weeks", _depth_chart_weeks, atomic=False),
     "depth-chart-check": Command("the round 4 depth chart stamp check (reads charts and filings, writes nothing; the coordinator's recorded run)", lambda c, i: depth_chart_check.run_stamp_check(c).lines()),
     "charted-history": Command("Next Gen Stats (2016 on) and PFR advanced stats (2018 on) per season through the weekly pass's ingests", _charted_history, atomic=False),

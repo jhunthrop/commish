@@ -126,6 +126,26 @@ export function teamDefenseUniverseIdForProviderId(providerId: string): string |
   return teamDefenseUniverseId(sourceTeamCode(productCode));
 }
 
+/**
+ * ESPN's club ids (its `proTeamId`), by product code (Lane 156, `team_codes.py`'s
+ * `ESPN_PRO_TEAM_IDS`). ESPN keys a D/ST as `-16000 - <club id>` ("Seahawks D/ST" is -16026), so a
+ * synthetic defense row carries that id in `espn_id` and its projections join it as a kicker's join him.
+ */
+const ESPN_PRO_TEAM_IDS: Readonly<Record<string, number>> = {
+  ATL: 1, BUF: 2, CHI: 3, CIN: 4, CLE: 5, DAL: 6, DEN: 7, DET: 8, GB: 9, TEN: 10,
+  IND: 11, KC: 12, LV: 13, LAR: 14, MIA: 15, MIN: 16, NE: 17, NO: 18, NYG: 19, NYJ: 20,
+  PHI: 21, ARI: 22, PIT: 23, LAC: 24, SF: 25, SEA: 26, TB: 27, WSH: 28, CAR: 29, JAX: 30,
+  BAL: 33, HOU: 34,
+};
+const ESPN_DEFENSE_ID_BASE = -16000;
+
+/** The ESPN id of one club's D/ST, the club in the source's spelling (`LA` is the Rams'). */
+export function teamDefenseEspnId(sourceCode: string): string {
+  const club = ESPN_PRO_TEAM_IDS[productTeamCode(sourceCode)];
+  if (club === undefined) throw new Error(`${sourceCode} has no ESPN club id`);
+  return String(ESPN_DEFENSE_ID_BASE - club);
+}
+
 /** All 32 synthetic ids, in the source's own spelling, sorted. What the backfill seeds. */
 export function teamDefenseUniverseIds(): readonly string[] {
   return NFL_TEAM_ABBREVIATIONS.map((code) => teamDefenseUniverseId(sourceTeamCode(code))).sort();

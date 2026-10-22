@@ -62,6 +62,23 @@ week, about 150 a regular season (plus one an hour while it fails). The API read
 `returnDates`): a return date counts only under the same status, as a real day no earlier than the
 list's own, and becomes the designation's `return_week`.
 
+The weekly kicker and team-defense sub-round's data (Lane 156, Amendment 7 items 3 and 9). Three
+operator commands, each idempotent and run once per store after revisions 0020 and 0021: `pbp-plays
+--first 2016 --last 2026` fills the play table's new kick columns (`kick_distance`, the field-goal,
+extra-point and two-point results, `kicker_player_id`, `td_team`, the punt-block, return and safety flags)
+on every stored play that holds them NULL, never rewriting a stored value, and inserts any play not yet
+stored (a re-run writes nothing; the weekly `play-by-play` step writes the columns from then on);
+`espn-kdef-archive` reads ESPN's archived weekly kicker and D/ST projections for 2023 and 2024, weeks 1
+to 18, once each (36 public requests, no sign-in; a week already held is not read again) into
+`espn_kdef_archive_rows`, a benchmark never read by a fit, every row stamped `archive_unstamped` (ESPN
+publishes no stamp for an archived split; it is taken as ESPN's last pre-game version, which can only
+favour ESPN); `team-defense-ids` gives each of the 32 synthetic `team-def:<code>` rows its D/ST's ESPN id
+(`-16000 - <ESPN club id>`, `-16026` the Seahawks), so ESPN's D/ST projections join a defense through
+`players.espn_id` as a kicker's join him (the `kdef` and `crosswalk` commands' seed does the same from
+now on). The kicking and team-defense weeks the sub-round reads are the tables `kdef` and the weekly
+`kicking-defense` step already keep; the input rule stamps them at read time
+(`model/weekly4/features/kdef_weeks.py`), so they need no backfill.
+
 The player's club (Lane 122). The same read, captured or unchanged, writes each listed player's club onto
 his existing `provider_players` row in the snapshot's savepoint (`pipeline/tank01/player_clubs.py`,
 `CaptureFeed.on_read`), and the line names the count (`tank01_player_list: captured, 1 requests, 2 clubs
@@ -115,10 +132,11 @@ the legacy table the TypeScript writes (`players` was `nfl_players`, `provider_p
 `python -m research.pipeline <command>` runs each command in the transaction `commands.py`
 declares. Atomic (one transaction, nothing written on failure): `universe`, `schedule`,
 `roster-weeks`, `draft-picks`, `coaches`, `tank01-schedule`, `tank01-adp`, `headshots`,
-`crosswalk`, `provider-names`, `capture-harvest`, `player-clubs`, `adp-snapshot`, `kdef-adp`, `current-ecr`, `props-snapshot`,
+`crosswalk`, `provider-names`, `team-defense-ids`, `capture-harvest`, `player-clubs`, `adp-snapshot`, `kdef-adp`, `current-ecr`, `props-snapshot`,
 `props-resolve`, `win-totals-seed`, `win-totals`. Not atomic, committing where the TypeScript's
 writes become durable, because the TypeScript writes outside a transaction there and a re-run is
-how a stopped run finishes: `season`, `context`, `derived-stat-lines`, `kdef`, `kdef-lines`, `tank01-roster`
+how a stopped run finishes: `season`, `context`, `derived-stat-lines`, `kdef`, `kdef-lines`, `pbp-plays` (after each
+season), `espn-kdef-archive` (after each week), `tank01-roster`
 (after the roster and after each week), `preseason`, `props-backfill` (after each event). Inside a
 command, each capture feed and each published board runs in its own savepoint, so one failed feed
 or board is reported and the rest are kept, as the TypeScript carries on.
