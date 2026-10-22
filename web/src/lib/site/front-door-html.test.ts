@@ -14,7 +14,7 @@ const skip = built ? false : 'the site is not built';
 
 /** The words a set draws in the hero, from the same table the page reads. */
 function wordsOf(set: (typeof WORD_SETS)[number]): { title: string; verb: string } {
-	const words = frontWords(RAIL_OF_WORD_SET[set], { season: 2026 }, false);
+	const words = frontWords(RAIL_OF_WORD_SET[set], { season: 2026, label: 'PPR', teams: 12 }, false);
 	return { title: words.title, verb: PAGE_VERBS[words.verb] };
 }
 

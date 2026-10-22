@@ -1,21 +1,21 @@
 /** The two records (Lane 114, the founder's ruling of 2026-10-21): the weekly record, our weekly
- * rankings against the weekly experts (ESPN's projection and the week's published projection, from
- * week 7), and the draft record, our draft board against ADP on the season's points so far. Each is
- * named by what it grades; ADP appears on the draft record alone. The weekly record is in the record's
+ * rankings against ESPN and the week's published projection (from week 7), and the draft record,
+ * our draft board against ADP on the season's points so far. Each is named by what it grades; ADP appears on the draft record alone. The weekly record is in the record's
  * own shape, so the page reads it with the record's functions (record.ts). */
-import { dayLabel, weekdayLabel } from '#lib/format/date.ts';
+import { BUILD_ZONE, dayTimeStamp } from '#lib/format/day-time.ts';
+import { dayLabel, weekdayLabel, weekdayWord } from '#lib/format/date.ts';
 import { plural } from '#lib/format/number.ts';
 import type { BasisPart } from './board-basis.ts';
+import { figurePair, type FigurePair } from './record-pair.ts';
 import {
-	RATE_PLACES,
 	RECORD_BOX,
 	RECORD_WORDS,
 	figureWords,
-	printPlaces,
 	publishedDrawn,
 	publishedWords,
 	saidOnly,
 	weekLines,
+	capitalized,
 	type LeagueBasis,
 	type RecordFigure,
 	type RecordSource,
@@ -23,24 +23,44 @@ import {
 } from './record.ts';
 import type { DraftLine, DraftRecord, RecordLine, RecordWeek, RunRecord } from './schema.ts';
 
+/** The weekly record's yardsticks, one name everywhere on the page (Lane 140, C15). */
+const YARDSTICKS = "ESPN and the week's published projection";
+
 /** The records' words, in one place for the copy guard. */
 export const RECORDS_WORDS = {
-	lead: 'Two records, each graded against what it competes with: our weekly rankings against the weekly experts, and our draft board against ADP.',
+	lead: `Two records, each graded against what it competes with: our weekly rankings against ${YARDSTICKS}, and our draft board against ADP.`,
 	weekly: 'Weekly record',
-	weeklyWhat: "Our weekly rankings against ESPN and the week's published projection",
+	weeklyWhat: `Our weekly rankings against ${YARDSTICKS}`,
 	draft: 'Draft record',
 	draftWhat: "Our draft board against ADP, on the season's points so far",
 	/** The weeks before the weekly record, one line (ruling 1). */
 	beforeLead: (from: number) => (from <= 2 ? 'Week 1' : `Weeks 1 to ${String(from - 1)}`),
-	before: (from: number, set: string) =>
-		`Weekly rankings start week ${String(from)} (${set}). Before that the site shipped the draft board, graded under Draft record.`,
+	/** The set rule, said once (Lane 140, C14): each week's own set time is on its row. */
+	before: (from: number) =>
+		`Weekly rankings start week ${String(from)}. Each week's are set before its first kickoff and graded as set, never as refreshed after. Before that the site shipped the draft board, graded under Draft record.`,
 	setBefore: (day: string) => `set before kickoff ${day}`,
-	setOn: (day: string) => `set ${day}`,
+	/** A set week's row, its set time to the minute and its zone (C14). */
+	setAt: (stamp: string) => `set ${stamp}`,
+	notPlayed: 'not played yet',
+	gradedOn: (day: string) => `graded ${day}`,
+	/** The run's day is the earliest the grading pass may grade (review MEDIUM-1), so "from". */
+	gradesOn: (day: string) => `grades from ${day}, when the stats land`,
+	gradesLater: 'grades when the stats land',
+	/** The weekly record's bug before a week of it is graded (C04): no figure, the week and when. */
+	pending: (week: number) => `Week ${String(week)} not graded yet`,
+	pendingWhen: (day: string | null, game: string | null) =>
+		game === null
+			? 'Grades when the stats land.'
+			: day === null
+				? `Grades after ${game}'s game.`
+				: `Grades from ${day}, after ${game}'s game.`,
 	/** A first week with no date on file yet. */
 	setUnknown: 'set before its first kickoff',
 	espnBasis:
 		"ESPN's is its own public projection in PPR, read before our order was set, on its players with an ESPN id.",
-	yahooBasis: 'Yahoo publishes no player projection we can read, so it is not graded.',
+	/** The season-long rule in a player's words (C16). */
+	seasonLong:
+		'A player put on IR or another season-long list after we set the order is still graded at the rank we set.',
 	/** A run before Lane 114 carries neither record: said once, until the next run writes them. */
 	waiting: 'This record is written by the next nightly run.',
 	position: 'Position',
@@ -63,44 +83,61 @@ export const RECORDS_WORDS = {
 	draftBye: 'A player past his bye has one game fewer counted.',
 	draftKickers: 'Kickers and defenses are left out: the board takes their order from ADP.',
 	draftScale:
-		'Order matched is how closely an order ranked the players as they finished the season so far: 1.00 is the same order, 0.00 no closer than chance, below it the reverse.',
+		"Order matched is how closely an order ranked the players to the season's finish so far: 1.00 is the same order, 0.00 no closer than chance, below 0.00 the order runs backwards.",
+	/** Under the places off tile (C17). */
+	lowerBetter: 'lower is better',
+	/** Under the top named tile: what the tops are (C17). */
+	namedKey: (tops: string) => `of the top ${tops}`,
 	draftChart: 'Order matched, season to date, through each week',
 	league: (host: string) => `Your ${host} league, as it scores`,
 	rostered: 'Rostered',
 	lineupOurs: 'Our picks',
 	lineupEspn: "ESPN's picks",
 	/** What the league row's figures are, at both widths (Lane 131 review MEDIUM-1, Lane 138). */
-	leagueRow:
-		"Your league's row grades its rostered players as it scores, and the lineup each picks.",
-	frontWeekly: (span: string, players: string, beside: string) =>
-		`Order matched, our weekly rankings over ${span}, ${players}.${beside}`,
-	frontDraft: (rate: string, through: number, players: string) =>
-		`Order matched, our draft board through week ${String(through)}, ${players}. ADP ${rate}.`,
-	frontDraftNamed: (ours: string, adp: string) => `Top named ${ours}, ADP ${adp}.`,
-	frontStarters: (ours: string, beside: string) => `Starters right ${ours}${beside}.`,
+	leagueRow: "Your league's row grades its rostered players and both lineups.",
+	frontWeekly: (span: string, players: string) => `Our weekly rankings over ${span}, ${players}.`,
+	frontDraft: (through: number, players: string) =>
+		`Our draft board through week ${String(through)}, ${players}.`,
 	frontWeeklyNext: (week: number) => `Weekly rankings start week ${String(week)}.`,
 	/** The weekly record's upcoming weeks (fix round 1, M4): the next one on its own line, the rest
 	 * said once. */
 	setEach: 'set each week before kickoff',
 	/** The order a set week of the weekly record graded (M2): never "rest-of-season". */
-	weeklyOrder: (day: string) => `Our weekly rankings, set ${day}`,
-	/** The weekly record before its first week is set. */
-	opening: (week: number) => `Week ${String(week)}`,
-	openingCaption: (set: string) => `Our first weekly rankings, ${set}.`
+	weeklyOrder: (day: string) => `Our weekly rankings, set ${day}`
 } as const;
 
-/** The weekly record's figure before any week of it is set: its first week and when it is set; null
- * once a week is set (the record's own headline then says how many are graded). */
-export function weeklyOpening(
+/** The weekly record's next week to grade and its schedule, as the page loader reads it from the
+ * run's schedule: the week's last kickoff. */
+export interface NextGrade {
+	week: number;
+	/** The week's last kickoff, null when the schedule names none. */
+	lastKickoff: string | null;
+}
+
+/** The weekly record's bug before any week of it is graded (Lane 140, C04): no figure, the week and
+ * when it grades, "Week 7 not graded yet", "Grades Wed Oct 28 after Monday's game." The day is the
+ * run's own for a set week (its last kickoff and the grading pass's wait), and absent for a week not
+ * set yet, which says only the game it waits on. Null once a week is graded. */
+export function weeklyPending(
 	record: RunRecord,
-	fromWeek: number
-): { value: string; caption: string } | null {
-	if (record.weeks.some((week) => week.status === 'graded' || week.status === 'frozen'))
-		return null;
-	const first = record.weeks.find((week) => week.week === fromWeek);
-	const at = first?.frozenAt ?? null;
-	const set = at === null ? RECORDS_WORDS.setUnknown : RECORDS_WORDS.setBefore(weekdayLabel(at));
-	return { value: RECORDS_WORDS.opening(fromWeek), caption: RECORDS_WORDS.openingCaption(set) };
+	next: NextGrade | null
+): { title: string; when: string } | null {
+	if (next === null || record.weeks.some((week) => week.status === 'graded')) return null;
+	const week = record.weeks.find((candidate) => candidate.week === next.week);
+	const day = week?.gradesFrom === undefined ? null : weekdayLabel(week.gradesFrom);
+	const game = next.lastKickoff === null ? null : weekdayWord(next.lastKickoff);
+	return { title: RECORDS_WORDS.pending(next.week), when: RECORDS_WORDS.pendingWhen(day, game) };
+}
+
+/** The orders the weekly record draws, ours first (C15): ESPN's columns from its first week, empty
+ * until a week is graded; the published projection's once a graded week carries it. */
+export function weeklySources(record: RunRecord): readonly RecordSource[] {
+	return ['ours', 'espn', ...(publishedDrawn(record) ? (['published'] as const) : [])];
+}
+
+/** The first week of the weekly record not graded yet, the one its bug names. */
+export function nextToGrade(record: RunRecord): number | null {
+	return record.weeks.find((week) => week.status !== 'graded')?.week ?? null;
 }
 
 /** The weekly record as a record the record's functions read, or null on a run before Lane 114. The
@@ -125,22 +162,12 @@ export function weeklyAsRecord(run: RunRecord): RunRecord | null {
 	};
 }
 
-/** The weeks before the weekly record, as one line: "Weeks 1 to 6" and "Weekly rankings start week 7
- * (set before kickoff Thu Oct 22). Before that the site shipped the draft board, graded under Draft
- * record." Null when the record starts at week 1. */
-export function beforeLine(
-	fromWeek: number,
-	first: RecordWeek | undefined
-): { lead: string; text: string } | null {
+/** The weeks before the weekly record, as one line that says the set rule once (C14): "Weeks 1 to
+ * 6" and "Weekly rankings start week 7. Each week's are set before its first kickoff and graded as
+ * set, never as refreshed after. Before that ...". Null when the record starts at week 1. */
+export function beforeLine(fromWeek: number): { lead: string; text: string } | null {
 	if (fromWeek <= 1) return null;
-	const at = first?.frozenAt ?? null;
-	const set =
-		at === null
-			? RECORDS_WORDS.setUnknown
-			: first?.status === 'upcoming'
-				? RECORDS_WORDS.setBefore(weekdayLabel(at))
-				: RECORDS_WORDS.setOn(weekdayLabel(at));
-	return { lead: RECORDS_WORDS.beforeLead(fromWeek), text: RECORDS_WORDS.before(fromWeek, set) };
+	return { lead: RECORDS_WORDS.beforeLead(fromWeek), text: RECORDS_WORDS.before(fromWeek) };
 }
 
 /** A sentence drawn at both widths, and one a desk alone draws: a phone holds eight lines of basis,
@@ -148,18 +175,15 @@ export function beforeLine(
 const both = (text: string): BasisPart => ({ text, phone: true });
 const deskOnly = (text: string): BasisPart => ({ text, phone: false });
 
-/** The weekly record's basis (Lanes 131, 138). Both widths say what each figure is: order matched,
- * places off, starters right in the lineup it counts, and, opened from a league, what the league row's
- * figures are. A desk also says what ESPN's projection is once drawn, when the published projection's
- * column starts once drawn, and Yahoo's absence. The rest are qualifications other parts of the page
- * say, so the desk holds five lines (Lane 138): how the rankings are set (the week table's lines), the
- * season-long rule, what the league's lineup leaves uncounted (its starters sentence names the lineup
- * it counts), and the published projection's start before it is drawn (the section's head names it). */
-export function weeklyBasis(
-	record: RunRecord,
-	league: LeagueBasis | null,
-	espnDrawn: boolean
-): BasisPart[] {
+/** The weekly record's basis (Lanes 131, 138, 140). Both widths say what each figure is: order
+ * matched, places off, starters right in the lineup it counts, and, opened from a league, what the
+ * league row's figures are. A desk also says what ESPN's projection is (its columns are drawn from the
+ * first week, C15), the season-long rule as a plain rule (C16), and when the published projection's
+ * column starts once drawn. The rest are said elsewhere, so the desk holds five lines (Lane 138): how
+ * the rankings are set (the line before the weeks), what the league's lineup leaves uncounted (its
+ * starters sentence names the lineup it counts), and the published projection's start before it is
+ * drawn (the section's head names it). */
+export function weeklyBasis(record: RunRecord, league: LeagueBasis | null): BasisPart[] {
 	return [
 		...saidOnly([
 			record.scale,
@@ -168,9 +192,9 @@ export function weeklyBasis(
 			league?.benchmark ? RECORDS_WORDS.leagueRow : null
 		]).map(both),
 		...saidOnly([
-			espnDrawn ? RECORDS_WORDS.espnBasis : null,
-			publishedDrawn(record) ? publishedWords(record) : null,
-			RECORDS_WORDS.yahooBasis
+			RECORDS_WORDS.espnBasis,
+			RECORDS_WORDS.seasonLong,
+			publishedDrawn(record) ? publishedWords(record) : null
 		]).map(deskOnly)
 	];
 }
@@ -182,8 +206,26 @@ function spanLead(weeks: readonly RecordWeek[]): string {
 	return first === last ? `Week ${String(first)}` : `Weeks ${String(first)} to ${String(last)}`;
 }
 
-/** The weekly record's week lines (fix round 1, M4): the record's own for the set and missed weeks;
- * of the weeks to come, the next to set on its own line with its kickoff day ("Week 7", "set before
+/** A set week's row (C14): its own set time, then whether it is played, waiting or graded: "set Tue
+ * Oct 20, 5:00 am Central, not played yet", "set ..., graded Wed Oct 28". */
+function setWeekText(week: RecordWeek, unplayed: readonly number[]): string {
+	if (week.frozenAt === null)
+		throw new Error(`Week ${String(week.week)} is ${week.status} with no date.`);
+	// The record's one clock, the one the run's other stamps are said on (C14).
+	const set = RECORDS_WORDS.setAt(dayTimeStamp(week.frozenAt, BUILD_ZONE));
+	const then =
+		week.status === 'graded' && week.gradedAt !== null
+			? RECORDS_WORDS.gradedOn(weekdayLabel(week.gradedAt))
+			: unplayed.includes(week.week)
+				? RECORDS_WORDS.notPlayed
+				: week.gradesFrom === undefined
+					? RECORDS_WORDS.gradesLater
+					: RECORDS_WORDS.gradesOn(weekdayLabel(week.gradesFrom));
+	return `${set}, ${then}`;
+}
+
+/** The weekly record's week lines (fix round 1, M4): each set week with its own set time (C14), the
+ * missed weeks as the record says them; of the weeks to come, the next to set on its own line with its kickoff day ("Week 7", "set before
  * kickoff Thu Oct 22") and the rest once ("Weeks 8 to 18", "set each week before kickoff"), so no line
  * reads as many weeks set on one day. */
 export function weeklyLines(weeks: readonly RecordWeek[], unplayed: readonly number[]): WeekLine[] {
@@ -191,6 +233,8 @@ export function weeklyLines(weeks: readonly RecordWeek[], unplayed: readonly num
 	const lines = weekLines(
 		weeks.filter((week) => week.status !== 'upcoming'),
 		unplayed
+	).map((line) =>
+		line.week === null ? line : { ...line, text: setWeekText(line.week, unplayed) }
 	);
 	const [next, ...rest] = coming;
 	if (next === undefined) return lines;
@@ -289,11 +333,43 @@ export function draftBasis(draft: DraftRecord): BasisPart[] {
 	];
 }
 
+/** The draft record's figures for ours and ADP, each pair at one size with its leader (C05). */
+export type DraftPairs = Readonly<Record<(typeof DRAFT_FIGURES)[number], FigurePair>>;
+
+export function draftPairs(line: DraftLine): DraftPairs {
+	const pair = (figure: RecordFigure): FigurePair =>
+		figurePair(line.ours, line.adp, figure, RECORD_BOX.adp);
+	return { agreement: pair('agreement'), placesOff: pair('placesOff'), starters: pair('starters') };
+}
+
+/** What each draft tile's figure is, under its head (C17): places off is better lower, and top named
+ * counts the season's top players at each position graded ("of the top 12 QB, 24 RB, 36 WR, 12 TE");
+ * null where a tile needs no key. */
+export function draftKeys(
+	draft: DraftRecord
+): Readonly<Record<(typeof DRAFT_FIGURES)[number], string | null>> {
+	const tops = draft.lines
+		.filter((line) => line.position !== 'All' && line.ours.startersOf > 0)
+		.map((line) => `${String(line.ours.startersOf)} ${line.position}`);
+	return {
+		agreement: null,
+		placesOff: RECORDS_WORDS.lowerBetter,
+		starters: tops.length === 0 ? null : RECORDS_WORDS.namedKey(tops.join(', '))
+	};
+}
+
+/** A pair on the front card, its figure's head beside it. */
+export interface FrontPair extends FigurePair {
+	label: string;
+}
+
 /** The front door's record card (ruling 4): the weekly record once a week of it is graded, the
- * draft record until then, named either way. */
+ * draft record until then, named either way. Each draws ours and its yardstick as pairs at one
+ * size (C05): ADP on the draft record, the first yardstick drawn on the weekly one. */
 export interface FrontRecord {
 	name: string;
-	value: string;
+	/** Ours beside the yardstick, at one size, each naming its leader (C05, fix round 1 MEDIUM-2). */
+	pairs: readonly FrontPair[];
 	caption: string;
 	/** The order matched scale, said under the figure (M4). */
 	scale: string;
@@ -301,16 +377,30 @@ export interface FrontRecord {
 	note: string | null;
 }
 
-function rate(value: number | null): string {
-	return value === null ? RECORD_BOX.none : printPlaces(value, RATE_PLACES);
+/** The weekly record's yardsticks, each with the line's ours it is compared with: on the season to
+ * date, ours pooled again over the weeks that graded it (review 66j N1); on a week's line, ours. */
+const OURS_ON = { espn: 'oursOnEspn', published: 'oursOnPublished' } as const;
+type Yardstick = keyof typeof OURS_ON;
+const isYardstick = (source: RecordSource): source is Yardstick => source in OURS_ON;
+
+/** Ours beside each yardstick the weekly record draws, for one figure, each at one size with its
+ * leader (Lane 140 fix round 1, HIGH-1: the C05 rule on the weekly record). */
+export function weeklyPairs(
+	line: RecordLine | undefined,
+	figure: RecordFigure,
+	sources: readonly RecordSource[]
+): FigurePair[] {
+	return sources.filter(isYardstick).map((source) => {
+		const ours = line?.[OURS_ON[source]] ?? line?.ours ?? null;
+		return figurePair(ours, line?.[source] ?? null, figure, RECORD_BOX[source]);
+	});
 }
 
-/** Each yardstick drawn beside ours on a weekly line, as ". ESPN 0.58. Published 0.55". */
-function besideWords(line: RecordLine, figure: RecordFigure): string {
-	const named = (['espn', 'published'] as const).flatMap((source) =>
-		line[source] === null ? [] : [`${RECORD_BOX[source]} ${figureWords(line[source], figure)}`]
-	);
-	return named.length === 0 ? '' : `, ${named.join(', ')}`;
+/** Whether ours is drawn accented in a weekly cell: only where it leads every yardstick graded there;
+ * with none graded there is nothing to lead. */
+export function oursLeadsAll(pairs: readonly FigurePair[]): boolean {
+	const graded = pairs.filter((pair) => pair.leader !== null);
+	return graded.length > 0 && graded.every((pair) => pair.leader === 'ours');
 }
 
 function weeklyFront(weekly: RunRecord): FrontRecord | null {
@@ -321,23 +411,21 @@ function weeklyFront(weekly: RunRecord): FrontRecord | null {
 	const last = graded.at(-1)?.week ?? first;
 	const span =
 		first === last ? `week ${String(first)}` : `weeks ${String(first)} to ${String(last)}`;
-	const beside = besideWords(all, 'agreement');
+	// The card's yardstick: the first the weekly record drew, ours at its size with the leader (MEDIUM-2).
+	const yardstick = (['espn', 'published'] as const).find((source) => all[source] !== null);
+	const pair = (figure: RecordFigure, label: string): FrontPair[] => {
+		const [found] = weeklyPairs(all, figure, yardstick === undefined ? [] : [yardstick]);
+		return found === undefined ? [] : [{ ...found, label }];
+	};
 	return {
 		name: RECORDS_WORDS.weekly,
-		value: rate(all.ours.agreement),
+		pairs: [
+			...pair('agreement', capitalized(weekly.statistic.agreement)),
+			...(all.ours.startersOf === 0 ? [] : pair('starters', capitalized(weekly.statistic.starters)))
+		],
 		scale: weekly.scale,
-		caption: RECORDS_WORDS.frontWeekly(
-			span,
-			plural(all.ours.graded, 'player'),
-			beside === '' ? '' : ` ${beside.slice(2)}.`
-		),
-		second:
-			all.ours.startersOf === 0
-				? null
-				: RECORDS_WORDS.frontStarters(
-						figureWords(all.ours, 'starters'),
-						besideWords(all, 'starters')
-					),
+		caption: RECORDS_WORDS.frontWeekly(span, plural(all.ours.graded, 'player')),
+		second: null,
 		note: null
 	};
 }
@@ -345,26 +433,23 @@ function weeklyFront(weekly: RunRecord): FrontRecord | null {
 function draftFront(
 	draft: DraftRecord,
 	weekly: RunRecord | null,
-	fromWeek: number | null
+	fromWeek: number | null,
+	/** The run's name for order matched, its head on the card. */
+	agreement: string
 ): FrontRecord | null {
 	const all = draft.lines.find((line) => line.position === 'All');
 	if (all === undefined || all.ours.agreement === null || draft.throughWeek === null) return null;
+	const pairs = draftPairs(all);
+	const heads = { agreement: capitalized(agreement), starters: RECORDS_WORDS.named };
 	return {
 		name: RECORDS_WORDS.draft,
-		value: rate(all.ours.agreement),
+		pairs: [
+			{ ...pairs.agreement, label: heads.agreement },
+			...(all.ours.startersOf === 0 ? [] : [{ ...pairs.starters, label: heads.starters }])
+		],
 		scale: RECORDS_WORDS.draftScale,
-		caption: RECORDS_WORDS.frontDraft(
-			rate(all.adp.agreement),
-			draft.throughWeek,
-			plural(all.ours.graded, 'player')
-		),
-		second:
-			all.ours.startersOf === 0
-				? null
-				: RECORDS_WORDS.frontDraftNamed(
-						figureWords(all.ours, 'starters'),
-						String(all.adp.starters)
-					),
+		caption: RECORDS_WORDS.frontDraft(draft.throughWeek, plural(all.ours.graded, 'player')),
+		second: null,
 		note: weekly === null || fromWeek === null ? null : RECORDS_WORDS.frontWeeklyNext(fromWeek)
 	};
 }
@@ -376,5 +461,5 @@ export function frontRecord(run: RunRecord): FrontRecord | null {
 	if (fromWeekly !== null) return fromWeekly;
 	return run.draft === undefined
 		? null
-		: draftFront(run.draft, weekly, run.weekly?.fromWeek ?? null);
+		: draftFront(run.draft, weekly, run.weekly?.fromWeek ?? null, run.statistic.agreement);
 }

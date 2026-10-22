@@ -42,6 +42,9 @@ export interface BasisFacts {
 	reach: FiguresReach | null;
 	/** ADP's count of ranked players the drafts do not take yet. */
 	noAdp?: number;
+	/** The page's heading says the board, its weeks and its shape (the front door, Lane 140 C24), so
+	 * the basis does not say them again. */
+	headSaysBoard?: true;
 }
 
 /** The gap's one definition, on every page that prints it, and the column head's title. */
@@ -75,7 +78,7 @@ export function boardBasis(facts: BasisFacts): BasisPart[] {
 					{ text: ourBoard(facts), phone: true }
 				]
 			: [
-					{ text: ourBoard(facts), phone: true },
+					...(facts.headSaysBoard ? [] : [{ text: ourBoard(facts), phone: true }]),
 					...(facts.position
 						? [{ text: `Tiers are drawn within ${facts.position}.`, phone: true }]
 						: []),

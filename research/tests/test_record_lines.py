@@ -242,9 +242,10 @@ def test_the_scale_prints_its_ends_as_the_page_prints_the_rate() -> None:
     """Ruling R2: order matched prints two decimals, so the sentence that says its scale names its ends
     in that form, 1.00 and 0.00, never 1.0 and 0 (Lane 78)."""
     ends = re.findall(r"-?\d+(?:\.\d+)?", SCALE)
-    assert ends == [f"{1:.{AGREEMENT_PLACES}f}", f"{0:.{AGREEMENT_PLACES}f}"], SCALE
+    zero = f"{0:.{AGREEMENT_PLACES}f}"
+    assert ends == [f"{1:.{AGREEMENT_PLACES}f}", zero, zero], SCALE
     assert SCALE == (
-        "Order matched is how closely an order ranked the players as they finished the week: 1.00 is the same order, 0.00 no closer than chance, below it the reverse."
+        "Order matched is how closely an order ranked the players to the week's finish: 1.00 is the same order, 0.00 no closer than chance, below 0.00 the order runs backwards."
     )
 
 

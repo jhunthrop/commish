@@ -4,7 +4,8 @@
 // after week 7 grades. Signed out, and signed in with the ESPN stand-in league selected (the fixture
 // API's weekly record in the league, scripts/inseason-fixture/record.ts, a STAND-IN week). It asserts
 // the rulings' words: each record named by what it grades, ADP only under the draft record, weeks 1 to
-// 6 in one line, the Yahoo sentence, the league's sentence, and the front card's named record. Exits
+// 6 in one line with the set rule, no Yahoo sentence, no figure before a week is graded, the draft
+// pairs' leaders, the league's sentence, and the front card's named record and week link. Exits
 // non-zero on any fault. Each record's basis is held to the budget on its own (basis-lines.ts: eight
 // lines at 390, Lane 131, and five at the 1440 desk, Lane 138), its count printed; the record pages are
 // shot in both themes, the budget measured in light.
@@ -22,8 +23,9 @@ const API_ORIGIN = process.argv[4] ?? 'http://localhost:8814';
 const out = new URL(process.argv[5] ?? '../screenshots/record-114/', import.meta.url);
 /** The shot widths; 1440 is where the desk budget is measured (basis-lines.ts BASIS_BUDGET). */
 const WIDTHS = [1440, 1280, 390] as const;
-/** The front card is shot at the widths it was before the desk budget joined (Lane 114). */
-const FRONT_WIDTHS: readonly number[] = [1280, 390];
+/** The front card is shot at 1280 and 390 (Lane 114), and its strip's basis held to the budget at
+ * 1440 and 390 too (Lane 140). */
+const FRONT_WIDTHS: readonly number[] = [1440, 1280, 390];
 const PHONE_MAX = 760;
 const SETTLE_MS = 600;
 const READY_TIMEOUT_MS = 30_000;
@@ -87,8 +89,8 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 	has(weekly, "Our weekly rankings against ESPN and the week's published projection", where);
 	has(weekly, 'Weeks 1 to 6', where);
 	has(weekly, 'Before that the site shipped the draft board, graded under Draft record.', where);
-	has(weekly, 'Yahoo publishes no player projection we can read, so it is not graded.', where);
-	lacks(weekly, /\bADP\b|FantasyPros|froze|freeze|rest-of-season/iu, where);
+	has(weekly, "Each week's are set before its first kickoff and graded as set", where);
+	lacks(weekly, /Yahoo|weekly experts|\bADP\b|FantasyPros|froze|freeze|rest-of-season/iu, where);
 	if (width > PHONE_MAX) has(weekly, 'Set each week before kickoff', where);
 	has(draft, 'Draft record', where);
 	has(draft, "Our draft board against ADP, on the season's points so far", where);
@@ -96,14 +98,23 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 	has(draft, "Top named counts how many of the season's top", where);
 	has(draft, 'ADP named more of the season', where);
 	has(draft, 'Each position is graded on its own', where);
+	// The draft tiles: ADP beside ours at one size, each pair's leader, and what the figures count.
+	has(draft, 'lower is better', where);
+	has(draft, 'of the top 12 QB, 24 RB, 36 WR, 12 TE', where);
+	has(draft, 'ADP by 4', where);
+	has(draft, 'below 0.00 the order runs backwards', where);
 	if (mode === 'upcoming') {
-		has(weekly, '(set before kickoff Thu Oct 22)', where);
+		has(weekly, 'Week 7 not graded yet', where);
+		has(weekly, "Grades after Monday's game.", where);
+		has(weekly, 'Set before kickoff Thu Oct 22', where);
 		lacks(weekly, /ESPN 0\.|Order matched by week/u, where);
 	} else {
-		has(weekly, '(set Thu Oct 22)', where);
+		has(weekly, 'Set Thu Oct 22, ', where);
 		has(weekly, 'Our weekly rankings, set Oct 22', where);
 		has(weekly, 'Order matched by week, 1 week graded', where);
 		has(weekly, "ESPN's is its own public projection in PPR", where);
+		// The weekly pairs name the leader, ESPN's where it leads (fix round 1, HIGH-1).
+		has(weekly, 'ESPN by 2', where);
 	}
 	if (who === 'espn') {
 		has(weekly, 'Your ESPN league, as it scores', where);
@@ -136,17 +147,43 @@ async function front(width: number): Promise<void> {
 	if (mode === 'upcoming') {
 		has(card, 'Draft record', where);
 		has(card, 'Order matched is how closely an order ranked the players', where);
-		has(card, 'Order matched, our draft board through week 5', where);
+		has(card, 'Our draft board through week 5', where);
 		has(card, 'Weekly rankings start week 7.', where);
+		has(card, 'ADP by 4', where);
+		lacks(card, /below it the reverse/u, where);
 	} else {
 		has(card, 'Weekly record', where);
 		has(card, 'Order matched is how closely an order ranked the players', where);
-		has(card, 'Order matched, our weekly rankings over week 7', where);
+		has(card, 'Our weekly rankings over week 7', where);
+		has(card, 'ESPN by 2', where);
 		lacks(card, /\bADP\b/u, where);
+	}
+	has(card, 'Week 7 rankings', where);
+	// The link lands on a page headed as the link promised (fix round 1, MEDIUM-3).
+	const target = await open('signed-out', width, '/players');
+	has(
+		(await target.locator('main h1, main h2').first().textContent()) ?? '',
+		'Week 7 rankings',
+		`${where} players`
+	);
+	await target.context().close();
+	const lines = await basisLines(page, 'section.top p.basis');
+	const report = basisReport(`front ${mode}`, width, lines);
+	if (report !== null) {
+		process.stdout.write(`${report.line}\n`);
+		if (report.fault !== null) faults.push(report.fault);
 	}
 	const shot = page.locator('aside[aria-label="Our record"]');
 	await shot.screenshot({ path: new URL(`front-${mode}-${String(width)}.png`, out).pathname });
 	await page.context().close();
+	// The whole front door in both themes, the heading, the strip's basis and its byes (Lane 140).
+	for (const theme of THEMES) {
+		const whole = await open('signed-out', width, '/', theme);
+		await whole.screenshot({
+			path: new URL(`front-page-${mode}-${theme}-${String(width)}.png`, out).pathname
+		});
+		await whole.context().close();
+	}
 }
 
 for (const width of WIDTHS) {

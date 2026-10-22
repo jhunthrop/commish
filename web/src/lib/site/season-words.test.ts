@@ -17,8 +17,8 @@ import { PAGE_VERBS, boardWords, frontWords } from './season-words.ts';
 
 const IN_SEASON: readonly RailKey[] = ['in_season', 'playoffs', 'playoffs_waivers'];
 const BEFORE_OR_AFTER: readonly RailKey[] = ['pre_draft', 'draft_day', 'offseason'];
-const REST = { season: 2026, rosFromWeek: 6, restFrom: 'from week 6', label: 'PPR' };
-const PRESEASON = { season: 2026, label: 'PPR' };
+const REST = { season: 2026, rosFromWeek: 6, restFrom: 'from week 6', label: 'PPR', teams: 12 };
+const PRESEASON = { season: 2026, label: 'PPR', teams: 12 };
 
 /** The copy rules: no em-dash or en-dash, no semicolon (the one guard's marks). */
 function clean(line: string): void {
@@ -36,8 +36,13 @@ for (const rail of IN_SEASON) {
 	void test(`the front door in ${rail} follows your league`, () => {
 		const words = frontWords(rail, REST, false);
 		assert.equal(words.title, 'In season');
+		// Signed out, or following none, the board is for the shape it is ranked for (C18).
 		assert.equal(
 			words.heading,
+			'Our board for the rest of the 2026 season from week 6, for a 12-team PPR league'
+		);
+		assert.equal(
+			frontWords(rail, REST, true).heading,
 			'Our board for the rest of the 2026 season from week 6, for your league'
 		);
 		assert.equal(words.verb, 'follow');
@@ -50,7 +55,7 @@ void test('the front door says a partly played first week as the run does: its g
 	const partly = { ...REST, restFrom: "from week 6's games left" };
 	assert.equal(
 		frontWords('in_season', partly, false).heading,
-		"Our board for the rest of the 2026 season from week 6's games left, for your league"
+		"Our board for the rest of the 2026 season from week 6's games left, for a 12-team PPR league"
 	);
 });
 
@@ -64,8 +69,9 @@ void test('a member who follows a league opens it from the front door in season'
 void test('in season on a board that still ranks the full season, the heading claims no rest of season', () => {
 	assert.equal(
 		frontWords('in_season', PRESEASON, false).heading,
-		'Our 2026 board, for your league'
+		'Our 2026 board, for a 12-team PPR league'
 	);
+	assert.equal(frontWords('in_season', PRESEASON, true).heading, 'Our 2026 board, for your league');
 });
 
 for (const rail of BEFORE_OR_AFTER) {

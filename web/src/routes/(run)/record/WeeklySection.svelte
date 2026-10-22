@@ -1,6 +1,7 @@
 <script lang="ts">
 	import BasisBlock from '#lib/ui/BasisBlock.svelte';
 	import Figure from '#lib/ui/Figure.svelte';
+	import PairTile from '#lib/ui/PairTile.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import {
 		RECORD_AFTER,
@@ -19,7 +20,6 @@
 		recordSources,
 		recordStatusSpans,
 		scoreOf,
-		sourceDrawn,
 		standingWords,
 		weekLines,
 		weekOrderWords,
@@ -43,9 +43,13 @@
 		beforeLine,
 		weeklyBasis,
 		weeklyLines,
-		weeklyOpening,
+		oursLeadsAll,
 		weeklyOrderWords,
-		weeklySpan
+		weeklyPairs,
+		weeklyPending,
+		weeklySources,
+		weeklySpan,
+		type NextGrade
 	} from '#lib/run/records.ts';
 	import type { RecordLine, RecordWeek, RunRecord } from '#lib/run/schema.ts';
 	import { hostWords } from '#lib/league/names.ts';
@@ -62,19 +66,30 @@
 		players: PlayersByWeek;
 		/** The section's head and what it grades; null for a run's own record, drawn as before. */
 		head: { title: string; what: string } | null;
+		/** The weekly record's next week to grade, which its bug names before a week is graded. */
+		next: NextGrade | null;
 	}
 
-	let { record: runRecord, fromWeek, unplayed, leagueRecord, players, head }: Props = $props();
+	let {
+		record: runRecord,
+		fromWeek,
+		unplayed,
+		leagueRecord,
+		players,
+		head,
+		next
+	}: Props = $props();
 
 	/** The one lineup every starters figure and sentence here reads (Lane 93 fix round 1). */
 	const lineup = $derived(pageLineup(runRecord, leagueRecord, players));
 	const record = $derived(shownRecord(runRecord, players, lineup));
 	const honest = $derived(honestWords(runRecord, record, lineup));
-	const opening = $derived(fromWeek === null ? null : weeklyOpening(record, fromWeek));
-	const headline = $derived(opening ?? recordHeadline(record, unplayed));
+	/** The weekly record before a week is graded says the week and when it grades, no figure (C04). */
+	const pending = $derived(head === null ? null : weeklyPending(record, next));
+	const headline = $derived(recordHeadline(record, unplayed));
 	const standing = $derived(standingWords(record));
 	const gaps = $derived(gapWords(record, unplayed));
-	const before = $derived(fromWeek === null ? null : beforeLine(fromWeek, record.weeks[0]));
+	const before = $derived(fromWeek === null ? null : beforeLine(fromWeek));
 
 	const FIGURE_HEADS = $derived<Record<RecordFigure, string>>({
 		agreement: record.statistic.agreement,
@@ -104,7 +119,7 @@
 	const bugHead = $derived(head === null ? gradedOrders(record) : weeklySpan(record));
 	const series = $derived(chartSeries(record, position));
 	const graded = $derived(record.weeks.filter((week) => week.status === 'graded'));
-	const sources = $derived(recordSources(record));
+	const sources = $derived(head === null ? recordSources(record) : weeklySources(record));
 	const beside = $derived(sources.filter((source) => source !== 'ours'));
 	const spans = $derived(recordStatusSpans(sources.length));
 
@@ -117,7 +132,7 @@
 		const league = leagueRecord === null ? null : leagueBasis(leagueRecord, lineup);
 		return head === null
 			? recordBasis(record, league).map((text) => ({ text, phone: true }))
-			: weeklyBasis(record, league, sourceDrawn(record, 'espn'));
+			: weeklyBasis(record, league);
 	});
 
 	const capitalized = (words: string): string =>
@@ -128,7 +143,12 @@
 	{#each RECORD_FIGURES as f (f)}
 		{#each sources as source (source)}
 			{#if source === 'ours'}
-				<td class="n m {f} {source}">{figureWords(scoreOf(line, source), f)}</td>
+				<!-- The weekly record accents ours only where it leads every yardstick (fix round 1). -->
+				<td
+					class="n m {f} {source}"
+					class:trails={head !== null && !oursLeadsAll(weeklyPairs(line, f, sources))}
+					>{figureWords(scoreOf(line, source), f)}</td
+				>
 			{:else}
 				{@const shown = besideOf(line, source, f)}
 				<td class="n m {f} {source}"
@@ -156,21 +176,37 @@
 			<div class="tiles">
 				{#each RECORD_FIGURES as f (f)}
 					<div class="tile">
-						<span class="label">{FIGURE_HEADS[f]}</span>
-						<span class="vals"
-							><b>{figureWords(scoreOf(toDateAll, 'ours'), f)}</b>{#each beside as source (source)}
-								{@const shown = besideOf(toDateAll, source, f)}
-								<span
-									>{SOURCE_HEADS[source]}
-									{shown.value}{#if shown.ours}, {shown.ours.toLowerCase()}{/if}</span
-								>
-							{/each}</span
-						>
+						{#if head !== null}
+							<!-- Ours and each yardstick at one size, each pair naming its leader (fix round 1). -->
+							{#each weeklyPairs(toDateAll, f, sources) as pair, i (pair.name)}
+								<PairTile label={i === 0 ? FIGURE_HEADS[f] : null} {pair} />
+							{/each}
+						{:else}
+							<span class="label">{FIGURE_HEADS[f]}</span>
+							<span class="vals"
+								><b>{figureWords(scoreOf(toDateAll, 'ours'), f)}</b
+								>{#each beside as source (source)}
+									{@const shown = besideOf(toDateAll, source, f)}
+									<span
+										>{SOURCE_HEADS[source]}
+										{shown.value}{#if shown.ours}, {shown.ours.toLowerCase()}{/if}</span
+									>
+								{/each}</span
+							>
+						{/if}
 					</div>
 				{/each}
 			</div>
 			{#if gaps}<p class="scale">{gaps}</p>{/if}
 			{#if honest}<p class="honest">{honest}</p>{/if}
+		</div>
+	{:else if pending}
+		<div class="bug pending" aria-label={pending.title}>
+			<div class="head">
+				<span class="order">{pending.title}</span>
+				<span class="when">{pending.when}</span>
+			</div>
+			{#if gaps}<p class="scale">{gaps}</p>{/if}
 		</div>
 	{:else}
 		<Panel padding="md">

@@ -101,17 +101,18 @@ void test('the lead names only the orders drawn, and says we set the order', () 
 	);
 });
 
-void test('Published names the week it starts only once a set order kept it (B04, review M3)', () => {
-	const from7 = "From week 7 each week is also graded against the week's published projection.";
+void test('Published names the week it starts only once a set order kept it, as a plain rule (B04, review M3, Lane 140 C16)', () => {
+	const from7 =
+		"From week 7 the week's published projection is graded beside ours on the same players.";
 	assert.equal(publishedWords(beforePublished), from7);
 	const promise =
-		"Each week will also be graded against the week's published projection from the first week our order is set with it.";
+		"The week's published projection is graded beside ours from the first week we read it before setting our order.";
 	const upcoming = record({ weeks: [gradedWeek(1, false), week(2, null, 'upcoming')] });
 	assert.equal(publishedWords(upcoming), promise, 'never the next week, renewed each week');
 	assert.equal(publishedWords(record({})), promise);
 	assert.equal(
 		publishedWords(withPublished),
-		"From week 7 each week is also graded against the week's published projection (Published)."
+		"From week 7 the week's published projection (Published) is graded beside ours on the same players."
 	);
 });
 

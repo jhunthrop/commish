@@ -6,7 +6,7 @@
 		"placesOff": "places off",
 		"starters": "starters right"
 	},
-	"scale": "Order matched is how closely an order ranked the players as they finished the week: 1.00 is the same order, 0.00 no closer than chance, below it the reverse.",
+	"scale": "Order matched is how closely an order ranked the players to the week's finish: 1.00 is the same order, 0.00 no closer than chance, below 0.00 the order runs backwards.",
 	"startersBasis": "Starters right counts a standard 12-team lineup, the week's top 12 QBs, 24 RBs, 36 WRs and 12 TEs, and how many of them the order also put there.",
 	"method": "Each week we set our order before the first kickoff and graded it on its players' points, ADP on the same players.",
 	"publishedFromWeek": null,
