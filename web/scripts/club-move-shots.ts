@@ -14,7 +14,8 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { copyFault, watchData } from './copy-scan.ts';
-import { lastGameClubWords, UNKNOWN_CLUB_WEEK } from '../src/lib/player/club-words.ts';
+import { lastGameClubWords } from '../src/lib/player/club-words.ts';
+import { SEASON_LOG_WORDS } from '../src/lib/run/season-log-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { fixtureApiClock, installFixtureApiClock } from './inseason-fixture/clock.ts';
 
@@ -72,7 +73,7 @@ try {
 			if (!seen.team.includes('Lions')) faults.push(`${where}: the card does not name the Lions`);
 			for (const week of UNKNOWN_WEEKS) {
 				const row = seen.rows.find((r) => r.week === String(week));
-				if (row?.opponent !== UNKNOWN_CLUB_WEEK)
+				if (row?.opponent !== SEASON_LOG_WORDS.didNotPlay)
 					faults.push(`${where}: week ${String(week)} reads "${row?.opponent ?? 'nothing'}"`);
 			}
 			const copy = await copyFault(page, undefined, 'body');

@@ -49,12 +49,14 @@ import { designationsSchema } from '../../src/lib/run/schema.ts';
 import { IN_RESERVE, advise } from './advise.ts';
 import {
 	capturedFreeAgents,
+	isStandInRow,
 	json,
 	runLines,
-	waiverSentence,
 	type BoardRow,
+	type FixtureWaiverRow,
 	type Game
 } from './run-lines.ts';
+import { standInLineup } from './stand-in-lineup.ts';
 import {
 	accepts,
 	better,
@@ -173,29 +175,49 @@ const PLAYING_RANKS = new Map(
 	).rows.map((row) => [row.id, row.positionRank])
 );
 
+/** The member's lines as the answers hold them: the lineup's slots, its bench and its reserve, the
+ * roster build.ts gains each add over. */
+function memberLines(advice: LineupAdvice): PlayerLine[] {
+	return [
+		...advice.slots.map((s) => s.ours),
+		...advice.bench,
+		...((advice as Partial<LineupAdvice>).reserve ?? [])
+	];
+}
+
 /** The free agents the capture lists (Lane 132, B111): the API reads each free agent's designation,
  * so the waiver answer keeps every one, listed or held out, each line drawn from the stand-in run by
- * build.ts's own line builder (run-lines.ts) and carrying the capture's status. A rerun reads this
- * file back, so a player the answer already holds is not added twice. */
-async function capturedRows(answer: WaiverAdvice): Promise<WaiverAdvice['rows']> {
+ * build.ts's own line builder (run-lines.ts) and carrying the capture's status. STAND-INS (B118): each
+ * row is labelled `standin` (run-lines.ts FixtureWaiverRow, never served); his line is the stand-in
+ * run's, a preseason order, so his rank is that board's and his points over replacement a week are
+ * over that run's own weeks (week 1 through the horizon); his drop and gain are build.ts's rule over
+ * the member's lines (stand-in-lineup.ts), never pinned. A rerun drops the labelled rows it added
+ * before and draws them again. */
+async function capturedRows(answer: WaiverAdvice): Promise<FixtureWaiverRow[]> {
 	const run = new URL(`${RUN_ID}/`, RUNS);
 	const [board, schedule, manifest, league] = await Promise.all([
 		json<{ rows: BoardRow[] }>(new URL('boards/ppr-12.json', run)),
 		json<{ slates: { abbr: string; games: Game[] }[] }>(new URL('schedule.json', run)),
 		json<{ formats: { id: string; rosFromWeek?: number }[] }>(new URL('manifest.json', run)),
-		json<{ scoring_settings: Record<string, number> }>(new URL('league.json', REPLAY))
+		json<{ scoring_settings: Record<string, number>; roster_positions: string[] }>(
+			new URL('league.json', REPLAY)
+		)
 	]);
+	// A full-season run ranks from week 1.
+	const fromWeek = manifest.formats.find((f) => f.id === 'ppr-12')?.rosFromWeek ?? 1;
 	const { boardLine } = await runLines({
 		run,
 		rows: board.rows,
 		slates: schedule.slates,
-		// A full-season run ranks from week 1.
-		fromWeek: manifest.formats.find((f) => f.id === 'ppr-12')?.rosFromWeek ?? 1,
+		fromWeek,
 		week: answer.week,
-		weeksCovered: weeksCovered(answer.week, STANDARD_HORIZON),
+		// The run's order covers its own weeks, from its first: a week's share of its points.
+		weeksCovered: weeksCovered(fromWeek, STANDARD_HORIZON),
 		scoring: league.scoring_settings,
 		gameFacts: games
 	});
+	const { waiverAdd } = standInLineup(league.roster_positions);
+	const mine = memberLines(lineup);
 	const kept = new Set(answer.rows.map((r) => r.add.player.board_id));
 	const listed = capturedFreeAgents(
 		board.rows,
@@ -218,10 +240,8 @@ async function capturedRows(answer: WaiverAdvice): Promise<WaiverAdvice['rows']>
 						};
 			return {
 				add,
-				drop: null,
-				gain: 0,
-				starts: false,
-				sentence: waiverSentence(add, null, 0, false),
+				...waiverAdd(add, mine),
+				standin: true,
 				week_gain: 0,
 				pickup: false,
 				beats: null,
@@ -565,8 +585,10 @@ function pickupTable(advice: WaiverAdvice): WaiverAdvice {
 	};
 }
 
+/** The answer build.ts wrote: the rows a run before this one added are drawn again. */
+const builtWaivers = { ...waivers, rows: waivers.rows.filter((r) => !isStandInRow(r)) };
 const stampedWaivers = pickupTable(
-	stamp({ ...waivers, rows: [...waivers.rows, ...(await capturedRows(waivers))] })
+	stamp({ ...builtWaivers, rows: [...builtWaivers.rows, ...(await capturedRows(builtWaivers))] })
 );
 const stampedFinder = stamp(trades);
 

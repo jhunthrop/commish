@@ -8,6 +8,9 @@
 //   front     the heading's run words as the signed-out front page prints them (B96, a check).
 // Every page: nothing scrolls sideways and the copy passes the one guard (copy-scan.ts). Exits
 // non-zero on any fault.
+// STAND-INS (B118): 36 of the Waivers rows, the questionable and doubtful free agents with no Proj among
+// them, are the stand-in run's preseason lines the fixture adds (waivers.json rows labelled `standin`,
+// inseason-fixture/project.ts), their gain the fixture's one rule; they are fixture data, not a defect.
 //
 // Lane 121 (B99): the Stash line says A game in the heads' words, and with the fixture API started with
 // FIXTURE_SEASON_TAKEN=1 (a league stating no regular season's end) "Regular season taken as weeks 1 to

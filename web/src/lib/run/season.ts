@@ -110,7 +110,11 @@ export const gameLogRowSchema = statLineSchema.extend({
 	opponent: club.nullable(),
 	/** True at home, false away, null where the opponent is. */
 	home: z.boolean().nullable(),
-	status: z.enum(GAME_STATUSES)
+	status: z.enum(GAME_STATUSES),
+	/** Set on an inactive week naming no opponent when he played it (offensive snaps or a stat line) in
+	 * a game the run cannot name: a free agent's week with no club edge (Lane 138). Absent otherwise,
+	 * and on a run before the field. */
+	unnamedGame: z.literal(true).optional()
 });
 
 const seasonShape = z.object({
@@ -146,6 +150,8 @@ function checkRow(row: LogRow, index: number, through: number, fail: Fail): void
 	if (row.status === 'bye' && named) fail(`${at} is a bye but names an opponent.`);
 	if ((row.status === 'played' || row.status === 'upcoming') && !named)
 		fail(`${at} is ${row.status} but names no opponent.`);
+	if (row.unnamedGame === true && (row.status !== 'inactive' || named))
+		fail(`${at} is a game the run cannot name, but it is ${row.status} or names an opponent.`);
 	if (row.status === 'upcoming' && row.week <= through)
 		fail(`${at} is upcoming, but the records reach week ${String(through)}.`);
 	const played = row.status === 'played';
