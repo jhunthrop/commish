@@ -5,7 +5,6 @@ import {
 	captureLine,
 	captureShort,
 	designationWord,
-	dueBackThisWeek,
 	rankWord,
 	returningMark,
 	calendarDay,
@@ -56,9 +55,8 @@ export function statusView(status: PlayerStatus, saying: Saying, draftOrder = fa
 				: seasonLongLine(status, capture.readAt, restOfSeason, zone)
 		};
 	}
-	const back = dueBackThisWeek(status.status, false, status.returning)
-		? status.returning
-		: undefined;
+	// A return day on a week's designation: due back this week (Lane 153).
+	const back = status.returning;
 	return {
 		rank: null,
 		mark: back === undefined ? designationWord(status.status) : returningMark(back),
@@ -73,7 +71,7 @@ export function statusView(status: PlayerStatus, saying: Saying, draftOrder = fa
  * latest report, ..." (Lane 153). The report may be a week old by the time the page is read. */
 export function weekNote(status: PlayerStatus): string {
 	const word =
-		status.returning !== undefined && dueBackThisWeek(status.status, false, status.returning)
+		status.returning !== undefined && !status.seasonLong
 			? `Expected back ${calendarDay(status.returning, true)}`
 			: designationWord(status.status);
 	return `${word} on the latest report, which does not move his place on our board.`;

@@ -190,18 +190,9 @@ export function calendarDay(day: string, weekday = false): string {
 	return `${weekday ? weekdayTime(noon, 'UTC').slice(0, 4) : ''}${shortDay(noon, 'UTC')}`;
 }
 
-/** Whether a designation is due back this week (Lane 153): the API and the capture send a return day
- * on a week's designation only when he is designated to return by the week's last game day, so he is
- * this week's question, ranked as playing; the platform's own IR mark gives way to it. */
-export function dueBackThisWeek(
-	status: DesignationStatus,
-	seasonLong: boolean,
-	returning: string | null | undefined
-): boolean {
-	return typeof returning === 'string' && !seasonLongStatus(status, seasonLong);
-}
-
-/** "Back Sun Oct 25": a player due back this week, his pill's word (Lane 153). */
+/** "Back Sun Oct 25": a player due back this week, his pill's word (Lane 153). The API and the capture
+ * send a return day on a week's designation only when he is designated to return by the week's last
+ * game day: this week's question, ranked as playing. */
 export function returningMark(returning: string): string {
 	return `Back ${calendarDay(returning, true)}`;
 }

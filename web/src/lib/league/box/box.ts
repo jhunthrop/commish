@@ -12,7 +12,6 @@ import { isFreeAgent } from '#lib/format/free-agent.ts';
 import { lastName } from '#lib/format/draft.ts';
 import {
 	designationWord,
-	dueBackThisWeek,
 	rankWord,
 	returningMark,
 	seasonLongMark,
@@ -269,7 +268,7 @@ export function statusOf(
 		// due back this week says his day (Lane 153).
 		mark: seasonLong
 			? seasonLongMark({ status, since: designation?.since ?? null, returning }, zone)
-			: returning !== null && dueBackThisWeek(status, false, returning)
+			: returning !== null
 				? returningMark(returning)
 				: (carriedMark(designation, zone) ?? designationWord(status)),
 		sits: sitsHim(status),
@@ -282,9 +281,8 @@ export function statusOf(
  * platform's own IR mark beside his name gives way to it. */
 function dueBack(designation: WeekFacts['designation']): boolean {
 	return (
-		designation !== undefined &&
-		designation !== null &&
-		dueBackThisWeek(designation.status, designation.season_long === true, designation.returning)
+		typeof designation?.returning === 'string' &&
+		!seasonLongStatus(designation.status, designation.season_long === true)
 	);
 }
 
