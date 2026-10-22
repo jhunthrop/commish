@@ -266,13 +266,33 @@ def test_a_newest_line_whose_game_is_not_final_yet_passes_the_gate(tmp_path: Pat
     assert record.passed, record.reasons
 
 
-def test_a_special_teams_edge_whose_game_is_not_final_names_that_page_alone(tmp_path: Path) -> None:
+_SPECIAL_TEAMS_UNFINISHED: Final = Mover(
+    {5: _LINE, _UNFINISHED_WEEK: _SPECIAL_TEAMS}, {_UNFINISHED_WEEK: _NO_OFFENSIVE_SNAP}, _PAGE_CLUB
+)
+
+
+def test_a_special_teams_edge_whose_game_is_not_final_passes_the_gate(tmp_path: Path) -> None:
     """Gap 1, the edge alone: a snap row with no offensive snap in LAC's unfinished week 6 makes that week
-    upcoming under LAC's game, which is his page club's bye. The reader holds an upcoming week to his page
-    club's slate, so it refuses this page, and names it: the nightly would hold it, not the run."""
-    season = _write_mover(tmp_path, Mover({5: _LINE, 6: _SPECIAL_TEAMS}, {6: _NO_OFFENSIVE_SNAP}, _PAGE_CLUB))
+    upcoming under LAC's game (at KC), which is his page club's bye. The reader finds the week's game on the
+    slate of the club the row names (`web/src/lib/run/row-game.ts`), as the page draws its day; Lane 136's
+    first commit refused it (DET's slate has no week 6 game)."""
+    season = _write_mover(tmp_path, _SPECIAL_TEAMS_UNFINISHED)
     by_week = {row["week"]: row for row in season["log"]}
-    assert (by_week[6]["status"], by_week[6]["opponent"]) == ("upcoming", "KC")
+    assert (by_week[_UNFINISHED_WEEK]["status"], by_week[_UNFINISHED_WEEK]["opponent"]) == ("upcoming", "KC")
+    assert by_week[_UNFINISHED_WEEK]["home"] is False
+    record = schema_gate(tmp_path, _RUN, contract_dir(os.environ))
+    assert record.passed, record.reasons
+    assert "4 of 4 player pages parsed" in record.summary
+
+
+def test_a_week_to_play_that_is_no_clubs_game_is_refused_by_the_gate(tmp_path: Path) -> None:
+    """The reader still refuses a week still to play that no club's slate has: KC is home in week 6, so a
+    row at home against KC is no club's game, and his page club has none that week."""
+    _write_mover(tmp_path, _SPECIAL_TEAMS_UNFINISHED)
+    page_path = tmp_path / "runs" / _RUN / "players" / f"{_PLAYER}.json"
+    page = _read(page_path)
+    log = [{**row, "home": True} if row["week"] == _UNFINISHED_WEEK else row for row in page["season"]["log"]]
+    page_path.write_text(json.dumps({**page, "season": {**page["season"], "log": log}}))
     record = schema_gate(tmp_path, _RUN, contract_dir(os.environ))
     assert not record.passed
     assert record.reasons == (

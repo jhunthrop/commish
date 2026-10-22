@@ -129,7 +129,7 @@ void test("the weeks still to play name a game kicked off or final by the run's 
 		]
 	};
 	const states = { 6: 'kicked_off', 7: 'final', 8: 'upcoming' } as const;
-	const view = seasonView(season, 'WR', [FORMAT], (week) => ({
+	const view = seasonView(season, 'WR', [FORMAT], ({ week }) => ({
 		kickoff: KICKOFF,
 		state: states[week as keyof typeof states]
 	}));

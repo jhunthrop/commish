@@ -12,6 +12,7 @@
  * is wrong. The one basis is the one most blocks share, so the odd page is the one named.
  */
 import { FREE_AGENT_WORDS, isFreeAgent } from '#lib/format/free-agent.ts';
+import { rowGame } from './row-game.ts';
 import type { PlayerSeason } from './season.ts';
 import type { Schedule, Slate } from './schema.ts';
 
@@ -61,13 +62,15 @@ function freeAgentRefusal(p: SeasonedPlayer): string | null {
 	return `players/${p.id}.json is ${FREE_AGENT_WORDS}, but his week ${String(wrong.week)} is ${wrong.status === 'bye' ? 'a bye' : 'still to play'}.`;
 }
 
-/** Every upcoming week is a game on his club's slate, so it has a kickoff. */
+/** Every upcoming week is a game on a club's slate, so it has a kickoff: his club's, or, a mover's week
+ * under the club his line was for, that club's game (run/row-game.ts, Lane 136). A week that is no
+ * club's game is refused. */
 const kickoffRefusal: PageRule = (p, slates) => {
 	if (isFreeAgent(p.team)) return freeAgentRefusal(p);
-	const slate = slates.get(p.team);
-	if (!slate) return `players/${p.id}.json's club ${p.team} has no slate.`;
-	const weeks = new Set(slate.games.map((game) => game.week));
-	const missing = p.season.log.find((row) => row.status === 'upcoming' && !weeks.has(row.week));
+	if (!slates.has(p.team)) return `players/${p.id}.json's club ${p.team} has no slate.`;
+	const missing = p.season.log.find(
+		(row) => row.status === 'upcoming' && rowGame(slates, p.team, row) === null
+	);
 	if (!missing) return null;
 	return `players/${p.id}.json has week ${String(missing.week)} to play, but ${p.team}'s slate has no game, so no kickoff, that week.`;
 };

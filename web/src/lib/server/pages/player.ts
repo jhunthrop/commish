@@ -24,7 +24,13 @@ import type { TierCliff } from '#lib/ui/tier.ts';
 import type { CaptureStamp } from '#lib/format/designation.ts';
 import { playerStatusWords, type PlayerStatusWords } from '#lib/run/status-view.ts';
 import { builtSaying, captureStamp } from '../statuses.ts';
-import { heldSeasonView, seasonView, type KickoffOf, type SeasonView } from './player-season.ts';
+import {
+	heldSeasonView,
+	kickoffsFrom,
+	seasonView,
+	type KickoffOf,
+	type SeasonView
+} from './player-season.ts';
 import type { PlayerSeason, PriorSeason } from '#lib/run/season.ts';
 import { basisTiles, cardBuild, restParts, restTile, type CardBuild } from './player-card.ts';
 import type { BasisTile, CardTile, RestParts } from '#lib/player/card.ts';
@@ -314,16 +320,12 @@ async function lastKickoffsOf(): Promise<Record<number, string>> {
 	return last;
 }
 
-/** His club's game in each week, from the run's schedule: its kickoff and its state at the run. A free
+/** Each week's game of his, from the run's schedule: its kickoff and its state at the run; his club's,
+ * or a mover's week under another club's opponent, that club's (run/row-game.ts, Lane 136). A free
  * agent (Lane 123) has no club, so no game in any week. */
 async function kickoffsOf(team: string): Promise<KickoffOf> {
 	if (isFreeAgent(team)) return () => null;
-	const slate = (await schedule()).slates.find((candidate) => candidate.abbr === team);
-	if (!slate) throw new Error(`${team} has no slate on the run's schedule.`);
-	return (week) => {
-		const game = slate.games.find((candidate) => candidate.week === week);
-		return game === undefined ? null : { kickoff: game.kickoff, state: game.state ?? null };
-	};
+	return kickoffsFrom((await schedule()).slates, team);
 }
 
 /** His season block as the page shows it; a page held back with no copy (Lane 136) has none. */
