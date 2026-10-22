@@ -55,6 +55,7 @@ import { weekOrderAnswer, weekPosition, type WeekOrderStates } from './week-orde
 import { tradeChecker } from './trade-check.ts';
 import { proposedTrades } from './trade-needs.ts';
 import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
+import { servedWaivers } from './run-lines.ts';
 import { finalWords, rateWords, titleWeekHorizon, withRuleList } from './week.ts';
 import { lineupSpent, TURNED_WEEK, turnedLineup, turnedTrades, turnedWaivers } from './turn.ts';
 import {
@@ -146,7 +147,7 @@ const [
 ] = await Promise.all([
 	load<LeagueSync>('sync'),
 	load<LineupAdvice>('lineup'),
-	load<WaiverAdvice>('waivers'),
+	load<WaiverAdvice>('waivers').then(servedWaivers),
 	load<TradeAdvice>('trades'),
 	load<GameWeek>('games'),
 	load<MatchupBox>('matchup'),

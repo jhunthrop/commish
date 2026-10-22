@@ -10,7 +10,8 @@
 //     answer's (waivers.json), Sleeper taking no claim from here;
 //   - across positions the rows are in the order of their points over replacement, as the API ranks
 //     (rank_by points_over_replacement), with no kicker or defense (Lane 66m).
-// STAND-INS, named here and in the shots' caption: the fixture holds 85 of the order's players;
+// STAND-INS, named here and in the shots' caption: the fixture holds 121 of the order's players, 36 of
+// them the waiver answer's rows labelled `standin` (project.ts, B118: the stand-in run's lines);
 // rest_of_season_points is the line's points a game times his club's games left from week 6 through
 // 17 (the byes in sync.json), the division the API makes the other way; points_over_replacement is
 // the line's a week times the 12 weeks the order covers; at a position serve.ts ranks the players it
