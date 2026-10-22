@@ -15,17 +15,19 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import Engine, insert, text
+from sqlalchemy import Connection, Engine, insert, select, text
 
 from research.capsules.facts.depth_reads import designations_in
 from research.db.engine import make_engine
 from research.db.schema.provider import CAPTURE_SNAPSHOTS
 from research.db.url import sqlalchemy_url
+from research.inseason import __main__ as inseason
 from research.model.designations import CODES, status_of
 from research.nightly.designation_dating import (
     DATINGS_KEPT,
     DATINGS_TABLE,
     RUNS_STATEMENT_TIMEOUT,
+    DatingOutcome,
     date_newest_capture,
     dating_digest,
     encode_runs,
@@ -200,3 +202,62 @@ def test_with_no_capture_there_is_nothing_to_date(recorded: Engine) -> None:
         conn.execute(CAPTURE_SNAPSHOTS.delete())
         outcome = date_newest_capture(conn, _NOW)
     assert not outcome.dated and outcome.line == "designation-dating: no injury capture yet, nothing to date"
+
+
+# THE HOURLY JOB'S SAVEPOINT (Lane 141, B116): the dating commits with the capture it dates, and a failed
+# dating rolls back only itself.
+
+
+def _later_capture(captured_at: datetime) -> dict[str, Any]:
+    """The recording's newest capture again, an hour later: a new capture the job stores and dates."""
+    newest = max(_recorded(), key=lambda c: datetime.fromisoformat(c["captured_at"]))
+    return {
+        "source": BY_DATE_SOURCE,
+        "payload": newest["payload"],
+        "captured_at": captured_at,
+        "digest": captured_at.isoformat(),
+    }
+
+
+def _stored(engine: Engine, captured_at: datetime) -> tuple[bool, list[datetime]]:
+    """Whether another connection sees the capture, and the captures it sees dated."""
+    with engine.connect() as conn:
+        capture = conn.execute(
+            select(CAPTURE_SNAPSHOTS.c.captured_at).where(CAPTURE_SNAPSHOTS.c.captured_at == captured_at)
+        ).first()
+        dated = conn.execute(text(f"select capture_at from {DATINGS_TABLE} order by capture_at")).scalars().all()
+    return capture is not None, list(dated)
+
+
+_LATER = datetime(2026, 10, 12, 7, 0, 0, 123000, tzinfo=UTC)
+
+
+def test_the_hourly_dating_commits_with_its_capture(recorded: Engine, capsys: pytest.CaptureFixture[str]) -> None:
+    with recorded.begin() as conn:
+        conn.execute(insert(CAPTURE_SNAPSHOTS), [_later_capture(_LATER)])
+        # The capture is not committed yet: the dating reads it in the same transaction.
+        assert inseason._date_designations(conn, _NOW)
+        # Until the commit no other connection sees the capture or its dating: no API instance dates the
+        # capture itself between two commits.
+        assert _stored(recorded, _LATER) == (False, [])
+    assert _stored(recorded, _LATER) == (True, [_LATER])
+    assert "designation-dating: the capture of 2026-10-12T07:00:00.123Z dated" in capsys.readouterr().out
+
+
+def test_a_refused_dating_rolls_back_only_itself(
+    recorded: Engine, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def refused(conn: Connection, _now: datetime) -> DatingOutcome:
+        # A row the table refuses (its digest check) aborts the savepoint, never the capture.
+        conn.execute(text(f"insert into {DATINGS_TABLE} values ('not a digest', now(), '[]', now())"))
+        return DatingOutcome("never reached")
+
+    monkeypatch.setattr(inseason, "date_newest_capture", refused)
+    with recorded.begin() as conn:
+        conn.execute(insert(CAPTURE_SNAPSHOTS), [_later_capture(_LATER)])
+        assert inseason._date_designations(conn, _NOW)
+        # The transaction goes on past the rolled back savepoint.
+        assert conn.execute(text("select 1")).scalar_one() == 1
+    assert _stored(recorded, _LATER) == (True, [])
+    out = capsys.readouterr().out
+    assert "designation-dating: FAILED, IntegrityError" in out and "the API dates the capture itself" in out
