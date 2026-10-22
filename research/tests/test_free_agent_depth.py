@@ -1,5 +1,5 @@
 """A free agent's depth facts (Lane 127, B103): his own record (the seasons he played, his injuries) whatever
-his club, none of a club's (its depth chart, play caller, offence, schedule), and the record says "a free
+his club, none of a club's (its depth chart, play caller, offense, schedule), and the record says "a free
 agent" once, never a depth-chart line. A player on a club keeps his club's facts; a board free agent is in
 no club's depth-chart room, never his old club's by last season's archive."""
 

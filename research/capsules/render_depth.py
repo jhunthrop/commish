@@ -317,7 +317,7 @@ def _no_club(facts: "PlayerFacts") -> str | None:
     player_line), so this line does not say it again (review MEDIUM-3)."""
     if facts.identity.team is not None:
         return None
-    return "Club: none, so the record holds no depth chart, play caller, offence or schedule."
+    return "Club: none, so the record holds no depth chart, play caller, offense or schedule."
 
 
 def render_depth_section(facts: "PlayerFacts") -> str | None:

@@ -164,7 +164,7 @@ def _seasons(player_id: str, data: _Pass) -> list[SeasonInputs]:
 @dataclass(frozen=True, slots=True)
 class _ClubFacts:
     """The depth facts a club gives him: who calls the plays, his place on its depth chart, who else
-    eats there, its offence and its schedule. A free agent has none (Lane 127, B103)."""
+    eats there, its offense and its schedule. A free agent has none (Lane 127, B103)."""
 
     coaching: Coaching | None
     depth_chart: DepthChart | None
