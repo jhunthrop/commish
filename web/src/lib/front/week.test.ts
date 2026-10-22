@@ -459,7 +459,7 @@ void test("the front door's FFPC bug says the opponent's figures as the home doe
 	);
 	// With no roster his "--" is said so, never by the starters' key.
 	const rosterless = ffpc('playing', { projection: null, schedule_state: 'kicked_off' });
-	assert.match(rosterless ?? '', / Teams FFPC sends no lineup or roster for read --\.$/);
+	assert.match(rosterless ?? '', / Teams FFPC sends no lineup or roster for show --\.$/);
 	assert.doesNotMatch(rosterless ?? '', /No Proj final while/);
 	for (const said of [friday, sunday, rosterless]) assert.doesNotMatch(said ?? '', bannedPattern());
 	// The opponent's Proj is our best lineup, not his starters as set: that sentence goes (fix round 3).

@@ -5,7 +5,8 @@
     uv run python -m research.inseason --task capture-harvest
 
 `capture-harvest` takes the hourly provider capture, dates the newest injury capture for the API into
-`app.designation_datings` (Lane 134, `nightly/designation_dating.py`), then reads the hour's game figures from it into
+`app.designation_datings` (Lane 134, `nightly/designation_dating.py`) in the capture's transaction, in a
+savepoint (Lane 141, B116), then reads the hour's game figures from it into
 `tank01_lines` and the weather service's kickoff forecasts into `nws_forecast` (Lane 66a). While a game
 of the current week that kicked off has no final, up to four days past its kickoff (Lane 84), it asks
 Tank01's week of games once for their statuses (Lane 80, `pipeline/tank01/game_status.py`, at most two
@@ -44,7 +45,7 @@ from typing import Final
 
 import httpx
 from psycopg.errors import InsufficientPrivilege
-from sqlalchemy import Engine
+from sqlalchemy import Connection, Engine
 from sqlalchemy.exc import SQLAlchemyError
 
 from research.cli import log_line as _line
@@ -219,9 +220,11 @@ def _capture_harvest(now: datetime) -> bool:
     fetcher = LiveFetcher()
     season = int(os.environ.get(SEASON_ENV, DEFAULT_SEASON))
     try:
+        # The dating commits with the capture it dates, so no API instance sees the capture undated and
+        # dates it itself (Lane 141, B116); its savepoint keeps the capture from a refused dating.
         with engine.begin() as conn:
             result = run_capture_harvest(conn, Tank01Client(fetcher, key), now, season)
-        dated_ok = _date_designations(engine, now)
+            dated_ok = _date_designations(conn, now)
         facts_ok = _game_facts(engine, fetcher, result, now)
         # On what the harvest left of its request budget this pass (Lane 80).
         left = CAPTURE_HARVEST_REQUEST_BUDGET - sum(feed.requests for feed in result.feeds)
@@ -247,14 +250,15 @@ def _capture_harvest(now: datetime) -> bool:
     return not failed and dated_ok and facts_ok and status.ok and returns_ok and parsed and market and charts
 
 
-def _date_designations(engine: Engine, now: datetime) -> bool:
-    """Right after the capture, the newest injury capture dated for the API (Lane 134,
-    `nightly/designation_dating.py`) in a transaction of its own, so a refused write never rolls back
-    the capture. Any failure is its own line and the hour goes on (the API dates the capture itself
-    meanwhile, as before); only a missing grant fails the job, since it fails every hour until an
-    operator grants it."""
+def _date_designations(conn: Connection, now: datetime) -> bool:
+    """Right after the capture, in its transaction, the newest injury capture dated for the API (Lane 134,
+    `nightly/designation_dating.py`): the two commit together, so no API instance dates the capture
+    itself between them (Lane 141, B116), and the dating runs in a savepoint, so a refused or failed
+    dating rolls back only itself and the capture commits. Any failure is its own line and the hour goes
+    on (the API dates the capture itself meanwhile, as before); only a missing grant fails the job, since
+    it fails every hour until an operator grants it."""
     try:
-        with engine.begin() as conn:
+        with conn.begin_nested():
             outcome = date_newest_capture(conn, now)
     except SQLAlchemyError as error:
         LOG.exception("the designation dating failed")

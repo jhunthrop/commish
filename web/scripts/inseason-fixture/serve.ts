@@ -34,7 +34,12 @@ import { playerWeek, type Sheet } from './player-week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 import { ESPN_STAND_IN_NAME, espnMatchup, espnSync } from './espn-sync.ts';
 import { yahooStandIn } from './yahoo.ts';
-import { ffpcAfterSunday, ffpcBeforeSunday } from './ffpc.ts';
+import {
+	ffpcAfterSunday,
+	ffpcBeforeSunday,
+	ffpcRosterless,
+	FFPC_ROSTERLESS_OPPONENT_VARIABLE
+} from './ffpc.ts';
 import { afterSundayOf, momentAt, SUNDAY, sundayOf } from './sunday.ts';
 import { linesOf, recordedMatchups, scoreboardAt } from './scoreboard-at.ts';
 import { inSeason, noWeek } from './member-week.ts';
@@ -553,6 +558,15 @@ const yahooAsked = (req: IncomingMessage, id: string): boolean =>
 const FFPC_PLATFORM = /(?:^|; )fixture_platform=ffpc(?:;|$)/;
 const ffpcAsked = (req: IncomingMessage, id: string): boolean =>
 	id === LEAGUE && FFPC_PLATFORM.test(req.headers.cookie ?? '');
+/** The recorded rosters as the FFPC stand-in reads them: its rosterless teams, the member's opponent
+ * among them under FIXTURE_FFPC_ROSTERLESS_OPPONENT=1 (Lane 141, B121). */
+const ffpcRecorded = {
+	...recordedWeek,
+	rosterless: ffpcRosterless(
+		sync.matchup?.opponent?.roster_id ?? null,
+		process.env[FFPC_ROSTERLESS_OPPONENT_VARIABLE] === '1'
+	)
+};
 /** The platform a request asks the recorded league on, its own when none. */
 const platformAsked = (req: IncomingMessage, id: string): 'yahoo' | 'ffpc' | null =>
 	yahooAsked(req, id) ? 'yahoo' : ffpcAsked(req, id) ? 'ffpc' : null;
@@ -577,11 +591,11 @@ function standInAsked(req: IncomingMessage, id: string): StandIn | null {
 	// The FFPC stand-in reads on the week's Saturday (its shots, Lane 94) and, after its Sunday, with the
 	// opponent's starters unlisted as FFPC's read holds them (Lane 121 fix round 2).
 	if (ffpcAsked(req, id) && afterSunday())
-		return { ...ffpcAfterSunday(sleeperAfter(), momentAt(now()), recordedWeek), readAt: readAt() };
+		return { ...ffpcAfterSunday(sleeperAfter(), momentAt(now()), ffpcRecorded), readAt: readAt() };
 	// Before it, every side but the member's unlisted too, from Thursday night on (Lane 127, B105).
 	if (ffpcAsked(req, id)) {
 		const week = { sync, lineup, matchup: matchupBox, scoreboard: scoreboardNow() };
-		return { ...ffpcBeforeSunday(week, momentAt(now()), recordedWeek), readAt: readAt() };
+		return { ...ffpcBeforeSunday(week, momentAt(now()), ffpcRecorded), readAt: readAt() };
 	}
 	if (!sunday && afterSunday()) {
 		const at = readAt();

@@ -29,6 +29,12 @@ def _engine() -> Any:
     return cast("Any", type("E", (), {"begin": lambda self: nullcontext(object())})())
 
 
+def _conn() -> Any:
+    """A connection whose savepoint does nothing: the dating's wiring alone (the savepoint's own path is
+    test_designation_dating's, against a database)."""
+    return cast("Any", type("C", (), {"begin_nested": lambda self: nullcontext(object())})())
+
+
 def _refused(*_args: object) -> None:
     raise RuntimeError("the capture's shape changed")
 
@@ -64,12 +70,12 @@ def test_the_hourly_job_dates_the_capture_and_fails_only_on_a_missing_grant(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(inseason, "date_newest_capture", lambda *args: DATED)
-    assert inseason._date_designations(_engine(), NOW)
+    assert inseason._date_designations(_conn(), NOW)
     assert f"  {DATED.line}" in capsys.readouterr().out
     # A missing grant fails every hour until an operator grants it: the job fails and alerts.
     denied = ProgrammingError("insert", {}, InsufficientPrivilege("permission denied for schema app"))
     monkeypatch.setattr(inseason, "date_newest_capture", _raising(denied))
-    assert not inseason._date_designations(_engine(), NOW)
+    assert not inseason._date_designations(_conn(), NOW)
     assert (
         "designation-dating: FAILED, ProgrammingError: permission denied for schema app; "
         "the API dates the capture itself" in capsys.readouterr().out
@@ -81,7 +87,7 @@ def test_the_hourly_job_dates_the_capture_and_fails_only_on_a_missing_grant(
         RuntimeError("a bug"),
     ):
         monkeypatch.setattr(inseason, "date_newest_capture", _raising(error))
-        assert inseason._date_designations(_engine(), NOW)
+        assert inseason._date_designations(_conn(), NOW)
         out = capsys.readouterr().out
         assert "designation-dating: FAILED, " in out and "the API dates the capture itself" in out
 

@@ -232,4 +232,22 @@ void test("a free agent's weeks past the records list no row, and his played wee
 			['Did not play', '', 'quiet']
 		]
 	);
+	// B120: his "Played, no stats" week past the records keeps its row and the head counts it, so the
+	// head never says week 3 over a table listing his week 4.
+	const ahead = {
+		...season,
+		log: season.log.map((r) => (r.week === 4 ? { ...r, unnamedGame: true as const } : r))
+	};
+	const view4 = seasonView(ahead, 'WR', [FORMAT], () => null);
+	assert.equal(view4.aside, '2026, PPR, through week 4');
+	assert.deepEqual(
+		view4.rows.map((row) => [row.week, row.opponent]),
+		[
+			[1, 'vs BUF'],
+			[2, 'Did not play'],
+			[3, 'Did not play'],
+			[4, 'Played, no stats']
+		]
+	);
+	assert.equal(seasonView(season, 'WR', [FORMAT], () => null).aside, '2026, PPR, through week 3');
 });

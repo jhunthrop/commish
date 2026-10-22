@@ -5,6 +5,8 @@ export const SEASON_LOG_WORDS = {
 	didNotPlay: 'Did not play',
 	/** Offensive snaps in a game the run cannot name (a free agent's week with no club edge, Lane 138):
 	 * he played, and the log has no stats to show for it. The ruling's "Played, no line" says the
-	 * betting word the copy guard refuses (banned-words.json `line`), so the table says stats (Lane 138). */
+	 * betting word the copy guard refuses (banned-words.json `line`), so the table says stats (Lane 138).
+	 * The week counts as a game: the season head's "through week N" reaches it, past the records too
+	 * (reach.ts countedWeek, Lane 141, B120). */
 	playedNoStats: 'Played, no stats'
 } as const;

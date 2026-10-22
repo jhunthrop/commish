@@ -32,6 +32,17 @@ void test('a season reaches its through week, or his later game that is already 
 	assert.equal(newestCountedWeek([freeAgent, sunday]), 5);
 });
 
+void test('a week he played that the run cannot name counts, past the records too (B120)', () => {
+	// His week 6 "Played, no stats" (Lane 138): the head says week 6 over a log listing it.
+	const snapped = {
+		through: 5,
+		log: [row(5, 'played'), { ...row(6, 'inactive', null), unnamedGame: true as const }]
+	};
+	assert.equal(countedWeek(snapped), 6);
+	// A week naming no club he did not play still reaches nothing.
+	assert.equal(countedWeek({ through: 5, log: [row(5, 'played'), row(6, 'inactive', null)] }), 5);
+});
+
 void test("the run's figures reach the newest counted game of any player, never less than through", () => {
 	const thursday = { through: 5, log: [row(6, 'played')] };
 	const sunday = { through: 5, log: [row(6, 'upcoming')] };

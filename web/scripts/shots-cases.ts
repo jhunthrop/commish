@@ -228,6 +228,21 @@ export const SHOT_CASES: readonly ShotCase[] = [
 		fixture: { FIXTURE_LATE_FINAL: 'LV,BUF' },
 		env: { CLOCK: 'tuesday-late' }
 	}),
+	// The member's opponent with no lineup or roster read (Lane 141, B121): "--" said in its own words.
+	...clocked(
+		'ffpc-no-box-shots',
+		'standin',
+		{
+			saturday: FIXTURE_WEEK_CLOCK,
+			sunday: FIXTURE_SUNDAY_MORNING_CLOCK,
+			'monday-live': FIXTURE_LIVE_CLOCK
+		},
+		{
+			fixture: { FIXTURE_FFPC_ROSTERLESS_OPPONENT: '1' },
+			env: { ROSTERLESS: '1' },
+			tag: 'rosterless-'
+		}
+	),
 	once('front-account-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	once('league-rail-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	once('purpose-shots', 'standin', FIXTURE_WEEK_CLOCK, { name: 'purpose-shots-week' }),
