@@ -71,7 +71,7 @@ def written(monkeypatch: pytest.MonkeyPatch) -> list[PlayerWeekObservation]:
 
 def test_the_usage_steps_run_after_the_stats_and_before_the_register() -> None:
     assert STEPS[: 1 + len(usage_steps.USAGE_STEPS)] == ("stats-ingest", *usage_steps.USAGE_STEPS)
-    assert STEPS[-4:] == ("props-snapshot", "grade", "freeze", "scoreboard")
+    assert STEPS[-5:] == ("props-snapshot", "grade", "freeze", "espn-fill", "scoreboard")
 
 
 def test_play_by_play_counts_every_passers_dropbacks_in_the_same_stream(written: list[PlayerWeekObservation]) -> None:

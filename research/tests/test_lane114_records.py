@@ -25,7 +25,7 @@ from research.db.url import sqlalchemy_url
 from research.errors import SchemaDriftError
 from research.inseason import season_week
 from research.inseason.season_week import GRADE_AFTER, SeasonWeekContext
-from research.model.register.freeze import SERVED_SOURCE, SHIPPED_SOURCE, week_espn_points
+from research.model.register.freeze import SERVED_SOURCE, SHIPPED_SOURCE, week_espn_read
 from research.nightly.build.season import draft_json, weekly_json
 from research.nightly.reads import draft_record, weekly_record
 from research.nightly.reads.record import Score
@@ -182,11 +182,12 @@ def test_a_read_is_kept_and_the_freeze_takes_the_newest_at_or_before_it(engine: 
             [{"season": _SEASON, "week": 7, "read_at": at, "espn_id": espn, "ppr_points": points}
              for at, espn, points in ((late, "11", 9.5), (_SET + timedelta(minutes=1), "11", 1.0))],
         )  # fmt: skip
-        kept = week_espn_points(conn, _SEASON, 7, _SET)
-        before = week_espn_points(conn, _SEASON, 7, early - timedelta(seconds=1))
+        kept = week_espn_read(conn, _SEASON, 7, _SET)
+        before = week_espn_read(conn, _SEASON, 7, early - timedelta(seconds=1))
         conn.rollback()
-    assert kept == {"00-a": 9.5}  # the newest read at or before the freeze, through his ESPN id
-    assert before == {}
+    assert kept.points == {"00-a": 9.5}  # the newest read at or before the freeze, through his ESPN id
+    assert kept.read_at == late  # and its instant, which the freeze keeps beside it (Lane 146)
+    assert (before.points, before.read_at) == ({}, None)
 
 
 def test_a_failed_read_raises_and_stores_nothing(engine: Engine) -> None:

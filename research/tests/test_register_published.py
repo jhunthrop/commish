@@ -2,7 +2,7 @@
 0013) and ESPN's own projection (Lane 114, revision 0017), his PPR points on the read at the freeze,
 None where it lists no row for him."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from research.db.schema.boards import REGISTER_FREEZE_ROWS
@@ -26,16 +26,18 @@ def _entry(player_id: str) -> SimpleNamespace:
 
 
 def test_a_freeze_row_carries_each_yardstick_or_none() -> None:
-    kept = freeze.Yardsticks({"listed": _POINTS}, {"listed": _ESPN})
+    read_at = _AT - timedelta(minutes=3)
+    kept = freeze.Yardsticks({"listed": _POINTS}, {"listed": _ESPN}, read_at)
     listed = freeze._freeze_row(2026, 7, _AT, _entry("listed"), {}, {}, {}, kept)
     absent = freeze._freeze_row(2026, 7, _AT, _entry("absent"), {}, {}, {}, kept)
-    assert (listed["published_points"], listed["espn_points"]) == (_POINTS, _ESPN)
-    assert (absent["published_points"], absent["espn_points"]) == (None, None)
+    assert (listed["published_points"], listed["espn_points"], listed["espn_read_at"]) == (_POINTS, _ESPN, read_at)
+    # The read's instant rides only with a figure from it (Lane 146).
+    assert (absent["published_points"], absent["espn_points"], absent["espn_read_at"]) == (None, None, None)
 
 
 def test_the_schema_and_the_insert_name_the_columns() -> None:
-    for column in ("published_points", "espn_points"):
+    for column in ("published_points", "espn_points", "espn_read_at"):
         assert column in REGISTER_FREEZE_ROWS.c
         assert REGISTER_FREEZE_ROWS.c[column].nullable
-    # Declared last (Lane 114): a reader that predates the column is unchanged.
-    assert list(REGISTER_FREEZE_ROWS.c.keys())[-1] == "espn_points"
+    # Declared last (Lane 114, then Lane 146): a reader that predates the column is unchanged.
+    assert list(REGISTER_FREEZE_ROWS.c.keys())[-2:] == ["espn_points", "espn_read_at"]

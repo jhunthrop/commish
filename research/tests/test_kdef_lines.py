@@ -272,7 +272,7 @@ _ONLY_KDEF = frozenset(STEPS) - {KICKING_DEFENSE}
 
 def test_the_step_sits_after_the_stats_it_stamps_from() -> None:
     assert STEPS.index(KICKING_DEFENSE) > STEPS.index("stats-ingest")
-    assert STEPS[-4:] == ("props-snapshot", "grade", "freeze", "scoreboard")
+    assert STEPS[-5:] == ("props-snapshot", "grade", "freeze", "espn-fill", "scoreboard")
 
 
 def test_the_weekly_pass_refreshes_the_tables_then_the_lines_and_reports_each_week(
