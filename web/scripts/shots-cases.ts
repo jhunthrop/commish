@@ -22,6 +22,9 @@ import {
 	SATURDAY_RUN_ID
 } from './inseason-fixture/run-ids.ts';
 
+/** Environment variables a case or a run sets on a child process. */
+export type Vars = Readonly<Record<string, string | undefined>>;
+
 export type RunKey =
 	| 'standin'
 	| 'contract'
@@ -35,7 +38,7 @@ export type RunKey =
 
 interface WriteStep {
 	args: readonly string[];
-	env?: NodeJS.ProcessEnv;
+	env?: Vars;
 }
 
 export interface ShotRun {
@@ -116,9 +119,9 @@ export interface ShotCase {
 	/** The fixture API's clock (FIXTURE_CLOCK). */
 	clock: string;
 	/** The fixture API's other flags. */
-	fixture?: NodeJS.ProcessEnv;
+	fixture?: Vars;
 	/** The script's own environment. */
-	env?: NodeJS.ProcessEnv;
+	env?: Vars;
 	args: (o: Origins) => string[];
 	/** The script starts the fixture API itself, on the port it is given. */
 	ownFixture?: boolean;
@@ -135,8 +138,8 @@ function clocked(
 	clocks: Readonly<Record<string, string>>,
 	extra: {
 		variable?: string;
-		env?: NodeJS.ProcessEnv;
-		fixture?: NodeJS.ProcessEnv;
+		env?: Vars;
+		fixture?: Vars;
 		tag?: string;
 	} = {}
 ): ShotCase[] {

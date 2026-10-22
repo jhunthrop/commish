@@ -25,7 +25,7 @@
 // and the dev server. Logs and shots go to screenshots/shots/<case>/.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
-import { SHOT_CASES, SHOT_RUNS, type RunKey, type ShotCase } from './shots-cases.ts';
+import { SHOT_CASES, SHOT_RUNS, type RunKey, type ShotCase, type Vars } from './shots-cases.ts';
 
 const BASE = Number(process.env.SHOTS_PORT_BASE ?? 8840);
 const PORTS = { fixture: BASE, web: BASE + 1, inspector: BASE + 2, dev: BASE + 3 } as const;
@@ -53,7 +53,7 @@ if (cases.length === 0) throw new Error(`No shot case is named ${named.join(', '
 const owned = new Set<ChildProcess>();
 
 /** Starts a command in its own process group, so stopping it stops what it started. */
-function start(command: string, args: readonly string[], env: NodeJS.ProcessEnv, log?: string) {
+function start(command: string, args: readonly string[], env: Vars, log?: string) {
 	const child = spawn(command, args, {
 		cwd: WEB,
 		env: { ...process.env, ...env },
@@ -85,7 +85,7 @@ process.on('SIGINT', () => process.exit(130));
 async function run(
 	command: string,
 	args: readonly string[],
-	env: NodeJS.ProcessEnv = {},
+	env: Vars = {},
 	log?: string
 ): Promise<number> {
 	const child = start(command, args, env, log);
@@ -102,7 +102,7 @@ async function run(
 	return code;
 }
 
-async function must(command: string, args: readonly string[], env: NodeJS.ProcessEnv = {}) {
+async function must(command: string, args: readonly string[], env: Vars = {}) {
 	const code = await new Promise<number>((resolve) => {
 		const child = spawn(command, args, {
 			cwd: WEB,
