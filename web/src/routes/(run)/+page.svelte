@@ -250,19 +250,13 @@
 					<PanelHead title="Our record" aside={page.record.season.toString()} />
 					{#if page.front}
 						<p class="standing">{page.front.name}</p>
-						{#if page.front.value !== null}
-							<div class="figures">
-								<Figure value={page.front.value} size="lg" caption={page.front.caption} />
-							</div>
-						{:else}
-							<!-- Ours and ADP at one size, each pair's leader named (C05). -->
-							<p class="record-note">{page.front.caption}</p>
-							<div class="figures pairs">
-								{#each page.front.pairs as pair (pair.label)}
-									<PairTile label={pair.label} {pair} size="md" />
-								{/each}
-							</div>
-						{/if}
+						<!-- Ours and its yardstick at one size, each pair's leader named (C05). -->
+						<p class="record-note">{page.front.caption}</p>
+						<div class="figures pairs">
+							{#each page.front.pairs as pair (pair.label)}
+								<PairTile label={pair.label} {pair} size="md" />
+							{/each}
+						</div>
 						{#if page.front.second}<p class="record-note">{page.front.second}</p>{/if}
 						<p class="record-note">{page.front.scale}</p>
 						{#if page.front.note}<p class="record-note">{page.front.note}</p>{/if}

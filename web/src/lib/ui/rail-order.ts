@@ -47,14 +47,14 @@ export function railFor(phase: LeaguePhase, waiversOpen: boolean): readonly Rail
 
 /** The season's rail with no league selected (signed out, or none followed; Lane 83, amending spec
  * 2026-10-16 §2): League, the follow page's one door, then the season's own pages, the week's order
- * among them (Lane 140, C19), all on the phone's five. The mock room is the front door's quiet verb in
- * season, so the rail gives its place to the week's order. Lineup, Matchup, Waivers and Trades could only lead to the follow page,
+ * (Lane 140, C19), which is Players under the week's name, and the mock room, all on the phone's
+ * five. Lineup, Matchup, Waivers and Trades could only lead to the follow page,
  * so they are not drawn. The rail styles show it on a season rail whose root names no league. */
 export const RAIL_WITHOUT_LEAGUE: readonly RailEntry[] = entries([
 	'league',
 	'rest_first',
 	'week',
-	'players',
+	'mock',
 	'record'
 ]);
 

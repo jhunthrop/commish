@@ -1,7 +1,7 @@
 /** A figure of ours beside a yardstick's, drawn at the same size, with the pair's leader named in one
  * word (Lane 140, C05): "level", "ours by 0.2", "ADP by 3". Ours is accented only where it leads, so a
  * tie or a loss never reads as a win. Pure, so the words and the leader are tested here. */
-import { RATE_PLACES, figureWords, type RecordFigure } from './record.ts';
+import { RATE_PLACES, figureWords, printPlaces, type RecordFigure } from './record.ts';
 import type { Score } from './schema.ts';
 
 /** The places each figure prints to: order matched to two, places off to one, the counts whole. */
@@ -51,7 +51,9 @@ function units(score: Score, figure: RecordFigure): number | null {
 				: score.startersOf === 0
 					? null
 					: score.starters;
-	return value === null ? null : Math.round(value * 10 ** PLACES[figure]);
+	if (value === null) return null;
+	// The printed figure's digits, never a rounding of our own (review LOW-1): 13.3 at one place is 133.
+	return PLACES[figure] === 0 ? value : Number(printPlaces(value, PLACES[figure]).replace('.', ''));
 }
 
 /** The pair for one figure: both printed as their cells print them, the leader by the figure's own

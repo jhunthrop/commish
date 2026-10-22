@@ -1,6 +1,7 @@
 <script lang="ts">
 	import BasisBlock from '#lib/ui/BasisBlock.svelte';
 	import Figure from '#lib/ui/Figure.svelte';
+	import PairTile from '#lib/ui/PairTile.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import {
 		RECORD_AFTER,
@@ -42,7 +43,9 @@
 		beforeLine,
 		weeklyBasis,
 		weeklyLines,
+		oursLeadsAll,
 		weeklyOrderWords,
+		weeklyPairs,
 		weeklyPending,
 		weeklySources,
 		weeklySpan,
@@ -140,7 +143,12 @@
 	{#each RECORD_FIGURES as f (f)}
 		{#each sources as source (source)}
 			{#if source === 'ours'}
-				<td class="n m {f} {source}">{figureWords(scoreOf(line, source), f)}</td>
+				<!-- The weekly record accents ours only where it leads every yardstick (fix round 1). -->
+				<td
+					class="n m {f} {source}"
+					class:trails={head !== null && !oursLeadsAll(weeklyPairs(line, f, sources))}
+					>{figureWords(scoreOf(line, source), f)}</td
+				>
 			{:else}
 				{@const shown = besideOf(line, source, f)}
 				<td class="n m {f} {source}"
@@ -168,16 +176,24 @@
 			<div class="tiles">
 				{#each RECORD_FIGURES as f (f)}
 					<div class="tile">
-						<span class="label">{FIGURE_HEADS[f]}</span>
-						<span class="vals"
-							><b>{figureWords(scoreOf(toDateAll, 'ours'), f)}</b>{#each beside as source (source)}
-								{@const shown = besideOf(toDateAll, source, f)}
-								<span
-									>{SOURCE_HEADS[source]}
-									{shown.value}{#if shown.ours}, {shown.ours.toLowerCase()}{/if}</span
-								>
-							{/each}</span
-						>
+						{#if head !== null}
+							<!-- Ours and each yardstick at one size, each pair naming its leader (fix round 1). -->
+							{#each weeklyPairs(toDateAll, f, sources) as pair, i (pair.name)}
+								<PairTile label={i === 0 ? FIGURE_HEADS[f] : null} {pair} />
+							{/each}
+						{:else}
+							<span class="label">{FIGURE_HEADS[f]}</span>
+							<span class="vals"
+								><b>{figureWords(scoreOf(toDateAll, 'ours'), f)}</b
+								>{#each beside as source (source)}
+									{@const shown = besideOf(toDateAll, source, f)}
+									<span
+										>{SOURCE_HEADS[source]}
+										{shown.value}{#if shown.ours}, {shown.ours.toLowerCase()}{/if}</span
+									>
+								{/each}</span
+							>
+						{/if}
 					</div>
 				{/each}
 			</div>

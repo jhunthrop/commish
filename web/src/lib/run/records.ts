@@ -2,18 +2,15 @@
  * rankings against ESPN and the week's published projection (from week 7), and the draft record,
  * our draft board against ADP on the season's points so far. Each is named by what it grades; ADP appears on the draft record alone. The weekly record is in the record's
  * own shape, so the page reads it with the record's functions (record.ts). */
-import { dayTimeStamp } from '#lib/format/day-time.ts';
+import { BUILD_ZONE, dayTimeStamp } from '#lib/format/day-time.ts';
 import { dayLabel, weekdayLabel, weekdayWord } from '#lib/format/date.ts';
 import { plural } from '#lib/format/number.ts';
-import { BUILD_ZONE } from '#lib/front/live-board.ts';
 import type { BasisPart } from './board-basis.ts';
 import { figurePair, type FigurePair } from './record-pair.ts';
 import {
-	RATE_PLACES,
 	RECORD_BOX,
 	RECORD_WORDS,
 	figureWords,
-	printPlaces,
 	publishedDrawn,
 	publishedWords,
 	saidOnly,
@@ -46,7 +43,8 @@ export const RECORDS_WORDS = {
 	setAt: (stamp: string) => `set ${stamp}`,
 	notPlayed: 'not played yet',
 	gradedOn: (day: string) => `graded ${day}`,
-	gradesOn: (day: string) => `grades ${day} when the stats land`,
+	/** The run's day is the earliest the grading pass may grade (review MEDIUM-1), so "from". */
+	gradesOn: (day: string) => `grades from ${day}, when the stats land`,
 	gradesLater: 'grades when the stats land',
 	/** The weekly record's bug before a week of it is graded (C04): no figure, the week and when. */
 	pending: (week: number) => `Week ${String(week)} not graded yet`,
@@ -55,7 +53,7 @@ export const RECORDS_WORDS = {
 			? 'Grades when the stats land.'
 			: day === null
 				? `Grades after ${game}'s game.`
-				: `Grades ${day} after ${game}'s game.`,
+				: `Grades from ${day}, after ${game}'s game.`,
 	/** A first week with no date on file yet. */
 	setUnknown: 'set before its first kickoff',
 	espnBasis:
@@ -97,11 +95,9 @@ export const RECORDS_WORDS = {
 	lineupEspn: "ESPN's picks",
 	/** What the league row's figures are, at both widths (Lane 131 review MEDIUM-1, Lane 138). */
 	leagueRow: "Your league's row grades its rostered players and both lineups.",
-	frontWeekly: (span: string, players: string, beside: string) =>
-		`Order matched, our weekly rankings over ${span}, ${players}.${beside}`,
+	frontWeekly: (span: string, players: string) => `Our weekly rankings over ${span}, ${players}.`,
 	frontDraft: (through: number, players: string) =>
 		`Our draft board through week ${String(through)}, ${players}.`,
-	frontStarters: (ours: string, beside: string) => `Starters right ${ours}${beside}.`,
 	frontWeeklyNext: (week: number) => `Weekly rankings start week ${String(week)}.`,
 	/** The weekly record's upcoming weeks (fix round 1, M4): the next one on its own line, the rest
 	 * said once. */
@@ -368,12 +364,11 @@ export interface FrontPair extends FigurePair {
 }
 
 /** The front door's record card (ruling 4): the weekly record once a week of it is graded, the
- * draft record until then, named either way. The draft record draws ours and ADP as pairs at one
- * size (C05); the weekly record its figure with the yardsticks in its caption. */
+ * draft record until then, named either way. Each draws ours and its yardstick as pairs at one
+ * size (C05): ADP on the draft record, the first yardstick drawn on the weekly one. */
 export interface FrontRecord {
 	name: string;
-	/** The weekly record's figure; null on the draft record, which draws its pairs. */
-	value: string | null;
+	/** Ours beside the yardstick, at one size, each naming its leader (C05, fix round 1 MEDIUM-2). */
 	pairs: readonly FrontPair[];
 	caption: string;
 	/** The order matched scale, said under the figure (M4). */
@@ -382,16 +377,30 @@ export interface FrontRecord {
 	note: string | null;
 }
 
-function rate(value: number | null): string {
-	return value === null ? RECORD_BOX.none : printPlaces(value, RATE_PLACES);
+/** The weekly record's yardsticks, each with the line's ours it is compared with: on the season to
+ * date, ours pooled again over the weeks that graded it (review 66j N1); on a week's line, ours. */
+const OURS_ON = { espn: 'oursOnEspn', published: 'oursOnPublished' } as const;
+type Yardstick = keyof typeof OURS_ON;
+const isYardstick = (source: RecordSource): source is Yardstick => source in OURS_ON;
+
+/** Ours beside each yardstick the weekly record draws, for one figure, each at one size with its
+ * leader (Lane 140 fix round 1, HIGH-1: the C05 rule on the weekly record). */
+export function weeklyPairs(
+	line: RecordLine | undefined,
+	figure: RecordFigure,
+	sources: readonly RecordSource[]
+): FigurePair[] {
+	return sources.filter(isYardstick).map((source) => {
+		const ours = line?.[OURS_ON[source]] ?? line?.ours ?? null;
+		return figurePair(ours, line?.[source] ?? null, figure, RECORD_BOX[source]);
+	});
 }
 
-/** Each yardstick drawn beside ours on a weekly line, as ". ESPN 0.58. Published 0.55". */
-function besideWords(line: RecordLine, figure: RecordFigure): string {
-	const named = (['espn', 'published'] as const).flatMap((source) =>
-		line[source] === null ? [] : [`${RECORD_BOX[source]} ${figureWords(line[source], figure)}`]
-	);
-	return named.length === 0 ? '' : `, ${named.join(', ')}`;
+/** Whether ours is drawn accented in a weekly cell: only where it leads every yardstick graded there;
+ * with none graded there is nothing to lead. */
+export function oursLeadsAll(pairs: readonly FigurePair[]): boolean {
+	const graded = pairs.filter((pair) => pair.leader !== null);
+	return graded.length > 0 && graded.every((pair) => pair.leader === 'ours');
 }
 
 function weeklyFront(weekly: RunRecord): FrontRecord | null {
@@ -402,24 +411,21 @@ function weeklyFront(weekly: RunRecord): FrontRecord | null {
 	const last = graded.at(-1)?.week ?? first;
 	const span =
 		first === last ? `week ${String(first)}` : `weeks ${String(first)} to ${String(last)}`;
-	const beside = besideWords(all, 'agreement');
+	// The card's yardstick: the first the weekly record drew, ours at its size with the leader (MEDIUM-2).
+	const yardstick = (['espn', 'published'] as const).find((source) => all[source] !== null);
+	const pair = (figure: RecordFigure, label: string): FrontPair[] => {
+		const [found] = weeklyPairs(all, figure, yardstick === undefined ? [] : [yardstick]);
+		return found === undefined ? [] : [{ ...found, label }];
+	};
 	return {
 		name: RECORDS_WORDS.weekly,
-		value: rate(all.ours.agreement),
-		pairs: [],
+		pairs: [
+			...pair('agreement', capitalized(weekly.statistic.agreement)),
+			...(all.ours.startersOf === 0 ? [] : pair('starters', capitalized(weekly.statistic.starters)))
+		],
 		scale: weekly.scale,
-		caption: RECORDS_WORDS.frontWeekly(
-			span,
-			plural(all.ours.graded, 'player'),
-			beside === '' ? '' : ` ${beside.slice(2)}.`
-		),
-		second:
-			all.ours.startersOf === 0
-				? null
-				: RECORDS_WORDS.frontStarters(
-						figureWords(all.ours, 'starters'),
-						besideWords(all, 'starters')
-					),
+		caption: RECORDS_WORDS.frontWeekly(span, plural(all.ours.graded, 'player')),
+		second: null,
 		note: null
 	};
 }
@@ -437,7 +443,6 @@ function draftFront(
 	const heads = { agreement: capitalized(agreement), starters: RECORDS_WORDS.named };
 	return {
 		name: RECORDS_WORDS.draft,
-		value: null,
 		pairs: [
 			{ ...pairs.agreement, label: heads.agreement },
 			...(all.ours.startersOf === 0 ? [] : [{ ...pairs.starters, label: heads.starters }])

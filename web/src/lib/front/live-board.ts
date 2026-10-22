@@ -4,7 +4,7 @@
  * the run's figures, said with the run's time beside them. Pure, so the tests read every figure and
  * word the strip prints. */
 import { timeOfDay, zoneWord } from '#lib/format/clock.ts';
-import { dayTimeStamp } from '#lib/format/day-time.ts';
+import { BUILD_ZONE, dayTimeStamp } from '#lib/format/day-time.ts';
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { BoardRowView } from '#lib/run/schema.ts';
@@ -18,8 +18,7 @@ export const STRIP_ROWS = 10;
  * live top ten is the run's top players re-valued, so it sits within these; any other row is built
  * from the answer's own line. */
 export const STRIP_POOL = 40;
-/** The clock a prerendered page says the run's time on, before the page knows the reader's. */
-export const BUILD_ZONE = 'America/Chicago';
+export { BUILD_ZONE };
 
 /** Every word the strip prints that is not a player's, a figure or the API's. */
 export const STRIP_WORDS = {

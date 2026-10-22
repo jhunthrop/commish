@@ -7,7 +7,7 @@ import { boardRestFrom } from '#lib/run/rest-from.ts';
 import { boardBasis, type BasisPart } from '#lib/run/board-basis.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import { rangeScale } from '#lib/run/derive.ts';
-import { recordHeadline, type RecordHeadline } from '#lib/run/record.ts';
+import { capitalized, recordHeadline, type RecordHeadline } from '#lib/run/record.ts';
 import { frontRecord, type FrontRecord } from '#lib/run/records.ts';
 import { rowFraming, type RowFraming } from '#lib/run/row-framing.ts';
 import type { BoardRowView, Format } from '#lib/run/schema.ts';
@@ -60,6 +60,14 @@ export interface FrontPage extends BoardStatuses {
 	front: FrontRecord | null;
 }
 
+/** The hero's line under the heading: the run's basis, less the weeks the heading says in season, its
+ * first phrase capitalized as the line's start (review LOW-2). */
+function heroMeta(format: Format): string[] {
+	const [first = '', ...rest] =
+		boardRestFrom(format) === null ? format.basis : format.basis.slice(1);
+	return [capitalized(first), ...rest].filter((phrase) => phrase !== '');
+}
+
 export async function frontPage(now: number): Promise<FrontPage> {
 	const format = await defaultFormat();
 	const [loaded, kept, capture, sources, byes, run] = await Promise.all([
@@ -90,11 +98,11 @@ export async function frontPage(now: number): Promise<FrontPage> {
 			reach,
 			headSaysBoard: true
 		}),
-		meta: boardRestFrom(format) === null ? format.basis : format.basis.slice(1),
+		meta: heroMeta(format),
 		weekRankings:
 			format.rosFromWeek === undefined
 				? null
-				: { label: weekRankingsWord(format.rosFromWeek), href: sectionHref('week') },
+				: { label: weekRankingsWord(format.rosFromWeek), href: sectionHref('players') },
 		gap: showsGap,
 		underway: reach !== null,
 		byes,

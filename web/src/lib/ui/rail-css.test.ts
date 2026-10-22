@@ -56,8 +56,8 @@ for (const key of RAIL_KEYS.filter(railInSeason)) {
 		const root = `:root[data-rail=${key}]:not([data-league]):not([data-league-pending])`;
 		const labels = (keys: string[]): string[] =>
 			keys.map((k) => RAIL_ITEMS.find((item) => item.key === k)?.label ?? k);
-		// The week's order takes the mock room's place on the five (Lane 140, C19).
-		const five = ['League', 'Rest of season', "This week's rankings", 'Players', 'Our record'];
+		// The week's order is Players under the week's name (Lane 140, C19 and fix round 1).
+		const five = ['League', 'Rest of season', "This week's rankings", 'Mock draft', 'Our record'];
 		assert.deepEqual(labels(shown(root, false)), five);
 		assert.deepEqual(labels(shown(root, true)), five);
 		assert.deepEqual(

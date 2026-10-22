@@ -5,7 +5,8 @@
 	 * C05): the record's draft tiles and the front door's record card draw it alike. Ours is accented
 	 * only where it leads. */
 	interface Props {
-		label: string;
+		/** The figure's head; null for a second yardstick under the first's. */
+		label: string | null;
 		/** What the figure is, under its head ("lower is better"); null for none. */
 		key?: string | null;
 		pair: FigurePair;
@@ -17,7 +18,7 @@
 </script>
 
 <div class="pair {size}">
-	<span class="label">{label}</span>
+	{#if label}<span class="label">{label}</span>{/if}
 	{#if key}<span class="key">{key}</span>{/if}
 	<span class="figs">
 		<span class="fig" class:lead={oursAccented(pair)}

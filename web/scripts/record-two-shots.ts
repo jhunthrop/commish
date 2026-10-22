@@ -113,6 +113,8 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 		has(weekly, 'Our weekly rankings, set Oct 22', where);
 		has(weekly, 'Order matched by week, 1 week graded', where);
 		has(weekly, "ESPN's is its own public projection in PPR", where);
+		// The weekly pairs name the leader, ESPN's where it leads (fix round 1, HIGH-1).
+		has(weekly, 'ESPN by 2', where);
 	}
 	if (who === 'espn') {
 		has(weekly, 'Your ESPN league, as it scores', where);
@@ -152,10 +154,19 @@ async function front(width: number): Promise<void> {
 	} else {
 		has(card, 'Weekly record', where);
 		has(card, 'Order matched is how closely an order ranked the players', where);
-		has(card, 'Order matched, our weekly rankings over week 7', where);
+		has(card, 'Our weekly rankings over week 7', where);
+		has(card, 'ESPN by 2', where);
 		lacks(card, /\bADP\b/u, where);
 	}
 	has(card, 'Week 7 rankings', where);
+	// The link lands on a page headed as the link promised (fix round 1, MEDIUM-3).
+	const target = await open('signed-out', width, '/players');
+	has(
+		(await target.locator('main h1, main h2').first().textContent()) ?? '',
+		'Week 7 rankings',
+		`${where} players`
+	);
+	await target.context().close();
 	const lines = await basisLines(page, 'section.top p.basis');
 	const report = basisReport(`front ${mode}`, width, lines);
 	if (report !== null) {
