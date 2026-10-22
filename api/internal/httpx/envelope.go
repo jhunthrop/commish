@@ -31,6 +31,8 @@ const (
 	// CodeTeamNotRead is an in-season route's 404 for a team missing from
 	// the league's last read: reading the host again may find it.
 	CodeTeamNotRead = "team_not_read"
+	// CodeFreeSeason is checkout's 409 in a free season: nothing is sold.
+	CodeFreeSeason = "free_season"
 )
 
 type ctxKey int

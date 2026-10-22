@@ -103,7 +103,11 @@ type Service struct {
 	Entitlements Entitlements
 	// Gateway is nil when Stripe is not configured; every route then
 	// answers 503 rather than the API refusing to start.
-	Gateway       Gateway
+	Gateway Gateway
+	// Free is the free season: while it is open checkout answers 409 and
+	// the catalog carries no figures, whatever Gateway is. The webhook
+	// stays live, so a test event still lands.
+	Free          entitlements.FreeSeason
 	WebhookSecret string
 	Viewer        auth.AccountViewer
 	Handles       HandleReader
@@ -139,6 +143,16 @@ func (s *Service) available(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	return true
+}
+
+// sells reports whether checkout may open: never in a free season, and
+// only with a gateway. On false it has already answered.
+func (s *Service) sells(w http.ResponseWriter, r *http.Request) bool {
+	if s.Free.Open(s.Now()) {
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeFreeSeason, freeSeasonWords, nil)
+		return false
+	}
+	return s.available(w, r)
 }
 
 func (s *Service) site(path string) string { return s.PublicBaseURL + path }

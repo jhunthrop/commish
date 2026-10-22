@@ -97,6 +97,47 @@ func TestASecondLeagueNeedsManyLeagues(t *testing.T) {
 	}
 }
 
+// In the free season the refusals above pass instead: an account with no
+// rows follows a second league, undoes a detach on top of another league,
+// and imports its league's scoring, and nothing is written to
+// app.entitlements for it.
+func TestTheFreeSeasonOpensEveryLeague(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	svc := replayService(pool)
+	svc.Entitlements = &entitlements.Store{Pool: pool, Free: entitlements.FreeSeason(2026)}
+	carol := newAccount(t, &auth.Store{Pool: pool}, "carol")
+	c := caller{t, svc, carol}
+
+	status, first, _ := attachAs(t, svc, carol, sleeperLink)
+	if status != http.StatusCreated {
+		t.Fatalf("first league: %d", status)
+	}
+	if status, _, feature := attachAs(t, svc, carol, mflLink); status != http.StatusCreated {
+		t.Fatalf("second league in the free season: %d %q, want 201", status, feature)
+	}
+	if status, _ := c.do(svc.detach, http.MethodDelete, "/", nil, first.String()); status != http.StatusOK {
+		t.Fatalf("detach: %d", status)
+	}
+	if status, _ := c.do(svc.restore, http.MethodPost, "/", nil, first.String()); status != http.StatusOK {
+		t.Fatalf("undoing the detach beside a second league: %d, want 200", status)
+	}
+	list, err := (&Store{Pool: pool}).Attached(ctx, carol)
+	if err != nil || len(list) != 2 {
+		t.Fatalf("carol follows %d leagues (%v), want 2", len(list), err)
+	}
+	if status, _, e := importAs(t, svc, carol, "sleeper", sleeperLink); status != http.StatusOK {
+		t.Fatalf("import scoring in the free season: %d %+v", status, e)
+	}
+	var rows int
+	if err := pool.QueryRow(ctx, `select count(*) from app.entitlements where account_id = $1`, carol).Scan(&rows); err != nil {
+		t.Fatal(err)
+	}
+	if rows != 0 {
+		t.Fatalf("the free season wrote %d entitlement rows, want none", rows)
+	}
+}
+
 // A Membership, which carries the Draft Pass's features, follows more
 // than one league.
 func TestAMembershipFollowsTwoLeagues(t *testing.T) {

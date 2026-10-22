@@ -760,7 +760,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** What is for sale, for how much and what each product unlocks. Prices are read from Stripe, the annual Membership first; what each product unlocks is read from app.product_features. With checkout not open (Stripe not configured) the prices are the launch prices stripe-setup creates, and checkout_open says no one can pay yet. */
+		/** What is for sale, for how much and what each product unlocks. Prices are read from Stripe, the annual Membership first; what each product unlocks is read from app.product_features. With checkout not open (Stripe not configured) the prices are the launch prices stripe-setup creates, and checkout_open says no one can pay yet. In a free season (FREE_SEASON) free_season is true, checkout_open is false and every price is null or missing. */
 		get: operations['getPlans'];
 		put?: never;
 		post?: never;
@@ -779,6 +779,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
+		/** Opens a Stripe checkout for the Draft Pass, the Membership or a group pass. In a free season it answers 409 free_season whatever the Stripe keys. */
 		post: operations['checkout'];
 		delete?: never;
 		options?: never;
@@ -1742,7 +1743,7 @@ export interface components {
 			request_id: string;
 		};
 		ErrorBody: {
-			/** @description invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal, team_not_read (a 404 from an in-season route: the drafter's team is missing from the league's last read, so reading the host again may find it) */
+			/** @description invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal, team_not_read (a 404 from an in-season route: the drafter's team is missing from the league's last read, so reading the host again may find it), free_season (a 409 from checkout: the season is free and nothing is sold) */
 			code: string;
 			message: string;
 			fields?: Record<string, string>;
@@ -2173,7 +2174,7 @@ export interface components {
 			currency: string;
 			interval: components['schemas']['Interval'] | null;
 		};
-		/** @description A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership). While checkout is not open the prices are the launch prices. */
+		/** @description A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership). While checkout is not open the prices are the launch prices. In a free season every price is null or missing and free_season is true. */
 		PlanCatalog: {
 			/** @description the season a pass bought now is for: the current one until its first kickoff, then the next */
 			season: number;
@@ -2184,6 +2185,8 @@ export interface components {
 			pass_ends_at: string;
 			/** @description false while Stripe is not configured */
 			checkout_open: boolean;
+			/** @description true while the season is free (FREE_SEASON): every account holds every feature, checkout_open is false and checkout answers 409 free_season. Missing from an API older than the free season. */
+			free_season?: boolean;
 			features: components['schemas']['PlanFeatures'];
 			draft_pass: components['schemas']['Price'] | null;
 			/** @description annual first */

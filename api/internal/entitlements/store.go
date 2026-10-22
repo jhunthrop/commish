@@ -12,7 +12,13 @@ import (
 )
 
 // Store is every read and write of app.entitlements.
-type Store struct{ Pool *pgxpool.Pool }
+type Store struct {
+	Pool *pgxpool.Pool
+	// Free is the free season: while it is open Can and Features grant
+	// every feature to every account without reading a row. The rows
+	// stay as they are, so a pass or a Membership is still shown.
+	Free FreeSeason
+}
 
 // liveClause is the one definition of a row that grants its features
 // at $now: a live status, started, and not yet ended.
@@ -28,9 +34,12 @@ type Store struct{ Pool *pgxpool.Pool }
 // started since as already started.
 const liveClause = `e.status in ` + liveStatuses + ` and e.starts_at <= greatest($2, statement_timestamp()) and (e.ends_at is null or e.ends_at > $2)`
 
-// Can answers whether the account may use feature at now, from the
-// tables alone.
+// Can answers whether the account may use feature at now: yes in a free
+// season, otherwise from the tables alone.
 func (s *Store) Can(ctx context.Context, accountID uuid.UUID, feature Feature, now time.Time) (bool, error) {
+	if s.Free.Open(now) {
+		return true, nil
+	}
 	var ok bool
 	err := s.Pool.QueryRow(ctx, `
 		select exists (
@@ -44,8 +53,12 @@ func (s *Store) Can(ctx context.Context, accountID uuid.UUID, feature Feature, n
 	return ok, nil
 }
 
-// Features lists every feature the account has at now.
+// Features lists every feature the account has at now: all of them in a
+// free season.
 func (s *Store) Features(ctx context.Context, accountID uuid.UUID, now time.Time) ([]Feature, error) {
+	if s.Free.Open(now) {
+		return AllFeatures(), nil
+	}
 	rows, err := s.Pool.Query(ctx, `
 		select distinct pf.feature from app.entitlements e
 		join app.product_features pf on pf.product = e.product
