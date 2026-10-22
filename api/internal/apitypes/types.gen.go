@@ -2220,7 +2220,7 @@ type Envelope struct {
 
 // ErrorBody defines model for ErrorBody.
 type ErrorBody struct {
-	// Code invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal, team_not_read (a 404 from an in-season route: the drafter's team is missing from the league's last read, so reading the host again may find it)
+	// Code invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal, team_not_read (a 404 from an in-season route: the drafter's team is missing from the league's last read, so reading the host again may find it), free_season (a 409 from checkout: the season is free and nothing is sold)
 	Code    string             `json:"code"`
 	Feature *Feature           `json:"feature,omitempty"`
 	Fields  *map[string]string `json:"fields,omitempty"`
@@ -3508,15 +3508,18 @@ type Placement struct {
 	Unplaced  int `json:"unplaced"`
 }
 
-// PlanCatalog A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership). While checkout is not open the prices are the launch prices.
+// PlanCatalog A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership). While checkout is not open the prices are the launch prices. In a free season every price is null or missing and free_season is true.
 type PlanCatalog struct {
 	// CheckoutOpen false while Stripe is not configured
 	CheckoutOpen bool   `json:"checkout_open"`
 	DraftPass    *Price `json:"draft_pass"`
 
 	// Features what each product unlocks, from app.product_features. A group pass seat is a draft_pass.
-	Features  PlanFeatures    `json:"features"`
-	GroupPass *GroupPassPrice `json:"group_pass"`
+	Features PlanFeatures `json:"features"`
+
+	// FreeSeason true while the season is free (FREE_SEASON): every account holds every feature, checkout_open is false and checkout answers 409 free_season. Missing from an API older than the free season.
+	FreeSeason *bool           `json:"free_season,omitempty"`
+	GroupPass  *GroupPassPrice `json:"group_pass"`
 
 	// Membership annual first
 	Membership []Price `json:"membership"`

@@ -94,7 +94,10 @@ func serve(ctx context.Context, log *slog.Logger) error {
 func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Observer, log *slog.Logger) (http.Handler, func(), error) {
 	now := time.Now
 	authStore := &auth.Store{Pool: pool}
-	ents := &entitlements.Store{Pool: pool}
+	ents := &entitlements.Store{Pool: pool, Free: entitlements.FreeSeason(cfg.FreeSeason)}
+	if ents.Free != entitlements.NoFreeSeason {
+		log.Info("free season", "season", cfg.FreeSeason, "ends_at", ents.Free.EndsAt(), "open", ents.Free.Open(now()))
+	}
 	sessions, err := auth.NewSessions(cfg.Session, cfg.HTTP.TrustedProxyHops, authStore, now, log)
 	if err != nil {
 		return nil, nil, err
@@ -147,7 +150,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	}
 	sale := &season.Sale{Schedule: draftBoards.Schedule, Log: log}
 	billingService := &billing.Service{
-		Store: &billing.Store{Pool: pool}, Entitlements: ents, Gateway: gateway(cfg, log),
+		Store: &billing.Store{Pool: pool}, Entitlements: ents, Gateway: gateway(cfg, log), Free: ents.Free,
 		WebhookSecret: cfg.Stripe.WebhookSecret, Viewer: viewer, Handles: authStore, Catalog: ents, Sale: sale,
 		PublicBaseURL: cfg.HTTP.PublicBaseURL, Now: now, Log: log,
 	}
