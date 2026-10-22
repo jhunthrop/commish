@@ -418,7 +418,11 @@ if (!process.env.BYTES_ONLY && lineupScreen !== undefined) {
 // The return case (Lane 153): Travis Etienne is designated to return Sunday Oct 18 on the capture the
 // run is marked with and the fixture league reads, so on the Lineup and on Players his row ranks him as
 // playing and its chip says his day, and his shelf draws his week, no tile saying a list.
-const RETURN_CASE = { slug: 'travis-etienne-jr', chip: 'Back Sun Oct 18', listed: onListWords('IR') };
+const RETURN_CASE = {
+	slug: 'travis-etienne-jr',
+	chip: 'Back Sun Oct 18',
+	listed: onListWords('IR')
+};
 for (const screen of SCREENS.filter((s) => s.name === 'lineup' || s.name === 'players')) {
 	if (process.env.BYTES_ONLY) break;
 	for (const theme of THEMES) {
@@ -441,12 +445,11 @@ for (const screen of SCREENS.filter((s) => s.name === 'lineup' || s.name === 'pl
 					.locator('.tile')
 					.filter({ hasText: RETURN_CASE.listed })
 					.count();
-				if (listed > 0) faults.push(`${label}: ${String(listed)} tiles say "${RETURN_CASE.listed}"`);
+				if (listed > 0)
+					faults.push(`${label}: ${String(listed)} tiles say "${RETURN_CASE.listed}"`);
 				await page.screenshot({
-					path: new URL(
-						`shelf-${screen.name}-returning-${theme}-${String(size.width)}.png`,
-						out
-					).pathname
+					path: new URL(`shelf-${screen.name}-returning-${theme}-${String(size.width)}.png`, out)
+						.pathname
 				});
 			} catch (error: unknown) {
 				faults.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
