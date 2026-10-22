@@ -143,7 +143,10 @@ async function context(theme: string, width: number, signedIn: boolean): Promise
 	return ctx;
 }
 
-async function open(page: Page, screen: Screen): Promise<void> {
+async function open(
+	page: Page,
+	screen: Pick<Screen, 'table' | 'ready'> & { path: string }
+): Promise<void> {
 	await page.goto(`${web}${screen.path}`);
 	await page.locator(screen.table).first().waitFor({ timeout: READY_TIMEOUT_MS });
 	await page
