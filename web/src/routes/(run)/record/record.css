@@ -16,10 +16,17 @@
 	border-radius: var(--r-md);
 	background: var(--surface);
 }
-.record .head {
+/* The bug's own head: scoped to the bug, so the page's title head keeps its place at the left
+   (Lane 140, C29). */
+.record .bug .head {
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
+}
+/* Before a week is graded: the week and when it grades, no figure (C04). */
+.record .bug .when {
+	font-size: var(--t-sm);
+	color: var(--ink-2);
 }
 .record .span {
 	font-size: var(--t-xs);
@@ -220,6 +227,11 @@
 	font-weight: 600;
 	color: var(--ink-2);
 }
+/* Players graded hugs its head, so the head sits over its own figures, never over the week labels
+   (C29). */
+.record .weeks .plc {
+	width: 1%;
+}
 .record td.m {
 	font-size: var(--t-lg);
 	font-weight: 600;
@@ -228,6 +240,11 @@
 .record td.m.ours {
 	font-weight: 800;
 	color: var(--accent-text);
+}
+/* Ours where a yardstick leads or ties: never accented over it (C05). */
+.record td.m.ours.trails {
+	font-weight: 600;
+	color: var(--ink-2);
 }
 .record th.m.ours,
 .record td.m.ours {
@@ -268,6 +285,9 @@
 }
 .record .totals td.m.ours {
 	color: var(--scoreboard-num);
+}
+.record .totals td.m.ours.trails {
+	color: var(--scoreboard-ink-2);
 }
 @media (max-width: 1180px) {
 	.record .bug {

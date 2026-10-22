@@ -19,7 +19,6 @@
 		recordSources,
 		recordStatusSpans,
 		scoreOf,
-		sourceDrawn,
 		standingWords,
 		weekLines,
 		weekOrderWords,
@@ -43,9 +42,11 @@
 		beforeLine,
 		weeklyBasis,
 		weeklyLines,
-		weeklyOpening,
 		weeklyOrderWords,
-		weeklySpan
+		weeklyPending,
+		weeklySources,
+		weeklySpan,
+		type NextGrade
 	} from '#lib/run/records.ts';
 	import type { RecordLine, RecordWeek, RunRecord } from '#lib/run/schema.ts';
 	import { hostWords } from '#lib/league/names.ts';
@@ -62,19 +63,30 @@
 		players: PlayersByWeek;
 		/** The section's head and what it grades; null for a run's own record, drawn as before. */
 		head: { title: string; what: string } | null;
+		/** The weekly record's next week to grade, which its bug names before a week is graded. */
+		next: NextGrade | null;
 	}
 
-	let { record: runRecord, fromWeek, unplayed, leagueRecord, players, head }: Props = $props();
+	let {
+		record: runRecord,
+		fromWeek,
+		unplayed,
+		leagueRecord,
+		players,
+		head,
+		next
+	}: Props = $props();
 
 	/** The one lineup every starters figure and sentence here reads (Lane 93 fix round 1). */
 	const lineup = $derived(pageLineup(runRecord, leagueRecord, players));
 	const record = $derived(shownRecord(runRecord, players, lineup));
 	const honest = $derived(honestWords(runRecord, record, lineup));
-	const opening = $derived(fromWeek === null ? null : weeklyOpening(record, fromWeek));
-	const headline = $derived(opening ?? recordHeadline(record, unplayed));
+	/** The weekly record before a week is graded says the week and when it grades, no figure (C04). */
+	const pending = $derived(head === null ? null : weeklyPending(record, next));
+	const headline = $derived(recordHeadline(record, unplayed));
 	const standing = $derived(standingWords(record));
 	const gaps = $derived(gapWords(record, unplayed));
-	const before = $derived(fromWeek === null ? null : beforeLine(fromWeek, record.weeks[0]));
+	const before = $derived(fromWeek === null ? null : beforeLine(fromWeek));
 
 	const FIGURE_HEADS = $derived<Record<RecordFigure, string>>({
 		agreement: record.statistic.agreement,
@@ -104,7 +116,7 @@
 	const bugHead = $derived(head === null ? gradedOrders(record) : weeklySpan(record));
 	const series = $derived(chartSeries(record, position));
 	const graded = $derived(record.weeks.filter((week) => week.status === 'graded'));
-	const sources = $derived(recordSources(record));
+	const sources = $derived(head === null ? recordSources(record) : weeklySources(record));
 	const beside = $derived(sources.filter((source) => source !== 'ours'));
 	const spans = $derived(recordStatusSpans(sources.length));
 
@@ -117,7 +129,7 @@
 		const league = leagueRecord === null ? null : leagueBasis(leagueRecord, lineup);
 		return head === null
 			? recordBasis(record, league).map((text) => ({ text, phone: true }))
-			: weeklyBasis(record, league, sourceDrawn(record, 'espn'));
+			: weeklyBasis(record, league);
 	});
 
 	const capitalized = (words: string): string =>
@@ -171,6 +183,14 @@
 			</div>
 			{#if gaps}<p class="scale">{gaps}</p>{/if}
 			{#if honest}<p class="honest">{honest}</p>{/if}
+		</div>
+	{:else if pending}
+		<div class="bug pending" aria-label={pending.title}>
+			<div class="head">
+				<span class="order">{pending.title}</span>
+				<span class="when">{pending.when}</span>
+			</div>
+			{#if gaps}<p class="scale">{gaps}</p>{/if}
 		</div>
 	{:else}
 		<Panel padding="md">
