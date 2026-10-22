@@ -5,7 +5,7 @@ import type { Format } from '#lib/run/schema.ts';
 import { STAT_FIELDS, type GameLogRow, type PlayerSeason, type StatLine } from '#lib/run/season.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { SEASON_LOG_WORDS } from '#lib/run/season-log-words.ts';
-import { seasonView } from './player-season.ts';
+import { seasonView, specialTeamsWeek } from './player-season.ts';
 
 void test("the season log's words pass the copy guard (Lane 138)", () => {
 	for (const words of Object.values(SEASON_LOG_WORDS))
@@ -250,4 +250,69 @@ void test("a free agent's weeks past the records list no row, and his played wee
 		]
 	);
 	assert.equal(seasonView(season, 'WR', [FORMAT], () => null).aside, '2026, PPR, through week 3');
+});
+
+/** Josiah Deguara's season as run 2026-10-22T05 had it (Lane 135): his page club SEA, his newest line
+ * PHI's week 4 game at home to LAR, a club edge with no stat line and no offensive snap. */
+function deguara(): PlayerSeason {
+	const phi: GameLogRow = {
+		...EMPTY,
+		snapShare: null,
+		points: null,
+		week: 4,
+		opponent: 'LAR',
+		home: true,
+		status: 'inactive'
+	};
+	const unplaced = (week: number): GameLogRow => ({ ...phi, week, opponent: null, home: null });
+	const seattle = (week: number): GameLogRow => ({ ...phi, week, opponent: 'ARI', home: false });
+	return {
+		season: 2026,
+		format: 'ppr-12',
+		weeks: 6,
+		through: 6,
+		games: 0,
+		pointsPerGame: null,
+		totals: { ...EMPTY, snapShare: null, points: null },
+		log: [unplaced(1), unplaced(2), unplaced(3), phi, seattle(5), seattle(6)]
+	};
+}
+
+void test("his newest line's week on special teams alone reads its own word, no other quiet week does (Lane 144)", () => {
+	const season = deguara();
+	const view = seasonView(season, 'TE', [FORMAT], () => null, [], { week: 4 });
+	assert.deepEqual(
+		view.rows.map((row) => [row.week, row.opponent, row.note]),
+		[
+			[1, 'Did not play', ''],
+			[2, 'Did not play', ''],
+			[3, 'Did not play', ''],
+			[4, 'vs LAR', SEASON_LOG_WORDS.specialTeams],
+			[5, 'at ARI', SEASON_LOG_WORDS.didNotPlay],
+			[6, 'at ARI', SEASON_LOG_WORDS.didNotPlay]
+		]
+	);
+	// With no lastGameClub (his own club's week, or a run before the field) the week is a week he sat.
+	const plain = seasonView(season, 'TE', [FORMAT], () => null);
+	assert.equal(plain.rows.find((row) => row.week === 4)?.note, SEASON_LOG_WORDS.didNotPlay);
+});
+
+void test("only an inactive row under the club's game is a special-teams week (Lane 144)", () => {
+	const season = deguara();
+	assert.equal(specialTeamsWeek(season, { week: 4 }), 4);
+	assert.equal(specialTeamsWeek(season, null), null);
+	assert.equal(specialTeamsWeek(null, { week: 4 }), null);
+	// A played newest line is a game, and a row naming no club is no club's game.
+	const playedFour = {
+		...season,
+		log: season.log.map((row) => (row.week === 4 ? played(4, 3.5) : row))
+	};
+	assert.equal(specialTeamsWeek(playedFour, { week: 4 }), null);
+	assert.equal(specialTeamsWeek(season, { week: 3 }), null);
+	// An edge in a game not final yet reads upcoming, and is not said to be special teams.
+	const upcoming = {
+		...season,
+		log: season.log.map((row) => (row.week === 4 ? { ...row, status: 'upcoming' as const } : row))
+	};
+	assert.equal(specialTeamsWeek(upcoming, { week: 4 }), null);
 });

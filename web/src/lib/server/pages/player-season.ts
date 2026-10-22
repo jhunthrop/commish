@@ -67,14 +67,41 @@ function opponentWords(row: GameLogRow): string {
 	return `${row.home === true ? 'vs' : 'at'} ${row.opponent}`;
 }
 
-function logRow(row: GameLogRow, columns: readonly StatColumn[]): LogRow {
+/** The page's `lastGameClub`: the week of his newest game line, for another club than his page's. */
+export interface LastGame {
+	week: number;
+}
+
+/** His newest game line's week when he was on the field for special teams alone, else null: the page's
+ * `lastGameClub` week, which the reader holds to that club's game (season-checks.ts checkLastGameClub,
+ * Lane 135), read inactive, no stat line and no offensive snap. The edge comes from the snap release,
+ * which lists special teams, so that week is one he played on special teams (Lane 144, B117). */
+export function specialTeamsWeek(
+	season: PlayerSeason | null,
+	lastGame: LastGame | null
+): number | null {
+	if (season === null || lastGame === null) return null;
+	const row = season.log.find((candidate) => candidate.week === lastGame.week);
+	return row?.status === 'inactive' && row.opponent !== null ? lastGame.week : null;
+}
+
+function inactiveNote(row: GameLogRow, specialTeams: number | null): string {
+	if (row.status !== 'inactive' || row.opponent === null) return '';
+	return row.week === specialTeams ? SEASON_LOG_WORDS.specialTeams : SEASON_LOG_WORDS.didNotPlay;
+}
+
+function logRow(
+	row: GameLogRow,
+	columns: readonly StatColumn[],
+	specialTeams: number | null
+): LogRow {
 	// The schema holds a played week to its points, so a played week here always has them.
 	const points = row.status === 'played' ? row.points : null;
 	const played = points !== null;
 	return {
 		week: row.week,
 		opponent: opponentWords(row),
-		note: row.status === 'inactive' && row.opponent !== null ? SEASON_LOG_WORDS.didNotPlay : '',
+		note: inactiveNote(row, specialTeams),
 		tone: played ? 'played' : row.status === 'bye' ? 'bye' : 'quiet',
 		points: points === null ? null : fixed(points),
 		cells: played ? columns.map((column) => column.value(row)) : null
@@ -209,7 +236,8 @@ export function seasonView(
 	position: Position,
 	formats: readonly Format[],
 	kickoffOf: KickoffOf,
-	prior: readonly PriorSeason[] = []
+	prior: readonly PriorSeason[] = [],
+	lastGame: LastGame | null = null
 ): SeasonView {
 	const format = formats.find((candidate) => candidate.id === season.format);
 	if (!format) throw new Error(`The season block is scored in ${season.format}, not on this run.`);
@@ -218,6 +246,7 @@ export function seasonView(
 	// The head never says week 5 over a table that has his week 6 (the sweep's X3).
 	const through = countedWeek(season);
 	const reach = through === 0 ? '' : `, through week ${String(through)}`;
+	const specialTeams = specialTeamsWeek(season, lastGame);
 	return {
 		season: season.season,
 		aside: `${String(season.season)}, ${format.label}${reach}`,
@@ -226,7 +255,7 @@ export function seasonView(
 		line: seasonLine(season, columns, format),
 		rows: past
 			.filter((row) => !unnamedAhead(row, season.through))
-			.map((row) => logRow(row, columns)),
+			.map((row) => logRow(row, columns, specialTeams)),
 		ahead: ahead.map((row) => aheadRow(row, kickoffOf)),
 		none: noneWords(season),
 		basis: basisWords(season, position),

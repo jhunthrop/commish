@@ -29,6 +29,7 @@ import {
 	heldSeasonView,
 	kickoffsFrom,
 	seasonView,
+	specialTeamsWeek,
 	type KickoffOf,
 	type SeasonView
 } from './player-season.ts';
@@ -307,12 +308,13 @@ function clubNameOf(list: readonly Club[], team: string): string {
  * run is from before the field. */
 function clubNoteOf(
 	list: readonly Club[],
-	loaded: Pick<PageSource, 'team' | 'lastGameClub'>
+	loaded: Pick<PageSource, 'team' | 'lastGameClub' | 'season'>
 ): string | null {
 	const last = loaded.lastGameClub;
 	if (!last) return null;
 	const club = isFreeAgent(loaded.team) ? null : clubOf(list, loaded.team);
-	return lastGameClubWords(club, last.week, clubOf(list, last.club));
+	const kind = specialTeamsWeek(loaded.season, last) === null ? 'game' : 'specialTeams';
+	return lastGameClubWords(club, last.week, clubOf(list, last.club), kind);
 }
 
 /** Each week's last kickoff across the run's schedule. */
@@ -349,7 +351,8 @@ async function seasonOf(
 		loaded.position,
 		formats,
 		await kickoffsOf(loaded.team),
-		loaded.priorSeasons
+		loaded.priorSeasons,
+		loaded.lastGameClub
 	);
 }
 

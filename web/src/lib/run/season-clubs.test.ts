@@ -155,13 +155,22 @@ void test('a run from before the field parses, and the field reads', () => {
 
 void test('the page says where he is now and whose his last game was', () => {
 	assert.equal(
-		lastGameClubWords({ nickname: 'Dolphins' }, 5, { nickname: 'Chargers' }),
+		lastGameClubWords({ nickname: 'Dolphins' }, 5, { nickname: 'Chargers' }, 'game'),
 		'Now with the Dolphins. His week 5 game was for the Chargers.'
 	);
 	// A free agent (Lane 123): no club now, said in words, never "no team".
 	assert.equal(
-		lastGameClubWords(null, 5, { nickname: 'Lions' }),
+		lastGameClubWords(null, 5, { nickname: 'Lions' }, 'game'),
 		'Now a free agent. His week 5 game was for the Lions.'
+	);
+	// Lane 144 (B117): a week on the field for special teams alone says so, never "game".
+	assert.equal(
+		lastGameClubWords({ nickname: 'Seahawks' }, 4, { nickname: 'Eagles' }, 'specialTeams'),
+		'Now with the Seahawks. His week 4 snaps were on special teams for the Eagles.'
+	);
+	assert.equal(
+		lastGameClubWords(null, 4, { nickname: 'Eagles' }, 'specialTeams'),
+		'Now a free agent. His week 4 snaps were on special teams for the Eagles.'
 	);
 });
 

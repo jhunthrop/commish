@@ -12,8 +12,13 @@
 //               which names no opponent and is a game he played the run cannot name (`unnamedGame`, Lane
 //               138); every later week names no opponent; his newest line is the Lions' (`lastGameClub`
 //               DET, week 5).
+//   special-teams (club-move-shots.ts special-teams, Lane 144, B117): STAND-IN, Lane 135's Deguara on
+//               Gibbs's page. His club stays the Lions; his week 4 line is his own under the Chargers'
+//               week 4 game, and his newest line is the Chargers' week 5 game with no stat line and no
+//               offensive snap, so that week reads inactive under it (home to DEN) and `lastGameClub` is
+//               LAC, week 5; weeks 1 to 3 name no opponent; week 6 is the Lions' bye.
 //
-//   node scripts/inseason-fixture/mover-run.ts mover|free-agent
+//   node scripts/inseason-fixture/mover-run.ts mover|free-agent|special-teams
 // then build with PUBLIC_RUN_ID=<the run's id> PUBLIC_RUN_BASE_URL=.runs and start the fixture API
 // with FIXTURE_RUN_ID=<the run's id>.
 import { cp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -40,9 +45,14 @@ const LAST_CLUB_WEEK = 5;
 /** The free agent's week of offensive snaps with no club edge (Lane 138). */
 const UNNAMED_GAME_WEEK = 3;
 
+/** The special-teams mover's newest line: the Chargers' week 5 game. */
+const SPECIAL_TEAMS_WEEK = 5;
+
 const kind = process.argv[2];
-if (kind !== 'mover' && kind !== 'free-agent')
-	throw new Error('Name the run: node scripts/inseason-fixture/mover-run.ts mover|free-agent');
+if (kind !== 'mover' && kind !== 'free-agent' && kind !== 'special-teams')
+	throw new Error(
+		'Name the run: node scripts/inseason-fixture/mover-run.ts mover|free-agent|special-teams'
+	);
 const run: ClubRun = kind;
 const RUN_ID = clubRunId(run);
 const SOURCE = new URL(
@@ -104,19 +114,37 @@ function gameOf(
 	return { opponent: game.opponent, home: game.home };
 }
 
+/** His played row of `week` on the contract run. */
+function lineOf(season: PlayerSeason, week: number): GameLogRow {
+	const row = season.log.find((r) => r.week === week);
+	if (row?.status !== 'played') throw new Error(`Gibbs has no week ${String(week)} line.`);
+	return row;
+}
+
 function moved(page: Json, schedule: ReturnType<typeof scheduleSchema.parse>): Json {
 	const season = page.season as PlayerSeason;
-	const line = (week: number): GameLogRow => {
-		const row = season.log.find((r) => r.week === week);
-		if (row?.status !== 'played') throw new Error(`Gibbs has no week ${String(week)} line.`);
-		return row;
-	};
+	const line = (week: number): GameLogRow => lineOf(season, week);
 	const rows: Record<number, Partial<GameLogRow>> = {
 		...Object.fromEntries(UNPLACED_WEEKS.map((week) => [week, UNPLACED])),
 		5: { ...line(5), ...gameOf(schedule, MOVED_TO, 5) },
 		6: { ...line(STAND_IN_WEEK), week: 6, ...gameOf(schedule, MOVED_TO, 6) }
 	};
 	return { ...page, season: withRows(season, rows), lastGameClub: { club: MOVED_TO, week: 6 } };
+}
+
+function specialTeams(page: Json, schedule: ReturnType<typeof scheduleSchema.parse>): Json {
+	const season = page.season as PlayerSeason;
+	const before = SPECIAL_TEAMS_WEEK - 1;
+	const rows: Record<number, Partial<GameLogRow>> = {
+		...Object.fromEntries(UNPLACED_WEEKS.map((week) => [week, UNPLACED])),
+		[before]: { ...lineOf(season, before), ...gameOf(schedule, MOVED_TO, before) },
+		[SPECIAL_TEAMS_WEEK]: { ...UNPLACED, ...gameOf(schedule, MOVED_TO, SPECIAL_TEAMS_WEEK) }
+	};
+	return {
+		...page,
+		season: withRows(season, rows),
+		lastGameClub: { club: MOVED_TO, week: SPECIAL_TEAMS_WEEK }
+	};
 }
 
 function freeAgent(page: Json): Json {
@@ -141,7 +169,12 @@ const pageUrl = new URL(`players/${GIBBS}.json`, OUT);
 const page = await readJson(pageUrl);
 if (page.team !== OWN_CLUB)
 	throw new Error(`Gibbs's club on the contract run is ${String(page.team)}.`);
-const rewritten = run === 'mover' ? moved(page, schedule) : freeAgent(page);
+const rewritten =
+	run === 'mover'
+		? moved(page, schedule)
+		: run === 'special-teams'
+			? specialTeams(page, schedule)
+			: freeAgent(page);
 await writeFile(pageUrl, JSON.stringify(rewritten));
 // His index entry says his club and his season as his page does (the build's reader holds them equal).
 const indexUrl = new URL('index.json', OUT);
