@@ -156,7 +156,7 @@ def test_the_weekly_pass_keeps_the_plays_for_the_play_table(written: list[Player
     assert report.plays_written == len(plays.rows) == len(expected)
     assert {(r["game_id"], r["play_id"]) for r in plays.rows} == {(r["game_id"], int(r["play_id"])) for r in expected}
     result = usage_steps.play_by_play(cast(Engine, _FakeEngine()), FixtureFetcher(), _SEASON)
-    assert f"{len(expected)} new plays in the play table" in result.summary
+    assert f"{len(expected)} plays written to the play table" in result.summary
 
 
 def test_a_landed_week_is_skipped_with_nothing_new(monkeypatch: pytest.MonkeyPatch) -> None:

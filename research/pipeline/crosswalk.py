@@ -28,6 +28,7 @@ from research.db.schema import PLAYER_CROSSWALK, PLAYERS, PROVIDER_PLAYERS
 from research.errors import CoherenceError
 from research.pipeline.nflverse.team_codes import (
     TEAM_DEFENSE_UNIVERSE_PREFIX,
+    team_defense_espn_id,
     team_defense_universe_id_for_provider_id,
     team_defense_universe_ids,
 )
@@ -226,12 +227,14 @@ def crosswalk_inputs(conn: Connection) -> CrosswalkInputs:
 
 
 def seed_team_defense_universe(conn: Connection) -> int:
-    """`seedTeamDefenseUniverse`: the 32 synthetic, unmistakably labelled universe rows."""
+    """`seedTeamDefenseUniverse`: the 32 synthetic, unmistakably labelled universe rows, each with its
+    D/ST's ESPN id (Lane 156). A stored row keeps every column but takes its ESPN id where it holds none,
+    so the seed is also the ESPN ids' backfill; the count is of the rows inserted or given their id."""
     rows = [
         {
             "id": universe_id,
             "pfr_id": None,
-            "espn_id": None,
+            "espn_id": team_defense_espn_id(universe_id[len(TEAM_DEFENSE_UNIVERSE_PREFIX) :]),
             "name": universe_id,
             "position": TEAM_DEFENSE_POSITION,
             "latest_team": universe_id[len(TEAM_DEFENSE_UNIVERSE_PREFIX) :],
@@ -240,8 +243,13 @@ def seed_team_defense_universe(conn: Connection) -> int:
         }
         for universe_id in team_defense_universe_ids()
     ]
-    statement = insert(PLAYERS).values(rows).on_conflict_do_nothing().returning(PLAYERS.c.id)
-    return len(conn.execute(statement).all())
+    statement = insert(PLAYERS).values(rows)
+    upsert = statement.on_conflict_do_update(
+        index_elements=[PLAYERS.c.id],
+        set_={"espn_id": statement.excluded.espn_id},
+        where=PLAYERS.c.espn_id.is_(None),
+    ).returning(PLAYERS.c.id)
+    return len(conn.execute(upsert).all())
 
 
 def universe_spelling(provider_name: str, universe_name: str) -> str | None:

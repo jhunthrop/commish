@@ -195,9 +195,12 @@ def test_a_missing_season_answer_is_a_failure() -> None:
 def engine() -> Any:
     if "PARITY_DATABASE_URL" not in os.environ:
         pytest.skip("needs a Postgres for scratch databases")
-    # Revision 0009, before 0010 creates the real stadiums table: these cases build their own stand-in.
-    url = databases.build_with_alembic(_DATABASE, revision="0009")
+    # The whole schema (the play ingest writes revision 0020's kick columns) without the real stadiums
+    # table revision 0010 creates: these cases build their own stand-in.
+    url = databases.build_with_alembic(_DATABASE)
     built = make_engine(sqlalchemy_url(url))
+    with built.begin() as conn:
+        conn.execute(text("drop table research.stadiums cascade"))
     try:
         yield built
     finally:

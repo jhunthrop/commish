@@ -67,7 +67,7 @@ def play_by_play(engine: Engine, fetcher: Fetcher, season: int) -> StepResult:
     summary = (
         f"{report.observations_written} new observations for {season} ({report.plays_read} plays, "
         f"{report.team_weeks} team-weeks, {report.player_weeks} player-weeks, {report.passer_weeks} passer-weeks, "
-        f"{report.unknown_players} ids outside the projected universe), {report.plays_written} new plays in the play table"
+        f"{report.unknown_players} ids outside the projected universe), {report.plays_written} plays written to the play table"
     )
     return written_result(PLAY_BY_PLAY, report.observations_written + report.plays_written, summary)
 

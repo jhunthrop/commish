@@ -39,6 +39,10 @@ PLAY_TYPES: Final = (
 WEATHER_SOURCES: Final = ("nflverse_games", "pbp_weather_text", "noaa_isd")
 ROOF_STATES: Final = ("dome", "closed", "open", "outdoors")
 PRECIPITATION_KINDS: Final = ("rain", "snow", "sleet", "mix")
+# The kick columns' vocabularies as nflverse writes them (revision 0020, Amendment 7 item 3b).
+FIELD_GOAL_RESULTS: Final = ("made", "missed", "blocked")
+EXTRA_POINT_RESULTS: Final = ("good", "failed", "blocked", "aborted", "safety")
+TWO_POINT_RESULTS: Final = ("success", "failure", "return", "safety")
 
 
 def _flag(name: str) -> "Column[bool]":
@@ -112,7 +116,23 @@ NFLVERSE_PBP_PLAYS: Final = Table(
     Column("stadium_id", Text),
     Column("stadium", Text),
     recorded_at(),
+    # The kick columns (revision 0020, Lane 156; Amendment 7 item 3b), declared last as the migration
+    # appends them: the weekly kicker and team-defense sub-round's field goals by distance, extra points,
+    # two-point tries, the kicker, the scoring club, and the block, return and safety flags.
+    Column("kick_distance", Integer),
+    Column("field_goal_result", Text),
+    Column("extra_point_result", Text),
+    Column("two_point_conv_result", Text),
+    Column("kicker_player_id", Text),
+    Column("td_team", Text),
+    _flag("punt_blocked"),
+    _flag("return_touchdown"),
+    Column("return_team", Text),
+    _flag("safety"),
     one_of("play_type", PLAY_TYPES, "nflverse_pbp_plays_play_type_ck"),
+    one_of("field_goal_result", FIELD_GOAL_RESULTS, "nflverse_pbp_plays_field_goal_result_ck"),
+    one_of("extra_point_result", EXTRA_POINT_RESULTS, "nflverse_pbp_plays_extra_point_result_ck"),
+    one_of("two_point_conv_result", TWO_POINT_RESULTS, "nflverse_pbp_plays_two_point_conv_result_ck"),
     Index("nflverse_pbp_plays_season_week_idx", "season", "week"),
     Index("nflverse_pbp_plays_posteam_idx", "posteam", "season", "week"),
 )

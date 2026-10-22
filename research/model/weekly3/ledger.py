@@ -44,6 +44,12 @@ ReadKind = Literal[
     "depth_prior",
     "forecast",
     "schedule",
+    # Amendment 7 item 3, the weekly kicker and team-defense sub-round: the kicking and team-defense
+    # weeks of weeks before W (replay at the Wednesday pass after their week, live at their
+    # `nflverse_kdef_week` stamp) and the play table's kick columns (stamped per game).
+    "kicking",
+    "team_defense",
+    "kicks",
 ]
 KINDS: Final[tuple[ReadKind, ...]] = ("box", "filings", "rate", "prior")
 SEASON_WIDE: Final = 0  # the week a `prior` stamp carries: the whole of the season before

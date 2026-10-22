@@ -236,6 +236,31 @@ ESPN_PROJECTION_ROWS: Final = Table(
     recorded_at(),
 )
 
+# ESPN's archived weekly kicker and D/ST projections (revision 0021, Lane 156; Amendment 7 item 9): the
+# public pool's projected one-period split for each kicker and D/ST ESPN still keeps for an archived
+# season (2023 and 2024), its own total under its league defaults and its projected components by ESPN's
+# stat id, as given. A benchmark the weekly kicker and team-defense sub-round grades against (KD3, KD4),
+# ingested once, NEVER AN INPUT. ESPN publishes no stamp for an archived split, so every row carries
+# `stamp` 'archive_unstamped': taken as ESPN's last pre-game version, which can only favour ESPN, and
+# printed beside the verdict. `read_at` is when we read the archive, after the games.
+ESPN_KDEF_ARCHIVE_STAMPS: Final = ("archive_unstamped",)
+ESPN_KDEF_POSITIONS: Final = ("K", "DEF")
+ESPN_KDEF_ARCHIVE_ROWS: Final = Table(
+    "espn_kdef_archive_rows",
+    METADATA,
+    Column("season", Integer, primary_key=True),
+    Column("week", Integer, primary_key=True),
+    Column("espn_id", Text, primary_key=True),
+    Column("read_at", DateTime(True), primary_key=True),
+    Column("position", Text, nullable=False),
+    Column("applied_total", Double(53), nullable=False),
+    Column("stats", JSONB, nullable=False),
+    Column("stamp", Text, nullable=False),
+    recorded_at(),
+    one_of("position", ESPN_KDEF_POSITIONS, "espn_kdef_archive_rows_position_ck"),
+    one_of("stamp", ESPN_KDEF_ARCHIVE_STAMPS, "espn_kdef_archive_rows_stamp_ck"),
+)
+
 # The anytime-touchdown market (revision 0009): a Yes price, and a No price where the book quotes one,
 # which `player_prop_observations` (point and under price NOT NULL) cannot hold. Append-only like it:
 # one event fetched twice keeps both. The market benchmark only, never an input, never on the site.
