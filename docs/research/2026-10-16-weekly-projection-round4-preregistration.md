@@ -1227,3 +1227,20 @@ claims.
    - *FantasyPros' weekly consensus* stays out until the founder clears its terms (3.3).
 3. **ADP.** ADP stays in every stored freeze row and the register's stored weekly grade for the research
    record, and is graded on the draft record alone.
+
+### Amendment 6, 2026-10-22, before week 7's first kickoff: a freeze with no ESPN read takes the first read before kickoff
+
+1. **What happened.** The Thursday 14:00 Eastern pass froze week 7 at 18:00:31Z (1,724 rows, the published
+   yardstick present) but its ESPN read failed: ESPN's player pool began answering 400
+   (`FILTER_LIMIT_MISSING_SORT`, a limit now needs a sort) that day. The read was fixed (Lane 145) and
+   taken at 19:03:50Z, 664 players, still 5 h 11 m before the week's first kickoff (00:15Z). A freeze does
+   not re-open, so the week 7 rows carried `espn_points` null.
+2. **Ruling.** A freeze whose ESPN yardstick is empty takes the first ESPN read of the week taken before
+   the week's first kickoff, and records which read filled it. ESPN's figure is a yardstick, never an input
+   to the order, so a read after the order was set cannot move the order; the only thing that can differ is
+   ESPN's own number, and the grader keeps the read's instant beside the freeze's. Week 7 is filled once by
+   hand from the 19:03:50Z read (dry run: 475 of 546 rows on the v7 board, 486 of 551 on v9, 539 of 627 on
+   the order shipped; the rest are players ESPN does not project). From Lane 146 the in-season pass fills
+   such a freeze itself on its next pass before kickoff and the fill is logged.
+3. **What stays.** A read taken after the first kickoff never fills a freeze; such a week is graded against
+   the published projection alone and the record says so.
