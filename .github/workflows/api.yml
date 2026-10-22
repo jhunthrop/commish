@@ -119,6 +119,9 @@ jobs:
       REGION: ${{ vars.GCP_REGION }}
       PROJECT: ${{ vars.GCP_PROJECT }}
     steps:
+        # For infra/post-deploy-check.sh, the job's last step.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with: { sparse-checkout: infra }
       - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
@@ -189,3 +192,8 @@ jobs:
               --set-env-vars "$API_ENV_VARS" --set-secrets "$API_SECRETS,$JOB_SECRETS" \
               --max-retries 1 --task-timeout 600s --quiet
           done
+
+        # Both services answer their readiness (the database reached) at the public names, or the
+        # deploy goes red: one retry after 30 s for the new revision's cold start.
+      - name: The api and the room answer
+        run: infra/post-deploy-check.sh https://api.trycommish.app/readyz https://room.trycommish.app/readyz
