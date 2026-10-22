@@ -108,6 +108,20 @@ policies = {
             "filter": 'resource.type = "cloud_scheduler_job" AND resource.labels.job_id =~ "^research-" AND severity >= ERROR',
         },
     },
+    # Lane 136: a nightly that published with a page its schema gate held back prints one `nightly HELD:`
+    # line naming each held page and its refusal (research/nightly/held_pages.py); the line is the email.
+    "Research nightly held a page": {
+        "displayName": "The nightly published with a player page held back",
+        "conditionMatchedLog": {
+            "filter": 'resource.type = "cloud_run_job" AND resource.labels.job_name = "nightly" AND textPayload : "nightly HELD:"',
+            "labelExtractors": {"held": 'REGEXP_EXTRACT(textPayload, "nightly HELD: (.*)")'},
+        },
+    },
+}
+documentation = {
+    "Research nightly held a page": "The nightly's schema gate refused a player page and published the run with it held "
+    "(its earlier copy, or its board figures alone). The line names each page and what the web's reader said: a "
+    "reader/writer drift to fix before the next night. research/nightly/held_pages.py.",
 }
 conditions = [policies[name]]
 policy = {
@@ -116,8 +130,8 @@ policy = {
     "enabled": not name.endswith(" absent") or enabled,
     "notificationChannels": [channel],
     "documentation": {
-        "content": "A research job failed or never started. Read its execution's log in Cloud Run (or the scheduler job's log); "
-        "a failed weekly pass names the step, and a missed freeze is permanent. infra/README.md, The research schedule.",
+        "content": documentation.get(name, "A research job failed or never started. Read its execution's log in Cloud Run (or the scheduler job's log); "
+        "a failed weekly pass names the step, and a missed freeze is permanent. infra/README.md, The research schedule."),
         "mimeType": "text/markdown",
     },
     "conditions": conditions,
@@ -133,7 +147,7 @@ print(json.dumps(policy))
 PY
 }
 
-POLICIES=("Research job execution failed" "Research schedule firing failed" "Research nightly absent" "Research in-season absent" "Research weekly pass absent")
+POLICIES=("Research job execution failed" "Research schedule firing failed" "Research nightly held a page" "Research nightly absent" "Research in-season absent" "Research weekly pass absent")
 
 existing_policy() { # display name
   call GET alertPolicies | python3 -c "

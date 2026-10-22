@@ -94,6 +94,11 @@ class Gates:
     # 15 players in any of 165 weeks, 12 in the trade deadline weeks, of 373 to 662 with a line. Twice that
     # holds every real week; a misread list moves hundreds.
     max_club_elsewhere_pages: int = 30
+    # The most player pages the schema gate may hold back and still publish the run (Lane 136): ten, or
+    # 2% of the pages, whichever is fewer. One page the reader refuses is a reader/writer drift on one
+    # player (Lanes 119, 135) and costs that page a night; past the line it is the run that is wrong.
+    max_held_pages: int = 10
+    max_held_page_share: float = 0.02
 
 
 GATES: Final = Gates()

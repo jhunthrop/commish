@@ -13,9 +13,11 @@ import {
 	type PriorSeason
 } from '#lib/run/season.ts';
 import { countedWeek } from '#lib/run/reach.ts';
-import type { Format, Game } from '#lib/run/schema.ts';
+import type { Format, Game, Slate } from '#lib/run/schema.ts';
+import { rowGame } from '#lib/run/row-game.ts';
 import { GAME_STATE_WORDS } from '#lib/format/game-facts.ts';
 import { UNKNOWN_CLUB_WEEK } from '#lib/player/club-words.ts';
+import { HELD_PAGE_WORDS } from '#lib/player/held-words.ts';
 import { STAT_COLUMNS, captionFor, type StatColumn } from '#lib/run/stat-columns.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { AheadRow, LogHead, LogRow, PriorRow, SeasonLine } from '#lib/ui/game-log.ts';
@@ -37,9 +39,22 @@ export interface SeasonView {
 	prior: PriorRow[];
 }
 
-/** His club's game in a week, from the run's schedule: its kickoff and its state at the run (Lane 80),
- * null on a run from before the field; null on his bye. */
-export type KickoffOf = (week: number) => { kickoff: string; state: Game['state'] | null } | null;
+/** A week's game, from the run's schedule: its kickoff and its state at the run (Lane 80), null on a
+ * run from before the field; null on his bye. The game is the row's (run/row-game.ts): a mover's week
+ * under the club his line was for is that club's game (Lane 136). */
+export type KickoffOf = (
+	row: Pick<GameLogRow, 'week' | 'opponent' | 'home'>
+) => { kickoff: string; state: Game['state'] | null } | null;
+
+/** His weeks' games on the run's slates, by the row (run/row-game.ts). */
+export function kickoffsFrom(slates: readonly Slate[], team: string): KickoffOf {
+	const byClub = new Map(slates.map((slate) => [slate.abbr, slate] as const));
+	if (!byClub.has(team)) throw new Error(`${team} has no slate on the run's schedule.`);
+	return (row) => {
+		const game = rowGame(byClub, team, row);
+		return game === null ? null : { kickoff: game.kickoff, state: game.state ?? null };
+	};
+}
 
 function opponentWords(row: GameLogRow): string {
 	if (row.status === 'bye') return 'Bye';
@@ -73,7 +88,7 @@ function dayWords(game: NonNullable<ReturnType<KickoffOf>>): string {
 
 function aheadRow(row: GameLogRow, kickoffOf: KickoffOf): AheadRow {
 	const bye = row.status === 'bye';
-	const game = bye ? null : kickoffOf(row.week);
+	const game = bye ? null : kickoffOf(row);
 	// The run's reader holds every week still to play to a kickoff (season-checks.ts).
 	if (!bye && game === null)
 		throw new Error(`Week ${String(row.week)} against ${String(row.opponent)} has no kickoff.`);
@@ -161,6 +176,23 @@ function priorRow(prior: PriorSeason, columns: readonly StatColumn[]): PriorRow 
 		sub: `${plural(prior.games, 'game')}${perGame}`,
 		total: prior.totals.points === null ? '' : fixed(prior.totals.points),
 		cells: columns.map((column) => column.value(prior.totals))
+	};
+}
+
+/** The block of a page held back with no earlier copy (Lane 136): no line, no log, the one sentence in
+ * the log's place, in the format the page leads with. */
+export function heldSeasonView(year: number, position: Position, format: Format): SeasonView {
+	return {
+		season: year,
+		aside: `${String(year)}, ${format.label}`,
+		heads: STAT_COLUMNS[position].map(({ short, full }) => ({ short, full })),
+		pointsHead: { short: 'Pts', full: `${format.label} points` },
+		line: null,
+		rows: [],
+		ahead: [],
+		none: HELD_PAGE_WORDS.log,
+		basis: HELD_PAGE_WORDS.basis,
+		prior: []
 	};
 }
 

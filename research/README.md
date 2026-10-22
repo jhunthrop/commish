@@ -702,7 +702,12 @@ uv run python -m research.model.fit_inputs
 5. **gates** (`nightly/gates.py`), each failure a named reason: `held_out_backtest`,
    `board_depth`, `capsules`, `basis`, `adp`, and `schema`: the web's own reader and schema
    (`nightly/contract/run-contract.ts` under node, the web's `src/lib/run` copied into the image) over
-   the run staged in a temporary directory, before anything is copied to the store.
+   the run staged in a temporary directory, before anything is copied to the store. A player page the
+   reader refuses is held, not the run (Lane 136, `nightly/held_pages.py`): up to ten pages, or 2% of
+   them if fewer, each shown from the newest passed run's copy (`held/<id>.json`, with that run's
+   stamp) or as its board figures alone, named in `held.json`, the gate's summary and one
+   `nightly HELD:` line the research alerts email; past the line, or on any refusal that is not one
+   page's, the run fails as before.
 6. **headshots** (`nightly/headshots.py`): every face mirrored into R2 by content
    (`headshots/<sha256>.<ext>`), fetched conditionally, with the run's map `headshots.json`.
 7. **write**: every artifact, `report.json` (steps, gates and their reasons, the held-out scores,

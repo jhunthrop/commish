@@ -24,7 +24,14 @@ import type { TierCliff } from '#lib/ui/tier.ts';
 import type { CaptureStamp } from '#lib/format/designation.ts';
 import { playerStatusWords, type PlayerStatusWords } from '#lib/run/status-view.ts';
 import { builtSaying, captureStamp } from '../statuses.ts';
-import { seasonView, type KickoffOf, type SeasonView } from './player-season.ts';
+import {
+	heldSeasonView,
+	kickoffsFrom,
+	seasonView,
+	type KickoffOf,
+	type SeasonView
+} from './player-season.ts';
+import type { PlayerSeason, PriorSeason } from '#lib/run/season.ts';
 import { basisTiles, cardBuild, restParts, restTile, type CardBuild } from './player-card.ts';
 import type { BasisTile, CardTile, RestParts } from '#lib/player/card.ts';
 import {
@@ -35,10 +42,11 @@ import {
 	entryBySlug,
 	index,
 	manifest,
-	player,
+	playerRead,
 	schedule,
 	seasonReach,
-	seasonUnderway
+	seasonUnderway,
+	type PlayerRead
 } from '../run.ts';
 import {
 	formatTable,
@@ -131,6 +139,56 @@ export interface PlayerPage {
 	/** Each week's last kickoff on the run's schedule, after which its lineup can no longer be set
 	 * (Lane 100, B64). */
 	lastKickoffs: Record<number, string>;
+	/** A page the nightly held back (Lane 136) shown from an earlier run's copy: that run, whose stamp
+	 * the page carries; null for tonight's own page and for the board's figures alone. */
+	copyOf: { runId: string; runAt: string } | null;
+}
+
+/** What a page is built from (run.ts playerRead): his own fields and formats, and what only a page of
+ * his carries, none of it for a held page with no copy. */
+interface PageSource {
+	id: string;
+	slug: string;
+	name: string;
+	position: Position;
+	team: string;
+	headshot: string;
+	formats: Record<string, PlayerFormat>;
+	season: PlayerSeason | null;
+	priorSeasons: PriorSeason[];
+	capsule: Capsule | null;
+	weekRead: WeekRead | null;
+	lastGameClub: Player['lastGameClub'];
+	copyOf: PlayerPage['copyOf'];
+}
+
+function sourceOf(read: PlayerRead): PageSource {
+	if (read.kind === 'facts') {
+		const { id, slug, name, position, team, headshot } = read.entry;
+		return {
+			id,
+			slug,
+			name,
+			position,
+			team,
+			headshot,
+			formats: read.formats,
+			season: null,
+			priorSeasons: [],
+			capsule: null,
+			weekRead: null,
+			lastGameClub: null,
+			copyOf: null
+		};
+	}
+	const { player } = read;
+	return {
+		...player,
+		priorSeasons: player.priorSeasons ?? [],
+		weekRead: player.weekRead ?? null,
+		lastGameClub: player.lastGameClub ?? null,
+		copyOf: read.kind === 'copy' ? read.from : null
+	};
 }
 
 export async function playerEntries(): Promise<{ slug: string }[]> {
@@ -239,7 +297,10 @@ function clubNameOf(list: readonly Club[], team: string): string {
 
 /** The line saying his newest game was for another club (Lane 120), null when it was his own's or the
  * run is from before the field. */
-function clubNoteOf(list: readonly Club[], loaded: Player): string | null {
+function clubNoteOf(
+	list: readonly Club[],
+	loaded: Pick<PageSource, 'team' | 'lastGameClub'>
+): string | null {
 	const last = loaded.lastGameClub;
 	if (!last) return null;
 	const club = isFreeAgent(loaded.team) ? null : clubOf(list, loaded.team);
@@ -259,31 +320,43 @@ async function lastKickoffsOf(): Promise<Record<number, string>> {
 	return last;
 }
 
-/** His club's game in each week, from the run's schedule: its kickoff and its state at the run. A free
+/** Each week's game of his, from the run's schedule: its kickoff and its state at the run; his club's,
+ * or a mover's week under another club's opponent, that club's (run/row-game.ts, Lane 136). A free
  * agent (Lane 123) has no club, so no game in any week. */
 async function kickoffsOf(team: string): Promise<KickoffOf> {
 	if (isFreeAgent(team)) return () => null;
-	const slate = (await schedule()).slates.find((candidate) => candidate.abbr === team);
-	if (!slate) throw new Error(`${team} has no slate on the run's schedule.`);
-	return (week) => {
-		const game = slate.games.find((candidate) => candidate.week === week);
-		return game === undefined ? null : { kickoff: game.kickoff, state: game.state ?? null };
-	};
+	return kickoffsFrom((await schedule()).slates, team);
+}
+
+/** His season block as the page shows it; a page held back with no copy (Lane 136) has none. */
+async function seasonOf(
+	loaded: PageSource,
+	formats: readonly Format[],
+	lead: Format,
+	year: number
+): Promise<SeasonView> {
+	if (loaded.season === null) return heldSeasonView(year, loaded.position, lead);
+	return seasonView(
+		loaded.season,
+		loaded.position,
+		formats,
+		await kickoffsOf(loaded.team),
+		loaded.priorSeasons
+	);
 }
 
 export async function playerPage(slug: string, now: number): Promise<PlayerPage> {
 	const entry = await entryBySlug(slug);
-	const [loaded, run, sources, kickoffOf, underway, capture, clubList, lastKickoffs] =
-		await Promise.all([
-			player(entry.id),
-			manifest(),
-			adp(),
-			kickoffsOf(entry.team),
-			seasonUnderway(),
-			designations(),
-			clubs(),
-			lastKickoffsOf()
-		]);
+	const [read, run, sources, underway, capture, clubList, lastKickoffs] = await Promise.all([
+		playerRead(entry.id),
+		manifest(),
+		adp(),
+		seasonUnderway(),
+		designations(),
+		clubs(),
+		lastKickoffsOf()
+	]);
+	const loaded = sourceOf(read);
 	const listed = capture?.players[entry.id];
 	const lines = await linesFor(
 		run.formats,
@@ -297,7 +370,7 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		(format, numbers) => ({
 			tile: restTile(format, numbers, loaded.position, run.season, listed),
 			parts: restParts(format, numbers, loaded.position, listed),
-			basis: basisTiles(format, numbers, run.season, loaded.season.games)
+			basis: basisTiles(format, numbers, run.season, loaded.season?.games ?? 0)
 		})
 	);
 	const [lead] = lines;
@@ -329,13 +402,7 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		adpSources: lead.adpSources,
 		boardSize: lead.boardSize,
 		capsule: loaded.capsule,
-		season: seasonView(
-			loaded.season,
-			loaded.position,
-			run.formats,
-			kickoffOf,
-			loaded.priorSeasons ?? []
-		),
+		season: await seasonOf(loaded, run.formats, lead.format, run.season),
 		underway,
 		status,
 		heldTier: listed?.seasonLong === true ? heldTierWords(listed.status) : null,
@@ -345,7 +412,8 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		restTile: lead.restTile,
 		restParts: lead.restParts,
 		basisTiles: lead.basisTiles,
-		weekRead: loaded.weekRead ?? null,
-		lastKickoffs
+		weekRead: loaded.weekRead,
+		lastKickoffs,
+		copyOf: loaded.copyOf
 	};
 }

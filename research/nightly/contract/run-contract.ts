@@ -15,6 +15,11 @@
 // `$app/env/public` (the build's PUBLIC_RUN_ID and PUBLIC_RUN_BASE_URL), is answered here with the run
 // to check. Every refusal is printed as one line, `schema:<file>:<message>`, and the exit status is 1
 // when there is any, 2 when the checker itself could not run.
+//
+// Lane 136: each player page the reader refuses is its own line, `schema:players/<id>.json:<message>`,
+// and each held page's earlier copy it refuses `schema:held/<id>.json:<message>`, so the gate can hold
+// a refused page back (research/nightly/held_pages.py) and fail the run on anything else. A run that
+// holds pages (`held.json`) is read as the build reads it: a held page's own document is never read.
 import { registerHooks } from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -54,9 +59,33 @@ interface Format {
   id: string;
 }
 
+const oneLine = (text: string): string => text.replaceAll("\n", " ");
+
 // One line per refusal, named by the first file that met it: the reader shares one read per artifact,
-// so a broken schedule refuses every page through the same error.
+// so a broken schedule refuses every page through the same error. The player pages the reader refuses
+// come as one error naming each (Lane 136), and each is a line of its own, keyed by its file.
 const refusals = new Map<string, string>();
+let refusedPages = 0;
+function refuse(error: unknown, file: string): void {
+  if (error instanceof web.RefusedPages) {
+    refusedPages = error.pages.size;
+    for (const [where, named] of [
+      ["players", error.pages],
+      ["held", error.copies],
+    ] as const) {
+      for (const [id, message] of named) {
+        const path = `${where}/${id}.json`;
+        refusals.set(path, `schema:${path}:${oneLine(message)}`);
+      }
+    }
+    return;
+  }
+  const message = oneLine(
+    error instanceof Error ? error.message : String(error),
+  );
+  if (!refusals.has(message))
+    refusals.set(message, `schema:${file}:${message}`);
+}
 async function check<T>(
   file: string,
   read: () => Promise<T>,
@@ -64,11 +93,7 @@ async function check<T>(
   try {
     return await read();
   } catch (error) {
-    const message = (
-      error instanceof Error ? error.message : String(error)
-    ).replaceAll("\n", " ");
-    if (!refusals.has(message))
-      refusals.set(message, `schema:${file}:${message}`);
+    refuse(error, file);
     return null;
   }
 }
@@ -86,11 +111,28 @@ for (const format of manifest?.formats ?? []) {
   );
   rows += (board?.rows.length ?? 0) + (board?.market?.length ?? 0);
 }
+const held = await check<Map<string, { copy: unknown }>>("held.json", () =>
+  web.held(),
+);
 let pages = 0;
 for (const entry of index ?? []) {
-  if (await check(`players/${entry.id}.json`, () => web.player(entry.id)))
-    pages += 1;
+  // Labelled `players` alone: only the reader's own refusal of a page names that page's file, so a
+  // failure every page meets (an unreadable schedule) is never taken for one page's.
+  const read = await check<{ kind: string }>("players", () =>
+    web.playerRead(entry.id),
+  );
+  if (read?.kind === "page") pages += 1;
 }
+// One error refuses every page's read, so the pages taken are those it does not name.
+if (refusedPages > 0 && held)
+  pages = (index?.length ?? 0) - held.size - refusedPages;
+const copies = [...(held?.values() ?? [])].filter(
+  (page) => page.copy !== null,
+).length;
+const heldWords =
+  held && held.size > 0
+    ? `, ${held.size} held (${copies} from an earlier run)`
+    : "";
 await check("adp.json", () => web.adp());
 await check("record.json", () => web.record());
 await check("clubs.json", () => web.clubs());
@@ -117,6 +159,6 @@ for (const name of [
 for (const line of refusals.values()) process.stdout.write(`${line}\n`);
 process.stdout.write(
   `run ${runId}: ${refusals.size} refusals; ${manifest?.formats.length ?? 0} formats (${rows} board rows), ` +
-    `${pages} of ${index?.length ?? 0} player pages parsed, adp, record, clubs, schedule, designations\n`,
+    `${pages} of ${index?.length ?? 0} player pages parsed${heldWords}, adp, record, clubs, schedule, designations\n`,
 );
 process.exit(refusals.size === 0 ? 0 : 1);
