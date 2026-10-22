@@ -2,7 +2,7 @@
 // signed out and signed in, at 1280 and 390, against the fixture API on the fixture week's clock and
 // the site built on the one-board run (inseason-fixture/one-board-run.ts, made Thursday morning, before
 // week 6's Thursday game). It asserts that the signed-out front door prints the run's figures with the
-// run's time ("Projected and Over replacement updated 8:50 am Central"), that the signed-in one prints the API's order, its lead
+// run's time ("Projected and Over replacement updated Thu Oct 15, 8:50 am Central"), that the signed-in one prints the API's order, its lead
 // naming the league's shape and the read, with no run stamp, and that /board reads the API's order
 // either way. With TWO_QB=1 (the fixture API started with FIXTURE_TWO_QB=1, Lane 117, B78) the signed-in
 // front door's strip holds rows built from the answer (shown with their Avg), and the basis says once why
@@ -30,7 +30,7 @@ const PHONE_MAX = 760;
 const HEIGHT = { desk: 900, phone: 844 } as const;
 const READY_TIMEOUT_MS = 30_000;
 const SETTLE_MS = 600;
-const RUN_STAMP = 'Over replacement updated 8:50 am Central';
+const RUN_STAMP = 'Over replacement updated Thu Oct 15, 8:50 am Central';
 const LIVE_LEAD = "for 12 teams, your league's shape, read";
 /** The API's order drawn as its box score (OrderScreen's table). */
 const ORDER_TABLE = 'table.order';

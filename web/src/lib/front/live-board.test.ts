@@ -230,7 +230,7 @@ void test('a figure the answer lacks, or a short answer, keeps the run strip', (
 
 void test("the signed-out strip says the run's time beside its figures", () => {
 	assert.deepEqual(runStampPart(RUN_AT, ZONE), {
-		text: 'Projected and Over replacement updated 8:50 am Central.',
+		text: 'Projected and Over replacement updated Mon Oct 19, 8:50 am Central.',
 		phone: true
 	});
 	// "Run" is never the page's word (B53).
@@ -246,10 +246,7 @@ void test('the basis says once what Over replacement counts, for the shape (B46)
 });
 
 void test("the live strip's lead says its weeks, the shape and when it was read", () => {
-	const run = [
-		{ text: 'Our PPR board, the rest of the 2026 season from week 6.', phone: true },
-		{ text: 'GP and Avg are this season’s.', phone: false }
-	];
+	const run = [{ text: 'GP and Avg are this season’s.', phone: false }];
 	const league = liveLeadPart(ANSWER, shapeWords(12, true), READ_AT, ZONE);
 	assert.equal(
 		league.text,
@@ -259,5 +256,5 @@ void test("the live strip's lead says its weeks, the shape and when it was read"
 		liveLeadPart(ANSWER, shapeWords(12, false), READ_AT, ZONE).text,
 		'Our rest-of-season order from week 7, by points over replacement for 12 teams, read 7:25 pm Central.'
 	);
-	assert.deepEqual(liveBasis(run, league), [league, run[1]]);
+	assert.deepEqual(liveBasis(run, league), [league, run[0]]);
 });

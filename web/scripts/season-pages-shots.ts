@@ -17,7 +17,7 @@ import { chromium, type BrowserContext, type Page } from 'playwright';
 import { signedOutTitle } from '../src/lib/account/keeps.ts';
 import { PAGE_VERBS, boardWords, frontWords } from '../src/lib/site/season-words.ts';
 import { PHASE_COOKIE } from './inseason-fixture/phases.ts';
-import { RAIL_KEYS, railInSeason, type RailKey } from '../src/lib/ui/nav.ts';
+import { RAIL_KEYS, railInSeason, railItemLabel, type RailKey } from '../src/lib/ui/nav.ts';
 import { railShown } from '../src/lib/ui/rail-order.ts';
 import { restFromWords } from '../src/lib/run/rest-from.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
@@ -33,6 +33,9 @@ const SEASON = 2026;
 const ROS_FROM_WEEK = process.env.ROS_FROM_WEEK;
 const COVER = {
 	season: SEASON,
+	// The stand-in's default board: PPR for 12 teams, the shape a signed-out heading names (Lane 140).
+	label: 'PPR',
+	teams: 12,
 	...(ROS_FROM_WEEK === undefined
 		? {}
 		: {
@@ -296,7 +299,8 @@ for (const theme of THEMES) {
 					.filter((item) => item.getBoundingClientRect().width > 0)
 					.map((item) => item.innerText.trim())
 			);
-			const want = items.map((item) => item.label);
+			// The week's order is named for the run's week (Lane 140).
+			const want = items.map((item) => railItemLabel(item, COVER.rosFromWeek ?? null));
 			if (JSON.stringify(shown) !== JSON.stringify(want)) {
 				failures.push(`${where}: the rail shows ${shown.join(', ')}, not ${want.join(', ')}`);
 			}

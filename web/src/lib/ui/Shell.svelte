@@ -12,6 +12,7 @@
 		RAIL_FOOT,
 		RAIL_ITEMS,
 		railHref,
+		railItemLabel,
 		sectionOf,
 		type RailItem,
 		type Section
@@ -35,10 +36,14 @@
 		 * names it, the selected league marked in its list (B38, Lane 115 B89). Left out, they open and
 		 * name the selected league's. */
 		league?: string;
+		/** The week the run's board ranks from in season, which names the rail's week order (Lane
+		 * 140, C19); absent before the season and on a page that carries no run. */
+		week?: number | null;
 		children: Snippet;
 	}
 
-	let { title, stamp, active, search, tail, league, children }: Props = $props();
+	let { title, stamp, active, search, tail, league, week = null, children }: Props = $props();
+	const labelOf = (item: RailItem): string => railItemLabel(item, week);
 
 	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
 	// The site's context: the session's copy at once, then /me. The rail's Board (/board, which
@@ -63,7 +68,7 @@
 		aria-current={item.section === current ? 'page' : undefined}
 	>
 		<RailIcon name={item.icon} />
-		<span>{item.label}</span>
+		<span>{labelOf(item)}</span>
 	</a>
 {/snippet}
 

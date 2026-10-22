@@ -52,11 +52,23 @@ function leagueVerb(following: boolean): PageVerb {
 	return following ? 'open_league' : 'follow';
 }
 
-export function frontWords(rail: RailKey, board: BoardCover, following: boolean): FrontWords {
+/** Whom the front door's board is for (Lane 140, C18): "your league" only once a league is followed,
+ * else the shape the board is ranked for, "a 12-team PPR league". */
+function whose(board: FrontCover, following: boolean): string {
+	return following ? 'your league' : `a ${String(board.teams)}-team ${board.label} league`;
+}
+
+/** What the front door's words need of the board: its cover, its scoring's label and its teams. */
+export type FrontCover = BoardCover & { label: string; teams: number };
+
+export function frontWords(rail: RailKey, board: FrontCover, following: boolean): FrontWords {
 	const season = String(board.season);
 	if (!railInSeason(rail)) {
 		return {
 			title: 'Draft prep',
+			// Before the draft the words are the same followed or not, so the prerendered hero never
+			// changes when the context answers (season-pages-shots); in season a followed member's front
+			// door draws the week in place of the hero.
 			heading: `Our ${season} board, for your draft and your league`,
 			verb: 'mock',
 			quiet: [leagueVerb(following), 'sheet']
@@ -64,8 +76,8 @@ export function frontWords(rail: RailKey, board: BoardCover, following: boolean)
 	}
 	const heading =
 		board.restFrom === undefined
-			? `Our ${season} board, for your league`
-			: `Our board for the rest of the ${season} season ${board.restFrom}, for your league`;
+			? `Our ${season} board, for ${whose(board, following)}`
+			: `Our board for the rest of the ${season} season ${board.restFrom}, for ${whose(board, following)}`;
 	return { title: 'In season', heading, verb: leagueVerb(following), quiet: ['mock'] };
 }
 

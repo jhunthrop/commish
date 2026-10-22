@@ -22,6 +22,7 @@ export type Section =
 	| 'sheet'
 	| 'advisor'
 	| 'record'
+	| 'week'
 	| 'account'
 	| 'league'
 	| 'lineup'
@@ -58,6 +59,18 @@ export const REST_OF_SEASON = 'Rest of season';
 /** The rail's item for the board with a league selected, apart from Players (Lane 104, B40): our
  * order in your league's view. */
 export const REST_IN_YOUR_LEAGUE = `${REST_OF_SEASON}, your league`;
+
+/** The week's order (Lane 140, C19): the season's rail with no league selected and the front card
+ * link our order with this week's figures beside it, named for the week the board ranks from. */
+export const WEEK_RANKINGS_KEY = 'week';
+export function weekRankingsWord(week: number | null): string {
+	return week === null ? "This week's rankings" : `Week ${String(week)} rankings`;
+}
+
+/** A rail item's label as the shell draws it: the week's order named for the run's week. */
+export function railItemLabel(item: Pick<RailItem, 'key' | 'label'>, week: number | null): string {
+	return item.key === WEEK_RANKINGS_KEY ? weekRankingsWord(week) : item.label;
+}
 
 /** Where a mock draft starts: the room's setup. */
 const MOCK_SETUP = '/mock/new';
@@ -144,6 +157,16 @@ export const RAIL_ITEMS: readonly RailItem[] = [
 	{ ...BOARD, key: 'rest_first', label: REST_OF_SEASON },
 	{ ...ADVISOR, key: 'advisor_first' },
 	BOARD,
+	// The week's order, on the season's rail with no league selected (rail-order.ts): our order with
+	// the week's Proj and game beside each player, on Players. It lights no page of its own.
+	{
+		key: WEEK_RANKINGS_KEY,
+		section: 'week',
+		label: weekRankingsWord(null),
+		href: '/players',
+		icon: 'lineup',
+		owns: []
+	},
 	{
 		key: 'players',
 		section: 'players',

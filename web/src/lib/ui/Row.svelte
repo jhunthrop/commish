@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { adpFigure } from '#lib/format/draft.ts';
 	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
+	import { byeCell } from '#lib/format/bye.ts';
 	import { gapText, gapTone } from '#lib/format/gap.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
@@ -43,6 +44,9 @@
 		scale?: RangeScale;
 		/** His club's bye week, null when the run names none. */
 		bye: number | null;
+		/** The week a rest-of-season board ranks from: a bye before it reads "Done" (Lane 140, C26).
+		 * Null on a board of the full season. */
+		byesFrom?: number | null;
 		/** Faces in the first screen of a prerendered board load eagerly. */
 		eager?: boolean;
 		/** The row's sheet control at its end (SheetMark), where the columns carry it. Anything in it
@@ -71,6 +75,7 @@
 		columns,
 		scale,
 		bye,
+		byesFrom = null,
 		eager = false,
 		action,
 		marks,
@@ -132,7 +137,7 @@
 				{status}
 			/>
 			<span class="club">{player.team}</span>
-			{#if bye !== null}<span class="phone-bye">Bye {bye}</span>{/if}
+			{#if bye !== null}<span class="phone-bye">Bye {byeCell(bye, byesFrom)}</span>{/if}
 			{#if marks}{@render marks()}{/if}
 		</span>
 	</span>
@@ -142,7 +147,7 @@
 				>{/if}</span
 		>{/if}
 	{#if cell.bye}<span class="n quiet {cell.bye}" class:absent={bye === null}
-			>{bye ?? EMPTY_FIGURE}</span
+			>{byeCell(bye, byesFrom)}</span
 		>{/if}
 	{#if cell.proj}<span class="n {cell.proj}" class:absent={ranked === null}
 			>{ranked ? fixed(ranked.projected) : EMPTY_FIGURE}</span

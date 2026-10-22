@@ -9,6 +9,7 @@
 	import { verbHref } from '#lib/site/verb-links.ts';
 	import { shownRail } from '#lib/site/shown-rail.svelte.ts';
 	import Figure from '#lib/ui/Figure.svelte';
+	import PairTile from '#lib/ui/PairTile.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import Phased from '#lib/ui/Phased.svelte';
@@ -195,7 +196,7 @@
 		{:else}
 			<HeroCard title={heading}>
 				{#snippet meta()}
-					<span>{format.basis.join(' · ')}</span>
+					<span>{page.meta.join(' · ')}</span>
 				{/snippet}
 				{#snippet aside()}
 					<Phased>
@@ -226,6 +227,7 @@
 								{columns}
 								scale={page.scale}
 								bye={page.byes[player.team] ?? null}
+								byesFrom={format.rosFromWeek ?? null}
 								eager={i < EAGER_ROWS}
 								season={player.season}
 								framing={page.framing}
@@ -248,9 +250,19 @@
 					<PanelHead title="Our record" aside={page.record.season.toString()} />
 					{#if page.front}
 						<p class="standing">{page.front.name}</p>
-						<div class="figures">
-							<Figure value={page.front.value} size="lg" caption={page.front.caption} />
-						</div>
+						{#if page.front.value !== null}
+							<div class="figures">
+								<Figure value={page.front.value} size="lg" caption={page.front.caption} />
+							</div>
+						{:else}
+							<!-- Ours and ADP at one size, each pair's leader named (C05). -->
+							<p class="record-note">{page.front.caption}</p>
+							<div class="figures pairs">
+								{#each page.front.pairs as pair (pair.label)}
+									<PairTile label={pair.label} {pair} size="md" />
+								{/each}
+							</div>
+						{/if}
 						{#if page.front.second}<p class="record-note">{page.front.second}</p>{/if}
 						<p class="record-note">{page.front.scale}</p>
 						{#if page.front.note}<p class="record-note">{page.front.note}</p>{/if}
@@ -270,6 +282,9 @@
 						{#if headline.gaps}<p class="record-note">{headline.gaps}</p>{/if}
 					{/if}
 					<div class="more">
+						{#if page.weekRankings}
+							<Quiet href={page.weekRankings.href} size="sm">{page.weekRankings.label}</Quiet>
+						{/if}
 						<Quiet href={links.record()} size="sm">How the board has done</Quiet>
 					</div>
 				</Panel>
@@ -316,6 +331,10 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 		gap: var(--s-3);
+	}
+
+	.pairs {
+		margin-top: var(--s-2);
 	}
 
 	.standing {

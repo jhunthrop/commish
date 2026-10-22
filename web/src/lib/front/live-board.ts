@@ -3,7 +3,7 @@
  * LiveBoard), in its order and to its tenth. A reader who is signed out, or whose read fails, keeps
  * the run's figures, said with the run's time beside them. Pure, so the tests read every figure and
  * word the strip prints. */
-import { timeOfDay, zoneWord } from '#lib/format/clock.ts';
+import { dayTimeStamp, timeOfDay, zoneWord } from '#lib/format/clock.ts';
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { BoardRowView } from '#lib/run/schema.ts';
@@ -22,7 +22,8 @@ export const BUILD_ZONE = 'America/Chicago';
 
 /** Every word the strip prints that is not a player's, a figure or the API's. */
 export const STRIP_WORDS = {
-	/** "Projected and Over replacement updated 8:50 am Central.": the run's figures with its time. */
+	/** "Projected and Over replacement updated Thu Oct 22, 8:50 am Central.": the run's figures with
+	 * its one stamp, day and zone (Lane 140, C24). */
 	updated: (at: string): string => `Projected and Over replacement updated ${at}.`,
 	/** What Over replacement counts, said once under the heads (B46). */
 	overReplacement: (teams: number): string =>
@@ -39,12 +40,10 @@ export const STRIP_WORDS = {
 	leagueAvg: "Avg in your league's scoring."
 } as const;
 
-/** "Projected and Over replacement updated 8:50 am Central.": the run's figures with its time. */
+/** "Projected and Over replacement updated Thu Oct 22, 8:50 am Central.": the run's figures with
+ * its one stamp (C24): the front door's basis dates the run here alone. */
 export function runStampPart(refreshedAt: string, zone: string): BasisPart {
-	return {
-		text: STRIP_WORDS.updated(`${timeOfDay(refreshedAt, zone)} ${zoneWord(zone)}`),
-		phone: true
-	};
+	return { text: STRIP_WORDS.updated(dayTimeStamp(refreshedAt, zone)), phone: true };
 }
 
 /** What Over replacement counts, for the shape the figures are for (B46). */
@@ -220,8 +219,8 @@ export function liveStrip(
 	return out;
 }
 
-/** The run's basis with its first sentence the live lead in place of the run's (the run stamp is
- * the run's strip's alone). */
+/** The run's basis led by the live lead (the run stamp is the run's strip's alone). The front
+ * door's run basis names no board of its own, its heading says it (Lane 140, C24). */
 export function liveBasis(runBasis: readonly BasisPart[], lead: BasisPart): BasisPart[] {
-	return [lead, ...runBasis.slice(1)];
+	return [lead, ...runBasis];
 }

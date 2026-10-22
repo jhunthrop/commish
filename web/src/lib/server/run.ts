@@ -423,6 +423,7 @@ export async function stamp(): Promise<RunStamp> {
 		season: run.season,
 		standIn: run.standIn,
 		search: searchPlaceholder(run.players),
-		formats: run.formats.map((format) => format.id)
+		formats: run.formats.map((format) => format.id),
+		...(run.formats[0]?.rosFromWeek === undefined ? {} : { week: run.formats[0].rosFromWeek })
 	};
 }
