@@ -134,7 +134,7 @@
 						},
 						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4371733.png",
 						"slug": "kenny-gainwell",
-						"position_rank": 25,
+						"position_rank": 26,
 						"points_over_replacement": -1.6,
 						"rest_of_season_per_game": 8.7,
 						"held": false,
@@ -593,6 +593,107 @@
 				},
 				{
 					"player": {
+						"host_id": "7543",
+						"board_id": "4239996",
+						"name": "Travis Etienne",
+						"position": "RB",
+						"team": "NO",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4239996.png",
+					"slug": "travis-etienne-jr",
+					"position_rank": 14,
+					"points_over_replacement": -2.6,
+					"rest_of_season_per_game": 11.4,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "NYG",
+						"home": false,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": {
+							"status": "questionable",
+							"as_of": "2026-10-14T02:03:35.613Z",
+							"returning": "2026-10-18"
+						},
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 3, "points": 9 },
+							{ "week": 2, "points": 5.1 },
+							{ "week": 1, "points": 14.8 }
+						],
+						"allowed_to_position": {
+							"points_a_game": 14.4,
+							"rank": 26,
+							"of": 32,
+							"position": "RB"
+						},
+						"game_total": {
+							"points": 45.5,
+							"team_points": 22,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 54,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
+					},
+					"week_projection": 14.19,
+					"projection_delta": 0.2,
+					"opp_rank": 26,
+					"season_avg": 9.63,
+					"last_points": 9
+				},
+				{
+					"player": {
+						"host_id": "HOU",
+						"board_id": null,
+						"name": "Houston Texans",
+						"position": "DEF",
+						"team": "HOU",
+						"injured_reserve": false
+					},
+					"headshot": null,
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"rest_of_season_per_game": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "JAX",
+						"home": false,
+						"kickoff": "2026-10-18T13:30:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 42.5,
+							"team_points": 20,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": true },
+						"weather": null
+					},
+					"week_projection": 7.9,
+					"projection_delta": -0.3,
+					"opp_rank": null,
+					"season_avg": null,
+					"last_points": null
+				},
+				{
+					"player": {
 						"host_id": "10235",
 						"board_id": "4426386",
 						"name": "Roschon Johnson",
@@ -644,47 +745,6 @@
 				},
 				{
 					"player": {
-						"host_id": "HOU",
-						"board_id": null,
-						"name": "Houston Texans",
-						"position": "DEF",
-						"team": "HOU",
-						"injured_reserve": false
-					},
-					"headshot": null,
-					"slug": null,
-					"position_rank": null,
-					"points_over_replacement": null,
-					"rest_of_season_per_game": null,
-					"held": false,
-					"facts": {
-						"week": 6,
-						"opponent": "JAX",
-						"home": false,
-						"kickoff": "2026-10-18T13:30:00.000Z",
-						"bye": false,
-						"designation": null,
-						"played": false,
-						"points_this_week": null,
-						"last_games": [],
-						"allowed_to_position": null,
-						"game_total": {
-							"points": 42.5,
-							"team_points": 20,
-							"read_at": "2026-10-16T21:01:26.774Z"
-						},
-						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
-						"roof": { "kind": "outdoors", "abroad": true },
-						"weather": null
-					},
-					"week_projection": 7.9,
-					"projection_delta": -0.3,
-					"opp_rank": null,
-					"season_avg": null,
-					"last_points": null
-				},
-				{
-					"player": {
 						"host_id": "9753",
 						"board_id": "4426385",
 						"name": "Zach Charbonnet",
@@ -694,7 +754,7 @@
 					},
 					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4426385.png",
 					"slug": "zach-charbonnet",
-					"position_rank": 46,
+					"position_rank": 47,
 					"points_over_replacement": -5.7,
 					"rest_of_season_per_game": 4.9,
 					"held": false,
@@ -830,67 +890,6 @@
 					"opp_rank": 3,
 					"season_avg": 15.2,
 					"last_points": 0.8
-				},
-				{
-					"player": {
-						"host_id": "7543",
-						"board_id": "4239996",
-						"name": "Travis Etienne",
-						"position": "RB",
-						"team": "NO",
-						"injured_reserve": false
-					},
-					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4239996.png",
-					"slug": "travis-etienne-jr",
-					"position_rank": null,
-					"points_over_replacement": -2.6,
-					"rest_of_season_per_game": 11.4,
-					"held": false,
-					"facts": {
-						"week": 6,
-						"opponent": "NYG",
-						"home": false,
-						"kickoff": "2026-10-18T17:00:00.000Z",
-						"bye": false,
-						"designation": {
-							"status": "injured_reserve",
-							"as_of": "2026-10-14T02:03:35.613Z",
-							"since": "2026-10-01T22:00:00.000Z",
-							"season_long": true
-						},
-						"played": false,
-						"points_this_week": null,
-						"last_games": [
-							{ "week": 3, "points": 9 },
-							{ "week": 2, "points": 5.1 },
-							{ "week": 1, "points": 14.8 }
-						],
-						"allowed_to_position": {
-							"points_a_game": 14.4,
-							"rank": 26,
-							"of": 32,
-							"position": "RB"
-						},
-						"game_total": {
-							"points": 45.5,
-							"team_points": 22,
-							"read_at": "2026-10-16T21:01:26.774Z"
-						},
-						"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
-						"roof": { "kind": "outdoors", "abroad": false },
-						"weather": {
-							"temperature_f": 54,
-							"wind_mph": 6.9,
-							"precipitation_chance": 0,
-							"precipitation_kind": "none",
-							"read_at": "2026-10-16T21:01:34.611Z"
-						}
-					},
-					"week_projection": 14.19,
-					"projection_delta": 0.2,
-					"opp_rank": 26,
-					"season_avg": 9.63,
-					"last_points": 9
 				},
 				{
 					"player": {
@@ -1366,7 +1365,7 @@
 						},
 						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3054850.png",
 						"slug": "alvin-kamara",
-						"position_rank": 42,
+						"position_rank": 43,
 						"points_over_replacement": 0.2,
 						"rest_of_season_per_game": 6.2,
 						"held": false,
@@ -1571,7 +1570,7 @@
 					},
 					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4575131.png",
 					"slug": "jacory-croskey-merritt",
-					"position_rank": 36,
+					"position_rank": 37,
 					"points_over_replacement": 0,
 					"rest_of_season_per_game": 6.6,
 					"held": false,

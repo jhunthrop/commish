@@ -174,9 +174,25 @@ export function captureLine(
  * began, or the word alone ("IR") when we do not know. The capture's read is never the chip's: the
  * page's basis line says it once. What the order does with him is said at the head of his section. */
 export function seasonLongMark(
-	status: { status: DesignationStatus; since: string | null },
+	status: { status: DesignationStatus; since: string | null; returning?: string | null },
 	zone: string = memberZone()
 ): string {
 	const word = RANK_WORDS[status.status];
+	// On the list with a later return day (Lane 153): "IR, back Nov 8".
+	if (status.returning) return `${word}, back ${calendarDay(status.returning)}`;
 	return status.since === null ? word : `${word} since ${shortDay(status.since, zone)}`;
+}
+
+/** "Nov 8", with its weekday "Sun Oct 25": the provider's return day (an ISO day), the same day on
+ * every clock. */
+export function calendarDay(day: string, weekday = false): string {
+	const noon = `${day}T12:00:00Z`;
+	return `${weekday ? weekdayTime(noon, 'UTC').slice(0, 4) : ''}${shortDay(noon, 'UTC')}`;
+}
+
+/** "Due back Sun Oct 25": a player due back this week, his pill's word (Lane 153). The API and the capture
+ * send a return day on a week's designation only when he is designated to return by the week's last
+ * game day: this week's question, ranked as playing. */
+export function returningMark(returning: string): string {
+	return `Due back ${calendarDay(returning, true)}`;
 }

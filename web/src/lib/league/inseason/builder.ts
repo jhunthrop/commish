@@ -4,6 +4,7 @@
  * lineups' change is the whole answer. */
 import { fixed } from '#lib/format/number.ts';
 import { listWords } from '#lib/format/list.ts';
+import { onReserve } from '../box/box.ts';
 import type { PlayerLine, TradeCheck, TradeCheckInput, TradeRow, TradeTeam } from './api.ts';
 import { GAIN_DECIMALS, gainAmount, perGameWords, teamAside } from './words.ts';
 
@@ -24,12 +25,7 @@ export interface Picks {
 /** Whether a player can be picked: at QB, RB, WR or TE, named by the host, and not on injured
  * reserve. */
 export function pickable(line: PlayerLine): boolean {
-	return (
-		TRADED.has(line.player.position) &&
-		line.player.host_id !== '' &&
-		!line.player.injured_reserve &&
-		line.facts.designation?.status !== 'injured_reserve'
-	);
+	return TRADED.has(line.player.position) && line.player.host_id !== '' && !onReserve(line);
 }
 
 /** A tap on a player: picked when the side has room, put back when he is picked. A third waits for

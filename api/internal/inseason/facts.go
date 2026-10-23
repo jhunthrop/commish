@@ -92,6 +92,12 @@ type Designation struct {
 	// counts), and the host's IR mark. The one list the line's rank, the
 	// order and the week's figures read (Lane 128).
 	SeasonLong bool
+	// Returning is the day the provider expects him back from a
+	// season-long list (boards.ReturnOf, Lane 153): with the status
+	// boards.ReturningStatus, this week's question, ranked as playing;
+	// with a season-long status, a day after this week's games. Nil with
+	// no date, a passed one, or a week's designation.
+	Returning *time.Time
 	// Pending is a designation whose dating is still pending
 	// (boards.DatingPending, a cold start's failed runs read): not yet
 	// known, so never on the wire and never carried over (Lane 116, B91).
@@ -447,15 +453,32 @@ func (s *Season) carriedOver(d boards.Designation, team string) bool {
 func (s *Season) designation(p Player) *Designation {
 	if d, ok := s.designations[p.BoardID]; ok && p.BoardID != "" {
 		if status := boards.StatusOf(d.Code); status != "" {
-			return &Designation{Status: status, AsOf: d.AsOf, Since: d.Since, Listed: d.Listed,
-				CarriedOver: s.carriedOver(d, p.Team), ReturnWeek: s.returnAfter(d.ReturnOn), Back: s.returnFrom(d.ReturnOn),
-				Pending: d.DatingPending, SeasonLong: d.SeasonLong()}
+			return s.read(d, p, status)
 		}
 	}
 	if p.HostIR {
 		return &Designation{Status: boards.StatusInjuredReserve, AsOf: p.ReadAt, SeasonLong: true}
 	}
 	return nil
+}
+
+// read is the capture's designation for him at the Season's week and
+// clock, under the return rule (boards.ReturnOf, Lane 153): a season-long
+// code due back by his club's game day this week is this week's question,
+// never a list, never carried over; one due back after it, or on a bye
+// week, keeps its list and carries the day.
+func (s *Season) read(d boards.Designation, p Player, status string) *Designation {
+	back := boards.ReturnOf(status, d.ReturnOn, s.clubDayEnd(p.Team), s.now)
+	if back == boards.ReturnThisWeek {
+		return &Designation{Status: boards.ReturningStatus, AsOf: d.AsOf, Returning: d.ReturnOn, Pending: d.DatingPending}
+	}
+	out := &Designation{Status: status, AsOf: d.AsOf, Since: d.Since, Listed: d.Listed,
+		CarriedOver: s.carriedOver(d, p.Team), ReturnWeek: s.returnAfter(d.ReturnOn), Back: s.returnFrom(d.ReturnOn),
+		Pending: d.DatingPending, SeasonLong: d.SeasonLong()}
+	if back == boards.ReturnLater {
+		out.Returning = d.ReturnOn
+	}
+	return out
 }
 
 // String names the facts for a test's failure.

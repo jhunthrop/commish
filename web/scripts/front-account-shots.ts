@@ -139,8 +139,9 @@ async function front(theme: string, width: number): Promise<void> {
 		};
 	});
 	if (seen.lead.length !== 2) fault(where, `lead bug teams ${seen.lead.join(' | ')}`);
-	// The fixture's three changes (Mahomes at QB, Johnson and the Texans for two on bye), Lane 128.
-	if (seen.strip[0] !== 'Three changes' || seen.gain[0] !== '+10.6')
+	// The fixture's three changes (Mahomes at QB, Etienne back Sunday and the Texans for two on bye),
+	// Lanes 128 and 153: 98.9 Proj against the platform's 74.6.
+	if (seen.strip[0] !== 'Three changes' || seen.gain[0] !== '+24.2')
 		fault(where, `strip ${seen.strip.join()} ${seen.gain.join()}`);
 	if (seen.verb[0] !== 'Set your lineup') fault(where, `verb ${seen.verb.join()}`);
 	if (seen.chips.join() !== 'Lineup,Waivers,Waivers') fault(where, `chips ${seen.chips.join()}`);

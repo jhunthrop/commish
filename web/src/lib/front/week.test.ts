@@ -314,6 +314,22 @@ void test('each chip names the fact and opens the screen that acts on it', () =>
 			]
 		]
 	);
+	// Designated to return this week (Lane 153): the chip says his day.
+	const [odunze] = SUCK.chips;
+	if (odunze === undefined) throw new Error('no status chip');
+	const designation = {
+		status: 'questionable' as const,
+		as_of: '2026-10-16T21:00:00.000Z',
+		returning: '2026-10-18'
+	};
+	const back = {
+		...odunze,
+		line: { ...odunze.line, facts: { ...odunze.line.facts, designation } }
+	};
+	assert.equal(
+		chipsOf({ ...SUCK, chips: [back] }, href, ZONE, NOW)[0]?.label,
+		'Due back Sun Oct 18'
+	);
 	const starterBye = chipsOf({ ...SUCK, chips: [{ ...BYE, idle: false }] }, href, ZONE, NOW);
 	assert.deepEqual(
 		starterBye.map((c) => [c.line, c.go]),

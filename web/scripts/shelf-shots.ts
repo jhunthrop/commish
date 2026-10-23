@@ -415,6 +415,50 @@ if (!process.env.BYTES_ONLY && lineupScreen !== undefined) {
 		}
 	}
 }
+// The return case (Lane 153): Travis Etienne is designated to return Sunday Oct 18 on the capture the
+// run is marked with and the fixture league reads, so on the Lineup and on Players his row ranks him as
+// playing and its chip says his day, and his shelf draws his week, no tile saying a list.
+const RETURN_CASE = {
+	slug: 'travis-etienne-jr',
+	chip: 'Due back Sun Oct 18',
+	listed: onListWords('IR')
+};
+for (const screen of SCREENS.filter((s) => s.name === 'lineup' || s.name === 'players')) {
+	if (process.env.BYTES_ONLY) break;
+	for (const theme of THEMES) {
+		for (const size of SIZES) {
+			const label = `${screen.name} returning ${theme} ${String(size.width)}`;
+			const ctx = await context(theme, size, screen.signedIn);
+			const page = await ctx.newPage();
+			try {
+				await page.goto(`${web}${screen.path}`);
+				await ready(page, screen);
+				const row = opener(page, RETURN_CASE.slug).locator('xpath=ancestor::tr[1]');
+				const rank = await rowRank(page, RETURN_CASE.slug);
+				if (rank === null) faults.push(`${label}: his row draws no rank`);
+				const said = await row.innerText();
+				if (!said.includes(RETURN_CASE.chip)) faults.push(`${label}: his row reads "${said}"`);
+				if (/\bIR\b/u.test(said)) faults.push(`${label}: his row still says IR: "${said}"`);
+				await openShelf(page, 'pointer', RETURN_CASE.slug);
+				await check(page, screen, label, size.width, rank);
+				const listed = await shelf(page)
+					.locator('.tile')
+					.filter({ hasText: RETURN_CASE.listed })
+					.count();
+				if (listed > 0)
+					faults.push(`${label}: ${String(listed)} tiles say "${RETURN_CASE.listed}"`);
+				await page.screenshot({
+					path: new URL(`shelf-${screen.name}-returning-${theme}-${String(size.width)}.png`, out)
+						.pathname
+				});
+			} catch (error: unknown) {
+				faults.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+			} finally {
+				await ctx.close();
+			}
+		}
+	}
+}
 // A player with a written week read (the stand-in run's, scripts/standin-week-reads.json), opened from
 // the address on Players: the read is drawn, in the UI face at the rows' body size (Lane 126).
 const READ_SLUG = 'puka-nacua';

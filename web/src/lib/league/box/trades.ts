@@ -34,7 +34,7 @@ import {
 	type BasisPart,
 	type Clock
 } from './basis.ts';
-import { BOX } from './box.ts';
+import { BOX, onReserve } from './box.ts';
 import { locked } from './lineup.ts';
 import { addressedWeek, arrivesPart, NEXT_WEEK, turnedPage, weekProjected } from './next-week.ts';
 import { GAIN_A_WEEK, SEASON } from './season.ts';
@@ -351,8 +351,7 @@ const ROSTER_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 /** A roster as the builder's box lists it: by position, each by this week's Proj, highest first (a
  * player without one after), injured reserve last. */
 export function rosterOrder(lines: readonly PlayerLine[]): PlayerLine[] {
-	const ir = (l: PlayerLine): number =>
-		Number(l.player.injured_reserve || l.facts.designation?.status === 'injured_reserve');
+	const ir = (l: PlayerLine): number => Number(onReserve(l));
 	const at = (l: PlayerLine): number => {
 		const i = ROSTER_ORDER.indexOf(l.player.position);
 		return i < 0 ? ROSTER_ORDER.length : i;

@@ -26,6 +26,7 @@ from research.capsules.week.sheet import (
     WeekSheet,
     central_day_and_time,
     points_text,
+    returning_words,
 )
 from research.model.jsmath import js_round
 from research.pipeline.jscompat import js_string
@@ -71,6 +72,10 @@ def _status_line(sheet: WeekSheet) -> str:
     report = report_words(sheet.status, sheet.written_at, sheet.game)
     if status is None:
         return f"Injury report: no designation for him on {report}."
+    returning = returning_words(sheet.status)
+    if returning is not None:
+        # Designated to return this week (Lane 153): available, his one sentence the fact.
+        return f"Injury report: {returning} He can play in {this_week}."
     word = STATUS_WORDS.get(status, status)
     if status in CANNOT_PLAY:
         return f"Injury report: {word} on {report}. He cannot play in {this_week}."
@@ -238,8 +243,9 @@ def week_facts_lines(sheet: WeekSheet) -> tuple[tuple[str, str], ...]:
         where = "vs" if game.home else "at"
         kickoff = f"{where} {game.opponent}, {central_day_and_time(game.kickoff)} Central"
         lines.append(("Game", f"bye, next game week {game.week} {kickoff}" if sheet.bye else kickoff))
-    status = sheet.status.status
-    lines.append(("Status", "no designation" if status is None else STATUS_WORDS.get(status, status)))
+    status, returning = sheet.status.status, returning_words(sheet.status)
+    shown = "no designation" if status is None else returning or STATUS_WORDS.get(status, status)
+    lines.append(("Status", shown.removesuffix(".")))
     if sheet.projection is not None and not sheet.bye:
         lines.append(("Published projection", f"{points_text(sheet.projection.points)} points (PPR)"))
     if sheet.allowed is not None and not sheet.bye:

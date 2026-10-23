@@ -6,6 +6,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/season"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // weekEnd is a week of the schedule and the end of its last game day,
@@ -62,6 +63,29 @@ func (s *Season) returnFrom(on *time.Time) *int {
 		return nil
 	}
 	return week
+}
+
+// clubDayEnd is the end of his club's game day in the addressed week,
+// midnight Eastern after its kickoff's day (the return rule's day,
+// boards.ReturnOf, Lane 153 fix round 1), zero when his club has no game
+// that week (a bye) or no club.
+func (s *Season) clubDayEnd(team string) time.Time {
+	g, ok := s.games[teamWeek{s.week, team}]
+	if !ok || team == "" || g.Kickoff.IsZero() {
+		return time.Time{}
+	}
+	day := g.Kickoff.In(season.Eastern())
+	return time.Date(day.Year(), day.Month(), day.Day()+1, 0, 0, 0, 0, season.Eastern())
+}
+
+// easternDay is a day held as midnight Eastern on the wire (an ISO day,
+// "2026-10-25"), nil for none.
+func easternDay(on *time.Time) *openapi_types.Date {
+	if on == nil {
+		return nil
+	}
+	day := on.In(season.Eastern())
+	return &openapi_types.Date{Time: time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)}
 }
 
 // returnAfter is the return week only when it is later than the week the

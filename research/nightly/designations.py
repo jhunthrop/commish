@@ -20,15 +20,21 @@ note saying out for the season) puts him below every available player at his pos
 out, doubtful or questionable moves nothing. The provider's codes and the rule are pinned for both
 lanes in `api/testdata/designation-codes.json` (`research/model/designations.py`).
 
+THE RETURN (Lane 153). A season-long code the daily player list dates back at or before his club's game
+day this week (`return_days.py`, fix round 1) is this week's designation: questionable, `returning` its day, not
+season-long, no since, so he is ranked as playing. One dated back later keeps his list with `returning`
+carried. A passed date, or none, leaves him as he was.
+
 SINCE. A season-long status is dated by the first capture of his unbroken run under it, over the by-date
 captures in the window; a run that reaches the window's oldest capture has no date (we do not know when
 it began), and a capture whose list does not read breaks no run. The roster sweep, which stands in only
 when no by-date capture exists, carries the note and no history.
 """
 
+import logging
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass, replace
+from datetime import date, datetime, timedelta
 from typing import Any, Final
 
 from sqlalchemy import Connection, Engine, bindparam, text
@@ -39,15 +45,32 @@ from sqlalchemy.types import DateTime, Text
 from research.capsules.facts.depth_absence import CapturedDesignation
 from research.capsules.facts.depth_reads import ROSTER_SWEEP_SOURCE, designations_in
 from research.errors import ResearchError
-from research.model.designations import SEASON_LONG, season_long, status_of
+from research.model.designations import (
+    RETURNING_LATER,
+    RETURNING_STATUS,
+    RETURNING_THIS_WEEK,
+    SEASON_LONG,
+    returning_of,
+    season_long,
+    status_of,
+)
 from research.model.instants import js_iso, ms_instant
 from research.nightly.config import EARLY_KEY, LATEST_KEY
 from research.nightly.designation_runs import BY_DATE_SOURCE, designation_runs
 from research.nightly.publish import Dispatcher, PublishOutcome, encode, read_json, run_key
 from research.nightly.published_board import MANIFEST_FILE, driver_line
+from research.nightly.return_days import (
+    ReturnDaysError,
+    ReturnList,
+    club_game_days,
+    eastern_day,
+    listed_returns,
+    return_day,
+)
 from research.nightly.run_store import JSON_TYPE, RunStore
 
 Json = dict[str, Any]
+LOG: Final = logging.getLogger(__name__)
 
 DESIGNATIONS_FILE: Final = "designations.json"
 BUILD_FILE: Final = "designations-build.json"
@@ -67,6 +90,11 @@ class PlayerStatus:
     status: str
     season_long: bool
     since: datetime | None
+    # The day he is due back from a season-long list (the return rule, Lane 153): with RETURNING_STATUS,
+    # this week's question; with a season-long status, a day after this week's games. None without one.
+    returning: date | None = None
+    # The season-long list he returns from this week (never in the file): the sheet's sentence names it.
+    returning_from: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,12 +193,36 @@ def _sweep_notes(conn: Connection, at: datetime) -> Mapping[str, str]:
     return {i: e.description for i, e in sweeps[0].entries.items() if e.description}
 
 
-def _statuses(conn: Connection, source: str, newest: Capture, stored_newest: bool) -> StatusRead:
+def _return_list(conn: Connection, at: datetime) -> ReturnList | None:
+    """The player list that dates the status list's returns, None when none is near it or it does not read
+    (logged: the statuses answer undated, as the API's)."""
+    try:
+        return listed_returns(conn, at, NOTE_WINDOW)
+    except ReturnDaysError as error:
+        LOG.warning(
+            "designations: the player list's return dates were not read (%s); the statuses answer undated", error
+        )
+        return None
+
+
+def _with_return(status: PlayerStatus, day: date | None, game_day: date | None, today: date) -> PlayerStatus:
+    """The status under the return rule (`model.designations.returning_of`)."""
+    reading = returning_of(status.status, day, game_day, today)
+    if reading == RETURNING_THIS_WEEK:
+        return PlayerStatus(RETURNING_STATUS, False, None, day, status.status)
+    if reading == RETURNING_LATER:
+        return replace(status, returning=day)
+    return status
+
+
+def _statuses(conn: Connection, source: str, newest: Capture, stored_newest: bool, now: datetime) -> StatusRead:
     entries = newest.entries or {}
     by_date = source == BY_DATE_SOURCE
     runs = _season_runs(conn, newest.at) if by_date else {}
     outs = by_date and any(status_of(e.designation) == "out" for e in entries.values())
     notes = _sweep_notes(conn, newest.at) if outs else {}
+    returns = _return_list(conn, newest.at)
+    game_days, today = club_game_days(conn, now), eastern_day(now)
     players: dict[str, PlayerStatus] = {}
     for player_id, captured in entries.items():
         status = status_of(captured.designation)
@@ -178,25 +230,30 @@ def _statuses(conn: Connection, source: str, newest: Capture, stored_newest: boo
             continue
         note = captured.description if not by_date else notes.get(player_id) if status == "out" else None
         long = season_long(status, note)
-        players[player_id] = PlayerStatus(status, long, runs.get((player_id, status)) if long else None)
+        read = PlayerStatus(status, long, runs.get((player_id, status)) if long else None)
+        entry = None if returns is None else returns.entries.get(player_id)
+        day = None if entry is None or returns is None else return_day(entry, status, returns.listed_at)
+        game_day = None if entry is None else game_days.get(entry.team)
+        players[player_id] = _with_return(read, day, game_day, today)
     # The feed's last check is this list's only when it is the newest stored: a check that returned a
     # list the floor refused never vouches for the older list shown.
     checked = _checked(conn, source) if stored_newest else None
     return StatusRead(ms_instant(newest.at), checked, source, players)
 
 
-def read_statuses(conn: Connection, before: datetime | None = None) -> StatusRead | None:
+def read_statuses(conn: Connection, before: datetime | None = None, *, now: datetime) -> StatusRead | None:
     """The newest by-date capture that reads (captured at or before `before`, when given), else the roster
     sweep's; None when neither has one. The one status read for `designations.json`, the published table,
     the week-ahead read's sheet and the page's serve rule (Lane 72, the re-review's F3).
 
     A newest capture over the byte cap, of the wrong shape or under the floor (readable_at) gives way
     to the next newest; a source whose newest few all fail is an error, never a silent fall to an
-    older list. A by-date out takes the note of the newest roster sweep near it."""
+    older list. A by-date out takes the note of the newest roster sweep near it. The return rule reads each
+    season-long status's return day against the current week at `now` (Lane 153)."""
     readable = newest_readable(conn, before)
     if readable is None:
         return None
-    return _statuses(conn, readable.source, readable.capture, readable.stored_newest)
+    return _statuses(conn, readable.source, readable.capture, readable.stored_newest, now)
 
 
 def newest_readable(conn: Connection, before: datetime | None = None) -> Readable | None:
@@ -215,21 +272,35 @@ def newest_readable(conn: Connection, before: datetime | None = None) -> Readabl
     return None
 
 
+def listed_status(read: StatusRead | None, player_id: str) -> PlayerStatus | None:
+    """His status on the read, None when it lists none for him."""
+    return None if read is None else read.players.get(player_id)
+
+
 def status_word(read: StatusRead | None, player_id: str) -> str | None:
     """His status in the contract's words on the read, None when it lists none for him: the same reading
     `designations_file` makes, so a page's week read and the web's hide rule never disagree."""
-    found = None if read is None else read.players.get(player_id)
+    found = listed_status(read, player_id)
     return None if found is None else found.status
+
+
+def _file_status(s: PlayerStatus) -> Json:
+    """One player's entry in `designations.json`; `returning` only when the read dates a return, so a file
+    without one reads as before."""
+    entry: Json = {
+        "status": s.status,
+        "seasonLong": s.season_long,
+        "since": None if s.since is None else js_iso(s.since),
+    }
+    if s.returning is not None:
+        entry["returning"] = s.returning.isoformat()
+    return entry
 
 
 def designations_file(read: StatusRead, ranked: Iterable[str]) -> Json:
     """`designations.json`: each ranked player the capture lists (the web's designationsSchema)."""
     players = {
-        player_id: {
-            "status": s.status,
-            "seasonLong": s.season_long,
-            "since": None if s.since is None else js_iso(s.since),
-        }
+        player_id: _file_status(s)
         for player_id in sorted(set(ranked))
         if (s := read.players.get(player_id)) is not None
     }
@@ -288,10 +359,11 @@ def ranked(store: RunStore, run_id: str) -> Ranked | None:
     return Ranked(season, frozenset(ids))
 
 
-def mark_runs(conn: Connection, store: RunStore, keys: Sequence[str]) -> Marked:
-    """`designations.json` written into each run the pointers at `keys` name, before `publish`. A run
-    whose boards do not read is left unmarked and named (the table sync fails it by name too)."""
-    read = read_statuses(conn)
+def mark_runs(conn: Connection, store: RunStore, keys: Sequence[str], now: datetime) -> Marked:
+    """`designations.json` written into each run the pointers at `keys` name, before `publish`, the return
+    rule read at `now`. A run whose boards do not read is left unmarked and named (the table sync fails it
+    by name too)."""
+    read = read_statuses(conn, now=now)
     if read is None:
         return Marked(None, {}, {}, "designations: no injury capture yet; the pages render as before")
     held: dict[str, frozenset[str]] = {}
@@ -398,14 +470,14 @@ def build_on_change(store: RunStore, marked: Marked, hour: Hour) -> BuildOutcome
 _RETRIED: Final = "the pages keep the last file; retried at the next publish hour"
 
 
-def mark_public_runs(engine: Engine | None, store: RunStore) -> Marked:
+def mark_public_runs(engine: Engine | None, store: RunStore, now: datetime) -> Marked:
     """The marking step of a publish hour: the public run and the early run, before the pointer
     moves. With no store it is skipped by name (the table step says whether that fails the hour)."""
     if engine is None:
         return Marked(None, {}, {}, "designations: skipped, no store to read the injury capture from")
     try:
         with engine.connect() as conn:
-            return mark_runs(conn, store, (LATEST_KEY, EARLY_KEY))
+            return mark_runs(conn, store, (LATEST_KEY, EARLY_KEY), now)
     except DesignationsError as error:
         return Marked(None, {}, {}, f"designations: FAILED ({error}); {_RETRIED}", ok=False)
     except SQLAlchemyError as error:

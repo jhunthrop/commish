@@ -238,7 +238,7 @@ def test_a_refused_capture_leaves_the_page_and_the_web_on_the_same_status(engine
         _capture(conn, first, full)
         _capture(conn, short, {"4430807": "Out"})
     with engine.connect() as conn:
-        read = read_statuses(conn, short + timedelta(minutes=5))
+        read = read_statuses(conn, short + timedelta(minutes=5), now=short + timedelta(minutes=5))
     assert read is not None and read.read_at == first
     web = designations_file(read, full)["players"]
     assert {pid: status_word(read, pid) for pid in full} == {pid: web[pid]["status"] for pid in full}

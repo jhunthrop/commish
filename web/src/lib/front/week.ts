@@ -4,7 +4,7 @@
  * (the bug's sides, the changes and what they add, a pickup's Proj); these functions only word and
  * place them. Pure, with the screens' links passed in, so every sentence is tested in week.test.ts. */
 import type { components } from '#lib/api/types.ts';
-import { designationWord } from '#lib/format/designation.ts';
+import { designationWord, returningMark } from '#lib/format/designation.ts';
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { fixed, ordinal } from '#lib/format/number.ts';
 import {
@@ -213,7 +213,13 @@ function chipLine(chip: RosterChip, row: BoxRow, zone: string, turned: number | 
 function chipLabel(chip: RosterChip, zone: string): string {
 	const listed = chip.line.facts.designation;
 	if (chip.kind === 'status' && listed)
-		return carriedMark(listed, zone) ?? designationWord(listed.status);
+		return (
+			carriedMark(listed, zone) ??
+			// Due back this week (Lane 153): a return day on a week's designation says his day.
+			(listed.returning !== undefined && listed.season_long !== true
+				? returningMark(listed.returning)
+				: designationWord(listed.status))
+		);
 	return chip.kind === 'bye' ? FRONT.bye : FRONT.topPickup;
 }
 

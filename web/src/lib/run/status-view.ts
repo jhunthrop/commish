@@ -6,6 +6,8 @@ import {
 	captureShort,
 	designationWord,
 	rankWord,
+	returningMark,
+	calendarDay,
 	seasonLongMark,
 	draftOrderLongLine,
 	seasonLongLine,
@@ -23,6 +25,9 @@ export interface StatusView {
 	mark: string;
 	/** Drawn as a loss: a status that keeps him out. */
 	sits: boolean;
+	/** A week's question (questionable, or due back this week, Lane 153): no reason on its own to sit
+	 * him. */
+	question?: true;
 	/** The sentence a season-long status carries, null for a week's. */
 	line: string | null;
 }
@@ -50,18 +55,26 @@ export function statusView(status: PlayerStatus, saying: Saying, draftOrder = fa
 				: seasonLongLine(status, capture.readAt, restOfSeason, zone)
 		};
 	}
+	// A return day on a week's designation: due back this week (Lane 153).
+	const back = status.returning;
 	return {
 		rank: null,
-		mark: designationWord(status.status),
+		mark: back === undefined ? designationWord(status.status) : returningMark(back),
 		sits: sitsHim(status.status),
-		line: null
+		line: null,
+		...(status.status === 'questionable' ? { question: true as const } : {})
 	};
 }
 
 /** A week's designation as a player page says it: "Doubtful on the latest report, which does not
- * move his place on our board." The report may be a week old by the time the page is read. */
-export function weekNote(status: PlayerStatus['status']): string {
-	return `${designationWord(status)} on the latest report, which does not move his place on our board.`;
+ * move his place on our board.", or for one due back this week "Expected back Sun Oct 25 on the
+ * latest report, ..." (Lane 153). The report may be a week old by the time the page is read. */
+export function weekNote(status: PlayerStatus): string {
+	const word =
+		status.returning !== undefined && !status.seasonLong
+			? `Expected back ${calendarDay(status.returning, true)}`
+			: designationWord(status.status);
+	return `${word} on the latest report, which does not move his place on our board.`;
 }
 
 /** The clock a page is built on: the NFL's, until the member's own is known in the browser. */
@@ -102,5 +115,5 @@ export interface PlayerStatusWords {
 export function playerStatusWords(status: PlayerStatus, saying: Saying): PlayerStatusWords {
 	const view = statusView(status, saying);
 	const capture = captureLine(saying.capture, saying.now, saying.zone);
-	return { view, note: `${view.line ?? weekNote(status.status)} ${capture}` };
+	return { view, note: `${view.line ?? weekNote(status)} ${capture}` };
 }

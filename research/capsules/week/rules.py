@@ -10,7 +10,8 @@ This week's rulings and the Lane 72 review's, each a rule the validator reads:
 - A player the sheet says may not be started (on his bye, out, on a season-long list, Doubtful) is never
   recommended to start: the writer's own call for its read must not be "start" (`CALLS`), and a sentence
   that tells a manager to start him, in his name or a pronoun, outside a negation of its own clause,
-  refuses the read too (H2). A player who cannot play is said not to play.
+  refuses the read too (H2). A player who cannot play is said not to play. One designated to return this week
+  (Lane 153) is this week's question and may play: no sentence keeps him on his list or out.
 - Every figure carries its unit or basis (points, PPR points, a game, degrees, mph, a percent, a count's
   noun, a rank's "of 32"); week numbers, the season and clock times are exempt (M1).
 - A rank in our order says which order it is: "in our preseason order" or "in our rest-of-season order" (M2).
@@ -368,6 +369,29 @@ def _cannot_start_violations(sentences: Sequence[str], sheet: WeekSheet, call: s
     return out
 
 
+# A read about a player designated to return this week (Lane 153) never keeps him on his list: he may play.
+_KEPT_OUT: Final = re.compile(
+    r"\b(?:does not|doesn't|will not|won't|cannot|can't) play\b|\bno game\b|\bruled out\b|\bsits? out\b|"
+    r"\bis out\b|\b(?:is|remains|stays|still) on (?:injured reserve|the (?:pup|nfi) list)\b",
+    re.IGNORECASE,
+)
+
+
+def _returning_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
+    if not sheet.can_play or not sheet.status.returning_this_week:
+        return []
+    return [
+        _sentence_violation(
+            "keeps a player designated to return this week out",
+            s,
+            f"He is designated to return and may play in week {sheet.week} of {sheet.season}: say what his "
+            "return means for a roster that has him.",
+        )
+        for s in sentences
+        if _KEPT_OUT.search(s)
+    ]
+
+
 def _wait_violation(text: str, sheet: WeekSheet, call: str | None) -> list[str]:
     if call != START or _WAITS.search(text) is None:
         return []
@@ -548,6 +572,7 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *_word_violations(sentences),
         *_projection_violations(sentences, sheet),
         *_cannot_start_violations(sentences, sheet, call),
+        *_returning_violations(sentences, sheet),
         *_unit_violations(sentences, sheet.season),
         *_cell_violations(sentences, sheet),
         *_misnamed_violations(sentences, sheet),

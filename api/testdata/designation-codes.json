@@ -17,5 +17,24 @@
 		"NFI": "nfi"
 	},
 	"season_long": ["injured_reserve", "suspended", "pup", "nfi"],
-	"out_for_the_season": "out for the season"
+	"out_for_the_season": "out for the season",
+	"returning": {
+		"this_week_status": "questionable",
+		"cases": [
+			{"name": "the Mason shape: back on his club's Sunday game day", "status": "injured_reserve", "returning": "2026-10-25", "club_game_day": "2026-10-25", "today": "2026-10-22", "reads": "this_week"},
+			{"name": "back on his club's Monday night game day", "status": "injured_reserve", "returning": "2026-10-26", "club_game_day": "2026-10-26", "today": "2026-10-22", "reads": "this_week"},
+			{"name": "back today", "status": "pup", "returning": "2026-10-22", "club_game_day": "2026-10-26", "today": "2026-10-22", "reads": "this_week"},
+			{"name": "back next week", "status": "injured_reserve", "returning": "2026-11-01", "club_game_day": "2026-10-26", "today": "2026-10-22", "reads": "later"},
+			{"name": "back the day after his club's game", "status": "suspended", "returning": "2026-10-27", "club_game_day": "2026-10-26", "today": "2026-10-22", "reads": "later"},
+			{"name": "a return date in the past", "status": "injured_reserve", "returning": "2026-10-19", "club_game_day": "2026-10-26", "today": "2026-10-22", "reads": "none"},
+			{"name": "no return date", "status": "injured_reserve", "returning": null, "club_game_day": "2026-10-26", "today": "2026-10-22", "reads": "none"},
+			{"name": "no game left this season", "status": "injured_reserve", "returning": "2027-02-01", "club_game_day": null, "today": "2027-01-20", "reads": "later"},
+			{"name": "a Thursday club's player dated back Sunday", "status": "injured_reserve", "returning": "2026-10-25", "club_game_day": "2026-10-22", "today": "2026-10-20", "reads": "later"},
+			{"name": "a Thursday club's player dated back Thursday", "status": "injured_reserve", "returning": "2026-10-22", "club_game_day": "2026-10-22", "today": "2026-10-20", "reads": "this_week"},
+			{"name": "a Sunday club's player dated back Monday", "status": "injured_reserve", "returning": "2026-10-26", "club_game_day": "2026-10-25", "today": "2026-10-22", "reads": "later"},
+			{"name": "his club on a bye this week", "status": "injured_reserve", "returning": "2026-10-25", "club_game_day": null, "today": "2026-10-22", "reads": "later"},
+			{"name": "a week's out with a date", "status": "out", "returning": "2026-10-25", "club_game_day": "2026-10-26", "today": "2026-10-22", "reads": "none"},
+			{"name": "a questionable with a date", "status": "questionable", "returning": "2026-10-25", "club_game_day": "2026-10-26", "today": "2026-10-22", "reads": "none"}
+		]
+	}
 }
