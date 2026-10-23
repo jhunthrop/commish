@@ -266,8 +266,12 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 	// "Bye in week N" after the players who play, who are numbered 1..n; Rest of season keeps them.
 	const numbered = places.filter((p) => !LIST_PLACE.test(p));
 	if (screen.name === 'players') {
-		const headsWanted = seen.byeGames.length > 0 ? 1 : 0;
-		if (seen.byeHeads.length !== headsWanted || seen.byeHeads.some((head) => !BYE_HEAD.test(head)))
+		// The stand-in always holds available byes beyond row 100: the section is drawn, never optional.
+		if (
+			seen.byeGames.length === 0 ||
+			seen.byeHeads.length !== 1 ||
+			seen.byeHeads.some((head) => !BYE_HEAD.test(head))
+		)
 			said.push(`players at ${String(width)}: byes' head ${JSON.stringify(seen.byeHeads)}`);
 		if (seen.byePlaces.some((p) => p !== ''))
 			said.push(`players at ${String(width)}: a bye numbered (${seen.byePlaces.join(' ')})`);
