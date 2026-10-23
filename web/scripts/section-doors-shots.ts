@@ -17,11 +17,9 @@ const web = process.argv[2] ?? 'http://localhost:4196';
 const out = new URL(process.argv[3] ?? '../screenshots/section-doors/', import.meta.url);
 
 const DOORS = [
-	{ name: 'lobby', path: '/lobby', lands: MOCK_SETUP, clean: true },
-	// The companion's front reads its recent drafts and takes a 401 as signed out (NewCompanion), which
-	// the fixture API does not serve: its landing is checked, its console is not.
-	{ name: 'companion', path: '/companion', lands: COMPANION_START, clean: false },
-	{ name: 'mock-new', path: MOCK_SETUP, lands: MOCK_SETUP, clean: true }
+	{ name: 'lobby', path: '/lobby', lands: MOCK_SETUP },
+	{ name: 'companion', path: '/companion', lands: COMPANION_START },
+	{ name: 'mock-new', path: MOCK_SETUP, lands: MOCK_SETUP }
 ] as const;
 
 await mkdir(out, { recursive: true });
@@ -29,7 +27,7 @@ const browser = await chromium.launch();
 const failures: string[] = [];
 
 async function shoot(door: (typeof DOORS)[number]): Promise<void> {
-	const { name, path, lands, clean } = door;
+	const { name, path, lands } = door;
 	const context = await browser.newContext({ viewport: { width: WIDTH, height: HEIGHT } });
 	const page: Page = await context.newPage();
 	const unauthorized: string[] = [];
@@ -45,9 +43,8 @@ async function shoot(door: (typeof DOORS)[number]): Promise<void> {
 	await page.waitForTimeout(SETTLE_MS);
 	const landed = new URL(page.url()).pathname;
 	if (landed !== lands) failures.push(`${path}: landed on ${landed}, wanted ${lands}`);
-	if (clean && unauthorized.length > 0)
-		failures.push(`${path}: 401 from ${unauthorized.join(', ')}`);
-	if (clean && errors.length > 0) failures.push(`${path}: console errors ${errors.join(' | ')}`);
+	if (unauthorized.length > 0) failures.push(`${path}: 401 from ${unauthorized.join(', ')}`);
+	if (errors.length > 0) failures.push(`${path}: console errors ${errors.join(' | ')}`);
 	await page.screenshot({ path: new URL(`${name}-${String(WIDTH)}.png`, out).pathname });
 	process.stdout.write(
 		`${path} -> ${landed}, ${String(unauthorized.length)} x 401, ${String(errors.length)} console errors\n`
