@@ -6,10 +6,14 @@
 	import Figure from './Figure.svelte';
 	import { tierColor, tierInk, type GroupName, type TierCliff } from './tier.ts';
 
-	interface Mate extends PlayerRef {
+	interface Mate extends Omit<PlayerRef, 'positionRank'> {
 		href: string;
 		/** Null once a read has answered without his figure: the empty figure, never another clock's. */
 		projected: number | null;
+		/** His rank as the page's head reads it; null for none, the position alone (Lane 162). */
+		positionRank: number | null;
+		/** The weeks his figure counts where they are not the basis's ("weeks 7 to 17", Lane 162). */
+		span?: string | null;
 	}
 
 	interface Props {
@@ -46,8 +50,9 @@
 				<PlayerLine
 					name={mate.name}
 					position={mate.position}
-					positionRank={mate.positionRank}
+					positionRank={mate.positionRank ?? undefined}
 					team={mate.team}
+					note={mate.span ?? null}
 					headshot={mate.headshot}
 					href={mate.href}
 					current={mate.id === currentId}

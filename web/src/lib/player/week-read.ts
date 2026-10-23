@@ -1,7 +1,7 @@
 /** The week-ahead read beside the card (Lane 66v). The read quotes the published projection it was
  * written with, in PPR, as the card prints it (the run's `projection`); while his game is still to come
- * and the week's published projection is another figure, the read is withheld behind the run's words
- * for it (`movedCaption`). From kickoff through final the read written for the week stands whatever the
+ * and the week's published projection has moved from it by the Proj change tile's threshold (card.ts
+ * projectionMoved, Lane 162), the read is withheld behind the run's words for it (`movedCaption`). From kickoff through final the read written for the week stands whatever the
  * card prints (Lane 158), and a read the run withheld says it was not written for this game (Lane 160).
  * A withheld read is its caption alone, never under the not-written line, which
  * is said only when the run holds no read for him (Lane 158). The figures are the run's and the API's,
@@ -9,7 +9,7 @@
 import type { components } from '#lib/api/types.ts';
 import type { GameHead } from '#lib/league/box/kickoff.ts';
 import type { WeekRead } from '#lib/run/schema.ts';
-import { CARD } from './card.ts';
+import { CARD, projectionMoved } from './card.ts';
 
 /** His game's state at the screen's clock, by the screen's one rule (kickoff.ts lineState), null for
  * a bye or a week with no game held. */
@@ -54,7 +54,10 @@ export function shownWeekRead(read: WeekRead, card: CardProjection | null): Show
 	const built = { withheld: false, body: read.body, caption: read.caption } as const;
 	if (card?.scoring !== 'ppr' || card.week !== read.week || underway(card.state)) return built;
 	if (read.projection === undefined || read.movedCaption === undefined) return built;
-	return card.points === read.projection ? built : { withheld: true, words: read.movedCaption };
+	// One threshold with the Proj change tile (Lane 162, D04): a move under it shows the read.
+	return projectionMoved(card.points, read.projection)
+		? { withheld: true, words: read.movedCaption }
+		: built;
 }
 
 /** The read's place when the run holds no read for him: his next game while it is still to come,

@@ -12,7 +12,8 @@ import {
 	restFromWords,
 	restOfSeasonHead,
 	restSpanWords,
-	tierBasisWords
+	tierBasisWords,
+	tierSpanOf
 } from '#lib/run/rest-from.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
 import {
@@ -39,6 +40,7 @@ import { hostWords } from '#lib/league/names.ts';
 import type { LogNext } from '#lib/ui/game-log.ts';
 import {
 	CARD,
+	SHOWN_CHANGE_FROM,
 	listedTiles,
 	restRankWords,
 	NONE,
@@ -56,10 +58,6 @@ import type { CardProjection } from './week-read.ts';
 
 /** Tenths in a point, the precision the API prints. */
 const TENTHS = 10;
-
-/** The smallest change the Proj change tile prints (Lane 139, C21): a tenth of a point is noise
- * beside a whole tile. The writer's cells hold the same (`capsules/week/cells.py SHOWN_CHANGE_FROM`). */
-export const SHOWN_CHANGE_FROM = 0.5;
 
 /** The week tile's and the change tile's own words (Lane 139, C06, C12, C21): the week's figure named as
  * the published projection with its one read stamp, the change with none. */
@@ -149,9 +147,13 @@ export interface LiveFormats {
 	figures: Partial<Record<BoardFormat, { points: number; vor: number | null }>>;
 }
 
-/** The tier box at the read's clock: each listed player's points, the drop and the basis. */
+/** The tier box at the read's clock: each listed player's points, his rank as the read ranks him and
+ * the weeks his points count where they are not the page's player's (Lane 162), the drop and the basis.
+ * `ranks` and `spans` are null on an answer older than the fields: the run's stand. */
 export interface LiveTier {
 	points: Readonly<Record<string, number | null>>;
+	ranks: Readonly<Record<string, number | null>> | null;
+	spans: Readonly<Record<string, string | null>> | null;
 	drop: number | null;
 	basis: string;
 }
@@ -160,8 +162,6 @@ export interface LiveTier {
 export interface TierAsk {
 	label: string;
 	season: number;
-	/** Only he is in the box: the basis words his own week (review M3). */
-	single: boolean;
 }
 
 function formatsOf(week: PlayerWeek, now: LiveRest | null): LiveFormats | null {
@@ -172,15 +172,28 @@ function formatsOf(week: PlayerWeek, now: LiveRest | null): LiveFormats | null {
 	return { head: restOfSeasonHead(now.from), figures };
 }
 
+/** The tier box at the read's clock. Its basis names the weeks his own figure counts, the span his rest
+ * tile says (Lane 162, D03), and each player whose figure counts other weeks says his; the board's first
+ * week only on an answer older than his. Each player's rank is the read's (the API's ranks for the
+ * line, Lane 128), so the box and the card's head say one number (D02). */
 function tierOf(week: PlayerWeek, now: LiveRest | null, ask: TierAsk | null): LiveTier | null {
 	const tier = week.tier;
 	if (now === null || ask === null || tier == null) return null;
+	const his = week.rest_from_week;
 	const board =
 		tier.from_week === null ? playerRestWords(null) : restFromWords(tier.from_week, tier.partial);
+	const ranked = tier.mates.some((m) => m.position_rank !== undefined);
+	const spanned = his !== undefined && tier.mates.some((m) => m.from_week !== undefined);
 	return {
 		points: Object.fromEntries(tier.mates.map((m) => [m.board_id, m.points])),
+		ranks: ranked
+			? Object.fromEntries(tier.mates.map((m) => [m.board_id, m.position_rank ?? null]))
+			: null,
+		spans: spanned
+			? Object.fromEntries(tier.mates.map((m) => [m.board_id, tierSpanOf(m.from_week, his)]))
+			: null,
 		drop: tier.drop,
-		basis: tierBasisWords(ask.label, ask.season, ask.single ? now.from : board)
+		basis: tierBasisWords(ask.label, ask.season, his === undefined ? board : restSpanWords(his))
 	};
 }
 

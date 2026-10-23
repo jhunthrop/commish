@@ -45,6 +45,24 @@ export interface CardHead {
 	opponent: string;
 }
 
+/** The smallest move of the week's published projection a page counts (Lane 139, C21; Lane 162, D04): the
+ * Proj change tile shows none under it, and a week read written at a figure the card prints within it
+ * stands. The writer's cells and the run's serve rule hold the same (`capsules/week/cells.py
+ * SHOWN_CHANGE_FROM`). */
+export const SHOWN_CHANGE_FROM = 0.5;
+
+/** Tenths in a point, the precision the API and the run print. */
+const TENTHS_IN_POINT = 10;
+
+/** Whether the card's published projection (`now`) has moved past the threshold from the figure a read
+ * quotes (`then`), each a printed tenth, taken in whole tenths so no float edge decides: a figure that
+ * appeared or went is a move. */
+export function projectionMoved(now: number | null, then: number | null): boolean {
+	if (now === null || then === null) return now !== then;
+	const tenths = Math.abs(Math.round(now * TENTHS_IN_POINT) - Math.round(then * TENTHS_IN_POINT));
+	return tenths >= SHOWN_CHANGE_FROM * TENTHS_IN_POINT;
+}
+
 /** A number not held. */
 export const NONE = EMPTY_FIGURE;
 

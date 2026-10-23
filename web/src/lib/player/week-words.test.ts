@@ -24,6 +24,7 @@ import {
 	verbOf,
 	verbFits,
 	heldVerb,
+	WEEK_TILE,
 	type PlayerWeek,
 	type ScreenHref
 } from './week-words.ts';
@@ -205,7 +206,7 @@ const LIVE_TIER: NonNullable<PlayerWeek['tier']> = {
 	from_week: 6,
 	partial: true
 };
-const TIER_ASK = { label: 'PPR', season: 2026, single: false };
+const TIER_ASK = { label: 'PPR', season: 2026 };
 
 void test("on Sunday evening the read's rest of season replaces the run's: his game is played, so he counts from week 7 (Lane 86)", () => {
 	const live = card(
@@ -282,11 +283,13 @@ void test('review H3: the tile, the read, the every-format table and the tier bo
 	assert.equal(live.formats.head, 'Rest of season from week 7');
 	assert.equal(live.formats.figures.superflex?.vor, 60.3);
 	assert.equal(live.tier.drop, 9.4);
-	assert.equal(
-		live.tier.basis,
-		"Projected PPR points for the rest of 2026 from week 6's games left"
-	);
-	// Review M3: with only him in the box, the basis words his own week, as his tile does.
+	// The box's basis names the weeks his own figure counts, as his tile does (Lane 162, D03), never the
+	// board's partly played week beside a total that no longer counts it.
+	assert.equal(live.tier.basis, 'Projected PPR points for the rest of 2026, weeks 7 to 17');
+	// An answer older than the ranks keeps the run's (Lane 162).
+	assert.equal(live.tier.ranks, null);
+	assert.equal(live.tier.spans, null);
+	// Review M3: with only him in the box, the basis words his own weeks, as his tile does.
 	const alone = liveCard({
 		week: week({
 			rest_of_season: [...RUN_FORMATS_LIVE],
@@ -299,12 +302,12 @@ void test('review H3: the tile, the read, the every-format table and the tier bo
 		opponents: {},
 		games: 3,
 		rest: REST,
-		tier: { ...TIER_ASK, single: true },
+		tier: TIER_ASK,
 		screenHref: href,
 		zone: ZONE,
 		now: NOW
 	});
-	assert.equal(alone.tier?.basis, 'Projected PPR points for the rest of 2026 from week 7');
+	assert.equal(alone.tier?.basis, 'Projected PPR points for the rest of 2026, weeks 7 to 17');
 	assert.equal(card(week()).formats, null);
 	assert.equal(card(week()).tier, null);
 });
@@ -945,6 +948,21 @@ void test('before kickoff a moved projection withholds the read: its caption alo
 	assert.ok(!JSON.stringify(shown).includes('not written'));
 });
 
+// Lane 162 (D04): one threshold for "the published projection moved". The read quotes 21.8; the Proj
+// change tile and the read's withhold read the same card figure against the same 0.5.
+void test('a move under the tile\'s 0.5 shows the read beside "Moved under 0.5"; 0.6 withholds it beside the move', () => {
+	const under = week({}, { week_projection: 22.2, projection_delta: 0.4 });
+	assert.equal(tile(card(under, null, NOW).tiles, 'delta').caption, WEEK_TILE.underShown);
+	assert.deepEqual(shownAt(under, NOW), SHOWN);
+	assert.deepEqual(
+		shownAt(week({}, { week_projection: 21.4, projection_delta: -0.4 }), NOW),
+		SHOWN
+	);
+	const past = week({}, { week_projection: 22.4, projection_delta: 0.6 });
+	assert.equal(tile(card(past, null, NOW).tiles, 'delta').value, '+0.6');
+	assert.deepEqual(shownAt(past, NOW), { withheld: true, words: WEEK_READ.movedCaption });
+});
+
 void test('once his game has kicked off the read stands whatever the card now prints', () => {
 	const live = week({}, { week_projection: 23.4, facts: facts({ points_this_week: 4.6 }) });
 	assert.equal(card(live, null, KICKED_OFF).projection.state, 'kicked_off');
@@ -999,4 +1017,77 @@ void test('a status-withheld read keeps its due time before kickoff, says not wr
 	assert.equal(card(final, null, FINAL).projection.state, 'final');
 	assert.deepEqual(at(final, FINAL), { withheld: true, words: CARD.readNotWritten });
 	assert.ok(!JSON.stringify(at(final, FINAL)).includes('due by'));
+});
+
+/** Lane 162 (D02, D03): Friday morning of week 7, his Thursday game played. His head reads the line's
+ * rank (QB 21) and the box reads each player's rank from the same answer, so the two never differ; his
+ * figure counts weeks 8 to 17, which the box's basis names, and the players whose games are still to come
+ * say their own weeks. */
+const THURSDAY_TIER: NonNullable<PlayerWeek['tier']> = {
+	format: 'ppr',
+	mates: [
+		{ board_id: 'kirk-cousins', points: 138.1, position_rank: 15, from_week: 7 },
+		{ board_id: PLAYER.id, points: 123.1, position_rank: 21, from_week: 8 },
+		{ board_id: 'justin-herbert', points: 133.1, position_rank: 16, from_week: 7 }
+	],
+	drop: 24.4,
+	from_week: 7,
+	partial: true
+};
+
+void test('the card head and the tier box read one rank, and the box names his weeks (Lane 162, D02, D03)', () => {
+	const live = liveCard({
+		week: week(
+			{ rest_of_season: [...RUN_FORMATS_LIVE], rest_from_week: 8, tier: THURSDAY_TIER },
+			{ position_rank: 21 }
+		),
+		player: PLAYER,
+		league: null,
+		tiles: BUILT,
+		opponents: {},
+		games: 3,
+		rest: REST,
+		tier: TIER_ASK,
+		screenHref: href,
+		zone: ZONE,
+		now: NOW
+	});
+	assert.ok(live.tier?.ranks && live.tier.spans);
+	assert.equal(live.positionRank, 21);
+	assert.equal(live.tier.ranks[PLAYER.id], live.positionRank);
+	assert.equal(tile(live.tiles, 'rest').caption.endsWith(`WR21 in our order`), true);
+	assert.equal(live.tier.basis, 'Projected PPR points for the rest of 2026, weeks 8 to 17');
+	assert.deepEqual(live.tier.spans, {
+		'kirk-cousins': 'weeks 7 to 17',
+		[PLAYER.id]: null,
+		'justin-herbert': 'weeks 7 to 17'
+	});
+	// A player on a season-long list: no rank in the head, none in the box.
+	const listed = liveCard({
+		week: week(
+			{
+				rest_of_season: [...RUN_FORMATS_LIVE],
+				rest_from_week: 8,
+				tier: {
+					...THURSDAY_TIER,
+					mates: THURSDAY_TIER.mates.map((m) =>
+						m.board_id === PLAYER.id ? { ...m, position_rank: null } : m
+					)
+				}
+			},
+			{ position_rank: null }
+		),
+		player: PLAYER,
+		league: null,
+		tiles: BUILT,
+		opponents: {},
+		games: 3,
+		rest: REST,
+		tier: TIER_ASK,
+		screenHref: href,
+		zone: ZONE,
+		now: NOW
+	});
+	assert.equal(listed.positionRank, null);
+	assert.equal(listed.tier?.ranks?.[PLAYER.id], null);
 });

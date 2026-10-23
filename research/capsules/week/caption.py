@@ -15,9 +15,9 @@ from zoneinfo import ZoneInfo
 from research.capsules.week.sheet import central_stamp
 
 EASTERN: Final = ZoneInfo("America/New_York")
-# The hourly capture's hours, Eastern (`research-capture-harvest`, "0 2,6-23 * * *" America/New_York): the
-# hourly week-reads pass runs at the end of each.
-HOURLY_PASS_HOURS_ET: Final = (2, *range(6, 24))
+# The hourly capture's hours, Eastern (`research-capture-harvest`, "0 0,2,6-23 * * *" America/New_York): the
+# hourly week-reads pass runs at the end of each (the web's `player/status-held.ts` mirrors them).
+HOURLY_PASS_HOURS_ET: Final = (0, 2, *range(6, 24))
 
 
 def written_caption(written_at: datetime, week: int, status_read: datetime | None = None) -> str:

@@ -36,14 +36,18 @@ def test_a_standing_read_is_served_with_its_caption_status_and_call() -> None:
     }
 
 
-def test_a_read_whose_projection_the_card_no_longer_prints_is_withheld() -> None:
-    """Lane 66v (the sweep's X5): Josh Allen's read quoted 26.6 while his card printed 26.4."""
-    moved = week_read_json(_read(), "questionable", kicked_off=False, clock=ReadClock(_WRITTEN), projection=15.0)
-    assert moved is not None
-    assert moved["body"] is None and moved["call"] is None
-    assert moved["caption"] == PROJECTION_MOVED_CAPTION
-    same = week_read_json(_read(), "questionable", kicked_off=False, clock=ReadClock(_WRITTEN), projection=15.24)
-    assert same is not None and same["body"] is not None
+def test_a_read_whose_projection_moved_by_the_tiles_threshold_is_withheld() -> None:
+    """Lane 66v (the sweep's X5), held to the Proj change tile's 0.5 (Lane 162, D04): the read quotes 15.2."""
+    clock = ReadClock(_WRITTEN)
+    for card in (14.7, 15.7, 14.6, None):
+        moved = week_read_json(_read(), "questionable", kicked_off=False, clock=clock, projection=card)
+        assert moved is not None, card
+        assert moved["body"] is None and moved["call"] is None, card
+        assert moved["caption"] == PROJECTION_MOVED_CAPTION, card
+    # A move the tile calls "under 0.5" stands, as does the same figure at the card's tenth.
+    for card in (15.24, 15.0, 15.6, 14.8):
+        same = week_read_json(_read(), "questionable", kicked_off=False, clock=clock, projection=card)
+        assert same is not None and same["body"] is not None, card
     # A run that read no projection for the week does not judge it.
     unread = week_read_json(_read(), "questionable", kicked_off=False, clock=ReadClock(_WRITTEN), projection=UNREAD)
     assert unread is not None and unread["body"] is not None

@@ -24,6 +24,8 @@
 		trailing?: Snippet;
 		/** The line heads a card beside a big face: the name at a board row's size, the person first. */
 		heads?: boolean;
+		/** A last part of the line under the name, after the team: a tier mate's weeks (Lane 162). */
+		note?: string | null;
 	}
 
 	let {
@@ -36,11 +38,12 @@
 		size = 32,
 		current = false,
 		trailing,
-		heads = false
+		heads = false,
+		note = null
 	}: Props = $props();
 
 	const meta = $derived(
-		[`${position}${positionRank === undefined ? '' : ` ${String(positionRank)}`}`, team]
+		[`${position}${positionRank === undefined ? '' : ` ${String(positionRank)}`}`, team, note]
 			.filter((part) => part !== null)
 			.join(' · ')
 	);

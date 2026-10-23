@@ -19,7 +19,7 @@ from typing import Any, Final
 from research.capsules.page_figures import projection_tenth
 from research.capsules.pull_figures import PageValues, page_numbers, pull_figures_of
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule
-from research.capsules.week.cadence import projection_moved
+from research.capsules.week.cadence import projection_moved_past_shown
 from research.capsules.week.caption import PROJECTION_MOVED_CAPTION, status_changed_caption, written_caption
 from research.capsules.week.store import StoredWeekRead
 from research.free_agent import run_club
@@ -314,13 +314,13 @@ def week_read_json(
     and its call. None for a page the writer did not write for the board week, or whose board-week game has
     kicked off. A read written against another status than his current one is withheld: its caption says his
     status changed and when the hourly pass writes the new read, and the page shows the season read beneath
-    it (the review's H3, the re-review's F5). So is a read whose published projection the card no longer
-    prints (`projection`, the run's for him; Lane 66v). `projection` and `movedCaption` are the figure the read
+    it (the review's H3, the re-review's F5). So is a read whose published projection the card prints has
+    moved from by the Proj change tile's threshold (`projection`, the run's for him; Lane 66v, Lane 162). `projection` and `movedCaption` are the figure the read
     quotes, as the card prints it, and the words the page shows once the card's live read prints another."""
     if stored is None or stored.source != WRITTEN_SOURCE or kicked_off:
         return None
     quoted = None if stored.projection_points is None else projection_tenth(stored.projection_points)
-    moved = not isinstance(projection, _Unread) and projection_moved(projection, stored.projection_points)
+    moved = not isinstance(projection, _Unread) and projection_moved_past_shown(projection, stored.projection_points)
     standing = stored.status == status and not moved
     if stored.status != status:
         caption = status_changed_caption(clock.as_of)

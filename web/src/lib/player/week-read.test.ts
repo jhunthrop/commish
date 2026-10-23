@@ -35,11 +35,17 @@ void test('the read stands while the card prints the projection it quotes', () =
 	assert.deepEqual(shownWeekRead(READ, ppr(26.4)), BUILT);
 });
 
-void test('before kickoff the read is withheld once the card prints another projection: its caption alone', () => {
-	assert.deepEqual(shownWeekRead({ ...READ, projection: 26.6 }, ppr(26.4)), {
-		withheld: true,
-		words: MOVED
-	});
+void test("before kickoff the read is withheld once the projection moves by the tile's 0.5: its caption alone", () => {
+	for (const card of [26.9, 25.9, 27.0]) {
+		assert.deepEqual(
+			shownWeekRead(READ, ppr(card)),
+			{ withheld: true, words: MOVED },
+			String(card)
+		);
+	}
+	// A move the Proj change tile calls "under 0.5" shows the read (Lane 162, D04).
+	for (const card of [26.8, 26.0, 26.5])
+		assert.deepEqual(shownWeekRead(READ, ppr(card)), BUILT, String(card));
 	assert.deepEqual(shownWeekRead(READ, ppr(null)), { withheld: true, words: MOVED });
 	// A bye or a week with no game held is judged as before kickoff.
 	assert.deepEqual(shownWeekRead(READ, ppr(20, null)), { withheld: true, words: MOVED });

@@ -5,7 +5,13 @@ import { FREE_AGENT_CLUB, isFreeAgent } from '#lib/format/free-agent.ts';
 import { windowLabel } from '#lib/format/date.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import { availableTierOf } from '#lib/run/held-places.ts';
-import { boardRestFrom, tierBasisWords } from '#lib/run/rest-from.ts';
+import {
+	boardRestFrom,
+	playerRestFrom,
+	restSpanWords,
+	tierBasisWords,
+	tierSpanOf
+} from '#lib/run/rest-from.ts';
 import type {
 	AdpSource,
 	Capsule,
@@ -36,6 +42,7 @@ import {
 import type { PlayerSeason, PriorSeason } from '#lib/run/season.ts';
 import { basisTiles, cardBuild, restParts, restTile, type CardBuild } from './player-card.ts';
 import { unwrittenByFormat } from './player-unwritten.ts';
+import { readAtStatus } from '#lib/player/status-held.ts';
 import type { BasisTile, CardTile, RestParts } from '#lib/player/card.ts';
 import {
 	adp,
@@ -69,6 +76,9 @@ export interface TierMate {
 	team: string;
 	headshot: string;
 	projected: number;
+	/** The weeks his figure counts where they are not the page's player's ("weeks 7 to 17"), null
+	 * where they are the same (Lane 162, D03). */
+	span: string | null;
 }
 
 export interface FormatLine {
@@ -260,35 +270,34 @@ async function mates(
 		throw new Error(`${entry.name} is not on the ${format.id} board his page says he is on.`);
 	const group = availableTierOf(rows, row);
 	if (group === null) return { tier: row.tier, cliff: null, mates: [] };
+	const his = playerRestFrom(format, row);
 	return {
 		tier: group.tier,
 		cliff: group.cliff,
-		mates: group.rows.map(
-			({ id, slug, name, position, positionRank, team, headshot, projected }) => ({
-				id,
-				slug,
-				name,
-				position,
-				positionRank,
-				team,
-				headshot,
-				projected
-			})
-		)
+		mates: group.rows.map((mate) => ({
+			id: mate.id,
+			slug: mate.slug,
+			name: mate.name,
+			position: mate.position,
+			positionRank: mate.positionRank,
+			team: mate.team,
+			headshot: mate.headshot,
+			projected: mate.projected,
+			span: tierSpanOf(playerRestFrom(format, mate), his)
+		}))
 	};
 }
 
-/** The tier box's basis: preseason the season's; in season the board's week, or with only him in the
- * box his own, as his tile words the same figure (review M3). */
+/** The tier box's basis: preseason the season's; in season the weeks his own figure counts, as his
+ * rest tile says them (Lane 162, D03), each mate counting other weeks saying his in his line. */
 function tierBasisOf(
-	lead: { format: Format; restParts: RestParts | null },
-	mates: number,
+	lead: { format: Format; numbers: PlayerFormat; restParts: RestParts | null },
 	season: number
 ): string {
-	const board = boardRestFrom(lead.format);
-	if (board === null) return `Projected ${lead.format.label} points, ${String(season)}`;
-	const from = mates === 1 && lead.restParts !== null ? lead.restParts.from : board;
-	return tierBasisWords(lead.format.label, season, from);
+	if (boardRestFrom(lead.format) === null)
+		return `Projected ${lead.format.label} points, ${String(season)}`;
+	const span = lead.restParts?.span ?? restSpanWords(playerRestFrom(lead.format, lead.numbers));
+	return tierBasisWords(lead.format.label, season, span);
 }
 
 function clubOf(list: readonly Club[], team: string): Club {
@@ -408,7 +417,7 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		tier,
 		pointsHead: formatTable(lines).head,
 		formatsNote: formatTable(lines).note,
-		tierBasis: tierBasisOf(lead, tier.mates.length, run.season),
+		tierBasis: tierBasisOf(lead, run.season),
 		words: lead.words,
 		rest: lead.rest,
 		adpSources: lead.adpSources,
@@ -424,7 +433,10 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		restTile: lead.restTile,
 		restParts: lead.restParts,
 		basisTiles: lead.basisTiles,
-		weekRead: loaded.weekRead,
+		// A read his designation moved past since it was written is withheld on the page and the shelf
+		// alike (Lane 162, D01).
+		weekRead:
+			loaded.weekRead === null ? null : readAtStatus(loaded.weekRead, capture, entry.id, now),
 		lastKickoffs,
 		copyOf: loaded.copyOf,
 		unwritten: unwrittenByFormat({

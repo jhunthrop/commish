@@ -439,7 +439,8 @@ if (!process.env.BYTES_ONLY && !IN_PLAY && lineupScreen !== undefined) {
 const RETURN_CASE = {
 	slug: 'travis-etienne-jr',
 	chip: 'Due back Sun Oct 18',
-	listed: onListWords('IR')
+	listed: onListWords('IR'),
+	withheld: 'His status changed since this read was written.'
 };
 // Shot on the week's clock alone, as the IR case: the in-play and after-games cases run their read alone.
 for (const screen of SCREENS.filter((s) => s.name === 'lineup' || s.name === 'players')) {
@@ -466,6 +467,10 @@ for (const screen of SCREENS.filter((s) => s.name === 'lineup' || s.name === 'pl
 					.count();
 				if (listed > 0)
 					faults.push(`${label}: ${String(listed)} tiles say "${RETURN_CASE.listed}"`);
+				// His read, written while he was on IR, is withheld behind the status caption (Lane 162, D01).
+				const shelfText = await shelf(page).innerText();
+				if (!shelfText.includes(RETURN_CASE.withheld) || shelfText.includes('does not play'))
+					faults.push(`${label}: his read is not withheld: "${shelfText}"`);
 				await page.screenshot({
 					path: new URL(`shelf-${screen.name}-returning-${theme}-${String(size.width)}.png`, out)
 						.pathname

@@ -5,13 +5,37 @@ import type { BoardFormat } from '#lib/sheet/model.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
 import type { LiveFormats, LiveTier } from './week-words.ts';
 
-/** The tier box's players: each one's live figure once the read has answered. */
-export function matesAt<M extends { id: string; projected: number }>(
+/** A tier box player as the box draws him: his figure, his rank (null for none) and his weeks where they
+ * are not the page's player's. */
+interface DrawnMate {
+	id: string;
+	projected: number | null;
+	positionRank: number | null;
+	span: string | null;
+}
+
+/** Ranked players in their order, an unranked one after them. */
+function byRank(a: number | null, b: number | null): number {
+	if (a === null || b === null) return (a === null ? 1 : 0) - (b === null ? 1 : 0);
+	return a - b;
+}
+
+/** The tier box's players: each one's live figure once the read has answered, and with an answer that
+ * ranks them his rank and his weeks as the read says them, in the order of those ranks (Lane 162, D02
+ * and D03: the box sorts by the number its head reads, a player unranked last). */
+export function matesAt<M extends DrawnMate>(
 	mates: readonly M[],
 	live: LiveTier | null
-): (Omit<M, 'projected'> & { projected: number | null })[] {
+): (Omit<M, keyof DrawnMate> & DrawnMate)[] {
 	if (live === null) return [...mates];
-	return mates.map((mate) => ({ ...mate, projected: live.points[mate.id] ?? null }));
+	const drawn = mates.map((mate) => ({
+		...mate,
+		projected: live.points[mate.id] ?? null,
+		positionRank: live.ranks === null ? mate.positionRank : (live.ranks[mate.id] ?? null),
+		span: live.spans === null ? mate.span : (live.spans[mate.id] ?? null)
+	}));
+	if (live.ranks === null) return drawn;
+	return drawn.toSorted((a, b) => byRank(a.positionRank, b.positionRank));
 }
 
 /** The tier's drop to the next: the live one once the read has answered. */

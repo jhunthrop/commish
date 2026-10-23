@@ -36,9 +36,20 @@ export function restOfSeasonHead(from: string): string {
 	return `Rest of season ${from}`;
 }
 
-/** The tier box's basis in season: "Projected PPR points for the rest of 2026 from week 8". */
-export function tierBasisWords(label: string, season: number, from: string): string {
-	return `Projected ${label} points for the rest of ${String(season)} ${from}`;
+/** The tier box's basis in season (Lane 162, D03): the weeks the page's own figure counts, as his rest
+ * tile says them, "Projected PPR points for the rest of 2026, weeks 8 to 17"; a player beside him whose
+ * figure counts other weeks says his own in his line (tierSpanOf). */
+export function tierBasisWords(label: string, season: number, span: string): string {
+	return `Projected ${label} points for the rest of ${String(season)}, ${span}`;
+}
+
+/** A tier mate's weeks where they are not the page's player's (Lane 162, D03): "weeks 7 to 17" in his
+ * line, null where his figure counts the same weeks or either is unknown. */
+export function tierSpanOf(
+	mate: number | null | undefined,
+	his: number | null | undefined
+): string | null {
+	return mate === undefined || his === undefined || mate === his ? null : restSpanWords(mate);
 }
 
 /** The board's words: its first week, and whether a game of it was played at the run. Null on a

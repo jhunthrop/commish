@@ -52,19 +52,35 @@ func playerParam(r *http.Request) (string, bool) {
 // week, in PPR, the week's projection read in PPR, and his rest-of-season
 // points a game on our board, as a league's rows carry them.
 func publicLine(d Data, projection boards.WeekProjection, b boards.Board, rest RestNow, bp boards.Player, week int, now time.Time) apitypes.PlayerLine {
+	season := publicSeason(d, week, now)
+	return publicLineIn(season, publicRanks(season, b), projection, b, rest, bp)
+}
+
+// publicSeason is the season a read with no league is read in: PPR, at
+// week and now.
+func publicSeason(d Data, week int, now time.Time) *Season {
+	return NewSeason(d, RulesOf(scoring.PresetRules(pprPreset)), week, now)
+}
+
+// publicRanks is each player's place among the players who play on b, the
+// one a league's lines say (PlayingRanks, Lane 128): none while a
+// season-long list holds him. The read's line and its tier box both read
+// it (Lane 162).
+func publicRanks(season *Season, b boards.Board) map[string]int {
+	return PlayingRanks(b, func(p boards.Player) bool {
+		d := season.designation(Player{BoardID: p.ID, Team: p.Team, Position: p.Position})
+		return d != nil && d.SeasonLong
+	})
+}
+
+// publicLineIn is publicLine on a season and its ranks already read.
+func publicLineIn(season *Season, ranks map[string]int, projection boards.WeekProjection, b boards.Board, rest RestNow, bp boards.Player) apitypes.PlayerLine {
 	boardID, position, team := bp.ID, bp.Position, bp.Team
-	season := NewSeason(d, RulesOf(scoring.PresetRules(pprPreset)), week, now)
 	facts := season.For(Player{BoardID: boardID, Team: team, Position: position})
 	id := boardID
 	line := apitypes.PlayerLine{Player: apitypes.LeaguePlayer{BoardId: &id, Name: bp.Name, Position: string(position), Team: boards.WireClub(team)},
 		Facts: wireFacts(facts, nil), RestOfSeasonPerGame: RestOfSeasonPerGame(b, bp, rest.Left)}
-	// His place among the players who play, the one a league's lines say
-	// (PlayingRanks, Lane 128); none while a season-long list holds him.
-	listed := func(p boards.Player) bool {
-		d := season.designation(Player{BoardID: p.ID, Team: p.Team, Position: p.Position})
-		return d != nil && d.SeasonLong
-	}
-	if rank, ok := PlayingRanks(b, listed)[boardID]; ok {
+	if rank, ok := ranks[boardID]; ok {
 		line.PositionRank = &rank
 	}
 	if facts.Opponent != "" {
@@ -134,19 +150,22 @@ func (s *Service) playerWeek(w http.ResponseWriter, r *http.Request) {
 	week := nextWeek(data.Games)
 	projection := s.projection(ctx, s.Season, week)
 	read, previous := readsOf(projection)
+	season := publicSeason(data, week, now)
+	ranks := publicRanks(season, board)
 	out := apitypes.PlayerWeek{Week: week,
-		Line:              publicLine(data, projection, board, rest, bp, week, now),
+		Line:              publicLineIn(season, ranks, projection, board, rest, bp),
 		ProjectionScoring: apitypes.ProjectionScoring{Format: apitypes.ProjectionScoringFormatPpr, LeagueOwn: false},
 		ProjectionReadAt:  read, ProjectionPreviousReadAt: previous}
-	fillRest(&out, lives, bp, tier)
+	fillRest(&out, lives, bp, tier, ranks)
 	out.AfterBye = s.publicAfterBye(ctx, out, data, board, rest, bp, now)
 	httpx.WriteOK(w, r, http.StatusOK, out)
 }
 
 // withRest puts his rest of season in every run format on a league's read
 // (fillRest): the run's formats, not the league's own, as his page's
-// every-format table and tier box are.
-func (s *Service) withRest(ctx context.Context, out *apitypes.PlayerWeek, bp boards.Player, tier tierQuery) error {
+// every-format table and tier box are; the tier's players ranked by ranks,
+// the league read's own.
+func (s *Service) withRest(ctx context.Context, out *apitypes.PlayerWeek, bp boards.Player, tier tierQuery, ranks map[string]int) error {
 	data, err := s.Facts.Data(ctx, s.Season)
 	if err != nil {
 		return err
@@ -155,7 +174,7 @@ func (s *Service) withRest(ctx context.Context, out *apitypes.PlayerWeek, bp boa
 	if err != nil {
 		return err
 	}
-	fillRest(out, lives, bp, tier)
+	fillRest(out, lives, bp, tier, ranks)
 	return nil
 }
 
@@ -185,7 +204,8 @@ func (s *Service) leaguePlayerWeek(w http.ResponseWriter, r *http.Request) {
 		s.answer(w, r, out, false)
 		return
 	}
-	if err := s.withRest(r.Context(), &out, bp, tier); err != nil {
+	// The tier box ranks its players as the league's line ranks him (Lane 162).
+	if err := s.withRest(r.Context(), &out, bp, tier, a.playingRanks()); err != nil {
 		httpx.WriteInternal(w, r, s.Log, "inseason: league player week rest of season", err)
 		return
 	}
