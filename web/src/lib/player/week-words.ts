@@ -30,6 +30,7 @@ import {
 	gameOf,
 	heldGame,
 	oppRankWord,
+	printTenth,
 	weatherCell,
 	type WeatherCell
 } from '#lib/league/box/box.ts';
@@ -44,7 +45,6 @@ import {
 	listedTiles,
 	restRankWords,
 	NONE,
-	printTenth,
 	publishedOn,
 	compareLeadsWithoutVerb,
 	withTile,

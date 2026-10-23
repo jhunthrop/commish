@@ -66,9 +66,6 @@ export function projectionMoved(now: number | null, then: number | null): boolea
 /** A number not held. */
 export const NONE = EMPTY_FIGURE;
 
-/** An API figure printed as given, one rule with the box cells (league/box/box.ts). */
-export { printTenth } from '#lib/league/box/box.ts';
-
 /** The scorings a week's projection is read in: the API's names (ProjectionScoring.format). */
 export type TileScoring = 'ppr' | 'half_ppr' | 'standard';
 
