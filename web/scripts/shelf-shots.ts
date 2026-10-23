@@ -13,9 +13,12 @@
 // quotes a projection the card does not print shows the moved caption alone before his kickoff, never
 // under "not written yet"; with SHELF_IN_PLAY=1 the case runs alone on the fixture's Sunday clock
 // (FIXTURE_SUNDAY_CLOCK, his noon game under way), where the read written for the week is shown.
+// Lane 160 (B140): CeeDee Lamb's read the run withheld for his status says its due time alone before his
+// Sunday night kickoff; with SHELF_AFTER_GAMES=1 the case runs alone on the fixture's Monday clock
+// (FIXTURE_MONDAY_CLOCK, his game final), where it says the read for this game was not written.
 // Exits non-zero on any fault.
 //
-//   [BYTES_ONLY=1] [SHELF_IN_PLAY=1] node scripts/shelf-shots.ts [web origin] [out dir]
+//   [BYTES_ONLY=1] [SHELF_IN_PLAY=1 | SHELF_AFTER_GAMES=1] node scripts/shelf-shots.ts [web origin] [out dir]
 // BYTES_ONLY prints the screens' script and stops, for a build from before the shelf.
 // with the site built against PUBLIC_API_URL naming the fixture API, which runs on the fixture week's
 // clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z) at API_ORIGIN.
@@ -31,6 +34,7 @@ import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { readFace } from './read-face.ts';
 import {
+	FIXTURE_MONDAY_CLOCK,
 	FIXTURE_SUNDAY_CLOCK,
 	FIXTURE_WEEK_CLOCK,
 	installFixtureClock,
@@ -55,9 +59,15 @@ const web = process.argv[2] ?? 'http://localhost:4173';
 const out = new URL(process.argv[3] ?? '../screenshots/shelf/', import.meta.url);
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
 const id = FIXTURE_IDS.league;
-/** Lane 158's in-play case alone, on the Sunday clock: every other case is shot on the week's. */
-const IN_PLAY = process.env.SHELF_IN_PLAY === '1';
-const CLOCK = IN_PLAY ? FIXTURE_SUNDAY_CLOCK : FIXTURE_WEEK_CLOCK;
+/** Lane 158's in-play case alone, on the Sunday clock, or Lane 160's after-the-games case alone, on
+ * the Monday clock: every other case is shot on the week's. */
+const AFTER_GAMES = process.env.SHELF_AFTER_GAMES === '1';
+const IN_PLAY = process.env.SHELF_IN_PLAY === '1' || AFTER_GAMES;
+const CLOCK = AFTER_GAMES
+	? FIXTURE_MONDAY_CLOCK
+	: IN_PLAY
+		? FIXTURE_SUNDAY_CLOCK
+		: FIXTURE_WEEK_CLOCK;
 
 interface Screen {
 	name: string;
@@ -431,8 +441,9 @@ const RETURN_CASE = {
 	chip: 'Due back Sun Oct 18',
 	listed: onListWords('IR')
 };
+// Shot on the week's clock alone, as the IR case: the in-play and after-games cases run their read alone.
 for (const screen of SCREENS.filter((s) => s.name === 'lineup' || s.name === 'players')) {
-	if (process.env.BYTES_ONLY) break;
+	if (process.env.BYTES_ONLY || IN_PLAY) break;
 	for (const theme of THEMES) {
 		for (const size of SIZES) {
 			const label = `${screen.name} returning ${theme} ${String(size.width)}`;
@@ -470,28 +481,39 @@ for (const screen of SCREENS.filter((s) => s.name === 'lineup' || s.name === 'pl
 // A player with a written week read (the stand-in run's, scripts/standin-week-reads.json), opened from
 // the address on Players: the read is drawn, in the UI face at the rows' body size (Lane 126). Lane
 // 158: Rome Odunze's read quotes 12.4, a projection his card does not print; before his kickoff the
-// shelf says the moved caption alone, from it (SHELF_IN_PLAY) the read written for the week.
+// shelf says the moved caption alone, from it (SHELF_IN_PLAY) the read written for the week. Lane 160:
+// CeeDee Lamb's read, withheld for his status, says its due time before his kickoff and, once his game
+// is final (SHELF_AFTER_GAMES), that the read for this game was not written.
 interface ReadCase {
 	slug: string;
 	shot: string;
-	/** The read is drawn, else its moved caption alone. */
+	/** The read is drawn, else the one sentence its place says alone. */
 	shown: boolean;
+	says?: string;
 }
 const MOVED = 'The published projection moved since this read was written.';
-const READ_CASES: readonly ReadCase[] = IN_PLAY
-	? [{ slug: 'rome-odunze', shot: 'read-in-play', shown: true }]
-	: [
-			{ slug: 'puka-nacua', shot: 'read', shown: true },
-			{ slug: 'rome-odunze', shot: 'read-moved', shown: false }
-		];
+const DUE = 'His status changed since this read was written. A new read is due by';
+const READ_CASES: readonly ReadCase[] = AFTER_GAMES
+	? [{ slug: 'ceedee-lamb', shot: 'read-withheld-final', shown: false, says: CARD.readNotWritten }]
+	: IN_PLAY
+		? [{ slug: 'rome-odunze', shot: 'read-in-play', shown: true }]
+		: [
+				{ slug: 'puka-nacua', shot: 'read', shown: true },
+				{ slug: 'rome-odunze', shot: 'read-moved', shown: false, says: MOVED },
+				{ slug: 'ceedee-lamb', shot: 'read-withheld', shown: false, says: DUE }
+			];
 
-/** The read's place says one thing: the read, or the moved caption alone, never "not written yet". */
+/** The read's place says one thing: the read, or its one sentence alone; "not written" only when that
+ * is the sentence, and never a due time once his game is under way or final. */
 async function checkRead(page: Page, read: ReadCase, label: string): Promise<void> {
 	const text = await shelf(page).locator('section.read').innerText();
-	if (text.includes(CARD.readNotYet) || text.includes(CARD.readNotWritten))
+	const unwritten = read.says === CARD.readNotWritten;
+	if (text.includes(CARD.readNotYet) || (!unwritten && text.includes(CARD.readNotWritten)))
 		faults.push(`${label}: the read's place says it is not written: "${text}"`);
-	if (text.includes(MOVED) === read.shown)
-		faults.push(`${label}: the moved caption ${read.shown ? 'over the read' : 'missing'}`);
+	for (const words of [MOVED, DUE, CARD.readNotWritten]) {
+		if (text.includes(words) !== (read.says === words))
+			faults.push(`${label}: "${words}" ${read.says === words ? 'missing' : 'said'}: "${text}"`);
+	}
 	if (read.shown) {
 		const face = await readFace(page, 'dialog.shelf[open]');
 		for (const said of face.faults) faults.push(`${label}: ${said}`);
@@ -525,6 +547,34 @@ if (!process.env.BYTES_ONLY && playersScreen !== undefined) {
 				} finally {
 					await ctx.close();
 				}
+			}
+		}
+	}
+}
+// Lane 160: the full player page says the same of Lamb's withheld read once his game is final, by the
+// same function (week-read.ts shownWeekRead) at the page's clock.
+if (!process.env.BYTES_ONLY && AFTER_GAMES) {
+	for (const theme of THEMES) {
+		for (const size of SIZES) {
+			const label = `page read-withheld-final ${theme} ${String(size.width)}`;
+			const ctx = await context(theme, size, false);
+			const page = await ctx.newPage();
+			try {
+				await page.goto(`${web}/players/ceedee-lamb`);
+				const place = page.locator('article.read').first();
+				await place.getByText(CARD.readNotWritten).first().waitFor({ timeout: READY_TIMEOUT_MS });
+				await page.waitForLoadState('networkidle');
+				const said = await place.innerText();
+				if (said.includes(DUE))
+					faults.push(`${label}: the page still says the due time: "${said}"`);
+				await page.screenshot({
+					fullPage: true,
+					path: new URL(`page-read-withheld-final-${theme}-${String(size.width)}.png`, out).pathname
+				});
+			} catch (error: unknown) {
+				faults.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+			} finally {
+				await ctx.close();
 			}
 		}
 	}
