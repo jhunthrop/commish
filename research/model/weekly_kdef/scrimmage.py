@@ -24,7 +24,7 @@ play table starts in 2016).
 
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Final
 
@@ -46,6 +46,7 @@ from research.model.weekly_kdef.rates import (
     shrunk_rate,
     trials_prior,
 )
+from research.pipeline.nflverse.team_eras import current_code, season_code
 
 QUARTERBACK: Final = "QB"
 SCRIMMAGE: Final = ("pass", "run")
@@ -77,7 +78,7 @@ def read_season_plays(  # noqa: PLR0913, PLR0917 - a season's reads, named
         raise InputRuleError(
             f"{later} plays of {season - 1} are stamped after {first}; one read of the season before is not exact"
         )
-    prior = reads.plays(conn, season - 1, LAST_POSSIBLE_WEEK, first)
+    prior = [_serving(season, p) for p in reads.plays(conn, season - 1, LAST_POSSIBLE_WEEK, first)]
     stamp = admit_read("prior", PLAY_PAIRS, prior, season, SEASON_WIDE, first)
     found = SeasonPlays(
         season,
@@ -90,8 +91,21 @@ def read_season_plays(  # noqa: PLR0913, PLR0917 - a season's reads, named
     return found, stamp
 
 
+def _serving(season: int, p: Play) -> Play:
+    """A season-before play with its clubs spelled as the season it serves spells them (OAK's 2019 plays
+    as LV's for 2020), so a relocated club's history joins its rows."""
+
+    def spelled(code: str | None) -> str | None:
+        return None if code is None else season_code(season, current_code(code))
+
+    return replace(p, posteam=spelled(p.posteam), defteam=spelled(p.defteam))
+
+
 def _scrimmage(p: Play) -> bool:
     return p.play_type in SCRIMMAGE and not p.two_point_attempt
+
+
+Snap = tuple[str, str, int, int]
 
 
 @dataclass(slots=True)
@@ -101,6 +115,8 @@ class PlayTally:
     gained: dict[str, list[float]]  # offense -> yards per scrimmage play
     allowed: dict[str, list[float]]  # defense -> yards per scrimmage play
     fourth: dict[str, list[float]]  # offense -> [went for it, fourth downs in field-goal range]
+    # (offense, defense, season, week) -> [scrimmage plays, dropbacks, interceptions]: each game's exposure
+    snaps: dict[Snap, list[float]]
 
 
 def _latest(games: Mapping[tuple[str, int, int, str], int]) -> dict[str, str]:
@@ -113,6 +129,7 @@ def _latest(games: Mapping[tuple[str, int, int, str], int]) -> dict[str, str]:
 
 
 def tally_plays(plays: Sequence[Play]) -> PlayTally:
+    snaps: dict[Snap, list[float]] = defaultdict(lambda: [0.0, 0.0, 0.0])
     passers: dict[str, list[float]] = defaultdict(lambda: [0.0, 0.0])
     games: dict[tuple[str, int, int, str], int] = defaultdict(int)
     gained: dict[str, list[float]] = defaultdict(list)
@@ -126,6 +143,11 @@ def tally_plays(plays: Sequence[Play]) -> PlayTally:
             passers[who][0] += float(bool(p.interception))
             passers[who][1] += 1.0
             games[(p.posteam, p.season, p.week, who)] += 1
+        if _scrimmage(p) and p.defteam is not None:
+            game = snaps[(p.posteam, p.defteam, p.season, p.week)]
+            game[0] += 1.0
+            game[1] += float(is_dropback(p))
+            game[2] += float(is_dropback(p) and bool(p.interception))
         if _scrimmage(p) and p.yards_gained is not None and p.defteam is not None:
             gained[p.posteam].append(float(p.yards_gained))
             allowed[p.defteam].append(float(p.yards_gained))
@@ -133,14 +155,16 @@ def tally_plays(plays: Sequence[Play]) -> PlayTally:
         if in_range and (_scrimmage(p) or p.play_type in KICKS):
             fourth[p.posteam][0] += float(_scrimmage(p))
             fourth[p.posteam][1] += 1.0
-    return PlayTally(dict(passers), _latest(games), dict(gained), dict(allowed), dict(fourth))
+    return PlayTally(dict(passers), _latest(games), dict(gained), dict(allowed), dict(fourth), dict(snaps))
 
 
 def merged(before: PlayTally, after: PlayTally) -> PlayTally:
     """The season before's tally with this season's after it (its latest passer wins where it has one)."""
 
-    def summed(a: Mapping[str, list[float]], b: Mapping[str, list[float]]) -> dict[str, list[float]]:
-        return {k: [x + y for x, y in zip(a.get(k, [0.0, 0.0]), b.get(k, [0.0, 0.0]), strict=True)] for k in {*a, *b}}
+    def summed[K](a: Mapping[K, list[float]], b: Mapping[K, list[float]]) -> dict[K, list[float]]:
+        width = len(next(iter({**a, **b}.values()), []))
+        zero = [0.0] * width
+        return {k: [x + y for x, y in zip(a.get(k, zero), b.get(k, zero), strict=True)] for k in {*a, *b}}
 
     def joined(a: Mapping[str, list[float]], b: Mapping[str, list[float]]) -> dict[str, list[float]]:
         return {k: [*a.get(k, []), *b.get(k, [])] for k in {*a, *b}}
@@ -151,6 +175,7 @@ def merged(before: PlayTally, after: PlayTally) -> PlayTally:
         joined(before.gained, after.gained),
         joined(before.allowed, after.allowed),
         summed(before.fourth, after.fourth),
+        summed(before.snaps, after.snaps),
     )
 
 

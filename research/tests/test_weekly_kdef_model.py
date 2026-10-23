@@ -6,18 +6,19 @@ why's exact Shapley values."""
 
 import hashlib
 import math
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from research.model.weekly4.features.plays import PLAY_COLUMNS, Play
-from research.model.weekly_kdef import kernel, scrimmage, statistics
+from research.model.weekly_kdef import benchmarks, kernel, scrimmage, statistics
 from research.model.weekly_kdef.expectations import Expectations
+from research.model.weekly_kdef.exposure import exposure_view
 from research.model.weekly_kdef.joint import Calibration, club_game_seed, defense_point, draw_row, kicker_point
 from research.model.weekly_kdef.rates import GamePrior, moments_prior, shrunk_per_game, shrunk_rate, trials_prior
-from research.model.weekly_kdef.tallies import Tally, add_kicking, club_kicker
+from research.model.weekly_kdef.tallies import Tally, add_defense, add_kicking, club_kicker
 from research.model.weekly_kdef.why import GROUPS, shapley, subsets
 
 
@@ -219,3 +220,61 @@ def test_the_plays_tally_counts_dropbacks_yards_and_fourth_downs() -> None:
     assert later.latest["SEA"] == "c"
     assert later.passers["a"] == [1.0, 2.0]
     assert len(later.gained["SEA"]) == 5
+
+
+def test_the_dst_crosswalk_reads_the_judged_seasons_codes_where_an_old_and_a_new_share_an_espn_id() -> None:
+    teams = pd.DataFrame({"season": [2019, 2019, 2023, 2023], "club": ["OAK", "SD", "LV", "LAC"]})
+    every = benchmarks.defense_crosswalk(sorted(set(teams["club"])))
+    assert every["-16013"] == "team-def:OAK"  # the fit seasons' code would take the Raiders' id
+    judged = benchmarks.judged_crosswalk(teams, 2023)
+    assert judged["-16013"] == "team-def:LV" and judged["-16024"] == "team-def:LAC"
+    assert set(judged.values()) == {"team-def:LV", "team-def:LAC"}
+
+
+def test_the_bandwidth_ties_within_round_fours_tenth_of_a_per_cent() -> None:
+    implied = np.array([20.0, 22.0, 20.5, 23.0, 21.0, 24.0])
+    scores = np.array([17.0, 24.0, 20.0, 27.0, 21.0, 24.0])
+    seasons = np.array([2016, 2016, 2017, 2017, 2018, 2018])
+    found = kernel.choose_bandwidth(implied, scores, seasons, (2016, 2017, 2018))
+    best = min(found.losses.values())
+    tied = [h for h, loss in found.losses.items() if loss <= best * (1 + 0.001)]
+    assert found.chosen == min(tied)
+
+
+def test_who_kicks_reads_the_week_w_filings_before_the_latest_game() -> None:
+    tally = Tally()
+    add_kicking(tally, [(2023, 1, _kicking(1, "K1", "SEA", 2)), (2023, 2, _kicking(2, "K2", "SEA", 1))])
+    stamp = datetime(2023, 9, 20, tzinfo=UTC)
+    assert club_kicker(tally, "SEA") == "K2"  # no filing: the kicker of the latest game
+    assert club_kicker(tally, "SEA", {"K1": stamp}) == "K1"  # the starter back, filed Questionable
+    assert club_kicker(tally, "SEA", {"K1": stamp, "K2": stamp + timedelta(hours=1)}) == "K2"  # the latest filing
+    assert club_kicker(tally, "SEA", {"X": stamp}) == "K2"  # another club's or no kicker's filing
+
+
+def test_takeaways_are_per_dropback_and_per_play_faced() -> None:
+    tally = Tally()
+    defense = {
+        "team": "SEA", "opponent_team": "KC", "points_allowed": None, "special_teams_tds": 0, "def_safeties": 0,
+        "def_punt_blocks": 0, "def_pat_blocks": 0, "def_fg_blocks": 0, "fumble_recovery_opp": 2,
+    }  # fmt: skip
+    add_defense(tally, [(2023, 1, defense)], lambda *_: None)
+    plays = [
+        _play(
+            "KC", 1, i, defteam="SEA", qb_dropback=i < 30, passer_player_id="pm", interception=i < 2, yards_gained=1.0
+        )
+        for i in range(60)
+    ]
+    view = exposure_view(tally, scrimmage.tally_plays(plays))
+    assert view.intercepted["SEA"] == [2.0, 30.0] and view.recovered["SEA"] == [2.0, 60.0]
+    assert view.lost["KC"] == [2.0, 60.0]
+    assert view.dropback_weight == pytest.approx(2 * 17 * 30) and view.play_weight == pytest.approx(2 * 17 * 60)
+    found = view.of("KC", "SEA")
+    assert found["def_int_per_dropback"] == pytest.approx(2 / 30)  # one club: its rate is the league's
+    assert found["def_fr_per_play"] == pytest.approx(2 / 60)
+
+
+def test_a_season_before_play_of_a_relocated_club_is_spelled_as_the_season_it_serves() -> None:
+    old = _play("OAK", 17, 1, defteam="SD")
+    served = scrimmage._serving(2020, old)
+    assert (served.posteam, served.defteam) == ("LV", "LAC")
+    assert scrimmage._serving(2017, _play("OAK", 1, 2, defteam="SD")).posteam == "OAK"

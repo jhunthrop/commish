@@ -85,10 +85,14 @@ def _make_validation(f: Fitted, kicks: pd.DataFrame, season: int) -> dict[str, f
 
 
 def _defaults(rows: pd.DataFrame, index: Mapping[str, np.ndarray]) -> dict[str, Any]:
-    found: dict[str, Any] = {name: int(rows[name].sum()) for name in judging.DEFAULT_COUNTS}
-    found["projected_kicker_without_a_line"] = int(
+    """The defaults counted, each for the positions judged (a stopped position's judged season is not read)."""
+    counts = {name: int(rows[name].sum()) for name in judging.DEFAULT_COUNTS}
+    counts["projected_kicker_without_a_line"] = int(
         ((rows["kicker_id"].notna()) & (rows["kicker_withheld"] == 0) & (rows["has_kicker_line"] == 0)).sum()
     )
+    found: dict[str, Any] = {
+        name: value for name, value in counts.items() if judging.DEFAULT_POSITION.get(name, set(index)) & set(index)
+    }
     found["population"] = {p: int(index[p].sum()) for p in index}
     return found
 
@@ -106,7 +110,7 @@ def judge(  # noqa: PLR0913, PLR0917 - one run's every input, named
 ) -> Result:
     read = read_all(conn, teams, t, reader, rule)
     archive, reader = espn_archive(conn, read.reader, t.judgment_season)
-    crosswalk = {**espn_players(conn), **benchmarks.defense_crosswalk(sorted(set(teams["club"].astype(str))))}
+    crosswalk = {**espn_players(conn), **benchmarks.judged_crosswalk(teams, t.judgment_season)}
     digests_after = after()
     fitted = fit_system(read, t, grid)
     defense, kicker, e = points_of(fitted, fitted.judged)

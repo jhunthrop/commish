@@ -50,6 +50,13 @@ def _matchup(frame: pd.DataFrame, priors: LeaguePriors, means: Mapping[str, floa
         **{name: means.get(name, float("nan")) for name in PLAY_MEANS},
     }
     found = frame.assign(**{k: v for k, v in {**rates, **trials}.items() if k in frame})
+    for rate, league in (
+        ("def_int_per_dropback", "league_int_per_dropback"),
+        ("def_fr_per_play", "league_fr_per_play"),
+        ("off_fumbles_lost_per_play", "league_fumbles_per_play"),
+    ):
+        if league in found:
+            found = found.assign(**{rate: found[league]})
     if "league_yards_per_play" in found:
         found = found.assign(
             off_yards_per_play=found["league_yards_per_play"], def_yards_per_play_allowed=found["league_yards_per_play"]

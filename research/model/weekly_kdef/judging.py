@@ -36,6 +36,15 @@ DEFAULT_COUNTS: Final = (
     "lost_prior_week",
     "default_no_game_figure",
 )
+# The position each default belongs to (the others are both positions').
+DEFAULT_POSITION: Final = {
+    "no_prior_unit_defense": {"DEF"},
+    "no_passer_history": {"DEF"},
+    "no_kicker_history": {"K"},
+    "no_kicker": {"K"},
+    "kicker_withheld": {"K"},
+    "projected_kicker_without_a_line": {"K"},
+}
 PUBLISHED_REFUSAL: Final = (
     "the published projection's archive: refused by name, no 2023 or 2024 week of it is stamped at or before t_g"
 )

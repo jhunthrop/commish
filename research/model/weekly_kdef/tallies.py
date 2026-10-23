@@ -3,8 +3,8 @@ week rows (the admitted rows at t_g, or a whole season's outcomes for the league
 the features read the same arithmetic.
 
 From the team-defense weeks: per defense (`team`), each game's points allowed over the implied points it
-faced, its interceptions, fumble recoveries, return touchdowns, safeties and blocks; per offense
-(`opponent_team`), its fumbles lost. From the kicking weeks:
+faced, its return touchdowns, safeties and blocks, and by game its fumble recoveries; per offense
+(`opponent_team`), by game its fumbles lost. From the kicking weeks:
 per club, its field-goal and extra-point attempts per game; per kicker, his attempts and makes by distance
 band, his extra points. From the kick plays: per club, its two-point tries and extra-point tries.
 """
@@ -12,13 +12,15 @@ band, his extra points. From the kick plays: per club, its two-point tries and e
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Final
 
 from research.model.weekly_kdef.scoring import FG_BANDS
 
 Implied = Callable[[int, int, str], float | None]  # (season, week, offense club) -> its implied points
-DEFENSE_STATS: Final = ("pa_over_expected", "int", "fr", "return_td", "safeties", "blocks")
-OFFENSE_STATS: Final = ("fumbles_lost", "fg_att", "pat_att", "two_point", "xp_try")
+DEFENSE_STATS: Final = ("pa_over_expected", "return_td", "safeties", "blocks")
+OFFENSE_STATS: Final = ("fg_att", "pat_att", "two_point", "xp_try")
+GAME_STATS: Final = ("fr", "fumbles_lost")  # by game only: their exposure is the game's plays (`exposure.py`)
 _BLOCKS: Final = ("def_punt_blocks", "def_pat_blocks", "def_fg_blocks")
 
 
@@ -72,12 +74,11 @@ def add_defense(tally: Tally, rows: Iterable[tuple[int, int, Mapping[str, Any]]]
         faced = implied(season, week, opponent)
         if faced is not None and v.get("points_allowed") is not None:
             d.values["pa_over_expected"].append(_number(v["points_allowed"]) - faced)
-        d.values["int"].append(_number(v["def_interceptions"]))
-        d.values["fr"].append(_number(v["fumble_recovery_opp"]))
+        d.by_game[(season, week)]["fr"] = _number(v["fumble_recovery_opp"])
         d.values["return_td"].append(_number(v["special_teams_tds"]))
         d.values["safeties"].append(_number(v["def_safeties"]))
         d.values["blocks"].append(sum(_number(v[c]) for c in _BLOCKS))
-        o.values["fumbles_lost"].append(_number(v["fumble_recovery_opp"]))
+        o.by_game[(season, week)]["fumbles_lost"] = _number(v["fumble_recovery_opp"])
 
 
 def _band_counts(v: Mapping[str, Any], kind: str) -> dict[str, float]:
@@ -140,8 +141,20 @@ def tally_of(
     return tally
 
 
-def club_kicker(tally: Tally, club: str) -> str | None:
-    """The kicker who kicked the club's latest game in the tally (most attempts that week, then by id)."""
+def club_kicker(tally: Tally, club: str, filed: Mapping[str, datetime] | None = None) -> str | None:
+    """Who kicks (design 5.3, Amendment 7 item 5): the club's kicker with the latest week-W filing that is not
+    Out or Doubtful (`filed`: each such filing's stamp), else the kicker who kicked the club's latest game in
+    the tally (most attempts that week, then by id). The caller withholds one filed Out or Doubtful."""
+    listed = sorted(
+        (
+            (stamp, pid)
+            for pid, stamp in (filed or {}).items()
+            if pid in tally.kickers and tally.kickers[pid].club == club
+        ),
+        key=lambda x: (x[0], _negated(x[1])),
+    )
+    if listed:
+        return listed[-1][1]
     best: tuple[tuple[int, int, float], str] | None = None
     for pid, k in tally.kickers.items():
         if k.club != club:

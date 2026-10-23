@@ -199,6 +199,8 @@ def espn_defense_points(c: Mapping[str, float]) -> float | None:
         return None
     total = allowed + yards
     for name, sources in _ESPN_DEFENSE_COUNTS.items():
+        if DEFENSE_POINTS[name] == 0.0:  # a block scores 0 (item 12f): its absence changes nothing
+            continue
         if any(source not in c for source in sources):
             return None
         total += DEFENSE_POINTS[name] * sum(c[source] for source in sources)

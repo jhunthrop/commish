@@ -69,6 +69,12 @@ def espn_values(
     return found, counts
 
 
+def judged_crosswalk(teams: pd.DataFrame, season: int) -> dict[str, str]:
+    """ESPN's D/ST ids for the judged season's clubs only: a relocated club's old code (OAK, SD) shares its
+    ESPN id with the new one, so the fit seasons' codes must never stand in the judged season's map."""
+    return defense_crosswalk(sorted(set(teams.loc[teams["season"] == season, "club"].astype(str))))
+
+
 def defense_crosswalk(clubs: Sequence[str]) -> dict[str, str]:
     """ESPN's D/ST id for each club, to the universe's `team-def:<club>`."""
     return {team_defense_espn_id(club): f"{DEFENSE_PREFIX}{club}" for club in clubs}

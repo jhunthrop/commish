@@ -2,14 +2,14 @@
 
 A per-game rate (points allowed over expected, takeaways, yards, attempts) is shrunk in the normal form:
 posterior = n / (n + k) x observed + k / (n + k) x prior, n the unit's games. k is either the design's
-fixed prior weight (6 games for points allowed over expected, toward 0; two seasons, 34 games, for the
-takeaways a defense makes, whose persistence is weak; a full season, 17 games, for return touchdowns,
-safeties and blocks) or the method of moments over the fit seasons' club-seasons (`moment_fit`: tau^2 =
+fixed prior weight (6 games for points allowed over expected, toward 0; a full season, 17 games, for
+return touchdowns, safeties and blocks) or the method of moments over the fit seasons' club-seasons (`moment_fit`: tau^2 =
 var(observed) - mean(noise / n), k = noise / tau^2, full pooling at tau^2 at or below zero, counted).
 
 A rate per trial (a kicker's makes, his long attempts, his extra points, a club's two-point tries and its
 field goals per scoring trip) is shrunk in the beta-binomial form toward its prior rate, tau^2 by the
-same method of moments with the binomial noise p (1 - p).
+same method of moments with the binomial noise p (1 - p), or with a fixed weight in trials (the
+takeaways a defense makes per dropback and per play faced, two seasons of them, whose persistence is weak).
 """
 
 import math
@@ -23,7 +23,7 @@ from research.model.weekly4.shrinkage import MomentFit, beta_binomial_rate, mome
 
 SEASON_GAMES: Final = 17.0
 POINTS_OVER_EXPECTED_K: Final = 6.0  # design 5.2: "shrunk toward 0 with 6 games of prior"
-TAKEAWAY_K: Final = 2 * SEASON_GAMES  # design 5.2: "heavy prior: 2 seasons"
+TAKEAWAY_SEASONS: Final = 2.0  # design 5.2: "heavy prior: 2 seasons" of dropbacks (or plays) faced
 SPECIAL_TEAMS_K: Final = SEASON_GAMES  # design 5.2: "a full season of prior"
 
 
@@ -76,6 +76,11 @@ class TrialPrior:
     @property
     def pooled(self) -> bool:
         return self.fit.pooled_fully
+
+
+def fixed_trial_rate(successes: float, trials: float, rate: float, weight: float) -> float:
+    """A per-trial rate under a Beta prior at `rate` worth `weight` trials: (rate x weight + s) / (weight + n)."""
+    return (rate * weight + successes) / (weight + trials) if weight + trials > 0 else rate
 
 
 def trials_prior(

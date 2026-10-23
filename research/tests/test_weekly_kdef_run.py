@@ -124,17 +124,51 @@ def test_the_check_and_the_judgment_run_end_to_end_once_each(built: tuple[str, P
     assert all(abs(gap) < 1e-6 for p in ("DEF", "K") if (gap := reported["why"][p]["largest_sum_gap"]) is not None)
     with pytest.raises(RefusedError, match="taken once"):
         execute("check", url, store, check_out, _setup(check_claim, None))
-    judgment_claim = tmp_path / "judgment-taken.json"
     left = [p for p in POSITIONS if not gates.stopped([GateLine(**x) for x in record["gates"][p]])]
     if not left:
         with pytest.raises(RefusedError, match="stop rule"):
-            execute("judgment", url, store, tmp_path / "judgment.json", _setup(judgment_claim, check_out))
-        assert not judgment_claim.exists()
-        return
-    execute("judgment", url, store, tmp_path / "judgment.json", _setup(judgment_claim, check_out))
-    judged = json.loads((tmp_path / "judgment.json").read_text())
-    assert judged["positions"] == left
-    assert judgment_claim.exists()
+            execute("judgment", url, store, tmp_path / "judgment.json", _setup(tmp_path / "taken.json", check_out))
+        assert not (tmp_path / "taken.json").exists()
+
+
+def _crafted(path: Path, left: tuple[str, ...]) -> Path:
+    """A check record whose stop rule leaves `left`: KD1 and KD2 passing for those, failing for the rest."""
+
+    def lines(passed: bool) -> list[dict[str, object]]:
+        return [
+            {"gate": gate, "subject": subject, "passed": passed, "detail": ""}
+            for gate, subject in (("KD1", "pooled vs recent form"), ("KD2", "pooled vs the streamer's sheet"))
+        ]
+
+    path.write_text(json.dumps({"command": "check", "gates": {p: lines(p in left) for p in POSITIONS}}))
+    return path
+
+
+@pytest.mark.parametrize("left", [("K",), ("DEF",), ("K", "DEF")])
+def test_the_judgment_runs_past_its_refusal_for_the_positions_the_check_left(
+    built: tuple[str, Path], tmp_path: Path, left: tuple[str, ...]
+) -> None:
+    url, store = built
+    record = _crafted(tmp_path / "check.json", left)
+    claim = tmp_path / "judgment-taken.json"
+    out = tmp_path / "judgment.json"
+    code = execute("judgment", url, store, out, _setup(claim, record))
+    judged = json.loads(out.read_text())
+    assert claim.exists()
+    assert judged["command"] == "judgment"
+    assert judged["positions"] == [p for p in POSITIONS if p in left]
+    assert set(judged["gates"]) == set(left)
+    assert all(len(judged["gates"][p]) == gates.LINES_PER_POSITION for p in left)
+    assert len(judged["report"]) == (gates.LINES_PER_POSITION + 1) * len(left)
+    assert code == (0 if all(judged["passed"][p] for p in left) else 1)
+    reported = judged["reported"]
+    assert set(reported["positions"]) == set(left)
+    assert set(reported["why"]) == set(left) and set(reported["draw_mean_breaches"]) == set(left)
+    assert (reported["flat_three_kickers"] is None) == ("K" not in left)
+    assert ("attempts" in reported["validation"]) == ("K" in left)
+    assert ("no_kicker_history" in reported["defaults"]) == ("K" in left)
+    with pytest.raises(RefusedError, match="taken once"):
+        execute("judgment", url, store, out, _setup(claim, record))
 
 
 def test_a_judgment_with_both_positions_stopped_is_refused_before_any_claim(
@@ -143,7 +177,7 @@ def test_a_judgment_with_both_positions_stopped_is_refused_before_any_claim(
     url, store = built
     failing = [{"gate": "KD1", "subject": "pooled vs recent form", "passed": False, "detail": ""}]
     record = tmp_path / "check.json"
-    record.write_text(json.dumps({"gates": dict.fromkeys(POSITIONS, failing)}))
+    record.write_text(json.dumps({"command": "check", "gates": dict.fromkeys(POSITIONS, failing)}))
     claim = tmp_path / "judgment-taken.json"
     with pytest.raises(RefusedError, match="stop rule"):
         execute("judgment", url, store, tmp_path / "out.json", _setup(claim, record))

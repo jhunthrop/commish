@@ -24,6 +24,7 @@ The league priors of season s read only the outcomes of seasons before s (`leagu
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from types import MappingProxyType
 from typing import Any, Final
 
@@ -32,7 +33,6 @@ import numpy as np
 from research.model.weekly_kdef.rates import (
     POINTS_OVER_EXPECTED_K,
     SPECIAL_TEAMS_K,
-    TAKEAWAY_K,
     GamePrior,
     TrialPrior,
     fixed_prior,
@@ -50,12 +50,9 @@ LONG_BANDS: Final = ("50_59", "60_plus")
 # ("league") or 0 ("zero") as its mean.
 GAME_RATES: Final = (
     ("def_pa_over_expected", "defense", "pa_over_expected", POINTS_OVER_EXPECTED_K, "zero"),
-    ("def_int_per_game", "defense", "int", TAKEAWAY_K, "league"),
-    ("def_fr_per_game", "defense", "fr", TAKEAWAY_K, "league"),
     ("def_return_td_per_game", "defense", "return_td", SPECIAL_TEAMS_K, "league"),
     ("def_safeties_per_game", "defense", "safeties", SPECIAL_TEAMS_K, "league"),
     ("def_blocks_per_game", "defense", "blocks", SPECIAL_TEAMS_K, "league"),
-    ("off_fumbles_lost_per_game", "offense", "fumbles_lost", None, "moments"),
     ("off_fg_att_per_game", "offense", "fg_att", None, "moments"),
 )
 TRIAL_RATES: Final = ("fg_share", "two_point_rate", "kicker_accuracy", "kicker_long_share", "kicker_xp_rate")
@@ -226,8 +223,10 @@ class MomentView:
     season: int
     priors: LeaguePriors
 
-    def row(self, offense: str, defense: str, withheld: frozenset[str]) -> dict[str, Any]:
-        kicker = club_kicker(self.tally, offense)
+    def row(
+        self, offense: str, defense: str, withheld: frozenset[str], filed: Mapping[str, datetime]
+    ) -> dict[str, Any]:
+        kicker = club_kicker(self.tally, offense, filed)
         found: dict[str, Any] = {
             **defense_features(self.tally, defense, self.season, self.priors),
             **offense_features(self.tally, offense, self.season, self.priors),

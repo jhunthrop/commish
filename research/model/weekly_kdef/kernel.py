@@ -4,7 +4,8 @@ exponentially tilted to a boosted Poisson mean.
 For a club-game whose scoring club is implied to score m (with no game figure, every club-game alike),
 the kernel weights each fit club-game by a
 Gaussian in the difference of their implied points (bandwidth h, chosen on the fit seasons by
-forward-chained log loss from {1.0, 1.5, 2.0, 3.0}, the smaller on a tie) and takes the weighted empirical
+forward-chained log loss from {1.0, 1.5, 2.0, 3.0}, the smaller among those within round 4's 0.1 per
+cent of the best) and takes the weighted empirical
 distribution of their scores over 0 to 59 and 60 plus. The distribution is then tilted, p_s x exp(theta s)
 normalised, with theta solved so its mean is the boosted model's expected score. The tilt keeps the
 scores' lumps (0, 3, 7, 10, 13, 14, 17, 20, 21, 24) that a smooth density would erase.
@@ -18,6 +19,8 @@ from dataclasses import dataclass
 from typing import Final
 
 import numpy as np
+
+from research.model.weekly4.tuning import TIE
 
 SCORES: Final = np.arange(0, 61, dtype=float)  # 60 is "60 plus"
 BANDWIDTHS: Final = (1.0, 1.5, 2.0, 3.0)
@@ -91,7 +94,8 @@ def choose_bandwidth(
     bandwidths: Sequence[float] = BANDWIDTHS,
 ) -> Bandwidth:
     """The bandwidth with the least forward-chained log loss over the fit seasons (each season after the
-    first scored by the kernel of the seasons before it); the smaller on a tie."""
+    first scored by the kernel of the seasons before it); round 4's tie rule (`tuning.TIE`, a loss within
+    0.1 per cent of the best ties) takes the smaller among the tied."""
     ordered = sorted(fit_seasons)
     losses: dict[float, float] = {}
     for h in bandwidths:
@@ -103,7 +107,7 @@ def choose_bandwidth(
                 total += log_loss(kernel(implied[base], scores[base], implied[test], h), scores[test])
         losses[h] = total
     best = min(losses.values())
-    return Bandwidth(min(h for h, loss in losses.items() if loss <= best), losses)
+    return Bandwidth(min(h for h, loss in losses.items() if loss <= best + TIE * abs(best)), losses)
 
 
 def quantile(dist: np.ndarray, q: float) -> np.ndarray:

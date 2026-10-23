@@ -47,7 +47,7 @@ def _record(k: bool, defense: bool) -> str:
             {"gate": "KD5", "subject": "below the floor", "passed": False, "detail": ""},
         ]
 
-    return json.dumps({"gates": {"K": lines(k), "DEF": lines(defense)}})
+    return json.dumps({"command": "check", "gates": {"K": lines(k), "DEF": lines(defense)}})
 
 
 def test_the_command_line_binds_the_preregistered_constants_and_paths() -> None:
@@ -55,7 +55,7 @@ def test_the_command_line_binds_the_preregistered_constants_and_paths() -> None:
     assert (check.t, check.claim, check.record) == (DEVELOPMENT_CHECK, CHECK_CLAIM, None)
     assert (judgment.t, judgment.claim, judgment.record) == (KDEF_WEEKLY, JUDGMENT_CLAIM, CHECK_RECORD)
     assert check.claim != judgment.claim
-    assert AMENDMENT == "91fa5cd3" and MEASURED_LAST == 2024  # noqa: PLR2004
+    assert AMENDMENT == "95adfeb3" and MEASURED_LAST == 2024  # noqa: PLR2004
     assert SCRATCH_PREFIXES == ("lane157_kdef",)
 
 
@@ -90,7 +90,9 @@ def test_the_judgment_runs_after_the_check_for_the_positions_it_left(tmp_path: P
     with pytest.raises(RefusedError, match="stop rule"):
         refusals("judgment", _setup(tmp_path, record=record))
     with pytest.raises(RefusedError, match="names no"):
-        judged_positions({"gates": {"K": []}})
+        judged_positions({"command": "check", "gates": {"K": []}})
+    with pytest.raises(RefusedError, match="not a check's record"):
+        judged_positions({"command": "judgment", "gates": {}})
 
 
 def test_no_season_after_2024_is_judged(tmp_path: Path) -> None:

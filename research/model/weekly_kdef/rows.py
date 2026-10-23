@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 
 from research.model.weekly_kdef import scoring
+from research.model.weekly_kdef.exposure import exposure_view
 from research.model.weekly_kdef.features import LeaguePriors, MomentView
 from research.model.weekly_kdef.reads import MomentInputs, SeasonInputs, SeasonOutcomes
 from research.model.weekly_kdef.scoring import FG_BANDS
@@ -157,14 +158,15 @@ def feature_rows(
         admitted_defense = {(str(r.values["team"]), r.week) for r in inputs_at.defense}
         admitted_kicking = {(str(r.values["team"]), r.week) for r in inputs_at.kicking}
         form = _form(inputs, inputs_at)
+        exposure = exposure_view(view.tally, inputs_at.plays.tally)
         for record in group.to_dict("records"):
             row = {str(k): v for k, v in record.items()}
             club, opponent = str(row["club"]), str(row["opponent"])
             lost = lost_a_prior_week(
                 week, held_defense[opponent], {w for c, w in admitted_defense if c == opponent}
             ) or lost_a_prior_week(week, held_kicking[club], {w for c, w in admitted_kicking if c == club})
-            features = view.row(club, opponent, inputs_at.withheld)
-            features |= inputs_at.plays.of(club, opponent)
+            features = view.row(club, opponent, inputs_at.withheld, inputs_at.filed)
+            features |= inputs_at.plays.of(club, opponent) | exposure.of(club, opponent)
             found.append(
                 {
                     **row,

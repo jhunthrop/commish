@@ -49,7 +49,7 @@ from research.model.weekly_kdef.reads import KdefReader, closed_after
 
 _ROOT: Final = Path(__file__).resolve().parents[3]
 PREREGISTRATION: Final = "docs/research/2026-10-16-weekly-projection-round4-preregistration.md"
-AMENDMENT: Final = "91fa5cd3"  # Amendment 7 with the coordinator's rulings (item 11), the lock of this sub-round
+AMENDMENT: Final = "95adfeb3"  # Amendment 7 item 12, the rulings on the build's readings: the lock
 SCRATCH_PREFIXES: Final = ("lane157_kdef",)  # design 7.3: "a scratch copy on 5433 named `lane157_kdef`"
 CHECK_RECORD: Final = DOCS / "2026-10-23-weekly-kdef-dev-check.json"
 CHECK_CLAIM: Final = DOCS / "2026-10-23-weekly-kdef-dev-check-taken.json"
@@ -134,6 +134,8 @@ def judged_positions(record: Mapping[str, Any] | None) -> tuple[str, ...]:
     """The positions the stop rule leaves after the check (item 11), or the refusal."""
     if record is None:
         raise RefusedError("no development check record: the judgment runs only after the check")
+    if record.get("command") != "check":
+        raise RefusedError("the development check record is not a check's record")
     left = []
     for position in POSITIONS:
         lines = [GateLine(**line) for line in record.get("gates", {}).get(position, [])]

@@ -37,15 +37,15 @@ POINTS_FEATURES: Final = (
 INTERCEPTION_FEATURES: Final = (
     "exp_dropbacks",
     "passer_int_rate",
-    "def_int_per_game",
+    "def_int_per_dropback",
     "spread",
     "wind_mph",
     "precipitation",
 )
 RECOVERY_FEATURES: Final = (
     "exp_plays",
-    "off_fumbles_lost_per_game",
-    "def_fr_per_game",
+    "off_fumbles_lost_per_play",
+    "def_fr_per_play",
     "precipitation",
     "temperature_f",
 )

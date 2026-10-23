@@ -102,6 +102,7 @@ class MomentInputs:
     defense: tuple[StampedRow, ...]
     kicks: tuple[StampedRow, ...]
     withheld: frozenset[str]  # players whose week-W filing at t_g is Out or Doubtful
+    filed: Mapping[str, datetime]  # players with a week-W filing at t_g that is not: its stamp
     plays: PlayView  # the passer, yards per play and fourth-down terms of every club
 
 
@@ -115,12 +116,16 @@ class SeasonInputs:
     stamps: tuple[Stamp, ...]
 
 
-def _withheld(conn: Connection, season: int, week: int, moment: datetime) -> tuple[frozenset[str], Stamp]:
+def _filings(
+    conn: Connection, season: int, week: int, moment: datetime
+) -> tuple[frozenset[str], dict[str, datetime], Stamp]:
     filings = observations_as_of(
         conn, ObservationQuery(season, week, moment, INJURY_SOURCE, metrics=(InjuryMetric.REPORT_STATUS,))
     )
     stamp = admit(filings, season, week, moment, "filings")
-    return frozenset(r.player_id for r in filings if status_of_filing(r.value) == WITHHELD), stamp
+    withheld = frozenset(r.player_id for r in filings if status_of_filing(r.value) == WITHHELD)
+    filed = {r.player_id: r.as_of for r in filings if r.player_id not in withheld}
+    return withheld, filed, stamp
 
 
 def _moment(  # noqa: PLR0913, PLR0917 - one instant's reads, named
@@ -129,9 +134,10 @@ def _moment(  # noqa: PLR0913, PLR0917 - one instant's reads, named
     kicking, k = kdef_weeks.kicking_weeks_at(conn, season, week, moment, passes)
     defense, d = kdef_weeks.defense_weeks_at(conn, season, week, moment, passes)
     kicks, p = kdef_weeks.kicks_at(conn, season, week, moment)
-    withheld, f = _withheld(conn, season, week, moment)
+    withheld, filed, f = _filings(conn, season, week, moment)
     view = plays_at(plays, week, moment, withheld)
-    return MomentInputs(tuple(kicking), tuple(defense), tuple(kicks), withheld, view), [k, d, p, f, *view.stamps]
+    found = MomentInputs(tuple(kicking), tuple(defense), tuple(kicks), withheld, FROZEN(filed), view)
+    return found, [k, d, p, f, *view.stamps]
 
 
 def season_inputs(
