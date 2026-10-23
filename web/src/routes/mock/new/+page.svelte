@@ -187,6 +187,12 @@
 		await siteContext.load();
 		const params = page.url.searchParams;
 		if (!params.has('from')) settings = inFormat(settings, siteContext.format);
+		// Signed out there is no account to read (Lane 166, D19): the shell's read above knows the
+		// session, so the member-only read is skipped and no request answers 401.
+		if (!siteContext.signedIn) {
+			signedOut = true;
+			return;
+		}
 		try {
 			leagues = await rooms.leagues();
 			exactRules = hasFeature(siteContext.features, 'custom_scoring');

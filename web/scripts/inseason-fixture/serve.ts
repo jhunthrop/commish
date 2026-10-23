@@ -820,6 +820,11 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		send(req, res, HTTP.ok, SEASON);
 		return;
 	}
+	// The open lobbies the mock setup page lists (Lane 166): none filling.
+	if (url.pathname === '/lobbies') {
+		send(req, res, HTTP.ok, []);
+		return;
+	}
 	// The catalog as the API answers it with checkout closed (Lane 150): `free_season` only when the
 	// case asks for it, so the free page is shot both on an API before Lane 149 and after it.
 	if (url.pathname === '/billing/plans') {
