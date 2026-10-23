@@ -3,7 +3,15 @@
  * that screen. Pure, so the tests read what the shelf prints: the row's own cells drawn as the card's
  * tiles at once, his Pts in place of Proj once his game has kicked off (the screen's one game-state
  * rule, kickoff.ts lineState as the row carries it), and the verb by the screen and his game. */
-import { BOX, deltaWord, easeOf, heldGame, oppRankWord, type BoxRow } from '#lib/league/box/box.ts';
+import {
+	BOX,
+	deltaWord,
+	easeOf,
+	heldGame,
+	oppRankWord,
+	printTenth,
+	type BoxRow
+} from '#lib/league/box/box.ts';
 import type { StatusView } from '#lib/run/status-view.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { CardSource } from './card-source.ts';
@@ -11,7 +19,6 @@ import {
 	CARD,
 	listedTiles,
 	NONE,
-	printTenth,
 	restRankWords,
 	TILE_ORDER,
 	type CardTile,
