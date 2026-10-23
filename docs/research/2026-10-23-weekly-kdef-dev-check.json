@@ -1,0 +1,590 @@
+{
+ "model": "commish_week_kdef_v1",
+ "command": "check",
+ "preregistration": {
+  "path": "docs/research/2026-10-16-weekly-projection-round4-preregistration.md",
+  "amendment": "95adfeb3"
+ },
+ "head": "ebb9d34ef2976f172f859640142162252fab5eee",
+ "thresholds": {
+  "model_name": "commish_week_kdef_v1",
+  "fit_seasons": [
+   2016,
+   2017,
+   2018,
+   2019,
+   2020,
+   2021,
+   2022
+  ],
+  "judgment_season": 2023,
+  "weeks": [
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "form_margin": 0.05,
+  "sheet_margin": 0.02,
+  "espn_margin": 0.0,
+  "calibration_low": 0.06,
+  "calibration_high": 0.14,
+  "median_low": 0.44,
+  "median_high": 0.56,
+  "starters": 12,
+  "resamples": 10000,
+  "seed": 42,
+  "lower_percentile": 2.5,
+  "draws": 2000,
+  "run_seed": 2023
+ },
+ "features": {
+  "directory": "/private/tmp/claude-501/-Users-jh-code-fantasy/d1b45147-2ef6-4dae-8e60-c0a2d552f0c5/scratchpad/features-dev",
+  "digests": {
+   "history-2016-teams.parquet": "2073fe020423efaa6016a4489f410630d2e43c5ff7550397a28e7bb145901ec9",
+   "history-2017-teams.parquet": "665a55595a765923388218443fa3799cf41ac1a9f9f42a0dd7bbdd8ef1301dd9",
+   "history-2018-teams.parquet": "896ec9315ba19dae1667f21c3f9454b3830bae0665095f70f30a6e0ba7fcd783",
+   "history-2019-teams.parquet": "50b16674dfa0461194fd22924ab68ac7fb1dbc177df988137396c90ba7e02eb1",
+   "history-2020-teams.parquet": "dcee9da81212ac0998f4627ded8f7ff44472b9e9958032a882e18b018d27bdac",
+   "history-2021-teams.parquet": "2e5c88390599971346edc659c2303ac7d57a2fbe59adb08f4ab2dece2d818f3d",
+   "history-2022-teams.parquet": "60d5d34657b59d50b6c2fa72f21ba0206786111f6060e46e0ef5d7f52d73e4c8",
+   "history-2023-teams.parquet": "126c20b959c88d96a557e0d3b51e8c714e3aa516a423e08bb3da477c8935791f"
+  },
+  "depth_chart_rule": "week"
+ },
+ "positions": [
+  "K",
+  "DEF"
+ ],
+ "gates": {
+  "K": [
+   {
+    "gate": "KD1",
+    "subject": "pooled vs recent form",
+    "passed": true,
+    "detail": "difference +0.0721 against a margin of +0.0500, over 15 weeks"
+   },
+   {
+    "gate": "KD1",
+    "subject": "lower bound vs recent form",
+    "passed": false,
+    "detail": "lower bound -0.0446 against 0"
+   },
+   {
+    "gate": "KD2",
+    "subject": "pooled vs the streamer's sheet",
+    "passed": false,
+    "detail": "difference -0.0162 against a margin of +0.0200, over 15 weeks"
+   },
+   {
+    "gate": "KD2",
+    "subject": "lower bound vs the streamer's sheet",
+    "passed": false,
+    "detail": "lower bound -0.1102 against 0"
+   },
+   {
+    "gate": "KD3",
+    "subject": "pooled vs ESPN",
+    "passed": false,
+    "detail": "difference -0.0022 against +0.0000 (a point comparison); ESPN publishes no stamp for an archived projection; it is taken as ESPN's last pre-game version, which can only favour ESPN"
+   },
+   {
+    "gate": "KD4",
+    "subject": "starters' points vs the streamer's sheet",
+    "passed": false,
+    "detail": "model 8.200 against 8.450"
+   },
+   {
+    "gate": "KD4",
+    "subject": "starters' points vs ESPN",
+    "passed": true,
+    "detail": "model 8.200 against 7.894"
+   },
+   {
+    "gate": "KD4",
+    "subject": "starters' points vs recent form",
+    "passed": true,
+    "detail": "model 8.200 against 7.606"
+   },
+   {
+    "gate": "KD5",
+    "subject": "below the floor",
+    "passed": true,
+    "detail": "0.087 against [0.06, 0.14], n=439"
+   },
+   {
+    "gate": "KD5",
+    "subject": "above the ceiling",
+    "passed": true,
+    "detail": "0.082 against [0.06, 0.14], n=439"
+   },
+   {
+    "gate": "KD5",
+    "subject": "below the median",
+    "passed": true,
+    "detail": "0.482 against [0.44, 0.56], n=439"
+   },
+   {
+    "gate": "KD6",
+    "subject": "isolation",
+    "passed": true,
+    "detail": "espn read [2023]; inputs read [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023]; outcomes read [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023]; every isolated table as it was; per-game clause: 4094 club-games, 5306 reads, every row before its instant"
+   }
+  ],
+  "DEF": [
+   {
+    "gate": "KD1",
+    "subject": "pooled vs recent form",
+    "passed": true,
+    "detail": "difference +0.2568 against a margin of +0.0500, over 15 weeks"
+   },
+   {
+    "gate": "KD1",
+    "subject": "lower bound vs recent form",
+    "passed": true,
+    "detail": "lower bound +0.1434 against 0"
+   },
+   {
+    "gate": "KD2",
+    "subject": "pooled vs the streamer's sheet",
+    "passed": false,
+    "detail": "difference -0.0326 against a margin of +0.0200, over 15 weeks"
+   },
+   {
+    "gate": "KD2",
+    "subject": "lower bound vs the streamer's sheet",
+    "passed": false,
+    "detail": "lower bound -0.0814 against 0"
+   },
+   {
+    "gate": "KD3",
+    "subject": "pooled vs ESPN",
+    "passed": true,
+    "detail": "difference +0.0122 against +0.0000 (a point comparison); ESPN publishes no stamp for an archived projection; it is taken as ESPN's last pre-game version, which can only favour ESPN"
+   },
+   {
+    "gate": "KD4",
+    "subject": "starters' points vs the streamer's sheet",
+    "passed": true,
+    "detail": "model 7.594 against 7.589"
+   },
+   {
+    "gate": "KD4",
+    "subject": "starters' points vs ESPN",
+    "passed": false,
+    "detail": "model 7.594 against 7.672"
+   },
+   {
+    "gate": "KD4",
+    "subject": "starters' points vs recent form",
+    "passed": true,
+    "detail": "model 7.594 against 5.711"
+   },
+   {
+    "gate": "KD5",
+    "subject": "below the floor",
+    "passed": true,
+    "detail": "0.096 against [0.06, 0.14], n=448"
+   },
+   {
+    "gate": "KD5",
+    "subject": "above the ceiling",
+    "passed": true,
+    "detail": "0.118 against [0.06, 0.14], n=448"
+   },
+   {
+    "gate": "KD5",
+    "subject": "below the median",
+    "passed": true,
+    "detail": "0.465 against [0.44, 0.56], n=448"
+   },
+   {
+    "gate": "KD6",
+    "subject": "isolation",
+    "passed": true,
+    "detail": "espn read [2023]; inputs read [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023]; outcomes read [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023]; every isolated table as it was; per-game clause: 4094 club-games, 5306 reads, every row before its instant"
+   }
+  ]
+ },
+ "passed": {
+  "K": false,
+  "DEF": false
+ },
+ "decision": {
+  "K": "STOP RULE: K fails KD1 or KD2 pooled on the check; its judged season is not judged",
+  "DEF": "STOP RULE: DEF fails KD1 or KD2 pooled on the check; its judged season is not judged"
+ },
+ "reported": {
+  "positions": {
+   "K": {
+    "rows": 439,
+    "weeks_answered": {
+     "form": 15,
+     "sheet": 15,
+     "espn": 15
+    },
+    "against": {
+     "form": {
+      "value": 0.07214000785906581,
+      "lower_bound": -0.04461260235894076,
+      "weeks": 15
+     },
+     "sheet": {
+      "value": -0.016206143866418964,
+      "lower_bound": -0.11021975791181858,
+      "weeks": 15
+     },
+     "espn": {
+      "value": -0.002235372242662672,
+      "lower_bound": -0.11483074153516244,
+      "weeks": 15
+     }
+    },
+    "pooled_rho": {
+     "model": 0.09550837763367705,
+     "form": 0.023368369774611233,
+     "sheet": 0.11171452150009602,
+     "espn": 0.0977437498763397
+    },
+    "starters_points": {
+     "model": 8.2,
+     "form": 7.605555555555556,
+     "sheet": 8.450000000000001,
+     "espn": 7.894444444444445
+    },
+    "range_shares": {
+     "below_floor": 0.08656036446469248,
+     "above_ceiling": 0.08200455580865604,
+     "below_median": 0.48177676537585423,
+     "size": 439
+    },
+    "per_week_sd_of_the_difference": {
+     "form": 0.23555822277132418,
+     "sheet": 0.1897059718461363,
+     "espn": 0.22489591523145877
+    },
+    "rows_without_espn": 0,
+    "rows_without_form": 0
+   },
+   "DEF": {
+    "rows": 448,
+    "weeks_answered": {
+     "form": 15,
+     "sheet": 15,
+     "espn": 15
+    },
+    "against": {
+     "form": {
+      "value": 0.2568116457644082,
+      "lower_bound": 0.1433649383754786,
+      "weeks": 15
+     },
+     "sheet": {
+      "value": -0.032636958588795825,
+      "lower_bound": -0.08137812772206969,
+      "weeks": 15
+     },
+     "espn": {
+      "value": 0.01223100360094792,
+      "lower_bound": -0.0514508196940893,
+      "weeks": 15
+     }
+    },
+    "pooled_rho": {
+     "model": 0.2963659223346101,
+     "form": 0.0395542765702019,
+     "sheet": 0.329002880923406,
+     "espn": 0.28413491873366215
+    },
+    "starters_points": {
+     "model": 7.594444444444445,
+     "form": 5.711111111111111,
+     "sheet": 7.588888888888889,
+     "espn": 7.672222222222222
+    },
+    "range_shares": {
+     "below_floor": 0.09598214285714286,
+     "above_ceiling": 0.11830357142857142,
+     "below_median": 0.4654017857142857,
+     "size": 448
+    },
+    "per_week_sd_of_the_difference": {
+     "form": 0.22138610925396232,
+     "sheet": 0.09856322957111234,
+     "espn": 0.12627934407056676
+    },
+    "rows_without_espn": 0,
+    "rows_without_form": 0
+   }
+  },
+  "defaults": {
+   "no_prior_unit_defense": 0,
+   "no_prior_unit_offense": 0,
+   "no_kicker_history": 0,
+   "no_passer_history": 0,
+   "no_kicker": 0,
+   "kicker_withheld": 0,
+   "lost_prior_week": 0,
+   "default_no_game_figure": 0,
+   "projected_kicker_without_a_line": 9,
+   "population": {
+    "K": 439,
+    "DEF": 448
+   }
+  },
+  "draw_mean_breaches": {
+   "DEF": 32,
+   "K": 19
+  },
+  "pooled_fully": {
+   "per_game": [],
+   "per_trial": []
+  },
+  "bandwidth": {
+   "chosen": 3.0,
+   "losses": {
+    "1.0": 11359.752651534258,
+    "1.5": 11032.354397547946,
+    "2.0": 10887.719414242894,
+    "3.0": 10807.311970062694
+   }
+  },
+  "calibration": {
+   "rows": 1534,
+   "multipliers": {
+    "sacks": [
+     1.2563668677147075,
+     0.9461917197096325,
+     0.7195028210470912
+    ],
+    "interceptions": [
+     1.425542034256001,
+     0.9619647985283905,
+     0.6176447472906094
+    ],
+    "fumble_recoveries": [
+     1.1434671717726663,
+     0.9155695891448891,
+     0.6454712740073898
+    ],
+    "attempts": [
+     0.909298456709119,
+     1.0296598247469473,
+     1.0517191914530275
+    ],
+    "touchdowns": [
+     0.3877721420337508,
+     0.9678146255559085,
+     1.6307916808532228
+    ]
+   },
+   "sack_dispersion": 19.338570667758308,
+   "yards_rho": 0.5063718867468389
+  },
+  "cells": {
+   "points": {
+    "2020": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2021": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2022": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2023": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)"
+   },
+   "interceptions": {
+    "2020": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2021": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2022": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2023": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)"
+   },
+   "fumble_recoveries": {
+    "2020": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2021": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2022": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2023": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)"
+   },
+   "attempts": {
+    "2020": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2021": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2022": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2023": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)"
+   },
+   "band_0": {
+    "2020": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2021": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2022": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2023": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)"
+   },
+   "band_1": {
+    "2020": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2021": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2022": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2023": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)"
+   },
+   "band_2": {
+    "2020": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2021": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2022": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2023": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)"
+   },
+   "band_3": {
+    "2020": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2021": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2022": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2023": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)"
+   },
+   "band_4": {
+    "2020": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2021": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2022": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2023": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)"
+   },
+   "make": {
+    "2020": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2021": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2022": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2023": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)"
+   },
+   "extra_point": {
+    "2020": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2021": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2022": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)",
+    "2023": "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=None)"
+   }
+  },
+  "validation": {
+   "points": {
+    "model": 2022.044027379019,
+    "the implied points alone": 1982.9285581319737
+   },
+   "attempts": {
+    "model": 474.07800249538076,
+    "the club's season rate": 467.4549464098699
+   },
+   "make": {
+    "model": 344.58917845871474,
+    "distance alone": 346.48044728592765
+   }
+  },
+  "ablations": {
+   "without weather": {
+    "DEF": 0.29815720667949785,
+    "K": 0.06519038030082258
+   },
+   "without the kicker's accuracy": {
+    "DEF": 0.2963659223346101,
+    "K": 0.07652517058540118
+   },
+   "without the team model's sacks": {
+    "DEF": 0.2874290294997914,
+    "K": 0.09550837763367705
+   },
+   "without the joint correlation": {
+    "DEF": 0.29820960458747925,
+    "K": 0.09993326379894532
+   }
+  },
+  "why": {
+   "DEF": {
+    "mean_absolute": {
+     "game": 1.1844172562071738,
+     "matchup": 0.6822057399187444,
+     "weather": 0.217383985450783,
+     "home_rest": 0.1432737170815433
+    },
+    "largest_sum_gap": 8.881784197001252e-16
+   },
+   "K": {
+    "mean_absolute": {
+     "game": 0.4901073147927973,
+     "matchup": 0.5630258059053715,
+     "weather": 0.41653340919462306,
+     "home_rest": 0.03221193437753866
+    },
+    "largest_sum_gap": 4.440892098500626e-16
+   }
+  },
+  "flat_three_kickers": 0.09638327026299441,
+  "espn_under_its_own_scoring": {
+   "K": 0.08694900567444576,
+   "DEF": 0.2846224741262674
+  },
+  "espn": {
+   "rescored": 1051,
+   "totals_taken": 674,
+   "archive_rows_without_a_universe_id": 36,
+   "population_rows_without_espn": {
+    "K": 0,
+    "DEF": 0
+   }
+  },
+  "espn_stamp_caveat": "ESPN publishes no stamp for an archived projection; it is taken as ESPN's last pre-game version, which can only favour ESPN",
+  "published_projection": "the published projection's archive: refused by name, no 2023 or 2024 week of it is stamped at or before t_g",
+  "outcome_seasons_read": {
+   "inputs": [
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023
+   ],
+   "outcomes": [
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023
+   ],
+   "espn": [
+    2023
+   ]
+  }
+ },
+ "seconds": 500.11266304110177,
+ "report": [
+  "PASS  K KD1 pooled vs recent form                difference +0.0721 against a margin of +0.0500, over 15 weeks",
+  "FAIL  K KD1 lower bound vs recent form           lower bound -0.0446 against 0",
+  "FAIL  K KD2 pooled vs the streamer's sheet       difference -0.0162 against a margin of +0.0200, over 15 weeks",
+  "FAIL  K KD2 lower bound vs the streamer's sheet  lower bound -0.1102 against 0",
+  "FAIL  K KD3 pooled vs ESPN                       difference -0.0022 against +0.0000 (a point comparison); ESPN publishes no stamp for an archived projection; it is taken as ESPN's last pre-game version, which can only favour ESPN",
+  "FAIL  K KD4 starters' points vs the streamer's sheet model 8.200 against 8.450",
+  "PASS  K KD4 starters' points vs ESPN             model 8.200 against 7.894",
+  "PASS  K KD4 starters' points vs recent form      model 8.200 against 7.606",
+  "PASS  K KD5 below the floor                      0.087 against [0.06, 0.14], n=439",
+  "PASS  K KD5 above the ceiling                    0.082 against [0.06, 0.14], n=439",
+  "PASS  K KD5 below the median                     0.482 against [0.44, 0.56], n=439",
+  "PASS  K KD6 isolation                            espn read [2023]; inputs read [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023]; outcomes read [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023]; every isolated table as it was; per-game clause: 4094 club-games, 5306 reads, every row before its instant",
+  "PASS  DEF KD1 pooled vs recent form                difference +0.2568 against a margin of +0.0500, over 15 weeks",
+  "PASS  DEF KD1 lower bound vs recent form           lower bound +0.1434 against 0",
+  "FAIL  DEF KD2 pooled vs the streamer's sheet       difference -0.0326 against a margin of +0.0200, over 15 weeks",
+  "FAIL  DEF KD2 lower bound vs the streamer's sheet  lower bound -0.0814 against 0",
+  "PASS  DEF KD3 pooled vs ESPN                       difference +0.0122 against +0.0000 (a point comparison); ESPN publishes no stamp for an archived projection; it is taken as ESPN's last pre-game version, which can only favour ESPN",
+  "PASS  DEF KD4 starters' points vs the streamer's sheet model 7.594 against 7.589",
+  "FAIL  DEF KD4 starters' points vs ESPN             model 7.594 against 7.672",
+  "PASS  DEF KD4 starters' points vs recent form      model 7.594 against 5.711",
+  "PASS  DEF KD5 below the floor                      0.096 against [0.06, 0.14], n=448",
+  "PASS  DEF KD5 above the ceiling                    0.118 against [0.06, 0.14], n=448",
+  "PASS  DEF KD5 below the median                     0.465 against [0.44, 0.56], n=448",
+  "PASS  DEF KD6 isolation                            espn read [2023]; inputs read [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023]; outcomes read [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023]; every isolated table as it was; per-game clause: 4094 club-games, 5306 reads, every row before its instant",
+  "STOP RULE: K fails KD1 or KD2 pooled on the check; its judged season is not judged",
+  "STOP RULE: DEF fails KD1 or KD2 pooled on the check; its judged season is not judged"
+ ]
+}
