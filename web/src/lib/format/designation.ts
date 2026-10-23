@@ -191,8 +191,9 @@ export function calendarDay(day: string, weekday = false): string {
 }
 
 /** "Due back Sun Oct 25": a player due back this week, his pill's word (Lane 153). The API and the capture
- * send a return day on a week's designation only when he is designated to return by the week's last
- * game day: this week's question, ranked as playing. */
+ * send a return day on a week's designation only when he is designated to return by his own club's game
+ * day this week, his club the board's (Lane 153 fix round 1, Lane 160): this week's question, ranked as
+ * playing. */
 export function returningMark(returning: string): string {
 	return `Due back ${calendarDay(returning, true)}`;
 }

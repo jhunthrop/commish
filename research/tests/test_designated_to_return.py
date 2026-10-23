@@ -22,7 +22,7 @@ from research.capsules.week.render import render_week_facts_block, render_week_s
 from research.capsules.week.rules import week_rule_violations
 from research.capsules.week.sheet import Status
 from research.db.engine import make_engine
-from research.db.schema import CAPTURE_SNAPSHOTS, TEAM_WEEK_OBSERVATIONS
+from research.db.schema import CAPTURE_SNAPSHOTS, PROVIDER_PLAYERS, TEAM_WEEK_OBSERVATIONS
 from research.db.url import sqlalchemy_url
 from research.model.designations import (
     NO_RETURN,
@@ -158,13 +158,19 @@ def _player(player_id: str, code: str, day: str, inj_date: str = "", team: str =
     }
 
 
-def _seed(engine: Engine, player_list: list[Json]) -> None:
+def _seed(engine: Engine, player_list: list[Json], clubs: dict[str, str | None] | None = None) -> None:
+    """The hourly list, the daily list and the week's kickoffs; each listed player's board club
+    (`provider_players.team`) is the list's own unless `clubs` names another (None for a free agent);
+    a player `clubs` names is on the hourly list too."""
+    listed = ("mason", "next", "past", "none", "thursday", "bye", *(clubs or {}))
     by_date = {
         "injList": [
             {"playerID": p, "designation": "Injured Reserve - Designated to Return" if p == "mason" else "IR"}
-            for p in ("mason", "next", "past", "none", "thursday", "bye")
+            for p in listed
         ]
     }
+    entries = [p for p in player_list if isinstance(p, dict)] if isinstance(player_list, list) else []
+    board = {str(p["playerID"]): p["team"] for p in entries} | (clubs or {})
     kickoffs = [
         # Week 8: Thursday Oct 22, Sunday Oct 25, Monday Oct 26 (its last game day). Week 9 from Oct 29.
         (8, "MIN", datetime(2026, 10, 25, 17, 0, tzinfo=UTC)),
@@ -176,6 +182,12 @@ def _seed(engine: Engine, player_list: list[Json]) -> None:
     with engine.begin() as conn:
         conn.execute(CAPTURE_SNAPSHOTS.delete())
         conn.execute(TEAM_WEEK_OBSERVATIONS.delete())
+        conn.execute(PROVIDER_PLAYERS.delete())
+        if board:
+            conn.execute(
+                insert(PROVIDER_PLAYERS),
+                [{"id": i, "name": i, "position": "RB", "team": team} for i, team in board.items()],
+            )
         conn.execute(
             insert(CAPTURE_SNAPSHOTS),
             [
@@ -249,3 +261,30 @@ def test_a_player_list_that_does_not_read_leaves_the_statuses_undated(engine: En
         read = read_statuses(conn, now=_NOW)
     assert read is not None
     assert read.players["mason"] == PlayerStatus("injured_reserve", True, None)
+
+
+def test_his_club_is_the_boards_never_the_list_entrys_after_a_trade(engine: Engine) -> None:
+    """Lane 160 (B139): the read takes his club from `provider_players.team`, the club the API's board reads
+    (`clubDayEnd(p.Team)` over `pp.team`), so after a mid-week trade both readers name one game day. The
+    daily list's entry still names his old club here (a refused club refresh, or a trade the list carries
+    before the store does): the board's club decides."""
+    _seed(
+        engine,
+        [
+            # Traded from a club on a bye (DAL) to a Sunday club (MIN): back Sunday is this week's question.
+            _player("traded_in", "IR", "20261025", team="DAL"),
+            # Traded from a Sunday club (MIN) to a club on a bye (DAL): no game this week, still listed.
+            _player("traded_out", "IR", "20261025", team="MIN"),
+            # A free agent on the board has no club, so no game day: listed, his day carried.
+            _player("free", "IR", "20261025", team="MIN"),
+        ],
+        clubs={"traded_in": "MIN", "traded_out": "DAL", "free": None},
+    )
+    with engine.connect() as conn:
+        read = read_statuses(conn, now=_NOW)
+    assert read is not None
+    assert read.players["traded_in"] == PlayerStatus(
+        RETURNING_STATUS, False, None, date(2026, 10, 25), "injured_reserve"
+    )
+    assert read.players["traded_out"] == PlayerStatus("injured_reserve", True, None, date(2026, 10, 25))
+    assert read.players["free"] == PlayerStatus("injured_reserve", True, None, date(2026, 10, 25))
