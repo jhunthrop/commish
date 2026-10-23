@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { links } from '#lib/site/links.ts';
 	import ActionBar from '#lib/ui/ActionBar.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
@@ -48,13 +49,18 @@
 	/** Every slot a league can have, one tap each (the setup page's slot chips). */
 	const SLOTS = Array.from({ length: MAX_TEAMS }, (_, i) => i + 1);
 
-	onMount(() => {
-		replay = page.url.searchParams.get('replay') === '1';
+	/** Signed out the member-only reads are skipped (Lane 166, D19): the shell's session read names it,
+	 * so no request answers 401. */
+	async function start(): Promise<void> {
+		await siteContext.load();
+		if (!siteContext.signedIn) {
+			view = 'signed-out';
+			return;
+		}
 		hostsApi
 			.connections()
 			.then((hosts) => (ffpcOn = ffpcOpen(hosts)))
 			.catch(() => (ffpcOn = false));
-		if (replay) link = REPLAY_WORDS;
 		companions
 			.me()
 			.then(async () => {
@@ -73,6 +79,12 @@
 				view = 'form';
 			})
 			.catch((error: unknown) => (view = isSignedOut(error) ? 'signed-out' : 'unreachable'));
+	}
+
+	onMount(() => {
+		replay = page.url.searchParams.get('replay') === '1';
+		if (replay) link = REPLAY_WORDS;
+		void start();
 	});
 
 	const ready = $derived(link.trim() !== '' && (by === 'slot' || username.trim() !== '') && !busy);

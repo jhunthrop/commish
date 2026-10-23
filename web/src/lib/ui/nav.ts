@@ -77,7 +77,7 @@ export const RANKINGS_NAME = 'Rankings';
 export const HELD_WEEK_LABEL = RANKINGS_NAME;
 
 /** Where a mock draft starts: the room's setup. */
-const MOCK_SETUP = '/mock/new';
+export const MOCK_SETUP = '/mock/new' as const;
 /** The verb to a mock draft, wherever a page offers one: the season's pages and the league's. */
 export const MOCK_VERB = 'Start a mock draft';
 /** The advisor's own page: our call beside your real draft (the live draft companion). */
