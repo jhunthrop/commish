@@ -93,7 +93,7 @@ void test('the same status in a run that began after the read is a change: off t
 	} as const;
 	assert.equal(readAtStatus(read, back, ETIENNE, BUILD).body, null);
 	// Cleared from the list since: no designation where the read says injured reserve.
-	const { [ETIENNE]: _cleared, ...rest } = CAPTURE.players;
+	const rest = Object.fromEntries(Object.entries(CAPTURE.players).filter(([id]) => id !== ETIENNE));
 	assert.equal(readAtStatus(read, { ...CAPTURE, players: rest }, ETIENNE, BUILD).body, null);
 });
 
