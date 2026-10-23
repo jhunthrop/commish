@@ -17,7 +17,7 @@ export const load: LayoutServerLoad = async () => {
 		buildWeekNames()
 	]);
 	return {
-		run: names === null ? run : { ...run, weekRankings: names.rankings, weekRank: names.rank },
+		run: names === null ? run : { ...run, weekRankings: names.rankings },
 		siteRail
 	};
 };

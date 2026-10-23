@@ -79,7 +79,7 @@ void test("the free season's list leads with every league, named from the platfo
 			'Every league you play in',
 			"Your league's exact scoring",
 			'Your lineup, waivers and trades',
-			"The week's rankings",
+			'Rankings',
 			'Our call in your real draft',
 			'The board',
 			'Every player',

@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
-import { HELD_WEEK_LABEL, NFL_REGULAR_WEEKS, RAIL_KEYS, railInSeason } from '#lib/ui/nav.ts';
+import { PAGE_PURPOSE, playersLead } from '#lib/order/words.ts';
+import { HELD_WEEK_LABEL, RAIL_KEYS, railInSeason } from '#lib/ui/nav.ts';
 import { railShown } from '#lib/ui/rail-order.ts';
 import { siteRailAt } from './site-season.ts';
 import { PAGE_NAME_WORDS, playersCrumb, railItemLabel, weekNames } from './week-names.ts';
@@ -24,12 +25,23 @@ const WEEK = 7;
 /** The names at a clock, the way the layout and the front card build them. */
 const namesAt = (now: Date, week: number | undefined) => weekNames(siteRailAt(now, KICKOFFS), week);
 
-void test('in season the page is the week rankings, its rank head the week rank', () => {
-	assert.deepEqual(namesAt(CLOCK.week7, WEEK), {
-		rankings: 'Week 7 rankings',
-		rank: 'Week 7 rank'
-	});
-	assert.equal(playersCrumb('Week 7 rankings'), 'Players / Week 7 rankings');
+void test('in season the page is Rankings, the week in its head and never in its name (Lane 164, D11)', () => {
+	assert.deepEqual(namesAt(CLOCK.week7, WEEK), { rankings: 'Rankings' });
+	assert.equal(playersCrumb('Rankings'), 'Players / Rankings');
+	// The head says whose order it is and where the week sits.
+	assert.equal(
+		PAGE_PURPOSE.rankings(WEEK),
+		"Our rest-of-season order, with week 7's game beside each player"
+	);
+	assert.doesNotMatch(PAGE_NAME_WORDS.rankings, /\d|week/iu);
+});
+
+void test('the three states by the clock: Players before the season, Rankings in it, Players the Tuesday after the last game', () => {
+	const tuesdayAfterLastGame = new Date('2027-01-12T12:00:00.000Z');
+	const nameAt = (now: Date) => namesAt(now, WEEK)?.rankings ?? PAGE_NAME_WORDS.players;
+	assert.equal(nameAt(CLOCK.preseason), 'Players');
+	assert.equal(nameAt(CLOCK.week7), 'Rankings');
+	assert.equal(nameAt(tuesdayAfterLastGame), 'Players');
 });
 
 void test('before and after the season the page stays Players, whatever week the run names', () => {
@@ -57,7 +69,7 @@ void test('every season rail, a league followed or not, draws the week item and 
 	const followed = railShown('in_season', true);
 	const week = followed.find((item) => item.key === 'week');
 	assert.ok(week);
-	assert.equal(railItemLabel(week, WEEK), 'Week 7 rankings');
+	assert.equal(railItemLabel(week, WEEK), 'Rankings');
 	assert.equal(week.icon, 'players');
 	assert.ok(!followed.some((item) => item.key !== 'lineup' && item.icon === 'lineup'));
 });
@@ -75,13 +87,13 @@ void test('a league drafted before week 1 sits on the in-season rail, its week i
 	assert.equal(playersCrumb(undefined), label);
 	// The first kickoff's instant names the week.
 	const kickoff = new Date(KICKOFFS[0] ?? '');
-	assert.equal(namesAt(kickoff, 1)?.rankings, 'Week 1 rankings');
+	assert.equal(namesAt(kickoff, 1)?.rankings, 'Rankings');
 });
 
 void test('the season ends with the last regular-season game, never the NFL postseason (Lane 143, B126)', () => {
 	// The last game day, the evening after its last kickoff on the Eastern clock: week 18 is still ranked.
 	const lastGameEvening = new Date('2027-01-11T03:30:00.000Z');
-	assert.equal(namesAt(lastGameEvening, 18)?.rankings, 'Week 18 rankings');
+	assert.equal(namesAt(lastGameEvening, 18)?.rankings, 'Rankings');
 	// The first instant after the last game day is the NFL's postseason: the page is Players again,
 	// whatever week the run still carries.
 	const postseason = new Date('2027-01-11T05:00:00.000Z');
@@ -95,26 +107,37 @@ void test('the season ends with the last regular-season game, never the NFL post
 	assert.equal(playersCrumb(undefined), PAGE_NAME_WORDS.players);
 });
 
-void test('the held label is the longest in-season form, so its room holds every week (Lane 143 fix round 1)', () => {
-	const forms = Array.from({ length: NFL_REGULAR_WEEKS }, (_, i) =>
-		PAGE_NAME_WORDS.rankings(i + 1)
-	);
-	const longest = Math.max(...forms.map((form) => form.length));
-	assert.equal(HELD_WEEK_LABEL.length, longest);
+void test('the held label is the longer of its two names, so its room holds either (Lane 143 fix round 1)', () => {
+	const forms = [PAGE_NAME_WORDS.players, PAGE_NAME_WORDS.rankings];
+	assert.equal(HELD_WEEK_LABEL.length, Math.max(...forms.map((form) => form.length)));
 	assert.ok(forms.includes(HELD_WEEK_LABEL));
-	// Its words wrap where every form's do: the same word count, the week's number never longer.
-	for (const form of forms)
-		assert.equal(form.split(' ').length, HELD_WEEK_LABEL.split(' ').length, form);
+	// Each is one word, so the label wraps nowhere at any rail width.
+	for (const form of forms) assert.ok(!form.includes(' '), form);
 });
 
 void test('the names are clean copy', () => {
 	for (const words of [
 		PAGE_NAME_WORDS.players,
-		PAGE_NAME_WORDS.rankings(WEEK),
-		PAGE_NAME_WORDS.rank(WEEK),
-		playersCrumb(PAGE_NAME_WORDS.rankings(WEEK))
+		PAGE_NAME_WORDS.rankings,
+		PAGE_PURPOSE.rankings(WEEK),
+		playersCrumb(PAGE_NAME_WORDS.rankings)
 	]) {
 		assert.doesNotMatch(words, bannedPattern(), words);
 		assert.doesNotMatch(words, /—/u, words);
 	}
+});
+
+void test('the head sentence follows the clock state, the chip and the board week the table shows (Lane 164)', () => {
+	const tuesdayAfterLastGame = new Date('2027-01-12T12:00:00.000Z');
+	const inSeasonAt = (now: Date) => namesAt(now, WEEK) !== null;
+	const lead = (now: Date, onWeekChip: boolean, boardWeek: number | null) =>
+		playersLead(inSeasonAt(now), onWeekChip, boardWeek);
+	// In season on our order's chips: the board week the table shows, named once.
+	assert.equal(lead(CLOCK.week7, false, 7), PAGE_PURPOSE.rankings(7));
+	assert.equal(lead(CLOCK.week7, false, 8), PAGE_PURPOSE.rankings(8));
+	// The K and D/ST chips keep their own basis line only.
+	assert.equal(lead(CLOCK.week7, true, 7), undefined);
+	// Before the season and the Tuesday after the last game: the page's purpose, no week named.
+	assert.equal(lead(CLOCK.preseason, false, 7), PAGE_PURPOSE.players);
+	assert.equal(lead(tuesdayAfterLastGame, false, 7), PAGE_PURPOSE.players);
 });

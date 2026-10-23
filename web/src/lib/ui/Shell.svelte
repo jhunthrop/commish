@@ -16,7 +16,7 @@
 		WEEK_RANKINGS_KEY,
 		railHref,
 		sectionOf,
-		weekRankingsWord,
+		RANKINGS_NAME,
 		type RailItem,
 		type Section
 	} from './nav.ts';
@@ -39,7 +39,7 @@
 		 * names it, the selected league marked in its list (B38, Lane 115 B89). Left out, they open and
 		 * name the selected league's. */
 		league?: string;
-		/** The rail's week order named for the run's week, "Week 7 rankings" (Lane 140, C19), built
+		/** The rail's week order named "Rankings" in season (Lane 140, C19; Lane 164), built
 		 * with the page (a prerendered one, server/build-week.ts); absent outside the season and on a
 		 * page the Worker draws in the browser, which names it from the context's week, read before
 		 * its first render (context/first-season.ts, Lane 143, B126). */
@@ -65,7 +65,7 @@
 	// (Lane 142), else Players, the page it opens, while no week is named (fix round 1).
 	const labelOf = (item: RailItem, week = siteContext.season?.board_week): string =>
 		item.key === WEEK_RANKINGS_KEY
-			? (weekLabel ?? (week ? weekRankingsWord(week) : item.label))
+			? (weekLabel ?? (week ? RANKINGS_NAME : item.label))
 			: item.label;
 
 	// The week item's label is held unpainted while a page the Worker draws reads the site's season

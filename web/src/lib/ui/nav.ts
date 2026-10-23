@@ -67,15 +67,14 @@ export const WEEK_RANKINGS_KEY = 'week';
  * answered), the Players item's label and the week item's until a week is known, so the label never
  * promises a page it does not open (Lane 142 fix round 1). The word table's root (run/week-names.ts). */
 export const PLAYERS_NAME = 'Players';
-/** "Week 7 rankings": the page's name in season (run/week-names.ts), and the rail's on a page the
- * Worker draws, from the context's week. */
-export const weekRankingsWord = (week: number): string => `Week ${String(week)} rankings`;
-/** The NFL's regular season in weeks: the latest week a run ranks from. */
-export const NFL_REGULAR_WEEKS = 18;
+/** The page's name in season (run/week-names.ts), and the rail's on a page the Worker draws once the
+ * context names a week. Never "Week 7 rankings": the page orders by our rest-of-season total, and no
+ * week-by-week order of ours exists to name (Lane 164, D11). */
+export const RANKINGS_NAME = 'Rankings';
 /** The week item's label while the season is read (Shell's held, Lane 143 fix round 1), never drawn:
- * the longest in-season form, so its room at any width is the room the named label takes and
- * nothing below moves when it lands (run/week-names.test.ts proves it the longest). */
-export const HELD_WEEK_LABEL = weekRankingsWord(NFL_REGULAR_WEEKS);
+ * the longer of the item's two names, so its room at any width is the room the named label takes and
+ * nothing below moves when it lands (run/week-names.test.ts proves it the longer). */
+export const HELD_WEEK_LABEL = RANKINGS_NAME;
 
 /** Where a mock draft starts: the room's setup. */
 const MOCK_SETUP = '/mock/new';

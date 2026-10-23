@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { BYE_WORDS } from '#lib/format/bye.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
-import { RAIL_ITEMS, WEEK_RANKINGS_KEY, weekRankingsWord } from '#lib/ui/nav.ts';
+import { RAIL_ITEMS, RANKINGS_NAME, WEEK_RANKINGS_KEY } from '#lib/ui/nav.ts';
 import { PAIR_WORDS } from './record-pair.ts';
 import type { BasisPart } from './board-basis.ts';
 import { RECORD_WORDS, publishedWords, recordSources, weekLines } from './record.ts';
@@ -459,7 +459,7 @@ void test('the records say no banned word and no em-dash', () => {
 		),
 		PAIR_WORDS.by('ADP', '4'),
 		BYE_WORDS.done,
-		weekRankingsWord(7),
+		RANKINGS_NAME,
 		RAIL_ITEMS.find((item) => item.key === WEEK_RANKINGS_KEY)?.label ?? '',
 		RECORDS_WORDS.draftSet('Tue Sep 8', 5),
 		RECORDS_WORDS.draftSet('Tue Sep 8', null),

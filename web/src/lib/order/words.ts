@@ -43,6 +43,19 @@ export const WEEK = {
 	byeIn: 'Bye in week'
 } as const;
 
+/** The Players page's sentence under its head (Lane 164): before the season the page's purpose; in
+ * season on our order's chips, whose order it is with the week's game beside each player, the week
+ * the table's own (the board's week the order was read for); on the K and D/ST chips none, their
+ * own basis line says the rest (one basis per screen). Undefined draws no sentence. */
+export function playersLead(
+	inSeason: boolean,
+	onWeekChip: boolean,
+	boardWeek: number | null
+): string | undefined {
+	if (!inSeason) return PAGE_PURPOSE.players;
+	return onWeekChip || boardWeek === null ? undefined : PAGE_PURPOSE.rankings(boardWeek);
+}
+
 /** The byes' section head, "Bye in week 7": the week's box score and the Players page's week
  * rankings say it in one word (Lane 163, D06). */
 export function byeHead(week: number): string {
@@ -55,5 +68,9 @@ export function byeHead(week: number): string {
 export const PAGE_PURPOSE = {
 	players:
 		"Every QB, RB, WR and TE in our order, and this week's kickers and defenses, to look up and to compare.",
+	/** The same page in season, "Rankings" (Lane 164, D11): whose order it is, and that the week's
+	 * game sits beside each player, the week said here and never in the page's name. */
+	rankings: (week: number) =>
+		`Our rest-of-season order, with week ${String(week)}'s game beside each player`,
 	rest: "Our order in your league's view: who holds each player, the free agents, and this week's kickers and defenses."
 } as const;
