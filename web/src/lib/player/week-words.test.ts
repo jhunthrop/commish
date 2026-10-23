@@ -1136,3 +1136,27 @@ void test('the card head and the tier box read one rank, and the box names his w
 	assert.equal(listed.positionRank, null);
 	assert.equal(listed.tier?.ranks?.[PLAYER.id], null);
 });
+
+// Lane 165 (D10): a read that stands never quotes a figure the Proj tile does not show.
+void test('a standing read quoting another figure than the Wk tile shows is named in the tile caption', () => {
+	const moved = week({}, { week_projection: 23.4, facts: facts({ points_this_week: 4.6 }) });
+	const live = liveCard({ ...liveInputOf(moved), read: WEEK_READ, now: KICKED_OFF });
+	assert.ok(tile(live.tiles, 'proj').caption.endsWith('. Proj at the read 21.8'));
+	// The tile showing the quoted figure says nothing more.
+	const same = liveCard({ ...liveInputOf(week()), read: WEEK_READ, now: KICKED_OFF });
+	assert.ok(!tile(same.tiles, 'proj').caption.includes('at the read'));
+	// Before kickoff a move past the shown threshold withholds the read, so the tile does not name it.
+	const ahead = liveCard({ ...liveInputOf(moved), read: WEEK_READ, now: NOW });
+	assert.ok(!tile(ahead.tiles, 'proj').caption.includes('at the read'));
+	// Under the threshold the read shows beside a tile that prints another tenth: the tile names the quote.
+	const under = week({}, { week_projection: 22.2 });
+	const near = liveCard({ ...liveInputOf(under), read: WEEK_READ, now: NOW });
+	assert.ok(tile(near.tiles, 'proj').caption.endsWith('Proj at the read 21.8'));
+	// A read that quoted none leaves the caption alone.
+	const quiet = liveCard({
+		...liveInputOf(moved),
+		read: { ...WEEK_READ, projection: null },
+		now: KICKED_OFF
+	});
+	assert.ok(!tile(quiet.tiles, 'proj').caption.includes('at the read'));
+});

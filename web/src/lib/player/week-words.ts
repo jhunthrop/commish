@@ -69,6 +69,10 @@ const TENTHS = 10;
  * the published projection with its one read stamp, the change with none. */
 export const WEEK_TILE = {
 	published: 'published projection',
+	/** The figure a standing read was written on, beside a tile that now shows another (Lane 165, D10),
+	 * so the read never quotes a number the tile does not show. */
+	atRead: (points: string, scoring: string | null) =>
+		`Proj at the read ${points}${scoring === null ? '' : ` in ${scoring}`}`,
 	sinceEarlier: 'since the earlier read',
 	underShown: `Moved under ${String(SHOWN_CHANGE_FROM)} since the earlier read`,
 	/** With a read written for the week the change is measured from the figure it quotes, the move that
@@ -331,14 +335,32 @@ function publishedWords(readAt: string | null, zone: string): string {
 		: `${WEEK_TILE.published}, read ${stampAt(readAt, zone)}`;
 }
 
-function projTile(week: PlayerWeek, zone: string): CardTile {
+/** The figure the shown read quotes when the tile prints another (Lane 165, D10): a read that stands
+ * (his game kicked off, or the move under the shown threshold) while the published projection has moved
+ * a tenth or more from it. Null when the tile shows the quoted figure, the read quotes none, or the
+ * read is withheld, which says its own words instead. */
+function readFigureWords(week: PlayerWeek, now: number, read: ReadQuote | null): string | null {
 	const value = week.line.week_projection;
+	const quoted = read?.week === week.week ? read.projection : null;
+	if (value === null || quoted === null || quoted === undefined) return null;
+	if (printTenth(quoted) === printTenth(value)) return null;
+	const scoring = week.projection_scoring.format;
+	const withheld = scoring === 'ppr' && toPlay(week.line.facts, now) && moveOf(week, read).crosses;
+	if (withheld) return null;
+	return WEEK_TILE.atRead(printTenth(quoted), scoring === 'ppr' ? null : SCORING_WORDS.ppr);
+}
+
+function projTile(week: PlayerWeek, zone: string, now: number, read: ReadQuote | null): CardTile {
+	const value = week.line.week_projection;
+	const atRead = readFigureWords(week, now, read);
+	const published =
+		value === null ? noProjWords(week) : publishedWords(week.projection_read_at, zone);
 	return {
 		key: 'proj',
 		// Beside the season's Projected, headed by the API's week, never the clock (the ruling).
 		label: weekHead(week.week),
 		value: value === null ? NONE : printTenth(value),
-		caption: value === null ? noProjWords(week) : publishedWords(week.projection_read_at, zone),
+		caption: atRead === null ? published : `${published}. ${atRead}`,
 		tone: 'lead'
 	};
 }
@@ -704,7 +726,7 @@ export function liveCard({
 		return found;
 	};
 	const updated = [
-		projTile(week, zone),
+		projTile(week, zone, now, read),
 		restTile(week, rest, fallback('rest'), player.position),
 		oppTile(week, player.position),
 		avgTile(week, games, fallback('avg')),
