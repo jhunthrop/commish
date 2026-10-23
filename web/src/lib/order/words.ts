@@ -55,5 +55,9 @@ export function byeHead(week: number): string {
 export const PAGE_PURPOSE = {
 	players:
 		"Every QB, RB, WR and TE in our order, and this week's kickers and defenses, to look up and to compare.",
+	/** The same page in season, "Rankings" (Lane 164, D11): whose order it is, and that the week's
+	 * game sits beside each player, the week said here and never in the page's name. */
+	rankings: (week: number) =>
+		`Our rest-of-season order, with week ${String(week)}'s game beside each player`,
 	rest: "Our order in your league's view: who holds each player, the free agents, and this week's kickers and defenses."
 } as const;

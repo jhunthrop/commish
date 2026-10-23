@@ -30,9 +30,6 @@
 	 * too, the roster mark onto his club line. */
 	interface Props {
 		label: string;
-		/** The head over #: our rest-of-season order's, or the Players page's "Week 7 rank" in season,
-		 * the rest of season then said once in the basis (Lane 142). */
-		rankHead?: string;
 		rows: readonly OrderView[];
 		rankBy: OrderAdvice['rank_by'];
 		/** The week the answer's projection is for (the API's), which heads it beside the season's
@@ -52,7 +49,6 @@
 
 	let {
 		label,
-		rankHead = ORDER.rankGroup,
 		rows,
 		rankBy,
 		week,
@@ -96,13 +92,13 @@
 <table class="order" class:marked aria-label={label}>
 	<thead>
 		<tr class="grp">
-			<th colspan={marked ? 3 : 2} scope="colgroup" class="g-order">{rankHead}</th>
+			<th colspan={marked ? 3 : 2} scope="colgroup" class="g-order">{ORDER.rankGroup}</th>
 			<th colspan="2"></th>
 			<th colspan={figures.length} scope="colgroup" class="g-rest">{ORDER.restGroup}</th>
 			<th colspan={marked || end ? 4 : 3} class="g-tail"></th>
 		</tr>
 		<tr class="cols">
-			<th class="n rank" scope="col" aria-label="{ORDER.rank}, {rankHead.toLowerCase()}"
+			<th class="n rank" scope="col" aria-label="{ORDER.rank}, {ORDER.rankGroup.toLowerCase()}"
 				>{ORDER.rank}</th
 			>
 			<th scope="col">{BOX.player}</th>

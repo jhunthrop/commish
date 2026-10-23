@@ -13,8 +13,8 @@
 // `published` (Lane 142) shoots the front card once the week's published projection is graded beside
 // ESPN: both yardsticks, the leader named per pair. `upcoming` also shoots the week's rankings page
 // and its rail at 1280 and 390, signed out and with the ESPN stand-in, on a run page and on a league
-// page the Worker draws: one name, "Week 7 rankings", on the rail, the bar's crumb after Players, the
-// page's head and its rank column. Lane 143 (B126): the week item is drawn with that one name from the
+// page the Worker draws: one name, "Rankings", on the rail, the bar's crumb after Players, the
+// page's head, its rank column keeping our rest-of-season order (Lane 164). Lane 143 (B126): the week item is drawn with that one name from the
 // first paint, never another first, on the run's page, the account page (its shell prerendered) and the
 // league page the Worker draws; and the week's projection column beside it heads the same week, "Wk 7"
 // (the fixture's order re-dated to the board's week, inseason-fixture/serve.ts orderWeek).
@@ -295,12 +295,12 @@ async function front(width: number): Promise<void> {
 			has(card, 'ours by 0.05', where);
 		} else lacks(card, /Published/u, where);
 	}
-	has(card, 'Week 7 rankings', where);
+	has(card, 'Rankings', where);
 	// The link lands on a page headed as the link promised (fix round 1, MEDIUM-3).
 	const target = await open('signed-out', width, '/players');
 	has(
 		(await target.locator('main h1, main h2').first().textContent()) ?? '',
-		'Week 7 rankings',
+		'Rankings',
 		`${where} players`
 	);
 	await target.context().close();
@@ -332,19 +332,19 @@ async function railLabels(page: Page): Promise<string[]> {
 	);
 }
 
-/** The rail's week item is "Week 7 rankings" as drawn, and shown wherever its rail shows it: every
+/** The rail's week item is "Rankings" as drawn, and shown wherever its rail shows it: every
  * desk, and the phone's five without a league (a followed league's five are its own pages). No
  * shown item says Players in season. */
 async function weekItemFaults(page: Page, who: Who, width: number, where: string): Promise<void> {
 	const drawn = await page.evaluate(
 		() => document.querySelector('nav.rail .item[data-k="week"] span')?.textContent.trim() ?? ''
 	);
-	if (drawn !== 'Week 7 rankings') faults.push(`${where}: the week item reads "${drawn}"`);
+	if (drawn !== 'Rankings') faults.push(`${where}: the week item reads "${drawn}"`);
 	// One name from the first paint: never Players first and renamed once the season answers.
 	const history = await page.evaluate(
 		() => (window as unknown as { weekItemDrawn: string[] }).weekItemDrawn
 	);
-	if (history.join() !== 'Week 7 rankings')
+	if (history.join() !== 'Rankings')
 		faults.push(`${where}: the week item was drawn as ${history.join(', then ')}`);
 	// Nothing below it moves when the label lands: every held height is the named label's.
 	const heights = await page.evaluate(
@@ -364,7 +364,7 @@ async function weekItemFaults(page: Page, who: Who, width: number, where: string
 		);
 	const labels = await railLabels(page);
 	const shown = width > PHONE_MAX || who === 'signed-out';
-	if (shown && !labels.includes('Week 7 rankings'))
+	if (shown && !labels.includes('Rankings'))
 		faults.push(`${where}: the rail shows ${labels.join(', ')}`);
 	if (labels.includes('Players')) faults.push(`${where}: the rail still says Players`);
 }
@@ -381,20 +381,12 @@ async function rail(who: Who, width: number): Promise<void> {
 		.waitFor({ state: 'attached', timeout: READY_TIMEOUT_MS })
 		.catch(() => faults.push(`${where}: the order table never drew`));
 	await weekItemFaults(page, who, width, where);
-	has(
-		(await page.locator('main h1, main h2').first().textContent()) ?? '',
-		'Week 7 rankings',
-		where
-	);
-	has((await head.textContent()) ?? '', 'Week 7 rank', where);
+	has((await page.locator('main h1, main h2').first().textContent()) ?? '', 'Rankings', where);
+	has((await head.textContent()) ?? '', 'Our rest-of-season order', where);
 	// The week's projection column is the same week's (Lane 143, B126: the fixture re-dated to week 7).
 	has((await page.locator('table.order th.proj').textContent()) ?? '', 'Wk 7', where);
 	if (width > PHONE_MAX)
-		has(
-			(await page.locator('header.top h1').textContent()) ?? '',
-			'Players / Week 7 rankings',
-			where
-		);
+		has((await page.locator('header.top h1').textContent()) ?? '', 'Players / Rankings', where);
 	await page.screenshot({
 		path: new URL(`rail-players-${who}-${String(width)}.png`, out).pathname
 	});

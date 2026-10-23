@@ -50,21 +50,11 @@
 		/** The selected league on Rest of season: its id and platform; null without one. */
 		league?: { id: string; host: LeagueHost } | null;
 		label: string;
-		/** The rank's head over #: the Players page's "Week 7 rank" in season (Lane 142), else our
-		 * rest-of-season order's. */
-		rankHead?: string;
 		/** The scoring the Players page's kickers and defenses are named in ("PPR", Lane 155). */
 		boardScoring?: string;
 	}
 
-	let {
-		mode,
-		position: opened = null,
-		league = null,
-		label,
-		rankHead,
-		boardScoring = ''
-	}: Props = $props();
+	let { mode, position: opened = null, league = null, label, boardScoring = '' }: Props = $props();
 
 	/** The rows one read asks for, and how many more Show more adds, up to the API's limit. */
 	const PAGE_ROWS = 100;
@@ -315,7 +305,6 @@
 			<div class:dim={reading}>
 				<OrderTable
 					{label}
-					{rankHead}
 					rows={views}
 					rankBy={advice.rank_by}
 					week={advice.week}

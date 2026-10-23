@@ -20,8 +20,8 @@
 	/** The Players screen (Lane 66j): the search first and our order as a box score, read from the
 	 * API with the page's script; the run's lists by position stay the page without one. */
 	let Order = $state<typeof OrderScreenComponent | null>(null);
-	/** In season the page is the week's rankings on every surface that points to it, Players the
-	 * crumb's root (Lane 142, ruling 1); before the season, Players. */
+	/** In season the page is "Rankings" on every surface that points to it, Players the crumb's root
+	 * (Lane 142, ruling 1; Lane 164); before the season, Players. */
 	const name = $derived(data.run.weekRankings ?? PAGE_NAME_WORDS.players);
 
 	// The league's rosters mark who is held on the lists.
@@ -40,7 +40,9 @@
 			title={name}
 			lead={Order === null
 				? `Every player on our ${data.format.label} board · by position · our rank overall at the right`
-				: PAGE_PURPOSE.players}
+				: data.run.week !== undefined && data.run.weekRankings !== undefined
+					? PAGE_PURPOSE.rankings(data.run.week)
+					: PAGE_PURPOSE.players}
 		>
 			{#snippet actions()}
 				<Quiet href={links.clubs()} size="sm">Clubs</Quiet>
@@ -50,7 +52,6 @@
 			<Order
 				mode="players"
 				label="Players in our rest-of-season order"
-				rankHead={data.run.weekRank}
 				boardScoring={data.format.label}
 			/>
 		{:else}

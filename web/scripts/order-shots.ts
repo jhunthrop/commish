@@ -4,7 +4,7 @@
 // board in season, signed in with the recorded Sleeper league selected; Players is signed out; Our
 // record reads the run the site was built from. At 1440, 1024, 800, 768 and 390 it asserts the page
 // never scrolls sideways, and that every screen's basis draws at most five rendered lines at 1440 and
-// eight at 390 (measured as line boxes, basis-lines.ts; Lane 66q, 66t). It also asserts the heads ("Our rest-of-season order" over # on Rest of season, "Week 7 rank" on Players, Rest of season
+// eight at 390 (measured as line boxes, basis-lines.ts; Lane 66q, 66t). It also asserts the heads ("Our rest-of-season order" over # on Rest of season, Rest of season
 // over Projected and A game, the week projection headed "Wk 6"), that every figure cell prints one decimal or --, that Trade for him sits on
 // fewer than a third of the rows, that the copy passes the one guard ("host" among its words, the
 // names the API and the run handed it skipped, copy-scan.ts), the record's Order matched head with the
@@ -98,9 +98,9 @@ const SCREENS = [
 		signedIn: false,
 		ready: 'Find a player',
 		table: 'table.order',
-		// In season Players is the week's rankings, its rank head the week's (Lane 142): the contract
+		// In season Players is Rankings, its rank head our rest-of-season order (Lane 164): the contract
 		// run ranks from week 7.
-		group: 'Week 7 rank'
+		group: 'Our rest-of-season order'
 	},
 	{
 		name: 'record',
