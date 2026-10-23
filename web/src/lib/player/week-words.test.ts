@@ -7,13 +7,13 @@ import type { WeekFacts } from '../league/inseason/api.ts';
 import {
 	CARD,
 	NONE,
-	printTenth,
 	publishedOn,
 	unreadBasis,
 	compareLeadsWithoutVerb,
 	type BasisTile,
 	type CardTile
 } from './card.ts';
+import { printTenth } from '#lib/league/box/box.ts';
 import { BASIS_WORDS, vsAvgCaption, vsAvgReason } from './basis-words.ts';
 import type { WeekRead } from '../run/schema.ts';
 import { noReadWords, shownWeekRead } from './week-read.ts';
