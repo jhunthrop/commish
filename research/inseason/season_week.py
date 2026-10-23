@@ -1,9 +1,14 @@
 """THE REGISTER'S WEEKLY PASS (`season-week`), ported from `research-ts/src/projections/season-week/steps.ts`.
 
-Fifteen steps, each isolated: a step that raises is reported as failed and the pass carries on to the
+Sixteen steps, each isolated: a step that raises is reported as failed and the pass carries on to the
 next, because a dead odds key must never stop the freeze that runs after it. The exit status is
 non-zero when any step failed.
 
+0. **player-list**: on the week's final pass (the Thursday 14:00 Eastern pass, `is_final_pass`), the
+   provider's player list read again before the freeze (Lane 160, B138): the daily list's same feed and
+   tables (`pipeline/tank01/capture.read_player_list`), one request, so a return date the provider moved
+   since 06:00 reaches the API's `returnDates` within the hour. Any other pass skips it by name; a failed
+   read fails this step alone, never the freeze. Needs TANK01_API_KEY.
 1. **stats-ingest**: the nflverse universe and the season's published weekly stats (idempotent).
 1a. **play-by-play**, **ftn-charting**, **next-gen-stats**, **pfr-advstats**: the season's
    play-by-play and the three charted feeds (`usage_steps`), each skipped until nflverse publishes it.
@@ -59,6 +64,7 @@ from research.model.reads.teams import kickoff_instants_by_week
 from research.model.register.espn_fill import fill_empty_espn_yardstick
 from research.model.register.freeze import SERVED_SOURCE, SHIPPED_SOURCE, take_freeze
 from research.model.register.grade import grade_week, latest_freeze_for
+from research.pipeline.budget import FixedBudget
 from research.pipeline.espn import projections as espn_projections
 from research.pipeline.http import Fetcher
 from research.pipeline.nflverse import ingest, season_stats
@@ -68,6 +74,8 @@ from research.pipeline.nflverse.games import ingest_games
 from research.pipeline.nflverse.kdef_lines import refresh_kdef_season
 from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource
 from research.pipeline.odds.ingest import run_odds_snapshot
+from research.pipeline.tank01.capture import PLAYER_LIST_REQUESTS, read_player_list
+from research.pipeline.tank01.client import API_KEY_ENV, Tank01Client
 
 LOG: Final = logging.getLogger(__name__)
 GRADE_AFTER: Final = timedelta(hours=36)
@@ -86,7 +94,9 @@ GAME_TABLE: Final = "game-table"
 KICKING_DEFENSE: Final = "kicking-defense"
 ESPN_PROJECTIONS: Final = "espn-projections"
 ESPN_FILL: Final = "espn-fill"
+PLAYER_LIST: Final = "player-list"
 STEPS: Final = (
+    PLAYER_LIST,
     "stats-ingest",
     *usage_steps.USAGE_STEPS,
     OPPONENT_RATINGS,
@@ -123,6 +133,24 @@ def _safely(name: str, body: Callable[[], StepResult], context: SeasonWeekContex
     except Exception as error:
         LOG.exception("season-week step %s failed", name)
         return StepResult(name, "failed", str(error))
+
+
+def player_list(context: SeasonWeekContext) -> StepResult:
+    """The player list read again on the week's final pass, before the freeze (Lane 160): its outcome as
+    the harvest's line names it, a failure failing this step alone."""
+    with context.engine.connect() as conn:
+        candidate = week_to_freeze(kickoff_instants_by_week(conn, context.season), context.now)
+    if candidate is None or not is_final_pass(candidate[1], context.now):
+        return StepResult(PLAYER_LIST, "skipped", "not the week's final pass; the harvest's daily read stands")
+    key = context.environ.get(API_KEY_ENV, "").strip()
+    if not key:
+        raise ConfigurationError(f"{API_KEY_ENV} is not set.")
+    client = Tank01Client(context.fetcher, key)
+    with context.engine.begin() as conn:
+        outcome = read_player_list(conn, client, context.now, context.season, FixedBudget(PLAYER_LIST_REQUESTS))
+    words = ", ".join(w for w in (outcome.reason, outcome.note) if w)
+    summary = f"week {candidate[0]}: {outcome.status}, {outcome.requests} requests" + (f", {words}" if words else "")
+    return StepResult(PLAYER_LIST, "failed" if outcome.status == "failed" else "ok", summary)
 
 
 def stats_ingest(context: SeasonWeekContext) -> StepResult:
@@ -381,6 +409,7 @@ def _usage_body(name: str, context: SeasonWeekContext) -> Callable[[], StepResul
 
 def _bodies(context: SeasonWeekContext) -> dict[str, Callable[[], StepResult]]:
     return {
+        PLAYER_LIST: lambda: player_list(context),
         "stats-ingest": lambda: stats_ingest(context),
         **{name: _usage_body(name, context) for name in usage_steps.USAGE_STEPS},
         OPPONENT_RATINGS: lambda: opponent_ratings(context),

@@ -105,7 +105,8 @@ def screen_player_list(_context: CaptureContext, answer: object) -> tuple[Status
 
 # THE RETURN DATES (Lane 110, B79). The player list is the one feed that carries each listed player's
 # expected return (`injury.injReturnDate`, YYYYMMDD), one request for every player; the hourly injury
-# list carries none. The harvest reads it once a day (`return_dates_due`); the API reads the date beside
+# list carries none. The harvest reads it once a day, and again on a game day's morning (`return_dates_due`,
+# Lane 160); the Thursday pass reads it before the freeze (`read_player_list`); the API reads the date beside
 # each designation (`api/internal/boards/designations.go`). The same read refreshes each listed player's
 # club on `provider_players` (Lane 122, `player_clubs`).
 PLAYER_LIST_SOURCE: Final = "tank01_player_list"
@@ -400,6 +401,11 @@ def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: dateti
 
 # The player list's day opens at 06:00 Eastern, the harvest's first pass of the day.
 RETURN_DATES_FROM: Final = time(6)
+# On a day with a game of the current week the list is read again from 09:00 Eastern (Lane 160, B138): a
+# return date the provider moved overnight reaches the API before the day's first kickoff (13:00 Sunday).
+GAME_DAY_RETURN_DATES_FROM: Final = time(9)
+# The player list is one request (`PLAYER_LIST_FEED`): the budget of a read outside the harvest's pass.
+PLAYER_LIST_REQUESTS: Final = 1
 
 _LIST_CHECKED: Final = text(f"select checked_at from {CAPTURE_CHECKS.fullname} where source = :source")
 
@@ -417,13 +423,23 @@ def latest_player_list(conn: Connection) -> ListRead | None:
     return None if row is None else ListRead(row.captured_at, row.payload)
 
 
-def return_dates_due(conn: Connection, now: datetime) -> bool:
-    """The player list is due once an Eastern day: from 06:00 until a pass reads it (captured or
-    unchanged, `capture_checks`). A failed read records no check, so the next pass asks again; an
-    operator's full capture after 06:00 is the day's read too."""
+def return_dates_opening(now: datetime, game_dates: Sequence[str]) -> datetime | None:
+    """The latest opening of the player list's read at or before `now`: 06:00 Eastern each day and, on a
+    day `game_dates` holds (YYYYMMDD, Eastern), 09:00 too; None before the day's first."""
     east = now.astimezone(_EASTERN)
-    opens = datetime.combine(east.date(), RETURN_DATES_FROM, _EASTERN)
-    if east < opens:
+    game_day = east.strftime("%Y%m%d") in game_dates
+    hours = (RETURN_DATES_FROM, *((GAME_DAY_RETURN_DATES_FROM,) if game_day else ()))
+    opened = [o for o in (datetime.combine(east.date(), h, _EASTERN) for h in hours) if o <= east]
+    return max(opened, default=None)
+
+
+def return_dates_due(conn: Connection, now: datetime, season: int) -> bool:
+    """The player list is due once an Eastern day from 06:00, and again from 09:00 on a game day of the
+    current week (Lane 160), until a pass reads it (captured or unchanged, `capture_checks`). A failed read
+    records no check, so the next pass asks again; an operator's full capture after an opening is that
+    opening's read too."""
+    opens = return_dates_opening(now, stored_week_game_dates(conn, season, now))
+    if opens is None:
         return False
     checked = conn.execute(_LIST_CHECKED, {"source": PLAYER_LIST_SOURCE}).scalar_one_or_none()
     return checked is None or checked < opens
@@ -432,14 +448,23 @@ def return_dates_due(conn: Connection, now: datetime) -> bool:
 def capture_return_dates(
     conn: Connection, client: Tank01Client, now: datetime, season: int, budget: FixedBudget
 ) -> FeedOutcome | None:
-    """The day's read of the player list (B79), last in the harvest's pass, on what the capture and the
-    game status left of the pass's ten requests, so it never costs a game its final; None when the day's
-    read is taken or not yet due. A pass with nothing left names it left for a later pass (the next hour
-    asks again), never a failure; a provider failure or a list with no players is a failure, stored
-    nowhere, and asked again the next hour."""
-    if not return_dates_due(conn, now):
+    """The day's read of the player list (B79), and a game day's morning read (Lane 160), last in the
+    harvest's pass, on what the capture and the game status left of the pass's ten requests, so it never
+    costs a game its final; None when the read is taken or not yet due. A pass with nothing left names it
+    left for a later pass (the next hour asks again), never a failure; a provider failure or a list with no
+    players is a failure, stored nowhere, and asked again the next hour."""
+    if not return_dates_due(conn, now, season):
         return None
-    if budget.limit < 1:
+    return read_player_list(conn, client, now, season, budget)
+
+
+def read_player_list(
+    conn: Connection, client: Tank01Client, now: datetime, season: int, budget: FixedBudget
+) -> FeedOutcome:
+    """One read of the player list, due or not: the harvest's (`capture_return_dates`) and the Thursday
+    pass's before its freeze (Lane 160, `inseason/season_week.player_list`). The same feed, screen and club
+    refresh, so it is stored, checked and counted as the daily read is."""
+    if budget.limit < PLAYER_LIST_REQUESTS:
         return FeedOutcome(PLAYER_LIST_SOURCE, "budget-refused", 0, "left for a later pass, this pass's requests spent")
     capture = CapturePass(now, season, current_nfl_week(conn, season), feeds=(PLAYER_LIST_FEED,))
     (outcome,) = capture_once(conn, client, capture, budget).feeds
