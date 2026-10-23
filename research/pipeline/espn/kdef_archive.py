@@ -54,6 +54,9 @@ POSITION_OF_ESPN: Final[Mapping[int, str]] = MappingProxyType({5: "K", 16: "DEF"
 # ESPN stat id -> the component the judged scoring reads (checked 2026-10-22 on 2024 week 8: a kicker's
 # made, attempted and missed field goals sum over the distance ids, and a D/ST's points-allowed and
 # yards-allowed band probabilities each sum to one; ESPN's total re-scores from them to a hundredth).
+# 74 and 76 (50 plus, made and missed) are the sums of 198 and 201 (50-59 and 60 plus, made) and of 200
+# and 203 (missed): a grader reads one or the other, never adds the figure to its parts (B132;
+# `model.weekly_kdef.scoring.espn_made_50_plus`).
 KICKER_STATS: Final[Mapping[str, str]] = MappingProxyType(
     {
         "80": "fg_made_0_39",

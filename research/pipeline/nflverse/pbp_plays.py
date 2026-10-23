@@ -32,7 +32,21 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Final
 
-from sqlalchemy import Boolean, Column, ColumnElement, Connection, Date, Double, Integer, Text, and_, func, or_
+from sqlalchemy import (
+    Boolean,
+    Column,
+    ColumnElement,
+    Connection,
+    Date,
+    Double,
+    Integer,
+    Text,
+    and_,
+    func,
+    or_,
+    select,
+    tuple_,
+)
 from sqlalchemy.dialects.postgresql import Insert, insert
 
 from research.db.schema import NFLVERSE_PBP_PLAYS
@@ -188,6 +202,32 @@ def record_plays(conn: Connection, rows: list[dict[str, object]]) -> int:
     return written
 
 
+_KEYS_PER_STATEMENT: Final = 1_000
+
+
+def kick_corrections(conn: Connection, rows: list[dict[str, object]]) -> int:
+    """The kick values the NULL-only fill drops (B132 L2): a stored play's non-NULL kick column that the
+    file now states differently, counted value by value, so a restatement by nflverse shows in the summary
+    instead of vanishing. The stored value is kept; this only counts."""
+    table = NFLVERSE_PBP_PLAYS
+    by_key = {(str(r["game_id"]), int(str(r["play_id"]))): r for r in rows}
+    keys = list(by_key)
+    dropped = 0
+    for start in range(0, len(keys), _KEYS_PER_STATEMENT):
+        chunk = keys[start : start + _KEYS_PER_STATEMENT]
+        stored = conn.execute(
+            select(table.c.game_id, table.c.play_id, *(table.c[c] for c in KICK_COLUMNS)).where(
+                tuple_(table.c.game_id, table.c.play_id).in_(chunk)
+            )
+        ).mappings()
+        for found in stored:
+            given = by_key[(str(found["game_id"]), int(found["play_id"]))]
+            dropped += sum(
+                1 for c in KICK_COLUMNS if found[c] is not None and given.get(c) is not None and found[c] != given[c]
+            )
+    return dropped
+
+
 @dataclass(frozen=True, slots=True)
 class PlaysReport:
     season: int
@@ -195,11 +235,13 @@ class PlaysReport:
     plays: int
     games: int
     written: int
+    corrections_dropped: int = 0
 
     def summary(self) -> str:
         return (
             f"play table {self.season}: {self.written} plays written (new, or their kick columns filled) of {self.plays} regular-season plays in "
-            f"{self.games} games ({self.rows_read} file rows read)"
+            f"{self.games} games ({self.rows_read} file rows read); {self.corrections_dropped} stored kick values the file now "
+            "states differently, kept as first stated"
         )
 
 
@@ -211,6 +253,7 @@ def ingest_pbp_plays(conn: Connection, client: NflverseClient, season: int) -> P
     wrong = {r["season"] for r in plays.rows} - {season}
     if wrong:
         raise SchemaDriftError(f"play_by_play_{season} holds plays of season {sorted(map(str, wrong))}; refused.")
+    corrections = kick_corrections(conn, plays.rows)
     written = record_plays(conn, plays.rows)
     games = len({r["game_id"] for r in plays.rows})
-    return PlaysReport(season, plays.read, len(plays.rows), games, written)
+    return PlaysReport(season, plays.read, len(plays.rows), games, written, corrections)

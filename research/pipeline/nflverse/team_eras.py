@@ -42,6 +42,14 @@ def season_code(season: int, code: str) -> str:
     return code
 
 
+def current_code(code: str) -> str:
+    """A relocated club's historical abbreviation as its current one (OAK -> LV); any other code as it is."""
+    for current, historical, _ in _RELOCATIONS:
+        if code == historical:
+            return current
+    return code
+
+
 def final_week_of(season: int) -> int:
     """18 from 2021, 17 before."""
     return 18 if season >= _SEVENTEEN_GAME_SEASON else 17
