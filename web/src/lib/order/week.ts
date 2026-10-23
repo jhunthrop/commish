@@ -22,7 +22,7 @@ import { finalsPartAt, uncountedPart } from '#lib/league/box/basis.ts';
 import { lineState } from '#lib/league/box/kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { WeekOrderAdvice, WeekOrderRow } from './api.ts';
-import { rosterBasis, rosterWords, type RosterView } from './order.ts';
+import { gameCell, rosterBasis, rosterWords, type RosterView } from './order.ts';
 import { MIN_SEARCH } from './path.ts';
 import { WEEK, byeHead } from './words.ts';
 import { WEEK_MANY, type WeekPosition } from './week-head.ts';
@@ -44,6 +44,16 @@ export const WEEK_TAB = {
 	byeIn: WEEK.byeIn,
 	/** The add column's head, as a screen reader hears it. */
 	add: 'Add'
+} as const;
+
+/** The scoring Avg and Last are in for a defense (Lane 165, D16): PPR has no meaning for a defense, so
+ * the basis names the scoring in force, the member's when a league is followed. */
+/** A member's own scoring, one phrasing for kickers and defenses. */
+const YOUR_SCORING = 'in your scoring';
+
+export const DEFENSE_SCORING = {
+	league: YOUR_SCORING,
+	standard: 'on standard defense scoring'
 } as const;
 
 /** A row as the week's table draws it. */
@@ -74,7 +84,7 @@ export function weekView(row: WeekOrderRow, zone: string, now: number): WeekView
 		key,
 		position: player.position,
 		hostId: player.host_id,
-		box: { ...box, key, name },
+		box: { ...box, key, name, ...gameCell(box, row.line, zone, now) },
 		named: player.name,
 		// The section by the one game-state rule at the page's clock (kickoff.ts lineState), so a read
 		// that lags a kickoff sits under Kicked off with its Game cell (Lane 85 fix round 2, H-A).
@@ -188,7 +198,7 @@ function orderSentence(advice: WeekOrderAdvice, reader: WeekReader, zone: string
 	const whose = scoring.league_own ? ", this league's own" : ", the closest to this league's rules";
 	const how =
 		advice.position === 'DEF'
-			? 'on its default defense scoring'
+			? DEFENSE_SCORING.standard
 			: reader.league === null
 				? `in ${reader.boardScoring} scoring`
 				: `in ${FORMAT_WORDS[scoring.format]} scoring${whose}`;
@@ -234,6 +244,13 @@ function gameSentence(advice: WeekOrderAdvice, zone: string, now: number): strin
 	return `${BOX.game} is each club's expected points, ${clubFirst}, and the kickoff weather, read ${weekdayTime(read, zone)} ${zoneWord(zone)}.`;
 }
 
+/** The scoring Avg and Last are in, as the basis says it. */
+function avgLastScoring(position: WeekPosition, reader: WeekReader): string {
+	if (position === 'DEF')
+		return reader.league === null ? DEFENSE_SCORING.standard : DEFENSE_SCORING.league;
+	return reader.league === null ? `in ${reader.boardScoring}` : YOUR_SCORING;
+}
+
 /** The tab's basis, every figure named once, within five rendered lines at a desk and eight on a
  * phone: the order with the model we lack, Opp rank, Avg and Last in the scoring the rows are in, the
  * Game cell's read and, in a league, whose the rosters are (at a desk only, as the order says it: the
@@ -246,7 +263,7 @@ export function weekBasis(
 ): BasisPart[] {
 	const { many, whose } = WEEK_NOUNS[advice.position];
 	const { league } = reader;
-	const scoring = league !== null ? "in this league's scoring" : `in ${reader.boardScoring}`;
+	const scoring = avgLastScoring(advice.position, reader);
 	const said: (BasisPart | null)[] = [
 		part(orderSentence(advice, reader, zone), true),
 		part(`${BOX.oppRank} is points allowed to ${many} this season, 1st the fewest.`, true),

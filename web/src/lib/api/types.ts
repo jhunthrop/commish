@@ -3624,6 +3624,8 @@ export interface components {
 			moves: components['schemas']['WaiverMoves'] | null;
 			/** @description every player the view holds before the limit */
 			total: number;
+			/** @description the players of total on a club's roster today (Lane 165, D12): the daily list's club, so a free agent or a retired player, who has none, is not counted; absent from an older answer */
+			on_club?: number;
 			/** @description in our order, at most the limit */
 			rows: components['schemas']['OrderRow'][];
 		};

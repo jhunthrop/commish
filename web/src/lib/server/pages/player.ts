@@ -40,7 +40,14 @@ import {
 	type SeasonView
 } from './player-season.ts';
 import type { PlayerSeason, PriorSeason } from '#lib/run/season.ts';
-import { basisTiles, cardBuild, restParts, restTile, type CardBuild } from './player-card.ts';
+import {
+	basisTiles,
+	cardBuild,
+	gamesLeftOf,
+	restParts,
+	restTile,
+	type CardBuild
+} from './player-card.ts';
 import { unwrittenByFormat } from './player-unwritten.ts';
 import { readAtStatus } from '#lib/player/status-held.ts';
 import type { BasisTile, CardTile, RestParts } from '#lib/player/card.ts';
@@ -367,14 +374,15 @@ async function seasonOf(
 
 export async function playerPage(slug: string, now: number): Promise<PlayerPage> {
 	const entry = await entryBySlug(slug);
-	const [read, run, sources, underway, capture, clubList, lastKickoffs] = await Promise.all([
+	const [read, run, sources, underway, capture, clubList, lastKickoffs, slate] = await Promise.all([
 		playerRead(entry.id),
 		manifest(),
 		adp(),
 		seasonUnderway(),
 		designations(),
 		clubs(),
-		lastKickoffsOf()
+		lastKickoffsOf(),
+		schedule()
 	]);
 	const loaded = sourceOf(read);
 	const listed = capture?.players[entry.id];
@@ -390,7 +398,12 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		(format, numbers) => ({
 			tile: restTile(format, numbers, loaded.position, run.season, listed),
 			parts: restParts(format, numbers, loaded.position, listed),
-			basis: basisTiles(format, numbers, loaded.season?.games ?? 0)
+			basis: basisTiles(
+				format,
+				numbers,
+				loaded.season?.games ?? 0,
+				gamesLeftOf(slate.slates, loaded.team)
+			)
 		})
 	);
 	const [lead] = lines;

@@ -27,6 +27,10 @@ export interface BasisTile {
 	/** vs Avg's reason from the order's stored basis, said once its two figures are (Lane 100 fix round
 	 * 1, M4): never beside "--". Null without the stored pace, and on the other tiles. */
 	reason: string | null;
+	/** The run holds games he may miss above zero (Lane 165, D17): only then does the caption end on
+	 * the rate a game after them. False on the pace tile and for a player expected to play every game
+	 * his club has left. */
+	mayMiss: boolean;
 }
 
 export interface CardTile {

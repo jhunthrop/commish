@@ -17,7 +17,7 @@ import { sectionHref } from '#lib/ui/nav.ts';
 import { boardSeason } from '../board-season.ts';
 import { buildSiteRail } from '../site-rail.ts';
 import { boardStatuses, type BoardStatuses } from '../statuses.ts';
-import { unplayedWeeks } from './record.ts';
+import { weekStatesOf } from './record.ts';
 import { adp, board, clubByes, defaultFormat, designations, manifest, record } from '../run.ts';
 
 import { STRIP_POOL, STRIP_ROWS } from '#lib/front/live-board.ts';
@@ -113,7 +113,7 @@ export async function frontPage(now: number): Promise<FrontPage> {
 		boardSize: loaded.rows.length,
 		boardCount: poolCount(loaded.rows.length, 'board'),
 		record: {
-			...recordHeadline(kept, await unplayedWeeks(kept)),
+			...recordHeadline(kept, (await weekStatesOf(kept, now)).unplayed),
 			season: kept.season,
 			scale: kept.scale
 		},

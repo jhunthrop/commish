@@ -55,6 +55,7 @@
 				record={run}
 				fromWeek={null}
 				unplayed={data.page.unplayed}
+				underway={data.page.underway}
 				{leagueRecord}
 				{players}
 				head={null}
@@ -65,6 +66,7 @@
 				record={weekly.record}
 				fromWeek={weekly.fromWeek}
 				unplayed={weekly.unplayed}
+				underway={weekly.underway}
 				{leagueRecord}
 				{players}
 				head={{ title: RECORDS_WORDS.weekly, what: RECORDS_WORDS.weeklyWhat }}

@@ -677,17 +677,19 @@ void test('our rate vs his Avg is the rest of season a game less his Avg, from t
 			label: BASIS_WORDS.pace,
 			value: '16.7',
 			caption: BASIS_WORDS.paceCaption,
-			reason: null
+			reason: null,
+			mayMiss: false
 		},
 		{
 			key: 'vsAvg',
 			label: BASIS_WORDS.vsAvg,
 			value: NONE,
 			caption: BASIS_WORDS.vsAvgCaption,
-			reason: vsAvgReason({ games: 5, blended: 27.1, share: 29, rate: 24.1 })
+			reason: vsAvgReason({ games: 5, blended: 27.1, share: 29, rate: 24.1 }),
+			mayMiss: true
 		}
 	];
-	const at = (perGame: number | null, format: 'ppr' | 'half_ppr' = 'ppr') =>
+	const at = (perGame: number | null, format: 'ppr' | 'half_ppr' = 'ppr', tiles = built) =>
 		liveCard({
 			week: week(
 				{ projection_scoring: { format, league_own: false } },
@@ -702,7 +704,7 @@ void test('our rate vs his Avg is the rest of season a game less his Avg, from t
 			screenHref: href,
 			zone: ZONE,
 			now: NOW,
-			basisTiles: built
+			basisTiles: tiles
 		}).basisTiles;
 	const filled = at(22.0);
 	assert.equal(filled.find((t) => t.key === 'vsAvg')?.value, '\u22128.7');
@@ -710,6 +712,15 @@ void test('our rate vs his Avg is the rest of season a game less his Avg, from t
 		filled.find((t) => t.key === 'vsAvg')?.caption,
 		'30.7 Avg in 5 games, 27.1 blended with his usage, 24.1 weighted 29% to his preseason pace, 22.0 a game after the games he may miss'
 	);
+	// A player the run expects to play every game left says no games he may miss (Lane 165, D17): the
+	// caption stops at the rate it blended to.
+	const healthy = built.map((t) => ({ ...t, mayMiss: false }));
+	const healthyCaption = at(24.1, 'ppr', healthy).find((t) => t.key === 'vsAvg')?.caption ?? '';
+	assert.equal(
+		healthyCaption,
+		'30.7 Avg in 5 games, 27.1 blended with his usage, 24.1 weighted 29% to his preseason pace'
+	);
+	assert.doesNotMatch(healthyCaption, /may miss/u);
 	// "--" stands with the plain caption: no reason beside a figure not drawn (fix round 1, M4).
 	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.caption, BASIS_WORDS.vsAvgCaption);
 	assert.equal(filled.find((t) => t.key === 'pace')?.value, '16.7');
@@ -723,7 +734,8 @@ void test('our rate vs his Avg names both figures, the pace and its share, as it
 	const caption = vsAvgCaption(
 		'22.0',
 		'30.7',
-		vsAvgReason({ games: 5, blended: 27.1, share: 29, rate: 24.1 })
+		vsAvgReason({ games: 5, blended: 27.1, share: 29, rate: 24.1 }),
+		true
 	);
 	// Each step in order, from his Avg to our rate, each figure the run's (Lane 139 fix round 1).
 	assert.equal(
@@ -731,7 +743,7 @@ void test('our rate vs his Avg names both figures, the pace and its share, as it
 		'30.7 Avg in 5 games, 27.1 blended with his usage, 24.1 weighted 29% to his preseason pace, 22.0 a game after the games he may miss'
 	);
 	assert.doesNotMatch(caption, /\bless\b/u);
-	assert.equal(vsAvgCaption('22.0', '30.7', null), '22.0 a game vs his 30.7 Avg');
+	assert.equal(vsAvgCaption('22.0', '30.7', null, false), '22.0 a game vs his 30.7 Avg');
 	assert.match(caption, new RegExp(BASIS_WORDS.pace.toLowerCase()));
 	assert.match(BASIS_WORDS.vsAvg, /^Our rate/u);
 });
@@ -1135,4 +1147,42 @@ void test('the card head and the tier box read one rank, and the box names his w
 	});
 	assert.equal(listed.positionRank, null);
 	assert.equal(listed.tier?.ranks?.[PLAYER.id], null);
+});
+
+// Lane 165 (D10): a read that stands never quotes a figure the Proj tile does not show.
+void test('a standing read quoting another figure than the Wk tile shows is named in the tile caption', () => {
+	const moved = week({}, { week_projection: 23.4, facts: facts({ points_this_week: 4.6 }) });
+	const live = liveCard({ ...liveInputOf(moved), read: WEEK_READ, now: KICKED_OFF });
+	assert.ok(tile(live.tiles, 'proj').caption.endsWith('. Proj at the read 21.8'));
+	// The tile showing the quoted figure says nothing more.
+	const same = liveCard({ ...liveInputOf(week()), read: WEEK_READ, now: KICKED_OFF });
+	assert.ok(!tile(same.tiles, 'proj').caption.includes('at the read'));
+	// Before kickoff a move past the shown threshold withholds the read, so the tile does not name it.
+	const ahead = liveCard({ ...liveInputOf(moved), read: WEEK_READ, now: NOW });
+	assert.ok(!tile(ahead.tiles, 'proj').caption.includes('at the read'));
+	// Under the threshold the read shows beside a tile that prints another tenth: the tile names the quote.
+	const under = week({}, { week_projection: 22.2 });
+	const near = liveCard({ ...liveInputOf(under), read: WEEK_READ, now: NOW });
+	assert.ok(tile(near.tiles, 'proj').caption.endsWith('Proj at the read 21.8'));
+	// A read that quoted none leaves the caption alone.
+	const quiet = liveCard({
+		...liveInputOf(moved),
+		read: { ...WEEK_READ, projection: null },
+		now: KICKED_OFF
+	});
+	assert.ok(!tile(quiet.tiles, 'proj').caption.includes('at the read'));
+});
+
+void test('"Proj at the read" is never shown for a read the page withholds (fix round 1, M2)', () => {
+	const moved = week({}, { week_projection: 23.4, facts: facts({ points_this_week: 4.6 }) });
+	const caption = (read: WeekRead, now: number) =>
+		tile(liveCard({ ...liveInputOf(moved), read, now }).tiles, 'proj').caption;
+	// The run withheld the read (a status change): the page shows its caption, the tile adds nothing.
+	assert.ok(!caption({ ...WEEK_READ, body: null }, KICKED_OFF).includes('at the read'));
+	// Before kickoff, moved past 0.5: withheld for the move.
+	assert.ok(!caption(WEEK_READ, NOW).includes('at the read'));
+	// A read from before the moved caption is never withheld for the move: the page shows it, so the tile names its figure.
+	assert.ok(
+		caption({ ...WEEK_READ, movedCaption: undefined }, NOW).endsWith('Proj at the read 21.8')
+	);
 });

@@ -355,3 +355,29 @@ func TestOrderRoutesCarryTheClaimMovesAndRefuseARosterWithoutALeague(t *testing.
 		t.Fatalf("public moves %+v", public.Moves)
 	}
 }
+
+// Lane 165 (D12): the count of players on a club's roster leaves out the players with no club (free
+// agents and retired players, the daily list's NULL club) and is the total with none of them.
+func TestOrderCountsThePlayersOnAClubsRoster(t *testing.T) {
+	f := newFixture(t)
+	f.raw.Order, f.raw.FromWeek = boards.OrderRestOfSeason, 6
+	cleared := 0
+	for i := range f.raw.Players {
+		if f.raw.Players[i].Position == draft.WR && cleared < 2 {
+			f.raw.Players[i].Team, f.raw.Players[i].Bye = "", 0
+			cleared++
+		}
+	}
+	config, err := mock.SlotConfig(*f.league.Saved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.league.Board, err = boards.For(f.raw, f.league.Saved.Teams, config); err != nil {
+		t.Fatal(err)
+	}
+	a := newFixtureAdvisor(t, f, nil)
+	out := a.Order(orderQuery{position: draft.WR, limit: 5}, nil)
+	if out.OnClub == nil || *out.OnClub != out.Total-cleared {
+		t.Fatalf("on club %v of %d with %d cleared", out.OnClub, out.Total, cleared)
+	}
+}

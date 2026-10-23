@@ -45,6 +45,19 @@ function withheldWords(read: WeekRead, card: CardProjection | null): string {
 	return card?.week === read.week && underway(card.state) ? CARD.readNotWritten : read.caption;
 }
 
+/** Whether the page withholds the read for the card's projection having moved (Lane 165 fix round 1,
+ * M2): the one test shownWeekRead and the Wk tile's "Proj at the read" share. A read the run withheld,
+ * or one from before the moved caption, is never withheld here. */
+export function movedPastRead(
+	read: Pick<WeekRead, 'body' | 'projection' | 'movedCaption' | 'week'>,
+	card: CardProjection | null
+): boolean {
+	if (read.body === null || card?.scoring !== 'ppr' || card.week !== read.week) return false;
+	if (underway(card.state)) return false;
+	if (read.projection === undefined || read.movedCaption === undefined) return false;
+	return projectionMoved(card.points, read.projection);
+}
+
 /** The read as the page shows it beside the card's live projection (null until the card has read). */
 export function shownWeekRead(read: WeekRead, card: CardProjection | null): ShownRead {
 	// A read the run already withheld keeps the run's caption (a status change says when the new one is
@@ -52,10 +65,8 @@ export function shownWeekRead(read: WeekRead, card: CardProjection | null): Show
 	// says no read was written for this game (Lane 160, B140).
 	if (read.body === null) return { withheld: true, words: withheldWords(read, card) };
 	const built = { withheld: false, body: read.body, caption: read.caption } as const;
-	if (card?.scoring !== 'ppr' || card.week !== read.week || underway(card.state)) return built;
-	if (read.projection === undefined || read.movedCaption === undefined) return built;
 	// One threshold with the Proj change tile (Lane 162, D04): a move under it shows the read.
-	return projectionMoved(card.points, read.projection)
+	return movedPastRead(read, card) && read.movedCaption !== undefined
 		? { withheld: true, words: read.movedCaption }
 		: built;
 }

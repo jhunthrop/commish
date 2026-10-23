@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { bannedIn } from '#lib/format/copy-guard.ts';
-import { lobbyFillWords, setupCells } from './setup.ts';
+import { lobbyFillWords, lobbyListHead, setupCells } from './setup.ts';
 
 void test('the setup strip says the clocks and when a lobby starts, nothing the form shows', () => {
 	assert.deepEqual(
@@ -34,6 +34,15 @@ void test('a lobby card says the people in, never a scoreline against its seats'
 		assert.doesNotMatch(words, /\bof\b/);
 		assert.equal(bannedIn(words), null);
 	}
+});
+
+void test('a lobby list with nobody in is open, "filling now" only from the first seat taken (Lane 165, D14)', () => {
+	assert.equal(lobbyListHead([{ filling: 0 }, { filling: 0 }]), 'Open lobbies');
+	assert.equal(lobbyListHead([]), 'Open lobbies');
+	assert.equal(lobbyListHead([{ filling: 0 }, { filling: 1 }]), 'Lobbies filling now');
+	for (const filling of [0, 1]) assert.equal(bannedIn(lobbyListHead([{ filling }])), null);
+	const list = readFileSync(new URL('./LobbyList.svelte', import.meta.url), 'utf8');
+	assert.match(list, /lobbyListHead\(/);
 });
 
 void test('the lobby list draws the count from its one function', () => {
