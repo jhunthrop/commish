@@ -14,11 +14,28 @@ export interface WeekStates {
 
 type ScheduledGame = Schedule['slates'][number]['games'][number];
 
-/** One week's games as one read, final once every one is. */
-function weekRead(games: readonly ScheduledGame[], now: number): 'upcoming' | 'playing' | 'final' {
+/** A game the run has not marked final is final once this long has passed since its kickoff (Lane 165
+ * fix round 1, M4): a build days after the run never reads a week "under way" past its last game's
+ * end. A game runs about three hours; the hourly capture marks Final in the hour after. */
+export const GAME_ENDS_AFTER_MS = 4 * 60 * 60 * 1000;
+
+/** The run's state for a game, final when it has ended by the clock. */
+function stateAt(game: ScheduledGame, now: number): ScheduledGame['state'] {
+	return game.state !== 'final' && now >= Date.parse(game.kickoff) + GAME_ENDS_AFTER_MS
+		? 'final'
+		: game.state;
+}
+
+/** One week's games as one read, final once every one is; null for a week with no game on the schedule,
+ * which is neither not played nor under way (M1). */
+function weekRead(
+	games: readonly ScheduledGame[],
+	now: number
+): 'upcoming' | 'playing' | 'final' | null {
+	if (games.length === 0) return null;
 	return linesRead(
 		games.map((game) => ({
-			game_state: game.state ?? null,
+			game_state: stateAt(game, now) ?? null,
 			played: false,
 			kickoff: game.kickoff,
 			bye: false

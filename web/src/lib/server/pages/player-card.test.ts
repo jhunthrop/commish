@@ -174,7 +174,7 @@ void test('in season the row under the tiles is the pace as stored and our rate 
 		preseasonShare: 29,
 		blendedPerGame: 27.1,
 		ratePerGame: 24.1,
-		expectedGames: 11.4
+		expectedGames: 10.4
 	};
 	assert.deepEqual(
 		basisTiles(IN_SEASON, stored, 5, 12).map((t) => [t.key, t.label, t.value, t.caption, t.reason]),
@@ -208,11 +208,12 @@ void test('in season the row under the tiles is the pace as stored and our rate 
 	const mayMiss = (expectedGames: number, left: number | null) =>
 		basisTiles(IN_SEASON, { ...stored, expectedGames }, 5, left).find((t) => t.key === 'vsAvg')
 			?.mayMiss;
-	assert.equal(mayMiss(11.4, 12), true);
+	// A whole game or more (MISSED_GAMES_FROM): the model's prior alone never says it (fix round 1, H1).
+	assert.equal(mayMiss(10.4, 12), true);
+	assert.equal(mayMiss(11, 12), true);
+	assert.equal(mayMiss(11.1, 12), false);
 	assert.equal(mayMiss(12, 12), false);
-	assert.equal(mayMiss(12.04, 12), false);
-	assert.equal(mayMiss(11.9, 12), true);
-	assert.equal(mayMiss(11.4, null), false);
+	assert.equal(mayMiss(10.4, null), false);
 	assert.equal(basisTiles(IN_SEASON, stored, 5, 12).find((t) => t.key === 'pace')?.mayMiss, false);
 	// Preseason, or a player the preseason board did not rank: no row.
 	assert.deepEqual(basisTiles(PRESEASON, stored, 5, 12), []);

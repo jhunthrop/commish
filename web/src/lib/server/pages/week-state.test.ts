@@ -66,3 +66,24 @@ void test('a set week with every game final is neither not played nor under way'
 	assert.deepEqual(done, { unplayed: [], underway: [] });
 	assert.equal(weekLines([WEEK])[0]?.text, 'set Tue Oct 20, grades when the stats land');
 });
+
+void test('a week with no game on the schedule is neither not played nor under way (fix round 1, M1)', () => {
+	const trimmed = { slates: [{ abbr: 'NE', games: [] }] } as unknown as Schedule;
+	assert.deepEqual(weekStates(RECORD, trimmed, at('2026-10-22T20:00:00Z')), {
+		unplayed: [],
+		underway: []
+	});
+});
+
+void test('a build after the last game has ended reads the week played, though the run never marked it final (M4)', () => {
+	const unmarked = schedule('kicked_off', 'kicked_off');
+	// Sunday 17:00Z kickoff: under way three hours in, played five hours after.
+	assert.deepEqual(weekStates(RECORD, unmarked, at('2026-10-25T20:00:00Z')), {
+		unplayed: [],
+		underway: [7]
+	});
+	assert.deepEqual(weekStates(RECORD, unmarked, at('2026-10-25T22:00:00Z')), {
+		unplayed: [],
+		underway: []
+	});
+});

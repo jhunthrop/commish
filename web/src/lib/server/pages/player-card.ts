@@ -107,7 +107,8 @@ export function restParts(
 	};
 }
 
-/** The games his club has still to play on the run, from his log; null with no season to count in
+/** The games his club has still to play on the run, from his log (the run's own schedule, a game under
+ * way at the run still "upcoming" there, as in the model's remaining); null with no season to count in
  * (Lane 165, D17). */
 export function gamesLeftOf(season: PlayerSeason | null): number | null {
 	if (season === null) return null;

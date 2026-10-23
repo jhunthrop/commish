@@ -1172,3 +1172,17 @@ void test('a standing read quoting another figure than the Wk tile shows is name
 	});
 	assert.ok(!tile(quiet.tiles, 'proj').caption.includes('at the read'));
 });
+
+void test('"Proj at the read" is never shown for a read the page withholds (fix round 1, M2)', () => {
+	const moved = week({}, { week_projection: 23.4, facts: facts({ points_this_week: 4.6 }) });
+	const caption = (read: WeekRead, now: number) =>
+		tile(liveCard({ ...liveInputOf(moved), read, now }).tiles, 'proj').caption;
+	// The run withheld the read (a status change): the page shows its caption, the tile adds nothing.
+	assert.ok(!caption({ ...WEEK_READ, body: null }, KICKED_OFF).includes('at the read'));
+	// Before kickoff, moved past 0.5: withheld for the move.
+	assert.ok(!caption(WEEK_READ, NOW).includes('at the read'));
+	// A read from before the moved caption is never withheld for the move: the page shows it, so the tile names its figure.
+	assert.ok(
+		caption({ ...WEEK_READ, movedCaption: undefined }, NOW).endsWith('Proj at the read 21.8')
+	);
+});

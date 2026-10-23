@@ -82,6 +82,8 @@ import { POSITIONS, type Position } from '../src/lib/types/player.ts';
 import { bucketUrl, credentialsFromToken } from './r2.ts';
 import { dropBetween, gapOf, tenth } from './tenth.ts';
 import { checkRunSeasons } from '../src/lib/run/season-checks.ts';
+import { MISSED_GAMES_FROM, mayMissGames } from '../src/lib/player/basis-words.ts';
+import { gamesLeftOf } from '../src/lib/server/pages/player-card.ts';
 import { GAME_LENGTH_MS, priorSeasonBlocks, seasonBlocks } from './standin-season.ts';
 import { marketRows, slugOf } from './standin-market.ts';
 import type { PlayerSeason, PriorSeason } from '../src/lib/run/season.ts';
@@ -725,6 +727,21 @@ async function writeLocal(files: ReadonlyMap<string, unknown>): Promise<void> {
 	const pointer = latestPointerSchema.parse({ runId: RUN_ID });
 	await writeFile(new URL(`runs/${LATEST_POINTER}`, OUT_ROOT), JSON.stringify(pointer));
 	process.stdout.write(`Wrote ${String(files.size)} artifacts to ${runDir.pathname}\n`);
+	process.stdout.write(`${missedGamesCount(files)}\n`);
+}
+
+/** How many players' caption says games he may miss (D17), so the first live run can be checked. */
+function missedGamesCount(files: ReadonlyMap<string, unknown>): string {
+	const pages = [...files.values()].filter((value): value is Player => isPlayerPage(value));
+	const above = pages.filter((page) => {
+		const numbers = page.formats[FORMAT.id];
+		return numbers !== undefined && mayMissGames(numbers.expectedGames, gamesLeftOf(page.season));
+	});
+	return `Players with ${String(MISSED_GAMES_FROM)} or more games he may miss: ${String(above.length)} of ${String(pages.length)}`;
+}
+
+function isPlayerPage(value: unknown): value is Player {
+	return typeof value === 'object' && value !== null && 'formats' in value && 'season' in value;
 }
 
 async function upload(files: ReadonlyMap<string, unknown>): Promise<void> {

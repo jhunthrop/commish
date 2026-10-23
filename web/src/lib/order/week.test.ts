@@ -206,7 +206,7 @@ void test("a member's defenses' basis: its default scoring, the league's own poi
 	const said = text(basis);
 	assert.match(
 		said,
-		/^Defenses are in order of Proj, this week's published projection on its default defense scoring, read Fri 9:00 pm Central, /
+		/^Defenses are in order of Proj, this week's published projection on standard defense scoring, read Fri 9:00 pm Central, /
 	);
 	assert.match(said, /read Fri 9:00 pm Central, as we have no defense model of our own\./);
 	assert.match(said, /Opp rank is points allowed to defenses this season/);
@@ -359,7 +359,7 @@ void test("the Players page's D/ST basis for a visitor: the published projection
 	assert.ok(order && avg);
 	assert.match(
 		order.text,
-		/^Defenses are in order of Proj, this week's published projection on its default defense scoring, read .+, as we have no defense model of our own\.$/
+		/^Defenses are in order of Proj, this week's published projection on standard defense scoring, read .+, as we have no defense model of our own\.$/
 	);
 	assert.equal(
 		avg.text,

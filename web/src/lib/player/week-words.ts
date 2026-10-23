@@ -56,11 +56,11 @@ import {
 	type RestParts
 } from './card.ts';
 import { vsAvgCaption } from './basis-words.ts';
-import type { CardProjection } from './week-read.ts';
+import { movedPastRead, type CardProjection } from './week-read.ts';
 import type { WeekRead } from '#lib/run/schema.ts';
 
 /** What of the week's read the change tile needs: its week and the projection it quotes. */
-export type ReadQuote = Pick<WeekRead, 'week' | 'projection'>;
+export type ReadQuote = Pick<WeekRead, 'week' | 'projection' | 'body' | 'movedCaption'>;
 
 /** Tenths in a point, the precision the API prints. */
 const TENTHS = 10;
@@ -345,8 +345,16 @@ function readFigureWords(week: PlayerWeek, now: number, read: ReadQuote | null):
 	if (value === null || quoted === null || quoted === undefined) return null;
 	if (printTenth(quoted) === printTenth(value)) return null;
 	const scoring = week.projection_scoring.format;
-	const withheld = scoring === 'ppr' && toPlay(week.line.facts, now) && moveOf(week, read).crosses;
-	if (withheld) return null;
+	// A read the page withholds (the run's, or for the move) quotes nothing to explain (fix round 1, M2),
+	// by the one test shownWeekRead uses.
+	const card = {
+		week: week.week,
+		scoring,
+		points: value,
+		state: lineState(week.line.facts, now)
+	};
+	if (read === null) return null;
+	if (read.body === null || movedPastRead(read, card)) return null;
 	return WEEK_TILE.atRead(printTenth(quoted), scoring === 'ppr' ? null : SCORING_WORDS.ppr);
 }
 

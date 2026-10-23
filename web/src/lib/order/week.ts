@@ -195,7 +195,7 @@ function orderSentence(advice: WeekOrderAdvice, reader: WeekReader, zone: string
 	const whose = scoring.league_own ? ", this league's own" : ", the closest to this league's rules";
 	const how =
 		advice.position === 'DEF'
-			? 'on its default defense scoring'
+			? DEFENSE_SCORING.standard
 			: reader.league === null
 				? `in ${reader.boardScoring} scoring`
 				: `in ${FORMAT_WORDS[scoring.format]} scoring${whose}`;

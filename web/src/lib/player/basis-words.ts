@@ -17,12 +17,23 @@ export const BASIS_WORDS = {
 /** Tenths in a game, so the missed games are taken from the printed figures. */
 const TENTHS_IN_GAME = 10;
 
-/** Whether the run expects him to miss games of his club's left (Lane 165, D17): the games his club
- * has left less the games the model expects him to play (the run's expectedGames), above zero in whole
- * tenths. Unknown games left is no figure to hold, so no clause. */
+/** The games he may miss the caption names from (Lane 165 fix round 1, D17): the model's expected games
+ * sit under his club's games left for every player (an availability prior), so only a whole game or
+ * more is a story worth a clause. */
+export const MISSED_GAMES_FROM = 1;
+
+/** The games the run expects him to miss of his club's left: games left less the run's expectedGames,
+ * both from the run's own figures for him (his log is the run's schedule), in whole tenths. Null with
+ * no games left to count. */
+export function missedGames(expectedGames: number, gamesLeft: number | null): number | null {
+	if (gamesLeft === null) return null;
+	return (gamesLeft * TENTHS_IN_GAME - Math.round(expectedGames * TENTHS_IN_GAME)) / TENTHS_IN_GAME;
+}
+
+/** Whether the caption says games he may miss: at least MISSED_GAMES_FROM of them. */
 export function mayMissGames(expectedGames: number, gamesLeft: number | null): boolean {
-	if (gamesLeft === null) return false;
-	return gamesLeft * TENTHS_IN_GAME - Math.round(expectedGames * TENTHS_IN_GAME) > 0;
+	const missed = missedGames(expectedGames, gamesLeft);
+	return missed !== null && missed >= MISSED_GAMES_FROM;
 }
 
 /** The steps the run stores from his Avg to our rate (Lane 139 fix round 1): his season blended with
