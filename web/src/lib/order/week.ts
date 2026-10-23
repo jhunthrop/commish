@@ -46,6 +46,13 @@ export const WEEK_TAB = {
 	add: 'Add'
 } as const;
 
+/** The scoring Avg and Last are in for a defense (Lane 165, D16): PPR has no meaning for a defense, so
+ * the basis names the scoring in force, the member's when a league is followed. */
+export const DEFENSE_SCORING = {
+	league: 'in your scoring',
+	standard: 'on standard defense scoring'
+} as const;
+
 /** A row as the week's table draws it. */
 export interface WeekView {
 	/** His board id: the sheet's key, and the Waivers screen's ?player= for his add. */
@@ -234,6 +241,13 @@ function gameSentence(advice: WeekOrderAdvice, zone: string, now: number): strin
 	return `${BOX.game} is each club's expected points, ${clubFirst}, and the kickoff weather, read ${weekdayTime(read, zone)} ${zoneWord(zone)}.`;
 }
 
+/** The scoring Avg and Last are in, as the basis says it. */
+function avgLastScoring(position: WeekPosition, reader: WeekReader): string {
+	if (position === 'DEF')
+		return reader.league === null ? DEFENSE_SCORING.standard : DEFENSE_SCORING.league;
+	return reader.league === null ? `in ${reader.boardScoring}` : "in this league's scoring";
+}
+
 /** The tab's basis, every figure named once, within five rendered lines at a desk and eight on a
  * phone: the order with the model we lack, Opp rank, Avg and Last in the scoring the rows are in, the
  * Game cell's read and, in a league, whose the rosters are (at a desk only, as the order says it: the
@@ -246,7 +260,7 @@ export function weekBasis(
 ): BasisPart[] {
 	const { many, whose } = WEEK_NOUNS[advice.position];
 	const { league } = reader;
-	const scoring = league !== null ? "in this league's scoring" : `in ${reader.boardScoring}`;
+	const scoring = avgLastScoring(advice.position, reader);
 	const said: (BasisPart | null)[] = [
 		part(orderSentence(advice, reader, zone), true),
 		part(`${BOX.oppRank} is points allowed to ${many} this season, 1st the fewest.`, true),

@@ -249,7 +249,8 @@
 				value={q}
 				oninput={(event) => search(event.currentTarget.value)}
 			/>
-			{#if advice && week === null}<span class="hits">{hitsWords(advice.total, filtered, advice.on_club)}</span
+			{#if advice && week === null}<span class="hits"
+					>{hitsWords(advice.total, filtered, advice.on_club)}</span
 				>{/if}
 		</label>
 	{/if}

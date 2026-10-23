@@ -197,7 +197,7 @@ void test("a member's defenses' basis: its default scoring, the league's own poi
 	);
 	assert.match(said, /read Fri 9:00 pm Central, as we have no defense model of our own\./);
 	assert.match(said, /Opp rank is points allowed to defenses this season/);
-	assert.match(said, /its points a game and last game, in this league's scoring\./);
+	assert.match(said, /its points a game and last game, in your scoring\./);
 	assert.match(said, /the defense's first/);
 	assert.match(said, /Roster is ESPN's, read /);
 	assert.doesNotMatch(said, /host/i);
@@ -341,14 +341,17 @@ void test("the Players page's chips: our order's four, then K and D/ST, which re
 	);
 });
 
-void test("the Players page's D/ST basis for a visitor: the published projection's order and no model of ours, in PPR (Lane 155)", () => {
+void test("the Players page's D/ST basis for a visitor: the published projection's order and no model of ours, Avg and Last on defense scoring, never PPR (Lane 155, Lane 165 D16)", () => {
 	const [order, , avg] = weekBasis(visitor(fixture.read.DEF), VISITOR, ZONE, SATURDAY);
 	assert.ok(order && avg);
 	assert.match(
 		order.text,
 		/^Defenses are in order of Proj, this week's published projection on its default defense scoring, read .+, as we have no defense model of our own\.$/
 	);
-	assert.equal(avg.text, 'Avg and Last are its points a game and last game, in PPR.');
+	assert.equal(
+		avg.text,
+		'Avg and Last are its points a game and last game, on standard defense scoring.'
+	);
 	// Before the projection is in: Avg's order, the existing sentence, no Proj claimed.
 	const [before] = weekBasis(visitor(fixture.unread.K), VISITOR, ZONE, TUESDAY);
 	assert.equal(
