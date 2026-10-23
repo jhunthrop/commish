@@ -13,6 +13,8 @@
 	import ActionRow from '#lib/ui/ActionRow.svelte';
 	import ActionRows from '#lib/ui/ActionRows.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
+	import Panel from '#lib/ui/Panel.svelte';
+	import AccountFoot from './AccountFoot.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import LineList from '#lib/ui/LineList.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
@@ -353,6 +355,8 @@
 				<ThemeSwitch />
 			</section>
 		{/if}
+		<!-- How to have the account deleted, and the legal pages, under every view once it is known. -->
+		{#if view !== null}<AccountFoot />{/if}
 	</main>
 </Shell>
 

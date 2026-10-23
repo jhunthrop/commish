@@ -94,7 +94,7 @@
 		{#if next}
 			<div class="next"><CardNext week={next.week} opponent={next.opponent} {cell} /></div>
 		{/if}
-		<div class="act">
+		<div class="act" data-pin>
 			{#if compareLeads}
 				<Verb size="lg" fill expanded={comparing} controls="compare" onclick={oncompare}
 					>{CARD.compare}</Verb

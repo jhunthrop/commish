@@ -4,6 +4,7 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import LeagueSwitch from '#lib/context/LeagueSwitch.svelte';
 	import RailIcon from './RailIcon.svelte';
+	import SiteFooter from './SiteFooter.svelte';
 	import Stamp from './Stamp.svelte';
 	import { barRows } from './bar-rows.ts';
 	import {
@@ -140,6 +141,7 @@
 			<div class="league"><LeagueSwitch page={league} /></div>
 		</header>
 		{@render children()}
+		<SiteFooter />
 	</div>
 </div>
 
