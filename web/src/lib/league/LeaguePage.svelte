@@ -657,7 +657,7 @@
 		}
 
 		.league {
-			padding: var(--s-3) var(--s-4) calc(var(--s-5) + 64px);
+			padding: var(--s-3) var(--s-4);
 		}
 
 		.pad {

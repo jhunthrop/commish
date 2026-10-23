@@ -10,6 +10,7 @@ import {
 	FIXTURE_THURSDAY_NIGHT_CLOCK,
 	FIXTURE_FRIDAY_CLOCK,
 	FIXTURE_TUESDAY_CLOCK,
+	FIXTURE_UNREAD_CLOCK,
 	FIXTURE_WEEK7_READ_CLOCK,
 	FIXTURE_WEEK_CLOCK
 } from './inseason-fixture/clock.ts';
@@ -295,8 +296,16 @@ export const SHOT_CASES: readonly ShotCase[] = [
 	once('game-facts-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	once('live-truth-shots', 'standin', FIXTURE_LIVE_CLOCK),
 	once('rail-shots', 'standin', FIXTURE_WEEK_CLOCK),
+	// The legal pages and the site footer under the pages it closes (Lane 151).
+	once('legal-shots', 'standin', FIXTURE_WEEK_CLOCK, { args: (o) => [o.web, o.api, o.out] }),
 	once('season-pages-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	once('board-row-shots', 'standin', FIXTURE_WEEK_CLOCK, { dev: true }),
+	// The Week N rankings page's K and D/ST chips (Lane 155): the week read, and the Tuesday before.
+	once('players-kdst-shots', 'standin', FIXTURE_WEEK_CLOCK),
+	once('players-kdst-shots', 'standin', FIXTURE_UNREAD_CLOCK, {
+		name: 'players-kdst-shots-empty',
+		env: { STATE: 'empty' }
+	}),
 	once('week-order-shots', 'standin', FIXTURE_WEEK_CLOCK, {
 		ownFixture: true,
 		args: (o) => [o.web, String(o.apiPort), o.out]

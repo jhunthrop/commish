@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
 import { KICKED_OFF_PART, UNCOUNTED } from '#lib/league/box/basis.ts';
-import { BOX, heldGame } from '#lib/league/box/box.ts';
+import { BOX, heldGame, positionWord } from '#lib/league/box/box.ts';
 import type { WeekOrderAdvice } from './api.ts';
 import { stamped } from '../../../scripts/inseason-fixture/game-state.ts';
 import { weekOrderPath } from './path.ts';
@@ -15,7 +15,9 @@ import {
 	landed,
 	rulesLeftOut,
 	weekBasis,
+	weekNone,
 	weekRosterFilter,
+	weekSearch,
 	weekSections,
 	weekStatus,
 	weekView,
@@ -24,7 +26,8 @@ import {
 	type WeekView
 } from './week.ts';
 import { weekHeading, weekPositionOf } from './week-head.ts';
-import { WEEK } from './words.ts';
+import { ORDER_POSITIONS, PLAYERS_CHIPS, weekChip } from './order.ts';
+import { PAGE_PURPOSE, WEEK } from './words.ts';
 
 const ZONE = 'America/Chicago';
 /** Saturday noon Central of week 6, and the Tuesday before (scripts/inseason-fixture/clock.ts). */
@@ -320,4 +323,63 @@ void test('a lagging read (the API upcoming, the clock past kickoff) sits under 
 	assert.ok(drawn.length > 0);
 	assert.ok(drawn.every((v) => v.section === 'kicked_off'));
 	assert.ok(text(weekBasis(lagging, VISITOR, ZONE, late)).includes(KICKED_OFF_PART));
+});
+
+void test("the Players page's chips: our order's four, then K and D/ST, which read the week (Lane 155)", () => {
+	assert.deepEqual(PLAYERS_CHIPS, [...ORDER_POSITIONS, 'K', 'DEF']);
+	assert.deepEqual(ORDER_POSITIONS, ['QB', 'RB', 'WR', 'TE']);
+	assert.deepEqual(
+		PLAYERS_CHIPS.map((p) => weekChip(p)),
+		[null, null, null, null, 'K', 'DEF']
+	);
+	assert.equal(weekChip(null), null);
+	assert.deepEqual(PLAYERS_CHIPS.map(positionWord).slice(-2), ['K', 'D/ST']);
+	// The purpose names the week's kickers and defenses, never as in our order.
+	assert.match(
+		PAGE_PURPOSE.players,
+		/^Every QB, RB, WR and TE in our order, and this week's kickers and defenses, /
+	);
+});
+
+void test("the Players page's D/ST basis for a visitor: the published projection's order and no model of ours, in PPR (Lane 155)", () => {
+	const [order, , avg] = weekBasis(visitor(fixture.read.DEF), VISITOR, ZONE, SATURDAY);
+	assert.ok(order && avg);
+	assert.match(
+		order.text,
+		/^Defenses are in order of Proj, this week's published projection on its default defense scoring, read .+, as we have no defense model of our own\.$/
+	);
+	assert.equal(avg.text, 'Avg and Last are its points a game and last game, in PPR.');
+	// Before the projection is in: Avg's order, the existing sentence, no Proj claimed.
+	const [before] = weekBasis(visitor(fixture.unread.K), VISITOR, ZONE, TUESDAY);
+	assert.equal(
+		before?.text,
+		"Kickers are in order of Avg until this week's published projection is in."
+	);
+});
+
+void test('the search on the week reads the row name, the API name and the club, case aside (Lane 155)', () => {
+	const all = views(visitor(fixture.read.DEF), SATURDAY);
+	const first = all[0];
+	assert.ok(first);
+	const nickname = first.box.name.replace(` ${positionWord('DEF')}`, '');
+	for (const q of [nickname.toLowerCase(), first.named.toUpperCase(), first.box.club]) {
+		const hits = all.filter(weekSearch(q));
+		assert.ok(
+			hits.some((r) => r.key === first.key),
+			q
+		);
+		assert.ok(hits.length < all.length, q);
+	}
+	// Below the API's fewest letters every row stays.
+	assert.equal(all.filter(weekSearch(' t ')).length, all.length);
+	assert.equal(all.filter(weekSearch('zzzz')).length, 0);
+	assert.equal(weekNone('DEF'), 'No defense matches.');
+	assert.equal(weekNone('K'), 'No kicker matches.');
+});
+
+void test("the Players page's week words pass the copy guard (Lane 155)", () => {
+	const banned = bannedPattern();
+	for (const said of [PAGE_PURPOSE.players, weekNone('K'), weekNone('DEF')]) {
+		assert.doesNotMatch(said, banned, said);
+	}
 });

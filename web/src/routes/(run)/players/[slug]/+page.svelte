@@ -505,9 +505,9 @@
 	}
 
 	@media (max-width: 760px) {
-		/* Room under the page for the verb pinned above the tab bar. */
+		/* The room for the verb pinned above the tab bar is the site footer's (data-pin, Lane 151). */
 		.player {
-			padding: var(--s-4) var(--s-4) calc(var(--s-6) + 64px);
+			padding: var(--s-4);
 			gap: var(--s-4);
 		}
 

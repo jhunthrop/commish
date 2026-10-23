@@ -51,6 +51,7 @@
 				mode="players"
 				label="Players in our rest-of-season order"
 				rankHead={data.run.weekRank}
+				boardScoring={data.format.label}
 			/>
 		{:else}
 			<div class="groups">

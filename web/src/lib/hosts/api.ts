@@ -68,11 +68,6 @@ export const hostsApi = {
 		client.call<null>(`/devices/${encodeURIComponent(id)}`, { method: 'DELETE' })
 };
 
-/** The consent the FFPC form asks for, word for word what the API keeps as consent version 3
- * (api/internal/hosts ConsentVersion): change the words, raise the version. */
-export const FFPC_CONSENT =
-	'We sign in to FFPC as you to read your league, and never make a move or a bid. We keep your FFPC password, encrypted, to sign in again when FFPC signs you out, at most once every six hours. League-mates on Commish see the league we read, never your lineup. Disconnect on your account page deletes your password and session at once.';
-
 /** FFPC's own rule on sharing a password, under the consent, so the member decides. */
 export const FFPC_TERMS =
 	"FFPC's terms ask members not to share their password, and connecting shares it with Commish.";
@@ -118,7 +113,7 @@ export function disconnect(host: ConnectedHost): Promise<null> {
 	}
 }
 
-export { ESPN_CONSENT, MFL_CONSENT } from './connection-words.ts';
+export { ESPN_CONSENT, FFPC_CONSENT, MFL_CONSENT } from './connection-words.ts';
 
 /** The account's connection to one host, if any. */
 export function connectionTo(

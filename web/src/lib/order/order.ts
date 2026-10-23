@@ -29,6 +29,7 @@ import { hostWords } from '#lib/league/names.ts';
 import { askedHref } from '#lib/league/box/asked.ts';
 import type { OrderAdvice, OrderPosition, OrderRow, RosterMark } from './api.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
+import type { WeekPosition } from './week-head.ts';
 import { ORDER } from './words.ts';
 
 export { ORDER };
@@ -36,6 +37,23 @@ export { ORDER };
 /** The position chips, in the board's order: every position, then each. Kickers and defenses are not
  * on the order (Lane 66m). */
 export const ORDER_POSITIONS: readonly OrderPosition[] = ['QB', 'RB', 'WR', 'TE'];
+
+/** The Players page's position chips (Lane 155): our order's four, then this week's kickers and
+ * defenses, which the week's box score draws in the published projection's order (we rank neither). */
+export const PLAYERS_CHIPS: readonly PlayersChip[] = [...ORDER_POSITIONS, 'K', 'DEF'];
+
+/** A Players chip: one of our order's positions, or the week's kickers or defenses. */
+export type PlayersChip = OrderPosition | WeekPosition;
+
+/** Whether a chip draws the week's box score (K or DEF) rather than our order. */
+export function isWeekChip(position: PlayersChip): position is WeekPosition {
+	return position === 'K' || position === 'DEF';
+}
+
+/** The week's position a chip draws (K or DEF), null for our order's and for All. */
+export function weekChip(position: PlayersChip | null): WeekPosition | null {
+	return position !== null && isWeekChip(position) ? position : null;
+}
 
 /** A roster chip: every player, the free ones, or the member's own. */
 export type RosterView = 'everyone' | 'free' | 'yours';

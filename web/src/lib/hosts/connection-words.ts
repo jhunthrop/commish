@@ -16,6 +16,12 @@ export const ESPN_CONSENT_VERSION = 3;
 export const ESPN_CONSENT =
 	'We keep an encrypted copy of your ESPN session so your league stays in sync and, when you ask, to make your moves. Disconnect deletes it at once.';
 
+/** The consent the FFPC form asks for, word for word what the API keeps as consent version 3
+ * (api/internal/hosts ConsentVersion): change the words, raise the version. Kept here beside the
+ * other platforms' words so the Privacy Policy reads the same sentence (Lane 151). */
+export const FFPC_CONSENT =
+	'We sign in to FFPC as you to read your league, and never make a move or a bid. We keep your FFPC password, encrypted, to sign in again when FFPC signs you out, at most once every six hours. League-mates on Commish see the league we read, never your lineup. Disconnect on your account page deletes your password and session at once.';
+
 /** The words that connect MyFantasyLeague, beside its form and on the account page: consent version
  * 1 (api/internal/hosts MFLConsentVersion), which names the lineup moves; a move needs a connection
  * made at 1. Change the words, raise the version. */
