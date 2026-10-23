@@ -58,7 +58,12 @@ function lastRead(capture: Pick<Designations, 'readAt' | 'checkedAt'>): number {
  * say so (one read before it is the list the writer read, or an older one); then another status than
  * the one the read was written against (a player due back this week reads questionable where the read
  * says IR), or the same status in a run that began after the read (`since`, the first capture of his
- * unbroken run), is a change. */
+ * unbroken run), is a change. A `returning` day is only ever set on a questionable player (schema.ts), so a
+ * read written against another status always differs by status. The one case this does not see, a read
+ * written while he was questionable and given a `returning` day since with the status unchanged, stands:
+ * the writer's rules refuse a read that keeps a returning player out at the next pass (rules.py
+ * `_returning_violations`), and the hourly build is the only refresh of this judgement (it is decided at
+ * the build's clock, as the run's own is). */
 export function statusChangedSince(
 	read: WeekRead,
 	capture: Pick<Designations, 'readAt' | 'checkedAt'>,

@@ -54,13 +54,41 @@ export const SHOWN_CHANGE_FROM = 0.5;
 /** Tenths in a point, the precision the API and the run print. */
 const TENTHS_IN_POINT = 10;
 
-/** Whether the card's published projection (`now`) has moved past the threshold from the figure a read
- * quotes (`then`), each a printed tenth, taken in whole tenths so no float edge decides: a figure that
- * appeared or went is a move. */
-export function projectionMoved(now: number | null, then: number | null): boolean {
-	if (now === null || then === null) return now !== then;
-	const tenths = Math.abs(Math.round(now * TENTHS_IN_POINT) - Math.round(then * TENTHS_IN_POINT));
-	return tenths >= SHOWN_CHANGE_FROM * TENTHS_IN_POINT;
+/** The projection's move as the page says it, one fact for the Proj change tile, the moved caption and the
+ * run's serve rule (Lane 162, D04 fix round 1): `change` is the signed move in points (null with no
+ * figures to subtract), `crosses` whether it reaches SHOWN_CHANGE_FROM, `basis` what it is measured from. */
+export interface ProjectionMove {
+	change: number | null;
+	crosses: boolean;
+	basis: 'read' | 'earlier';
+}
+
+/** The published projection's move: since the read was written when a read quotes one (`quoted`, null when
+ * it had none, undefined with no read), else since the earlier snapshot (`earlier`, the API's
+ * projection_delta). Taken in whole printed tenths so no float edge decides; a figure that appeared or went
+ * is a move with no number. */
+export function projectionMove(
+	now: number | null,
+	quoted: number | null | undefined,
+	earlier: number | null
+): ProjectionMove {
+	if (quoted === undefined) {
+		const tenths = earlier === null ? null : Math.round(earlier * TENTHS_IN_POINT);
+		return { change: earlier, crosses: tenths !== null && crossesShown(tenths), basis: 'earlier' };
+	}
+	if (now === null || quoted === null)
+		return { change: null, crosses: now !== quoted, basis: 'read' };
+	const tenths = Math.round(now * TENTHS_IN_POINT) - Math.round(quoted * TENTHS_IN_POINT);
+	return { change: tenths / TENTHS_IN_POINT, crosses: crossesShown(tenths), basis: 'read' };
+}
+
+function crossesShown(tenths: number): boolean {
+	return Math.abs(tenths) >= SHOWN_CHANGE_FROM * TENTHS_IN_POINT;
+}
+
+/** Whether the read's quoted figure has moved past the threshold: the withhold's question. */
+export function projectionMoved(now: number | null, quoted: number | null): boolean {
+	return projectionMove(now, quoted, null).crosses;
 }
 
 /** A number not held. */

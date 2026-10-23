@@ -963,6 +963,51 @@ void test('a move under the tile\'s 0.5 shows the read beside "Moved under 0.5";
 	assert.deepEqual(shownAt(past, NOW), { withheld: true, words: WEEK_READ.movedCaption });
 });
 
+// Lane 162 fix round 1 (D04): with a read written for the week the Proj change tile is measured from the
+// figure the read quotes, so the tile and the withhold are one fact; with no read, from the earlier
+// snapshot. The read quotes 21.8; the earlier snapshot says something else.
+const withRead = (w: PlayerWeek, read: WeekRead | null) =>
+	liveCard({ ...liveInputOf(w), read, now: NOW });
+const liveInputOf = (w: PlayerWeek) => ({
+	week: w,
+	player: PLAYER,
+	league: null,
+	tiles: BUILT,
+	opponents: { 5: 'vs BUF' },
+	games: 3,
+	rest: REST,
+	screenHref: href,
+	zone: ZONE
+});
+
+void test('the change tile and the withhold read the move since the read was written, at 0.4 and 0.6', () => {
+	// The snapshot says 0.8 but the read's own quote is 0.4 away: the tile says under 0.5, the read shows.
+	const under = week({}, { week_projection: 22.2, projection_delta: 0.8 });
+	const shownCard = withRead(under, WEEK_READ);
+	assert.equal(tile(shownCard.tiles, 'delta').value, NONE);
+	assert.equal(tile(shownCard.tiles, 'delta').caption, WEEK_TILE.underShownRead);
+	assert.deepEqual(shownWeekRead(WEEK_READ, shownCard.projection), SHOWN);
+	// The snapshot says 0.3 but the quote is 0.6 away: the tile says +0.6 and the read is withheld.
+	const past = week({}, { week_projection: 22.4, projection_delta: 0.3 });
+	const heldCard = withRead(past, WEEK_READ);
+	assert.equal(tile(heldCard.tiles, 'delta').value, '+0.6');
+	assert.equal(tile(heldCard.tiles, 'delta').caption, WEEK_TILE.sinceRead);
+	assert.deepEqual(shownWeekRead(WEEK_READ, heldCard.projection), {
+		withheld: true,
+		words: WEEK_READ.movedCaption
+	});
+	assert.ok(heldCard.basis.join(' ').includes(WEEK_TILE.changePartRead));
+	// With no read the tile keeps the earlier snapshot, and says so.
+	const none = withRead(week({}, { week_projection: 22.4, projection_delta: 0.4 }), null);
+	assert.equal(tile(none.tiles, 'delta').caption, WEEK_TILE.underShown);
+	assert.equal(withRead(past, null).tiles.find((t) => t.key === 'delta')?.value, NONE);
+	assert.equal(
+		tile(withRead(week({}, { week_projection: 22.4, projection_delta: 0.6 }), null).tiles, 'delta')
+			.value,
+		'+0.6'
+	);
+});
+
 void test('once his game has kicked off the read stands whatever the card now prints', () => {
 	const live = week({}, { week_projection: 23.4, facts: facts({ points_this_week: 4.6 }) });
 	assert.equal(card(live, null, KICKED_OFF).projection.state, 'kicked_off');

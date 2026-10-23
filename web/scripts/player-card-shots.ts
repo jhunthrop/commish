@@ -82,6 +82,8 @@ interface Shot {
 	held?: string;
 	/** Designated to return this week (Lane 153): his chip's day and his note, his rank and week his. */
 	returning?: { chip: string; note: string };
+	/** His tier box's basis names the weeks his total counts (Lane 162, D03). */
+	tierSpan?: string;
 }
 
 const SHOTS: readonly Shot[] = [
@@ -151,7 +153,16 @@ const SHOTS: readonly Shot[] = [
 /** On the contract fixture's rest-of-season run: one signed-out page, the run's own player. A run that
  * ranks the rest of the season leads with Compare (card.ts compareLeadsWithoutVerb, Lane 117). */
 const ROS_SHOTS: readonly Shot[] = [
-	{ name: 'ros', slug: 'josh-allen', signedIn: false, verb: CARD.compare, weekRead: 'none' }
+	{ name: 'ros', slug: 'josh-allen', signedIn: false, verb: CARD.compare, weekRead: 'none' },
+	// The tier box names the weeks his total counts (Lane 162, D03), beside the head's one rank.
+	{
+		name: 'tier-span',
+		slug: 'josh-allen',
+		signedIn: false,
+		verb: CARD.compare,
+		weekRead: 'none',
+		tierSpan: 'weeks 8 to 17'
+	}
 ];
 const ROS = ROS_FROM_WEEK !== undefined;
 
@@ -371,6 +382,11 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 		for (const label of card.labels)
 			check(card.captions[label] !== onListWords('IR'), `${where}: ${label} says his list`);
 	}
+	if (shot.tierSpan !== undefined)
+		check(
+			card.tierBox.includes(shot.tierSpan),
+			`${where}: the tier box does not say ${shot.tierSpan}: "${card.tierBox}"`
+		);
 	// One rank per player per screen (Lane 162, D02): his tier line ranks him as the pill does.
 	if (card.tierSelf !== '') {
 		const rankIn = (text: string): string => /\b(?:QB|RB|WR|TE) \d+\b/iu.exec(text)?.[0] ?? '';
