@@ -173,10 +173,11 @@ void test('in season the row under the tiles is the pace as stored and our rate 
 		preseasonPerGame: 17.5,
 		preseasonShare: 29,
 		blendedPerGame: 27.1,
-		ratePerGame: 24.1
+		ratePerGame: 24.1,
+		expectedGames: 11.4
 	};
 	assert.deepEqual(
-		basisTiles(IN_SEASON, stored, 5).map((t) => [t.key, t.label, t.value, t.caption, t.reason]),
+		basisTiles(IN_SEASON, stored, 5, 12).map((t) => [t.key, t.label, t.value, t.caption, t.reason]),
 		[
 			['pace', 'Preseason pace', '17.5', 'a game, the pace our rate starts from', null],
 			[
@@ -189,21 +190,31 @@ void test('in season the row under the tiles is the pace as stored and our rate 
 		]
 	);
 	// The preseason total is not drawn beside the pace: the two never reconcile (C09).
-	assert.ok(!basisTiles(IN_SEASON, stored, 5).some((t) => t.value === '262.1'));
+	assert.ok(!basisTiles(IN_SEASON, stored, 5, 12).some((t) => t.value === '262.1'));
 	// A run older than the fields names the steps without their figures.
 	assert.equal(
-		basisTiles(IN_SEASON, { ...stored, ratePerGame: undefined }, 5).at(-1)?.reason,
+		basisTiles(IN_SEASON, { ...stored, ratePerGame: undefined }, 5, 12).at(-1)?.reason,
 		'in 5 games, weighted with his preseason pace'
 	);
 	// With no stored pace there is no reason to give: the cell alone.
 	assert.deepEqual(
-		basisTiles(IN_SEASON, { ...stored, preseasonPerGame: undefined }, 5).map((t) => [
+		basisTiles(IN_SEASON, { ...stored, preseasonPerGame: undefined }, 5, 12).map((t) => [
 			t.key,
 			t.reason
 		]),
 		[['vsAvg', null]]
 	);
+	// The games he may miss are the club's games left less the games the run expects him to play (D17).
+	const mayMiss = (expectedGames: number, left: number | null) =>
+		basisTiles(IN_SEASON, { ...stored, expectedGames }, 5, left).find((t) => t.key === 'vsAvg')
+			?.mayMiss;
+	assert.equal(mayMiss(11.4, 12), true);
+	assert.equal(mayMiss(12, 12), false);
+	assert.equal(mayMiss(12.04, 12), false);
+	assert.equal(mayMiss(11.9, 12), true);
+	assert.equal(mayMiss(11.4, null), false);
+	assert.equal(basisTiles(IN_SEASON, stored, 5, 12).find((t) => t.key === 'pace')?.mayMiss, false);
 	// Preseason, or a player the preseason board did not rank: no row.
-	assert.deepEqual(basisTiles(PRESEASON, stored, 5), []);
-	assert.deepEqual(basisTiles(IN_SEASON, { ...stored, preseasonPoints: null }, 5), []);
+	assert.deepEqual(basisTiles(PRESEASON, stored, 5, 12), []);
+	assert.deepEqual(basisTiles(IN_SEASON, { ...stored, preseasonPoints: null }, 5, 12), []);
 });

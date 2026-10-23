@@ -40,7 +40,14 @@ import {
 	type SeasonView
 } from './player-season.ts';
 import type { PlayerSeason, PriorSeason } from '#lib/run/season.ts';
-import { basisTiles, cardBuild, restParts, restTile, type CardBuild } from './player-card.ts';
+import {
+	basisTiles,
+	cardBuild,
+	gamesLeftOf,
+	restParts,
+	restTile,
+	type CardBuild
+} from './player-card.ts';
 import { unwrittenByFormat } from './player-unwritten.ts';
 import { readAtStatus } from '#lib/player/status-held.ts';
 import type { BasisTile, CardTile, RestParts } from '#lib/player/card.ts';
@@ -390,7 +397,7 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		(format, numbers) => ({
 			tile: restTile(format, numbers, loaded.position, run.season, listed),
 			parts: restParts(format, numbers, loaded.position, listed),
-			basis: basisTiles(format, numbers, loaded.season?.games ?? 0)
+			basis: basisTiles(format, numbers, loaded.season?.games ?? 0, gamesLeftOf(loaded.season))
 		})
 	);
 	const [lead] = lines;

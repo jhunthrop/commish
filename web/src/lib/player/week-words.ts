@@ -697,7 +697,7 @@ function vsAvgTile(week: PlayerWeek, rest: RestParts | null, built: BasisTile): 
 	return {
 		...built,
 		value: signed(tenths / TENTHS),
-		caption: vsAvgCaption(printTenth(perGame), printTenth(avg), built.reason)
+		caption: vsAvgCaption(printTenth(perGame), printTenth(avg), built.reason, built.mayMiss)
 	};
 }
 

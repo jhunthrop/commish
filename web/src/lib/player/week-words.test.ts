@@ -677,17 +677,19 @@ void test('our rate vs his Avg is the rest of season a game less his Avg, from t
 			label: BASIS_WORDS.pace,
 			value: '16.7',
 			caption: BASIS_WORDS.paceCaption,
-			reason: null
+			reason: null,
+			mayMiss: false
 		},
 		{
 			key: 'vsAvg',
 			label: BASIS_WORDS.vsAvg,
 			value: NONE,
 			caption: BASIS_WORDS.vsAvgCaption,
-			reason: vsAvgReason({ games: 5, blended: 27.1, share: 29, rate: 24.1 })
+			reason: vsAvgReason({ games: 5, blended: 27.1, share: 29, rate: 24.1 }),
+			mayMiss: true
 		}
 	];
-	const at = (perGame: number | null, format: 'ppr' | 'half_ppr' = 'ppr') =>
+	const at = (perGame: number | null, format: 'ppr' | 'half_ppr' = 'ppr', tiles = built) =>
 		liveCard({
 			week: week(
 				{ projection_scoring: { format, league_own: false } },
@@ -702,7 +704,7 @@ void test('our rate vs his Avg is the rest of season a game less his Avg, from t
 			screenHref: href,
 			zone: ZONE,
 			now: NOW,
-			basisTiles: built
+			basisTiles: tiles
 		}).basisTiles;
 	const filled = at(22.0);
 	assert.equal(filled.find((t) => t.key === 'vsAvg')?.value, '\u22128.7');
@@ -710,6 +712,15 @@ void test('our rate vs his Avg is the rest of season a game less his Avg, from t
 		filled.find((t) => t.key === 'vsAvg')?.caption,
 		'30.7 Avg in 5 games, 27.1 blended with his usage, 24.1 weighted 29% to his preseason pace, 22.0 a game after the games he may miss'
 	);
+	// A player the run expects to play every game left says no games he may miss (Lane 165, D17): the
+	// caption stops at the rate it blended to.
+	const healthy = built.map((t) => ({ ...t, mayMiss: false }));
+	const healthyCaption = at(24.1, 'ppr', healthy).find((t) => t.key === 'vsAvg')?.caption ?? '';
+	assert.equal(
+		healthyCaption,
+		'30.7 Avg in 5 games, 27.1 blended with his usage, 24.1 weighted 29% to his preseason pace'
+	);
+	assert.doesNotMatch(healthyCaption, /may miss/u);
 	// "--" stands with the plain caption: no reason beside a figure not drawn (fix round 1, M4).
 	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.caption, BASIS_WORDS.vsAvgCaption);
 	assert.equal(filled.find((t) => t.key === 'pace')?.value, '16.7');
@@ -723,7 +734,8 @@ void test('our rate vs his Avg names both figures, the pace and its share, as it
 	const caption = vsAvgCaption(
 		'22.0',
 		'30.7',
-		vsAvgReason({ games: 5, blended: 27.1, share: 29, rate: 24.1 })
+		vsAvgReason({ games: 5, blended: 27.1, share: 29, rate: 24.1 }),
+		true
 	);
 	// Each step in order, from his Avg to our rate, each figure the run's (Lane 139 fix round 1).
 	assert.equal(
@@ -731,7 +743,7 @@ void test('our rate vs his Avg names both figures, the pace and its share, as it
 		'30.7 Avg in 5 games, 27.1 blended with his usage, 24.1 weighted 29% to his preseason pace, 22.0 a game after the games he may miss'
 	);
 	assert.doesNotMatch(caption, /\bless\b/u);
-	assert.equal(vsAvgCaption('22.0', '30.7', null), '22.0 a game vs his 30.7 Avg');
+	assert.equal(vsAvgCaption('22.0', '30.7', null, false), '22.0 a game vs his 30.7 Avg');
 	assert.match(caption, new RegExp(BASIS_WORDS.pace.toLowerCase()));
 	assert.match(BASIS_WORDS.vsAvg, /^Our rate/u);
 });

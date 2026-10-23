@@ -246,7 +246,7 @@ function setWeekText(
 export function weeklyLines(
 	weeks: readonly RecordWeek[],
 	unplayed: readonly number[],
-	underway: readonly number[]
+	underway: readonly number[] = []
 ): WeekLine[] {
 	const coming = weeks.filter((week) => week.status === 'upcoming');
 	const lines = weekLines(

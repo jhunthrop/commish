@@ -11,7 +11,7 @@ import { positionRankShown } from '#lib/run/held-places.ts';
 import { playerRestFrom, playerRestWords, restSpanWords } from '#lib/run/rest-from.ts';
 import type { Capsule, Format, PlayerFormat, PlayerStatus } from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
-import { BASIS_WORDS, vsAvgReason } from '#lib/player/basis-words.ts';
+import { BASIS_WORDS, mayMissGames, vsAvgReason } from '#lib/player/basis-words.ts';
 import {
 	CARD,
 	NONE,
@@ -107,13 +107,25 @@ export function restParts(
 	};
 }
 
+/** The games his club has still to play on the run, from his log; null with no season to count in
+ * (Lane 165, D17). */
+export function gamesLeftOf(season: PlayerSeason | null): number | null {
+	if (season === null) return null;
+	return season.log.filter((row) => row.status === 'upcoming' && row.opponent !== null).length;
+}
+
 /** The in-season row under the tiles in a format (Lane 100, B17 and B51): the pace a game the order
  * starts from, as the run stores it, and our rest-of-season rate a game against his Avg, which the
  * week's read fills (Lane 139, C08). His preseason figure for the full season is not drawn beside the
  * pace (C09): it is the served board's over its own games, the pace the raw line's, so the two never
  * reconcile on the card. None preseason or for a player the preseason board did not rank. The reason
  * beside the rate is said only with the stored pace it rests on, its share when the run says it. */
-export function basisTiles(format: Format, numbers: PlayerFormat, games: number): BasisTile[] {
+export function basisTiles(
+	format: Format,
+	numbers: PlayerFormat,
+	games: number,
+	gamesLeft: number | null
+): BasisTile[] {
 	const points = numbers.preseasonPoints ?? null;
 	if (format.rosFromWeek === undefined || points === null) return [];
 	const pace = numbers.preseasonPerGame ?? null;
@@ -126,7 +138,8 @@ export function basisTiles(format: Format, numbers: PlayerFormat, games: number)
 						label: BASIS_WORDS.pace,
 						value: fixed(pace),
 						caption: BASIS_WORDS.paceCaption,
-						reason: null
+						reason: null,
+						mayMiss: false
 					}
 				]),
 		{
@@ -142,7 +155,8 @@ export function basisTiles(format: Format, numbers: PlayerFormat, games: number)
 							blended: numbers.blendedPerGame ?? null,
 							share: numbers.preseasonShare ?? null,
 							rate: numbers.ratePerGame ?? null
-						})
+						}),
+			mayMiss: mayMissGames(numbers.expectedGames, gamesLeft)
 		}
 	];
 }
