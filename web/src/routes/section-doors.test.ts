@@ -15,13 +15,13 @@ const DOORS = [
 ] as const;
 
 for (const { door, target, href } of DOORS) {
-	test(`${door} redirects to ${href} by the rail's own constant`, () => {
+	void test(`${door} redirects to ${href} by the rail's own constant`, () => {
 		const source = read(door);
 		assert.match(source, new RegExp(`redirect\\(307, resolve\\(${target}\\)\\)`));
 		assert.doesNotMatch(source, /['"]\/(mock|companion)\/new['"]/);
 	});
 
-	test(`${href} is a page of its own`, () => {
+	void test(`${href} is a page of its own`, () => {
 		assert.ok(readFileSync(new URL(`.${href}/+page.svelte`, import.meta.url)).length > 0);
 	});
 }

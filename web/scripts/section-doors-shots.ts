@@ -49,8 +49,8 @@ async function shoot(door: (typeof DOORS)[number]): Promise<void> {
 		failures.push(`${path}: 401 from ${unauthorized.join(', ')}`);
 	if (clean && errors.length > 0) failures.push(`${path}: console errors ${errors.join(' | ')}`);
 	await page.screenshot({ path: new URL(`${name}-${String(WIDTH)}.png`, out).pathname });
-	console.log(
-		`${path} -> ${landed}, ${String(unauthorized.length)} x 401, ${String(errors.length)} console errors`
+	process.stdout.write(
+		`${path} -> ${landed}, ${String(unauthorized.length)} x 401, ${String(errors.length)} console errors\n`
 	);
 	await context.close();
 }
@@ -58,6 +58,6 @@ async function shoot(door: (typeof DOORS)[number]): Promise<void> {
 for (const door of DOORS) await shoot(door);
 await browser.close();
 if (failures.length > 0) {
-	console.error(failures.join('\n'));
+	process.stderr.write(`${failures.join('\n')}\n`);
 	process.exit(1);
 }
