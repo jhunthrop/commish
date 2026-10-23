@@ -25,9 +25,9 @@ export { BUILD_ZONE };
 
 /** Every word the strip prints that is not a player's, a figure or the API's. */
 export const STRIP_WORDS = {
-	/** "Projected and Over replacement updated Thu Oct 22, 8:50 am Central.": the run's figures with
+	/** "Projected updated Thu Oct 22, 8:50 am Central.": the run's figures with
 	 * its one stamp, day and zone (Lane 140, C24). */
-	updated: (at: string): string => `Projected and Over replacement updated ${at}.`,
+	updated: (at: string): string => `Projected updated ${at}.`,
 	/** The league a figure is for, as the API names it (words.go OrderLeague). */
 	yourLeague: 'your league',
 	shapeLeague: (teams: number, scoring: string): string =>
@@ -44,7 +44,7 @@ export const STRIP_WORDS = {
 	leagueAvg: "Avg in your league's scoring."
 } as const;
 
-/** "Projected and Over replacement updated Thu Oct 22, 8:50 am Central.": the run's figures with
+/** "Projected updated Thu Oct 22, 8:50 am Central.": the run's figures with
  * its one stamp (C24): the front door's basis dates the run here alone. */
 export function runStampPart(refreshedAt: string, zone: string): BasisPart {
 	return { text: STRIP_WORDS.updated(dayTimeStamp(refreshedAt, zone)), phone: true };

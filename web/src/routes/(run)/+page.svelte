@@ -236,6 +236,7 @@
 								framing={page.framing}
 								status={words?.rows[player.id] ?? null}
 								untiered={player.untiered === true}
+								vorHeld={liveRead === null}
 							>
 								{#snippet action()}<RowSheetMark {player} />{/snippet}
 							</Row>

@@ -230,7 +230,7 @@ void test('a figure the answer lacks, or a short answer, keeps the run strip', (
 
 void test("the signed-out strip says the run's time beside its figures", () => {
 	assert.deepEqual(runStampPart(RUN_AT, ZONE), {
-		text: 'Projected and Over replacement updated Mon Oct 19, 8:50 am Central.',
+		text: 'Projected updated Mon Oct 19, 8:50 am Central.',
 		phone: true
 	});
 	// "Run" is never the page's word (B53).

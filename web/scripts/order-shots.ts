@@ -190,7 +190,22 @@ async function common(page: Page, screen: Screen, width: number): Promise<string
 	return said;
 }
 
+/** Show more until every row the read holds is drawn: the week's byes are its last rows (Lane 163). */
+async function showEveryRow(page: Page): Promise<void> {
+	const more = page.getByRole('button', { name: ORDER.moreRows });
+	while ((await more.count()) > 0) {
+		const before = await page.locator('main table.order tbody tr').count();
+		await more.first().click();
+		await page.waitForFunction(
+			(was) => document.querySelectorAll('main table.order tbody tr').length > was,
+			before,
+			{ timeout: READY_TIMEOUT_MS }
+		);
+	}
+}
+
 async function orderFaults(page: Page, screen: Screen, width: number): Promise<string[]> {
+	if (screen.name === 'players') await showEveryRow(page);
 	const seen = await page.evaluate(() => {
 		const table = document.querySelector('main table.order');
 		const text = (el: Element): string => el.textContent.trim();
@@ -202,7 +217,8 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 			trades: [...(table?.querySelectorAll('a.verb.trade') ?? [])].length,
 			adds: [...(table?.querySelectorAll('a.verb.add') ?? [])].length,
 			mine: table?.querySelectorAll('tbody tr.mine').length ?? 0,
-			cells: [...(table?.querySelectorAll('td.n') ?? [])].filter(visible).map(text),
+			// A bye's # cell is empty by ruling (Lane 163), so it is no figure.
+			cells: [...(table?.querySelectorAll('td.n:not(.bye .rank)') ?? [])].filter(visible).map(text),
 			places: [...(table?.querySelectorAll('tbody:not(.bye) td.rank') ?? [])].map(text),
 			// The week's rankings (Lane 163, D06): the byes' section, its head and its # cells.
 			byeHeads: [...(table?.querySelectorAll('tbody.bye tr.sec th') ?? [])].map(text),
@@ -250,7 +266,6 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 	// "Bye in week N" after the players who play, who are numbered 1..n; Rest of season keeps them.
 	const numbered = places.filter((p) => !LIST_PLACE.test(p));
 	if (screen.name === 'players') {
-		// The section is drawn exactly when an available player is on bye (the stand-in week may have none).
 		const headsWanted = seen.byeGames.length > 0 ? 1 : 0;
 		if (seen.byeHeads.length !== headsWanted || seen.byeHeads.some((head) => !BYE_HEAD.test(head)))
 			said.push(`players at ${String(width)}: byes' head ${JSON.stringify(seen.byeHeads)}`);

@@ -32,7 +32,7 @@ const PHONE_MAX = 760;
 const HEIGHT = { desk: 900, phone: 844 } as const;
 const READY_TIMEOUT_MS = 30_000;
 const SETTLE_MS = 600;
-const RUN_STAMP = 'Over replacement updated Thu Oct 15, 8:50 am Central';
+const RUN_STAMP = 'Projected updated Thu Oct 15, 8:50 am Central';
 const LIVE_LEAD = "for 12 teams, your league's shape, read";
 /** The signed-out lead: the board's shape, no league (Lane 163, D05). */
 const LIVE_LEAD_OUT = 'by points over replacement for 12 teams, read';
@@ -139,6 +139,20 @@ for (const theme of THEMES) {
 			await ctx.close();
 		}
 	}
+}
+// The prerendered card before any script runs holds its Over replacement cells (Lane 163 fix round
+// 1, D05): the run's level is not the site's one definition, so no signed figure is drawn.
+for (const width of WIDTHS) {
+	const ctx = await browser.newContext({
+		viewport: { width, height: HEIGHT.desk },
+		javaScriptEnabled: false
+	});
+	const page = await ctx.newPage();
+	await page.goto(`${web}/`, { waitUntil: 'load' });
+	const text = (await page.locator('section.top').textContent()) ?? '';
+	if (/[+\u2212-]\d+\.\d/u.test(text))
+		faults.push(`front prerendered at ${String(width)}: draws an Over replacement figure`);
+	await ctx.close();
 }
 await browser.close();
 for (const fault of faults) process.stdout.write(`FAULT ${fault}\n`);
