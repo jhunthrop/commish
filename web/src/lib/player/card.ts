@@ -116,6 +116,8 @@ export const CARD = {
 	ourRead: 'Our read',
 	/** In season, the read's place while no week read stands for him (Lane 100, B44). */
 	readNotYet: 'Our read for his next game is not written yet.',
+	/** The same place once his game has kicked off or is final (Lane 158): never "next" for it. */
+	readNotWritten: 'Our read for this game was not written.',
 	/** The Proj of the week after his bye once its capture time has passed with none read. */
 	nextProjNotIn: 'Not in yet',
 	/** A "--" says why on its tile (review M4). */

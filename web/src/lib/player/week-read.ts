@@ -1,23 +1,31 @@
 /** The week-ahead read beside the card (Lane 66v). The read quotes the published projection it was
- * written with, in PPR, as the card prints it (the run's `projection`); once the card's live read prints
- * another figure for that week, the read is withheld behind the run's words for it (`movedCaption`),
- * under the not-written-yet line (Lane 126). The figures are the run's and the API's, each rounded once there:
- * this only compares them. */
+ * written with, in PPR, as the card prints it (the run's `projection`); while his game is still to come
+ * and the week's published projection is another figure, the read is withheld behind the run's words
+ * for it (`movedCaption`). From kickoff through final the read written for the week stands whatever the
+ * card prints (Lane 158). A withheld read is its caption alone, never under the not-written line, which
+ * is said only when the run holds no read for him (Lane 158). The figures are the run's and the API's,
+ * each rounded once there: this only compares them. */
 import type { components } from '#lib/api/types.ts';
+import type { GameHead } from '#lib/league/box/kickoff.ts';
 import type { WeekRead } from '#lib/run/schema.ts';
+import { CARD } from './card.ts';
 
-/** The card's live projection for a week: its scoring, and the figure it prints (null for none). */
+/** His game's state at the screen's clock, by the screen's one rule (kickoff.ts lineState), null for
+ * a bye or a week with no game held. */
+export type ReadGameState = GameHead['state'] | null;
+
+/** The card's live projection for a week: its scoring, the week's published projection (null for
+ * none) and his game's state at the card's clock. */
 export interface CardProjection {
 	week: number;
 	scoring: components['schemas']['ProjectionScoring']['format'];
 	points: number | null;
+	state: ReadGameState;
 }
 
-/** What the page shows of the read: its body (null when withheld) and the caption over it. */
-export interface ShownRead {
-	body: string | null;
-	caption: string;
-}
+/** What the page shows of the read: the read with its caption, or a withheld read's caption alone. */
+export type ShownRead =
+	{ withheld: false; body: string; caption: string } | { withheld: true; words: string };
 
 /** The read's section as the page names it: the week it was written for, never "the week ahead",
  * which a week already played is not (Lane 95, B16). */
@@ -25,12 +33,23 @@ export function weekReadLabel(read: Pick<WeekRead, 'week'>): string {
 	return `Our read for week ${String(read.week)}`;
 }
 
+/** His game has kicked off or is final: the read written for the week stands. */
+function underway(state: ReadGameState): boolean {
+	return state === 'kicked_off' || state === 'final';
+}
+
 /** The read as the page shows it beside the card's live projection (null until the card has read). */
 export function shownWeekRead(read: WeekRead, card: CardProjection | null): ShownRead {
-	const built = { body: read.body, caption: read.caption };
 	// A read the run already withheld keeps the run's caption (a status change says when the new one is due).
-	if (read.body === null) return built;
-	if (card?.scoring !== 'ppr' || card.week !== read.week) return built;
+	if (read.body === null) return { withheld: true, words: read.caption };
+	const built = { withheld: false, body: read.body, caption: read.caption } as const;
+	if (card?.scoring !== 'ppr' || card.week !== read.week || underway(card.state)) return built;
 	if (read.projection === undefined || read.movedCaption === undefined) return built;
-	return card.points === read.projection ? built : { body: null, caption: read.movedCaption };
+	return card.points === read.projection ? built : { withheld: true, words: read.movedCaption };
+}
+
+/** The read's place when the run holds no read for him: his next game while it is still to come,
+ * never "next" for a game under way or final (Lane 158). */
+export function noReadWords(state: ReadGameState): string {
+	return underway(state) ? CARD.readNotWritten : CARD.readNotYet;
 }

@@ -1,8 +1,10 @@
-// The week-ahead read beside the card (Lane 66v): run with `npm test`.
+// The week-ahead read beside the card (Lane 66v, Lane 158): run with `npm test`. The engine's cases
+// at fixed clocks (kicked off, final, moved before kickoff) are in week-words.test.ts.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { WeekRead } from '../run/schema.ts';
-import { shownWeekRead, weekReadLabel } from './week-read.ts';
+import { CARD } from './card.ts';
+import { noReadWords, shownWeekRead, weekReadLabel, type ReadGameState } from './week-read.ts';
 
 const MOVED = 'The published projection moved since this read was written.';
 const READ: WeekRead = {
@@ -16,7 +18,13 @@ const READ: WeekRead = {
 	projection: 26.4,
 	movedCaption: MOVED
 };
-const ppr = (points: number | null) => ({ week: 7, scoring: 'ppr' as const, points });
+const ppr = (points: number | null, state: ReadGameState = 'upcoming') => ({
+	week: 7,
+	scoring: 'ppr' as const,
+	points,
+	state
+});
+const BUILT = { withheld: false, body: READ.body, caption: READ.caption };
 
 void test('the read is named by the week it was written for, never the week ahead (Lane 95)', () => {
 	assert.equal(weekReadLabel(READ), 'Our read for week 7');
@@ -24,35 +32,54 @@ void test('the read is named by the week it was written for, never the week ahea
 });
 
 void test('the read stands while the card prints the projection it quotes', () => {
-	assert.deepEqual(shownWeekRead(READ, ppr(26.4)), { body: READ.body, caption: READ.caption });
+	assert.deepEqual(shownWeekRead(READ, ppr(26.4)), BUILT);
 });
 
-void test('the read is withheld once the card prints another projection (the sweep X5: 26.6 against 26.4)', () => {
+void test('before kickoff the read is withheld once the card prints another projection: its caption alone', () => {
 	assert.deepEqual(shownWeekRead({ ...READ, projection: 26.6 }, ppr(26.4)), {
-		body: null,
-		caption: MOVED
+		withheld: true,
+		words: MOVED
 	});
-	assert.deepEqual(shownWeekRead(READ, ppr(null)), { body: null, caption: MOVED });
+	assert.deepEqual(shownWeekRead(READ, ppr(null)), { withheld: true, words: MOVED });
+	// A bye or a week with no game held is judged as before kickoff.
+	assert.deepEqual(shownWeekRead(READ, ppr(20, null)), { withheld: true, words: MOVED });
+});
+
+void test('from kickoff through final the read stands whatever the card prints (Lane 158)', () => {
+	for (const state of ['kicked_off', 'final'] as const) {
+		assert.deepEqual(shownWeekRead(READ, ppr(4.6, state)), BUILT, state);
+		assert.deepEqual(shownWeekRead(READ, ppr(null, state)), BUILT, state);
+	}
 });
 
 void test('the read stands as built until the card reads in PPR for its week', () => {
-	const built = { body: READ.body, caption: READ.caption };
-	assert.deepEqual(shownWeekRead(READ, null), built);
-	assert.deepEqual(shownWeekRead(READ, { week: 7, scoring: 'half_ppr', points: 22.1 }), built);
-	assert.deepEqual(shownWeekRead(READ, { ...ppr(20), week: 8 }), built);
+	assert.deepEqual(shownWeekRead(READ, null), BUILT);
+	assert.deepEqual(
+		shownWeekRead(READ, { week: 7, scoring: 'half_ppr', points: 22.1, state: 'upcoming' }),
+		BUILT
+	);
+	assert.deepEqual(shownWeekRead(READ, { ...ppr(20), week: 8 }), BUILT);
 	// A run from before the read carried its figure is not judged.
 	const older: WeekRead = { ...READ, projection: undefined, movedCaption: undefined };
-	assert.deepEqual(shownWeekRead(older, ppr(20)), built);
+	assert.deepEqual(shownWeekRead(older, ppr(20)), BUILT);
 });
 
-void test('a read the run withheld for his status keeps its due time when the card also moved', () => {
+void test('a read the run withheld for his status keeps its due time alone, at any state', () => {
 	const status =
 		'His status changed since this read was written. A new read is due by Sat 9:00 am Central.';
 	const withheld = { ...READ, body: null, caption: status };
-	assert.deepEqual(shownWeekRead(withheld, ppr(25.1)), { body: null, caption: status });
+	for (const state of ['upcoming', 'kicked_off', 'final'] as const)
+		assert.deepEqual(shownWeekRead(withheld, ppr(25.1, state)), { withheld: true, words: status });
 });
 
 void test('a read the run already withheld stays withheld', () => {
 	const withheld = { ...READ, body: null, caption: MOVED };
-	assert.deepEqual(shownWeekRead(withheld, ppr(26.4)), { body: null, caption: MOVED });
+	assert.deepEqual(shownWeekRead(withheld, ppr(26.4)), { withheld: true, words: MOVED });
+});
+
+void test('with no read the place names his next game only while it is still to come', () => {
+	assert.equal(noReadWords('upcoming'), CARD.readNotYet);
+	assert.equal(noReadWords(null), CARD.readNotYet);
+	assert.equal(noReadWords('kicked_off'), CARD.readNotWritten);
+	assert.equal(noReadWords('final'), CARD.readNotWritten);
 });

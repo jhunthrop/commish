@@ -370,6 +370,11 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 	check(card.verbs.includes('Compare'), `${where}: no Compare`);
 	check(WEEK_READ.test(card.readText) === (shot.weekRead === 'shown'), `${where}: the week read`);
 	check(card.readText.includes(WITHHELD) === (shot.weekRead === 'withheld'), `${where}: withheld`);
+	// A withheld read is its caption alone, never under the not-written line (Lane 158).
+	check(
+		shot.weekRead !== 'withheld' || !card.readText.includes(CARD.readNotYet),
+		`${where}: the withheld read says it is not written`
+	);
 	if (!ROS && !card.underway && !card.readText.includes('Our written read of him is not ready'))
 		check(
 			/Written \w{3} \d{1,2}, from his facts through last season/.test(card.readText),

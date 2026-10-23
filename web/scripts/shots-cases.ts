@@ -179,6 +179,11 @@ const BOARD_WEEK_7 = { [BOARD_WEEK_VARIABLE]: '7' };
 export const SHOT_CASES: readonly ShotCase[] = [
 	// The stand-in run.
 	once('shelf-shots', 'standin', FIXTURE_WEEK_CLOCK),
+	// Lane 158: a player in play with a read, his noon game under way.
+	once('shelf-shots', 'standin', FIXTURE_SUNDAY_CLOCK, {
+		name: 'shelf-shots-in-play',
+		env: { SHELF_IN_PLAY: '1' }
+	}),
 	once('player-card-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	once('inseason-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	...clocked('platform-finals-shots', 'standin', {
