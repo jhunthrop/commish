@@ -27,14 +27,19 @@ const client = apiClient(PUBLIC_API_URL);
 
 export { ApiError };
 
+/** A call the API answers only after reading the platform live: connecting, and the platform's own
+ * league list, waited for longer than a read of ours. */
+const LIVE_READ = { timeout: 'platform' } as const;
+
 export const hostsApi = {
 	connections: () => client.call<HostConnections>('/hosts'),
 	connectFFPC: (email: string, password: string, consent: boolean) =>
 		client.call<HostConnected>('/hosts/ffpc/connect', {
 			method: 'POST',
+			...LIVE_READ,
 			body: { email, password, consent }
 		}),
-	ffpcLeagues: () => client.call<HostLeague[]>('/hosts/ffpc/leagues'),
+	ffpcLeagues: () => client.call<HostLeague[]>('/hosts/ffpc/leagues', LIVE_READ),
 	disconnectFFPC: () => client.call<null>('/hosts/ffpc', { method: 'DELETE' }),
 	/** Yahoo's authorize address, with a state bound to this account for ten minutes. */
 	connectYahoo: (returnTo?: string) =>
@@ -42,25 +47,27 @@ export const hostsApi = {
 			method: 'POST',
 			body: returnTo === undefined ? {} : { return_to: returnTo }
 		}),
-	yahooLeagues: () => client.call<HostLeague[]>('/hosts/yahoo/leagues'),
+	yahooLeagues: () => client.call<HostLeague[]>('/hosts/yahoo/leagues', LIVE_READ),
 	disconnectYahoo: () => client.call<null>('/hosts/yahoo', { method: 'DELETE' }),
 	/** The member's two ESPN cookies, kept encrypted once one read of their leagues shows they work:
 	 * proven when a private league reads with them too, else kept with a note saying why. */
 	connectESPN: (swid: string, s2: string) =>
 		client.call<HostConnected>('/hosts/espn/connect', {
 			method: 'POST',
+			...LIVE_READ,
 			body: { swid, espn_s2: s2, consent: true, consent_version: ESPN_CONSENT_VERSION }
 		}),
-	espnLeagues: () => client.call<HostLeague[]>('/hosts/espn/leagues'),
+	espnLeagues: () => client.call<HostLeague[]>('/hosts/espn/leagues', LIVE_READ),
 	disconnectESPN: () => client.call<null>('/hosts/espn', { method: 'DELETE' }),
 	/** The member's MyFantasyLeague username and password, sent once: the API exchanges them at
 	 * MyFantasyLeague's login and keeps only the session it answers. */
 	connectMFL: (username: string, password: string) =>
 		client.call<HostConnected>('/hosts/mfl/connect', {
 			method: 'POST',
+			...LIVE_READ,
 			body: { username, password, consent: true, consent_version: MFL_CONSENT_VERSION }
 		}),
-	mflLeagues: () => client.call<HostLeague[]>('/hosts/mfl/leagues'),
+	mflLeagues: () => client.call<HostLeague[]>('/hosts/mfl/leagues', LIVE_READ),
 	disconnectMFL: () => client.call<null>('/hosts/mfl', { method: 'DELETE' }),
 	devices: () => client.call<Device[]>('/devices'),
 	pairCode: () => client.call<PairCode>('/devices/codes', { method: 'POST' }),
