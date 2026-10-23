@@ -9,51 +9,15 @@
 #
 # THE ABSENCE POLICIES (fix round 2, N5; one condition each, as PromQL requires) are what catch a schedule that never fires: a paused or
 # deleted scheduler job starts no execution and logs no error, so the two failure policies stay
-# silent. They are created DISABLED, because the schedule is paused until cutover and it would fire at
-# once; the cutover's last step, after resuming the six scheduler jobs, is `enable-absence`.
+# silent. `apply` creates them DISABLED (a paused schedule would fire them at once) and keeps an
+# enabled one enabled; `enable-absence` turns them on. All six policies are on since 2026-10-22.
 #
-# Run by hand (bash). It calls the Cloud Monitoring API with the caller's own token, because the
-# monitoring policy commands are only in gcloud's alpha component.
+# Run by hand (bash). The project, the channel and the API call are infra/lib/monitoring.sh's.
 set -euo pipefail
 
-PROJECT="trycommish"
-EMAIL="jhunthrop@yahoo.com"
-CHANNEL_NAME="Research jobs: the founder"
-GCLOUD="${GCLOUD:-gcloud}"
-API="https://monitoring.googleapis.com/v3/projects/${PROJECT}"
-TOKEN="$("${GCLOUD}" auth print-access-token)"
-
-call() { # method, path, [body]; a refused call prints the API's own error
-  local out
-  out="$(curl --silent --show-error --fail-with-body -X "$1" "${API}/$2" \
-    -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" ${3:+--data "$3"})" || {
-    echo "$1 $2 refused: ${out}" >&2
-    return 1
-  }
-  printf '%s' "${out}"
-}
-
-channel() {
-  local found
-  found="$(call GET notificationChannels | python3 -c "
-import json, sys
-for c in json.load(sys.stdin).get('notificationChannels', []):
-    if c.get('displayName') == sys.argv[1] and c.get('labels', {}).get('email_address') == sys.argv[2]:
-        print(c['name']); break" "${CHANNEL_NAME}" "${EMAIL}")"
-  if [[ -z "${found}" && "${1:-}" == "create" ]]; then
-    local body
-    body="$(channel_body)"
-    found="$(call POST notificationChannels "${body}" | python3 -c 'import json, sys; print(json.load(sys.stdin)["name"])')"
-  fi
-  printf '%s' "${found}"
-}
-
-channel_body() {
-  python3 - "${CHANNEL_NAME}" "${EMAIL}" <<'PY'
-import json, sys
-print(json.dumps({"type": "email", "displayName": sys.argv[1], "labels": {"email_address": sys.argv[2]}, "enabled": True}))
-PY
-}
+# shellcheck source=infra/lib/monitoring.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/monitoring.sh"
+monitoring_login
 
 # The two policies, by display name. Each is created once; a policy already present is left alone.
 policy_body() { # display name, channel, absence enabled (true|false)
@@ -148,14 +112,6 @@ PY
 }
 
 POLICIES=("Research job execution failed" "Research schedule firing failed" "Research nightly held a page" "Research nightly absent" "Research in-season absent" "Research weekly pass absent")
-
-existing_policy() { # display name
-  call GET alertPolicies | python3 -c "
-import json, sys
-for p in json.load(sys.stdin).get('alertPolicies', []):
-    if p.get('displayName') == sys.argv[1]:
-        print(p['name'], p.get('enabled', False), ','.join(p.get('notificationChannels', []))); break" "$1"
-}
 
 apply() { # absence enabled (true|false)
   local ch name line

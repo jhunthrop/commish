@@ -4,6 +4,7 @@
  * resolves to the payload or throws an ApiError carrying the envelope's code, so a caller branches
  * on the code and shows the API's own sentence.
  */
+import { REQUEST_TIMEOUT_MS, type RequestTimeout, type RequestTimeouts } from './config.ts';
 import { SESSION_CSRF_COOKIE } from './session.ts';
 import type { components } from './types.ts';
 
@@ -56,7 +57,8 @@ export interface RequestOptions {
 	/** A JSON body, or a string sent as is with `contentType`. */
 	body?: unknown;
 	contentType?: string;
-	signal?: AbortSignal;
+	/** How long to wait: a read's or a write's by the method, unless the call reads a platform live. */
+	timeout?: RequestTimeout;
 }
 
 export interface ApiClient {
@@ -87,11 +89,26 @@ function bodyFor(options: RequestOptions): BodyInit | undefined {
 		: JSON.stringify(options.body);
 }
 
-/** A client for the API at `origin`. `fetcher` is the window's fetch unless a caller passes one. */
-export function apiClient(origin: string, fetcher: typeof fetch = fetch): ApiClient {
+/** The answer that never arrived: no network, a hung API past its wait, or Google's front end
+ * answering for it. Status 0, so a caller reads it as "can't reach" and a write as maybe sent. */
+function unreachable(): ApiError {
+	return new ApiError(0, { code: CLIENT_CODES.offline, message: 'We could not reach Commish' });
+}
+
+/** A client for the API at `origin`. `fetcher` is the window's fetch and `timeouts` the site's
+ * waits unless a caller (a test) passes its own. */
+export function apiClient(
+	origin: string,
+	fetcher: typeof fetch = fetch,
+	timeouts: RequestTimeouts = REQUEST_TIMEOUT_MS
+): ApiClient {
 	return {
 		async call<T>(path: string, options: RequestOptions = {}): Promise<T> {
 			const method = options.method ?? 'GET';
+			// The wait is the call's only signal: no caller passes its own (the option was dropped).
+			const wait = AbortSignal.timeout(
+				timeouts[options.timeout ?? (SAFE_METHODS.has(method) ? 'read' : 'write')]
+			);
 			let response: Response;
 			try {
 				response = await fetcher(`${origin}${path}`, {
@@ -99,25 +116,25 @@ export function apiClient(origin: string, fetcher: typeof fetch = fetch): ApiCli
 					credentials: 'include',
 					headers: headersFor(method, options),
 					body: bodyFor(options),
-					signal: options.signal
+					signal: wait
 				});
-			} catch (cause) {
-				if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
-				throw new ApiError(0, {
-					code: CLIENT_CODES.offline,
-					message: 'We could not reach Commish'
-				});
+			} catch {
+				throw unreachable();
 			}
+			const { status } = response;
 			const parsed: unknown = await response.json().catch(() => null);
 			if (!isEnvelope(parsed)) {
-				throw new ApiError(response.status, {
+				// Past the wait while the body was read, or Google's front end answering 502 to 504 with
+				// its own page for a service that is down, cold or past its timeout (launch audit G2).
+				if (wait.aborted || (status > 501 && status < 505)) throw unreachable();
+				throw new ApiError(status, {
 					code: CLIENT_CODES.malformed,
 					message: 'Commish answered in a way we did not expect'
 				});
 			}
 			if (!parsed.ok || parsed.error) {
 				throw new ApiError(
-					response.status,
+					status,
 					parsed.error ?? { code: CLIENT_CODES.malformed, message: 'Something went wrong' }
 				);
 			}
