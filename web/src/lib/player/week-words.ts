@@ -692,7 +692,8 @@ export function liveCard({
 		projection: {
 			week: week.week,
 			scoring: week.projection_scoring.format,
-			points: week.line.week_projection
+			points: week.line.week_projection,
+			state: lineState(week.line.facts, now)
 		}
 	};
 }

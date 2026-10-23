@@ -9,9 +9,13 @@
 // reopens it and the close button then clears the address. A player with a written read, opened from
 // the address on Players, shows the read in the UI face at the rows' body size (Lane 126). The Lineup's
 // IR case (Lane 128) opens a player on injured reserve: no rank on his row, "QB IR" on the shelf. It prints each screen's script on load,
-// gzipped, before any tap (the shelf's script waits for the first). Exits non-zero on any fault.
+// gzipped, before any tap (the shelf's script waits for the first). Lane 158: a player whose read
+// quotes a projection the card does not print shows the moved caption alone before his kickoff, never
+// under "not written yet"; with SHELF_IN_PLAY=1 the case runs alone on the fixture's Sunday clock
+// (FIXTURE_SUNDAY_CLOCK, his noon game under way), where the read written for the week is shown.
+// Exits non-zero on any fault.
 //
-//   [BYTES_ONLY=1] node scripts/shelf-shots.ts [web origin] [out dir]
+//   [BYTES_ONLY=1] [SHELF_IN_PLAY=1] node scripts/shelf-shots.ts [web origin] [out dir]
 // BYTES_ONLY prints the screens' script and stops, for a build from before the shelf.
 // with the site built against PUBLIC_API_URL naming the fixture API, which runs on the fixture week's
 // clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z) at API_ORIGIN.
@@ -27,6 +31,7 @@ import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { readFace } from './read-face.ts';
 import {
+	FIXTURE_SUNDAY_CLOCK,
 	FIXTURE_WEEK_CLOCK,
 	installFixtureClock,
 	requireFixtureClock
@@ -50,6 +55,9 @@ const web = process.argv[2] ?? 'http://localhost:4173';
 const out = new URL(process.argv[3] ?? '../screenshots/shelf/', import.meta.url);
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
 const id = FIXTURE_IDS.league;
+/** Lane 158's in-play case alone, on the Sunday clock: every other case is shot on the week's. */
+const IN_PLAY = process.env.SHELF_IN_PLAY === '1';
+const CLOCK = IN_PLAY ? FIXTURE_SUNDAY_CLOCK : FIXTURE_WEEK_CLOCK;
 
 interface Screen {
 	name: string;
@@ -114,7 +122,7 @@ const SCREENS: readonly Screen[] = [
 	}
 ];
 
-await requireFixtureClock(API_ORIGIN);
+await requireFixtureClock(API_ORIGIN, CLOCK);
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 const faults: string[] = [];
@@ -130,7 +138,7 @@ async function context(
 		deviceScaleFactor: size.width === PHONE.width ? 2 : 1
 	});
 	watchData(ctx);
-	await installFixtureClock(ctx, FIXTURE_WEEK_CLOCK);
+	await installFixtureClock(ctx, CLOCK);
 	if (signedIn) await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
@@ -326,7 +334,7 @@ async function behave(page: Page, screen: Screen, label: string): Promise<void> 
 }
 
 const bytes: string[] = [];
-for (const screen of SCREENS) {
+for (const screen of IN_PLAY ? [] : SCREENS) {
 	const { load, tap } = await scriptBytes(screen);
 	const first = tap === null ? 'no shelf' : `first tap adds ${String(tap)} B gz`;
 	bytes.push(
@@ -334,7 +342,7 @@ for (const screen of SCREENS) {
 	);
 }
 
-const shotScreens = process.env.BYTES_ONLY ? [] : SCREENS.filter((s) => s.shot);
+const shotScreens = process.env.BYTES_ONLY || IN_PLAY ? [] : SCREENS.filter((s) => s.shot);
 for (const screen of shotScreens) {
 	for (const theme of THEMES) {
 		for (const size of SIZES) {
@@ -374,7 +382,7 @@ const IR_CASE = {
 	weekTiles: 3
 };
 const lineupScreen = SCREENS.find((s) => s.name === 'lineup');
-if (!process.env.BYTES_ONLY && lineupScreen !== undefined) {
+if (!process.env.BYTES_ONLY && !IN_PLAY && lineupScreen !== undefined) {
 	for (const theme of THEMES) {
 		for (const size of SIZES) {
 			const label = `lineup IR ${theme} ${String(size.width)}`;
@@ -416,30 +424,63 @@ if (!process.env.BYTES_ONLY && lineupScreen !== undefined) {
 	}
 }
 // A player with a written week read (the stand-in run's, scripts/standin-week-reads.json), opened from
-// the address on Players: the read is drawn, in the UI face at the rows' body size (Lane 126).
-const READ_SLUG = 'puka-nacua';
+// the address on Players: the read is drawn, in the UI face at the rows' body size (Lane 126). Lane
+// 158: Rome Odunze's read quotes 12.4, a projection his card does not print; before his kickoff the
+// shelf says the moved caption alone, from it (SHELF_IN_PLAY) the read written for the week.
+interface ReadCase {
+	slug: string;
+	shot: string;
+	/** The read is drawn, else its moved caption alone. */
+	shown: boolean;
+}
+const MOVED = 'The published projection moved since this read was written.';
+const READ_CASES: readonly ReadCase[] = IN_PLAY
+	? [{ slug: 'rome-odunze', shot: 'read-in-play', shown: true }]
+	: [
+			{ slug: 'puka-nacua', shot: 'read', shown: true },
+			{ slug: 'rome-odunze', shot: 'read-moved', shown: false }
+		];
+
+/** The read's place says one thing: the read, or the moved caption alone, never "not written yet". */
+async function checkRead(page: Page, read: ReadCase, label: string): Promise<void> {
+	const text = await shelf(page).locator('section.read').innerText();
+	if (text.includes(CARD.readNotYet) || text.includes(CARD.readNotWritten))
+		faults.push(`${label}: the read's place says it is not written: "${text}"`);
+	if (text.includes(MOVED) === read.shown)
+		faults.push(`${label}: the moved caption ${read.shown ? 'over the read' : 'missing'}`);
+	if (read.shown) {
+		const face = await readFace(page, 'dialog.shelf[open]');
+		for (const said of face.faults) faults.push(`${label}: ${said}`);
+		process.stdout.write(`${label}: the read's lines ${face.lines.join(', ')} characters\n`);
+	}
+}
+
 const playersScreen = SCREENS.find((s) => s.name === 'players');
 if (!process.env.BYTES_ONLY && playersScreen !== undefined) {
-	for (const theme of THEMES) {
-		for (const size of SIZES) {
-			const label = `read ${theme} ${String(size.width)}`;
-			const ctx = await context(theme, size, playersScreen.signedIn);
-			const page = await ctx.newPage();
-			try {
-				await page.goto(`${web}${playersScreen.path}?${SHELF_PARAM}=${READ_SLUG}`);
-				await ready(page, playersScreen);
-				await shelf(page).locator('.prose.week').waitFor({ timeout: READY_TIMEOUT_MS });
-				await page.evaluate(() => document.fonts.ready);
-				const face = await readFace(page, 'dialog.shelf[open]');
-				for (const said of face.faults) faults.push(`${label}: ${said}`);
-				process.stdout.write(`${label}: the read's lines ${face.lines.join(', ')} characters\n`);
-				await page.screenshot({
-					path: new URL(`shelf-read-${theme}-${String(size.width)}.png`, out).pathname
-				});
-			} catch (error: unknown) {
-				faults.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
-			} finally {
-				await ctx.close();
+	for (const read of READ_CASES) {
+		for (const theme of THEMES) {
+			for (const size of SIZES) {
+				const label = `${read.shot} ${theme} ${String(size.width)}`;
+				const ctx = await context(theme, size, playersScreen.signedIn);
+				const page = await ctx.newPage();
+				try {
+					await page.goto(`${web}${playersScreen.path}?${SHELF_PARAM}=${read.slug}`);
+					await ready(page, playersScreen);
+					await shelf(page)
+						.locator(read.shown ? '.prose.week' : 'section.read .unwritten')
+						.waitFor({ timeout: READY_TIMEOUT_MS });
+					// The week's figures are read: the read's place is judged against them.
+					await page.waitForLoadState('networkidle');
+					await page.evaluate(() => document.fonts.ready);
+					await checkRead(page, read, label);
+					await page.screenshot({
+						path: new URL(`shelf-${read.shot}-${theme}-${String(size.width)}.png`, out).pathname
+					});
+				} catch (error: unknown) {
+					faults.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+				} finally {
+					await ctx.close();
+				}
 			}
 		}
 	}

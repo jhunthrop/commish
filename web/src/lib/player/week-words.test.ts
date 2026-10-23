@@ -15,6 +15,8 @@ import {
 	type CardTile
 } from './card.ts';
 import { BASIS_WORDS, vsAvgCaption, vsAvgReason } from './basis-words.ts';
+import type { WeekRead } from '../run/schema.ts';
+import { noReadWords, shownWeekRead } from './week-read.ts';
 import {
 	compareSay,
 	liveCard,
@@ -911,4 +913,63 @@ void test("the page's pill and rest caption name one rank, before the read and a
 			JSON.stringify(line)
 		);
 	}
+});
+
+// Lane 158: the week read beside the card, through the engine at fixed clocks. The read quotes 21.8,
+// the week's published projection the card prints; his game kicks off Sun Oct 18, 3:05 pm Central.
+const KICKED_OFF = Date.parse('2026-10-18T21:00:00.000Z');
+const FINAL = Date.parse('2026-10-19T03:00:00.000Z');
+const WEEK_READ: WeekRead = {
+	week: 6,
+	body: 'Puka Nacua gets the Cardinals at home, and the published projection has him at 21.8 points.',
+	caption: 'Written Sat Oct 17, 1:12 pm CT, for week 6',
+	status: null,
+	call: 'start',
+	writtenAt: READ,
+	factsAt: READ,
+	projection: 21.8,
+	movedCaption: 'The published projection moved since this read was written.'
+};
+const shownAt = (w: PlayerWeek, now: number) =>
+	shownWeekRead(WEEK_READ, card(w, null, now).projection);
+const SHOWN = { withheld: false, body: WEEK_READ.body, caption: WEEK_READ.caption };
+
+void test('before kickoff the read stands while the published projection is the one it quotes', () => {
+	assert.equal(card(week(), null, NOW).projection.state, 'upcoming');
+	assert.deepEqual(shownAt(week(), NOW), SHOWN);
+});
+
+void test('before kickoff a moved projection withholds the read: its caption alone, never "not written"', () => {
+	const shown = shownAt(week({}, { week_projection: 23.4 }), NOW);
+	assert.deepEqual(shown, { withheld: true, words: WEEK_READ.movedCaption });
+	assert.ok(!JSON.stringify(shown).includes('not written'));
+});
+
+void test('once his game has kicked off the read stands whatever the card now prints', () => {
+	const live = week({}, { week_projection: 23.4, facts: facts({ points_this_week: 4.6 }) });
+	assert.equal(card(live, null, KICKED_OFF).projection.state, 'kicked_off');
+	assert.deepEqual(shownAt(live, KICKED_OFF), SHOWN);
+});
+
+void test('once his game is final the read stands', () => {
+	const final = week(
+		{},
+		{
+			week_projection: 23.4,
+			facts: facts({ played: true, game_state: 'final', points_this_week: 18.2 })
+		}
+	);
+	assert.equal(card(final, null, FINAL).projection.state, 'final');
+	assert.deepEqual(shownAt(final, FINAL), SHOWN);
+});
+
+void test('with no read at all the place says it is not written, "next" only for a game to come', () => {
+	assert.equal(noReadWords(card(week(), null, NOW).projection.state), CARD.readNotYet);
+	for (const now of [KICKED_OFF, FINAL]) {
+		const words = noReadWords(card(week(), null, now).projection.state);
+		assert.equal(words, CARD.readNotWritten);
+		assert.ok(!/\bnext\b/u.test(words), words);
+	}
+	for (const words of [CARD.readNotYet, CARD.readNotWritten])
+		assert.equal(BANNED.exec(words), null, words);
 });

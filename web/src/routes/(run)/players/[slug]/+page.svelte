@@ -13,7 +13,7 @@
 	import { UNWRITTEN_READ } from '#lib/run/unwritten-words.ts';
 	import { CARD, compareLeadsWithoutVerb, unreadBasis, type CardTile } from '#lib/player/card.ts';
 	import type { CardLeague, LiveCard } from '#lib/player/week-words.ts';
-	import { shownWeekRead, weekReadLabel } from '#lib/player/week-read.ts';
+	import { noReadWords, shownWeekRead, weekReadLabel } from '#lib/player/week-read.ts';
 	import { cliffAt, lineFiguresAt, matesAt } from '#lib/player/live-figures.ts';
 	import { builtTiles, cardSource } from '#lib/player/card-source.ts';
 	import PlayerCard from '#lib/player/PlayerCard.svelte';
@@ -326,19 +326,17 @@
 						class="week-read"
 						aria-label={page.weekRead ? weekReadLabel(page.weekRead) : null}
 					>
-						<Capsule
-							body={weekRead.body}
-							byline={weekRead.caption}
-							week
-							unwritten={CARD.readNotYet}
-							pulls={[]}
-						/>
+						{#if weekRead.withheld}
+							<p class="unwritten">{weekRead.words}</p>
+						{:else}
+							<Capsule body={weekRead.body} byline={weekRead.caption} week pulls={[]} />
+						{/if}
 					</section>
 				{/if}
 				<!-- In season the read is one paragraph, the week's (Lane 100, B44): the season read and its
 				     drafted-for numbers are the draft's, shown before the first kickoff only. -->
 				{#if page.underway}
-					{#if !weekRead}<p class="unwritten">{CARD.readNotYet}</p>{/if}
+					{#if !weekRead}<p class="unwritten">{noReadWords(live?.projection.state ?? null)}</p>{/if}
 				{:else if page.capsule}
 					<Capsule body={page.capsule.body} byline={page.card.readStamp} pulls={readPulls} />
 				{:else}

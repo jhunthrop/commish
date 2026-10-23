@@ -314,16 +314,14 @@ function capsuleOf(
 async function weekReads(): Promise<Map<string, WeekRead>> {
 	const file = new URL('./standin-week-reads.json', import.meta.url);
 	const recorded = JSON.parse(await readFile(file, 'utf8')) as {
-		reads: (Pick<WeekRead, 'week' | 'body' | 'caption' | 'writtenAt' | 'call' | 'status'> & {
+		reads: (Pick<
+			WeekRead,
+			'week' | 'body' | 'caption' | 'writtenAt' | 'call' | 'status' | 'projection' | 'movedCaption'
+		> & {
 			id: string;
 		})[];
 	};
-	return new Map(
-		recorded.reads.map(({ id, week, body, caption, writtenAt, call, status }) => [
-			id,
-			{ week, body, caption, writtenAt, call, status, factsAt: null }
-		])
-	);
+	return new Map(recorded.reads.map(({ id, ...read }) => [id, { ...read, factsAt: null }]));
 }
 
 /** The recorded injury capture (scripts/standin-designations.json) for the players the board ranks,

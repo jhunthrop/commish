@@ -27,7 +27,7 @@
 		shelfVerb
 	} from './shelf.ts';
 	import type { ShelfHost } from './shelf-state.ts';
-	import { shownWeekRead } from './week-read.ts';
+	import { noReadWords, shownWeekRead } from './week-read.ts';
 	import type { LiveCard } from './week-words.ts';
 
 	/** The player shelf (Lane 113): the top of his page over the screen the member is deciding on, his
@@ -79,8 +79,16 @@
 	const cell = $derived(
 		shown.note !== null ? null : (live?.cell ?? (row === null ? null : rowNext(row)))
 	);
+	/** His game's state for the read: the row's, the rule the verb and the week tile follow, else the
+	 * card's own at the same clock where the shelf opened on no row (Lane 158). */
+	const readState = $derived(row === null ? (live?.projection.state ?? null) : game);
 	const read = $derived(
-		built?.weekRead ? shownWeekRead(built.weekRead, live?.projection ?? null) : null
+		built?.weekRead
+			? shownWeekRead(
+					built.weekRead,
+					live === null ? null : { ...live.projection, state: readState }
+				)
+			: null
 	);
 	const basis = $derived(
 		live?.basis ?? [
@@ -169,16 +177,10 @@
 		{#if built}
 			<section class="read">
 				<h3><Label>{CARD.ourRead}</Label></h3>
-				{#if read}
-					<Capsule
-						body={read.body}
-						byline={read.caption}
-						week
-						unwritten={CARD.readNotYet}
-						pulls={[]}
-					/>
+				{#if read && !read.withheld}
+					<Capsule body={read.body} byline={read.caption} week pulls={[]} />
 				{:else}
-					<p class="unwritten">{CARD.readNotYet}</p>
+					<p class="unwritten">{read?.words ?? noReadWords(readState)}</p>
 				{/if}
 			</section>
 		{/if}
