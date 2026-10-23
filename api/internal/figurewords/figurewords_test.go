@@ -5,7 +5,8 @@ import "testing"
 // The embedded table carries every head the web draws.
 func TestTheTableNamesEveryFigure(t *testing.T) {
 	if Table.Projected != "Projected" || Table.PerGame != "A game" || Table.Avg != "Avg" || Table.Week != "Wk" || Table.Points != "Points" ||
-		Table.FreeAgentClub != "FA" || Table.FreeAgent != "a free agent" {
+		Table.FreeAgentClub != "FA" || Table.FreeAgent != "a free agent" ||
+		Table.OverReplacement != "his points less a free pickup's" {
 		t.Fatalf("%+v", Table)
 	}
 }
@@ -15,7 +16,7 @@ func TestATableMissingAWordFails(t *testing.T) {
 	if _, err := Parse([]byte(`{"projected":"Projected"}`)); err == nil {
 		t.Fatal("a table with one word parsed")
 	}
-	if _, err := Parse([]byte(`{"projected":"P","points":"P","perGame":"G","avg":"A","week":"W","restFrom":"from week","restFromPartial":"x {week}","freeAgentClub":"FA","freeAgent":"a free agent"}`)); err == nil {
+	if _, err := Parse([]byte(`{"projected":"P","points":"P","perGame":"G","avg":"A","week":"W","restFrom":"from week","restFromPartial":"x {week}","freeAgentClub":"FA","freeAgent":"a free agent","overReplacement":"his points less a free pickup's"}`)); err == nil {
 		t.Fatal("a week template with no slot parsed")
 	}
 	if _, err := Parse([]byte(`not json`)); err == nil {

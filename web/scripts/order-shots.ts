@@ -23,7 +23,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { onListWords } from '../src/lib/format/designation.ts';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
-import { ORDER } from '../src/lib/order/words.ts';
+import { ORDER, byeHead } from '../src/lib/order/words.ts';
 import { locationFor, parseBaseUrl, parseRunId } from '../src/lib/run/config.ts';
 import { RECORD_BOX, publishedDrawn, recordBasis } from '../src/lib/run/record.ts';
 import { RUN_PATHS, recordSchema, type RunRecord } from '../src/lib/run/schema.ts';
@@ -80,6 +80,8 @@ const FIGURE_CELL = /^([-−]?\d+(\.\d)?|\d+(st|nd|rd|th)|--)$/;
 /** A season-long list's short form, the # cell of a player the order places after the available
  * (Lane 128 review fix round 1): never a number. */
 const LIST_PLACE = /^(IR|PUP|NFI|Susp|Out)$/;
+/** The byes' section head on the week's rankings, the week box score's own (words.ts byeHead). */
+const BYE_HEAD = new RegExp(`^${byeHead(0).replace(/0$/u, '')}\\d+$`, 'iu');
 
 const SCREENS = [
 	{
@@ -188,7 +190,22 @@ async function common(page: Page, screen: Screen, width: number): Promise<string
 	return said;
 }
 
+/** Show more until every row the read holds is drawn: the week's byes are its last rows (Lane 163). */
+async function showEveryRow(page: Page): Promise<void> {
+	const more = page.getByRole('button', { name: ORDER.moreRows });
+	while ((await more.count()) > 0) {
+		const before = await page.locator('main table.order tbody tr').count();
+		await more.first().click();
+		await page.waitForFunction(
+			(was) => document.querySelectorAll('main table.order tbody tr').length > was,
+			before,
+			{ timeout: READY_TIMEOUT_MS }
+		);
+	}
+}
+
 async function orderFaults(page: Page, screen: Screen, width: number): Promise<string[]> {
+	if (screen.name === 'players') await showEveryRow(page);
 	const seen = await page.evaluate(() => {
 		const table = document.querySelector('main table.order');
 		const text = (el: Element): string => el.textContent.trim();
@@ -200,8 +217,20 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 			trades: [...(table?.querySelectorAll('a.verb.trade') ?? [])].length,
 			adds: [...(table?.querySelectorAll('a.verb.add') ?? [])].length,
 			mine: table?.querySelectorAll('tbody tr.mine').length ?? 0,
-			cells: [...(table?.querySelectorAll('td.n') ?? [])].filter(visible).map(text),
-			places: [...(table?.querySelectorAll('td.rank') ?? [])].map(text),
+			// A bye's # cell is empty by ruling (Lane 163), so it is no figure.
+			cells: [...(table?.querySelectorAll('td.n:not(.bye .rank)') ?? [])].filter(visible).map(text),
+			places: [...(table?.querySelectorAll('tbody:not(.bye) td.rank') ?? [])].map(text),
+			// The week's rankings (Lane 163, D06): the byes' section, its head and its # cells.
+			byeHeads: [...(table?.querySelectorAll('tbody.bye tr.sec th') ?? [])].map(text),
+			byePlaces: [...(table?.querySelectorAll('tbody.bye td.rank') ?? [])].map(text),
+			byeGames: [...(table?.querySelectorAll('tbody.bye td.game') ?? [])].map(text),
+			// A player on a season-long list sits among the rows that play and may be on bye: only an
+			// available one (a numbered row) is a bye among the players who play.
+			playingByes: [...(table?.querySelectorAll('tbody.playing tr') ?? [])].filter(
+				(tr) =>
+					/^bye$/iu.test((tr.querySelector('td.game')?.textContent ?? '').trim()) &&
+					/^\d+$/u.test((tr.querySelector('td.rank')?.textContent ?? '').trim())
+			).length,
 			folded: [...(table?.querySelectorAll('.ph-ev') ?? [])].filter(visible).map(text)
 		};
 	});
@@ -233,6 +262,26 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 	const firstListed = places.findIndex((p) => LIST_PLACE.test(p));
 	if (firstListed >= 0 && places.slice(firstListed).some((p) => !LIST_PLACE.test(p)))
 		said.push(`${screen.name}: a numbered row after a listed one (${places.join(' ')})`);
+	// Players is the week's rankings (Lane 163, D06): no player on bye is numbered, every bye sits in
+	// "Bye in week N" after the players who play, who are numbered 1..n; Rest of season keeps them.
+	const numbered = places.filter((p) => !LIST_PLACE.test(p));
+	if (screen.name === 'players') {
+		// The stand-in always holds available byes beyond row 100: the section is drawn, never optional.
+		if (
+			seen.byeGames.length === 0 ||
+			seen.byeHeads.length !== 1 ||
+			seen.byeHeads.some((head) => !BYE_HEAD.test(head))
+		)
+			said.push(`players at ${String(width)}: byes' head ${JSON.stringify(seen.byeHeads)}`);
+		if (seen.byePlaces.some((p) => p !== ''))
+			said.push(`players at ${String(width)}: a bye numbered (${seen.byePlaces.join(' ')})`);
+		if (seen.byeGames.some((g) => !/bye/iu.test(g)) || seen.playingByes > 0)
+			said.push(`players at ${String(width)}: a bye among the players who play`);
+		if (numbered.some((p, i) => p !== String(i + 1)))
+			said.push(`players at ${String(width)}: the players who play read ${numbered.join(' ')}`);
+	} else if (seen.byeHeads.length > 0) {
+		said.push(`${screen.name}: draws a byes' section`);
+	}
 	if (screen.signedIn) {
 		if (seen.trades === 0 || seen.trades >= seen.rows * MOST_TRADE_SHARE)
 			said.push(`rest: Trade for him on ${String(seen.trades)} of ${String(seen.rows)} rows`);

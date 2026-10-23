@@ -67,6 +67,10 @@
 		/** A row the run does not tier (one the front door builds from the API's line, Lane 96): its
 		 * tier cell prints the empty figure. */
 		untiered?: boolean;
+		/** The front's prerendered strip before the live read answers (Lane 163 fix round 1, D05): the
+		 * run's Over replacement counts another level than the site's one definition, so its cell is
+		 * held, never a number that would change when the read lands. */
+		vorHeld?: boolean;
 	}
 
 	let {
@@ -83,7 +87,8 @@
 		held = null,
 		framing,
 		status = null,
-		untiered = false
+		untiered = false,
+		vorHeld = false
 	}: Props = $props();
 
 	function inDraftOrder(row: BoardPlayer | DraftOrderPlayer): row is DraftOrderPlayer {
@@ -100,7 +105,7 @@
 	const heldOut = $derived(status !== null && status.rank !== null);
 	const rankShown = $derived(status?.rank ?? (ranked === null ? '' : String(ranked.ourRank)));
 	const vor = $derived(
-		ranked === null
+		ranked === null || vorHeld
 			? null
 			: framedVorCell(ranked.vor, ranked.vorRound, heldOut ? HELD_FRAMING : framing)
 	);

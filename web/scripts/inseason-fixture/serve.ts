@@ -712,9 +712,15 @@ function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
 					.map((row, i) => ({ ...row, rank: i + 1 }));
 	// Every player on a season-long list after every available one, numbered on from them (order.go
 	// playingFirst, Lane 128 fix round 1).
+	// With byes=last on the read with no league, every available player on bye after the rest,
+	// numbered on (order.go playingFirst, Lane 163 D06).
+	const byesLast = !league && params.get('byes') === 'last';
+	const byeLast = (row: OrderRow): boolean =>
+		byesLast && row.line.facts.bye && !seasonLongLine(row.line);
 	const playingFirst = [
-		...ranked.filter((row) => !seasonLongLine(row.line)),
-		...ranked.filter((row) => seasonLongLine(row.line))
+		...ranked.filter((row) => !seasonLongLine(row.line) && !byeLast(row)),
+		...ranked.filter((row) => seasonLongLine(row.line)),
+		...ranked.filter(byeLast)
 	].map((row, i) => ({ ...row, rank: i + 1 }));
 	const roster = params.get('roster');
 	const found = playingFirst.filter(

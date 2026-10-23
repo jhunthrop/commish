@@ -39,6 +39,10 @@ type Words struct {
 	FreeAgentClub string `json:"freeAgentClub"`
 	// FreeAgent says the same in a sentence: "a free agent".
 	FreeAgent string `json:"freeAgent"`
+	// OverReplacement is what Over repl. counts, the site's one
+	// definition (Lane 163, D05): "his points less a free pickup's", the
+	// league it is for said after it.
+	OverReplacement string `json:"overReplacement"`
 }
 
 // WeekSlot is the placeholder RestFrom and RestFromPartial carry.
@@ -51,7 +55,8 @@ func Parse(b []byte) (Words, error) {
 		return Words{}, fmt.Errorf("figurewords: %w", err)
 	}
 	for name, word := range map[string]string{"projected": w.Projected, "points": w.Points, "perGame": w.PerGame, "avg": w.Avg, "week": w.Week,
-		"restFrom": w.RestFrom, "restFromPartial": w.RestFromPartial, "freeAgentClub": w.FreeAgentClub, "freeAgent": w.FreeAgent} {
+		"restFrom": w.RestFrom, "restFromPartial": w.RestFromPartial, "freeAgentClub": w.FreeAgentClub, "freeAgent": w.FreeAgent,
+		"overReplacement": w.OverReplacement} {
 		if word == "" {
 			return Words{}, fmt.Errorf("figurewords: no word for %s", name)
 		}

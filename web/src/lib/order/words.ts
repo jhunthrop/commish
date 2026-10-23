@@ -38,8 +38,16 @@ export const ORDER = {
  * for the copy guard. Its head is week-head.ts's, the rest of the tab's words week.ts's. */
 export const WEEK = {
 	reading: "Reading this week's rows",
-	needsScript: "This week's rows need JavaScript."
+	needsScript: "This week's rows need JavaScript.",
+	/** The byes' section, before its week (byeHead). */
+	byeIn: 'Bye in week'
 } as const;
+
+/** The byes' section head, "Bye in week 7": the week's box score and the Players page's week
+ * rankings say it in one word (Lane 163, D06). */
+export function byeHead(week: number): string {
+	return `${WEEK.byeIn} ${String(week)}`;
+}
 
 /** Each in-season page's purpose, one sentence under its head (Lane 104, B40): Players is every
  * player our order covers and this week's kickers and defenses, never said to be in it (Lane 155),

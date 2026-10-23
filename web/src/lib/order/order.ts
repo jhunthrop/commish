@@ -30,7 +30,7 @@ import { askedHref } from '#lib/league/box/asked.ts';
 import type { OrderAdvice, OrderPosition, OrderRow, RosterMark } from './api.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
 import type { WeekPosition } from './week-head.ts';
-import { ORDER } from './words.ts';
+import { ORDER, byeHead } from './words.ts';
 
 export { ORDER };
 
@@ -91,8 +91,12 @@ export interface OrderView {
 	/** The week column (Lane 92, B36): his Pts once his game is final, his Proj before (weekFigure). */
 	week: number | null;
 	rank: number;
-	/** The # cell: his place, or the list's short form ("IR") for a player on a season-long list. */
+	/** The # cell: his place, the list's short form ("IR") for a player on a season-long list, or
+	 * nothing on the week's rankings for a player on bye (Lane 163, D06). */
 	place: string;
+	/** On the week's rankings, an available player whose club is on bye this week: his row sits in
+	 * the byes' section after the players who play (orderSections). */
+	bye: boolean;
 	figures: Readonly<Record<FigureKey, number | null>>;
 	/** Whose roster holds him in words, with its kind for the chip; null without a league. */
 	roster: { kind: RosterMark['kind']; words: string } | null;
@@ -125,20 +129,30 @@ export function rosterWords(mark: RosterMark): string {
 
 /** One row's view. Its key is his board id, which every row carries (the order only ranks players
  * our board places). In a position's view the # is his place there, so his pill names his position
- * alone; across positions it names his place at his position too. */
-export function orderView(row: OrderRow, zone: string, pillRank: boolean, now: number): OrderView {
+ * alone; across positions it names his place at his position too. On the week's rankings
+ * (byesApart, the Players page, Lane 163 D06) a player on bye draws no place. */
+export function orderView(
+	row: OrderRow,
+	zone: string,
+	pillRank: boolean,
+	now: number,
+	byesApart = false
+): OrderView {
 	const box = boxRow(row.line, '', zone, pillRank, now);
 	const key = row.line.player.board_id ?? row.line.player.host_id;
+	const listed = onList(box.status);
+	const bye = byesApart && row.line.facts.bye && !listed;
 	return {
 		key,
 		position: row.line.player.position,
 		hostId: row.line.player.host_id,
 		box: { ...box, key, ...orderGame(box, row.line, zone, now) },
-		week: onList(box.status) ? null : weekFigure(row.line, now),
+		week: listed ? null : weekFigure(row.line, now),
 		rank: row.rank,
 		// A player on a season-long list sits after every available one with no number (Lane 128 fix
-		// round 1): his # cell reads the list's short form.
-		place: onList(box.status) ? (box.status?.rank ?? '') : String(row.rank),
+		// round 1): his # cell reads the list's short form. A bye on the week's rankings has none.
+		place: listed ? (box.status?.rank ?? '') : bye ? '' : String(row.rank),
+		bye,
 		figures: {
 			por: row.points_over_replacement,
 			total: row.rest_of_season_points,
@@ -148,6 +162,24 @@ export function orderView(row: OrderRow, zone: string, pillRank: boolean, now: n
 		move: row.move,
 		held: heldMoveWords(row, box.status)
 	};
+}
+
+/** A run of the order's rows under one head: the players who play first with none, then on the
+ * week's rankings the byes under "Bye in week 7", as the week's box score draws its byes (Lane 163,
+ * D06). A section with no rows is not drawn. */
+export interface OrderSection {
+	key: 'playing' | 'bye';
+	head: string | null;
+	rows: OrderView[];
+}
+
+/** The rows in their sections, in the API's order (byes=last puts the byes last). */
+export function orderSections(views: readonly OrderView[], week: number): OrderSection[] {
+	const sections: OrderSection[] = [
+		{ key: 'playing', head: null, rows: views.filter((v) => !v.bye) },
+		{ key: 'bye', head: byeHead(week), rows: views.filter((v) => v.bye) }
+	];
+	return sections.filter((section) => section.rows.length > 0);
 }
 
 /** His Game cell on the order (Lane 139, C07, C11): a kickoff still to come with its zone, so it never

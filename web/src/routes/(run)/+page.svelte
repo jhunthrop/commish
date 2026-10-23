@@ -78,9 +78,10 @@
 	});
 	const words = $derived(sayBoard({ ...page, rows: page.pool }, live));
 
-	/** One board for a signed-in member (Lane 96): the strip prints the API's live order, the one
-	 * Players and Rest of 2026 read at the same clock, for the followed league's shape or for 12 teams.
-	 * A reader signed out, or whose read fails, keeps the run's figures with the run's time. */
+	/** One board for every reader (Lane 96, Lane 163 D05): the strip prints the API's live order, the
+	 * one Players and Rest of 2026 read at the same clock, for the followed league's shape or, signed
+	 * out or following none, for the board's 12 teams, so Over replacement is one number on every
+	 * page. A read that fails keeps the run's figures with the run's time. */
 	let zone = $state(BUILD_ZONE);
 	onMount(() => {
 		zone = memberZone();
@@ -95,7 +96,7 @@
 	} | null>(null);
 	$effect(() => {
 		const league = siteContext.league;
-		if (!siteContext.signedIn || format.rosFromWeek === undefined) {
+		if (format.rosFromWeek === undefined) {
 			liveRead = null;
 			return;
 		}
@@ -113,6 +114,8 @@
 			.then((answer) => {
 				if (stale) return;
 				const rows = liveStrip(page.pool, answer, teams);
+				// The scoring the head and the basis name is a league's alone: with none, the board's.
+				const scoring = league === null ? null : answer.projection_scoring;
 				const readAt = answerReadAt(answer, Date.now());
 				const lead = liveLeadPart(answer, shapeWords(teams, league !== null), readAt, zone);
 				liveRead =
@@ -122,10 +125,10 @@
 								rows,
 								basis: [
 									...liveBasis(page.basis, lead),
-									overReplacementPart(teams),
-									...stripBasisParts(rows, format.label, answer.projection_scoring)
+									overReplacementPart(teams, format.label, league !== null),
+									...stripBasisParts(rows, format.label, scoring)
 								],
-								head: stripHead(format.label, answer.projection_scoring)
+								head: stripHead(format.label, scoring)
 							};
 			})
 			.catch(() => {
@@ -141,7 +144,7 @@
 		liveRead?.basis ?? [
 			...page.basis,
 			...(runStamp === null ? [] : [runStamp]),
-			overReplacementPart(format.teams)
+			overReplacementPart(format.teams, format.label, false)
 		]
 	);
 
@@ -233,6 +236,7 @@
 								framing={page.framing}
 								status={words?.rows[player.id] ?? null}
 								untiered={player.untiered === true}
+								vorHeld={liveRead === null}
 							>
 								{#snippet action()}<RowSheetMark {player} />{/snippet}
 							</Row>

@@ -17,8 +17,11 @@
 		sortedFigure,
 		moveHref,
 		moveWords,
+		orderSections,
+		type OrderSection,
 		type OrderView
 	} from './order.ts';
+	import SectionHead from './SectionHead.svelte';
 
 	/** Our order as a box score (Lane 66j): #, the player, in a league his roster, his game, Proj, then
 	 * Rest of season with his projected points first and big (Lane 139, C20), Over repl. beside it across
@@ -42,6 +45,9 @@
 		tagsOf?: (boardId: string | null) => readonly string[];
 		/** A row's own control at the end (the Players screen's sheet mark), when not a league's move. */
 		end?: Snippet<[OrderView]>;
+		/** The week's rankings (the Players page, Lane 163 D06): the byes in their own section after
+		 * the players who play, headed "Bye in week 7" as the week's box score heads its byes. */
+		byesApart?: boolean;
 	}
 
 	let {
@@ -52,7 +58,8 @@
 		week,
 		league,
 		tagsOf = () => [],
-		end
+		end,
+		byesApart = false
 	}: Props = $props();
 
 	const marked = $derived(league !== null);
@@ -60,6 +67,12 @@
 	/** The column # sorts on, its head marked where it is not the big first column (MEDIUM-3). */
 	const sortedBy = $derived(sortedFigure(rankBy));
 	const SEPARATOR = ', ';
+	/** The rows in their sections: one with no head, unless the byes sit apart. */
+	const sections = $derived<OrderSection[]>(
+		byesApart ? orderSections(rows, week) : [{ key: 'playing', head: null, rows: [...rows] }]
+	);
+	/** Every column, for a section head across the row. */
+	const span = $derived((marked ? 3 : 2) + 2 + figures.length + (marked || end ? 4 : 3));
 
 	/** The folded line under the name below 1100 px: every figure after the key, the opponent's rank,
 	 * then Avg and Last. */
@@ -111,48 +124,51 @@
 				>{/if}
 		</tr>
 	</thead>
-	<tbody>
-		{#each rows as row (row.key)}
-			{@const href = moveHref(row, league?.id ?? null, tabHref)}
-			{@const rank = row.box.evidence.oppRank}
-			<tr class:mine={row.roster?.kind === 'yours'}>
-				<td class="n rank">{row.place}</td>
-				<td class="player">
-					<BoxPlayer row={row.box} tags={tagsOf(row.box.boardId)}>
-						{#snippet after()}<span class="ph-mark">{@render mark(row, 'fold')}</span>{/snippet}
-						<span class="ph-ev">{folded(row)}</span>
-					</BoxPlayer>
-				</td>
-				{#if marked}<td class="roster">{@render mark(row, 'md')}</td>{/if}
-				<td class="game"><BoxGame row={row.box} /></td>
-				<td class="n proj">{boxNumber(row.week)}</td>
-				{#each figures as f, i (f)}
-					<td class="n {i === 0 ? 'key' : 'ev fig'}">{boxNumber(row.figures[f])}</td>
-				{/each}
-				<td class="n ev first">{boxNumber(row.box.evidence.avg)}</td>
-				<td class="n ev">{boxNumber(row.box.evidence.last)}</td>
-				<td class="n ev opp"
-					><OppRank
-						text={oppRankWord(rank)}
-						ease={rank === null ? null : easeOf(rank, row.box.evidence.oppOf)}
-					/></td
-				>
-				{#if marked || end}
-					<td class="act">
-						{#if league !== null && href !== null && row.move}
-							<MoveLink
-								{href}
-								move={row.move}
-								said={moveWords(row, league.moves, league.host)}
-								name={row.box.name}
-							/>
-						{:else if league !== null && row.held !== null}<span class="held">{row.held}</span>
-						{:else if end}{@render end(row)}{/if}
+	{#each sections as section (section.key)}
+		<tbody class={section.key}>
+			{#if section.head}<SectionHead {span} head={section.head} />{/if}
+			{#each section.rows as row (row.key)}
+				{@const href = moveHref(row, league?.id ?? null, tabHref)}
+				{@const rank = row.box.evidence.oppRank}
+				<tr class:mine={row.roster?.kind === 'yours'}>
+					<td class="n rank">{row.place}</td>
+					<td class="player">
+						<BoxPlayer row={row.box} tags={tagsOf(row.box.boardId)}>
+							{#snippet after()}<span class="ph-mark">{@render mark(row, 'fold')}</span>{/snippet}
+							<span class="ph-ev">{folded(row)}</span>
+						</BoxPlayer>
 					</td>
-				{/if}
-			</tr>
-		{/each}
-	</tbody>
+					{#if marked}<td class="roster">{@render mark(row, 'md')}</td>{/if}
+					<td class="game"><BoxGame row={row.box} /></td>
+					<td class="n proj">{boxNumber(row.week)}</td>
+					{#each figures as f, i (f)}
+						<td class="n {i === 0 ? 'key' : 'ev fig'}">{boxNumber(row.figures[f])}</td>
+					{/each}
+					<td class="n ev first">{boxNumber(row.box.evidence.avg)}</td>
+					<td class="n ev">{boxNumber(row.box.evidence.last)}</td>
+					<td class="n ev opp"
+						><OppRank
+							text={oppRankWord(rank)}
+							ease={rank === null ? null : easeOf(rank, row.box.evidence.oppOf)}
+						/></td
+					>
+					{#if marked || end}
+						<td class="act">
+							{#if league !== null && href !== null && row.move}
+								<MoveLink
+									{href}
+									move={row.move}
+									said={moveWords(row, league.moves, league.host)}
+									name={row.box.name}
+								/>
+							{:else if league !== null && row.held !== null}<span class="held">{row.held}</span>
+							{:else if end}{@render end(row)}{/if}
+						</td>
+					{/if}
+				</tr>
+			{/each}
+		</tbody>
+	{/each}
 </table>
 
 <style>
@@ -272,7 +288,7 @@
 		background: var(--surface-2);
 	}
 
-	tbody tr:last-child td {
+	tbody:last-child tr:last-child td {
 		border-bottom: 0;
 	}
 

@@ -24,6 +24,7 @@ import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { WeekOrderAdvice, WeekOrderRow } from './api.ts';
 import { rosterBasis, rosterWords, type RosterView } from './order.ts';
 import { MIN_SEARCH } from './path.ts';
+import { WEEK, byeHead } from './words.ts';
 import { WEEK_MANY, type WeekPosition } from './week-head.ts';
 
 /** Each position's words: its rows in the plural, one of them, whose a row's figures are, and whose
@@ -40,7 +41,7 @@ export const WEEK_TAB = {
 	unread: 'We could not read this week just now. Try again in a minute.',
 	kickedOff: BOX.kickedOff,
 	played: 'Played',
-	byeIn: 'Bye in week',
+	byeIn: WEEK.byeIn,
 	/** The add column's head, as a screen reader hears it. */
 	add: 'Add'
 } as const;
@@ -149,11 +150,7 @@ export function weekSections(
 		const rows = views.filter((v) => v.section === key);
 		if (rows.length === 0) return [];
 		const head =
-			key === 'to_play'
-				? null
-				: key === 'bye'
-					? `${WEEK_TAB.byeIn} ${String(week)}`
-					: kickedOffHead(rows, zone);
+			key === 'to_play' ? null : key === 'bye' ? byeHead(week) : kickedOffHead(rows, zone);
 		return [{ key, head, rows }];
 	});
 }

@@ -9,6 +9,7 @@
 	import RosterChip from '#lib/ui/RosterChip.svelte';
 	import type { WeekOrderAdvice } from './api.ts';
 	import { ORDER, moveHref, moveWords } from './order.ts';
+	import SectionHead from './SectionHead.svelte';
 	import { foldedEvidence, WEEK_TAB, type WeekSection, type WeekView } from './week.ts';
 
 	/** The kickers' or defenses' week as a box score (Lane 66w): the player (his face or the club's
@@ -49,7 +50,7 @@
 	{#each sections as section (section.key)}
 		<tbody class={section.key}>
 			{#if section.head}
-				<tr class="sec"><th colspan={span} scope="colgroup">{section.head}</th></tr>
+				<SectionHead {span} head={section.head} />
 			{/if}
 			{#each section.rows as row (row.key)}
 				{@render line(row)}
@@ -152,19 +153,6 @@
 		width: 148px;
 	}
 
-	.sec th {
-		height: 26px;
-		padding: 0 var(--s-2);
-		text-align: left;
-		background: var(--bg);
-		font-size: var(--t-xs);
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: var(--track-label);
-		color: var(--ink-2);
-		border-bottom: 1px solid var(--line);
-	}
-
 	td {
 		padding: 6px var(--s-2);
 		border-bottom: 1px solid var(--line);
@@ -175,7 +163,7 @@
 		height: var(--row-h);
 	}
 
-	tbody tr:not(.sec):hover td {
+	tbody tr:hover td {
 		background: var(--surface-2);
 	}
 
