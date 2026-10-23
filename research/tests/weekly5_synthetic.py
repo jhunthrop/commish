@@ -3,7 +3,7 @@
 round 4's feature store (players, teams, plays, written as its files with a build report) and the frames
 round 3's reads give the run (the rate m, the lines, the forms, the fumbles lost, the population rows).
 Nothing here is a real season's figure: every value is drawn from a fixed generator, and the seasons are
-2016 to 2021 so no test names a season the rounds hold out.
+2015 to 2021 so no test names a season the rounds hold out.
 """
 
 import json
@@ -34,17 +34,19 @@ from research.model.weekly5.system import Grids, Sources
 
 CLUBS: Final = ("ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE")
 ROSTER: Final = (("QB", 1), ("RB", 2), ("WR", 3), ("TE", 1))
-SEASONS: Final = tuple(range(2016, 2022))
+SEASONS: Final = tuple(range(2015, 2022))
 WEEKS: Final = tuple(range(1, 11))
 ROOFS: Final = ("outdoors", "dome", "closed", "open")
 TINY: Final = Grids((Cell(7, 0.0, 20, 5),), (Cell(7, 0.0, 20, 5, 0.5),))
-# A check on synthetic seasons: the player fit on 2019 and 2020, the team and play models on 2016 to 2020,
-# judged on 2021 weeks 6 to 10, small resamples.
+ROLE_WEIGHT: Final = {1: 2.0, 2: 1.0, 3: 0.35}  # a published depth rank moves his week's work
+# A check on synthetic seasons: the player fit on 2018 and 2019, the team and play models on 2015 to 2019,
+# judged on 2020 weeks 6 to 10; the judgment one season on. Small resamples and cells, every margin as
+# preregistered.
 T: Final[RoundFive] = replace(
     DEVELOPMENT_CHECK,
-    player_fit_seasons=(2019, 2020),
-    team_fit_seasons=tuple(range(2016, 2021)),
-    judgment_season=2021,
+    player_fit_seasons=(2018, 2019),
+    team_fit_seasons=tuple(range(2015, 2020)),
+    judgment_season=2020,
     weeks=tuple(range(6, 11)),
     fit_weeks=tuple(range(4, 11)),
     resamples=200,
@@ -53,7 +55,7 @@ T: Final[RoundFive] = replace(
     chance_min_bins=1,
 )
 T_JUDGED: Final[RoundFive] = replace(
-    T, player_fit_seasons=(2019, 2020, 2021), team_fit_seasons=tuple(range(2016, 2022)), judgment_season=2021
+    T, player_fit_seasons=(2018, 2019, 2020), team_fit_seasons=tuple(range(2015, 2021)), judgment_season=2021
 )
 
 
@@ -93,7 +95,16 @@ def _play(base: dict[str, Any], **values: Any) -> dict[str, Any]:
 
 
 def _game_plays(  # noqa: PLR0913, PLR0917 - one synthetic game's every coordinate
-    rng: np.random.Generator, season: int, week: int, game_id: str, club: str, opponent: str, roof: str, wind: float
+    rng: np.random.Generator,
+    season: int,
+    week: int,
+    game_id: str,
+    club: str,
+    opponent: str,
+    roof: str,
+    wind: float,
+    work: dict[str, float],
+    implied: float,
 ) -> list[dict[str, Any]]:
     base = {"season": season, "week": week, "game_id": game_id, "as_of": f"{season}-10-01T00:00:00+00:00",
             "posteam": club, "defteam": opponent, "roof": roof, "indoor": float(roof in ("dome", "closed")),
@@ -102,10 +113,12 @@ def _game_plays(  # noqa: PLR0913, PLR0917 - one synthetic game's every coordina
     qb = player_id(club, "QB", 1)
     receivers = [player_id(club, "WR", 1), player_id(club, "WR", 2), player_id(club, "WR", 3),
                  player_id(club, "TE", 1), player_id(club, "RB", 1), player_id(club, "RB", 2)]  # fmt: skip
-    weights = np.array([0.26, 0.2, 0.12, 0.18, 0.14, 0.1])
+    weights = np.array([0.26, 0.2, 0.12, 0.18, 0.14, 0.1]) * np.array([work.get(r, 0.0) for r in receivers])
+    weights = weights / weights.sum()
+    volume = max(0.6, implied / 22.0)
     rows: list[dict[str, Any]] = []
     play = 0
-    for _ in range(int(rng.integers(28, 40))):
+    for _ in range(int(rng.integers(28, 40) * volume)):
         play += 1
         yard = float(rng.integers(1, 99))
         common = {**base, "play_id": play, "down": float(rng.integers(1, 4)), "ydstogo": 10.0, "yardline_100": yard}
@@ -127,14 +140,18 @@ def _game_plays(  # noqa: PLR0913, PLR0917 - one synthetic game's every coordina
                    "sack": 0.0, "air_yards": float(rng.integers(-3, 25))}  # fmt: skip
         rows.append(_play(common, kind="dropback", player_id=qb, **outcome))
         rows.append(_play(common, kind="target", player_id=target, **outcome))
-    for _ in range(int(rng.integers(18, 28))):
+    backs = [player_id(club, "RB", 1), player_id(club, "RB", 2)]
+    share = np.array([0.65, 0.35]) * np.array([work.get(b, 0.0) for b in backs]) + 1e-9
+    share = share / share.sum()
+    for _ in range(int(rng.integers(18, 28) * volume)):
         play += 1
         yard = float(rng.integers(1, 99))
-        runner = player_id(club, "RB", 1) if rng.random() < 0.65 else player_id(club, "RB", 2)
+        runner = backs[int(rng.choice(2, p=share))]
         if rng.random() < 0.05:
             runner = qb
         elif rng.random() < 0.05:
             runner = player_id(club, "WR", 1) if rng.random() < 0.6 else player_id(club, "TE", 1)
+            runner = runner if work.get(runner, 0.0) > 0 else backs[0]
         gain = float(rng.integers(-2, 12))
         rows.append(_play({**base, "play_id": play, "down": 1.0, "ydstogo": 10.0, "yardline_100": yard},
                           kind="carry", player_id=runner, yards_gained=gain, touchdown=float(gain >= yard),
@@ -185,15 +202,15 @@ def _points(rows: list[dict[str, Any]], pid: str, fumbles: float) -> dict[str, f
 
 
 def _player_row(  # noqa: PLR0913, PLR0917 - one synthetic row's every coordinate
-    team: dict[str, Any], pid: str, position: str, played: int, shares: dict[str, float], rng: np.random.Generator
+    team: dict[str, Any], pid: str, position: str, played: int, shares: dict[str, float], role: int
 ) -> dict[str, Any]:
     row = {**_blank(PLAYER_SCHEMA), **{k: team[k] for k, _ in TEAM_SCHEMA if k in dict(PLAYER_SCHEMA)}}
     for name in (*GAME_DEFAULTS, *PLAYER_DEFAULTS):
         row[default_column(name)] = 0
-    withheld = int(rng.random() < 0.04)
+    withheld = int(role == 0)
     row.update(
         player_id=pid, position=position, status="Out" if withheld else "", withheld=withheld,
-        games_played=played, played_in_last_three=int(played > 0), depth_rank=float(1 + pid.endswith("2")),
+        games_played=played, played_in_last_three=int(played > 0), depth_rank=math.nan if withheld else float(role),
         snap_season=0.7, snap_last_three=0.7, snap_trend=0.0, depth_chart_week=team["week"],
     )  # fmt: skip
     if played == 0:
@@ -227,7 +244,10 @@ def build(directory: Path | None = None, seed: int = 11) -> Built:
                             "opponent_implied_points": 44.0 - implied, "spread": 2 * implied - 44.0, "roof": roof,
                             "indoor": float(roof in ("dome", "closed")), "temperature_f": 60.0, "wind_mph": wind,
                             "precipitation": 0.0, "own_pace": 28.0, "opponent_pace": 28.0}  # fmt: skip
-                    game_plays = _game_plays(rng, season, week, game_id, club, opponent, roof, wind)
+                    roles = {pid: (0 if position != "QB" and rng.random() < 0.05 else int(rng.integers(1, 4)))
+                             for pid, position in roster(club)}  # fmt: skip
+                    work = {pid: ROLE_WEIGHT.get(role, 0.0) for pid, role in roles.items()}
+                    game_plays = _game_plays(rng, season, week, game_id, club, opponent, roof, wind, work, implied)
                     plays += game_plays
                     team = _team_row(season, week, game_id, club, opponent, game)
                     teams.append({**team, **_team_outcomes(game_plays)})
@@ -237,7 +257,9 @@ def build(directory: Path | None = None, seed: int = 11) -> Built:
                         club_total = counts.get(club, {})
                         shares = {kind: (own.get(kind, 0.0) / club_total[kind] if club_total.get(kind) else 0.0)
                                   for kind in ("targets", "carries", "dropbacks", "red_zone", "inside_ten", "air_yards")}  # fmt: skip
-                        players.append(_player_row(team, pid, position, played, shares, rng))
+                        players.append(_player_row(team, pid, position, played, shares, roles[pid]))
+                        if roles[pid] == 0:
+                            continue
                         fumble = float(rng.random() < 0.03)
                         scored = _points(game_plays, pid, fumble)
                         lines.append({"season": season, "week": week, "player_id": pid, "club": club, **scored})
@@ -256,7 +278,8 @@ def build(directory: Path | None = None, seed: int = 11) -> Built:
                                         counts[who][kind] += 1.0
     store = _frames(players, teams, plays)
     sources = _sources(pd.DataFrame(lines), pd.DataFrame(fumbles), where)
-    built = Built(store, sources, {s: population(sources, s, where, rng) for s in (2021,)})
+    judged = (T.judgment_season, T_JUDGED.judgment_season)
+    built = Built(store, sources, {s: population(sources, s, where, rng) for s in judged})
     if directory is not None:
         built.directory = directory
         write_store(directory, players, teams, plays)
