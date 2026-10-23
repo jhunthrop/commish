@@ -2,7 +2,8 @@
  * written with, in PPR, as the card prints it (the run's `projection`); while his game is still to come
  * and the week's published projection is another figure, the read is withheld behind the run's words
  * for it (`movedCaption`). From kickoff through final the read written for the week stands whatever the
- * card prints (Lane 158). A withheld read is its caption alone, never under the not-written line, which
+ * card prints (Lane 158), and a read the run withheld says it was not written for this game (Lane 160).
+ * A withheld read is its caption alone, never under the not-written line, which
  * is said only when the run holds no read for him (Lane 158). The figures are the run's and the API's,
  * each rounded once there: this only compares them. */
 import type { components } from '#lib/api/types.ts';
@@ -38,10 +39,18 @@ function underway(state: ReadGameState): boolean {
 	return state === 'kicked_off' || state === 'final';
 }
 
+/** A read the run withheld: its caption while his game for the read's week is to come, the
+ * not-written line once that game is under way or final. */
+function withheldWords(read: WeekRead, card: CardProjection | null): string {
+	return card?.week === read.week && underway(card.state) ? CARD.readNotWritten : read.caption;
+}
+
 /** The read as the page shows it beside the card's live projection (null until the card has read). */
 export function shownWeekRead(read: WeekRead, card: CardProjection | null): ShownRead {
-	// A read the run already withheld keeps the run's caption (a status change says when the new one is due).
-	if (read.body === null) return { withheld: true, words: read.caption };
+	// A read the run already withheld keeps the run's caption (a status change says when the new one is
+	// due) while his game is to come; from kickoff through final that due time has passed, so the place
+	// says no read was written for this game (Lane 160, B140).
+	if (read.body === null) return { withheld: true, words: withheldWords(read, card) };
 	const built = { withheld: false, body: read.body, caption: read.caption } as const;
 	if (card?.scoring !== 'ppr' || card.week !== read.week || underway(card.state)) return built;
 	if (read.projection === undefined || read.movedCaption === undefined) return built;

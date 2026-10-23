@@ -64,12 +64,30 @@ void test('the read stands as built until the card reads in PPR for its week', (
 	assert.deepEqual(shownWeekRead(older, ppr(20)), BUILT);
 });
 
-void test('a read the run withheld for his status keeps its due time alone, at any state', () => {
+void test('a read the run withheld for his status keeps its due time alone while his game is to come', () => {
 	const status =
 		'His status changed since this read was written. A new read is due by Sat 9:00 am Central.';
 	const withheld = { ...READ, body: null, caption: status };
-	for (const state of ['upcoming', 'kicked_off', 'final'] as const)
+	for (const state of ['upcoming', null] as const)
 		assert.deepEqual(shownWeekRead(withheld, ppr(25.1, state)), { withheld: true, words: status });
+	assert.deepEqual(shownWeekRead(withheld, null), { withheld: true, words: status });
+});
+
+void test('from kickoff through final a withheld read says it was not written, never the passed due time (Lane 160)', () => {
+	const status =
+		'His status changed since this read was written. A new read is due by Sat 9:00 am Central.';
+	const withheld = { ...READ, body: null, caption: status };
+	for (const state of ['kicked_off', 'final'] as const) {
+		assert.deepEqual(shownWeekRead(withheld, ppr(25.1, state)), {
+			withheld: true,
+			words: CARD.readNotWritten
+		});
+		// Another week's game says nothing of this read's.
+		assert.deepEqual(shownWeekRead(withheld, { ...ppr(25.1, state), week: 8 }), {
+			withheld: true,
+			words: status
+		});
+	}
 });
 
 void test('a read the run already withheld stays withheld', () => {
