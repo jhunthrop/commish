@@ -234,8 +234,8 @@ function setWeekText(
 				: underway.includes(week.week)
 					? RECORDS_WORDS.underway
 					: week.gradesFrom === undefined
-					? RECORDS_WORDS.gradesLater
-					: RECORDS_WORDS.gradesOn(weekdayLabel(week.gradesFrom));
+						? RECORDS_WORDS.gradesLater
+						: RECORDS_WORDS.gradesOn(weekdayLabel(week.gradesFrom));
 	return `${set}, ${then}`;
 }
 

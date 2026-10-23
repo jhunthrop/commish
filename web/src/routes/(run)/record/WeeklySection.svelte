@@ -115,7 +115,8 @@
 	/** The weekly record says its weeks and its order in its own words (fix round 1, M2 and M4); a
 	 * run's own record before Lane 114 as it always did. */
 	const rows = $derived(
-		head === null ? weekLines(record.weeks, unplayed, underway)
+		head === null
+			? weekLines(record.weeks, unplayed, underway)
 			: weeklyLines(record.weeks, unplayed, underway)
 	);
 	const orderOf = (week: RecordWeek): string | null =>
