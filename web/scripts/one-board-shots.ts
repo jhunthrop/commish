@@ -83,11 +83,8 @@ async function twoQbFaults(page: Page, where: string): Promise<void> {
 
 /** The Players page's read with no league: each top player's Over replacement, to the tenth. */
 type OrderAdvice = components['schemas']['OrderAdvice'];
-const publicOrder = (
-	(await (await fetch(`${API_ORIGIN}/order?limit=${String(STRIP_ROWS)}`)).json()) as {
-		data: OrderAdvice;
-	}
-).data;
+const publicResponse = await fetch(`${API_ORIGIN}/order?limit=${String(STRIP_ROWS)}`);
+const publicOrder = (await publicResponse.json<{ data: OrderAdvice }>()).data;
 
 /** One number everywhere (Lane 163, D05): the signed-out strip prints each row's Over replacement
  * as GET /order gives it, and its basis says the site's one definition once. */

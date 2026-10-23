@@ -37,7 +37,7 @@ export const RECORDS_WORDS = {
 	beforeLead: (from: number) => (from <= 2 ? 'Week 1' : `Weeks 1 to ${String(from - 1)}`),
 	/** The set rule, said once (Lane 140, C14): each week's own set time is on its row. */
 	before: (from: number) =>
-		`Weekly rankings start week ${String(from)}. Each week's are set before its first kickoff and graded as set, never as refreshed after. Before that the site shipped the draft board, graded under Draft record.`,
+		`Weekly rankings start week ${String(from)}. Each week's are set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record.`,
 	setBefore: (day: string) => `set before kickoff ${day}`,
 	/** A set week's row, its set time to the minute and its zone (C14). */
 	setAt: (stamp: string) => `set ${stamp}`,
@@ -56,10 +56,10 @@ export const RECORDS_WORDS = {
 				: `Grades from ${day}, after ${game}'s game.`,
 	/** A first week with no date on file yet. */
 	setUnknown: 'set before its first kickoff',
-	/** ESPN's projection and the season-long rule (C16) in one sentence, one line at a desk (Lane 163,
-	 * D07): a week whose ESPN read came after the set says so under its own row (Lane 147). */
-	espnBasis:
-		"ESPN's is its own public PPR projection read before the week's first kickoff, and a player put on IR after we set the order is graded at the rank we set.",
+	/** ESPN's projection in one line at a desk (Lane 163, D07): the season-long rule (C16) is said in
+	 * the set rule's line (before) and a week whose ESPN read came after the set under its own row
+	 * (Lane 147). */
+	espnBasis: "ESPN's is its own public PPR projection, read before the week's first kickoff.",
 	/** The weekly run's yardstick sentences (Lanes 146 and 148, research/nightly/reads/weekly_record.py), here
 	 * for the copy guard and the stand-in run only: the page prints a week's espnNote as the run wrote
 	 * it, never these. */
@@ -79,17 +79,15 @@ export const RECORDS_WORDS = {
 		through === null ? 'No week counted yet' : `Season points through week ${String(through)}`,
 	draftPlayers: (n: number) => plural(n, 'player'),
 	/** The draft record's basis, a sentence a part so a phone draws the figures' own (Lane 131). */
-	draftSet: (set: string) =>
-		`Our draft board is the preseason order we set ${set}, before the season's first kickoff, beside ADP as it stood then.`,
-	draftGraded: (through: number | null) =>
-		`${
+	draftSet: (set: string, through: number | null) =>
+		`Our draft board is the preseason order we set ${set}, graded on ${
 			through === null
-				? 'It is graded on the season points of the weeks played once the first week is complete'
-				: `It is graded on each player's season points through week ${String(through)}`
+				? 'the season points of the weeks played once the first week is complete'
+				: `each player's season points through week ${String(through)}`
 		} in PPR, on the players both rank who have played.`,
 	draftPositions: 'Each position is graded on its own, All by players graded.',
-	draftBye: 'A player past his bye has one game fewer counted.',
-	draftKickers: 'Kickers and defenses are left out: the board takes their order from ADP.',
+	draftLeftOut:
+		'Kickers and defenses are left out, and a player past his bye has one game fewer counted.',
 	draftScale:
 		"Order matched is how closely an order ranked the players to the season's finish so far: 1.00 is the same order, 0.00 no closer than chance, below 0.00 the order runs backwards.",
 	/** Under the places off tile (C17). */
@@ -336,10 +334,8 @@ export function draftSeries(
 export function draftBasis(draft: DraftRecord): BasisPart[] {
 	return [
 		...[
-			RECORDS_WORDS.draftSet(weekdayLabel(draft.setAt)),
-			RECORDS_WORDS.draftGraded(draft.throughWeek),
-			RECORDS_WORDS.draftBye,
-			RECORDS_WORDS.draftKickers
+			RECORDS_WORDS.draftSet(weekdayLabel(draft.setAt), draft.throughWeek),
+			RECORDS_WORDS.draftLeftOut
 		].map(deskOnly),
 		...saidOnly([RECORDS_WORDS.draftPositions, draft.namedBasis]).map(both)
 	];

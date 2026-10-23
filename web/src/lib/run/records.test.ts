@@ -158,7 +158,7 @@ void test('the weekly record reads as a record with ESPN beside ours and no ADP 
 void test('weeks 1 to 6 are one line that says the set rule once (C14)', () => {
 	assert.deepEqual(beforeLine(7), {
 		lead: 'Weeks 1 to 6',
-		text: "Weekly rankings start week 7. Each week's are set before its first kickoff and graded as set, never as refreshed after. Before that the site shipped the draft board, graded under Draft record."
+		text: "Weekly rankings start week 7. Each week's are set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record."
 	});
 	assert.equal(beforeLine(1), null);
 	assert.equal(beforeLine(2)?.lead, 'Week 1');
@@ -393,8 +393,8 @@ void test("the draft basis: a phone says the figures' sentences, a desk when the
 	assert.ok(!drawnOn(basis, 'desk').some((text) => /^Order matched|^Places off/u.test(text)));
 	const desk = drawnOn(basis, 'desk');
 	assert.match(desk[0] ?? '', /^Our draft board is the preseason order we set Tue Sep 8/u);
-	assert.match(desk[1] ?? '', /through week 5 in PPR/u);
-	assert.ok(desk.includes(RECORDS_WORDS.draftBye) && desk.includes(RECORDS_WORDS.draftKickers));
+	assert.match(desk[0] ?? '', /through week 5 in PPR/u);
+	assert.ok(desk.includes(RECORDS_WORDS.draftLeftOut));
 	assert.equal(desk.at(-1), draft.namedBasis);
 });
 
@@ -461,9 +461,9 @@ void test('the records say no banned word and no em-dash', () => {
 		BYE_WORDS.done,
 		weekRankingsWord(7),
 		RAIL_ITEMS.find((item) => item.key === WEEK_RANKINGS_KEY)?.label ?? '',
-		RECORDS_WORDS.draftSet('Tue Sep 8'),
-		RECORDS_WORDS.draftGraded(5),
-		RECORDS_WORDS.draftGraded(null)
+		RECORDS_WORDS.draftSet('Tue Sep 8', 5),
+		RECORDS_WORDS.draftSet('Tue Sep 8', null),
+		RECORDS_WORDS.draftLeftOut
 	];
 	for (const words of said) {
 		assert.doesNotMatch(words, bannedPattern(), words);

@@ -208,9 +208,13 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 			byeHeads: [...(table?.querySelectorAll('tbody.bye tr.sec th') ?? [])].map(text),
 			byePlaces: [...(table?.querySelectorAll('tbody.bye td.rank') ?? [])].map(text),
 			byeGames: [...(table?.querySelectorAll('tbody.bye td.game') ?? [])].map(text),
-			playingByes: [...(table?.querySelectorAll('tbody.playing td.game') ?? [])]
-				.map(text)
-				.filter((said) => /^bye$/iu.test(said)).length,
+			// A player on a season-long list sits among the rows that play and may be on bye: only an
+			// available one (a numbered row) is a bye among the players who play.
+			playingByes: [...(table?.querySelectorAll('tbody.playing tr') ?? [])].filter(
+				(tr) =>
+					/^bye$/iu.test((tr.querySelector('td.game')?.textContent ?? '').trim()) &&
+					/^\d+$/u.test((tr.querySelector('td.rank')?.textContent ?? '').trim())
+			).length,
 			folded: [...(table?.querySelectorAll('.ph-ev') ?? [])].filter(visible).map(text)
 		};
 	});
@@ -246,7 +250,9 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 	// "Bye in week N" after the players who play, who are numbered 1..n; Rest of season keeps them.
 	const numbered = places.filter((p) => !LIST_PLACE.test(p));
 	if (screen.name === 'players') {
-		if (seen.byeHeads.length !== 1 || !BYE_HEAD.test(seen.byeHeads[0] ?? ''))
+		// The section is drawn exactly when an available player is on bye (the stand-in week may have none).
+		const headsWanted = seen.byeGames.length > 0 ? 1 : 0;
+		if (seen.byeHeads.length !== headsWanted || seen.byeHeads.some((head) => !BYE_HEAD.test(head)))
 			said.push(`players at ${String(width)}: byes' head ${JSON.stringify(seen.byeHeads)}`);
 		if (seen.byePlaces.some((p) => p !== ''))
 			said.push(`players at ${String(width)}: a bye numbered (${seen.byePlaces.join(' ')})`);
