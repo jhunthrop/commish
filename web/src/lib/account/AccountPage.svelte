@@ -13,7 +13,6 @@
 	import ActionRow from '#lib/ui/ActionRow.svelte';
 	import ActionRows from '#lib/ui/ActionRows.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
-	import Panel from '#lib/ui/Panel.svelte';
 	import AccountFoot from './AccountFoot.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import LineList from '#lib/ui/LineList.svelte';
