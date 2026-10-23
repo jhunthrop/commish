@@ -1,11 +1,14 @@
-/** One board for a signed-in member (Lane 96 fix round 1, B08): the front door's strip prints the
- * API's live order, the one Players and Rest of 2026 read at the same clock (restlive.go RestAt and
- * LiveBoard), in its order and to its tenth. A reader who is signed out, or whose read fails, keeps
- * the run's figures, said with the run's time beside them. Pure, so the tests read every figure and
+/** One board for every reader (Lane 96 fix round 1, B08; Lane 163, D05): the front door's strip
+ * prints the API's live order, the one Players and Rest of 2026 read at the same clock (restlive.go
+ * RestAt and LiveBoard), in its order and to its tenth, signed out too, so Over replacement is one
+ * number on every page. A reader whose read fails keeps the run's figures, said with the run's time
+ * beside them. Pure, so the tests read every figure and
  * word the strip prints. */
 import { timeOfDay, zoneWord } from '#lib/format/clock.ts';
 import { BUILD_ZONE, dayTimeStamp } from '#lib/format/day-time.ts';
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
+import { overReplacementWords } from '#lib/format/figure-words.ts';
+import { COLUMN_HEADS } from '#lib/ui/board-columns.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { BoardRowView } from '#lib/run/schema.ts';
 import type { components } from '#lib/api/types.ts';
@@ -25,9 +28,10 @@ export const STRIP_WORDS = {
 	/** "Projected and Over replacement updated Thu Oct 22, 8:50 am Central.": the run's figures with
 	 * its one stamp, day and zone (Lane 140, C24). */
 	updated: (at: string): string => `Projected and Over replacement updated ${at}.`,
-	/** What Over replacement counts, said once under the heads (B46). */
-	overReplacement: (teams: number): string =>
-		`Over replacement: his projected points above the last starter at his position for ${String(teams)} teams.`,
+	/** The league a figure is for, as the API names it (words.go OrderLeague). */
+	yourLeague: 'your league',
+	shapeLeague: (teams: number, scoring: string): string =>
+		`a ${String(teams)}-team ${scoring} league`,
 	/** Why a row built from the answer reads "--" for Tier, said once in the basis (B78, Lane 117):
 	 * his tier is the run's, and the page carries the top rows of the board it is built on alone. */
 	untiered: (label: string): string =>
@@ -46,9 +50,11 @@ export function runStampPart(refreshedAt: string, zone: string): BasisPart {
 	return { text: STRIP_WORDS.updated(dayTimeStamp(refreshedAt, zone)), phone: true };
 }
 
-/** What Over replacement counts, for the shape the figures are for (B46). */
-export function overReplacementPart(teams: number): BasisPart {
-	return { text: STRIP_WORDS.overReplacement(teams), phone: true };
+/** What Over replacement counts, said once under the heads (B46): the site's one definition
+ * (figure-words.ts, Lane 163 D05), for the followed league or the board's shape. */
+export function overReplacementPart(teams: number, scoring: string, league: boolean): BasisPart {
+	const said = league ? STRIP_WORDS.yourLeague : STRIP_WORDS.shapeLeague(teams, scoring);
+	return { text: overReplacementWords(COLUMN_HEADS.vor.text, said), phone: true };
 }
 
 /** The shape the live figures are for: "for 12 teams", or in a league "for 12 teams, your league's

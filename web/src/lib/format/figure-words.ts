@@ -27,6 +27,9 @@ export interface FigureWords {
 	freeAgentClub: string;
 	/** "a free agent": the same in a sentence. */
 	freeAgent: string;
+	/** "his points less a free pickup's": what Over replacement counts, the site's one definition
+	 * (Lane 163, D05), the league it is for said after it (overReplacementWords). */
+	overReplacement: string;
 }
 
 export const FIGURE: Readonly<FigureWords> = TABLE;
@@ -35,4 +38,11 @@ export const FIGURE: Readonly<FigureWords> = TABLE;
  * never the reader's clock. */
 export function weekHead(week: number): string {
 	return `${FIGURE.week} ${String(week)}`;
+}
+
+/** What Over replacement counts for a league, the one sentence every screen that draws the figure
+ * without the API's basis says (Lane 163, D05), in the API's words (words.go OrderScreenBasis):
+ * "Over replacement is his points less a free pickup's in a 12-team PPR league." */
+export function overReplacementWords(head: string, league: string): string {
+	return `${head} is ${FIGURE.overReplacement} in ${league}.`;
 }

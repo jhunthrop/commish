@@ -29,7 +29,7 @@ import { chromium, type Page } from 'playwright';
 import { RECORDS_WORDS } from '../src/lib/run/records.ts';
 import { ERROR_WORDS } from '../src/lib/site/error-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
-import { basisLines, basisReport } from './basis-lines.ts';
+import { PAGE_BASIS, basisLines, basisReport } from './basis-lines.ts';
 import { installFixtureApiClock } from './inseason-fixture/clock.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 
@@ -169,6 +169,18 @@ async function basisFaults(page: Page, who: Who, width: number): Promise<void> {
 		process.stdout.write(`${report.line}\n`);
 		if (report.fault !== null) faults.push(report.fault);
 	}
+	// The page's footers together, printed for the report (Lane 163, D07), and Order matched and
+	// Places off defined once on the page, never again in the draft's.
+	const total = await basisLines(page, PAGE_BASIS);
+	process.stdout.write(
+		`basis record ${mode} page ${who} ${String(width)}: ${String(total)} lines\n`
+	);
+	const said = (await page.locator(PAGE_BASIS).allTextContents()).join(' ');
+	for (const lead of ['Order matched is', 'Places off is']) {
+		const times = said.split(lead).length - 1;
+		if (times !== 1)
+			faults.push(`record ${mode} ${who} ${String(width)}: "${lead}" ${String(times)} times`);
+	}
 }
 
 async function record(who: Who, width: number, theme: Theme): Promise<void> {
@@ -193,7 +205,8 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 	has(draft, 'lower is better', where);
 	has(draft, 'of the top 12 QB, 24 RB, 36 WR, 12 TE', where);
 	has(draft, 'ADP by 4', where);
-	has(draft, 'below 0.00 the order runs backwards', where);
+	// Order matched and Places off are the weekly basis's, said once (Lane 163, D07).
+	lacks(draft, /Order matched is|Places off is/u, where);
 	// Week 7's ESPN sentence (Lane 147): drawn once under its row when the run carries it, nothing
 	// on a run without it.
 	const notes = await page.locator('section#weekly table.weeks tr.note td:visible').allInnerTexts();
@@ -208,7 +221,7 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 		has(weekly, 'Set Thu Oct 22, ', where);
 		has(weekly, 'Our weekly rankings, set Oct 22', where);
 		has(weekly, 'Order matched by week, 1 week graded', where);
-		has(weekly, "ESPN's is its own public projection in PPR", where);
+		has(weekly, RECORDS_WORDS.espnBasis, where);
 		// The weekly pairs name the leader, ESPN's where it leads (fix round 1, HIGH-1).
 		has(weekly, 'ESPN by 2', where);
 		if (notes.join('|') !== RECORDS_WORDS.espnReadAfter)

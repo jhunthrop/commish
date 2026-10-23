@@ -12,7 +12,7 @@
 	import type { SheetPlayer } from '#lib/sheet/model.ts';
 	import type { Position } from '#lib/types/player.ts';
 	import { orderApi, type OrderAdvice, type OrderPosition } from './api.ts';
-	import { MIN_SEARCH } from './path.ts';
+	import { BYES_LAST, MIN_SEARCH } from './path.ts';
 	import {
 		ORDER,
 		PLAYERS_CHIPS,
@@ -104,8 +104,10 @@
 	const weekShown = $derived(
 		week !== null && weekSaid?.key === weekReadKey(week, null) ? weekSaid : null
 	);
+	/** The Players page is the week's rankings: its byes sit apart, never numbered (Lane 163, D06). */
+	const byesApart = $derived(mode === 'players');
 	const views = $derived(
-		advice?.rows.map((row) => orderView(row, memberZone(), position === null, now)) ?? []
+		advice?.rows.map((row) => orderView(row, memberZone(), position === null, now, byesApart)) ?? []
 	);
 	const basis = $derived(
 		advice === null
@@ -173,7 +175,8 @@
 				position: asked,
 				q: q.trim().length >= MIN_SEARCH ? q : null,
 				roster: rosterFilter(roster),
-				limit
+				limit,
+				byes: byesApart ? BYES_LAST : null
 			});
 			if (mine !== latest) return;
 			now = Date.now();
@@ -319,6 +322,7 @@
 					league={tableLeague}
 					tagsOf={sheetTags}
 					end={mode === 'players' ? sheetMark : undefined}
+					{byesApart}
 				/>
 			</div>
 		{/if}

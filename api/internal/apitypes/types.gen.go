@@ -5260,6 +5260,9 @@ type OrderParams struct {
 
 	// Limit at most this many rows, 100 without it
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Byes last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the answer's week (line.facts.bye) after the rest, the players on a season-long list included, numbered on from them; without it the order keeps them in their places
+	Byes *string `form:"byes,omitempty" json:"byes,omitempty"`
 }
 
 // WeekOrderParams defines parameters for WeekOrder.

@@ -238,11 +238,16 @@ void test("the signed-out strip says the run's time beside its figures", () => {
 });
 
 void test('the basis says once what Over replacement counts, for the shape (B46)', () => {
+	// One definition with the API's order basis (Lane 163, D05): the shared table's words.
 	assert.equal(
-		overReplacementPart(12).text,
-		'Over replacement: his projected points above the last starter at his position for 12 teams.'
+		overReplacementPart(12, 'PPR', false).text,
+		"Over replacement is his points less a free pickup's in a 12-team PPR league."
 	);
-	assert.match(overReplacementPart(10).text, /for 10 teams\.$/);
+	assert.match(overReplacementPart(10, 'half PPR', false).text, /in a 10-team half PPR league\.$/);
+	assert.equal(
+		overReplacementPart(12, 'PPR', true).text,
+		"Over replacement is his points less a free pickup's in your league."
+	);
 });
 
 void test("the live strip's lead says its weeks, the shape and when it was read", () => {

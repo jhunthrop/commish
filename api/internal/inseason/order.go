@@ -36,9 +36,14 @@ const (
 	fieldQuery  = "q"
 	fieldLimit  = "limit"
 	fieldRoster = "roster"
+	// fieldByes asks for the Players page's week order (Lane 163, D06):
+	// byesLast is its one value.
+	fieldByes   = "byes"
+	byesLast    = "last"
 	queryWords  = "Type 2 to 40 letters of a name or a club"
 	limitWords  = "Ask for 1 to 400 rows"
 	rosterWords = "Pick free or yours"
+	byesWords   = "Ask for byes=last or leave it out"
 	// orderPositionWords names the positions the order ranks.
 	orderPositionWords = "Pick a position: QB, RB, WR or TE"
 )
@@ -52,6 +57,11 @@ type orderQuery struct {
 	// roster keeps only the free players or the drafter's own (review 66j
 	// H5), "" for everyone; the league's route only.
 	roster apitypes.RosterMarkKind
+	// byesLast puts every available player whose club is on bye in the
+	// order's week after the rest (Lane 163, D06): the Players page's
+	// Week N rankings never number a player on bye. The read with no
+	// league only.
+	byesLast bool
 }
 
 // parseOrderQuery reads ?position=, ?q=, ?limit= and, in a league, ?roster=,
@@ -63,6 +73,12 @@ func parseOrderQuery(r *http.Request, league bool) (orderQuery, map[string]strin
 	bad := map[string]string{}
 	if out.roster != "" && (!league || (out.roster != apitypes.RosterMarkKindFree && out.roster != apitypes.RosterMarkKindYours)) {
 		bad[fieldRoster] = rosterWords
+	}
+	if raw := values.Get(fieldByes); !league && raw != "" {
+		out.byesLast = raw == byesLast
+		if !out.byesLast {
+			bad[fieldByes] = byesWords
+		}
 	}
 	if out.position != "" && !orderPositions[out.position] {
 		bad[fieldPosition] = orderPositionWords
@@ -116,17 +132,24 @@ func (a *advisor) ranked(position draft.Position) []boards.Player {
 // season, the platform's IR mark) after every available one, each group
 // kept in its order and numbered on from the last available place (Lane
 // 128): the in-season order never ranks him as playing (the 2026-10-16
-// ruling), so his row draws the list's word in place of its number.
-func (a *advisor) playingFirst(players []boards.Player, hosts map[string]string) ([]boards.Player, []int) {
-	var playing, listed []boards.Player
+// ruling), so his row draws the list's word in place of its number. With
+// byesLast an available player whose club is on bye in the order's week
+// comes last of all, after the listed players (Lane 163, D06): the week's
+// rankings number the players who play it first, and his row draws no
+// number.
+func (a *advisor) playingFirst(players []boards.Player, hosts map[string]string, byesLast bool) ([]boards.Player, []int) {
+	var playing, listed, byes []boards.Player
 	for _, p := range players {
-		if a.seasonLong(p, hosts) {
+		switch {
+		case a.seasonLong(p, hosts):
 			listed = append(listed, p)
-		} else {
+		case byesLast && a.season.OnBye(p.Team):
+			byes = append(byes, p)
+		default:
 			playing = append(playing, p)
 		}
 	}
-	ordered := append(playing, listed...)
+	ordered := append(append(playing, listed...), byes...)
 	ranks := make([]int, len(ordered))
 	for i := range ordered {
 		ranks[i] = i + 1
@@ -315,7 +338,7 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 		out.ReadAt = &readAt
 		hosts = a.hostIDs()
 	}
-	players, ranks := a.playingFirst(a.ranked(q.position), hosts)
+	players, ranks := a.playingFirst(a.ranked(q.position), hosts, q.byesLast)
 	for i, p := range players {
 		if !matches(p, q.q) || (q.roster != "" && a.rosterMark(p.ID).Kind != q.roster) {
 			continue

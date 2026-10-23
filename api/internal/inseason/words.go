@@ -575,11 +575,11 @@ func restFromWords(r RestFrom) string {
 // two-week final named.
 func OrderScreenBasis(b OrderBasis, from RestFrom, league string, h Horizon) string {
 	if b != RestOfSeason || from.Week < 1 {
-		return fmt.Sprintf("Our preseason order: All ranks by Over repl., his season less a free pickup's in %s.", league)
+		return fmt.Sprintf("Our preseason order: All ranks by Over repl., %s in %s.", figurewords.Table.OverReplacement, league)
 	}
 	return fmt.Sprintf("Our rest-of-season order %s. A position ranks by %s through week %d%s, byes out, "+
-		"All by Over repl., his points less a free pickup's in %s.%s", restFromWords(from), figurewords.Table.Projected, h.Last,
-		h.finalWords(from.Week), league, h.rateWords(from.Week))
+		"All by Over repl., %s in %s.%s", restFromWords(from), figurewords.Table.Projected, h.Last,
+		h.finalWords(from.Week), figurewords.Table.OverReplacement, league, h.rateWords(from.Week))
 }
 
 // secondMention is a name as a sentence names him again: his last name, a

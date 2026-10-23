@@ -1225,6 +1225,14 @@ paths:
         required: false
         description: at most this many rows, 100 without it
         schema: { type: integer, minimum: 1, maximum: 400 }
+      - name: byes
+        in: query
+        required: false
+        description: >-
+          last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the
+          answer's week (line.facts.bye) after the rest, the players on a season-long list included, numbered on from
+          them; without it the order keeps them in their places
+        schema: { type: string, enum: [last] }
     get:
       tags: [league-sync]
       operationId: order

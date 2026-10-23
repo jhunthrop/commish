@@ -146,7 +146,7 @@ func TestOrderScreenBasisNamesItsLeague(t *testing.T) {
 	if stand != "a 12-team PPR league" {
 		t.Errorf("%q", stand)
 	}
-	if got := OrderScreenBasis(Preseason, RestFrom{}, stand, StandardHorizon); got != "Our preseason order: All ranks by Over repl., his season less a free pickup's in a 12-team PPR league." {
+	if got := OrderScreenBasis(Preseason, RestFrom{}, stand, StandardHorizon); got != "Our preseason order: All ranks by Over repl., his points less a free pickup's in a 12-team PPR league." {
 		t.Errorf("%q", got)
 	}
 }

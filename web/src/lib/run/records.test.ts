@@ -205,11 +205,7 @@ void test("the weekly basis: both widths say the figures' sentences, a desk ESPN
 	const phone = [record.scale, RECORD_WORDS.placesOff, 'Starters right counts a standard lineup.'];
 	assert.deepEqual(drawnOn(weeklyBasis(record, null), 'phone'), phone);
 	// The method and the published projection's promise are said elsewhere; Yahoo is not named (C27).
-	assert.deepEqual(drawnOn(weeklyBasis(record, null), 'desk'), [
-		...phone,
-		RECORDS_WORDS.espnBasis,
-		RECORDS_WORDS.seasonLong
-	]);
+	assert.deepEqual(drawnOn(weeklyBasis(record, null), 'desk'), [...phone, RECORDS_WORDS.espnBasis]);
 	assert.ok(!drawnOn(weeklyBasis(record, null), 'desk').some((text) => text.includes('Yahoo')));
 	const withPublished = {
 		...record,
@@ -229,11 +225,7 @@ void test("the weekly basis: both widths say the figures' sentences, a desk ESPN
 		RECORDS_WORDS.leagueRow
 	];
 	assert.deepEqual(drawnOn(opened, 'phone'), figures);
-	assert.deepEqual(drawnOn(opened, 'desk'), [
-		...figures,
-		RECORDS_WORDS.espnBasis,
-		RECORDS_WORDS.seasonLong
-	]);
+	assert.deepEqual(drawnOn(opened, 'desk'), [...figures, RECORDS_WORDS.espnBasis]);
 	const noBenchmark = weeklyBasis(record, { ...league, benchmark: null });
 	assert.ok(!drawnOn(noBenchmark, 'desk').includes(RECORDS_WORDS.leagueRow));
 });
@@ -396,12 +388,9 @@ void test('the draft table lists each position, All as its totals, and its chart
 
 void test("the draft basis: a phone says the figures' sentences, a desk when the board was set too (Lane 131)", () => {
 	const basis = draftBasis(draft);
-	assert.deepEqual(drawnOn(basis, 'phone'), [
-		RECORDS_WORDS.draftPositions,
-		RECORDS_WORDS.draftScale,
-		RECORD_WORDS.placesOff,
-		draft.namedBasis
-	]);
+	// Order matched and places off are the weekly basis's, said once on the page (Lane 163, D07).
+	assert.deepEqual(drawnOn(basis, 'phone'), [RECORDS_WORDS.draftPositions, draft.namedBasis]);
+	assert.ok(!drawnOn(basis, 'desk').some((text) => /^Order matched|^Places off/u.test(text)));
 	const desk = drawnOn(basis, 'desk');
 	assert.match(desk[0] ?? '', /^Our draft board is the preseason order we set Tue Sep 8/u);
 	assert.match(desk[1] ?? '', /through week 5 in PPR/u);

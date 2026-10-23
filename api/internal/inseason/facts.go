@@ -355,6 +355,18 @@ type Player struct {
 	ReadAt time.Time
 }
 
+// OnBye is whether a club has no game in the season's week while the
+// week has games and the club has some this season (Facts.Bye's rule).
+func (s *Season) OnBye(team string) bool {
+	if team == "" {
+		return false
+	}
+	if _, ok := s.games[teamWeek{s.week, team}]; ok {
+		return false
+	}
+	return s.weekHasGames && s.scheduled[team]
+}
+
 // For is one player's facts.
 func (s *Season) For(p Player) Facts {
 	f := Facts{Week: s.week, Designation: s.designation(p)}
@@ -370,7 +382,7 @@ func (s *Season) For(p Player) Facts {
 				f.Allowed = &a
 			}
 		} else {
-			f.Bye = s.weekHasGames && s.scheduled[p.Team]
+			f.Bye = s.OnBye(p.Team)
 		}
 	}
 	games := s.gamesOf(p)

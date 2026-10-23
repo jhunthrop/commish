@@ -4,7 +4,7 @@ import { BOX } from '#lib/league/box/box.ts';
 import { ORDER } from '#lib/order/words.ts';
 import { CARD, unreadBasis } from '#lib/player/card.ts';
 import { COLUMN_HEADS } from '#lib/ui/board-columns.ts';
-import { FIGURE, weekHead } from './figure-words.ts';
+import { FIGURE, overReplacementWords, weekHead } from './figure-words.ts';
 
 void test('the words are the one table the API embeds, every head named', () => {
 	assert.deepEqual(FIGURE, {
@@ -16,8 +16,16 @@ void test('the words are the one table the API embeds, every head named', () => 
 		restFrom: 'from week {week}',
 		restFromPartial: "from week {week}'s games left",
 		freeAgentClub: 'FA',
-		freeAgent: 'a free agent'
+		freeAgent: 'a free agent',
+		overReplacement: "his points less a free pickup's"
 	});
+});
+
+void test('Over replacement is defined once, in the words the API says it in (Lane 163, D05)', () => {
+	assert.equal(
+		overReplacementWords(COLUMN_HEADS.vor.text, 'a 12-team PPR league'),
+		"Over replacement is his points less a free pickup's in a 12-team PPR league."
+	);
 });
 
 void test('each week template holds exactly one week slot (re-review N3)', () => {

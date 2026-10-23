@@ -1108,6 +1108,8 @@ export interface paths {
 				q?: string;
 				/** @description at most this many rows, 100 without it */
 				limit?: number;
+				/** @description last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the answer's week (line.facts.bye) after the rest, the players on a season-long list included, numbered on from them; without it the order keeps them in their places */
+				byes?: 'last';
 			};
 			header?: never;
 			path?: never;
@@ -6030,6 +6032,8 @@ export interface operations {
 				q?: string;
 				/** @description at most this many rows, 100 without it */
 				limit?: number;
+				/** @description last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the answer's week (line.facts.bye) after the rest, the players on a season-long list included, numbered on from them; without it the order keeps them in their places */
+				byes?: 'last';
 			};
 			header?: never;
 			path?: never;

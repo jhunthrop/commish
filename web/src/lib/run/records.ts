@@ -56,8 +56,10 @@ export const RECORDS_WORDS = {
 				: `Grades from ${day}, after ${game}'s game.`,
 	/** A first week with no date on file yet. */
 	setUnknown: 'set before its first kickoff',
+	/** ESPN's projection and the season-long rule (C16) in one sentence, one line at a desk (Lane 163,
+	 * D07): a week whose ESPN read came after the set says so under its own row (Lane 147). */
 	espnBasis:
-		"ESPN's is its own public projection in PPR, read before the week's first kickoff, on its players with an ESPN id.",
+		"ESPN's is its own public PPR projection read before the week's first kickoff, and a player put on IR after we set the order is graded at the rank we set.",
 	/** The weekly run's yardstick sentences (Lanes 146 and 148, research/nightly/reads/weekly_record.py), here
 	 * for the copy guard and the stand-in run only: the page prints a week's espnNote as the run wrote
 	 * it, never these. */
@@ -67,9 +69,6 @@ export const RECORDS_WORDS = {
 		"ESPN's projection was not read before this week's first kickoff, so the week is graded against the week's published projection alone.",
 	noYardstick:
 		"No yardstick was read before this week's first kickoff, so the week is graded on its own order alone.",
-	/** The season-long rule in a player's words (C16). */
-	seasonLong:
-		'A player put on IR or another season-long list after we set the order is still graded at the rank we set.',
 	/** A run before Lane 114 carries neither record: said once, until the next run writes them. */
 	waiting: 'This record is written by the next nightly run.',
 	position: 'Position',
@@ -189,7 +188,8 @@ const deskOnly = (text: string): BasisPart => ({ text, phone: false });
 /** The weekly record's basis (Lanes 131, 138, 140). Both widths say what each figure is: order
  * matched, places off, starters right in the lineup it counts, and, opened from a league, what the
  * league row's figures are. A desk also says what ESPN's projection is (its columns are drawn from the
- * first week, C15), the season-long rule as a plain rule (C16), and when the published projection's
+ * first week, C15) with the season-long rule (C16) in the same sentence (Lane 163, D07), and when the
+ * published projection's
  * column starts once drawn. The rest are said elsewhere, so the desk holds five lines (Lane 138): how
  * the rankings are set (the line before the weeks), what the league's lineup leaves uncounted (its
  * starters sentence names the lineup it counts), and the published projection's start before it is
@@ -204,7 +204,6 @@ export function weeklyBasis(record: RunRecord, league: LeagueBasis | null): Basi
 		]).map(both),
 		...saidOnly([
 			RECORDS_WORDS.espnBasis,
-			RECORDS_WORDS.seasonLong,
 			publishedDrawn(record) ? publishedWords(record) : null
 		]).map(deskOnly)
 	];
@@ -331,8 +330,9 @@ export function draftSeries(
 
 /** The draft record's basis (Lane 131). A desk says when the board was set and what it is graded on
  * (the section's head and the bug say both on a phone), the bye and the kickers left out; both widths
- * say how All combines the positions and what each figure is: order matched, places off and top
- * named. */
+ * say how All combines the positions and what top named counts. Order matched and places off are
+ * said once on the page, in the weekly record's basis above it (Lane 163, D07): the draft sentence
+ * names the finish they are measured against, the season's points so far. */
 export function draftBasis(draft: DraftRecord): BasisPart[] {
 	return [
 		...[
@@ -341,12 +341,7 @@ export function draftBasis(draft: DraftRecord): BasisPart[] {
 			RECORDS_WORDS.draftBye,
 			RECORDS_WORDS.draftKickers
 		].map(deskOnly),
-		...saidOnly([
-			RECORDS_WORDS.draftPositions,
-			RECORDS_WORDS.draftScale,
-			RECORD_WORDS.placesOff,
-			draft.namedBasis
-		]).map(both)
+		...saidOnly([RECORDS_WORDS.draftPositions, draft.namedBasis]).map(both)
 	];
 }
 
