@@ -2,7 +2,7 @@
 	import '#lib/ui/fonts/ui.css';
 	import '#lib/ui/tokens.css';
 	import '#lib/ui/base.css';
-	import favicon from '#lib/assets/favicon.svg';
+	import favicon from '#lib/assets/favicon.svg?no-inline';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
