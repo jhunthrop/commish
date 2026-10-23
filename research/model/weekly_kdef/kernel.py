@@ -1,7 +1,8 @@
 """THE POINTS DISTRIBUTION (design 5.2; Amendment 7 item 4): a kernel over the fit club-games' scores,
 exponentially tilted to a boosted Poisson mean.
 
-For a club-game whose scoring club is implied to score m, the kernel weights each fit club-game by a
+For a club-game whose scoring club is implied to score m (with no game figure, every club-game alike),
+the kernel weights each fit club-game by a
 Gaussian in the difference of their implied points (bandwidth h, chosen on the fit seasons by
 forward-chained log loss from {1.0, 1.5, 2.0, 3.0}, the smaller on a tie) and takes the weighted empirical
 distribution of their scores over 0 to 59 and 60 plus. The distribution is then tilted, p_s x exp(theta s)
@@ -33,7 +34,9 @@ def kernel(base_implied: np.ndarray, base_scores: np.ndarray, implied: np.ndarra
     onehot = np.zeros((len(base_scores), len(SCORES)))
     onehot[np.arange(len(base_scores)), np.clip(base_scores, 0, 60).astype(int)] = 1.0
     gap = (np.asarray(implied, dtype=float)[:, None] - np.asarray(base_implied, dtype=float)[None, :]) / bandwidth
-    weights = np.exp(-0.5 * gap**2)
+    # A club-game with no game figure (round 4's `no_game_figure` default) weighs every fit club-game alike:
+    # the league's distribution, which the tilt then moves to the points model's mean.
+    weights = np.exp(-0.5 * np.nan_to_num(gap, nan=0.0) ** 2)
     found = weights @ onehot
     total = found.sum(axis=1, keepdims=True)
     return np.where(total > 0, found / np.maximum(total, 1e-300), 1.0 / len(SCORES))

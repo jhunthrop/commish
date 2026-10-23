@@ -34,6 +34,7 @@ DEFAULT_COUNTS: Final = (
     "no_kicker",
     "kicker_withheld",
     "lost_prior_week",
+    "default_no_game_figure",
 )
 PUBLISHED_REFUSAL: Final = (
     "the published projection's archive: refused by name, no 2023 or 2024 week of it is stamped at or before t_g"

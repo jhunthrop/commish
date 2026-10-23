@@ -30,6 +30,13 @@ def test_the_tilt_meets_the_boosted_mean_and_keeps_the_lumps() -> None:
     assert set(np.flatnonzero(tilted[0] > 0)) == set(np.flatnonzero(raw[0] > 0)) == {13, 17, 20, 21, 24, 27}
 
 
+def test_a_club_game_with_no_game_figure_weighs_every_fit_club_game_alike() -> None:
+    base = np.array([20.0, 28.0])
+    scores = np.array([14.0, 31.0])
+    found = kernel.kernel(base, scores, np.array([np.nan]), 1.0)
+    assert found[0, 14] == pytest.approx(0.5) and found[0, 31] == pytest.approx(0.5)
+
+
 def test_the_bandwidth_is_the_least_forward_chained_log_loss_the_smaller_on_a_tie() -> None:
     implied = np.array([20.0, 20.0, 20.0, 20.0])
     scores = np.array([17.0, 17.0, 17.0, 17.0])
