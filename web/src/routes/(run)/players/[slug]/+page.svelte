@@ -102,11 +102,7 @@
 							next: page.tier.cliff?.nextId ?? null,
 							format: tierFormat
 						};
-			const source = cardSource(page, lead, {
-				label: scoring,
-				season,
-				single: page.tier.mates.length === 1
-			});
+			const source = cardSource(page, lead, { label: scoring, season });
 			// The page's clock: the card is drawn at the moment its week is read.
 			const card = await module.readCard(source, at, ask, () => Date.now());
 			if (mine !== asked) return;

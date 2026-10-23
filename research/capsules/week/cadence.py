@@ -18,6 +18,7 @@ from typing import Final
 
 from research.capsules.page_figures import projection_tenth
 from research.capsules.store import WRITTEN_SOURCE
+from research.capsules.week.cells import SHOWN_CHANGE_FROM
 from research.capsules.week.sheet import CENTRAL, WeekSheet
 from research.capsules.week.store import StoredWeekRead
 
@@ -42,6 +43,22 @@ def projection_moved(now: float | None, then: float | None) -> bool:
     if now is None or then is None:
         return (now is None) != (then is None)
     return projection_tenth(now) != projection_tenth(then)
+
+
+# Tenths in a point: the card's figures are whole tenths, so the serve rule compares them as integers.
+_TENTHS: Final = 10
+
+
+def projection_moved_past_shown(now: float | None, then: float | None) -> bool:
+    """Whether the card's published projection (`now`) has moved from a read's (`then`) by the Proj change
+    tile's threshold (`cells.SHOWN_CHANGE_FROM`, Lane 162, D04): the page's serve rule, so a move the tile
+    calls "under 0.5" never withholds the read (the web's `card.ts projectionMoved`). A figure that appeared
+    or went is a move. The rewrite still follows any tenth (`projection_moved`), so the quote is refreshed
+    the next night."""
+    if now is None or then is None:
+        return (now is None) != (then is None)
+    moved = abs(round(projection_tenth(now) * _TENTHS) - round(projection_tenth(then) * _TENTHS))
+    return moved >= round(SHOWN_CHANGE_FROM * _TENTHS)
 
 
 def _projection_moved(sheet: WeekSheet, stored: StoredWeekRead) -> bool:

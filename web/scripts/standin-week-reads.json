@@ -1,5 +1,5 @@
 {
-	"note": "Lane 72's recorded week-ahead reads (research/tests/testdata/week_reads/recorded.json, week 6 of 2026): the stand-in run's weekRead for these three players until the nightly writes every page's. CeeDee Lamb's is shown withheld, as a read his status moved past (Lane 72's rule): its caption alone, in the words and due time the nightly gives it for that write, so the page's withheld state is shot. Lane 158: Rome Odunze's is a stand-in written for the sweep (his club plays Sunday's noon slot), quoting a published projection of 12.4 the card does not print, with the moved caption: before his kickoff the shelf shows the caption alone, from his kickoff the read itself.",
+	"note": "Lane 72's recorded week-ahead reads (research/tests/testdata/week_reads/recorded.json, week 6 of 2026): the stand-in run's weekRead for these three players until the nightly writes every page's. CeeDee Lamb's is shown withheld, as a read his status moved past (Lane 72's rule): its caption alone, in the words and due time the nightly gives it for that write, so the page's withheld state is shot. Lane 158: Rome Odunze's is a stand-in written for the sweep (his club plays Sunday's noon slot), quoting a published projection of 12.4 the card does not print, with the moved caption: before his kickoff the shelf shows the caption alone, from his kickoff the read itself. Lane 162 (D01): Travis Etienne Jr.'s is a stand-in written for the sweep on Tuesday, before the recorded capture, while he was on injured reserve; the capture has him due back Sunday, so his page and his shelf show the status caption alone, never a read that benches him.",
 	"reads": [
 		{
 			"id": "4426515",
@@ -42,6 +42,16 @@
 			"status": "questionable",
 			"projection": 12.4,
 			"movedCaption": "The published projection moved since this read was written."
+		},
+		{
+			"id": "4239996",
+			"name": "Travis Etienne Jr.",
+			"week": 6,
+			"body": "Travis Etienne Jr. does not play in week 6 of 2026: he sits on injured reserve on Tuesday's report. Keep him on your roster and find a fill-in at running back for this week.",
+			"caption": "Written Tue Oct 13, 4:00 pm CT, for week 6",
+			"call": "sit",
+			"writtenAt": "2026-10-13T21:00:00.000Z",
+			"status": "injured_reserve"
 		}
 	]
 }

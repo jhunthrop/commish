@@ -4271,8 +4271,14 @@ type Tiebreak string
 type TierMate struct {
 	BoardId string `json:"board_id"`
 
+	// FromWeek the week his points count from, his club's first game still to play at the read's clock (the read's rest_from_week for him), so the tier box says whose span is not the card's (Lane 162); null with no game left; absent from an older answer
+	FromWeek *int `json:"from_week,omitempty"`
+
 	// Points his rest-of-season points at the read's clock, one decimal; null when the board has no projection for him
 	Points *float64 `json:"points"`
+
+	// PositionRank his place at his position among the players on no season-long list, the read's own rank (the one its line.position_rank says, PlayingRanks, Lane 128), so the tier box and the card's head draw one number (Lane 162); null on a season-long list or off the board; absent from an older answer
+	PositionRank *int `json:"position_rank,omitempty"`
 }
 
 // TradeAdvice defines model for TradeAdvice.

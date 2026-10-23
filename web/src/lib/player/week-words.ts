@@ -12,7 +12,8 @@ import {
 	restFromWords,
 	restOfSeasonHead,
 	restSpanWords,
-	tierBasisWords
+	tierBasisWords,
+	tierSpanOf
 } from '#lib/run/rest-from.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
 import {
@@ -40,6 +41,8 @@ import { hostWords } from '#lib/league/names.ts';
 import type { LogNext } from '#lib/ui/game-log.ts';
 import {
 	CARD,
+	SHOWN_CHANGE_FROM,
+	projectionMove,
 	listedTiles,
 	restRankWords,
 	NONE,
@@ -49,17 +52,18 @@ import {
 	type BasisTile,
 	type CardHead,
 	type CardTile,
+	type ProjectionMove,
 	type RestParts
 } from './card.ts';
 import { vsAvgCaption } from './basis-words.ts';
 import type { CardProjection } from './week-read.ts';
+import type { WeekRead } from '#lib/run/schema.ts';
+
+/** What of the week's read the change tile needs: its week and the projection it quotes. */
+export type ReadQuote = Pick<WeekRead, 'week' | 'projection'>;
 
 /** Tenths in a point, the precision the API prints. */
 const TENTHS = 10;
-
-/** The smallest change the Proj change tile prints (Lane 139, C21): a tenth of a point is noise
- * beside a whole tile. The writer's cells hold the same (`capsules/week/cells.py SHOWN_CHANGE_FROM`). */
-export const SHOWN_CHANGE_FROM = 0.5;
 
 /** The week tile's and the change tile's own words (Lane 139, C06, C12, C21): the week's figure named as
  * the published projection with its one read stamp, the change with none. */
@@ -67,7 +71,13 @@ export const WEEK_TILE = {
 	published: 'published projection',
 	sinceEarlier: 'since the earlier read',
 	underShown: `Moved under ${String(SHOWN_CHANGE_FROM)} since the earlier read`,
-	changePart: `${CARD.delta} is its move since the earlier read, shown from ${String(SHOWN_CHANGE_FROM)}.`
+	/** With a read written for the week the change is measured from the figure it quotes, the move that
+	 * decides whether the read stands (Lane 162, D04). */
+	sinceRead: 'since our read was written',
+	underShownRead: `Moved under ${String(SHOWN_CHANGE_FROM)} since our read was written`,
+	notInRead: 'Not in our read',
+	changePart: `${CARD.delta} is its move since the earlier read, shown from ${String(SHOWN_CHANGE_FROM)}.`,
+	changePartRead: `${CARD.delta} is its move since our read was written, shown from ${String(SHOWN_CHANGE_FROM)}; the read is withheld from the same move.`
 } as const;
 
 type Schemas = components['schemas'];
@@ -149,9 +159,13 @@ export interface LiveFormats {
 	figures: Partial<Record<BoardFormat, { points: number; vor: number | null }>>;
 }
 
-/** The tier box at the read's clock: each listed player's points, the drop and the basis. */
+/** The tier box at the read's clock: each listed player's points, his rank as the read ranks him and
+ * the weeks his points count where they are not the page's player's (Lane 162), the drop and the basis.
+ * `ranks` and `spans` are null on an answer older than the fields: the run's stand. */
 export interface LiveTier {
 	points: Readonly<Record<string, number | null>>;
+	ranks: Readonly<Record<string, number | null>> | null;
+	spans: Readonly<Record<string, string | null>> | null;
 	drop: number | null;
 	basis: string;
 }
@@ -160,8 +174,6 @@ export interface LiveTier {
 export interface TierAsk {
 	label: string;
 	season: number;
-	/** Only he is in the box: the basis words his own week (review M3). */
-	single: boolean;
 }
 
 function formatsOf(week: PlayerWeek, now: LiveRest | null): LiveFormats | null {
@@ -172,15 +184,28 @@ function formatsOf(week: PlayerWeek, now: LiveRest | null): LiveFormats | null {
 	return { head: restOfSeasonHead(now.from), figures };
 }
 
+/** The tier box at the read's clock. Its basis names the weeks his own figure counts, the span his rest
+ * tile says (Lane 162, D03), and each player whose figure counts other weeks says his; the board's first
+ * week only on an answer older than his. Each player's rank is the read's (the API's ranks for the
+ * line, Lane 128), so the box and the card's head say one number (D02). */
 function tierOf(week: PlayerWeek, now: LiveRest | null, ask: TierAsk | null): LiveTier | null {
 	const tier = week.tier;
 	if (now === null || ask === null || tier == null) return null;
+	const his = week.rest_from_week;
 	const board =
 		tier.from_week === null ? playerRestWords(null) : restFromWords(tier.from_week, tier.partial);
+	const ranked = tier.mates.some((m) => m.position_rank !== undefined);
+	const spanned = his !== undefined && tier.mates.some((m) => m.from_week !== undefined);
 	return {
 		points: Object.fromEntries(tier.mates.map((m) => [m.board_id, m.points])),
+		ranks: ranked
+			? Object.fromEntries(tier.mates.map((m) => [m.board_id, m.position_rank ?? null]))
+			: null,
+		spans: spanned
+			? Object.fromEntries(tier.mates.map((m) => [m.board_id, tierSpanOf(m.from_week, his)]))
+			: null,
 		drop: tier.drop,
-		basis: tierBasisWords(ask.label, ask.season, ask.single ? now.from : board)
+		basis: tierBasisWords(ask.label, ask.season, his === undefined ? board : restSpanWords(his))
 	};
 }
 
@@ -421,32 +446,45 @@ function lastTile(
 
 /** The change's caption: what it is measured from, never a stamp (Lane 139, C12: the page keeps three),
  * or why there is none. With no Proj the Proj tile says why, so the change says nothing. */
-function deltaCaption(week: PlayerWeek): string {
+function deltaCaption(week: PlayerWeek, move: ProjectionMove): string {
 	if (week.line.week_projection === null) return CARD.noProjToCompare;
+	if (move.basis === 'read') return readDeltaCaption(move);
 	if (week.projection_previous_read_at === null) return CARD.noEarlierRead;
-	const delta = week.line.projection_delta;
-	if (delta === null) return CARD.notInEarlier;
-	return shownChange(delta) === null ? WEEK_TILE.underShown : WEEK_TILE.sinceEarlier;
+	if (week.line.projection_delta === null) return CARD.notInEarlier;
+	return move.crosses ? WEEK_TILE.sinceEarlier : WEEK_TILE.underShown;
+}
+
+function readDeltaCaption(move: ProjectionMove): string {
+	if (move.change === null) return WEEK_TILE.notInRead;
+	return move.crosses ? WEEK_TILE.sinceRead : WEEK_TILE.underShownRead;
+}
+
+/** The week's move as the change tile and the read's withhold both read it (Lane 162, D04 fix round 1):
+ * from the read's quoted figure when a read was written for this week, else from the earlier snapshot. */
+function moveOf(week: PlayerWeek, read: ReadQuote | null): ProjectionMove {
+	const quoted = read?.week === week.week ? read.projection : undefined;
+	return projectionMove(week.line.week_projection, quoted, week.line.projection_delta);
 }
 
 /** The change as the tile prints it: null for a move under SHOWN_CHANGE_FROM (Lane 139, C21). */
-export function shownChange(delta: number | null): number | null {
-	return delta === null || Math.abs(delta) < SHOWN_CHANGE_FROM ? null : delta;
+function shownChange(move: ProjectionMove): number | null {
+	return move.crosses ? move.change : null;
 }
 
-function deltaTile(week: PlayerWeek, zone: string, now: number): CardTile {
+function deltaTile(week: PlayerWeek, zone: string, now: number, read: ReadQuote | null): CardTile {
 	const after = afterByeOf(week);
 	if (after !== null) return afterByeProjTile(after, week.projection_scoring, zone);
 	// A free agent has no game (Lane 123): no change to measure, and no kickoff to say.
 	if (isFreeAgent(week.line.player.team))
 		return { key: 'delta', label: CARD.delta, value: NONE, caption: '', tone: 'quiet' };
 	const ahead = toPlay(week.line.facts, now) || week.line.facts.bye;
+	const move = moveOf(week, read);
 	return {
 		key: 'delta',
 		label: CARD.delta,
-		value: ahead ? deltaWord(shownChange(week.line.projection_delta)) : NONE,
+		value: ahead ? deltaWord(shownChange(move)) : NONE,
 		caption: ahead
-			? deltaCaption(week)
+			? deltaCaption(week, move)
 			: lineState(week.line.facts, now) === 'final'
 				? CARD.gameFinal
 				: CARD.kickedOff,
@@ -493,6 +531,13 @@ function restTile(
 	};
 }
 
+/** The change tile's basis line: what its move is measured from (Lane 162, D04), none on a bye. */
+function changePartOf(week: PlayerWeek, read: ReadQuote | null): string | null {
+	if (afterByeOf(week) !== null) return null;
+	if (moveOf(week, read).basis === 'read') return WEEK_TILE.changePartRead;
+	return week.projection_previous_read_at === null ? null : WEEK_TILE.changePart;
+}
+
 /** The basis lines the week's read says, once each and short (the Waivers forms): the projection's
  * with its change's, then the evidence columns' scoring, and while a game waits on its stats, when they
  * land. No stamp (Lane 139, C12): the week tile says when the projection was read, the read's caption
@@ -502,7 +547,8 @@ export function liveBasis(
 	league: boolean,
 	zone: string,
 	now: number,
-	listed = false
+	listed = false,
+	read: ReadQuote | null = null
 ): string[] {
 	const scoringWords = league
 		? 'your scoring'
@@ -522,9 +568,7 @@ export function liveBasis(
 			clock
 		),
 		// On his bye the change's tile gives his next week's Proj: no change is shown to name.
-		afterByeOf(week) === null && week.projection_previous_read_at !== null
-			? WEEK_TILE.changePart
-			: null
+		changePartOf(week, read)
 	]
 		.filter((said) => said !== null)
 		.join(' ');
@@ -599,6 +643,8 @@ export interface LiveInput {
 	/** The season-long list's word ("IR") his card's pill shows, null when he is on none: his week's
 	 * tiles then say the list in place of a Proj, an Opp rank or a change (Lane 128 fix round 1). */
 	held?: string | null;
+	/** The week's read, whose quoted projection the change tile measures from (Lane 162, D04). */
+	read?: ReadQuote | null;
 	screenHref: ScreenHref;
 	zone?: string;
 	/** The time the card is drawn at, in ms: a game kicked off by then says no facts read. */
@@ -646,6 +692,7 @@ export function liveCard({
 	basisTiles = [],
 	lastKickoffs = {},
 	held: listed = null,
+	read = null,
 	screenHref,
 	zone = memberZone(),
 	now
@@ -662,7 +709,7 @@ export function liveCard({
 		oppTile(week, player.position),
 		avgTile(week, games, fallback('avg')),
 		lastTile(week, opponents, fallback('last')),
-		deltaTile(week, zone, now)
+		deltaTile(week, zone, now, read)
 	].reduce<CardTile[]>((all, tile) => withTile(all, tile), [...tiles]);
 	const { cell, next } = nextOf(week, zone, now, listed !== null);
 	const leagueVerb = league !== null && week.verb !== null ? week.verb : null;
@@ -684,7 +731,7 @@ export function liveCard({
 		// Signed out in season no lineup or league verb fits either: Compare leads, not the sheet's add
 		// (Lane 100 fix round 1, M3).
 		compareLeads: held || (league === null && compareLeadsWithoutVerb(rest)),
-		basis: liveBasis(week, leagueVerb !== null, zone, now, listed !== null),
+		basis: liveBasis(week, leagueVerb !== null, zone, now, listed !== null, read),
 		rest: restAtClock,
 		formats: formatsOf(week, restAtClock),
 		tier: tierOf(week, restAtClock, tier),

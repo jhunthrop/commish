@@ -131,7 +131,7 @@ export const runIndex = await (async (): Promise<
 /** One run format's in-season rows: each player's club, points and points over replacement. */
 interface FormatRows {
 	format: BoardFormat;
-	rows: Map<string, { team: string; projected: number; vor: number }>;
+	rows: Map<string, { team: string; projected: number; vor: number; positionRank: number }>;
 }
 
 /** Every format the run carries, its rows and its schedule (Lane 86): null on a preseason run. */
@@ -150,13 +150,24 @@ const runRead = await (async (): Promise<{
 			const format = apiFormatOf(f);
 			if (format === null) continue;
 			const board = await readRun<{
-				rows: { id: string; team: string; projected: number | null; vor: number | null }[];
+				rows: {
+					id: string;
+					team: string;
+					projected: number | null;
+					vor: number | null;
+					positionRank: number;
+				}[];
 			}>(`boards/${f.id}.json`);
 			const rows = new Map(
 				board.rows.flatMap((r) =>
 					r.projected === null || r.vor === null
 						? []
-						: [[r.id, { team: r.team, projected: r.projected, vor: r.vor }] as const]
+						: [
+								[
+									r.id,
+									{ team: r.team, projected: r.projected, vor: r.vor, positionRank: r.positionRank }
+								] as const
+							]
 				)
 			);
 			formats.push({ format, rows });
@@ -263,7 +274,17 @@ export function restAtClock(
 		...out,
 		tier: {
 			format: ask.format,
-			mates: ask.ids.map((mate) => ({ board_id: mate, points: pointsOf(mate) })),
+			mates: ask.ids.map((mate) => {
+				const row = board.rows.get(mate);
+				const mateFrom = row === undefined ? null : (clubAtClock(row.team, now)?.from ?? null);
+				// The API's tierMate: his rank as the read's line says it and the week his points count from.
+				return {
+					board_id: mate,
+					points: pointsOf(mate),
+					position_rank: row?.positionRank ?? null,
+					from_week: mateFrom
+				};
+			}),
 			drop: last === null || next === null ? null : roundTenth(last - next),
 			from_week: clock.from,
 			partial: clock.partial

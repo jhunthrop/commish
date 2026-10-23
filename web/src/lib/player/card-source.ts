@@ -77,7 +77,10 @@ export function cardPlayer(page: Pick<CardData, 'id' | 'name' | 'team' | 'positi
 /** The card's build from his page, with the tier box the read is asked for (null on the shelf, which
  * draws no tier box). */
 export function cardSource(
-	page: Pick<CardData, 'id' | 'name' | 'team' | 'position' | 'card' | 'lastKickoffs' | 'status'>,
+	page: Pick<
+		CardData,
+		'id' | 'name' | 'team' | 'position' | 'card' | 'lastKickoffs' | 'status' | 'weekRead'
+	>,
 	lead: CardLead,
 	tier: TierAsk | null
 ): CardSource {
@@ -91,6 +94,7 @@ export function cardSource(
 		basisTiles: lead.basisTiles,
 		lastKickoffs: page.lastKickoffs,
 		// The list his page's pill shows (the run's injury capture), "IR" in place of his week.
-		held: page.status?.words.view.rank ?? null
+		held: page.status?.words.view.rank ?? null,
+		read: page.weekRead
 	};
 }

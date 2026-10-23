@@ -82,6 +82,8 @@ interface Shot {
 	held?: string;
 	/** Designated to return this week (Lane 153): his chip's day and his note, his rank and week his. */
 	returning?: { chip: string; note: string };
+	/** His tier box's basis names the weeks his total counts (Lane 162, D03). */
+	tierSpan?: string;
 }
 
 const SHOTS: readonly Shot[] = [
@@ -129,7 +131,9 @@ const SHOTS: readonly Shot[] = [
 		slug: 'travis-etienne-jr',
 		signedIn: false,
 		verb: 'Add to my sheet',
-		weekRead: 'none',
+		// His stand-in read was written Tuesday while he was on IR; due back Sunday since, it is withheld
+		// behind the status caption (Lane 162, D01), never a read that benches him.
+		weekRead: 'withheld',
 		returning: {
 			chip: 'Due back Sun Oct 18',
 			note: 'Expected back Sun Oct 18 on the latest report, which does not move his place on our board.'
@@ -149,7 +153,16 @@ const SHOTS: readonly Shot[] = [
 /** On the contract fixture's rest-of-season run: one signed-out page, the run's own player. A run that
  * ranks the rest of the season leads with Compare (card.ts compareLeadsWithoutVerb, Lane 117). */
 const ROS_SHOTS: readonly Shot[] = [
-	{ name: 'ros', slug: 'josh-allen', signedIn: false, verb: CARD.compare, weekRead: 'none' }
+	{ name: 'ros', slug: 'josh-allen', signedIn: false, verb: CARD.compare, weekRead: 'none' },
+	// The tier box names the weeks his total counts (Lane 162, D03), beside the head's one rank.
+	{
+		name: 'tier-span',
+		slug: 'josh-allen',
+		signedIn: false,
+		verb: CARD.compare,
+		weekRead: 'none',
+		tierSpan: 'weeks 8 to 17'
+	}
 ];
 const ROS = ROS_FROM_WEEK !== undefined;
 
@@ -197,6 +210,8 @@ interface Card {
 	main: string;
 	/** The side box's text: his tier mates, or a held player's "On IR, not ranked". */
 	tierBox: string;
+	/** His own line in the tier box, "RB 14 · JAX", empty with none (Lane 162, D02). */
+	tierSelf: string;
 	basis: string[];
 	basisLines: number;
 	nextRow: string;
@@ -240,6 +255,7 @@ async function read(page: Page): Promise<Card> {
 			readText: document.querySelector<HTMLElement>('main .read')?.innerText ?? '',
 			main: document.querySelector<HTMLElement>('main')?.innerText ?? '',
 			tierBox: document.querySelector<HTMLElement>('main .side')?.innerText ?? '',
+			tierSelf: document.querySelector<HTMLElement>('main .side .current')?.innerText ?? '',
 			// In season the tier box is headed by why his rest-of-season figure sits there (CARD.whyRest,
 			// Lane 100, B30), and the read is the week's alone: the season read and its stamp are the
 			// draft's.
@@ -366,6 +382,23 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 		for (const label of card.labels)
 			check(card.captions[label] !== onListWords('IR'), `${where}: ${label} says his list`);
 	}
+	if (shot.tierSpan !== undefined)
+		check(
+			card.tierBox.includes(shot.tierSpan),
+			`${where}: the tier box does not say ${shot.tierSpan}: "${card.tierBox}"`
+		);
+	// One rank per player per screen (Lane 162, D02): his tier line ranks him as the pill does.
+	if (card.tierSelf !== '') {
+		const rankIn = (text: string): string => /\b(?:QB|RB|WR|TE) \d+\b/iu.exec(text)?.[0] ?? '';
+		check(
+			rankIn(card.tierSelf).toUpperCase() === rankIn(card.pill).toUpperCase(),
+			`${where}: the tier says "${card.tierSelf}", the pill "${card.pill}"`
+		);
+	}
+	check(
+		!card.readText.includes('does not play') || shot.weekRead === 'shown',
+		`${where}: a benching read`
+	);
 	check(card.verbs.includes(shot.verb), `${where}: verbs ${card.verbs.join(', ')}`);
 	check(card.verbs.includes('Compare'), `${where}: no Compare`);
 	check(WEEK_READ.test(card.readText) === (shot.weekRead === 'shown'), `${where}: the week read`);
