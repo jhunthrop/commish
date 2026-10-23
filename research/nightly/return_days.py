@@ -11,16 +11,23 @@ The status read (`designations.read_statuses`) takes the return rule's two input
   read. The list is never loaded whole (some 4 MB): the store picks out the dated entries.
 - HIS CLUB'S GAME. The day of his club's kickoff in the current week, Eastern (Lane 153 fix round 1): the
   earliest week whose last kickoff falls today or later (the nflverse schedule's kickoff observations, the
-  latest per club as the API reads it), his club by the player list's team. A club on a bye this week has none.
+  latest per club as the API reads it). A club on a bye this week has none.
+- HIS CLUB. The board's club, `provider_players.team` (`board_clubs`), the column the API's board reads
+  (`api/internal/boards/market.go` `columns`, `pp.team`) and the daily list's read writes
+  (`pipeline/tank01/player_clubs.refresh_player_clubs`, Lane 122), never the list entry's own `team`: the two
+  readers then name the same game day for a player traded mid-week, and for one the club refresh refused
+  (more than its ceiling of changes) both keep his previous club until it lands (Lane 160, B139). A free
+  agent has no club there, so no game day: his day is carried, as the API's.
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Final
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, func, select, text
 
+from research.db.schema import PROVIDER_PLAYERS
 from research.model.designations import status_of
 from research.nightly.reads.schedule import EASTERN
 from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource
@@ -42,8 +49,6 @@ class ListedReturn:
 
     code: str
     date: str
-    # His club in the provider's words (the product's codes: LAR, WSH), "" when the list names none.
-    team: str = ""
 
 
 def eastern_day(instant: datetime) -> date:
@@ -67,8 +72,7 @@ _LISTED: Final = text(
     "with newest as (select payload, captured_at from research.capture_snapshots "
     "where source = :source and captured_at <= :before order by captured_at desc limit 1) "
     "select n.captured_at, jsonb_typeof(n.payload) = 'array' as list, btrim(coalesce(e->>'playerID', '')) as id, "
-    "coalesce(e->'injury'->>'designation', '') as code, btrim(coalesce(e->'injury'->>'injReturnDate', '')) as day, "
-    "upper(btrim(coalesce(e->>'team', ''))) as team "
+    "coalesce(e->'injury'->>'designation', '') as code, btrim(coalesce(e->'injury'->>'injReturnDate', '')) as day "
     "from newest n left join lateral jsonb_array_elements(case when jsonb_typeof(n.payload) = 'array' "
     "then n.payload else '[]'::jsonb end) as e on jsonb_typeof(e) = 'object' and jsonb_typeof(e->'injury') = 'object' "
     "and btrim(coalesce(e->'injury'->>'injReturnDate', '')) <> '' limit :most"
@@ -98,7 +102,7 @@ def listed_returns(conn: Connection, status_at: datetime, window: timedelta) -> 
         raise ReturnDaysError(f"the player list dates over {MAX_DATED} players")
     if listed_at < status_at - window:
         return None
-    entries = {r.id: ListedReturn(r.code, r.day, r.team) for r in rows if r.id}
+    entries = {r.id: ListedReturn(r.code, r.day) for r in rows if r.id}
     return ReturnList(listed_at, entries)
 
 
@@ -123,3 +127,16 @@ def club_game_days(conn: Connection, now: datetime) -> Mapping[str, date]:
         {"source": ScheduleSource.KICKOFF, "metric": ScheduleMetric.KICKOFF_INSTANT, "today": today},
     ).all()
     return {product_team_code(r.team): eastern_day(r.as_of) for r in rows}
+
+
+def board_clubs(conn: Connection, player_ids: Iterable[str]) -> Mapping[str, str]:
+    """Each player's club on the board, by provider id, in the product's codes (LAR, WSH): the stored
+    `provider_players.team` the API's board reads as his club. A free agent (no club) or a player the store
+    does not hold is absent."""
+    ids = sorted(set(player_ids))
+    if not ids:
+        return {}
+    table = PROVIDER_PLAYERS
+    club = func.upper(func.btrim(table.c.team))
+    rows = conn.execute(select(table.c.id, club.label("team")).where(table.c.id.in_(ids), table.c.team.is_not(None)))
+    return {str(r.id): product_team_code(str(r.team)) for r in rows if r.team}

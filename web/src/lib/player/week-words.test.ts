@@ -973,3 +973,30 @@ void test('with no read at all the place says it is not written, "next" only for
 	for (const words of [CARD.readNotYet, CARD.readNotWritten])
 		assert.equal(BANNED.exec(words), null, words);
 });
+
+// Lane 160 (B140): a read the run withheld for a status change, through the engine on a fixed Sunday
+// clock. Before kickoff its due time stands; from kickoff through final the due time has passed and the
+// place says no read was written for this game.
+void test('a status-withheld read keeps its due time before kickoff, says not written from kickoff through final', () => {
+	const due =
+		'His status changed since this read was written. A new read is due by Sat Oct 17, 9:00 am CT.';
+	const withheld: WeekRead = {
+		...WEEK_READ,
+		body: null,
+		caption: due,
+		status: 'Questionable',
+		call: null
+	};
+	const at = (w: PlayerWeek, now: number) => shownWeekRead(withheld, card(w, null, now).projection);
+	assert.deepEqual(at(week(), NOW), { withheld: true, words: due });
+	const live = week({}, { facts: facts({ points_this_week: 4.6 }) });
+	assert.equal(card(live, null, KICKED_OFF).projection.state, 'kicked_off');
+	assert.deepEqual(at(live, KICKED_OFF), { withheld: true, words: CARD.readNotWritten });
+	const final = week(
+		{},
+		{ facts: facts({ played: true, game_state: 'final', points_this_week: 18.2 }) }
+	);
+	assert.equal(card(final, null, FINAL).projection.state, 'final');
+	assert.deepEqual(at(final, FINAL), { withheld: true, words: CARD.readNotWritten });
+	assert.ok(!JSON.stringify(at(final, FINAL)).includes('due by'));
+});

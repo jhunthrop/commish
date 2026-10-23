@@ -184,6 +184,11 @@ export const SHOT_CASES: readonly ShotCase[] = [
 		name: 'shelf-shots-in-play',
 		env: { SHELF_IN_PLAY: '1' }
 	}),
+	// Lane 160: a read withheld for his status, his game final.
+	once('shelf-shots', 'standin', FIXTURE_MONDAY_CLOCK, {
+		name: 'shelf-shots-after-games',
+		env: { SHELF_AFTER_GAMES: '1' }
+	}),
 	once('player-card-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	once('inseason-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	...clocked('platform-finals-shots', 'standin', {

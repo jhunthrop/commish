@@ -13,7 +13,8 @@ of the current week that kicked off has no final, up to four days past its kicko
 Tank01's week of games once for their statuses (Lane 80, `pipeline/tank01/game_status.py`, at most two
 calls an hour), and a game that answer still has open, or leaves out, 3 h 30 m past its kickoff by its own box score
 (Lane 101, at most two a pass), so a game is final the hour after it ends. Then, once an Eastern day from
-06:00, on what the pass left of its ten requests, the player list (Lane 110, B79), the one feed carrying
+06:00, and again from 09:00 on a game day of the current week (Lane 160, B138), on what the pass left of
+its ten requests, the player list (Lane 110, B79), the one feed carrying
 each injured player's expected return (`injReturnDate`), which the API reads beside his designation; the
 same read writes each listed player's club onto `provider_players` and names how many changed (Lane 122,
 `pipeline/tank01/player_clubs.py`), and a read that would change more than 60 writes none and fails.

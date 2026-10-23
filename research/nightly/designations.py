@@ -21,7 +21,7 @@ out, doubtful or questionable moves nothing. The provider's codes and the rule a
 lanes in `api/testdata/designation-codes.json` (`research/model/designations.py`).
 
 THE RETURN (Lane 153). A season-long code the daily player list dates back at or before his club's game
-day this week (`return_days.py`, fix round 1) is this week's designation: questionable, `returning` its day, not
+day this week (`return_days.py`, fix round 1; his club the board's, Lane 160) is this week's designation: questionable, `returning` its day, not
 season-long, no since, so he is ranked as playing. One dated back later keeps his list with `returning`
 carried. A passed date, or none, leaves him as he was.
 
@@ -62,6 +62,7 @@ from research.nightly.published_board import MANIFEST_FILE, driver_line
 from research.nightly.return_days import (
     ReturnDaysError,
     ReturnList,
+    board_clubs,
     club_game_days,
     eastern_day,
     listed_returns,
@@ -223,6 +224,7 @@ def _statuses(conn: Connection, source: str, newest: Capture, stored_newest: boo
     notes = _sweep_notes(conn, newest.at) if outs else {}
     returns = _return_list(conn, newest.at)
     game_days, today = club_game_days(conn, now), eastern_day(now)
+    clubs = {} if returns is None else board_clubs(conn, returns.entries)
     players: dict[str, PlayerStatus] = {}
     for player_id, captured in entries.items():
         status = status_of(captured.designation)
@@ -233,7 +235,8 @@ def _statuses(conn: Connection, source: str, newest: Capture, stored_newest: boo
         read = PlayerStatus(status, long, runs.get((player_id, status)) if long else None)
         entry = None if returns is None else returns.entries.get(player_id)
         day = None if entry is None or returns is None else return_day(entry, status, returns.listed_at)
-        game_day = None if entry is None else game_days.get(entry.team)
+        club = clubs.get(player_id)
+        game_day = None if entry is None or club is None else game_days.get(club)
         players[player_id] = _with_return(read, day, game_day, today)
     # The feed's last check is this list's only when it is the newest stored: a check that returned a
     # list the floor refused never vouches for the older list shown.

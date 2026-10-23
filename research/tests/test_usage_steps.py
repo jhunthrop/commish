@@ -70,7 +70,8 @@ def written(monkeypatch: pytest.MonkeyPatch) -> list[PlayerWeekObservation]:
 
 
 def test_the_usage_steps_run_after_the_stats_and_before_the_register() -> None:
-    assert STEPS[: 1 + len(usage_steps.USAGE_STEPS)] == ("stats-ingest", *usage_steps.USAGE_STEPS)
+    # The player list's pre-freeze read is first (Lane 160), then the stats and the usage steps.
+    assert STEPS[: 2 + len(usage_steps.USAGE_STEPS)] == ("player-list", "stats-ingest", *usage_steps.USAGE_STEPS)
     assert STEPS[-5:] == ("props-snapshot", "grade", "freeze", "espn-fill", "scoreboard")
 
 
