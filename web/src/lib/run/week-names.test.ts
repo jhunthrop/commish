@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
-import { PAGE_PURPOSE } from '#lib/order/words.ts';
+import { PAGE_PURPOSE, playersLead } from '#lib/order/words.ts';
 import { HELD_WEEK_LABEL, RAIL_KEYS, railInSeason } from '#lib/ui/nav.ts';
 import { railShown } from '#lib/ui/rail-order.ts';
 import { siteRailAt } from './site-season.ts';
@@ -125,4 +125,19 @@ void test('the names are clean copy', () => {
 		assert.doesNotMatch(words, bannedPattern(), words);
 		assert.doesNotMatch(words, /—/u, words);
 	}
+});
+
+void test('the head sentence follows the clock state, the chip and the board week the table shows (Lane 164)', () => {
+	const tuesdayAfterLastGame = new Date('2027-01-12T12:00:00.000Z');
+	const inSeasonAt = (now: Date) => namesAt(now, WEEK) !== null;
+	const lead = (now: Date, onWeekChip: boolean, boardWeek: number | null) =>
+		playersLead(inSeasonAt(now), onWeekChip, boardWeek);
+	// In season on our order's chips: the board week the table shows, named once.
+	assert.equal(lead(CLOCK.week7, false, 7), PAGE_PURPOSE.rankings(7));
+	assert.equal(lead(CLOCK.week7, false, 8), PAGE_PURPOSE.rankings(8));
+	// The K and D/ST chips keep their own basis line only.
+	assert.equal(lead(CLOCK.week7, true, 7), undefined);
+	// Before the season and the Tuesday after the last game: the page's purpose, no week named.
+	assert.equal(lead(CLOCK.preseason, false, 7), PAGE_PURPOSE.players);
+	assert.equal(lead(tuesdayAfterLastGame, false, 7), PAGE_PURPOSE.players);
 });

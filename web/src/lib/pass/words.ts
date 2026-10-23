@@ -93,8 +93,8 @@ export function freeSeasonLines(open: OpenHosts): readonly FreeLine[] {
 			section: 'lineup'
 		},
 		{
-			lead: "The week's rankings",
-			text: 'every player in our order for the week, with his game',
+			lead: 'Rankings',
+			text: "every player in our rest-of-season order, with his week's game and the week's published projection",
 			section: 'players'
 		},
 		{

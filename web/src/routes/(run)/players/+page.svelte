@@ -10,7 +10,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import type OrderScreenComponent from '#lib/order/OrderScreen.svelte';
-	import { PAGE_PURPOSE } from '#lib/order/words.ts';
+	import { playersLead } from '#lib/order/words.ts';
 	import { PAGE_NAME_WORDS, playersCrumb } from '#lib/run/week-names.ts';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
@@ -23,6 +23,17 @@
 	/** In season the page is "Rankings" on every surface that points to it, Players the crumb's root
 	 * (Lane 142, ruling 1; Lane 164); before the season, Players. */
 	const name = $derived(data.run.weekRankings ?? PAGE_NAME_WORDS.players);
+
+	/** What the table says of itself for the head (Lane 164): a K or D/ST chip, and the week it shows;
+	 * the run's week stands in until the table has read. */
+	interface HeadState {
+		weekChip: boolean;
+		week: number | null;
+	}
+	let head = $state<HeadState>({ weekChip: false, week: null });
+	function setHead(state: HeadState): void {
+		head = state;
+	}
 
 	// The league's rosters mark who is held on the lists.
 	onMount(() => {
@@ -40,9 +51,11 @@
 			title={name}
 			lead={Order === null
 				? `Every player on our ${data.format.label} board · by position · our rank overall at the right`
-				: data.run.week !== undefined && data.run.weekRankings !== undefined
-					? PAGE_PURPOSE.rankings(data.run.week)
-					: PAGE_PURPOSE.players}
+				: playersLead(
+						data.run.weekRankings !== undefined,
+						head.weekChip,
+						head.week ?? data.run.week ?? null
+					)}
 		>
 			{#snippet actions()}
 				<Quiet href={links.clubs()} size="sm">Clubs</Quiet>
@@ -53,6 +66,7 @@
 				mode="players"
 				label="Players in our rest-of-season order"
 				boardScoring={data.format.label}
+				onhead={setHead}
 			/>
 		{:else}
 			<div class="groups">

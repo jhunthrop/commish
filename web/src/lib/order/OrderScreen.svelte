@@ -52,9 +52,19 @@
 		label: string;
 		/** The scoring the Players page's kickers and defenses are named in ("PPR", Lane 155). */
 		boardScoring?: string;
+		/** Tells the page what its head needs (Lane 164): whether a K or D/ST chip is drawn, and the
+		 * week of the order the table shows, so the head and the Wk column read one source. */
+		onhead?: (state: { weekChip: boolean; week: number | null }) => void;
 	}
 
-	let { mode, position: opened = null, league = null, label, boardScoring = '' }: Props = $props();
+	let {
+		mode,
+		position: opened = null,
+		league = null,
+		label,
+		boardScoring = '',
+		onhead
+	}: Props = $props();
 
 	/** The rows one read asks for, and how many more Show more adds, up to the API's limit. */
 	const PAGE_ROWS = 100;
@@ -94,6 +104,9 @@
 	const weekShown = $derived(
 		week !== null && weekSaid?.key === weekReadKey(week, null) ? weekSaid : null
 	);
+	$effect(() => {
+		onhead?.({ weekChip: week !== null, week: advice?.week ?? null });
+	});
 	/** The Players page is the week's rankings: its byes sit apart, never numbered (Lane 163, D06). */
 	const byesApart = $derived(mode === 'players');
 	const views = $derived(
