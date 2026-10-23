@@ -68,6 +68,19 @@ const text = (parts: readonly { text: string }[]): string => parts.map((p) => p.
 const views = (a: WeekOrderAdvice, now: number): WeekView[] =>
 	a.rows.map((r) => weekView(r, ZONE, now));
 
+void test("the K and D/ST rows say a game the skill chips' way: the zone on the kickoff, the expected score labelled (Lane 165, D15)", () => {
+	for (const position of ['K', 'DEF'] as const) {
+		const upcoming = views(fixture.read[position], SATURDAY).filter((v) => v.section === 'to_play');
+		const withScore = upcoming.filter((v) => v.box.expected !== null);
+		assert.ok(upcoming.length > 0 && withScore.length > 0, position);
+		for (const v of upcoming) {
+			const when = heldGame(v.box.game)?.when ?? '';
+			assert.match(when, /^\w{3} \d{1,2}:\d{2} [ap]m CT$/, `${position} ${when}`);
+		}
+		for (const v of withScore) assert.match(v.box.expected ?? '', /^Expected score [A-Z]{2,3} /);
+	}
+});
+
 void test("the tabs' heads and positions: never the rest of the season", () => {
 	assert.equal(weekPositionOf('K'), 'K');
 	assert.equal(weekPositionOf('DST'), 'DEF');

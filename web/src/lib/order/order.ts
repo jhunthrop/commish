@@ -146,7 +146,7 @@ export function orderView(
 		key,
 		position: row.line.player.position,
 		hostId: row.line.player.host_id,
-		box: { ...box, key, ...orderGame(box, row.line, zone, now) },
+		box: { ...box, key, ...gameCell(box, row.line, zone, now) },
 		week: listed ? null : weekFigure(row.line, now),
 		rank: row.rank,
 		// A player on a season-long list sits after every available one with no number (Lane 128 fix
@@ -184,8 +184,8 @@ export function orderSections(views: readonly OrderView[], week: number): OrderS
 
 /** His Game cell on the order (Lane 139, C07, C11): a kickoff still to come with its zone, so it never
  * reads as another zone's, and the expected score labelled with both clubs, so it never reads as a
- * final. */
-function orderGame(
+ * final. The one cell of every Players chip (Lane 165, D15): the week's K and D/ST rows draw it too. */
+export function gameCell(
 	box: BoxRow,
 	line: OrderRow['line'],
 	zone: string,

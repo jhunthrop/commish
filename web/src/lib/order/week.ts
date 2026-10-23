@@ -22,7 +22,7 @@ import { finalsPartAt, uncountedPart } from '#lib/league/box/basis.ts';
 import { lineState } from '#lib/league/box/kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { WeekOrderAdvice, WeekOrderRow } from './api.ts';
-import { rosterBasis, rosterWords, type RosterView } from './order.ts';
+import { gameCell, rosterBasis, rosterWords, type RosterView } from './order.ts';
 import { MIN_SEARCH } from './path.ts';
 import { WEEK, byeHead } from './words.ts';
 import { WEEK_MANY, type WeekPosition } from './week-head.ts';
@@ -81,7 +81,7 @@ export function weekView(row: WeekOrderRow, zone: string, now: number): WeekView
 		key,
 		position: player.position,
 		hostId: player.host_id,
-		box: { ...box, key, name },
+		box: { ...box, key, name, ...gameCell(box, row.line, zone, now) },
 		named: player.name,
 		// The section by the one game-state rule at the page's clock (kickoff.ts lineState), so a read
 		// that lags a kickoff sits under Kicked off with its Game cell (Lane 85 fix round 2, H-A).
