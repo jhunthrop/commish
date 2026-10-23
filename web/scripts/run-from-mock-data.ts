@@ -732,10 +732,14 @@ async function writeLocal(files: ReadonlyMap<string, unknown>): Promise<void> {
 
 /** How many players' caption says games he may miss (D17), so the first live run can be checked. */
 function missedGamesCount(files: ReadonlyMap<string, unknown>): string {
+	const schedule = files.get(RUN_PATHS.schedule) as Schedule;
 	const pages = [...files.values()].filter((value): value is Player => isPlayerPage(value));
 	const above = pages.filter((page) => {
 		const numbers = page.formats[FORMAT.id];
-		return numbers !== undefined && mayMissGames(numbers.expectedGames, gamesLeftOf(page.season));
+		return (
+			numbers !== undefined &&
+			mayMissGames(numbers.expectedGames, gamesLeftOf(schedule.slates, page.team))
+		);
 	});
 	return `Players with ${String(MISSED_GAMES_FROM)} or more games he may miss: ${String(above.length)} of ${String(pages.length)}`;
 }

@@ -48,8 +48,11 @@ export const WEEK_TAB = {
 
 /** The scoring Avg and Last are in for a defense (Lane 165, D16): PPR has no meaning for a defense, so
  * the basis names the scoring in force, the member's when a league is followed. */
+/** A member's own scoring, one phrasing for kickers and defenses. */
+const YOUR_SCORING = 'in your scoring';
+
 export const DEFENSE_SCORING = {
-	league: 'in your scoring',
+	league: YOUR_SCORING,
 	standard: 'on standard defense scoring'
 } as const;
 
@@ -245,7 +248,7 @@ function gameSentence(advice: WeekOrderAdvice, zone: string, now: number): strin
 function avgLastScoring(position: WeekPosition, reader: WeekReader): string {
 	if (position === 'DEF')
 		return reader.league === null ? DEFENSE_SCORING.standard : DEFENSE_SCORING.league;
-	return reader.league === null ? `in ${reader.boardScoring}` : "in this league's scoring";
+	return reader.league === null ? `in ${reader.boardScoring}` : YOUR_SCORING;
 }
 
 /** The tab's basis, every figure named once, within five rendered lines at a desk and eight on a

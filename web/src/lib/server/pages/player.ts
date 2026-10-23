@@ -374,14 +374,15 @@ async function seasonOf(
 
 export async function playerPage(slug: string, now: number): Promise<PlayerPage> {
 	const entry = await entryBySlug(slug);
-	const [read, run, sources, underway, capture, clubList, lastKickoffs] = await Promise.all([
+	const [read, run, sources, underway, capture, clubList, lastKickoffs, slate] = await Promise.all([
 		playerRead(entry.id),
 		manifest(),
 		adp(),
 		seasonUnderway(),
 		designations(),
 		clubs(),
-		lastKickoffsOf()
+		lastKickoffsOf(),
+		schedule()
 	]);
 	const loaded = sourceOf(read);
 	const listed = capture?.players[entry.id];
@@ -397,7 +398,12 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		(format, numbers) => ({
 			tile: restTile(format, numbers, loaded.position, run.season, listed),
 			parts: restParts(format, numbers, loaded.position, listed),
-			basis: basisTiles(format, numbers, loaded.season?.games ?? 0, gamesLeftOf(loaded.season))
+			basis: basisTiles(
+				format,
+				numbers,
+				loaded.season?.games ?? 0,
+				gamesLeftOf(slate.slates, loaded.team)
+			)
 		})
 	);
 	const [lead] = lines;

@@ -9,7 +9,7 @@ import type { GameLogRow, PlayerSeason } from '#lib/run/season.ts';
 import { apiFormatOf } from '#lib/run/format-ids.ts';
 import { positionRankShown } from '#lib/run/held-places.ts';
 import { playerRestFrom, playerRestWords, restSpanWords } from '#lib/run/rest-from.ts';
-import type { Capsule, Format, PlayerFormat, PlayerStatus } from '#lib/run/schema.ts';
+import type { Capsule, Format, PlayerFormat, PlayerStatus, Schedule } from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
 import { BASIS_WORDS, mayMissGames, vsAvgReason } from '#lib/player/basis-words.ts';
 import {
@@ -107,12 +107,14 @@ export function restParts(
 	};
 }
 
-/** The games his club has still to play on the run, from his log (the run's own schedule, a game under
- * way at the run still "upcoming" there, as in the model's remaining); null with no season to count in
- * (Lane 165, D17). */
-export function gamesLeftOf(season: PlayerSeason | null): number | null {
-	if (season === null) return null;
-	return season.log.filter((row) => row.status === 'upcoming' && row.opponent !== null).length;
+/** The games his club has still to play: its games still upcoming on the run's own schedule at the run
+ * instant, the set the model's expectedGames is built from (Lane 165 fix round 2, M3). His log's
+ * "upcoming" is no stand-in: the nightly marks it whenever a player has no stat line yet, so a game under
+ * way counts there. Null for a run whose schedule carries no game states. */
+export function gamesLeftOf(slates: Schedule['slates'], club: string): number | null {
+	const games = slates.filter((slate) => slate.abbr === club).flatMap((slate) => slate.games);
+	if (games.some((game) => game.state === undefined)) return null;
+	return games.filter((game) => game.state === 'upcoming').length;
 }
 
 /** The in-season row under the tiles in a format (Lane 100, B17 and B51): the pace a game the order

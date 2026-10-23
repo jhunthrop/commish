@@ -1,10 +1,17 @@
 // The player card as the build words it (Lane 66h): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Format, PlayerFormat, PlayerStatus } from '#lib/run/schema.ts';
+import type { Format, PlayerFormat, PlayerStatus, Schedule } from '#lib/run/schema.ts';
 import type { GameLogRow, PlayerSeason, StatLine } from '#lib/run/season.ts';
 import { STAT_FIELDS } from '#lib/run/season.ts';
-import { basisTiles, cardBuild, readStamp, restParts, restTile } from './player-card.ts';
+import {
+	basisTiles,
+	cardBuild,
+	gamesLeftOf,
+	readStamp,
+	restParts,
+	restTile
+} from './player-card.ts';
 
 const EMPTY = Object.fromEntries(STAT_FIELDS.map((field) => [field, null])) as Omit<
 	StatLine,
@@ -218,4 +225,39 @@ void test('in season the row under the tiles is the pace as stored and our rate 
 	// Preseason, or a player the preseason board did not rank: no row.
 	assert.deepEqual(basisTiles(PRESEASON, stored, 5, 12), []);
 	assert.deepEqual(basisTiles(IN_SEASON, { ...stored, preseasonPoints: null }, 5, 12), []);
+});
+
+void test("games left are the club's games still upcoming on the run's schedule, never the log's upcoming rows (fix round 2, M3)", () => {
+	const game = (week: number, state: 'upcoming' | 'kicked_off' | 'final') => ({
+		week,
+		opponent: 'CHI',
+		home: true,
+		kickoff: '2026-10-25T17:00:00.000Z',
+		state
+	});
+	const slates = [
+		{ abbr: 'DET', games: [game(7, 'kicked_off'), game(8, 'upcoming'), game(9, 'upcoming')] },
+		{ abbr: 'CHI', games: [game(7, 'final')] }
+	] as unknown as Schedule['slates'];
+	// His log would count the game under way as upcoming (3); the schedule leaves it out (2).
+	assert.equal(gamesLeftOf(slates, 'DET'), 2);
+	assert.equal(gamesLeftOf(slates, 'CHI'), 0);
+	const old = [
+		{ abbr: 'DET', games: [{ ...game(8, 'upcoming'), state: undefined }] }
+	] as unknown as Schedule['slates'];
+	assert.equal(gamesLeftOf(old, 'DET'), null);
+	// 1.4 expected games of 2 left is a healthy player: no clause (3 left, the log's count, would say one).
+	const STORED = {
+		...NUMBERS,
+		preseasonPoints: 262.1,
+		preseasonPerGame: 17.5,
+		preseasonShare: 29,
+		blendedPerGame: 27.1,
+		ratePerGame: 24.1
+	};
+	const mayMiss = (left: number | null) =>
+		basisTiles(IN_SEASON, { ...STORED, expectedGames: 1.4 }, 5, left).find((t) => t.key === 'vsAvg')
+			?.mayMiss;
+	assert.equal(mayMiss(gamesLeftOf(slates, 'DET')), false);
+	assert.equal(mayMiss(3), true);
 });

@@ -14,9 +14,10 @@ export interface WeekStates {
 
 type ScheduledGame = Schedule['slates'][number]['games'][number];
 
-/** A game the run has not marked final is final once this long has passed since its kickoff (Lane 165
- * fix round 1, M4): a build days after the run never reads a week "under way" past its last game's
- * end. A game runs about three hours; the hourly capture marks Final in the hour after. */
+/** The finality bound (Lane 165 fix round 2): a game the run has not marked final counts as final once
+ * this long has passed since its kickoff, so a build days after the run never reads a week "under way"
+ * past its last game's end. It bounds when a game is over, never how fast one is played: a game runs
+ * about three hours and the hourly capture marks Final in the hour after. */
 export const GAME_ENDS_AFTER_MS = 4 * 60 * 60 * 1000;
 
 /** The run's state for a game, final when it has ended by the clock. */
