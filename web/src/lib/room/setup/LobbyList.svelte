@@ -2,7 +2,7 @@
 	import Panel from '#lib/ui/Panel.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import type { LobbyFilling, LobbyFormat } from '../api.ts';
-	import { lobbyFillWords, lobbyTitle } from './setup.ts';
+	import { lobbyFillWords, lobbyListHead, lobbyTitle } from './setup.ts';
 
 	interface Props {
 		lobbies: readonly LobbyFilling[];
@@ -18,7 +18,7 @@
 </script>
 
 <Panel>
-	<h3>Lobbies filling now</h3>
+	<h3>{lobbyListHead(lobbies)}</h3>
 	<ul>
 		{#each lobbies as lobby (lobby.format)}
 			{#snippet body()}

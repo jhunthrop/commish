@@ -148,6 +148,17 @@ export function lobbyFillWords(filling: number): LobbyFill {
 		: { words: 'No one in yet', empty: true };
 }
 
+/** The lobby list's head words (Lane 165, D14). */
+export const LOBBY_HEAD = {
+	open: 'Open lobbies',
+	filling: 'Lobbies filling now'
+} as const;
+
+/** A list of lobbies is "filling now" only from the first seat taken; with nobody in any it is open. */
+export function lobbyListHead(lobbies: readonly Pick<LobbyFilling, 'filling'>[]): string {
+	return lobbies.some((lobby) => lobby.filling > 0) ? LOBBY_HEAD.filling : LOBBY_HEAD.open;
+}
+
 /** "12 teams, PPR" for a lobby format. */
 export function lobbyTitle(
 	teams: number,
