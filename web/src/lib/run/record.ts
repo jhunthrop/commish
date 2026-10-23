@@ -60,6 +60,9 @@ export const RECORD_WORDS = {
 	/** The weeks no order was set for: never graded after the fact (B03). */
 	missedOne: (week: string) => `${week} was not set before kickoff, so it cannot be graded.`,
 	missedMany: (weeks: string) => `${weeks} were not set before kickoff, so they cannot be graded.`,
+	/** A set week's game state beside its set time (D08): the schedule's, never the run's. */
+	notPlayed: 'not played yet',
+	underway: 'under way',
 	/** A set week whose games are played and whose stats have not landed. */
 	waiting: (week: string, day: string | null) =>
 		day === null
@@ -200,10 +203,15 @@ function lead(weeks: readonly RecordWeek[]): string {
 
 /** A set week as a person says it: "set Tue Sep 8, graded Wed Oct 14", "set Thu Oct 22, not played
  * yet" before its first kickoff, "set Tue Oct 13, grades Wed Oct 21 when the stats land" after it. */
-function frozenWords(week: RecordWeek, unplayed: readonly number[]): string {
+function frozenWords(
+	week: RecordWeek,
+	unplayed: readonly number[],
+	underway: readonly number[]
+): string {
 	const set = `set ${stamp(week.frozenAt, week)}`;
 	if (week.status === 'graded') return `${set}, graded ${stamp(week.gradedAt, week)}`;
-	if (unplayed.includes(week.week)) return `${set}, not played yet`;
+	if (unplayed.includes(week.week)) return `${set}, ${RECORD_WORDS.notPlayed}`;
+	if (underway.includes(week.week)) return `${set}, ${RECORD_WORDS.underway}`;
 	return week.gradesFrom === undefined
 		? `${set}, grades when the stats land`
 		: `${set}, grades ${weekdayLabel(week.gradesFrom)} when the stats land`;
@@ -242,10 +250,11 @@ function joins(run: readonly RecordWeek[] | undefined, week: RecordWeek): boolea
 /** The season week by week, each run of missed weeks one line ("Weeks 3 to 5, our order was not set
  * before kickoff, so they cannot be graded") and every week still to come one line ("Weeks 7 to 18,
  * set before kickoff Thu Oct 22"), so the list says what happened and what is next rather than logging
- * each week alike. `unplayed` names the set weeks whose first kickoff is still ahead of the run. */
+ * each week alike. `unplayed` names the set weeks whose first kickoff is still ahead, `underway` those with a game not final. */
 export function weekLines(
 	weeks: readonly RecordWeek[],
-	unplayed: readonly number[] = []
+	unplayed: readonly number[] = [],
+	underway: readonly number[] = []
 ): WeekLine[] {
 	return runsOf(weeks).map((run) => {
 		const [first] = run;
@@ -253,7 +262,7 @@ export function weekLines(
 		const grouped = first.status === 'missed' || first.status === 'upcoming';
 		return grouped
 			? { lead: lead(run), text: runWords(run), week: null }
-			: { lead: lead(run), text: frozenWords(first, unplayed), week: first };
+			: { lead: lead(run), text: frozenWords(first, unplayed, underway), week: first };
 	});
 }
 

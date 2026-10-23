@@ -63,6 +63,7 @@
 		/** The weekly record's first week, null for a run's own record (no line before it). */
 		fromWeek: number | null;
 		unplayed: readonly number[];
+		underway: readonly number[];
 		leagueRecord: LeagueRecord | null;
 		players: PlayersByWeek;
 		/** The section's head and what it grades; null for a run's own record, drawn as before. */
@@ -75,6 +76,7 @@
 		record: runRecord,
 		fromWeek,
 		unplayed,
+		underway,
 		leagueRecord,
 		players,
 		head,
@@ -113,7 +115,8 @@
 	/** The weekly record says its weeks and its order in its own words (fix round 1, M2 and M4); a
 	 * run's own record before Lane 114 as it always did. */
 	const rows = $derived(
-		head === null ? weekLines(record.weeks, unplayed) : weeklyLines(record.weeks, unplayed)
+		head === null ? weekLines(record.weeks, unplayed, underway)
+			: weeklyLines(record.weeks, unplayed, underway)
 	);
 	const orderOf = (week: RecordWeek): string | null =>
 		head === null ? weekOrderWords(week) : weeklyOrderWords(week);

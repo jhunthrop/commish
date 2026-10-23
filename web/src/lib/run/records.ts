@@ -41,7 +41,8 @@ export const RECORDS_WORDS = {
 	setBefore: (day: string) => `set before kickoff ${day}`,
 	/** A set week's row, its set time to the minute and its zone (C14). */
 	setAt: (stamp: string) => `set ${stamp}`,
-	notPlayed: 'not played yet',
+	notPlayed: RECORD_WORDS.notPlayed,
+	underway: RECORD_WORDS.underway,
 	gradedOn: (day: string) => `graded ${day}`,
 	/** The run's day is the earliest the grading pass may grade (review MEDIUM-1), so "from". */
 	gradesOn: (day: string) => `grades from ${day}, when the stats land`,
@@ -216,7 +217,11 @@ function spanLead(weeks: readonly RecordWeek[]): string {
 
 /** A set week's row (C14): its own set time, then whether it is played, waiting or graded: "set Tue
  * Oct 20, 5:00 am Central, not played yet", "set ..., graded Wed Oct 28". */
-function setWeekText(week: RecordWeek, unplayed: readonly number[]): string {
+function setWeekText(
+	week: RecordWeek,
+	unplayed: readonly number[],
+	underway: readonly number[]
+): string {
 	if (week.frozenAt === null)
 		throw new Error(`Week ${String(week.week)} is ${week.status} with no date.`);
 	// The record's one clock, the one the run's other stamps are said on (C14).
@@ -226,7 +231,9 @@ function setWeekText(week: RecordWeek, unplayed: readonly number[]): string {
 			? RECORDS_WORDS.gradedOn(weekdayLabel(week.gradedAt))
 			: unplayed.includes(week.week)
 				? RECORDS_WORDS.notPlayed
-				: week.gradesFrom === undefined
+				: underway.includes(week.week)
+					? RECORDS_WORDS.underway
+					: week.gradesFrom === undefined
 					? RECORDS_WORDS.gradesLater
 					: RECORDS_WORDS.gradesOn(weekdayLabel(week.gradesFrom));
 	return `${set}, ${then}`;
@@ -236,13 +243,18 @@ function setWeekText(week: RecordWeek, unplayed: readonly number[]): string {
  * missed weeks as the record says them; of the weeks to come, the next to set on its own line with its kickoff day ("Week 7", "set before
  * kickoff Thu Oct 22") and the rest once ("Weeks 8 to 18", "set each week before kickoff"), so no line
  * reads as many weeks set on one day. */
-export function weeklyLines(weeks: readonly RecordWeek[], unplayed: readonly number[]): WeekLine[] {
+export function weeklyLines(
+	weeks: readonly RecordWeek[],
+	unplayed: readonly number[],
+	underway: readonly number[]
+): WeekLine[] {
 	const coming = weeks.filter((week) => week.status === 'upcoming');
 	const lines = weekLines(
 		weeks.filter((week) => week.status !== 'upcoming'),
-		unplayed
+		unplayed,
+		underway
 	).map((line) =>
-		line.week === null ? line : { ...line, text: setWeekText(line.week, unplayed) }
+		line.week === null ? line : { ...line, text: setWeekText(line.week, unplayed, underway) }
 	);
 	const [next, ...rest] = coming;
 	if (next === undefined) return lines;
