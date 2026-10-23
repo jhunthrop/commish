@@ -84,12 +84,12 @@ jobs:
           POSTGRES_USER: parity
           POSTGRES_PASSWORD: parity
           POSTGRES_DB: parity
-        ports: ["5432:5432"]
+        ports: ["5433:5432"]
         options: >-
           --health-cmd "pg_isready -U parity -d parity"
           --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      PARITY_DATABASE_URL: postgres://parity:parity@localhost:5432/parity
+      PARITY_DATABASE_URL: postgres://parity:parity@localhost:5433/parity
       TZ: UTC
     defaults: { run: { working-directory: research } }
     steps:
