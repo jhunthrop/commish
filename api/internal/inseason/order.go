@@ -339,16 +339,21 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 		hosts = a.hostIDs()
 	}
 	players, ranks := a.playingFirst(a.ranked(q.position), hosts, q.byesLast)
+	onClub := 0
 	for i, p := range players {
 		if !matches(p, q.q) || (q.roster != "" && a.rosterMark(p.ID).Kind != q.roster) {
 			continue
 		}
 		out.Total++
+		if p.Team != "" {
+			onClub++
+		}
 		if len(out.Rows) == q.limit {
 			continue
 		}
 		out.Rows = append(out.Rows, a.orderRow(p, ranks[i], hosts, targets))
 	}
+	out.OnClub = &onClub
 	for _, r := range out.Rows {
 		if r.Line.RestOfSeasonPerGame != nil {
 			out.Basis += " " + PerGameBasis()

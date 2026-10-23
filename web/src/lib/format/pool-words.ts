@@ -8,7 +8,7 @@ import { count, plural } from './number.ts';
 
 export const POOL = {
 	ranked: 'ranked',
-	rosters: 'on NFL rosters',
+	rosters: 'on NFL rosters today',
 	board: 'on our board',
 	boardWithMarket: 'on our board with kickers and defenses',
 	room: 'left to draft'
@@ -31,10 +31,12 @@ export function boardPoolCount(rows: readonly { draftOrder?: boolean }[]): strin
 	);
 }
 
-/** The order's hits: its pool with no filter set ("1,365 on NFL rosters"), the matches with a search, a
- * position or a roster filter ("12 matches"), which are no longer the pool. */
-export function hitsWords(total: number, filtered: boolean): string {
-	return filtered ? plural(total, 'match', 'matches') : poolCount(total, 'rosters');
+/** The order's hits: the players on a club's roster today with no filter set ("1,012 on NFL rosters
+ * today", the API's on_club, which leaves out free agents and retired players, Lane 165 D12), the
+ * matches with a search, a position or a roster filter ("12 matches"), which are no longer the pool.
+ * An answer from before on_club counts every player it holds. */
+export function hitsWords(total: number, filtered: boolean, onClub: number | undefined): string {
+	return filtered ? plural(total, 'match', 'matches') : poolCount(onClub ?? total, 'rosters');
 }
 
 /** The site search's placeholder: "Search 619 ranked players", the players it finds pages for. */

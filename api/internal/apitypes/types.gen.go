@@ -3408,6 +3408,9 @@ type OrderAdvice struct {
 	// Moves the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league
 	Moves *WaiverMoves `json:"moves"`
 
+	// OnClub the players of total on a club's roster today (Lane 165, D12): the daily list's club, so a free agent or a retired player, who has none, is not counted; absent from an older answer
+	OnClub *int `json:"on_club,omitempty"`
+
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
 

@@ -4622,6 +4622,11 @@ components:
           nullable: true
           description: the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league
         total: { type: integer, description: every player the view holds before the limit, after the search and the roster filter }
+        on_club:
+          type: integer
+          description: >-
+            the players of total on a club's roster today (Lane 165, D12): the daily list's club, so a free agent or a
+            retired player, who has none, is not counted; absent from an older answer
         rows:
           type: array
           description: in our order, at most the limit

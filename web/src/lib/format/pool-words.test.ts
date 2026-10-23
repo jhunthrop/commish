@@ -4,7 +4,7 @@ import { boardPoolCount, hitsWords, POOL, poolCount, searchPlaceholder } from '.
 
 void test('every count names its pool, grouped as a reader reads it (the sweep X4)', () => {
 	assert.equal(poolCount(619, 'ranked'), '619 ranked');
-	assert.equal(poolCount(1365, 'rosters'), '1,365 on NFL rosters');
+	assert.equal(poolCount(1365, 'rosters'), '1,365 on NFL rosters today');
 	assert.equal(poolCount(619, 'board'), '619 on our board');
 	assert.equal(poolCount(665, 'boardWithMarket'), '665 on our board with kickers and defenses');
 	assert.equal(poolCount(1413, 'room'), '1,413 left to draft');
@@ -29,7 +29,13 @@ void test('the site search names the players it finds pages for', () => {
 });
 
 void test('a filtered view counts its matches, never the pool', () => {
-	assert.equal(hitsWords(1365, false), '1,365 on NFL rosters');
-	assert.equal(hitsWords(1, true), '1 match');
-	assert.equal(hitsWords(160, true), '160 matches');
+	assert.equal(hitsWords(1365, false, 1012), '1,012 on NFL rosters today');
+	assert.equal(hitsWords(1, true, 1), '1 match');
+	assert.equal(hitsWords(160, true, 150), '160 matches');
+});
+
+void test('the unfiltered count leaves out players with no club, and an older answer counts all (Lane 165, D12)', () => {
+	assert.equal(hitsWords(1365, false, 1012), '1,012 on NFL rosters today');
+	assert.equal(hitsWords(1365, false, 0), '0 on NFL rosters today');
+	assert.equal(hitsWords(1365, false, undefined), '1,365 on NFL rosters today');
 });
