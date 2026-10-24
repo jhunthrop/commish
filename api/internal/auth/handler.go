@@ -28,6 +28,10 @@ const (
 	stateTTL      = 10 * time.Minute
 	maxReturnTo   = 512
 	signInProblem = "/sign-in/problem"
+	// appSignedIn is the app link an app's sign-in comes back to, on the
+	// site, with the pairing code: the universal link on iOS and the app
+	// link on Android (the web serves the association files).
+	appSignedIn = "/app/signed-in"
 )
 
 // Rate limits for the auth routes.
@@ -51,8 +55,18 @@ type AccountStore interface {
 	SetHandle(ctx context.Context, id uuid.UUID, handle string) (Account, error)
 }
 
+// AppCodes mints the pairing code an app's sign-in hands back to the
+// app, good for one device of kind and only with the verifier behind
+// challenge. devices.Service implements it.
+type AppCodes interface {
+	AppCode(ctx context.Context, accountID uuid.UUID, kind DeviceKind, challenge string) (string, error)
+}
+
 // Handler serves /auth and /me.
 type Handler struct {
+	// AppCodes mints an app's pairing code at the callback; nil sends an
+	// app's sign-in to the problem page.
+	AppCodes      AppCodes
 	Store         AccountStore
 	Sessions      *Sessions
 	IdP           IdentityProvider
@@ -87,6 +101,10 @@ type signInState struct {
 	State    string    `json:"s"`
 	ReturnTo string    `json:"r"`
 	Expires  time.Time `json:"e"`
+	// Client is the app signing in (ios, android), empty for the web.
+	Client DeviceKind `json:"c,omitempty"`
+	// Challenge is the app's S256 PKCE challenge, empty for the web.
+	Challenge string `json:"p,omitempty"`
 }
 
 // safeReturnTo keeps only a path on the site: never another host, never
@@ -105,13 +123,59 @@ func safeReturnTo(raw string) string {
 
 func (h *Handler) site(path string) string { return h.PublicBaseURL + path }
 
+// appSignIn is what an app's /auth/login names: the app and the S256
+// challenge of the verifier it keeps.
+type appSignIn struct {
+	Client    DeviceKind
+	Challenge string
+}
+
+// The refusals of an app's /auth/login, by the field at fault. The apps
+// show the field's sentence.
+const (
+	badClient          = "An app signs in as ios or android"
+	badMethod          = "An app signs in with code_challenge_method S256"
+	badChallenge       = "An app signs in with the S256 code_challenge of its code_verifier"
+	badAppReturnPrefix = "An app comes back to "
+)
+
+// readAppSignIn reads an app's sign-in from the query: no client is the
+// web (the zero value, no fault); an app names ios or android, comes back
+// to the app link alone (given exactly or left out) and sends an S256
+// challenge. fault names the one field at fault and its sentence.
+func (h *Handler) readAppSignIn(q url.Values) (appSignIn, map[string]string) {
+	if !q.Has("client") {
+		return appSignIn{}, nil
+	}
+	kind, ok := ParseDeviceKind(q.Get("client"))
+	switch {
+	case !ok || !kind.IsApp():
+		return appSignIn{}, map[string]string{"client": badClient}
+	case q.Has("return_to") && q.Get("return_to") != h.site(appSignedIn):
+		return appSignIn{}, map[string]string{"return_to": badAppReturnPrefix + h.site(appSignedIn)}
+	case q.Get("code_challenge_method") != PKCEMethod:
+		return appSignIn{}, map[string]string{"code_challenge_method": badMethod}
+	case !ValidChallenge(q.Get("code_challenge")):
+		return appSignIn{}, map[string]string{"code_challenge": badChallenge}
+	}
+	return appSignIn{Client: kind, Challenge: q.Get("code_challenge")}, nil
+}
+
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	app, fault := h.readAppSignIn(q)
+	if fault != nil {
+		httpx.WriteInvalid(w, r, fault)
+		return
+	}
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	st := signInState{
-		State:    base64.RawURLEncoding.EncodeToString(b),
-		ReturnTo: safeReturnTo(r.URL.Query().Get("return_to")),
-		Expires:  h.Now().Add(stateTTL),
+		State:     base64.RawURLEncoding.EncodeToString(b),
+		ReturnTo:  safeReturnTo(q.Get("return_to")),
+		Expires:   h.Now().Add(stateTTL),
+		Client:    app.Client,
+		Challenge: app.Challenge,
 	}
 	screen := ScreenSignIn
 	if r.URL.Query().Get("screen") == string(ScreenSignUp) {
@@ -192,7 +256,32 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	h.Sessions.Issue(w, token)
 	h.claimAnon(w, r, acct.ID)
+	if st.Client.IsApp() {
+		h.returnToApp(w, r, acct.ID, appSignIn{Client: st.Client, Challenge: st.Challenge})
+		return
+	}
 	http.Redirect(w, r, h.site(st.ReturnTo), http.StatusFound)
+}
+
+// returnToApp hands a signed-in app its pairing code on the app link,
+// which the app trades at POST /devices/pair, with the verifier behind
+// the sealed challenge, for its device token. The link is built here
+// from the site, never read from the request, so the code goes nowhere
+// else, and without the verifier it pairs nothing.
+func (h *Handler) returnToApp(w http.ResponseWriter, r *http.Request, accountID uuid.UUID, app appSignIn) {
+	if h.AppCodes == nil || !ValidChallenge(app.Challenge) {
+		h.Log.Error("auth: app sign-in", "request_id", httpx.RequestIDFrom(r.Context()), "err", "no app codes or no challenge")
+		http.Redirect(w, r, h.site(signInProblem), http.StatusFound)
+		return
+	}
+	code, err := h.AppCodes.AppCode(r.Context(), accountID, app.Client, app.Challenge)
+	if err != nil {
+		h.Log.Error("auth: app sign-in", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+		http.Redirect(w, r, h.site(signInProblem), http.StatusFound)
+		return
+	}
+	q := url.Values{"code": {code}, "client": {string(app.Client)}}
+	http.Redirect(w, r, h.site(appSignedIn)+"?"+q.Encode(), http.StatusSeeOther)
 }
 
 // claimAnon moves the mocks this browser drafted signed out to the

@@ -50,22 +50,49 @@ paths:
     get:
       tags: [auth]
       operationId: login
-      summary: Redirects to WorkOS AuthKit. return_to is a path on the site the browser comes back to.
+      summary: >-
+        Redirects to WorkOS AuthKit. On the web return_to is a path on the site the browser comes back to. An app
+        (client ios or android, in the system browser sheet) comes back to the app link alone,
+        https://trycommish.app/app/signed-in (the site plus /app/signed-in), given exactly or left out, and sends
+        code_challenge, the S256 PKCE challenge (base64url of SHA-256 of a code_verifier the app keeps in memory, no
+        padding, 43 characters), with code_challenge_method S256. Any other client, return_to, challenge or method
+        answers 400 naming that field, before AuthKit is asked.
       parameters:
         - { name: return_to, in: query, required: false, schema: { type: string, maxLength: 512 } }
         - { name: screen, in: query, required: false, schema: { type: string, enum: [sign-in, sign-up] } }
+        - name: client
+          in: query
+          required: false
+          description: the app signing in; absent for the web
+          schema: { type: string, enum: [ios, android] }
+        - name: code_challenge
+          in: query
+          required: false
+          description: an app's S256 PKCE challenge, required with client; ignored for the web
+          schema: { type: string, pattern: "^[A-Za-z0-9_-]{43}$" }
+        - name: code_challenge_method
+          in: query
+          required: false
+          description: required with client
+          schema: { type: string, enum: [S256] }
       responses:
         "302": { description: to WorkOS }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
   /auth/callback:
     get:
       tags: [auth]
       operationId: callback
-      summary: WorkOS returns here. Sets the sealed session cookie on the apex domain and redirects to the site.
+      summary: >-
+        WorkOS returns here. Sets the sealed session cookie on the apex domain and redirects to the site. For an app's
+        sign-in it also mints a pairing code (ten minutes, one use, good only for that app's kind and only with the
+        code_verifier behind the sign-in's code_challenge) and answers 303 to the app link with code and client in the
+        query; the app trades the code and its verifier at POST /devices/pair.
       parameters:
         - { name: code, in: query, required: true, schema: { type: string } }
         - { name: state, in: query, required: true, schema: { type: string } }
       responses:
         "302": { description: to the site, or to its sign-in problem page }
+        "303": { description: "an app's sign-in, to https://trycommish.app/app/signed-in?code=...&client=ios|android" }
   /auth/logout:
     post:
       tags: [auth]
@@ -85,14 +112,14 @@ paths:
     get:
       tags: [auth]
       operationId: getMe
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/AccountResponse" }
         "401": { $ref: "#/components/responses/ErrorResponse" }
     patch:
       tags: [auth]
       operationId: updateMe
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -112,7 +139,7 @@ paths:
         three facts about the member's roster, each from the reads the in-season routes already make. The front door
         reads this once and makes no other in-season read. A league whose read fails stays on the list with problem
         saying why.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200":
           description: the account's leagues this week
@@ -146,7 +173,7 @@ paths:
       summary: >-
         The site's context: one of the account's followed leagues, or a format with no league. Every page reads the
         selection from /me.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -161,7 +188,7 @@ paths:
     get:
       tags: [leagues]
       operationId: listLeagues
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PerPage" }]
       responses:
         "200":
@@ -175,7 +202,7 @@ paths:
     post:
       tags: [leagues]
       operationId: createLeague
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -190,14 +217,14 @@ paths:
     get:
       tags: [leagues]
       operationId: getLeague
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/LeagueResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
     put:
       tags: [leagues]
       operationId: replaceLeague
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -210,7 +237,7 @@ paths:
     delete:
       tags: [leagues]
       operationId: deleteLeague
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -224,7 +251,7 @@ paths:
         scoring settings, ESPN from a public league's settings (a private league is refused with a sentence saying to
         make it viewable or enter the rules by hand), MyFantasyLeague from a public league's rules. Yahoo is entered
         by hand. Needs the custom_scoring feature (403 naming it). Nothing is saved.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -251,7 +278,7 @@ paths:
       summary: >-
         Read a league on another host by its link (Sleeper, or a public MyFantasyLeague league) and answer its name and
         teams, so the drafter can say which team is theirs. Free. Nothing is saved.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -273,7 +300,7 @@ paths:
         its shape. The drafter's seat is the team their Sleeper username runs, or the team they pick. Attaching the
         same league again updates the seat. One live league is free; a second needs the many_leagues feature
         (the Draft Pass or the Membership), refused with 403 naming it. A detached league does not count.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -292,7 +319,7 @@ paths:
       tags: [league-sync]
       operationId: listAttached
       summary: The account's attached leagues, newest first.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200":
           description: up to twenty
@@ -310,7 +337,7 @@ paths:
       summary: >-
         Stop following a league. The attachment is kept as detached, with the saved league it made, so the detach
         can be undone (restore) and mocks saved from it keep their settings.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -322,7 +349,7 @@ paths:
       summary: >-
         Undo a detach. The league is followed again with the seat and saved league it had. Like an attach, a second
         live league needs the many_leagues feature (403 naming it).
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "403": { $ref: "#/components/responses/ErrorResponse" }
@@ -342,7 +369,7 @@ paths:
         The attached league as it stands: standings, the drafter's roster, the week's matchup, the moves of this week
         and last, and the unrostered pool on our board. One upstream read per league per minute whatever the viewer
         count; when the host fails, the last good read with host_stale_seconds.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/LeagueSyncResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -359,7 +386,7 @@ paths:
       operationId: refreshLeague
       summary: >-
         Read the league from its host now, shared with any read inside the last ten seconds. 30 an hour an account.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/LeagueSyncResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -380,7 +407,7 @@ paths:
         hard facts (bye, out, doubtful), each change from the lineup the host holds with its reason in one sentence.
         Reads the league as the sync route does. moves says whether the lineup can be set on the host from our screen
         (POST /leagues/attached/{id}/moves/plan, then /moves); nothing here writes the host.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/LineupAdviceResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -401,7 +428,7 @@ paths:
         The week's matchup as a box score: each side's starters in the host's slots and its bench, every player with
         his line (his game's facts, his points so far once his game has kicked off, the week's published projection).
         Reads the league as the sync route does; the sync answer's matchup keeps the score and the teams.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/MatchupBoxResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -422,7 +449,7 @@ paths:
         Every game of the league's week: each side's points so far as the host scores them, its starters' summed
         published projection, and the game's state from its starters' kickoffs (before kickoff, playing, final). Reads
         the league as the sync route does.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/ScoreboardResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -445,7 +472,7 @@ paths:
         the lineup our set order picks from the member's roster scored against the points of the lineup ESPN's own
         projection picks from the same roster (or, where that read carries no ESPN projection, the week's published
         projection), both scored as the league scores. Reads the league as the sync route does.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/LeagueRecordResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -475,7 +502,7 @@ paths:
       summary: >-
         Waivers: the unrostered players on our board ranked by the gain to the drafter's lineup, each with the drop it
         costs least to lose. A player tagged Hold on the drafter's sheets is never the drop. We submit nothing.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/WaiverAdviceResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
@@ -519,7 +546,7 @@ paths:
         The Rest of season screen for the drafter's league: our rest-of-season order valued for the league, each
         player with his week, whose roster holds him and the one move his row admits (add a free player the league
         starts, trade for one the trade finder's best trade with his team brings in). We submit nothing.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/OrderAdviceResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
@@ -544,7 +571,7 @@ paths:
         with its week, in the order of the week's published projection, in the league's scoring, whose roster holds
         it and an add on the first five free rows still to play. We have no kicker or defense model, so there is no
         rest-of-season order for these positions. We submit nothing.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/WeekOrderAdviceResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
@@ -571,7 +598,7 @@ paths:
         The trade finder: for each other team, the one-for-one and two-for-one trades (both ways) after which both
         lineups gain on our order and both still fill every slot, best for the drafter first. A player tagged Hold on
         the drafter's sheets is never given. We never send an offer.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/TradeAdviceResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
@@ -597,7 +624,7 @@ paths:
         drop a full roster makes for two in, and whether each roster still fills every slot. A player not on the
         named roster, a kicker, a defense, or a player on injured reserve or the taxi squad answers 422 with the
         sentence naming him. We never send an offer.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -637,7 +664,7 @@ paths:
         when he is on the drafter's roster and our lineup starts him where the platform does not, the lineup otherwise,
         a trade for him when another roster holds him, and the claim or the platform's waiver page when no roster does,
         as the claim moves say. A quarterback, running back, receiver or tight end our board places; anyone else 404s.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/PlayerWeekResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
@@ -665,7 +692,7 @@ paths:
         connection is signed out or agreed to words older than the moves (a sentence asks to connect again), or the
         stored SWID does not own the team the attached league names as the member's in ESPN's teams read.
         20 a minute an account.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -690,7 +717,7 @@ paths:
       tags: [league-sync]
       operationId: listHostMoves
       summary: The member's own moves on this league, newest first, the last 20.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/HostMovesResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -705,7 +732,7 @@ paths:
         page). Every move is kept as its proof. 409 for a token
         already used, 400 for a token for another account, league or move, or expired, 422 for a move the fresh read refuses
         (another week, a starter moved, a locked player, not the member's team). 5 a minute an account.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -724,7 +751,7 @@ paths:
     get:
       tags: [sheets]
       operationId: listSheets
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PerPage" }]
       responses:
         "200":
@@ -738,7 +765,7 @@ paths:
     post:
       tags: [sheets]
       operationId: createSheet
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -754,14 +781,14 @@ paths:
       tags: [sheets]
       operationId: getSheet
       summary: The sheet with every row in rank order. Also the print view's data.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/SheetDetailResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
     patch:
       tags: [sheets]
       operationId: renameSheet
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -774,7 +801,7 @@ paths:
     delete:
       tags: [sheets]
       operationId: deleteSheet
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -784,7 +811,7 @@ paths:
       tags: [sheets]
       operationId: replaceSheetRows
       summary: Replaces every row. Rank is the order of the array, from 1. A drag sends the whole order.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -803,7 +830,7 @@ paths:
       tags: [sheets]
       operationId: updateSheetRow
       summary: Sets one row's tier, tag and note. Null clears a field.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -829,7 +856,7 @@ paths:
         Replaces the rows from a CSV in the export's columns (rank, player_id, name, position, team, tier, tags,
         note). rank and player_id and name and position are required. tags holds up to four tags separated by
         commas, bars or semicolons, and a header named tag is read as tags. Rows are ordered by rank.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -852,7 +879,7 @@ paths:
       tags: [exports]
       operationId: exportSheet
       summary: Writes the sheet as a file to object storage and returns a signed link to it.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -866,7 +893,7 @@ paths:
     get:
       tags: [exports]
       operationId: listExports
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PerPage" }]
       responses:
         "200":
@@ -883,7 +910,7 @@ paths:
       tags: [exports]
       operationId: getExport
       summary: A fresh signed link to an export that has not expired.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/ExportLinkResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -913,7 +940,7 @@ paths:
       summary: >-
         Opens a Stripe checkout for the Draft Pass, the Membership or a group pass. In a free season it answers 409
         free_season whatever the Stripe keys.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -929,7 +956,7 @@ paths:
       tags: [billing]
       operationId: billingPortal
       summary: The Stripe customer portal, for the card and receipts.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/RedirectResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -939,7 +966,7 @@ paths:
       tags: [billing]
       operationId: cancelMembership
       summary: One-click cancellation. The Membership runs to the end of the period it was paid for and does not renew.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/AccountResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -949,7 +976,7 @@ paths:
       tags: [billing]
       operationId: resumeMembership
       summary: Undoes a cancellation before the period ends.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/AccountResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -974,7 +1001,7 @@ paths:
       tags: [billing]
       operationId: listGroupPasses
       summary: The group passes this account bought, with their claim links.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200":
           description: newest first
@@ -1006,7 +1033,7 @@ paths:
     post:
       tags: [billing]
       operationId: claimGroupPass
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/AccountResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -1017,7 +1044,7 @@ paths:
     get:
       tags: [mocks]
       operationId: listMocks
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PerPage" }]
       responses:
         "200":
@@ -1036,7 +1063,7 @@ paths:
         turn: every bot pick before it is already made, with the board the room drafts from. Signed out, a browser
         keeps 25 unfinished mocks (409 past that) and every signed-out browser together starts 2,000 an hour (429
         past that).
-      security: [{ session: [] }, { anon: [] }, {}]
+      security: [{ session: [] }, { device: [] }, { anon: [] }, {}]
       requestBody:
         required: true
         content:
@@ -1058,14 +1085,14 @@ paths:
       tags: [mocks]
       operationId: getMock
       summary: The room as it stands, with the board.
-      security: [{ session: [] }, { anon: [] }]
+      security: [{ session: [] }, { device: [] }, { anon: [] }]
       responses:
         "200": { $ref: "#/components/responses/MockRoomResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
     delete:
       tags: [mocks]
       operationId: deleteMock
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -1078,7 +1105,7 @@ paths:
         The drafter's pick, and every bot pick to the drafter's next turn in the same transaction, stamped with no
         delay. pick is the overall pick the drafter saw, so a second submit of the same click answers 409. The
         answer carries no board.
-      security: [{ session: [] }, { anon: [] }]
+      security: [{ session: [] }, { device: [] }, { anon: [] }]
       requestBody:
         required: true
         content:
@@ -1098,7 +1125,7 @@ paths:
       summary: >-
         Takes back one of the drafter's picks and every pick after it. The draft replays from there with the same
         seed, so the bots draft the same up to the change.
-      security: [{ session: [] }, { anon: [] }]
+      security: [{ session: [] }, { device: [] }, { anon: [] }]
       requestBody:
         required: true
         content:
@@ -1122,7 +1149,7 @@ paths:
       summary: >-
         Pick for me to round N: the drafter's turns through that round draft from the queue first, then the
         newest cheat sheet, then the board.
-      security: [{ session: [] }, { anon: [] }]
+      security: [{ session: [] }, { device: [] }, { anon: [] }]
       responses:
         "200": { $ref: "#/components/responses/MockRoomResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
@@ -1134,7 +1161,7 @@ paths:
       tags: [mocks]
       operationId: finishMock
       summary: Finish the draft, every remaining turn by the same rule as autopick.
-      security: [{ session: [] }, { anon: [] }]
+      security: [{ session: [] }, { device: [] }, { anon: [] }]
       responses:
         "200": { $ref: "#/components/responses/MockRoomResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -1145,7 +1172,7 @@ paths:
       tags: [mocks]
       operationId: queueMock
       summary: Replaces the drafter's queue, best first.
-      security: [{ session: [] }, { anon: [] }]
+      security: [{ session: [] }, { device: [] }, { anon: [] }]
       requestBody:
         required: true
         content:
@@ -1166,7 +1193,7 @@ paths:
         Our call at the drafter's turn and every player's chance of lasting to the next one, from the advisor, or
         from the engine's 200 runs when the advisor does not answer. Recorded the first time it is read and written
         with the pick.
-      security: [{ session: [] }, { anon: [] }]
+      security: [{ session: [] }, { device: [] }, { anon: [] }]
       responses:
         "200": { $ref: "#/components/responses/RoomCardResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -1177,7 +1204,7 @@ paths:
       tags: [mocks]
       operationId: mockReport
       summary: The finished draft's report, computed once and kept until an undo reopens the draft.
-      security: [{ session: [] }, { anon: [] }]
+      security: [{ session: [] }, { device: [] }, { anon: [] }]
       responses:
         "200": { $ref: "#/components/responses/MockReportResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -1338,7 +1365,7 @@ paths:
       summary: >-
         Takes a seat in the format's filling room, or opens one. A room starts when it is full or 90 seconds after
         its first drafter joined, with bots in the open seats. Needs a handle (409 with field handle without one).
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -1354,7 +1381,7 @@ paths:
       tags: [rooms]
       operationId: getLobby
       summary: The room's settings, seats and board, for a drafter with a seat in it. Picks come over the socket.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/LobbyRoomResponse" }
         "403": { $ref: "#/components/responses/ErrorResponse" }
@@ -1365,7 +1392,7 @@ paths:
       tags: [rooms]
       operationId: leaveLobby
       summary: Gives the seat up. A filling room frees it; a drafting room hands it to a bot at once.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "403": { $ref: "#/components/responses/ErrorResponse" }
@@ -1378,7 +1405,7 @@ paths:
       summary: >-
         On your turn, our call as in the solo room. Off it, the call if the board holds to your pick, with each
         player's chance of reaching it.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/RoomCardResponse" }
         "403": { $ref: "#/components/responses/ErrorResponse" }
@@ -1390,7 +1417,7 @@ paths:
       tags: [rooms]
       operationId: lobbyReport
       summary: The report of a finished lobby, for the caller's seat.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/MockReportResponse" }
         "403": { $ref: "#/components/responses/ErrorResponse" }
@@ -1402,7 +1429,7 @@ paths:
       tags: [companions]
       operationId: listCompanions
       summary: The account's newest followed drafts, newest first, with the Sleeper username each seat was found by.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200":
           description: up to five
@@ -1420,7 +1447,7 @@ paths:
         Follow a draft running on another host (Sleeper today) from the drafter's seat. Needs the live_draft_advisor
         feature (403 with feature otherwise). Snake drafts only; an auction, a linear order or a reversal is refused
         with a sentence. The same draft again answers the companion already made, with the seat updated.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -1448,7 +1475,7 @@ paths:
         The host's draft as of at most two seconds ago, the drafter's seat, pick N of M, picks until their turn, and at
         their turn our call. One upstream read per draft per two seconds whatever the viewer count; when the host fails,
         the last snapshot with host_stale_seconds.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/CompanionResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -1459,7 +1486,7 @@ paths:
       tags: [companions]
       operationId: companionReport
       summary: The report on the finished draft from the drafter's seat, once the host says it is complete (409 before).
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/MockReportResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -1470,7 +1497,7 @@ paths:
       tags: [devices]
       operationId: listDevices
       summary: The account's paired browsers, newest first, each with its scopes and when it last sent a page.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200":
           description: up to ten
@@ -1487,7 +1514,7 @@ paths:
       summary: >-
         A one-time pairing code for the browser extension: six words, good for ten minutes and one pairing. A new code
         replaces the account's earlier one.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "201":
           description: the code, shown once
@@ -1502,8 +1529,12 @@ paths:
       tags: [devices]
       operationId: pairDevice
       summary: >-
-        The extension trades a pairing code for its device token, answered this once and never again. The token goes
-        in Authorization Bearer on the device routes only, never in a cookie. 10 a minute an address.
+        A device trades a pairing code for its device token, answered this once and never again. The extension (kind
+        extension, the default) trades the account page's code, and its token goes in Authorization Bearer on the
+        device routes only. An app (kind ios or android) trades the code its sign-in came back with and the
+        code_verifier behind that sign-in's code_challenge, and its token also carries the session scope. A code pairs
+        only the kind it was minted for; a missing or wrong verifier is 400 and spends nothing. Never a cookie. 10 a
+        minute an address.
       requestBody:
         required: true
         content:
@@ -1542,7 +1573,7 @@ paths:
       tags: [devices]
       operationId: revokeDevice
       summary: Unpair a browser. Its token opens nothing from the next request on.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -1557,7 +1588,7 @@ paths:
         read. No credential is ever answered. Signed out it answers the switches with no
         connections: a switch is not account data. MyFantasyLeague is listed with HOST_WRITES_MFL_LINEUP on and the
         key present, and while the switch is off, signed in, to the accounts on its proof list alone.
-      security: [{ session: [] }, {}]
+      security: [{ session: [] }, { device: [] }, {}]
       responses:
         "200":
           description: the connections
@@ -1577,7 +1608,7 @@ paths:
         leagues. Needs consent, kept with its time and words. Three refused sign-ins in an hour pause connecting for the
         hour (423). 5 an hour an account. 502 when FFPC is not answering or answers a sign-in in a way we do not expect;
         503 when FFPC is not open here or its sign-in page changed.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -1603,7 +1634,7 @@ paths:
       tags: [hosts]
       operationId: ffpcLeagues
       summary: The member's FFPC leagues, read from FFPC as them. 409 when the connection needs a fresh sign-in.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200":
           description: the leagues
@@ -1621,7 +1652,7 @@ paths:
       tags: [hosts]
       operationId: disconnectFFPC
       summary: Disconnect FFPC. The kept sign-in and session are deleted at once; leagues read from FFPC stop updating.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -1634,7 +1665,7 @@ paths:
         account that expires in ten minutes, one use, and a PKCE S256 challenge. The permission Yahoo shows is Fantasy
         Sports, read only. The page the member started from may ride along (return_to), a path on the site the callback
         sends them back to once connected. 5 an hour an account. 503 when Yahoo is not open here.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: false
         content:
@@ -1674,7 +1705,7 @@ paths:
         The member's Yahoo football leagues for the current season, read from Yahoo as them, each with its size, its
         scoring type and whether the account follows it already. 404 when not connected; 409 when Yahoo refused the kept
         token and the member connects again.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200":
           description: the leagues
@@ -1693,7 +1724,7 @@ paths:
       tags: [hosts]
       operationId: disconnectYahoo
       summary: Disconnect Yahoo. The kept tokens are deleted at once; leagues read from Yahoo keep their last read, shown as stale.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -1712,7 +1743,7 @@ paths:
         Answers the member's ESPN football leagues this season. Needs consent. 422 when ESPN does not accept the two
         values; three refusals in an hour pause connecting for the hour (423). 502, with nothing kept, when ESPN does
         not answer within the connect's 40 seconds. 5 an hour an account. 503 when ESPN is not open here.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -1752,7 +1783,7 @@ paths:
         checked private reads that league with the cookies before answering: that proves the session, and a refusal
         signs it out. 404 when not connected; 409 when ESPN does not accept the cookies (the message says whether it
         ever did).
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200":
           description: the leagues
@@ -1771,7 +1802,7 @@ paths:
       tags: [hosts]
       operationId: disconnectESPN
       summary: Disconnect ESPN. The kept cookies are deleted at once; private leagues read from ESPN keep their last read, shown as stale.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -1790,7 +1821,7 @@ paths:
         (423), as do three refusals of one username from any account, or the site's hourly cap on MyFantasyLeague
         sign-ins across every account (423, one sentence for both). 502, with nothing kept, when MyFantasyLeague does
         not answer. 5 an hour an account.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
         content:
@@ -1820,7 +1851,7 @@ paths:
         whether the account follows it already. 503 when MyFantasyLeague is not open to the account (the switch off and
         the account not on its proof list), as connecting is. 404 when not connected; 409 when MyFantasyLeague no
         longer accepts the session (or it is past its expiry, at most a year from connecting), which signs it out.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200":
           description: the leagues
@@ -1839,7 +1870,7 @@ paths:
       tags: [hosts]
       operationId: disconnectMFL
       summary: Disconnect MyFantasyLeague. The kept session is deleted at once; lineup moves on MyFantasyLeague stop.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { device: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -1873,9 +1904,11 @@ components:
       type: http
       scheme: bearer
       description: >-
-        A paired browser's device token (the extension), minted once at /devices/pair and sent as Authorization Bearer.
-        It opens only the device routes, each of which names the scope it needs (league:write or draft:write); it is
-        never a cookie, so it needs no CSRF token. It is stored hashed and revoked from the account page.
+        A paired device's token (the browser extension or an app), minted once at /devices/pair and sent as
+        Authorization Bearer. The extension's opens only the device routes, each of which names the scope it needs
+        (league:write or draft:write). An app's (kind ios or android) also carries the session scope, which opens
+        every route that names this scheme beside session, as its account. It is never a cookie, so it needs no CSRF
+        token. It is stored hashed and revoked from the account page.
     session:
       type: apiKey
       in: cookie
@@ -5570,14 +5603,20 @@ components:
 
     DeviceScope:
       type: string
-      description: what a paired browser may write
-      enum: [league:write, draft:write]
+      description: what a paired device may do; session (an app's alone) opens every signed-in route
+      enum: [league:write, draft:write, session]
+    DeviceKind:
+      type: string
+      description: what was paired, the browser extension or an app
+      enum: [extension, ios, android]
     Device:
       type: object
       required: [id, name, scopes, created_at, last_used_at]
       properties:
         id: { type: string, format: uuid }
         name: { type: string, description: what the browser called itself at pairing }
+        kind:
+          $ref: "#/components/schemas/DeviceKind"
         scopes: { type: array, items: { $ref: "#/components/schemas/DeviceScope" } }
         created_at: { type: string, format: date-time }
         last_used_at:
@@ -5603,6 +5642,15 @@ components:
       properties:
         code: { type: string, minLength: 1, maxLength: 200, description: the six words as typed, any case or spacing }
         name: { type: string, maxLength: 60, description: what the browser calls itself, like Chrome on a Mac }
+        kind:
+          $ref: "#/components/schemas/DeviceKind"
+        code_verifier:
+          type: string
+          minLength: 43
+          maxLength: 128
+          description: >-
+            an app's PKCE verifier, whose S256 challenge it sent on /auth/login; required for kind ios and android,
+            ignored for the extension
     Paired:
       type: object
       required: [token, device]

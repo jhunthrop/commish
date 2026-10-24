@@ -22,21 +22,54 @@ import (
 // The bearer path (spec §2.8): a paired device, the browser extension
 // first, sends a scoped token in Authorization: Bearer instead of the
 // session cookie. A device token is never a cookie, so no CSRF token
-// rides with it: nothing a browser sends on its own carries it. It opens
-// only the routes that name one of its scopes (httpx.Device), never a
-// session route, and it is revoked from the account page.
+// rides with it: nothing a browser sends on its own carries it. The
+// extension's token opens only the routes that name one of its scopes
+// (httpx.Device). An app's token (iOS, Android: the mobile spec §5.2)
+// also carries ScopeSession, which opens the session's routes as its
+// account (SessionOr). Every token is revoked from the account page.
 
-// Scope is what a device token may write.
+// Scope is what a device token may do.
 type Scope string
 
-// The scopes the extension is minted with: league pages and draft picks.
+// The scopes: league pages, draft picks, and the whole signed-in surface.
 const (
 	ScopeLeagueWrite Scope = "league:write"
 	ScopeDraftWrite  Scope = "draft:write"
+	ScopeSession     Scope = "session"
 )
 
-// DeviceScopes are the scopes a paired device carries.
-func DeviceScopes() []Scope { return []Scope{ScopeLeagueWrite, ScopeDraftWrite} }
+// DeviceKind is what was paired: the browser extension or an app.
+type DeviceKind string
+
+// The kinds. The words are a contract with the apps (/auth/login's
+// client, PairInput's kind) and with the devices table's check.
+const (
+	KindExtension DeviceKind = "extension"
+	KindIOS       DeviceKind = "ios"
+	KindAndroid   DeviceKind = "android"
+)
+
+// ParseDeviceKind reads one of the three words exactly.
+func ParseDeviceKind(raw string) (DeviceKind, bool) {
+	switch k := DeviceKind(raw); k {
+	case KindExtension, KindIOS, KindAndroid:
+		return k, true
+	}
+	return "", false
+}
+
+// IsApp reports whether the kind is a phone app: the kinds that sign in
+// through /auth/login and carry the session scope.
+func (k DeviceKind) IsApp() bool { return k == KindIOS || k == KindAndroid }
+
+// ScopesFor is what a device of kind is minted with: an app the session
+// besides the extension's two, the extension only its two.
+func ScopesFor(kind DeviceKind) []Scope {
+	if kind.IsApp() {
+		return []Scope{ScopeSession, ScopeLeagueWrite, ScopeDraftWrite}
+	}
+	return []Scope{ScopeLeagueWrite, ScopeDraftWrite}
+}
 
 // Device is a paired device as a request carries it.
 type Device struct {
@@ -152,10 +185,49 @@ func (b *Bearer) parse(r *http.Request) (string, bool) {
 // RateKey keys a device route's limit by its token when the MAC holds,
 // by the address otherwise, with no database read.
 func (b *Bearer) RateKey(r *http.Request) string {
-	if token, ok := b.parse(r); ok {
-		return "d:" + hex.EncodeToString(TokenHash(token)[:16])
+	if key, ok := b.TokenKey(r); ok {
+		return key
 	}
 	return "ip:" + httpx.AddressKey(httpx.ClientIP(r, b.trustedHops))
+}
+
+// TokenKey is a rate key for the request's token when it carries one
+// whose MAC holds, read with no database read.
+func (b *Bearer) TokenKey(r *http.Request) (string, bool) {
+	token, ok := b.parse(r)
+	if !ok {
+		return "", false
+	}
+	return "d:" + hex.EncodeToString(TokenHash(token)[:16]), true
+}
+
+// SessionOr serves a session route (httpx.SignedIn, httpx.Public). A
+// request whose token is a live device carrying ScopeSession goes to
+// signedIn with that device's account and the device on its context: the
+// cookie is not read and no CSRF token is asked for, since nothing a
+// browser sends on its own carries the header. Every other request goes
+// to cookie, the session path, unchanged: no token, a token that is not
+// ours, an unknown or revoked one, and the extension's, which never
+// carries the scope. Only a well-formed token costs a device read.
+func (b *Bearer) SessionOr(signedIn, cookie http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, ok := b.parse(r)
+		if !ok {
+			cookie.ServeHTTP(w, r)
+			return
+		}
+		acct, dev, err := b.store.DeviceAccount(r.Context(), TokenHash(token), b.now())
+		switch {
+		case errors.Is(err, ErrNoDevice), err == nil && !dev.Has(ScopeSession):
+			cookie.ServeHTTP(w, r)
+			return
+		case err != nil:
+			httpx.WriteInternal(w, r, b.log, "auth: device session", err)
+			return
+		}
+		ctx := WithDevice(WithAccount(r.Context(), acct), dev)
+		signedIn.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 // Require resolves the request's device and its account and refuses a
