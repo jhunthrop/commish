@@ -773,4 +773,8 @@ a judged outcome.
 ## 9. Amendments
 
 Each amendment is committed before the step it governs, as 6.4 requires, and names what the document
-said, what was found, and the rule as it now reads. None yet.
+said, what was found, and the rule as it now reads.
+
+### Amendment 1, 2026-10-26, before the check (Lane 168's build, its review)
+
+(1) §2.5 names `qb_scramble`; the store's play rows (round 4's build, digest-pinned) carry no such flag, so a scramble is round 4's `play_model.scramble`: a dropback with no sack, completion or interception, with nonzero yards (gained or lost) or a touchdown; a scramble with zero yards and no score reads as an incompletion. (2) For a conversion, each of a game's u units carries d^a: sum w = sum d^a u and sum w^2 = sum d^(2a) u, so n_eff is in expected-touchdown units, k's unit (the literal (d^a u)^2 would count games). (3) §2.2's "a row at his position" reads as any row of his on his club's week-W chart, the store's `depth_rank` being his best rank over the chart's slots. None reads an outcome or moves a threshold, seed, population or judged week. The check also compares every feature file it opens, the judged season's included, with round 4's recorded digests before its claim (the build review's HIGH); the judgment compares 2016 to 2023 and records 2024.
