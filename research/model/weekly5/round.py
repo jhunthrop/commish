@@ -342,7 +342,7 @@ def _fit_sources(fit: FitReads) -> Sources:
 
 def _isolation(
     setup: Setup, prepared: Prepared, judged: JudgedReads, fitted: Any, after: Mapping[str, str]
-) -> GateLine:
+) -> tuple[GateLine, dict[str, tuple[int, ...]]]:
     t = setup.t
     fit = prepared.fit
     if fit is None:
@@ -357,7 +357,7 @@ def _isolation(
         gates.PLAYERS: tuple(sorted({*fitted.served["players"], *fit.served, *judged.fit_served})),
         gates.JUDGED: tuple(sorted({*judged.served, t.judgment_season})),
     }
-    return gates.isolation_line(served, prepared.before, after, (held, detail), t)
+    return gates.isolation_line(served, prepared.before, after, (held, detail), t), served
 
 
 def _assessed(fitted: Any, judged: JudgedReads, t: RoundFive, candidate: str) -> tuple[Assessed, pd.DataFrame]:
@@ -394,7 +394,7 @@ def execute(setup: Setup, url: str, features: Path) -> int:
             after = env.digests(conn)
     finally:
         engine.dispose()
-    isolation = _isolation(setup, prepared, judged, fitted, after)
+    isolation, served = _isolation(setup, prepared, judged, fitted, after)
     found = {c: _assessed(fitted, judged, t, c) for c in candidates}
     lines_of = {c: [*a.lines, isolation] for c, (a, _) in found.items()}
     choice = choose({c: a for c, (a, _) in found.items()}) if setup.command == "check" else None
@@ -442,7 +442,7 @@ def execute(setup: Setup, url: str, features: Path) -> int:
         },
         "round_three": {"lines": [asdict(line) for line in judged.lines]},
         "fitted": fitted_payload(fitted),
-        "outcome_seasons_read": {name: list(v) for name, v in _served(isolation).items()},
+        "outcome_seasons_read": {name: list(v) for name, v in served.items()},
         "candidates": {
             c: {
                 "gates": [asdict(g) for g in lines_of[c]],
@@ -466,16 +466,6 @@ def execute(setup: Setup, url: str, features: Path) -> int:
     }
     setup.record.write_text(json.dumps(record, indent=1, default=str))
     return 0 if setup.command == "check" or gates.verdict(lines) else 1
-
-
-def _served(line: GateLine) -> dict[str, list[int]]:
-    """The readers' seasons as G5's line states them (the record names them beside the line)."""
-    found: dict[str, list[int]] = {}
-    for part in line.detail.split("; "):
-        if " outcomes read for " in part:
-            name, seasons = part.split(" outcomes read for ")
-            found[name] = json.loads(seasons) if seasons.startswith("[") else []
-    return found
 
 
 def setup_for(command: Command, environment: Environment) -> Setup:

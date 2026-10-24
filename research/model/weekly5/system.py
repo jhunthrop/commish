@@ -250,7 +250,10 @@ def fit_rest(  # noqa: PLR0913, PLR0917 - the run's every input, named
     data = {
         s: SeasonData(
             s,
-            with_targets(rows[rows["season"] == s].reset_index(drop=True), lined),
+            # Only the fit seasons' rows carry their week's realised components (the trees' targets).
+            with_targets(rows[rows["season"] == s].reset_index(drop=True), lined)
+            if s in t.player_fit_seasons
+            else rows[rows["season"] == s].reset_index(drop=True),
             store.teams[store.teams["season"] == s].reset_index(drop=True),
         )
         for s in seasons
