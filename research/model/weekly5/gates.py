@@ -25,6 +25,7 @@ from research.model.weekly.round.scoring import FORMATS, SKILL_POSITIONS
 from research.model.weekly2 import gates as round_two
 from research.model.weekly2.gates import GateLine, Ordering, Thresholds
 from research.model.weekly3 import gates as round_three
+from research.model.weekly4.gates import CellShares, _inside
 from research.model.weekly5 import decisions
 from research.model.weekly5.decisions import Spreadsheets
 
@@ -220,22 +221,9 @@ def places_lines(model: float | None, benches: Mapping[str, float | None], t: Ro
     return [*lines, *_joined("G3", per_sheet, t.gated_sheets)]
 
 
-@dataclass(frozen=True, slots=True)
-class CellShares:
-    """One G4 cell: the shares of outcomes below the floor, above the ceiling and below the median."""
-
-    below: float | None
-    above: float | None
-    below_median: float | None
-    size: int
-
-
-def _inside(value: float, low: float, high: float) -> bool:
-    return low <= value <= high
-
-
 def calibration_lines(cells: Mapping[str, CellShares], t: RoundFive) -> list[GateLine]:
-    """G4's twelve cells, each with n >= 100: floor and ceiling shares in [0.06, 0.14], the median's in
+    """Round 4's `gates.calibration_lines` line for line, its constant passed in (round 4's reads ROUND_FOUR);
+    G4's twelve cells, each with n >= 100: floor and ceiling shares in [0.06, 0.14], the median's in
     [0.44, 0.56]."""
     lines: list[GateLine] = []
     for position in SKILL_POSITIONS:

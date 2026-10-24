@@ -9,8 +9,9 @@ from types import MappingProxyType
 import pytest
 
 from research.model.weekly2.gates import ChanceBin, Difference, GateLine, Ordering
+from research.model.weekly4.gates import CellShares
 from research.model.weekly5 import decisions, gates
-from research.model.weekly5.gates import DEVELOPMENT_CHECK, GATE_LINES, ROUND_FIVE, CellShares
+from research.model.weekly5.gates import DEVELOPMENT_CHECK, GATE_LINES, ROUND_FIVE
 from research.model.weekly5.judgment import Comparison, gate_lines
 
 POSITIONS = ("QB", "RB", "WR", "TE")
@@ -198,6 +199,18 @@ def test_g5_readers_and_tables(
 ) -> None:
     assert gates.isolation_line(served, before, after, (True, "ok"), ROUND_FIVE).passed is passed
     assert not gates.isolation_line(served, before, after, (False, "broken"), ROUND_FIVE).passed
+
+
+@pytest.mark.parametrize("bound", [0.0, -0.001])
+def test_the_stop_rule_fires_on_a_pooled_line_at_its_margin_with_no_bound_above_zero(bound: float) -> None:
+    """Reading 13 end to end: a G2 or G6 pooled line meeting its margin with its bound at or below 0 stops."""
+    passing = ordering(0.05, 0.01)
+    g2 = gates.ordering_lines("G2", "recent form", ordering(0.05, bound), ROUND_FIVE.form_margin, ROUND_FIVE)
+    g6 = gates.sheet_lines({"sheet": passing, "damped": passing}, ROUND_FIVE)
+    assert gates.stopping([*g2, *g6]) == ["G2 pooled vs recent form"]
+    g2 = gates.ordering_lines("G2", "recent form", passing, ROUND_FIVE.form_margin, ROUND_FIVE)
+    g6 = gates.sheet_lines({"sheet": passing, "damped": ordering(0.05, bound)}, ROUND_FIVE)
+    assert gates.stopping([*g2, *g6]) == ["pooled vs the spreadsheets"]
 
 
 def test_the_stop_rule_reads_g2_pooled_and_g6_pooled_only() -> None:

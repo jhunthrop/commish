@@ -24,8 +24,10 @@ from research.model.domain import StatLine
 from research.model.reads.observations import SeasonStatLine
 from research.model.weekly.round.scoring import FORMATS, form_from_lines, points_by_format
 from research.model.weekly2.statistics import JudgedRow
+from research.model.weekly3 import ledger
 from research.model.weekly3.ledger import InputRuleError, ReadKind
 from research.model.weekly3.work import USAGE_ROWS
+from research.model.weekly4.features import admitted
 from research.model.weekly4.features.admitted import ADMITTED, PLAYS, admit_observations, admit_read
 from research.model.weekly4.features.plays import PLAY_COLUMNS
 from research.model.weekly5.judgment import form_mismatches
@@ -52,9 +54,27 @@ def test_guard_one_the_kickoff_and_weather_lists_are_as_selected() -> None:
 
 @pytest.mark.parametrize("kind", KINDS)
 def test_guard_one_a_week_w_game_result_is_refused_through_every_read_kind(kind: ReadKind) -> None:
-    row = TeamWeekObservation(2021, 7, "KC", "nflverse_kickoff", "game_result", 1.0, KICKOFF)
-    with pytest.raises(InputRuleError):
+    """Stamped an hour before t_g, so neither the stamp rule nor (for a week-W kind) the week rule refuses it:
+    the allow-list does."""
+    row = TeamWeekObservation(2021, 7, "KC", "nflverse_kickoff", "game_result", 1.0, T_G - timedelta(hours=1))
+    with pytest.raises(InputRuleError, match="allow-list refuses"):
         admit_observations(kind, [row], 2021, 7, T_G)
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_guard_one_holds_with_the_week_and_stamp_rules_switched_off(
+    kind: ReadKind, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Lane 156's mutation discipline: with round 3's week and stamp rules off, a week-W `game_result` stamped
+    at the kickoff is still refused through every kind, so the guard proves the allow-list itself; and with the
+    allow-list off too, the same row is admitted, so the test can fail."""
+    monkeypatch.setattr(ledger, "_week_breaks", lambda *args: None)
+    monkeypatch.setattr(ledger, "_stamp_breaks", lambda *args: None)
+    row = TeamWeekObservation(2021, 7, "KC", "nflverse_kickoff", "game_result", 1.0, KICKOFF)
+    with pytest.raises(InputRuleError, match="allow-list refuses"):
+        admit_observations(kind, [row], 2021, 7, T_G)
+    monkeypatch.setattr(admitted, "refused_pairs", lambda kind, pairs: [])
+    assert admit_observations(kind, [row], 2021, 7, T_G).rows == 1
 
 
 @pytest.mark.parametrize(("source", "metric"), USAGE_ROWS)

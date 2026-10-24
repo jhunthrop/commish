@@ -36,7 +36,8 @@ def benchmark_values(
     teams: pd.DataFrame,
     positions: Mapping[str, str],
 ) -> tuple[Values, dict[str, int]]:
-    """Last-three form and both spreadsheets for every population row of the judged season (`lines` and
+    """Round 4's `judgment.benchmark_values` term for term, with the damped sheet beside the preregistered one:
+    last-three form and both spreadsheets for every population row of the judged season (`lines` and
     `teams` that season's), and the rows read without a club."""
     pairing = teams[["week", "club", "opponent"]]
     implied = teams.set_index(["week", "club"])["implied_points"].to_dict()

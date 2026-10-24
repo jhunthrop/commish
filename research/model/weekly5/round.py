@@ -39,6 +39,7 @@ from research.model.ros.scratch import check_scratch_url
 from research.model.weekly2.gates import GateLine
 from research.model.weekly2.guard import guard_queries
 from research.model.weekly2.judge import DOCS
+from research.model.weekly4.features.outcomes import LAST_SERVED
 from research.model.weekly4.files import build_report, load_store
 from research.model.weekly4.system import Store
 from research.model.weekly5 import decisions, gates
@@ -50,6 +51,7 @@ from research.model.weekly5.preconditions import (
     DEPTH_RULE,
     component_mismatches,
     digest_mismatches,
+    file_digests,
     first_team_cells,
     share_mismatches,
 )
@@ -258,11 +260,13 @@ def store_clause(report: Mapping[str, Any], last_season: int) -> tuple[bool, str
         for s in seasons
     )
     later = sorted(int(x) for x in report.get("outcome_seasons_read", []) if int(x) > last_season)
+    beyond = [x for x in later if x > LAST_SERVED]
     detail = (
         f"the store: {broken} broken reads over {len(seasons)} seasons read, clauses {'held' if held else 'broken'}"
         + (f"; its build also read the outcomes of {later} for files this run does not open" if later else "")
+        + (f"; past round 4's builder's last season {LAST_SERVED}: {beyond}" if beyond else "")
     )
-    return broken == 0 and held and bool(seasons), detail
+    return broken == 0 and held and bool(seasons) and not beyond, detail
 
 
 def thresholds_payload(t: RoundFive) -> dict[str, Any]:
@@ -314,7 +318,10 @@ def _prepare(conn: Connection, setup: Setup, features: Path) -> Prepared:
     pre = [s for s in t.player_fit_seasons if s < t.judgment_season]
     store = load_store(features, range(t.team_fit_seasons[0], t.judgment_season), pre)  # 2016 on
     r4 = env.round_four_record()
-    moved = digest_mismatches(store.digests, r4)
+    opened = range(t.team_fit_seasons[0], t.judgment_season + 1)
+    # The judged season's files are hashed here (bytes only) and opened after the claim.
+    hashed = {**file_digests(features, (t.judgment_season,)), **store.digests}
+    moved = digest_mismatches(hashed, r4, opened)
     if moved:
         raise RefusedError("the feature files differ from round 4's development check: " + "; ".join(moved[:3]))
     missing, counts = env.preconditions(conn, t)
@@ -340,8 +347,13 @@ def _fit_sources(fit: FitReads) -> Sources:
     return Sources(fit.rates, fit.lines, fit.forms, fit.fumbles)
 
 
-def _isolation(
-    setup: Setup, prepared: Prepared, judged: JudgedReads, fitted: Any, after: Mapping[str, str]
+def _isolation(  # noqa: PLR0913, PLR0917 - the isolation line's every input, named
+    setup: Setup,
+    prepared: Prepared,
+    judged: JudgedReads,
+    sources: Sources,
+    fitted: Any,
+    after: Mapping[str, str],
 ) -> tuple[GateLine, dict[str, tuple[int, ...]]]:
     t = setup.t
     fit = prepared.fit
@@ -351,7 +363,11 @@ def _isolation(
     store_held = store_clause(prepared.report, t.judgment_season)
     held = (r3 is not None and r3.passed) and fit.clause[0] and store_held[0]
     r3_detail = "none" if r3 is None else r3.detail.split("per-game clause: ")[-1]
-    detail = f"round 3's reads: {r3_detail}; the fit weeks' reads: {fit.clause[1]}; {store_held[1]}"
+    differ = form_mismatches(judged.rows, sources.forms, t.judgment_season)
+    detail = (
+        f"round 3's reads: {r3_detail}; the fit weeks' reads: {fit.clause[1]}; {store_held[1]}; "
+        f"guard 5: {differ} population rows whose rival form differs from G2's (recorded)"
+    )
     served = {
         gates.PLAYS_AND_TEAMS: tuple(fitted.served["plays and teams"]),
         gates.PLAYERS: tuple(sorted({*fitted.served["players"], *fit.served, *judged.fit_served})),
@@ -394,7 +410,7 @@ def execute(setup: Setup, url: str, features: Path) -> int:
             after = env.digests(conn)
     finally:
         engine.dispose()
-    isolation, served = _isolation(setup, prepared, judged, fitted, after)
+    isolation, served = _isolation(setup, prepared, judged, sources, fitted, after)
     found = {c: _assessed(fitted, judged, t, c) for c in candidates}
     lines_of = {c: [*a.lines, isolation] for c, (a, _) in found.items()}
     choice = choose({c: a for c, (a, _) in found.items()}) if setup.command == "check" else None

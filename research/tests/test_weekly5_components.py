@@ -21,7 +21,7 @@ POSITIONS = {"qb": "QB", "wr": "WR", "rb": "RB"}
 def play(kind: str, player: str, play_id: int, **values: float) -> dict[str, object]:
     base = {"season": 2021, "week": 3, "game_id": "g", "play_id": play_id, "kind": kind, "player_id": player,
             "posteam": "KC", "yardline_100": 50.0, "complete_pass": 0.0, "yards_gained": 0.0, "touchdown": 0.0,
-            "interception": 0.0, "sack": 0.0, "xfp_ppr": 1.0}  # fmt: skip
+            "interception": 0.0, "sack": 0.0, "xfp_ppr": 1.0, "air_yards": 5.0}  # fmt: skip
     return {**base, **values}
 
 

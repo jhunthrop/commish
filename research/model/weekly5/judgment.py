@@ -27,11 +27,12 @@ from research.model.weekly2.statistics import (
     places_mean,
     rho_deltas,
 )
+from research.model.weekly4.gates import CellShares
 from research.model.weekly4.scoring import Row, orderings, source_names
 from research.model.weekly5 import gates
 from research.model.weekly5.bands import Bands, band_of, start_over
 from research.model.weekly5.benchmarks import Values
-from research.model.weekly5.gates import CellShares, RoundFive
+from research.model.weekly5.gates import RoundFive
 
 SOURCES: Final = ("model", "form", "last_three", "sheet", "damped", "round_three")
 DECIMALS: Final = 4  # 2.8: "A tie is equality at four decimals, the precision the results record"

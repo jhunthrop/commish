@@ -30,6 +30,7 @@ import pandas as pd
 
 from research.model.weekly4.features.plays import INSIDE_TEN_YARDS, RED_ZONE_YARDS
 from research.model.weekly4.play_model import actual_points, scramble
+from research.model.weekly4.share_model import realised_shares, week_counts
 
 KEY: Final = ["season", "week", "club", "player_id"]
 SUMMED: Final = (
@@ -112,11 +113,12 @@ def player_games(priced: pd.DataFrame, teams: pd.DataFrame, positions: Mapping[s
     games = games.assign(position=games["player_id"].map(positions))
     games = games[games["position"].notna()].reset_index(drop=True)
     qb = (games["position"] == "QB").to_numpy(dtype=float)
-    club = games.groupby(["season", "week", "club"])[["red_zone", "inside_ten", "dropbacks"]].transform("sum")
+    # Round 4's realised shares: his opportunities over his club's, every player's counted (a fullback's too).
+    realised = realised_shares(games, week_counts(priced[priced["player_id"].notna()]))
 
-    def share(column: str) -> np.ndarray:
-        total = club[column].to_numpy(dtype=float)
-        return np.where(total > 0, games[column].to_numpy(dtype=float) / np.maximum(total, 1e-12), 0.0)
+    def share(kind: str) -> np.ndarray:
+        found: np.ndarray = realised[f"y_{kind}"].to_numpy(dtype=float)
+        return found
 
     touchdowns = games[["season", "week", "club"]].merge(
         teams[["season", "week", "club", "rushing_touchdowns", "receiving_touchdowns"]],

@@ -16,8 +16,9 @@ or unequal one refuses the run and is named.
 Round 3's reproduction of its 26 lines is the runner's (`weekly4.round_three.reproduction`).
 """
 
+import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any, Final
@@ -32,6 +33,7 @@ from research.model.weekly5.gates import RoundFive
 from research.model.weekly5.system import Components
 
 ROUND_FOUR_RECORD: Final = DOCS / "2026-10-16-weekly-projection-round4-development-check.json"
+STORE_KINDS: Final = ("players", "teams", "plays")
 DEPTH_RULE: Final = "week"  # 6.3: "the feature files rebuilt with `--depth-chart week`"
 
 
@@ -60,13 +62,31 @@ def recorded(path: Path = ROUND_FOUR_RECORD) -> dict[str, Any]:
     return found
 
 
-def digest_mismatches(digests: Mapping[str, str], record: Mapping[str, Any]) -> list[str]:
-    """Every file round 4's record names that this store reads with another digest."""
+def file_season(name: str) -> int:
+    """The season of a store file (`history-<season>-<kind>.parquet`)."""
+    return int(name.split("-")[1])
+
+
+def file_digests(directory: Path, seasons: Sequence[int]) -> dict[str, str]:
+    """Each store file of `seasons` hashed, bytes only (no row is read for the model)."""
+    found: dict[str, str] = {}
+    for season in seasons:
+        for kind in STORE_KINDS:
+            path = directory / f"history-{season}-{kind}.parquet"
+            if path.exists():
+                found[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return found
+
+
+def digest_mismatches(digests: Mapping[str, str], record: Mapping[str, Any], seasons: Sequence[int]) -> list[str]:
+    """Every file round 4's record names for a season the run opens that this store holds with another digest, or
+    that the run did not hash (6.3: "A missing or unequal one refuses the run and is named")."""
     named = record["features"]["digests"]
+    opened = set(seasons)
     return sorted(
-        f"{name}: {digests[name]} against {digest}"
+        f"{name}: {digests.get(name, 'not checked')} against {digest}"
         for name, digest in named.items()
-        if name in digests and digests[name] != digest
+        if file_season(name) in opened and digests.get(name) != digest
     )
 
 

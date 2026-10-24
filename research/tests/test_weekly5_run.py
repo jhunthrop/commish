@@ -214,3 +214,17 @@ def test_round_fours_unreproduced_components_refuse_before_the_claim(
     setup = _setup("check", built, tmp_path, environment=SyntheticEnvironment(built, moved))
     with pytest.raises(RefusedError, match="differ from round 4"):
         execute(setup, url, store)
+
+
+@pytest.mark.parametrize("kind", ["players", "teams", "plays"])
+def test_a_moved_judged_season_file_refuses_before_the_claim(
+    scratch: tuple[str, Path, synthetic.Built], tmp_path: Path, kind: str
+) -> None:
+    """H1: the check hashes its judged season's files before the claim and compares them with round 4's record."""
+    url, store, built = scratch
+    name = f"history-{synthetic.T.judgment_season}-{kind}.parquet"
+    moved = {**_EMPTY_RECORD, "features": {"digests": {name: "0" * 64}}}
+    setup = _setup("check", built, tmp_path, environment=SyntheticEnvironment(built, moved))
+    with pytest.raises(RefusedError, match=name):
+        execute(setup, url, store)
+    assert not setup.claim.exists()
