@@ -255,5 +255,7 @@ export const STATIC_HEADS = {
 	account: (): HeadMarkup => built(HEAD_WORDS.account, links.account(), { noindex: true }),
 	compare: (): HeadMarkup => built(HEAD_WORDS.compare, links.compare(), { noindex: true }),
 	offline: (): HeadMarkup => built(HEAD_WORDS.offline, resolve('/offline'), { noindex: true }),
+	appSignedIn: (): HeadMarkup =>
+		built(HEAD_WORDS.appSignedIn, resolve('/app/signed-in'), { noindex: true }),
 	notFound: (): HeadMarkup => built(ERROR_WORDS.notFound.lead, null, { noindex: true })
 } as const;

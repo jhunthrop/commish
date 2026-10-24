@@ -90,8 +90,12 @@ jobs:
       - name: Build every nightly page, timed
         if: steps.fresh.outputs.build != 'false'
         # The request API the account page and the sheet's sync call, fixed at build (src/env.ts).
+        # The apps' link claims (scripts/well-known.ts): empty until the founder sets them, and an
+        # empty one claims no app.
         env:
           PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          ANDROID_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
         run: |
           start=$(date +%s)
           npm run build

@@ -124,7 +124,8 @@ export const HEAD_WORDS = {
 	print: 'Your cheat sheet, laid out to print.',
 	account: 'Your Commish account: your leagues, your cheat sheets and your mock drafts.',
 	compare: 'Pick two players to see which one we would take, with their figures side by side.',
-	offline: 'The last board this device saved, for when it has no connection.'
+	offline: 'The last board this device saved, for when it has no connection.',
+	appSignedIn: 'Where the Commish app picks up after you sign in.'
 } as const;
 
 /** A page the browser draws, its title and line, the same for every address under it. */

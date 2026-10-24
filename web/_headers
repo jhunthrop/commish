@@ -29,3 +29,10 @@
 /data/run.txt
   ! Cache-Control
   Cache-Control: no-store
+
+# The app-link association files (Lane 172, scripts/well-known.ts): Apple's has no extension and
+# both must answer as JSON for iOS and Android to verify the apps' links.
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+/.well-known/assetlinks.json
+  Content-Type: application/json
