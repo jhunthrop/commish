@@ -82,8 +82,8 @@ enum WeekBasis {
     }
 
     static func paragraph(_ facts: Facts, cuts: TeamCuts) -> String {
-        let team = facts.board.map { team(facts, board: $0, cuts: cuts) }
-        return [standings(host: facts.host, terms: facts.terms), team].compactMap(\.self).filter { !$0.isEmpty }
+        let teamWords = facts.board.map { Self.team(facts, board: $0, cuts: cuts) }
+        return [standings(host: facts.host, terms: facts.terms), teamWords].compactMap(\.self).filter { !$0.isEmpty }
             .joined(separator: " ")
     }
 
