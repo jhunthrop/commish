@@ -1,7 +1,10 @@
 package app.trycommish.core.signin
 
-import app.trycommish.api.AppPairInput
 import app.trycommish.api.Transport
+import app.trycommish.api.data
+import app.trycommish.api.models.DeviceKind
+import app.trycommish.api.models.PairInput
+import app.trycommish.api.models.Paired
 import app.trycommish.core.Session
 import kotlinx.coroutines.CancellationException
 import java.net.URI
@@ -35,7 +38,7 @@ fun interface Pairing {
     suspend fun pair(
         code: String,
         name: String,
-        kind: String,
+        kind: DeviceKind,
         verifier: String,
     ): PairedDevice
 }
@@ -47,10 +50,14 @@ class ApiPairing(
     override suspend fun pair(
         code: String,
         name: String,
-        kind: String,
+        kind: DeviceKind,
         verifier: String,
     ): PairedDevice {
-        val paired = transport.pair(AppPairInput(code, name, kind, verifier))
+        val paired =
+            transport
+                .devices()
+                .pairDevice(PairInput(code = code, name = name, kind = kind, codeVerifier = verifier))
+                .data<Paired>()
         return PairedDevice(paired.token, paired.device.id.toString())
     }
 }
@@ -93,7 +100,7 @@ class SignIn(
         verifier = made
         val query =
             listOf(
-                "client" to KIND,
+                "client" to KIND.value,
                 "return_to" to returnTo,
                 "code_challenge" to Pkce.challenge(made),
                 "code_challenge_method" to "S256",
@@ -132,7 +139,7 @@ class SignIn(
     }
 
     private companion object {
-        const val KIND = "android"
+        val KIND = DeviceKind.android
 
         /** By name: the Charset overloads need API 33. */
         const val UTF_8 = "UTF-8"

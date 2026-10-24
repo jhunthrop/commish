@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -67,6 +68,8 @@ fun RootTabs(
     }
 }
 
+private const val LABEL_LEADING = 1.1f
+
 /** Opens a tab with its own back stack restored, never a second copy of it. */
 fun NavHostController.open(tab: Tab) {
     navigate(tab.route) {
@@ -91,8 +94,10 @@ private fun Bar(
                 label = {
                     Text(
                         stringResource(tab.label),
-                        style = Faces.label.copy(letterSpacing = Faces.small.letterSpacing),
-                        maxLines = 1,
+                        // "Rest of season" is the longest: two short lines, never cut.
+                        style = Faces.label.copy(letterSpacing = Faces.small.letterSpacing, lineHeight = Faces.label.fontSize * LABEL_LEADING),
+                        maxLines = 2,
+                        textAlign = TextAlign.Center,
                     )
                 },
                 colors =

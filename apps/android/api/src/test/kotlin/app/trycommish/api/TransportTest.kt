@@ -1,6 +1,9 @@
 package app.trycommish.api
 
+import app.trycommish.api.models.DeviceKind
 import app.trycommish.api.models.LeagueSync
+import app.trycommish.api.models.PairInput
+import app.trycommish.api.models.Paired
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -66,7 +69,9 @@ class TransportTest {
                 }
             val result =
                 Transport("http://api.test", engine, token = { null })
-                    .pair(AppPairInput(code = "c0de", name = "Pixel 8", kind = "android", codeVerifier = "v3rifier"))
+                    .devices()
+                    .pairDevice(PairInput(code = "c0de", name = "Pixel 8", kind = DeviceKind.android, codeVerifier = "v3rifier"))
+                    .data<Paired>()
             assertEquals("/devices/pair", path)
             assertEquals("""{"code":"c0de","name":"Pixel 8","kind":"android","code_verifier":"v3rifier"}""", sent)
             assertEquals("tok_new", result.token)

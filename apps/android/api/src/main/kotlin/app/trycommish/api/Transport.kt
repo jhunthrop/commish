@@ -3,23 +3,15 @@ package app.trycommish.api
 import app.trycommish.api.apis.DevicesApi
 import app.trycommish.api.apis.LeagueSyncApi
 import app.trycommish.api.infrastructure.HttpResponse
-import app.trycommish.api.models.Paired
-import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
-import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import java.util.UUID
 
 /** The header the API logs a request under, so a member's report finds its line. */
@@ -57,33 +49,7 @@ class Transport(
     fun leagueSync(): LeagueSyncApi = LeagueSyncApi(baseUrl, engine, config)
 
     fun devices(): DevicesApi = DevicesApi(baseUrl, engine, config)
-
-    private val client by lazy { HttpClient(engine, config) }
-
-    /**
-     * Trades the sign-in's pairing code for this device's token (`POST /devices/pair`). Written by
-     * hand while the generated PairInput lacks `kind` and `code_verifier` (Task B adds them to
-     * api/openapi.yaml); once it carries them this calls `devices().pairDevice`.
-     */
-    suspend fun pair(input: AppPairInput): Paired {
-        val response =
-            client.post("${baseUrl.trimEnd('/')}/devices/pair") {
-                contentType(ContentType.Application.Json)
-                setBody(input)
-            }
-        return decodeEnvelope(response.bodyAsText(), response.status.value)
-    }
 }
-
-/** The pairing body an app sends: the code from the sign-in's return link, the device's name, the
- * app's kind (ios, android) and the PKCE verifier the sign-in began with. */
-@Serializable
-data class AppPairInput(
-    val code: String,
-    val name: String,
-    val kind: String,
-    @SerialName("code_verifier") val codeVerifier: String,
-)
 
 /** The envelope's data from a generated call's answer, or the API's failure. */
 suspend inline fun <reified T> HttpResponse<*>.data(): T = decodeEnvelope(response.bodyAsText(), status)

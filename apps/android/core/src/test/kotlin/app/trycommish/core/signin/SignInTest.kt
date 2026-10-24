@@ -1,5 +1,6 @@
 package app.trycommish.core.signin
 
+import app.trycommish.api.models.DeviceKind
 import app.trycommish.core.MemorySession
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -27,10 +28,10 @@ class SignInTest {
         override suspend fun pair(
             code: String,
             name: String,
-            kind: String,
+            kind: DeviceKind,
             verifier: String,
         ): PairedDevice {
-            calls += listOf(code, name, kind, verifier)
+            calls += listOf(code, name, kind.value, verifier)
             if (fail) throw IOException("offline")
             return PairedDevice(token = "tok_new", deviceId = "dev-1")
         }
