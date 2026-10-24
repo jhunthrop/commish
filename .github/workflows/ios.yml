@@ -35,8 +35,6 @@ permissions:
   contents: read
 
 env:
-  # The newest iPhone simulator the selected Xcode carries is picked in the step that builds.
-  SIMULATOR_OS: latest
   # XcodeGen pinned by version and checksum, as the actions are by SHA.
   XCODEGEN_VERSION: 2.46.0
   XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
@@ -130,11 +128,22 @@ jobs:
           "$RUNNER_TEMP/xcodegen/bin/xcodegen" generate
       - name: Build and test
         run: |
-          # The first available iPhone simulator of the selected Xcode's newest runtime.
-          device="$(xcrun simctl list devices available | grep -m 1 -o 'iPhone [^(]*' | sed 's/ *$//')"
-          echo "Simulator: $device"
+          # The first available iPhone under the newest iOS runtime the selected Xcode carries, by its
+          # id: simctl's JSON is keyed by runtime, and the runtimes are ordered by version, not listed.
+          udid="$(xcrun simctl list devices available -j | python3 -c '
+          import json, re, sys
+          devices = json.load(sys.stdin)["devices"]
+          def version(runtime):
+              return tuple(int(n) for n in re.findall(r"\d+", runtime.rsplit("iOS-", 1)[-1]))
+          runtimes = sorted((r for r in devices if ".SimRuntime.iOS-" in r), key=version)
+          phones = [d for d in devices[runtimes[-1]] if d["name"].startswith("iPhone")] if runtimes else []
+          if not phones:
+              sys.exit("No available iPhone simulator under an iOS runtime.")
+          print("Simulator:", phones[0]["name"], "on", runtimes[-1], file=sys.stderr)
+          print(phones[0]["udid"])
+          ')"
           xcodebuild -project Commish.xcodeproj -scheme Commish \
-            -destination "platform=iOS Simulator,name=$device,OS=$SIMULATOR_OS" \
+            -destination "platform=iOS Simulator,id=$udid" \
             -derivedDataPath build/DerivedData -skipPackagePluginValidation -skipMacroValidation \
             CODE_SIGNING_ALLOWED=NO build test
       - name: TestFlight upload
