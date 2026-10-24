@@ -28,12 +28,17 @@ void test('a quote, a backslash, a newline and a dollar are escaped in both lang
 	const { swift, kotlin } = renderWords([
 		{ name: 'Odd', table: { said: 'He said "go"\nthen $5 \\ more' } }
 	]);
-	assert.ok(swift.includes('public static let said = "He said \\"go\\"\\nthen $5 \\\\ more"'), swift);
+	assert.ok(
+		swift.includes('public static let said = "He said \\"go\\"\\nthen $5 \\\\ more"'),
+		swift
+	);
 	assert.ok(kotlin.includes('const val said = "He said \\"go\\"\\nthen \\$5 \\\\ more"'), kotlin);
 });
 
 void test("a key that is the language's keyword is quoted the language's way", () => {
-	const { swift, kotlin } = renderWords([{ name: 'K', table: { when: 'When', default: 'Default' } }]);
+	const { swift, kotlin } = renderWords([
+		{ name: 'K', table: { when: 'When', default: 'Default' } }
+	]);
 	assert.match(kotlin, /const val `when` = "When"/);
 	assert.match(swift, /public static let `default` = "Default"/);
 });

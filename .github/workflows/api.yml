@@ -7,9 +7,9 @@ name: api
 on:
   push:
     branches: [main]
-    paths: ['api/**', 'go.work', 'web/src/lib/api/types.ts', '.github/workflows/api.yml']
+    paths: ['api/**', 'go.work', 'web/src/lib/api/types.ts', 'shared/**', 'web/src/lib/ui/tokens.generated.css', 'web/src/lib/league/home/home.ts', 'web/src/fixtures/**', 'web/scripts/inseason-fixture/**', '.github/workflows/api.yml']
   pull_request:
-    paths: ['api/**', 'go.work', 'web/src/lib/api/types.ts', '.github/workflows/api.yml']
+    paths: ['api/**', 'go.work', 'web/src/lib/api/types.ts', 'shared/**', 'web/src/lib/ui/tokens.generated.css', 'web/src/lib/league/home/home.ts', 'web/src/fixtures/**', 'web/scripts/inseason-fixture/**', '.github/workflows/api.yml']
   workflow_dispatch:
 
 # Deploys run one at a time and never cancel each other mid-migration.
@@ -67,13 +67,16 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with: { go-version-file: api/go.mod, cache-dependency-path: api/go.sum }
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with: { node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json }
+        # 24: the shared generators run as TypeScript and read import.meta.main (shared/scripts).
+        with: { node-version: 24, cache: npm, cache-dependency-path: web/package-lock.json }
       - name: gofmt
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
       - run: go vet ./...
       - run: go build ./...
-      - name: The generated Go and TypeScript types match openapi.yaml
+      - name: The generated Go and TypeScript types match openapi.yaml, the shared tokens, words and fixtures their sources
         run: make check-gen
+      - name: The shared generators' tests
+        run: node --test ../shared/scripts/*.test.ts
         # -p 1: the database-backed packages share one database and each
         # resets the app schema.
       - run: go test -race -p 1 ./...

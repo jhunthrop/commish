@@ -62,7 +62,8 @@ function split(table: WordTable, name: string): Split {
 	const strings: [string, string][] = [];
 	const functions: string[] = [];
 	for (const [key, value] of Object.entries(table)) {
-		if (!IDENTIFIER.test(key)) throw new Error(`${name}.${key} is not an identifier the apps can use.`);
+		if (!IDENTIFIER.test(key))
+			throw new Error(`${name}.${key} is not an identifier the apps can use.`);
 		if (typeof value === 'string') strings.push([key, value]);
 		else if (typeof value === 'function') functions.push(key);
 		else throw new Error(`${name}.${key} is a ${typeof value}, not a string or a function.`);
@@ -86,7 +87,10 @@ export function renderWords(tables: readonly NamedTable[]): { swift: string; kot
 		.map(
 			({ name, strings }) =>
 				`    public enum ${name} {\n${strings
-					.map(([key, text]) => `        public static let ${swiftKey(key)} = ${stringLiteral(text, 'swift')}`)
+					.map(
+						([key, text]) =>
+							`        public static let ${swiftKey(key)} = ${stringLiteral(text, 'swift')}`
+					)
 					.join('\n')}\n    }`
 		)
 		.join('\n\n');
@@ -94,7 +98,10 @@ export function renderWords(tables: readonly NamedTable[]): { swift: string; kot
 		.map(
 			({ name, strings }) =>
 				`    object ${name} {\n${strings
-					.map(([key, text]) => `        const val ${kotlinKey(key)} = ${stringLiteral(text, 'kotlin')}`)
+					.map(
+						([key, text]) =>
+							`        const val ${kotlinKey(key)} = ${stringLiteral(text, 'kotlin')}`
+					)
 					.join('\n')}\n    }`
 		)
 		.join('\n\n');

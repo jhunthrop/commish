@@ -66,7 +66,10 @@ export const SWIFT_TYPE_ENUM = 'TypeScale';
 
 /** `inkStrong2` as the web names it: `ink-strong-2`. */
 export function kebab(name: string): string {
-	return name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').replace(/([a-zA-Z])(\d)/g, '$1-$2').toLowerCase();
+	return name
+		.replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+		.replace(/([a-zA-Z])(\d)/g, '$1-$2')
+		.toLowerCase();
 }
 
 function isPair(token: ColorToken): token is PairColor {
@@ -84,7 +87,8 @@ function resolveColors(colors: Tokens['color']): Map<string, Record<Theme, strin
 		const done = resolved.get(name);
 		if (done) return done;
 		const token = colors[name];
-		if (token === undefined) throw new Error(`color.${from} names color.${name}, which is not a token.`);
+		if (token === undefined)
+			throw new Error(`color.${from} names color.${name}, which is not a token.`);
 		if (resolving.has(name)) throw new Error(`color.${name} refers back to itself.`);
 		resolving.add(name);
 		const value = colorValue(name, token, (other) => resolve(other, name));
@@ -290,7 +294,8 @@ ${[
 /** The three files from the tokens, or an error naming the token that is wrong. */
 export function render(tokens: Tokens): Rendered {
 	for (const [key, note] of Object.entries(tokens.notes ?? {})) {
-		if (note.includes('*/')) throw new Error(`notes.${key} would close the comment it is carried in.`);
+		if (note.includes('*/'))
+			throw new Error(`notes.${key} would close the comment it is carried in.`);
 	}
 	const colors = resolveColors(tokens.color);
 	return {
