@@ -96,6 +96,22 @@ def default_counts(scored: pd.DataFrame, rows: Sequence[Row], t: RoundFive) -> d
     return counts
 
 
+def fit_defaults(fitted: Fitted, t: RoundFive) -> dict[str, Any]:
+    """2.12's defaults on each fit season's fit rows (lined, weeks 4 to 17): no game this season, a quarterback
+    with no carry, a quantity at n_eff = 0, and every store indicator."""
+    found: dict[str, Any] = {}
+    for season in t.player_fit_seasons:
+        rows = fitted.data[season].rows
+        rows = rows[(rows["lined"] == 1) & rows["week"].isin(t.fit_weeks)]
+        indicators = [c for c in rows.columns if c.startswith("default_")]
+        found[str(season)] = {
+            "rows": len(rows),
+            "no_game_this_season": int(rows["default_no_game_this_season"].fillna(0).sum()),
+            "store_defaults": {c.removeprefix("default_"): int(rows[c].fillna(0).sum()) for c in indicators},
+        }
+    return found
+
+
 def team_residuals(fitted: Fitted) -> dict[str, dict[str, float]]:
     """The team model's mean residual (realised less expected) by season and target."""
     found: dict[str, dict[str, float]] = {}
@@ -175,6 +191,7 @@ def reported(  # noqa: PLR0913, PLR0917 - the reported views' every input, named
     return {
         "ablations": ablations(fitted, t, candidate, rows, judged),
         "defaults": default_counts(scored, rows, t),
+        "defaults_fit_rows": fit_defaults(fitted, t),
         "no_play_evidence": no_play(fitted, t, r3_rows),
         "team_residual_by_season": team_residuals(fitted),
         "questionable": questionable(fitted, t),
