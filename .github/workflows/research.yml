@@ -17,6 +17,7 @@ on:
       - "web/src/lib/types/player.ts"
       - "web/src/lib/format/**"
       - "api/internal/figurewords/words.json"
+      - "shared/words/banned-words.json"
       - "web/package-lock.json"
       - "research-ts/**"
       - "drizzle/**"
@@ -38,6 +39,7 @@ on:
       - "web/src/lib/types/player.ts"
       - "web/src/lib/format/**"
       - "api/internal/figurewords/words.json"
+      - "shared/words/banned-words.json"
       - "web/package-lock.json"
       - "research-ts/**"
       - "drizzle/**"
@@ -184,10 +186,12 @@ jobs:
           context: research
           file: research/Dockerfile
           # The web's run contract, which the nightly's schema gate runs (research/nightly/schema_gate.py),
-          # and the API's words file its format modules import (research/Dockerfile, the web-contract stage).
+          # the API's words file its format modules import, and the site's banned list the writer reads
+          # (research/Dockerfile, the web-contract stage).
           build-contexts: |
             web=web
             api=api
+            shared=shared
           build-args: VERSION=${{ github.sha }}
           load: true
           tags: ${{ env.IMAGE }}

@@ -18,7 +18,11 @@ const DOCKERFILE = join(REPOSITORY, 'research/Dockerfile');
 const RUN_CONTRACT = join(REPOSITORY, 'research/nightly/contract/run-contract.ts');
 const STAGE = 'web-contract';
 // The named build contexts the stage copies from (research.yml's build-contexts), by repository path.
-const CONTEXTS: Readonly<Record<string, string>> = { web: WEB_ROOT, api: join(REPOSITORY, 'api') };
+const CONTEXTS: Readonly<Record<string, string>> = {
+	web: WEB_ROOT,
+	api: join(REPOSITORY, 'api'),
+	shared: join(REPOSITORY, 'shared')
+};
 // What the gate imports (run-contract.ts loads the reader), and the type module the stage copies beside it.
 const ENTRIES = ['src/lib/server/run.ts', 'src/lib/types/player.ts'];
 const LIB_PREFIX = '#lib/';
@@ -249,12 +253,13 @@ const SITE_WORDS = readFileSync(join(REPOSITORY, 'research/capsules/site_words.p
 const LIST_PATH = /LIST_PATH: Final = Path\("([^"]+)"\)/.exec(SITE_WORDS)?.[1] ?? '';
 
 void test("the site's banned list is copied where the writer reads it in the image", () => {
-	assert.equal(LIST_PATH, 'src/lib/format/banned-words.json');
+	// Beside the web's copy, where the repository holds it (shared/words, Lane 171).
+	assert.equal(LIST_PATH, '../shared/words/banned-words.json');
 	assert.ok(existsSync(join(WEB_ROOT, LIST_PATH)), LIST_PATH);
 	assert.equal(imagePath(stage, join(WEB_ROOT, LIST_PATH)), posix.join(stage.workdir, LIST_PATH));
 	const without: Stage = {
 		...stage,
-		copies: stage.copies.filter((copy) => !copy.source.endsWith(join('src', 'lib', 'format')))
+		copies: stage.copies.filter((copy) => !copy.source.endsWith('banned-words.json'))
 	};
 	assert.equal(imagePath(without, join(WEB_ROOT, LIST_PATH)), null);
 });

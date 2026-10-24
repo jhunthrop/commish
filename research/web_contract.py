@@ -3,7 +3,8 @@
 The nightly's schema gate drives the web's own reader (`nightly/schema_gate.py`), and the writer reads
 the site's one banned list (`capsules/site_words.py`). In the research image the web-contract stage
 copies them into `WEB_CONTRACT_DIR` (research/Dockerfile: `src/lib/run`, `src/lib/format` and the
-reader); in a developer's tree they are the repository's own web/.
+reader), with the banned list beside it at `../shared/words`; in a developer's tree they are the
+repository's own web/ and shared/.
 """
 
 import os

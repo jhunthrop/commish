@@ -1,10 +1,11 @@
 """THE SITE'S ONE BANNED LIST, read by the writer: the words and marks the site never prints.
 
 The site's copy guard (`web/src/lib/format/copy-guard.ts`) and the writer read one file,
-`web/src/lib/format/banned-words.json` (the sweep of 2026-10-20, C7 and Y6: "15 total touchdowns" and
+`shared/words/banned-words.json` (the sweep of 2026-10-20, C7 and Y6: "15 total touchdowns" and
 "holding this line" passed the writer and tripped the site). The writer refuses every word on it, so
 prose that passes the writer passes the site. The file is the web contract's (`research.web_contract`):
-the research image's web-contract stage copies `src/lib/format` whole.
+the research image's web-contract stage copies it beside the web's copy, as the repository holds it
+(`../shared/words` from the web contract, Lane 171).
 
 Each word is a pattern fragment matched whole and in any case, keyed to the word a reader sees; the
 betting line spares the field's own lines (the goal line, the offensive and defensive line, the O-line
@@ -20,7 +21,7 @@ from typing import Final, cast
 
 from research.web_contract import contract_dir
 
-LIST_PATH: Final = Path("src/lib/format/banned-words.json")
+LIST_PATH: Final = Path("../shared/words/banned-words.json")
 _WORD_GROUPS: Final = ("bettingOnly", "bettingShared", "trading", "platform")
 
 

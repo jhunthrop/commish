@@ -127,7 +127,7 @@ func TestWebhookStaysLiveInTheFreeSeason(t *testing.T) {
 
 // The free season's sentence passes the site's copy rules: no trading or
 // betting word, no platform word, no dash between clauses, no semicolon
-// (web/src/lib/format/banned-words.json).
+// (shared/words/banned-words.json).
 func TestFreeSeasonWordsPassTheCopyRules(t *testing.T) {
 	banned := regexp.MustCompile(`(?i)\b(markets?|prices?|priced|buy|buys|buying|sell|sells|selling|stock|hosts?|totals?|odds|bets?)\b|[—–;]`)
 	if m := banned.FindString(freeSeasonWords); m != "" {

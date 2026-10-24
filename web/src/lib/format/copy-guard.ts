@@ -2,10 +2,11 @@
  * (member-facing copy names the platform, never "host"), whole words, any case. One list for every
  * guard that reads the site's copy (Lane 66n re-review N5, re-review 2 F1, Lane 66q): every test and
  * shots script that guards copy reads it here. A guard with words of its own composes this list with
- * them (bannedIn), never a second list. The list itself is banned-words.json, which the research
- * writer reads too (research/capsules/site_words.py, the sweep's C7 and Y6), so prose that passes the
- * writer passes the site. */
-import LIST from './banned-words.json' with { type: 'json' };
+ * them (bannedIn), never a second list. The list itself is shared/words/banned-words.json (moved there
+ * for the apps' word tests, Lane 171), which the research writer reads too
+ * (research/capsules/site_words.py, the sweep's C7 and Y6), so prose that passes the writer passes the
+ * site. */
+import LIST from '../../../../shared/words/banned-words.json' with { type: 'json' };
 
 /** The one list's shape: each word a pattern fragment keyed to the word as a reader sees it, the
  * betting line with the field's own lines it spares, and the marks. */
