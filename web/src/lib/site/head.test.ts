@@ -46,9 +46,13 @@ void test('the share set: the og tags with the card at its size, and the large c
 });
 
 void test('a page served at any address names no canonical or og:url', () => {
-	const tags = shareTags({ ...HEAD, path: null }).map((tag) => tag.id);
-	assert.ok(!tags.includes('og:url'));
-	assert.doesNotMatch(headHtml({ ...HEAD, path: null }), /canonical/);
+	const anywhere = { ...HEAD, ...pageMeta('One sentence.', null) };
+	assert.ok(!shareTags(anywhere).some((tag) => tag.id === 'og:url'));
+	assert.doesNotMatch(headHtml(anywhere), /canonical/);
+	// A page whose share opens another address than its canonical one (a member's league).
+	const shared = headHtml({ ...HEAD, ...pageMeta('One.', '/league/', { sharePath: '/league/x' }) });
+	assert.match(shared, /rel="canonical" href="https:\/\/trycommish\.app\/league\/"/);
+	assert.match(shared, /og:url" content="https:\/\/trycommish\.app\/league\/x"/);
 });
 
 void test("the Worker's head escapes its words and keeps a member's page out of search", () => {

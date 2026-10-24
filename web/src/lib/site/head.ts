@@ -36,6 +36,9 @@ export interface PageMeta {
 	/** Its canonical address on the site, a path with no query string; null on a page served at any
 	 * address (the not-found page), which names none. */
 	path: string | null;
+	/** The address a share opens (og:url): the canonical one, except on a page the browser draws,
+	 * whose canonical names its section and whose share opens the member's own league or report. */
+	sharePath: string | null;
 	/** A player's page is a profile, every other page a website. */
 	type: 'website' | 'profile';
 	card: ShareCard;
@@ -58,6 +61,8 @@ export type HeadMarkup = string;
 export interface ShellHead {
 	title: string;
 	markup: HeadMarkup;
+	/** The whole document title, printed as is in place of "<title> · Commish": the front door's. */
+	fullTitle?: string;
 }
 
 /** A page's meta with the defaults said once: a website, the site's card, no data, indexed. */
@@ -69,12 +74,16 @@ export function pageMeta(
 	return {
 		description,
 		path,
+		sharePath: more.sharePath ?? path,
 		type: more.type ?? 'website',
 		card: more.card ?? 'site',
 		structured: more.structured ?? null,
 		noindex: more.noindex ?? false
 	};
 }
+
+/** The front door's whole title, printed as is: the site's name first, what it is after. */
+export const FRONT_TITLE = `${SITE_NAME}${TITLE_JOIN}fantasy football rankings`;
 
 /** "Puka Nacua · Commish". */
 export function documentTitle(name: string): string {
@@ -101,7 +110,7 @@ export function shareTags(meta: PageMeta): ShareTag[] {
 	const og = (id: string, content: string): ShareTag => ({ key: 'property', id, content });
 	return [
 		og('og:description', meta.description),
-		...(meta.path === null ? [] : [og('og:url', siteUrl(meta.path))]),
+		...(meta.sharePath === null ? [] : [og('og:url', siteUrl(meta.sharePath))]),
 		og('og:site_name', SITE_NAME),
 		og('og:type', meta.type),
 		og('og:image', siteUrl(card.path)),

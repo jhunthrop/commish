@@ -85,10 +85,12 @@ export function personData(player: {
 	};
 }
 
-/** The rankings page's order, its first RANKINGS_LIST_SIZE players at their places. */
+/** The rankings page's order, its first RANKINGS_LIST_SIZE ranked players, each at the overall rank
+ * the page prints beside him (fix round 1, M2). A player on a season-long list shows a word there,
+ * never a number, so the caller leaves him out and the ranks after him keep the page's numbers. */
 export function itemListData(
 	name: string,
-	players: readonly { name: string; path: string }[]
+	players: readonly { name: string; path: string; rank: number }[]
 ): ItemListData {
 	const shown = players.slice(0, RANKINGS_LIST_SIZE);
 	return {
@@ -96,9 +98,9 @@ export function itemListData(
 		'@type': 'ItemList',
 		name,
 		numberOfItems: shown.length,
-		itemListElement: shown.map((player, at) => ({
+		itemListElement: shown.map((player) => ({
 			'@type': 'ListItem',
-			position: at + 1,
+			position: player.rank,
 			url: siteUrl(player.path),
 			name: player.name
 		}))
@@ -162,9 +164,12 @@ function itemListFaults(data: ItemListData): string[] {
 		...(items.length > 0 ? [] : ['ItemList has no itemListElement']),
 		...(data.numberOfItems === items.length ? [] : ['ItemList numberOfItems is not its length']),
 		...items.flatMap((item: { '@type': string; position: number; url: string }, at) =>
-			item['@type'] === 'ListItem' && item.position === at + 1 && isUrl(item.url)
+			item['@type'] === 'ListItem' &&
+			Number.isInteger(item.position) &&
+			item.position > (items[at - 1]?.position ?? 0) &&
+			isUrl(item.url)
 				? []
-				: [`ItemList item ${String(at + 1)} lacks its position or url`]
+				: [`ItemList item ${String(at + 1)} lacks a rising position or its url`]
 		)
 	];
 }

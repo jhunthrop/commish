@@ -37,16 +37,25 @@ void test("a player's Person names his position at his club, his page, his face 
 	assert.equal(free.jobTitle, 'WR');
 });
 
-void test("the rankings page's ItemList is its first 50, each at its place with its page", () => {
+void test("the rankings page's ItemList is its first 50, each at the overall rank the page prints", () => {
+	// The player ranked 4th is on a season-long list: the page prints a word in his place, so he is
+	// left out, and the ranks after him keep the page's numbers (fix round 1, M2).
 	const players = Array.from({ length: 80 }, (_, at) => ({
-		name: `Player ${String(at)}`,
-		path: `/players/p-${String(at)}`
-	}));
+		name: `Player ${String(at + 1)}`,
+		path: `/players/p-${String(at + 1)}`,
+		rank: at + 1
+	})).filter((player) => player.rank !== 4);
 	const list = itemListData('Our 2026 order, top 50', players);
 	assert.deepEqual(structuredFaults(list), []);
 	assert.equal(list.itemListElement.length, RANKINGS_LIST_SIZE);
-	assert.equal(list.itemListElement[0]?.position, 1);
-	assert.equal(list.itemListElement[49]?.url, 'https://trycommish.app/players/p-49');
+	assert.deepEqual(
+		list.itemListElement.slice(0, 4).map((item) => item.position),
+		[1, 2, 3, 5]
+	);
+	assert.equal(list.itemListElement[4]?.url, 'https://trycommish.app/players/p-6');
+	assert.equal(list.itemListElement[49]?.position, 51);
+	const falling = { ...list, itemListElement: [...list.itemListElement].reverse() };
+	assert.ok(structuredFaults(falling).length > 0);
 });
 
 void test('the record is a Dataset with a description, a day interval and its address', () => {
@@ -81,7 +90,7 @@ void test('the check names each missing field', () => {
 		'Person has no name',
 		'Person has no url'
 	]);
-	const list = itemListData('List', [{ name: 'A', path: '/players/a' }]);
+	const list = itemListData('List', [{ name: 'A', path: '/players/a', rank: 1 }]);
 	assert.deepEqual(structuredFaults({ ...list, itemListElement: [] }), [
 		'ItemList has no itemListElement',
 		'ItemList numberOfItems is not its length'

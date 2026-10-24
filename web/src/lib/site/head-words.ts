@@ -138,7 +138,7 @@ export const WORKER_HEADS = {
 	league: {
 		title: 'Your league',
 		description:
-			"Your league on our board: your roster, this week's matchup and your league's free agents, kept up to date. Free."
+			"Your league on our board: your roster, this week's matchup and your league's free agents, kept up to date."
 	},
 	mock: {
 		title: 'Mock draft',
@@ -157,6 +157,9 @@ export const WORKER_HEADS = {
 	}
 } as const satisfies Record<string, WorkerHead>;
 export type WorkerSection = keyof typeof WORKER_HEADS;
+
+/** The league's line in the free season, which /pass says at the same clock (pass/free-season.ts). */
+export const LEAGUE_FREE = 'Free through the 2026 season.';
 
 function lowered(text: string): string {
 	return text.charAt(0).toLowerCase() + text.slice(1);

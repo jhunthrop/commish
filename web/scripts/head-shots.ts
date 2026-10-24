@@ -8,6 +8,7 @@
 // with the site built and served by the Worker (scripts/shots.ts starts both).
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { canonicalPathOf } from '../src/lib/server/worker-head.ts';
 import { robotsTxt } from '../src/lib/site/crawl.ts';
 import { SITE_ORIGIN } from '../src/lib/site/origins.ts';
 import { structuredFaults, type StructuredData } from '../src/lib/site/structured-data.ts';
@@ -31,7 +32,7 @@ const PRERENDERED = [
 	'/pass',
 	'/terms'
 ] as const;
-const DRAWN = ['/league/fixture-league', '/mock/new'] as const;
+const DRAWN = ['/league/fixture-league', '/mock/new', '/mock/share/fixture-share'] as const;
 
 interface Head {
 	path: string;
@@ -85,8 +86,13 @@ async function readHead(path: string): Promise<Head> {
 	for (const data of structured)
 		for (const missing of structuredFaults(data)) fault(`${path}: ${missing}`);
 	const canonical = canonicals[0]?.[1] ?? null;
-	if (canonical !== null && canonical !== `${SITE_ORIGIN}${path === '/' ? '/' : path}`)
-		fault(`${path}: canonical ${canonical}`);
+	// A page the browser draws names its section canonical, never a member's id, and its share is the
+	// request's own address (fix round 1, M1).
+	const drawn = (DRAWN as readonly string[]).includes(path);
+	if (canonical !== `${SITE_ORIGIN}${drawn ? canonicalPathOf(path) : path}`)
+		fault(`${path}: canonical ${String(canonical)}`);
+	if (tags['og:url'] !== `${SITE_ORIGIN}${path}`)
+		fault(`${path}: og:url ${String(tags['og:url'])}`);
 	return {
 		path,
 		title: titles[0] ?? '',

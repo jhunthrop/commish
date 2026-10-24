@@ -4,7 +4,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedIn } from '#lib/format/copy-guard.ts';
-import { HEAD_WORDS, WORKER_HEADS, type BoardFacts, type PlayerFacts } from './head-words.ts';
+import {
+	HEAD_WORDS,
+	LEAGUE_FREE,
+	WORKER_HEADS,
+	type BoardFacts,
+	type PlayerFacts
+} from './head-words.ts';
 import { LLMS_ABOUT } from './crawl.ts';
 
 const PUKA: PlayerFacts = {
@@ -49,6 +55,7 @@ function everySentence(): string[] {
 		HEAD_WORDS.compare,
 		HEAD_WORDS.offline,
 		LLMS_ABOUT,
+		LEAGUE_FREE,
 		...Object.values(WORKER_HEADS).flatMap((head) => [head.title, head.description])
 	];
 }
@@ -94,7 +101,7 @@ void test('every sentence is one sentence, free of the banned words and marks', 
 		assert.ok(sentence.trim() === sentence && sentence.length > 0, sentence);
 	}
 	for (const head of Object.values(WORKER_HEADS)) {
-		assert.match(head.description, /^[^.]+\.( Free\.)?$/, head.description);
+		assert.match(head.description, /^[^.]+\.$/, head.description);
 	}
 });
 

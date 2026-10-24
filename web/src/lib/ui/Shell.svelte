@@ -111,7 +111,7 @@
 	</a>
 {/snippet}
 
-{#if head}<HeadTags title={head.title} markup={head.markup} />{/if}
+{#if head}<HeadTags title={head.title} markup={head.markup} fullTitle={head.fullTitle} />{/if}
 
 <div class="app">
 	<!-- The rail follows the season (spec 2026-10-16 §2): every item is drawn in one order every

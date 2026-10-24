@@ -21,8 +21,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const rail = building
 		? await (await import('#lib/server/site-rail.ts')).buildSiteRail(new Date(buildInstant()))
 		: null;
-	// A page the browser draws answers with its section's head, so an unfurl reads a title (Lane 169).
-	const head = building ? '' : (workerHeadHtml(event.url.pathname) ?? '');
+	// A page the browser draws answers with its section's head, so an unfurl reads a title (Lane 169),
+	// at the request's clock (build-clock.ts: each request its own outside a build).
+	const head = building ? '' : (workerHeadHtml(event.url.pathname, new Date(buildInstant())) ?? '');
 	return resolve(event, {
 		transformPageChunk: ({ html }) => pageChunk(html, rail, head),
 		preload: ({ type }) => type === 'css'

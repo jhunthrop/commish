@@ -60,9 +60,24 @@ function clubName(clubs: readonly Club[], abbr: string): string {
 	return `${club.city} ${club.nickname}`;
 }
 
-/** His week ahead, the card's (player-card.ts weekAhead): the game with its opponent named, or his bye. */
-function weekGame(season: PlayerSeason | null, clubs: readonly Club[]): WeekGame | null {
-	const row = season === null ? null : weekAhead(season);
+/** His week ahead, the card's (player-card.ts weekAhead): the game with its opponent named, or his bye.
+ * A week before the one the board ranks from is passed over for his first game or bye from it, so his
+ * line never names a week the rankings page has left behind when his log lags the run (fix round 1,
+ * L2). */
+function weekGame(
+	season: PlayerSeason | null,
+	clubs: readonly Club[],
+	fromWeek: number | undefined
+): WeekGame | null {
+	const ahead = season === null ? null : weekAhead(season);
+	const row =
+		season !== null && ahead !== null && fromWeek !== undefined && ahead.week < fromWeek
+			? (season.log.find(
+					(entry) =>
+						entry.week >= fromWeek &&
+						(entry.status === 'bye' || (entry.status === 'upcoming' && entry.opponent !== null))
+				) ?? null)
+			: ahead;
 	if (row === null) return null;
 	if (row.opponent === null) return { kind: 'bye', week: row.week };
 	return {
@@ -97,7 +112,7 @@ export function playerDescription(player: PlayerHeadSource, clubs: readonly Club
 		season: player.year,
 		label: player.lead.label,
 		rest: player.lead.rosFromWeek !== undefined,
-		game: weekGame(player.season, clubs)
+		game: weekGame(player.season, clubs, player.lead.rosFromWeek)
 	});
 }
 
@@ -129,12 +144,16 @@ export function rankingsHead(
 	format: Format,
 	season: number,
 	week: number | undefined,
-	ordered: readonly { name: string; slug: string }[]
+	ordered: readonly { name: string; slug: string; ourRank: number }[]
 ): HeadMarkup {
 	return built(rankingsDescription(format, season, week), links.players(), {
 		structured: itemListData(
 			HEAD_WORDS.rankingsList(season),
-			ordered.map((player) => ({ name: player.name, path: links.player(player.slug) }))
+			ordered.map((player) => ({
+				name: player.name,
+				path: links.player(player.slug),
+				rank: player.ourRank
+			}))
 		)
 	});
 }

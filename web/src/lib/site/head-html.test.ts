@@ -9,6 +9,7 @@ import { join, relative } from 'node:path';
 import { test } from 'node:test';
 import { bannedIn, bannedInCopy } from '#lib/format/copy-guard.ts';
 import { robotsTxt } from './crawl.ts';
+import { FRONT_TITLE } from './head.ts';
 import { SITE_ORIGIN } from './origins.ts';
 import { structuredFaults, type StructuredData } from './structured-data.ts';
 
@@ -100,7 +101,9 @@ void test(
 		for (const page of pages()) {
 			const { html, file } = page;
 			assert.equal(count(html, /<title>/), 1, `${file}: title`);
-			assert.match(html, /<title>[^<]+ · Commish<\/title>/, file);
+			// The front door's title is its own, the site's name first (head.ts FRONT_TITLE).
+			if (file === 'index.html') assert.ok(html.includes(`<title>${FRONT_TITLE}</title>`), file);
+			else assert.match(html, /<title>[^<]+ · Commish<\/title>/, file);
 			assert.equal(count(html, /<meta name="description"/), 1, `${file}: description`);
 			const description = unescaped(metaContent(html, 'name', 'description') ?? '');
 			assert.ok(description.length > 0, `${file}: an empty description`);
@@ -134,7 +137,9 @@ void test('the pages in search have titles of their own', { skip }, () => {
 		);
 		titles.set(title, page.file);
 	}
-	assert.ok(titles.size > 100, String(titles.size));
+	// One title for each page in search: exactly the pages the build's sitemap lists.
+	const listed = readFileSync(join(BUILT, 'sitemap.xml'), 'utf8').match(/<loc>/g)?.length ?? 0;
+	assert.equal(titles.size, listed);
 });
 
 void test('each page family carries its structured data', { skip }, () => {

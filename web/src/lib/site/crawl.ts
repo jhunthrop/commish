@@ -14,6 +14,10 @@ export const UNCRAWLED_PATHS = [
 	'/claim'
 ] as const;
 
+/** A shared mock's report under /mock/: crawled, so its link unfurls (Lane 169 fix round 1, ruling
+ * i). The longest match wins, so it overrides the section's Disallow. */
+export const CRAWLED_UNDER = ['/mock/share/'] as const;
+
 export const SITEMAP_PATH = '/sitemap.xml';
 export const LLMS_PATH = '/llms.txt';
 
@@ -49,6 +53,7 @@ export function robotsTxt(): string {
 		'# the pages the browser draws for a member carry nothing public.',
 		'User-agent: *',
 		...UNCRAWLED_PATHS.map((path) => `Disallow: ${path}`),
+		...CRAWLED_UNDER.map((path) => `Allow: ${path}`),
 		'Allow: /',
 		'',
 		`Sitemap: ${siteUrl(SITEMAP_PATH)}`,
@@ -65,7 +70,7 @@ export interface LlmsPage {
 
 /** The site in one paragraph, the opening of /llms.txt. */
 export const LLMS_ABOUT =
-	"Commish is a fantasy football site. It publishes its own rest-of-season rankings for every QB, RB, WR and TE, a page for every player, and a public record of how its rankings called each week's games. Members follow their own leagues for their lineup, matchup, waivers and trades, run mock drafts and keep a cheat sheet.";
+	"Commish is a fantasy football site. It publishes its own rest-of-season rankings for every QB, RB, WR and TE, a page for every player, and a public record of how the order it set before each week's kickoff compared with what happened. Members follow their own leagues for their lineup, matchup, waivers and trades, run mock drafts and keep a cheat sheet.";
 
 /** /llms.txt in the plain-text convention (llmstxt.org): the name, the paragraph, the pages. */
 export function llmsTxt(pages: readonly LlmsPage[]): string {

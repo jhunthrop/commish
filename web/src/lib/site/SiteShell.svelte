@@ -14,20 +14,22 @@
 		/** The page's head but its title, built with the page on the server (Lane 169): its
 		 * description, canonical address, share tags and structured data. */
 		head: HeadMarkup;
+		/** A whole document title printed as is (the front door's, head.ts FRONT_TITLE). */
+		fullTitle?: string;
 		/** The run every number on the page comes from. */
 		run: RunStamp;
 		tail?: Snippet;
 		children: Snippet;
 	}
 
-	let { title, heading, head, run, tail, children }: Props = $props();
+	let { title, heading, head, fullTitle, run, tail, children }: Props = $props();
 
 	const stamp = $derived(runStampText(run));
 </script>
 
 <Shell
 	title={heading ?? title}
-	head={{ title, markup: head }}
+	head={{ title, markup: head, fullTitle }}
 	{stamp}
 	{tail}
 	weekLabel={run.weekRankings}

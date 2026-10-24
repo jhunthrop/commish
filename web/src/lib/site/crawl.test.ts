@@ -5,7 +5,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedIn } from '#lib/format/copy-guard.ts';
-import { LLMS_ABOUT, UNCRAWLED_PATHS, llmsTxt, robotsTxt, sitemapXml } from './crawl.ts';
+import {
+	CRAWLED_UNDER,
+	LLMS_ABOUT,
+	UNCRAWLED_PATHS,
+	llmsTxt,
+	robotsTxt,
+	sitemapXml
+} from './crawl.ts';
 
 const AI_CRAWLERS = ['GPTBot', 'ClaudeBot', 'PerplexityBot', 'Google-Extended', 'CCBot'];
 
@@ -17,6 +24,9 @@ void test('the robots file allows every crawler and keeps out only the member pa
 	const disallowed = (robots.match(/^Disallow: (.*)$/gm) ?? []).map((line) => line.slice(10));
 	assert.ok(!disallowed.includes('/'));
 	assert.deepEqual(disallowed, [...UNCRAWLED_PATHS]);
+	const allowed = (robots.match(/^Allow: (.*)$/gm) ?? []).map((line) => line.slice(7));
+	assert.deepEqual(allowed, [...CRAWLED_UNDER, '/']);
+	assert.ok(allowed.includes('/mock/share/'), 'a shared mock unfurls');
 	assert.match(robots, /^Sitemap: https:\/\/trycommish\.app\/sitemap\.xml$/m);
 });
 
