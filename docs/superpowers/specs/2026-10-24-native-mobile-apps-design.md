@@ -44,7 +44,7 @@ The web is the design outline. Each app screen maps to a web route and keeps tha
 | Draft | Lobby | `/lobby/[id]`, `/lobby/[id]/report` | Join, draft with people, the report |
 | Draft | Companion | `/companion/new`, `/companion/[id]` | The second screen for a draft running on another platform |
 
-The bottom bar keeps the web's five (`web/src/lib/ui/nav.ts`): League, Board (Rest of season in season), Mock draft, Advisor, Players, in the web's season-phase order. The mark leads nothing on the phone; the web's phone bar is the reference.
+The bottom bar is the web's phone bar for the season phase, exactly as `railFor` in `web/src/lib/ui/rail-order.ts` lists it (amended 2026-10-24 after Lane 173): in season League, Lineup, Matchup, Waivers, Trades (Waivers drops in the playoffs once the wire closes); before the draft League, Board, Mock draft, Advisor, Players. The apps switch the five by phase as the web does. The mark leads nothing on the phone.
 
 ## 4. Repository layout
 
