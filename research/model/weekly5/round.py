@@ -40,13 +40,12 @@ from research.model.weekly2.gates import GateLine
 from research.model.weekly2.guard import guard_queries
 from research.model.weekly2.judge import DOCS
 from research.model.weekly4.files import build_report, load_store
-from research.model.weekly4.round import store_clause
 from research.model.weekly4.system import Store
 from research.model.weekly5 import decisions, gates
 from research.model.weekly5.benchmarks import benchmark_values
 from research.model.weekly5.board import CANDIDATES
 from research.model.weekly5.gates import DEVELOPMENT_CHECK, GATE_LINES, ROUND_FIVE, RoundFive
-from research.model.weekly5.judgment import Assessed, assess, choose
+from research.model.weekly5.judgment import Assessed, assess, choose, form_mismatches
 from research.model.weekly5.preconditions import (
     DEPTH_RULE,
     component_mismatches,
@@ -249,6 +248,24 @@ def _store_rule(report: Mapping[str, Any]) -> None:
         )
 
 
+def store_clause(report: Mapping[str, Any], last_season: int) -> tuple[bool, str]:
+    """The store's per-game clause over the seasons this run reads (its build's report): no broken read and
+    every clause held. A reading: the build of a later season (2024's files beside the check's) read that
+    season's outcomes for its own team rows; this run opens no file of it, so it is recorded, not failed."""
+    seasons = [s for s in report["seasons"] if int(s["season"]) <= last_season]
+    broken = sum(int(s["stamps"]["broken"]) for s in seasons)
+    held = all(
+        s["clause"]["team"]["holds"] and (s["clause"]["player"] is None or s["clause"]["player"]["holds"])
+        for s in seasons
+    )
+    later = sorted(int(x) for x in report.get("outcome_seasons_read", []) if int(x) > last_season)
+    detail = (
+        f"the store: {broken} broken reads over {len(seasons)} seasons read, clauses {'held' if held else 'broken'}"
+        + (f"; its build also read the outcomes of {later} for files this run does not open" if later else "")
+    )
+    return broken == 0 and held and bool(seasons), detail
+
+
 def thresholds_payload(t: RoundFive) -> dict[str, Any]:
     found: dict[str, Any] = {}
     for f in fields(t):
@@ -420,6 +437,9 @@ def execute(setup: Setup, url: str, features: Path) -> int:
             "round_four_reproduced": True,
             "round_three_reproduced": True,
             "first_team_model_cells": first_team_cells(prepared.components, t),
+            "guard_five_rows_whose_rival_form_differs_from_g2": form_mismatches(
+                judged.rows, sources.forms, t.judgment_season
+            ),
         },
         "round_three": {"lines": [asdict(line) for line in judged.lines]},
         "fitted": fitted_payload(fitted),

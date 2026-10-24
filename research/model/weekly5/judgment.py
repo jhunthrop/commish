@@ -258,3 +258,24 @@ def choose(assessed: Mapping[str, Assessed]) -> Choice:
         f"judgment, a tie to the components: {chosen}"
     )
     return Choice(chosen, values, rule)
+
+
+FORM_TOLERANCE: Final = 1e-9
+
+
+def form_mismatches(r3_rows: Sequence[JudgedRow], forms: pd.DataFrame, season: int) -> int:
+    """Guard 5 on the run's own rows: the population rows whose rival form (`forms`) differs from the G2
+    benchmark's in any format, or exists on one side only."""
+    mine = forms[forms["season"] == season]
+    rival: dict[Key, dict[str, float]] = {
+        (int(w), str(p)): {n: float(v) for n, v in zip(FORMATS, values, strict=True)}
+        for w, p, *values in zip(mine["week"], mine["player_id"], *(mine[f"form_{n}"] for n in FORMATS), strict=True)
+    }
+    found = 0
+    for r in r3_rows:
+        own = rival.get((r.week, r.player_id))
+        if r.form is None or own is None:
+            found += int((own is None) != (r.form is None))
+            continue
+        found += int(any(abs(own[n] - float(r.form[n])) > FORM_TOLERANCE for n in FORMATS))
+    return found
