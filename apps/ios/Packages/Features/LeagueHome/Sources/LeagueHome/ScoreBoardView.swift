@@ -89,7 +89,10 @@ struct BugCard: View {
                     .color(bug.state == .kickedOff ? Tokens.Color.scoreboardInk : Tokens.Color.scoreboardInk2))
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            figureHead(bug.small, theme: theme)
+            // Before kickoff a bug draws one figure, so the small column gives its room to the words.
+            if !bug.small.isEmpty {
+                figureHead(bug.small, theme: theme)
+            }
             figureHead(bug.big, theme: theme)
         }
         .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
@@ -124,10 +127,12 @@ struct BugCard: View {
             Text(side.record)
                 .font(Faces.font(.num, size: Tokens.TypeScale.sm, weight: .medium))
                 .foregroundStyle(theme.color(Tokens.Color.scoreboardInk2))
-            Text(side.small)
-                .font(Faces.font(.num, size: Tokens.TypeScale.md, weight: .medium))
-                .foregroundStyle(theme.color(Tokens.Color.scoreboardInk2))
-                .frame(width: Self.figureWidth, alignment: .trailing)
+            if !bug.small.isEmpty {
+                Text(side.small)
+                    .font(Faces.font(.num, size: Tokens.TypeScale.md, weight: .medium))
+                    .foregroundStyle(theme.color(Tokens.Color.scoreboardInk2))
+                    .frame(width: Self.figureWidth, alignment: .trailing)
+            }
             Text(side.big)
                 .font(Faces.font(.num, size: Tokens.TypeScale.xl, weight: .bold))
                 // The member's own figure in the board's number colour, as the web marks "you".
