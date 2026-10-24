@@ -7,9 +7,9 @@ name: api
 on:
   push:
     branches: [main]
-    paths: ['api/**', 'go.work', 'web/src/lib/api/types.ts', '.github/workflows/api.yml']
+    paths: ['api/**', 'go.work', 'web/src/lib/api/types.ts', 'shared/fixtures/**', '.github/workflows/api.yml']
   pull_request:
-    paths: ['api/**', 'go.work', 'web/src/lib/api/types.ts', '.github/workflows/api.yml']
+    paths: ['api/**', 'go.work', 'web/src/lib/api/types.ts', 'shared/fixtures/**', '.github/workflows/api.yml']
   workflow_dispatch:
 
 # Deploys run one at a time and never cancel each other mid-migration.

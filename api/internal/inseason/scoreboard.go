@@ -181,6 +181,7 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 		}
 	}
 	out.State, out.NextKickoff = gameState(game, unlisted)
+	out.GameState = scoreboardGameState(out, a.now)
 	// Such a side's projected final once the game reads kicked off by the bug's own rule (Lane 127
 	// fix round 1); a side with no roster read keeps none (Lane 125).
 	for i, s := range sides {

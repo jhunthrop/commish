@@ -80,6 +80,7 @@ func publicLineIn(season *Season, ranks map[string]int, projection boards.WeekPr
 	id := boardID
 	line := apitypes.PlayerLine{Player: apitypes.LeaguePlayer{BoardId: &id, Name: bp.Name, Position: string(position), Team: boards.WireClub(team)},
 		Facts: wireFacts(facts, nil), RestOfSeasonPerGame: RestOfSeasonPerGame(b, bp, rest.Left)}
+	line.GameState = lineGameState(line, season.now)
 	if rank, ok := ranks[boardID]; ok {
 		line.PositionRank = &rank
 	}

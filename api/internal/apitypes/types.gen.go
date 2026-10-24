@@ -426,6 +426,33 @@ func (e GameState) Valid() bool {
 	}
 }
 
+// Defines values for GameStateCellState.
+const (
+	GameStateCellStateBye        GameStateCellState = "bye"
+	GameStateCellStateFinal      GameStateCellState = "final"
+	GameStateCellStateKickedOff  GameStateCellState = "kicked_off"
+	GameStateCellStateNoGame     GameStateCellState = "no_game"
+	GameStateCellStateNotStarted GameStateCellState = "not_started"
+)
+
+// Valid indicates whether the value is a known member of the GameStateCellState enum.
+func (e GameStateCellState) Valid() bool {
+	switch e {
+	case GameStateCellStateBye:
+		return true
+	case GameStateCellStateFinal:
+		return true
+	case GameStateCellStateKickedOff:
+		return true
+	case GameStateCellStateNoGame:
+		return true
+	case GameStateCellStateNotStarted:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GroupPassStatus.
 const (
 	GroupPassStatusActive   GroupPassStatus = "active"
@@ -2363,6 +2390,18 @@ type GameSpreadSide string
 // GameState a game's state, one rule for every screen: upcoming before its kickoff, kicked_off from its kickoff until its final is in, final once the store holds its result or a stat line from either side
 type GameState string
 
+// GameStateCell a game at the request's clock as every screen says it (Lane 176), one rule for the web and the apps: a player's game by the web's lineState, a scoreboard game by its gameHead (web/src/lib/league/box/kickoff.ts), held to them by shared/fixtures/parity/game-state.json
+type GameStateCell struct {
+	// State not_started before its kickoff; kicked_off from its kickoff (an upcoming read whose kickoff has passed included) until its final is in; final; bye, his club's bye week; no_game, no game held for him this week (a free agent, or a club with no game we hold). Open: a client reads a value it does not know by its word
+	State GameStateCellState `json:"state"`
+
+	// Word the word the screen prints for the state: "Next kickoff" (empty for a scoreboard game with no kickoff to name), "Kicked off", "Final", "Bye", "No club" for a free agent, empty for any other line with no game
+	Word string `json:"word"`
+}
+
+// GameStateCellState not_started before its kickoff; kicked_off from its kickoff (an upcoming read whose kickoff has passed included) until its final is in; final; bye, his club's bye week; no_game, no game held for him this week (a free agent, or a club with no game we hold). Open: a client reads a value it does not know by its word
+type GameStateCellState string
+
 // GameTotal the game's expected score, the consensus of the hourly capture's newest read before kickoff; a read more than six hours before kickoff (or before now) gives way to the game table's newest weekly read, with its own read time
 type GameTotal struct {
 	// Points both clubs' points together
@@ -3631,6 +3670,9 @@ type PlayerLine struct {
 	// Facts one player's week; a fact we do not hold is null, never zero
 	Facts WeekFacts `json:"facts"`
 
+	// GameState his game this week at the request's clock in the state and the word the screen prints (Lane 176): from facts' bye, kickoff, game_state and played by the web's lineState, so no client computes it; absent from an older answer
+	GameState *GameStateCell `json:"game_state,omitempty"`
+
 	// GamesPlayed the completed games season_avg is over, a final game the platform's points count included (facts.last_games source platform, Lane 111); absent before his first game and from an older answer
 	GamesPlayed *int `json:"games_played,omitempty"`
 
@@ -4070,6 +4112,9 @@ type Scoreboard struct {
 
 // ScoreboardGame defines model for ScoreboardGame.
 type ScoreboardGame struct {
+	// GameState the game at the request's clock in the state and the word its score bug prints (Lane 176): from state and next_kickoff by the web's gameHead, never bye or no_game; absent from an older answer
+	GameState *GameStateCell `json:"game_state,omitempty"`
+
 	// NextKickoff the earliest kickoff still to come among both sides' starters, null when none is
 	NextKickoff *time.Time `json:"next_kickoff"`
 
