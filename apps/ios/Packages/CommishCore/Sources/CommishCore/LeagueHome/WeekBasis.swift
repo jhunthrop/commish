@@ -130,7 +130,7 @@ enum WeekBasis {
     static func standings(host: Components.Schemas.LeagueHost, terms: Components.Schemas.LeagueTerms) -> String {
         let platform = PortedWords.platform(host)
         let home = CommishDesign.Words.LeagueHome.self
-        let tiebreak = terms.tiebreak.map { "then \(PortedWords.tiebreak($0.value1))" }
+        let tiebreak = terms.tiebreak.flatMap { PortedWords.tiebreak($0.value1) }.map { "then \($0)" }
             ?? "then points for, as \(platform) lists them"
         return "Standings follow \(platform)'s record, \(tiebreak). \(home.pointsFor) and \(home.pointsAgainst) are "
             + "points for and against, \(home.streak) the current run\(waiverBasis(platform, terms: terms))."
@@ -138,12 +138,13 @@ enum WeekBasis {
 
     private static func waiverBasis(_ platform: String, terms: Components.Schemas.LeagueTerms) -> String {
         let home = CommishDesign.Words.LeagueHome.self
-        switch terms.waivers {
+        switch terms.waivers?.value1 {
         case .budget:
             let budget = terms.waiverBudget.map { " of \(Formatting.dollars($0))" } ?? ""
             return ", \(home.budget) the budget left\(budget)"
         case .order:
-            let how = terms.waiverOrder.map { "\(PortedWords.waiverOrder($0.value1)), \(home.firstPicks)" }
+            let how = terms.waiverOrder.flatMap { PortedWords.waiverOrder($0.value1) }
+                .map { "\($0), \(home.firstPicks)" }
                 ?? home.firstPicks
             return ", \(home.order) the place in \(platform)'s order (\(how))"
         case nil:
@@ -174,7 +175,7 @@ enum WeekBasis {
 
     /// names.ts rulesOwner: FFPC fixes its own rules; on any other platform the league's commissioner does.
     private static func rulesOwner(_ host: Components.Schemas.LeagueHost) -> String {
-        host == .ffpc ? PortedWords.platform(host) : "your league"
+        host.value1 == .ffpc ? PortedWords.platform(host) : "your league"
     }
 
     private static func sentenceStart(_ words: String) -> String {

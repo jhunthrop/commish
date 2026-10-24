@@ -56,7 +56,7 @@ enum MovesFeed {
         let names = Dictionary(sync.teams.map { ($0.rosterId, $0.name) }, uniquingKeysWith: { first, _ in first })
         let name = { (id: Int) in names[id] ?? "Team \(id)" }
         return sync.moves.enumerated().map { index, move in
-            let trade = move.kind == .trade
+            let trade = move.kind.value1 == .trade
             let dropOnly = !trade && move.adds.isEmpty && !move.drops.isEmpty
             let player = { (moved: Components.Schemas.MovePlayer, to: String?) in
                 MovePlayerLine(
@@ -80,10 +80,12 @@ enum MovesFeed {
     }
 
     private static func kind(_ kind: Components.Schemas.LeagueMove.KindPayload) -> String {
-        switch kind {
+        switch kind.value1 {
         case .add: PortedWords.MoveKind.add
         case .waiver: PortedWords.MoveKind.waiver
         case .trade: PortedWords.MoveKind.trade
+        // A kind this build does not know: the API's own word for it.
+        case nil: PortedWords.unknown(kind.value2) ?? PortedWords.Box.none
         }
     }
 }

@@ -5,10 +5,10 @@ import Foundation
 public struct PairInput: Equatable, Sendable {
     public let code: String
     public let name: String
-    public let kind: Components.Schemas.DeviceKind
+    public let kind: Components.Schemas.DeviceKindKnown
     public let codeVerifier: String
 
-    public init(code: String, name: String, kind: Components.Schemas.DeviceKind, codeVerifier: String) {
+    public init(code: String, name: String, kind: Components.Schemas.DeviceKindKnown, codeVerifier: String) {
         self.code = code
         self.name = name
         self.kind = kind
@@ -46,7 +46,7 @@ public struct PairingClient: DevicePairing {
 
     public func pair(_ input: PairInput) async throws -> PairedDevice {
         let body = Components.Schemas.PairInput(
-            code: input.code, name: input.name, kind: input.kind, codeVerifier: input.codeVerifier
+            code: input.code, name: input.name, kind: .init(value1: input.kind), codeVerifier: input.codeVerifier
         )
         switch try await APIClient.unwrapped({ try await client.pairDevice(body: .json(body)) }) {
         case let .created(answer):

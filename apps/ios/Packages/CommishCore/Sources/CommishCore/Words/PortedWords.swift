@@ -20,16 +20,32 @@ public enum PortedWords {
         public static let none = "--"
     }
 
-    /// web/src/lib/league/names.ts HOST_WORDS: the platform named, never "host".
+    /// An API value this build does not know (an enum opened by apps/ios/scripts/gen-openapi.ts): its
+    /// own word, underscores read as spaces, first letter capital ("fleaflicker" is "Fleaflicker"),
+    /// never a crash and never a code. Nil when the API sent nothing readable.
+    public static func unknown(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else {
+            return nil
+        }
+        let words = raw.replacingOccurrences(of: "_", with: " ")
+        return words.prefix(1).uppercased() + words.dropFirst()
+    }
+
+    /// web/src/lib/league/names.ts HOST_WORDS: the platform named, never "host"; a platform this build
+    /// does not know by the API's own name for it.
     public static func platform(_ host: Components.Schemas.LeagueHost) -> String {
-        switch host {
+        switch host.value1 {
         case .sleeper: "Sleeper"
         case .mfl: "MyFantasyLeague"
         case .ffpc: "FFPC"
         case .yahoo: "Yahoo"
         case .espn: "ESPN"
+        case nil: unknown(host.value2) ?? unknownPlatform
         }
     }
+
+    /// A platform the API names with nothing readable.
+    public static let unknownPlatform = "Your platform"
 
     /// web/src/lib/league/home/home.ts KIND_WORDS and DROP_WORD.
     public enum MoveKind {
@@ -39,30 +55,33 @@ public enum PortedWords {
         public static let drop = "Drop"
     }
 
-    /// home.ts TIEBREAK_WORDS.
-    public static func tiebreak(_ rule: Components.Schemas.Tiebreak) -> String {
-        switch rule {
+    /// home.ts TIEBREAK_WORDS; nil for a rule this build does not know, said as no rule stated.
+    public static func tiebreak(_ rule: Components.Schemas.Tiebreak) -> String? {
+        switch rule.value1 {
         case .headToHead: "head to head"
         case .pointsFor: "points for"
         case .pointsAgainst: "points against"
         case .divisionRecord: "division record"
+        case nil: nil
         }
     }
 
-    /// home.ts WAIVER_ORDER_WORDS.
-    public static func waiverOrder(_ order: Components.Schemas.WaiverOrder) -> String {
-        switch order {
+    /// home.ts WAIVER_ORDER_WORDS; nil for an order this build does not know.
+    public static func waiverOrder(_ order: Components.Schemas.WaiverOrder) -> String? {
+        switch order.value1 {
         case .rolling: "rolling"
         case .inverseStandings: "reverse standings"
+        case nil: nil
         }
     }
 
-    /// box.ts FORMAT_WORDS.
+    /// box.ts FORMAT_WORDS; a format this build does not know by the API's own word.
     public static func format(_ format: Components.Schemas.ProjectionScoring.FormatPayload) -> String {
-        switch format {
+        switch format.value1 {
         case .ppr: "PPR"
         case .halfPpr: "half-PPR"
         case .standard: "standard"
+        case nil: format.value2 ?? Box.none
         }
     }
 

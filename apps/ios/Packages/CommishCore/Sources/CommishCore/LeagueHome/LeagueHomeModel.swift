@@ -80,8 +80,8 @@ public struct LeagueHomeModel: Sendable, Equatable {
                 points: mine.playerPoints ? starter.points.map { Formatting.fixed($0) } ?? none : none
             )
         }
-        let bench = sync.roster.filter { $0.slot == .bench }.count
-        let reserve = sync.roster.filter { $0.slot == .reserve }.count
+        let bench = sync.roster.filter { $0.slot.value1 == .bench }.count
+        let reserve = sync.roster.filter { $0.slot.value1 == .reserve }.count
         let reserveWords = reserve > 0 ? ". \(PortedWords.Box.reserve), \(reserve)" : ""
         return LineupSection(
             title: Home.yourLineup,

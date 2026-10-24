@@ -80,10 +80,10 @@ enum Standings {
 
     /// "$675" left of the budget, "6th" in the order, "--" where unsaid.
     static func waiverCell(_ team: Components.Schemas.LeagueTeam, terms: Components.Schemas.LeagueTerms) -> String {
-        if terms.waivers == .budget, let left = team.waiverBudgetLeft {
+        if terms.waivers?.value1 == .budget, let left = team.waiverBudgetLeft {
             return Formatting.dollars(left)
         }
-        if terms.waivers == .order, let order = team.waiverOrder {
+        if terms.waivers?.value1 == .order, let order = team.waiverOrder {
             return Formatting.ordinal(order)
         }
         return PortedWords.Box.none
@@ -99,11 +99,15 @@ enum Standings {
     }
 
     static func seeding(_ terms: Components.Schemas.LeagueTerms, host: Components.Schemas.LeagueHost) -> String? {
-        let seeds = terms.playoffSeeds ?? []
+        // A seed this build does not know is counted and named by neither rule.
+        let seeds = (terms.playoffSeeds ?? []).map(\.value1)
         guard seeds.contains(.points) else {
             return nil
         }
-        let seededBy: [String] = [(.record, "on record"), (.points, "on points")].compactMap { kind, words in
+        let rules: [(Components.Schemas.LeagueTerms.PlayoffSeedsPayloadPayload.Value1Payload, String)] = [
+            (.record, "on record"), (.points, "on points"),
+        ]
+        let seededBy: [String] = rules.compactMap { kind, words in
             let numbers = seeds.enumerated().filter { $0.element == kind }.map { $0.offset + 1 }
             return numbers.isEmpty ? nil : "\(seedNumbers(numbers)) \(words)"
         }

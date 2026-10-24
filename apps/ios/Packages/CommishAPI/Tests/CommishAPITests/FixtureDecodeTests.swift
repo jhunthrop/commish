@@ -8,7 +8,7 @@ struct FixtureDecodeTests {
     @Test func leagueSyncDecodesFromTheSharedFixture() throws {
         let sync = try Fixture.leagueSync()
         #expect(sync.name == "S.U.C.K. - Severely Underrated Carolina Keepers")
-        #expect(sync.host == .ffpc)
+        #expect(sync.host.value1 == .ffpc)
         #expect(sync.teams.count == 12)
         #expect(sync.me == 1)
     }

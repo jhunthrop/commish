@@ -19,10 +19,11 @@ struct GameHead: Equatable {
 
     init(state: Components.Schemas.ScoreboardGame.StatePayload, next: Date?, now: Date) {
         let ahead = next.flatMap { $0 > now ? $0 : nil }
-        switch state {
+        switch state.value1 {
         case .final: (self.state, self.next) = (.final, nil)
         case .playing: (self.state, self.next) = (.kickedOff, ahead)
-        case .upcoming:
+        // A state this build does not know reads by its kickoff alone, as an upcoming game does.
+        case .upcoming, nil:
             if next == nil {
                 (self.state, self.next) = (.upcoming, nil)
             } else if let ahead {
@@ -146,7 +147,7 @@ enum ScoreBugs {
             return startersFinal
         }
         if let schedule = side.scheduleState?.value1 {
-            return schedule == .final
+            return schedule.value1 == .final
         }
         return state == .final
     }
