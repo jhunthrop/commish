@@ -2,29 +2,38 @@ package app.trycommish.android
 
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import app.trycommish.api.Transport
 import app.trycommish.core.Cache
 import app.trycommish.core.Clock
 import app.trycommish.core.EncryptedSession
 import app.trycommish.core.FileCache
 import app.trycommish.core.Session
+import app.trycommish.core.SessionEnd
 import app.trycommish.core.SystemClock
 import app.trycommish.core.leaguehome.ApiLeagueReads
-import app.trycommish.core.leaguehome.LeagueChooser
 import app.trycommish.core.leaguehome.LeagueHomeViewModel
+import app.trycommish.core.leaguehome.LeagueHomeWords
 import app.trycommish.core.leaguehome.LeagueReads
 import app.trycommish.core.signin.ApiPairing
 import app.trycommish.core.signin.SignIn
+import app.trycommish.core.signin.SignInResult
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.security.SecureRandom
 import java.time.ZoneId
 
+private const val TAG = "Commish"
+
 /**
  * The app's graph, built by hand (no DI framework, spec §6.2): one session, one transport, one cache,
- * one clock, and the factories each screen's view model is made from. Every dependency is a
- * constructor argument, so a test builds the same pieces with fakes.
+ * one clock, the app's own coroutine scope, and the factories each screen's view model is made from.
+ * Every dependency is a constructor argument, so a test builds the same pieces with fakes.
  */
 class AppGraph(
     context: Context,
@@ -33,24 +42,48 @@ class AppGraph(
 ) {
     val clock: Clock = SystemClock
     val zone: ZoneId get() = ZoneId.systemDefault()
-    val session: Session = EncryptedSession(context)
-    private val cache: Cache = FileCache(context.cacheDir.resolve("answers"))
+    private val session: Session = EncryptedSession(context)
+    private val cache: Cache = FileCache(context.cacheDir.resolve("answers")) { what, e -> Log.w(TAG, what, e) }
     private val transport = Transport(apiBaseUrl, token = { session.token })
     private val reads: LeagueReads = ApiLeagueReads(transport)
 
+    /** Work that must outlive a screen or a rotation: the sign-in's pairing, once its verifier is spent. */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     private val signedInState = MutableStateFlow(session.token != null)
+    private val signInMessageState = MutableStateFlow<String?>(null)
 
     /** Whether the device holds a token, for the tabs that need one. */
     val signedIn: StateFlow<Boolean> = signedInState.asStateFlow()
 
-    val signIn = SignIn(apiBaseUrl, returnTo, Build.MODEL, ApiPairing(transport), session, SecureRandom())
+    /** What the sign-in screen says about the last attempt or the last sign-out, if anything. */
+    val signInMessage: StateFlow<String?> = signInMessageState.asStateFlow()
 
-    val leagueChooser = LeagueChooser(reads, cache, clock)
+    private val signIn = SignIn(apiBaseUrl, returnTo, Build.MODEL, ApiPairing(transport), session, SecureRandom())
+    val signInFlow = SignInFlow(signIn, returnTo)
 
-    fun leagueHomeViewModel(): LeagueHomeViewModel = LeagueHomeViewModel(reads, cache, clock, zone)
+    /** The API refused the token: forget it and every kept answer, and ask for a sign-in. */
+    val sessionEnd =
+        SessionEnd {
+            session.signOut()
+            cache.clear()
+            signInMessageState.value = LeagueHomeWords.signedOut
+            signedInState.value = false
+        }
 
-    /** Re-reads the session after a sign-in or a sign-out. */
-    fun sessionChanged() {
-        signedInState.value = session.token != null
+    fun leagueHomeViewModel(): LeagueHomeViewModel = LeagueHomeViewModel(reads, cache, clock, zone, sessionEnd)
+
+    /** Completes a sign-in from its return link in the app's scope, so a rotation cannot cancel it. */
+    fun completeSignIn(link: String) {
+        appScope.launch {
+            when (val result = signInFlow.complete(link)) {
+                SignInResult.SignedIn -> {
+                    signInMessageState.value = null
+                    signedInState.value = true
+                }
+                is SignInResult.Refused -> signInMessageState.value = result.message
+                SignInResult.Ignored -> Unit
+            }
+        }
     }
 }

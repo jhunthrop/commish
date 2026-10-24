@@ -1,15 +1,8 @@
 package app.trycommish.android
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -17,62 +10,71 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import app.trycommish.core.leaguehome.LeagueHomeViewModel
+import app.trycommish.core.phoneBar
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.Rail
+import app.trycommish.design.RailItem
 
-/** The bar's five tabs in the web's in-season order (web/src/lib/ui/rail-order.ts: League, the week's
- * Players, Rest of season; then Mock draft and Advisor). Only League is live in this build; the rest
- * show their name. */
-enum class Tab(
-    val route: String,
-    @StringRes val label: Int,
-    val icon: ImageVector,
-) {
-    League("league", R.string.tab_league, Icons.Filled.Home),
-    Players("players", R.string.tab_players, Icons.Filled.Person),
-    Rest("rest", R.string.tab_rest, Icons.AutoMirrored.Filled.List),
-    Mock("mock", R.string.tab_mock, Icons.Filled.PlayArrow),
-    Advisor("advisor", R.string.tab_advisor, Icons.Filled.Info),
-}
+/** The League page's route, the one screen live in this build. */
+private const val LEAGUE = "league"
 
-/** The app's shell: the bottom bar and a back stack per tab (each tab keeps its place when left). */
+/** Every page any phase's bar opens (Rail.generated.kt), each its own route. */
+private val PAGES: List<RailItem> = (Rail.byKey.values.flatten() + Rail.withoutLeague).distinctBy { it.page }
+
+/**
+ * The app's shell: the web's phone bar for the season phase of the league the League tab opened
+ * (rail-order.ts railFor, generated into Rail.generated.kt with the web's labels and glyphs), signed
+ * out the season's bar without a league, and a back stack per tab. Only League is live; the rest show
+ * their name until their screen lanes land.
+ */
 @Composable
-fun RootTabs(
-    league: @Composable () -> Unit,
+fun Shell(
+    graph: AppGraph,
+    onOpenLineup: (leagueId: String) -> Unit,
     nav: NavHostController = rememberNavController(),
 ) {
+    val vm: LeagueHomeViewModel = viewModel { graph.leagueHomeViewModel() }
+    val signedIn by graph.signedIn.collectAsStateWithLifecycle()
+    val choice by vm.choice.collectAsStateWithLifecycle()
+    val bar = if (signedIn) phoneBar(choice) else Rail.withoutLeague
     val entry by nav.currentBackStackEntryAsState()
     val current = entry?.destination?.route
+    // A bar that no longer holds the open page (the phase moved) opens its first tab.
+    LaunchedEffect(bar, current) {
+        if (current != null && bar.none { it.page == current }) nav.open(bar.first().page)
+    }
     Scaffold(
         containerColor = CommishTheme.colors.bg,
-        bottomBar = { Bar(current) { tab -> nav.open(tab) } },
+        bottomBar = { Bar(bar, current) { nav.open(it.page) } },
     ) { padding ->
-        NavHost(nav, startDestination = Tab.League.route, modifier = Modifier.padding(padding)) {
-            composable(Tab.League.route) { league() }
-            Tab.entries.filter { it != Tab.League }.forEach { tab ->
-                composable(tab.route) { Placeholder(stringResource(tab.label)) }
+        NavHost(nav, startDestination = LEAGUE, modifier = Modifier.padding(padding)) {
+            composable(LEAGUE) { LeagueTab(graph, vm, onOpenLineup) }
+            PAGES.filter { it.page != LEAGUE }.forEach { item ->
+                composable(item.page) { Placeholder(item.label) }
             }
         }
     }
 }
 
-private const val LABEL_LEADING = 1.1f
-
 /** Opens a tab with its own back stack restored, never a second copy of it. */
-fun NavHostController.open(tab: Tab) {
-    navigate(tab.route) {
+private fun NavHostController.open(route: String) {
+    navigate(route) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
         restoreState = true
@@ -81,26 +83,21 @@ fun NavHostController.open(tab: Tab) {
 
 @Composable
 private fun Bar(
+    items: List<RailItem>,
     current: String?,
-    onOpen: (Tab) -> Unit,
+    onOpen: (RailItem) -> Unit,
 ) {
     val c = CommishTheme.colors
     NavigationBar(containerColor = c.shell) {
-        Tab.entries.forEach { tab ->
+        items.forEach { item ->
             NavigationBarItem(
-                selected = current == tab.route,
-                onClick = { onOpen(tab) },
-                icon = { Icon(tab.icon, contentDescription = null) },
+                selected = current == item.page,
+                onClick = { onOpen(item) },
+                icon = { Icon(painterResource(item.glyph), contentDescription = null) },
                 label = {
                     Text(
-                        stringResource(tab.label),
-                        // "Rest of season" is the longest: two short lines, never cut.
-                        style =
-                            Faces.label.copy(
-                                letterSpacing = Faces.small.letterSpacing,
-                                lineHeight =
-                                    Faces.label.fontSize * LABEL_LEADING,
-                            ),
+                        item.label,
+                        style = Faces.label.copy(letterSpacing = Faces.small.letterSpacing),
                         maxLines = 2,
                         textAlign = TextAlign.Center,
                     )

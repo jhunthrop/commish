@@ -44,12 +44,10 @@ class SignInFlow(
             .launchUrl(context, Uri.parse(signIn.start()))
     }
 
-    /** The sign-in's result for an intent carrying the app's return link, null for any other intent. */
-    suspend fun handle(intent: Intent?): SignInResult? {
-        val link = intent?.data?.toString() ?: return null
-        if (!link.startsWith(returnTo)) return null
-        return signIn.complete(link)
-    }
+    /** The app's return link an intent carries, null for any other intent. */
+    fun returnLink(intent: Intent?): String? = intent?.data?.toString()?.takeIf { it.startsWith(returnTo) }
+
+    suspend fun complete(link: String): SignInResult = signIn.complete(link)
 }
 
 /** The League tab signed out: what signing in does, and the one verb. */

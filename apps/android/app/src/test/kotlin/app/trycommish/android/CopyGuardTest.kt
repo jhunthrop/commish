@@ -2,6 +2,7 @@ package app.trycommish.android
 
 import app.trycommish.core.leaguehome.LeagueHomeWords
 import app.trycommish.core.signin.SignInWords
+import app.trycommish.design.Rail
 import app.trycommish.design.Words
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -49,14 +50,22 @@ class CopyGuardTest {
 
     private fun bannedIn(text: String): String? = pattern.find(text)?.value
 
-    /** Every string constant a word table holds. */
+    /** Every string constant a word table holds, and every value of its maps (the platforms, the
+     * kinds, the tiebreaks). A Kotlin object's properties are static fields of its class. */
     private fun table(owner: Class<*>): List<String> =
         owner.declaredFields
-            .filter { Modifier.isStatic(it.modifiers) && it.type == String::class.java }
-            .map {
-                it.isAccessible = true
-                it.get(null) as String
+            .filter { Modifier.isStatic(it.modifiers) }
+            .flatMap { field ->
+                field.isAccessible = true
+                when (val value = field.get(null)) {
+                    is String -> listOf(value)
+                    is Map<*, *> -> value.values.filterIsInstance<String>()
+                    else -> emptyList()
+                }
             }
+
+    /** The bar's labels, every phase's. */
+    private fun railLabels(): List<String> = (Rail.byKey.values.flatten() + Rail.withoutLeague).map { it.label }
 
     private fun stringsXml(): List<String> {
         val xml = File(repository, "apps/android/app/src/main/res/values/strings.xml").readText()
@@ -73,14 +82,18 @@ class CopyGuardTest {
     @Test
     fun `no word the app prints is on the list`() {
         val printed =
-            stringsXml() + table(Words.LeagueHome::class.java) + table(LeagueHomeWords::class.java) + table(SignInWords::class.java)
+            stringsXml() + table(Words.LeagueHome::class.java) + table(LeagueHomeWords::class.java) + table(SignInWords::class.java) +
+                railLabels()
         assertEquals(emptyList<String>(), printed.filter { bannedIn(it) != null })
     }
 
     @Test
     fun `the word tables are read, not empty`() {
-        assert(stringsXml().size >= 6)
+        assert(stringsXml().isNotEmpty())
         assert(table(LeagueHomeWords::class.java).contains(LeagueHomeWords.cannotLoad))
+        assert(table(LeagueHomeWords::class.java).contains("MyFantasyLeague"))
+        assert(table(LeagueHomeWords::class.java).contains(LeagueHomeWords.standingsBasis))
+        assert(railLabels().contains("Matchup"))
         assert(table(Words.LeagueHome::class.java).contains(Words.LeagueHome.noMoves))
     }
 }
