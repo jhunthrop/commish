@@ -65,7 +65,7 @@ paths:
         - { name: code, in: query, required: true, schema: { type: string } }
         - { name: state, in: query, required: true, schema: { type: string } }
       responses:
-        "302": { description: to the site, or to its sign-in problem page }
+        "302": { description: "to the site, or to its sign-in problem page" }
   /auth/logout:
     post:
       tags: [auth]

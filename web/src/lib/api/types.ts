@@ -4745,7 +4745,7 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description to the site */
+			/** @description to the site, or to its sign-in problem page */
 			302: {
 				headers: Record<string, unknown>;
 				content?: never;
