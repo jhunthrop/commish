@@ -1,0 +1,46 @@
+# The iOS app's release lanes. CI runs `beta` on main once the App Store Connect key is a repository
+# secret (.github/workflows/ios.yml); until then that step is skipped by name.
+#
+# Secrets, from the environment, never from the repository:
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_CONTENT  the App Store Connect API key (the .p8's text)
+#   APPLE_TEAM_ID                                the team that signs, a repository variable
+default_platform(:ios)
+
+platform :ios do
+  desc "Build the App Store archive, signed automatically with the API key, and upload it to TestFlight"
+  lane :beta do
+    %w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_CONTENT APPLE_TEAM_ID].each do |name|
+      UI.user_error!("#{name} is not set: TestFlight needs the App Store Connect key and the team") if ENV[name].to_s.empty?
+    end
+    setup_ci
+    key = app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_content: ENV["ASC_KEY_CONTENT"],
+      in_house: false
+    )
+    key_path = File.join(Dir.tmpdir, "AuthKey_#{ENV['ASC_KEY_ID']}.p8")
+    File.write(key_path, ENV["ASC_KEY_CONTENT"])
+    begin
+      build_app(
+        project: "Commish.xcodeproj",
+        scheme: "Commish",
+        configuration: "Release",
+        export_method: "app-store",
+        output_directory: "build",
+        xcargs: [
+          "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']}",
+          # The build number is the workflow run's, so every upload is new to TestFlight.
+          "CURRENT_PROJECT_VERSION=#{ENV.fetch('GITHUB_RUN_NUMBER', '1')}",
+          "-allowProvisioningUpdates",
+          "-authenticationKeyPath #{key_path}",
+          "-authenticationKeyID #{ENV['ASC_KEY_ID']}",
+          "-authenticationKeyIssuerID #{ENV['ASC_ISSUER_ID']}"
+        ].join(" ")
+      )
+      upload_to_testflight(api_key: key, skip_waiting_for_build_processing: true)
+    ensure
+      File.delete(key_path) if File.exist?(key_path)
+    end
+  end
+end

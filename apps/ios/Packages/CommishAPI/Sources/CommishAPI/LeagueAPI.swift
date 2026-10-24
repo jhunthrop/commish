@@ -14,7 +14,7 @@ public protocol LeagueAPI: Sendable {
 /// The generated client behind ``LeagueAPI``: each operation's documented answers unwrapped, an
 /// error answer thrown as the API's own code and sentence.
 public struct APIClient: LeagueAPI {
-    private let client: Client
+    let client: Client
 
     public init(client: Client) {
         self.client = client
