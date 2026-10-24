@@ -106,9 +106,17 @@ def _assessed(value: float | None) -> Assessed:
 
 @pytest.mark.parametrize(
     ("components", "rival", "chosen"),
-    [(0.03, 0.04, "rival"), (0.04, 0.03, "components"), (0.03001, 0.03004, "components"), (None, 0.01, "rival"), (0.01, None, "components")],
+    [
+        (0.03, 0.04, "rival"),
+        (0.04, 0.03, "components"),
+        (0.03001, 0.03004, "components"),
+        (None, 0.01, "rival"),
+        (0.01, None, "components"),
+    ],
 )
-def test_the_choice_at_four_decimals_a_tie_to_the_components(components: float | None, rival: float | None, chosen: str) -> None:
+def test_the_choice_at_four_decimals_a_tie_to_the_components(
+    components: float | None, rival: float | None, chosen: str
+) -> None:
     found = choose({"components": _assessed(components), "rival": _assessed(rival)})
     assert found.chosen == chosen
     assert "four decimals" in found.rule

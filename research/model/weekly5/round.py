@@ -81,7 +81,6 @@ CHECK_CLAIM: Final = DOCS / "2026-10-26-weekly-projection-round5-dev-check-taken
 JUDGMENT_RECORD: Final = DOCS / "2026-10-26-weekly-projection-round5-results.json"
 JUDGMENT_CLAIM: Final = DOCS / "2026-10-26-weekly-projection-round5-judgment-taken.json"
 SCRATCH_PREFIXES: Final = ("lane70_",)  # 6.3: "The round's scratch guard admits only a `lane70_` database on 5433"
-FIRST_STORE_SEASON: Final = 2016
 ARTIFACT_PREFIX: Final = "weekly5/"  # this round's own `model_artifacts` keys (G5)
 ISOLATED: Final = (
     "preseason_projections",
@@ -313,7 +312,7 @@ def _prepare(conn: Connection, setup: Setup, features: Path) -> Prepared:
     report = build_report(features)
     _store_rule(report)
     pre = [s for s in t.player_fit_seasons if s < t.judgment_season]
-    store = load_store(features, range(FIRST_STORE_SEASON, t.judgment_season), pre)
+    store = load_store(features, range(t.team_fit_seasons[0], t.judgment_season), pre)  # 2016 on
     r4 = env.round_four_record()
     moved = digest_mismatches(store.digests, r4)
     if moved:

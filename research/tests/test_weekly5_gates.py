@@ -95,7 +95,9 @@ def test_g6_passes_a_line_only_against_both_sheets() -> None:
     assert floor[0].passed and not any(line.passed for line in floor[1:])
 
 
-@pytest.mark.parametrize(("choice", "label"), [("preregistered", "the preregistered spreadsheet"), ("damped", "the damped spreadsheet")])
+@pytest.mark.parametrize(
+    ("choice", "label"), [("preregistered", "the preregistered spreadsheet"), ("damped", "the damped spreadsheet")]
+)
 def test_under_one_sheet_the_other_is_reported_only(choice: str, label: str) -> None:
     t = replace(ROUND_FIVE, spreadsheets=choice)  # type: ignore[arg-type]
     other = "damped" if choice == "preregistered" else "sheet"
@@ -147,7 +149,9 @@ def test_g4_cells_at_their_edges(changes: dict[str, float | int], passed: bool) 
 
 def _bins(observed: float, pairs: int = 200, count: int = 3) -> list[ChanceBin]:
     lows = (0.5, 0.6, 0.7, 0.8, 0.9)
-    return [ChanceBin(low, low + 0.1, pairs if i < count else 0, low + 0.05, observed + low) for i, low in enumerate(lows)]
+    return [
+        ChanceBin(low, low + 0.1, pairs if i < count else 0, low + 0.05, observed + low) for i, low in enumerate(lows)
+    ]
 
 
 @pytest.mark.parametrize(
@@ -167,7 +171,11 @@ def _comparison() -> Comparison:
 def test_thirty_four_lines_with_g5() -> None:
     lines = gate_lines(_comparison(), _cells(), [], ROUND_FIVE)
     g5 = gates.isolation_line(
-        {gates.PLAYS_AND_TEAMS: (2016,), gates.PLAYERS: (2021,), gates.JUDGED: (2024,)}, {"t": "1"}, {"t": "1"}, (True, "ok"), ROUND_FIVE
+        {gates.PLAYS_AND_TEAMS: (2016,), gates.PLAYERS: (2021,), gates.JUDGED: (2024,)},
+        {"t": "1"},
+        {"t": "1"},
+        (True, "ok"),
+        ROUND_FIVE,
     )
     counts = {g: sum(1 for x in [*lines, g5] if x.gate == g) for g in ("G1", "G2", "G6", "G7", "G3", "G4", "G5")}
     assert counts == {"G1": 5, "G2": 6, "G6": 5, "G7": 1, "G3": 3, "G4": 13, "G5": 1}

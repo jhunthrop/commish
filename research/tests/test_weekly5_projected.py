@@ -53,7 +53,10 @@ def test_a_chart_row_of_another_week_or_after_t_g_is_refused() -> None:
 
 
 def test_a_snap_in_one_of_his_clubs_last_three_games() -> None:
-    snaps = [Snap(2021, 1, KICKOFF - timedelta(days=28), "wr", 12.0), Snap(2021, 3, KICKOFF - timedelta(days=14), "rb", 0.0)]
+    snaps = [
+        Snap(2021, 1, KICKOFF - timedelta(days=28), "wr", 12.0),
+        Snap(2021, 3, KICKOFF - timedelta(days=14), "rb", 0.0),
+    ]
     assert not evidence("wr", [], snaps, {2, 3, 4}, 2021, 5, MOMENT)  # week 1 is not one of the last three
     assert evidence("wr", [], snaps, {1, 2, 3}, 2021, 5, MOMENT)
     assert not evidence("rb", [], snaps, {1, 2, 3}, 2021, 5, MOMENT)  # a snap row of 0 is no snap
@@ -77,5 +80,7 @@ def test_the_store_form_withholds_and_needs_evidence() -> None:
 def test_the_tree_inputs_hold_the_feature_row_less_the_named_columns() -> None:
     assert not EXCLUDED & set(FEATURE_INPUTS)
     assert "roof" in FEATURE_INPUTS and "surface" not in FEATURE_INPUTS
-    assert {"implied_points", "depth_rank", "played_in_last_three", "default_no_game_this_season"} <= set(FEATURE_INPUTS)
+    assert {"implied_points", "depth_rank", "played_in_last_three", "default_no_game_this_season"} <= set(
+        FEATURE_INPUTS
+    )
     assert "precipitation_probability" not in FEATURE_INPUTS

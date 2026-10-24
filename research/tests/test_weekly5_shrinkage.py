@@ -36,7 +36,16 @@ ZEROS = dict.fromkeys(
 
 
 def game(week: int, player: str = "wr", position: str = "WR", season: int = 2021, **values: float) -> dict[str, object]:
-    return {"season": season, "week": week, "player_id": player, "position": position, "club": "KC", "games": 1.0, **ZEROS, **values}
+    return {
+        "season": season,
+        "week": week,
+        "player_id": player,
+        "position": position,
+        "club": "KC",
+        "games": 1.0,
+        **ZEROS,
+        **values,
+    }
 
 
 def frame(*rows: dict[str, object]) -> pd.DataFrame:
@@ -69,7 +78,7 @@ def test_a_conversion_counts_expected_touchdown_units() -> None:
     games = frame(game(1, rushing_touchdowns=1, u_rush=0.5), game(2, rushing_touchdowns=0, u_rush=1.5))
     sums = weighted_sums(games, 2021, 3, 1.0, [("rushing_touchdowns", "u_rush")])
     assert sums.loc["wr", "u_rush|w"] == pytest.approx(2.0)  # at d = 1, n_eff is his expected touchdowns
-    w, w2 = sums.loc["wr", "u_rush|w"], sums.loc["wr", "u_rush|w2"]
+    w, w2 = sums["u_rush|w"].to_numpy(dtype=float)[0], sums["u_rush|w2"].to_numpy(dtype=float)[0]
     assert w**2 / w2 == pytest.approx(2.0)
 
 
@@ -90,11 +99,13 @@ def test_guard_two_a_week_w_line_raises_in_every_read() -> None:
 
 
 def test_the_season_reads_take_only_earlier_weeks() -> None:
-    games = frame(game(1, targets=3, receptions=1), game(2, targets=5, receptions=5), game(3, targets=100, receptions=100))
+    games = frame(
+        game(1, targets=3, receptions=1), game(2, targets=5, receptions=5), game(3, targets=100, receptions=100)
+    )
     rows = frame(game(3), game(1))
     found = anchors(games, rows)
     assert found.loc[0, "anchor_targets"] == pytest.approx(4.0)  # weeks 1 and 2, never week 3's own
-    assert np.isnan(found.loc[1, "anchor_targets"])  # before his first game
+    assert np.isnan(found["anchor_targets"].to_numpy(dtype=float)[1])  # before his first game
 
 
 def _window(seasons: tuple[int, ...] = (2021, 2022)) -> pd.DataFrame:
@@ -126,15 +137,17 @@ def test_the_fit_chooses_per_position_and_quantity_on_the_window() -> None:
         assert d in shrinkage.DECAYS
         grid = shrinkage.CONVERSION_PRIORS if shrinkage.QUANTITIES[quantity].conversion else shrinkage.COUNT_PRIORS
         assert k in grid
-    assert set(fit.losses[("WR", "receptions_per_target")]) == {(d, k) for d in shrinkage.DECAYS for k in shrinkage.COUNT_PRIORS}
+    assert set(fit.losses[("WR", "receptions_per_target")]) == {
+        (d, k) for d in shrinkage.DECAYS for k in shrinkage.COUNT_PRIORS
+    }
     assert fit.rates[("WR", "receptions_per_target")] == pytest.approx(0.6)
     assert fit.rates[("QB", QB_CARRY)] == pytest.approx(34.0 / 8.0)
 
 
 def test_the_tie_rule_prefers_more_pooling() -> None:
-    assert shrinkage._choose({(0.85, 10.0): 1.0, (1.0, 10.0): 1.0005, (0.95, 20.0): 1.0009}) == (0.95, 20.0)  # noqa: SLF001
-    assert shrinkage._choose({(0.85, 10.0): 1.0, (1.0, 20.0): 1.002}) == (0.85, 10.0)  # noqa: SLF001
-    assert shrinkage._choose({(0.85, 40.0): 1.0, (1.0, 40.0): 1.0}) == (1.0, 40.0)  # noqa: SLF001
+    assert shrinkage._choose({(0.85, 10.0): 1.0, (1.0, 10.0): 1.0005, (0.95, 20.0): 1.0009}) == (0.95, 20.0)
+    assert shrinkage._choose({(0.85, 10.0): 1.0, (1.0, 20.0): 1.002}) == (0.85, 10.0)
+    assert shrinkage._choose({(0.85, 40.0): 1.0, (1.0, 40.0): 1.0}) == (1.0, 40.0)
 
 
 def test_guard_four_the_fit_refuses_rows_outside_its_window() -> None:

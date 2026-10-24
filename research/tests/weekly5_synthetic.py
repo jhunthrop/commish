@@ -319,7 +319,8 @@ def write_store(
 def _sources(lines: pd.DataFrame, fumbles: pd.DataFrame, where: dict[str, str]) -> Sources:
     rates = []
     forms = []
-    for (season, pid), mine in lines.groupby(["season", "player_id"]):
+    for (year, pid), mine in lines.groupby(["season", "player_id"]):
+        season = int(str(year))
         level = float(mine["ppr"].mean())
         prior = lines[(lines["season"] == season - 1) & (lines["player_id"] == pid)]
         for week in WEEKS:
@@ -340,11 +341,12 @@ def population(sources: Sources, season: int, where: dict[str, str], rng: np.ran
     forms = sources.forms.set_index(["season", "week", "player_id"])
     adp = {pid: float(i + 1) for i, pid in enumerate(sorted(where))}
     rows = []
-    for r in lines.itertuples():
-        key = (season, int(r.week), str(r.player_id))
-        form = {n: float(forms.loc[key, f"form_{n}"]) for n in FORMATS} if key in forms.index else None
+    values = forms.to_dict("index")
+    for r in lines.to_dict("records"):
+        key = (season, int(r["week"]), str(r["player_id"]))
+        form = {n: float(values[key][f"form_{n}"]) for n in FORMATS} if key in values else None
         number = None if form is None else {n: v * float(rng.uniform(0.8, 1.2)) for n, v in form.items()}
-        actual = {n: float(getattr(r, n)) for n in FORMATS}
-        rows.append(JudgedRow(int(r.week), str(r.player_id), where[str(r.player_id)], number, None, None,
-                              adp[str(r.player_id)], form, actual, False))  # fmt: skip
+        actual = {n: float(r[n]) for n in FORMATS}
+        pid = str(r["player_id"])
+        rows.append(JudgedRow(int(r["week"]), pid, where[pid], number, None, None, adp[pid], form, actual, False))
     return rows

@@ -42,7 +42,9 @@ def plays() -> pd.DataFrame:
 
 
 def teams() -> pd.DataFrame:
-    return pd.DataFrame([{"season": 2021, "week": 3, "club": "KC", "rushing_touchdowns": 2.0, "receiving_touchdowns": 1.0}])
+    return pd.DataFrame(
+        [{"season": 2021, "week": 3, "club": "KC", "rushing_touchdowns": 2.0, "receiving_touchdowns": 1.0}]
+    )
 
 
 def test_each_realised_quantity_is_read_as_2_5_says() -> None:
@@ -77,8 +79,24 @@ def test_lined_games_keep_a_line_with_no_play_and_his_fumbles() -> None:
 def test_fumbles_lost_per_touch_by_position_on_the_window() -> None:
     games = pd.DataFrame(
         [
-            {"season": 2021, "week": 1, "position": "RB", "receptions": 2.0, "carries": 18.0, "dropbacks": 0.0, "fumbles_lost": 1.0},
-            {"season": 2021, "week": 2, "position": "QB", "receptions": 0.0, "carries": 5.0, "dropbacks": 35.0, "fumbles_lost": 2.0},
+            {
+                "season": 2021,
+                "week": 1,
+                "position": "RB",
+                "receptions": 2.0,
+                "carries": 18.0,
+                "dropbacks": 0.0,
+                "fumbles_lost": 1.0,
+            },
+            {
+                "season": 2021,
+                "week": 2,
+                "position": "QB",
+                "receptions": 0.0,
+                "carries": 5.0,
+                "dropbacks": 35.0,
+                "fumbles_lost": 2.0,
+            },
         ]
     )
     assert fumble_rates(games, (2021,)) == {"RB": pytest.approx(1 / 20), "QB": pytest.approx(2 / 40)}
@@ -124,7 +142,9 @@ def test_a_receivers_touchdowns_are_the_clubs_times_his_modelled_share_times_his
 
 
 def test_a_missing_modelled_share_falls_back_and_is_counted() -> None:
-    rows = pd.DataFrame([_row("WR", model_red_zone=math.nan), _row("WR", model_red_zone=math.nan, share_season_red_zone=math.nan)])
+    rows = pd.DataFrame(
+        [_row("WR", model_red_zone=math.nan), _row("WR", model_red_zone=math.nan, share_season_red_zone=math.nan)]
+    )
     found = expected_components(rows, {"WR": 0.0})
     assert list(found[NO_SHARE]) == [1, 1]
     first = 0.5 * 0.05 + 0.5 * 0.1
@@ -136,13 +156,24 @@ def test_the_point_is_the_house_scoring_of_the_expected_components() -> None:
     line = StatLine("p", 3, passing_yards=250, passing_touchdowns=2, interceptions=1, rushing_yards=31,
                     rushing_touchdowns=1, receiving_yards=12, receiving_touchdowns=0, receptions=2, fumbles_lost=1)  # fmt: skip
     components = pd.DataFrame(
-        [{expected_column(c): v for c, v in (("passing_yards", 250), ("passing_touchdowns", 2), ("interceptions", 1),
-          ("rushing_yards", 31), ("rushing_touchdowns", 1), ("receiving_yards", 12), ("receiving_touchdowns", 0),
-          ("receptions", 2), ("fumbles_lost", 1))}]  # fmt: skip
+        [
+            {
+                expected_column(c): v
+                for c, v in (
+                    ("passing_yards", 250),
+                    ("passing_touchdowns", 2),
+                    ("interceptions", 1),
+                    ("rushing_yards", 31),
+                    ("rushing_touchdowns", 1),
+                    ("receiving_yards", 12),
+                    ("receiving_touchdowns", 0),
+                    ("receptions", 2),
+                    ("fumbles_lost", 1),
+                )
+            }
+        ]
     )
-    from research.model.weekly.round.scoring import FORMATS as RULES  # noqa: PLC0415 - the formats' rules
-
-    for name, rules in RULES.items():
+    for rules in FORMATS.values():
         assert score(components, rules)[0] == pytest.approx(compute_fantasy_points(line, "RB", rules))
 
 
@@ -155,8 +186,20 @@ def test_no_game_this_season_takes_the_rate_m_and_an_unnumbered_row_none() -> No
         ]
     )
     components = pd.DataFrame({expected_column("receptions"): [1.0, 4.0, 4.0]}).reindex(
-        columns=[expected_column(c) for c in ("passing_yards", "passing_touchdowns", "interceptions", "rushing_yards",
-                 "rushing_touchdowns", "receiving_yards", "receiving_touchdowns", "receptions", "fumbles_lost")],  # fmt: skip
+        columns=[
+            expected_column(c)
+            for c in (
+                "passing_yards",
+                "passing_touchdowns",
+                "interceptions",
+                "rushing_yards",
+                "rushing_touchdowns",
+                "receiving_yards",
+                "receiving_touchdowns",
+                "receptions",
+                "fumbles_lost",
+            )
+        ],
         fill_value=0.0,
     )
     found = points(rows, components, np.array([True, True, False]))
