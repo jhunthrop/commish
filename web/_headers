@@ -30,6 +30,17 @@
   ! Cache-Control
   Cache-Control: no-store
 
+# The app's sign-in landing (Lane 172) is opened with a pairing code in its query: it sends no
+# referrer and no cache keeps it, so the address goes nowhere past the browser.
+/app/signed-in
+  Referrer-Policy: no-referrer
+  ! Cache-Control
+  Cache-Control: no-store
+/app/signed-in/*
+  Referrer-Policy: no-referrer
+  ! Cache-Control
+  Cache-Control: no-store
+
 # The app-link association files (Lane 172, scripts/well-known.ts): Apple's has no extension and
 # both must answer as JSON for iOS and Android to verify the apps' links.
 /.well-known/apple-app-site-association

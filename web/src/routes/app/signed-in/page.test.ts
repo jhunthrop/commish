@@ -49,3 +49,14 @@ void test(`the page never prints the code it is opened with (${APP_SIGNED_IN_PAT
 	assert.match(route, /export const prerender = true/);
 	assert.match(route, /export const csr = false/);
 });
+
+void test('the page, opened with a code, sends no referrer and is never stored', () => {
+	const headers = readFileSync(new URL('../../../../_headers', import.meta.url), 'utf8');
+	for (const path of [APP_SIGNED_IN_PATH, `${APP_SIGNED_IN_PATH}/*`]) {
+		const rule = headers.split(/\n(?=\S)/).find((block) => block.split('\n')[0] === path);
+		assert.ok(rule, `no _headers rule for ${path}`);
+		assert.match(rule, /^ {2}Referrer-Policy: no-referrer$/m);
+		assert.match(rule, /^ {2}! Cache-Control$/m);
+		assert.match(rule, /^ {2}Cache-Control: no-store$/m);
+	}
+});
