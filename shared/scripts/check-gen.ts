@@ -1,5 +1,5 @@
 /** The shared sources' drift check: regenerates every file the shared generators write (the tokens,
- * the words, the fixtures) into a temp dir and compares each, byte for byte, with the file in the
+ * the words, the fixtures, the mark) into a temp dir and compares each, byte for byte, with the file in the
  * repository, which git must track. A generated file edited by hand, one never regenerated after its
  * source changed, one missing, untracked, or left behind in a generated folder fails it: it prints
  * each path and exits 1. `make -C api check-gen` runs it in CI, `npm run check:shared` in web/.
@@ -10,6 +10,7 @@ import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generate as exportFixtures } from './export-fixtures.ts';
+import { generate as genMark } from './gen-mark.ts';
 import { generate as genTokens } from './gen-tokens.ts';
 import { generate as genWords } from './gen-words.ts';
 import { REPOSITORY, writeOutputs, type Outputs } from './generated.ts';
@@ -68,7 +69,8 @@ async function main(): Promise<number> {
 	const outputs: Outputs = new Map([
 		...(await genTokens()),
 		...(await genWords()),
-		...(await exportFixtures())
+		...(await exportFixtures()),
+		...(await genMark())
 	]);
 	const fresh = await mkdtemp(join(tmpdir(), 'commish-check-gen-'));
 	try {

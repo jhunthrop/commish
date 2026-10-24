@@ -23,7 +23,8 @@ line_length:
   error: 140
   ignores_comments: true
 identifier_name:
-  excluded: [id, x, y, i, s]
+  # ui: the interface face's token name; x, y: coordinates.
+  excluded: [id, x, y, ui]
 type_body_length:
   warning: 300
 file_length:
