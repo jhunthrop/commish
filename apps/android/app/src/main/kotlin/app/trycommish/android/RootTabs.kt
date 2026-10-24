@@ -95,7 +95,12 @@ private fun Bar(
                     Text(
                         stringResource(tab.label),
                         // "Rest of season" is the longest: two short lines, never cut.
-                        style = Faces.label.copy(letterSpacing = Faces.small.letterSpacing, lineHeight = Faces.label.fontSize * LABEL_LEADING),
+                        style =
+                            Faces.label.copy(
+                                letterSpacing = Faces.small.letterSpacing,
+                                lineHeight =
+                                    Faces.label.fontSize * LABEL_LEADING,
+                            ),
                         maxLines = 2,
                         textAlign = TextAlign.Center,
                     )
