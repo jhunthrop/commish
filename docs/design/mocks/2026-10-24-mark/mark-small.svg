@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+<style>.ink{stroke:#15120f}.pea{fill:#c2470a}@media (prefers-color-scheme:dark){.ink{stroke:#f5f0ea}.pea{fill:#ff7130}}</style>
+<path class="ink" d="M80.7 52.7 L250.4 52.7 L244.7 92.0 L153.5 110.4 L155.8 128.2 A75.1 75.1 0 1 1 80.7 52.7 Z" fill="none" stroke-width="18.2" stroke-linejoin="round"/>
+<circle class="pea" cx="80.7" cy="128.2" r="26.6"/>
+</svg>
