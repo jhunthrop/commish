@@ -21,6 +21,11 @@ on:
       - "api/openapi.yaml"
       - ".github/workflows/ios.yml"
   workflow_dispatch:
+    inputs:
+      record_snapshots:
+        description: Record the snapshot references on this image and upload them (commit them from the artifact)
+        type: boolean
+        default: false
 
 concurrency:
   group: ios-${{ github.ref }}
@@ -32,6 +37,9 @@ permissions:
 env:
   # The newest iPhone simulator the selected Xcode carries is picked in the step that builds.
   SIMULATOR_OS: latest
+  # XcodeGen pinned by version and checksum, as the actions are by SHA.
+  XCODEGEN_VERSION: 2.46.0
+  XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
 
 jobs:
   packages:
@@ -61,7 +69,26 @@ jobs:
       - name: SwiftFormat and SwiftLint
         run: scripts/lint.sh
       - name: Package tests (view models, copy guard, snapshots)
+        if: ${{ !inputs.record_snapshots }}
         run: scripts/test-packages.sh
+      - name: Record the snapshot references on this image
+        if: ${{ inputs.record_snapshots }}
+        env:
+          SNAPSHOT_RECORD: "1"
+          SNAPSHOT_SHOTS: ${{ runner.temp }}/persona-shots
+        run: scripts/test-packages.sh CommishDesign Features/LeagueHome
+      - name: Recorded references
+        if: ${{ inputs.record_snapshots }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: snapshot-references
+          path: apps/ios/Packages/**/__Snapshots__/*.png
+      - name: Persona renders at each phone's own scale
+        if: ${{ inputs.record_snapshots }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: persona-shots
+          path: ${{ runner.temp }}/persona-shots/
       - name: Snapshot differences
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -74,6 +101,7 @@ jobs:
     name: App build and tests on a simulator
     runs-on: macos-26
     needs: packages
+    if: ${{ !inputs.record_snapshots }}
     defaults: { run: { working-directory: apps/ios } }
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
@@ -94,7 +122,12 @@ jobs:
           key: derived-${{ runner.os }}-${{ hashFiles('apps/ios/project.yml', 'apps/ios/Packages/**/Package.resolved', 'api/openapi.yaml') }}
           restore-keys: derived-${{ runner.os }}-
       - name: XcodeGen
-        run: brew install xcodegen && xcodegen generate
+        run: |
+          curl -sSL -o "$RUNNER_TEMP/xcodegen.zip" \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/$XCODEGEN_VERSION/xcodegen.zip"
+          echo "$XCODEGEN_SHA256  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          "$RUNNER_TEMP/xcodegen/bin/xcodegen" generate
       - name: Build and test
         run: |
           # The first available iPhone simulator of the selected Xcode's newest runtime.

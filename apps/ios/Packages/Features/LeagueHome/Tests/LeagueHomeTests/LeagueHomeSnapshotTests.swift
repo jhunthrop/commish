@@ -8,8 +8,9 @@ import SwiftUI
 import Testing
 
 /// The League home's mock: the fixture league at its Sunday clock (the noon games in their fourth
-/// quarter) and at its Saturday clock (every Sunday game to come), both themes, iPhone 15 and iPhone
-/// SE, the whole height. These images are what the persona panel reads.
+/// quarter) in its three runs, and its top at the Saturday clock (every Sunday game to come), both
+/// themes, iPhone 15 and iPhone SE, at 1x. With SNAPSHOT_SHOTS set the whole screen is also written
+/// at each phone's own scale, which is what the persona panel reads.
 @MainActor
 struct LeagueHomeSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -48,23 +49,41 @@ struct LeagueHomeSnapshotTests {
         return LeagueHomeModel(sync: sync, scoreboard: board, now: now, zone: zone)
     }
 
+    /// The runs a clock is drawn in: every run on Sunday; Saturday's lineup and moves are Sunday's.
+    static func parts(at clock: String) -> [LeagueHomePart] {
+        clock == "2026-10-18T18-56-00Z" ? LeagueHomePart.allCases : [.top]
+    }
+
     @Test(arguments: 0 ..< cases.count)
     func leagueHome(index: Int) throws {
         let (clock, scheme, device) = (Self.cases[index].clock, Self.cases[index].scheme, Self.cases[index].device)
-        let screen = try LeagueHomeScreen(model: Self.model(at: clock), stamp: nil, still: true, openLineup: {})
-        let image = try #require(Snapshot.render(screen, device: device, scheme: scheme))
+        let model = try Self.model(at: clock)
         let name = "league-home-\(clock.prefix(10))-\(device.name)-\(scheme)"
-        let result = Snapshot.verify(image, named: name, in: Self.folder)
-        #expect(result.matches, "\(result.message)")
+        Snapshot.shoot(
+            LeagueHomeScreen(model: model, stamp: nil, still: true, openLineup: {}),
+            named: name, device: device, scheme: scheme
+        )
+        for part in Self.parts(at: clock) {
+            let view = LeagueHomePartView(part: part, model: model, stamp: nil, still: true, openLineup: {})
+            let result = Snapshot.verify(
+                view, named: "\(name)-\(part)", device: device, scheme: scheme, in: Self.folder
+            )
+            #expect(result.matches, "\(result.message)")
+        }
     }
 
     @Test func aSavedHomeCarriesItsStamp() throws {
-        let screen = try LeagueHomeScreen(
-            model: Self.model(at: "2026-10-18T18-56-00Z"), stamp: "\(AppWords.lastRead) Sun 1:52 pm", still: true,
-            openLineup: {}
+        let view = try LeagueHomePartView(
+            part: .top, model: Self.model(at: "2026-10-18T18-56-00Z"), stamp: "\(AppWords.lastRead) Sun 1:52 pm",
+            still: true, openLineup: {}
         )
-        let image = try #require(Snapshot.render(screen, device: .iPhoneSE, scheme: .light))
-        let result = Snapshot.verify(image, named: "league-home-stale-iPhoneSE-light", in: Self.folder)
+        let result = Snapshot.verify(
+            view, named: "league-home-stale-iPhoneSE-light-top", device: .iPhoneSE, scheme: .light, in: Self.folder
+        )
         #expect(result.matches, "\(result.message)")
+    }
+
+    @Test func everyReferenceIsSmallEnoughToKeep() {
+        #expect(Snapshot.oversized(in: Self.folder).isEmpty, "\(Snapshot.oversized(in: Self.folder))")
     }
 }

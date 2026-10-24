@@ -21,36 +21,73 @@ public struct LeagueHomeScreen: View {
     }
 
     public var body: some View {
-        let theme = Theme(colorScheme)
         VStack(alignment: .leading, spacing: Tokens.Space.s5) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(model.platform)
-                    .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .bold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(theme.color(Tokens.Color.accentText))
-                Text(model.leagueName)
-                    .font(Faces.font(.num, size: Tokens.TypeScale.head, weight: .bold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(theme.color(Tokens.Color.ink))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.isHeader)
+            ForEach(LeagueHomePart.allCases, id: \.self) { part in
+                LeagueHomePartView(part: part, model: model, stamp: stamp, still: still, openLineup: openLineup)
             }
-            .padding(.horizontal, Tokens.Space.s4)
-            if !model.bugs.isEmpty {
-                ScoreBoardView(
-                    title: model.weekTitle, aside: model.scoreboardAside, stamp: stamp, bugs: model.bugs,
-                    scrolls: !still
-                )
-            }
-            StandingsView(section: model.standings)
-            if let lineup = model.lineup {
-                LineupSummaryView(section: lineup, openLineup: openLineup)
-            }
-            MovesFeedView(section: model.moves)
-            BasisText(model.basis)
-                .padding(.horizontal, Tokens.Space.s4)
         }
         .padding(.vertical, Tokens.Space.s4)
+    }
+}
+
+/// The screen's three runs, top to bottom: each a snapshot of its own, so no reference grows past what
+/// a repository keeps, and a change shows in the run it touched.
+enum LeagueHomePart: CaseIterable {
+    /// The league's head, the week's scoreboard and the standings.
+    case top
+    /// The member's lineup.
+    case lineup
+    /// The moves and the basis.
+    case foot
+}
+
+struct LeagueHomePartView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let part: LeagueHomePart
+    let model: LeagueHomeModel
+    let stamp: String?
+    let still: Bool
+    let openLineup: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.s5) {
+            switch part {
+            case .top:
+                head
+                if !model.bugs.isEmpty {
+                    ScoreBoardView(
+                        title: model.weekTitle, aside: model.scoreboardAside, stamp: stamp, bugs: model.bugs,
+                        scrolls: !still
+                    )
+                }
+                StandingsView(section: model.standings)
+            case .lineup:
+                if let lineup = model.lineup {
+                    LineupSummaryView(section: lineup, openLineup: openLineup)
+                }
+            case .foot:
+                MovesFeedView(section: model.moves)
+                BasisText(model.basis)
+                    .padding(.horizontal, Tokens.Space.s4)
+            }
+        }
+    }
+
+    private var head: some View {
+        let theme = Theme(colorScheme)
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(model.platform)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .bold))
+                .textCase(.uppercase)
+                .foregroundStyle(theme.color(Tokens.Color.accentText))
+            Text(model.leagueName)
+                .font(Faces.font(.num, size: Tokens.TypeScale.head, weight: .bold))
+                .textCase(.uppercase)
+                .foregroundStyle(theme.color(Tokens.Color.ink))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+        }
+        .padding(.horizontal, Tokens.Space.s4)
     }
 }
 

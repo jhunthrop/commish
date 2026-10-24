@@ -12,10 +12,15 @@ struct SpecimenSnapshotTests {
         .appendingPathComponent("__Snapshots__")
 
     @Test(arguments: [Scheme.light, Scheme.dark])
-    func specimen(scheme: Scheme) throws {
-        let image = try #require(Snapshot.render(Specimen(), device: .iPhoneSE, scheme: scheme))
-        let result = Snapshot.verify(image, named: "specimen-\(scheme)", in: Self.folder)
+    func specimen(scheme: Scheme) {
+        let result = Snapshot.verify(
+            Specimen(), named: "specimen-\(scheme)", device: .iPhoneSE, scheme: scheme, in: Self.folder
+        )
         #expect(result.matches, "\(result.message)")
+    }
+
+    @Test func everyReferenceIsSmallEnoughToKeep() {
+        #expect(Snapshot.oversized(in: Self.folder).isEmpty, "\(Snapshot.oversized(in: Self.folder))")
     }
 }
 

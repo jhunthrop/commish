@@ -5,7 +5,8 @@ import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// A phone a snapshot is drawn at: its width in points and its pixel scale.
+/// A phone a snapshot is drawn at: its width in points and its own pixel scale, which the persona
+/// renders use. The references are drawn at 1x (review M3): small to keep, and still every point.
 public struct SnapshotDevice: Sendable, Equatable {
     public let name: String
     public let width: Double
@@ -25,15 +26,23 @@ public struct SnapshotResult: Sendable, Equatable {
 /// Each screen's mock is its snapshot: the view drawn at a phone's width in a theme, its whole
 /// height, compared with the committed PNG. swift-snapshot-testing needs XCTest, which the Command
 /// Line Tools do not carry, so this draws with SwiftUI's ImageRenderer and runs under Swift Testing
-/// on any Mac. `SNAPSHOT_RECORD=1` writes the references; a missing one is written and fails once.
+/// on any Mac. The references are CI's own: `SNAPSHOT_RECORD=1` writes them (ios.yml's record run
+/// uploads them); a missing one is written and fails. `SNAPSHOT_SHOTS=<folder>` also writes each view
+/// at its phone's own scale there, for the persona panel, never into git.
 public enum Snapshot {
-    /// A pixel differs when a channel moves more than this (of 255): antialiasing on another macOS.
+    /// A pixel differs when a channel moves more than this (of 255).
     public static let channelTolerance = 24
-    /// The share of differing pixels a match allows.
-    public static let pixelTolerance = 0.01
+    /// The differing pixels a match allows, an absolute count so a changed figure never passes.
+    public static let maxDifferingPixels = 300
+    /// The largest reference a suite may commit, in bytes.
+    public static let maxReferenceBytes = 300_000
+    /// The references' pixel scale.
+    public static let referenceScale: Double = 1
 
     @MainActor
-    public static func render(_ view: some View, device: SnapshotDevice, scheme: Scheme) -> CGImage? {
+    public static func render(
+        _ view: some View, device: SnapshotDevice, scheme: Scheme, scale: Double = referenceScale
+    ) -> CGImage? {
         let theme = Theme(scheme: scheme)
         let framed = view
             .frame(width: device.width)
@@ -42,8 +51,30 @@ public enum Snapshot {
             .environment(\.colorScheme, scheme == .dark ? .dark : .light)
         let renderer = ImageRenderer(content: framed)
         renderer.proposedSize = ProposedViewSize(width: device.width, height: nil)
-        renderer.scale = device.scale
+        renderer.scale = scale
         return renderer.cgImage
+    }
+
+    /// Writes `view` at its phone's own scale to SNAPSHOT_SHOTS for the persona panel, when it is set.
+    @MainActor
+    public static func shoot(_ view: some View, named name: String, device: SnapshotDevice, scheme: Scheme) {
+        guard let shots = ProcessInfo.processInfo.environment["SNAPSHOT_SHOTS"],
+              let image = render(view, device: device, scheme: scheme, scale: device.scale)
+        else {
+            return
+        }
+        _ = write(image, to: URL(fileURLWithPath: shots).appendingPathComponent("\(name).png"))
+    }
+
+    /// Renders `view` at 1x and compares it with `<folder>/<name>.png`.
+    @MainActor
+    public static func verify(
+        _ view: some View, named name: String, device: SnapshotDevice, scheme: Scheme, in folder: URL
+    ) -> SnapshotResult {
+        guard let image = render(view, device: device, scheme: scheme) else {
+            return SnapshotResult(matches: false, message: "\(name): the view did not render")
+        }
+        return verify(image, named: name, in: folder)
     }
 
     /// Compares `image` with `<folder>/<name>.png`, recording it when asked or when it is missing.
@@ -52,26 +83,36 @@ public enum Snapshot {
         let record = ProcessInfo.processInfo.environment["SNAPSHOT_RECORD"] == "1"
         guard !record, let committed = load(reference) else {
             let wrote = write(image, to: reference)
-            let why = record ? "Recorded" : "No reference, recorded one; run again"
+            let why = record ? "Recorded" : "No reference, so one was recorded. Run again"
             return SnapshotResult(matches: record && wrote, message: "\(why): \(reference.path)")
         }
-        let share = differingShare(committed, image)
-        guard share > pixelTolerance else {
+        let differing = differingPixels(committed, image)
+        guard differing > maxDifferingPixels else {
             return SnapshotResult(matches: true, message: "")
         }
         let failure = folder.appendingPathComponent("__Failures__/\(name).png")
         _ = write(image, to: failure)
-        let percent = String(format: "%.2f", share * 100)
         return SnapshotResult(
             matches: false,
-            message: "\(name): \(percent)% of pixels differ, actual at \(failure.path)"
+            message: "\(name): \(differing) pixels differ (\(maxDifferingPixels) allowed), actual at \(failure.path)"
         )
     }
 
-    /// The share of pixels that differ, 1 when the sizes differ.
-    public static func differingShare(_ lhs: CGImage, _ rhs: CGImage) -> Double {
+    /// The references in a folder over the size a suite may commit.
+    public static func oversized(in folder: URL) -> [String] {
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: folder, includingPropertiesForKeys: [.fileSizeKey]
+        )) ?? []
+        return files.filter { $0.pathExtension == "png" }.compactMap { file in
+            let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            return size > maxReferenceBytes ? "\(file.lastPathComponent): \(size) bytes" : nil
+        }
+    }
+
+    /// The pixels that differ, every pixel when the sizes differ.
+    public static func differingPixels(_ lhs: CGImage, _ rhs: CGImage) -> Int {
         guard lhs.width == rhs.width, lhs.height == rhs.height, let left = rgba(lhs), let right = rgba(rhs) else {
-            return 1
+            return max(lhs.width * lhs.height, rhs.width * rhs.height)
         }
         var differing = 0
         for pixel in stride(from: 0, to: left.count, by: 4) {
@@ -81,7 +122,7 @@ public enum Snapshot {
                 break
             }
         }
-        return Double(differing) / Double(lhs.width * lhs.height)
+        return differing
     }
 
     static func rgba(_ image: CGImage) -> [UInt8]? {
@@ -109,11 +150,29 @@ public enum Snapshot {
 
     static func write(_ image: CGImage, to url: URL) -> Bool {
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
+        guard let opaque = opaque(image),
+              let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
         else {
             return false
         }
-        CGImageDestinationAddImage(destination, image, nil)
+        // Every PNG filter tried per row: the smallest file for text on flat colour.
+        let filters = [kCGImagePropertyPNGCompressionFilter: Self.allPNGFilters]
+        CGImageDestinationAddImage(destination, opaque, [kCGImagePropertyPNGDictionary: filters] as CFDictionary)
         return CGImageDestinationFinalize(destination)
+    }
+
+    /// ImageIO's IMAGEIO_PNG_ALL_FILTERS (none, sub, up, average, Paeth), a C macro Swift does not import.
+    static let allPNGFilters = 0x08 | 0x10 | 0x20 | 0x40 | 0x80
+
+    /// The image without its alpha channel: a screen is opaque, and three channels keep a quarter less.
+    static func opaque(_ image: CGImage) -> CGImage? {
+        guard let context = CGContext(
+            data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        ) else {
+            return nil
+        }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return context.makeImage()
     }
 }
