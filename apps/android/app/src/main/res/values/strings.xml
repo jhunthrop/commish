@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app's chrome: its name and the bar's five tabs, in the web's words (web/src/lib/ui/nav.ts).
+     Every screen's words live in its word table (Words, LeagueHomeWords, SignInWords); the copy guard
+     (CopyGuardTest) reads this file and those tables. -->
+<resources>
+    <string name="app_name">Commish</string>
+    <string name="tab_league">League</string>
+    <string name="tab_players">Players</string>
+    <string name="tab_rest">Rest of season</string>
+    <string name="tab_mock">Mock draft</string>
+    <string name="tab_advisor">Advisor</string>
+</resources>

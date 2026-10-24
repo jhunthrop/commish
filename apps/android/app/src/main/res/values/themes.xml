@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The window behind Compose: the page colour of each theme (Tokens.Color.bg), so no flash of white in
+     the dark theme before the first frame. -->
+<resources>
+    <style name="Theme.Commish" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+    <color name="window_background">#FFFFFF</color>
+</resources>
