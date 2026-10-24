@@ -45,10 +45,16 @@ public enum BoxTone: Sendable, Equatable {
 public struct BoxCell: Sendable, Equatable {
     public let text: String
     public let tone: BoxTone
+    /// A line under the text in the small face: the streak under a team's name.
+    public let sub: String?
+    /// The initials of a face drawn before the text: someone on every row.
+    public let face: String?
 
-    public init(_ text: String, tone: BoxTone = .plain) {
+    public init(_ text: String, tone: BoxTone = .plain, sub: String? = nil, face: String? = nil) {
         self.text = text
         self.tone = tone
+        self.sub = sub
+        self.face = face
     }
 }
 
@@ -80,14 +86,17 @@ public struct BoxTable: View {
         self.rows = rows
     }
 
+    /// The face's side in a row.
+    static let faceSide: Double = 26
+
     public var body: some View {
         let theme = Theme(colorScheme)
         VStack(spacing: 0) {
-            line(columns.map { BoxCell($0.title, tone: .muted) }, head: true, theme: theme)
+            line(columns.map { BoxCell($0.title, tone: .muted) }, head: true, mine: false, theme: theme)
                 .padding(.vertical, Tokens.Space.s1)
             ForEach(rows) { row in
                 Rectangle().fill(theme.color(Tokens.Color.line)).frame(height: 1)
-                line(row.cells, head: false, theme: theme)
+                line(row.cells, head: false, mine: row.mine, theme: theme)
                     .padding(.vertical, Tokens.Space.s2)
                     .background(row.mine ? theme.color(Tokens.Color.accentWash) : .clear)
                 if row.ruleBelow {
@@ -97,19 +106,32 @@ public struct BoxTable: View {
         }
     }
 
-    private func line(_ cells: [BoxCell], head: Bool, theme: Theme) -> some View {
+    private func line(_ cells: [BoxCell], head: Bool, mine: Bool, theme: Theme) -> some View {
         HStack(spacing: Tokens.Space.s2) {
             ForEach(Array(zip(columns, cells)), id: \.0.id) { column, cell in
-                Text(cell.text)
-                    .font(font(column: column, cell: cell, head: head))
-                    .foregroundStyle(theme.color(ink(cell.tone)))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .frame(
-                        minWidth: column.fixedWidth.map { CGFloat($0) },
-                        maxWidth: column.fixedWidth.map { CGFloat($0) } ?? .infinity,
-                        alignment: Alignment(horizontal: column.alignment, vertical: .center)
-                    )
+                HStack(spacing: Tokens.Space.s2) {
+                    if let face = cell.face {
+                        Avatar(face, side: Self.faceSide, mine: mine)
+                    }
+                    VStack(alignment: column.alignment, spacing: 0) {
+                        Text(cell.text)
+                            .font(font(column: column, cell: cell, head: head))
+                            .foregroundStyle(theme.color(ink(cell.tone)))
+                            .lineLimit(1)
+                            // A figure keeps its size in every row; a long name gives way.
+                            .fixedSize(horizontal: column.numeric, vertical: false)
+                        if let sub = cell.sub, !sub.isEmpty {
+                            Text(sub)
+                                .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .medium))
+                                .foregroundStyle(theme.color(Tokens.Color.ink3))
+                        }
+                    }
+                }
+                .frame(
+                    minWidth: column.fixedWidth.map { CGFloat($0) },
+                    maxWidth: column.fixedWidth.map { CGFloat($0) } ?? .infinity,
+                    alignment: Alignment(horizontal: column.alignment, vertical: .center)
+                )
             }
         }
         .padding(.horizontal, Tokens.Space.s2)

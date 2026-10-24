@@ -45,6 +45,8 @@ public enum Stands: String, Sendable, Equatable {
 public struct BugSide: Sendable, Equatable {
     public let rosterID: Int
     public let name: String
+    /// The face's letters where the platform gives no image (the app draws no image yet).
+    public let initials: String
     public let record: String
     public let me: Bool
     public let small: String
@@ -116,9 +118,11 @@ enum ScoreBugs {
         let state = drawn.state
         let final = drawn.final
         let (small, big) = figures(side, state: state, final: final, headFinal: drawn.headFinal)
+        let name = team?.name ?? "Team \(side.rosterId)"
         return BugSide(
             rosterID: side.rosterId,
-            name: team?.name ?? "Team \(side.rosterId)",
+            name: name,
+            initials: Initials.of(name),
             record: record(team),
             me: side.rosterId == member,
             small: small,

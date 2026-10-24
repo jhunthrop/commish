@@ -44,4 +44,16 @@ public struct Theme: Sendable, Equatable {
         let rgb = RGB(token.value(in: scheme))
         return Color(.sRGB, red: rgb.red, green: rgb.green, blue: rgb.blue, opacity: 1)
     }
+
+    /// CSS's `color-mix(in srgb, a percent%, b)`: `percent` of `token` over the rest of `base`.
+    public func mix(_ token: ThemedColor, _ percent: Double, into base: ThemedColor) -> Color {
+        let top = RGB(token.value(in: scheme))
+        let bottom = RGB(base.value(in: scheme))
+        let share = percent / 100
+        let blend = { (over: Double, under: Double) in over * share + under * (1 - share) }
+        return Color(
+            .sRGB, red: blend(top.red, bottom.red), green: blend(top.green, bottom.green),
+            blue: blend(top.blue, bottom.blue), opacity: 1
+        )
+    }
 }

@@ -8,6 +8,11 @@ public struct MovePlayerLine: Sendable, Equatable {
     public let club: String
     /// The team that took him in a trade.
     public let to: String?
+
+    /// "RB CHI": his position and club, beside the name.
+    public var detail: String {
+        "\(position) \(club)"
+    }
 }
 
 /// One move as the feed draws it (home.ts FeedRow): its day and time, its kind, its teams, the players

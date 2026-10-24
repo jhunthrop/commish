@@ -37,7 +37,8 @@ public enum Snapshot {
         let theme = Theme(scheme: scheme)
         let framed = view
             .frame(width: device.width)
-            .background(theme.color(Tokens.Color.bg))
+            .background(theme.color(Tokens.Color.bg).ignoresSafeArea())
+            .ignoresSafeArea()
             .environment(\.colorScheme, scheme == .dark ? .dark : .light)
         let renderer = ImageRenderer(content: framed)
         renderer.proposedSize = ProposedViewSize(width: device.width, height: nil)

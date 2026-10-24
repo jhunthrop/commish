@@ -46,7 +46,8 @@ export function parsePath(path: string): Segment[] {
 	while (i < tokens.length) {
 		const letter = tokens[i] ?? '';
 		const arity = ARITY[letter];
-		if (arity === undefined) throw new Error(`The mark's path holds a command it cannot draw: ${letter}`);
+		if (arity === undefined)
+			throw new Error(`The mark's path holds a command it cannot draw: ${letter}`);
 		const args = tokens.slice(i + 1, i + 1 + arity).map(Number);
 		i += 1 + arity;
 		if (letter === 'Z') {
@@ -99,7 +100,10 @@ function arcCurves(from: Point, args: readonly number[], to: Point): Segment[] {
 	const pieces = Math.ceil(Math.abs(sweepAngle) / (Math.PI / 2) - 1e-9);
 	const step = sweepAngle / pieces;
 	const k = (4 / 3) * Math.tan(step / 4);
-	const point = (t: number): Point => ({ x: centre.x + rx * Math.cos(t), y: centre.y + ry * Math.sin(t) });
+	const point = (t: number): Point => ({
+		x: centre.x + rx * Math.cos(t),
+		y: centre.y + ry * Math.sin(t)
+	});
 	const segments: Segment[] = [];
 	for (let n = 0; n < pieces; n++) {
 		const a = start + n * step;

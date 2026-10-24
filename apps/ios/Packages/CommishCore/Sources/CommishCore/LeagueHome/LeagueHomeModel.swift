@@ -6,6 +6,7 @@ import Foundation
 public struct LineupLine: Sendable, Equatable, Identifiable {
     public let id: String
     public let name: String
+    public let initials: String
     /// "QB PIT": his position and club, under the name.
     public let detail: String
     public let points: String
@@ -74,6 +75,7 @@ public struct LeagueHomeModel: Sendable, Equatable {
             return LineupLine(
                 id: "\(index)-\(player.hostId)",
                 name: player.name,
+                initials: Initials.of(player.name),
                 detail: "\(position) \(player.team)",
                 points: mine.playerPoints ? starter.points.map { Formatting.fixed($0) } ?? none : none
             )

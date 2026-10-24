@@ -12,6 +12,7 @@ public struct StandingsLine: Sendable, Equatable, Identifiable {
     public let rosterID: Int
     public let rank: Int
     public let team: String
+    public let initials: String
     public let record: String
     public let pointsFor: String
     public let pointsAgainst: String
@@ -46,6 +47,7 @@ enum Standings {
                 rosterID: team.rosterId,
                 rank: index + 1,
                 team: team.name,
+                initials: Initials.of(team.name),
                 record: "\(team.wins)-\(team.losses)-\(team.ties)",
                 pointsFor: Formatting.fixed(team.pointsFor),
                 pointsAgainst: figure(team.pointsAgainst),

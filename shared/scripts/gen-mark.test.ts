@@ -17,12 +17,17 @@ void test('moves, lines and the close read as themselves', () => {
 void test('an arc becomes cubic curves that end on its end point, a quarter turn or less each', () => {
 	// A half circle of radius 10 centred on the origin, from (10, 0) to (-10, 0), sweeping through +y.
 	const segments = parsePath('M10 0 A10 10 0 0 1 -10 0');
-	const curves = segments.filter((s): s is Extract<Segment, { kind: 'curve' }> => s.kind === 'curve');
+	const curves = segments.filter(
+		(s): s is Extract<Segment, { kind: 'curve' }> => s.kind === 'curve'
+	);
 	assert.equal(curves.length, 2);
 	const last = curves.at(-1);
 	assert.ok(last && near(last.x, -10) && near(last.y, 0), JSON.stringify(last));
 	// The first quarter ends at the bottom of the circle (y down), (0, 10).
-	assert.ok(near(curves[0]?.x ?? NaN, 0) && near(curves[0]?.y ?? NaN, 10), JSON.stringify(curves[0]));
+	assert.ok(
+		near(curves[0]?.x ?? NaN, 0) && near(curves[0]?.y ?? NaN, 10),
+		JSON.stringify(curves[0])
+	);
 });
 
 void test('a radius too short for its end points grows until it spans them, as SVG says', () => {
