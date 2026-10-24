@@ -37,6 +37,7 @@ const (
 type Device struct {
 	ID         uuid.UUID
 	Name       string
+	Kind       auth.DeviceKind
 	Scopes     []auth.Scope
 	CreatedAt  time.Time
 	LastUsedAt *time.Time
@@ -46,25 +47,51 @@ type Device struct {
 // scoped by account or by a token hash.
 type Store struct{ Pool *pgxpool.Pool }
 
-// PutCode stores the account's pairing code, replacing any earlier one.
-func (s *Store) PutCode(ctx context.Context, accountID uuid.UUID, hash []byte, expires time.Time) error {
-	_, err := s.Pool.Exec(ctx, `insert into app.device_pair_codes (account_id, code_hash, expires_at) values ($1, $2, $3)
-		on conflict (account_id) do update set code_hash = excluded.code_hash, expires_at = excluded.expires_at, created_at = now()`,
-		accountID, hash, expires)
+// Binding is what a pairing code is good for: one kind of device and,
+// for an app, the S256 challenge of the verifier the app keeps. The
+// extension's code has no challenge.
+type Binding struct {
+	Kind      auth.DeviceKind
+	Challenge string
+}
+
+// challengeOrNull is the binding's challenge as the column holds it.
+func (b Binding) challengeOrNull() *string {
+	if b.Challenge == "" {
+		return nil
+	}
+	return &b.Challenge
+}
+
+// PutCode stores the account's pairing code under its binding, replacing
+// any earlier code.
+func (s *Store) PutCode(ctx context.Context, accountID uuid.UUID, b Binding, hash []byte, expires time.Time) error {
+	_, err := s.Pool.Exec(ctx, `insert into app.device_pair_codes (account_id, code_hash, expires_at, kind, code_challenge)
+		values ($1, $2, $3, $4, $5)
+		on conflict (account_id) do update
+		  set code_hash = excluded.code_hash, expires_at = excluded.expires_at, kind = excluded.kind,
+		      code_challenge = excluded.code_challenge, created_at = now()`,
+		accountID, hash, expires, string(b.Kind), b.challengeOrNull())
 	if err != nil {
 		return fmt.Errorf("devices: put code: %w", err)
 	}
 	return nil
 }
 
-// Pair spends a live code and makes a device for its account under the
-// token's hash, in one transaction: a code pairs exactly one device.
-func (s *Store) Pair(ctx context.Context, code []byte, name string, tokenHash []byte, scopes []auth.Scope, now time.Time) (uuid.UUID, Device, error) {
+// Pair spends a live code whose binding matches (its kind, and its
+// challenge or the lack of one) and makes a device of that kind for its
+// account under the token's hash, in one transaction: a code pairs
+// exactly one device, only of its own kind, and an app's only with its
+// verifier. A code that does not match is left as it was.
+func (s *Store) Pair(ctx context.Context, code []byte, b Binding, name string, tokenHash []byte, scopes []auth.Scope, now time.Time) (uuid.UUID, Device, error) {
+	kind := b.Kind
 	var accountID uuid.UUID
 	var dev Device
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		err := tx.QueryRow(ctx, `delete from app.device_pair_codes where code_hash = $1 and expires_at > $2 returning account_id`,
-			code, now).Scan(&accountID)
+		err := tx.QueryRow(ctx, `delete from app.device_pair_codes
+			where code_hash = $1 and expires_at > $2 and kind = $3 and code_challenge is not distinct from $4
+			returning account_id`,
+			code, now, string(kind), b.challengeOrNull()).Scan(&accountID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrBadCode
 		}
@@ -78,9 +105,10 @@ func (s *Store) Pair(ctx context.Context, code []byte, name string, tokenHash []
 		if n >= MaxDevices {
 			return ErrTooMany
 		}
-		dev = Device{Name: name, Scopes: scopes}
-		return tx.QueryRow(ctx, `insert into app.devices (account_id, name, token_hash, scopes) values ($1, $2, $3, $4)
-			returning id, created_at`, accountID, name, tokenHash, scopeStrings(scopes)).Scan(&dev.ID, &dev.CreatedAt)
+		dev = Device{Name: name, Kind: kind, Scopes: scopes}
+		return tx.QueryRow(ctx, `insert into app.devices (account_id, name, token_hash, scopes, kind, created_at)
+			values ($1, $2, $3, $4, $5, $6) returning id, created_at`,
+			accountID, name, tokenHash, scopeStrings(scopes), string(kind), now).Scan(&dev.ID, &dev.CreatedAt)
 	})
 	if errors.Is(err, ErrBadCode) || errors.Is(err, ErrTooMany) {
 		return uuid.Nil, Device{}, err
@@ -107,20 +135,25 @@ func toScopes(raw []string) []auth.Scope {
 	return out
 }
 
+const deviceColumns = `id, name, kind, scopes, created_at, last_used_at`
+
+func scanDevice(row pgx.Row) (Device, error) {
+	var d Device
+	var kind string
+	var scopes []string
+	err := row.Scan(&d.ID, &d.Name, &kind, &scopes, &d.CreatedAt, &d.LastUsedAt)
+	d.Kind, d.Scopes = auth.DeviceKind(kind), toScopes(scopes)
+	return d, err
+}
+
 // List is the account's live devices, newest first.
 func (s *Store) List(ctx context.Context, accountID uuid.UUID) ([]Device, error) {
-	rows, err := s.Pool.Query(ctx, `select id, name, scopes, created_at, last_used_at from app.devices
+	rows, err := s.Pool.Query(ctx, `select `+deviceColumns+` from app.devices
 		where account_id = $1 and revoked_at is null order by created_at desc, id limit $2`, accountID, MaxDevices)
 	if err != nil {
 		return nil, fmt.Errorf("devices: list: %w", err)
 	}
-	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Device, error) {
-		var d Device
-		var scopes []string
-		err := r.Scan(&d.ID, &d.Name, &scopes, &d.CreatedAt, &d.LastUsedAt)
-		d.Scopes = toScopes(scopes)
-		return d, err
-	})
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Device, error) { return scanDevice(r) })
 	if err != nil {
 		return nil, fmt.Errorf("devices: list: %w", err)
 	}
@@ -143,18 +176,14 @@ func (s *Store) Revoke(ctx context.Context, accountID, id uuid.UUID, now time.Ti
 
 // Get is one of the account's live devices.
 func (s *Store) Get(ctx context.Context, accountID, id uuid.UUID) (Device, error) {
-	var d Device
-	var scopes []string
-	err := s.Pool.QueryRow(ctx, `select id, name, scopes, created_at, last_used_at from app.devices
-		where id = $1 and account_id = $2 and revoked_at is null`, id, accountID).
-		Scan(&d.ID, &d.Name, &scopes, &d.CreatedAt, &d.LastUsedAt)
+	d, err := scanDevice(s.Pool.QueryRow(ctx, `select `+deviceColumns+` from app.devices
+		where id = $1 and account_id = $2 and revoked_at is null`, id, accountID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Device{}, ErrNotFound
 	}
 	if err != nil {
 		return Device{}, fmt.Errorf("devices: get %s: %w", id, err)
 	}
-	d.Scopes = toScopes(scopes)
 	return d, nil
 }
 
@@ -165,11 +194,12 @@ func (s *Store) DeviceAccount(ctx context.Context, tokenHash []byte, now time.Ti
 	var d auth.Device
 	var scopes []string
 	var lastUsed *time.Time
+	var created time.Time
 	err := s.Pool.QueryRow(ctx, `select a.id, a.workos_user_id, a.email, a.first_name, a.last_name, a.handle, a.created_at,
-			d.id, d.scopes, d.last_used_at
+			d.id, d.scopes, d.last_used_at, d.created_at
 		from app.devices d join app.accounts a on a.id = d.account_id
 		where d.token_hash = $1 and d.revoked_at is null`, tokenHash).
-		Scan(&a.ID, &a.WorkOSUserID, &a.Email, &a.FirstName, &a.LastName, &a.Handle, &a.CreatedAt, &d.ID, &scopes, &lastUsed)
+		Scan(&a.ID, &a.WorkOSUserID, &a.Email, &a.FirstName, &a.LastName, &a.Handle, &a.CreatedAt, &d.ID, &scopes, &lastUsed, &created)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return auth.Account{}, auth.Device{}, auth.ErrNoDevice
 	}
@@ -177,12 +207,31 @@ func (s *Store) DeviceAccount(ctx context.Context, tokenHash []byte, now time.Ti
 		return auth.Account{}, auth.Device{}, fmt.Errorf("devices: resolve: %w", err)
 	}
 	d.AccountID, d.Scopes = a.ID, toScopes(scopes)
+	if lapsed(d, created, lastUsed, now) {
+		return auth.Account{}, auth.Device{}, auth.ErrNoDevice
+	}
 	if lastUsed == nil || now.Sub(*lastUsed) >= usedEvery {
 		if _, err := s.Pool.Exec(ctx, `update app.devices set last_used_at = $2 where id = $1`, d.ID, now); err != nil {
 			return auth.Account{}, auth.Device{}, fmt.Errorf("devices: note use: %w", err)
 		}
 	}
 	return a, d, nil
+}
+
+// lapsed reports whether a device carrying the session scope (an app's)
+// has gone unused past the browser session's life, auth.SessionTTL, from
+// its last use (noted to the hour) or its pairing: it then opens nothing,
+// as an idle browser session would. The extension's token reaches only
+// the device routes and does not lapse.
+func lapsed(d auth.Device, created time.Time, lastUsed *time.Time, now time.Time) bool {
+	if !d.Has(auth.ScopeSession) {
+		return false
+	}
+	since := created
+	if lastUsed != nil {
+		since = *lastUsed
+	}
+	return now.Sub(since) > auth.SessionTTL
 }
 
 // SweepCodes deletes every code past its ten minutes.
