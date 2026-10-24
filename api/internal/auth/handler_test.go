@@ -67,13 +67,32 @@ func (m *memAccounts) SetHandle(context.Context, uuid.UUID, string) (auth.Accoun
 	return m.acct, nil
 }
 
-// memCodes records the codes the callback asked for.
-type memCodes struct {
-	kinds []auth.DeviceKind
+// A fixed PKCE pair, the challenge computed apart from this code (Python's
+// hashlib and base64): the app keeps the verifier and sends the S256
+// challenge on /auth/login.
+const (
+	appVerifier  = "dBjftJeZ4CVP-mJ92K9F_dRwOR6lh1NcvnNyJRVKRQ4"
+	appChallenge = "8Gupdd4T5YR22GTKmsYs9odoxLTD8iuFKqtpc8YlXEU"
+)
+
+// appLogin is an app's /auth/login query: its client, the app link and
+// the S256 challenge.
+func appLogin(client string) string {
+	return url.Values{
+		"client": {client}, "return_to": {appLink},
+		"code_challenge": {appChallenge}, "code_challenge_method": {"S256"},
+	}.Encode()
 }
 
-func (m *memCodes) AppCode(_ context.Context, _ uuid.UUID, kind auth.DeviceKind) (string, error) {
+// memCodes records the codes the callback asked for.
+type memCodes struct {
+	kinds      []auth.DeviceKind
+	challenges []string
+}
+
+func (m *memCodes) AppCode(_ context.Context, _ uuid.UUID, kind auth.DeviceKind, challenge string) (string, error) {
 	m.kinds = append(m.kinds, kind)
+	m.challenges = append(m.challenges, challenge)
 	return "acorn amber anchor apple arch atlas", nil
 }
 
@@ -151,12 +170,14 @@ func TestWebSignInUnchanged(t *testing.T) {
 }
 
 // An app's sign-in comes back to the app link with a pairing code for
-// its kind and the client named, by 303.
+// its kind and the client named, by 303, and the code is minted under
+// the challenge the app sent.
 func TestAppSignInRedirectsToTheAppLink(t *testing.T) {
 	for _, client := range []string{"ios", "android"} {
 		codes := &memCodes{}
 		h := newAuthHandler(t, &memAccounts{}, codes)
-		for _, query := range []string{"client=" + client + "&return_to=" + url.QueryEscape(appLink), "client=" + client} {
+		bare := url.Values{"client": {client}, "code_challenge": {appChallenge}, "code_challenge_method": {"S256"}}.Encode()
+		for _, query := range []string{appLogin(client), bare} {
 			w := signIn(t, h, query)
 			to, err := url.Parse(w.Header().Get("Location"))
 			if w.Code != http.StatusSeeOther || err != nil {
@@ -172,32 +193,54 @@ func TestAppSignInRedirectsToTheAppLink(t *testing.T) {
 		if len(codes.kinds) != 2 || string(codes.kinds[0]) != client {
 			t.Fatalf("%s: codes minted for %v", client, codes.kinds)
 		}
+		if codes.challenges[0] != appChallenge || codes.challenges[1] != appChallenge {
+			t.Fatalf("%s: codes minted under %v", client, codes.challenges)
+		}
 	}
 }
 
-// An app's sign-in refuses anything but the app link to come back to,
-// and any client word but the two apps', with the API's own 400 before
-// AuthKit is ever asked.
+// An app's sign-in refuses a client word but the two apps', a return but
+// the app link, and a missing or malformed S256 challenge, with the API's
+// own 400 naming the field at fault, before AuthKit is ever asked.
 func TestAppSignInRefusesForeignReturns(t *testing.T) {
 	h := newAuthHandler(t, &memAccounts{}, &memCodes{})
-	for _, query := range []string{
-		"client=ios&return_to=" + url.QueryEscape("https://evil.example/"),
-		"client=ios&return_to=" + url.QueryEscape("/app/signed-in"),
-		"client=android&return_to=" + url.QueryEscape(appLink+"?x=1"),
-		"client=ios&return_to=" + url.QueryEscape("https://trycommish.app.evil.example/app/signed-in"),
-		"client=extension",
-		"client=web",
-		"client=IOS",
+	with := func(change map[string]string) string {
+		q, _ := url.ParseQuery(appLogin("ios"))
+		for k, v := range change {
+			if v == "" {
+				q.Del(k)
+				continue
+			}
+			q.Set(k, v)
+		}
+		return q.Encode()
+	}
+	for query, field := range map[string]string{
+		with(map[string]string{"return_to": "https://evil.example/"}):                             "return_to",
+		with(map[string]string{"return_to": "/app/signed-in"}):                                    "return_to",
+		with(map[string]string{"client": "android", "return_to": appLink + "?x=1"}):               "return_to",
+		with(map[string]string{"return_to": "https://trycommish.app.evil.example/app/signed-in"}): "return_to",
+		with(map[string]string{"client": "extension"}):                                            "client",
+		with(map[string]string{"client": "web"}):                                                  "client",
+		with(map[string]string{"client": "IOS"}):                                                  "client",
+		with(map[string]string{"code_challenge": ""}):                                             "code_challenge",
+		with(map[string]string{"code_challenge": appChallenge[:42]}):                              "code_challenge",
+		with(map[string]string{"code_challenge": appChallenge[:42] + "="}):                        "code_challenge",
+		with(map[string]string{"code_challenge_method": ""}):                                      "code_challenge_method",
+		with(map[string]string{"code_challenge_method": "plain"}):                                 "code_challenge_method",
 	} {
 		w := serve(routeHandler(t, h, "/auth/login"), "/auth/login?"+query, nil)
 		var env struct {
-			OK    bool `json:"ok"`
 			Error struct {
-				Code string `json:"code"`
+				Code   string            `json:"code"`
+				Fields map[string]string `json:"fields"`
 			} `json:"error"`
 		}
 		if w.Code != http.StatusBadRequest || json.Unmarshal(w.Body.Bytes(), &env) != nil || env.Error.Code != httpx.CodeInvalid {
 			t.Fatalf("%q: %d %s", query, w.Code, w.Body)
+		}
+		if _, ok := env.Error.Fields[field]; !ok || len(env.Error.Fields) != 1 {
+			t.Fatalf("%q named %v, want %s", query, env.Error.Fields, field)
 		}
 		if len(w.Result().Cookies()) != 0 {
 			t.Fatalf("%q set a state cookie", query)
@@ -206,8 +249,9 @@ func TestAppSignInRefusesForeignReturns(t *testing.T) {
 }
 
 // End to end against the devices table: the code the callback hands the
-// app pairs one iOS device once, carrying the session scope, and the
-// token it mints opens a signed-in route.
+// app pairs one iOS device once, and only with the verifier behind the
+// challenge the sign-in began with; the token it mints opens a signed-in
+// route.
 func TestAppSignInCodePairsOnce(t *testing.T) {
 	pool := dbtest.Pool(t)
 	accounts := &auth.Store{Pool: pool}
@@ -223,7 +267,7 @@ func TestAppSignInCodePairsOnce(t *testing.T) {
 	svc := &devices.Service{Store: store, Tokens: bearer, CodeKey: codeKey, Now: fixedNow, Log: quietLog()}
 	h := newAuthHandler(t, accounts, svc)
 
-	w := signIn(t, h, "client=ios&return_to="+url.QueryEscape(appLink))
+	w := signIn(t, h, appLogin("ios"))
 	to, err := url.Parse(w.Header().Get("Location"))
 	if w.Code != http.StatusSeeOther || err != nil {
 		t.Fatalf("callback: %d %q", w.Code, w.Header().Get("Location"))
@@ -240,9 +284,13 @@ func TestAppSignInCodePairsOnce(t *testing.T) {
 	if err := server.Mount(mux, routes, sessions, bearer, fixedNow); err != nil {
 		t.Fatal(err)
 	}
-	pair := func() (int, apitypes.Paired) {
+	pair := func(verifier string) (int, apitypes.Paired) {
 		kind := apitypes.DeviceKindIos
-		body, _ := json.Marshal(apitypes.PairInput{Code: code, Kind: &kind})
+		in := apitypes.PairInput{Code: code, Kind: &kind}
+		if verifier != "" {
+			in.CodeVerifier = &verifier
+		}
+		body, _ := json.Marshal(in)
 		r := httptest.NewRequest(http.MethodPost, "/devices/pair", strings.NewReader(string(body)))
 		r.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
@@ -253,14 +301,21 @@ func TestAppSignInCodePairsOnce(t *testing.T) {
 		_ = json.Unmarshal(rec.Body.Bytes(), &env)
 		return rec.Code, env.Data
 	}
-	status, paired := pair()
+	// Someone holding the link but not the app: no verifier, a wrong one.
+	// Each is refused and spends nothing, so the app still pairs.
+	for _, verifier := range []string{"", strings.Repeat("a", 43)} {
+		if status, p := pair(verifier); status != http.StatusBadRequest || p.Token != "" {
+			t.Fatalf("pair with verifier %q: %d", verifier, status)
+		}
+	}
+	status, paired := pair(appVerifier)
 	if status != http.StatusCreated || paired.Device.Kind == nil || *paired.Device.Kind != apitypes.DeviceKindIos {
 		t.Fatalf("pair: %d %+v", status, paired.Device)
 	}
 	if !slices.Contains(paired.Device.Scopes, apitypes.DeviceScopeSession) {
 		t.Fatalf("an iOS device without the session scope: %v", paired.Device.Scopes)
 	}
-	if status, _ := pair(); status != http.StatusBadRequest {
+	if status, _ := pair(appVerifier); status != http.StatusBadRequest {
 		t.Fatalf("the code paired twice: %d", status)
 	}
 	r := httptest.NewRequest(http.MethodGet, "/leagues/attached", nil)
@@ -269,5 +324,23 @@ func TestAppSignInCodePairsOnce(t *testing.T) {
 	mux.ServeHTTP(rec, r)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("the app's token on a signed-in route: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// The S256 challenge is base64url(SHA-256(verifier)) with no padding,
+// checked against a pair computed apart from this code.
+func TestPKCEChallenge(t *testing.T) {
+	if got := auth.PKCEChallenge(appVerifier); got != appChallenge {
+		t.Fatalf("challenge %q", got)
+	}
+	for _, v := range []string{appVerifier, strings.Repeat("~", 128), "a-b.c_d~" + strings.Repeat("0", 35)} {
+		if !auth.ValidVerifier(v) {
+			t.Fatalf("%q refused", v)
+		}
+	}
+	for _, v := range []string{"", strings.Repeat("a", 42), strings.Repeat("a", 129), appVerifier[:42] + "+"} {
+		if auth.ValidVerifier(v) {
+			t.Fatalf("%q accepted", v)
+		}
 	}
 }

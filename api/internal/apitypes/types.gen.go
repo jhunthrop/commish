@@ -1800,6 +1800,21 @@ func (e LoginParamsClient) Valid() bool {
 	}
 }
 
+// Defines values for LoginParamsCodeChallengeMethod.
+const (
+	LoginParamsCodeChallengeMethodS256 LoginParamsCodeChallengeMethod = "S256"
+)
+
+// Valid indicates whether the value is a known member of the LoginParamsCodeChallengeMethod enum.
+func (e LoginParamsCodeChallengeMethod) Valid() bool {
+	switch e {
+	case LoginParamsCodeChallengeMethodS256:
+		return true
+	default:
+		return false
+	}
+}
+
 // Account defines model for Account.
 type Account struct {
 	CreatedAt time.Time       `json:"created_at"`
@@ -3542,6 +3557,9 @@ type PairInput struct {
 	// Code the six words as typed
 	Code string `json:"code"`
 
+	// CodeVerifier an app's PKCE verifier, whose S256 challenge it sent on /auth/login; required for kind ios and android, ignored for the extension
+	CodeVerifier *string `json:"code_verifier,omitempty"`
+
 	// Kind what was paired, the browser extension or an app
 	Kind *DeviceKind `json:"kind,omitempty"`
 
@@ -5210,6 +5228,12 @@ type LoginParams struct {
 
 	// Client the app signing in; absent for the web
 	Client *LoginParamsClient `form:"client,omitempty" json:"client,omitempty"`
+
+	// CodeChallenge an app's S256 PKCE challenge, required with client; ignored for the web
+	CodeChallenge *string `form:"code_challenge,omitempty" json:"code_challenge,omitempty"`
+
+	// CodeChallengeMethod required with client
+	CodeChallengeMethod *LoginParamsCodeChallengeMethod `form:"code_challenge_method,omitempty" json:"code_challenge_method,omitempty"`
 }
 
 // LoginParamsScreen defines parameters for Login.
@@ -5217,6 +5241,9 @@ type LoginParamsScreen string
 
 // LoginParamsClient defines parameters for Login.
 type LoginParamsClient string
+
+// LoginParamsCodeChallengeMethod defines parameters for Login.
+type LoginParamsCodeChallengeMethod string
 
 // StripeWebhookJSONBody defines parameters for StripeWebhook.
 type StripeWebhookJSONBody = map[string]interface{}

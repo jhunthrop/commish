@@ -45,15 +45,20 @@ const (
 	badPageCode = "That code has been used or is more than ten minutes old. Show a new one on your account page"
 	badAppCode  = "That code has been used or is more than ten minutes old. Sign in again"
 	badKind     = "Pair as extension, ios or android"
+	badVerifier = "Send the code_verifier this app began its sign-in with, or sign in again"
+	tooMany     = "Your account has %d paired devices, the most allowed. Unpair one first"
 )
 
-// errNotAnApp is an app code asked for a kind that is not an app.
-var errNotAnApp = errors.New("devices: app codes are for ios and android")
+// Errors AppCode answers, never a member's.
+var (
+	errNotAnApp    = errors.New("devices: app codes are for ios and android")
+	errNoChallenge = errors.New("devices: an app code needs an S256 challenge")
+)
 
 // Repository is the part of Store the handlers use.
 type Repository interface {
-	PutCode(ctx context.Context, accountID uuid.UUID, kind auth.DeviceKind, hash []byte, expires time.Time) error
-	Pair(ctx context.Context, code []byte, kind auth.DeviceKind, name string, tokenHash []byte, scopes []auth.Scope, now time.Time) (uuid.UUID, Device, error)
+	PutCode(ctx context.Context, accountID uuid.UUID, b Binding, hash []byte, expires time.Time) error
+	Pair(ctx context.Context, code []byte, b Binding, name string, tokenHash []byte, scopes []auth.Scope, now time.Time) (uuid.UUID, Device, error)
 	List(ctx context.Context, accountID uuid.UUID) ([]Device, error)
 	Get(ctx context.Context, accountID, id uuid.UUID) (Device, error)
 	Revoke(ctx context.Context, accountID, id uuid.UUID, now time.Time) error
@@ -86,33 +91,37 @@ func (s *Service) Routes() []httpx.Route {
 	}
 }
 
-// issue stores a fresh code for one kind of device on the account,
-// replacing its earlier code, and answers it with when it ends.
-func (s *Service) issue(ctx context.Context, accountID uuid.UUID, kind auth.DeviceKind) (string, time.Time, error) {
+// issue stores a fresh code under its binding on the account, replacing
+// its earlier code, and answers it with when it ends.
+func (s *Service) issue(ctx context.Context, accountID uuid.UUID, b Binding) (string, time.Time, error) {
 	code, err := NewCode()
 	if err != nil {
 		return "", time.Time{}, err
 	}
 	expires := s.Now().Add(CodeTTL)
-	if err := s.Store.PutCode(ctx, accountID, kind, codeHash(s.CodeKey, code), expires); err != nil {
+	if err := s.Store.PutCode(ctx, accountID, b, codeHash(s.CodeKey, code), expires); err != nil {
 		return "", time.Time{}, err
 	}
 	return code, expires, nil
 }
 
 // AppCode is the code an app's sign-in hands back to the app (auth's
-// callback): good for one device of that app's kind, for ten minutes.
-func (s *Service) AppCode(ctx context.Context, accountID uuid.UUID, kind auth.DeviceKind) (string, error) {
+// callback): good for one device of that app's kind, for ten minutes,
+// and only with the verifier behind challenge.
+func (s *Service) AppCode(ctx context.Context, accountID uuid.UUID, kind auth.DeviceKind, challenge string) (string, error) {
 	if !kind.IsApp() {
 		return "", errNotAnApp
 	}
-	code, _, err := s.issue(ctx, accountID, kind)
+	if !auth.ValidChallenge(challenge) {
+		return "", errNoChallenge
+	}
+	code, _, err := s.issue(ctx, accountID, Binding{Kind: kind, Challenge: challenge})
 	return code, err
 }
 
 // code is the account page's code, for the extension.
 func (s *Service) code(w http.ResponseWriter, r *http.Request) {
-	code, expires, err := s.issue(r.Context(), auth.AccountID(r), auth.KindExtension)
+	code, expires, err := s.issue(r.Context(), auth.AccountID(r), Binding{Kind: auth.KindExtension})
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "devices: code", err)
 		return
@@ -120,13 +129,26 @@ func (s *Service) code(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, http.StatusCreated, apitypes.PairCode{Code: code, ExpiresAt: expires})
 }
 
-// pairKind is the kind a pairing asks for: the extension when it names
-// none, as the extension has always paired.
-func pairKind(in apitypes.PairInput) (auth.DeviceKind, bool) {
-	if in.Kind == nil {
-		return auth.KindExtension, true
+// pairBinding is the binding a pairing asks to spend: the extension when
+// it names no kind, as the extension has always paired, with no
+// challenge; an app with the S256 challenge of the verifier it sent. A
+// fault names the field and its sentence.
+func pairBinding(in apitypes.PairInput) (Binding, map[string]string) {
+	kind := auth.KindExtension
+	if in.Kind != nil {
+		k, ok := auth.ParseDeviceKind(string(*in.Kind))
+		if !ok {
+			return Binding{}, map[string]string{"kind": badKind}
+		}
+		kind = k
 	}
-	return auth.ParseDeviceKind(string(*in.Kind))
+	if !kind.IsApp() {
+		return Binding{Kind: kind}, nil
+	}
+	if in.CodeVerifier == nil || !auth.ValidVerifier(*in.CodeVerifier) {
+		return Binding{}, map[string]string{"code_verifier": badVerifier}
+	}
+	return Binding{Kind: kind, Challenge: auth.PKCEChallenge(*in.CodeVerifier)}, nil
 }
 
 func (s *Service) pair(w http.ResponseWriter, r *http.Request) {
@@ -134,11 +156,12 @@ func (s *Service) pair(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, httpx.MaxSmallBody, &in) {
 		return
 	}
-	kind, ok := pairKind(in)
-	if !ok {
-		httpx.WriteInvalid(w, r, map[string]string{"kind": badKind})
+	binding, fault := pairBinding(in)
+	if fault != nil {
+		httpx.WriteInvalid(w, r, fault)
 		return
 	}
+	kind := binding.Kind
 	code, ok := NormalizeCode(in.Code)
 	if !ok {
 		httpx.WriteInvalid(w, r, map[string]string{"code": fmt.Sprintf("Type the %d words from your account page", CodeWords)})
@@ -151,7 +174,7 @@ func (s *Service) pair(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	token, hash := s.Tokens.Mint()
-	_, dev, err := s.Store.Pair(r.Context(), codeHash(s.CodeKey, code), kind, name, hash, auth.ScopesFor(kind), s.Now())
+	_, dev, err := s.Store.Pair(r.Context(), codeHash(s.CodeKey, code), binding, name, hash, auth.ScopesFor(kind), s.Now())
 	switch {
 	case errors.Is(err, ErrBadCode):
 		bad := badPageCode
@@ -161,7 +184,7 @@ func (s *Service) pair(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, map[string]string{"code": bad})
 	case errors.Is(err, ErrTooMany):
 		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict,
-			fmt.Sprintf("Your account has %d paired browsers, the most allowed. Unpair one first", MaxDevices), nil)
+			fmt.Sprintf(tooMany, MaxDevices), nil)
 	case err != nil:
 		httpx.WriteInternal(w, r, s.Log, "devices: pair", err)
 	default:

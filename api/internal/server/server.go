@@ -87,6 +87,11 @@ func Mount(mux *http.ServeMux, routes []httpx.Route, sessions Sessions, devices 
 			h = cookie
 			if devices != nil {
 				h = devices.SessionOr(h, cookie)
+			}
+			// Only a SignedIn route is keyed by the token: a public route
+			// (pairing, sign-in) stays on the address or cookie, so a
+			// handful of old tokens buys no extra guesses there.
+			if devices != nil && rt.Access == httpx.SignedIn {
 				rateKey = tokenOr(devices, sessions)
 			}
 		}

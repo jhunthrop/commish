@@ -17,7 +17,15 @@ alter table app.devices add constraint devices_scopes_check check (
 alter table app.device_pair_codes add column kind text not null default 'extension';
 alter table app.device_pair_codes add constraint device_pair_codes_kind_check check (kind in ('extension', 'ios', 'android'));
 
+-- An app's code is bound to the app that began the sign-in (PKCE, RFC
+-- 7636): the S256 challenge it sent on /auth/login, and the code pairs
+-- only with the verifier behind it. The extension's code has none. An
+-- app's code without one pairs nothing.
+alter table app.device_pair_codes add column code_challenge text
+  check (code_challenge is null or code_challenge ~ '^[A-Za-z0-9_-]{43}$');
+
 -- +goose Down
+alter table app.device_pair_codes drop column code_challenge;
 alter table app.device_pair_codes drop column kind;
 delete from app.devices where kind <> 'extension';
 alter table app.devices drop constraint devices_scopes_check;

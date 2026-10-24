@@ -45,7 +45,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Redirects to WorkOS AuthKit. On the web return_to is a path on the site the browser comes back to. An app (client ios or android, in the system browser sheet) comes back to the app link alone, https://trycommish.app/app/signed-in (the site plus /app/signed-in), given exactly or left out; any other return_to or client answers 400 before AuthKit is asked. */
+		/** Redirects to WorkOS AuthKit. On the web return_to is a path on the site the browser comes back to. An app (client ios or android, in the system browser sheet) comes back to the app link alone, https://trycommish.app/app/signed-in (the site plus /app/signed-in), given exactly or left out, and sends code_challenge, the S256 PKCE challenge (base64url of SHA-256 of a code_verifier the app keeps in memory, no padding, 43 characters), with code_challenge_method S256. Any other client, return_to, challenge or method answers 400 naming that field, before AuthKit is asked. */
 		get: operations['login'];
 		put?: never;
 		post?: never;
@@ -62,7 +62,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** WorkOS returns here. Sets the sealed session cookie on the apex domain and redirects to the site. For an app's sign-in it also mints a pairing code (ten minutes, one use, good only for that app's kind) and answers 303 to the app link with code and client in the query; the app trades the code at POST /devices/pair. */
+		/** WorkOS returns here. Sets the sealed session cookie on the apex domain and redirects to the site. For an app's sign-in it also mints a pairing code (ten minutes, one use, good only for that app's kind and only with the code_verifier behind the sign-in's code_challenge) and answers 303 to the app link with code and client in the query; the app trades the code and its verifier at POST /devices/pair. */
 		get: operations['callback'];
 		put?: never;
 		post?: never;
@@ -1431,7 +1431,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** A device trades a pairing code for its device token, answered this once and never again. The extension (kind extension, the default) trades the account page's code, and its token goes in Authorization Bearer on the device routes only. An app (kind ios or android) trades the code its sign-in came back with, and its token also carries the session scope. A code pairs only the kind it was minted for. Never a cookie. 10 a minute an address. */
+		/** A device trades a pairing code for its device token, answered this once and never again. The extension (kind extension, the default) trades the account page's code, and its token goes in Authorization Bearer on the device routes only. An app (kind ios or android) trades the code its sign-in came back with and the code_verifier behind that sign-in's code_challenge, and its token also carries the session scope. A code pairs only the kind it was minted for; a missing or wrong verifier is 400 and spends nothing. Never a cookie. 10 a minute an address. */
 		post: operations['pairDevice'];
 		delete?: never;
 		options?: never;
@@ -4301,6 +4301,8 @@ export interface components {
 			/** @description what the browser calls itself */
 			name?: string;
 			kind?: components['schemas']['DeviceKind'];
+			/** @description an app's PKCE verifier, whose S256 challenge it sent on /auth/login; required for kind ios and android, ignored for the extension */
+			code_verifier?: string;
 		};
 		Paired: {
 			/** @description the device token */
@@ -4728,6 +4730,10 @@ export interface operations {
 				screen?: 'sign-in' | 'sign-up';
 				/** @description the app signing in; absent for the web */
 				client?: 'ios' | 'android';
+				/** @description an app's S256 PKCE challenge, required with client; ignored for the web */
+				code_challenge?: string;
+				/** @description required with client */
+				code_challenge_method?: 'S256';
 			};
 			header?: never;
 			path?: never;
