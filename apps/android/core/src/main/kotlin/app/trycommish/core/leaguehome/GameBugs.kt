@@ -20,6 +20,10 @@ import app.trycommish.api.models.GameState as SideScheduleState
  */
 
 private const val MINUTE_SECONDS = 60L
+
+/** A team the league's read does not name: "Team 7". */
+internal fun teamFallback(rosterId: Int): String = LeagueHomeWords.fill(LeagueHomeWords.teamFallback, "id" to rosterId.toString())
+
 private const val HOUR_SECONDS = 3600L
 
 /** A game's head and its next kickoff still to come at the page's clock. */
@@ -146,7 +150,7 @@ internal fun gameBugs(
                     val (small, big) = sideFigures(side, head.state, finals[s], smallHead == Words.LeagueHome.final)
                     BugSide(
                         rosterId = side.rosterId,
-                        name = team?.name ?: "Team ${side.rosterId}",
+                        name = team?.name ?: teamFallback(side.rosterId),
                         record = bugRecord(team),
                         me = side.rosterId == sync.me,
                         final = finals[s],

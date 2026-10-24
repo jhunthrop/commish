@@ -58,6 +58,7 @@ fun LeagueHomeScreen(
             LeagueHomeState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             is LeagueHomeState.Failed -> Failed(state.message)
             is LeagueHomeState.Loaded -> Loaded(state.model, stampText(state.stamp, state.stale, zone), onOpenLineup)
+            LeagueHomeState.SignedOut -> Failed(LeagueHomeWords.signedOut)
         }
     }
 }

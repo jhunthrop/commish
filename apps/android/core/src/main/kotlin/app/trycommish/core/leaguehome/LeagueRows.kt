@@ -46,10 +46,19 @@ internal fun standingsBasis(sync: LeagueSync): String {
     val platform = LeagueHomeWords.platform(sync.host)
     val terms = sync.terms
     val tiebreak = terms.tiebreak?.let(LeagueHomeWords::tiebreak)
-    val after = tiebreak?.let { "then $it" } ?: "then points for, as $platform lists them"
+    val after =
+        tiebreak?.let { LeagueHomeWords.fill(LeagueHomeWords.thenTiebreak, "tiebreak" to it) }
+            ?: LeagueHomeWords.fill(LeagueHomeWords.thenPointsFor, "platform" to platform)
     val words = Words.LeagueHome
-    return "Standings follow $platform's record, $after. ${words.pointsFor} and ${words.pointsAgainst} are points " +
-        "for and against, ${words.streak} the current run${waiverBasis(platform, terms)}."
+    return LeagueHomeWords.fill(
+        LeagueHomeWords.standingsBasis,
+        "platform" to platform,
+        "after" to after,
+        "pf" to words.pointsFor,
+        "pa" to words.pointsAgainst,
+        "streak" to words.streak,
+        "waiver" to waiverBasis(platform, terms),
+    )
 }
 
 private fun waiverBasis(
@@ -58,13 +67,13 @@ private fun waiverBasis(
 ): String =
     when (terms.waivers) {
         LeagueTerms.Waivers.budget -> {
-            val of = terms.waiverBudget?.let { " of $${Format.count(it)}" }.orEmpty()
-            ", ${Words.LeagueHome.budget} the budget left$of"
+            val of = terms.waiverBudget?.let { LeagueHomeWords.fill(LeagueHomeWords.budgetOf, "amount" to "$${Format.count(it)}") }
+            LeagueHomeWords.fill(LeagueHomeWords.budgetBasis, "faab" to Words.LeagueHome.budget, "of" to of.orEmpty())
         }
         LeagueTerms.Waivers.order -> {
             val order = terms.waiverOrder?.let(LeagueHomeWords::waiverOrder)
             val how = order?.let { "$it, ${Words.LeagueHome.firstPicks}" } ?: Words.LeagueHome.firstPicks
-            ", ${Words.LeagueHome.order} the place in $platform's order ($how)"
+            LeagueHomeWords.fill(LeagueHomeWords.orderBasis, "order" to Words.LeagueHome.order, "platform" to platform, "how" to how)
         }
         else -> ""
     }
@@ -127,7 +136,7 @@ internal fun movesFeed(
     zone: ZoneId,
 ): MovesFeed {
     val names = sync.teams.associate { it.rosterId to it.name }
-    val nameOf = { id: Int -> names[id] ?: "Team $id" }
+    val nameOf = { id: Int -> names[id] ?: teamFallback(id) }
     val player = { trade: Boolean ->
         { m: MovePlayer ->
             FeedPlayer(m.player.hostId, m.player.name, position(m.player.position), m.player.team, if (trade) nameOf(m.rosterId) else null)

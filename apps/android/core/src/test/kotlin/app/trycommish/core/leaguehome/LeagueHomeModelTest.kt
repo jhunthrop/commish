@@ -1,5 +1,7 @@
 package app.trycommish.core.leaguehome
 
+import app.trycommish.api.models.LeagueHost
+import app.trycommish.api.models.LeagueMove
 import app.trycommish.design.Words
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -154,5 +156,18 @@ class LeagueHomeModelTest {
     fun `a platform that gives no moves draws no feed`() {
         val unread = Fixtures.sync().copy(movesRead = false)
         assertNull(leagueHomeModel(unread, null, Fixtures.sunday, Fixtures.zone).moves)
+    }
+
+    @Test
+    fun `a platform and a move kind from a newer API read as neutral words`() {
+        val sync = Fixtures.sync()
+        val newer =
+            sync.copy(
+                host = LeagueHost.unknown_default_open_api,
+                moves = sync.moves.mapIndexed { i, m -> if (i == 0) m.copy(kind = LeagueMove.Kind.unknown_default_open_api) else m },
+            )
+        val home = leagueHomeModel(newer, null, Fixtures.sunday, Fixtures.zone)
+        assertEquals(LeagueHomeWords.unknownPlatform, home.platform)
+        assertEquals(Words.LeagueHome.move, requireNotNull(home.moves).rows.first().kind)
     }
 }

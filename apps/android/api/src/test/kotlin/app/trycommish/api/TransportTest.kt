@@ -79,6 +79,16 @@ class TransportTest {
         }
 
     @Test
+    fun `a 401 is Unauthorized, so the app signs the device out`() =
+        runTest {
+            val body = """{"ok":false,"data":null,"error":{"code":"unauthorized","message":"Sign in."}}"""
+            val engine = MockEngine { respond(body, HttpStatusCode.Unauthorized, json) }
+            val sync = Transport("http://api.test", engine, token = { "tok_old" }).leagueSync()
+            assertThrows<Unauthorized> { sync.leagueSync(leagueId).data<LeagueSync>() }
+            assertThrows<Unauthorized> { sync.leagueSync(leagueId).bodyText() }
+        }
+
+    @Test
     fun `an error envelope fails with the API's code and message`() =
         runTest {
             val body = """{"ok":false,"data":null,"error":{"code":"not_found","message":"No such league."}}"""

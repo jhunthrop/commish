@@ -46,10 +46,20 @@ class Transport(
         )
     }
 
-    fun leagueSync(): LeagueSyncApi = LeagueSyncApi(baseUrl, engine, config)
+    /** Each generated client once per transport: each holds one HttpClient for the app's life. */
+    private val leagueSyncApi by lazy { LeagueSyncApi(baseUrl, engine, config) }
+    private val devicesApi by lazy { DevicesApi(baseUrl, engine, config) }
 
-    fun devices(): DevicesApi = DevicesApi(baseUrl, engine, config)
+    fun leagueSync(): LeagueSyncApi = leagueSyncApi
+
+    fun devices(): DevicesApi = devicesApi
+}
+
+/** An answer's body whole, or Unauthorized when the API no longer takes the device's token. */
+suspend fun HttpResponse<*>.bodyText(): String {
+    if (status == HTTP_UNAUTHORIZED) throw Unauthorized()
+    return response.bodyAsText()
 }
 
 /** The envelope's data from a generated call's answer, or the API's failure. */
-suspend inline fun <reified T> HttpResponse<*>.data(): T = decodeEnvelope(response.bodyAsText(), status)
+suspend inline fun <reified T> HttpResponse<*>.data(): T = decodeEnvelope(bodyText(), status)

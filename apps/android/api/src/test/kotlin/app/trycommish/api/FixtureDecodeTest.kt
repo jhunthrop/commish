@@ -1,6 +1,7 @@
 package app.trycommish.api
 
 import app.trycommish.api.models.LeagueHost
+import app.trycommish.api.models.LeagueMove
 import app.trycommish.api.models.LeagueSync
 import app.trycommish.api.models.Scoreboard
 import app.trycommish.api.models.ScoreboardGame
@@ -44,6 +45,17 @@ class FixtureDecodeTest {
         val grown = JsonObject(root + ("data" to JsonObject(data + ("a_field_from_next_week" to JsonPrimitive(7)))))
         val sync = decodeEnvelope<LeagueSync>(grown.toString())
         assertEquals(12, sync.teams.size)
+    }
+
+    @Test
+    fun `a platform or a move kind this build does not know reads as the unknown case, never a crash`() {
+        val body =
+            fixture("leagues-attached-$leagueId.json")
+                .replace("\"host\": \"ffpc\"", "\"host\": \"fleaflicker\"")
+                .replaceFirst("\"kind\": \"add\"", "\"kind\": \"commissioner\"")
+        val sync = decodeEnvelope<LeagueSync>(body)
+        assertEquals(LeagueHost.unknown_default_open_api, sync.host)
+        assertEquals(LeagueMove.Kind.unknown_default_open_api, sync.moves.first().kind)
     }
 
     @Test

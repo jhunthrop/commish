@@ -55,11 +55,16 @@ class ApiFailure(
     override val message: String,
 ) : Exception(message)
 
+/** The API refused the device's token (401): it lapsed unused or was revoked. The app signs the
+ * device out and asks for a sign-in, never "no connection". */
+class Unauthorized : Exception("The API no longer accepts this device's sign-in.")
+
 /** The envelope's data from an answer's body, or the API's failure. */
 inline fun <reified T> decodeEnvelope(
     body: String,
     status: Int = HTTP_OK,
 ): T {
+    if (status == HTTP_UNAUTHORIZED) throw Unauthorized()
     val envelope = CommishJson.decodeFromString<Envelope<T>>(body)
     val error = envelope.error
     if (!envelope.ok || error != null) {
@@ -69,3 +74,4 @@ inline fun <reified T> decodeEnvelope(
 }
 
 const val HTTP_OK = 200
+const val HTTP_UNAUTHORIZED = 401

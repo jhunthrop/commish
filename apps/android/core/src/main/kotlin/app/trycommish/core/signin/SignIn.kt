@@ -65,6 +65,10 @@ class ApiPairing(
 sealed interface SignInResult {
     data object SignedIn : SignInResult
 
+    /** A return link with no sign-in begun here (used, or the app restarted since): nothing to say,
+     * the member signs in again from the button. */
+    data object Ignored : SignInResult
+
     data class Refused(
         val message: String,
     ) : SignInResult
@@ -75,7 +79,6 @@ sealed interface SignInResult {
 object SignInWords {
     const val signIn = "Sign in"
     const val lead = "Sign in to see your leagues. Commish opens your browser to sign in, then brings you back here."
-    const val notStarted = "That sign-in link has already been used. Sign in again from the app."
     const val didNotFinish = "Sign-in did not finish. Check your connection and sign in again."
 }
 
@@ -110,7 +113,7 @@ class SignIn(
 
     suspend fun complete(link: String): SignInResult {
         val code = codeOf(link) ?: return SignInResult.Refused(SignInWords.didNotFinish)
-        val held = verifier ?: return SignInResult.Refused(SignInWords.notStarted)
+        val held = verifier ?: return SignInResult.Ignored
         verifier = null
         return try {
             val device = pairing.pair(code, deviceName, KIND, held)

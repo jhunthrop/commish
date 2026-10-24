@@ -1,5 +1,6 @@
 package app.trycommish.core.leaguehome
 
+import app.trycommish.api.Unauthorized
 import app.trycommish.api.decodeEnvelope
 import app.trycommish.api.models.AttachedLeague
 import app.trycommish.api.models.LeaguePhase
@@ -17,8 +18,11 @@ fun leagueToOpen(leagues: List<AttachedLeague>): AttachedLeague? = leagues.first
 
 /** What the League tab opens. */
 sealed interface LeagueChoice {
+    /** A league, with its phase and whether its waivers run, which choose the bottom bar. */
     data class Chosen(
         val leagueId: String,
+        val phase: LeaguePhase,
+        val waiversOpen: Boolean,
     ) : LeagueChoice
 
     /** The member has attached no league. */
@@ -27,28 +31,43 @@ sealed interface LeagueChoice {
     /** No connection and nothing kept. */
     data object Unreachable : LeagueChoice
 
+    /** The API no longer takes the device's token. */
+    data object SignedOut : LeagueChoice
+
     /** The sentence the tab shows when there is no league to draw. */
     fun message(): String? =
         when (this) {
             is Chosen -> null
             NoLeague -> LeagueHomeWords.noLeague
             Unreachable -> LeagueHomeWords.cannotLoad
+            SignedOut -> LeagueHomeWords.signedOut
         }
 }
 
-/** Chooses the League tab's league from `/leagues/attached`, kept like every answer so the tab opens
- * with no connection. */
+/** Chooses the League tab's league from `/leagues/attached`, kept like every answer: [kept] reads the
+ * kept list at once with no network, [choose] asks the API and keeps its answer. */
 class LeagueChooser(
     private val reads: LeagueReads,
     private val cache: Cache,
     private val clock: Clock,
 ) {
+    /** The choice from the kept list, null when nothing is kept. */
+    fun kept(): LeagueChoice? =
+        cache
+            .read(LeagueHomeKeys.ATTACHED)
+            ?.body
+            ?.let(::decode)
+            ?.let(::choiceOf)
+
+    /** The choice from the API; with no connection the kept list's, else Unreachable. */
     suspend fun choose(): LeagueChoice {
         val fresh =
             try {
                 reads.attached()
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: Unauthorized) {
+                return LeagueChoice.SignedOut
             } catch (
                 @Suppress("TooGenericExceptionCaught") e: Exception,
             ) {
@@ -59,12 +78,11 @@ class LeagueChooser(
             cache.write(LeagueHomeKeys.ATTACHED, Cached(fresh, clock.now()))
             return choiceOf(leagues)
         }
-        val kept = cache.read(LeagueHomeKeys.ATTACHED)?.body?.let(::decode) ?: return LeagueChoice.Unreachable
-        return choiceOf(kept)
+        return kept() ?: LeagueChoice.Unreachable
     }
 
     private fun choiceOf(leagues: List<AttachedLeague>): LeagueChoice =
-        leagueToOpen(leagues)?.let { LeagueChoice.Chosen(it.id.toString()) } ?: LeagueChoice.NoLeague
+        leagueToOpen(leagues)?.let { LeagueChoice.Chosen(it.id.toString(), it.phase, it.waiversOpen) } ?: LeagueChoice.NoLeague
 
     private fun decode(body: String): List<AttachedLeague>? = runCatching { decodeEnvelope<List<AttachedLeague>>(body) }.getOrNull()
 }

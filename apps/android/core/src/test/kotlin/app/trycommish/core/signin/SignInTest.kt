@@ -100,11 +100,11 @@ class SignInTest {
         }
 
     @Test
-    fun `a return with no sign-in begun is refused, the verifier never guessed`() =
+    fun `a return with no sign-in begun is ignored, the verifier never guessed`() =
         runTest {
             val pairing = FakePairing()
             val result = flow(pairing).complete("$returnTo?code=abc123&client=android")
-            assertEquals(SignInResult.Refused(SignInWords.notStarted), result)
+            assertEquals(SignInResult.Ignored, result)
             assertTrue(pairing.calls.isEmpty())
         }
 
@@ -115,7 +115,7 @@ class SignInTest {
             val signIn = flow(pairing)
             signIn.start()
             signIn.complete("$returnTo?code=abc123&client=android")
-            assertEquals(SignInResult.Refused(SignInWords.notStarted), signIn.complete("$returnTo?code=abc123&client=android"))
+            assertEquals(SignInResult.Ignored, signIn.complete("$returnTo?code=abc123&client=android"))
         }
 
     @Test

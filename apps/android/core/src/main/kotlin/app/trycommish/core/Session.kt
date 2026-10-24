@@ -19,6 +19,11 @@ interface Session {
     fun signOut()
 }
 
+/** What the app does when the API refuses the device's token: forget it and ask for a sign-in. */
+fun interface SessionEnd {
+    fun signedOut()
+}
+
 /** A session in memory, for tests and previews. */
 class MemorySession(
     override var token: String? = null,
