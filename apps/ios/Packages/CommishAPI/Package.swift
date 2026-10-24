@@ -5,7 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "CommishAPI",
-    platforms: [.iOS(.v17), .macOS(.v14)],
+    platforms: [.iOS("17.4"), .macOS(.v14)],
     products: [.library(name: "CommishAPI", targets: ["CommishAPI"])],
     dependencies: [
         .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.10.0"),

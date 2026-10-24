@@ -5,7 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "LeagueHome",
-    platforms: [.iOS(.v17), .macOS(.v14)],
+    platforms: [.iOS("17.4"), .macOS(.v14)],
     products: [.library(name: "LeagueHome", targets: ["LeagueHome"])],
     dependencies: [
         .package(path: "../../CommishCore"),

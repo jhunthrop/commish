@@ -7,3 +7,6 @@ fastlane/report.xml
 fastlane/test_output/
 fastlane/README.md
 __Failures__/
+# Written by xcodegen generate from project.yml, the one source.
+Commish/Info.plist
+Commish/Commish.entitlements

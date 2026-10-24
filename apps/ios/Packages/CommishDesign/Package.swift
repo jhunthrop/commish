@@ -6,7 +6,7 @@ import PackageDescription
 
 let package = Package(
     name: "CommishDesign",
-    platforms: [.iOS(.v17), .macOS(.v14)],
+    platforms: [.iOS("17.4"), .macOS(.v14)],
     products: [
         .library(name: "CommishDesign", targets: ["CommishDesign"]),
         .library(name: "CommishSnapshotSupport", targets: ["CommishSnapshotSupport"]),

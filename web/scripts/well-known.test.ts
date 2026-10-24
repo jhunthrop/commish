@@ -22,6 +22,7 @@ const DIGEST = Array.from({ length: 32 }, (_, i) =>
 
 interface Aasa {
 	applinks: { details: { appIDs: string[]; paths: string[]; components: { '/': string }[] }[] };
+	webcredentials?: { apps: string[] };
 }
 
 interface AssetLink {
@@ -35,6 +36,7 @@ void test('the Apple file names the iOS app under the team and every path the ap
 	assert.ok(detail);
 	assert.deepEqual(detail.appIDs, [`${TEAM}.${IOS_BUNDLE_ID}`]);
 	assert.equal(`${TEAM}.${IOS_BUNDLE_ID}`, 'ABCDE12345.app.trycommish.ios');
+	assert.deepEqual(aasa.webcredentials, { apps: [`${TEAM}.${IOS_BUNDLE_ID}`] });
 	for (const path of ['/app/signed-in', '/players/*', '/league/*', '/mock/share/*']) {
 		assert.ok(detail.paths.includes(path), path);
 		assert.ok(
