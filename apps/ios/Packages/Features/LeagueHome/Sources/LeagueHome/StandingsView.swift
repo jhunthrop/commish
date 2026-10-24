@@ -19,7 +19,10 @@ struct StandingsView: View {
         section.rows.map { line in
             let cells = [
                 BoxCell(String(line.rank), tone: .muted),
-                BoxCell(line.team, tone: .strong, sub: line.streak, face: line.initials),
+                BoxCell(
+                    line.team, tone: .strong, sub: line.streak, face: line.initials,
+                    subPill: line.streakWon.map { $0 ? .gain : .loss }
+                ),
                 BoxCell(line.record),
                 BoxCell(line.pointsFor),
                 BoxCell(line.proj),

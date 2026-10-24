@@ -17,6 +17,11 @@ public struct StandingsLine: Sendable, Equatable, Identifiable {
     public let pointsFor: String
     public let pointsAgainst: String
     public let streak: String
+    /// The streak is of wins (true) or losses (false), nil with none (Standings.svelte's win class).
+    public var streakWon: Bool? {
+        streak.isEmpty ? nil : streak.hasPrefix("W")
+    }
+
     public let waiver: String
     public let proj: String
     public let me: Bool

@@ -49,12 +49,17 @@ public struct BoxCell: Sendable, Equatable {
     public let sub: String?
     /// The initials of a face drawn before the text: someone on every row.
     public let face: String?
+    /// The sub-line drawn as a pill in this tone (a streak, won or lost), plain text when nil.
+    public let subPill: PillTone?
 
-    public init(_ text: String, tone: BoxTone = .plain, sub: String? = nil, face: String? = nil) {
+    public init(
+        _ text: String, tone: BoxTone = .plain, sub: String? = nil, face: String? = nil, subPill: PillTone? = nil
+    ) {
         self.text = text
         self.tone = tone
         self.sub = sub
         self.face = face
+        self.subPill = subPill
     }
 }
 
@@ -120,7 +125,9 @@ public struct BoxTable: View {
                             .lineLimit(1)
                             // A figure keeps its size in every row; a long name gives way.
                             .fixedSize(horizontal: column.numeric, vertical: false)
-                        if let sub = cell.sub, !sub.isEmpty {
+                        if let sub = cell.sub, !sub.isEmpty, let pill = cell.subPill {
+                            Pill(sub, tone: pill).padding(.top, 2)
+                        } else if let sub = cell.sub, !sub.isEmpty {
                             Text(sub)
                                 .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .medium))
                                 .foregroundStyle(theme.color(Tokens.Color.ink3))

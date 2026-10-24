@@ -130,7 +130,8 @@ struct BugCard: View {
                 .frame(width: Self.figureWidth, alignment: .trailing)
             Text(side.big)
                 .font(Faces.font(.num, size: Tokens.TypeScale.xl, weight: .bold))
-                .foregroundStyle(ink)
+                // The member's own figure in the board's number colour, as the web marks "you".
+                .foregroundStyle(side.me ? theme.color(Tokens.Color.scoreboardNum) : ink)
                 .frame(width: Self.figureWidth, alignment: .trailing)
         }
     }

@@ -17,8 +17,10 @@ public struct SectionHead: View {
     public var body: some View {
         let theme = Theme(colorScheme)
         VStack(alignment: .leading, spacing: 2) {
+            // The web's h2: the number face, uppercase (ScoreBoard.svelte, Standings.svelte).
             Text(title)
-                .font(Faces.font(.ui, size: Tokens.TypeScale.lg, weight: .bold))
+                .font(Faces.font(.num, size: Tokens.TypeScale.xl, weight: .bold))
+                .textCase(.uppercase)
                 .foregroundStyle(theme.color(Tokens.Color.ink))
                 .accessibilityAddTraits(.isHeader)
             if let aside {
