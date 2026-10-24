@@ -151,7 +151,10 @@ try {
 	for (const width of WIDTHS) {
 		const page = await browser.newPage({ viewport: { width, height: 900 } });
 		await page.setContent(unfurlHtml(heads), { waitUntil: 'networkidle' });
-		await page.screenshot({ path: new URL(`unfurls-${String(width)}.png`, out).pathname, fullPage: true });
+		await page.screenshot({
+			path: new URL(`unfurls-${String(width)}.png`, out).pathname,
+			fullPage: true
+		});
 		await page.close();
 	}
 } finally {
