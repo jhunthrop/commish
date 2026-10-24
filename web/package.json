@@ -23,7 +23,9 @@
 		"standin": "node --env-file-if-exists=.env scripts/run-from-mock-data.ts",
 		"shots": "node --env-file-if-exists=.env scripts/shots.ts",
 		"measure:sheet": "node scripts/measure-sheet.ts",
-		"measure:page": "node scripts/measure-page-js.ts"
+		"measure:page": "node scripts/measure-page-js.ts",
+		"gen:shared": "node ../shared/scripts/gen-tokens.ts && node ../shared/scripts/gen-words.ts && node ../shared/scripts/export-fixtures.ts",
+		"check:shared": "node ../shared/scripts/check-gen.ts"
 	},
 	"devDependencies": {
 		"@capsizecss/metrics": "^4.3.0",

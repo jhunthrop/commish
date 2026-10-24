@@ -110,7 +110,12 @@ arrive. The swap costs a CLS of about 0.035 against the 0.05 budget.
 `src/lib/ui/tokens.css` is the token set of the approved design authority,
 `docs/design/mocks/2026-10-12-commish/tokens.css`, copied verbatim in the same three blocks: light on
 bare `:root`, dark under `prefers-color-scheme` guarded by `:root:not([data-theme="light"])`, and
-dark again under `:root[data-theme="dark"]`. Change a token there first, then here.
+dark again under `:root[data-theme="dark"]`. Since Lane 171 the colours, type scale, spacing and radii
+come from one source shared with the iOS and Android apps, `shared/design/tokens.json`: change a
+token there and run `npm run gen:shared`, which writes `src/lib/ui/tokens.generated.css` (imported at
+the top of `tokens.css`) and the apps' Swift and Kotlin. `tokens.css` keeps the font stacks, layout
+and shadows. `npm run check:shared` (and `make -C api check-gen` in CI) fails on a generated file
+that differs from its source.
 
 The primitives in `src/lib/ui/` port the mock's `build/shell.py` and `build/roomparts.py`, one
 component per file with typed props. Every color is a token, and no page styles a primitive from the

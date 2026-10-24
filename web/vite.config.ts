@@ -1,6 +1,6 @@
 import adapter from '@sveltejs/adapter-cloudflare';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, searchForWorkspaceRoot } from 'vite';
 import { shellHrefs } from './src/lib/ui/nav.ts';
 
 const NOT_FOUND = 404;
@@ -94,6 +94,9 @@ export default defineConfig({
 	// An explicit, empty PostCSS config: without it Vite walks up from web/ and finds the root Next
 	// app's postcss.config.mjs, whose plugin only the root install has, which failed the first CI build.
 	css: { postcss: { plugins: [] } },
+	// The sources the web shares with the apps (shared/: the banned list, Lane 171) sit beside web/, so
+	// the dev server may serve them; the workspace root stays allowed, as it is when nothing is listed.
+	server: { fs: { allow: [searchForWorkspaceRoot(process.cwd()), '../shared'] } },
 	plugins: [
 		sveltekit({
 			compilerOptions: {

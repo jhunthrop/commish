@@ -6,13 +6,14 @@ import { test } from 'node:test';
 import { MARK_COLORS } from '#lib/ui/mark.ts';
 import { APP_COLORS, APP_ICONS, appHeadTags, webManifest } from './app-manifest.ts';
 
-const TOKENS = readFileSync(new URL('../ui/tokens.css', import.meta.url), 'utf8');
+// The colours live in the generated tokens (shared/design/tokens.json, Lane 171).
+const TOKENS = readFileSync(new URL('../ui/tokens.generated.css', import.meta.url), 'utf8');
 const STATIC = new URL('../../../static/', import.meta.url);
 
 /** A token's value in the block that starts at `selector`. */
 function tokenIn(selector: string, token: string): string {
 	const start = TOKENS.indexOf(selector);
-	assert.notEqual(start, -1, `tokens.css has no ${selector} block`);
+	assert.notEqual(start, -1, `tokens.generated.css has no ${selector} block`);
 	const match = new RegExp(`--${token}:\\s*(#[0-9a-f]{6})`).exec(TOKENS.slice(start));
 	assert.ok(match?.[1], `no --${token} after ${selector}`);
 	return match[1];

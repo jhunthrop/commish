@@ -1,0 +1,57 @@
+# .github/workflows/shared.yml
+# The sources the web and the apps share (shared/, Lane 171): the design tokens, the word tables and
+# the fixtures, each generated into the web's CSS, the apps' Swift and Kotlin and shared/fixtures.
+# This regenerates them and fails on any generated file that differs from its source, so a hand edit
+# to a generated file, or a web change that moves a fixture answer, fails here on its own push. No
+# deploy: api.yml still runs the same check inside `make check-gen` on an API push.
+name: shared
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "shared/**"
+      - "apps/ios/Packages/CommishDesign/Sources/CommishDesign/*.generated.swift"
+      - "apps/android/design/src/main/kotlin/app/trycommish/design/**"
+      - "web/src/lib/**"
+      - "web/src/fixtures/**"
+      - "web/scripts/inseason-fixture/**"
+      - "web/src/lib/ui/tokens.generated.css"
+      - ".github/workflows/shared.yml"
+  pull_request:
+    paths:
+      - "shared/**"
+      - "apps/ios/Packages/CommishDesign/Sources/CommishDesign/*.generated.swift"
+      - "apps/android/design/src/main/kotlin/app/trycommish/design/**"
+      - "web/src/lib/**"
+      - "web/src/fixtures/**"
+      - "web/scripts/inseason-fixture/**"
+      - "web/src/lib/ui/tokens.generated.css"
+      - ".github/workflows/shared.yml"
+
+concurrency:
+  group: shared-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # 24: the generators run as TypeScript and read import.meta.main.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 24, cache: npm, cache-dependency-path: web/package-lock.json }
+      # The generators import the web's modules (the word tables, the fixture API and what it reads).
+      - name: Install the web's dependencies
+        working-directory: web
+        run: npm ci --no-audit --no-fund
+      - name: The generated tokens, words and fixtures match their sources
+        run: node shared/scripts/check-gen.ts
+      - name: The shared generators' tests
+        run: node --test shared/scripts/*.test.ts
+      - name: The web's own entry to the same check
+        working-directory: web
+        run: npm run check:shared

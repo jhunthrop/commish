@@ -3,8 +3,12 @@
    search across the top, dense rows in the middle, a filter and sheet rail on the right.
    Borrowed from Scout: a reading serif, allowed on the player page's prose and its pull figures only.
    Borrowed from Broadcast: the score bug and the lower third, allowed in a live draft room only.
+   The colours in both themes, the type scale, spacing and radii come from one source shared with the
+   apps, shared/design/tokens.json, generated into tokens.generated.css (shared/scripts/gen-tokens.ts,
+   Lane 171). This file keeps what only the web has: the font stacks, the layout and the shadows.
    Light values live on bare :root. Dark redefines tokens only, twice, so the OS
    setting and the explicit data-theme toggle both win. */
+@import './tokens.generated.css';
 
 :root {
 	/* Type. Outfit is the geometric UI face: Poppins's circles with a tighter set width,
@@ -28,27 +32,12 @@
 	--t-byline: var(--t-xs); /* 11, the tile caption's size */
 	--lh-byline: 1.35;
 
-	/* Type scale, 1.2 ratio from a 14px base. Numbers use --font-num at the top three. */
-	--t-xs: 0.6875rem; /* 11 labels on cells, uppercase, tracked */
-	--t-sm: 0.8125rem; /* 13 secondary text */
-	--t-md: 0.9375rem; /* 15 names, body in rows */
-	--t-lg: 1.125rem; /* 18 section heads, prose */
-	--t-xl: 1.625rem; /* 26 cell numbers in display face */
-	--t-head: 1.875rem; /* 30 a panel title in the display face */
-	--t-display: 2.375rem; /* 38 a page title in the display face */
-	--t-2xl: 2.75rem; /* 44 tier cliffs, clock */
-	--t-3xl: 5.5rem; /* 88 the one big number on a page */
+	/* The type scale (tokens.generated.css) is a 1.2 ratio from a 14px base. Numbers use --font-num
+	   at the top three. */
 	--track-label: 0.08em;
 
-	/* Space and shape. Rows are 52px on desktop and 48 on the phone. Radii are small:
+	/* Layout. Rows are 52px on desktop and 48 on the phone. Radii (tokens.generated.css) are small:
      a press box is glass and steel, not pillows. */
-	--s-1: 4px;
-	--s-2: 8px;
-	--s-3: 12px;
-	--s-4: 16px;
-	--s-5: 24px;
-	--s-6: 32px;
-	--s-7: 48px;
 	--row-h: 52px;
 	--verb-h: 42px; /* the one solid verb, and the top bar slot that holds it */
 	--touch: 44px; /* the smallest target a thumb gets on a phone */
@@ -62,97 +51,8 @@
 	--switch-min-w: 148px; /* a cut league name with its flag and chevron, the least it gives way to */
 	--find-min-w: 160px; /* the bar's search, where its placeholder still reads */
 	--form-w: 420px; /* a form's column: its fields, its consent and the choice above it */
-	--r-sm: 4px;
-	--r-md: 8px;
-	--r-pill: 999px;
 
-	/* Neutrals, light. True paper white with ink that leans a touch warm toward the
-     accent, so the greys read as chosen rather than default. */
-	--bg: #ffffff;
-	--surface: #f8f7f5;
-	--surface-2: #efedea;
-	--line: #e3dfda;
-	--line-strong: #cfc9c2;
-	--ink: #15120f;
-	--ink-2: #48413b;
-	--ink-3: #6b635c; /* 5.9:1 on --bg */
-	/* A week already played: muted ink, never opacity, so its text holds 4.5:1 (ink-3 is 5.0:1 on
-	   --surface-2 in light, 4.9:1 in dark). */
-	--played-ink: var(--ink-3);
-	--shell: #ffffff; /* rail and top bar */
-	--shell-line: #e3dfda;
-
-	/* The one warm accent: burnt orange at hue 20. Streak amber (#E39A0E) sits at 38
-     and reads 2.3:1 as text on white, so it cannot carry a verb in light. This orange
-     holds 5:1 under white text and as text on paper, and stays clear of every tier hue.
-     It marks three things only: the brand, the one solid verb, and you. */
-	--accent: #c2470a;
-	--accent-ink: #ffffff; /* text on an accent fill */
-	--accent-text: #b03f06; /* accent used as text on --bg */
-	--accent-wash: #fdebe0; /* your rows, your picks */
-	--focus: #c2470a;
-
-	/* Magnitude. Over replacement is tinted by the round it would go in on our board
-     of 400 (1 to 4, then none). Below replacement takes the rose wash and a minus. */
-	--heat-1: #a6e3bd;
-	--heat-2: #c8eed5;
-	--heat-3: #e0f5e7;
-	--heat-4: #f0faf3;
-	--heat-neg: #fbe1e4;
-	--heat-ink: #15120f;
-
-	/* Drafters versus us. Later is a gain for you, earlier is a cost. Always with the word. */
-	--gain-bg: #dcf3e4;
-	--gain-ink: #11663a;
-	--loss-bg: #fbe1e4;
-	--loss-ink: #a3243a;
-	/* A player's status on his face: injured reserve, a solid tag at the photo's top left. */
-	--status-ir-bg: #a3243a;
-	--status-ir-ink: #ffffff;
-
-	/* Tiers are one ink ramp (B47): tier 1 the full ink, each tier after it a step toward the page,
-	   never a hue, so no tier reads as a warning. Built from --ink and --bg, so each theme takes it from
-	   its own two. The first three carry --bg text, the rest --ink, each pair 4.5:1 or better in both
-	   themes; the label carries the tier number, so the shade is never the only channel. */
-	--tier-1: var(--ink);
-	--tier-2: color-mix(in srgb, var(--ink) 76%, var(--bg));
-	--tier-3: color-mix(in srgb, var(--ink) 62%, var(--bg));
-	--tier-4: color-mix(in srgb, var(--ink) 38%, var(--bg));
-	--tier-5: color-mix(in srgb, var(--ink) 28%, var(--bg));
-	--tier-6: color-mix(in srgb, var(--ink) 20%, var(--bg));
-	--tier-7: color-mix(in srgb, var(--ink) 14%, var(--bg));
-	--tier-ink-1: var(--bg);
-	--tier-ink-2: var(--bg);
-	--tier-ink-3: var(--bg);
-	--tier-ink-4: var(--ink);
-	--tier-ink-5: var(--ink);
-	--tier-ink-6: var(--ink);
-	--tier-ink-7: var(--ink);
 	--tier-wash: 9%; /* how much of the tier hue tints its band */
-
-	/* The scoreboard: a lit board on black in both themes. In Commish it carries the draft room's
-     score bug and lower third, and nothing outside a live draft. The orange on it is the dark-theme
-     accent, so the brand reads the same on the board in either theme. */
-	--scoreboard: #15120f;
-	--scoreboard-2: #221d19; /* a raised segment of the bug */
-	--scoreboard-line: #3a332d; /* dividers between segments */
-	--scoreboard-ink: #f5f0ea;
-	--scoreboard-ink-2: #b9b0a7; /* labels on the board */
-	--scoreboard-num: #ff7130;
-	--scoreboard-num-ink: #170802; /* text on an orange segment of the bug */
-	/* A gain and a loss on the board, black in both themes (the trade builder's scoreboard). */
-	--scoreboard-gain-bg: #12341f;
-	--scoreboard-gain-ink: #6fdc99;
-	--scoreboard-loss-bg: #3a161c;
-	--scoreboard-loss-ink: #ff9aa9;
-
-	/* Paper: what a printed page is in either theme. Never redefined for dark, so the print
-     preview reads as the page that will come out of the printer, and print media below
-     puts every page on it. */
-	--paper: #ffffff;
-	--paper-ink: #15120f;
-	--paper-line: #d8d3cd;
-	--paper-muted: #5c544d; /* 7.4:1 on --paper */
 
 	--shadow-pop: 0 1px 2px rgb(21 18 15 / 0.06), 0 8px 24px rgb(21 18 15 / 0.08);
 	color-scheme: light;
@@ -160,81 +60,13 @@
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme='light']) {
-		--bg: #090807;
-		--surface: #12100e;
-		--surface-2: #1b1815;
-		--line: #29241f;
-		--line-strong: #3a332d;
-		--ink: #f5f0ea;
-		--ink-2: #b9b0a7;
-		--ink-3: #8f857c;
-		--shell: #050404;
-		--shell-line: #1e1a17;
-		--accent: #ff7130;
-		--accent-ink: #170802;
-		--accent-text: #ff8a4f;
-		--accent-wash: #2a160b;
-		--focus: #ff8a4f;
-		--heat-1: #1d6a3e;
-		--heat-2: #17502f;
-		--heat-3: #133a23;
-		--heat-4: #10261a;
-		--heat-neg: #43191f;
-		--heat-ink: #f5f0ea;
-		--gain-bg: #12341f;
-		--gain-ink: #6fdc99;
-		--loss-bg: #3a161c;
-		--loss-ink: #ff8f9f;
-		--status-ir-bg: #ff8f9f;
-		--status-ir-ink: #1a0a0d;
 		--tier-wash: 16%;
-		--scoreboard: #000000;
-		--scoreboard-2: #15120f;
-		--scoreboard-line: #29241f;
-		--scoreboard-ink: #f5f0ea;
-		--scoreboard-ink-2: #b9b0a7;
-		--scoreboard-num: #ff7130;
-		--scoreboard-num-ink: #170802;
 		--shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
 		color-scheme: dark;
 	}
 }
 :root[data-theme='dark'] {
-	--bg: #090807;
-	--surface: #12100e;
-	--surface-2: #1b1815;
-	--line: #29241f;
-	--line-strong: #3a332d;
-	--ink: #f5f0ea;
-	--ink-2: #b9b0a7;
-	--ink-3: #8f857c;
-	--shell: #050404;
-	--shell-line: #1e1a17;
-	--accent: #ff7130;
-	--accent-ink: #170802;
-	--accent-text: #ff8a4f;
-	--accent-wash: #2a160b;
-	--focus: #ff8a4f;
-	--heat-1: #1d6a3e;
-	--heat-2: #17502f;
-	--heat-3: #133a23;
-	--heat-4: #10261a;
-	--heat-neg: #43191f;
-	--heat-ink: #f5f0ea;
-	--gain-bg: #12341f;
-	--gain-ink: #6fdc99;
-	--loss-bg: #3a161c;
-	--loss-ink: #ff8f9f;
-	--status-ir-bg: #ff8f9f;
-	--status-ir-ink: #1a0a0d;
 	--tier-wash: 16%;
-	--scoreboard: #000000;
-	--scoreboard-2: #15120f;
-	--scoreboard-line: #29241f;
-	--scoreboard-ink: #f5f0ea;
-	--scoreboard-ink-2: #b9b0a7;
-	--scoreboard-num: #ff7130;
-	--scoreboard-num-ink: #170802;
 	--shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
 	color-scheme: dark;
 }

@@ -1,0 +1,216 @@
+{
+	"ok": true,
+	"data": {
+		"week": 6,
+		"read_at": "2026-10-18T18:52:00.000Z",
+		"projection_read_at": "2026-10-17T02:00:00.000Z",
+		"projection_scoring": {
+			"format": "ppr",
+			"league_own": false,
+			"te_bonus": 0.5
+		},
+		"games": [
+			{
+				"state": "playing",
+				"next_kickoff": "2026-10-18T20:05:00.000Z",
+				"to_play": "5 to play",
+				"sides": [
+					{
+						"roster_id": 1,
+						"points": 39.1,
+						"points_read": true,
+						"projection": 74.7,
+						"starters": 10,
+						"played": 4,
+						"projected_final": 73.2,
+						"to_play": "3 to play",
+						"in_play": 3,
+						"starters_final": false
+					},
+					{
+						"roster_id": 7,
+						"points": 57.9,
+						"points_read": true,
+						"projection": 104.8,
+						"starters": 0,
+						"played": 0,
+						"projected_final": 121.2,
+						"to_play": null,
+						"in_play": 0,
+						"projection_best_lineup": true,
+						"projected_final_paced": true,
+						"schedule_state": "kicked_off"
+					}
+				]
+			},
+			{
+				"state": "playing",
+				"next_kickoff": "2026-10-18T20:05:00.000Z",
+				"to_play": null,
+				"sides": [
+					{
+						"roster_id": 2,
+						"points": 14.4,
+						"points_read": true,
+						"projection": null,
+						"starters": 0,
+						"played": 0,
+						"projected_final": null,
+						"to_play": null,
+						"in_play": 0,
+						"schedule_state": "kicked_off"
+					},
+					{
+						"roster_id": 6,
+						"points": 6.5,
+						"points_read": true,
+						"projection": null,
+						"starters": 0,
+						"played": 0,
+						"projected_final": null,
+						"to_play": null,
+						"in_play": 0,
+						"schedule_state": "kicked_off"
+					}
+				]
+			},
+			{
+				"state": "playing",
+				"next_kickoff": "2026-10-18T20:05:00.000Z",
+				"to_play": null,
+				"sides": [
+					{
+						"roster_id": 3,
+						"points": 15.7,
+						"points_read": true,
+						"projection": 45.1,
+						"starters": 0,
+						"played": 0,
+						"projected_final": 36.8,
+						"to_play": null,
+						"in_play": 0,
+						"projection_best_lineup": true,
+						"projected_final_paced": true,
+						"schedule_state": "kicked_off"
+					},
+					{
+						"roster_id": 9,
+						"points": 12.2,
+						"points_read": true,
+						"projection": null,
+						"starters": 0,
+						"played": 0,
+						"projected_final": null,
+						"to_play": null,
+						"in_play": 0,
+						"schedule_state": "kicked_off"
+					}
+				]
+			},
+			{
+				"state": "playing",
+				"next_kickoff": "2026-10-18T20:05:00.000Z",
+				"to_play": null,
+				"sides": [
+					{
+						"roster_id": 4,
+						"points": 33.2,
+						"points_read": true,
+						"projection": null,
+						"starters": 0,
+						"played": 0,
+						"projected_final": null,
+						"to_play": null,
+						"in_play": 0,
+						"schedule_state": "kicked_off"
+					},
+					{
+						"roster_id": 8,
+						"points": 32.4,
+						"points_read": true,
+						"projection": null,
+						"starters": 0,
+						"played": 0,
+						"projected_final": null,
+						"to_play": null,
+						"in_play": 0,
+						"schedule_state": "kicked_off"
+					}
+				]
+			},
+			{
+				"state": "playing",
+				"next_kickoff": "2026-10-18T20:25:00.000Z",
+				"to_play": null,
+				"sides": [
+					{
+						"roster_id": 5,
+						"points": 24.1,
+						"points_read": true,
+						"projection": 28.4,
+						"starters": 0,
+						"played": 0,
+						"projected_final": 29.4,
+						"to_play": null,
+						"in_play": 0,
+						"projection_best_lineup": true,
+						"best_lineup_skipped": true,
+						"projected_final_paced": true,
+						"schedule_state": "kicked_off"
+					},
+					{
+						"roster_id": 10,
+						"points": 10.9,
+						"points_read": true,
+						"projection": 39.4,
+						"starters": 0,
+						"played": 0,
+						"projected_final": 34.1,
+						"to_play": null,
+						"in_play": 0,
+						"projection_best_lineup": true,
+						"best_lineup_skipped": true,
+						"projected_final_paced": true,
+						"schedule_state": "kicked_off"
+					}
+				]
+			},
+			{
+				"state": "playing",
+				"next_kickoff": "2026-10-18T20:25:00.000Z",
+				"to_play": null,
+				"sides": [
+					{
+						"roster_id": 11,
+						"points": 16.7,
+						"points_read": true,
+						"projection": 60.1,
+						"starters": 0,
+						"played": 0,
+						"projected_final": 47.8,
+						"to_play": null,
+						"in_play": 0,
+						"projection_best_lineup": true,
+						"projected_final_paced": true,
+						"schedule_state": "kicked_off"
+					},
+					{
+						"roster_id": 12,
+						"points": 11.3,
+						"points_read": true,
+						"projection": 36.5,
+						"starters": 0,
+						"played": 0,
+						"projected_final": 31.1,
+						"to_play": null,
+						"in_play": 0,
+						"projection_best_lineup": true,
+						"projected_final_paced": true,
+						"schedule_state": "kicked_off"
+					}
+				]
+			}
+		]
+	},
+	"error": null
+}

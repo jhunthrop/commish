@@ -8,7 +8,7 @@ name: web
 on:
   push:
     branches: [main]
-    paths: ["web/**", "api/internal/figurewords/words.json", ".github/workflows/web.yml"]
+    paths: ["web/**", "shared/**", "api/internal/figurewords/words.json", ".github/workflows/web.yml"]
   repository_dispatch:
     types: [nightly-run]
   # The hourly backstop at any hour, the delivery path: `publish` moves runs/latest.json every hour

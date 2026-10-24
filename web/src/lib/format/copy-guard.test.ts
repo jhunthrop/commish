@@ -3,7 +3,7 @@
 // with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import LIST_FILE from './banned-words.json' with { type: 'json' };
+import LIST_FILE from '../../../../shared/words/banned-words.json' with { type: 'json' };
 import {
 	BANNED_LIST,
 	BANNED_MARKS,

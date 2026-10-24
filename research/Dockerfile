@@ -1,6 +1,7 @@
-# research/Dockerfile. The build context is research/, with web/ and api/ as the named contexts `web`
-# and `api` (the run contract the nightly's schema gate reads, and the API's words file it imports):
-#   docker build --build-context web=web --build-context api=api \
+# research/Dockerfile. The build context is research/, with web/, api/ and shared/ as the named contexts
+# `web`, `api` and `shared` (the run contract the nightly's schema gate reads, the API's words file it
+# imports, and the site's banned list the writer reads):
+#   docker build --build-context web=web --build-context api=api --build-context shared=shared \
 #     --build-arg VERSION=$(git rev-parse --short=8 HEAD) -f research/Dockerfile -t commish-research:local research
 #
 # One image, three modules, each run with `python -m`:
@@ -20,8 +21,9 @@
 # `../../../../api/internal/figurewords/words.json`). Every runtime import of the reader is one of the
 # copies below: web/src/lib/run/image-closure.test.ts walks the closure against these COPY lines and
 # pins, so an import the image lacks fails the web's tests, not the image job (Lane 76).
-# The writer reads the site's one banned list from the same copy (src/lib/format/banned-words.json,
-# research/capsules/site_words.py through research/web_contract.py).
+# The writer reads the site's one banned list beside the copy, where the repository holds it
+# (shared/words/banned-words.json, the named context `shared`, research/capsules/site_words.py through
+# research/web_contract.py).
 FROM node:24-slim AS web-contract
 WORKDIR /contract/web
 COPY --from=web package-lock.json /tmp/web-lock.json
@@ -35,6 +37,7 @@ COPY --from=web src/lib/run ./src/lib/run
 COPY --from=web src/lib/format ./src/lib/format
 COPY --from=web src/lib/types/player.ts ./src/lib/types/player.ts
 COPY --from=api internal/figurewords/words.json ../api/internal/figurewords/words.json
+COPY --from=shared words/banned-words.json ../shared/words/banned-words.json
 # The build's own reader, which the gate drives so that its cross-file checks are the web's, not a copy.
 COPY --from=web src/lib/server/run.ts ./src/lib/server/run.ts
 
