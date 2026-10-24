@@ -312,6 +312,8 @@ export const SHOT_CASES: readonly ShotCase[] = [
 	once('legal-shots', 'standin', FIXTURE_WEEK_CLOCK, { args: (o) => [o.web, o.api, o.out] }),
 	// The heads the served site answers with, its sitemap, robots file and /llms.txt (Lane 169).
 	once('head-shots', 'standin', FIXTURE_WEEK_CLOCK),
+	// The whistle in the rail and the phone bar, and the persona gate's mocks (Lane 170).
+	once('mark-shots', 'standin', FIXTURE_WEEK_CLOCK, { args: (o) => [o.web, o.api, o.out] }),
 	once('season-pages-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	once('board-row-shots', 'standin', FIXTURE_WEEK_CLOCK, { dev: true }),
 	// The Week N rankings page's K and D/ST chips (Lane 155): the week read, and the Tuesday before.
