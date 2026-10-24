@@ -640,14 +640,14 @@ export interface FeedRow {
 	detail: string;
 }
 
-const KIND_WORDS: Readonly<Record<LeagueMove['kind'], string>> = {
+export const KIND_WORDS: Readonly<Record<LeagueMove['kind'], string>> = {
 	add: 'Free agent',
 	waiver: 'Waiver',
 	trade: 'Trade'
 };
 
 /** A move that only lets a player go. */
-const DROP_WORD = 'Drop';
+export const DROP_WORD = 'Drop';
 
 /** A move's day and time: "Sun 11:44 am". */
 export function moveWhen(at: string, zone: string = memberZone()): string {

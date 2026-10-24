@@ -94,7 +94,7 @@ export const NONE_UNLISTED: UnlistedDrawn = {
 
 /** Where a best lineup is drawn from: the roster, or where it passed over a player with no Proj, the
  * players of it with one (Lane 137, B107). */
-const BEST_LINEUP_FROM = {
+export const BEST_LINEUP_FROM = {
 	rosters: 'their rosters',
 	projected: `the players with a ${BOX.proj}`
 } as const;
@@ -103,7 +103,7 @@ const BEST_LINEUP_FROM = {
  * round 3, roster_projection.go inPlayAt): the clause the sentence gains while a Proj final is drawn,
  * and its shorter form, a qualification a crowded phone says instead (Lane 137 fix round 1). */
 export const PACE_CLAUSE = "in-play players at their projection's pace";
-const PACE_CLAUSE_SHORT = 'in-play players at pace';
+export const PACE_CLAUSE_SHORT = 'in-play players at pace';
 
 /** Whether the teams' words run past the one plain sentence (its pace clause, its "players with a Proj",
  * or the second sentence for the teams with no roster): a phone then says its qualifications short or
