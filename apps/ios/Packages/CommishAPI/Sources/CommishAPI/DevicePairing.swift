@@ -1,35 +1,18 @@
 import Foundation
 
-/// The device kinds the API mints a token for: an app kind carries the session scope, so one token
-/// opens every signed-in read.
-public enum DeviceKind: String, Codable, Sendable {
-    case ios
-    case android
-    case extensionBrowser = "extension"
-}
-
-/// The body of `POST /devices/pair` for an app: the code the sign-in return carried, what the phone
-/// calls itself, its kind, and the PKCE verifier whose challenge went out on `/auth/login`.
-///
-/// Hand-written, not generated: the operation's `kind` and `code_verifier` arrive with Lane 172's
-/// `api/openapi.yaml` (plan Task B). Once they are on main, `pairDevice` joins the generator's filter
-/// and this call moves onto the generated client with the same shape.
-public struct PairInput: Codable, Equatable, Sendable {
+/// What a sign-in sends to `POST /devices/pair`: the code the return link carried, what the phone calls
+/// itself, its kind, and the PKCE verifier whose challenge went out on `/auth/login`.
+public struct PairInput: Equatable, Sendable {
     public let code: String
     public let name: String
-    public let kind: DeviceKind
+    public let kind: Components.Schemas.DeviceKind
     public let codeVerifier: String
 
-    public init(code: String, name: String, kind: DeviceKind, codeVerifier: String) {
+    public init(code: String, name: String, kind: Components.Schemas.DeviceKind, codeVerifier: String) {
         self.code = code
         self.name = name
         self.kind = kind
         self.codeVerifier = codeVerifier
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case code, name, kind
-        case codeVerifier = "code_verifier"
     }
 }
 
@@ -48,49 +31,33 @@ public protocol DevicePairing: Sendable {
     func pair(_ input: PairInput) async throws -> PairedDevice
 }
 
-/// `POST /devices/pair` over URLSession.
+/// `POST /devices/pair` through the generated client (the operation Lane 172 gave `kind` and
+/// `code_verifier`). An app kind mints a token with the session scope.
 public struct PairingClient: DevicePairing {
-    private let baseURL: URL
-    private let session: URLSession
+    private let client: Client
 
-    public init(baseURL: URL, session: URLSession = .shared) {
-        self.baseURL = baseURL
-        self.session = session
+    public init(client: Client) {
+        self.client = client
+    }
+
+    public init(baseURL: URL, tokens: any TokenSource) {
+        self.init(client: Transport.client(baseURL: baseURL, tokens: tokens))
     }
 
     public func pair(_ input: PairInput) async throws -> PairedDevice {
-        let (body, response) = try await session.data(for: Self.request(input, baseURL: baseURL))
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        return try Self.answer(body, status: status)
-    }
-
-    public static func request(_ input: PairInput, baseURL: URL) throws -> URLRequest {
-        var request = URLRequest(url: baseURL.appendingPathComponent("devices/pair"))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.httpBody = try APIDecoding.encoder().encode(input)
-        return request
-    }
-
-    public static func answer(_ body: Data, status: Int) throws -> PairedDevice {
-        let paired: Paired
-        do {
-            paired = try APIDecoding.envelopeData(Paired.self, from: body)
-        } catch let error as APIError {
-            throw error
-        } catch {
+        let body = Components.Schemas.PairInput(
+            code: input.code, name: input.name, kind: input.kind, codeVerifier: input.codeVerifier
+        )
+        switch try await APIClient.unwrapped({ try await client.pairDevice(body: .json(body)) }) {
+        case let .created(answer):
+            let paired = try APIClient.payload(answer.body.json.value2.data)
+            return PairedDevice(token: paired.token, deviceID: paired.device.id)
+        case let .badRequest(answer):
+            throw try APIClient.problem(answer.body.json)
+        case let .conflict(answer):
+            throw try APIClient.problem(answer.body.json)
+        case let .undocumented(status, _):
             throw APIError.status(status)
         }
-        return PairedDevice(token: paired.token, deviceID: paired.device.id)
-    }
-
-    private struct Paired: Decodable {
-        struct Device: Decodable {
-            let id: String
-        }
-
-        let token: String
-        let device: Device
     }
 }

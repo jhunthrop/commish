@@ -25,7 +25,11 @@ let package = Package(
         ),
         .testTarget(
             name: "CommishAPITests",
-            dependencies: ["CommishAPI"]
+            dependencies: [
+                "CommishAPI",
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+                .product(name: "HTTPTypes", package: "swift-http-types"),
+            ]
         ),
     ]
 )
