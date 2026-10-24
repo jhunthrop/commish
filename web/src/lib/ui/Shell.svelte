@@ -5,6 +5,7 @@
 	import LeagueSwitch from '#lib/context/LeagueSwitch.svelte';
 	import HeadTags from '#lib/site/HeadTags.svelte';
 	import type { ShellHead } from '#lib/site/head.ts';
+	import Mark from './Mark.svelte';
 	import RailIcon from './RailIcon.svelte';
 	import SiteFooter from './SiteFooter.svelte';
 	import Stamp from './Stamp.svelte';
@@ -90,10 +91,13 @@
 	/** The phone bar's rows from the parts this page passes (bar-rows.ts): with none, the one row led by
 	 * the site mark, the way home; the bottom bar keeps its five, so the mark takes no tab. */
 	const rows = $derived(barRows({ stamp, tail, search }));
+	/** The mark's side in the rail's 56 px slot and in the phone bar's 44 px cell (Lane 170). */
+	const RAIL_MARK_SIZE = 36;
+	const BAR_MARK_SIZE = 28;
 </script>
 
-{#snippet siteMark(cls: string)}
-	<a class={cls} href={HOME_HREF} aria-label="Commish"><b>C</b></a>
+{#snippet siteMark(cls: string, size: number)}
+	<a class={cls} href={HOME_HREF} aria-label="Commish"><Mark {size} /></a>
 {/snippet}
 
 {#snippet railLink(item: RailItem, foot: boolean)}
@@ -120,7 +124,7 @@
 	     the boot script before the first paint and by the context after. So a prerendered page never
 	     paints the wrong rail and then swaps it. -->
 	<nav class="rail" aria-label="Sections" style="--phone-items: {PHONE_RAIL_ITEMS}">
-		{@render siteMark('mark')}
+		{@render siteMark('mark', RAIL_MARK_SIZE)}
 		{#each RAIL_ITEMS as item (item.key)}
 			{@render railLink(item, false)}
 		{/each}
@@ -129,7 +133,7 @@
 	</nav>
 	<div class="main">
 		<header class="top" data-rows={rows}>
-			{#if rows === 1}{@render siteMark('home')}{/if}
+			{#if rows === 1}{@render siteMark('home', BAR_MARK_SIZE)}{/if}
 			<h1>
 				{#if typeof title === 'string'}{title}{:else}{@render title()}{/if}
 			</h1>
@@ -180,17 +184,6 @@
 		height: 56px;
 		margin-bottom: var(--s-3);
 		text-decoration: none;
-	}
-
-	.mark b,
-	.home b {
-		font-family: var(--font-num);
-		font-weight: 800;
-		font-size: 30px;
-		line-height: 1;
-		color: var(--ink);
-		border-bottom: 4px solid var(--accent);
-		padding-bottom: 2px;
 	}
 
 	/* The week item's label while the season is read: its room kept, nothing painted (Lane 143). */
@@ -424,11 +417,6 @@
 			grid-area: home;
 			display: grid;
 			margin: -10px 0 -10px -10px;
-		}
-
-		.home b {
-			font-size: 24px;
-			border-bottom-width: 3px;
 		}
 
 		h1 {

@@ -32,7 +32,7 @@ export interface ManifestIcon {
 
 const PNG = 'image/png';
 
-/** The mark on the dark page colour (scripts/app-icons.ts draws them from favicon.svg). */
+/** The mark on the dark page colour (scripts/app-icons.ts draws them from ui/mark.ts). */
 export const APP_ICONS = {
 	small: { src: '/icons/icon-192.png', sizes: '192x192', type: PNG, purpose: 'any' },
 	large: { src: '/icons/icon-512.png', sizes: '512x512', type: PNG, purpose: 'any' },

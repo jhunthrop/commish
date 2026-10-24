@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { test } from 'node:test';
+import { MARK_COLORS } from '#lib/ui/mark.ts';
 import { APP_COLORS, APP_ICONS, appHeadTags, webManifest } from './app-manifest.ts';
 
 const TOKENS = readFileSync(new URL('../ui/tokens.css', import.meta.url), 'utf8');
@@ -22,6 +23,13 @@ void test('the colours are the tokens: the top bar for the chrome, the page for 
 	assert.equal(APP_COLORS.light.page, tokenIn(':root {', 'bg'));
 	assert.equal(APP_COLORS.dark.chrome, tokenIn(":root[data-theme='dark']", 'shell'));
 	assert.equal(APP_COLORS.dark.page, tokenIn(":root[data-theme='dark']", 'bg'));
+});
+
+void test("the mark on the icons is the tokens' ink and accent, in each theme", () => {
+	assert.equal(MARK_COLORS.light.ink, tokenIn(':root {', 'ink'));
+	assert.equal(MARK_COLORS.light.accent, tokenIn(':root {', 'accent'));
+	assert.equal(MARK_COLORS.dark.ink, tokenIn(":root[data-theme='dark']", 'ink'));
+	assert.equal(MARK_COLORS.dark.accent, tokenIn(":root[data-theme='dark']", 'accent'));
 });
 
 void test('the manifest opens standalone on the board, in the dark flagship, with icons that exist', () => {
