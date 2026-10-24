@@ -1,6 +1,8 @@
 import { legalHrefs } from '#lib/legal/legal-hrefs.ts';
 import { PRIVACY } from '#lib/legal/privacy-words.ts';
 import { buildWeekLabel } from '#lib/server/build-week.ts';
+import { resolve } from '$app/paths';
+import { legalHead } from '#lib/server/pages/head.ts';
 import type { PageServerLoad } from './$types';
 
 /** The words and their links built at prerender (legal-hrefs.ts), and the rail's week item named at
@@ -8,5 +10,6 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async () => ({
 	...(await buildWeekLabel()),
 	doc: PRIVACY,
-	hrefs: legalHrefs()
+	hrefs: legalHrefs(),
+	head: legalHead(PRIVACY, resolve('/privacy'))
 });

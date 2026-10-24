@@ -5,4 +5,4 @@
 	let { data }: PageProps = $props();
 </script>
 
-<AccountPage weekLabel={data.weekLabel} />
+<AccountPage weekLabel={data.weekLabel} head={data.head} />

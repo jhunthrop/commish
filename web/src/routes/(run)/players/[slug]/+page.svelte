@@ -226,7 +226,7 @@
 	</section>
 {/snippet}
 
-<SiteShell title={page.name} run={data.run}>
+<SiteShell title={page.name} head={page.head} run={data.run}>
 	<main class="player">
 		<Crumb
 			trail={[

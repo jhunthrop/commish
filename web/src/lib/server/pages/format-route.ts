@@ -5,7 +5,9 @@ import { error, redirect } from '@sveltejs/kit';
 import { DEFAULT_TEAMS } from '#lib/format/draft.ts';
 import { CHOOSER, type CatalogFormat } from '#lib/run/catalog.ts';
 import type { Format } from '#lib/run/schema.ts';
+import type { HeadMarkup } from '#lib/site/head.ts';
 import { manifest } from '../run.ts';
+import { absentHead } from './head.ts';
 
 const NOT_FOUND = 404;
 const PERMANENT_REDIRECT = 308;
@@ -95,13 +97,20 @@ export interface AbsentFormatPage {
 	/** The first week the run's default board ranks the rest of the season, absent preseason: what
 	 * the page's words need to name the board the way the run's own boards do. */
 	rosFromWeek?: number;
+	/** The page's head, kept out of search (Lane 169). */
+	head: HeadMarkup;
 }
 
-export async function absentFormatPage(format: CatalogFormat): Promise<AbsentFormatPage> {
+/** The page at `path`, the board's or ADP's address for the format. */
+export async function absentFormatPage(
+	format: CatalogFormat,
+	path: string
+): Promise<AbsentFormatPage> {
 	const { formats } = await manifest();
 	const rosFromWeek = formats[0]?.rosFromWeek;
 	return {
 		format,
+		head: absentHead(format.label, path),
 		formats: await formatChips(),
 		...(rosFromWeek === undefined ? {} : { rosFromWeek })
 	};

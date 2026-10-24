@@ -3,6 +3,7 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import RowSheetMark from '#lib/site/RowSheetMark.svelte';
 	import SiteShell from '#lib/site/SiteShell.svelte';
+	import { FRONT_TITLE } from '#lib/site/head.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
 	import { PAGE_VERBS, frontWords, type FrontWords } from '#lib/site/season-words.ts';
@@ -176,14 +177,6 @@
 	});
 </script>
 
-<svelte:head>
-	<meta
-		name="description"
-		content="Our {data.run
-			.season} {format.label} board from our own projections, every player's page, your league's lineup, waivers and trades, mock drafts and a cheat sheet."
-	/>
-</svelte:head>
-
 {#snippet barTitle()}
 	<Phased>{#snippet children(set: WordSet)}{wordsOf(set).title}{/snippet}</Phased>
 {/snippet}
@@ -192,7 +185,13 @@
 	<Phased>{#snippet children(set: WordSet)}{wordsOf(set).heading}{/snippet}</Phased>
 {/snippet}
 
-<SiteShell title={documentTitle} heading={barTitle} run={data.run}>
+<SiteShell
+	title={documentTitle}
+	fullTitle={FRONT_TITLE}
+	heading={barTitle}
+	head={data.head}
+	run={data.run}
+>
 	<main class="front">
 		{#if weekShown}
 			{#if FrontWeek}<FrontWeek chosen={leagueId} />{:else}<div class="reserve"></div>{/if}

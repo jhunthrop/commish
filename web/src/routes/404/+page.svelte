@@ -6,4 +6,4 @@
 	let { data }: PageProps = $props();
 </script>
 
-<ErrorView words={ERROR_WORDS.notFound} weekLabel={data.weekLabel} />
+<ErrorView words={ERROR_WORDS.notFound} weekLabel={data.weekLabel} head={data.head} />

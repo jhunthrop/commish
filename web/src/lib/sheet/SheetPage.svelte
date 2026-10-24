@@ -11,6 +11,7 @@
 	import Menu from '#lib/ui/Menu.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Search from '#lib/ui/Search.svelte';
+	import type { HeadMarkup } from '#lib/site/head.ts';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
@@ -32,9 +33,11 @@
 	interface Props {
 		/** The rail's week item, named at build in season (server/build-week.ts, Lane 143, B126). */
 		weekLabel?: string | undefined;
+		/** The page's head but its title, built at prerender (Lane 169). */
+		head: HeadMarkup;
 	}
 
-	let { weekLabel }: Props = $props();
+	let { weekLabel, head }: Props = $props();
 
 	const directory = fileDirectory();
 	/** The mock draft section, whose route another lane builds. */
@@ -169,11 +172,12 @@
 	{/if}
 {/snippet}
 
-<svelte:head>
-	<title>Your cheat sheet · Commish</title>
-</svelte:head>
-
-<Shell title="Cheat sheet" active="sheet" {weekLabel}>
+<Shell
+	head={{ title: 'Your cheat sheet', markup: head }}
+	title="Cheat sheet"
+	active="sheet"
+	{weekLabel}
+>
 	{#snippet search()}
 		<Search
 			placeholder={rows.length > 0

@@ -310,6 +310,8 @@ export const SHOT_CASES: readonly ShotCase[] = [
 	once('section-doors-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	// The legal pages and the site footer under the pages it closes (Lane 151).
 	once('legal-shots', 'standin', FIXTURE_WEEK_CLOCK, { args: (o) => [o.web, o.api, o.out] }),
+	// The heads the served site answers with, its sitemap, robots file and /llms.txt (Lane 169).
+	once('head-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	once('season-pages-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	once('board-row-shots', 'standin', FIXTURE_WEEK_CLOCK, { dev: true }),
 	// The Week N rankings page's K and D/ST chips (Lane 155): the week read, and the Tuesday before.

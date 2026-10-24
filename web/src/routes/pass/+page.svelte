@@ -5,4 +5,4 @@
 	let { data }: PageProps = $props();
 </script>
 
-<PassPage weekLabel={data.weekLabel} builtFree={data.freeSeason} />
+<PassPage weekLabel={data.weekLabel} builtFree={data.freeSeason} head={data.head} />

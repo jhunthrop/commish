@@ -5,6 +5,7 @@
 	import { hasSessionCookie } from '#lib/api/session.ts';
 	import { hostsApi, openHostsOf } from '#lib/hosts/api.ts';
 	import { SWITCHED_SHUT, type OpenHosts } from '#lib/league/hosts.ts';
+	import type { HeadMarkup } from '#lib/site/head.ts';
 	import { links } from '#lib/site/links.ts';
 	import Footnote from '#lib/ui/Footnote.svelte';
 	import LineList from '#lib/ui/LineList.svelte';
@@ -22,9 +23,11 @@
 		weekLabel?: string | undefined;
 		/** The free season at the build's clock, so the first paint says it (free-season.ts). */
 		builtFree: boolean;
+		/** The page's head but its title, built at prerender in the build's words (Lane 169). */
+		head: HeadMarkup;
 	}
 
-	let { weekLabel, builtFree }: Props = $props();
+	let { weekLabel, builtFree, head }: Props = $props();
 
 	/** The free page (Lane 150): every account has every tool through the 2026 season, said once,
 	 * with what that is and the one verb, and nothing on it sells. The build's clock paints it; in the
@@ -55,12 +58,7 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{words.title} · Commish</title>
-	<meta name="description" content={words.description} />
-</svelte:head>
-
-<Shell title={words.title} active="account" {weekLabel}>
+<Shell title={words.title} head={{ title: words.title, markup: head }} active="account" {weekLabel}>
 	<main class="free">
 		<PageHead title={words.title} />
 		<Panel as="section" label={words.title}>

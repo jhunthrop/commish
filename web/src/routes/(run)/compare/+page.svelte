@@ -137,10 +137,6 @@
 	});
 </script>
 
-<svelte:head>
-	<meta name="robots" content="noindex" />
-</svelte:head>
-
 {#snippet theCall()}
 	{#if verdict?.kind === 'call'}
 		{@const leader = verdict.leader.side.player}
@@ -153,7 +149,7 @@
 	{/if}
 {/snippet}
 
-<SiteShell title="Compare" run={data.run}>
+<SiteShell title="Compare" head={data.head} run={data.run}>
 	<main class="compare">
 		<PageHead
 			title="Compare"

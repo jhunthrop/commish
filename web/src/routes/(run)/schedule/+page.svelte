@@ -12,7 +12,7 @@
 	const lead = $derived(page.lead);
 </script>
 
-<SiteShell title="Schedule strength" run={data.run}>
+<SiteShell title="Schedule strength" head={data.head} run={data.run}>
 	{#snippet tail()}<Verb href={sectionHref('mock')}>Start a mock draft</Verb>{/snippet}
 	<main class="schedule">
 		<PageHead title="{page.season} schedule strength" {lead} />

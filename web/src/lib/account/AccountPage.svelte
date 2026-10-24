@@ -19,6 +19,7 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import ThemeSwitch from '#lib/ui/ThemeSwitch.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import type { HeadMarkup } from '#lib/site/head.ts';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
@@ -53,9 +54,11 @@
 	interface Props {
 		/** The rail's week item, named at build in season (server/build-week.ts, Lane 143, B126). */
 		weekLabel?: string | undefined;
+		/** The page's head but its title, built at prerender (Lane 169). */
+		head: HeadMarkup;
 	}
 
-	let { weekLabel }: Props = $props();
+	let { weekLabel, head }: Props = $props();
 
 	/** Your account: who you are, your sheets and mocks, your plan (free this season, Lane 150), and
 	 * sign out. Signed out, the sign-in verb and what an account keeps. The shell is
@@ -180,14 +183,9 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Account · Commish</title>
-	<meta name="robots" content="noindex" />
-</svelte:head>
-
 <!-- No bar parts, so the phone bar is its one row (Lane 87). The page's way to a mock is its Next
      draft row; the bottom bar carries Mock draft only on a rail without a league's screens. -->
-<Shell title="Account" {weekLabel}>
+<Shell head={{ title: 'Account', markup: head }} title="Account" {weekLabel}>
 	<main class="account" aria-busy={view === null}>
 		{#if view === null}
 			<!-- The shell is drawn; the account arrives in a moment and takes this place. -->

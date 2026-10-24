@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { offlineLead } from '#lib/site/offline-words.ts';
 	import { fixed } from '#lib/format/number.ts';
+	import HeadTags from '#lib/site/HeadTags.svelte';
 	import Footnote from '#lib/ui/Footnote.svelte';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import type { PageProps } from './$types';
@@ -8,10 +9,7 @@
 	let { data }: PageProps = $props();
 </script>
 
-<svelte:head>
-	<title>Offline · Commish</title>
-	<meta name="robots" content="noindex" />
-</svelte:head>
+<HeadTags title="Offline" markup={data.head} />
 
 <main class="offline">
 	<p class="lead">{offlineLead(data.runAt)}</p>

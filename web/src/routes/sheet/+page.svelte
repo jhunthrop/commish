@@ -5,4 +5,4 @@
 	let { data }: PageProps = $props();
 </script>
 
-<SheetPage weekLabel={data.weekLabel} />
+<SheetPage weekLabel={data.weekLabel} head={data.head} />

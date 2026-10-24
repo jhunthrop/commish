@@ -11,6 +11,11 @@
 	import { ranksOf } from './model.ts';
 	import { sheetStore as store } from './store.svelte.ts';
 	import { tagLabel } from './tags.ts';
+	import HeadTags from '#lib/site/HeadTags.svelte';
+	import type { HeadMarkup } from '#lib/site/head.ts';
+
+	/** The page's head, built at prerender (Lane 169); its title names your sheet once it loads. */
+	let { head }: { head: HeadMarkup } = $props();
 
 	/** Your sheet on paper: one page per position, your order, your tiers as rules across the
 	 * column, tags and the first line of each note. */
@@ -74,9 +79,7 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{sheet.name} · Print · Commish</title>
-</svelte:head>
+<HeadTags title="{sheet.name} · Print" markup={head} />
 
 <div class="bar">
 	<Quiet href={resolve('/sheet')}>{PRINT_WORDS.back}</Quiet>

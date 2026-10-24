@@ -24,11 +24,12 @@ const APP_HEAD = `${appHeadTags()}<style>${railCss()}</style>`;
 const ROOT = /<html((?:\s[^>]*)?)>/;
 
 /** One chunk of a page's HTML, finished. `rail` is the site's rail at build, null for a page drawn
- * at request time, whose root names none (the boot script takes the last build's). */
-export function pageChunk(html: string, rail: RailKey | null): string {
+ * at request time, whose root names none (the boot script takes the last build's). `head` is the
+ * page's own head for a page the browser draws (server/worker-head.ts), empty for every other. */
+export function pageChunk(html: string, rail: RailKey | null, head = ''): string {
 	const finished = html
 		.replace(THEME_BOOT_PLACEHOLDER, THEME_BOOT_SCRIPT + contextBootScript(rail))
-		.replace(APP_HEAD_PLACEHOLDER, APP_HEAD)
+		.replace(APP_HEAD_PLACEHOLDER, APP_HEAD + head)
 		.replace(RAIL_SPRITE_PLACEHOLDER, RAIL_SPRITE);
 	return rail === null ? finished : finished.replace(ROOT, `<html$1 ${RAIL_ATTR}="${rail}">`);
 }

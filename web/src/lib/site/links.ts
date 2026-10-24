@@ -30,6 +30,8 @@ export const links = {
 					format,
 					position: positionSegment(position)
 				}),
+	/** Every player, the rankings page in season. */
+	players: (): string => resolve('/(run)/players'),
 	player: (slug: string): string => resolve('/(run)/players/[slug]', { slug }),
 	/** His page at This season, the season line and the game log. */
 	playerSeason: (slug: string): string =>

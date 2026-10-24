@@ -1,5 +1,7 @@
 /** ADP for one format: every player its named sources have, in the order drafters take them, beside
  * where our board has him. */
+import type { HeadMarkup } from '#lib/site/head.ts';
+import { adpHead } from './head.ts';
 import { carriesGap } from '#lib/format/gap.ts';
 import { adpDrafts } from '#lib/run/adp-drafts.ts';
 import { carriesRange } from '#lib/run/derive.ts';
@@ -31,6 +33,8 @@ import {
 
 export interface AdpPage extends BoardStatuses {
 	format: Format;
+	/** The page's head (Lane 169). */
+	head: HeadMarkup;
 	formats: FormatChip[];
 	sources: AdpSource[];
 	/** Board rows with an ADP, earliest first: the ranked rows (each with his season so far once it is
@@ -62,7 +66,7 @@ export async function adpRoute(formatId: string, now: number): Promise<AdpRoute>
 	const route = await formatRoute(formatId, (id) => links.adp(id));
 	return route.kind === 'run'
 		? { kind: 'adp', page: await adpPage(route.format.id, now) }
-		: { kind: 'absent', page: await absentFormatPage(route.format) };
+		: { kind: 'absent', page: await absentFormatPage(route.format, links.adp(route.format.id)) };
 }
 
 export async function adpEntries(): Promise<{ format: string }[]> {
@@ -88,6 +92,7 @@ export async function adpPage(formatId: string, now: number): Promise<AdpPage> {
 	const sources = all.sources.filter((source) => source.formats.includes(format.id));
 	return {
 		format,
+		head: adpHead(format, run.season, showsGap),
 		formats,
 		sources,
 		rows,

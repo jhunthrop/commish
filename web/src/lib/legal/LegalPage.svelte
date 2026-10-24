@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PageHead from '#lib/ui/PageHead.svelte';
+	import type { HeadMarkup } from '#lib/site/head.ts';
 	import Shell from '#lib/ui/Shell.svelte';
 	import type { LegalDoc } from './legal-doc.ts';
 	import type { LegalHrefs } from './legal-hrefs.ts';
@@ -11,18 +12,16 @@
 		doc: LegalDoc;
 		/** Where each linked place lives (legal-hrefs.ts). */
 		hrefs: LegalHrefs;
+		/** The page's head but its title, built at prerender (Lane 169). */
+		head: HeadMarkup;
 		/** The rail's week item, named at build in season (server/build-week.ts, Lane 143, B126). */
 		weekLabel?: string | undefined;
 	}
 
-	let { doc, hrefs, weekLabel }: Props = $props();
+	let { doc, hrefs, head, weekLabel }: Props = $props();
 </script>
 
-<svelte:head>
-	<title>{doc.title} · Commish</title>
-</svelte:head>
-
-<Shell title={doc.title} active={null} {weekLabel}>
+<Shell title={doc.title} head={{ title: doc.title, markup: head }} active={null} {weekLabel}>
 	<main class="legal">
 		<p class="draft">{doc.draftNote}</p>
 		<PageHead title={doc.title} lead={doc.lead} />

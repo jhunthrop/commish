@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import PlayerSearch from './PlayerSearch.svelte';
+	import type { HeadMarkup } from './head.ts';
 	import { runStampText, type RunStamp } from '#lib/run/stamp.ts';
 
 	interface Props {
@@ -10,22 +11,29 @@
 		/** The bar's title when it differs from the document's: a format page's bar leaves the format
 		 * to the league switch beside it ("Board", where the document says "PPR Board"). */
 		heading?: string | Snippet;
+		/** The page's head but its title, built with the page on the server (Lane 169): its
+		 * description, canonical address, share tags and structured data. */
+		head: HeadMarkup;
+		/** A whole document title printed as is (the front door's, head.ts FRONT_TITLE). */
+		fullTitle?: string;
 		/** The run every number on the page comes from. */
 		run: RunStamp;
 		tail?: Snippet;
 		children: Snippet;
 	}
 
-	let { title, heading, run, tail, children }: Props = $props();
+	let { title, heading, head, fullTitle, run, tail, children }: Props = $props();
 
 	const stamp = $derived(runStampText(run));
 </script>
 
-<svelte:head>
-	<title>{title} · Commish</title>
-</svelte:head>
-
-<Shell title={heading ?? title} {stamp} {tail} weekLabel={run.weekRankings}>
+<Shell
+	title={heading ?? title}
+	head={{ title, markup: head, fullTitle }}
+	{stamp}
+	{tail}
+	weekLabel={run.weekRankings}
+>
 	{#snippet search()}<PlayerSearch placeholder={run.search} />{/snippet}
 	{@render children()}
 </Shell>

@@ -1,5 +1,9 @@
 /** The board's data for one format and one view: All, ranked by points over replacement, or one
  * position, ranked within it and drawn in tiers. */
+import type { HeadMarkup } from '#lib/site/head.ts';
+import { boardHead } from './head.ts';
+import { buildSiteRail } from '../site-rail.ts';
+import { railInSeason } from '#lib/ui/nav.ts';
 import { error } from '@sveltejs/kit';
 import {
 	carriesRange,
@@ -38,6 +42,8 @@ const NOT_FOUND = 404;
 
 export interface BoardPage {
 	format: Format;
+	/** The page's head (Lane 169). */
+	head: HeadMarkup;
 	formats: FormatChip[];
 	/** null is the All view. */
 	position: Position | null;
@@ -84,13 +90,14 @@ export async function boardPage(
 	const position = segment === null ? null : positionFromSegment(segment);
 	if (segment !== null && position === null) error(NOT_FOUND, 'No such position.');
 	const format = await formatForRoute(formatId, (id) => links.board(id, position));
-	const [loaded, formats, sources, capture, byes, run] = await Promise.all([
+	const [loaded, formats, sources, capture, byes, run, rail] = await Promise.all([
 		board(format.id),
 		formatChips(),
 		adp(),
 		designations(),
 		clubByes(),
-		manifest()
+		manifest(),
+		buildSiteRail(new Date(now))
 	]);
 	// A kicker's or a defense's view lists his position in draft order, apart from the ranked rows.
 	const marketView = position !== null && isMarketPosition(position);
@@ -109,6 +116,7 @@ export async function boardPage(
 	const showsGap = rowFraming(format).compare && carriesGap(rows);
 	return {
 		format,
+		head: boardHead(format, run.season, position, positionsIn(loaded.rows), railInSeason(rail)),
 		formats,
 		position,
 		positions: positionsIn([...loaded.rows, ...loaded.market]),
@@ -140,7 +148,7 @@ export async function boardRoute(formatId: string, now: number): Promise<BoardRo
 	const route = await formatRoute(formatId, (id) => links.board(id));
 	return route.kind === 'run'
 		? { kind: 'board', page: await boardPage(route.format.id, null, now) }
-		: { kind: 'absent', page: await absentFormatPage(route.format) };
+		: { kind: 'absent', page: await absentFormatPage(route.format, links.board(route.format.id)) };
 }
 
 /** Every format slug a board route answers: canonical ids, short slugs that redirect, and the

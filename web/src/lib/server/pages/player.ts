@@ -49,6 +49,8 @@ import {
 	type CardBuild
 } from './player-card.ts';
 import { unwrittenByFormat } from './player-unwritten.ts';
+import { playerHead } from './head.ts';
+import type { HeadMarkup } from '#lib/site/head.ts';
 import { readAtStatus } from '#lib/player/status-held.ts';
 import type { BasisTile, CardTile, RestParts } from '#lib/player/card.ts';
 import {
@@ -168,6 +170,8 @@ export interface PlayerPage {
 	 * read yet; empty otherwise. Built here so the page's script carries none of its words (Lane 142,
 	 * the player page's budget). */
 	unwritten: Record<string, UnwrittenLine[]>;
+	/** His page's head, built with it (Lane 169): his name, club, position, rank and week's game. */
+	head: HeadMarkup;
 }
 
 /** What a page is built from (run.ts playerRead): his own fields and formats, and what only a page of
@@ -459,6 +463,15 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 			held: status?.words.view.rank ?? null,
 			underway,
 			written: loaded.capsule !== null
-		})
+		}),
+		head: playerHead(
+			{
+				...loaded,
+				positionRank: listed?.seasonLong === true ? null : lead.numbers.positionRank,
+				lead: lead.format,
+				year: run.season
+			},
+			clubList
+		)
 	};
 }
