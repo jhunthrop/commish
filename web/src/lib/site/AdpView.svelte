@@ -99,11 +99,7 @@
 	}
 </script>
 
-<svelte:head>
-	<link rel="canonical" href={links.adp(page.format.id)} />
-</svelte:head>
-
-<SiteShell title="{page.format.label} ADP" heading="ADP" {run}>
+<SiteShell title="{page.format.label} ADP" heading="ADP" head={page.head} {run}>
 	{#snippet tail()}<Verb href={sectionHref('mock')}>Start a mock draft</Verb>{/snippet}
 	<main class="adp">
 		<div class="lead">

@@ -2,6 +2,7 @@ import { boardBasis, type BasisPart } from '#lib/run/board-basis.ts';
 import { adpDrafts } from '#lib/run/adp-drafts.ts';
 import { rowFraming } from '#lib/run/row-framing.ts';
 import { adp, clubByes, manifest, seasonReach, seasonUnderway } from '#lib/server/run.ts';
+import { STATIC_HEADS } from '#lib/server/pages/head.ts';
 import type { PageServerLoad } from './$types';
 
 /** The comparison page is built once with no players chosen. The two players come from the query
@@ -34,5 +35,12 @@ export const load: PageServerLoad = async () => {
 			]
 		])
 	);
-	return { formats: run.formats, basis, byes, season: run.season, underway };
+	return {
+		formats: run.formats,
+		basis,
+		byes,
+		season: run.season,
+		underway,
+		head: STATIC_HEADS.compare()
+	};
 };

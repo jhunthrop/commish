@@ -68,7 +68,7 @@
 	const words = $derived(sayBoard(page, live));
 </script>
 
-<SiteShell title={name} run={data.run}>
+<SiteShell title={name} head={data.head} run={data.run}>
 	{#snippet tail()}
 		{#if pair.length === 2}<Verb href={links.compare(pair[0]?.slug, pair[1]?.slug)}
 				>Compare two of them</Verb

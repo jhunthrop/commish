@@ -44,7 +44,12 @@
 	});
 </script>
 
-<SiteShell title={name} heading={playersCrumb(data.run.weekRankings)} run={data.run}>
+<SiteShell
+	title={name}
+	heading={playersCrumb(data.run.weekRankings)}
+	head={data.head}
+	run={data.run}
+>
 	{#snippet tail()}<Quiet href={links.compare()}>Compare two players</Quiet>{/snippet}
 	<main class="players">
 		<PageHead

@@ -42,7 +42,7 @@
 	});
 </script>
 
-<SiteShell title="Our record" run={data.run}>
+<SiteShell title="Our record" head={data.head} run={data.run}>
 	<main class="record">
 		<PageHead
 			title="Our record"

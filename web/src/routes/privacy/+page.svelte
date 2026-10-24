@@ -5,4 +5,4 @@
 	let { data }: PageProps = $props();
 </script>
 
-<LegalPage doc={data.doc} hrefs={data.hrefs} weekLabel={data.weekLabel} />
+<LegalPage doc={data.doc} hrefs={data.hrefs} head={data.head} weekLabel={data.weekLabel} />

@@ -176,7 +176,7 @@ function lastPlayed(season: PlayerSeason): GameLogRow | null {
 
 /** The week ahead: the first week past his counted one that is a game to play or his bye, so a bye
  * week heads the card as the bye, never the game after it (the sweep's M6). */
-function weekAhead(season: PlayerSeason): GameLogRow | null {
+export function weekAhead(season: PlayerSeason): GameLogRow | null {
 	const counted = countedWeek(season);
 	return (
 		season.log.find(

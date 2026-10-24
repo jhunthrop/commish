@@ -41,11 +41,7 @@
 	);
 </script>
 
-<svelte:head>
-	<meta name="robots" content="noindex" />
-</svelte:head>
-
-<SiteShell title={name(page.format.label)} {run}>
+<SiteShell title={name(page.format.label)} head={page.head} {run}>
 	{#snippet tail()}<Verb href={sectionHref('mock')}>Start a mock draft</Verb>{/snippet}
 	<main class="absent">
 		<PageHead title={heading} />

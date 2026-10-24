@@ -3,6 +3,7 @@ import { boardSeason } from '#lib/server/board-season.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import { positionRankShown, rankShown } from '#lib/run/held-places.ts';
 import { board, defaultFormat, designations, stamp } from '#lib/server/run.ts';
+import { STATIC_HEADS } from '#lib/server/pages/head.ts';
 import type { PageServerLoad } from './$types';
 
 /** The offline shell: the default board's top rows from the run this deploy was built from, under
@@ -17,6 +18,7 @@ export const load: PageServerLoad = async () => {
 	const rows = withStatuses((await board(format.id)).rows, capture);
 	const { lead } = await boardSeason(format, rows.slice(0, OFFLINE_BOARD_ROWS));
 	return {
+		head: STATIC_HEADS.offline(),
 		runAt: run.runAt,
 		basis: lead ?? format.basis.join(' · '),
 		format: { label: format.label, unit: format.unit },

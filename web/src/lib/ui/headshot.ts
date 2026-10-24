@@ -65,3 +65,13 @@ export function headshotSources(url: string, size: number, phoneSize?: number): 
 		sizes: `${PHONE_MEDIA} ${String(phoneDrawn)}px, ${String(drawn)}px`
 	};
 }
+
+/** A headshot's address on our origin at one width, for a share card or structured data; null for
+ * a URL that is not a provider headshot, which is never named off the page. */
+export function headshotAt(url: string, width: number): string | null {
+	const match = ESPN_HEADSHOT.exec(url);
+	const league = match?.[1];
+	const id = match?.[2];
+	if (!league || !id || !isHeadshotLeague(league)) return null;
+	return routeUrl(league, id, Math.min(Math.max(width, HEADSHOT_MIN_WIDTH), HEADSHOT_MAX_WIDTH));
+}

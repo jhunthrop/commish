@@ -7,7 +7,6 @@
 	import { RAIL_OF_WORD_SET, type RailKey, type WordSet } from '#lib/ui/nav.ts';
 	import BoardView from './BoardView.svelte';
 	import SiteShell from './SiteShell.svelte';
-	import { links } from './links.ts';
 	import { weekBoardWords } from '#lib/order/week-head.ts';
 	import { PAGE_VERBS, boardWords, type BoardWords } from './season-words.ts';
 	import { shownRail } from './shown-rail.svelte.ts';
@@ -38,10 +37,6 @@
 	const documentTitle = $derived(wordsAt(rail()).title);
 </script>
 
-<svelte:head>
-	<link rel="canonical" href={links.board(page.format.id, page.position)} />
-</svelte:head>
-
 {#snippet barTitle()}
 	<Phased>{#snippet children(set: WordSet)}{wordsOf(set).bar}{/snippet}</Phased>
 {/snippet}
@@ -50,7 +45,7 @@
 	<Phased>{#snippet children(set: WordSet)}{wordsOf(set).heading}{/snippet}</Phased>
 {/snippet}
 
-<SiteShell title={documentTitle} heading={barTitle} {run}>
+<SiteShell title={documentTitle} heading={barTitle} head={page.head} {run}>
 	{#snippet tail()}
 		<Phased>
 			{#snippet children(set: WordSet)}

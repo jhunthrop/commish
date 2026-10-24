@@ -3,6 +3,8 @@
 	import { page } from '$app/state';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import LeagueSwitch from '#lib/context/LeagueSwitch.svelte';
+	import HeadTags from '#lib/site/HeadTags.svelte';
+	import type { ShellHead } from '#lib/site/head.ts';
 	import RailIcon from './RailIcon.svelte';
 	import SiteFooter from './SiteFooter.svelte';
 	import Stamp from './Stamp.svelte';
@@ -47,6 +49,10 @@
 		/** The page holds the week item's label before its season read starts: the Worker's error
 		 * page, drawn on the server where no read runs (Lane 148). */
 		holdWeek?: boolean;
+		/** The page's head (Lane 169): its title, and its description, canonical address, share tags
+		 * and structured data as the server built them. Left out by a page the browser draws, whose
+		 * head the Worker answers with (hooks.server.ts), and which sets only its title as it reads. */
+		head?: ShellHead;
 		children: Snippet;
 	}
 
@@ -59,6 +65,7 @@
 		league,
 		weekLabel,
 		holdWeek = false,
+		head,
 		children
 	}: Props = $props();
 	// The week's order: the page's own name for it, else on a page the Worker draws the context's week
@@ -103,6 +110,8 @@
 		<span class:held={held(item)}>{held(item) ? HELD_WEEK_LABEL : labelOf(item)}</span>
 	</a>
 {/snippet}
+
+{#if head}<HeadTags title={head.title} markup={head.markup} />{/if}
 
 <div class="app">
 	<!-- The rail follows the season (spec 2026-10-16 §2): every item is drawn in one order every

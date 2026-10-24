@@ -15,7 +15,7 @@
 	const lead = $derived(page.lead);
 </script>
 
-<SiteShell title="Clubs" run={data.run}>
+<SiteShell title="Clubs" head={data.head} run={data.run}>
 	<main class="clubs">
 		<PageHead title="Clubs" {lead} />
 		<ul>
