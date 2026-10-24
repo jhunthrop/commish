@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -228,3 +229,95 @@ func TestDeviceCap(t *testing.T) {
 }
 
 func strp(s string) *string { return &s }
+
+func kindp(k apitypes.DeviceKind) *apitypes.DeviceKind { return &k }
+
+// appCode is the code an app's sign-in hands back for kind.
+func (h harness) appCode(acct auth.Account, kind auth.DeviceKind) string {
+	code, err := h.svc.AppCode(context.Background(), acct.ID, kind)
+	if err != nil {
+		h.t.Fatalf("app code: %v", err)
+	}
+	return code
+}
+
+func (h harness) pairAs(code string, kind *apitypes.DeviceKind) (int, apitypes.Paired) {
+	status, body := h.call(http.MethodPost, "/devices/pair", "", apitypes.PairInput{Code: code, Kind: kind})
+	var p apitypes.Paired
+	_ = json.Unmarshal(body, &p)
+	return status, p
+}
+
+// An app pairs with its sign-in's code and carries the session scope, so
+// its token opens the session's routes; the extension's pairing, with or
+// without the word, does not; the list names each device's kind.
+func TestPairingByKind(t *testing.T) {
+	h, alice, _ := newHarness(t)
+	for _, kind := range []auth.DeviceKind{auth.KindIOS, auth.KindAndroid} {
+		status, p := h.pairAs(h.appCode(alice, kind), kindp(apitypes.DeviceKind(kind)))
+		if status != http.StatusCreated || p.Device.Kind == nil || string(*p.Device.Kind) != string(kind) {
+			t.Fatalf("%s pair: %d %+v", kind, status, p.Device)
+		}
+		if !slices.Contains(p.Device.Scopes, apitypes.DeviceScopeSession) || len(p.Device.Scopes) != 3 {
+			t.Fatalf("%s scopes %v", kind, p.Device.Scopes)
+		}
+		if status, _ := h.call(http.MethodGet, "/session-only", p.Token, nil); status != http.StatusOK {
+			t.Fatalf("%s token on a session route: %d", kind, status)
+		}
+		h.clock.now = h.clock.now.Add(7 * time.Second)
+	}
+	for _, kind := range []*apitypes.DeviceKind{nil, kindp(apitypes.DeviceKindExtension)} {
+		status, p := h.pairAs(h.code(alice), kind)
+		if status != http.StatusCreated || p.Device.Kind == nil || *p.Device.Kind != apitypes.DeviceKindExtension {
+			t.Fatalf("extension pair: %d %+v", status, p.Device)
+		}
+		if slices.Contains(p.Device.Scopes, apitypes.DeviceScopeSession) {
+			t.Fatalf("an extension carries the session scope: %v", p.Device.Scopes)
+		}
+		if status, _ := h.call(http.MethodGet, "/session-only", p.Token, nil); status != http.StatusUnauthorized {
+			t.Fatalf("an extension token on a session route: %d", status)
+		}
+		h.clock.now = h.clock.now.Add(7 * time.Second)
+	}
+	status, body := h.signedIn(h.svc.list, alice, http.MethodGet, "")
+	var list []apitypes.Device
+	if status != http.StatusOK || json.Unmarshal(body, &list) != nil || len(list) != 4 {
+		t.Fatalf("list: %d %s", status, body)
+	}
+	kinds := map[apitypes.DeviceKind]int{}
+	for _, d := range list {
+		if d.Kind == nil {
+			t.Fatalf("a listed device without its kind: %+v", d)
+		}
+		kinds[*d.Kind]++
+	}
+	if kinds[apitypes.DeviceKindIos] != 1 || kinds[apitypes.DeviceKindAndroid] != 1 || kinds[apitypes.DeviceKindExtension] != 2 {
+		t.Fatalf("kinds %v", kinds)
+	}
+}
+
+// A code pairs only the kind it was minted for: the account page's code
+// never mints an app's session scope, an app's code never pairs another
+// kind, and an unknown kind is refused.
+func TestCodesPairOnlyTheirKind(t *testing.T) {
+	h, alice, _ := newHarness(t)
+	page := h.code(alice)
+	if status, _ := h.pairAs(page, kindp(apitypes.DeviceKindIos)); status != http.StatusBadRequest {
+		t.Fatalf("the account page's code paired an app: %d", status)
+	}
+	h.clock.now = h.clock.now.Add(7 * time.Second)
+	ios := h.appCode(alice, auth.KindIOS)
+	for _, kind := range []*apitypes.DeviceKind{nil, kindp(apitypes.DeviceKindExtension), kindp(apitypes.DeviceKindAndroid)} {
+		if status, _ := h.pairAs(ios, kind); status != http.StatusBadRequest {
+			t.Fatalf("an iOS code paired as %v: %d", kind, status)
+		}
+		h.clock.now = h.clock.now.Add(7 * time.Second)
+	}
+	status, body := h.call(http.MethodPost, "/devices/pair", "", map[string]string{"code": ios, "kind": "watch"})
+	if status != http.StatusBadRequest {
+		t.Fatalf("an unknown kind: %d %s", status, body)
+	}
+	if _, err := h.svc.AppCode(context.Background(), alice.ID, auth.KindExtension); err == nil {
+		t.Fatal("an app code was minted for the extension")
+	}
+}

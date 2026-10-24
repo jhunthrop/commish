@@ -37,6 +37,7 @@ const (
 type Device struct {
 	ID         uuid.UUID
 	Name       string
+	Kind       auth.DeviceKind
 	Scopes     []auth.Scope
 	CreatedAt  time.Time
 	LastUsedAt *time.Time
@@ -46,25 +47,28 @@ type Device struct {
 // scoped by account or by a token hash.
 type Store struct{ Pool *pgxpool.Pool }
 
-// PutCode stores the account's pairing code, replacing any earlier one.
-func (s *Store) PutCode(ctx context.Context, accountID uuid.UUID, hash []byte, expires time.Time) error {
-	_, err := s.Pool.Exec(ctx, `insert into app.device_pair_codes (account_id, code_hash, expires_at) values ($1, $2, $3)
-		on conflict (account_id) do update set code_hash = excluded.code_hash, expires_at = excluded.expires_at, created_at = now()`,
-		accountID, hash, expires)
+// PutCode stores the account's pairing code for one kind of device,
+// replacing any earlier code.
+func (s *Store) PutCode(ctx context.Context, accountID uuid.UUID, kind auth.DeviceKind, hash []byte, expires time.Time) error {
+	_, err := s.Pool.Exec(ctx, `insert into app.device_pair_codes (account_id, code_hash, expires_at, kind) values ($1, $2, $3, $4)
+		on conflict (account_id) do update
+		  set code_hash = excluded.code_hash, expires_at = excluded.expires_at, kind = excluded.kind, created_at = now()`,
+		accountID, hash, expires, string(kind))
 	if err != nil {
 		return fmt.Errorf("devices: put code: %w", err)
 	}
 	return nil
 }
 
-// Pair spends a live code and makes a device for its account under the
-// token's hash, in one transaction: a code pairs exactly one device.
-func (s *Store) Pair(ctx context.Context, code []byte, name string, tokenHash []byte, scopes []auth.Scope, now time.Time) (uuid.UUID, Device, error) {
+// Pair spends a live code minted for kind and makes a device of that kind
+// for its account under the token's hash, in one transaction: a code
+// pairs exactly one device, and only of its own kind.
+func (s *Store) Pair(ctx context.Context, code []byte, kind auth.DeviceKind, name string, tokenHash []byte, scopes []auth.Scope, now time.Time) (uuid.UUID, Device, error) {
 	var accountID uuid.UUID
 	var dev Device
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		err := tx.QueryRow(ctx, `delete from app.device_pair_codes where code_hash = $1 and expires_at > $2 returning account_id`,
-			code, now).Scan(&accountID)
+		err := tx.QueryRow(ctx, `delete from app.device_pair_codes where code_hash = $1 and expires_at > $2 and kind = $3 returning account_id`,
+			code, now, string(kind)).Scan(&accountID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrBadCode
 		}
@@ -78,9 +82,9 @@ func (s *Store) Pair(ctx context.Context, code []byte, name string, tokenHash []
 		if n >= MaxDevices {
 			return ErrTooMany
 		}
-		dev = Device{Name: name, Scopes: scopes}
-		return tx.QueryRow(ctx, `insert into app.devices (account_id, name, token_hash, scopes) values ($1, $2, $3, $4)
-			returning id, created_at`, accountID, name, tokenHash, scopeStrings(scopes)).Scan(&dev.ID, &dev.CreatedAt)
+		dev = Device{Name: name, Kind: kind, Scopes: scopes}
+		return tx.QueryRow(ctx, `insert into app.devices (account_id, name, token_hash, scopes, kind) values ($1, $2, $3, $4, $5)
+			returning id, created_at`, accountID, name, tokenHash, scopeStrings(scopes), string(kind)).Scan(&dev.ID, &dev.CreatedAt)
 	})
 	if errors.Is(err, ErrBadCode) || errors.Is(err, ErrTooMany) {
 		return uuid.Nil, Device{}, err
@@ -107,20 +111,25 @@ func toScopes(raw []string) []auth.Scope {
 	return out
 }
 
+const deviceColumns = `id, name, kind, scopes, created_at, last_used_at`
+
+func scanDevice(row pgx.Row) (Device, error) {
+	var d Device
+	var kind string
+	var scopes []string
+	err := row.Scan(&d.ID, &d.Name, &kind, &scopes, &d.CreatedAt, &d.LastUsedAt)
+	d.Kind, d.Scopes = auth.DeviceKind(kind), toScopes(scopes)
+	return d, err
+}
+
 // List is the account's live devices, newest first.
 func (s *Store) List(ctx context.Context, accountID uuid.UUID) ([]Device, error) {
-	rows, err := s.Pool.Query(ctx, `select id, name, scopes, created_at, last_used_at from app.devices
+	rows, err := s.Pool.Query(ctx, `select `+deviceColumns+` from app.devices
 		where account_id = $1 and revoked_at is null order by created_at desc, id limit $2`, accountID, MaxDevices)
 	if err != nil {
 		return nil, fmt.Errorf("devices: list: %w", err)
 	}
-	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Device, error) {
-		var d Device
-		var scopes []string
-		err := r.Scan(&d.ID, &d.Name, &scopes, &d.CreatedAt, &d.LastUsedAt)
-		d.Scopes = toScopes(scopes)
-		return d, err
-	})
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Device, error) { return scanDevice(r) })
 	if err != nil {
 		return nil, fmt.Errorf("devices: list: %w", err)
 	}
@@ -143,18 +152,14 @@ func (s *Store) Revoke(ctx context.Context, accountID, id uuid.UUID, now time.Ti
 
 // Get is one of the account's live devices.
 func (s *Store) Get(ctx context.Context, accountID, id uuid.UUID) (Device, error) {
-	var d Device
-	var scopes []string
-	err := s.Pool.QueryRow(ctx, `select id, name, scopes, created_at, last_used_at from app.devices
-		where id = $1 and account_id = $2 and revoked_at is null`, id, accountID).
-		Scan(&d.ID, &d.Name, &scopes, &d.CreatedAt, &d.LastUsedAt)
+	d, err := scanDevice(s.Pool.QueryRow(ctx, `select `+deviceColumns+` from app.devices
+		where id = $1 and account_id = $2 and revoked_at is null`, id, accountID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Device{}, ErrNotFound
 	}
 	if err != nil {
 		return Device{}, fmt.Errorf("devices: get %s: %w", id, err)
 	}
-	d.Scopes = toScopes(scopes)
 	return d, nil
 }
 

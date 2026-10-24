@@ -28,6 +28,10 @@ const (
 	stateTTL      = 10 * time.Minute
 	maxReturnTo   = 512
 	signInProblem = "/sign-in/problem"
+	// appSignedIn is the app link an app's sign-in comes back to, on the
+	// site, with the pairing code: the universal link on iOS and the app
+	// link on Android (the web serves the association files).
+	appSignedIn = "/app/signed-in"
 )
 
 // Rate limits for the auth routes.
@@ -51,8 +55,17 @@ type AccountStore interface {
 	SetHandle(ctx context.Context, id uuid.UUID, handle string) (Account, error)
 }
 
+// AppCodes mints the pairing code an app's sign-in hands back to the
+// app, good for one device of kind. devices.Service implements it.
+type AppCodes interface {
+	AppCode(ctx context.Context, accountID uuid.UUID, kind DeviceKind) (string, error)
+}
+
 // Handler serves /auth and /me.
 type Handler struct {
+	// AppCodes mints an app's pairing code at the callback; nil sends an
+	// app's sign-in to the problem page.
+	AppCodes      AppCodes
 	Store         AccountStore
 	Sessions      *Sessions
 	IdP           IdentityProvider
@@ -87,6 +100,8 @@ type signInState struct {
 	State    string    `json:"s"`
 	ReturnTo string    `json:"r"`
 	Expires  time.Time `json:"e"`
+	// Client is the app signing in (ios, android), empty for the web.
+	Client DeviceKind `json:"c,omitempty"`
 }
 
 // safeReturnTo keeps only a path on the site: never another host, never
@@ -105,13 +120,39 @@ func safeReturnTo(raw string) string {
 
 func (h *Handler) site(path string) string { return h.PublicBaseURL + path }
 
+// signInClient reads an app's client and return: no client is the web
+// (ok, empty kind); an app names ios or android and comes back to the app
+// link alone, given exactly or left out. Anything else is not ok.
+func (h *Handler) signInClient(q url.Values) (DeviceKind, bool) {
+	if !q.Has("client") {
+		return "", true
+	}
+	kind, ok := ParseDeviceKind(q.Get("client"))
+	if !ok || !kind.IsApp() {
+		return "", false
+	}
+	if q.Has("return_to") && q.Get("return_to") != h.site(appSignedIn) {
+		return "", false
+	}
+	return kind, true
+}
+
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	client, ok := h.signInClient(q)
+	if !ok {
+		httpx.WriteInvalid(w, r, map[string]string{
+			"return_to": "An app signs in with client ios or android and comes back to " + h.site(appSignedIn),
+		})
+		return
+	}
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	st := signInState{
 		State:    base64.RawURLEncoding.EncodeToString(b),
-		ReturnTo: safeReturnTo(r.URL.Query().Get("return_to")),
+		ReturnTo: safeReturnTo(q.Get("return_to")),
 		Expires:  h.Now().Add(stateTTL),
+		Client:   client,
 	}
 	screen := ScreenSignIn
 	if r.URL.Query().Get("screen") == string(ScreenSignUp) {
@@ -192,7 +233,31 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	h.Sessions.Issue(w, token)
 	h.claimAnon(w, r, acct.ID)
+	if st.Client.IsApp() {
+		h.returnToApp(w, r, acct.ID, st.Client)
+		return
+	}
 	http.Redirect(w, r, h.site(st.ReturnTo), http.StatusFound)
+}
+
+// returnToApp hands a signed-in app its pairing code on the app link,
+// which the app trades at POST /devices/pair for its device token. The
+// link is built here from the site, never read from the request, so the
+// code goes nowhere else.
+func (h *Handler) returnToApp(w http.ResponseWriter, r *http.Request, accountID uuid.UUID, client DeviceKind) {
+	if h.AppCodes == nil {
+		h.Log.Error("auth: app sign-in", "request_id", httpx.RequestIDFrom(r.Context()), "err", "no app codes")
+		http.Redirect(w, r, h.site(signInProblem), http.StatusFound)
+		return
+	}
+	code, err := h.AppCodes.AppCode(r.Context(), accountID, client)
+	if err != nil {
+		h.Log.Error("auth: app sign-in", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+		http.Redirect(w, r, h.site(signInProblem), http.StatusFound)
+		return
+	}
+	q := url.Values{"code": {code}, "client": {string(client)}}
+	http.Redirect(w, r, h.site(appSignedIn)+"?"+q.Encode(), http.StatusSeeOther)
 }
 
 // claimAnon moves the mocks this browser drafted signed out to the

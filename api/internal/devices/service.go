@@ -31,13 +31,29 @@ const (
 	limitReadPerMinute   = 120
 	limitRevokePerMinute = 30
 	maxNameLen           = 60
-	defaultName          = "A browser"
 )
+
+// defaultNames name a device that did not name itself, by kind.
+var defaultNames = map[auth.DeviceKind]string{
+	auth.KindExtension: "A browser",
+	auth.KindIOS:       "An iPhone",
+	auth.KindAndroid:   "An Android phone",
+}
+
+// The pairing refusals, by where the member gets a new code.
+const (
+	badPageCode = "That code has been used or is more than ten minutes old. Show a new one on your account page"
+	badAppCode  = "That code has been used or is more than ten minutes old. Sign in again"
+	badKind     = "Pair as extension, ios or android"
+)
+
+// errNotAnApp is an app code asked for a kind that is not an app.
+var errNotAnApp = errors.New("devices: app codes are for ios and android")
 
 // Repository is the part of Store the handlers use.
 type Repository interface {
-	PutCode(ctx context.Context, accountID uuid.UUID, hash []byte, expires time.Time) error
-	Pair(ctx context.Context, code []byte, name string, tokenHash []byte, scopes []auth.Scope, now time.Time) (uuid.UUID, Device, error)
+	PutCode(ctx context.Context, accountID uuid.UUID, kind auth.DeviceKind, hash []byte, expires time.Time) error
+	Pair(ctx context.Context, code []byte, kind auth.DeviceKind, name string, tokenHash []byte, scopes []auth.Scope, now time.Time) (uuid.UUID, Device, error)
 	List(ctx context.Context, accountID uuid.UUID) ([]Device, error)
 	Get(ctx context.Context, accountID, id uuid.UUID) (Device, error)
 	Revoke(ctx context.Context, accountID, id uuid.UUID, now time.Time) error
@@ -70,18 +86,47 @@ func (s *Service) Routes() []httpx.Route {
 	}
 }
 
-func (s *Service) code(w http.ResponseWriter, r *http.Request) {
+// issue stores a fresh code for one kind of device on the account,
+// replacing its earlier code, and answers it with when it ends.
+func (s *Service) issue(ctx context.Context, accountID uuid.UUID, kind auth.DeviceKind) (string, time.Time, error) {
 	code, err := NewCode()
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	expires := s.Now().Add(CodeTTL)
+	if err := s.Store.PutCode(ctx, accountID, kind, codeHash(s.CodeKey, code), expires); err != nil {
+		return "", time.Time{}, err
+	}
+	return code, expires, nil
+}
+
+// AppCode is the code an app's sign-in hands back to the app (auth's
+// callback): good for one device of that app's kind, for ten minutes.
+func (s *Service) AppCode(ctx context.Context, accountID uuid.UUID, kind auth.DeviceKind) (string, error) {
+	if !kind.IsApp() {
+		return "", errNotAnApp
+	}
+	code, _, err := s.issue(ctx, accountID, kind)
+	return code, err
+}
+
+// code is the account page's code, for the extension.
+func (s *Service) code(w http.ResponseWriter, r *http.Request) {
+	code, expires, err := s.issue(r.Context(), auth.AccountID(r), auth.KindExtension)
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "devices: code", err)
 		return
 	}
-	expires := s.Now().Add(CodeTTL)
-	if err := s.Store.PutCode(r.Context(), auth.AccountID(r), codeHash(s.CodeKey, code), expires); err != nil {
-		httpx.WriteInternal(w, r, s.Log, "devices: put code", err)
-		return
-	}
 	httpx.WriteOK(w, r, http.StatusCreated, apitypes.PairCode{Code: code, ExpiresAt: expires})
+}
+
+// pairKind is the kind a pairing asks for: the extension when it names
+// none, as the extension has always paired.
+func pairKind(in apitypes.PairInput) (auth.DeviceKind, bool) {
+	if in.Kind == nil {
+		return auth.KindExtension, true
+	}
+	return auth.ParseDeviceKind(string(*in.Kind))
 }
 
 func (s *Service) pair(w http.ResponseWriter, r *http.Request) {
@@ -89,22 +134,31 @@ func (s *Service) pair(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, httpx.MaxSmallBody, &in) {
 		return
 	}
+	kind, ok := pairKind(in)
+	if !ok {
+		httpx.WriteInvalid(w, r, map[string]string{"kind": badKind})
+		return
+	}
 	code, ok := NormalizeCode(in.Code)
 	if !ok {
 		httpx.WriteInvalid(w, r, map[string]string{"code": fmt.Sprintf("Type the %d words from your account page", CodeWords)})
 		return
 	}
-	name := defaultName
+	name := defaultNames[kind]
 	if in.Name != nil {
 		if n := CleanName(*in.Name); n != "" {
 			name = n
 		}
 	}
 	token, hash := s.Tokens.Mint()
-	_, dev, err := s.Store.Pair(r.Context(), codeHash(s.CodeKey, code), name, hash, auth.DeviceScopes(), s.Now())
+	_, dev, err := s.Store.Pair(r.Context(), codeHash(s.CodeKey, code), kind, name, hash, auth.ScopesFor(kind), s.Now())
 	switch {
 	case errors.Is(err, ErrBadCode):
-		httpx.WriteInvalid(w, r, map[string]string{"code": "That code has been used or is more than ten minutes old. Show a new one on your account page"})
+		bad := badPageCode
+		if kind.IsApp() {
+			bad = badAppCode
+		}
+		httpx.WriteInvalid(w, r, map[string]string{"code": bad})
 	case errors.Is(err, ErrTooMany):
 		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict,
 			fmt.Sprintf("Your account has %d paired browsers, the most allowed. Unpair one first", MaxDevices), nil)
@@ -165,7 +219,8 @@ func view(d Device) apitypes.Device {
 	for i, sc := range d.Scopes {
 		scopes[i] = apitypes.DeviceScope(sc)
 	}
-	return apitypes.Device{Id: d.ID, Name: d.Name, Scopes: scopes, CreatedAt: d.CreatedAt, LastUsedAt: d.LastUsedAt}
+	kind := apitypes.DeviceKind(d.Kind)
+	return apitypes.Device{Id: d.ID, Name: d.Name, Kind: &kind, Scopes: scopes, CreatedAt: d.CreatedAt, LastUsedAt: d.LastUsedAt}
 }
 
 // CleanName is a browser's name for itself as the account page may show

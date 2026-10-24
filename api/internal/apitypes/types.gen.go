@@ -198,10 +198,32 @@ func (e DesignationStatus) Valid() bool {
 	}
 }
 
+// Defines values for DeviceKind.
+const (
+	DeviceKindAndroid   DeviceKind = "android"
+	DeviceKindExtension DeviceKind = "extension"
+	DeviceKindIos       DeviceKind = "ios"
+)
+
+// Valid indicates whether the value is a known member of the DeviceKind enum.
+func (e DeviceKind) Valid() bool {
+	switch e {
+	case DeviceKindAndroid:
+		return true
+	case DeviceKindExtension:
+		return true
+	case DeviceKindIos:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeviceScope.
 const (
 	DeviceScopeDraftWrite  DeviceScope = "draft:write"
 	DeviceScopeLeagueWrite DeviceScope = "league:write"
+	DeviceScopeSession     DeviceScope = "session"
 )
 
 // Valid indicates whether the value is a known member of the DeviceScope enum.
@@ -210,6 +232,8 @@ func (e DeviceScope) Valid() bool {
 	case DeviceScopeDraftWrite:
 		return true
 	case DeviceScopeLeagueWrite:
+		return true
+	case DeviceScopeSession:
 		return true
 	default:
 		return false
@@ -1758,6 +1782,24 @@ func (e LoginParamsScreen) Valid() bool {
 	}
 }
 
+// Defines values for LoginParamsClient.
+const (
+	LoginParamsClientAndroid LoginParamsClient = "android"
+	LoginParamsClientIos     LoginParamsClient = "ios"
+)
+
+// Valid indicates whether the value is a known member of the LoginParamsClient enum.
+func (e LoginParamsClient) Valid() bool {
+	switch e {
+	case LoginParamsClientAndroid:
+		return true
+	case LoginParamsClientIos:
+		return true
+	default:
+		return false
+	}
+}
+
 // Account defines model for Account.
 type Account struct {
 	CreatedAt time.Time       `json:"created_at"`
@@ -2150,6 +2192,9 @@ type Device struct {
 	CreatedAt time.Time          `json:"created_at"`
 	Id        openapi_types.UUID `json:"id"`
 
+	// Kind what was paired, the browser extension or an app
+	Kind *DeviceKind `json:"kind,omitempty"`
+
 	// LastUsedAt when it last sent a page, to the hour; null when it never has
 	LastUsedAt *time.Time `json:"last_used_at"`
 
@@ -2157,6 +2202,9 @@ type Device struct {
 	Name   string        `json:"name"`
 	Scopes []DeviceScope `json:"scopes"`
 }
+
+// DeviceKind what was paired, the browser extension or an app
+type DeviceKind string
 
 // DeviceMe defines model for DeviceMe.
 type DeviceMe struct {
@@ -2166,7 +2214,7 @@ type DeviceMe struct {
 	Handle *string `json:"handle"`
 }
 
-// DeviceScope what a paired browser may write
+// DeviceScope what a paired device may do; session (an app's alone) opens every signed-in route
 type DeviceScope string
 
 // DraftPassState defines model for DraftPassState.
@@ -3493,6 +3541,9 @@ type PairCode struct {
 type PairInput struct {
 	// Code the six words as typed
 	Code string `json:"code"`
+
+	// Kind what was paired, the browser extension or an app
+	Kind *DeviceKind `json:"kind,omitempty"`
 
 	// Name what the browser calls itself
 	Name *string `json:"name,omitempty"`
@@ -5156,10 +5207,16 @@ type CallbackParams struct {
 type LoginParams struct {
 	ReturnTo *string            `form:"return_to,omitempty" json:"return_to,omitempty"`
 	Screen   *LoginParamsScreen `form:"screen,omitempty" json:"screen,omitempty"`
+
+	// Client the app signing in; absent for the web
+	Client *LoginParamsClient `form:"client,omitempty" json:"client,omitempty"`
 }
 
 // LoginParamsScreen defines parameters for Login.
 type LoginParamsScreen string
+
+// LoginParamsClient defines parameters for Login.
+type LoginParamsClient string
 
 // StripeWebhookJSONBody defines parameters for StripeWebhook.
 type StripeWebhookJSONBody = map[string]interface{}
