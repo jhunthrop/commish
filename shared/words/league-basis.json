@@ -1,0 +1,17 @@
+{
+	"asOfKickoff": "as of kickoff once started",
+	"projFinalPart": "Proj final adds the Pts and the Proj each starter has left.",
+	"noProjFinalPart": "No Proj final while a starter still to play has no Proj.",
+	"paceClause": "in-play players at their projection's pace",
+	"paceClauseShort": "in-play players at pace",
+	"oppPart": "Opp rank is points allowed to his position, 1st fewest.",
+	"rankOppPart": "Our rank is his place at his position in our order, Opp rank the points allowed to it, 1st fewest.",
+	"rankPart": "Our rank is his place at his position in our order.",
+	"pickPart": "Our pick starts the highest Proj at each slot.",
+	"rankOppPhone": "Our rank is his place at his position, Opp the points allowed to it, 1st fewest.",
+	"oppPhone": "Opp is points allowed to his position, 1st fewest.",
+	"statsByWednesday": "by Wednesday.",
+	"kickedOffPart": "Final lands the hour after a game, stats by Wednesday.",
+	"forRostered": " for rostered players",
+	"functions": []
+}

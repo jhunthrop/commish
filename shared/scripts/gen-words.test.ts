@@ -2,7 +2,7 @@
 // `Words` object. Run with `node --test shared/scripts/*.test.ts`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { renderWords, renderTable } from './gen-words.ts';
+import { OUTPUT, TABLES, gather, generate, renderWords, renderTable } from './gen-words.ts';
 
 const TABLE = { week: 'Week', noMoves: 'No moves yet', f: (x: number): number => x };
 
@@ -45,4 +45,65 @@ void test("a key that is the language's keyword is quoted the language's way", (
 
 void test('a member that is neither a string nor a function fails with its key named', () => {
 	assert.throws(() => renderTable({ n: 3 }, 'Bad'), /Bad\.n/);
+});
+
+void test('a table gathered from a module: an object export spread, a string export under its key', () => {
+	const module = { KINDS: { add: 'Free agent', trade: 'Trade' }, DROP_WORD: 'Drop' };
+	assert.deepEqual(gather(module, ['KINDS', ['drop', 'DROP_WORD']], 'm.ts'), {
+		add: 'Free agent',
+		trade: 'Trade',
+		drop: 'Drop'
+	});
+});
+
+void test('gathering fails on an export missing, a keyed export not a string and a key twice', () => {
+	assert.throws(() => gather({}, ['BOX'], 'm.ts'), /m\.ts exports no BOX/);
+	assert.throws(() => gather({ N: 3 }, [['n', 'N']], 'm.ts'), /m\.ts N is a number, not a string/);
+	assert.throws(() => gather({ T: 'x' }, ['T'], 'm.ts'), /m\.ts T is a string, not a table/);
+	assert.throws(
+		() => gather({ A: { drop: 'Drop' }, D: 'Drop' }, ['A', ['drop', 'D']], 'm.ts'),
+		/m\.ts gives drop twice/
+	);
+});
+
+void test('several tables: each its own enum and object inside Words, in the order listed', () => {
+	const { swift, kotlin } = renderWords([
+		{ name: 'Box', table: { proj: 'Proj' } },
+		{ name: 'Platform', table: { espn: 'ESPN' } }
+	]);
+	assert.match(swift, /public enum Box \{\s*public static let proj = "Proj"\s*\}\s*public enum Platform \{/);
+	assert.match(kotlin, /object Box \{\s*const val proj = "Proj"\s*\}\s*object Platform \{/);
+});
+
+void test("the tables: the League home's and the box score's, each with its own JSON", () => {
+	assert.deepEqual(
+		TABLES.map((t) => t.name),
+		[
+			'LeagueHome',
+			'Box',
+			'BoxFormat',
+			'Basis',
+			'BestLineupFrom',
+			'Kickoff',
+			'MoveKind',
+			'Tiebreak',
+			'WaiverOrder',
+			'Platform'
+		]
+	);
+	assert.equal(new Set(TABLES.map((t) => t.json)).size, TABLES.length);
+});
+
+void test("the web's own words land in the JSON, the Swift and the Kotlin", async () => {
+	const outputs = await generate();
+	const json = (path: string): Record<string, unknown> =>
+		JSON.parse(outputs.get(path) ?? '{}') as Record<string, unknown>;
+	assert.equal(json('shared/words/league-box.json').totals, 'Team');
+	assert.equal(json('shared/words/league-platform.json').mfl, 'MyFantasyLeague');
+	assert.equal(json('shared/words/league-move-kind.json').drop, 'Drop');
+	assert.equal(json('shared/words/league-basis.json').paceClauseShort, 'in-play players at pace');
+	const swift = outputs.get(OUTPUT.swift) ?? '';
+	const kotlin = outputs.get(OUTPUT.kotlin) ?? '';
+	assert.match(swift, /public enum Tiebreak \{[^}]*public static let head_to_head = "head to head"/);
+	assert.match(kotlin, /object Kickoff \{[^}]*const val decided = "Decided"/);
 });
