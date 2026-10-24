@@ -218,7 +218,8 @@ CHEV = svg('<path d="M6 9l6 6 6-6"/>', 14)
 
 
 def shell(title: str, theme: str, bar: str, active: str, tail: str, body: str, players: int) -> str:
-    tokens = open(TOKENS).read()
+    # tokens.css imports the generated colours and scale (Lane 171); inline, the import never resolves.
+    tokens = open(os.path.join(os.path.dirname(TOKENS), 'tokens.generated.css')).read() + open(TOKENS).read()
     css = open(os.path.join(OUT, 'board-row.css')).read()
     rail = ''.join(
         f'<a href="#" class="{"on" if name == active else ""}">{ICONS[name]}<span>{name}</span></a>'

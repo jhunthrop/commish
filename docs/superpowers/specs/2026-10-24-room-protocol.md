@@ -196,7 +196,7 @@ sends an error frame saying why first:
 | `hello expected` | `invalid`: "The first message must be a hello with the last seq you applied" | socket.go:199-202 |
 | `seat over its socket budget` | `rate_limited`: "This seat already has three tabs open on the room. Close one and reload." | socket.go:108-112, limits.go:47 |
 | `seat over its socket budget` | `rate_limited`: "This seat is reconnecting too fast. Wait a few seconds and reload." | socket.go:108-112, limits.go:48 |
-| `too many commands` | the last `rate_limited` refusal | socket.go:248-251 |
+| `too many commands` | none for the closing command itself, only the `rate_limited` refusals before it | socket.go:248-251 |
 
 The socket budget is per seat on the instance (limits.go:32-43): at most 3 sockets open at once, a
 new one at most 12 a minute after a burst of 6; a seat with no socket for 10 minutes is forgotten.
@@ -222,7 +222,7 @@ Any close other than 1008 and the client's own is retried (lobby-socket.ts:68-99
 
 - The waits are `[250, 500, 1000, 2000, 5000]` milliseconds (`RETRY_MS`, lobby-socket.ts:17), one
   step per attempt, staying at 5000 after the last. A welcome resets it to the first step.
-- A socket that closed after its welcome retries at once on the ladder.
+- A socket that closed after its welcome retries on the ladder, its first wait 250 ms.
 - A socket that closed before its welcome asks why first (section 1's probe): final, it stops; else
   it retries on the ladder.
 - Every retry opens the same `socket_url` and sends a hello with the last `seq` applied, so the
