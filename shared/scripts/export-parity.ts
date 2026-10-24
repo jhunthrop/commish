@@ -1,0 +1,162 @@
+/** What the web's own readers draw from the shared fixtures, as JSON the apps' tests hold their ports
+ * to: the League home's score bugs, standings, moves feed and bases (web/src/lib/league/home/home.ts)
+ * at each fixture clock, in the fixture's zone. An app that ports a reader (plan 2026-10-24 Global
+ * Constraints: no screen computes game state once the API serves it, until then it ports the web's
+ * reader) asserts its output equals this file, so a change to the web's words or rules fails the
+ * app's test until the port follows.
+ *
+ *   node shared/scripts/export-parity.ts
+ *
+ * It reads the committed fixtures (export-fixtures.ts writes them; check-gen holds both). */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { REPOSITORY, generatedBy, writeOutputs, type Outputs } from './generated.ts';
+import { BOX } from '../../web/src/lib/league/box/box.ts';
+import { fixed } from '../../web/src/lib/format/number.ts';
+import {
+	bugsFinalNone,
+	bugsMissListedFinal,
+	bugsOf,
+	bugsPlayingListed,
+	feedRows,
+	playoffRule,
+	projections,
+	recordCell,
+	seedingWords,
+	standingsBasis,
+	standingsRows,
+	teamBasis,
+	unlistedDrawn,
+	waiverCell
+} from '../../web/src/lib/league/home/home.ts';
+import { leagueWeekParts, weekBasisText } from '../../web/src/lib/league/home/week-basis.ts';
+import type { LeagueSync } from '../../web/src/lib/league/api.ts';
+import type { Scoreboard } from '../../web/src/lib/league/inseason/api.ts';
+
+const SCRIPT = 'shared/scripts/export-parity.ts';
+export const OUTPUT = 'shared/fixtures/parity/league-home.json';
+const INSEASON = 'shared/fixtures/inseason';
+const LEAGUE = '6f1d1c52-2626-4a26-9a26-000000000026';
+/** The fixture's zone: its clocks are named on Central time (shared/fixtures/README.md). */
+export const ZONE = 'America/Chicago';
+/** Every scoreboard clock the fixtures carry, as its file names it. */
+export const CLOCKS = [
+	'2026-10-16T02-00-00Z',
+	'2026-10-17T17-00-00Z',
+	'2026-10-18T18-56-00Z',
+	'2026-10-19T16-00-00Z',
+	'2026-10-20T00-40-00Z',
+	'2026-10-20T17-00-00Z'
+] as const;
+
+/** A file name's clock as an instant: `2026-10-17T17-00-00Z` as `2026-10-17T17:00:00.000Z`. */
+export function instantOf(clock: string): string {
+	return clock.replace(/T(\d\d)-(\d\d)-(\d\d)Z$/, 'T$1:$2:$3.000Z');
+}
+
+const figure = (value: number | null): string => (value === null ? BOX.none : fixed(value, 1));
+
+/** The League home at one clock: the score bugs, the standings rows as a phone draws them, the team
+ * basis whole and the page's basis paragraph as a phone says it (with no Lineup read, so no Game
+ * sentence), each exactly as the web's readers give them. */
+export function homeAt(sync: LeagueSync, board: Scoreboard, now: string): unknown {
+	const at = Date.parse(now);
+	const bugs = bugsOf(board, sync, at, ZONE, { host: sync.host, readAt: board.read_at });
+	const started = bugs.some((b) => b.state !== 'upcoming');
+	return {
+		now,
+		bugs: bugs.map((b) => ({
+			mine: b.mine,
+			state: b.state,
+			head: b.head,
+			words: b.words,
+			small: b.columns.small,
+			big: b.columns.big,
+			sides: b.sides.map((s) => ({
+				name: s.name,
+				record: s.record,
+				me: s.me,
+				small: s.small,
+				big: s.big,
+				toPlay: s.toPlay,
+				stands: s.stands
+			}))
+		})),
+		standings: standingsRows(sync, projections(board, at)).map((r) => ({
+			rank: r.rank,
+			team: r.team.name,
+			record: recordCell(r.team),
+			pointsFor: fixed(r.team.points_for, 1),
+			pointsAgainst: figure(r.team.points_against),
+			streak: r.team.streak ?? '',
+			waiver: waiverCell(r.team, sync.terms),
+			proj: figure(r.proj),
+			me: r.me
+		})),
+		teamBasis: teamBasis(
+			sync.host,
+			board.projection_read_at,
+			board.projection_scoring,
+			false,
+			ZONE,
+			started,
+			bugsMissListedFinal(bugs),
+			bugsPlayingListed(bugs),
+			bugsFinalNone(bugs),
+			unlistedDrawn(bugs)
+		),
+		phoneBasis: weekBasisText(
+			leagueWeekParts({
+				sync,
+				scoreboard: board,
+				playerPoints: false,
+				gameLines: null,
+				bugs,
+				now: at,
+				zone: ZONE
+			}),
+			'phone'
+		)
+	};
+}
+
+/** The parity file from the league's sync answer and its scoreboard answers by clock. */
+export function renderParity(sync: LeagueSync, boards: ReadonlyMap<string, Scoreboard>): string {
+	const clocks = Object.fromEntries(
+		[...boards].map(([clock, board]) => [clock, homeAt(sync, board, instantOf(clock))])
+	);
+	const parity = {
+		about: generatedBy(SCRIPT, 'web/src/lib/league/home/home.ts over shared/fixtures/inseason'),
+		zone: ZONE,
+		league: sync.id,
+		clocks,
+		moves: feedRows(sync, ZONE).map((r) => ({
+			when: r.when,
+			kind: r.kind,
+			teams: r.teams.map((t) => t.name),
+			adds: r.adds.map((p) => ({ name: p.name, position: p.position, club: p.club, to: p.to })),
+			drops: r.drops.map((p) => ({ name: p.name, position: p.position, club: p.club })),
+			detail: r.detail,
+			mine: r.mine
+		})),
+		playoffRule: playoffRule(sync.terms, sync.teams.length),
+		seeding: seedingWords(sync.terms, sync.host),
+		standingsBasis: standingsBasis(sync.host, sync.terms)
+	};
+	return `${JSON.stringify(parity, null, '\t')}\n`;
+}
+
+async function answer<T>(file: string): Promise<T> {
+	const text = await readFile(join(REPOSITORY, INSEASON, file), 'utf8');
+	return (JSON.parse(text) as { data: T }).data;
+}
+
+export async function generate(): Promise<Outputs> {
+	const sync = await answer<LeagueSync>(`leagues-attached-${LEAGUE}.json`);
+	const boards = new Map<string, Scoreboard>();
+	for (const clock of CLOCKS)
+		boards.set(clock, await answer<Scoreboard>(`scoreboard-${LEAGUE}-${clock}.json`));
+	return new Map([[OUTPUT, renderParity(sync, boards)]]);
+}
+
+if (import.meta.main) await writeOutputs(await generate());

@@ -25,7 +25,7 @@ public struct APIClient: LeagueAPI {
     }
 
     public func leagueSync(id: String) async throws -> LeagueSync {
-        switch try await client.leagueSync(path: .init(id: id)) {
+        switch try await Self.unwrapped({ try await client.leagueSync(path: .init(id: id)) }) {
         case let .ok(answer):
             return try Self.payload(answer.body.json.value2.data)
         case let .notFound(answer):
@@ -38,7 +38,7 @@ public struct APIClient: LeagueAPI {
     }
 
     public func scoreboard(id: String) async throws -> Scoreboard {
-        switch try await client.leagueScoreboard(path: .init(id: id)) {
+        switch try await Self.unwrapped({ try await client.leagueScoreboard(path: .init(id: id)) }) {
         case let .ok(answer):
             return try Self.payload(answer.body.json.value2.data)
         case let .notFound(answer):
@@ -51,6 +51,16 @@ public struct APIClient: LeagueAPI {
             throw try Self.problem(answer.body.json)
         case let .undocumented(status, _):
             throw APIError.status(status)
+        }
+    }
+
+    /// The generated client wraps a transport's failure (no network, a timeout) in its own error: the
+    /// caller gets the failure itself, so the screen can say "no connection" in words.
+    static func unwrapped<T>(_ call: () async throws -> T) async throws -> T {
+        do {
+            return try await call()
+        } catch let error as ClientError {
+            throw error.underlyingError
         }
     }
 

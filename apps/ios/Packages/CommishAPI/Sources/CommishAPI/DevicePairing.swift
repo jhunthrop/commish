@@ -37,6 +37,11 @@ public struct PairInput: Codable, Equatable, Sendable {
 public struct PairedDevice: Equatable, Sendable {
     public let token: String
     public let deviceID: String
+
+    public init(token: String, deviceID: String) {
+        self.token = token
+        self.deviceID = deviceID
+    }
 }
 
 public protocol DevicePairing: Sendable {

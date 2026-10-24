@@ -1,0 +1,46 @@
+/// The app's own words: what the web has no table for because the web has no such screen part (the
+/// tab bar's screens not live yet, the sign-in sheet, a read that failed with no saved answer). Every
+/// view reads its words from here, the generated web words or the ported ones, never a literal.
+public enum AppWords {
+    /// The phone's five in season, the web's names and order (web/src/lib/ui/rail-order.ts in_season,
+    /// nav.ts labels).
+    public enum Tab {
+        public static let league = "League"
+        public static let lineup = "Lineup"
+        public static let matchup = "Matchup"
+        public static let waivers = "Waivers"
+        public static let trades = "Trades"
+    }
+
+    /// web/src/lib/league/LeaguePage.svelte stampOf: a read whose latest try failed.
+    public static let lastRead = "Last read"
+
+    /// LineupSummary.svelte's line beside the head: "As set on FFPC".
+    public static func asSetOn(_ platform: String) -> String {
+        "As set on \(platform)"
+    }
+
+    public enum SignIn {
+        public static let title = "Commish"
+        public static let lead = "Your leagues on ESPN, Sleeper, Yahoo, MyFantasyLeague and FFPC, in one place."
+        public static let verb = "Sign in"
+        public static let working = "Signing in"
+        public static let signOut = "Sign out"
+    }
+
+    /// Said in place of a screen when nothing can be shown: the API's own sentence where it sent one,
+    /// else one of these. Never an error code.
+    public enum Failure {
+        public static let offline =
+            "No connection, and nothing saved on this phone yet. Try again once you have signal."
+        public static let signedOut = "Sign in again to see your league."
+        public static let unknown = "We could not read your league just now. Try again in a minute."
+        public static let signInFailed = "Signing in did not finish. Try again."
+        public static let tryAgain = "Try again"
+    }
+
+    /// The league the app opens until the Leagues screen lets the member pick one.
+    public enum LeagueList {
+        public static let none = "Follow a league on trycommish.app and it shows here."
+    }
+}

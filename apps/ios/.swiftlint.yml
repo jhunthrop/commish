@@ -23,8 +23,9 @@ line_length:
   error: 140
   ignores_comments: true
 identifier_name:
-  # ui: the interface face's token name; x, y: coordinates.
-  excluded: [id, x, y, ui]
+  # ui: the interface face's token name; x, y: coordinates; me, to: the web's own names
+  # (home.ts BugSide.me, FeedPlayer.to), kept so a port reads beside its source.
+  excluded: [id, x, y, ui, me, to]
 type_body_length:
   warning: 300
 file_length:
