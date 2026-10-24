@@ -32,7 +32,9 @@ public struct SnapshotResult: Sendable, Equatable {
 public enum Snapshot {
     /// A pixel differs when a channel moves more than this (of 255).
     public static let channelTolerance = 24
-    /// The differing pixels a match allows, an absolute count so a changed figure never passes.
+    /// The differing pixels a match allows, an absolute count whatever the image's height: room for the
+    /// edge pixels a renderer moves between runs, not proof that every glyph matches (one changed digit
+    /// at 1x can stay under it). A changed line or layout fails; the Core's tests pin each word and figure.
     public static let maxDifferingPixels = 300
     /// The largest reference a suite may commit, in bytes.
     public static let maxReferenceBytes = 300_000

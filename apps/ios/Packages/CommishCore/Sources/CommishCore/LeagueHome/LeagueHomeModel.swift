@@ -45,7 +45,7 @@ public struct LeagueHomeModel: Sendable, Equatable {
     typealias Home = CommishDesign.Words.LeagueHome
 
     public init(sync: LeagueSync, scoreboard: Scoreboard?, now: Date, zone: TimeZone) {
-        let platform = PortedWords.platform(sync.host)
+        let platform = ValueWords.platform(sync.host)
         let bugs = scoreboard.map {
             ScoreBugs.bugs($0, sync: sync, now: now, zone: zone, read: .init(platform: platform, readAt: $0.readAt))
         } ?? []
@@ -68,7 +68,7 @@ public struct LeagueHomeModel: Sendable, Equatable {
         guard let mine = sync.matchup?.value1.mine else {
             return nil
         }
-        let none = PortedWords.Box.none
+        let none = Words.Box.none
         let rows = mine.starters.enumerated().map { index, starter in
             let player = starter.player
             let position = player.position == "DEF" ? "D/ST" : player.position
@@ -82,14 +82,14 @@ public struct LeagueHomeModel: Sendable, Equatable {
         }
         let bench = sync.roster.filter { $0.slot.value1 == .bench }.count
         let reserve = sync.roster.filter { $0.slot.value1 == .reserve }.count
-        let reserveWords = reserve > 0 ? ". \(PortedWords.Box.reserve), \(reserve)" : ""
+        let reserveWords = reserve > 0 ? ". \(Words.Box.reserve), \(reserve)" : ""
         return LineupSection(
             title: Home.yourLineup,
             setOn: AppWords.asSetOn(platform),
-            columns: [PortedWords.Box.player, PortedWords.Box.pts],
+            columns: [Words.Box.player, Words.Box.pts],
             rows: rows,
             total: mine.pointsRead ? Formatting.fixed(mine.points) : none,
-            bench: "\(PortedWords.Box.bench), \(Formatting.plural(bench, "player"))\(reserveWords)",
+            bench: "\(Words.Box.bench), \(Formatting.plural(bench, "player"))\(reserveWords)",
             verb: Home.openLineup
         )
     }

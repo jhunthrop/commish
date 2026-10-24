@@ -43,7 +43,7 @@ enum MovesFeed {
     static func section(_ sync: LeagueSync, zone: TimeZone) -> MovesSection {
         let rows = sync.movesRead ? lines(sync, zone: zone) : []
         let note: String? = if !sync.movesRead {
-            "\(PortedWords.platform(sync.host)) gives no move history to us."
+            "\(ValueWords.platform(sync.host)) gives no move history to us."
         } else if rows.isEmpty {
             Home.noMoves
         } else {
@@ -69,7 +69,7 @@ enum MovesFeed {
             return MoveLine(
                 id: "\(move.at.timeIntervalSince1970)-\(index)",
                 when: Formatting.weekdayTime(move.at, zone: zone),
-                kind: dropOnly ? PortedWords.MoveKind.drop : kind(move.kind),
+                kind: dropOnly ? Words.MoveKind.drop : kind(move.kind),
                 teams: move.rosterIds.map(name),
                 adds: move.adds.map { player($0, trade ? name($0.rosterId) : nil) },
                 drops: trade ? [] : move.drops.map { player($0, nil) },
@@ -81,11 +81,11 @@ enum MovesFeed {
 
     private static func kind(_ kind: Components.Schemas.LeagueMove.KindPayload) -> String {
         switch kind.value1 {
-        case .add: PortedWords.MoveKind.add
-        case .waiver: PortedWords.MoveKind.waiver
-        case .trade: PortedWords.MoveKind.trade
+        case .add: Words.MoveKind.add
+        case .waiver: Words.MoveKind.waiver
+        case .trade: Words.MoveKind.trade
         // A kind this build does not know: the API's own word for it.
-        case nil: PortedWords.unknown(kind.value2) ?? PortedWords.Box.none
+        case nil: ValueWords.unknown(kind.value2) ?? Words.Box.none
         }
     }
 }

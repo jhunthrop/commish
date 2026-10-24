@@ -3,8 +3,8 @@ import Foundation
 import Testing
 
 /// The copy rules over every word the app prints: shared/words/banned-words.json (the web's and the
-/// research writer's one list) and its marks, over the word tables (the generated web words, the
-/// app's own and the ported ones) and any string catalog; and no view writes a word of its own.
+/// research writer's one list) and its marks, over the word tables (the generated web words and the
+/// app's own) and any string catalog; and no view writes a word of its own.
 struct CopyGuardTests {
     private static let apps = Fixtures.shared.appendingPathComponent("../apps/ios").standardized
 

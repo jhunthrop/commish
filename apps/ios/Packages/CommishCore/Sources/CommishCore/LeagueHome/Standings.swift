@@ -65,7 +65,7 @@ enum Standings {
         let rule = playoffRule(sync.terms, teams: sync.teams.count)
         return StandingsSection(
             title: Home.standings,
-            columns: [Home.rank, Home.team, Home.record, Home.pointsFor] + (projected ? [PortedWords.Box.proj] : []),
+            columns: [Home.rank, Home.team, Home.record, Home.pointsFor] + (projected ? [Words.Box.proj] : []),
             rows: rows,
             playoffCut: rule?.after,
             playoffWords: rule?.words,
@@ -75,7 +75,7 @@ enum Standings {
     }
 
     private static func figure(_ value: Double?) -> String {
-        value.map { Formatting.fixed($0) } ?? PortedWords.Box.none
+        value.map { Formatting.fixed($0) } ?? Words.Box.none
     }
 
     /// "$675" left of the budget, "6th" in the order, "--" where unsaid.
@@ -86,7 +86,7 @@ enum Standings {
         if terms.waivers?.value1 == .order, let order = team.waiverOrder {
             return Formatting.ordinal(order)
         }
-        return PortedWords.Box.none
+        return Words.Box.none
     }
 
     static func playoffRule(_ terms: Components.Schemas.LeagueTerms, teams: Int) -> (after: Int, words: String)? {
@@ -111,7 +111,7 @@ enum Standings {
             let numbers = seeds.enumerated().filter { $0.element == kind }.map { $0.offset + 1 }
             return numbers.isEmpty ? nil : "\(seedNumbers(numbers)) \(words)"
         }
-        let platform = PortedWords.platform(host)
+        let platform = ValueWords.platform(host)
         return "\(platform) seeds \(seeds.count) for the playoffs\(weeksWords(terms.playoffWeeks?.value1)): "
             + "\(seededBy.joined(separator: ", "))."
     }
