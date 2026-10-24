@@ -1,0 +1,7 @@
+--swiftversion 6.0
+--maxwidth 120
+--indent 4
+--wraparguments before-first
+--wrapcollections before-first
+--exclude Packages/*/.build,Packages/Features/*/.build,**/*.generated.swift
+--disable redundantReturn,wrapMultilineStatementBraces

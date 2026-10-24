@@ -1,0 +1,15 @@
+generate:
+  - types
+  - client
+accessModifier: public
+namingStrategy: idiomatic
+# The operations the app calls today. A screen lane adds its own here; the whole spec generates a
+# client the app does not need and slows every build.
+filter:
+  operations:
+    - listAttached
+    - leagueSync
+    - leagueScoreboard
+    - deviceMe
+    - revokeDevice
+    - pairDevice

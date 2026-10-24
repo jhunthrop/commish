@@ -1,0 +1,37 @@
+included:
+  - Commish
+  - CommishTests
+  - Packages
+excluded:
+  - Packages/*/.build
+  - Packages/Features/*/.build
+  - Packages/*/Sources/*/*.generated.swift
+strict: true
+disabled_rules:
+  # SwiftFormat owns commas (its trailingCommas rule), so the two never disagree.
+  - trailing_comma
+opt_in_rules:
+  - empty_count
+  - first_where
+  - sorted_first_last
+  - contains_over_filter_count
+  - explicit_init
+  - redundant_nil_coalescing
+  - toggle_bool
+line_length:
+  warning: 120
+  error: 140
+  ignores_comments: true
+identifier_name:
+  # ui: the interface face's token name; x, y: coordinates; me, to: the web's own names
+  # (home.ts BugSide.me, FeedPlayer.to), kept so a port reads beside its source.
+  excluded: [id, x, y, ui, me, to]
+type_body_length:
+  warning: 300
+file_length:
+  warning: 400
+  error: 800
+function_body_length:
+  warning: 50
+nesting:
+  type_level: 3

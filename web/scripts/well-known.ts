@@ -32,7 +32,8 @@ export interface WellKnownEnv {
 }
 
 /** The Apple file: the iOS app under the team for every app-link path, in both the paths form and
- * the components form iOS reads. No team, no app. */
+ * the components form iOS reads, and under webcredentials, which lets the app's sign-in sheet take
+ * its https return (ASWebAuthenticationSession's https callback, iOS 17.4). No team, no app. */
 export function appleAppSiteAssociation(teamId: string): object {
 	const team = teamId.trim();
 	if (team === '') return { applinks: { details: [] } };
@@ -48,7 +49,8 @@ export function appleAppSiteAssociation(teamId: string): object {
 					components: APP_LINK_PATHS.map((path) => ({ '/': path }))
 				}
 			]
-		}
+		},
+		webcredentials: { apps: [`${team}.${IOS_BUNDLE_ID}`] }
 	};
 }
 

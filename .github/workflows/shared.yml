@@ -12,6 +12,9 @@ on:
     paths:
       - "shared/**"
       - "apps/ios/Packages/CommishDesign/Sources/CommishDesign/*.generated.swift"
+      - "apps/ios/Packages/CommishAPI/Sources/CommishAPI/openapi.yaml"
+      - "apps/ios/scripts/**"
+      - "api/openapi.yaml"
       - "apps/android/design/src/main/kotlin/app/trycommish/design/**"
       - "web/src/lib/**"
       - "web/src/fixtures/**"
@@ -22,6 +25,9 @@ on:
     paths:
       - "shared/**"
       - "apps/ios/Packages/CommishDesign/Sources/CommishDesign/*.generated.swift"
+      - "apps/ios/Packages/CommishAPI/Sources/CommishAPI/openapi.yaml"
+      - "apps/ios/scripts/**"
+      - "api/openapi.yaml"
       - "apps/android/design/src/main/kotlin/app/trycommish/design/**"
       - "web/src/lib/**"
       - "web/src/fixtures/**"
@@ -50,8 +56,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: The generated tokens, words and fixtures match their sources
         run: node shared/scripts/check-gen.ts
-      - name: The shared generators' tests
-        run: node --test shared/scripts/*.test.ts
+      - name: The shared generators' tests, and the iOS client spec's
+        run: node --test shared/scripts/*.test.ts apps/ios/scripts/*.test.ts
       - name: The web's own entry to the same check
         working-directory: web
         run: npm run check:shared
