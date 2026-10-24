@@ -42,7 +42,7 @@ struct UnknownValueTests {
     }
 
     @Test func anEmptyUnknownSaysNothing() {
-        #expect(PortedWords.unknown(nil) == nil)
-        #expect(PortedWords.unknown("") == nil)
+        #expect(ValueWords.unknown(nil) == nil)
+        #expect(ValueWords.unknown("") == nil)
     }
 }

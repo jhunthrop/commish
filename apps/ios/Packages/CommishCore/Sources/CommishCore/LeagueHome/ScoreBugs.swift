@@ -89,13 +89,13 @@ enum ScoreBugs {
             let head = GameHead(state: game.state, next: game.nextKickoff, now: now)
             let finals = game.sides.map { sideFinal($0, state: head.state) }
             let allFinal = !finals.isEmpty && finals.allSatisfy(\.self)
-            let small = head.state == .upcoming ? "" : allFinal ? PortedWords.Box.final : PortedWords.Box.projFinal
-            let big = head.state == .upcoming ? PortedWords.Box.proj : PortedWords.Box.pts
+            let small = head.state == .upcoming ? "" : allFinal ? Words.Box.final : Words.Box.projFinal
+            let big = head.state == .upcoming ? Words.Box.proj : Words.Box.pts
             let (headWords, words) = headAndWords(head, zone: zone, read: read, now: now)
             let sides = zip(game.sides, finals).map { side, final in
                 bugSide(
                     side, game: game, team: teams[side.rosterId], member: sync.me,
-                    drawn: .init(state: head.state, final: final, headFinal: small == PortedWords.Box.final)
+                    drawn: .init(state: head.state, final: final, headFinal: small == Words.Box.final)
                 )
             }
             return ScoreBug(
@@ -154,7 +154,7 @@ enum ScoreBugs {
 
     /// home.ts sideFigures: Proj before kickoff; from it Pts with the projected final small; Final.
     private static func figures(_ side: Side, state: GameHeadState, final: Bool, headFinal: Bool) -> (String, String) {
-        let none = PortedWords.Box.none
+        let none = Words.Box.none
         let proj = side.projection.map { Formatting.fixed($0) } ?? none
         if state == .upcoming {
             return ("", proj)
@@ -163,7 +163,7 @@ enum ScoreBugs {
         if !final {
             return (side.projectedFinal.map { Formatting.fixed($0) } ?? none, pts)
         }
-        return (headFinal ? pts : "\(PortedWords.Box.final) \(pts)", pts)
+        return (headFinal ? pts : "\(Words.Box.final) \(pts)", pts)
     }
 
     private static func stands(_ side: Side, game: Game, started: Bool) -> Stands {
@@ -186,8 +186,8 @@ enum ScoreBugs {
 
     private static func headAndWords(_ head: GameHead, zone: TimeZone, read: Read?, now: Date) -> (String, String) {
         switch head.state {
-        case .final: return (PortedWords.Box.final, "")
-        case .kickedOff: return (PortedWords.Box.kickedOff, read.map { readCell($0, now: now) } ?? "")
+        case .final: return (Words.Box.final, "")
+        case .kickedOff: return (Words.Box.kickedOff, read.map { readCell($0, now: now) } ?? "")
         case .upcoming:
             guard let next = head.next else {
                 return ("", "")

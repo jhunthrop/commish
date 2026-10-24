@@ -1,6 +1,6 @@
 /// The app's own words: what the web has no table for because the web has no such screen part (the
 /// tab bar's screens not live yet, the sign-in sheet, a read that failed with no saved answer). Every
-/// view reads its words from here, the generated web words or the ported ones, never a literal.
+/// view reads its words from here or the generated web words (Words), never a literal.
 public enum AppWords {
     /// The phone bar's tabs, the web's rail labels (web/src/lib/ui/nav.ts, run/week-names.ts); which
     /// five show is PhoneRail's, by the league's phase.
@@ -19,6 +19,9 @@ public enum AppWords {
         public static let restOfSeason = "Rest of season"
         public static let record = "Our record"
     }
+
+    /// A platform the API names with nothing readable (ValueWords.platform).
+    public static let unknownPlatform = "Your platform"
 
     /// web/src/lib/league/LeaguePage.svelte stampOf: a read whose latest try failed.
     public static let lastRead = "Last read"

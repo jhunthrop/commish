@@ -91,7 +91,7 @@ struct LeagueHomeModelTests {
         #expect(home.standings.title == Words.LeagueHome.standings)
         #expect(home.standings.columns == [
             Words.LeagueHome.rank, Words.LeagueHome.team, Words.LeagueHome.record,
-            Words.LeagueHome.pointsFor, PortedWords.Box.proj,
+            Words.LeagueHome.pointsFor, Words.Box.proj,
         ])
         #expect(home.moves.title == Words.LeagueHome.moves)
         #expect(home.moves.aside == Words.LeagueHome.movesAside)
@@ -124,7 +124,7 @@ struct LeagueHomeModelTests {
         )
         #expect(home.moves.note == "FFPC gives no move history to us.")
         #expect(home.bugs.isEmpty)
-        #expect(home.standings.columns.contains(PortedWords.Box.proj) == false)
+        #expect(home.standings.columns.contains(Words.Box.proj) == false)
     }
 
     @Test func theLineupListsTheMembersStartersAndTheBench() throws {
