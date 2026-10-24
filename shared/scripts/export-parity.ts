@@ -1,6 +1,7 @@
 /** What the web's own readers draw from the shared fixtures, as JSON the apps' tests hold their ports
  * to: the League home's score bugs, standings, moves feed and bases (web/src/lib/league/home/home.ts)
- * at each fixture clock, in the fixture's zone. An app that ports a reader (plan 2026-10-24 Global
+ * at each fixture clock, in the fixture's zone, and every lineup line's and scoreboard game's state
+ * (game-state-parity.ts), which the API's own test holds its wire field to. An app that ports a reader (plan 2026-10-24 Global
  * Constraints: no screen computes game state once the API serves it, until then it ports the web's
  * reader) asserts its output equals this file, so a change to the web's words or rules fails the
  * app's test until the port follows.
@@ -35,6 +36,13 @@ import { LEAGUE_PHASES, PHONE_RAIL_ITEMS } from '../../web/src/lib/ui/nav.ts';
 import { RAIL_WITHOUT_LEAGUE, railFor } from '../../web/src/lib/ui/rail-order.ts';
 import { railItemLabel } from '../../web/src/lib/run/week-names.ts';
 import type { Scoreboard } from '../../web/src/lib/league/inseason/api.ts';
+import {
+	GAME_STATE_OUTPUT,
+	lineupRows,
+	renderGameState,
+	scoreboardRows,
+	type GameStateRow
+} from './game-state-parity.ts';
 
 const SCRIPT = 'shared/scripts/export-parity.ts';
 export const OUTPUT = 'shared/fixtures/parity/league-home.json';
@@ -192,14 +200,38 @@ async function answer<T>(file: string): Promise<T> {
 	return (JSON.parse(text) as { data: T }).data;
 }
 
+/** The fixture answer a route names at a clock, as the game-state rows cite it. */
+const sourceOf = (route: 'lineup' | 'scoreboard', clock: string) => ({
+	route: `GET /leagues/attached/${LEAGUE}/${route}`,
+	clock: instantOf(clock),
+	fixture: `${INSEASON}/${route}-${LEAGUE}-${clock}.json`
+});
+
+/** Every lineup line and scoreboard game at every clock, by the web's game-state readers. */
+async function gameStateRows(boards: ReadonlyMap<string, Scoreboard>): Promise<GameStateRow[]> {
+	const rows: GameStateRow[] = [];
+	for (const clock of CLOCKS) {
+		const lineup = sourceOf('lineup', clock);
+		rows.push(...lineupRows(lineup, await answer<unknown>(`lineup-${LEAGUE}-${clock}.json`)));
+		const board = boards.get(clock);
+		if (board !== undefined) rows.push(...scoreboardRows(sourceOf('scoreboard', clock), board));
+	}
+	return rows;
+}
+
 export async function generate(): Promise<Outputs> {
 	const sync = await answer<LeagueSync>(`leagues-attached-${LEAGUE}.json`);
 	const boards = new Map<string, Scoreboard>();
 	for (const clock of CLOCKS)
 		boards.set(clock, await answer<Scoreboard>(`scoreboard-${LEAGUE}-${clock}.json`));
+	const about = generatedBy(
+		SCRIPT,
+		'web/src/lib/league/box/kickoff.ts (lineState, gameHead) over shared/fixtures/inseason'
+	);
 	return new Map([
 		[OUTPUT, renderParity(sync, boards)],
-		[RAIL_OUTPUT, renderRail()]
+		[RAIL_OUTPUT, renderRail()],
+		[GAME_STATE_OUTPUT, renderGameState(about, await gameStateRows(boards))]
 	]);
 }
 

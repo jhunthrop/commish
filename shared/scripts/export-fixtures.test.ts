@@ -32,13 +32,14 @@ void test('an instant names a file with no colons', () => {
 	assert.throws(() => clockPart('Saturday'), /Saturday/);
 });
 
-void test('the plan reads the league once and its scoreboard at every clock', () => {
+void test('the plan reads the league once, its scoreboard and lineup at every clock', () => {
 	const files = fixturePlan({ leagueId: LEAGUE, clocks: CLOCKS }).flatMap((step) => step.files);
 	const names = files.map((f) => f.file);
 	assert.ok(names.includes(`leagues-attached-${LEAGUE}.json`));
 	assert.ok(names.includes('leagues-attached.json'));
 	for (const clock of Object.values(CLOCKS)) {
 		assert.ok(names.includes(`scoreboard-${LEAGUE}-${clockPart(clock)}.json`), clock);
+		assert.ok(names.includes(`lineup-${LEAGUE}-${clockPart(clock)}.json`), clock);
 	}
 	assert.equal(new Set(names).size, names.length, 'every file once');
 });
@@ -46,7 +47,7 @@ void test('the plan reads the league once and its scoreboard at every clock', ()
 void test('every committed fixture parses, and every answer is a successful envelope', () => {
 	assert.ok(JSON.parse(readFileSync(join(FIXTURES, 'mock-2026-ppr.json'), 'utf8')));
 	const files = readdirSync(join(FIXTURES, 'inseason'));
-	assert.ok(files.length >= 9, files.join(', '));
+	assert.ok(files.length >= 15, files.join(', '));
 	for (const file of files) {
 		const body = answer(file);
 		assert.equal(body.ok, true, file);

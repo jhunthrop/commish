@@ -58,7 +58,8 @@ export function clockPart(iso: string): string {
 }
 
 /** The answers to read at each clock, the League home's reads: the league list and the league once,
- * at the week's clock, with the week's games, and the scoreboard at every clock. */
+ * at the week's clock, with the week's games, and the scoreboard and the member's lineup at every
+ * clock (the lineup's lines carry each player's game, which the game-state parity reads, Lane 176). */
 export function fixturePlan(source: FixtureSource): { clock: string; files: FixtureFile[] }[] {
 	const id = source.leagueId;
 	const { week, ...rest } = source.clocks;
@@ -68,6 +69,16 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 		clock,
 		about: `the week's scoreboard, ${name}`
 	});
+	const lineup = (clock: string, name: string): FixtureFile => ({
+		file: `lineup-${id}-${clockPart(clock)}.json`,
+		route: `GET /leagues/attached/${id}/lineup`,
+		clock,
+		about: `the member's lineup, ${name}`
+	});
+	const atClock = (clock: string, name: string): FixtureFile[] => [
+		scoreboard(clock, name),
+		lineup(clock, name)
+	];
 	return [
 		{
 			clock: week,
@@ -90,12 +101,12 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 					clock: week,
 					about: "the week's NFL games with their facts, as the platform games are drawn from"
 				},
-				scoreboard(week, 'Saturday noon Central, every Sunday game to come')
+				...atClock(week, 'Saturday noon Central, every Sunday game to come')
 			]
 		},
 		...Object.entries(rest).map(([name, clock]) => ({
 			clock,
-			files: [scoreboard(clock, CLOCK_WORDS[name as keyof typeof rest])]
+			files: atClock(clock, CLOCK_WORDS[name as keyof typeof rest])
 		}))
 	];
 }
