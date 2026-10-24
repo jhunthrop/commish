@@ -61,12 +61,12 @@ public enum Tokens {
     public enum Color { public static let ink = ThemedColor(light: 0x15120F, dark: 0xF5F0EA) /* one per token */ }
     public enum Space { public static let s1: Double = 4 /* ... */ }
     public enum Radius { public static let sm: Double = 4; public static let md: Double = 8; public static let pill: Double = 999 }
-    public enum Type { public static let xs: Double = 11 /* ... */ }
+    public enum TypeScale { public static let xs: Double = 11 /* ... */ }  // Type is reserved in Swift; Kotlin keeps Tokens.Type
     public enum Font { public static let ui = "Outfit"; public static let num = "Big Shoulders Display"; public static let read = "Newsreader" }
 }
 ```
 
-- Produces Kotlin with the same names in `object Tokens { object Color { val ink = ThemedColor(0xFF15120F, 0xFFF5F0EA) } ... }` in package `app.trycommish.design`, `data class ThemedColor(val light: Long, val dark: Long)`.
+- Produces Kotlin with the same names (the type scale as `Tokens.Type`) in `object Tokens { object Color { val ink = ThemedColor(0xFF15120F, 0xFFF5F0EA) } ... }` in package `app.trycommish.design`, `data class ThemedColor(val light: Long, val dark: Long)`.
 - Produces `shared/words/league-home.json`: the web's `HOME` table from `web/src/lib/league/home/home.ts` as `{ "key": "string" }` for every string-valued member (function-valued members are listed by name under `"functions": [...]` so the apps know which words are built, not copied), exported by `gen-words.ts` importing the TS module through `tsx`; Swift `public enum Words { public enum LeagueHome { public static let week = "Week" /* ... */ } }` and the Kotlin `object Words { object LeagueHome { const val week = "Week" } }`.
 - Produces `shared/fixtures/`: `mock-2026-ppr.json` from `web/src/fixtures/mock-2026-ppr.ts`, and the in-season fixture league from `web/scripts/inseason-fixture/` (the FFPC league, its scoreboard answers at the fixture clocks, the platform games) as one JSON per answer the API would give, named by route (`leagues-attached-<id>.json`, `scoreboard-<id>-<clockIso>.json`), with `README.md` naming the fixture clocks.
 - Produces `docs/superpowers/specs/2026-10-24-room-protocol.md`: the lobby socket protocol from `web/src/lib/room/lobby-socket.ts` and `api/cmd/room`: the hello (last seq), the welcome (actions since, server `now`), update frames, error frames, the 1008 close and its reasons, the retry ladder `[250, 500, 1000, 2000, 5000]` ms, session affinity, how a command is sent and refused. Every frame as a JSON example.
