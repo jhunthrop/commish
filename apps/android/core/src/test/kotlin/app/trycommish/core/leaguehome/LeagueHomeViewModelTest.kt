@@ -31,6 +31,8 @@ class LeagueHomeViewModelTest {
     ) : LeagueReads {
         var calls = 0
 
+        override suspend fun attached(): String = Fixtures.attachedBody()
+
         override suspend fun sync(leagueId: String): String {
             calls++
             gate?.await()

@@ -10,6 +10,7 @@ android {
     namespace = "app.trycommish.core"
     compileSdk = 35
     defaultConfig { minSdk = 26 }
+    testFixtures { enable = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

@@ -97,7 +97,7 @@ class SignIn(
                 "return_to" to returnTo,
                 "code_challenge" to Pkce.challenge(made),
                 "code_challenge_method" to "S256",
-            ).joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, Charsets.UTF_8)}" }
+            ).joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, UTF_8)}" }
         return "${apiBaseUrl.trimEnd('/')}/auth/login?$query"
     }
 
@@ -127,11 +127,14 @@ class SignIn(
             ?.split('&')
             ?.map { it.split('=', limit = 2) }
             ?.firstOrNull { it.size == 2 && it[0] == "code" }
-            ?.let { URLDecoder.decode(it[1], Charsets.UTF_8) }
+            ?.let { URLDecoder.decode(it[1], UTF_8) }
             ?.takeIf { it.isNotBlank() }
     }
 
     private companion object {
         const val KIND = "android"
+
+        /** By name: the Charset overloads need API 33. */
+        const val UTF_8 = "UTF-8"
     }
 }

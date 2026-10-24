@@ -29,9 +29,15 @@ object LeagueHomeWords {
     const val trade = "Trade"
     const val drop = "Drop"
 
+    /** A traded player's new team: "to Dad Runners". */
+    const val to = "to"
+
     /** The stamp of an answer just read, and of one kept from before while the API cannot be reached. */
     const val read = "Read"
-    const val lastRead = "Last read, no connection now"
+    const val offline = "No connection, showing the read of"
+
+    /** A member with no league attached yet: where to attach one. */
+    const val noLeague = "Attach a league from ESPN, Sleeper, Yahoo, MyFantasyLeague or FFPC at trycommish.app, then pull down here."
 
     /** With nothing kept and no connection: what happened and what to do, never an error code. */
     const val cannotLoad = "We could not reach Commish. Check your connection, then pull down to try again."

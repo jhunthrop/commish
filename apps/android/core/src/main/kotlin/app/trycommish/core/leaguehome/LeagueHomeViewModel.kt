@@ -22,6 +22,8 @@ import java.util.UUID
 /** The League home's two reads as the API answers them, the envelope's body whole, so the cache keeps
  * exactly what the API sent. */
 interface LeagueReads {
+    suspend fun attached(): String
+
     suspend fun sync(leagueId: String): String
 
     suspend fun scoreboard(leagueId: String): String
@@ -31,6 +33,13 @@ interface LeagueReads {
 class ApiLeagueReads(
     private val transport: Transport,
 ) : LeagueReads {
+    override suspend fun attached(): String =
+        transport
+            .leagueSync()
+            .listAttached()
+            .response
+            .bodyAsText()
+
     override suspend fun sync(leagueId: String): String =
         transport
             .leagueSync()
@@ -48,6 +57,8 @@ class ApiLeagueReads(
 
 /** The cache's keys, the routes the answers came from. */
 object LeagueHomeKeys {
+    const val ATTACHED = "/leagues/attached"
+
     fun sync(leagueId: String): String = "/leagues/attached/$leagueId/sync"
 
     fun scoreboard(leagueId: String): String = "/leagues/attached/$leagueId/scoreboard"

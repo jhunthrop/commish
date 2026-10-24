@@ -22,6 +22,8 @@ object Fixtures {
 
     private val inseason = File(System.getProperty("fixtures"), "inseason")
 
+    fun attachedBody(): String = File(inseason, "leagues-attached.json").readText()
+
     fun syncBody(): String = File(inseason, "leagues-attached-$LEAGUE_ID.json").readText()
 
     /** The scoreboard's answer at a clock, its file named by the instant with dashes for colons. */
