@@ -21,10 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.trycommish.core.AppWords
 import app.trycommish.core.Format
 import app.trycommish.core.leaguehome.LeagueHomeModel
 import app.trycommish.core.leaguehome.LeagueHomeState
-import app.trycommish.core.leaguehome.LeagueHomeWords
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
 import app.trycommish.design.Mark
@@ -58,7 +58,7 @@ fun LeagueHomeScreen(
             LeagueHomeState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             is LeagueHomeState.Failed -> Failed(state.message)
             is LeagueHomeState.Loaded -> Loaded(state.model, stampText(state.stamp, state.stale, zone), onOpenLineup)
-            LeagueHomeState.SignedOut -> Failed(LeagueHomeWords.signedOut)
+            LeagueHomeState.SignedOut -> Failed(AppWords.signedOut)
         }
     }
 }
@@ -68,7 +68,7 @@ private fun stampText(
     stamp: Instant,
     stale: Boolean,
     zone: ZoneId,
-): String = "${if (stale) LeagueHomeWords.offline else LeagueHomeWords.read} ${Format.weekdayTime(stamp, zone)}"
+): String = "${if (stale) AppWords.offline else AppWords.read} ${Format.weekdayTime(stamp, zone)}"
 
 @Composable
 private fun Failed(message: String) {
