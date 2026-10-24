@@ -2,6 +2,7 @@ package app.trycommish.core.leaguehome
 
 import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.LeagueMove
+import app.trycommish.core.AppWords
 import app.trycommish.design.Words
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -31,7 +32,7 @@ class LeagueHomeModelTest {
         assertEquals("Sun 8:30 am", game.head)
         assertEquals(Words.LeagueHome.nextKickoff, game.words)
         assertEquals("", game.smallHead)
-        assertEquals(LeagueHomeWords.proj, game.bigHead)
+        assertEquals(Words.Box.proj, game.bigHead)
         assertEquals(listOf("74.7", "104.8"), game.sides.map { it.big })
         assertEquals(listOf(Stands.Level, Stands.Level), game.sides.map { it.stands })
     }
@@ -42,10 +43,10 @@ class LeagueHomeModelTest {
         val mine = games.first()
         assertTrue(mine.mine)
         assertEquals(GameState.KickedOff, mine.state)
-        assertEquals(LeagueHomeWords.kickedOff, mine.head)
+        assertEquals(Words.Box.kickedOff, mine.head)
         assertEquals("FFPC 4 min ago", mine.words)
-        assertEquals(LeagueHomeWords.projFinal, mine.smallHead)
-        assertEquals(LeagueHomeWords.pts, mine.bigHead)
+        assertEquals(Words.Box.projFinal, mine.smallHead)
+        assertEquals(Words.Box.pts, mine.bigHead)
         val (me, them) = mine.sides
         assertEquals(
             listOf("McConkey Kong Country", "1-4", "39.1", "73.2", "3 to play"),
@@ -55,7 +56,7 @@ class LeagueHomeModelTest {
         assertEquals(Stands.Behind, me.stands)
         assertEquals(Stands.Ahead, them.stands)
         assertEquals("121.2", them.small)
-        assertEquals(LeagueHomeWords.none, games[1].sides[0].small)
+        assertEquals(Words.Box.none, games[1].sides[0].small)
     }
 
     @Test
@@ -89,7 +90,7 @@ class LeagueHomeModelTest {
                 first.proj,
             ),
         )
-        assertEquals(LeagueHomeWords.none, standings.rows[3].proj)
+        assertEquals(Words.Box.none, standings.rows[3].proj)
         val me = standings.rows.last()
         assertTrue(me.me)
         assertEquals(listOf("567.0", "730.3", "$1,000", "73.2"), listOf(me.pointsFor, me.pointsAgainst, me.waiver, me.proj))
@@ -119,7 +120,7 @@ class LeagueHomeModelTest {
         assertEquals(10, lineup.starters.size)
         assertEquals(listOf("QB", "Aaron Rodgers", "PIT"), lineup.starters.first().let { listOf(it.position, it.name, it.club) })
         assertEquals(listOf("D/ST", "Minnesota Vikings"), lineup.starters.last().let { listOf(it.position, it.name) })
-        assertEquals("${LeagueHomeWords.bench}, 10 players", lineup.bench)
+        assertEquals("${Words.Box.bench}, 10 players", lineup.bench)
     }
 
     @Test
@@ -128,16 +129,16 @@ class LeagueHomeModelTest {
         val rows = requireNotNull(moves).rows
         assertEquals(15, rows.size)
         val first = rows.first()
-        assertEquals(listOf("Sun 11:44 am", LeagueHomeWords.freeAgent), listOf(first.whenText, first.kind))
+        assertEquals(listOf("Sun 11:44 am", Words.MoveKind.add), listOf(first.whenText, first.kind))
         assertEquals(listOf("McConkey Kong Country"), first.teams)
         assertTrue(first.mine)
         assertEquals("Roschon Johnson", first.adds.single().name)
         assertEquals(listOf("RB", "CHI"), first.adds.single().let { listOf(it.position, it.club) })
         assertEquals("George Holani", first.drops.single().name)
         val waiver = rows.last()
-        assertEquals(listOf("Wed 6:37 am", LeagueHomeWords.waiver, "FAAB $7"), listOf(waiver.whenText, waiver.kind, waiver.detail))
+        assertEquals(listOf("Wed 6:37 am", Words.MoveKind.waiver, "FAAB $7"), listOf(waiver.whenText, waiver.kind, waiver.detail))
         assertEquals("D/ST", waiver.adds.single().position)
-        val trade = rows.first { it.kind == LeagueHomeWords.trade }
+        val trade = rows.first { it.kind == Words.MoveKind.trade }
         assertEquals(listOf("Dad Runners", "thatmattkelley"), trade.teams)
         assertEquals(listOf("Dad Runners", "thatmattkelley"), trade.adds.map { it.to })
         assertTrue(trade.drops.isEmpty())
@@ -167,7 +168,7 @@ class LeagueHomeModelTest {
                 moves = sync.moves.mapIndexed { i, m -> if (i == 0) m.copy(kind = LeagueMove.Kind.unknown_default_open_api) else m },
             )
         val home = leagueHomeModel(newer, null, Fixtures.sunday, Fixtures.zone)
-        assertEquals(LeagueHomeWords.unknownPlatform, home.platform)
+        assertEquals(AppWords.unknownPlatform, home.platform)
         assertEquals(Words.LeagueHome.move, requireNotNull(home.moves).rows.first().kind)
     }
 }

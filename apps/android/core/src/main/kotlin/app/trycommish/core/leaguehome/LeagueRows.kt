@@ -17,7 +17,7 @@ import java.time.ZoneId
  * (standingsRows, waiverColumn, waiverCell, recordCell, standingsBasis, feedRows).
  */
 
-private fun figure(value: Double?): String = value?.let { Format.fixed(it) } ?: LeagueHomeWords.none
+private fun figure(value: Double?): String = value?.let { Format.fixed(it) } ?: Words.Box.none
 
 private fun waiverHead(terms: LeagueTerms): String? =
     when (terms.waivers) {
@@ -36,29 +36,19 @@ private fun waiverCell(
     return when {
         terms.waivers == LeagueTerms.Waivers.budget && budget != null -> "$${Format.count(budget)}"
         terms.waivers == LeagueTerms.Waivers.order && order != null -> Format.ordinal(order)
-        else -> LeagueHomeWords.none
+        else -> Words.Box.none
     }
 }
 
 /** What the standings' numbers are, said once: the order and its tiebreak, PF and PA, the streak, the
- * waiver column. */
+ * waiver column (home.ts standingsBasis, tiebreakWords and waiverBasis, built as the web builds them). */
 internal fun standingsBasis(sync: LeagueSync): String {
-    val platform = LeagueHomeWords.platform(sync.host)
+    val platform = ValueWords.platform(sync.host)
     val terms = sync.terms
-    val tiebreak = terms.tiebreak?.let(LeagueHomeWords::tiebreak)
-    val after =
-        tiebreak?.let { LeagueHomeWords.fill(LeagueHomeWords.thenTiebreak, "tiebreak" to it) }
-            ?: LeagueHomeWords.fill(LeagueHomeWords.thenPointsFor, "platform" to platform)
+    val after = terms.tiebreak?.let(ValueWords::tiebreak)?.let { "then $it" } ?: "then points for, as $platform lists them"
     val words = Words.LeagueHome
-    return LeagueHomeWords.fill(
-        LeagueHomeWords.standingsBasis,
-        "platform" to platform,
-        "after" to after,
-        "pf" to words.pointsFor,
-        "pa" to words.pointsAgainst,
-        "streak" to words.streak,
-        "waiver" to waiverBasis(platform, terms),
-    )
+    return "Standings follow $platform's record, $after. ${words.pointsFor} and ${words.pointsAgainst} are points for and against, " +
+        "${words.streak} the current run${waiverBasis(platform, terms)}."
 }
 
 private fun waiverBasis(
@@ -67,13 +57,13 @@ private fun waiverBasis(
 ): String =
     when (terms.waivers) {
         LeagueTerms.Waivers.budget -> {
-            val of = terms.waiverBudget?.let { LeagueHomeWords.fill(LeagueHomeWords.budgetOf, "amount" to "$${Format.count(it)}") }
-            LeagueHomeWords.fill(LeagueHomeWords.budgetBasis, "faab" to Words.LeagueHome.budget, "of" to of.orEmpty())
+            val of = terms.waiverBudget?.let { " of $${Format.count(it)}" }.orEmpty()
+            ", ${Words.LeagueHome.budget} the budget left$of"
         }
         LeagueTerms.Waivers.order -> {
-            val order = terms.waiverOrder?.let(LeagueHomeWords::waiverOrder)
+            val order = terms.waiverOrder?.let(ValueWords::waiverOrder)
             val how = order?.let { "$it, ${Words.LeagueHome.firstPicks}" } ?: Words.LeagueHome.firstPicks
-            LeagueHomeWords.fill(LeagueHomeWords.orderBasis, "order" to Words.LeagueHome.order, "platform" to platform, "how" to how)
+            ", ${Words.LeagueHome.order} the place in $platform's order ($how)"
         }
         else -> ""
     }
@@ -118,7 +108,7 @@ internal fun lineupSummary(sync: LeagueSync): LineupSummary {
         }
     val bench = sync.roster.count { it.slot == RosterSpot.Slot.bench }
     val reserve = sync.roster.count { it.slot == RosterSpot.Slot.reserve }
-    val benchWords = "${LeagueHomeWords.bench}, ${Format.plural(bench, LeagueHomeWords.player, LeagueHomeWords.players)}"
+    val benchWords = "${Words.Box.bench}, ${Format.plural(bench, "player", "players")}"
     return LineupSummary(
         team =
             sync.teams
@@ -126,7 +116,7 @@ internal fun lineupSummary(sync: LeagueSync): LineupSummary {
                 ?.name
                 .orEmpty(),
         starters = starters,
-        bench = if (reserve > 0) "$benchWords. ${LeagueHomeWords.reserve}, $reserve" else benchWords,
+        bench = if (reserve > 0) "$benchWords. ${Words.Box.reserve}, $reserve" else benchWords,
     )
 }
 
@@ -149,7 +139,7 @@ internal fun movesFeed(
             MoveRow(
                 key = "${move.at}-$i",
                 whenText = Format.weekdayTime(Instant.parse(move.at), zone),
-                kind = if (dropOnly) LeagueHomeWords.drop else LeagueHomeWords.kind(move.kind),
+                kind = if (dropOnly) Words.MoveKind.drop else ValueWords.moveKind(move.kind),
                 teams = move.rosterIds.map(nameOf),
                 mine = sync.me in move.rosterIds,
                 adds = move.adds.map(player(trade)),

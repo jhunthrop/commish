@@ -2,6 +2,7 @@ package app.trycommish.core.leaguehome
 
 import app.trycommish.api.Unauthorized
 import app.trycommish.api.models.LeaguePhase
+import app.trycommish.core.AppWords
 import app.trycommish.core.Cached
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
@@ -58,7 +59,7 @@ class LeagueChooserTest {
         runTest {
             val choice = LeagueChooser(Reads(body = null), MemoryCache(), clock).choose()
             assertEquals(LeagueChoice.Unreachable, choice)
-            assertEquals(LeagueHomeWords.cannotLoad, choice.message())
+            assertEquals(AppWords.cannotLoad, choice.message())
         }
 
     @Test
@@ -66,7 +67,7 @@ class LeagueChooserTest {
         runTest {
             val choice = LeagueChooser(Reads(body = """{"ok":true,"data":[],"error":null}"""), MemoryCache(), clock).choose()
             assertEquals(LeagueChoice.NoLeague, choice)
-            assertEquals(LeagueHomeWords.noLeague, choice.message())
+            assertEquals(AppWords.noLeague, choice.message())
         }
 
     @Test
@@ -75,6 +76,6 @@ class LeagueChooserTest {
             val cache = MemoryCache().apply { write(LeagueHomeKeys.ATTACHED, Cached(Fixtures.attachedBody(), Fixtures.week)) }
             val choice = LeagueChooser(Reads(unauthorized = true), cache, clock).choose()
             assertEquals(LeagueChoice.SignedOut, choice)
-            assertEquals(LeagueHomeWords.signedOut, choice.message())
+            assertEquals(AppWords.signedOut, choice.message())
         }
 }

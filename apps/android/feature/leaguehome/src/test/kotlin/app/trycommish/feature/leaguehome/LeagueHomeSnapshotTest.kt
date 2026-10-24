@@ -6,12 +6,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
+import app.trycommish.core.AppWords
 import app.trycommish.core.leaguehome.Fixtures
 import app.trycommish.core.leaguehome.LeagueHomeModel
 import app.trycommish.core.leaguehome.LeagueHomeState
-import app.trycommish.core.leaguehome.LeagueHomeWords
 import app.trycommish.core.leaguehome.leagueHomeModel
 import app.trycommish.design.CommishTheme
+import app.trycommish.design.Words
 import com.android.ide.common.rendering.api.SessionParams.RenderingMode
 import org.junit.Rule
 import org.junit.Test
@@ -85,14 +86,14 @@ class LeagueHomeSnapshotTest {
     @Test fun offlineSmallLight() =
         screen("offline-small", dark = false, state = fresh.copy(stamp = Instant.parse("2026-10-18T17:00:00Z"), stale = true))
 
-    @Test fun failedSmallLight() = screen("failed-small", dark = false, state = LeagueHomeState.Failed(LeagueHomeWords.cannotLoad))
+    @Test fun failedSmallLight() = screen("failed-small", dark = false, state = LeagueHomeState.Failed(AppWords.cannotLoad))
 
-    @Test fun failedSmallDark() = screen("failed-small", dark = true, state = LeagueHomeState.Failed(LeagueHomeWords.cannotLoad))
+    @Test fun failedSmallDark() = screen("failed-small", dark = true, state = LeagueHomeState.Failed(AppWords.cannotLoad))
 
     /** The feed's first eight moves, a trade among them, so the image stays under Paparazzi's scale. */
     private fun firstMoves() =
         requireNotNull(model.moves).let { feed ->
-            val trade = feed.rows.first { it.kind == LeagueHomeWords.trade }
+            val trade = feed.rows.first { it.kind == Words.MoveKind.trade }
             feed.copy(rows = (feed.rows.take(MOVES_SHOWN - 1) + trade).distinct())
         }
 
