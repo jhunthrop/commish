@@ -2,14 +2,22 @@
 /// tab bar's screens not live yet, the sign-in sheet, a read that failed with no saved answer). Every
 /// view reads its words from here, the generated web words or the ported ones, never a literal.
 public enum AppWords {
-    /// The phone's five in season, the web's names and order (web/src/lib/ui/rail-order.ts in_season,
-    /// nav.ts labels).
+    /// The phone bar's tabs, the web's rail labels (web/src/lib/ui/nav.ts, run/week-names.ts); which
+    /// five show is PhoneRail's, by the league's phase.
     public enum Tab {
         public static let league = "League"
         public static let lineup = "Lineup"
         public static let matchup = "Matchup"
         public static let waivers = "Waivers"
         public static let trades = "Trades"
+        public static let board = "Board"
+        public static let players = "Players"
+        public static let mock = "Mock draft"
+        public static let sheet = "Cheat sheet"
+        public static let advisor = "Advisor"
+        public static let rankings = "Rankings"
+        public static let restOfSeason = "Rest of season"
+        public static let record = "Our record"
     }
 
     /// web/src/lib/league/LeaguePage.svelte stampOf: a read whose latest try failed.

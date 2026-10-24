@@ -9,8 +9,7 @@ struct CommishApp: App {
     private let environment: AppEnvironment
     @State private var session: AppSession
     @State private var flow: SignInFlow
-    @State private var working = false
-    @State private var problem: String?
+    @State private var signIn = SignInModel()
 
     init() {
         let environment = AppEnvironment.live()
@@ -36,29 +35,36 @@ struct CommishApp: App {
         case .restoring:
             ProgressView()
         case .signedOut:
-            SignInView(working: working, problem: problem) {
-                problem = nil
-                working = true
-                flow.begin { link in Task { await finish(link) } }
+            SignInView(working: signIn.working, problem: signIn.problem) {
+                signIn.began()
+                flow.begin(
+                    returned: { link in Task { await finish(link) } },
+                    ended: { signIn.ended() }
+                )
             }
-        case let .signedIn(leagueID):
-            RootTabs(environment: environment, leagueID: leagueID) {
-                Task { await session.signOut() }
-            }
+        case let .signedIn(league):
+            RootTabs(
+                environment: environment,
+                league: league,
+                tabs: session.tabs,
+                signOut: { Task { await session.signOut() } },
+                expired: { Task { await session.expire() } }
+            )
         }
     }
 
     /// The return link, from the sheet or as a universal link: pair, then read the account.
     private func finish(_ link: URL) async {
-        defer { working = false }
         do {
             if try await flow.finish(link) {
+                signIn.finished(nil)
                 await session.restore()
+            } else {
+                // Not this flow's return (or no flow under way): the verb comes back.
+                signIn.ended()
             }
-        } catch let APIError.envelope(_, message) {
-            problem = message
         } catch {
-            problem = AppWords.Failure.signInFailed
+            signIn.finished(error)
         }
     }
 }

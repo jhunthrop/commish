@@ -30,7 +30,10 @@ struct CopyGuardTests {
     }
 
     @Test func noViewWritesAWordOfItsOwn() throws {
-        let literal = try NSRegularExpression(pattern: #"\b(Text|Label|Button|navigationTitle)\(\s*""#)
+        let literal =
+            try NSRegularExpression(
+                pattern: #"\b(Text|Label|Button|navigationTitle|Verb|QuietButton|BasisText|SectionHead|Pill)\(\s*""#
+            )
         for file in try Self.swiftFiles(under: ["Commish", "Packages/Features"]) {
             let source = try String(contentsOf: file, encoding: .utf8)
             let found = literal.firstMatch(in: source, range: NSRange(source.startIndex..., in: source))

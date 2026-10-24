@@ -6,8 +6,14 @@ import Security
 /// a test. The token is never logged and never leaves the store except as the bearer header.
 public protocol SessionStore: TokenSource {
     func deviceID() async -> String?
-    func save(token: String, deviceID: String) async
+    /// Throws when the store refused the write, so a sign-in never "succeeds" with no token kept.
+    func save(token: String, deviceID: String) async throws
     func clear() async
+}
+
+/// The Keychain refused a write, with its OSStatus.
+public struct KeychainError: Error, Equatable {
+    public let status: OSStatus
 }
 
 public actor MemorySessionStore: SessionStore {
@@ -49,9 +55,9 @@ public actor KeychainSessionStore: SessionStore {
         read("device")
     }
 
-    public func save(token: String, deviceID: String) async {
-        write("token", token)
-        write("device", deviceID)
+    public func save(token: String, deviceID: String) async throws {
+        try write("token", token)
+        try write("device", deviceID)
     }
 
     public func clear() async {
@@ -75,11 +81,17 @@ public actor KeychainSessionStore: SessionStore {
         return String(data: data, encoding: .utf8)
     }
 
-    private func write(_ account: String, _ value: String) {
-        SecItemDelete(query(account) as CFDictionary)
+    private func write(_ account: String, _ value: String) throws {
+        let removed = SecItemDelete(query(account) as CFDictionary)
+        guard removed == errSecSuccess || removed == errSecItemNotFound else {
+            throw KeychainError(status: removed)
+        }
         var item = query(account)
         item[kSecValueData] = Data(value.utf8)
         item[kSecAttrAccessible] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(item as CFDictionary, nil)
+        let added = SecItemAdd(item as CFDictionary, nil)
+        guard added == errSecSuccess else {
+            throw KeychainError(status: added)
+        }
     }
 }

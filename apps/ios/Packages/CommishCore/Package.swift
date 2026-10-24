@@ -6,11 +6,14 @@ import PackageDescription
 
 let package = Package(
     name: "CommishCore",
-    platforms: [.iOS(.v17), .macOS(.v14)],
+    platforms: [.iOS("17.4"), .macOS(.v14)],
     products: [.library(name: "CommishCore", targets: ["CommishCore"])],
     dependencies: [
         .package(path: "../CommishAPI"),
         .package(path: "../CommishDesign"),
+        // The tests drive the generated client over a transport of their own.
+        .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.8.0"),
+        .package(url: "https://github.com/apple/swift-http-types", from: "1.3.0"),
     ],
     targets: [
         .target(
@@ -20,6 +23,13 @@ let package = Package(
                 .product(name: "CommishDesign", package: "CommishDesign"),
             ]
         ),
-        .testTarget(name: "CommishCoreTests", dependencies: ["CommishCore"]),
+        .testTarget(
+            name: "CommishCoreTests",
+            dependencies: [
+                "CommishCore",
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+                .product(name: "HTTPTypes", package: "swift-http-types"),
+            ]
+        ),
     ]
 )

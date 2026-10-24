@@ -3,10 +3,11 @@ import CommishCore
 import UIKit
 
 /// Sign-in in the system browser sheet (ASWebAuthenticationSession): the API's login with the PKCE
-/// challenge, AuthKit, then the API's callback sends the sheet to the app link with the pairing code.
-/// On iOS 17.4 and later the sheet itself takes the https return (it needs the app associated with
-/// trycommish.app for web credentials); before it, the sheet's callback scheme is left empty and the
-/// return arrives as a universal link through `onOpenURL`. Either way it ends in `finish`.
+/// challenge, AuthKit, then the API's callback sends the sheet to the app link with the pairing code,
+/// which the sheet catches as its https return (iOS 17.4, the app holding web credentials for
+/// trycommish.app). A universal link to the same address arriving through `onOpenURL` ends it the
+/// same way. Every end calls back: the return link, or `ended` when the sheet closes, fails or never
+/// opens, so the screen's verb is never left disabled.
 @MainActor
 final class SignInFlow: NSObject, ASWebAuthenticationPresentationContextProviding {
     private let signIn: SignIn
@@ -19,30 +20,34 @@ final class SignInFlow: NSObject, ASWebAuthenticationPresentationContextProvidin
         self.base = base
     }
 
-    /// Opens the sheet; `returned` gets the return link when the sheet itself catches it.
-    func begin(returned: @escaping @MainActor @Sendable (URL) -> Void) {
+    func begin(
+        returned: @escaping @MainActor @Sendable (URL) -> Void,
+        ended: @escaping @MainActor @Sendable () -> Void
+    ) {
         let started = signIn.start(base: base)
         self.started = started
-        // Nonisolated: the system may call it off the main thread; it hops back with the link.
+        // Nonisolated: the system may call it off the main thread; it hops back.
         let completion: ASWebAuthenticationSession.CompletionHandler = { @Sendable url, _ in
-            // A cancelled sheet sends no link and nothing is said: the member is back where they were.
-            guard let url else {
-                return
+            Task { @MainActor in
+                if let url {
+                    returned(url)
+                } else {
+                    ended()
+                }
             }
-            Task { @MainActor in returned(url) }
         }
-        let session = if #available(iOS 17.4, *) {
-            ASWebAuthenticationSession(
-                url: started.url,
-                callback: .https(host: SignInRoute.returnTo.host() ?? "", path: SignInRoute.returnTo.path()),
-                completionHandler: completion
-            )
-        } else {
-            ASWebAuthenticationSession(url: started.url, callbackURLScheme: nil, completionHandler: completion)
-        }
+        let session = ASWebAuthenticationSession(
+            url: started.url,
+            callback: .https(host: SignInRoute.returnTo.host() ?? "", path: SignInRoute.returnTo.path()),
+            completionHandler: completion
+        )
         session.presentationContextProvider = self
-        session.start()
         sheet = session
+        if !session.start() {
+            self.started = nil
+            sheet = nil
+            ended()
+        }
     }
 
     /// Whether the link is this flow's return; when it is, pairs with the verifier held since `begin`.

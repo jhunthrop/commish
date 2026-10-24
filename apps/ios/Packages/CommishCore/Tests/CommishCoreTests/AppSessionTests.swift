@@ -7,6 +7,10 @@ import Testing
 /// sign-out that revokes this phone and forgets its token and its saved answers.
 @MainActor
 struct AppSessionTests {
+    nonisolated static func followed(_ id: String) -> FollowedLeague {
+        FollowedLeague(id: id, phase: .inSeason, waiversOpen: true)
+    }
+
     /// A defaults suite of the test's own, so no test reads another's last league.
     static func defaults() -> UserDefaults {
         UserDefaults(suiteName: "commish-tests-\(UUID().uuidString)")!
@@ -25,7 +29,7 @@ struct AppSessionTests {
 
     @Test func aTokenOpensTheFirstFollowedLeague() async {
         let store = MemorySessionStore()
-        await store.save(token: "t", deviceID: "d")
+        try await store.save(token: "t", deviceID: "d")
         let session = AppSession(
             account: StubAccount(leagues: [Fixtures.league, "other"]),
             store: store,
@@ -33,12 +37,12 @@ struct AppSessionTests {
             defaults: Self.defaults()
         )
         await session.restore()
-        #expect(session.state == .signedIn(leagueID: Fixtures.league))
+        #expect(session.state == .signedIn(league: Self.followed(Fixtures.league)))
     }
 
     @Test func noFollowedLeagueSaysWhereToFollowOne() async {
         let store = MemorySessionStore()
-        await store.save(token: "t", deviceID: "d")
+        try await store.save(token: "t", deviceID: "d")
         let session = AppSession(
             account: StubAccount(leagues: []),
             store: store,
@@ -46,12 +50,13 @@ struct AppSessionTests {
             defaults: Self.defaults()
         )
         await session.restore()
-        #expect(session.state == .signedIn(leagueID: nil))
+        #expect(session.state == .signedIn(league: nil))
+        #expect(session.tabs == PhoneRail.withoutLeague)
     }
 
     @Test func aRevokedTokenSignsOut() async {
         let store = MemorySessionStore()
-        await store.save(token: "t", deviceID: "d")
+        try await store.save(token: "t", deviceID: "d")
         let session = AppSession(
             account: StubAccount(error: APIError.status(401)),
             store: store,
@@ -65,7 +70,7 @@ struct AppSessionTests {
 
     @Test func signingOutRevokesThisPhoneAndForgetsIt() async {
         let store = MemorySessionStore()
-        await store.save(token: "t", deviceID: "d-9")
+        try await store.save(token: "t", deviceID: "d-9")
         let account = StubAccount(leagues: [Fixtures.league])
         let session = AppSession(account: account, store: store, cache: NullCache(), defaults: Self.defaults())
         await session.restore()
@@ -86,11 +91,11 @@ actor StubAccount: AccountAPI {
         self.error = error
     }
 
-    func attachedLeagueIDs() async throws -> [String] {
+    func followedLeagues() async throws -> [FollowedLeague] {
         if let error {
             throw error
         }
-        return leagues
+        return leagues.map(AppSessionTests.followed)
     }
 
     func revokeDevice(id: String) async throws {

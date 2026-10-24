@@ -73,7 +73,7 @@ struct SignInTests {
 
     @Test func signingOutForgetsTheToken() async {
         let store = MemorySessionStore()
-        await store.save(token: "t", deviceID: "d")
+        try await store.save(token: "t", deviceID: "d")
         await store.clear()
         #expect(await store.token() == nil)
     }

@@ -1,18 +1,17 @@
 import CommishAPI
 import CryptoKit
 import Foundation
+import Security
 
 /// PKCE (RFC 7636): the app makes a verifier, sends its S256 challenge on `/auth/login`, holds the
 /// verifier in memory for the one flow and sends it on `/devices/pair`, so a pairing code caught on its
 /// way back to the phone opens nothing without it.
 public enum PKCE {
-    /// 32 random bytes as base64url: 43 characters.
+    /// 32 bytes from the system's secure random source as base64url: 43 characters.
     public static func verifier() -> String {
         var bytes = [UInt8](repeating: 0, count: 32)
-        var generator = SystemRandomNumberGenerator()
-        for index in bytes.indices {
-            bytes[index] = UInt8.random(in: .min ... .max, using: &generator)
-        }
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        precondition(status == errSecSuccess, "The system's secure random source failed: \(status)")
         return base64URL(Data(bytes))
     }
 
@@ -105,6 +104,6 @@ public struct SignIn: Sendable {
         let paired = try await pairing.pair(
             PairInput(code: code, name: deviceName, kind: .ios, codeVerifier: started.verifier)
         )
-        await store.save(token: paired.token, deviceID: paired.deviceID)
+        try await store.save(token: paired.token, deviceID: paired.deviceID)
     }
 }

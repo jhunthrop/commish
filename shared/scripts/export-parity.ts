@@ -31,10 +31,16 @@ import {
 } from '../../web/src/lib/league/home/home.ts';
 import { leagueWeekParts, weekBasisText } from '../../web/src/lib/league/home/week-basis.ts';
 import type { LeagueSync } from '../../web/src/lib/league/api.ts';
+import { LEAGUE_PHASES, PHONE_RAIL_ITEMS } from '../../web/src/lib/ui/nav.ts';
+import { RAIL_WITHOUT_LEAGUE, railFor } from '../../web/src/lib/ui/rail-order.ts';
+import { railItemLabel } from '../../web/src/lib/run/week-names.ts';
 import type { Scoreboard } from '../../web/src/lib/league/inseason/api.ts';
 
 const SCRIPT = 'shared/scripts/export-parity.ts';
 export const OUTPUT = 'shared/fixtures/parity/league-home.json';
+export const RAIL_OUTPUT = 'shared/fixtures/parity/phone-rail.json';
+/** A week the season has named: the in-season rails' week item says Rankings then. */
+const NAMED_WEEK = 7;
 const INSEASON = 'shared/fixtures/inseason';
 const LEAGUE = '6f1d1c52-2626-4a26-9a26-000000000026';
 /** The fixture's zone: its clocks are named on Central time (shared/fixtures/README.md). */
@@ -146,6 +152,41 @@ export function renderParity(sync: LeagueSync, boards: ReadonlyMap<string, Score
 	return `${JSON.stringify(parity, null, '\t')}\n`;
 }
 
+interface PhoneItem {
+	key: string;
+	label: string;
+}
+
+const phoneFive = (
+	items: readonly { key: string; label: string; wideOnly: boolean }[]
+): PhoneItem[] =>
+	items
+		.filter((item) => !item.wideOnly)
+		.slice(0, PHONE_RAIL_ITEMS)
+		.map((item) => ({ key: item.key, label: railItemLabel(item, NAMED_WEEK) }));
+
+/** The phone's bottom bar for each phase of a followed league (web/src/lib/ui/rail-order.ts railFor),
+ * the playoffs with waivers open and closed, and the bar with no league followed, as the web draws
+ * them with the season's week named. The apps' bars are held to it. */
+export function renderRail(): string {
+	const phases = Object.fromEntries(
+		LEAGUE_PHASES.flatMap((phase) =>
+			phase === 'playoffs'
+				? [
+						['playoffs', phoneFive(railFor(phase, false))],
+						['playoffs_waivers', phoneFive(railFor(phase, true))]
+					]
+				: [[phase, phoneFive(railFor(phase, true))]]
+		)
+	);
+	const rail = {
+		about: generatedBy(SCRIPT, 'web/src/lib/ui/rail-order.ts'),
+		phases,
+		withoutLeague: phoneFive(RAIL_WITHOUT_LEAGUE)
+	};
+	return `${JSON.stringify(rail, null, '\t')}\n`;
+}
+
 async function answer<T>(file: string): Promise<T> {
 	const text = await readFile(join(REPOSITORY, INSEASON, file), 'utf8');
 	return (JSON.parse(text) as { data: T }).data;
@@ -156,7 +197,10 @@ export async function generate(): Promise<Outputs> {
 	const boards = new Map<string, Scoreboard>();
 	for (const clock of CLOCKS)
 		boards.set(clock, await answer<Scoreboard>(`scoreboard-${LEAGUE}-${clock}.json`));
-	return new Map([[OUTPUT, renderParity(sync, boards)]]);
+	return new Map([
+		[OUTPUT, renderParity(sync, boards)],
+		[RAIL_OUTPUT, renderRail()]
+	]);
 }
 
 if (import.meta.main) await writeOutputs(await generate());

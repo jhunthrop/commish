@@ -11,10 +11,19 @@ public final class AppSession {
         case restoring
         case signedOut
         /// Signed in; nil while the account follows no league.
-        case signedIn(leagueID: String?)
+        case signedIn(league: FollowedLeague?)
     }
 
     public private(set) var state: State = .restoring
+
+    /// The phone's five for the league shown: by its phase as the web's bar, or with no league the
+    /// bar for none (PhoneRail).
+    public var tabs: [RailTab] {
+        guard case let .signedIn(league) = state else {
+            return []
+        }
+        return league.map { PhoneRail.tabs(phase: $0.phase, waiversOpen: $0.waiversOpen) } ?? PhoneRail.withoutLeague
+    }
 
     private let account: any AccountAPI
     private let store: any SessionStore
@@ -38,14 +47,15 @@ public final class AppSession {
             return
         }
         do {
-            state = try await .signedIn(leagueID: account.attachedLeagueIDs().first)
-        } catch APIError.status(401), APIError.envelope(code: "unauthorized", _) {
-            await forget()
+            state = try await .signedIn(league: account.followedLeagues().first)
+        } catch where APIError.signsOut(error) {
+            await expire()
         } catch {
-            state = .signedIn(leagueID: lastLeague)
+            // No signal: the league last opened, on its saved home, its phase unread (in season).
+            state = .signedIn(league: lastLeague.map { FollowedLeague(id: $0, phase: nil, waiversOpen: true) })
         }
-        if case let .signedIn(leagueID?) = state {
-            lastLeague = leagueID
+        if case let .signedIn(league?) = state {
+            lastLeague = league.id
         }
     }
 
@@ -55,10 +65,12 @@ public final class AppSession {
         if let device = await store.deviceID() {
             try? await account.revokeDevice(id: device)
         }
-        await forget()
+        await expire()
     }
 
-    private func forget() async {
+    /// The API refused the token (a signed-in read answered 401): forget it and the saved answers, and
+    /// show sign-in. Nothing to revoke: the API already holds the token as dead.
+    public func expire() async {
         await store.clear()
         await cache.clear()
         lastLeague = nil

@@ -8,6 +8,14 @@ public enum APIError: Error, Equatable, Sendable {
     case status(Int)
     /// The body held neither a payload nor an error.
     case emptyEnvelope
+
+    /// The API refused the device token: it lapsed with its session, or the phone was unpaired.
+    public static func signsOut(_ error: any Error) -> Bool {
+        switch error {
+        case APIError.status(401), APIError.envelope(code: "unauthorized", _): true
+        default: false
+        }
+    }
 }
 
 /// Reads the API's envelope (`ok`, `data`, `error`, `request_id`) the way the generated client does:
