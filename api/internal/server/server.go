@@ -50,18 +50,22 @@ type Sessions interface {
 	Middleware(next http.Handler) http.Handler
 }
 
-// Devices is what Mount needs from auth.Bearer: a rate key read from
-// the token alone, and the middleware that resolves the device.
+// Devices is what Mount needs from auth.Bearer: rate keys read from the
+// token alone, the middleware that resolves the device on a device
+// route, and the app's way onto a session route (the session scope).
 type Devices interface {
 	RateKey(r *http.Request) string
+	TokenKey(r *http.Request) (string, bool)
 	Require(scope auth.Scope) httpx.Middleware
+	SessionOr(signedIn, cookie http.Handler) http.Handler
 }
 
 // Mount registers routes on mux. Each route runs, in order: its name
 // for the access log and the metrics, its rate limit, then the session
-// lookup, then the session requirement. The limit comes before the
-// lookup, so a flood costs no database read: its key is read from the
-// sealed cookie alone (or the address), never from the sessions table.
+// lookup (an app's device token, else the cookie), then the session
+// requirement. The limit comes before the lookup, so a flood costs no
+// database read: its key is read from the token or the sealed cookie
+// alone (or the address), never from a table.
 // A route without a limit is a programming error and refuses to mount,
 // so no endpoint ships unlimited, and so is a device route without a
 // scope or without devices to resolve it.
@@ -77,10 +81,20 @@ func Mount(mux *http.ServeMux, routes []httpx.Route, sessions Sessions, devices 
 		if rt.Access == httpx.SignedIn {
 			h = auth.RequireSession(h)
 		}
-		if rt.Access.ResolvesSession() {
-			h = sessions.Middleware(h)
-		}
 		rateKey := sessions.RateKey
+		if rt.Access.ResolvesSession() {
+			cookie := sessions.Middleware(h)
+			h = cookie
+			if devices != nil {
+				h = devices.SessionOr(h, cookie)
+			}
+			// Only a SignedIn route is keyed by the token: a public route
+			// (pairing, sign-in) stays on the address or cookie, so a
+			// handful of old tokens buys no extra guesses there.
+			if devices != nil && rt.Access == httpx.SignedIn {
+				rateKey = tokenOr(devices, sessions)
+			}
+		}
 		if rt.Access == httpx.Device {
 			h = devices.Require(auth.Scope(rt.Scope))(h)
 			rateKey = devices.RateKey
@@ -90,6 +104,18 @@ func Mount(mux *http.ServeMux, routes []httpx.Route, sessions Sessions, devices 
 		mux.Handle(rt.Pattern(), h)
 	}
 	return nil
+}
+
+// tokenOr keys a session route by the device token when one is sent, so
+// an app behind a shared address is not limited by its neighbours, and
+// by the cookie or the address otherwise.
+func tokenOr(devices Devices, sessions Sessions) func(*http.Request) string {
+	return func(r *http.Request) string {
+		if key, ok := devices.TokenKey(r); ok {
+			return key
+		}
+		return sessions.RateKey(r)
+	}
 }
 
 // Health is liveness, readiness and the catch-all 404.
