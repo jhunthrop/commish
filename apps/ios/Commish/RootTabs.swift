@@ -14,7 +14,7 @@ struct RootTabs: View {
     let tabs: [RailTab]
     let signOut: () -> Void
     /// The API refused the token on a signed-in read: the app signs out and shows sign-in.
-    let expired: () -> Void
+    let expired: @MainActor () -> Void
 
     var body: some View {
         TabView(selection: $selection) {
@@ -68,7 +68,7 @@ private struct LeagueScreen: View {
     init(
         environment: AppEnvironment,
         leagueID: String,
-        expired: @escaping () -> Void,
+        expired: @escaping @MainActor () -> Void,
         openLineup: @escaping () -> Void
     ) {
         _viewModel = State(initialValue: LeagueHomeViewModel(
