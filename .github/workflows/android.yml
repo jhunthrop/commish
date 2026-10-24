@@ -1,0 +1,105 @@
+# .github/workflows/android.yml
+# The Android app (apps/android, Lane 174): the files generated from the web (the mark, the window
+# colours, the phone bar and its glyphs) against the web, ktlint,
+# Android lint, the unit tests (the League home against shared/fixtures with a fixed clock, the
+# client against the fixtures, the copy guard), the Paparazzi snapshots against the committed images,
+# and a debug build. On main, with the Play service account and the upload key in the repository's
+# secrets, Fastlane sends the signed bundle to Play's internal track; without them that step is
+# skipped by name and the run stays green.
+name: android
+
+on:
+  # Every branch, so a lane's push runs it with no pull request; the paths keep it to the app's inputs.
+  push:
+    paths:
+      - "apps/android/**"
+      - "shared/**"
+      - "api/openapi.yaml"
+      - "web/src/lib/ui/mark.ts"
+      - "web/src/lib/ui/nav.ts"
+      - "web/src/lib/ui/rail-order.ts"
+      - "web/src/lib/ui/rail-icons.ts"
+      - "web/src/lib/ui/icons.ts"
+      - "web/src/lib/site/app-manifest.ts"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "apps/android/**"
+      - "shared/**"
+      - "api/openapi.yaml"
+      - "web/src/lib/ui/mark.ts"
+      - "web/src/lib/ui/nav.ts"
+      - "web/src/lib/ui/rail-order.ts"
+      - "web/src/lib/ui/rail-icons.ts"
+      - "web/src/lib/ui/icons.ts"
+      - "web/src/lib/site/app-manifest.ts"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/android
+    # The Play key and the upload keystore are never in the job's environment: one step says whether
+    # they exist, and only the upload step reads them.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with: { distribution: temurin, java-version: "17" }
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      # 24: the script runs as TypeScript and imports the web's mark, rail and manifest modules, which use no packages.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 24 }
+
+      - name: The files generated from the web match it
+        run: node scripts/web-shell.ts --check
+
+      - name: Lint, unit tests, snapshots, debug build
+        run: ./gradlew ktlintCheck lint testDebugUnitTest verifyPaparazziDebug assembleDebug --continue
+
+      - name: Keep the reports and the snapshot diffs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-reports
+          path: |
+            apps/android/**/build/reports/
+            apps/android/**/build/paparazzi/failures/
+          retention-days: 7
+
+      - name: Whether the Play key and the upload keystore are present
+        id: play
+        run: echo "has_key=${{ secrets.PLAY_JSON_KEY != '' && secrets.ANDROID_KEYSTORE_BASE64 != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Play internal (skipped, no PLAY_JSON_KEY or upload key secret)
+        if: github.ref == 'refs/heads/main' && steps.play.outputs.has_key != 'true'
+        run: echo "The Play service account or the upload key is not in the repository's secrets yet, so nothing is uploaded."
+
+      - uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1.335.0
+        if: github.ref == 'refs/heads/main' && steps.play.outputs.has_key == 'true'
+        with: { ruby-version: "3.3" }
+
+      - name: Upload to Play internal
+        if: github.ref == 'refs/heads/main' && steps.play.outputs.has_key == 'true'
+        env:
+          PLAY_JSON_KEY: ${{ secrets.PLAY_JSON_KEY }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/upload.jks"
+          gem install fastlane --no-document
+          fastlane internal

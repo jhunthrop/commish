@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app's name. The bar's labels are the web's (Rail.generated.kt), every screen's words live in
+     its word table (Words, LeagueHomeWords, SignInWords); the copy guard (CopyGuardTest) reads this
+     file and those tables. -->
+<resources>
+    <string name="app_name">Commish</string>
+</resources>
