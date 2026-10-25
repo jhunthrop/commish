@@ -16,6 +16,7 @@
 	import { noReadWords, shownWeekRead, weekReadLabel } from '#lib/player/week-read.ts';
 	import { cliffAt, lineFiguresAt, matesAt } from '#lib/player/live-figures.ts';
 	import { builtTiles, cardSource } from '#lib/player/card-source.ts';
+	import { PLAYER_PAGE } from '#lib/player/page-words.ts';
 	import PlayerCard from '#lib/player/PlayerCard.svelte';
 	import type PlayerCompare from '#lib/player/PlayerCompare.svelte';
 	import Credit from '#lib/site/Credit.svelte';
@@ -291,12 +292,12 @@
 					{/snippet}
 					{lead.words.drafters}
 				</Fact>
-				<Fact label="Over replacement" heat={heatFor(n.vor, n.vorRound)}>
+				<Fact label={PLAYER_PAGE.overReplacement} heat={heatFor(n.vor, n.vorRound)}>
 					{#snippet value()}<Figure value={signed(n.vor)} /><span>{unit}</span>{/snippet}
 					{lead.words.value}
 				</Fact>
 				{#if n.floor !== null && n.median !== null && n.ceiling !== null}
-					<Fact label="Floor, median, ceiling">
+					<Fact label={PLAYER_PAGE.outcomes}>
 						{#snippet value()}
 							<span class="bar"
 								><OutcomeBar
@@ -306,8 +307,7 @@
 								/></span
 							>
 						{/snippet}
-						{season}
-						{scoring} points, from his low case to his high case
+						{PLAYER_PAGE.outcomesCaption(season, scoring)}
 					</Fact>
 				{/if}
 			</section>
@@ -370,7 +370,7 @@
 						{ label: 'Format' },
 						{ label: 'Our rank', align: 'end' },
 						{ label: live?.formats?.head ?? page.pointsHead, align: 'end' },
-						{ label: 'Over replacement', align: 'end' },
+						{ label: PLAYER_PAGE.overReplacement, align: 'end' },
 						{ label: 'Tier', align: 'end' }
 					]}
 				>

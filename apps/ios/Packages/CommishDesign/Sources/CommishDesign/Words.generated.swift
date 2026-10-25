@@ -366,4 +366,31 @@ public enum Words {
     public enum Bye {
         public static let done = "Done"
     }
+
+    public enum HeldPage {
+        public static let log = "His game log is not written yet."
+        public static let basis = "His figures are the board's. His game log and our read of him are not written yet."
+    }
+
+    public enum WeekTile {
+        public static let published = "published projection"
+        public static let sinceEarlier = "since the earlier read"
+        public static let underShown = "Moved under 0.5 since the earlier read"
+        public static let sinceRead = "since our read was written"
+        public static let underShownRead = "Moved under 0.5 since our read was written"
+        public static let notInRead = "Not in our read"
+        public static let changePart = "Proj change is its move since the earlier read, shown from 0.5."
+        public static let changePartRead = "Proj change is its move since our read was written, shown from 0.5; the read is withheld from the same move."
+    }
+
+    public enum PlayerPage {
+        public static let overReplacement = "Over replacement"
+        public static let outcomes = "Floor, median, ceiling"
+    }
+
+    public enum ReadFigures {
+        public static let preseasonProjection = "Preseason projection"
+        public static let preseasonTiers = "Preseason tiers"
+        public static let restOfSeason = "Rest of season"
+    }
 }

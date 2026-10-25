@@ -1,0 +1,7 @@
+{
+	"overReplacement": "Over replacement",
+	"outcomes": "Floor, median, ceiling",
+	"functions": [
+		"outcomesCaption"
+	]
+}

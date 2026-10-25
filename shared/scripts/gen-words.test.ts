@@ -119,7 +119,11 @@ void test("the tables: the League home's, the box score's, then the shell's and 
 			'Tier',
 			'TierGroup',
 			'RunStamp',
-			'Bye'
+			'Bye',
+			'HeldPage',
+			'WeekTile',
+			'PlayerPage',
+			'ReadFigures'
 		]
 	);
 	assert.equal(new Set(TABLES.map((t) => t.json)).size, TABLES.length);
@@ -148,6 +152,11 @@ void test("the web's own words land in the JSON, the Swift and the Kotlin", asyn
 		/^Gap, drafters' ADP less our rank/
 	);
 	assert.equal(json('shared/words/player-card.json').none, '--');
+	assert.equal(json('shared/words/player-held.json').log, 'His game log is not written yet.');
+	assert.equal(json('shared/words/player-week-tile.json').sinceRead, 'since our read was written');
+	assert.deepEqual(json('shared/words/player-week-tile.json').functions, ['atRead']);
+	assert.equal(json('shared/words/player-page.json').outcomes, 'Floor, median, ceiling');
+	assert.equal(json('shared/words/player-read-figures.json').preseasonTiers, 'Preseason tiers');
 	const swift = outputs.get(OUTPUT.swift) ?? '';
 	const kotlin = outputs.get(OUTPUT.kotlin) ?? '';
 	assert.match(

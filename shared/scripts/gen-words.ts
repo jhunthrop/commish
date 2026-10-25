@@ -46,7 +46,9 @@ const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
  * screens' lines, a status in words and in a rank's few characters, and the figures' heads; then the
  * Matchup's (Lane 183): the words beside its box scores; then the Board's (Lane 182): its chips and heads,
  * its formats' chips, the Gap's definition, and the season pages' verbs; then the run's board on the Board
- * (Lane 190): a tier band's words, what its count counts, the run's stamp and a past bye's word. */
+ * (Lane 190): a tier band's words, what its count counts, the run's stamp and a past bye's word; then the
+ * player sheet's and page's (Lane 192): a held page's words, the week tile's, the page's facts and the
+ * read's figures' labels. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -54,7 +56,12 @@ export const TABLES: readonly TableSource[] = [
 		picks: ['HOME'],
 		json: 'shared/words/league-home.json'
 	},
-	{ name: 'Box', module: BOX_MODULE, picks: ['BOX'], json: 'shared/words/league-box.json' },
+	{
+		name: 'Box',
+		module: BOX_MODULE,
+		picks: ['BOX'],
+		json: 'shared/words/league-box.json'
+	},
 	{
 		name: 'BoxFormat',
 		module: BOX_MODULE,
@@ -246,6 +253,34 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/format/bye.ts',
 		picks: ['BYE_WORDS'],
 		json: 'shared/words/bye.json'
+	},
+	{
+		name: 'HeldPage',
+		module: 'web/src/lib/player/held-words.ts',
+		picks: ['HELD_PAGE_WORDS'],
+		json: 'shared/words/player-held.json'
+	},
+	{
+		name: 'WeekTile',
+		module: 'web/src/lib/player/week-words.ts',
+		picks: ['WEEK_TILE'],
+		json: 'shared/words/player-week-tile.json'
+	},
+	{
+		name: 'PlayerPage',
+		module: 'web/src/lib/player/page-words.ts',
+		picks: ['PLAYER_PAGE'],
+		json: 'shared/words/player-page.json'
+	},
+	{
+		name: 'ReadFigures',
+		module: 'web/src/lib/run/read-figures.ts',
+		picks: [
+			['preseasonProjection', 'PRESEASON_PROJECTION'],
+			['preseasonTiers', 'PRESEASON_TIERS'],
+			['restOfSeason', 'REST_OF_SEASON']
+		],
+		json: 'shared/words/player-read-figures.json'
 	}
 ];
 export const OUTPUT = {
@@ -287,15 +322,23 @@ function split(table: WordTable, name: string): Split {
 /** One table's JSON: each string by its key, then the function members' names. */
 export function renderTable(table: WordTable, name: string): { json: string } {
 	const { strings, functions } = split(table, name);
-	return { json: `${JSON.stringify({ ...Object.fromEntries(strings), functions }, null, '\t')}\n` };
+	return {
+		json: `${JSON.stringify({ ...Object.fromEntries(strings), functions }, null, '\t')}\n`
+	};
 }
 
 const swiftKey = (key: string): string => (SWIFT_KEYWORDS.has(key) ? `\`${key}\`` : key);
 const kotlinKey = (key: string): string => (KOTLIN_KEYWORDS.has(key) ? `\`${key}\`` : key);
 
 /** Every table into one Swift file and one Kotlin file. */
-export function renderWords(tables: readonly NamedTable[]): { swift: string; kotlin: string } {
-	const parts = tables.map(({ name, table }) => ({ name, ...split(table, name) }));
+export function renderWords(tables: readonly NamedTable[]): {
+	swift: string;
+	kotlin: string;
+} {
+	const parts = tables.map(({ name, table }) => ({
+		name,
+		...split(table, name)
+	}));
 	const swift = parts
 		.map(
 			({ name, strings }) =>
@@ -370,7 +413,10 @@ export function gather(
 
 async function readTable(source: TableSource): Promise<NamedTable> {
 	const module = (await import(join(REPOSITORY, source.module))) as Record<string, unknown>;
-	return { name: source.name, table: gather(module, source.picks, source.module) };
+	return {
+		name: source.name,
+		table: gather(module, source.picks, source.module)
+	};
 }
 
 export async function generate(): Promise<Outputs> {
