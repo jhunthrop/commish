@@ -14,6 +14,8 @@ junit5 = "5.11.3"
 junit4 = "4.13.2"
 android-junit5 = "1.11.2.0"
 paparazzi = "1.3.5"
+# Compose tests on the JVM (Lane 197): the sheet's composable wiring, with no device.
+robolectric = "4.14.1"
 openapi-generator = "7.10.0"
 ktlint-gradle = "12.1.2"
 # The image loader faces draw through (Lane 195), pinned: Compose and OkHttp, as the API client uses.
@@ -27,6 +29,9 @@ compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview"
 compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 compose-foundation = { module = "androidx.compose.foundation:foundation" }
 compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
 lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel", version.ref = "lifecycle" }
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
