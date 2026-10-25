@@ -3,15 +3,10 @@ package app.trycommish.feature.start
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -130,14 +125,16 @@ private fun MovePanelView(
     Row(
         Modifier
             .fillMaxWidth()
-            .height(IntrinsicSize.Min)
             .clip(shape)
             .background(c.surface)
+            .edgeRule(if (panel.tone == MovePanel.Tone.Problem) c.lossInk else c.accent, PANEL_EDGE)
             .border(1.dp, c.line, shape)
             .semantics { contentDescription = Words.Move.title },
     ) {
-        Box(Modifier.width(PANEL_EDGE).fillMaxHeight().background(if (panel.tone == MovePanel.Tone.Problem) c.lossInk else c.accent))
-        Column(Modifier.padding(Tokens.Space.s4.dp), verticalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp)) {
+        Column(
+            Modifier.padding(Tokens.Space.s4.dp).padding(start = PANEL_EDGE),
+            verticalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp),
+        ) {
             Text(
                 panel.line,
                 style = Faces.body.copy(fontWeight = if (panel.tone == MovePanel.Tone.Quiet) FontWeight.Normal else FontWeight.SemiBold),

@@ -93,6 +93,7 @@ internal fun StartPage(
     openRecord: () -> Unit,
     parts: List<StartPart>,
     modifier: Modifier = Modifier,
+    chipShown: (key: String, whole: Boolean) -> Unit = { _, _ -> },
 ) {
     Column(
         modifier.background(CommishTheme.colors.bg).padding(horizontal = Tokens.Space.s3.dp, vertical = Tokens.Space.s4.dp),
@@ -101,7 +102,7 @@ internal fun StartPage(
         parts.forEach { part ->
             when (part) {
                 StartPart.Lineup -> {
-                    Strip(model, stamp, openRecord)
+                    Strip(model, stamp, openRecord, chipShown)
                     LineupTable(model, actions)
                 }
                 StartPart.Bench -> {

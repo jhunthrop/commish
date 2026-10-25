@@ -22,12 +22,14 @@ import app.trycommish.core.start.MoveStep
 import app.trycommish.core.start.StartFixtures
 import app.trycommish.core.start.StartState
 import app.trycommish.core.start.StartUi
+import app.trycommish.core.start.StripChip
 import app.trycommish.core.start.startModel
 import app.trycommish.core.start.startPin
 import app.trycommish.core.start.startStamp
 import app.trycommish.design.CommishTheme
 import com.android.ide.common.rendering.api.SessionParams.RenderingMode
 import com.android.resources.Density
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -96,10 +98,21 @@ class StartSnapshotTest(
     @Test
     fun start() {
         val mode = if (part == Part.Lineup || part == Part.Bench) RenderingMode.V_SCROLL else RenderingMode.SHRINK
+        val shown = mutableMapOf<String, Boolean>()
         paparazzi.unsafeUpdateConfig(deviceConfig = phone.config, renderingMode = mode)
         paparazzi.snapshot(name = "start-${scene.id}-${part.id}-${phone.id}-${if (dark) "dark" else "light"}") {
-            CommishTheme(dark = dark) { Mock(scene, part, phone) }
+            CommishTheme(dark = dark) { Mock(scene, part, phone) { key, whole -> shown[key] = whole } }
         }
+        if (part == Part.Phone || part == Part.Lineup) everyChipIsDrawnWhole(shown)
+    }
+
+    /** The strip draws every chip the model holds, each whole: a swap the verb makes is never hidden by the
+     * strip's own height (Lane 181 review H1, the D/ST chip clipped under "Three changes"). */
+    private fun everyChipIsDrawnWhole(shown: Map<String, Boolean>) {
+        val chips = startModel(adviceOf(scene), leagueOf(scene), StartFixtures.instant(scene.clock), Fixtures.zone).chips
+        assertEquals(chips.map { it.key }.toSet(), shown.keys)
+        assertEquals(chips.count { it is StripChip.SwapChip }, chips.count { it is StripChip.SwapChip && shown[it.key] == true })
+        assertEquals(emptyList<String>(), shown.filterValues { !it }.keys.toList())
     }
 
     companion object {
@@ -136,11 +149,14 @@ private const val ESPN_PAGE = "https://fantasy.espn.com/football/team"
 
 /** The screen's state at a scene, as the view model holds it: loaded at the scene's clock, a saved read
  * (read at the scene's clock, shown with no signal since), or the move at one of its steps. */
+private fun leagueOf(scene: StartSnapshotTest.Scene): LeagueHost = if (scene.writes) LeagueHost.espn else LeagueHost.ffpc
+
+private fun adviceOf(scene: StartSnapshotTest.Scene) =
+    if (scene.writes) StartFixtures.writes(scene.clock) else StartFixtures.lineup(scene.clock)
+
 private fun uiOf(scene: StartSnapshotTest.Scene): StartUi {
-    val league = if (scene.writes) LeagueHost.espn else LeagueHost.ffpc
-    val advice = if (scene.writes) StartFixtures.writes(scene.clock) else StartFixtures.lineup(scene.clock)
     val now = StartFixtures.instant(scene.clock)
-    val model = startModel(advice, league, now, Fixtures.zone)
+    val model = startModel(adviceOf(scene), leagueOf(scene), now, Fixtures.zone)
     val loaded = StartState.Loaded(model, now, stale = scene == StartSnapshotTest.Scene.Stale)
     return StartUi(state = loaded, step = stepOf(scene))
 }
@@ -181,6 +197,7 @@ private fun Mock(
     scene: StartSnapshotTest.Scene,
     part: StartSnapshotTest.Part,
     phone: StartSnapshotTest.Phone,
+    chipShown: (String, Boolean) -> Unit,
 ) {
     val ui = uiOf(scene)
     val loaded = ui.state as StartState.Loaded
@@ -199,11 +216,12 @@ private fun Mock(
                         {},
                         listOf(StartPart.Lineup),
                         Modifier.wrapContentHeight(Alignment.Top, unbounded = true),
+                        chipShown,
                     )
                 }
                 if (!pin.isEmpty) Pin(pin, PinActions())
             }
-        StartSnapshotTest.Part.Lineup -> StartPage(loaded.model, stamp, rows, {}, listOf(StartPart.Lineup), bg)
+        StartSnapshotTest.Part.Lineup -> StartPage(loaded.model, stamp, rows, {}, listOf(StartPart.Lineup), bg, chipShown)
         StartSnapshotTest.Part.Bench -> StartPage(loaded.model, stamp, rows, {}, listOf(StartPart.Bench), bg)
         StartSnapshotTest.Part.Pin -> Pin(pin, PinActions())
     }

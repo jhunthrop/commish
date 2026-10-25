@@ -3,17 +3,13 @@ package app.trycommish.feature.start
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -22,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -58,27 +56,36 @@ internal fun Strip(
     model: StartModel,
     stamp: String?,
     openRecord: () -> Unit,
+    /** Each chip as laid out, by its key, and whether it is drawn whole: the snapshot test's check that the
+     * strip hides none. */
+    chipShown: (key: String, whole: Boolean) -> Unit = { _, _ -> },
 ) {
     val c = CommishTheme.colors
     val shape = RoundedCornerShape(Tokens.Radius.md.dp)
     Row(
         Modifier
             .fillMaxWidth()
-            .height(IntrinsicSize.Min)
             .clip(shape)
             .background(c.surface)
+            .edgeRule(c.accent, EDGE)
             .border(1.dp, c.line, shape)
             .semantics(mergeDescendants = false) { contentDescription = model.decision },
     ) {
-        Box(Modifier.width(EDGE).fillMaxHeight().background(c.accent))
-        Column(Modifier.padding(Tokens.Space.s4.dp), verticalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp)) {
+        Column(Modifier.padding(Tokens.Space.s4.dp).padding(start = EDGE), verticalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp)) {
                 Head(model, stamp, Modifier.weight(1f))
                 Sum(model, openRecord)
             }
             if (model.chips.isNotEmpty()) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    model.chips.forEach { Chip(it) }
+                    model.chips.forEach { chip ->
+                        Chip(
+                            chip,
+                            Modifier.onGloballyPositioned {
+                                chipShown(chip.key, it.boundsInWindow().height >= it.size.height - WHOLE_SLACK)
+                            },
+                        )
+                    }
                 }
             }
             model.missed?.let { missed ->
@@ -169,7 +176,10 @@ private fun Link(
 /** A chip: a spot no one can play in the loss's ink, or a swap as the phone names it, the slot then who
  * comes in (the bench row's arrow names who goes out). */
 @Composable
-private fun Chip(chip: StripChip) {
+private fun Chip(
+    chip: StripChip,
+    modifier: Modifier,
+) {
     val c = CommishTheme.colors
     val pill = RoundedCornerShape(Tokens.Radius.pill.dp)
     when (chip) {
@@ -179,7 +189,7 @@ private fun Chip(chip: StripChip) {
                 style = Faces.small.copy(fontSize = Tokens.Type.xs.sp),
                 color = c.lossInk,
                 modifier =
-                    Modifier
+                    modifier
                         .height(CHIP_HEIGHT)
                         .background(c.bg, pill)
                         .border(1.dp, c.lossInk.copy(alpha = LOSS_EDGE), pill)
@@ -188,7 +198,7 @@ private fun Chip(chip: StripChip) {
             )
         is StripChip.SwapChip ->
             Row(
-                Modifier
+                modifier
                     .height(CHIP_HEIGHT)
                     .background(c.bg, pill)
                     .border(1.dp, c.lineStrong, pill)
@@ -215,3 +225,6 @@ private fun Chip(chip: StripChip) {
 }
 
 private const val LOSS_EDGE = 0.4f
+
+/** Under a pixel short of its height still counts as drawn whole. */
+private const val WHOLE_SLACK = 0.5f
