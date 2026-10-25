@@ -84,6 +84,18 @@ sealed interface ShellDestination {
 /** The League tab's page, the selected league's home. */
 const val LEAGUE_PAGE = "league"
 
+/** The Lineup tab's page, the selected league's Start screen. */
+const val LINEUP_PAGE = "start"
+
+/** Where a league home's Open Lineup goes: the Lineup tab where the bar has one and the home is the
+ * league the tabs show; null where it has none (a home pushed for a league whose bar has no Lineup),
+ * which the app opens on the site. */
+fun lineupOf(
+    leagueId: String,
+    shown: String?,
+    bar: List<RailItem>,
+): ShellDestination.Tab? = ShellDestination.Tab(LINEUP_PAGE).takeIf { leagueId == shown && bar.any { it.page == LINEUP_PAGE } }
+
 /** Where choosing a league in the switch opens its home: the League tab where the bar has one (the
  * tab shows the selected league), else the home pushed on the tab in view (B149). */
 fun homeOf(

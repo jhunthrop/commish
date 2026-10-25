@@ -1,9 +1,12 @@
 package app.trycommish.android
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.util.Log
 import app.trycommish.api.Transport
+import app.trycommish.api.models.LeagueHost
 import app.trycommish.core.AppWords
 import app.trycommish.core.Cache
 import app.trycommish.core.Clock
@@ -21,6 +24,9 @@ import app.trycommish.core.shell.ShellViewModel
 import app.trycommish.core.signin.ApiPairing
 import app.trycommish.core.signin.SignIn
 import app.trycommish.core.signin.SignInResult
+import app.trycommish.core.start.ApiLineupReads
+import app.trycommish.core.start.LineupReads
+import app.trycommish.core.start.StartViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +39,7 @@ import java.security.SecureRandom
 import java.time.ZoneId
 
 private const val TAG = "Commish"
+private const val CLIP_LABEL = "Lineup"
 
 /**
  * The app's graph, built by hand (no DI framework, spec §6.2): one session, one transport, one cache,
@@ -51,6 +58,8 @@ class AppGraph(
     private val transport = Transport(apiBaseUrl, token = { session.token })
     private val reads: LeagueReads = ApiLeagueReads(transport)
     private val account: AccountReads = ApiAccountReads(transport)
+    private val lineups: LineupReads = ApiLineupReads(transport)
+    private val clipboard: ClipboardManager? = context.getSystemService(ClipboardManager::class.java)
 
     /** Work that must outlive a screen or a rotation: the sign-in's pairing, once its verifier is spent. */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -77,6 +86,21 @@ class AppGraph(
         }
 
     fun leagueHomeViewModel(): LeagueHomeViewModel = LeagueHomeViewModel(reads, cache, clock, zone, sessionEnd)
+
+    /** A league's Start screen, the lineup copied to the phone's clipboard. */
+    fun startViewModel(league: LeagueHost): StartViewModel = StartViewModel(lineups, cache, clock, zone, league, ::copy, sessionEnd)
+
+    /** Puts the lineup on the clipboard; false where the phone would not take it. */
+    private fun copy(text: String): Boolean {
+        val board = clipboard ?: return false
+        return try {
+            board.setPrimaryClip(ClipData.newPlainText(CLIP_LABEL, text))
+            true
+        } catch (e: SecurityException) {
+            Log.w(TAG, "copy the lineup", e)
+            false
+        }
+    }
 
     fun shellViewModel(): ShellViewModel = ShellViewModel(account, cache, clock, zone, sessionEnd)
 

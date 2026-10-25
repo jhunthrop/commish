@@ -65,6 +65,33 @@ data class StartPin(
     val isEmpty: Boolean get() = verb == null && foot.isEmpty() && panel == null
 }
 
+/** "Last read Sat 12:00 pm" while the lineup shown is a saved one, the instant in the member's zone. */
+fun startStamp(
+    ui: StartUi,
+    zone: ZoneId,
+): String? {
+    val loaded = ui.state as? StartState.Loaded ?: return null
+    return if (loaded.stale) "${AppWords.lastRead} ${Format.weekdayTime(loaded.stamp, zone)}" else null
+}
+
+/** The pin: the confirmation while it is open; else the verb, disabled with the stamp's reason while the
+ * lineup shown is a saved one (a move made from it would not be the platform's lineup). Pure, so a
+ * snapshot draws it from a state as the screen does. */
+fun startPin(
+    ui: StartUi,
+    platform: String,
+    zone: ZoneId,
+): StartPin {
+    MovePanel.of(ui.step, platform)?.let { return StartPin(null, false, emptyList(), it) }
+    val loaded = ui.state as? StartState.Loaded ?: return StartPin(null, false, emptyList(), null)
+    val verb = loaded.model.verb?.title
+    val stamp = startStamp(ui, zone)
+    if (loaded.stale && verb != null && stamp != null) {
+        return StartPin(verb, false, listOf(listOf(FootRun("$stamp. ${AppWords.readAgainToSet}"))), null)
+    }
+    return StartPin(verb, verb != null, ui.copied ?: loaded.model.foot, null)
+}
+
 /**
  * The Start screen's view model, the iOS one's in the League home's pattern: the reads, the cache and the
  * clock injected; the saved lineup at once (its verb disabled, dated), then the API's; the verb that
@@ -103,23 +130,10 @@ class StartViewModel(
     val platform: String get() = ValueWords.platform(league)
 
     /** "Last read Sat 12:00 pm" while the lineup shown is a saved one. */
-    fun stampWords(ui: StartUi = this.ui.value): String? {
-        val loaded = ui.state as? StartState.Loaded ?: return null
-        return if (loaded.stale) "${AppWords.lastRead} ${Format.weekdayTime(loaded.stamp, zone)}" else null
-    }
+    fun stampWords(ui: StartUi = this.ui.value): String? = startStamp(ui, zone)
 
-    /** The pin: the confirmation while it is open; else the verb, disabled with the stamp's reason while
-     * the lineup shown is a saved one (a move made from it would not be the platform's lineup). */
-    fun pin(ui: StartUi = this.ui.value): StartPin {
-        MovePanel.of(ui.step, platform)?.let { return StartPin(null, false, emptyList(), it) }
-        val loaded = ui.state as? StartState.Loaded ?: return StartPin(null, false, emptyList(), null)
-        val verb = loaded.model.verb?.title
-        val stamp = stampWords(ui)
-        if (loaded.stale && verb != null && stamp != null) {
-            return StartPin(verb, false, listOf(listOf(FootRun("$stamp. ${AppWords.readAgainToSet}"))), null)
-        }
-        return StartPin(verb, verb != null, ui.copied ?: loaded.model.foot, null)
-    }
+    /** The pin for the screen as it is. */
+    fun pin(ui: StartUi = this.ui.value): StartPin = startPin(ui, platform, zone)
 
     /** The saved lineup at once on the first open, then the API's; a failed read keeps the lineup shown,
      * dated; a refused token signs out. Each call cancels the one before. */
