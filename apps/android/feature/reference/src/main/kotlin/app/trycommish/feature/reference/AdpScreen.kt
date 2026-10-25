@@ -17,6 +17,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.trycommish.core.board.BoardChip
@@ -32,21 +33,33 @@ import app.trycommish.feature.board.roundTint
 import app.trycommish.feature.board.tintTile
 import app.trycommish.feature.boxscore.ChipRow
 
-/** ADP's phone columns (board-columns.ts in the drafters' order, the phone band): the ADP leading, his
- * face, the player taking the rest, then his points, his value and the Gap. Where our board has him is his
- * pill's number and, before the draft, the Gap (Lane 199 review H1). */
-private object AdpWidths {
-    val adp = 38.dp
+/** ADP's phone columns (board-columns.ts in the drafters' order): the ADP leading, his face, the player
+ * taking the rest, then his points, his value and the Gap, 4 dp apart as on iOS. Where our board has him is
+ * his pill's number and, before the draft, the Gap (Lane 199 review H1). Below 375 dp the figures narrow (the
+ * web's phone band, Projected 48 and Over repl 54, the ADP and the Gap to their widest figure), so the player
+ * keeps about 116 dp: his name whole and his pill, club and bye on one line (Lane 202 review H1). A figure
+ * wider than its cell shrinks rather than cuts. */
+private class AdpWidths(
+    narrow: Boolean,
+) {
+    val adp = if (narrow) 36.dp else 40.dp
     val face = 32.dp
-    val projected = 62.dp
-    val overReplacement = 58.dp
-    val gap = 44.dp
+    val projected = if (narrow) 48.dp else 62.dp
+    val overReplacement = if (narrow) 54.dp else 58.dp
+    val gap = if (narrow) 38.dp else 44.dp
 
-    // The board's gap: the round's tint reaches this far left of Over repl (tintTile).
-    val spacing = 6.dp
+    /** The cells' spacing, which the round's tint behind Over repl reaches across to Projected's edge. */
+    val spacing = 4.dp
     val row = 52.dp
     val head = 34.dp
 }
+
+/** The widths for this phone's width. */
+@Composable
+private fun adpWidths(): AdpWidths = AdpWidths(LocalConfiguration.current.screenWidthDp < NARROW_DP)
+
+/** iOS SE's width: a phone narrower takes the narrow figures. */
+private const val NARROW_DP = 375
 
 /** ADP's controls: a row opens his sheet, a club chip its club, a format chip that format. */
 class AdpActions(
@@ -58,16 +71,17 @@ class AdpActions(
 @Composable
 fun AdpHeadRow(model: AdpModel) {
     val c = CommishTheme.colors
+    val widths = adpWidths()
     val heads = model.heads
-    val trailing = listOfNotNull(AdpWidths.projected, AdpWidths.overReplacement, AdpWidths.gap.takeIf { model.gap })
+    val trailing = listOfNotNull(widths.projected, widths.overReplacement, widths.gap.takeIf { model.gap })
     Column(Modifier.fillMaxWidth().background(c.bg)) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = AdpWidths.head).padding(horizontal = Tokens.Space.s2.dp),
-            horizontalArrangement = Arrangement.spacedBy(AdpWidths.spacing),
+            Modifier.fillMaxWidth().heightIn(min = widths.head).padding(horizontal = Tokens.Space.s2.dp),
+            horizontalArrangement = Arrangement.spacedBy(widths.spacing),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ColumnHead(heads[0], Modifier.width(AdpWidths.adp))
-            ColumnHead(heads[1], Modifier.weight(1f).padding(start = AdpWidths.face + AdpWidths.spacing), TextAlign.Start)
+            ColumnHead(heads[0], Modifier.width(widths.adp))
+            ColumnHead(heads[1], Modifier.weight(1f).padding(start = widths.face + widths.spacing), TextAlign.Start)
             heads.drop(2).zip(trailing).forEach { (words, width) -> ColumnHead(words, Modifier.width(width)) }
         }
         HorizontalDivider(color = c.line)
@@ -84,26 +98,27 @@ fun AdpRowView(
     actions: ReferenceActions,
 ) {
     val c = CommishTheme.colors
+    val widths = adpWidths()
     val drawn = row.row
     val tap =
         drawn.sheetPlayer?.let { player -> Modifier.clickable { actions.open(player) } }
             ?: Modifier.clickable(enabled = drawn.club != Words.Figure.freeAgentClub) { actions.club(drawn.club) }
     Column(Modifier.fillMaxWidth().background(c.surface).then(tap)) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = AdpWidths.row).padding(horizontal = Tokens.Space.s2.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(AdpWidths.spacing),
+            Modifier.fillMaxWidth().heightIn(min = widths.row).padding(horizontal = Tokens.Space.s2.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(widths.spacing),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RowFigure(row.adp, Modifier.width(AdpWidths.adp), ink = c.ink)
-            Headshot(drawn.headshot, drawn.initials, AdpWidths.face)
-            RowWho(drawn, actions::club, Modifier.weight(1f))
-            RowFigure(drawn.projected, Modifier.width(AdpWidths.projected), ink = c.ink)
+            RowFigure(row.adp, Modifier.width(widths.adp), ink = c.ink)
+            Headshot(drawn.headshot, drawn.initials, widths.face)
+            RowWho(drawn, actions::club, Modifier.weight(1f), wraps = false)
+            RowFigure(drawn.projected, Modifier.width(widths.projected), ink = c.ink)
             val tint = roundTint(drawn.heat)
             RowFigure(
                 drawn.overReplacement,
-                Modifier.width(AdpWidths.overReplacement).then(tint?.let { Modifier.tintTile(it) } ?: Modifier),
+                Modifier.width(widths.overReplacement).then(tint?.let { Modifier.tintTile(it, widths.spacing) } ?: Modifier),
             )
-            if (gap) RowFigure(drawn.gap, Modifier.width(AdpWidths.gap), ink = gapInk(drawn.gapTone))
+            if (gap) RowFigure(drawn.gap, Modifier.width(widths.gap), ink = gapInk(drawn.gapTone))
         }
         HorizontalDivider(color = c.line)
     }

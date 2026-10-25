@@ -3,11 +3,15 @@ package app.trycommish.feature.reference
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import app.trycommish.design.CommishTheme
+import app.trycommish.design.Faces
 import com.android.ide.common.rendering.api.SessionParams.RenderingMode
 import com.android.resources.Density
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +69,10 @@ class ReferenceSnapshotTest(
         val screen = screenOf(scene, SceneReads(scene, scheduler))
         paparazzi.snapshot(name = "reference-${scene.id}-${phone.id}-${if (dark) "dark" else "light"}") {
             CommishTheme(dark = dark) {
-                Box(Modifier.background(CommishTheme.colors.bg).fillMaxWidth()) { screen() }
+                Box(Modifier.background(CommishTheme.colors.bg).fillMaxWidth()) {
+                    NumberFaceWarmUp()
+                    screen()
+                }
             }
         }
     }
@@ -118,6 +125,18 @@ internal fun screenOf(
             ({ ScheduleScreen(model, null, ReferenceActions(), model.grid.rows.take(GRID_ROWS), still = true) })
         }
     }
+
+/**
+ * The number face's semibold cut resolved before any other, unseen. Layoutlib keeps the first variation of
+ * the variable font this JVM resolves: where the first number drawn is the heading's Bold, every later
+ * SemiBold cell draws at the file's thinnest instance (Lane 202 fix round 1, M1: a cell specimen drawn
+ * first made the same scenes draw at weight; the Board's module draws a table scene first, so it never
+ * met this). A device resolves each cut on its own and is not affected.
+ */
+@Composable
+private fun NumberFaceWarmUp() {
+    Box(Modifier.size(0.dp)) { Text("0", style = Faces.cell) }
+}
 
 private fun twoX(
     base: DeviceConfig,
