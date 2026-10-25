@@ -47,6 +47,7 @@ import app.trycommish.core.waivers.WaiverSortKey
 import app.trycommish.core.waivers.WaiverTable
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.NumWeight
 import app.trycommish.design.Pill
 import app.trycommish.design.R
 import app.trycommish.design.StrokeGlyph
@@ -291,10 +292,11 @@ private fun BeatsView(
             Text(
                 figure,
                 style =
-                    Faces.cell.copy(
-                        fontSize = if (beats.loud) Tokens.Type.lg.sp else Tokens.Type.sm.sp,
-                        fontWeight = if (beats.loud) FontWeight.Bold else FontWeight.Medium,
-                    ),
+                    if (beats.loud) {
+                        Faces.number(NumWeight.Bold)
+                    } else {
+                        Faces.number(NumWeight.Medium, Tokens.Type.sm.sp)
+                    },
                 color =
                     when {
                         beats.loud -> c.gainInk
@@ -356,7 +358,7 @@ private fun DropRowView(
             drop.starter?.let { Pill(it) }
             Text(
                 drop.gain,
-                style = Faces.cell.copy(fontSize = Tokens.Type.lg.sp, fontWeight = FontWeight.Bold),
+                style = Faces.number(NumWeight.Bold),
                 color =
                     when {
                         drop.gain.startsWith("+") -> c.gainInk

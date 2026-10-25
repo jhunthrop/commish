@@ -11,12 +11,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.trycommish.core.start.StartModel
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.NumWeight
 import app.trycommish.design.Tokens
 import app.trycommish.design.Words
 import app.trycommish.feature.boxscore.BoxColumn
@@ -77,7 +77,7 @@ private fun EmptyRow(slot: String) {
     ) {
         Text(
             slot,
-            style = Faces.cell.copy(fontSize = Tokens.Type.md.sp, fontWeight = FontWeight.Bold),
+            style = Faces.number(NumWeight.Bold, Tokens.Type.md.sp),
             color = c.ink2,
             modifier = Modifier.width(BoxColumn.slot),
         )

@@ -24,11 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.trycommish.core.waivers.BidField
 import app.trycommish.core.waivers.WaiverPin
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.NumWeight
 import app.trycommish.design.Tokens
 import app.trycommish.design.Verb
 import app.trycommish.design.Words
@@ -101,7 +101,7 @@ private fun BidFieldView(
     val c = CommishTheme.colors
     val focus = LocalFocusManager.current
     val shape = RoundedCornerShape(Tokens.Radius.sm.dp)
-    val number = Faces.cell.copy(fontSize = Tokens.Type.lg.sp, fontWeight = FontWeight.Medium, color = c.ink)
+    val number = Faces.number(NumWeight.Medium).copy(color = c.ink)
     val frame =
         Modifier
             .size(BID_WIDTH, BID_HEIGHT)

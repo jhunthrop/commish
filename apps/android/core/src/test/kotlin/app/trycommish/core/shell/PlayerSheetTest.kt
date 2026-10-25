@@ -12,9 +12,9 @@ import org.junit.jupiter.api.Test
 class PlayerSheetTest {
     private val rows =
         listOf(
-            SheetPlayer("p-1", "puka-nacua", "Puka Nacua", "WR", "4", "LAR"),
-            SheetPlayer("p-2", "bijan-robinson", "Bijan Robinson", "RB", "1", "ATL"),
-            SheetPlayer("p-3", "sam-laporta", "Sam LaPorta", "TE", null, "DET"),
+            SheetPlayer("p-1", "puka-nacua", "Puka Nacua", "WR", "4", "LAR", null),
+            SheetPlayer("p-2", "bijan-robinson", "Bijan Robinson", "RB", "1", "ATL", null),
+            SheetPlayer("p-3", "sam-laporta", "Sam LaPorta", "TE", null, "DET", null),
         )
 
     @Test
@@ -25,6 +25,17 @@ class PlayerSheetTest {
         assertEquals("RB 1", model.pill)
         assertEquals("ATL", model.club)
         assertEquals("TE", playerSheetModel(rows[2]).pill)
+    }
+
+    @Test
+    fun `the face is the row's https headshot, and none where the row has none`() {
+        val face = "https://a.espncdn.com/i/headshots/nfl/players/full/4426515.png"
+        assertEquals(face, playerSheetModel(rows[0].copy(headshot = face)).headshot)
+        assertNull(playerSheetModel(rows[0]).headshot)
+        assertEquals(face, headshotOf(face))
+        assertNull(headshotOf("http://a.espncdn.com/x.png"))
+        assertNull(headshotOf(""))
+        assertNull(headshotOf(null))
     }
 
     @Test
