@@ -91,7 +91,18 @@ public struct APIDateTranscoder: DateTranscoder {
 
 /// The generated client over URLSession with the device middleware and the ETag's.
 public enum Transport {
-    public static func client(baseURL: URL, tokens: any TokenSource, session: URLSession = .shared) -> Client {
+    /// The app's session: no URL cache. The app keeps every answer itself (AnswerCache) and a run
+    /// route's ETag with it, so a read always reaches the API and a 304 comes back as a 304; URLSession's
+    /// own cache would answer a run route from its copy for the route's max-age, and turn a 304 into
+    /// that copy's 200 after it.
+    public static let session: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration)
+    }()
+
+    public static func client(baseURL: URL, tokens: any TokenSource, session: URLSession = session) -> Client {
         Client(
             serverURL: baseURL,
             configuration: Configuration(dateTranscoder: APIDateTranscoder()),
