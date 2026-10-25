@@ -60,7 +60,11 @@ internal object RecordSections {
             rows = lines.map { row(it, positions, sources, weekly) },
             toDate =
                 all?.let {
-                    RecordToDate(Words.RecordBox.toDate, "${it.ours.graded} distinct", cellsByPosition(book.toDate, positions, sources, weekly))
+                    RecordToDate(
+                        Words.RecordBox.toDate,
+                        "${it.ours.graded} distinct",
+                        cellsByPosition(book.toDate, positions, sources, weekly),
+                    )
                 },
             basis = basis(book, weekly),
         )
@@ -83,7 +87,10 @@ internal object RecordSections {
             val headline = RecordLines.headline(book)
             return RecordBug.Headline(headline.first, headline.second, gaps)
         }
-        val tiles = RecordFigure.entries.map { figure -> if (weekly) weeklyTile(book, all, figure, sources) else ownTile(book, all, figure, sources) }
+        val tiles =
+            RecordFigure.entries.map { figure ->
+                if (weekly) weeklyTile(book, all, figure, sources) else ownTile(book, all, figure, sources)
+            }
         val head =
             if (weekly) {
                 RecordWords.spanLead(book.weeks.filter { it.status == RunRecordWeekStatus.graded }.map { it.week })
@@ -133,7 +140,18 @@ internal object RecordSections {
             order = order,
             graded = graded,
             caption = if (graded) caption(week, order, line.text, weekly) else null,
-            players = if (graded) (week?.lines?.firstOrNull { it.position == RunRecordPosition.All }?.ours?.graded ?: 0).toString() else null,
+            players =
+                if (graded) {
+                    (
+                        week
+                            ?.lines
+                            ?.firstOrNull { it.position == RunRecordPosition.All }
+                            ?.ours
+                            ?.graded ?: 0
+                    ).toString()
+                } else {
+                    null
+                },
             cells = if (graded) cellsByPosition(week?.lines.orEmpty(), positions, sources, weekly) else null,
             note = if (weekly && graded) week?.espnNote else null,
         )
@@ -231,11 +249,17 @@ internal object RecordSections {
             span = all?.let { draft.throughWeek?.let { week -> "Season points through week $week" } ?: "No week counted yet" },
             players = all?.let { Format.plural(it.ours.graded, "player", "players") },
             tiles =
-                all?.let { line ->
-                    RecordFigure.entries.map { figure ->
-                        DraftTile(figure, heads.getValue(figure), keys[figure], FigurePair.of(line.ours, line.adp, figure, Words.RecordBox.adp))
-                    }
-                }.orEmpty(),
+                all
+                    ?.let { line ->
+                        RecordFigure.entries.map { figure ->
+                            DraftTile(
+                                figure,
+                                heads.getValue(figure),
+                                keys[figure],
+                                FigurePair.of(line.ours, line.adp, figure, Words.RecordBox.adp),
+                            )
+                        }
+                    }.orEmpty(),
             honest = if (all == null) null else draft.honest,
             figures = RecordFigure.entries.map { RecordWords.capitalized(heads.getValue(it)) },
             rows = draft.lines.filter { it.position != RunRecordPosition.All }.map(::draftRow),

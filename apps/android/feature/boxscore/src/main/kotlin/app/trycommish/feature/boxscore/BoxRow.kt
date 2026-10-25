@@ -368,7 +368,7 @@ private fun evidence(
 }
 
 /** The kickoff weather's glyphs, the web's own paths (web/src/lib/league/box/WeatherGlyph.svelte). */
-internal object WeatherGlyphs {
+object WeatherGlyphs {
     private val paths =
         mapOf(
             "wind" to listOf("M3 8h11a3 3 0 1 0-3-3", "M3 12h15a3 3 0 1 1-3 3", "M3 16h8"),

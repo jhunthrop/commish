@@ -55,7 +55,8 @@ class RankingsViewModelTest {
         return (loaded.content as RankingsContent.Order).model to loaded.stale
     }
 
-    private fun RankingsViewModel.week(): WeekRankingsModel = ((ui.value.state as RankingsState.Loaded).content as RankingsContent.Week).model
+    private fun RankingsViewModel.week(): WeekRankingsModel =
+        ((ui.value.state as RankingsState.Loaded).content as RankingsContent.Week).model
 
     @Test
     fun `the Rankings open on our order named for the season`() =
@@ -68,7 +69,12 @@ class RankingsViewModelTest {
             assertEquals("Rankings", vm.name)
             assertEquals("Our rest-of-season order, with week 6's game beside each player", vm.lead())
             assertFalse(stale)
-            assertEquals("D'Andre Swift", model.rows.first().player.name)
+            assertEquals(
+                "D'Andre Swift",
+                model.rows
+                    .first()
+                    .player.name,
+            )
             assertEquals("121 on NFL rosters today", model.hits)
             assertTrue(vm.ui.value.more)
             assertEquals(listOf(OrderQuery(null, null, RankingsUi.PAGE_ROWS)), reads.queries)
@@ -98,12 +104,23 @@ class RankingsViewModelTest {
             advanceUntilIdle()
             val (receivers, _) = vm.order()
             assertEquals("53 matches", receivers.hits)
-            assertEquals("WR", receivers.rows.first().player.pill, "a position's pill names his position alone")
+            assertEquals(
+                "WR",
+                receivers.rows
+                    .first()
+                    .player.pill,
+                "a position's pill names his position alone",
+            )
             vm.choose(RankingsChip.DEF)
             advanceUntilIdle()
             val defenses = vm.week()
             assertEquals("Week 6 defenses", defenses.heading)
-            assertEquals("Titans D/ST", defenses.rows.first().player.name)
+            assertEquals(
+                "Titans D/ST",
+                defenses.rows
+                    .first()
+                    .player.name,
+            )
             assertNull(vm.lead(), "the week's basis line says the rest")
             assertEquals(listOf(WeekPosition.DEF), reads.weeks)
         }
@@ -202,7 +219,12 @@ class RankingsViewModelTest {
             val (model, stale) = vm.order()
             assertTrue(stale)
             assertNull(vm.ui.value.chip, "the chip of the rows still shown")
-            assertEquals("D'Andre Swift", model.rows.first().player.name)
+            assertEquals(
+                "D'Andre Swift",
+                model.rows
+                    .first()
+                    .player.name,
+            )
             assertEquals(AppWords.cannotLoad, vm.ui.value.problem)
             vm.choose(RankingsChip.RB)
             advanceUntilIdle()

@@ -189,7 +189,8 @@ class RankingsParityTest {
                 row.text("folded"),
             )
 
-    private fun orderRowOf(row: RankingsRow): List<Any?> = playerOf(row.player) + listOf(row.rank, row.place, row.bye, row.week, row.total, row.folded)
+    private fun orderRowOf(row: RankingsRow): List<Any?> =
+        playerOf(row.player) + listOf(row.rank, row.place, row.bye, row.week, row.total, row.folded)
 
     private fun weekRowOf(row: JsonObject): List<Any?> = playerOf(row) + listOf(row.text("proj"), row.text("folded"))
 

@@ -62,7 +62,12 @@ private val PAGES: List<RailItem> =
     (Rail.byKey.values.flatten() + Rail.withoutLeague + Rail.withoutLeagueBySeason.values.flatten()).distinctBy { it.page }
 
 /** The tabs drawn by their own screens; the rest show their name until their lane lands. */
-private val LIVE_PAGES = setOf(LEAGUE_PAGE, LINEUP_PAGE, MATCHUP_PAGE, WAIVERS_PAGE, TRADES_PAGE, BOARD_PAGE)
+private val LIVE_PAGES = setOf(LEAGUE_PAGE, LINEUP_PAGE, MATCHUP_PAGE, WAIVERS_PAGE, TRADES_PAGE, BOARD_PAGE, PLAYERS_PAGE, RECORD_PAGE)
+
+/** The run pages the bar opens: the order's (Rankings in season, Players before and after it) and Our
+ * record. */
+private const val PLAYERS_PAGE = "players"
+private const val RECORD_PAGE = "record"
 
 /** The pushed screens' routes, one per ShellRoute. */
 private object Routes {
@@ -86,7 +91,8 @@ private object Routes {
  * season (Rail.generated.kt), a back stack per tab, and the one player sheet over all of it. Choosing
  * a league shows it, writes it to the site, and opens its home: the League tab where the bar has one,
  * else the home pushed on the tab in view (B149). League, Lineup, Matchup, Waivers, Trades and the board (the
- * Board item, and Rest of season in season with no league) are live; the rest show their name.
+ * Board item, and Rest of season in season with no league), Rankings (the Players page) and Our record are
+ * live, and the search opens Rankings with its letters; the rest show their name.
  * A home's Open Lineup opens the Lineup tab for the league shown, else the lineup on the site.
  */
 @Composable
@@ -205,11 +211,13 @@ private fun Pages(
             val following = (state as? ShellState.Ready)?.selected != null
             boardInSeason(bar)?.let { BoardTab(graph, it, following) }
         }
+        composable(PLAYERS_PAGE) { RankingsTab(graph, state, query = "") }
+        composable(RECORD_PAGE) { RecordTab(graph) }
         PAGES.filter { it.page !in LIVE_PAGES }.forEach { item ->
             composable(item.page) { NamedScreen(item.label) }
         }
         composable(Routes.PLAYERS, listOf(navArgument("query") { type = NavType.StringType })) { entry ->
-            NamedScreen(AppWords.players, aside = entry.arguments?.getString("query"))
+            RankingsTab(graph, state, entry.arguments?.getString("query").orEmpty())
         }
         // The player page's lane (S6) fills this from the slug.
         composable(Routes.PLAYER) { NamedScreen(AppWords.players) }

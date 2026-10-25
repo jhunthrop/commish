@@ -148,7 +148,12 @@ class RecordParityTest {
                 tile.ours?.let { ours ->
                     mapOf(
                         "ours" to ours,
-                        "beside" to tile.beside.map { mapOf("head" to it.head, "value" to it.value, "ours" to it.ours).filterValues { v -> v != null } },
+                        "beside" to
+                            tile.beside.map {
+                                mapOf("head" to it.head, "value" to it.value, "ours" to it.ours).filterValues { v ->
+                                    v != null
+                                }
+                            },
                     )
                 },
         ).filterValues { it != null }
@@ -173,7 +178,8 @@ class RecordParityTest {
             pair.getValue("accented").jsonPrimitive.boolean,
         )
 
-    private fun pairOf(pair: FigurePair): List<Any?> = listOf(pair.ours, pair.theirs, pair.name, pair.leader?.word, pair.lead, pair.accented)
+    private fun pairOf(pair: FigurePair): List<Any?> =
+        listOf(pair.ours, pair.theirs, pair.name, pair.leader?.word, pair.lead, pair.accented)
 
     private fun cellsOf(cells: JsonObject?): Map<String, Map<String, List<Any?>>>? =
         cells?.mapValues { (_, figures) ->
@@ -188,7 +194,9 @@ class RecordParityTest {
 
     private fun cellsOf(cells: RecordCells?): Map<String, Map<String, List<Any?>>>? =
         cells?.mapValues { (_, figures) ->
-            figures.entries.associate { (figure, shown) -> figure.key to listOf(shown.trails, shown.cells.map { listOf(it.value, it.same) }) }
+            figures.entries.associate { (figure, shown) ->
+                figure.key to listOf(shown.trails, shown.cells.map { listOf(it.value, it.same) })
+            }
         }
 
     private fun rowOf(row: JsonObject): List<Any?> =
@@ -206,7 +214,8 @@ class RecordParityTest {
     private fun rowOf(row: RecordRow): List<Any?> =
         listOf(row.lead, row.text, row.order, row.caption, row.graded, row.players, cellsOf(row.cells), row.note)
 
-    private fun toDateOf(row: JsonObject): List<Any?> = listOf(row.text("lead"), row.text("players"), cellsOf(row.getValue("cells").jsonObject))
+    private fun toDateOf(row: JsonObject): List<Any?> =
+        listOf(row.text("lead"), row.text("players"), cellsOf(row.getValue("cells").jsonObject))
 
     private fun toDateOf(row: RecordToDate): List<Any?> = listOf(row.lead, row.players, cellsOf(row.cells))
 
@@ -221,5 +230,12 @@ class RecordParityTest {
         )
 
     private fun draftRowOf(row: DraftRow): List<Any?> =
-        listOf(row.position, row.players, row.cells.entries.associate { (figure, cell) -> figure.key to listOf(cell.accented, listOf(cell.ours, cell.adp)) })
+        listOf(
+            row.position,
+            row.players,
+            row.cells.entries.associate { (figure, cell) ->
+                figure.key to
+                    listOf(cell.accented, listOf(cell.ours, cell.adp))
+            },
+        )
 }

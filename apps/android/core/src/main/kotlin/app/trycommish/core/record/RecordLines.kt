@@ -96,7 +96,8 @@ internal object RecordLines {
     private fun runWords(run: List<RunRecordWeek>): String {
         val first = run.first()
         if (first.status == missed) return "${RecordWords.reason(first)}, so ${if (run.size == 1) "it" else "they"} cannot be graded"
-        return first.frozenAt?.let { "set before kickoff ${RecordWords.weekdayDay(it)}" } ?: "our first order is set before its first kickoff"
+        return first.frozenAt?.let { "set before kickoff ${RecordWords.weekdayDay(it)}" }
+            ?: "our first order is set before its first kickoff"
     }
 
     /** record.ts frozenWords: "set Tue Sep 8, graded Wed Oct 14". */
@@ -110,7 +111,9 @@ internal object RecordLines {
             week.status == graded -> "$set, graded ${week.gradedAt?.let(RecordWords::weekdayDay).orEmpty()}"
             week.week in unplayed -> "$set, ${Words.Record.notPlayed}"
             week.week in underway -> "$set, ${Words.Record.underway}"
-            else -> week.gradesFrom?.let { "$set, grades ${RecordWords.weekdayDay(it)} when the stats land" } ?: "$set, grades when the stats land"
+            else ->
+                week.gradesFrom?.let { "$set, grades ${RecordWords.weekdayDay(it)} when the stats land" }
+                    ?: "$set, grades when the stats land"
         }
     }
 
@@ -151,7 +154,9 @@ internal object RecordLines {
                 week.status == graded && gradedAt != null -> "graded ${RecordWords.weekdayDay(gradedAt)}"
                 week.week in unplayed -> Words.Records.notPlayed
                 week.week in underway -> Words.Records.underway
-                else -> week.gradesFrom?.let { "grades from ${RecordWords.weekdayDay(it)}, when the stats land" } ?: Words.Records.gradesLater
+                else ->
+                    week.gradesFrom?.let { "grades from ${RecordWords.weekdayDay(it)}, when the stats land" }
+                        ?: Words.Records.gradesLater
             }
         return "$set, $then"
     }
@@ -163,7 +168,11 @@ internal object RecordLines {
         next: NextGrade?,
     ): Pair<String, String>? {
         if (next == null || book.weeks.any { it.status == graded }) return null
-        val day = book.weeks.firstOrNull { it.week == next.week }?.gradesFrom?.let(RecordWords::weekdayDay)
+        val day =
+            book.weeks
+                .firstOrNull { it.week == next.week }
+                ?.gradesFrom
+                ?.let(RecordWords::weekdayDay)
         val game = next.lastKickoff?.let(RecordWords::weekdayWord)
         val whenSaid =
             when {

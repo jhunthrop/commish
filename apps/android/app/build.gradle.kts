@@ -77,6 +77,8 @@ dependencies {
     implementation(project(":feature:start"))
     implementation(project(":feature:waivers"))
     implementation(project(":feature:trades"))
+    implementation(project(":feature:rankings"))
+    implementation(project(":feature:record"))
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
