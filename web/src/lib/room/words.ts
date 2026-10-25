@@ -91,8 +91,18 @@ export const ROOM = {
 	pool: 'Pool',
 	yourTeam: 'Your team',
 	/** An open roster slot. */
-	open: 'open'
+	open: 'open',
+	/** The wall's title (Wall.svelte), and its cell on the clock: yours, a shared draft's seat, anyone's. */
+	wall: 'The wall',
+	yourPick: 'Your pick',
+	theirPick: 'Their pick',
+	onTheClock: 'On the clock'
 } as const;
+
+/** The wall's label: "rounds 1 to 3 of 20". */
+export function wallRounds(shown: number, rounds: number): string {
+	return `rounds 1 to ${String(shown)} of ${String(rounds)}`;
+}
 
 /** The pool's count line: "1,447 left to draft, ranked by points over replacement". */
 export function poolLine(left: number): string {

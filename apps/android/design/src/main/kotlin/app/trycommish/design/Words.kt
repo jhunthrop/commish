@@ -857,6 +857,10 @@ object Words {
         const val pool = "Pool"
         const val yourTeam = "Your team"
         const val open = "open"
+        const val wall = "The wall"
+        const val yourPick = "Your pick"
+        const val theirPick = "Their pick"
+        const val onTheClock = "On the clock"
     }
 
     object Report {
@@ -878,5 +882,10 @@ object Words {
         const val median = "median"
         const val medianPoints = "median starting points"
         const val middleRuns = "the middle 80% of runs"
+    }
+
+    object DraftDay {
+        const val advisorVerb = "Open the Advisor"
+        const val turnsAfterDraft = "The site turns to your season after your draft."
     }
 }

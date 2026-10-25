@@ -13,7 +13,8 @@ import Testing
 /// tab bar: the start page with a link pasted and slot 5 chosen; waiting for others before the first
 /// turn (the bar, the picks as they land, the call that waits on the board); the member's turn with
 /// the odds (the picks since, our call, who we would take next) and the pool under it; the pick
-/// marked on the strip once it lands, with the team; the report's head, its pick by pick and its runs;
+/// marked on the strip once it lands, with the team; the wall through round 2 with the pick on the
+/// clock; the report's head, its pick by pick and its runs;
 /// and the stale state, the last picks kept with the reconnecting line and their stamp. With
 /// SNAPSHOT_SHOTS set each is also written at its phone's own scale for the persona panel.
 @MainActor
@@ -30,6 +31,7 @@ struct CompanionSnapshotTests {
         case turn
         case turnPool = "turn-pool"
         case marked
+        case wall
         case reportHead = "report-head"
         case reportPicks = "report-picks"
         case reportRuns = "report-runs"
@@ -40,7 +42,7 @@ struct CompanionSnapshotTests {
             switch self {
             case .new, .waiting: [.waiting]
             case .turn, .turnPool: [.waiting, .between, .turn]
-            case .marked: [.waiting, .between, .turn, .taken]
+            case .marked, .wall: [.waiting, .between, .turn, .taken]
             case .reportHead, .reportPicks, .reportRuns: CompanionFixture.Moment.allCases
             case .stale: [.waiting, .between]
             }
@@ -50,6 +52,7 @@ struct CompanionSnapshotTests {
             switch self {
             case .turnPool: [.pool]
             case .marked: [.strips, .call, .team]
+            case .wall: [.wall]
             case .turn: [.strips, .call]
             default: Set(CompanionPart.allCases)
             }
@@ -128,9 +131,21 @@ struct CompanionSnapshotTests {
         )
     }
 
+    /// The phones' chrome over and under the room: the status bar and home indicator of a phone with
+    /// a notch, the SE's status bar, the navigation bar, the tab bar.
+    enum Chrome {
+        static let tallPhone: Double = 700
+        static let statusBar: Double = 54
+        static let homeIndicator: Double = 34
+        static let shortStatusBar: Double = 20
+        static let navigationBar: Double = 56
+        static let tabBar: Double = 50
+    }
+
     /// The room between the top bar and the tab bar, by phone.
     static func room(_ device: SnapshotDevice) -> Double {
-        device.height - (device.height > 700 ? 54 + 34 : 20) - 56 - 50
+        let top = device.height > Chrome.tallPhone ? Chrome.statusBar + Chrome.homeIndicator : Chrome.shortStatusBar
+        return device.height - top - Chrome.navigationBar - Chrome.tabBar
     }
 
     @Test(arguments: 0 ..< cases.count)

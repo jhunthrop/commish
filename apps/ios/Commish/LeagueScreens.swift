@@ -1,21 +1,27 @@
+import CommishAPI
 import CommishCore
 import LeagueHome
 import Matchup
 import SwiftUI
 
-/// A league's home: owns its view model for the league it shows; a score bug opens its game.
+/// A league's home: owns its view model for the league it shows; a score bug opens its game; on the
+/// followed league's draft day its Advisor verb opens the companion.
 struct LeagueScreen: View {
     @State private var viewModel: LeagueHomeViewModel
     private let leagueID: String
     private let openLineup: () -> Void
     private let openGame: (Int?) -> Void
+    private let draftDay: DraftDayEntry?
+    private let openAdvisor: () -> Void
 
     init(
         environment: AppEnvironment,
         leagueID: String,
+        league: FollowedLeague?,
         expired: @escaping @MainActor () -> Void,
         openLineup: @escaping () -> Void,
-        openGame: @escaping (Int?) -> Void
+        openGame: @escaping (Int?) -> Void,
+        openAdvisor: @escaping () -> Void
     ) {
         _viewModel = State(initialValue: LeagueHomeViewModel(
             api: environment.api, cache: environment.cache, clock: environment.clock, onSignedOut: expired
@@ -23,10 +29,17 @@ struct LeagueScreen: View {
         self.leagueID = leagueID
         self.openLineup = openLineup
         self.openGame = openGame
+        draftDay = league.flatMap {
+            DraftDayEntry(phase: $0.phase, draftAt: $0.draftAt, now: environment.clock.now, zone: .current)
+        }
+        self.openAdvisor = openAdvisor
     }
 
     var body: some View {
-        LeagueHomeView(viewModel: viewModel, leagueID: leagueID, openLineup: openLineup, openGame: openGame)
+        LeagueHomeView(
+            viewModel: viewModel, leagueID: leagueID, openLineup: openLineup, openGame: openGame,
+            draftDay: draftDay, openAdvisor: openAdvisor
+        )
     }
 }
 

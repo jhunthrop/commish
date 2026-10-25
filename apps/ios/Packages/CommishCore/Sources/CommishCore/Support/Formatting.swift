@@ -37,6 +37,11 @@ public enum Formatting {
     /// number.ts MINUS: a negative figure's sign, the width of a plus in tabular figures.
     public static let minus = "\u{2212}"
 
+    /// A range's two ends as the range bar prints them (number.ts spanWords): "212.3 to 407.3".
+    public static func span(_ floor: Double, _ ceiling: Double) -> String {
+        "\(fixed(floor)) to \(fixed(ceiling))"
+    }
+
     /// number.ts signed: "+113.9", "−12.5", "+0.0" for a figure that rounds to nothing; `decimals` 0
     /// for a whole count of picks, "+2".
     public static func signed(_ value: Double, decimals: Int = 1) -> String {

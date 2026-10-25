@@ -855,6 +855,10 @@ public enum Words {
         public static let pool = "Pool"
         public static let yourTeam = "Your team"
         public static let `open` = "open"
+        public static let wall = "The wall"
+        public static let yourPick = "Your pick"
+        public static let theirPick = "Their pick"
+        public static let onTheClock = "On the clock"
     }
 
     public enum Report {
@@ -876,5 +880,10 @@ public enum Words {
         public static let median = "median"
         public static let medianPoints = "median starting points"
         public static let middleRuns = "the middle 80% of runs"
+    }
+
+    public enum DraftDay {
+        public static let advisorVerb = "Open the Advisor"
+        public static let turnsAfterDraft = "The site turns to your season after your draft."
     }
 }

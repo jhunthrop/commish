@@ -103,10 +103,15 @@ struct CallPanelView: View {
     }
 }
 
-/// Who we would take next (Shortlist.svelte): each player after the call with his chance of lasting.
+/// Who we would take next (Shortlist.svelte): each player after the call with his chance of lasting,
+/// our why's first sentence under his name, and his outcome range on the list's shared scale.
 struct ShortlistView: View {
     let lines: [ShortlistLine]
     let open: (SheetPlayer) -> Void
+
+    /// Shortlist.svelte's face and the range's widest (.range max-width).
+    private static let face: Double = 40
+    private static let rangeWidth: Double = 360
 
     var body: some View {
         Panel {
@@ -115,8 +120,17 @@ struct ShortlistView: View {
                     .padding(.bottom, Tokens.Space.s2)
                 ForEach(lines) { line in
                     HStack(spacing: 6) {
-                        PlayerFace(player: line.player, side: 40)
-                        WhoCell(player: line.player)
+                        PlayerFace(player: line.player, side: Self.face)
+                        VStack(alignment: .leading, spacing: Tokens.Space.s1) {
+                            WhoCell(player: line.player)
+                            if let why = line.why {
+                                NoteText(text: why)
+                            }
+                            if let range = line.range {
+                                RangeBar(left: range.left, width: range.width, mid: range.mid, text: range.text)
+                                    .frame(maxWidth: Self.rangeWidth, alignment: .leading)
+                            }
+                        }
                         ChanceCell(
                             chance: line.chance,
                             label: line.label,
