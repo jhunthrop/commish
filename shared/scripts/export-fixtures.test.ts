@@ -9,8 +9,10 @@ import {
 	claimBody,
 	clockPart,
 	fixturePlan,
-	HOLDING_PLAYER
+	HOLDING_PLAYER,
+	SHEET_CLOCKS
 } from './export-fixtures.ts';
+import { PUBLIC_SHEET_PLAYER_IDS, SHEET_PLAYER_IDS } from './sheet-players.ts';
 import { REPOSITORY } from './generated.ts';
 
 const FIXTURES = join(REPOSITORY, 'shared/fixtures');
@@ -75,7 +77,11 @@ void test("the board file is the API's PPR board: its basis, its capture, its pl
 		format: string;
 		basis: string;
 		status_read?: unknown;
-		players: { adp: number | null; position_rank: number; status?: { season_long: boolean } }[];
+		players: {
+			adp: number | null;
+			position_rank: number;
+			status?: { season_long: boolean };
+		}[];
 	};
 	assert.equal(board.format, 'ppr');
 	assert.ok(board.basis.length > 0);
@@ -110,6 +116,37 @@ void test('each scoreboard is read at its own clock, the README names every file
 		const file = `scoreboard-${LEAGUE}-${clockPart(clock)}.json`;
 		assert.ok(answer(file).data, file);
 		assert.ok(readme.includes(file), file);
+	}
+});
+
+void test("the player sheet's weeks: each sheet player's league read at the sheet's clocks, and the public read at the week's", () => {
+	const files = fixturePlan({ leagueId: LEAGUE, clocks: CLOCKS }).flatMap((step) => step.files);
+	assert.deepEqual(SHEET_CLOCKS, ['week', 'sunday', 'monday']);
+	for (const name of SHEET_CLOCKS) {
+		const clock = CLOCKS[name];
+		for (const id of SHEET_PLAYER_IDS) {
+			const file = `player-${LEAGUE}-${id}-${clockPart(clock)}.json`;
+			const planned = files.find((f) => f.file === file);
+			assert.equal(planned?.route, `GET /leagues/attached/${LEAGUE}/players/${id}`, file);
+			assert.equal(planned.clock, clock, file);
+			const week = answer(file).data as {
+				week: number;
+				line: { player: { board_id: string } };
+				verb: unknown;
+			};
+			assert.equal(week.line.player.board_id, id, file);
+			assert.notEqual(week.verb, null, `${file}: the league's read gives his verb`);
+		}
+	}
+	for (const id of PUBLIC_SHEET_PLAYER_IDS) {
+		const file = `player-${id}-${clockPart(CLOCKS.week)}.json`;
+		assert.equal(files.find((f) => f.file === file)?.route, `GET /players/${id}/week`, file);
+		const week = answer(file).data as {
+			verb: unknown;
+			projection_scoring: { format: string };
+		};
+		assert.equal(week.verb, null, `${file}: no league, no verb`);
+		assert.equal(week.projection_scoring.format, 'ppr', file);
 	}
 });
 

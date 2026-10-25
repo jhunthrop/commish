@@ -56,6 +56,12 @@ public struct MatchupWeek: Equatable, Sendable {
     public let boxes: [TeamBox]
     public let basis: String
 
+    /// Whether his row is one of the member's own (MatchupPanel.svelte rowsOf(mine)): only those offer
+    /// the way to his lineup.
+    public func isMine(_ player: SheetPlayer) -> Bool {
+        boxes.filter(\.mine).flatMap { $0.starters + $0.bench }.contains { $0.sheetPlayer?.id == player.id }
+    }
+
     /// Every player a row opens in the sheet, both teams'.
     public var sheetPlayers: [SheetPlayer] {
         boxes.flatMap { $0.starters + $0.bench }.compactMap(\.sheetPlayer)

@@ -43,6 +43,8 @@ packages:
     path: Packages/Features/Board
   Waivers:
     path: Packages/Features/Waivers
+  Player:
+    path: Packages/Features/Player
   Trades:
     path: Packages/Features/Trades
 targets:
@@ -62,6 +64,7 @@ targets:
       - package: Matchup
       - package: Board
       - package: Waivers
+      - package: Player
       - package: Trades
     entitlements:
       path: Commish/Commish.entitlements

@@ -783,6 +783,8 @@ void test('copy guard: no card word uses a betting or trading word, the word hos
 		CARD.tier,
 		CARD.readNotYet,
 		...Object.values(BASIS_WORDS),
+		// Every week tile word, the read's change part included (Lane 192: it held a semicolon).
+		...Object.values(WEEK_TILE).filter((said) => typeof said === 'string'),
 		vsAvgReason({ games: 5, blended: 27.1, share: 29, rate: 24.1 }),
 		publishedOn('Thursday'),
 		CARD.writtenFrom,
