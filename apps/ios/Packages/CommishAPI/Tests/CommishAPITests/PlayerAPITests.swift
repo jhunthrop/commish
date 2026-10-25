@@ -35,10 +35,12 @@ struct PlayerAPITests {
         let fixture = RunFixture.standIn
         let tag = try fixture.tag("players/4431299.json")
         let transport = try TaggedTransport(status: .ok, tag: tag, body: fixture.pageAnswer(id: "4431299"))
-        guard case let .fresh(page, sent) = try await Self.client(transport).page(id: "4431299", tag: nil) else {
+        guard case let .fresh(answer, sent) = try await Self.client(transport).page(id: "4431299", tag: nil) else {
             Issue.record("a first read is fresh")
             return
         }
+        let page = answer.player
+        #expect(answer.runId == "2026-10-12T00-standin")
         #expect(sent == tag)
         #expect(page.name == "Rome Odunze")
         #expect(page.weekRead?.value1.week == 6)

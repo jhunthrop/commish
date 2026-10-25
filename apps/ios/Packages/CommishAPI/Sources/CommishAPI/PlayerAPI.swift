@@ -4,6 +4,7 @@ import OpenAPIRuntime
 public typealias PlayerWeek = Components.Schemas.PlayerWeek
 public typealias PlayerVerb = Components.Schemas.PlayerVerb
 public typealias RunPlayer = Components.Schemas.RunPlayer
+public typealias RunPlayerAnswer = Components.Schemas.RunPlayerAnswer
 public typealias RunPlayerFormat = Components.Schemas.RunPlayerFormat
 public typealias RunWeekRead = Components.Schemas.RunWeekRead
 public typealias RunCapsule = Components.Schemas.RunCapsule
@@ -30,9 +31,9 @@ public protocol PlayerWeekAPI: Sendable {
 public protocol RunPagesAPI: Sendable {
     /// Every page the run has, each by his id and slug.
     func index(tag: String?) async throws -> RunRead<[RunIndexEntry]>
-    /// His page; a held page, a kicker or a defense is refused (not_found), as the API holds a refused
-    /// document back.
-    func page(id: String, tag: String?) async throws -> RunRead<RunPlayer>
+    /// His page with the run it is from; a held page, a kicker or a defense is refused (not_found), as
+    /// the API holds a refused document back.
+    func page(id: String, tag: String?) async throws -> RunRead<RunPlayerAnswer>
     /// The pages the nightly held this run, nil when it held none.
     func held(tag: String?) async throws -> RunRead<[RunHeldPage]?>
     /// An earlier run's copy of a held page, the same shape as a page.
@@ -96,11 +97,11 @@ extension APIClient: RunPagesAPI {
         }
     }
 
-    public func page(id: String, tag: String?) async throws -> RunRead<RunPlayer> {
+    public func page(id: String, tag: String?) async throws -> RunRead<RunPlayerAnswer> {
         let input = Operations.RunPlayer.Input(path: .init(id: id), headers: .init(ifNoneMatch: tag))
         switch try await Self.unwrapped({ try await client.runPlayer(input) }) {
         case let .ok(answer):
-            return try .fresh(Self.payload(answer.body.json.value2.data).player, tag: answer.headers.eTag)
+            return try .fresh(Self.payload(answer.body.json.value2.data), tag: answer.headers.eTag)
         case let .notModified(answer):
             return .unchanged(tag: answer.headers.eTag ?? tag)
         case let .badRequest(answer):

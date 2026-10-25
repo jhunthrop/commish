@@ -10,7 +10,12 @@ public extension RunFixture {
     }
 
     func page(id: String) throws -> RunPlayer {
-        try APIDecoding.envelopeData(Components.Schemas.RunPlayerAnswer.self, from: pageAnswer(id: id)).player
+        try pageRead(id: id).player
+    }
+
+    /// His page with the run it is from, as the route answers it.
+    func pageRead(id: String) throws -> RunPlayerAnswer {
+        try APIDecoding.envelopeData(RunPlayerAnswer.self, from: pageAnswer(id: id))
     }
 
     func scheduleAnswer() throws -> Data {
@@ -90,11 +95,11 @@ public struct StubPages: RunPagesAPI {
         try read("index.json", tag: tag) { try fixture.indexEntries() }
     }
 
-    public func page(id: String, tag: String?) async throws -> RunRead<RunPlayer> {
+    public func page(id: String, tag: String?) async throws -> RunRead<RunPlayerAnswer> {
         guard heldPages[id] == nil else {
             throw APIError.envelope(code: "not_found", message: "The run held this page: read /run/held.")
         }
-        return try read("players/\(id).json", tag: tag) { try fixture.page(id: id) }
+        return try read("players/\(id).json", tag: tag) { try fixture.pageRead(id: id) }
     }
 
     public func held(tag: String?) async throws -> RunRead<[RunHeldPage]?> {
