@@ -275,7 +275,8 @@
 						><ul class="wk-chips">
 							{#each chips as chip (chip)}<li>{chip}</li>{/each}
 						</ul>
-						<a class="graded-under" href="#draft">{RECORDS_WORDS.beforePhone}</a></td
+						<a class="graded-under" href="#draft">{RECORDS_WORDS.beforePhone}</a>
+						<span class="set-rule">{RECORDS_WORDS.setRulePhone}</span></td
 					>
 				</tr>
 			{/if}

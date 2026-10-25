@@ -26,22 +26,27 @@ import type { DraftLine, DraftRecord, RecordLine, RecordWeek, RunRecord } from '
 /** The weekly record's yardsticks, one name everywhere on the page (Lane 140, C15). */
 const YARDSTICKS = "ESPN and the week's published projection";
 
+/** The draft record's name, one source for every sentence that names it (review L2). */
+const DRAFT_RECORD = 'Draft record';
+
 /** The records' words, in one place for the copy guard. */
 export const RECORDS_WORDS = {
 	lead: `Two records, each graded against what it competes with: our weekly rankings against ${YARDSTICKS}, and our draft board against ADP.`,
 	weekly: 'Weekly record',
 	weeklyWhat: `Our weekly rankings against ${YARDSTICKS}`,
-	draft: 'Draft record',
+	draft: DRAFT_RECORD,
 	draftWhat: "Our draft board against ADP, on the season's points so far",
 	/** The weeks before the weekly record, one line (ruling 1). */
 	beforeLead: (from: number) => (from <= 2 ? 'Week 1' : `Weeks 1 to ${String(from - 1)}`),
 	/** The set rule, said once (Lane 140, C14): each week's own set time is on its row. */
 	before: (from: number) =>
-		`Weekly rankings start week ${String(from)}. Each week's rankings are set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record.`,
+		`Weekly rankings start week ${String(from)}. Each week's rankings are set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under ${DRAFT_RECORD}.`,
 	/** The weeks before the weekly record on a phone (Lane 209): a chip a week, "Wk 1", then where
 	 * they are graded, in place of the set rule's paragraph, which a desk says. */
 	beforeChip: (week: number) => `Wk ${String(week)}`,
-	beforePhone: 'Graded under Draft record',
+	beforePhone: `Graded under ${DRAFT_RECORD}`,
+	/** The set rule's short form under the chips, so a phone says it once too (review M3). */
+	setRulePhone: "Each week's rankings are graded as set, never as refreshed after.",
 	setBefore: (day: string) => `set before kickoff ${day}`,
 	/** A set week's row, its set time to the minute and its zone (C14). */
 	setAt: (stamp: string) => `set ${stamp}`,

@@ -169,6 +169,8 @@ void test('on a phone the weeks before the weekly record are a chip a week, not 
 	assert.deepEqual(beforeChips(7), ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4', 'Wk 5', 'Wk 6']);
 	assert.deepEqual(beforeChips(1), []);
 	assert.equal(RECORDS_WORDS.beforePhone, 'Graded under Draft record');
+	assert.ok(RECORDS_WORDS.before(7).includes('graded as set, never as refreshed after'));
+	assert.ok(RECORDS_WORDS.setRulePhone.includes('graded as set, never as refreshed after'));
 });
 
 void test("the weekly record draws ESPN's columns from its first week, the published projection's once graded (C15)", () => {

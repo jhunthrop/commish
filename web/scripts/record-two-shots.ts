@@ -197,6 +197,10 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 	if (width <= PHONE_MAX) {
 		const chips = await page.locator('section#weekly tr.before .wk-chips li:visible').count();
 		if (chips !== 6) faults.push(`${where}: ${String(chips)} week chips before the weekly record`);
+		// The set rule said once on the phone too, read as drawn (review M3), not from hidden cells.
+		const seen = await page.locator('section#weekly').innerText();
+		if (!seen.includes(RECORDS_WORDS.setRulePhone))
+			faults.push(`${where}: the phone does not say the set rule`);
 	}
 	lacks(weekly, /Yahoo|weekly experts|\bADP\b|FantasyPros|froze|freeze|rest-of-season/iu, where);
 	if (width > PHONE_MAX) has(weekly, 'Set each week before kickoff', where);
