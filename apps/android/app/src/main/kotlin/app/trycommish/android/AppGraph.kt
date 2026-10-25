@@ -10,13 +10,13 @@ import android.os.Build
 import android.util.Log
 import app.trycommish.api.Transport
 import app.trycommish.api.models.LeagueHost
-import app.trycommish.core.AppWords
 import app.trycommish.core.Cache
 import app.trycommish.core.Clock
 import app.trycommish.core.EncryptedSession
 import app.trycommish.core.FileCache
 import app.trycommish.core.Session
 import app.trycommish.core.SessionEnd
+import app.trycommish.core.SignInState
 import app.trycommish.core.SignOut
 import app.trycommish.core.SystemClock
 import app.trycommish.core.account.AccountHooks
@@ -65,9 +65,7 @@ import app.trycommish.core.waivers.WaiverViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.security.SecureRandom
 import java.time.ZoneId
@@ -107,26 +105,21 @@ class AppGraph(
     /** Work that must outlive a screen or a rotation: the sign-in's pairing, once its verifier is spent. */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-    private val signedInState = MutableStateFlow(session.token != null)
-    private val signInMessageState = MutableStateFlow<String?>(null)
+    /** The one place the app's sign-in state turns (sign out, a refused token, a finished sign-in). */
+    private val signInState =
+        SignInState(session, cache, SignOut(session, cache, account::revokeDevice) { Log.w(TAG, "revoke device", it) })
 
     /** Whether the device holds a token, for the tabs that need one. */
-    val signedIn: StateFlow<Boolean> = signedInState.asStateFlow()
+    val signedIn: StateFlow<Boolean> = signInState.signedIn
 
     /** What the sign-in screen says about the last attempt or the last sign-out, if anything. */
-    val signInMessage: StateFlow<String?> = signInMessageState.asStateFlow()
+    val signInMessage: StateFlow<String?> = signInState.message
 
     private val signIn = SignIn(apiBaseUrl, returnTo, Build.MODEL, ApiPairing(transport), session, SecureRandom())
     val signInFlow = SignInFlow(signIn, returnTo)
 
     /** The API refused the token: forget it and every kept answer, and ask for a sign-in. */
-    val sessionEnd =
-        SessionEnd {
-            session.signOut()
-            cache.clear()
-            signInMessageState.value = AppWords.signedOut
-            signedInState.value = false
-        }
+    val sessionEnd: SessionEnd = signInState.sessionEnd
 
     fun leagueHomeViewModel(): LeagueHomeViewModel = LeagueHomeViewModel(reads, cache, clock, zone, sessionEnd)
 
@@ -223,36 +216,24 @@ class AppGraph(
             zone,
             push,
             { session.deviceId },
-            AccountHooks(::signOut, sessionEnd, leaguesChanged),
+            AccountHooks(::signOut, sessionEnd, leaguesChanged, signInState::holdsToken),
         )
 
     fun shellViewModel(): ShellViewModel = ShellViewModel(account, cache, clock, zone, sessionEnd)
-
-    private val signOutSession = SignOut(session, cache, account::revokeDevice) { Log.w(TAG, "revoke device", it) }
 
     /** The member signs this phone out (the Account's Sign out, or its own row's): the API forgets its
      * sign-in when it can be reached, the phone forgets its token and every kept answer whatever the API
      * said, and the app returns to sign-in. */
     fun signOut() {
-        appScope.launch {
-            try {
-                signOutSession()
-            } finally {
-                signInMessageState.value = null
-                signedInState.value = false
-            }
-        }
+        appScope.launch { signInState.signOut() }
     }
 
     /** Completes a sign-in from its return link in the app's scope, so a rotation cannot cancel it. */
     fun completeSignIn(link: String) {
         appScope.launch {
             when (val result = signInFlow.complete(link)) {
-                SignInResult.SignedIn -> {
-                    signInMessageState.value = null
-                    signedInState.value = true
-                }
-                is SignInResult.Refused -> signInMessageState.value = result.message
+                SignInResult.SignedIn -> signInState.signedInNow()
+                is SignInResult.Refused -> signInState.refused(result.message)
                 SignInResult.Ignored -> Unit
             }
         }

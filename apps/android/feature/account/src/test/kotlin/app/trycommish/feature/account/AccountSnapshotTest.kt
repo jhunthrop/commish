@@ -125,10 +125,22 @@ class AccountSnapshotTest(
     @Test
     fun mockShowsTheStatesItNames() {
         if (dark || phone != Phone.Pixel9 || scene.part == null) return
-        val model = (viewModelAt(scene, scheduler).ui.value.state as AccountState.Loaded).model
+        val vm = viewModelAt(scene, scheduler)
+        val loaded = vm.ui.value.state as AccountState.Loaded
+        val model = loaded.model
         when (scene) {
             Scene.NotFree -> assertEquals(null, model.plan)
             Scene.Detached -> assertEquals(listOf(false, true, false), model.leagues?.map { it.detached })
+            Scene.Stale -> {
+                assertEquals(true, loaded.stale)
+                assertEquals("Last read Sat 12:00 pm", vm.stampWords())
+            }
+            Scene.Switches ->
+                assertEquals(
+                    false,
+                    vm.ui.value.push
+                        .on(PushKind.Status),
+                )
             else -> assertEquals(listOf(true, false), model.devices.map { it.thisPhone })
         }
     }
@@ -167,7 +179,7 @@ private fun viewModelAt(
     val cache = MemoryCache()
     val stub = StubAccountScreen(flag = if (scene == AccountSnapshotTest.Scene.NotFree) false else null)
     val push = MemoryPushStore(PushSettings.standard.with(PushKind.Status, isOn = false))
-    val hooks = AccountHooks({}, {}, {})
+    val hooks = AccountHooks({}, {}, {}, { true })
 
     fun at(seconds: Long) =
         AccountViewModel(

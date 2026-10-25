@@ -3,6 +3,7 @@ package app.trycommish.core.account
 import app.trycommish.api.ApiFailure
 import app.trycommish.api.Unauthorized
 import app.trycommish.api.decodeEnvelope
+import kotlinx.coroutines.delay
 import java.io.File
 import java.io.IOException
 
@@ -49,6 +50,9 @@ class StubAccountScreen(
     var offline = false
     var refuse = false
     var restoreRefusal: String? = null
+
+    /** How long a restore takes to answer, in milliseconds of the test's clock (an Undo on a slow network). */
+    var restoreDelay = 0L
     var detached: List<String> = emptyList()
     var restored: List<String> = emptyList()
     var revoked: List<String> = emptyList()
@@ -68,6 +72,7 @@ class StubAccountScreen(
     }
 
     override suspend fun restore(id: String) {
+        delay(restoreDelay)
         check()
         restoreRefusal?.let { throw ApiFailure(FORBIDDEN, "many_leagues", it) }
         restored = restored + id
