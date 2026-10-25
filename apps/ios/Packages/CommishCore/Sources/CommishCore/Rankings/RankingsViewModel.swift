@@ -44,6 +44,9 @@ public final class RankingsViewModel {
     public private(set) var limit = RankingsViewModel.pageRows
     /// Letters typed on our order that its next read has not asked for yet.
     public private(set) var searchPending = false
+    /// Why the chip or search asked for last could not be read while an earlier answer stays drawn,
+    /// said once over the rows; nil once a read lands.
+    public private(set) var problem: String?
 
     private let api: any RankingsAPI
     private let cache: any AnswerCache
@@ -59,11 +62,26 @@ public final class RankingsViewModel {
         case week(WeekOrderAdvice)
     }
 
+    /// What is drawn: the read's route, the chip and the letters it was asked for, its answer and when.
     private struct Shown {
         let route: String
+        let chip: RankingsChip?
+        let query: String
         let answer: Answer
         let stamp: Date
         let stale: Bool
+
+        func stale(_ isStale: Bool) -> Shown {
+            Shown(route: route, chip: chip, query: query, answer: answer, stamp: stamp, stale: isStale)
+        }
+    }
+
+    /// One read as asked: its route (the cache key), the chip and the letters, and the order's query.
+    private struct Asked {
+        let route: String
+        let chip: RankingsChip?
+        let query: String
+        let order: OrderQuery
     }
 
     /// `inSeason` names the page "Rankings" and says the week's game beside each player; `query` is the
@@ -107,39 +125,51 @@ public final class RankingsViewModel {
 
     /// The read the chips and the search name: the week's for K and D/ST, our order's otherwise.
     var route: String {
-        if let position = chip?.weekPosition {
-            return "/order/week?position=\(position.rawValue)"
-        }
-        return orderQuery.route
+        asked.route
     }
 
     var orderQuery: OrderQuery {
         OrderQuery(position: chip?.orderPosition, search: query, limit: limit)
     }
 
+    /// The read the chips and the search name now, captured before any await so its request and its
+    /// cache key are the same read whatever is typed or chosen meanwhile.
+    private var asked: Asked {
+        let order = orderQuery
+        let route = chip?.weekPosition.map { "/order/week?position=\($0.rawValue)" } ?? order.route
+        return Asked(route: route, chip: chip, query: query, order: order)
+    }
+
     /// The chips' and the search's read: its saved answer at once when nothing of it is shown, then the
-    /// API's; a failed read keeps what is shown, stale; a refused token signs out.
+    /// API's; a failed read keeps what is shown, stale, with the reason said once over it (the chip put
+    /// back to the one it was read for, the letters left as typed); a refused token signs out.
     public func load() async {
         searchPending = false
         latest += 1
         let mine = latest
-        let route = route
-        let chip = chip
-        if shown?.route != route, let saved = await cache.read(Answer.self, route: route), mine == latest {
-            show(Shown(route: route, answer: saved.value, stamp: saved.stamp, stale: true))
+        let asked = asked
+        if shown?.route != asked.route, let saved = await cache.read(Answer.self, route: asked.route),
+           mine == latest {
+            show(Shown(
+                route: asked.route, chip: asked.chip, query: asked.query, answer: saved.value, stamp: saved.stamp,
+                stale: true
+            ))
         }
         do {
-            let answer: Answer = if let position = chip?.weekPosition {
+            let answer: Answer = if let position = asked.chip?.weekPosition {
                 try await .week(api.weekOrder(position: position))
             } else {
-                try await .order(api.order(orderQuery))
+                try await .order(api.order(asked.order))
             }
             let stamp = clock.now
-            await cache.write(answer, route: route, stamp: stamp)
+            await cache.write(answer, route: asked.route, stamp: stamp)
             guard mine == latest else {
                 return
             }
-            show(Shown(route: route, answer: answer, stamp: stamp, stale: false))
+            problem = nil
+            show(Shown(
+                route: asked.route, chip: asked.chip, query: asked.query, answer: answer, stamp: stamp, stale: false
+            ))
         } catch where APIError.signsOut(error) {
             state = .failed(AppWords.Failure.signedOut)
             onSignedOut()
@@ -147,11 +177,15 @@ public final class RankingsViewModel {
             guard mine == latest else {
                 return
             }
-            if let shown, shown.route == route {
-                show(Shown(route: route, answer: shown.answer, stamp: shown.stamp, stale: true))
-            } else {
+            guard let shown else {
                 state = .failed(LeagueHomeViewModel.sentence(for: error))
+                return
             }
+            if shown.route != asked.route {
+                problem = LeagueHomeViewModel.sentence(for: error)
+                chip = shown.chip
+            }
+            show(shown.stale(true))
         }
     }
 
@@ -172,7 +206,10 @@ public final class RankingsViewModel {
         limit = Self.pageRows
         searchPending = searchReads
         if let shown, case .week = shown.answer {
-            show(shown)
+            show(Shown(
+                route: shown.route, chip: shown.chip, query: letters, answer: shown.answer, stamp: shown.stamp,
+                stale: shown.stale
+            ))
         }
     }
 
@@ -201,11 +238,11 @@ public final class RankingsViewModel {
         let content: RankingsContent = switch next.answer {
         case let .order(advice):
             .order(RankingsModel(
-                advice: advice, chip: chip, query: query, inSeason: inSeason, zone: zone, now: now
+                advice: advice, chip: next.chip, query: next.query, inSeason: inSeason, zone: zone, now: now
             ))
         case let .week(advice):
             .week(WeekRankingsModel(
-                advice: advice, position: advice.position.value1 == .def ? .def : .k, query: query,
+                advice: advice, position: advice.position.value1 == .def ? .def : .k, query: next.query,
                 boardScoring: ValueWords.format(advice.projectionScoring.format), zone: zone, now: now
             ))
         }

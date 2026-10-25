@@ -191,6 +191,8 @@ public struct RankingsScreen: View {
     let query: String
     let content: RankingsContent
     let more: Bool
+    /// Why the chip or search asked for last could not be read, said once over the rows shown.
+    var problem: String?
     let actions: RankingsActions
     var still = false
     var rows: Int?
@@ -201,6 +203,7 @@ public struct RankingsScreen: View {
             switch content {
             case let .order(model):
                 RankingsFiltersView(chip: chip, query: query, hits: model.hits, actions: actions, still: still)
+                ProblemLine(problem: problem)
                 RankingsTableView(model: model, sections: Self.first(model.sections, rows), open: actions.open)
                 if more, rows == nil {
                     QuietButton(Words.Order.moreRows, action: actions.more)
@@ -211,6 +214,7 @@ public struct RankingsScreen: View {
                 }
             case let .week(model):
                 RankingsFiltersView(chip: chip, query: query, hits: nil, actions: actions, still: still)
+                ProblemLine(problem: problem)
                 WeekRankingsView(model: model, sections: Self.first(model.sections, rows), open: actions.open)
             }
         }
@@ -230,6 +234,21 @@ public struct RankingsScreen: View {
             let kept = Array(section.rows.prefix(left))
             left -= kept.count
             return section.with(rows: kept)
+        }
+    }
+}
+
+/// The one line over the rows when the chip or search asked for could not be read, in the loss's ink.
+struct ProblemLine: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let problem: String?
+
+    var body: some View {
+        if let problem {
+            Text(problem)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(Theme(colorScheme).color(Tokens.Color.lossInk))
         }
     }
 }
@@ -256,7 +275,8 @@ public struct RankingsView: View {
                 ScrollView {
                     RankingsScreen(
                         name: viewModel.name, lead: viewModel.lead, stamp: viewModel.stampWords, chip: viewModel.chip,
-                        query: viewModel.query, content: content, more: viewModel.more, actions: actions
+                        query: viewModel.query, content: content, more: viewModel.more, problem: viewModel.problem,
+                        actions: actions
                     )
                 }
                 .refreshable { await viewModel.load() }

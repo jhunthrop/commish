@@ -94,11 +94,24 @@ enum RecordSections {
         let order = week.flatMap { weekly ? RecordLines.weeklyOrder($0) : RecordLines.weekOrder($0) }
         return RecordRow(
             lead: line.lead, text: RecordWords.capitalized(line.text), order: order, graded: graded,
+            caption: graded ? caption(week, order: order, text: line.text, weekly: weekly) : nil,
             players: graded ? String(week?.lines.first { $0.position.value1 == .all }?.ours.graded ?? 0) : nil,
             cells: graded
                 ? cellsByPosition(week?.lines ?? [], positions: positions, sources: sources, weekly: weekly) : nil,
             note: weekly && graded ? week?.espnNote : nil
         )
+    }
+
+    /// A graded week's caption: the order with when it was graded on the weekly record (its order words
+    /// carry the set date), the order with the run's own words on the record before Lane 114.
+    static func caption(_ week: RunRecordWeek?, order: String?, text: String, weekly: Bool) -> String {
+        guard let order else {
+            return RecordWords.capitalized(text)
+        }
+        guard weekly, let graded = week?.gradedAt else {
+            return "\(order), \(text)"
+        }
+        return "\(order), graded \(RecordWords.weekdayDay(graded))"
     }
 
     static func cellsByPosition(

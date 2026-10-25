@@ -52,6 +52,10 @@ public struct RankingsPlayer: Equatable, Sendable {
     public let club: String
     /// "RB 15", "TE IR", "K"; nil for a defense, whose mark names it.
     public let pill: String?
+    /// His position as the pill names it, nil for a defense.
+    public let position: String?
+    /// His rank at the position where the pill draws it, or the list he is on ("IR"); nil with neither.
+    public let rank: String?
     public let status: RowStatus?
     public let game: RowGame
     /// "Expected score CHI 26.5, ATL 23", while his game is to come.
@@ -62,9 +66,7 @@ public struct RankingsPlayer: Equatable, Sendable {
     /// kicker, a defense), as the web's row draws no link.
     public var sheetPlayer: SheetPlayer? {
         slug.map { slug in
-            let position = pill.map { String($0.prefix { $0 != " " }) }
-            let rank = pill.flatMap { words in words.firstIndex(of: " ").map { String(words[$0...].dropFirst()) } }
-            return SheetPlayer(id: key, slug: slug, name: name, position: position, rank: rank, club: club)
+            SheetPlayer(id: key, slug: slug, name: name, position: position, rank: rank, club: club)
         }
     }
 }
@@ -133,10 +135,9 @@ enum RankingsRows {
         let key = line.player.boardId ?? line.player.hostId
         let listed = row.status?.onList == true
         let rank = pillRank && !listed ? line.positionRank : nil
-        let pill: String? = pilled.contains(line.player.position)
-            ? [line.player.position, rank.map(String.init) ?? row.status?.rank].compactMap(\.self)
-            .joined(separator: " ")
-            : nil
+        let position = pilled.contains(line.player.position) ? line.player.position : nil
+        let shownRank = position == nil ? nil : rank.map(String.init) ?? row.status?.rank
+        let pill = position.map { [$0, shownRank].compactMap(\.self).joined(separator: " ") }
         var game = row.game
         if case let .game(place, _) = row.game, row.read.toPlay, let kickoff = facts.kickoff {
             game = .game(where: place, when: Formatting.kickoffAt(kickoff, zone: zone))
@@ -145,7 +146,8 @@ enum RankingsRows {
         let name = defense ? "\(nickname(line.player.name)) \(row.position)" : row.name
         return RankingsPlayer(
             key: key, name: name, fit: defense ? StartRows.lastName(StartRows.withoutDefense(name)) : row.fit,
-            slug: line.slug, clubMark: row.clubMark, club: row.club, pill: pill, status: row.status, game: game,
+            slug: line.slug, clubMark: row.clubMark, club: row.club, pill: pill, position: position,
+            rank: shownRank, status: row.status, game: game,
             expected: row.expected == nil ? nil : expectedScore(facts, club: line.player.team), weather: row.weather
         )
     }

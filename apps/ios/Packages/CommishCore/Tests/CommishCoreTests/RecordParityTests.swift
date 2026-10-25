@@ -218,6 +218,7 @@ struct RecordParity: Decodable, Sendable {
         let lead: String
         let text: String
         let order: String?
+        let caption: String?
         let graded: Bool
         let players: String?
         let cells: Cells?
@@ -227,6 +228,7 @@ struct RecordParity: Decodable, Sendable {
             lead = row.lead
             text = row.text
             order = row.order
+            caption = row.caption
             graded = row.graded
             players = row.players
             cells = row.cells.map(RecordParity.cells)

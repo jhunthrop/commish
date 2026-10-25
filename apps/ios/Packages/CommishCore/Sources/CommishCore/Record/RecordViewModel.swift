@@ -40,6 +40,8 @@ public final class RecordViewModel {
     private let zone: TimeZone
     private let onSignedOut: @MainActor () -> Void
     private var shown: (read: RecordRead, stamp: Date)?
+    /// The newest load: an older one's answer (a pull during the first read) is saved, never shown.
+    private var latest = 0
 
     public init(
         api: any RecordAPI, cache: any AnswerCache, clock: any Clock, zone: TimeZone = .current,
@@ -63,6 +65,8 @@ public final class RecordViewModel {
     /// The saved read at once when nothing is shown, then the record and the schedule naming their kept
     /// ETags; a failed read keeps what is shown, stale; a refused token signs out.
     public func load() async {
+        latest += 1
+        let mine = latest
         let saved = await cache.read(RecordRead.self, route: Self.route)
         if shown == nil, let saved {
             show(saved.value, stamp: saved.stamp, stale: true)
@@ -77,11 +81,17 @@ public final class RecordViewModel {
             )
             let stamp = clock.now
             await cache.write(fresh, route: Self.route, stamp: stamp)
+            guard mine == latest else {
+                return
+            }
             show(fresh, stamp: stamp, stale: false)
         } catch where APIError.signsOut(error) {
             state = .failed(AppWords.Failure.signedOut)
             onSignedOut()
         } catch {
+            guard mine == latest else {
+                return
+            }
             if let shown {
                 show(shown.read, stamp: shown.stamp, stale: true)
             } else {

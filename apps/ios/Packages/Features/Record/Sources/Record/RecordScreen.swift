@@ -136,7 +136,7 @@ struct WeeksView: View {
                 ForEach(section.rows) { row in
                     if row.graded, let cells = row.cells?[choice.position]?[choice.figure] {
                         figureRow(
-                            lead: row.lead, order: [row.order, row.text].compactMap(\.self).joined(separator: ". "),
+                            lead: row.lead, order: row.caption,
                             cells: cells, theme: theme
                         )
                     } else {

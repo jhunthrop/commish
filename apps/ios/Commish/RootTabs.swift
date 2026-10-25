@@ -182,12 +182,11 @@ struct RootTabs: View {
         }
     }
 
-    /// The season names the order's page Rankings: the followed league's phase, or with none the site's.
+    /// The season names the order's page Rankings (week-names.ts weekNames): the site's regular season,
+    /// whether or not a league is followed; Players before it, after it and in the NFL's postseason. An
+    /// unread season reads as in season, as the bar does.
     private var inSeason: Bool {
-        if let league = selectedLeague {
-            return league.phase == .inSeason || league.phase == .playoffs || league.phase == nil
-        }
-        return session.sitePhase == nil || session.sitePhase == .inSeason || session.sitePhase == .playoffs
+        session.sitePhase == nil || session.sitePhase == .inSeason
     }
 
     private var selectedLeague: FollowedLeague? {

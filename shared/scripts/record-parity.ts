@@ -10,6 +10,7 @@
  * Written by export-parity.ts beside the others. */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { weekdayLabel } from '../../web/src/lib/format/date.ts';
 import { drawnText } from '../../web/src/lib/league/box/basis.ts';
 import {
 	RECORD_BOX,
@@ -167,6 +168,19 @@ function cellsOf(
 	);
 }
 
+/** A graded week's caption: the order with when it was graded on the weekly record, whose order
+ * words carry the set date; the order with the run's own words on the record before Lane 114. */
+function captionOf(
+	week: RunRecord['weeks'][number] | null,
+	order: string | null,
+	text: string,
+	weekly: boolean
+): string {
+	if (order === null) return capitalized(text);
+	if (!weekly || week === null || week.gradedAt === null) return `${order}, ${text}`;
+	return `${order}, ${RECORDS_WORDS.gradedOn(weekdayLabel(week.gradedAt))}`;
+}
+
 /** The weekly record's section (or the run's own before Lane 114) as WeeklySection draws it. */
 function weeklySection(
 	record: RunRecord,
@@ -252,6 +266,9 @@ function weeklySection(
 				lead: row.lead,
 				text: capitalized(row.text),
 				order,
+				// The app's line under a graded week on a phone, the set date said once (the web's Status
+				// column, hidden below 1180 px).
+				caption: graded ? captionOf(row.week, order, row.text, weekly) : null,
 				graded,
 				players: graded
 					? String(allLine(row.week?.lines ?? [])?.ours.graded ?? RECORD_BOX.none)

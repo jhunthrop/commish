@@ -130,6 +130,50 @@ struct RankingsViewModelTests {
         #expect(viewModel.state == .failed(AppWords.Failure.signedOut))
     }
 
+    /// Review H1: All is shown, then WR has never been read and fails: All's rows stay, stale, with the
+    /// reason said once over them; the chip goes back to the one its rows were read for, so the chips
+    /// and the search stay to move on with.
+    @Test func aChipNeverReadThatFailsKeepsWhatIsShownAndItsChips() async throws {
+        let viewModel = rankings(FailingRankings())
+        await viewModel.load()
+        await viewModel.choose(chip: .receiver)
+        let (model, stale) = try #require(order(viewModel))
+        #expect(stale)
+        #expect(viewModel.chip == nil, "the chip of the rows still shown")
+        #expect(model.rows.first?.player.name == "D'Andre Swift")
+        #expect(viewModel.problem == AppWords.Failure.offline)
+        await viewModel.choose(chip: .runningBack)
+        #expect(viewModel.chip == .runningBack, "another chip still reads")
+        #expect(viewModel.problem == nil)
+    }
+
+    /// Review H1 on the search: letters whose read fails leave the field as typed and the rows shown.
+    @Test func aSearchThatFailsKeepsItsLettersAndTheRowsShown() async throws {
+        let viewModel = rankings(FailingRankings())
+        await viewModel.load()
+        viewModel.find("wa")
+        await viewModel.load()
+        let (model, stale) = try #require(order(viewModel))
+        #expect(stale)
+        #expect(viewModel.query == "wa")
+        #expect(model.hits == "121 on NFL rosters today", "the rows still drawn are the order's")
+        #expect(viewModel.problem == AppWords.Failure.offline)
+    }
+
+    /// Review M1: letters typed while the cache is read change neither the read's request nor the key
+    /// its answer is saved under.
+    @Test func aQueryTypedDuringTheCacheReadIsNotTheOneSaved() async {
+        let api = CountingRankings()
+        let cache = GatedCache(FileCache(folder: folder))
+        let viewModel = rankings(api, cache: cache)
+        await cache.onRead { await MainActor.run { viewModel.find("wa") } }
+        await viewModel.load()
+        #expect(await api.queries == [OrderQuery(position: nil, search: nil, limit: 100)])
+        let saved = await cache.read(SavedAnswer.self, route: "/order?limit=100&byes=last")
+        #expect(saved != nil, "saved under the route it was asked for")
+        #expect(await cache.read(SavedAnswer.self, route: "/order?limit=100&q=wa&byes=last") == nil)
+    }
+
     // MARK: Our record
 
     private func record(
@@ -248,5 +292,57 @@ actor CountingRecord: RecordAPI {
             unchanged += 1
         }
         return read
+    }
+}
+
+/// The fixture's order, failing every read that names WR or a search, as no signal does.
+struct FailingRankings: RankingsAPI {
+    private let stub = StubRankings()
+
+    func order(_ query: OrderQuery) async throws -> OrderAdvice {
+        guard query.position == nil || query.position == .rb, query.search == nil else {
+            throw URLError(.notConnectedToInternet)
+        }
+        return try await stub.order(query)
+    }
+
+    func weekOrder(position: WeekOrderPosition) async throws -> WeekOrderAdvice {
+        try await stub.weekOrder(position: position)
+    }
+}
+
+/// A saved answer's shape, to read what the view model saved.
+enum SavedAnswer: Codable, Sendable {
+    case order(OrderAdvice)
+    case week(WeekOrderAdvice)
+}
+
+/// A cache that runs a step of the test's own while a read is out, then reads.
+actor GatedCache: AnswerCache {
+    private let inner: FileCache
+    private var step: (@Sendable () async -> Void)?
+
+    init(_ inner: FileCache) {
+        self.inner = inner
+    }
+
+    func onRead(_ next: @escaping @Sendable () async -> Void) {
+        step = next
+    }
+
+    func read<Value: Codable & Sendable>(_ type: Value.Type, route: String) async -> Cached<Value>? {
+        if let current = step {
+            step = nil
+            await current()
+        }
+        return await inner.read(type, route: route)
+    }
+
+    func write(_ value: some Codable & Sendable, route: String, stamp: Date) async {
+        await inner.write(value, route: route, stamp: stamp)
+    }
+
+    func clear() async {
+        await inner.clear()
     }
 }
