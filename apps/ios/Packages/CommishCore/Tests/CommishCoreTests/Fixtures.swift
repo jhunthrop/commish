@@ -48,11 +48,6 @@ enum Fixtures {
         try APIDecoding.envelopeData(MatchupBox.self, from: data("fixtures/inseason/matchup-\(league)-\(clock).json"))
     }
 
-    /// The API's PPR board (GET /boards/ppr), as a dev API answered it.
-    static func board() throws -> RoomBoard {
-        try APIDecoding.envelopeData(RoomBoard.self, from: data("fixtures/inseason/boards-ppr.json"))
-    }
-
     /// A file clock as its instant: `2026-10-18T18-56-00Z` as 18:56 UTC that day.
     static func instant(_ clock: String) -> Date {
         let text = clock.replacingOccurrences(

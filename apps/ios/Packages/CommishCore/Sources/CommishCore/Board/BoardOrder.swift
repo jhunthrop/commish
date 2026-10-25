@@ -1,104 +1,90 @@
 import CommishAPI
-import CommishDesign
 import Foundation
 
-/// The rows a view lists, in our order, as the web's board orders them (BoardView.svelte), over the
-/// API's board, whose players come in the order drafters take them. Nothing here numbers a player: a
-/// row's position number is the API's `position_rank`, whatever the view leaves out (plan Review
-/// Focus 4).
-enum BoardOrder {
-    struct Section {
-        let id: String
-        let head: String?
-        let players: [BoardPlayer]
+/// A row a board places: his id, his position and his place at it.
+protocol PlacedRow {
+    var id: String { get }
+    var positionRank: Int { get }
+    var positionName: String { get }
+}
+
+extension RunBoardRow: PlacedRow {
+    var positionName: String {
+        position.value1?.rawValue ?? position.value2 ?? ""
     }
+}
 
-    /// The ranked positions, which the All view lists (a kicker and a defense have no points of ours).
-    static let ranked: Set<BoardPosition> = [.quarterback, .runningBack, .receiver, .tightEnd]
+extension RunMarketRow: PlacedRow {
+    var positionName: String {
+        position.value1?.rawValue ?? position.value2 ?? ""
+    }
+}
 
-    static func sections(_ players: [BoardPlayer], position: BoardPosition?) -> [Section] {
-        guard let position else {
-            return [Section(id: "all", head: nil, players: all(players))]
-        }
-        let listed = players.filter { BoardPosition($0.position) == position }
-        guard !position.draftOrder else {
-            // A kicker's or a defense's view is the drafts' order, the API's own.
-            return [Section(id: position.rawValue, head: nil, players: listed)]
-        }
-        // A position view: its available players by their place at the position, then those on a
-        // season-long list under a head of their own (BoardView's tiers, then heldRows).
-        let available = listed.filter { !heldOut($0) }.enumerated()
+/// A position's tier as the web draws it (run/tiers.ts TierGroup): its number, the players shown in
+/// it, and its drop to the next tier as the run writes it, nil where the drop is not said.
+struct TierGroup {
+    let tier: Int
+    let rows: [RunBoardRow]
+    let drop: Double?
+}
+
+/// The rows a view lists as the web's board page lists them (server/pages/board.ts, BoardView.svelte),
+/// over the run's board, whose ranked rows come in our order: the All view the run's order, a
+/// position's view by his place at it in tiers, and a kicker's or a defense's the drafts' order; each
+/// player on a season-long list after the last available player at his position. Nothing here numbers
+/// a player: every number is the run's.
+enum BoardOrder {
+    typealias Statuses = [String: RunPlayerStatus]
+
+    /// derive.ts rowsAt and market.ts marketAt: a position's rows by their place, ties as listed.
+    static func at<Row: PlacedRow>(_ rows: [Row], position: BoardPosition) -> [Row] {
+        rows.enumerated()
+            .filter { $0.element.positionName == position.rawValue }
             .sorted { ($0.element.positionRank, $0.offset) < ($1.element.positionRank, $1.offset) }
             .map(\.element)
-        let held = listed.filter(heldOut)
-        return [Section(id: position.rawValue, head: nil, players: available)]
-            + (held.isEmpty ? [] : [Section(
-                id: "\(position.rawValue)-held",
-                head: Words.Board.heldHead,
-                players: held
-            )])
     }
 
-    /// The All view: every ranked player by points over replacement, the API's board's own order
-    /// (draftroom boardRanks), each on a season-long list after the last available player at his
-    /// position (board-status.ts withStatuses).
-    static func all(_ players: [BoardPlayer]) -> [BoardPlayer] {
-        let valued = players.enumerated().filter { _, player in
-            player.vor != nil && BoardPosition(player.position).map(ranked.contains) == true
-        }
-        let ordered = valued.sorted { lhs, rhs in
-            precedes(lhs.element, rhs.element) ?? (lhs.offset < rhs.offset)
-        }.map(\.element)
-        return withStatuses(ordered)
-    }
-
-    /// Whether `lhs` comes first: the larger value over replacement; at the same tenth, the place the
-    /// API's Gap gives each (his ADP less the Gap), which the API ranked on the unrounded value; nil
-    /// when neither tells them apart.
-    static func precedes(_ lhs: BoardPlayer, _ rhs: BoardPlayer) -> Bool? {
-        guard let left = lhs.vor, let right = rhs.vor else {
-            return nil
-        }
-        if left != right {
-            return left > right
-        }
-        guard let leftPlace = place(lhs), let rightPlace = place(rhs), leftPlace != rightPlace else {
-            return nil
-        }
-        return leftPlace < rightPlace
-    }
-
-    /// His place on our board as the API's Gap says it: the Gap is his ADP less the place, both to a
-    /// tenth, so the place is exact.
-    static func place(_ player: BoardPlayer) -> Int? {
-        guard let adp = player.adp, let gap = player.gap else {
-            return nil
-        }
-        return Int((adp - gap).rounded())
-    }
-
-    static func heldOut(_ player: BoardPlayer) -> Bool {
-        player.status?.seasonLong == true
+    static func heldOut(_ row: some PlacedRow, _ statuses: Statuses) -> Bool {
+        statuses[row.id]?.seasonLong == true
     }
 
     /// board-status.ts withStatuses: each player on a season-long list after the last available player
     /// at his position, in their order; a position with nobody available as it was.
-    static func withStatuses(_ players: [BoardPlayer]) -> [BoardPlayer] {
+    static func withStatuses<Row: PlacedRow>(_ rows: [Row], _ statuses: Statuses) -> [Row] {
         var lastAvailable: [String: Int] = [:]
-        var waiting: [String: [BoardPlayer]] = [:]
-        for (index, player) in players.enumerated() {
-            let position = player.position.value1?.rawValue ?? player.position.value2 ?? ""
-            if heldOut(player) {
-                waiting[position, default: []].append(player)
+        var waiting: [String: [Row]] = [:]
+        for (index, row) in rows.enumerated() {
+            if heldOut(row, statuses) {
+                waiting[row.positionName, default: []].append(row)
             } else {
-                lastAvailable[position] = index
+                lastAvailable[row.positionName] = index
             }
         }
-        return players.enumerated().flatMap { index, player -> [BoardPlayer] in
-            let position = player.position.value1?.rawValue ?? player.position.value2 ?? ""
-            let last = lastAvailable[position]
-            let here = !heldOut(player) || last == nil ? [player] : []
-            return here + (index == last ? waiting[position] ?? [] : [])
+        return rows.enumerated().flatMap { index, row -> [Row] in
+            let last = lastAvailable[row.positionName]
+            let here = !heldOut(row, statuses) || last == nil ? [row] : []
+            return here + (index == last ? waiting[row.positionName] ?? [] : [])
+        }
+    }
+
+    /// run/tiers.ts tierGroups: a position's tiers in order, its players on a season-long list left
+    /// out, each tier's drop said only where neither its last player nor the next tier's first is.
+    static func tiers(_ rows: [RunBoardRow], position: BoardPosition, _ statuses: Statuses) -> [TierGroup] {
+        let all = at(rows, position: position)
+        let out = { (row: RunBoardRow) in heldOut(row, statuses) }
+        var groups: [(tier: Int, rows: [RunBoardRow])] = []
+        for row in all where !out(row) {
+            if groups.last?.tier == row.tier {
+                groups[groups.count - 1].rows.append(row)
+            } else {
+                groups.append((row.tier, [row]))
+            }
+        }
+        return groups.map { group in
+            let end = all.last { $0.tier == group.tier }
+            let start = all.first { $0.tier == group.tier + 1 }
+            let shown = end.map { !out($0) } == true && start.map { !out($0) } == true
+            return TierGroup(tier: group.tier, rows: group.rows, drop: shown ? end?.tierDrop : nil)
         }
     }
 }
