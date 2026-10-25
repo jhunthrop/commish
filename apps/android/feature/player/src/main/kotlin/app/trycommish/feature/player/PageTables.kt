@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.trycommish.core.player.FormatsTable
 import app.trycommish.core.player.SeasonView
 import app.trycommish.core.player.TierBox
@@ -55,7 +56,7 @@ private const val MATE_HEIGHT = 40
 private const val TOGGLE_HEIGHT = 44
 private const val WEEK_WIDTH = 28
 private const val CHEVRON = 16
-private const val OPEN_TURN = 90f
+private const val CLOSED_TURN = -90f
 
 /** A line of the game log or a table: the pinned lead and its sub, then each figure in its column. */
 private data class LogCells(
@@ -119,7 +120,7 @@ private fun EarlierSeasons(prior: List<SeasonView.Prior>) {
             painterResource(R.drawable.icon_chevron),
             contentDescription = null,
             tint = c.ink2,
-            modifier = Modifier.size(CHEVRON.dp).rotate(if (open) OPEN_TURN else 0f),
+            modifier = Modifier.size(CHEVRON.dp).rotate(if (open) 0f else CLOSED_TURN),
         )
         Text(Words.Card.earlierSeasons, style = Faces.small.copy(fontWeight = FontWeight.SemiBold), color = c.ink2)
     }
@@ -172,7 +173,7 @@ private fun LogLine(
             cells.values.forEachIndexed { index, value ->
                 val style =
                     when {
-                        head -> Faces.label.copy(fontWeight = FontWeight.Bold)
+                        head -> Faces.label.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.sp)
                         else -> Faces.number(if (index == 0) NumWeight.Bold else NumWeight.Medium)
                     }
                 Text(
@@ -181,7 +182,7 @@ private fun LogLine(
                     color = ink,
                     textAlign = TextAlign.End,
                     maxLines = if (head) HEAD_LINES else 1,
-                    modifier = Modifier.weight(1f).padding(start = 2.dp),
+                    modifier = Modifier.weight(if (index == 0) LEAD_FIGURE_WEIGHT else 1f).padding(start = 2.dp),
                 )
             }
         }
@@ -190,6 +191,9 @@ private fun LogLine(
 }
 
 private const val HEAD_LINES = 4
+
+/** The first figure (Pts, a total) takes more of the row, so a season total prints whole. */
+private const val LEAD_FIGURE_WEIGHT = 1.5f
 
 /** The pinned lead: a week beside its opponent, a total's sub under its lead. */
 @Composable
