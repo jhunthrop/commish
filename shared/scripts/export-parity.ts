@@ -48,6 +48,7 @@ import { CARD, unreadBasis } from '../../web/src/lib/player/card.ts';
 import { railItemLabel } from '../../web/src/lib/run/week-names.ts';
 import type { Scoreboard } from '../../web/src/lib/league/inseason/api.ts';
 import { LINEUP_OUTPUT, lineupAt, moveWords, withWrites } from './lineup-parity.ts';
+import { BOARD_OUTPUT, renderBoard } from './board-parity.ts';
 import type { LineupAdvice } from '../../web/src/lib/league/inseason/api.ts';
 import {
 	GAME_STATE_OUTPUT,
@@ -391,7 +392,16 @@ export async function generate(): Promise<Outputs> {
 		[RAIL_OUTPUT, renderRail()],
 		[SHELL_OUTPUT, renderShell(await answer<SwitchLeague[]>('leagues-attached.json'))],
 		[GAME_STATE_OUTPUT, renderGameState(about, await gameStateRows(boards))],
-		[LINEUP_OUTPUT, await renderLineup(sync.host)]
+		[LINEUP_OUTPUT, await renderLineup(sync.host)],
+		[
+			BOARD_OUTPUT,
+			renderBoard(
+				generatedBy(
+					SCRIPT,
+					'web/src/lib/site/season-words.ts (boardWords), web/src/lib/format/number.ts and gap.ts'
+				)
+			)
+		]
 	]);
 }
 

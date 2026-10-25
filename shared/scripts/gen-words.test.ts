@@ -110,7 +110,10 @@ void test("the tables: the League home's, the box score's, then the shell's and 
 			'InSeason',
 			'Designation',
 			'DesignationRank',
-			'Figure'
+			'Figure',
+			'Board',
+			'BoardFormat',
+			'PageVerb'
 		]
 	);
 	assert.equal(new Set(TABLES.map((t) => t.json)).size, TABLES.length);
@@ -128,6 +131,12 @@ void test("the web's own words land in the JSON, the Swift and the Kotlin", asyn
 	assert.equal(json('shared/words/shell-league-switch.json').followFirst, 'Follow your league');
 	assert.equal(json('shared/words/player-shelf.json').fullPage, 'Full page');
 	assert.equal(json('shared/words/league-scoring.json').half_ppr, 'half PPR');
+	assert.equal(
+		json('shared/words/board.json').heldHead,
+		'On a season-long list, his figures assume he plays'
+	);
+	assert.equal(json('shared/words/board-format.json').half, 'Half PPR');
+	assert.equal(json('shared/words/page-verb.json').mock, 'Start a mock draft');
 	assert.equal(json('shared/words/player-card.json').none, '--');
 	const swift = outputs.get(OUTPUT.swift) ?? '';
 	const kotlin = outputs.get(OUTPUT.kotlin) ?? '';

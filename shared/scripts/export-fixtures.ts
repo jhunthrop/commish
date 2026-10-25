@@ -101,6 +101,12 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 					clock: week,
 					about: "the week's NFL games with their facts, as the platform games are drawn from"
 				},
+				{
+					file: 'boards-ppr.json',
+					route: 'GET /boards/ppr',
+					clock: week,
+					about: 'the PPR draft board as a dev API answered it (record-boards.ts), the Board screen'
+				},
 				...atClock(week, 'Saturday noon Central, every Sunday game to come')
 			]
 		},
