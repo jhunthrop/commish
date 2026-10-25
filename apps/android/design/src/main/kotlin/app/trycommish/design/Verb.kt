@@ -1,6 +1,6 @@
 package app.trycommish.design
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -17,13 +17,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -101,13 +101,22 @@ fun StrokeGlyph(
     stroke: Float = 2f,
     modifier: Modifier = Modifier,
 ) {
-    val parsed = remember(paths) { paths.map { PathParser().parsePathString(it).toPath() } }
-    Canvas(modifier.size(side)) {
-        val scale = size.minDimension / GRID
-        withTransform({ scale(scale, scale, pivot = Offset.Zero) }) {
-            parsed.forEach { drawPath(it, color, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)) }
+    val vector =
+        remember(paths, side, color, stroke) {
+            paths
+                .fold(
+                    ImageVector.Builder(defaultWidth = side, defaultHeight = side, viewportWidth = GRID, viewportHeight = GRID),
+                ) { builder, d ->
+                    builder.addPath(
+                        pathData = PathParser().parsePathString(d).toNodes(),
+                        stroke = SolidColor(color),
+                        strokeLineWidth = stroke,
+                        strokeLineCap = StrokeCap.Round,
+                        strokeLineJoin = StrokeJoin.Round,
+                    )
+                }.build()
         }
-    }
+    Image(rememberVectorPainter(vector), contentDescription = null, modifier = modifier.size(side))
 }
 
 private const val GRID = 24f
