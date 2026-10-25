@@ -52,18 +52,24 @@ struct MockBarView: View {
     var body: some View {
         let theme = Theme(colorScheme)
         VStack(alignment: .leading, spacing: Tokens.Space.s2) {
-            HStack(alignment: .bottom, spacing: Tokens.Space.s4) {
-                Text(bar.head)
-                    .font(Faces.font(.num, size: Tokens.TypeScale.head, weight: .bold))
-                    .textCase(.uppercase)
-                    .monospacedDigit()
-                    .fixedSize()
-                    .foregroundStyle(theme.color(Tokens.Color.ink))
-                    .accessibilityAddTraits(.isHeader)
-                if live {
-                    ScrollView(.horizontal, showsIndicators: false) { Cells(cells: bar.cells) }
-                } else {
-                    Cells(cells: bar.cells).frame(minWidth: 0, maxWidth: .infinity, alignment: .leading).clipped()
+            // The web's bar wraps (SoloBar's flex-wrap): the pick and its cells on one line where they
+            // fit, the cells under the pick where they do not, so your next pick is never cut off.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .bottom, spacing: Tokens.Space.s4) {
+                    head(theme)
+                    Cells(cells: bar.cells)
+                }
+                VStack(alignment: .leading, spacing: Tokens.Space.s2) {
+                    head(theme)
+                    Cells(cells: bar.cells)
+                }
+                VStack(alignment: .leading, spacing: Tokens.Space.s2) {
+                    head(theme)
+                    if live {
+                        ScrollView(.horizontal, showsIndicators: false) { Cells(cells: bar.cells) }
+                    } else {
+                        Cells(cells: bar.cells).frame(minWidth: 0, maxWidth: .infinity, alignment: .leading).clipped()
+                    }
                 }
             }
             HStack(spacing: Tokens.Space.s2) {
@@ -92,6 +98,17 @@ struct MockBarView: View {
 }
 
 extension MockBarView {
+    /// The pick on the clock, the bar's head.
+    func head(_ theme: Theme) -> some View {
+        Text(bar.head)
+            .font(Faces.font(.num, size: Tokens.TypeScale.head, weight: .bold))
+            .textCase(.uppercase)
+            .monospacedDigit()
+            .fixedSize()
+            .foregroundStyle(theme.color(Tokens.Color.ink))
+            .accessibilityAddTraits(.isHeader)
+    }
+
     /// More's face: the phone's fold of the bar's other verbs, or "Link copied" for a moment.
     func more(_ theme: Theme) -> some View {
         Text(copied ? Words.Mock.copied : Words.Mock.more)
