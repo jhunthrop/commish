@@ -1243,7 +1243,7 @@ paths:
         (the default first) with the week its rest of season ranks from, and how many players have a page. The run is
         the one runs/latest.json names, the same the site is built from, and never one whose manifest is missing or
         names another run. Only the members the site's reader names are sent; the sources block is provenance and is
-        never sent. Every /run route answers ETag (the run id and the file; designations, rewritten beside the run every
+        never sent. Every /run route answers a weak ETag (the run id and the file; designations, rewritten beside the run every
         hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a
         matching If-None-Match. 503 storage_unavailable when the run cannot be read here.
       parameters:
@@ -1351,6 +1351,7 @@ paths:
                       blendedPerGame: 24.2
                       ratePerGame: 24.1
                       restFromWeek: 7
+                      gamePoints: 24.1
                   market:
                     - id: DST-SEA
                       slug: seattle-seahawks
@@ -2194,7 +2195,7 @@ components:
 
   headers:
     RunETag:
-      description: the run id and the file, quoted, one value per run and file
+      description: weak, the run id and the file, one value per run and file (the gzip and the plain body share it)
       schema: { type: string }
     RunCacheControl:
       description: public, with a short max-age
@@ -3957,6 +3958,12 @@ components:
           minimum: 1
           nullable: true
           description: in season, the week his rest of season starts from, null with no game left
+        gamePoints:
+          type: number
+          nullable: true
+          description: >-
+            in season, his points for one more game of his club; null preseason, absent on a run older than the
+            field
     RunMarketRow:
       type: object
       description: >-

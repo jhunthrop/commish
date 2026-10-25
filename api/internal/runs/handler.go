@@ -125,9 +125,10 @@ func formatsOf(manifest Answer) ([]string, error) {
 // matches reports whether an If-None-Match header names tag: "*", or a
 // listed tag, weak or strong (a weak comparison, as RFC 9110 has it).
 func matches(header, tag string) bool {
+	opaque := strings.TrimPrefix(tag, "W/")
 	for _, listed := range strings.Split(header, ",") {
 		listed = strings.TrimSpace(listed)
-		if listed == "*" || strings.TrimPrefix(listed, "W/") == tag {
+		if listed == "*" || strings.TrimPrefix(listed, "W/") == opaque {
 			return true
 		}
 	}

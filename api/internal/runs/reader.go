@@ -20,6 +20,11 @@ import (
 // answers' max-age is the same, so a client never holds a run longer.
 const PointerTTL = time.Minute
 
+// failureTTL is how long a failed first read of the pointer is answered
+// again before the bucket is asked again, so a cold start against a
+// bucket that is down costs one read per failureTTL, not one a request.
+const failureTTL = 5 * time.Second
+
 // readTimeout bounds one shared read of the bucket, apart from the
 // request that started it, so one caller leaving cancels no other's.
 const readTimeout = 10 * time.Second
@@ -51,6 +56,9 @@ type Reader struct {
 	mu        sync.Mutex
 	runID     string
 	checkedAt time.Time
+	// failed is the last pointer read's error while no run is published,
+	// answered again until failureTTL after checkedAt.
+	failed error
 	// answers are the published run's alone, by file path: a new run
 	// drops the last one's.
 	answers map[string]cached
@@ -67,19 +75,23 @@ func NewReader(objects Objects, now func() time.Time, log *slog.Logger) *Reader 
 // read again after PointerTTL.
 func (r *Reader) Published(ctx context.Context) (string, error) {
 	r.mu.Lock()
-	current, checkedAt := r.runID, r.checkedAt
+	current, checkedAt, failed := r.runID, r.checkedAt, r.failed
 	r.mu.Unlock()
 	if current != "" && r.now().Sub(checkedAt) < PointerTTL {
 		return current, nil
+	}
+	if current == "" && failed != nil && r.now().Sub(checkedAt) < failureTTL {
+		return "", failed
 	}
 	v, err, _ := r.group.Do("pointer", func() (any, error) {
 		return r.readPointer(ctx, current)
 	})
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.checkedAt = r.now()
+	r.checkedAt, r.failed = r.now(), nil
 	if err != nil {
 		if r.runID == "" {
+			r.failed = err
 			return "", err
 		}
 		r.log.Warn("runs: the latest pointer did not read; the published run stays", "run_id", r.runID, "err", err)
@@ -148,6 +160,17 @@ func (r *Reader) Read(ctx context.Context, a artifact) (Answer, error) {
 		return r.load(ctx, runID, a)
 	})
 	if err != nil {
+		if ok && hit.answer.RunID == runID {
+			// An hourly file's re-read failed: the last good copy stands,
+			// read again after PointerTTL.
+			r.log.Warn("runs: a re-read failed; the last copy stays", "run_id", runID, "file", a.path, "err", err)
+			r.mu.Lock()
+			if r.runID == runID {
+				r.answers[a.path] = cached{answer: hit.answer, readAt: r.now()}
+			}
+			r.mu.Unlock()
+			return hit.answer, nil
+		}
 		return Answer{}, err
 	}
 	answer := v.(Answer)
@@ -182,14 +205,15 @@ func (r *Reader) load(ctx context.Context, runID string, a artifact) (Answer, er
 }
 
 // etag names the run and the file; an hourly file's adds a digest of
-// what it holds, since the run's id stays while it is written again.
+// what it holds, since the run's id stays while it is written again. It
+// is weak: the gzip and the plain body of one answer share it.
 func etag(runID string, a artifact, data []byte) string {
 	tag := runID + "/" + a.path
 	if a.hourly {
 		sum := sha256.Sum256(data)
 		tag += "@" + hex.EncodeToString(sum[:hourlyTagBytes])
 	}
-	return `"` + tag + `"`
+	return `W/"` + tag + `"`
 }
 
 func fileKey(runID, file string) string { return path.Join(runsPrefix, runID, file) }

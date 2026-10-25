@@ -4255,6 +4255,9 @@ type RunBoardRow struct {
 	// Floor null in season
 	Floor *float32 `json:"floor"`
 
+	// GamePoints in season, his points for one more game of his club; null preseason, absent on a run older than the field
+	GamePoints *float32 `json:"gamePoints,omitempty"`
+
 	// Gap the drafters' ADP less our rank, to a tenth: plus when drafters take him later than we rank him; null without an ADP, absent on a run older than the column
 	Gap      *float32 `json:"gap,omitempty"`
 	Headshot string   `json:"headshot"`

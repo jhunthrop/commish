@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -191,7 +192,7 @@ func TestAnswersAreTheRunsFiles(t *testing.T) {
 	s := fixtureServer(t)
 
 	manifest := data(t, s.get(t, "/run/manifest", nil))
-	sameJSON(t, "manifest", decoded(t, manifest["manifest"]), only(t, fixtureFile(t, "manifest.json"), manifestMembers))
+	sameJSON(t, "manifest", decoded(t, manifest["manifest"]), only(t, fixtureFile(t, "manifest.json"), jsonNames(reflect.TypeFor[apitypes.RunManifest]())))
 
 	board := data(t, s.get(t, "/run/boards/"+pprFormat, nil))
 	file := decoded(t, fixtureFile(t, "boards/"+pprFormat+".json")).(map[string]any)
@@ -213,7 +214,7 @@ func TestAnswersAreTheRunsFiles(t *testing.T) {
 
 	designations := data(t, s.get(t, "/run/designations", nil))
 	sameJSON(t, "designations", decoded(t, designations["designations"]),
-		only(t, fixtureFile(t, "designations.json"), designationsMembers))
+		only(t, fixtureFile(t, "designations.json"), jsonNames(reflect.TypeFor[apitypes.RunDesignations]())))
 }
 
 // The OpenAPI's schemas name every field the run writes: each file
@@ -248,19 +249,20 @@ func TestTheContractNamesEveryField(t *testing.T) {
 	}
 }
 
-// ETag names the run and the file; a matching If-None-Match, weak or
-// listed, answers 304 with no body; any other the file.
+// ETag names the run and the file, weak (the gzip and the plain body
+// share it); a matching If-None-Match, weak, strong or listed, answers
+// 304 with no body; any other the file.
 func TestETagAndNotModified(t *testing.T) {
 	s := fixtureServer(t)
 	first := s.get(t, "/run/boards/"+pprFormat, nil)
 	tag := first.Header().Get("ETag")
-	if want := `"` + fixtureRun + `/boards/` + pprFormat + `.json"`; tag != want {
+	if want := `W/"` + fixtureRun + `/boards/` + pprFormat + `.json"`; tag != want {
 		t.Fatalf("ETag %s; want %s", tag, want)
 	}
 	if got := first.Header().Get("Cache-Control"); got != "public, max-age=60" {
 		t.Fatalf("Cache-Control %q", got)
 	}
-	for _, header := range []string{tag, "W/" + tag, `"other", ` + tag, "*"} {
+	for _, header := range []string{tag, strings.TrimPrefix(tag, "W/"), `"other", ` + tag, "*"} {
 		rec := s.get(t, "/run/boards/"+pprFormat, http.Header{"If-None-Match": {header}})
 		if rec.Code != http.StatusNotModified || rec.Body.Len() != 0 || rec.Header().Get("ETag") != tag {
 			t.Fatalf("If-None-Match %s: %d %q", header, rec.Code, rec.Body.String())
@@ -295,7 +297,7 @@ func TestReadsCachedPerRun(t *testing.T) {
 			s.objs.readsOf(pointer), s.objs.readsOf(board), s.objs.readsOf(designations))
 	}
 	tag := s.get(t, "/run/designations", nil).Header().Get("ETag")
-	if want := `"` + fixtureRun + `/designations.json@`; len(tag) <= len(want) || tag[:len(want)] != want {
+	if want := `W/"` + fixtureRun + `/designations.json@`; len(tag) <= len(want) || tag[:len(want)] != want {
 		t.Fatalf("an hourly file's ETag %s; want the run, the file and a digest", tag)
 	}
 }
@@ -436,5 +438,147 @@ func TestBoardOfAnotherFormatRefused(t *testing.T) {
 	})
 	if rec := newServer(t, newDirObjects(os.DirFS(root))).get(t, "/run/boards/ppr-12", nil); rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status %d; want 503", rec.Code)
+	}
+}
+
+// jsonNames is every member a contract type names.
+func jsonNames(t reflect.Type) []string {
+	names := make([]string, 0, t.NumField())
+	for i := range t.NumField() {
+		name, _, _ := strings.Cut(t.Field(i).Tag.Get("json"), ",")
+		names = append(names, name)
+	}
+	return names
+}
+
+// withExtra is a JSON object with one more member, the way the nightly
+// adds a field the contract does not name yet.
+func withExtra(t *testing.T, raw string, key string) string {
+	t.Helper()
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(raw), &obj); err != nil {
+		t.Fatal(err)
+	}
+	obj[key] = "never on the wire"
+	b, err := json.Marshal(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// A member the contract does not name, at any depth (a manifest's format,
+// a board row, a kicker's row, an index entry's season, an ADP source, a
+// designation), never reaches the wire, and every answer still decodes
+// strictly into its contract type.
+func TestTheContractNamesEveryFieldAndDropsTheRest(t *testing.T) {
+	const extra = "internalNote"
+	root := t.TempDir()
+	manifest := decoded(t, fixtureFile(t, "manifest.json")).(map[string]any)
+	formats := manifest["formats"].([]any)
+	formats[0] = mustObject(t, withExtra(t, mustJSON(t, formats[0]), extra))
+	board := decoded(t, fixtureFile(t, "boards/"+pprFormat+".json")).(map[string]any)
+	rows := board["rows"].([]any)
+	rows[0] = mustObject(t, withExtra(t, mustJSON(t, rows[0]), extra))
+	market := `{"id":"DST-SEA","slug":"seattle-seahawks","name":"Seattle Seahawks","position":"DST","positionRank":1,"team":"SEA",` +
+		`"headshot":null,"orderBasis":"market","ourRank":401,"adp":81,"vorRound":null,"projected":null,"vor":null,` +
+		`"expectedGames":null,"floor":null,"median":null,"ceiling":null,"tier":null}`
+	board["rows"] = append(rows, mustObject(t, withExtra(t, market, extra)))
+	index := decoded(t, fixtureFile(t, "index.json")).([]any)
+	entry := index[0].(map[string]any)
+	entry["season"] = mustObject(t, withExtra(t, mustJSON(t, entry["season"]), extra))
+	adp := decoded(t, fixtureFile(t, "adp.json")).(map[string]any)
+	sources := adp["sources"].([]any)
+	sources[0] = mustObject(t, withExtra(t, mustJSON(t, sources[0]), extra))
+	designations := decoded(t, fixtureFile(t, "designations.json")).(map[string]any)
+	for id, status := range designations["players"].(map[string]any) {
+		designations["players"].(map[string]any)[id] = mustObject(t, withExtra(t, mustJSON(t, status), extra))
+	}
+	at := "runs/" + fixtureRun + "/"
+	writeRun(t, root, fixtureRun, map[string]string{
+		at + "manifest.json":                 mustJSON(t, manifest),
+		at + "boards/" + pprFormat + ".json": mustJSON(t, board),
+		at + "index.json":                    mustJSON(t, index),
+		at + "adp.json":                      mustJSON(t, adp),
+		at + designationsFile.path:           mustJSON(t, designations),
+	})
+	s := newServer(t, newDirObjects(os.DirFS(root)))
+	answers := map[string]any{
+		"/run/manifest":            &apitypes.RunManifestAnswer{},
+		"/run/boards/" + pprFormat: &apitypes.RunBoardAnswer{},
+		"/run/index":               &apitypes.RunIndexAnswer{},
+		"/run/adp":                 &apitypes.RunAdpAnswer{},
+		"/run/designations":        &apitypes.RunDesignationsAnswer{},
+	}
+	for route, into := range answers {
+		rec := s.get(t, route, nil)
+		if strings.Contains(rec.Body.String(), extra) {
+			t.Fatalf("%s sent a member the contract does not name: %s", route, rec.Body.String())
+		}
+		raw, err := json.Marshal(data(t, rec))
+		if err != nil {
+			t.Fatal(err)
+		}
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(into); err != nil {
+			t.Fatalf("%s: %v", route, err)
+		}
+	}
+	if got := answers["/run/boards/"+pprFormat].(*apitypes.RunBoardAnswer); len(got.Market) != 1 || len(got.Rows) == 0 {
+		t.Fatalf("the board's rows %d and market %d", len(got.Rows), len(got.Market))
+	}
+}
+
+func mustJSON(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func mustObject(t *testing.T, raw string) map[string]any {
+	t.Helper()
+	obj, ok := decoded(t, []byte(raw)).(map[string]any)
+	if !ok {
+		t.Fatalf("%s is not an object", raw)
+	}
+	return obj
+}
+
+// With no run published yet, a failed pointer read is answered again for
+// failureTTL before the bucket is asked again.
+func TestColdStartFailureKept(t *testing.T) {
+	objs := newDirObjects(os.DirFS(t.TempDir()))
+	objs.fail["runs/latest.json"] = errors.New("r2 is down")
+	s := newServer(t, objs)
+	for range 3 {
+		if rec := s.get(t, "/run/manifest", nil); rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("status %d; want 503", rec.Code)
+		}
+	}
+	if got := objs.readsOf("runs/latest.json"); got != 1 {
+		t.Fatalf("pointer reads %d within failureTTL; want 1", got)
+	}
+	*s.now = s.now.Add(failureTTL)
+	s.get(t, "/run/manifest", nil)
+	if got := objs.readsOf("runs/latest.json"); got != 2 {
+		t.Fatalf("pointer reads %d after failureTTL; want 2", got)
+	}
+}
+
+// When an hourly file's re-read fails the last good copy is served.
+func TestHourlyRereadFailureKeepsCopy(t *testing.T) {
+	s := fixtureServer(t)
+	first := s.get(t, "/run/designations", nil)
+	data(t, first)
+	s.objs.fail[fileKey(fixtureRun, designationsFile.path)] = errors.New("r2 is down")
+	*s.now = s.now.Add(PointerTTL)
+	again := s.get(t, "/run/designations", nil)
+	data(t, again)
+	if again.Header().Get("ETag") != first.Header().Get("ETag") {
+		t.Fatalf("ETag %s; want the last copy's %s", again.Header().Get("ETag"), first.Header().Get("ETag"))
 	}
 }

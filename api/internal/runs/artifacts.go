@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
+
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 )
 
 // The run's names, the web's (web/src/lib/run/schema.ts and primitives.ts).
@@ -20,16 +23,6 @@ const (
 	// marketBasis is a kicker's or a defense's orderBasis: in the
 	// drafters' order after the ranked rows (the web's run/market.ts).
 	marketBasis = "market"
-)
-
-// The members of the manifest and of the capture the apps are sent: the
-// web's manifestSchema and designationsSchema, less the provenance no
-// screen prints (no public data credits: the manifest's sources and the
-// capture's feed). What else the nightly writes in its manifest (its
-// status, its register's steps, its code's versions) is ours alone.
-var (
-	manifestMembers     = []string{"runId", "runAt", "season", "implementation", "standIn", "formats", "players"}
-	designationsMembers = []string{"readAt", "checkedAt", "players"}
 )
 
 // field is one member of an answer beside its run id, the run's JSON.
@@ -52,20 +45,37 @@ type artifact struct {
 	shape func(raw []byte) ([]field, error)
 }
 
+// Each file is held to its contract type (project.go), so the apps get
+// exactly what openapi.yaml names, which the web's test holds to its zod
+// schemas: never the provenance no screen prints (the manifest's sources,
+// the capture's feed; no public data credits) nor what else the nightly
+// writes for itself (its status, its register's steps, its versions).
 var (
-	manifestFile = artifact{path: manifestPath, name: "manifest", shape: func(raw []byte) ([]field, error) {
-		return picked("manifest", raw, manifestMembers)
-	}}
-	indexFile = artifact{path: "index.json", name: "index", shape: shapeIndex}
-	adpFile   = artifact{path: "adp.json", name: "adp", shape: func(raw []byte) ([]field, error) {
-		if !json.Valid(raw) {
-			return nil, fmt.Errorf("adp.json is not JSON")
-		}
-		return []field{{"adp", raw}}, nil
-	}}
+	manifestFile     = artifact{path: manifestPath, name: "manifest", shape: whole("manifest", reflect.TypeFor[apitypes.RunManifest]())}
+	indexFile        = artifact{path: "index.json", name: "index", shape: shapeIndex}
+	adpFile          = artifact{path: "adp.json", name: "adp", shape: whole("adp", reflect.TypeFor[apitypes.RunAdp]())}
 	designationsFile = artifact{path: "designations.json", name: "designations", hourly: true, optional: true,
-		shape: func(raw []byte) ([]field, error) { return picked("designations", raw, designationsMembers) }}
+		shape: whole("designations", reflect.TypeFor[apitypes.RunDesignations]())}
 )
+
+// The rows and entries of the two kinds a board and the index carry.
+var (
+	boardRowType    = reflect.TypeFor[apitypes.RunBoardRow]()
+	marketRowType   = reflect.TypeFor[apitypes.RunMarketRow]()
+	indexEntryType  = reflect.TypeFor[apitypes.RunIndexEntry]()
+	marketEntryType = reflect.TypeFor[apitypes.RunMarketEntry]()
+)
+
+// whole is an answer of one member, the file held to its contract type.
+func whole(name string, t reflect.Type) func(raw []byte) ([]field, error) {
+	return func(raw []byte) ([]field, error) {
+		value, err := project(raw, t)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", name, err)
+		}
+		return []field{{name, value}}, nil
+	}
+}
 
 // boardFile is a format's board, its ranked rows and its kickers and
 // defenses apart, each in the file's order.
@@ -81,7 +91,7 @@ func boardFile(format string) artifact {
 		if file.Format != format {
 			return nil, fmt.Errorf("boards/%s.json says it is the %q board", format, file.Format)
 		}
-		rows, market, err := splitMarket(file.Rows)
+		rows, market, err := splitMarket(file.Rows, boardRowType, marketRowType)
 		if err != nil {
 			return nil, fmt.Errorf("boards/%s.json: %w", format, err)
 		}
@@ -95,7 +105,7 @@ func shapeIndex(raw []byte) ([]field, error) {
 	if err := json.Unmarshal(raw, &entries); err != nil {
 		return nil, fmt.Errorf("index.json: %w", err)
 	}
-	pages, market, err := splitMarket(entries)
+	pages, market, err := splitMarket(entries, indexEntryType, marketEntryType)
 	if err != nil {
 		return nil, fmt.Errorf("index.json: %w", err)
 	}
@@ -103,8 +113,8 @@ func shapeIndex(raw []byte) ([]field, error) {
 }
 
 // splitMarket is a list's projection-ranked members and its kickers and
-// defenses apart, each in the list's order, each member as written.
-func splitMarket(members []json.RawMessage) (ranked, market json.RawMessage, err error) {
+// defenses apart, each in the list's order, each held to its type.
+func splitMarket(members []json.RawMessage, rankedType, marketType reflect.Type) (ranked, market json.RawMessage, err error) {
 	byBasis := map[bool][]json.RawMessage{false: {}, true: {}}
 	for i, member := range members {
 		var basis struct {
@@ -114,34 +124,21 @@ func splitMarket(members []json.RawMessage) (ranked, market json.RawMessage, err
 			return nil, nil, fmt.Errorf("member %d: %w", i, err)
 		}
 		isMarket := basis.OrderBasis == marketBasis
-		byBasis[isMarket] = append(byBasis[isMarket], member)
+		t := rankedType
+		if isMarket {
+			t = marketType
+		}
+		projected, err := project(member, t)
+		if err != nil {
+			return nil, nil, fmt.Errorf("member %d: %w", i, err)
+		}
+		byBasis[isMarket] = append(byBasis[isMarket], projected)
 	}
 	if ranked, err = json.Marshal(byBasis[false]); err != nil {
 		return nil, nil, err
 	}
 	market, err = json.Marshal(byBasis[true])
 	return ranked, market, err
-}
-
-// picked is an answer of one member: the file's object with only the
-// members named, each as written. A member it lacks is left out, as the
-// file leaves it out.
-func picked(name string, raw []byte, members []string) ([]field, error) {
-	var all map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &all); err != nil {
-		return nil, fmt.Errorf("%s: %w", name, err)
-	}
-	kept := make(map[string]json.RawMessage, len(members))
-	for _, member := range members {
-		if value, ok := all[member]; ok {
-			kept[member] = value
-		}
-	}
-	value, err := json.Marshal(kept)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", name, err)
-	}
-	return []field{{name, value}}, nil
 }
 
 // encodeAnswer is the answer's data: the run id, then each field.

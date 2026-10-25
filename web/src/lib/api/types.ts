@@ -1106,7 +1106,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** The published nightly run's manifest (Lane 185): its id, when it finished, its season, every format it carries (the default first) with the week its rest of season ranks from, and how many players have a page. The run is the one runs/latest.json names, the same the site is built from, and never one whose manifest is missing or names another run. Only the members the site's reader names are sent; the sources block is provenance and is never sent. Every /run route answers ETag (the run id and the file; designations, rewritten beside the run every hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a matching If-None-Match. 503 storage_unavailable when the run cannot be read here. */
+		/** The published nightly run's manifest (Lane 185): its id, when it finished, its season, every format it carries (the default first) with the week its rest of season ranks from, and how many players have a page. The run is the one runs/latest.json names, the same the site is built from, and never one whose manifest is missing or names another run. Only the members the site's reader names are sent; the sources block is provenance and is never sent. Every /run route answers a weak ETag (the run id and the file; designations, rewritten beside the run every hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a matching If-None-Match. 503 storage_unavailable when the run cannot be read here. */
 		get: operations['runManifest'];
 		put?: never;
 		post?: never;
@@ -3085,6 +3085,8 @@ export interface components {
 			ratePerGame?: number | null;
 			/** @description in season, the week his rest of season starts from, null with no game left */
 			restFromWeek?: number | null;
+			/** @description in season, his points for one more game of his club; null preseason, absent on a run older than the field */
+			gamePoints?: number | null;
 		};
 		/** @description a kicker or a defense on a board, after the ranked rows in the drafters' order, with no projected points and no tier: every figure of ours is always null */
 		RunMarketRow: {
@@ -5055,7 +5057,7 @@ export interface components {
 	};
 	requestBodies: never;
 	headers: {
-		/** @description the run id and the file, quoted, one value per run and file */
+		/** @description weak, the run id and the file, one value per run and file (the gzip and the plain body share it) */
 		RunETag: string;
 		/** @description public, with a short max-age */
 		RunCacheControl: string;
@@ -6540,7 +6542,8 @@ export interface operations {
 					 *             "preseasonShare": 40,
 					 *             "blendedPerGame": 24.2,
 					 *             "ratePerGame": 24.1,
-					 *             "restFromWeek": 7
+					 *             "restFromWeek": 7,
+					 *             "gamePoints": 24.1
 					 *           }
 					 *         ],
 					 *         "market": [
