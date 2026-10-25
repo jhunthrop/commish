@@ -35,6 +35,8 @@ packages:
     path: Packages/Features/Shell
   Start:
     path: Packages/Features/Start
+  Board:
+    path: Packages/Features/Board
 targets:
   Commish:
     type: application
@@ -48,6 +50,7 @@ targets:
       - package: LeagueHome
       - package: Shell
       - package: Start
+      - package: Board
     entitlements:
       path: Commish/Commish.entitlements
       properties:
