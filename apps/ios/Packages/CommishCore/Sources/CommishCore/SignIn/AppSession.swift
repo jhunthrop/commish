@@ -2,9 +2,11 @@ import CommishAPI
 import Foundation
 import Observation
 
-/// Whether the phone is signed in, the leagues it follows and which one it shows: the one last chosen
-/// in the league switch, else the newest followed. With none followed, the site's season, which sets
-/// the bar as the web's (spec §3).
+/// Whether the phone is signed in, the leagues it follows and which one it shows: the site's selection
+/// from GET /me (chosen on the web or in the app), else the one last shown on this phone, else the
+/// newest followed. With none followed, the site's season, which sets the bar as the web's (spec §3).
+/// A choice in the switch shows at once and is written to the site (PUT /me/league), so the web opens
+/// on it too.
 @MainActor
 @Observable
 public final class AppSession {
@@ -16,9 +18,9 @@ public final class AppSession {
     }
 
     public private(set) var state: State = .restoring
-    /// Every followed league, newest first, as the API last listed them.
+    /// Every followed league, newest first, as GET /me last listed them.
     public private(set) var leagues: [FollowedLeague] = []
-    /// The site's season, read only while no league is followed; nil unread.
+    /// The site's season; nil unread or a phase this build does not know.
     public private(set) var sitePhase: SitePhase?
 
     /// The phone's five for the league shown: by its phase as the web's bar, or with no league the
@@ -43,6 +45,9 @@ public final class AppSession {
         return league
     }
 
+    /// The last choice's write to the site, kept so a test can await it; the app never waits on it.
+    @ObservationIgnored private(set) var selectionWrite: Task<Void, Never>?
+
     private let account: any AccountAPI
     private let store: any SessionStore
     private let cache: any AnswerCache
@@ -62,41 +67,57 @@ public final class AppSession {
         self.defaults = defaults
     }
 
-    /// The cache key of the followed leagues.
-    static let leaguesRoute = "/leagues/attached"
+    /// The cache key of the account's context.
+    static let accountRoute = "/me"
 
-    /// Reads the saved token and, with one, the followed leagues. A refused token signs the phone out;
-    /// no signal keeps it signed in on the leagues last read.
+    /// Reads the saved token and, with one, the account: its leagues, the site's selection and season.
+    /// A refused token signs the phone out; no signal keeps it signed in on the account last read.
     public func restore() async {
         guard await store.token() != nil else {
             state = .signedOut
             return
         }
+        let context: AccountContext?
+        // Read fresh, the site's selection leads (a choice made on the web shows here); from the saved
+        // copy, this phone's last choice does, being newer than the copy.
+        let choices: [String?]
         do {
-            leagues = try await account.followedLeagues()
-            await cache.write(leagues, route: Self.leaguesRoute, stamp: clock.now)
+            let read = try await account.account()
+            await cache.write(read, route: Self.accountRoute, stamp: clock.now)
+            context = read
+            choices = [read.selected, lastLeague]
         } catch where APIError.signsOut(error) {
             await expire()
             return
         } catch {
-            leagues = await cache.read([FollowedLeague].self, route: Self.leaguesRoute)?.value ?? []
+            context = await cache.read(AccountContext.self, route: Self.accountRoute)?.value
+            choices = [lastLeague, context?.selected]
         }
-        let league = leagues.first { $0.id == lastLeague } ?? leagues.first
-        if league == nil {
-            // The site's season sets the bar; unread, the season's bar.
-            sitePhase = try? await account.siteSeason()
-        }
+        leagues = context?.leagues ?? []
+        sitePhase = context?.season
+        let league = choices.compactMap { id in leagues.first { $0.id == id } }.first ?? leagues.first
         state = .signedIn(league: league)
         lastLeague = league?.id
     }
 
-    /// The member chose a league in the switch: the app shows it, and opens on it next time.
+    /// The member chose a league in the switch: the app shows it at once and opens on it next time, and
+    /// the site selects it too. The write never takes the choice back: a league the API no longer
+    /// lists, an older API or no signal leave it as chosen; only a refused token signs out.
     public func choose(_ id: String) {
         guard case .signedIn = state, let league = leagues.first(where: { $0.id == id }) else {
             return
         }
         state = .signedIn(league: league)
         lastLeague = id
+        selectionWrite = Task { [account] in
+            do {
+                try await account.selectLeague(id: id)
+            } catch where APIError.signsOut(error) {
+                await expire()
+            } catch {
+                // Not taken by the site: the phone keeps the choice, the web keeps its own.
+            }
+        }
     }
 
     /// Unpairs this phone on the API, then forgets its token and its saved answers whatever the API
@@ -119,7 +140,7 @@ public final class AppSession {
         state = .signedOut
     }
 
-    /// The league last shown, so the next open (and a phone with no signal) shows it again.
+    /// The league last shown, so a phone with no signal (or a site with no selection) shows it again.
     private var lastLeague: String? {
         get { defaults.string(forKey: Self.lastLeagueKey) }
         set { defaults.set(newValue, forKey: Self.lastLeagueKey) }

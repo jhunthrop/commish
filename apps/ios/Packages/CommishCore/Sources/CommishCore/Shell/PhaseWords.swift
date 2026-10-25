@@ -1,4 +1,5 @@
 import CommishAPI
+import CommishDesign
 import Foundation
 
 /// A league's place in its season in a word, beside its name in the league switch: a port of
@@ -62,8 +63,22 @@ public enum PhaseWords {
     }
 }
 
-/// A followed league's names in words (web/src/lib/league/names.ts).
+/// A followed league's names in words (web/src/lib/league/names.ts, context/menu-words.ts).
 public enum LeagueNames {
+    /// menu-words.ts leagueLine: the league's platform and scoring under its name in the switch, "FFPC,
+    /// extra points per catch for tight ends", with its lineup when it reads on its own board, "Sleeper,
+    /// half PPR, superflex". A scoring this build does not know leaves the platform alone.
+    public static func leagueLine(_ league: FollowedLeague) -> String {
+        var parts = [ValueWords.platform(league.host)]
+        if let scoring = league.scoring {
+            parts.append(scoring == .tePremium ? Words.LeagueSwitch.tePremium : ValueWords.scoring(scoring))
+        }
+        if league.format == .superflex {
+            parts.append("superflex")
+        }
+        return parts.joined(separator: ", ")
+    }
+
     /// The league's own name, or its platform's when its read has none yet ("Your Yahoo league").
     public static func followedName(_ league: FollowedLeague) -> String {
         league.name.isEmpty ? "Your \(ValueWords.platform(league.host)) league" : league.name

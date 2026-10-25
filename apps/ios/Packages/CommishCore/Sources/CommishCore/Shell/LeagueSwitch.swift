@@ -2,8 +2,8 @@ import CommishAPI
 import CommishDesign
 import Foundation
 
-/// One league in the switch's list: its name, its platform on the line under it, its phase word
-/// where the account's leagues differ, and whether it is the one the app shows.
+/// One league in the switch's list: its name, its platform and scoring on the line under it, its phase
+/// word where the account's leagues differ, and whether it is the one the app shows.
 public struct LeagueSwitchRow: Equatable, Sendable, Identifiable {
     public let id: String
     public let name: String
@@ -13,13 +13,10 @@ public struct LeagueSwitchRow: Equatable, Sendable, Identifiable {
 }
 
 /// The top bar's league switch (web/src/lib/context/LeagueSwitch.svelte and LeagueMenu.svelte): its
-/// face names the league the app shows, and opened it lists every followed league, the selected one
-/// first, then the rest newest first as the API lists them. Choosing one opens its home (B149: the way
-/// to the League home from a bar with no League tab). With none followed the face says how to follow
-/// one and the list says where.
-///
-/// The web's line under a name adds the league's scoring ("FFPC, half PPR"), which GET /leagues/attached
-/// does not carry; the app's line is the platform alone until it does.
+/// face names the league the app shows, and opened it lists every followed league newest first as
+/// GET /me lists them, the selected one marked in place. Choosing one opens its home (B149: the way to
+/// the League home from a bar with no League tab). With none followed the face says how to follow one
+/// and the list says where.
 public struct LeagueSwitchModel: Equatable, Sendable {
     public let face: String
     public let title: String
@@ -29,12 +26,11 @@ public struct LeagueSwitchModel: Equatable, Sendable {
 
     public init(leagues: [FollowedLeague], selected: String?, now: Date, zone: TimeZone) {
         let phases = PhaseWords.phaseWords(leagues, now: now, zone: zone)
-        let ordered = leagues.filter { $0.id == selected } + leagues.filter { $0.id != selected }
-        rows = ordered.map { league in
+        rows = leagues.map { league in
             LeagueSwitchRow(
                 id: league.id,
                 name: LeagueNames.followedName(league),
-                line: ValueWords.platform(league.host),
+                line: LeagueNames.leagueLine(league),
                 phase: phases[league.id],
                 selected: league.id == selected
             )
@@ -53,6 +49,8 @@ public enum ShellRoute: Hashable, Sendable {
     case account
     /// A league's home, pushed where the bar has no League tab.
     case leagueHome(id: String)
+    /// A player's page, reached by his site link (the sheet's Full page, or a link from elsewhere).
+    case player(slug: String)
 
     public enum Destination: Equatable, Sendable {
         case tab(String)
