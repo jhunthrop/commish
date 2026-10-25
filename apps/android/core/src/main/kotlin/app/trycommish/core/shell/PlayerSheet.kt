@@ -1,5 +1,6 @@
 package app.trycommish.core.shell
 
+import app.trycommish.design.Site
 import app.trycommish.design.Words
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -92,7 +93,7 @@ fun initialsOf(name: String): String {
 /** The site's addresses the app links to. */
 object SiteLinks {
     /** The site, whose assetlinks.json hands its app-link paths to the app. */
-    const val ORIGIN = "https://trycommish.app"
+    const val ORIGIN = Site.ORIGIN
 
     /** Our record, past weeks of our order (the Lineup strip's link, web links.record()). */
     const val RECORD = "$ORIGIN/record"

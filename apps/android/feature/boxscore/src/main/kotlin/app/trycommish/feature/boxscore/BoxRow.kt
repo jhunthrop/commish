@@ -46,9 +46,9 @@ import app.trycommish.core.start.Move
 import app.trycommish.core.start.RowCells
 import app.trycommish.core.start.RowGame
 import app.trycommish.design.ArrowMark
+import app.trycommish.design.Avatar
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
-import app.trycommish.design.Headshot
 import app.trycommish.design.NumWeight
 import app.trycommish.design.Pill
 import app.trycommish.design.PillTone
@@ -216,7 +216,7 @@ fun PlayerCell(
     val row = cells.row
     val ink = if (cells.idle) c.ink3 else c.ink
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp)) {
-        Headshot(row.headshot, if (row.clubMark) row.club else initialsOf(row.name), BoxColumn.face)
+        Avatar(if (row.clubMark) row.club else initialsOf(row.name), BoxColumn.face)
         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
             NameLine(cells, ink, sheetPlayer, open)
             ClubLine(cells)

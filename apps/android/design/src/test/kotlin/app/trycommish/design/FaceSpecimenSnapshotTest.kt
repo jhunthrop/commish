@@ -10,6 +10,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.cash.paparazzi.DeviceConfig
@@ -34,7 +36,18 @@ class FaceSpecimenSnapshotTest {
     @Test
     fun ladder() {
         paparazzi.unsafeUpdateConfig(deviceConfig = TWO_X, renderingMode = RenderingMode.SHRINK)
-        paparazzi.snapshot(name = "faces-ladder") { CommishTheme(dark = false) { Ladder() } }
+        paparazzi.snapshot(name = "faces-ladder") {
+            CommishTheme(dark = false) { Ladder(WEIGHTS, SIZES) { wght, size -> Faces.numAt(wght, size) } }
+        }
+    }
+
+    /** The interface face's ladder, the same "0" from Regular to past ExtraBold at its sizes. */
+    @Test
+    fun uiLadder() {
+        paparazzi.unsafeUpdateConfig(deviceConfig = TWO_X, renderingMode = RenderingMode.SHRINK)
+        paparazzi.snapshot(name = "faces-ladder-ui") {
+            CommishTheme(dark = false) { Ladder(UI_WEIGHTS, UI_SIZES) { wght, size -> Faces.uiAt(wght, size) } }
+        }
     }
 
     @Test
@@ -52,6 +65,12 @@ class FaceSpecimenSnapshotTest {
         /** The ladder's weights: Medium's CSS number to past ExtraBold, a step of 25. */
         val WEIGHTS = (500..850 step 25).toList()
 
+        /** The interface face's ladder: Regular's CSS number to past Bold. */
+        val UI_WEIGHTS = (400..800 step 25).toList()
+
+        /** The interface sizes: xs, sm, md, lg, xl. */
+        val UI_SIZES = listOf(Tokens.Type.xs, Tokens.Type.sm, Tokens.Type.md, Tokens.Type.lg, Tokens.Type.xl)
+
         /** The figure sizes: md, lg, xl, head, display. */
         val SIZES = listOf(Tokens.Type.md, Tokens.Type.lg, Tokens.Type.xl, Tokens.Type.head, Tokens.Type.display)
 
@@ -68,12 +87,16 @@ class FaceSpecimenSnapshotTest {
 
 /** A grid of "0": a row per weight, a column per size, nothing else drawn, so each glyph is found alone. */
 @Composable
-private fun Ladder() {
+private fun <S : Number> Ladder(
+    weights: List<Int>,
+    sizes: List<S>,
+    style: (Int, TextUnit) -> TextStyle,
+) {
     Column(Modifier.background(CommishTheme.colors.bg).padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        FaceSpecimenSnapshotTest.WEIGHTS.forEach { wght ->
+        weights.forEach { wght ->
             Row(verticalAlignment = Alignment.Bottom) {
-                FaceSpecimenSnapshotTest.SIZES.forEach { size ->
-                    Text("0", style = Faces.numAt(wght, size.sp), color = CommishTheme.colors.ink, modifier = Modifier.width(48.dp))
+                sizes.forEach { size ->
+                    Text("0", style = style(wght, size.toFloat().sp), color = CommishTheme.colors.ink, modifier = Modifier.width(48.dp))
                 }
             }
         }
