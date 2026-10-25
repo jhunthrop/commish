@@ -70,7 +70,7 @@ struct BoardModelTests {
         #expect(model.columns == .draftOrder)
         #expect(model.rows.allSatisfy { $0.projected == Words.Box.none })
         #expect(model.rows.allSatisfy { $0.sheetPlayer == nil }, "the site has no page for him")
-        #expect(model.rows.first?.pill.hasPrefix(position.label) == true)
+        #expect(model.rows.first?.pill == position.label, "his place is the Draft order column's")
     }
 
     @Test func theAllViewIsOurOrderByOverReplacementEachNumberStillTheAPIs() throws {

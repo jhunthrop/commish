@@ -107,6 +107,11 @@ public struct BoardSection: Equatable, Sendable, Identifiable {
     public let id: String
     public let head: String?
     public let rows: [BoardRow]
+
+    /// The same section over some of its rows: a mock's slice of a long list.
+    public func with(rows kept: [BoardRow]) -> BoardSection {
+        BoardSection(id: id, head: head, rows: kept)
+    }
 }
 
 /// The figures a view carries, each named once over the rows.
@@ -152,9 +157,7 @@ public struct BoardModel: Equatable, Sendable {
             ),
             following: following
         )
-        formats = BoardFormat.allCases.map {
-            BoardChip(label: BoardModel.label($0), value: $0, pressed: $0 == filter.format)
-        }
+        formats = BoardModel.formatChips(filter.format)
         let present = Set(board.players.compactMap { BoardPosition($0.position) })
         positions = [BoardChip(label: Words.Board.all, value: nil, pressed: filter.position == nil)]
             + BoardPosition.allCases.filter(present.contains).map {
@@ -174,6 +177,12 @@ public struct BoardModel: Equatable, Sendable {
         }.map { [$0] } ?? [])
     }
 
+    /// The format chips with the chosen one pressed: drawn over the board, and alone over a format whose
+    /// board could not be read, so the member can choose another.
+    public static func formatChips(_ chosen: BoardFormat) -> [BoardChip<BoardFormat>] {
+        BoardFormat.allCases.map { BoardChip(label: label($0), value: $0, pressed: $0 == chosen) }
+    }
+
     /// A format's chip (board-words.ts BOARD_FORMAT_WORDS).
     public static func label(_ format: BoardFormat) -> String {
         switch format {
@@ -188,6 +197,9 @@ public struct BoardModel: Equatable, Sendable {
         let label = position?.label ?? player.position.value2 ?? ""
         let status = boardStatus(player.status, zone: zone)
         let rank = status?.rank ?? String(player.positionRank)
+        // A kicker's or a defense's place is his Draft order column, so his pill is his position alone
+        // (Row.svelte pillRank); a season-long list's word still shows.
+        let pillRank = position?.draftOrder == true ? status?.rank : rank
         let slug = PlayerPages.slug(player.name)
         let paged = position.map { !$0.draftOrder } == true && pages.contains(slug)
         // A player on a season-long list: his rank is the word, so no gap (Row.svelte heldOut).
@@ -196,7 +208,7 @@ public struct BoardModel: Equatable, Sendable {
             id: player.id,
             name: player.name,
             initials: Initials.of(player.name),
-            pill: "\(label) \(rank)",
+            pill: [label, pillRank].compactMap(\.self).joined(separator: " "),
             club: player.team,
             bye: player.bye.map { "\(Words.Board.bye) \($0)" },
             status: status,

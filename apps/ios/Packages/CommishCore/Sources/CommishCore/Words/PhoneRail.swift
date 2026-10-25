@@ -22,11 +22,27 @@ public enum PhoneRail {
     static let league = RailTab(key: leagueKey, label: AppWords.Tab.league)
     /// The Lineup tab's key: the selected league's Start screen.
     public static let lineupKey = "lineup"
+    /// The Board tab's key, before the draft, on draft day and after the season.
+    public static let boardKey = "board"
+    /// The season's Rest of season item with no league followed (nav.ts rest_first): the board,
+    /// ranking the rest of the season.
+    public static let restKey = "rest_first"
+
+    /// Whether a tab shows the board in season (the rest of it) or not: the web's rail reaches the
+    /// board by its Board item and, in season with no league, by Rest of season; nil for any other tab.
+    public static func boardInSeason(_ key: String) -> Bool? {
+        switch key {
+        case boardKey: false
+        case restKey: true
+        default: nil
+        }
+    }
+
     static let lineup = RailTab(key: lineupKey, label: AppWords.Tab.lineup)
     static let matchup = RailTab(key: "matchup", label: AppWords.Tab.matchup)
     static let waivers = RailTab(key: "waivers", label: AppWords.Tab.waivers)
     static let trades = RailTab(key: "trades", label: AppWords.Tab.trades)
-    static let board = RailTab(key: "board", label: AppWords.Tab.board)
+    static let board = RailTab(key: boardKey, label: AppWords.Tab.board)
     static let players = RailTab(key: "players", label: AppWords.Tab.players)
     static let mock = RailTab(key: "mock", label: AppWords.Tab.mock)
     static let sheet = RailTab(key: "sheet", label: AppWords.Tab.sheet)
@@ -69,7 +85,7 @@ public enum PhoneRail {
     /// The season's five with no league followed (RAIL_WITHOUT_LEAGUE).
     public static let withoutLeague: [RailTab] = [
         league,
-        RailTab(key: "rest_first", label: AppWords.Tab.restOfSeason),
+        RailTab(key: restKey, label: AppWords.Tab.restOfSeason),
         week,
         mock,
         RailTab(key: "record", label: AppWords.Tab.record),
