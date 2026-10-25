@@ -315,6 +315,8 @@ public enum Words {
 
     public enum Matchup {
         public static let vs = "vs"
+        public static let theirGame = "Their game"
+        public static let yourGame = "Your game"
         public static let yoursOnly = "shows us your lineup only."
         public static let allPlayOn = "An all-play week on"
         public static let allPlaySet = "your score is set against every other team's."
