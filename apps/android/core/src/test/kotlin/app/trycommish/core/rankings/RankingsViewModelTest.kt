@@ -264,6 +264,43 @@ class RankingsViewModelTest {
             assertNull(cache.read("/order?limit=100&q=wa&byes=last"))
         }
 
+    /** Review M1 (fix round 1): letters typed on the kickers' week while it is read, its saved rows shown,
+     * still filter the rows once the fresh answer lands; the read and its key stay the week's. */
+    @Test
+    fun `a kicker search typed while the week is read holds when the answer lands`() =
+        runTest(main) {
+            val cache = MemoryCache()
+            val first = rankings(StubRankings(), cache = cache)
+            first.choose(RankingsChip.K)
+            advanceUntilIdle()
+            val every = first.week().rows.size
+            lateinit var vm: RankingsViewModel
+            val typing = TypingWeek(StubRankings()) { vm.find("lo") }
+            vm = rankings(typing, cache = cache)
+            vm.choose(RankingsChip.K)
+            advanceUntilIdle()
+            assertEquals("lo", vm.ui.value.query)
+            val rows = vm.week().rows
+            assertFalse((vm.ui.value.state as RankingsState.Loaded).stale, "the fresh answer landed")
+            assertTrue(rows.isNotEmpty() && rows.size < every, "the letters still filter: ${rows.size} of $every")
+            assertTrue(rows.all { "lo" in it.player.name.lowercase() || "lo" in it.player.club.lowercase() })
+            assertEquals(listOf(WeekPosition.K), typing.weeks)
+        }
+
+    /** The week read through a stub, running the test's typing while the read is out. */
+    private class TypingWeek(
+        private val inner: StubRankings,
+        private val typing: () -> Unit,
+    ) : RankingsReads by inner {
+        val weeks = mutableListOf<WeekPosition>()
+
+        override suspend fun weekOrder(position: WeekPosition): String {
+            weeks += position
+            typing()
+            return inner.weekOrder(position)
+        }
+    }
+
     /** The fixture's order failing every read that names WR or a search, as no signal does. */
     private fun failing(query: OrderQuery): Boolean = (query.position != null && query.position != OrderPosition.RB) || query.search != null
 

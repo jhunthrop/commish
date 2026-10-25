@@ -202,7 +202,10 @@ class RankingsViewModel(
     private suspend fun read(asked: Asked) {
         if (shown?.route != asked.route) {
             cache.read(asked.route)?.let { saved ->
-                decoded(asked.route, saved.body)?.let { show(Shown(asked.route, asked.chip, asked.query, it, saved.stamp, stale = true)) }
+                decoded(
+                    asked.route,
+                    saved.body,
+                )?.let { show(Shown(asked.route, asked.chip, lettersFor(it, asked), it, saved.stamp, stale = true)) }
             }
         }
         try {
@@ -212,7 +215,7 @@ class RankingsViewModel(
             val stamp = clock.now()
             cache.write(asked.route, Cached(body, stamp))
             mutableUi.update { it.copy(problem = null) }
-            show(Shown(asked.route, asked.chip, asked.query, answer, stamp, stale = false))
+            show(Shown(asked.route, asked.chip, lettersFor(answer, asked), answer, stamp, stale = false))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Unauthorized) {
@@ -224,6 +227,14 @@ class RankingsViewModel(
             failed(asked, failure(e))
         }
     }
+
+    /** The letters an answer is drawn with: on our order the ones its read asked for (the API filtered
+     * by them); on the week's, which the phone filters, the ones in the field as it lands, so a search
+     * typed while the week was read holds (review M1). The read's route and request stay the captured. */
+    private fun lettersFor(
+        answer: Answer,
+        asked: Asked,
+    ): String = if (answer is Answer.Week) ui.value.query else asked.query
 
     /** A failed read keeps what is shown, stale; a chip or search never read says why over the rows and
      * the chip goes back to the one they were read for (review H1); with nothing shown, the sentence. */
