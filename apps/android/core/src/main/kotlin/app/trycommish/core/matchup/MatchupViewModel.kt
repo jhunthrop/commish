@@ -48,6 +48,16 @@ sealed interface MatchupState {
     data object SignedOut : MatchupState
 }
 
+/** "Last read Sun 1:52 pm" while the week shown is a saved one or the latest read failed, the instant in
+ * the member's zone. Pure, so a snapshot draws it from a state as the screen does. */
+fun matchupStamp(
+    state: MatchupState,
+    zone: ZoneId,
+): String? {
+    val loaded = state as? MatchupState.Loaded ?: return null
+    return if (loaded.stale) "${AppWords.lastRead} ${Format.weekdayTime(loaded.stamp, zone)}" else null
+}
+
 /** The two bodies the Matchup reads, kept together under one stamp: the league read and the box score,
  * null where the API has none. */
 @Serializable
@@ -94,10 +104,7 @@ class MatchupViewModel(
     val polling: Boolean get() = poll?.isActive == true
 
     /** "Last read Sun 1:52 pm" while the week shown is a saved one or the latest read failed. */
-    fun stampWords(state: MatchupState = this.state.value): String? {
-        val loaded = state as? MatchupState.Loaded ?: return null
-        return if (loaded.stale) "${AppWords.lastRead} ${Format.weekdayTime(loaded.stamp, zone)}" else null
-    }
+    fun stampWords(state: MatchupState = this.state.value): String? = matchupStamp(state, zone)
 
     /** The visibility signal: true while the screen is on screen with the app started. Visible reads at
      * once and then every [POLL_MS]; hidden stops the poll, so nothing is read in the background. Saying
