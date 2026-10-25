@@ -24,3 +24,10 @@ filter:
     - runAdp
     - runDesignations
     - runClubs
+    - runIndex
+    - runPlayer
+    - runHeld
+    - runHeldCopy
+    - runSchedule
+    - playerWeek
+    - leaguePlayerWeek
