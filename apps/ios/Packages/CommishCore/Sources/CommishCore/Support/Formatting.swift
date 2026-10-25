@@ -76,6 +76,11 @@ public enum Formatting {
         format(date, "EEE h:mm a", zone: zone)
     }
 
+    /// "Thursday": the day of an instant on the member's clock, as the web's weekdayName.
+    public static func weekdayName(_ date: Date, zone: TimeZone) -> String {
+        format(date, "EEEE", zone: zone)
+    }
+
     /// "7:00 pm": a time of day on the member's clock, as the web's timeOfDay.
     public static func timeOfDay(_ date: Date, zone: TimeZone) -> String {
         format(date, "h:mm a", zone: zone)

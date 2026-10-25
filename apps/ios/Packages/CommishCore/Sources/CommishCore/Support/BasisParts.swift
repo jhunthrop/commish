@@ -9,7 +9,7 @@ enum BasisParts {
     /// rules add a tight end's extra ", PPR shown, nearest FFPC's rules".
     static func scoringWords(
         _ scoring: Components.Schemas.ProjectionScoring,
-        host: Components.Schemas.LeagueHost
+        host: Components.Schemas.LeagueHost?
     ) -> String {
         let format = ValueWords.format(scoring.format)
         if scoring.leagueOwn {
@@ -22,14 +22,18 @@ enum BasisParts {
     }
 
     /// basis.ts teBonusSentence: "FFPC adds 0.5 a catch for TEs.", nil without one.
-    static func teBonusSentence(_ bonus: Double?, host: Components.Schemas.LeagueHost) -> String? {
+    static func teBonusSentence(_ bonus: Double?, host: Components.Schemas.LeagueHost?) -> String? {
         let owner = sentenceStart(rulesOwner(host))
         return bonus.map { "\(owner) adds \(Formatting.number($0)) a catch for TEs." }
     }
 
-    /// names.ts rulesOwner: FFPC fixes its own rules; on any other platform the league's commissioner does.
-    static func rulesOwner(_ host: Components.Schemas.LeagueHost) -> String {
-        host.value1 == .ffpc ? ValueWords.platform(host) : "your league"
+    /// names.ts rulesOwner: FFPC fixes its own rules; on any other platform, or with none named, the
+    /// league's commissioner does.
+    static func rulesOwner(_ host: Components.Schemas.LeagueHost?) -> String {
+        guard let host, host.value1 == .ffpc else {
+            return "your league"
+        }
+        return ValueWords.platform(host)
     }
 
     static func sentenceStart(_ words: String) -> String {

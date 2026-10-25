@@ -48,6 +48,18 @@ enum Fixtures {
         try APIDecoding.envelopeData(MatchupBox.self, from: data("fixtures/inseason/matchup-\(league)-\(clock).json"))
     }
 
+    /// The trade finder at a clock (GET /leagues/attached/{id}/trades).
+    static func trades(_ clock: String) throws -> TradeAdvice {
+        try APIDecoding.envelopeData(TradeAdvice.self, from: data("fixtures/inseason/trades-\(league)-\(clock).json"))
+    }
+
+    /// The check of the strip's trade `number` at a clock (POST /leagues/attached/{id}/trades/check).
+    static func tradeCheck(_ clock: String, _ number: Int) throws -> TradeCheck {
+        try APIDecoding.envelopeData(
+            TradeCheck.self, from: data("fixtures/inseason/trade-check-\(league)-\(clock)-\(number).json")
+        )
+    }
+
     /// The API's PPR board (GET /boards/ppr), as a dev API answered it.
     static func board() throws -> RoomBoard {
         try APIDecoding.envelopeData(RoomBoard.self, from: data("fixtures/inseason/boards-ppr.json"))
