@@ -129,7 +129,7 @@ public extension View {
                 host.close()
                 openPage(slug)
                 return .handled
-            case let .reference(route)?, let .companion(route)?:
+            case let .reference(route)?, let .companion(route)?, let .mock(route)?:
                 host.close()
                 openRoute(route)
                 return .handled

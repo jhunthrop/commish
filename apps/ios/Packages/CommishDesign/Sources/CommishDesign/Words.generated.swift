@@ -884,6 +884,7 @@ public enum Words {
         public static let finish = "Finish the draft"
         public static let share = "Save and share"
         public static let copied = "Link copied"
+        public static let wall = "The wall"
         public static let queue = "Queue"
         public static let queued = "Queued"
         public static let draft = "Draft"

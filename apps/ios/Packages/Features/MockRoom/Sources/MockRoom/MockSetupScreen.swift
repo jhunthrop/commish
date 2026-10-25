@@ -1,0 +1,158 @@
+import Board
+import CommishAPI
+import CommishCore
+import CommishDesign
+import SwiftUI
+
+/// The setup (web/src/routes/mock/new at 390) for a mock against bots: the title, the clocks, the
+/// scoring, the teams, your slot, the lineup, and the one verb pinned at the foot. Starting answers the
+/// room's id, which the app opens full screen.
+public struct MockSetupScreen: View {
+    @Environment(\.colorScheme) private var colorScheme
+    private let viewModel: MockSetupViewModel
+    private let started: (String) -> Void
+    var live = true
+
+    public init(viewModel: MockSetupViewModel, started: @escaping (String) -> Void, live: Bool = true) {
+        self.viewModel = viewModel
+        self.started = started
+        self.live = live
+    }
+
+    public var body: some View {
+        let theme = Theme(colorScheme)
+        Group {
+            if live {
+                ScrollView { form(theme) }
+                    .safeAreaInset(edge: .bottom, spacing: 0) { pin(theme) }
+            } else {
+                VStack(spacing: 0) {
+                    form(theme)
+                    pin(theme)
+                }
+            }
+        }
+        .background(theme.color(Tokens.Color.bg))
+    }
+
+    private func form(_ theme: Theme) -> some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.s4) {
+            Text(Words.Mock.setupTitle)
+                .font(Faces.font(.num, size: Tokens.TypeScale.display, weight: .bold))
+                .textCase(.uppercase)
+                .foregroundStyle(theme.color(Tokens.Color.ink))
+                .accessibilityAddTraits(.isHeader)
+                .padding(.horizontal, Tokens.Space.s3)
+            Cells(cells: viewModel.cells).padding(.horizontal, Tokens.Space.s3)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(Words.MockClocks.label)
+            row(Words.Mock.scoring, chips: viewModel.scoringChips) { viewModel.choose(scoring: $0) }
+            row(Words.Mock.teams, chips: viewModel.teamChips) { viewModel.choose(teamsChip: $0) }
+            slots
+            row(Words.Mock.lineup, chips: viewModel.lineupChips) { viewModel.choose(lineup: $0) }
+        }
+        .padding(.vertical, Tokens.Space.s4)
+    }
+
+    /// Your slot: one chip per team and Random, wrapping as the web's loose group does.
+    private var slots: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.s2) {
+            Head(text: Words.Mock.slot, alignment: .leading).padding(.horizontal, Tokens.Space.s3)
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: Tokens.Space.s2), count: 7),
+                alignment: .leading,
+                spacing: Tokens.Space.s2
+            ) {
+                ForEach(viewModel.slots.compactMap(\.self), id: \.self) { slot in
+                    ChoiceChip(String(slot), pressed: slot == viewModel.settings.slot) { viewModel.choose(slot: slot) }
+                }
+            }
+            .padding(.horizontal, Tokens.Space.s3)
+            ChoiceChip(Words.Mock.random, pressed: viewModel.settings.slot == nil) { viewModel.choose(slot: nil) }
+                .fixedSize()
+                .padding(.horizontal, Tokens.Space.s3)
+        }
+    }
+
+    private func row(_ label: String, chips: [BoardChip<String>], choose: @escaping (String) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.s2) {
+            Head(text: label, alignment: .leading).padding(.horizontal, Tokens.Space.s3)
+            ChipRow(chips: chips, choose: choose, live: live)
+        }
+    }
+
+    private func pin(_ theme: Theme) -> some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.s2) {
+            if let problem = viewModel.problem {
+                Note(text: problem)
+            }
+            Verb(Words.Mock.start, enabled: !viewModel.busy) {
+                Task {
+                    if let id = await viewModel.start() {
+                        started(id)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, Tokens.Space.s3)
+        .padding(.vertical, Tokens.Space.s2)
+        .frame(maxWidth: .infinity)
+        .background(theme.color(Tokens.Color.bg))
+        .overlay(alignment: .top) { Hairline() }
+    }
+}
+
+/// A shared draft read by its code (web/src/routes/mock/share/[code] at 390): its head and the room as
+/// it stood, read and never drafted in; once finished its report. Its one verb runs the draft as the
+/// reader's own and the app opens that room.
+public struct SharedMockView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    private let viewModel: SharedMockViewModel
+    private let opened: (String) -> Void
+    @State private var shown = PoolModel.firstRows
+
+    public init(viewModel: SharedMockViewModel, opened: @escaping (String) -> Void) {
+        self.viewModel = viewModel
+        self.opened = opened
+    }
+
+    public var body: some View {
+        let theme = Theme(colorScheme)
+        Group {
+            switch viewModel.state {
+            case .loading:
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            case let .room(model):
+                ScrollView {
+                    MockRoomScreen(
+                        model: model, stale: nil, refusal: viewModel.problem, enabled: false,
+                        actions: MockRoomActions(
+                            draft: { _ in }, undo: {}, autopick: {}, finish: {}, share: {}, queue: { _ in },
+                            mark: { _ in }, filter: { viewModel.choose(filter: $0) }
+                        )
+                    )
+                    .with(shown: shown, more: { shown += PoolModel.moreRows }, run: run, starting: viewModel.starting)
+                }
+            case let .report(report, verb):
+                ScrollView {
+                    MockReportScreen(
+                        report: report,
+                        verbs: MockReportVerbs(lead: verb, run: run, another: nil, copied: false, copy: nil)
+                    )
+                }
+            case let .failed(sentence):
+                BasisText(sentence).padding(Tokens.Space.s5).frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .background(theme.color(Tokens.Color.bg))
+        .task { await viewModel.load() }
+    }
+
+    private func run() {
+        Task {
+            if let id = await viewModel.run() {
+                opened(id)
+            }
+        }
+    }
+}

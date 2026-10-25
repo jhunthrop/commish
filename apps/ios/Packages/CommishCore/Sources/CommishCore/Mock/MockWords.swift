@@ -68,8 +68,8 @@ public enum MockWords {
     }
 
     /// mock-words.ts sharedTitle: "jh's mock from slot 5", "A shared mock from slot 5".
-    public static func sharedTitle(by: String?, slot: Int) -> String {
-        "\(by.map { "\($0)'s mock" } ?? "A shared mock") from slot \(slot)"
+    public static func sharedTitle(sharedBy: String?, slot: Int) -> String {
+        "\(sharedBy.map { "\($0)'s mock" } ?? "A shared mock") from slot \(slot)"
     }
 
     /// mock-words.ts sharedAt: "finished", "at pick 5.08".

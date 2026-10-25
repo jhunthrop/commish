@@ -11,10 +11,15 @@ import Testing
 /// cannot be read drafts from the pool; the report's verbs and the setup start what they say.
 @MainActor
 struct MockRoomViewModelTests {
-    static func viewModel(_ api: StubMock, cache: FileCache = MockParityTests.cache(), signedOut: @escaping @MainActor () -> Void = {})
+    static func viewModel(
+        _ api: StubMock,
+        cache: FileCache = MockParityTests.cache(),
+        signedOut: @escaping @MainActor () -> Void = {}
+    )
         -> MockRoomViewModel {
         MockRoomViewModel(
-            id: MockFixture.id, api: api, cache: cache, clock: MockParityTests.clock, zone: TimeZone(identifier: "America/Chicago")!,
+            id: MockFixture.id, api: api, cache: cache, clock: MockParityTests.clock,
+            zone: TimeZone(identifier: "America/Chicago")!,
             onSignedOut: signedOut
         )
     }
@@ -34,11 +39,11 @@ struct MockRoomViewModelTests {
             return
         }
         #expect(!stale)
-        #expect(model.room.pickNumber == (try MockFixture.room(.pick1)).pickNumber)
+        #expect(try model.room.pickNumber == (MockFixture.room(.pick1)).pickNumber)
         #expect(model.team.slots.contains { $0.player?.id == expected })
     }
 
-    @Test func aMarkedRowIsTheOneDrafted() async throws {
+    @Test func aMarkedRowIsTheOneDrafted() async {
         let api = StubMock()
         let viewModel = Self.viewModel(api)
         await viewModel.load()
@@ -55,7 +60,7 @@ struct MockRoomViewModelTests {
         #expect(await api.picks.map(\.player) == [row.id])
     }
 
-    @Test func offlineTheSavedRoomShowsStaleAndDraftsNothing() async throws {
+    @Test func offlineTheSavedRoomShowsStaleAndDraftsNothing() async {
         let cache = MockParityTests.cache()
         let api = StubMock()
         let first = Self.viewModel(api, cache: cache)
@@ -94,7 +99,7 @@ struct MockRoomViewModelTests {
             Issue.record("no room")
             return
         }
-        #expect(model.room.pickNumber == (try MockFixture.room(.create)).pickNumber)
+        #expect(try model.room.pickNumber == (MockFixture.room(.create)).pickNumber)
         #expect(viewModel.canWrite)
     }
 
@@ -106,7 +111,7 @@ struct MockRoomViewModelTests {
         #expect(viewModel.state == .failed(AppWords.Failure.signedOut))
     }
 
-    @Test func aTurnWhoseCallCannotBeReadDraftsFromThePool() async throws {
+    @Test func aTurnWhoseCallCannotBeReadDraftsFromThePool() async {
         // The first answer carries no card and the card route fails.
         let api = StubMock()
         await api.setCardMissing(true)
@@ -132,7 +137,7 @@ struct MockRoomViewModelTests {
         guard case let .room(model, _) = viewModel.state else {
             return
         }
-        #expect(model.room.queue == (try MockFixture.room(.queue)).queue)
+        #expect(try model.room.queue == (MockFixture.room(.queue)).queue)
     }
 
     @Test func undoTakesBackYourLatestPick() async throws {
@@ -164,7 +169,7 @@ struct MockRoomViewModelTests {
         #expect(viewModel.shareURL == code.map(MockRoomViewModel.shareLink))
         #expect(viewModel.shareURL?.absoluteString.hasPrefix("https://trycommish.app/mock/share/") == true)
         let again = await viewModel.runAgain()
-        #expect(again == (try MockFixture.room(.create)).id)
+        #expect(try again == (MockFixture.room(.create)).id)
         #expect(await api.created.first?.settings?.value1.slot == slot)
     }
 
@@ -188,7 +193,7 @@ struct MockRoomViewModelTests {
         setup.choose(lineup: .superflex)
         setup.choose(preset: .halfPpr)
         let id = await setup.start()
-        #expect(id == (try MockFixture.room(.create)).id)
+        #expect(try id == (MockFixture.room(.create)).id)
         let sent = try #require(await api.created.first?.settings?.value1)
         #expect(sent.teams == 10 && sent.slot == 7)
         #expect(MockWords.formatLine(sent) == "10 teams · half PPR · superflex")

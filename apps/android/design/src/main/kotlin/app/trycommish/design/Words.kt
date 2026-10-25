@@ -886,6 +886,7 @@ object Words {
         const val finish = "Finish the draft"
         const val share = "Save and share"
         const val copied = "Link copied"
+        const val wall = "The wall"
         const val queue = "Queue"
         const val queued = "Queued"
         const val draft = "Draft"

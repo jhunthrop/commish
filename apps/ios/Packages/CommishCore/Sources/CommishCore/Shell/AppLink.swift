@@ -12,6 +12,8 @@ public enum AppLink: Equatable, Sendable {
     /// The live-draft companion: its start page (/companion/new, `?replay=1` for the development
     /// replay, as the web reads it) or a followed draft (/companion/<id>).
     case companion(ShellRoute)
+    /// The mock room: its setup (/mock, /mock/new) or a shared draft by its code (/mock/share/<code>).
+    case mock(ShellRoute)
 
     public static func of(_ url: URL) -> AppLink? {
         guard url.scheme == SiteLinks.origin.scheme, url.host() == SiteLinks.origin.host() else {
@@ -29,7 +31,21 @@ public enum AppLink: Equatable, Sendable {
             let replay = query.first { $0.name == "replay" }?.value == "1"
             return .companion(parts[1] == "new" ? .companionNew(replay: replay) : .companion(id: parts[1]))
         }
+        if parts.first == "mock" {
+            return mock(parts).map(AppLink.mock)
+        }
         return reference(parts, query: query).map(AppLink.reference)
+    }
+
+    /// The mock room's pages by their site paths (web links.ts, nav.ts MOCK_SETUP): /mock and /mock/new
+    /// the setup, /mock/share/<code> a shared draft. A room by its id is the account's on the site.
+    private static func mock(_ parts: [String]) -> ShellRoute? {
+        switch parts.count {
+        case 1: .mockSetup(from: nil)
+        case 2 where parts[1] == "new": .mockSetup(from: nil)
+        case 3 where parts[1] == "share" && !parts[2].isEmpty: .sharedMock(code: parts[2])
+        default: nil
+        }
     }
 
     /// The reference pages by their site paths (web links.ts): /adp/<format>, /compare?a=&b=, /clubs,

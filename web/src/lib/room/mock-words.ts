@@ -11,6 +11,7 @@ export const MOCK = {
 	finish: 'Finish the draft',
 	share: 'Save and share',
 	copied: 'Link copied',
+	wall: 'The wall',
 	queue: 'Queue',
 	queued: 'Queued',
 	draft: 'Draft',

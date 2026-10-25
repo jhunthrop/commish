@@ -4,6 +4,7 @@
 	import Face from '#lib/ui/Face.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import NameWords from '#lib/ui/NameWords.svelte';
+	import { MOCK } from './mock-words.ts';
 	import type { WallCell } from './model.ts';
 
 	interface Props {
@@ -23,9 +24,9 @@
 	let { rows, names, you, now, teams, rounds, whose = 'your' }: Props = $props();
 </script>
 
-<section aria-label="The wall">
+<section aria-label={MOCK.wall}>
 	<div class="head">
-		<DisplayTitle size="panel">The wall</DisplayTitle>
+		<DisplayTitle size="panel">{MOCK.wall}</DisplayTitle>
 		<Label>rounds 1 to {rows.length} of {rounds}</Label>
 	</div>
 	<div class="wrap">

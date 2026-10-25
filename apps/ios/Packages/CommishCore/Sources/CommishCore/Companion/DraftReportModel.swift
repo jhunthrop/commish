@@ -225,7 +225,10 @@ public struct DraftReportModel: Equatable, Sendable {
                 figure: figure.text, figureMuted: figure.muted,
                 adp: kept ? nil : pick.adpGap.map { Self.later($0, decimals: 1) },
                 ours: kept ? nil : pick.boardGap.map { Self.later(Double($0), decimals: 0) },
-                still: still.text, stillWait: still.wait, stillMuted: still.muted, madeBy: Self.madeBy(pick, shared: shared),
+                still: still.text, stillWait: still.wait, stillMuted: still.muted, madeBy: Self.madeBy(
+                    pick,
+                    shared: shared
+                ),
                 mine: pick.madeBy.value1 == .you
             )
         }

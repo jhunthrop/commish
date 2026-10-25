@@ -6,6 +6,7 @@ import CommishDesign
 import Companion
 import LeagueHome
 import Matchup
+import MockRoom
 import Player
 import Shell
 import Start
@@ -30,6 +31,8 @@ struct RootTabs: View {
     @State private var switchOpen = false
     @State private var query = ""
     @State private var sheet = PlayerSheetHost()
+    /// The mock room open full screen over the shell, its bar hidden while drafting.
+    @State private var mockRoom: OpenMock?
     @Environment(\.openURL) private var openURL
     let environment: AppEnvironment
     let session: AppSession
@@ -51,6 +54,17 @@ struct RootTabs: View {
         }
         .tint(Theme(colorScheme).color(Tokens.Color.accent))
         .environment(sheet)
+        .fullScreenCover(item: $mockRoom) { open in
+            MockRoomCover(
+                environment: environment, id: open.id, expired: expired, close: { mockRoom = nil },
+                opened: { mockRoom = OpenMock(id: $0) },
+                anotherSlot: { settings in
+                    mockRoom = nil
+                    self.open(.mockSetup(from: settings))
+                }
+            )
+            .id(open.id)
+        }
         // The sheet's Full page is his page in the app: the sheet closes onto it, pushed on the tab in view.
         .playerSheet(sheet, openPage: { open(.player(slug: $0)) }, openRoute: open, content: { player in
             PlayerSheetContainer(player: player, offer: sheet.offer, close: sheet.close) { player in
@@ -168,6 +182,8 @@ struct RootTabs: View {
                 expired: expired
             )
             .id("\(tab.key)-\(selectedLeague != nil)")
+        } else if PhoneRail.isMock(tab.key) {
+            MockSetupTab(environment: environment, from: nil, expired: expired) { mockRoom = OpenMock(id: $0) }
         } else {
             NamedScreen(tab.label)
         }
@@ -212,6 +228,11 @@ struct RootTabs: View {
                 open(.companionNew(replay: false))
             }
             .id(id)
+        case let .mockSetup(from):
+            MockSetupTab(environment: environment, from: from, expired: expired) { mockRoom = OpenMock(id: $0) }
+        case let .sharedMock(code):
+            SharedMockTab(environment: environment, code: code) { mockRoom = OpenMock(id: $0) }
+                .id(code)
         case .adp, .compare, .clubs, .club, .schedule:
             ReferenceScreen(route: route, environment: environment, league: selectedLeague, expired: expired)
                 .id(route)

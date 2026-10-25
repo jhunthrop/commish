@@ -75,7 +75,7 @@ public final class MockRoomViewModel {
     }
 
     /// The share link of a draft by its code (actions.ts copyShareLink).
-    public static func shareLink(_ code: String) -> URL {
+    public nonisolated static func shareLink(_ code: String) -> URL {
         SiteLinks.origin.appendingPathComponent("mock/share").appendingPathComponent(code)
     }
 
@@ -334,7 +334,8 @@ public final class MockRoomViewModel {
         }
         let board = RoomBoardView(saved.board, teams: room.teams)
         let drafted = Set(room.picks.map(\.playerId))
-        if room.waiting, let view = saved.card.flatMap({ CallView($0, board: board, drafted: drafted, teams: room.teams) }) {
+        if room.waiting,
+           let view = saved.card.flatMap({ CallView($0, board: board, drafted: drafted, teams: room.teams) }) {
             ui.lastCall = view
         }
         let model = MockRoomModel(room: room, board: board, card: saved.card, ui: ui)

@@ -66,6 +66,33 @@ public final class MockSetupViewModel {
         settings.lineup.value1
     }
 
+    /// The scoring chips, by the preset's raw value.
+    public var scoringChips: [BoardChip<String>] {
+        MockSetup.scoring.map { BoardChip(label: $0.label, value: $0.preset.rawValue, pressed: $0.preset == preset) }
+    }
+
+    public var teamChips: [BoardChip<String>] {
+        MockSetup.teams.map { BoardChip(label: String($0), value: String($0), pressed: $0 == settings.teams) }
+    }
+
+    /// The lineup chips, by the lineup's raw value.
+    public var lineupChips: [BoardChip<String>] {
+        MockSetup.lineups.map { BoardChip(label: $0.label, value: $0.lineup.rawValue, pressed: $0.lineup == lineup) }
+    }
+
+    /// A chip chosen by its value.
+    public func choose(scoring raw: String) {
+        Components.Schemas.ScoringPresetKnown(rawValue: raw).map { choose(preset: $0) }
+    }
+
+    public func choose(teamsChip raw: String) {
+        Int(raw).map { choose(teams: $0) }
+    }
+
+    public func choose(lineup raw: String) {
+        Components.Schemas.LineupKnown(rawValue: raw).map { choose(lineup: $0) }
+    }
+
     /// The slots to choose from: one per team, then Random (nil).
     public var slots: [Int?] {
         (1 ... settings.teams).map { Optional($0) } + [nil]

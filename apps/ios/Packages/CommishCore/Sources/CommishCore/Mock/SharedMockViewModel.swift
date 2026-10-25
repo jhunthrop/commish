@@ -35,11 +35,11 @@ public final class SharedMockViewModel {
             self.room = room
             if MockRoomModel.status(room) == "complete" {
                 let report = try await api.sharedReport(code: code)
-                let by: String?? = .some(room.sharedBy)
+                let drafter: String?? = .some(room.sharedBy)
                 state = .report(
                     DraftReportModel(
-                        report, names: MockWords.seatNames(teams: report.teams, slot: report.slot, sharedBy: by),
-                        seats: Words.Mock.botsByAdp, reshuffled: Words.Mock.reshuffled, sharedBy: by
+                        report, names: MockWords.seatNames(teams: report.teams, slot: report.slot, sharedBy: drafter),
+                        seats: Words.Mock.botsByAdp, reshuffled: Words.Mock.reshuffled, sharedBy: drafter
                     ),
                     verb: MockWords.runShared(report.slot)
                 )
@@ -67,7 +67,11 @@ public final class SharedMockViewModel {
         var settings = room.settings
         settings.slot = room.slot
         do {
-            return try await api.createMock(MockCreate(leagueId: nil, settings: .init(value1: settings), seed: room.seed)).id
+            return try await api.createMock(MockCreate(
+                leagueId: nil,
+                settings: .init(value1: settings),
+                seed: room.seed
+            )).id
         } catch {
             problem = MockRoomViewModel.sentence(for: error)
             return nil
@@ -81,7 +85,8 @@ public final class SharedMockViewModel {
         var ui = MockRoomUI()
         ui.filter = filter
         state = .room(MockRoomModel(
-            room: room, board: RoomBoardView(board, teams: room.teams), card: nil, ui: ui, sharedBy: .some(room.sharedBy)
+            room: room, board: RoomBoardView(board, teams: room.teams), card: nil, ui: ui,
+            sharedBy: .some(room.sharedBy)
         ))
     }
 }
