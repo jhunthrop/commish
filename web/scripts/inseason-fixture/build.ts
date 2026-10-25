@@ -41,6 +41,7 @@ import {
 	type BoardRow,
 	type Game
 } from './run-lines.ts';
+import { boardPlacer, sleeperName, type SleeperPlayer } from './sleeper-players.ts';
 import {
 	CHECK_BASIS,
 	LINEUP_BASIS,
@@ -100,13 +101,6 @@ const SLOT_OF: Readonly<Record<string, LineupSlot['slot']>> = {
 	DEF: 'DEF'
 };
 
-interface SleeperPlayer {
-	full_name?: string;
-	first_name?: string;
-	last_name?: string;
-	position: string;
-	team: string | null;
-}
 interface SleeperRoster {
 	roster_id: number;
 	owner_id: string;
@@ -203,27 +197,8 @@ const uncountedRules = ((): string[] => {
 })();
 const uncounted = uncountedOf(uncountedRules);
 
-/** "amon-ra st brown": a name as both sources can agree on it. */
-function key(name: string): string {
-	return name
-		.toLowerCase()
-		.replace(/[.'’]/g, '')
-		.replace(/\b(jr|sr|ii|iii|iv|v)\b/g, '')
-		.replace(/[^a-z]+/g, ' ')
-		.trim();
-}
-const boardByKey = new Map(board.rows.map((r) => [`${key(r.name)}|${r.position}`, r] as const));
-
-function sleeperName(p: SleeperPlayer): string {
-	return p.full_name ?? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
-}
-
 /** The board row for a Sleeper player, by name and position. A defense is never on the board. */
-function placed(id: string): BoardRow | null {
-	const p = sleeperPlayers[id];
-	if (!p) return null;
-	return boardByKey.get(`${key(sleeperName(p))}|${p.position}`) ?? null;
-}
+const placed = boardPlacer(board.rows, sleeperPlayers);
 
 const byes: Record<string, number> = Object.fromEntries(
 	schedule.slates.flatMap((s) => {

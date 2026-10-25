@@ -45,14 +45,18 @@ export async function recordedMatchups(): Promise<SleeperMatchup[]> {
 	return JSON.parse(await readFile(REPLAY, 'utf8')) as SleeperMatchup[];
 }
 
-/** Every line the recorded answers hold, by host id: each starter's game and projection. */
-export function linesOf(answers: {
-	lineup: LineupAdvice;
-	waivers: WaiverAdvice;
-	trades: TradeAdvice;
-	matchup: MatchupBox;
-}): Map<string, PlayerLine> {
-	const out = new Map<string, PlayerLine>();
+/** Every line the recorded answers hold, by host id: each starter's game and projection; `extra`
+ * first (the other game's full lines, other-game-lines.ts), the answers' own lines over them. */
+export function linesOf(
+	answers: {
+		lineup: LineupAdvice;
+		waivers: WaiverAdvice;
+		trades: TradeAdvice;
+		matchup: MatchupBox;
+	},
+	extra: readonly PlayerLine[] = []
+): Map<string, PlayerLine> {
+	const out = new Map<string, PlayerLine>(extra.map((line) => [line.player.host_id, line]));
 	const remember = (line: PlayerLine | null | undefined): void => {
 		if (line) out.set(line.player.host_id, line);
 	};

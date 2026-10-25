@@ -20,6 +20,7 @@ import type {
 	WaiverAdvice
 } from '../../src/lib/league/inseason/api.ts';
 import { leagueFields } from './league-fields.ts';
+import { otherGameLines } from './other-game.ts';
 import { linesOf, recordedMatchups, scoreboardAt } from './scoreboard-at.ts';
 import { SUNDAY, sundayFinal } from './sunday.ts';
 
@@ -51,7 +52,7 @@ const recordedWeek = {
 	me: sync.me,
 	week: sync.week,
 	matchups,
-	lines: linesOf({ lineup, waivers, trades, matchup: box }),
+	lines: linesOf({ lineup, waivers, trades, matchup: box }, await otherGameLines()),
 	box
 };
 
