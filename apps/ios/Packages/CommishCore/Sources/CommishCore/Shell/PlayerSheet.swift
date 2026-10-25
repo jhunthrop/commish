@@ -88,6 +88,16 @@ public enum SiteLinks {
 
     /// The cheat sheet (nav.ts, the sheet's rail item).
     public static let sheet = origin.appendingPathComponent("sheet")
+
+    /// What is free (links.pass(), the account's plan card's link in the free season).
+    public static let pass = origin.appendingPathComponent("pass")
+
+    /// The two legal pages (legal/legal-links.ts), named at the account's foot.
+    public static let privacy = origin.appendingPathComponent("privacy")
+    public static let terms = origin.appendingPathComponent("terms")
+
+    /// The one address a member writes to (legal/contact.ts SUPPORT_HREF).
+    public static let support = URL(string: "mailto:\(Words.Support.email)")!
 }
 
 /// The sheet a screen presents from its rows: the player shown, by his id. A screen whose list reads
