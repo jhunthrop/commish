@@ -163,6 +163,17 @@ object Words {
         const val te_premium = "TE premium"
     }
 
+    object FormatLabel {
+        const val ppr = "PPR"
+        const val half_ppr = "Half PPR"
+        const val standard = "Standard"
+        const val te_premium = "TE premium"
+        const val superflex = "Superflex"
+        const val two_flex = "Two flex"
+        const val dynasty = "Dynasty"
+        const val best_ball = "Best ball"
+    }
+
     object Shelf {
         const val fullPage = "Full page"
         const val close = "Close"

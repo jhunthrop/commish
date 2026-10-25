@@ -161,6 +161,17 @@ public enum Words {
         public static let te_premium = "TE premium"
     }
 
+    public enum FormatLabel {
+        public static let ppr = "PPR"
+        public static let half_ppr = "Half PPR"
+        public static let standard = "Standard"
+        public static let te_premium = "TE premium"
+        public static let superflex = "Superflex"
+        public static let two_flex = "Two flex"
+        public static let dynasty = "Dynasty"
+        public static let best_ball = "Best ball"
+    }
+
     public enum Shelf {
         public static let fullPage = "Full page"
         public static let close = "Close"
