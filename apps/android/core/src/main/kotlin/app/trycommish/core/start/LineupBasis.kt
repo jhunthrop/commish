@@ -18,7 +18,7 @@ internal object BasisParts {
      * rules add a tight end's extra ", PPR shown, nearest FFPC's rules". */
     fun scoringWords(
         scoring: ProjectionScoring,
-        league: LeagueHost,
+        league: LeagueHost?,
     ): String {
         val format = ValueWords.format(scoring.format)
         return when {
@@ -31,11 +31,29 @@ internal object BasisParts {
     /** basis.ts teBonusSentence: "FFPC adds 0.5 a catch for TEs.", null without one. */
     fun teBonusSentence(
         bonus: Double?,
-        league: LeagueHost,
+        league: LeagueHost?,
     ): String? = bonus?.let { "${rulesOwner(league).replaceFirstChar { c -> c.uppercase() }} adds ${Format.number(it)} a catch for TEs." }
 
-    /** names.ts rulesOwner: FFPC fixes its own rules; on any other platform the league's commissioner does. */
-    private fun rulesOwner(league: LeagueHost): String = if (league == LeagueHost.ffpc) ValueWords.platform(league) else "your league"
+    /** names.ts rulesOwner: FFPC fixes its own rules; on any other platform, and with none named, the
+     * league's commissioner does. */
+    private fun rulesOwner(league: LeagueHost?): String =
+        if (league == LeagueHost.ffpc) ValueWords.platform(LeagueHost.ffpc) else "your league"
+
+    /** basis.ts uncountedPart: the rules our stats lack, framed by whether any row counts the platform's
+     * points; an answer without the list says its note as sent. */
+    fun uncounted(
+        note: String,
+        list: String?,
+        lines: List<PlayerLine>,
+    ): String {
+        val names = list.orEmpty()
+        if (names.isEmpty()) return note
+        return if (lines.any { LineupBasis.platformGame(it) != null }) {
+            "Our stats omit $names."
+        } else {
+            "${Words.Box.avg} and ${Words.Box.last} are our stats, which omit $names."
+        }
+    }
 
     /** basis.ts projFinalPhone: why the Proj final is "--" where it is, else what it adds; nothing before
      * kickoff. */
@@ -119,7 +137,7 @@ internal object LineupBasis {
                 if (drawsFacts(facts)) null else finalsPhone(facts),
                 Words.Basis.rankOppPhone,
                 ptsPhone(advice.playerPoints, ValueWords.platform(facts.league)),
-                uncounted(advice, facts.lines),
+                BasisParts.uncounted(advice.basisNote, advice.basisNoteList, facts.lines),
             )
         return parts.filterNotNull().filter { it.isNotEmpty() }.joinToString(" ")
     }
@@ -211,19 +229,4 @@ internal object LineupBasis {
         } else {
             "${Words.Box.pts} are $platform's team points alone."
         }
-
-    /** basis.ts uncountedPart: the rules our stats lack, framed by whether any row counts the platform's
-     * points; an answer without the list says its note as sent. */
-    private fun uncounted(
-        advice: LineupAdvice,
-        lines: List<PlayerLine>,
-    ): String {
-        val names = advice.basisNoteList.orEmpty()
-        if (names.isEmpty()) return advice.basisNote
-        return if (lines.any { platformGame(it) != null }) {
-            "Our stats omit $names."
-        } else {
-            "${Words.Box.avg} and ${Words.Box.last} are our stats, which omit $names."
-        }
-    }
 }
