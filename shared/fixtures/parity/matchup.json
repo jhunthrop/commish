@@ -10940,6 +10940,200 @@
 		},
 		"noWeek": {
 			"gap": "Your league has no games this week."
-		}
+		},
+		"reads": [
+			{
+				"host": "ffpc",
+				"state": "fresh",
+				"age": "now",
+				"seconds": 0,
+				"gap": "We could not read this week's game from FFPC. Read from FFPC just now.",
+				"scoreGap": "We could not read your score for this week from FFPC. Read from FFPC just now."
+			},
+			{
+				"host": "ffpc",
+				"state": "fresh",
+				"age": "minutes",
+				"seconds": 300,
+				"gap": "We could not read this week's game from FFPC. Read from FFPC 5 minutes ago.",
+				"scoreGap": "We could not read your score for this week from FFPC. Read from FFPC 5 minutes ago."
+			},
+			{
+				"host": "ffpc",
+				"state": "fresh",
+				"age": "hours",
+				"seconds": 7200,
+				"gap": "We could not read this week's game from FFPC. Read from FFPC 2 hours ago.",
+				"scoreGap": "We could not read your score for this week from FFPC. Read from FFPC 2 hours ago."
+			},
+			{
+				"host": "ffpc",
+				"state": "signedOut",
+				"age": "now",
+				"seconds": 0,
+				"gap": "We could not read this week's game from FFPC. Sign in to FFPC to keep this league in sync. This is our last read, just now.",
+				"scoreGap": "We could not read your score for this week from FFPC. Sign in to FFPC to keep this league in sync. This is our last read, just now."
+			},
+			{
+				"host": "ffpc",
+				"state": "signedOut",
+				"age": "minutes",
+				"seconds": 300,
+				"gap": "We could not read this week's game from FFPC. Sign in to FFPC to keep this league in sync. This is our last read, 5 minutes ago.",
+				"scoreGap": "We could not read your score for this week from FFPC. Sign in to FFPC to keep this league in sync. This is our last read, 5 minutes ago."
+			},
+			{
+				"host": "ffpc",
+				"state": "signedOut",
+				"age": "hours",
+				"seconds": 7200,
+				"gap": "We could not read this week's game from FFPC. Sign in to FFPC to keep this league in sync. This is our last read, 2 hours ago.",
+				"scoreGap": "We could not read your score for this week from FFPC. Sign in to FFPC to keep this league in sync. This is our last read, 2 hours ago."
+			},
+			{
+				"host": "ffpc",
+				"state": "failed",
+				"age": "now",
+				"seconds": 0,
+				"gap": "We could not read this week's game from FFPC. FFPC is not answering. This is our last read, just now.",
+				"scoreGap": "We could not read your score for this week from FFPC. FFPC is not answering. This is our last read, just now."
+			},
+			{
+				"host": "ffpc",
+				"state": "failed",
+				"age": "minutes",
+				"seconds": 300,
+				"gap": "We could not read this week's game from FFPC. FFPC is not answering. This is our last read, 5 minutes ago.",
+				"scoreGap": "We could not read your score for this week from FFPC. FFPC is not answering. This is our last read, 5 minutes ago."
+			},
+			{
+				"host": "ffpc",
+				"state": "failed",
+				"age": "hours",
+				"seconds": 7200,
+				"gap": "We could not read this week's game from FFPC. FFPC is not answering. This is our last read, 2 hours ago.",
+				"scoreGap": "We could not read your score for this week from FFPC. FFPC is not answering. This is our last read, 2 hours ago."
+			},
+			{
+				"host": "ffpc",
+				"state": "stale",
+				"age": "now",
+				"seconds": 0,
+				"gap": "We could not read this week's game from FFPC. Read from FFPC just now. Reading again.",
+				"scoreGap": "We could not read your score for this week from FFPC. Read from FFPC just now. Reading again."
+			},
+			{
+				"host": "ffpc",
+				"state": "stale",
+				"age": "minutes",
+				"seconds": 300,
+				"gap": "We could not read this week's game from FFPC. Read from FFPC 5 minutes ago. Reading again.",
+				"scoreGap": "We could not read your score for this week from FFPC. Read from FFPC 5 minutes ago. Reading again."
+			},
+			{
+				"host": "ffpc",
+				"state": "stale",
+				"age": "hours",
+				"seconds": 7200,
+				"gap": "We could not read this week's game from FFPC. Read from FFPC 2 hours ago. Reading again.",
+				"scoreGap": "We could not read your score for this week from FFPC. Read from FFPC 2 hours ago. Reading again."
+			},
+			{
+				"host": "sleeper",
+				"state": "fresh",
+				"age": "now",
+				"seconds": 0,
+				"gap": "We could not read this week's game from Sleeper. Read from Sleeper just now.",
+				"scoreGap": "We could not read your score for this week from Sleeper. Read from Sleeper just now."
+			},
+			{
+				"host": "sleeper",
+				"state": "fresh",
+				"age": "minutes",
+				"seconds": 300,
+				"gap": "We could not read this week's game from Sleeper. Read from Sleeper 5 minutes ago.",
+				"scoreGap": "We could not read your score for this week from Sleeper. Read from Sleeper 5 minutes ago."
+			},
+			{
+				"host": "sleeper",
+				"state": "fresh",
+				"age": "hours",
+				"seconds": 7200,
+				"gap": "We could not read this week's game from Sleeper. Read from Sleeper 2 hours ago.",
+				"scoreGap": "We could not read your score for this week from Sleeper. Read from Sleeper 2 hours ago."
+			},
+			{
+				"host": "sleeper",
+				"state": "signedOut",
+				"age": "now",
+				"seconds": 0,
+				"gap": "We could not read this week's game from Sleeper. Connect Sleeper to keep this league in sync. This is our last read, just now.",
+				"scoreGap": "We could not read your score for this week from Sleeper. Connect Sleeper to keep this league in sync. This is our last read, just now."
+			},
+			{
+				"host": "sleeper",
+				"state": "signedOut",
+				"age": "minutes",
+				"seconds": 300,
+				"gap": "We could not read this week's game from Sleeper. Connect Sleeper to keep this league in sync. This is our last read, 5 minutes ago.",
+				"scoreGap": "We could not read your score for this week from Sleeper. Connect Sleeper to keep this league in sync. This is our last read, 5 minutes ago."
+			},
+			{
+				"host": "sleeper",
+				"state": "signedOut",
+				"age": "hours",
+				"seconds": 7200,
+				"gap": "We could not read this week's game from Sleeper. Connect Sleeper to keep this league in sync. This is our last read, 2 hours ago.",
+				"scoreGap": "We could not read your score for this week from Sleeper. Connect Sleeper to keep this league in sync. This is our last read, 2 hours ago."
+			},
+			{
+				"host": "sleeper",
+				"state": "failed",
+				"age": "now",
+				"seconds": 0,
+				"gap": "We could not read this week's game from Sleeper. Sleeper is not answering. This is our last read, just now.",
+				"scoreGap": "We could not read your score for this week from Sleeper. Sleeper is not answering. This is our last read, just now."
+			},
+			{
+				"host": "sleeper",
+				"state": "failed",
+				"age": "minutes",
+				"seconds": 300,
+				"gap": "We could not read this week's game from Sleeper. Sleeper is not answering. This is our last read, 5 minutes ago.",
+				"scoreGap": "We could not read your score for this week from Sleeper. Sleeper is not answering. This is our last read, 5 minutes ago."
+			},
+			{
+				"host": "sleeper",
+				"state": "failed",
+				"age": "hours",
+				"seconds": 7200,
+				"gap": "We could not read this week's game from Sleeper. Sleeper is not answering. This is our last read, 2 hours ago.",
+				"scoreGap": "We could not read your score for this week from Sleeper. Sleeper is not answering. This is our last read, 2 hours ago."
+			},
+			{
+				"host": "sleeper",
+				"state": "stale",
+				"age": "now",
+				"seconds": 0,
+				"gap": "We could not read this week's game from Sleeper. Read from Sleeper just now. Reading again.",
+				"scoreGap": "We could not read your score for this week from Sleeper. Read from Sleeper just now. Reading again."
+			},
+			{
+				"host": "sleeper",
+				"state": "stale",
+				"age": "minutes",
+				"seconds": 300,
+				"gap": "We could not read this week's game from Sleeper. Read from Sleeper 5 minutes ago. Reading again.",
+				"scoreGap": "We could not read your score for this week from Sleeper. Read from Sleeper 5 minutes ago. Reading again."
+			},
+			{
+				"host": "sleeper",
+				"state": "stale",
+				"age": "hours",
+				"seconds": 7200,
+				"gap": "We could not read this week's game from Sleeper. Read from Sleeper 2 hours ago. Reading again.",
+				"scoreGap": "We could not read your score for this week from Sleeper. Read from Sleeper 2 hours ago. Reading again."
+			}
+		]
 	}
 }

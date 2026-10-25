@@ -6,6 +6,7 @@ import { gameHead, KICKOFF, linesRead, type GameRead } from './kickoff.ts';
 import { NONE_UNLISTED, type UnlistedDrawn } from './basis.ts';
 import type { LeagueHost, MatchupSide } from '../api.ts';
 import { hostWords } from '../names.ts';
+import { scoreUnread } from '../model.ts';
 import type { GameState, MatchupBox, MatchupBoxSide, PlayerLine } from '../inseason/api.ts';
 import {
 	BOX,
@@ -44,6 +45,18 @@ export function yoursOnlyWords(host: LeagueHost): string {
 /** "An all-play week on Sleeper: your score is set against every other team's." */
 export function allPlayWords(host: LeagueHost): string {
 	return `${MATCHUP.allPlayOn} ${hostWords(host)}: ${MATCHUP.allPlaySet}`;
+}
+
+/** A side has started once its total is not 0 or a starter has a point: before that its zeros
+ * would read as duds, so its points stay blank. */
+export function sideStarted(s: MatchupSide): boolean {
+	return s.points !== 0 || s.starters.some((p) => (p.points ?? 0) !== 0);
+}
+
+/** Whether a side's read score is shown: once it has started, or in an all-play week even at 0 (the
+ * host's own total, read, is the fact); never a score the platform could not give. */
+export function showsTotal(s: MatchupSide, allPlay: boolean): boolean {
+	return !scoreUnread(s) && (sideStarted(s) || allPlay);
 }
 
 /** A side's rows and totals as its box draws them. */

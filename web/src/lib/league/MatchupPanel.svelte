@@ -15,6 +15,7 @@
 		matchupStarted,
 		matchupUnlisted,
 		nextKickoff,
+		showsTotal,
 		sideBox,
 		standingLine,
 		unlistedStates,
@@ -54,17 +55,6 @@
 
 	const matchup = $derived(sync.matchup);
 
-	/** A side has started once its total is not 0 or a starter has a point: before that its zeros
-	 * would read as duds, so its points stay blank. */
-	function hasStarted(s: MatchupSide): boolean {
-		return s.points !== 0 || s.starters.some((p) => (p.points ?? 0) !== 0);
-	}
-
-	/** In an all-play week a read score is shown even at 0: the host's own total, read, is the fact. */
-	function showsTotal(s: MatchupSide): boolean {
-		return !scoreUnread(s) && (hasStarted(s) || sync.week_all_play);
-	}
-
 	/** Both sides' starters' lines, the game's by the one rule: a side listing none (an FFPC opponent)
 	 * reads by the schedule (unlisted), never by his bench's games (Lane 137, B107). */
 	const starterLines = $derived((box?.sides ?? []).flatMap((s) => s.starters.map((st) => st.line)));
@@ -82,7 +72,7 @@
 	function boxOf(s: MatchupSide): SideBox {
 		const answered = box?.sides.find((b) => b.roster_id === s.roster_id) ?? null;
 		return sideBox(s, answered, {
-			hostTotal: showsTotal(s) ? s.points : null,
+			hostTotal: showsTotal(s, sync.week_all_play) ? s.points : null,
 			landed: box?.projection_read_at != null,
 			week: matchup?.week ?? sync.week,
 			now: now.getTime(),

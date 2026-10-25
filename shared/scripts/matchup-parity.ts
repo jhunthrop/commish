@@ -26,6 +26,7 @@ import {
 	matchupStarted,
 	matchupUnlisted,
 	nextKickoff,
+	showsTotal,
 	sideBox,
 	standingLine,
 	unlistedStates,
@@ -39,16 +40,6 @@ import { matchupGap, scoreGap, scoreUnread, teamName } from '../../web/src/lib/l
 import { cells } from './lineup-parity.ts';
 
 export const MATCHUP_OUTPUT = 'shared/fixtures/parity/matchup.json';
-
-/** MatchupPanel's hasStarted: a side's points stay blank until its total or a starter's is not 0. */
-function hasStarted(s: MatchupSide): boolean {
-	return s.points !== 0 || s.starters.some((p) => (p.points ?? 0) !== 0);
-}
-
-/** MatchupPanel's showsTotal: a read score shows once started, or at 0 in an all-play week. */
-function showsTotal(sync: LeagueSync, s: MatchupSide): boolean {
-	return !scoreUnread(s) && (hasStarted(s) || sync.week_all_play);
-}
 
 /** The Team row as TeamFigures draws it. */
 function teamRow(totals: BoxTotals): unknown {
@@ -95,7 +86,7 @@ export function matchupAt(
 			s,
 			box?.sides.find((b) => b.roster_id === s.roster_id) ?? null,
 			{
-				hostTotal: showsTotal(sync, s) ? s.points : null,
+				hostTotal: showsTotal(s, sync.week_all_play) ? s.points : null,
 				landed: box?.projection_read_at != null,
 				week: matchup.week,
 				now,
@@ -193,6 +184,41 @@ export function gapsOf(sync: LeagueSync, clock: string): unknown {
 	const none = { ...sync, matchup: null };
 	return {
 		unread: matchupAt(none, null, clock, 'UTC'),
-		noWeek: matchupAt({ ...none, week: 0 }, null, clock, 'UTC')
+		noWeek: matchupAt({ ...none, week: 0 }, null, clock, 'UTC'),
+		reads: readCases(sync)
 	};
+}
+
+/** The read's states the gap sentences name (model.ts readLine): a fresh read, a platform signed
+ * out, one not answering, a kept read being read again. */
+const READ_STATES = {
+	fresh: { host_signed_out: false, host_failed: false, host_stale_seconds: 0 },
+	signedOut: { host_signed_out: true, host_failed: false, host_stale_seconds: 0 },
+	failed: { host_signed_out: false, host_failed: true, host_stale_seconds: 0 },
+	stale: { host_signed_out: false, host_failed: false, host_stale_seconds: 120 }
+} as const;
+
+/** The ages a read is said at: just now, minutes, hours. */
+const READ_AGES = { now: 0, minutes: 5 * 60, hours: 2 * 60 * 60 } as const;
+
+/** Every branch of the gap sentences (matchupGap and scoreGap over readLine and agoWords): each read
+ * state at each age, on the platform's own name and FFPC's, whose verb differs. */
+function readCases(sync: LeagueSync): unknown[] {
+	const hosts: readonly LeagueSync['host'][] = ['ffpc', 'sleeper'];
+	return hosts.flatMap((host) =>
+		Object.entries(READ_STATES).flatMap(([state, flags]) =>
+			Object.entries(READ_AGES).map(([age, seconds]) => {
+				const read = { ...sync, ...flags, host };
+				const now = new Date(Date.parse(sync.read_at) + seconds * 1000);
+				return {
+					host,
+					state,
+					age,
+					seconds,
+					gap: matchupGap(read, now),
+					scoreGap: scoreGap(read, now)
+				};
+			})
+		)
+	);
 }
