@@ -45,10 +45,10 @@ class MatchupActions(
     val refresh: () -> Unit = {},
 )
 
-/** The screen's two runs, top to bottom, each a snapshot of its own so no reference grows past what a
- * repository keeps: the title, the bug, its notes and the member's box; then the opponent's box and the
+/** The screen's runs, top to bottom, so a snapshot draws each part whole and no reference grows past what
+ * a repository keeps: the title, the bug and its notes; the member's box; the opponent's box and the
  * basis. */
-enum class MatchupPart { Mine, Theirs }
+enum class MatchupPart { Head, Mine, Theirs }
 
 /**
  * The Matchup screen (web MatchupScreen.svelte and MatchupPanel.svelte at 390): the week and both teams,
@@ -102,12 +102,12 @@ internal fun MatchupPage(
     ) {
         parts.forEach { part ->
             when (part) {
-                MatchupPart.Mine -> {
+                MatchupPart.Head -> {
                     MatchupTitle(week, stamp)
                     MatchupBugView(week.bug)
                     week.notes.forEach { BasisText(it) }
-                    week.boxes.firstOrNull()?.let { TeamBoxView(it, actions) }
                 }
+                MatchupPart.Mine -> week.boxes.firstOrNull()?.let { TeamBoxView(it, actions) }
                 MatchupPart.Theirs -> {
                     week.boxes.drop(1).forEach { TeamBoxView(it, actions) }
                     week.noOpponent?.let { BasisText(it) }
