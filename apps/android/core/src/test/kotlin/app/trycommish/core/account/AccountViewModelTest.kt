@@ -300,8 +300,11 @@ class AccountViewModelTest {
             // Another screen's 401 ended the session: the session and the cache are gone.
             token = false
             cache.clear()
-            advanceUntilIdle()
+            // The shell pops the Account while the window is still open: leave()'s own guard decides.
             vm.leave()
+            assertNull(cache.read(AccountViewModel.ROUTE))
+            assertEquals(0, heard.leaguesChanged)
+            advanceUntilIdle()
             assertNull(cache.read(AccountViewModel.ROUTE))
             assertEquals(0, heard.leaguesChanged)
         }
