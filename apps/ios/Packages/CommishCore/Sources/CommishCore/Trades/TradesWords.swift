@@ -14,6 +14,9 @@ public enum Tone: String, Equatable, Sendable {
 public enum TradesWords {
     static let minus = "\u{2212}"
     static let countWords = ["No", "One", "Two"]
+    /// TradeStrip's words between a card's parts: "with Max_Jensen10", "Rodgers for Skattebo".
+    public static let with = "with"
+    public static let forWord = "for"
 
     /// format/list.ts listWords: "Skattebo and Strong", "A, B and C".
     static func list(_ items: [String]) -> String {
