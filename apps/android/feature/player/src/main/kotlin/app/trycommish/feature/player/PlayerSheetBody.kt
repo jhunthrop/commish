@@ -18,9 +18,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.trycommish.core.player.PlayerSheetViewModel
+import app.trycommish.core.player.PlayerSheets
 import app.trycommish.core.player.SheetState
+import app.trycommish.core.shell.PlayerSheetHost
 import app.trycommish.core.shell.SheetOffer
 import app.trycommish.core.shell.SheetVerb
+import app.trycommish.core.shell.ShellRoute
 import app.trycommish.core.shell.unreadBasis
 import app.trycommish.core.start.GameRead
 import app.trycommish.design.CommishTheme
@@ -28,32 +31,54 @@ import app.trycommish.design.Faces
 import app.trycommish.design.Tokens
 import app.trycommish.design.Verb
 import app.trycommish.design.Words
+import app.trycommish.feature.shell.PlayerSheet
 
 /** The verb's room at the sheet's foot. */
 private const val HELD_HEIGHT = 48
 
 /**
- * The player sheet's body over his view model: the shelf's words while his week is read, his card once it
- * is, the shelf's words for a week that could not be read; and the screen's verb pinned at its foot, in its
- * place once his game has kicked off on a lineup screen the held words (shelf.ts shelfVerb). The view
- * model is read once per its player (the caller keys it by his id), so the list under the sheet reading
- * again never reads his week again.
+ * The one player sheet over the tabs (Lane 179's frame, PlayerSheet): its body for the player the host
+ * shows and the screen's verb pinned at its foot, both over the one view model `sheets` keeps for his id
+ * (plan Review Focus 3), so the list under the sheet reading again (his fresh facts, a new order) neither
+ * makes another view model nor reads his week again. Full page opens his page and closes the sheet.
  */
 @Composable
-fun PlayerSheetBody(
+fun PlayerSheetContainer(
+    host: PlayerSheetHost,
+    sheets: PlayerSheets,
+    openPlayer: (ShellRoute.Player) -> Unit,
+) {
+    PlayerSheet(
+        host,
+        openPlayer,
+        foot = { player, close -> PlayerSheetFoot(sheets.of(player), host.offer, close) },
+    ) { player ->
+        PlayerSheetBody(sheets.of(player))
+    }
+}
+
+/** The sheet's body over his view model, read once per view model: the shelf's words while his week is
+ * read, his card once it is, the shelf's words for a week that could not be read. */
+@Composable
+fun PlayerSheetBody(viewModel: PlayerSheetViewModel) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(viewModel) { viewModel.load() }
+    PlayerSheetState(state, viewModel.stampWords(state))
+}
+
+/** The screen's verb at the sheet's foot, in its place once his game has kicked off on a lineup screen the
+ * held words (shelf.ts shelfVerb); the verb acts, then the sheet closes. */
+@Composable
+fun PlayerSheetFoot(
     viewModel: PlayerSheetViewModel,
     offer: SheetOffer?,
     close: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(viewModel) { viewModel.load() }
-    Column(Modifier.fillMaxWidth()) {
-        PlayerSheetState(state, viewModel.stampWords(state), Modifier.padding(bottom = Tokens.Space.s5.dp))
-        SheetVerb.of(offer, gameOf(state))?.let { verb ->
-            SheetVerbView(verb) {
-                offer?.act?.invoke()
-                close()
-            }
+    SheetVerb.of(offer, gameOf(state))?.let { verb ->
+        SheetVerbView(verb) {
+            offer?.act?.invoke()
+            close()
         }
     }
 }

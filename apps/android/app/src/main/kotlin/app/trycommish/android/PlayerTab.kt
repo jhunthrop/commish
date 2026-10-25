@@ -15,8 +15,7 @@ import app.trycommish.core.shell.PlayerSheetHost
 import app.trycommish.core.shell.ShellRoute
 import app.trycommish.design.RailItem
 import app.trycommish.feature.player.PlayerPageView
-import app.trycommish.feature.player.PlayerSheetBody
-import app.trycommish.feature.shell.PlayerSheet
+import app.trycommish.feature.player.PlayerSheetContainer
 
 /** A player's page pushed on the tab in view (the sheet's Full page): its own view model per slug and
  * league, read on open and on a pull; its verb opens the bar's tab where the bar has it, or the platform's
@@ -62,7 +61,5 @@ fun PlayerSheetOver(
     openPlayer: (ShellRoute.Player) -> Unit,
 ) {
     val sheets = remember(graph, league?.id) { PlayerSheets { graph.playerSheetViewModel(it, league) } }
-    PlayerSheet(host, openPlayer) { player ->
-        PlayerSheetBody(sheets.of(player), host.offer, close = host::close)
-    }
+    PlayerSheetContainer(host, sheets, openPlayer)
 }

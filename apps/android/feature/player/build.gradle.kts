@@ -26,10 +26,10 @@ kotlin { jvmToolchain(17) }
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":feature:shell"))
     implementation(libs.lifecycle.runtime.compose)
 
     testImplementation(libs.junit4)
     testImplementation(libs.coroutines.test)
     testImplementation(testFixtures(project(":core")))
-    testImplementation(project(":feature:shell"))
 }
