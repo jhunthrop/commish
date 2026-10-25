@@ -53,7 +53,6 @@ import app.trycommish.feature.shell.LeagueSwitchMenu
 import app.trycommish.feature.shell.LocalPlayerSheet
 import app.trycommish.feature.shell.NamedScreen
 import app.trycommish.feature.shell.PhoneTabBar
-import app.trycommish.feature.shell.PlayerSheet
 import app.trycommish.feature.shell.TopBar
 import app.trycommish.feature.shell.TopBarActions
 
@@ -62,7 +61,12 @@ private val PAGES: List<RailItem> =
     (Rail.byKey.values.flatten() + Rail.withoutLeague + Rail.withoutLeagueBySeason.values.flatten()).distinctBy { it.page }
 
 /** The tabs drawn by their own screens; the rest show their name until their lane lands. */
-private val LIVE_PAGES = setOf(LEAGUE_PAGE, LINEUP_PAGE, MATCHUP_PAGE, WAIVERS_PAGE, TRADES_PAGE, BOARD_PAGE)
+private val LIVE_PAGES = setOf(LEAGUE_PAGE, LINEUP_PAGE, MATCHUP_PAGE, WAIVERS_PAGE, TRADES_PAGE, BOARD_PAGE, PLAYERS_PAGE, RECORD_PAGE)
+
+/** The run pages the bar opens: the order's (Rankings in season, Players before and after it) and Our
+ * record. */
+private const val PLAYERS_PAGE = "players"
+private const val RECORD_PAGE = "record"
 
 /** The pushed screens' routes, one per ShellRoute. */
 private object Routes {
@@ -86,7 +90,8 @@ private object Routes {
  * season (Rail.generated.kt), a back stack per tab, and the one player sheet over all of it. Choosing
  * a league shows it, writes it to the site, and opens its home: the League tab where the bar has one,
  * else the home pushed on the tab in view (B149). League, Lineup, Matchup, Waivers, Trades and the board (the
- * Board item, and Rest of season in season with no league) are live; the rest show their name.
+ * Board item, and Rest of season in season with no league), Rankings (the Players page) and Our record are
+ * live, and the search opens Rankings with its letters; the rest show their name.
  * A home's Open Lineup opens the Lineup tab for the league shown, else the lineup on the site.
  */
 @Composable
@@ -166,7 +171,7 @@ fun Shell(
         ) { padding ->
             // The bars' room counted as taken, so a pin's imePadding lifts it only by what the keyboard adds.
             Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
-                Pages(graph, nav, state, bar, shell::open, openLineup)
+                Pages(graph, nav, state, bar, shell::open, openLineup, ::openTab)
                 if (switchOpen) {
                     Box(
                         Modifier
@@ -181,7 +186,7 @@ fun Shell(
                 }
             }
         }
-        PlayerSheet(sheet, openPlayer = { push(it) })
+        PlayerSheetOver(graph, sheet, (state as? ShellState.Ready)?.selected, openPlayer = { push(it) })
     }
 }
 
@@ -194,25 +199,30 @@ private fun Pages(
     bar: List<RailItem>,
     retry: () -> Unit,
     onOpenLineup: (leagueId: String) -> Unit,
+    openTab: (String) -> Unit,
 ) {
+    val selected = (state as? ShellState.Ready)?.selected
     NavHost(nav, startDestination = LEAGUE_PAGE) {
         composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup) }
         composable(LINEUP_PAGE) { StartTab(graph, state, retry) }
-        composable(MATCHUP_PAGE) { MatchupTab(graph, state, retry) }
+        composable(MATCHUP_PAGE) { MatchupTab(graph, state, retry) { openTab(LINEUP_PAGE) } }
         composable(WAIVERS_PAGE) { WaiversTab(graph, state, retry) }
         composable(TRADES_PAGE) { TradesTab(graph, state, retry) }
         composable(BOARD_PAGE) {
             val following = (state as? ShellState.Ready)?.selected != null
             boardInSeason(bar)?.let { BoardTab(graph, it, following) }
         }
+        composable(PLAYERS_PAGE) { RankingsTab(graph, state, query = "") }
+        composable(RECORD_PAGE) { RecordTab(graph) }
         PAGES.filter { it.page !in LIVE_PAGES }.forEach { item ->
             composable(item.page) { NamedScreen(item.label) }
         }
         composable(Routes.PLAYERS, listOf(navArgument("query") { type = NavType.StringType })) { entry ->
-            NamedScreen(AppWords.players, aside = entry.arguments?.getString("query"))
+            RankingsTab(graph, state, entry.arguments?.getString("query").orEmpty())
         }
-        // The player page's lane (S6) fills this from the slug.
-        composable(Routes.PLAYER) { NamedScreen(AppWords.players) }
+        composable(Routes.PLAYER, listOf(navArgument("slug") { type = NavType.StringType })) { entry ->
+            entry.arguments?.getString("slug")?.let { PlayerPage(graph, it, selected, bar, openTab) }
+        }
         composable(Routes.ACCOUNT) { NamedScreen(Words.Shell.account, verb = AppWords.signOut to graph::signOut) }
         composable(Routes.LEAGUE_HOME) { entry ->
             entry.arguments?.getString("id")?.let { LeagueHome(graph, it, onOpenLineup) }

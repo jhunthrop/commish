@@ -1,11 +1,18 @@
 package app.trycommish.feature.shell
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -16,14 +23,24 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.trycommish.core.shell.PlayerSheetHost
@@ -54,6 +71,7 @@ private val FACE = 64.dp
 fun PlayerSheet(
     host: PlayerSheetHost,
     openPlayer: (ShellRoute.Player) -> Unit,
+    foot: @Composable (player: SheetPlayer, close: () -> Unit) -> Unit = { _, _ -> },
     content: @Composable (SheetPlayer) -> Unit = { SheetBasis(playerSheetModel(it).loading) },
 ) {
     val shown by host.shown.collectAsStateWithLifecycle()
@@ -62,8 +80,24 @@ fun PlayerSheet(
         val state = rememberModalBottomSheetState(skipPartiallyExpanded = false)
         val scope = rememberCoroutineScope()
         val close: () -> Unit = { scope.launch { state.hide() }.invokeOnCompletion { host.close() } }
+        // How much of the sheet is below the screen while it is partly open: the foot is lifted by it,
+        // so the verb stays pinned at the sheet's visible foot at either height.
+        var hidden by remember { mutableIntStateOf(0) }
+        val navigationBar = WindowInsets.navigationBars.getBottom(LocalDensity.current)
         ModalBottomSheet(onDismissRequest = host::close, sheetState = state, containerColor = CommishTheme.colors.bg) {
-            PlayerSheetFrame(playerSheetModel(player), close, { link -> host.followFullPage(link)?.let(openPlayer) }) {
+            PlayerSheetFrame(
+                playerSheetModel(player),
+                close,
+                { link -> host.followFullPage(link)?.let(openPlayer) },
+                Modifier.fillMaxHeight().onGloballyPositioned { frame ->
+                    // The frame's bottom past the window's foot above the navigation bar.
+                    val bottom = frame.positionInWindow().y + frame.size.height
+                    val usable = frame.findRootCoordinates().size.height - navigationBar
+                    hidden = (bottom - usable).toInt().coerceAtLeast(0)
+                },
+                footLift = hidden,
+                foot = { foot(player, close) },
+            ) {
                 content(player)
             }
         }
@@ -81,15 +115,28 @@ fun PlayerSheetFrame(
     close: () -> Unit,
     openFullPage: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** How far the foot is lifted above the frame's own bottom: the part of the sheet below the screen. */
+    footLift: Int = 0,
+    /** The screen's verb, pinned at the sheet's foot under the scrolling body. */
+    foot: @Composable () -> Unit = {},
     content: @Composable () -> Unit = { SheetBasis(model.loading) },
 ) {
-    Column(
-        modifier.fillMaxWidth().padding(horizontal = Tokens.Space.s4.dp),
-        verticalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp),
-    ) {
+    Column(modifier.fillMaxWidth().padding(horizontal = Tokens.Space.s4.dp)) {
         SheetTop(model, close, openFullPage)
-        SheetHead(model)
-        content()
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = Tokens.Space.s5.dp),
+            verticalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp),
+        ) {
+            SheetHead(model)
+            content()
+        }
+        val ground = CommishTheme.colors.bg
+        Box(
+            Modifier
+                .offset { IntOffset(0, -footLift) }
+                // The sheet's ground under the lifted foot, down to the frame's bottom, so no body shows below it.
+                .drawBehind { drawRect(ground, size = Size(size.width, size.height + footLift)) },
+        ) { foot() }
     }
 }
 

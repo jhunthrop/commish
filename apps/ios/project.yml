@@ -51,6 +51,8 @@ packages:
     path: Packages/Features/Rankings
   Record:
     path: Packages/Features/Record
+  Account:
+    path: Packages/Features/Account
   Reference:
     path: Packages/Features/Reference
 targets:
@@ -74,6 +76,7 @@ targets:
       - package: Trades
       - package: Rankings
       - package: Record
+      - package: Account
       - package: Reference
     entitlements:
       path: Commish/Commish.entitlements

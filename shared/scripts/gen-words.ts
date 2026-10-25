@@ -42,6 +42,7 @@ const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
 const ORDER_WORDS_MODULE = 'web/src/lib/order/words.ts';
 const WEEK_MODULE = 'web/src/lib/order/week.ts';
 const RECORD_MODULE = 'web/src/lib/run/record.ts';
+const ACCOUNT_MODULE = 'web/src/lib/account/words.ts';
 const REFERENCE_MODULE = 'web/src/lib/site/reference-words.ts';
 const STRENGTH_MODULE = 'web/src/lib/run/strength-words.ts';
 
@@ -60,8 +61,10 @@ const STRENGTH_MODULE = 'web/src/lib/run/strength-words.ts';
  * labels and the words in place of a read not ready; then the Rankings' and Our record's (Lane 194):
  * the order's table, its week's kickers and defenses, the page's purpose and name, the pool's counts,
  * and the record's words, its box's heads, the orders a week graded, the two records' words and a
- * pair's; then the reference screens' (Lane 199): ADP's, Compare's with its failure and its
- * same-player sentence, the clubs' and a club's, the schedule grid's, and schedule strength's heads. */
+ * pair's; then the Account's (Lane 198): the page's own words, the free season's plan card and end,
+ * the leagues table's, the paired devices', the push switches', the page's foot and the address it
+ * names; then the reference screens' (Lane 199): ADP's, Compare's with its failure and its same-player
+ * sentence, the clubs' and a club's, the schedule grid's, and schedule strength's heads. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -149,6 +152,7 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/context/menu-words.ts',
 		picks: [
 			['followFirst', 'FOLLOW_FIRST'],
+			['followAnother', 'FOLLOW_ANOTHER'],
 			['tePremium', 'TE_PREMIUM_WORDS']
 		],
 		json: 'shared/words/shell-league-switch.json'
@@ -158,6 +162,12 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/league/names.ts',
 		picks: ['SCORING_WORDS'],
 		json: 'shared/words/league-scoring.json'
+	},
+	{
+		name: 'FormatLabel',
+		module: 'web/src/lib/sheet/format.ts',
+		picks: ['FORMAT_LABELS'],
+		json: 'shared/words/format-labels.json'
 	},
 	{
 		name: 'Shelf',
@@ -429,6 +439,54 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/run/record-pair.ts',
 		picks: ['PAIR_WORDS'],
 		json: 'shared/words/record-pair.json'
+	},
+	{
+		name: 'Account',
+		module: ACCOUNT_MODULE,
+		picks: ['ACCOUNT_WORDS'],
+		json: 'shared/words/account.json'
+	},
+	{
+		name: 'FreePlan',
+		module: ACCOUNT_MODULE,
+		picks: ['FREE_PLAN_WORDS', ['see', 'FREE_SEE']],
+		json: 'shared/words/account-free-plan.json'
+	},
+	{
+		name: 'Attached',
+		module: 'web/src/lib/league/attached-rows.ts',
+		picks: ['ATTACHED_WORDS'],
+		json: 'shared/words/account-attached.json'
+	},
+	{
+		name: 'Devices',
+		module: 'web/src/lib/hosts/device-words.ts',
+		picks: ['DEVICES'],
+		json: 'shared/words/account-devices.json'
+	},
+	{
+		name: 'Push',
+		module: 'web/src/lib/account/push-words.ts',
+		picks: ['PUSH'],
+		json: 'shared/words/account-push.json'
+	},
+	{
+		name: 'AccountFoot',
+		module: 'web/src/lib/account/foot-words.ts',
+		picks: ['ACCOUNT_FOOT'],
+		json: 'shared/words/account-foot.json'
+	},
+	{
+		name: 'Support',
+		module: 'web/src/lib/legal/contact.ts',
+		picks: [['email', 'SUPPORT_EMAIL']],
+		json: 'shared/words/account-support.json'
+	},
+	{
+		name: 'FreeSeason',
+		module: 'web/src/lib/pass/free-season.ts',
+		picks: [['ends', 'FREE_SEASON_ENDS']],
+		json: 'shared/words/account-free-season.json'
 	},
 	{
 		name: 'AdpPage',

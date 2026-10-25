@@ -5,6 +5,7 @@ import java.math.RoundingMode
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.floor
@@ -17,6 +18,8 @@ object Format {
     private val weekdayName = DateTimeFormatter.ofPattern("EEEE", Locale.US)
     private val shortDay = DateTimeFormatter.ofPattern("MMM d", Locale.US)
     private val monthDay = DateTimeFormatter.ofPattern("MMMM d", Locale.US)
+    private val zoneShort = DateTimeFormatter.ofPattern("v", Locale.US)
+    private val weekday = DateTimeFormatter.ofPattern("EEE", Locale.US)
 
     /** "39.1": `value.toFixed(decimals)` as JavaScript gives it, the exact binary value rounded with a
      * tie away from zero, and a negative that rounds to zero keeping its sign ("-0.0"). */
@@ -36,6 +39,14 @@ object Format {
 
     /** "1,000": a whole number with thousands separators. */
     fun count(value: Int): String = String.format(Locale.US, "%,d", value)
+
+    /** "1,234": a figure rounded to a whole with thousands separators, a tie away from zero (number.ts
+     * count, Intl's whole format). */
+    fun whole(value: Double): String {
+        val rounded = BigDecimal(abs(value)).setScale(0, RoundingMode.HALF_UP)
+        val text = String.format(Locale.US, "%,d", rounded.toBigInteger())
+        return if (value < 0 && rounded.signum() != 0) "-$text" else text
+    }
 
     /** "1st", "2nd", "11th", "23rd". */
     fun ordinal(value: Int): String {
@@ -88,6 +99,32 @@ object Format {
         zone: ZoneId,
     ): String = monthDay.format(instant.atZone(zone))
 
+    /** "CT": the zone's generic short name after a time, the same in summer and winter (clock.ts
+     * zoneShort). */
+    fun zoneShort(
+        instant: Instant,
+        zone: ZoneId,
+    ): String = zoneShort.format(instant.atZone(zone))
+
+    /** "Sun 3:25 pm CT": a kickoff with its zone (clock.ts kickoffAt). */
+    fun kickoffAt(
+        instant: Instant,
+        zone: ZoneId,
+    ): String = "${weekdayTime(instant, zone)} ${zoneShort(instant, zone)}"
+
+    /** "Wed Oct 21, 11:12 am CT": the player page's one stamp format (clock.ts stampAt). */
+    fun stampAt(
+        instant: Instant,
+        zone: ZoneId,
+    ): String =
+        "${weekday.format(instant.atZone(zone))} ${shortDay(instant, zone)}, ${timeOfDay(instant, zone)} ${zoneShort(instant, zone)}"
+
+    /** "Thu Oct 15": a day with its weekday (date.ts weekdayLabel). */
+    fun weekdayDay(
+        instant: Instant,
+        zone: ZoneId,
+    ): String = "${weekday.format(instant.atZone(zone))} ${shortDay(instant, zone)}"
+
     /** Whether two instants fall on the same calendar day on the member's clock (clock.ts sameDay). */
     fun sameDay(
         a: Instant,
@@ -95,9 +132,18 @@ object Format {
         zone: ZoneId,
     ): Boolean = a.atZone(zone).toLocalDate() == b.atZone(zone).toLocalDate()
 
+    /** "Central": the zone's generic name with " Time" dropped where one word is left (basis.ts zoneWord,
+     * the iOS Formatting.zoneWord); "Central European Time" whole. */
+    fun zoneWord(zone: ZoneId): String {
+        val name = zone.getDisplayName(TextStyle.FULL, Locale.US)
+        val bare = name.removeSuffix(ZONE_SUFFIX)
+        return if (name.endsWith(ZONE_SUFFIX) && ' ' !in bare) bare else name
+    }
+
     private fun lowerPeriod(text: String): String = text.replace("AM", "am").replace("PM", "pm")
 
     private const val WHOLE_LIMIT = 1e15
+    private const val ZONE_SUFFIX = " Time"
     private const val TEN = 10
     private const val HUNDRED = 100
     private val TEENS = 11..13

@@ -1,3 +1,4 @@
+import Account
 import Board
 import CommishAPI
 import CommishCore
@@ -15,12 +16,12 @@ import Waivers
 
 /// The phone's five, the web's bar for the shown league's phase or, with none, the site's season
 /// (PhoneRail, held to rail-order.ts), each under the top bar: the league switch, the player search
-/// and the account's way in. Choosing a league opens its home: the League tab where the bar has one,
-/// else the home pushed on the tab in view (B149). League, Lineup, Matchup, Waivers, Trades, the board
-/// (the Board item, and Rest of season in season with no league), Rankings and Our record are live, and
-/// the search opens Rankings with its letters; the others say their screen's name until their lane
-/// lands. Every screen presents the player sheet through the one host; its Full page and a player's
-/// site link push his page on the tab in view.
+/// and the account's way in, which opens the Account. Choosing a league opens its home: the League
+/// tab where the bar has one, else the home pushed on the tab in view (B149). League, Lineup,
+/// Matchup, Waivers, Trades, the board (the Board item, and Rest of season in season with no league),
+/// Rankings and Our record are live, and the search opens Rankings with its letters; the others say
+/// their screen's name until their lane lands. Every screen presents the player sheet through the one
+/// host; its Full page and a player's site link push his page on the tab in view.
 struct RootTabs: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var selection = PhoneRail.leagueKey
@@ -33,7 +34,6 @@ struct RootTabs: View {
     let session: AppSession
     /// A site link the app was opened with (a player's page), pushed on the tab in view once.
     @Binding var linked: ShellRoute?
-    let signOut: () -> Void
     /// The API refused the token on a signed-in read: the app signs out and shows sign-in.
     let expired: @MainActor () -> Void
 
@@ -176,7 +176,9 @@ struct RootTabs: View {
             )
             .id(slug)
         case .account:
-            NamedScreen(PhoneRail.account.label, verb: (AppWords.SignIn.signOut, signOut))
+            AccountTab(environment: environment, session: session, expired: expired) { id in
+                choose(id)
+            }
         case let .leagueHome(id):
             LeagueScreen(environment: environment, leagueID: id, expired: expired) {}
         case .adp, .compare, .clubs, .club, .schedule:

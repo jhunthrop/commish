@@ -18,6 +18,7 @@ import { BOARD_OUTPUT } from './board-parity.ts';
 import { BOARD_RUN_OUTPUT } from './board-run-parity.ts';
 import { PLAYER_SHEET_OUTPUT } from './player-sheet-parity.ts';
 import { SHEET_PLAYER_IDS } from './sheet-players.ts';
+import { ACCOUNT_OUTPUT } from './account-parity.ts';
 import { GAP_WORDS } from '../../web/src/lib/run/board-basis.ts';
 
 void test('a file clock reads back as its instant', () => {
@@ -322,4 +323,30 @@ void test("the Trades at every clock: each row's offer in the web's words, the s
 		[true, true]
 	);
 	assert.equal(parity.builder.pin, '+5.7 a week for your lineup, +0.7 for theirs');
+});
+
+void test("the Account's words: who, the free season's plan, each league's row, each device's line (Lane 198)", async () => {
+	const account = JSON.parse((await generate()).get(ACCOUNT_OUTPUT) ?? '{}') as {
+		who: { name: string; line: string };
+		plan: { title: string; line: string };
+		leagues: { id: string; team: string; read: string }[];
+		counts: { count: number; words: string }[];
+		devices: { id: string; line: string }[];
+		reads: { readAt: string | null; words: string }[];
+		freeSeason: { now: string; flag: boolean | null; free: boolean }[];
+	};
+	assert.equal(account.who.line, 'fixture@example.com, with us since Sep 1');
+	assert.equal(account.plan.title, 'Free this season');
+	assert.equal(account.leagues.length, 12);
+	assert.equal(account.leagues[0]?.team, 'McConkey Kong Country, on FFPC');
+	assert.ok(account.counts.some((c) => c.words === '3, newest first'));
+	assert.deepEqual(
+		account.devices.map((d) => d.line),
+		['Paired Oct 12, last used Oct 17', 'Paired Sep 3, not used yet']
+	);
+	assert.ok(account.reads.some((r) => r.words === '4 minutes ago'));
+	assert.deepEqual(
+		account.freeSeason.map((f) => f.free),
+		[true, true, false, false, true, false]
+	);
 });

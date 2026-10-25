@@ -35,7 +35,7 @@ import { RefusedPages, boardFormats } from '#lib/run/held.ts';
 // The schema gate's script (research/nightly/contract/run-contract.ts) names each refused page by it.
 export { RefusedPages } from '#lib/run/held.ts';
 import { seasonRefusals } from '#lib/run/season-checks.ts';
-import { countedReach, finalsReach, reachWords, type Reach } from '#lib/run/reach.ts';
+import { finalsReach, runReach, type Reach } from '#lib/run/reach.ts';
 import { openRun, type RunReader } from '#lib/run/source.ts';
 import type { RunStamp } from '#lib/run/stamp.ts';
 import { searchPlaceholder } from '#lib/format/pool-words.ts';
@@ -287,21 +287,12 @@ export interface SeasonReach {
 
 export function seasonReach(): Promise<SeasonReach> {
 	return once('season:reach', async () => {
-		// Tonight's own pages: a held page's copy is an earlier run's season (Lane 136).
-		const [players, slate] = await Promise.all([ownPages(), schedule()]);
-		const [first] = players;
-		if (!first) throw new Error('The run has no page the reader took.');
-		const { season } = first;
-		const { label } = await formatById(season.format);
-		// Counted games only (review finding 1): his club's game, by his log, never a status final alone.
-		const counted = players.map((loaded) => ({ ...loaded.season, team: loaded.team }));
-		const reach = countedReach(counted, slate.slates, season.through);
-		return {
-			format: season.format,
-			scoring: label,
-			through: reachWords(reach),
-			complete: season.through
-		};
+		// Tonight's own pages: a held page's copy is an earlier run's season (Lane 136). Counted games
+		// only (review finding 1): his club's game, by his log, never a status final alone. The API's
+		// /run/manifest sends the same reach (run/reach.ts runReach, Lane 203).
+		const [players, slate, run] = await Promise.all([ownPages(), schedule(), manifest()]);
+		const { format, scoring, through, complete } = runReach(players, slate.slates, run.formats);
+		return { format, scoring, through, complete };
 	});
 }
 

@@ -87,6 +87,11 @@ public enum LeagueNames {
 
     /// The league's own name, or its platform's when its read has none yet ("Your Yahoo league").
     public static func followedName(_ league: FollowedLeague) -> String {
-        league.name.isEmpty ? "Your \(ValueWords.platform(league.host)) league" : league.name
+        followedName(league.name, host: league.host)
+    }
+
+    /// The same for a league named by its name and platform alone (an attached league).
+    public static func followedName(_ name: String, host: Components.Schemas.LeagueHost) -> String {
+        name.isEmpty ? "Your \(ValueWords.platform(host)) league" : name
     }
 }

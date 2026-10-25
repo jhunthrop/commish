@@ -1,0 +1,17 @@
+{
+	"title": "Leagues attached",
+	"league": "League",
+	"record": "Record",
+	"season": "Season",
+	"lastRead": "Last read",
+	"inSeason": "In season",
+	"open": "Open",
+	"detach": "Detach",
+	"detaching": "Detaching",
+	"detached": "Detached.",
+	"undo": "Undo",
+	"unread": "Your leagues can't be read right now.",
+	"none": "No leagues yet",
+	"newestFirst": "newest first",
+	"functions": []
+}

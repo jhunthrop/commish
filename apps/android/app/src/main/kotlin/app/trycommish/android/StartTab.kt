@@ -8,12 +8,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.trycommish.core.AppWords
 import app.trycommish.core.shell.FollowedLeague
+import app.trycommish.core.shell.SheetOffer
+import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.shell.ShellState
 import app.trycommish.core.shell.SiteLinks
 import app.trycommish.core.start.StartPin
 import app.trycommish.core.start.StartState
 import app.trycommish.core.start.StartUi
 import app.trycommish.core.start.StartViewModel
+import app.trycommish.design.Words
 import app.trycommish.feature.shell.LocalPlayerSheet
 import app.trycommish.feature.start.PinActions
 import app.trycommish.feature.start.StartActions
@@ -43,6 +46,17 @@ fun StartTab(
     StartScreen(StartUi(waiting), null, nothing, refreshing = false, actions = StartActions(refresh = onRetry))
 }
 
+/** The sheet's verb on the Lineup (StartScreen.svelte's backToLineupOffer): back onto his row, his swap
+ * said under it where the advice makes one. */
+private fun backToLineup(
+    state: StartState,
+    player: SheetPlayer,
+): SheetOffer {
+    val model = (state as? StartState.Loaded)?.model
+    val line = model?.rowOf(player)?.let(model::swapLine)
+    return SheetOffer(Words.Shelf.backToLineup, line, lineup = true) {}
+}
+
 /** One league's Start screen, its own view model per league: the saved lineup at once, then the API's;
  * a pull reads again; a row's name opens the one player sheet, which keeps its player as the lineup reads
  * again under it; the lineup copied to the phone's clipboard; a platform's page opened in the browser. */
@@ -66,7 +80,7 @@ private fun LeagueStart(
         refreshing = refreshing && ui.state is StartState.Loaded,
         actions =
             StartActions(
-                open = sheet::open,
+                open = { player -> sheet.open(player, backToLineup(ui.state, player)) },
                 toggleWhy = vm::toggleWhy,
                 openRecord = { uri.openUri(SiteLinks.RECORD) },
                 refresh = { vm.load(id) },

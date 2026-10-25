@@ -72,6 +72,10 @@ import {
 	wordCases
 } from './trades-parity.ts';
 import { HOLDING_PLAYER } from './export-fixtures.ts';
+import { ACCOUNT_OUTPUT, renderAccount } from './account-parity.ts';
+import type { Account } from '../../web/src/lib/account/account-api.ts';
+import type { AttachedLeague } from '../../web/src/lib/league/api.ts';
+import type { Device } from '../../web/src/lib/hosts/api.ts';
 import { worthProposing } from '../../web/src/lib/league/box/trades.ts';
 import type { TradeAdvice, TradeCheck } from '../../web/src/lib/league/inseason/api.ts';
 import {
@@ -642,6 +646,22 @@ export async function generate(): Promise<Outputs> {
 					SCRIPT,
 					'web/src/lib/run/record.ts and records.ts (the record page) over the fixture records and the contract run'
 				)
+			)
+		],
+		[
+			ACCOUNT_OUTPUT,
+			renderAccount(
+				generatedBy(
+					SCRIPT,
+					'web/src/lib/account/words.ts, league/attached-rows.ts and hosts/device-words.ts over shared/fixtures/inseason'
+				),
+				{
+					me: await answer<Account>('me.json'),
+					devices: await answer<Device[]>('devices.json'),
+					attached: await answer<AttachedLeague[]>('leagues-attached.json')
+				},
+				instantOf(WEEK_CLOCK),
+				ZONE
 			)
 		],
 		[

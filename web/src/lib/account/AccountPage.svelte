@@ -7,7 +7,6 @@
 	import { page } from '$app/state';
 	import { PUBLIC_API_URL } from '$app/env/public';
 	import { ApiError, apiClient } from '#lib/api/client.ts';
-	import { dayLabel } from '#lib/format/date.ts';
 	import { zoneName } from '#lib/format/clock.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import ActionRow from '#lib/ui/ActionRow.svelte';
@@ -42,13 +41,15 @@
 	import { hasFeature } from './features.ts';
 	import { freeSeasonAt, readFreeSeason } from '#lib/pass/free-season.ts';
 	import {
+		ACCOUNT_WORDS,
 		FREE_SEE,
 		boughtPlan,
 		displayName,
 		draftToolsRecede,
 		mockLine,
 		planWords,
-		sheetLine
+		sheetLine,
+		whoLine
 	} from './words.ts';
 
 	interface Props {
@@ -127,7 +128,7 @@
 		try {
 			await step();
 		} catch (error) {
-			problem = error instanceof ApiError ? error.message : 'That did not go through. Try again.';
+			problem = error instanceof ApiError ? error.message : ACCOUNT_WORDS.failed;
 		} finally {
 			busy = false;
 		}
@@ -236,9 +237,9 @@
 			<div class="who">
 				<div class="title">
 					<h2>{displayName(account)}</h2>
-					<p class="lede">{account.email}, with us since {dayLabel(account.created_at)}</p>
+					<p class="lede">{whoLine(account)}</p>
 				</div>
-				<Quiet disabled={busy} onclick={() => void signOut()}>Sign out</Quiet>
+				<Quiet disabled={busy} onclick={() => void signOut()}>{ACCOUNT_WORDS.signOut}</Quiet>
 			</div>
 
 			<div class="grid">
@@ -249,7 +250,7 @@
 
 				<aside class="side" aria-label="Your plan and display">
 					<section aria-label="Plan">
-						<div class="sec-h"><h2>Plan</h2></div>
+						<div class="sec-h"><h2>{ACCOUNT_WORDS.plan}</h2></div>
 						<div class="kv">
 							<div class="kvr">
 								<span class="st"><b class="plan">{plan.title}</b><span>{plan.line}</span></span>
