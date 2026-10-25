@@ -1,12 +1,13 @@
 package runs
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"reflect"
 	"regexp"
-	"slices"
+	"sync"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -54,53 +55,88 @@ func pageOf(file, id string) artifact {
 	}}
 }
 
+// pageState is where a player id stands in one run: whether the index
+// gives him a page, whether the gate held it, and whether an earlier
+// run's copy stands in for it.
+type pageState struct {
+	runID   string
+	paged   bool
+	held    bool
+	hasCopy bool
+}
+
 // handlePlayer answers his page tonight. An id the run gives no page (a
 // kicker, a defense, anyone the index does not list) is 404, and so is a
 // held page: the gate refused tonight's document, so it is never sent;
-// /run/held names his copy.
+// /run/held says whether a copy stands in. The page is read in the run
+// the held pages were read from, so a pointer moving between the reads
+// cannot send another run's refused page.
 func (h *Handler) handlePlayer(w http.ResponseWriter, r *http.Request) {
 	id, ok := h.playerID(w, r)
 	if !ok {
 		return
 	}
-	pages, err := h.pagesOf(r)
-	if err != nil {
+	state, err := h.stateOf(r.Context(), id)
+	switch {
+	case err != nil:
 		h.unavailable(w, r, err)
-		return
-	}
-	if !slices.Contains(pages, id) {
+	case !state.paged:
 		h.noPage(w, r, "The run has no page for "+id+".")
-		return
+	case state.held:
+		h.noPage(w, r, "His page is held this run; /run/held says whether a copy stands in.")
+	default:
+		h.serveIn(w, r, state.runID, playerFile(id))
 	}
-	held, err := h.heldOf(r)
-	if err != nil {
-		h.unavailable(w, r, err)
-		return
-	}
-	if _, isHeld := held[id]; isHeld {
-		h.noPage(w, r, "His page is held this run. /run/held names his copy.")
-		return
-	}
-	h.serve(w, r, playerFile(id))
 }
 
 // handleCopy answers a held page's copy from an earlier run, 404 for an
-// id held.json does not list with a copy.
+// id the run does not hold with a copy, read in the run that holds it.
 func (h *Handler) handleCopy(w http.ResponseWriter, r *http.Request) {
 	id, ok := h.playerID(w, r)
 	if !ok {
 		return
 	}
-	held, err := h.heldOf(r)
+	state, err := h.stateOf(r.Context(), id)
+	switch {
+	case err != nil:
+		h.unavailable(w, r, err)
+	case !state.paged || !state.held || !state.hasCopy:
+		h.noPage(w, r, "The run holds no copy of a page for "+id+".")
+	default:
+		h.serveIn(w, r, state.runID, copyFile(id))
+	}
+}
+
+// stateOf reads the held pages, then the index in the same run.
+func (h *Handler) stateOf(ctx context.Context, id string) (pageState, error) {
+	heldAnswer, err := h.Reader.Read(ctx, heldFile)
+	if err != nil {
+		return pageState{}, err
+	}
+	held, err := h.held.of(heldAnswer, heldIDs)
+	if err != nil {
+		return pageState{}, err
+	}
+	index, err := h.Reader.ReadIn(ctx, heldAnswer.RunID, indexFile)
+	if err != nil {
+		return pageState{}, err
+	}
+	pages, err := h.pages.of(index, pageIDs)
+	if err != nil {
+		return pageState{}, err
+	}
+	_, paged := pages[id]
+	hasCopy, isHeld := held[id]
+	return pageState{runID: heldAnswer.RunID, paged: paged, held: isHeld, hasCopy: hasCopy}, nil
+}
+
+func (h *Handler) serveIn(w http.ResponseWriter, r *http.Request, runID string, a artifact) {
+	answer, err := h.Reader.ReadIn(r.Context(), runID, a)
 	if err != nil {
 		h.unavailable(w, r, err)
 		return
 	}
-	if hasCopy, isHeld := held[id]; !isHeld || !hasCopy {
-		h.noPage(w, r, "The run holds no copy of a page for "+id+".")
-		return
-	}
-	h.serve(w, r, copyFile(id))
+	h.respond(w, r, answer)
 }
 
 func (h *Handler) playerID(w http.ResponseWriter, r *http.Request) (string, bool) {
@@ -116,13 +152,8 @@ func (h *Handler) noPage(w http.ResponseWriter, r *http.Request, message string)
 	httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, message, nil)
 }
 
-// pagesOf is every player id the index gives a page, so a player's key
-// enters the cache only for a page the run has.
-func (h *Handler) pagesOf(r *http.Request) ([]string, error) {
-	index, err := h.Reader.Read(r.Context(), indexFile)
-	if err != nil {
-		return nil, err
-	}
+// pageIDs is every player id an index answer gives a page.
+func pageIDs(index Answer) (map[string]struct{}, error) {
 	var data struct {
 		Pages []struct {
 			ID string `json:"id"`
@@ -131,20 +162,16 @@ func (h *Handler) pagesOf(r *http.Request) ([]string, error) {
 	if err := json.Unmarshal(index.Data, &data); err != nil {
 		return nil, fmt.Errorf("runs: run %s index pages: %w", index.RunID, err)
 	}
-	ids := make([]string, len(data.Pages))
-	for i, page := range data.Pages {
-		ids[i] = page.ID
+	ids := make(map[string]struct{}, len(data.Pages))
+	for _, page := range data.Pages {
+		ids[page.ID] = struct{}{}
 	}
 	return ids, nil
 }
 
-// heldOf is every held page by id, true where an earlier run's copy is
+// heldIDs is every held page by id, true where an earlier run's copy is
 // beside the run; empty on a run that held none.
-func (h *Handler) heldOf(r *http.Request) (map[string]bool, error) {
-	answer, err := h.Reader.Read(r.Context(), heldFile)
-	if err != nil {
-		return nil, err
-	}
+func heldIDs(answer Answer) (map[string]bool, error) {
 	var data struct {
 		Held *apitypes.RunHeld `json:"held"`
 	}
@@ -158,4 +185,27 @@ func (h *Handler) heldOf(r *http.Request) (map[string]bool, error) {
 		}
 	}
 	return held, nil
+}
+
+// derived is a value worked out from one answer, kept until an answer
+// with another ETag comes (a new run, or an hourly file read again).
+type derived[T any] struct {
+	mu    sync.Mutex
+	tag   string
+	value T
+}
+
+func (d *derived[T]) of(answer Answer, build func(Answer) (T, error)) (T, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.tag == answer.ETag {
+		return d.value, nil
+	}
+	value, err := build(answer)
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	d.tag, d.value = answer.ETag, value
+	return value, nil
 }

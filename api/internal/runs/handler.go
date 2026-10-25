@@ -25,6 +25,11 @@ var cacheControl = "public, max-age=" + strconv.Itoa(int(PointerTTL.Seconds()))
 type Handler struct {
 	Reader *Reader
 	Log    *slog.Logger
+
+	// pages and held are worked out once per index and held answer, so
+	// a player route costs a map lookup (pages.go).
+	pages derived[map[string]struct{}]
+	held  derived[map[string]bool]
 }
 
 // Routes is every /run route: public, read only.
@@ -86,6 +91,12 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, a artifact) {
 		h.unavailable(w, r, err)
 		return
 	}
+	h.respond(w, r, answer)
+}
+
+// respond writes a file's answer: its ETag and Cache-Control, and a 304
+// with no body when the If-None-Match names it.
+func (h *Handler) respond(w http.ResponseWriter, r *http.Request, answer Answer) {
 	header := w.Header()
 	header.Set("ETag", answer.ETag)
 	header.Set("Cache-Control", cacheControl)

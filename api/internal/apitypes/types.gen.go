@@ -4613,7 +4613,9 @@ type RunHeldAnswer struct {
 // RunHeldCopy the earlier run his copy is from, and when that run was written
 type RunHeldCopy struct {
 	RunAt time.Time `json:"runAt"`
-	RunId string    `json:"runId"`
+
+	// RunId the run id: 2026-10-20T12-ros
+	RunId string `json:"runId"`
 }
 
 // RunHeldPage a held page, less what the reader said of it (the run's report)

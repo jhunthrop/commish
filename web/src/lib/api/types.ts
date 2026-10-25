@@ -3531,6 +3531,7 @@ export interface components {
 		};
 		/** @description the earlier run his copy is from, and when that run was written */
 		RunHeldCopy: {
+			/** @description the run id: 2026-10-20T12-ros */
 			runId: string;
 			/** Format: date-time */
 			runAt: string;
@@ -7493,7 +7494,7 @@ export interface operations {
 					 *             }
 					 *           ],
 					 *           "lastGameClub": {
-					 *             "club": "DET",
+					 *             "club": "NYJ",
 					 *             "week": 1,
 					 *             "specialTeams": true
 					 *           }

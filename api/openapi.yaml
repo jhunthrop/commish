@@ -1688,7 +1688,7 @@ paths:
                           defensive_touchdowns: null
                           snapShare: 0.71
                           points: 30.7
-                    lastGameClub: { club: DET, week: 1, specialTeams: true }
+                    lastGameClub: { club: NYJ, week: 1, specialTeams: true }
         "304": { $ref: "#/components/responses/RunNotModified" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -4759,7 +4759,7 @@ components:
       description: the earlier run his copy is from, and when that run was written
       required: [runId, runAt]
       properties:
-        runId: { type: string }
+        runId: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}(-[a-z0-9-]+)?$", description: "the run id: 2026-10-20T12-ros" }
         runAt: { type: string, format: date-time }
     RunHeldPage:
       type: object

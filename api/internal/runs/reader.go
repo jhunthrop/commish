@@ -40,8 +40,11 @@ type Answer struct {
 	Data  json.RawMessage
 }
 
+// cached is a file's answer in the published run, or the error its last
+// read failed with, answered again until failureTTL after readAt.
 type cached struct {
 	answer Answer
+	err    error
 	readAt time.Time
 }
 
@@ -150,36 +153,57 @@ func (r *Reader) Read(ctx context.Context, a artifact) (Answer, error) {
 	if err != nil {
 		return Answer{}, err
 	}
+	return r.ReadIn(ctx, runID, a)
+}
+
+// ReadIn is a file's answer from the run runID, so two files one answer
+// rests on come from one run even when the pointer moves between their
+// reads. Only the published run's answers are cached: a run the pointer
+// has moved past is read again (runs are never rewritten, so it reads
+// the same).
+func (r *Reader) ReadIn(ctx context.Context, runID string, a artifact) (Answer, error) {
 	r.mu.Lock()
 	hit, ok := r.answers[a.path]
 	r.mu.Unlock()
-	if ok && hit.answer.RunID == runID && (!a.hourly || r.now().Sub(hit.readAt) < PointerTTL) {
+	ok = ok && hit.answer.RunID == runID
+	if ok && hit.err != nil {
+		if r.now().Sub(hit.readAt) < failureTTL {
+			return Answer{}, hit.err
+		}
+		ok = false
+	}
+	if ok && (!a.hourly || r.now().Sub(hit.readAt) < PointerTTL) {
 		return hit.answer, nil
 	}
 	v, err, _ := r.group.Do(fileKey(runID, a.path), func() (any, error) {
 		return r.load(ctx, runID, a)
 	})
 	if err != nil {
-		if ok && hit.answer.RunID == runID {
-			// An hourly file's re-read failed: the last good copy stands,
-			// read again after PointerTTL.
-			r.log.Warn("runs: a re-read failed; the last copy stays", "run_id", runID, "file", a.path, "err", err)
-			r.mu.Lock()
-			if r.runID == runID {
-				r.answers[a.path] = cached{answer: hit.answer, readAt: r.now()}
-			}
-			r.mu.Unlock()
-			return hit.answer, nil
+		if !ok {
+			// A file that will not read is answered with its error for
+			// failureTTL, so a refused file costs one bucket read per
+			// failureTTL, not one a request.
+			r.keep(runID, a.path, cached{answer: Answer{RunID: runID}, err: err, readAt: r.now()})
+			return Answer{}, err
 		}
-		return Answer{}, err
+		// An hourly file's re-read failed: the last good copy stands, read
+		// again after PointerTTL.
+		r.log.Warn("runs: a re-read failed; the last copy stays", "run_id", runID, "file", a.path, "err", err)
+		r.keep(runID, a.path, cached{answer: hit.answer, readAt: r.now()})
+		return hit.answer, nil
 	}
 	answer := v.(Answer)
-	r.mu.Lock()
-	if r.runID == runID {
-		r.answers[a.path] = cached{answer: answer, readAt: r.now()}
-	}
-	r.mu.Unlock()
+	r.keep(runID, a.path, cached{answer: answer, readAt: r.now()})
 	return answer, nil
+}
+
+// keep caches a file's answer or failure while runID is the published run.
+func (r *Reader) keep(runID, file string, c cached) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.runID == runID {
+		r.answers[file] = c
+	}
 }
 
 func (r *Reader) load(ctx context.Context, runID string, a artifact) (Answer, error) {
