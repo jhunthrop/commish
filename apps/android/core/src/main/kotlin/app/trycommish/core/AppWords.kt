@@ -18,6 +18,9 @@ object AppWords {
     /** With nothing kept and no connection: what happened and what to do, never an error code. */
     const val cannotLoad = "We could not reach Commish. Check your connection, then pull down to try again."
 
+    /** The way to read again from a screen that has nothing to show. */
+    const val tryAgain = "Try again"
+
     /** The API no longer takes the device's sign-in (it lapsed unused, or was revoked). */
     const val signedOut = "Your sign-in on this phone has run out. Sign in again to see your leagues."
 
