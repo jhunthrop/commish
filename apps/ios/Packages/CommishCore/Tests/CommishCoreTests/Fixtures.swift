@@ -48,6 +48,25 @@ enum Fixtures {
         try APIDecoding.envelopeData(MatchupBox.self, from: data("fixtures/inseason/matchup-\(league)-\(clock).json"))
     }
 
+    /// The trade finder at a clock (GET /leagues/attached/{id}/trades).
+    static func trades(_ clock: String) throws -> TradeAdvice {
+        try APIDecoding.envelopeData(TradeAdvice.self, from: data("fixtures/inseason/trades-\(league)-\(clock).json"))
+    }
+
+    /// The trades holding one player at the week's clock (GET .../trades?player=8439, Aaron Rodgers).
+    static func tradesHolding() throws -> TradeAdvice {
+        try APIDecoding.envelopeData(
+            TradeAdvice.self, from: data("fixtures/inseason/trades-\(league)-player-8439-\(week).json")
+        )
+    }
+
+    /// The check of the strip's trade `number` at a clock (POST /leagues/attached/{id}/trades/check).
+    static func tradeCheck(_ clock: String, _ number: Int) throws -> TradeCheck {
+        try APIDecoding.envelopeData(
+            TradeCheck.self, from: data("fixtures/inseason/trade-check-\(league)-\(clock)-\(number).json")
+        )
+    }
+
     /// The players free to add in a league at a clock (GET /leagues/attached/{id}/waivers).
     static func waivers(_ id: String, _ clock: String) throws -> WaiverAdvice {
         try APIDecoding.envelopeData(WaiverAdvice.self, from: data("fixtures/inseason/waivers-\(id)-\(clock).json"))

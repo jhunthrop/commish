@@ -32,3 +32,5 @@ filter:
     - playerWeek
     - leaguePlayerWeek
     - leagueWaivers
+    - leagueTrades
+    - checkLeagueTrade

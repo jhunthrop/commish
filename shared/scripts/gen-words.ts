@@ -48,11 +48,11 @@ const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
  * Matchup's (Lane 183): the words beside its box scores; then the Board's (Lane 182): its chips and heads,
  * its formats' chips, the Gap's definition, and the season pages' verbs; then the run's board on the Board
  * (Lane 190): a tier band's words, what its count counts, the run's stamp and a past bye's word; then the
- * its formats' chips, the Gap's definition, and the season pages' verbs; then the Waivers' (Lane 186): its
- * table, strip and drop panel, the heads' basis, the Stash group, the season figures' heads and the strip's
- * mark; then the run's board on the Board (Lane 190): a tier band's words, what its count counts, the run's
- * stamp and a past bye's word; then the player sheet's and page's (Lane 192): a held page's words, the
- * week tile's, the page's facts, the read's figures' labels and the words in place of a read not ready. */
+ * Waivers' (Lane 186): its table, strip and drop panel, the heads' basis, the Stash group, the season
+ * figures' heads and the strip's mark; then the Trades' (Lane 189): the trade table's words, the
+ * picker's first choice and the close call's chip, and the builder's lines; then the player sheet's
+ * and page's (Lane 192): a held page's words, the week tile's, the page's facts, the read's figures'
+ * labels and the words in place of a read not ready. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -287,6 +287,27 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/league/box/strip.ts',
 		picks: ['STRIP'],
 		json: 'shared/words/league-strip.json'
+	},
+	{
+		name: 'Trades',
+		module: 'web/src/lib/league/box/trades.ts',
+		picks: ['TRADES'],
+		json: 'shared/words/league-trades.json'
+	},
+	{
+		name: 'TradePicker',
+		module: 'web/src/lib/league/inseason/words.ts',
+		picks: [
+			['every', 'EVERY_TRADE'],
+			['closeForThem', 'CLOSE_FOR_THEM']
+		],
+		json: 'shared/words/league-trade-picker.json'
+	},
+	{
+		name: 'Builder',
+		module: 'web/src/lib/league/inseason/builder.ts',
+		picks: ['BUILDER_LINES'],
+		json: 'shared/words/league-builder.json'
 	},
 	{
 		name: 'HeldPage',

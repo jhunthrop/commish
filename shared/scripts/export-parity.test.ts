@@ -13,6 +13,7 @@ import {
 } from './export-parity.ts';
 import { LINEUP_OUTPUT } from './lineup-parity.ts';
 import { WAIVERS_OUTPUT } from './waivers-parity.ts';
+import { TRADES_OUTPUT } from './trades-parity.ts';
 import { BOARD_OUTPUT } from './board-parity.ts';
 import { BOARD_RUN_OUTPUT } from './board-run-parity.ts';
 import { PLAYER_SHEET_OUTPUT } from './player-sheet-parity.ts';
@@ -278,4 +279,47 @@ void test("the Waivers at every clock, each ESPN stand-in's with its claim made 
 	const espn = parity.claim.hosts.find((h) => h.host === 'espn');
 	assert.equal(espn?.verb, 'Claim on ESPN');
 	assert.ok(espn?.results.some((r) => r.words.includes('processes it Wed 2:00 am')));
+});
+
+void test("the Trades at every clock: each row's offer in the web's words, the strip's checks scored", async () => {
+	interface Row {
+		offer: string;
+		opened: { groups: { rows: { slot: string }[] }[] };
+	}
+	const parity = JSON.parse((await generate()).get(TRADES_OUTPUT) ?? '{}') as {
+		clocks: Record<string, { finder: { every: { mine: Row[] } }; basis: { closed: string } }>;
+		checks: Record<string, { yours: { figures: { projBefore: string } }; sentence: string }[]>;
+		copied: { done: string };
+		words: { checks: { sentence: string }[]; under: string };
+		holding: { rows: { key: string }[]; unheld: { decision: string } | null };
+		builder: { yours: { rows: { pick: string }[] }; pin: string };
+	};
+	assert.deepEqual(Object.keys(parity.clocks), [...CLOCKS]);
+	for (const clock of CLOCKS) {
+		const rows = parity.clocks[clock]?.finder.every.mine ?? [];
+		assert.ok(rows.length > 0, clock);
+		for (const row of rows) {
+			assert.match(row.offer, /^Trade with .+: .+ for .+\.$/, clock);
+			assert.deepEqual(row.opened.groups.length, 2, clock);
+		}
+		assert.match(parity.clocks[clock]?.basis.closed ?? '', /How the order has done$/, clock);
+	}
+	// On Sunday afternoon the strip's trades move players already playing: no Proj before or after.
+	const sunday = parity.checks['2026-10-18T18-56-00Z'] ?? [];
+	assert.equal(sunday.length, 2);
+	assert.ok(sunday.every((c) => c.yours.figures.projBefore === '--'));
+	assert.equal(parity.copied.done, "Copied. Propose it on FFPC's trade page.");
+	// Every checkWords branch, the under 0.1 gain, a holding read and the builder (fix round 1).
+	assert.equal(
+		new Set(parity.words.checks.map((c) => c.sentence)).size,
+		parity.words.checks.length
+	);
+	assert.match(parity.words.under, /gains under 0\.1 points/);
+	assert.ok(parity.holding.rows.length > 0);
+	assert.match(parity.holding.unheld?.decision ?? '', /^No trade we found includes /);
+	assert.deepEqual(
+		['on', 'drop'].map((pick) => parity.builder.yours.rows.some((r) => r.pick === pick)),
+		[true, true]
+	);
+	assert.equal(parity.builder.pin, '+5.7 a week for your lineup, +0.7 for theirs');
 });

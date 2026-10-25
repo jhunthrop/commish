@@ -45,7 +45,9 @@ public enum PhoneRail {
     /// The Waivers tab's key: the selected league's players free to add.
     public static let waiversKey = "waivers"
     static let waivers = RailTab(key: waiversKey, label: AppWords.Tab.waivers)
-    static let trades = RailTab(key: "trades", label: AppWords.Tab.trades)
+    /// The Trades tab's key: the selected league's trade finder.
+    public static let tradesKey = "trades"
+    static let trades = RailTab(key: tradesKey, label: AppWords.Tab.trades)
     static let board = RailTab(key: boardKey, label: AppWords.Tab.board)
     static let players = RailTab(key: "players", label: AppWords.Tab.players)
     static let mock = RailTab(key: "mock", label: AppWords.Tab.mock)

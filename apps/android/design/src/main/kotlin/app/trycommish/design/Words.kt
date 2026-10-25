@@ -419,6 +419,64 @@ object Words {
         const val best = "Best"
     }
 
+    object Trades {
+        const val weekHead = "This week, Proj"
+        const val weekShort = "This week"
+        const val you = "You"
+        const val them = "Them"
+        const val gainHead = "Gain a week"
+        const val yourGain = "Your gain"
+        const val theirGain = "Their gain"
+        const val give = "You give"
+        const val get = "You get"
+        const val with = "With"
+        const val room = "Room"
+        const val best = "Best with each team"
+        const val every = "Every trade"
+        const val sideGive = "Give"
+        const val sideGet = "Get"
+        const val sideDrop = "Drop"
+        const val perGame = "A game"
+        const val why = "Why this trade"
+        const val fromThis = "Build from this"
+        const val youHaveRoom = "You have room"
+        const val aStarter = "a starter"
+        const val theyHaveRoom = "They have room"
+        const val noOneToDrop = "No one to drop"
+        const val hasRoom = "Has room"
+        const val copied = "Copied."
+        const val copyFailed = "This browser would not copy it."
+        const val proposeItOn = "Propose it on"
+        const val aWeekForYou = "a week for your lineup"
+        const val forTheirs = "for theirs"
+        const val weekWord = "Week"
+        const val yourSide = "You"
+        const val theirSide = "With"
+        const val propose = "Propose"
+        const val sortBy = "Sort by"
+        const val to = "to"
+        const val projForYou = "Proj this week for your lineup"
+    }
+
+    object TradePicker {
+        const val every = "Every trade"
+        const val closeForThem = "A close call for them"
+    }
+
+    object Builder {
+        const val open = "Build a trade"
+        const val figures = "What the figures are"
+        const val team = "Trade with"
+        const val give = "You give"
+        const val get = "You get"
+        const val pickBoth = "Pick one or two of your players and one or two of theirs."
+        const val pickYours = "Now pick one or two of your players to give."
+        const val pickTheirs = "Now pick one or two of theirs to get."
+        const val checking = "Checking the trade"
+        const val notNow = "Not now"
+        const val full = "Two picked, tap one to put him back"
+    }
+
     object HeldPage {
         const val log = "His game log is not written yet."
         const val basis = "His figures are the board's. His game log and our read of him are not written yet."

@@ -4,7 +4,14 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { claimBody, clockPart, fixturePlan, SHEET_CLOCKS } from './export-fixtures.ts';
+import {
+	CHECKED_TRADES,
+	claimBody,
+	clockPart,
+	fixturePlan,
+	HOLDING_PLAYER,
+	SHEET_CLOCKS
+} from './export-fixtures.ts';
 import { PUBLIC_SHEET_PLAYER_IDS, SHEET_PLAYER_IDS } from './sheet-players.ts';
 import { REPOSITORY } from './generated.ts';
 
@@ -43,6 +50,7 @@ void test('the plan reads the league once, its scoreboard, lineup, matchup and l
 		assert.ok(names.includes(`lineup-${LEAGUE}-${clockPart(clock)}.json`), clock);
 		assert.ok(names.includes(`matchup-${LEAGUE}-${clockPart(clock)}.json`), clock);
 		assert.ok(names.includes(`sync-${LEAGUE}-${clockPart(clock)}.json`), clock);
+		assert.ok(names.includes(`trades-${LEAGUE}-${clockPart(clock)}.json`), clock);
 		assert.ok(names.includes(`waivers-${LEAGUE}-${clockPart(clock)}.json`), clock);
 	}
 	assert.equal(new Set(names).size, names.length, 'every file once');
@@ -201,4 +209,27 @@ void test("a claim's body: the first pickup with no bid planned, the plan's bid 
 	assert.equal(made.move.claim.bid, 0);
 	const result = answer(`claim-move-${ESPN.pending}.json`).data as { outcome: string };
 	assert.equal(result.outcome, 'pending');
+});
+
+void test("the strip's trades are checked at the week's and the Sunday's clocks, each posted", () => {
+	const checks = fixturePlan({ leagueId: LEAGUE, clocks: CLOCKS })
+		.flatMap((step) => step.files)
+		.filter((f) => f.check !== undefined);
+	assert.deepEqual(
+		checks.map((f) => [f.file, f.check]),
+		[CLOCKS.week, CLOCKS.sunday].flatMap((clock) =>
+			Array.from({ length: CHECKED_TRADES }, (_, index) => [
+				`trade-check-${LEAGUE}-${clockPart(clock)}-${String(index + 1)}.json`,
+				{ trades: `trades-${LEAGUE}-${clockPart(clock)}.json`, index }
+			])
+		)
+	);
+	for (const f of checks) assert.equal(f.route, `POST /leagues/attached/${LEAGUE}/trades/check`);
+	const files = fixturePlan({ leagueId: LEAGUE, clocks: CLOCKS }).flatMap((step) => step.files);
+	assert.ok(
+		files.some(
+			(f) => f.route === `GET /leagues/attached/${LEAGUE}/trades?player=${HOLDING_PLAYER}`
+		),
+		'the picker narrowed to one player is read'
+	);
 });

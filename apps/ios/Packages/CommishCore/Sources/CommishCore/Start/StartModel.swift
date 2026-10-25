@@ -22,15 +22,24 @@ public struct RowCells: Equatable, Sendable, Identifiable {
     public let evidence: String
     public let oppRank: String?
     public let ease: Ease
+    /// His rest-of-season points a game, "--" without one (the Trades screen's last cell).
+    public let season: String
 
     public var id: String {
         row.id
     }
 
-    init(_ entry: LineupEntry?, row plain: StartRow, reserve: ReserveRow?) {
+    /// A trade's row (TradeFinder's opened players): which way he moves for the member, his side in
+    /// the slot's cell.
+    init(trade row: StartRow, move: Move) {
+        self.init(nil, row: row, reserve: nil, move: move)
+    }
+
+    init(_ entry: LineupEntry?, row plain: StartRow, reserve: ReserveRow?, move: Move? = nil) {
         let row = plain.reserved(reserve)
         self.row = row
-        move = entry?.move
+        self.move = move ?? entry?.move
+        season = StartWords.number(row.season)
         idle = entry?.idle ?? false
         why = entry?.why
         rank = reserve != nil ? "" : row.rank.map(String.init) ?? Words.Box.none
