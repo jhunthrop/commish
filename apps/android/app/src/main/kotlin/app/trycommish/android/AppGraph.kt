@@ -29,6 +29,7 @@ import app.trycommish.core.matchup.MatchupReads
 import app.trycommish.core.matchup.MatchupViewModel
 import app.trycommish.core.shell.AccountReads
 import app.trycommish.core.shell.ApiAccountReads
+import app.trycommish.core.shell.FollowedLeague
 import app.trycommish.core.shell.ShellViewModel
 import app.trycommish.core.signin.ApiPairing
 import app.trycommish.core.signin.SignIn
@@ -36,6 +37,10 @@ import app.trycommish.core.signin.SignInResult
 import app.trycommish.core.start.ApiLineupReads
 import app.trycommish.core.start.LineupReads
 import app.trycommish.core.start.StartViewModel
+import app.trycommish.core.trades.ApiTradeReads
+import app.trycommish.core.trades.TradeMe
+import app.trycommish.core.trades.TradeReads
+import app.trycommish.core.trades.TradesViewModel
 import app.trycommish.core.waivers.ApiWaiverReads
 import app.trycommish.core.waivers.WaiverReads
 import app.trycommish.core.waivers.WaiverViewModel
@@ -73,6 +78,7 @@ class AppGraph(
     private val lineups: LineupReads = ApiLineupReads(transport)
     private val matchups: MatchupReads = ApiMatchupReads(transport)
     private val waivers: WaiverReads = ApiWaiverReads(transport)
+    private val trades: TradeReads = ApiTradeReads(transport)
     private val runs: RunReads = ApiRunReads(transport)
     private val appContext: Context = context.applicationContext
     private val clipboard: ClipboardManager? = context.getSystemService(ClipboardManager::class.java)
@@ -120,6 +126,11 @@ class AppGraph(
      * in the browser. */
     fun waiverViewModel(league: LeagueHost): WaiverViewModel =
         WaiverViewModel(waivers, cache, clock, zone, league, ::copy, ::openPage, sessionEnd)
+
+    /** A league's Trades, an offer copied to the phone's clipboard and the platform's trade page opened in
+     * the browser; the member's side named by the league's team and standing. */
+    fun tradesViewModel(league: FollowedLeague): TradesViewModel =
+        TradesViewModel(trades, cache, clock, zone, league.host, TradeMe.of(league), ::copy, ::openPage, sessionEnd)
 
     /** Opens a page in the browser from outside an activity's composition. */
     private fun openPage(url: String) {
