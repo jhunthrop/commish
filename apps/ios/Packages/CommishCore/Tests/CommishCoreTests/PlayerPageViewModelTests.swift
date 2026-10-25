@@ -85,8 +85,15 @@ struct PlayerPageViewModelTests {
         await viewModel.load()
         let (page, _) = try #require(page(viewModel))
         #expect(page.heldBasis == Words.HeldPage.basis)
-        #expect(page.read == .unwritten(Words.Unwritten.read))
+        #expect(page.read == nil, "the held words say once that our read is not written")
         #expect(page.figure == "199.2", "the board's figure")
+    }
+
+    @Test func eachVerbOpensItsLeagueScreensTabOrThePlatformsPage() throws {
+        #expect(CardVerb.Target.lineup.tabKey == PhoneRail.lineupKey)
+        #expect(CardVerb.Target.waivers.tabKey == "waivers")
+        #expect(CardVerb.Target.trades.tabKey == "trades")
+        #expect(try CardVerb.Target.platform(#require(URL(string: "https://fantasy.espn.com"))).tabKey == nil)
     }
 
     @Test func aSlugTheRunHasNoPageForSaysSo() async {

@@ -19,6 +19,18 @@ public struct CardVerb: Equatable, Sendable {
     public let note: String?
 }
 
+public extension CardVerb.Target {
+    /// The bar's tab the verb opens, nil for the platform's own page.
+    var tabKey: String? {
+        switch self {
+        case .lineup: PhoneRail.lineupKey
+        case .waivers: PhoneRail.waivers.key
+        case .trades: PhoneRail.trades.key
+        case .platform: nil
+        }
+    }
+}
+
 /// week-words.ts verbOf, heldVerb and verbFits, held to the parity's verbs.
 enum CardVerbs {
     typealias Kind = Components.Schemas.PlayerVerb.KindPayload.Value1Payload

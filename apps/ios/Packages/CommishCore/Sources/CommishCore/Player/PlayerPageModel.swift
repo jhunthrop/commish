@@ -54,7 +54,8 @@ public struct PlayerPageModel: Equatable, Sendable {
     public let outcomes: Outcomes?
     /// In place of his tier for a player on a season-long list: "On IR, not ranked".
     public let heldTier: String?
-    public let read: Read
+    /// Nil for a page held back with no copy: its foot says once that our read is not written.
+    public let read: Read?
     public let verb: CardVerb?
     /// The run's stamp the page is from: the earlier run's for a held page's copy.
     public let stamp: String
@@ -136,7 +137,8 @@ public enum PlayerPages {
             heat: Heat.of(vor: numbers.vor, round: numbers.vorRound),
             outcomes: outcomes(numbers, format: format, season: input.manifest.season),
             heldTier: heldOut ? listed?.status.value1.flatMap(PageWords.heldTier) : nil,
-            read: read(input, underway: underway, projection: numbers.projected),
+            read: heldBasis(input.source) == nil
+                ? read(input, underway: underway, projection: numbers.projected) : nil,
             verb: verb(input),
             stamp: stamp(input),
             heldBasis: heldBasis(input.source)

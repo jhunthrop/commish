@@ -42,6 +42,11 @@ public struct CardTile: Equatable, Sendable, Identifiable {
 public struct CardHead: Equatable, Sendable {
     public let week: Int
     public let opponent: String
+
+    /// CardNext.svelte's week: "Week 6".
+    public var label: String {
+        "\(Words.Card.week) \(week)"
+    }
 }
 
 /// The week ahead's cell under his name (week-words.ts NextCell): "at ATL", "Sun 12:00 pm CT", then the
