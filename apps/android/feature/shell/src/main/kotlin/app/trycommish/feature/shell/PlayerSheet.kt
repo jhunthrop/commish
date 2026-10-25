@@ -31,9 +31,9 @@ import app.trycommish.core.shell.PlayerSheetModel
 import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.shell.ShellRoute
 import app.trycommish.core.shell.playerSheetModel
-import app.trycommish.design.Avatar
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.Headshot
 import app.trycommish.design.PositionPill
 import app.trycommish.design.R
 import app.trycommish.design.Tokens
@@ -132,7 +132,7 @@ private fun SheetBasis(text: String) {
 private fun SheetHead(model: PlayerSheetModel) {
     val c = CommishTheme.colors
     Row(horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp), verticalAlignment = Alignment.CenterVertically) {
-        Avatar(model.initials, FACE)
+        Headshot(model.headshot, model.initials, FACE)
         Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp)) {
             Text(model.name.uppercase(), style = Faces.head, color = c.ink, modifier = Modifier.semantics { heading() })
             Row(horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp), verticalAlignment = Alignment.CenterVertically) {

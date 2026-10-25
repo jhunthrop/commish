@@ -35,6 +35,7 @@ import app.trycommish.core.waivers.PickupCard
 import app.trycommish.core.waivers.WaiverModel
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.NumWeight
 import app.trycommish.design.Tokens
 import app.trycommish.feature.boxscore.edgeRule
 
@@ -141,7 +142,7 @@ private fun Card(
         horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp),
     ) {
         Box(Modifier.size(SLOT_SIDE).background(c.surface2, CircleShape), contentAlignment = Alignment.Center) {
-            Text(card.slot, style = Faces.cell.copy(fontSize = Tokens.Type.md.sp, fontWeight = FontWeight.Bold), color = c.ink2)
+            Text(card.slot, style = Faces.number(NumWeight.Bold, Tokens.Type.md.sp), color = c.ink2)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             card.mark?.let {

@@ -33,6 +33,7 @@ import app.trycommish.core.matchup.BugTeam
 import app.trycommish.core.matchup.MatchupBug
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.NumWeight
 import app.trycommish.design.Tokens
 import app.trycommish.feature.boxscore.HEAD_TRACKING
 
@@ -98,7 +99,7 @@ private fun TopLine(bug: MatchupBug) {
         bug.head?.let { head ->
             Text(
                 head.uppercase(),
-                style = Faces.cell.copy(fontWeight = FontWeight.Bold, letterSpacing = HEAD_FACE_TRACKING.em),
+                style = Faces.number(NumWeight.Bold).copy(letterSpacing = HEAD_FACE_TRACKING.em),
                 color = c.scoreboardInk,
                 modifier = centred,
             )
@@ -159,7 +160,7 @@ private fun Side(
         ) {
             Text(
                 team.big,
-                style = Faces.head.copy(fontWeight = FontWeight.Bold),
+                style = Faces.head,
                 color = if (team.me) c.scoreboardNum else c.scoreboardInk,
                 maxLines = 1,
                 softWrap = false,
@@ -168,7 +169,7 @@ private fun Side(
             if (team.small.isNotEmpty()) {
                 Text(
                     team.small,
-                    style = Faces.cell.copy(fontSize = Tokens.Type.sm.sp, fontWeight = FontWeight.Medium),
+                    style = Faces.number(NumWeight.Medium, Tokens.Type.sm.sp),
                     color = c.scoreboardInk2,
                     maxLines = 1,
                     softWrap = false,

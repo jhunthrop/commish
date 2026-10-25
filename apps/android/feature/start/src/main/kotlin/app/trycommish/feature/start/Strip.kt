@@ -39,6 +39,7 @@ import app.trycommish.core.start.StripSum
 import app.trycommish.design.ArrowMark
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.NumWeight
 import app.trycommish.design.Tokens
 import app.trycommish.design.Words
 import app.trycommish.feature.boxscore.clickableLink
@@ -135,7 +136,7 @@ private fun Sum(
         model.sum?.let { sum ->
             Text(sum.figure, style = Faces.figure, color = c.accentText)
             Text(sumWords(sum), style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.sp), textAlign = TextAlign.End)
-            sum.final?.let { Text(it, style = Faces.cell.copy(fontWeight = FontWeight.Bold, fontSize = Tokens.Type.md.sp), color = c.ink2) }
+            sum.final?.let { Text(it, style = Faces.number(NumWeight.Bold, Tokens.Type.md.sp), color = c.ink2) }
         }
         model.done?.let {
             Text(
@@ -212,7 +213,7 @@ private fun Chip(
             ) {
                 Text(
                     chip.swap.slot,
-                    style = Faces.cell.copy(fontSize = Tokens.Type.xs.sp, fontWeight = FontWeight.Bold),
+                    style = Faces.number(NumWeight.Bold, Tokens.Type.xs.sp),
                     color = c.ink,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.background(c.surface2, pill).widthIn(min = 28.dp).padding(horizontal = 4.dp),

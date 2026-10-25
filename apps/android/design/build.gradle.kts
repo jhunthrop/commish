@@ -1,10 +1,12 @@
 // The design: Task A's generated Tokens.kt and Words.kt (shared/design, shared/words), the Material 3
-// theme in both schemes, the three faces, and the shared composables every screen draws with.
+// theme in both schemes, the three faces, and the shared composables every screen draws with, a
+// player's face among them, loaded through Coil with a disk cache.
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.android.junit5)
+    alias(libs.plugins.paparazzi)
 }
 
 android {
@@ -31,8 +33,13 @@ dependencies {
     api(libs.compose.material3)
     api(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
+    // The specimen is a Paparazzi rule, a JUnit 4 test, run on the platform beside the JUnit 5 ones.
+    testImplementation(libs.junit4)
+    testRuntimeOnly(libs.junit.vintage.engine)
 }

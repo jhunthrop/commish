@@ -7,8 +7,27 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+
+/**
+ * A weight of the display face by role: the CSS number the web asks for and iOS draws (CommishDesign
+ * FaceWeight), and the `wght` the bundled variable font is set to on Android so a figure's strokes match
+ * iOS's at the same size. CoreText draws the same font file heavier than Android does, by more where
+ * the face's weight axis is flat (500 to 600). Measured as the "0"'s side stroke over its height,
+ * iOS's references against this module's ladder (FaceSpecimenSnapshotTest, Lane 195): iOS's 500, 600
+ * and 700 draw as Android's 625, 675 and 750. This is the one place a cut is chosen; screens name a
+ * role and never a FontWeight of this face.
+ */
+enum class NumWeight(
+    val css: Int,
+    val drawn: Int,
+) {
+    Medium(css = 500, drawn = 625),
+    SemiBold(css = 600, drawn = 675),
+    Bold(css = 700, drawn = 750),
+}
 
 /**
  * The three faces (Tokens.Font): Outfit for the interface, Big Shoulders Display for numbers, Newsreader
@@ -17,21 +36,42 @@ import androidx.compose.ui.unit.sp
  */
 object Faces {
     @OptIn(ExperimentalTextApi::class)
+    private fun font(
+        res: Int,
+        wght: Int,
+    ): Font = Font(res, FontWeight(wght), variationSettings = FontVariation.Settings(FontVariation.weight(wght)))
+
     private fun family(
         res: Int,
         vararg weights: FontWeight,
-    ): FontFamily =
-        FontFamily(
-            weights.map { w -> Font(res, w, variationSettings = FontVariation.Settings(FontVariation.weight(w.weight))) },
-        )
+    ): FontFamily = FontFamily(weights.map { font(res, it.weight) })
 
     val ui: FontFamily = family(R.font.outfit, FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold)
-    val num: FontFamily =
-        family(R.font.big_shoulders_display, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold, FontWeight.ExtraBold)
+
+    /** The display face at each role's drawn weight, so a style's weight matches one of its fonts exactly. */
+    private val numFamily: FontFamily = FontFamily(NumWeight.entries.map { font(R.font.big_shoulders_display, it.drawn) })
     val read: FontFamily = family(R.font.newsreader, FontWeight.Normal, FontWeight.Medium)
 
     private const val TABULAR = "tnum"
     private const val LABEL_TRACKING = 0.06
+
+    /** The display face at a `wght` of its own, for the weight measurement only (FaceSpecimenSnapshotTest). */
+    internal fun numAt(
+        wght: Int,
+        size: TextUnit,
+    ): TextStyle =
+        TextStyle(
+            fontFamily = FontFamily(font(R.font.big_shoulders_display, wght)),
+            fontWeight = FontWeight(wght),
+            fontSize = size,
+            fontFeatureSettings = TABULAR,
+        )
+
+    /** A figure in the display face at a role's weight and a size, tabular. */
+    fun number(
+        weight: NumWeight,
+        size: TextUnit = Tokens.Type.lg.sp,
+    ): TextStyle = TextStyle(fontFamily = numFamily, fontWeight = FontWeight(weight.drawn), fontSize = size, fontFeatureSettings = TABULAR)
 
     /** Labels on cells: uppercase, tracked, the smallest size. */
     val label =
@@ -47,13 +87,13 @@ object Faces {
     val section = TextStyle(fontFamily = ui, fontWeight = FontWeight.SemiBold, fontSize = Tokens.Type.lg.sp)
 
     /** A number in a row, the interface's size, tabular. */
-    val cell = TextStyle(fontFamily = num, fontWeight = FontWeight.SemiBold, fontSize = Tokens.Type.lg.sp, fontFeatureSettings = TABULAR)
+    val cell = number(NumWeight.SemiBold)
 
     /** A score's big figure, tabular. */
-    val figure = TextStyle(fontFamily = num, fontWeight = FontWeight.Bold, fontSize = Tokens.Type.xl.sp, fontFeatureSettings = TABULAR)
+    val figure = number(NumWeight.Bold, Tokens.Type.xl.sp)
 
     /** A panel title in the display face. */
-    val head = TextStyle(fontFamily = num, fontWeight = FontWeight.ExtraBold, fontSize = Tokens.Type.head.sp)
+    val head = number(NumWeight.Bold, Tokens.Type.head.sp).copy(fontFeatureSettings = null)
 
     /** Prose under a table, said once. */
     val basis = TextStyle(fontFamily = read, fontSize = Tokens.Type.sm.sp)
