@@ -8,8 +8,13 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonEncoder
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
+import java.math.BigDecimal
 import java.util.UUID
 
 /** A uuid as the API writes it, a string. The generated types mark it contextual. */
@@ -24,13 +29,36 @@ private object UuidSerializer : KSerializer<UUID> {
     override fun deserialize(decoder: Decoder): UUID = UUID.fromString(decoder.decodeString())
 }
 
+/** A number the schema leaves without a format (the run's figures: 344.1, a tier's drop), read as the
+ * API wrote it with no binary rounding on the way in. The generated types mark it contextual. */
+private object BigDecimalSerializer : KSerializer<BigDecimal> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("BigDecimal", PrimitiveKind.DOUBLE)
+
+    override fun serialize(
+        encoder: Encoder,
+        value: BigDecimal,
+    ) = (encoder as? JsonEncoder)?.encodeJsonElement(JsonPrimitive(value)) ?: encoder.encodeDouble(value.toDouble())
+
+    override fun deserialize(decoder: Decoder): BigDecimal =
+        (decoder as? JsonDecoder)
+            ?.decodeJsonElement()
+            ?.jsonPrimitive
+            ?.content
+            ?.let(::BigDecimal)
+            ?: BigDecimal(decoder.decodeDouble().toString())
+}
+
 /** The one JSON configuration every answer is read with: a field this build does not know is skipped,
  * so the API can add fields without breaking an app already in members' hands. */
 val CommishJson: Json =
     Json {
         ignoreUnknownKeys = true
         explicitNulls = false
-        serializersModule = SerializersModule { contextual(UuidSerializer) }
+        serializersModule =
+            SerializersModule {
+                contextual(UuidSerializer)
+                contextual(BigDecimalSerializer)
+            }
     }
 
 /** The JSON a request's body is written with: a field the schema requires and the app holds as null is
