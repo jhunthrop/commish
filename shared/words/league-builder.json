@@ -1,0 +1,14 @@
+{
+	"open": "Build a trade",
+	"figures": "What the figures are",
+	"team": "Trade with",
+	"give": "You give",
+	"get": "You get",
+	"pickBoth": "Pick one or two of your players and one or two of theirs.",
+	"pickYours": "Now pick one or two of your players to give.",
+	"pickTheirs": "Now pick one or two of theirs to get.",
+	"checking": "Checking the trade",
+	"notNow": "Not now",
+	"full": "Two picked, tap one to put him back",
+	"functions": []
+}

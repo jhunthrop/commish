@@ -9,15 +9,16 @@ import Record
 import Shell
 import Start
 import SwiftUI
+import Trades
 import Waivers
 
 /// The phone's five, the web's bar for the shown league's phase or, with none, the site's season
 /// (PhoneRail, held to rail-order.ts), each under the top bar: the league switch, the player search
 /// and the account's way in. Choosing a league opens its home: the League tab where the bar has one,
-/// else the home pushed on the tab in view (B149). League, Lineup, Matchup, Waivers, the board (the
-/// Board item, and Rest of season in season with no league), Rankings and Our record are live, and the
-/// search opens Rankings with its letters; the others say their screen's name until their lane lands.
-/// Every screen presents the player sheet through the one host.
+/// else the home pushed on the tab in view (B149). League, Lineup, Matchup, Waivers, Trades, the board
+/// (the Board item, and Rest of season in season with no league), Rankings and Our record are live, and
+/// the search opens Rankings with its letters; the others say their screen's name until their lane
+/// lands. Every screen presents the player sheet through the one host.
 struct RootTabs: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var selection = PhoneRail.leagueKey
@@ -120,8 +121,11 @@ struct RootTabs: View {
         case let (PhoneRail.waiversKey, league?):
             WaiversTab(environment: environment, league: league, expired: expired)
                 .id(league.id)
+        case let (PhoneRail.tradesKey, league?):
+            TradesTab(environment: environment, league: league, expired: expired)
+                .id(league.id)
         case (PhoneRail.leagueKey, nil), (PhoneRail.lineupKey, nil), (PhoneRail.matchupKey, nil),
-             (PhoneRail.waiversKey, nil):
+             (PhoneRail.waiversKey, nil), (PhoneRail.tradesKey, nil):
             BasisText(AppWords.LeagueList.none).padding(Tokens.Space.s5)
         case (PhoneRail.rankingsKey, _):
             RankingsTab(environment: environment, inSeason: inSeason, query: "", expired: expired)
@@ -256,6 +260,30 @@ private struct MatchupTab: View {
 
     var body: some View {
         MatchupView(viewModel: viewModel, leagueID: leagueID)
+    }
+}
+
+/// A league's Trades: owns its view model for the league it shows; the offer copied to the system
+/// clipboard, the member's team and standing as the switch names them.
+private struct TradesTab: View {
+    @State private var viewModel: TradesViewModel
+    private let leagueID: String
+
+    init(environment: AppEnvironment, league: FollowedLeague, expired: @escaping @MainActor () -> Void) {
+        _viewModel = State(initialValue: TradesViewModel(
+            api: environment.api, cache: environment.cache, clock: environment.clock, host: league.host,
+            me: TradeMe(league: league),
+            copy: { text in
+                UIPasteboard.general.string = text
+                return true
+            },
+            onSignedOut: expired
+        ))
+        leagueID = league.id
+    }
+
+    var body: some View {
+        TradesView(viewModel: viewModel, leagueID: leagueID)
     }
 }
 

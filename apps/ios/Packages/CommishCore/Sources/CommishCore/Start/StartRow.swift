@@ -54,6 +54,9 @@ public struct StartRow: Equatable, Sendable, Identifiable {
     public let avg: Double?
     public let last: Double?
     public let delta: Double?
+    /// His rest-of-season points a game on our board, the Trades screen's last cell (box.ts
+    /// RowEvidence.season).
+    public let season: Double?
 
     /// Still to come at the screen's clock: the Opp rank's tint draws only then.
     public var toCome: Bool {
@@ -71,7 +74,7 @@ public struct StartRow: Equatable, Sendable, Identifiable {
             id: id, boardID: boardID, slot: slot, name: name, fit: fit, slug: slug, clubMark: clubMark, club: club,
             position: position, rank: rank, status: status, reserve: self.reserve, game: .none, expected: nil,
             weather: nil, proj: slotted ? nil : proj, pts: slotted ? nil : pts, read: read, oppRank: nil, oppOf: nil,
-            avg: avg, last: last, delta: slotted ? nil : delta
+            avg: avg, last: last, delta: slotted ? nil : delta, season: season
         )
     }
 }
@@ -88,7 +91,8 @@ enum StartRows {
     static let rankedClubs = 32
     static let precipitationNamedFrom = 20.0
 
-    /// ranked draws his rest-of-season rank (box.ts boxRow's ranked): the Waivers rows leave it out.
+    /// ranked draws his rest-of-season rank (box.ts boxRow's ranked): the Waivers' and the Trades' rows
+    /// leave it out.
     static func row(_ line: PlayerLine, slot: String, zone: TimeZone, now: Date, ranked: Bool = true) -> StartRow {
         let facts = line.facts
         let player = line.player
@@ -108,7 +112,8 @@ enum StartRows {
             expected: read.toPlay ? expected(facts) : nil, weather: read.toPlay ? weather(facts) : nil,
             proj: listed ? nil : line.weekProjection, pts: facts.pointsThisWeek, read: read,
             oppRank: listed ? nil : line.oppRank, oppOf: listed ? nil : facts.allowedToPosition?.value1.of,
-            avg: line.seasonAvg, last: line.lastPoints, delta: listed ? nil : line.projectionDelta
+            avg: line.seasonAvg, last: line.lastPoints, delta: listed ? nil : line.projectionDelta,
+            season: line.restOfSeasonPerGame
         )
     }
 

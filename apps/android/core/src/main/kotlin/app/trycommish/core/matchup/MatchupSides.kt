@@ -217,6 +217,7 @@ internal object MatchupSides {
             fit = if (mark) StartRows.lastName(StartRows.withoutDefense(player.name)) else StartRows.initialName(player.name),
             slug = null,
             clubMark = mark,
+            headshot = null,
             club = player.team,
             position = position,
             rank = null,

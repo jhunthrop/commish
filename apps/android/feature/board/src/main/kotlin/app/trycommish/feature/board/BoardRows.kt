@@ -34,9 +34,9 @@ import app.trycommish.core.board.BoardRow
 import app.trycommish.core.board.GapTone
 import app.trycommish.core.board.Heat
 import app.trycommish.core.shell.SheetPlayer
-import app.trycommish.design.Avatar
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.Headshot
 import app.trycommish.design.Pill
 import app.trycommish.design.PillTone
 import app.trycommish.design.PositionPill
@@ -146,7 +146,7 @@ internal fun BoardRowView(
             horizontalArrangement = Arrangement.spacedBy(GAP),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Avatar(row.initials, Widths.face)
+            Headshot(row.headshot, row.initials, Widths.face)
             Who(row, Modifier.weight(1f))
             Figures(row, columns)
         }
@@ -184,7 +184,7 @@ private fun Figures(
     val c = CommishTheme.colors
     when (columns) {
         is BoardColumns.Ranked -> {
-            Figure(row.projected, Widths.projected, c.ink, BIG_NUMBER)
+            Figure(row.projected, Widths.projected, c.ink, Faces.figure)
             // The round's tint, reaching a gap's width past the cell's left edge (Row.svelte .heat-*).
             val tile = tint(row.heat)
             Figure(row.overReplacement, Widths.overReplacement, c.ink2, modifier = tile?.let { Modifier.tile(it) } ?: Modifier)
@@ -254,7 +254,3 @@ private fun gapInk(tone: GapTone?): Color =
         GapTone.Loss -> CommishTheme.colors.lossInk
         GapTone.Even, null -> CommishTheme.colors.ink2
     }
-
-/** The row's one big number in the display face's heaviest cut: the bundled variable face draws its Bold
- * instance as its thinnest on Android, and ExtraBold heavy, as the iOS row's bold figure. */
-private val BIG_NUMBER = Faces.figure.copy(fontWeight = FontWeight.ExtraBold)

@@ -1,5 +1,6 @@
 package app.trycommish.core.shell
 
+import app.trycommish.design.Site
 import app.trycommish.design.Words
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +20,8 @@ data class SheetPlayer(
     val rank: String?,
     /** His club as the row draws it. */
     val club: String?,
+    /** His face as the row draws it, null with none (headshotOf). */
+    val headshot: String?,
 )
 
 /**
@@ -28,7 +31,8 @@ data class SheetPlayer(
  */
 data class PlayerSheetModel(
     val name: String,
-    /** His face where no headshot is drawn yet: his initials. */
+    /** His face: the row's headshot, his initials while it loads and where there is none. */
+    val headshot: String?,
     val initials: String,
     /** "WR 4", "RB IR", or his position alone; null where the row draws none. */
     val pill: String?,
@@ -43,6 +47,7 @@ data class PlayerSheetModel(
 fun playerSheetModel(player: SheetPlayer): PlayerSheetModel =
     PlayerSheetModel(
         name = player.name,
+        headshot = player.headshot,
         initials = initialsOf(player.name),
         pill = player.position?.let { position -> player.rank?.let { "$position $it" } ?: position },
         club = player.club,
@@ -66,6 +71,9 @@ fun unreadBasis(
     }
 }
 
+/** His face where the API gives an https address (the app loads no other), else none. */
+fun headshotOf(address: String?): String? = address?.takeIf { it.startsWith("https://") }
+
 /** Name suffixes that are never the last name (web/src/lib/ui/initials.ts). */
 private val SUFFIXES = setOf("jr", "sr", "ii", "iii", "iv", "v")
 
@@ -85,7 +93,7 @@ fun initialsOf(name: String): String {
 /** The site's addresses the app links to. */
 object SiteLinks {
     /** The site, whose assetlinks.json hands its app-link paths to the app. */
-    const val ORIGIN = "https://trycommish.app"
+    const val ORIGIN = Site.ORIGIN
 
     /** Our record, past weeks of our order (the Lineup strip's link, web links.record()). */
     const val RECORD = "$ORIGIN/record"

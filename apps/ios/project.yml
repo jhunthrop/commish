@@ -43,6 +43,8 @@ packages:
     path: Packages/Features/Board
   Waivers:
     path: Packages/Features/Waivers
+  Trades:
+    path: Packages/Features/Trades
   Rankings:
     path: Packages/Features/Rankings
   Record:
@@ -64,6 +66,7 @@ targets:
       - package: Matchup
       - package: Board
       - package: Waivers
+      - package: Trades
       - package: Rankings
       - package: Record
     entitlements:

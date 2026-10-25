@@ -31,6 +31,7 @@ import app.trycommish.core.matchup.MatchupWeek
 import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.NumWeight
 import app.trycommish.design.Tokens
 import app.trycommish.design.Words
 import app.trycommish.feature.boxscore.BasisText
@@ -129,7 +130,7 @@ private fun MatchupTitle(
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
             week.week.uppercase(),
-            style = Faces.cell.copy(fontSize = Tokens.Type.md.sp, fontWeight = FontWeight.Bold, letterSpacing = TITLE_TRACKING.em),
+            style = Faces.number(NumWeight.Bold, Tokens.Type.md.sp).copy(letterSpacing = TITLE_TRACKING.em),
             color = c.accentText,
         )
         Text(

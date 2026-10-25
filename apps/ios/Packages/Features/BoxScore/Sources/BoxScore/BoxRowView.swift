@@ -30,16 +30,27 @@ public struct BoxRowView: View {
         VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 0) {
                 slot(theme)
-                PlayerCell(cells: cells, evidence: style.evidence, open: actions.open)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(cells.rank)
-                    .font(Faces.font(.num, size: Tokens.TypeScale.lg, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(theme.color(cells.rank == Words.Box.none ? Tokens.Color.ink3 : Tokens.Color.ink))
-                    .frame(width: Column.rank, alignment: .leading)
-                    .padding(.leading, Tokens.Space.s1)
+                PlayerCell(
+                    cells: cells, sheetPlayer: cells.sheetPlayer, evidence: style.evidence ? cells.evidence : nil,
+                    facts: style.facts, shortName: style.shortName, open: actions.open
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if style.rank {
+                    Text(cells.rank)
+                        .font(Faces.font(.num, size: Tokens.TypeScale.lg, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(
+                            theme.color(cells.rank == Words.Box.none ? Tokens.Color.ink3 : Tokens.Color.ink)
+                        )
+                        .frame(width: Column.rank, alignment: .leading)
+                        .padding(.leading, Tokens.Space.s1)
+                }
                 Figure(text: cells.proj, width: Column.proj, muted: cells.proj == Words.Box.none)
-                Figure(text: cells.pts, width: Column.pts, muted: cells.pts == Words.Box.none)
+                if style.season {
+                    Figure(text: cells.season, width: Column.season, muted: cells.season == Words.Box.none)
+                } else {
+                    Figure(text: cells.pts, width: Column.pts, muted: cells.pts == Words.Box.none)
+                }
                 if style.why {
                     why(theme)
                 }
@@ -131,23 +142,22 @@ public struct PlayerCell: View {
     let sheetPlayer: SheetPlayer?
     let evidenceText: String?
     let facts: Bool
+    /// His short form, "A. Rodgers", whatever the room (the Trades' rows, BoxLine shortOnPhone).
+    let shortName: Bool
     let clears: String?
     let note: String?
 
-    init(cells: RowCells, evidence: Bool, open: @escaping (SheetPlayer) -> Void) {
-        self.init(cells: cells, sheetPlayer: cells.sheetPlayer, evidence: evidence ? cells.evidence : nil, open: open)
-    }
-
     /// `evidence` is the line under the game, nil for none; `facts` draws the expected score and weather.
     public init(
-        cells: RowCells, sheetPlayer: SheetPlayer?, evidence: String?, facts: Bool = true, clears: String? = nil,
-        note: String? = nil, open: @escaping (SheetPlayer) -> Void
+        cells: RowCells, sheetPlayer: SheetPlayer?, evidence: String?, facts: Bool = true, shortName: Bool = false,
+        clears: String? = nil, note: String? = nil, open: @escaping (SheetPlayer) -> Void
     ) {
         self.cells = cells
         self.sheetPlayer = sheetPlayer
         self.evidence = evidence != nil
         evidenceText = evidence
         self.facts = facts
+        self.shortName = shortName
         self.clears = clears
         self.note = note ?? cells.note
         self.open = open
@@ -178,7 +188,9 @@ public struct PlayerCell: View {
     @ViewBuilder
     private func name(_: Theme) -> some View {
         let label = ViewThatFits(in: .horizontal) {
-            nameText(cells.row.name)
+            if !shortName {
+                nameText(cells.row.name)
+            }
             nameText(cells.row.fit)
         }
         if let player = sheetPlayer {

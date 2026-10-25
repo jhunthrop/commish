@@ -13,7 +13,12 @@ import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { REPOSITORY, generatedBy, writeOutputs, type Outputs } from './generated.ts';
 import { claimMove } from '../../web/src/lib/league/inseason/move.ts';
-import type { HostMovePlan, WaiverAdvice } from '../../web/src/lib/league/inseason/api.ts';
+import type {
+	HostMovePlan,
+	TradeAdvice,
+	WaiverAdvice
+} from '../../web/src/lib/league/inseason/api.ts';
+import { worthProposing } from '../../web/src/lib/league/box/trades.ts';
 
 const SCRIPT = 'shared/scripts/export-fixtures.ts';
 const FIXTURES = 'shared/fixtures';
@@ -57,15 +62,30 @@ export interface ClaimRead {
 	plan: string | null;
 }
 
+/** A trade's check (Lane 189): the strip's trade at `index` (trades.ts worthProposing) in the trades
+ * answer in `trades`, posted as the web's builder posts a finder row. */
+export interface CheckRead {
+	trades: string;
+	index: number;
+}
+
 /** An answer's file: the route it answers, the clock it was read at, and what the file holds; a
- * claim's, the answers its body is built from. */
+ * claim's or a check's, the answers its body is built from. */
 export interface FixtureFile {
 	file: string;
 	route: string;
 	clock: string | null;
 	about: string;
 	claim?: ClaimRead;
+	check?: CheckRead;
 }
+
+/** The player the Trades holding picker narrows to in the fixtures, by board id: the member's Aaron
+ * Rodgers, whom the strip's best trade gives (Lane 189 fix round 1). */
+export const HOLDING_PLAYER = '8439';
+
+/** The trades a clock's checks are posted for: the strip's two (trades.ts STRIP_MOST). */
+export const CHECKED_TRADES = 2;
 
 /** An instant as a file name part, with no colons: `2026-10-17T17:00:00.000Z` as `2026-10-17T17-00-00Z`. */
 export function clockPart(iso: string): string {
@@ -83,7 +103,8 @@ export function clockPart(iso: string): string {
  * the Matchup's reads at every clock too, its box score and the league read whose matchup keeps the
  * score (Lane 183); the Waivers answer at every clock, and on each ESPN stand-in at the week's clock
  * its Waivers and the claim of its first pickup planned and made, done, refused and pending (Lane
- * 186). */
+ * 186); the trade finder at every clock, and at the week's and the Sunday's clocks the check of each
+ * trade the strip names (Lane 189). */
 export function fixturePlan(source: FixtureSource): { clock: string; files: FixtureFile[] }[] {
 	const id = source.leagueId;
 	const { week, ...rest } = source.clocks;
@@ -117,13 +138,30 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 		clock,
 		about: `the players free to add, ${name}`
 	});
+	const trades = (clock: string, name: string): FixtureFile => ({
+		file: `trades-${id}-${clockPart(clock)}.json`,
+		route: `GET /leagues/attached/${id}/trades`,
+		clock,
+		about: `the trade finder, ${name}`
+	});
+	const checks = (clock: string, name: string): FixtureFile[] =>
+		Array.from({ length: CHECKED_TRADES }, (_, index) => ({
+			file: `trade-check-${id}-${clockPart(clock)}-${String(index + 1)}.json`,
+			route: `POST /leagues/attached/${id}/trades/check`,
+			clock,
+			about: `the check of the strip's trade ${String(index + 1)}, ${name}`,
+			check: { trades: trades(clock, name).file, index }
+		}));
+	const checked = new Set([source.clocks.week, source.clocks.sunday]);
 	const orders = (clock: string, name: string): FixtureFile[] => orderFiles(clock, name);
 	const atClock = (clock: string, name: string): FixtureFile[] => [
 		scoreboard(clock, name),
 		lineup(clock, name),
 		matchup(clock, name),
 		sync(clock, name),
-		waivers(id, clock, name)
+		waivers(id, clock, name),
+		trades(clock, name),
+		...(checked.has(clock) ? checks(clock, name) : [])
 	];
 	const claims = Object.entries(source.espn ?? {}).flatMap(([outcome, league]): FixtureFile[] => {
 		const pool = waivers(league, week, `the ESPN stand-in whose claim is ${outcome}`);
@@ -180,6 +218,13 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 					route: `GET /leagues/attached/${id}/waivers?position=DEF`,
 					clock: week,
 					about: 'the players free to add narrowed to defenses, as the D/ST chip reads them'
+				},
+				{
+					file: `trades-${id}-player-${HOLDING_PLAYER}-${clockPart(week)}.json`,
+					route: `GET /leagues/attached/${id}/trades?player=${HOLDING_PLAYER}`,
+					clock: week,
+					about:
+						"the trades holding one player, the member's Aaron Rodgers, as the Trades holding picker reads them"
 				},
 				...claims,
 				...orders(week, 'Saturday noon Central, every Sunday game to come')
@@ -305,6 +350,23 @@ export function claimBody(file: FixtureFile, answers: ReadonlyMap<string, unknow
 	};
 }
 
+/** A check's body, as the web's builder sends a finder row (builder.ts builtFrom): the strip's trade's
+ * team and both sides by host id. */
+export function checkBody(file: FixtureFile, answers: ReadonlyMap<string, unknown>): unknown {
+	const { check } = file;
+	if (check === undefined) return undefined;
+	const advice = (answers.get(check.trades) as Envelope<TradeAdvice> | undefined)?.data;
+	const entry = advice === undefined ? undefined : worthProposing(advice.teams)[check.index];
+	if (entry === undefined)
+		throw new Error(`${check.trades} has no strip trade ${String(check.index + 1)}.`);
+	const ids = (side: readonly { player: { host_id: string } }[]): string[] =>
+		side.map((line) => line.player.host_id);
+	return { team: entry.team.roster_id, give: ids(entry.row.give), get: ids(entry.row.get) };
+}
+
+/** A file posted after the answers its body is built from: a claim or a check. */
+const posted = (file: FixtureFile): boolean => file.claim !== undefined || file.check !== undefined;
+
 /** Starts the fixture API on `clock`, stopped there, reads each file's route and stops it. */
 async function readAt(clock: string, files: readonly FixtureFile[]): Promise<[string, string][]> {
 	const port = await freePort();
@@ -333,13 +395,20 @@ async function readAt(clock: string, files: readonly FixtureFile[]): Promise<[st
 	try {
 		await waitFor(origin, child);
 		const answers = new Map<string, unknown>();
-		const gets = files.filter((file) => file.claim === undefined);
+		const gets = files.filter((file) => !posted(file));
 		await Promise.all(
 			gets.map(async (file) => answers.set(file.file, await read(file, undefined)))
 		);
-		// A claim after the answers its body is built from, one at a time, in the plan's order.
-		for (const file of files.filter((f) => f.claim !== undefined))
-			answers.set(file.file, await read(file, claimBody(file, answers)));
+		// A claim or a check after the answers its body is built from, one at a time, in the plan's
+		// order.
+		for (const file of files.filter(posted))
+			answers.set(
+				file.file,
+				await read(
+					file,
+					file.check === undefined ? claimBody(file, answers) : checkBody(file, answers)
+				)
+			);
 		return files.map((file): [string, string] => [
 			`${FIXTURES}/inseason/${file.file}`,
 			`${JSON.stringify(answers.get(file.file), null, '\t')}\n`

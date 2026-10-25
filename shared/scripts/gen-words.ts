@@ -52,9 +52,11 @@ const RECORD_MODULE = 'web/src/lib/run/record.ts';
  * its formats' chips, the Gap's definition, and the season pages' verbs; then the run's board on the Board
  * (Lane 190): a tier band's words, what its count counts, the run's stamp and a past bye's word; then the
  * Waivers' (Lane 186): its table, strip and drop panel, the heads' basis, the Stash group, the season
- * figures' heads and the strip's mark; then the Rankings' and Our record's (Lane 194): the order's
- * table, its week's kickers and defenses, the page's purpose and name, the pool's counts, and the
- * record's words, its box's heads, the orders a week graded, the two records' words and a pair's. */
+ * figures' heads and the strip's mark; then the Trades' (Lane 189): the trade table's words, the
+ * picker's first choice and the close call's chip, and the builder's lines; then the Rankings' and Our
+ * record's (Lane 194): the order's table, its week's kickers and defenses, the page's purpose and name,
+ * the pool's counts, and the record's words, its box's heads, the orders a week graded, the two
+ * records' words and a pair's. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -289,6 +291,27 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/league/box/strip.ts',
 		picks: ['STRIP'],
 		json: 'shared/words/league-strip.json'
+	},
+	{
+		name: 'Trades',
+		module: 'web/src/lib/league/box/trades.ts',
+		picks: ['TRADES'],
+		json: 'shared/words/league-trades.json'
+	},
+	{
+		name: 'TradePicker',
+		module: 'web/src/lib/league/inseason/words.ts',
+		picks: [
+			['every', 'EVERY_TRADE'],
+			['closeForThem', 'CLOSE_FOR_THEM']
+		],
+		json: 'shared/words/league-trade-picker.json'
+	},
+	{
+		name: 'Builder',
+		module: 'web/src/lib/league/inseason/builder.ts',
+		picks: ['BUILDER_LINES'],
+		json: 'shared/words/league-builder.json'
 	},
 	{
 		name: 'Order',

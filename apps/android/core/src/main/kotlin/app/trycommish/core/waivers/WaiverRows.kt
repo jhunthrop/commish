@@ -75,7 +75,17 @@ data class PoolRow(
     val sheetPlayer: SheetPlayer?
         get() {
             val row = cells.row
-            return row.slug?.let { SheetPlayer(key, it, row.name, row.position, row.rank?.toString() ?: row.status?.rank, row.club) }
+            return row.slug?.let {
+                SheetPlayer(
+                    key,
+                    it,
+                    row.name,
+                    row.position,
+                    row.rank?.toString() ?: row.status?.rank,
+                    row.club,
+                    row.headshot,
+                )
+            }
         }
 }
 
