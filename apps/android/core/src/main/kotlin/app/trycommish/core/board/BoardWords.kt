@@ -103,6 +103,9 @@ object RunWords {
     fun stamp(manifest: RunManifest): String =
         "${if (manifest.standIn) Words.RunStamp.standIn else Words.RunStamp.updated} ${day(manifest.runAt)}"
 
+    /** site/absent.ts absentWords' title: "Half PPR is not on our board yet", a format the run lacks. */
+    fun absent(label: String): String = "$label is not on our board yet"
+
     /** site/offline-words.ts offlineLead: the reason a saved board shows, said with its run's day. */
     fun offline(manifest: RunManifest): String = "${AppWords.offlineBoard} ${day(manifest.runAt)}."
 
