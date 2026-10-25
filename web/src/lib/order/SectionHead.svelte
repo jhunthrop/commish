@@ -31,9 +31,16 @@
 		border-bottom: 1px solid var(--line);
 	}
 
+	/* A phone's box score lays its rows out as grids (Lane 209); the section head stays one band. */
 	@media (max-width: 760px) {
-		.sec {
+		.sec,
+		.sec th {
+			display: block;
 			height: auto;
+		}
+
+		.sec th {
+			line-height: 26px;
 		}
 	}
 </style>

@@ -8,9 +8,11 @@
 	 * sheet. It adds through the lazily loaded sheet, so the row needs nothing loaded first. */
 	interface Props {
 		player: SheetPlayer;
+		/** On a phone the plus says its word (SheetMark's named). */
+		named?: boolean;
 	}
 
-	let { player }: Props = $props();
+	let { player, named = false }: Props = $props();
 </script>
 
 <SheetMark
@@ -18,4 +20,5 @@
 	place={lazySheet.place(player.id)}
 	sheetHref={links.sheet()}
 	onadd={() => lazySheet.add(player)}
+	{named}
 />

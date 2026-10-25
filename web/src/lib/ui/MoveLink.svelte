@@ -12,9 +12,12 @@
 		said: string;
 		/** The player it is for, as a screen reader hears it after the verb. */
 		name: string;
+		/** Below 900 px the glyph keeps a short word beside it ("Add", "Trade"), never a bare glyph:
+		 * a phone's Rankings row names its one verb (Lane 209, review M4). */
+		short?: string | null;
 	}
 
-	let { href, move, said, name }: Props = $props();
+	let { href, move, said, name, short = null }: Props = $props();
 </script>
 
 <a class="verb {move}" {href} aria-label="{said}, {name}"
@@ -28,7 +31,9 @@
 			stroke-linecap="round"
 			stroke-linejoin="round"
 			aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3" /></svg
-		>{/if}<span>{said}</span></a
+		>{/if}<span class="said">{said}</span>{#if short}<span class="short" aria-hidden="true"
+			>{short}</span
+		>{/if}</a
 >
 
 <style>
@@ -56,6 +61,10 @@
 		border-color: var(--ink-3);
 	}
 
+	.short {
+		display: none;
+	}
+
 	@media (max-width: 900px) {
 		.verb {
 			width: 32px;
@@ -69,6 +78,26 @@
 
 		.trade {
 			border-color: var(--line);
+		}
+	}
+
+	/* Where a row names its verb (below a wide screen), its short word beside the glyph. */
+	@media (max-width: 1100px) {
+		.verb:has(.short) {
+			width: auto;
+			height: 24px;
+			padding: 0 var(--s-2);
+			flex-direction: row-reverse;
+			justify-content: center;
+			border-radius: var(--r-pill);
+		}
+
+		.verb:has(.short) .said {
+			display: none;
+		}
+
+		.verb .short {
+			display: inline;
 		}
 	}
 </style>

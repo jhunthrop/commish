@@ -4,6 +4,8 @@
 	"weeklyWhat": "Our weekly rankings against ESPN and the week's published projection",
 	"draft": "Draft record",
 	"draftWhat": "Our draft board against ADP, on the season's points so far",
+	"beforePhone": "Graded under Draft record",
+	"setRulePhone": "Each week's rankings are graded as set, never as refreshed after.",
 	"notPlayed": "not played yet",
 	"underway": "under way",
 	"gradesLater": "grades when the stats land",
@@ -30,6 +32,7 @@
 	"functions": [
 		"beforeLead",
 		"before",
+		"beforeChip",
 		"setBefore",
 		"setAt",
 		"gradedOn",
