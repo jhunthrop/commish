@@ -624,6 +624,7 @@ object Words {
         const val weeklyWhat = "Our weekly rankings against ESPN and the week's published projection"
         const val draft = "Draft record"
         const val draftWhat = "Our draft board against ADP, on the season's points so far"
+        const val beforePhone = "Graded under Draft record"
         const val notPlayed = "not played yet"
         const val underway = "under way"
         const val gradesLater = "grades when the stats land"

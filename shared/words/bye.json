@@ -1,4 +1,6 @@
 {
 	"done": "Done",
-	"functions": []
+	"functions": [
+		"week"
+	]
 }

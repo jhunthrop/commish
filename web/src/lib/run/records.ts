@@ -37,7 +37,11 @@ export const RECORDS_WORDS = {
 	beforeLead: (from: number) => (from <= 2 ? 'Week 1' : `Weeks 1 to ${String(from - 1)}`),
 	/** The set rule, said once (Lane 140, C14): each week's own set time is on its row. */
 	before: (from: number) =>
-		`Weekly rankings start week ${String(from)}. Each week's are set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record.`,
+		`Weekly rankings start week ${String(from)}. Each week's rankings are set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record.`,
+	/** The weeks before the weekly record on a phone (Lane 209): a chip a week, "Wk 1", then where
+	 * they are graded, in place of the set rule's paragraph, which a desk says. */
+	beforeChip: (week: number) => `Wk ${String(week)}`,
+	beforePhone: 'Graded under Draft record',
 	setBefore: (day: string) => `set before kickoff ${day}`,
 	/** A set week's row, its set time to the minute and its zone (C14). */
 	setAt: (stamp: string) => `set ${stamp}`,
@@ -172,11 +176,20 @@ export function weeklyAsRecord(run: RunRecord): RunRecord | null {
 }
 
 /** The weeks before the weekly record, as one line that says the set rule once (C14): "Weeks 1 to
- * 6" and "Weekly rankings start week 7. Each week's are set before its first kickoff and graded as
+ * 6" and "Weekly rankings start week 7. Each week's rankings are set before its first kickoff and graded as
  * set, never as refreshed after. Before that ...". Null when the record starts at week 1. */
 export function beforeLine(fromWeek: number): { lead: string; text: string } | null {
 	if (fromWeek <= 1) return null;
 	return { lead: RECORDS_WORDS.beforeLead(fromWeek), text: RECORDS_WORDS.before(fromWeek) };
+}
+
+/** The weeks before the weekly record as a phone draws them (Lane 209, Lane 208's F8): a chip a week,
+ * "Wk 1" to "Wk 6", never the set rule's paragraph in a narrow cell. Empty when the record starts at
+ * week 1. */
+export function beforeChips(fromWeek: number): string[] {
+	return Array.from({ length: Math.max(0, fromWeek - 1) }, (_, i) =>
+		RECORDS_WORDS.beforeChip(i + 1)
+	);
 }
 
 /** A sentence drawn at both widths, and one a desk alone draws: a phone holds eight lines of basis,

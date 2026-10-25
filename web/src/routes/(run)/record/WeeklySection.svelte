@@ -40,6 +40,7 @@
 	} from '#lib/run/record-league.ts';
 	import {
 		RECORDS_WORDS,
+		beforeChips,
 		beforeLine,
 		weeklyBasis,
 		weeklyLines,
@@ -93,6 +94,8 @@
 	const standing = $derived(standingWords(record));
 	const gaps = $derived(gapWords(record, unplayed));
 	const before = $derived(fromWeek === null ? null : beforeLine(fromWeek));
+	/** The same weeks on a phone: a chip a week, never the set rule's paragraph (Lane 209). */
+	const chips = $derived(fromWeek === null ? [] : beforeChips(fromWeek));
 
 	const FIGURE_HEADS = $derived<Record<RecordFigure, string>>({
 		agreement: record.statistic.agreement,
@@ -265,10 +268,15 @@
 		</thead>
 		<tbody>
 			{#if before}
-				<tr class="quiet">
+				<tr class="quiet before">
 					<td class="wk">{before.lead}</td>
 					<td class="st wide desk" colspan={spans.desk}>{before.text}</td>
-					<td class="st wide narrow" colspan={spans.narrow}>{before.text}</td>
+					<td class="st wide narrow" colspan={spans.narrow}
+						><ul class="wk-chips">
+							{#each chips as chip (chip)}<li>{chip}</li>{/each}
+						</ul>
+						<a class="graded-under" href="#draft">{RECORDS_WORDS.beforePhone}</a></td
+					>
 				</tr>
 			{/if}
 			{#each rows as row (row.lead)}
