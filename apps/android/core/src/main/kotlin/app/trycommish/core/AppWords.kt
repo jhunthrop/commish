@@ -43,6 +43,10 @@ object AppWords {
      * words): a lineup set from it may not be the platform's now, so the phone reads it again first. */
     const val readAgainToSet = "Pull down to read your lineup again before you set it."
 
+    /** Under the Waivers screen's verb, disabled, while the waivers shown are a saved read (the iOS app's
+     * words): a player on it may have been claimed since, so the phone reads them again first. */
+    fun waiversStale(stamp: String): String = "$stamp. Pull down to read waivers again before you claim."
+
     /** The board's nouns as the bar names it (web nav.ts), the iOS AppWords.Tab's: the draft's board, and
      * in season the board of the rest of the season. */
     const val board = "Board"
