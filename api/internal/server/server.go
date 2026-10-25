@@ -83,10 +83,13 @@ func Mount(mux *http.ServeMux, routes []httpx.Route, sessions Sessions, devices 
 		}
 		rateKey := sessions.RateKey
 		if rt.Access.ResolvesSession() {
-			cookie := sessions.Middleware(h)
+			// A device's session goes straight to the route: a cookie beside
+			// its token is not read (no account swap, no CSRF check).
+			route := h
+			cookie := sessions.Middleware(route)
 			h = cookie
 			if devices != nil {
-				h = devices.SessionOr(h, cookie)
+				h = devices.SessionOr(route, cookie)
 			}
 			// Only a SignedIn route is keyed by the token: a public route
 			// (pairing, sign-in) stays on the address or cookie, so a

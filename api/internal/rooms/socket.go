@@ -43,6 +43,16 @@ const (
 // limitConnectPerMinute bounds how often one drafter opens a socket.
 const limitConnectPerMinute = 30
 
+// signedOutReason closes a socket opened with an app's device token once
+// that token is revoked or lapses; the error frame before it is the 401's.
+const signedOutReason = "signed out"
+
+// DeviceSessions re-reads an app's device token on a socket it opened:
+// auth.Bearer, the check the upgrade passed through.
+type DeviceSessions interface {
+	SessionDevice(ctx context.Context, r *http.Request) (auth.Account, auth.Device, error)
+}
+
 // Socket serves GET /rooms/{id}/ws.
 type Socket struct {
 	Lobby *lobby.Store
@@ -55,8 +65,13 @@ type Socket struct {
 	// OriginHosts are the hosts a browser may open a socket from, the
 	// same origins CORS allows.
 	OriginHosts []string
-	Now         func() time.Time
-	Log         *slog.Logger
+	// Devices re-reads the device token of a socket an app opened, at
+	// every ping, so a revoked or lapsed token closes it.
+	Devices DeviceSessions
+	// PingEvery is the heartbeat, pingEvery when zero.
+	PingEvery time.Duration
+	Now       func() time.Time
+	Log       *slog.Logger
 
 	presence presence
 	limits   seatLimits
@@ -90,6 +105,10 @@ func (s *Socket) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	account := auth.AccountID(r)
+	signedIn, ok := s.deviceCheck(w, r)
+	if !ok {
+		return
+	}
 	seat, ok := s.admit(w, r, roomID, account)
 	if !ok {
 		return
@@ -117,9 +136,26 @@ func (s *Socket) serve(w http.ResponseWriter, r *http.Request) {
 	if s.Adopt != nil {
 		s.Adopt(r.Context(), roomID)
 	}
-	if err := s.session(r.Context(), conn, roomID, account, seat, budget); err != nil && !isClosed(err) {
+	if err := s.session(r.Context(), conn, roomID, account, seat, budget, signedIn); err != nil && !isClosed(err) {
 		s.Log.Warn("rooms: session", "request_id", httpx.RequestIDFrom(r.Context()), "room", roomID, "err", err)
 	}
+}
+
+// deviceCheck is how a socket opened with an app's device token is
+// re-read while it stays open: nil for a cookie's socket. A device socket
+// on a service with no Devices is refused, never left unchecked.
+func (s *Socket) deviceCheck(w http.ResponseWriter, r *http.Request) (func(context.Context) error, bool) {
+	if _, byDevice := auth.DeviceFrom(r.Context()); !byDevice {
+		return nil, true
+	}
+	if s.Devices == nil {
+		httpx.WriteInternal(w, r, s.Log, "rooms: device socket", errors.New("rooms: no device check"))
+		return nil, false
+	}
+	return func(ctx context.Context) error {
+		_, _, err := s.Devices.SessionDevice(ctx, r)
+		return err
+	}, true
 }
 
 // admit is the socket's authorization rule: a room's log is read only by
@@ -188,7 +224,7 @@ func wire(rows []lobby.LogRow, seat int) []apitypes.RoomAction {
 // A drafter who left is given the seat back on connecting; the last
 // socket of a drafter on this instance closing hands the seat to its
 // stand-in at once.
-func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, account uuid.UUID, seat int, budget *seatBudget) error {
+func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, account uuid.UUID, seat int, budget *seatBudget, signedIn func(context.Context) error) error {
 	helloCtx, cancel := context.WithTimeout(ctx, helloTimeout)
 	var hello apitypes.RoomHello
 	err := wsjson.Read(helloCtx, conn, &hello)
@@ -235,7 +271,11 @@ func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, acco
 	commands := make(chan apitypes.RoomCommand)
 	readErr := make(chan error, 1)
 	go func() { readErr <- readCommands(ctx, conn, commands) }()
-	ticker := time.NewTicker(pingEvery)
+	every := s.PingEvery
+	if every <= 0 {
+		every = pingEvery
+	}
+	ticker := time.NewTicker(every)
 	defer ticker.Stop()
 	// Drops are this socket's own: one socket abusing the seat's budget is
 	// closed, the seat's other tabs stay.
@@ -268,6 +308,9 @@ func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, acco
 			if err != nil {
 				return err
 			}
+			if closed, err := s.stillSignedIn(ctx, conn, signedIn); closed || err != nil {
+				return err
+			}
 			// The seat is present while a socket pings (see lobby.Seat).
 			if err := s.Lobby.Touch(ctx, roomID, account); err != nil {
 				return err
@@ -279,6 +322,21 @@ func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, acco
 			}
 		}
 	}
+}
+
+// stillSignedIn re-reads an app socket's device token: a revoked or
+// lapsed one gets the 401's error frame and the socket is closed with
+// 1008, so the app signs out as on a 401. closed reports that close.
+func (s *Socket) stillSignedIn(ctx context.Context, conn *websocket.Conn, signedIn func(context.Context) error) (closed bool, err error) {
+	if signedIn == nil {
+		return false, nil
+	}
+	err = signedIn(ctx)
+	if !errors.Is(err, auth.ErrNoDevice) {
+		return false, err
+	}
+	_ = s.refuse(ctx, conn, httpx.CodeUnauthorized, auth.SignInMessage)
+	return true, conn.Close(websocket.StatusPolicyViolation, signedOutReason)
 }
 
 func (s *Socket) refuse(ctx context.Context, conn *websocket.Conn, code, message string) error {

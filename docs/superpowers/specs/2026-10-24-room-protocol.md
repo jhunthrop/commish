@@ -23,11 +23,19 @@ opens exactly that URL; it never builds one.
 ```
 
 The upgrade is `GET /rooms/{id}/ws` with access `SignedIn`, at most 30 a minute per caller
-(socket.go:83). The browser is signed in by its session cookie. An app is signed in by its device
-token in `Authorization: Bearer <token>` once Task B of the mobile foundation plan
-(docs/superpowers/plans/2026-10-24-mobile-foundation.md) gives app tokens the session scope; a
-native client sends no `Origin`, and the WebSocket library (`github.com/coder/websocket` v1.8.12)
-checks `OriginPatterns` only on a request that carries one (socket.go:97).
+(socket.go). The browser is signed in by its session cookie. An app is signed in by its device
+token in `Authorization: Bearer <token>` on the upgrade, a token carrying the `session` scope (an
+`ios` or `android` pairing), checked by the same code as the api's session routes
+(`auth.Bearer.SessionDevice`, mounted by `server.Mount` in both services, Lane 211): the token's
+use is noted, a lapsed or revoked token, or the extension's (no `session` scope), answers the same
+401 as the api (`unauthorized`, "Sign in to do that"), and the room's seat is the device's account.
+The token is read only from the header, never from the query string (a URL is logged by proxies).
+An upgrade carrying both a token and a session cookie is the token's, and is logged. Both
+`URLSessionWebSocketTask` (a `URLRequest` with the header) and OkHttp (`Request.Builder().header`)
+set the header on the upgrade, so no subprotocol carries the token. A native client sends no
+`Origin`, and the WebSocket library (`github.com/coder/websocket` v1.8.12) checks `OriginPatterns`
+only on a request that carries one, so the browser's origin check stays for every upgrade that
+sends one.
 
 ### Refused before the upgrade
 
@@ -197,6 +205,7 @@ sends an error frame saying why first:
 | `seat over its socket budget` | `rate_limited`: "This seat already has three tabs open on the room. Close one and reload." | socket.go:108-112, limits.go:47 |
 | `seat over its socket budget` | `rate_limited`: "This seat is reconnecting too fast. Wait a few seconds and reload." | socket.go:108-112, limits.go:48 |
 | `too many commands` | none for the closing command itself, only the `rate_limited` refusals before it | socket.go:248-251 |
+| `signed out` | `unauthorized`: "Sign in to do that" | an app's socket whose device token was revoked or lapsed, read at every ping (socket.go `stillSignedIn`); the app signs out as on a 401. A cookie's socket is not re-read. |
 
 The socket budget is per seat on the instance (limits.go:32-43): at most 3 sockets open at once, a
 new one at most 12 a minute after a burst of 6; a seat with no socket for 10 minutes is forgotten.
