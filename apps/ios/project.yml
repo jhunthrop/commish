@@ -47,6 +47,10 @@ packages:
     path: Packages/Features/Player
   Trades:
     path: Packages/Features/Trades
+  Rankings:
+    path: Packages/Features/Rankings
+  Record:
+    path: Packages/Features/Record
   Reference:
     path: Packages/Features/Reference
 targets:
@@ -68,6 +72,8 @@ targets:
       - package: Waivers
       - package: Player
       - package: Trades
+      - package: Rankings
+      - package: Record
       - package: Reference
     entitlements:
       path: Commish/Commish.entitlements

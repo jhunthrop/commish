@@ -59,6 +59,8 @@ import type { HostMoveResult, WaiverAdvice } from '../../web/src/lib/league/inse
 import { BOARD_OUTPUT, renderBoard } from './board-parity.ts';
 import { BOARD_RUN_OUTPUT, renderBoardRun } from './board-run-parity.ts';
 import { PLAYER_SHEET_OUTPUT, renderPlayerSheet } from './player-sheet-parity.ts';
+import { RANKINGS_OUTPUT, renderRankings } from './rankings-parity.ts';
+import { RECORD_OUTPUT, renderRecord } from './record-parity.ts';
 import { REFERENCE_OUTPUT, renderReference } from './reference-parity.ts';
 import {
 	builderAt,
@@ -624,6 +626,24 @@ export async function generate(): Promise<Outputs> {
 			)
 		],
 		[TRADES_OUTPUT, await renderTrades(sync.host)],
+		[
+			RANKINGS_OUTPUT,
+			await renderRankings(
+				generatedBy(
+					SCRIPT,
+					'web/src/lib/order (orderView, orderSections, orderBasis, weekView, weekSections, weekBasis) over the order answers in shared/fixtures/inseason'
+				)
+			)
+		],
+		[
+			RECORD_OUTPUT,
+			await renderRecord(
+				generatedBy(
+					SCRIPT,
+					'web/src/lib/run/record.ts and records.ts (the record page) over the fixture records and the contract run'
+				)
+			)
+		],
 		[
 			REFERENCE_OUTPUT,
 			await renderReference(

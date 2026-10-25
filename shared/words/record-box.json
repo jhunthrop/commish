@@ -1,0 +1,17 @@
+{
+	"week": "Week",
+	"players": "Players graded",
+	"status": "Status",
+	"ours": "Ours",
+	"adp": "ADP",
+	"espn": "ESPN",
+	"published": "Published",
+	"toDate": "To date",
+	"none": "--",
+	"chart": "Order matched by week",
+	"league": "Your lineup, our picks",
+	"functions": [
+		"distinct",
+		"chartWeeks"
+	]
+}

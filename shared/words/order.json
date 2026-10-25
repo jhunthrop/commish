@@ -1,0 +1,23 @@
+{
+	"rank": "#",
+	"rankGroup": "Our rest-of-season order",
+	"roster": "Roster",
+	"restGroup": "Rest of season",
+	"total": "Projected",
+	"overRepl": "Over repl.",
+	"perGame": "A game",
+	"yours": "Yours",
+	"free": "Free",
+	"tradeFor": "Trade for him",
+	"noReturn": "no return date",
+	"backLate": "back after the regular season",
+	"every": "All",
+	"everyone": "Everyone",
+	"search": "Find a player or a club",
+	"moreRows": "Show more",
+	"none": "No player in our order matches.",
+	"unread": "We could not read our order just now. Try again in a minute.",
+	"reading": "Reading our order",
+	"needsScript": "Our rest-of-season order needs JavaScript.",
+	"functions": []
+}

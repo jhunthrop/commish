@@ -512,6 +512,135 @@ object Words {
         const val read = "Our written read of him is not ready. Here is what it will be built from."
     }
 
+    object Order {
+        const val rank = "#"
+        const val rankGroup = "Our rest-of-season order"
+        const val roster = "Roster"
+        const val restGroup = "Rest of season"
+        const val total = "Projected"
+        const val overRepl = "Over repl."
+        const val perGame = "A game"
+        const val yours = "Yours"
+        const val free = "Free"
+        const val tradeFor = "Trade for him"
+        const val noReturn = "no return date"
+        const val backLate = "back after the regular season"
+        const val every = "All"
+        const val everyone = "Everyone"
+        const val search = "Find a player or a club"
+        const val moreRows = "Show more"
+        const val none = "No player in our order matches."
+        const val unread = "We could not read our order just now. Try again in a minute."
+        const val reading = "Reading our order"
+        const val needsScript = "Our rest-of-season order needs JavaScript."
+    }
+
+    object OrderWeek {
+        const val reading = "Reading this week's rows"
+        const val needsScript = "This week's rows need JavaScript."
+        const val byeIn = "Bye in week"
+    }
+
+    object PagePurpose {
+        const val players = "Every QB, RB, WR and TE in our order, and this week's kickers and defenses, to look up and to compare."
+        const val rest = "Our order in your league's view: who holds each player, the free agents, and this week's kickers and defenses."
+    }
+
+    object WeekTab {
+        const val unread = "We could not read this week just now. Try again in a minute."
+        const val kickedOff = "Kicked off"
+        const val played = "Played"
+        const val byeIn = "Bye in week"
+        const val add = "Add"
+    }
+
+    object DefenseScoring {
+        const val league = "in your scoring"
+        const val standard = "on standard defense scoring"
+    }
+
+    object WeekMany {
+        const val K = "kickers"
+        const val DEF = "defenses"
+        const val thisWeek = "this week"
+    }
+
+    object PageName {
+        const val players = "Players"
+        const val rankings = "Rankings"
+    }
+
+    object Pool {
+        const val ranked = "ranked"
+        const val rosters = "on NFL rosters today"
+        const val board = "on our board"
+        const val boardWithMarket = "on our board with kickers and defenses"
+        const val room = "left to draft"
+    }
+
+    object Record {
+        const val placesOff = "Places off is how many places a player finished from his rank, lower is better."
+        const val notPlayed = "not played yet"
+        const val underway = "under way"
+        const val noneSet = "weeks graded. Our first order is set before the first kickoff"
+    }
+
+    object RecordBox {
+        const val week = "Week"
+        const val players = "Players graded"
+        const val status = "Status"
+        const val ours = "Ours"
+        const val adp = "ADP"
+        const val espn = "ESPN"
+        const val published = "Published"
+        const val toDate = "To date"
+        const val none = "--"
+        const val chart = "Order matched by week"
+        const val league = "Your lineup, our picks"
+    }
+
+    object RecordOrder {
+        const val preseason = "Our preseason order"
+        const val rest_of_season = "Our rest-of-season order"
+    }
+
+    object Records {
+        const val lead = "Two records, each graded against what it competes with: our weekly rankings against ESPN and the week's published projection, and our draft board against ADP."
+        const val weekly = "Weekly record"
+        const val weeklyWhat = "Our weekly rankings against ESPN and the week's published projection"
+        const val draft = "Draft record"
+        const val draftWhat = "Our draft board against ADP, on the season's points so far"
+        const val notPlayed = "not played yet"
+        const val underway = "under way"
+        const val gradesLater = "grades when the stats land"
+        const val setUnknown = "set before its first kickoff"
+        const val espnBasis = "ESPN's is its own public PPR projection, read before the week's first kickoff."
+        const val espnReadAfter = "ESPN's projection this week was read after our weekly rankings were set, still before the first kickoff."
+        const val espnUnread = "ESPN's projection was not read before this week's first kickoff, so the week is graded against the week's published projection alone."
+        const val noYardstick = "No yardstick was read before this week's first kickoff, so the week is graded on its own order alone."
+        const val waiting = "This record is written by the next nightly run."
+        const val position = "Position"
+        const val players = "Players graded"
+        const val all = "All"
+        const val named = "Top named"
+        const val draftPositions = "Each position is graded on its own, All by players graded."
+        const val draftLeftOut = "Kickers and defenses are left out, and a player past his bye has one game fewer counted."
+        const val draftScale = "Order matched is how closely an order ranked the players to the season's finish so far: 1.00 is the same order, 0.00 no closer than chance, below 0.00 the order runs backwards."
+        const val lowerBetter = "lower is better"
+        const val draftChart = "Order matched, season to date, through each week"
+        const val rostered = "Rostered"
+        const val lineupOurs = "Our picks"
+        const val lineupEspn = "ESPN's picks"
+        const val leagueRow = "Your league's row grades its rostered players and both lineups."
+        const val setEach = "set each week before kickoff"
+    }
+
+    object Pair {
+        const val ours = "Ours"
+        const val level = "level"
+        const val oursBy = "ours"
+    }
+
     object AdpPage {
         const val heading = "ADP"
         const val board = "Board"

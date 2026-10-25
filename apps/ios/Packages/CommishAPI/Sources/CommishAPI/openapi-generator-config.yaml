@@ -34,3 +34,6 @@ filter:
     - leagueWaivers
     - leagueTrades
     - checkLeagueTrade
+    - order
+    - weekOrder
+    - runRecord
