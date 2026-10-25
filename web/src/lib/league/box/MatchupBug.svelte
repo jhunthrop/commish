@@ -24,9 +24,21 @@
 		/** "Down 14.1 with nobody left, McCaffrey and Kittle playing for them", the API's, null before
 		 * kickoff or without one. */
 		standing?: string | null;
+		/** Another team's game (Lane 204): neither side is the member's, so no side reads You or
+		 * Opponent and none is in the accent. */
+		other?: boolean;
 	}
 
-	let { week, mine, opponent, kickoff, started, read, standing = null }: Props = $props();
+	let {
+		week,
+		mine,
+		opponent,
+		kickoff,
+		started,
+		read,
+		standing = null,
+		other = false
+	}: Props = $props();
 </script>
 
 {#snippet side(s: Side, me: boolean)}
@@ -34,9 +46,8 @@
 	<div class="sd" class:me>
 		<span class="avatar"><TeamAvatar name={s.name} size={44} {me} board /></span>
 		<span class="nm"
-			><small>{me ? BOX.you : BOX.opponent}</small><b>{s.name}</b>{#if s.toPlay}<span class="tp"
-					>{s.toPlay}</span
-				>{/if}</span
+			>{#if !other}<small>{me ? BOX.you : BOX.opponent}</small>{/if}<b>{s.name}</b
+			>{#if s.toPlay}<span class="tp">{s.toPlay}</span>{/if}</span
 		>
 		<span class="sc">
 			<b class="big" aria-label="{f.bigLabel} {f.big}">{f.big}</b>
@@ -46,7 +57,7 @@
 {/snippet}
 
 <section class="bug" class:alone={opponent === null} aria-label="Week {week} score">
-	{@render side(mine, true)}
+	{@render side(mine, !other)}
 	<div class="mid">
 		<small>Week {week}</small>
 		{#if kickoff}<b>{kickoff.head}</b><span>{kickoff.words}</span>{/if}

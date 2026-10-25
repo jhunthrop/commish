@@ -5,6 +5,7 @@
 import { PUBLIC_API_URL } from '$app/env/public';
 import { apiClient } from '#lib/api/client.ts';
 import type { components, operations } from '#lib/api/types.ts';
+import { GAME_PARAM } from '../box/game.ts';
 
 type Schemas = components['schemas'];
 export type LineupAdvice = Schemas['LineupAdvice'];
@@ -60,8 +61,12 @@ const path = (id: string, tail: string, query: Record<string, string | null> = {
 
 export const inSeasonApi = {
 	lineup: (id: string) => client.call<LineupAdvice>(path(id, 'lineup')),
-	/** The week's matchup as a box score: both sides' starters in their slots and their benches. */
-	matchup: (id: string) => client.call<MatchupBox>(path(id, 'matchup')),
+	/** The week's matchup as a box score: both sides' starters in their slots and their benches; the
+	 * member's game, or the game of the roster given (Lane 204). */
+	matchup: (id: string, roster: number | null = null) =>
+		client.call<MatchupBox>(
+			path(id, 'matchup', { [GAME_PARAM]: roster === null ? null : String(roster) })
+		),
 	/** Every game of the week: each side's points, its starters' projection and the game's state. */
 	scoreboard: (id: string) => client.call<Scoreboard>(path(id, 'scoreboard')),
 	/** The adds, at one position when given, keeping the asked player's row (his board id) past the
