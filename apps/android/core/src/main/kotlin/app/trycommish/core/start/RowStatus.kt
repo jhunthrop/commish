@@ -64,7 +64,7 @@ internal object RowStatuses {
         flagged: Boolean,
     ): Boolean = flagged || status in seasonLongStatuses
 
-    private fun sits(status: DesignationStatus): Boolean = status != DesignationStatus.questionable && status != DesignationStatus.doubtful
+    fun sits(status: DesignationStatus): Boolean = status != DesignationStatus.questionable && status != DesignationStatus.doubtful
 
     /** box.ts statusOf: the week's designation first, else the platform's injured reserve; null with
      * neither, or with a status this build does not know. */
@@ -105,7 +105,7 @@ internal object RowStatuses {
     }
 
     /** designation.ts seasonLongMark: "IR since Sep 22", "IR, back Nov 8", or "IR". */
-    private fun seasonLongMark(
+    fun seasonLongMark(
         status: DesignationStatus,
         since: Instant?,
         returning: String?,

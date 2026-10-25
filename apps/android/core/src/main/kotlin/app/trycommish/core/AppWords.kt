@@ -43,6 +43,14 @@ object AppWords {
      * words): a lineup set from it may not be the platform's now, so the phone reads it again first. */
     const val readAgainToSet = "Pull down to read your lineup again before you set it."
 
+    /** The board's nouns as the bar names it (web nav.ts), the iOS AppWords.Tab's: the draft's board, and
+     * in season the board of the rest of the season. */
+    const val board = "Board"
+    const val restOfSeason = "Rest of season"
+
+    /** site/offline-words.ts offlineLead, before the run's day: why a saved board shows with no signal. */
+    const val offlineBoard = "You're offline, so this is the last board this device saved, updated"
+
     /** The account screen's one verb until its lane lands: this phone signs out. */
     const val signOut = "Sign out"
 }
