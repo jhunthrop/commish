@@ -1,28 +1,34 @@
-/** The Rankings screen's parity (Lane 194): what the web's Players page in season prints at 390
+/** The Rankings screen's parity (Lane 194): what the web's Players page in season draws at 390
  * (routes/(run)/players/+page.svelte over order/OrderScreen.svelte, OrderTable.svelte, WeekScreen.svelte
  * and WeekTable.svelte) for each order answer the fixture API gave with no league, in the fixture's
  * zone, as JSON the apps' ports are held to: the page's name and the sentence under it, the search's
  * hits, every row as the phone draws it (its place, the API's rank, the player cell with his pill, his
- * game with its zone, the expected score and weather, the line folded under his name, the week's
- * figure and his Projected) in its section, whether Show more is offered, and the phone's basis; for
+ * game with its zone, the expected score and weather, his figures as the web's strip draws them (cells,
+ * each head and value), the week's figure and his Projected) in its section, whether Show more is offered, and the phone's basis; for
  * the kickers' and defenses' week its sections and their heads, its rows, the status line before the
  * week's projection is in, the basis line with the rules our stats lack, and a search over it.
  * Written by export-parity.ts beside the others.
  *
- * Since Lane 209 the web's phone row draws its figures as labelled cells (FigureStrip) and its basis
- * says the Opp rank head's sentence; the apps' rows still fold the figures into one line under the
- * name with the shorter "Opp" sentence, so this file keeps describing the apps' row as they draw it
- * (appFolded, appWeekFolded, appBasis) until the apps draw the strip too. */
+ * Since Lane 209 the web's phone row draws its figures as labelled cells (FigureStrip), pinned here as
+ * `cells` from the web's own builders (stripCells, weekStripCells). The apps' rows still fold the
+ * figures into one line under the name with the shorter "Opp" sentence: `folded` and the basis's Opp
+ * sentence keep what the apps draw, their values from the web's cell builders, until B196 draws the
+ * strip in the apps and both go. */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { hitsWords } from '../../web/src/lib/format/pool-words.ts';
 import { weekHead } from '../../web/src/lib/format/figure-words.ts';
 import { OPP_PART, OPP_PHONE, drawnText } from '../../web/src/lib/league/box/basis.ts';
 import {
+	figureCell,
+	formCells,
+	oppCell,
+	type StripCell
+} from '../../web/src/lib/league/box/figure-strip.ts';
+import {
 	BOX,
 	boxNumber,
 	fitName,
-	oppRankWord,
 	positionWord,
 	type BoxRow
 } from '../../web/src/lib/league/box/box.ts';
@@ -35,6 +41,7 @@ import {
 	orderBasis,
 	orderSections,
 	orderView,
+	stripCells,
 	weekChip,
 	type OrderView,
 	type PlayersChip
@@ -42,6 +49,7 @@ import {
 import { MIN_SEARCH } from '../../web/src/lib/order/path.ts';
 import {
 	landed,
+	weekStripCells,
 	rulesLeftOut,
 	weekBasis,
 	weekNone,
@@ -143,22 +151,38 @@ function playerCell(box: BoxRow): unknown {
 	};
 }
 
-/** The line the apps fold under his name on a phone, as the web's phone row did before Lane 209. */
+/** The web's strip as the parity pins it: each cell's head and value, and whether it is the key. */
+function cellsOf(cells: readonly StripCell[]): unknown[] {
+	return cells.map((c) => ({
+		head: c.head,
+		value: c.value,
+		key: c.key === true
+	}));
+}
+
+/** The apps' folded line (B196 replaces it with the strip): the web's cells joined, the opponent's
+ * rank under the apps' short head and left out on a bye. */
+function appFoldedOf(cells: readonly StripCell[]): string {
+	return cells
+		.filter((c) => !(c.head === BOX.oppRank && c.ease === null))
+		.map((c) => `${c.head === BOX.oppRank ? BOX.opp : c.head} ${c.value}`)
+		.join(', ');
+}
+
+/** The apps' order line: every figure after Projected, the opponent's rank, Avg and Last. */
 function appFolded(view: OrderView, rankBy: OrderAdvice['rank_by']): string {
 	const rest = figureColumns(rankBy)
 		.slice(1)
-		.map((f) => `${FIGURE_HEADS[f]} ${boxNumber(view.figures[f])}`);
-	const rank = view.box.evidence.oppRank;
-	const opp = rank === null ? [] : [`${BOX.opp} ${oppRankWord(rank)}`];
-	return [
-		...rest,
-		...opp,
-		`${BOX.avg} ${boxNumber(view.box.evidence.avg)}`,
-		`${BOX.last} ${boxNumber(view.box.evidence.last)}`
-	].join(', ');
+		.map((f) => figureCell(FIGURE_HEADS[f], view.figures[f]));
+	return appFoldedOf([...rest, oppCell(view.box.evidence), ...formCells(view.box.evidence)]);
 }
 
-function orderRow(view: OrderView, rank: number, rankBy: OrderAdvice['rank_by']): unknown {
+function orderRow(
+	view: OrderView,
+	rank: number,
+	rankBy: OrderAdvice['rank_by'],
+	week: number
+): unknown {
 	return {
 		...(playerCell(view.box) as object),
 		rank,
@@ -166,6 +190,7 @@ function orderRow(view: OrderView, rank: number, rankBy: OrderAdvice['rank_by'])
 		bye: view.bye,
 		week: boxNumber(view.week),
 		total: boxNumber(view.figures.total),
+		cells: cellsOf(stripCells(view, rankBy, week)),
 		folded: appFolded(view, rankBy)
 	};
 }
@@ -185,7 +210,7 @@ function orderCase(advice: OrderAdvice, chip: PlayersChip | null, q: string, now
 			head: section.head,
 			rows: section.rows.map((view) => {
 				const index = views.indexOf(view);
-				return orderRow(view, advice.rows[index]?.rank ?? 0, advice.rank_by);
+				return orderRow(view, advice.rows[index]?.rank ?? 0, advice.rank_by, advice.week);
 			})
 		})),
 		more: advice.total > advice.rows.length,
@@ -193,17 +218,12 @@ function orderCase(advice: OrderAdvice, chip: PlayersChip | null, q: string, now
 	};
 }
 
-/** The kickers' and defenses' evidence the apps fold under the name: "Opp 16th, Avg 10.6, Last 5.0",
- * the opponent's rank left out on a bye, as the web's phone row did before Lane 209. */
-function appWeekFolded(view: WeekView): string {
-	const { oppRank, avg, last } = view.box.evidence;
-	const opp = oppRank === null ? [] : [`${BOX.opp} ${oppRankWord(oppRank)}`];
-	return [...opp, `${BOX.avg} ${boxNumber(avg)}`, `${BOX.last} ${boxNumber(last)}`].join(', ');
-}
-
 /** The phone's basis as the apps draw it: their folded line names the opponent's rank "Opp", so its
- * sentence is the short one where the web's strip heads it "Opp rank". */
+ * sentence is the short one where the web's strip heads it "Opp rank". Fails loudly when the web's
+ * sentence is not there to swap, so the apps' basis never drifts in silence. */
 function appBasis(text: string): string {
+	if (!text.includes(OPP_PART))
+		throw new Error(`rankings parity: the order's phone basis no longer says "${OPP_PART}"`);
 	return text.replace(OPP_PART, OPP_PHONE);
 }
 
@@ -211,7 +231,8 @@ function weekRow(view: WeekView): unknown {
 	return {
 		...(playerCell(view.box) as object),
 		proj: boxNumber(view.box.proj),
-		folded: appWeekFolded(view)
+		cells: cellsOf(weekStripCells(view)),
+		folded: appFoldedOf(weekStripCells(view))
 	};
 }
 
