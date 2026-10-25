@@ -31,12 +31,14 @@ import androidx.navigation.navArgument
 import app.trycommish.core.AppWords
 import app.trycommish.core.phoneBar
 import app.trycommish.core.shell.LEAGUE_PAGE
+import app.trycommish.core.shell.LINEUP_PAGE
 import app.trycommish.core.shell.PlayerSheetHost
 import app.trycommish.core.shell.ShellDestination
 import app.trycommish.core.shell.ShellRoute
 import app.trycommish.core.shell.ShellState
 import app.trycommish.core.shell.ShellViewModel
 import app.trycommish.core.shell.homeOf
+import app.trycommish.core.shell.lineupOf
 import app.trycommish.core.shell.searchRoute
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Rail
@@ -76,7 +78,8 @@ private object Routes {
  * the account's way in) and the web's phone bar for the shown league's phase, or with none the site's
  * season (Rail.generated.kt), a back stack per tab, and the one player sheet over all of it. Choosing
  * a league shows it, writes it to the site, and opens its home: the League tab where the bar has one,
- * else the home pushed on the tab in view (B149). Only League is live; the rest show their name.
+ * else the home pushed on the tab in view (B149). League and Lineup are live; the rest show their name.
+ * A home's Open Lineup opens the Lineup tab for the league shown, else the lineup on the site.
  */
 @Composable
 fun Shell(
@@ -121,6 +124,11 @@ fun Shell(
         }
     }
 
+    val openLineup: (String) -> Unit = { id ->
+        val shown = (state as? ShellState.Ready)?.selected?.id
+        lineupOf(id, shown, bar)?.let { openTab(it.page) } ?: onOpenLineup(id)
+    }
+
     CompositionLocalProvider(LocalPlayerSheet provides sheet) {
         Scaffold(
             containerColor = CommishTheme.colors.bg,
@@ -149,7 +157,7 @@ fun Shell(
             bottomBar = { PhoneTabBar(bar, tab) { openTab(it.page) } },
         ) { padding ->
             Box(Modifier.padding(padding)) {
-                Pages(graph, nav, state, shell::open, onOpenLineup)
+                Pages(graph, nav, state, shell::open, openLineup)
                 if (switchOpen) {
                     Box(
                         Modifier
@@ -179,7 +187,8 @@ private fun Pages(
 ) {
     NavHost(nav, startDestination = LEAGUE_PAGE) {
         composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup) }
-        PAGES.filter { it.page != LEAGUE_PAGE }.forEach { item ->
+        composable(LINEUP_PAGE) { StartTab(graph, state, retry) }
+        PAGES.filter { it.page != LEAGUE_PAGE && it.page != LINEUP_PAGE }.forEach { item ->
             composable(item.page) { NamedScreen(item.label) }
         }
         composable(Routes.PLAYERS, listOf(navArgument("query") { type = NavType.StringType })) { entry ->

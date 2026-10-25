@@ -304,6 +304,13 @@ object Words {
         const val overReplacement = "his points less a free pickup's"
     }
 
+    object Matchup {
+        const val vs = "vs"
+        const val yoursOnly = "shows us your lineup only."
+        const val allPlayOn = "An all-play week on"
+        const val allPlaySet = "your score is set against every other team's."
+    }
+
     object Board {
         const val all = "All"
         const val defense = "DST"

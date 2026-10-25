@@ -69,3 +69,16 @@ struct MarkTests {
         #expect(MarkShape.stroke(forSide: 120) == MarkTrace.stroke)
     }
 }
+
+/// FlowRow's rows: leading from the edge, or centred by half the slack as the web's
+/// `justify-content: center` (the Matchup bug's top line, Lane 183 review M1).
+struct FlowRowTests {
+    @Test func aCentredRowStartsHalfItsSlackIn() {
+        #expect(FlowRow.inset(row: 200, in: 360, alignment: .center) == 80)
+        #expect(FlowRow.inset(row: 200, in: 360, alignment: .leading) == 0)
+    }
+
+    @Test func aRowWiderThanTheWidthStartsAtTheEdge() {
+        #expect(FlowRow.inset(row: 400, in: 360, alignment: .center) == 0)
+    }
+}

@@ -54,7 +54,7 @@ enum MovesFeed {
 
     static func lines(_ sync: LeagueSync, zone: TimeZone) -> [MoveLine] {
         let names = Dictionary(sync.teams.map { ($0.rosterId, $0.name) }, uniquingKeysWith: { first, _ in first })
-        let name = { (id: Int) in names[id] ?? "Team \(id)" }
+        let name = { (id: Int) in names[id] ?? LeagueNames.unnamedTeam(id) }
         return sync.moves.enumerated().map { index, move in
             let trade = move.kind.value1 == .trade
             let dropOnly = !trade && move.adds.isEmpty && !move.drops.isEmpty

@@ -29,7 +29,7 @@ enum LineupBasis {
         let parts: [String?] = [
             pickProj(facts, kicked: kicked),
             BasisParts.projFinalPhone(started: projFinal, missing: noFinal),
-            gamePart(facts),
+            gamePart(lines: facts.lines, zone: facts.zone, now: facts.now),
             drawsFacts(facts) ? nil : finalsPhone(facts),
             Words.Basis.rankOppPhone,
             ptsPhone(advice.playerPoints, platform: ValueWords.platform(facts.host)),
@@ -54,13 +54,13 @@ enum LineupBasis {
     }
 
     /// basis.ts gamePart 'full': the oldest read of any game still to be played.
-    static func gamePart(_ facts: Facts) -> String? {
-        let reads = facts.lines.filter { LineRead.game($0, now: facts.now).toPlay }.flatMap { line in
+    static func gamePart(lines: [PlayerLine], zone: TimeZone, now: Date) -> String? {
+        let reads = lines.filter { LineRead.game($0, now: now).toPlay }.flatMap { line in
             [line.facts.gameTotal?.value1.readAt, line.facts.weather?.value1.readAt].compactMap(\.self)
         }
         return reads.min().map {
             "\(Words.Box.game) is each club's expected points, his first, and weather, read "
-                + "\(Formatting.weekdayTime($0, zone: facts.zone))."
+                + "\(Formatting.weekdayTime($0, zone: zone))."
         }
     }
 
@@ -76,7 +76,7 @@ enum LineupBasis {
     /// basis.ts finalsParts as the phone draws them: when Final and the stats land while a row waits,
     /// the platform's points named where a row counts them.
     static func finalsPhone(_ facts: Facts) -> String? {
-        let timing = kickedOffPart(facts)
+        let timing = kickedOffPart(lines: facts.lines, now: facts.now)
         let counted = facts.lines.first { platformGame($0) != nil }
         guard let counted, let game = platformGame(counted) else {
             return timing
@@ -96,9 +96,9 @@ enum LineupBasis {
 
     /// basis.ts kickedOffPartAt: when Final and the stats land, while a row is in play or final with
     /// the week's stats not in his games yet.
-    static func kickedOffPart(_ facts: Facts) -> String? {
-        let waiting = facts.lines.contains { line in
-            let read = LineRead.game(line, now: facts.now)
+    static func kickedOffPart(lines: [PlayerLine], now: Date) -> String? {
+        let waiting = lines.contains { line in
+            let read = LineRead.game(line, now: now)
             let ours = line.facts.lastGames.contains { $0.week == line.facts.week && !fromPlatform($0) }
             return read == .kickedOff || (read == .final && !ours)
         }

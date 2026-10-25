@@ -1,9 +1,13 @@
 package app.trycommish.core
 
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.floor
 
 /** The web's number and clock formats (web/src/lib/format/number.ts, clock.ts), so the app prints the
  * same cell the web does for the same figure. */
@@ -12,11 +16,21 @@ object Format {
     private val timeOfDay = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
     private val shortDay = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 
-    /** "39.1": one decimal, as JavaScript's toFixed rounds it. */
+    /** "39.1": `value.toFixed(decimals)` as JavaScript gives it, the exact binary value rounded with a
+     * tie away from zero, and a negative that rounds to zero keeping its sign ("-0.0"). */
     fun fixed(
         value: Double,
         decimals: Int = 1,
-    ): String = String.format(Locale.US, "%.${decimals}f", value)
+    ): String {
+        val text = BigDecimal(abs(value)).setScale(decimals, RoundingMode.HALF_UP).toPlainString()
+        return if (value < 0) "-$text" else text
+    }
+
+    /** A number as JavaScript's `String(n)` writes it: "0.5", "1", "-2". */
+    fun number(value: Double): String {
+        val whole = value == floor(value) && abs(value) < WHOLE_LIMIT
+        return if (whole) value.toLong().toString() else value.toString()
+    }
 
     /** "1,000": a whole number with thousands separators. */
     fun count(value: Int): String = String.format(Locale.US, "%,d", value)
@@ -69,6 +83,7 @@ object Format {
 
     private fun lowerPeriod(text: String): String = text.replace("AM", "am").replace("PM", "pm")
 
+    private const val WHOLE_LIMIT = 1e15
     private const val TEN = 10
     private const val HUNDRED = 100
     private val TEENS = 11..13

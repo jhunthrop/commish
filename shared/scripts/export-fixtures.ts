@@ -59,7 +59,9 @@ export function clockPart(iso: string): string {
 
 /** The answers to read at each clock, the League home's reads: the league list and the league once,
  * at the week's clock, with the week's games, and the scoreboard and the member's lineup at every
- * clock (the lineup's lines carry each player's game, which the game-state parity reads, Lane 176). */
+ * clock (the lineup's lines carry each player's game, which the game-state parity reads, Lane 176);
+ * the Matchup's reads at every clock too, its box score and the league read whose matchup keeps the
+ * score (Lane 183). */
 export function fixturePlan(source: FixtureSource): { clock: string; files: FixtureFile[] }[] {
 	const id = source.leagueId;
 	const { week, ...rest } = source.clocks;
@@ -75,9 +77,23 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 		clock,
 		about: `the member's lineup, ${name}`
 	});
+	const matchup = (clock: string, name: string): FixtureFile => ({
+		file: `matchup-${id}-${clockPart(clock)}.json`,
+		route: `GET /leagues/attached/${id}/matchup`,
+		clock,
+		about: `the week's matchup as a box score, ${name}`
+	});
+	const sync = (clock: string, name: string): FixtureFile => ({
+		file: `sync-${id}-${clockPart(clock)}.json`,
+		route: `GET /leagues/attached/${id}/sync`,
+		clock,
+		about: `the league read with its matchup's score, ${name}`
+	});
 	const atClock = (clock: string, name: string): FixtureFile[] => [
 		scoreboard(clock, name),
-		lineup(clock, name)
+		lineup(clock, name),
+		matchup(clock, name),
+		sync(clock, name)
 	];
 	return [
 		{

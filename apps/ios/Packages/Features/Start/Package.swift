@@ -10,6 +10,7 @@ let package = Package(
     platforms: [.iOS("17.4"), .macOS(.v14)],
     products: [.library(name: "Start", targets: ["Start"])],
     dependencies: [
+        .package(path: "../BoxScore"),
         .package(path: "../../CommishCore"),
         .package(path: "../../CommishDesign"),
         .package(path: "../../CommishAPI"),
@@ -18,6 +19,7 @@ let package = Package(
         .target(
             name: "Start",
             dependencies: [
+                .product(name: "BoxScore", package: "BoxScore"),
                 .product(name: "CommishCore", package: "CommishCore"),
                 .product(name: "CommishDesign", package: "CommishDesign"),
             ]
@@ -26,6 +28,7 @@ let package = Package(
             name: "StartTests",
             dependencies: [
                 "Start",
+                .product(name: "BoxScore", package: "BoxScore"),
                 .product(name: "CommishAPI", package: "CommishAPI"),
                 .product(name: "CommishSnapshotSupport", package: "CommishDesign"),
             ],

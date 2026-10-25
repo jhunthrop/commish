@@ -44,7 +44,8 @@ const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
  * tiebreak and waiver order, the platforms' names; then the Start screen's (Lane 180): the lineup's
  * strip and verb, the positions an opponent's rank is against, the move's confirmation, the in-season
  * screens' lines, a status in words and in a rank's few characters, and the figures' heads; then the
- * Board's (Lane 182): its chips and heads, its formats' chips, the Gap's definition, and the season pages' verbs. */
+ * Matchup's (Lane 183): the words beside its box scores; then the Board's (Lane 182): its chips and heads,
+ * its formats' chips, the Gap's definition, and the season pages' verbs. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -190,6 +191,12 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/format/figure-words.ts',
 		picks: ['FIGURE'],
 		json: 'shared/words/figure.json'
+	},
+	{
+		name: 'Matchup',
+		module: 'web/src/lib/league/box/matchup.ts',
+		picks: ['MATCHUP'],
+		json: 'shared/words/league-matchup.json'
 	},
 	{
 		name: 'Board',

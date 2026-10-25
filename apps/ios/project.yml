@@ -35,6 +35,10 @@ packages:
     path: Packages/Features/Shell
   Start:
     path: Packages/Features/Start
+  BoxScore:
+    path: Packages/Features/BoxScore
+  Matchup:
+    path: Packages/Features/Matchup
   Board:
     path: Packages/Features/Board
 targets:
@@ -50,6 +54,8 @@ targets:
       - package: LeagueHome
       - package: Shell
       - package: Start
+      - package: BoxScore
+      - package: Matchup
       - package: Board
     entitlements:
       path: Commish/Commish.entitlements

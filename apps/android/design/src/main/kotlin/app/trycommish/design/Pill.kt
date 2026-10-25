@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /** What a pill says by its colour, always beside its word: plain, you, a gain, a loss. */
@@ -56,6 +57,7 @@ private fun PillText(
         style = style,
         color = ink,
         maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier =
             modifier
                 .background(ground, RoundedCornerShape(Tokens.Radius.sm.dp))

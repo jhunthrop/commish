@@ -302,6 +302,13 @@ public enum Words {
         public static let overReplacement = "his points less a free pickup's"
     }
 
+    public enum Matchup {
+        public static let vs = "vs"
+        public static let yoursOnly = "shows us your lineup only."
+        public static let allPlayOn = "An all-play week on"
+        public static let allPlaySet = "your score is set against every other team's."
+    }
+
     public enum Board {
         public static let all = "All"
         public static let defense = "DST"

@@ -3,7 +3,7 @@ import CommishDesign
 import Foundation
 
 /// The basis sentences' shared parts (web/src/lib/league/box/basis.ts and league/names.ts), one port
-/// for every screen's basis: the League home's and the Lineup's.
+/// for every screen's basis: the League home's, the Lineup's and the Matchup's.
 enum BasisParts {
     /// basis.ts leagueScoringWords: " on your rules", ", PPR nearest your rules", or for a league whose
     /// rules add a tight end's extra ", PPR shown, nearest FFPC's rules".
@@ -43,5 +43,26 @@ enum BasisParts {
             return ""
         }
         return missing ? Words.Basis.noProjFinalPart : Words.Basis.projFinalPart
+    }
+
+    /// basis.ts finalNonePart: why a side's Final reads "--".
+    static func finalNonePart(_ platform: String) -> String {
+        "A \(Words.Box.final) of \(Words.Box.none) is a score \(platform) does not send us."
+    }
+
+    /// basis.ts unlistedPart: what the teams a platform sends no lineup for draw, said once.
+    static func unlistedPart(_ platform: String, drawn: UnlistedDrawn, form: UnlistedForm) -> String {
+        let box = Words.Box.self
+        let from = drawn.skipped ? Words.BestLineupFrom.projected : Words.BestLineupFrom.rosters
+        let paceWords = form == .full ? Words.Basis.paceClause : Words.Basis.paceClauseShort
+        let pace = drawn.paced ? ", \(paceWords)" : ""
+        if form == .one, drawn.bestLineup, drawn.noRoster {
+            return "Teams \(platform) sends no lineup for show our best lineup from \(from)\(pace), "
+                + "or \(box.none) with none."
+        }
+        let best = drawn.bestLineup
+            ? "\(box.proj) for teams \(platform) sends no lineup for is our best lineup from \(from)\(pace)." : ""
+        let none = drawn.noRoster ? "Teams \(platform) sends no lineup or roster for show \(box.none)." : ""
+        return [best, none].filter { !$0.isEmpty }.joined(separator: " ")
     }
 }

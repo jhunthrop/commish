@@ -3,6 +3,7 @@ import CommishAPI
 import CommishCore
 import CommishDesign
 import LeagueHome
+import Matchup
 import Shell
 import Start
 import SwiftUI
@@ -10,9 +11,9 @@ import SwiftUI
 /// The phone's five, the web's bar for the shown league's phase or, with none, the site's season
 /// (PhoneRail, held to rail-order.ts), each under the top bar: the league switch, the player search
 /// and the account's way in. Choosing a league opens its home: the League tab where the bar has one,
-/// else the home pushed on the tab in view (B149). League, Lineup and the board (the Board item, and
-/// Rest of season in season with no league) are live; the others say their screen's name until their
-/// lane lands. Every screen presents the player sheet through the one host.
+/// else the home pushed on the tab in view (B149). League, Lineup, Matchup and the board (the Board
+/// item, and Rest of season in season with no league) are live; the others say their screen's name
+/// until their lane lands. Every screen presents the player sheet through the one host.
 struct RootTabs: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var selection = PhoneRail.leagueKey
@@ -109,7 +110,10 @@ struct RootTabs: View {
         case let (PhoneRail.lineupKey, league?):
             LineupScreen(environment: environment, league: league, expired: expired)
                 .id(league.id)
-        case (PhoneRail.leagueKey, nil), (PhoneRail.lineupKey, nil):
+        case let (PhoneRail.matchupKey, league?):
+            MatchupTab(environment: environment, leagueID: league.id, expired: expired)
+                .id(league.id)
+        case (PhoneRail.leagueKey, nil), (PhoneRail.lineupKey, nil), (PhoneRail.matchupKey, nil):
             BasisText(AppWords.LeagueList.none).padding(Tokens.Space.s5)
         default:
             if let inSeason = PhoneRail.boardInSeason(tab.key) {
@@ -214,6 +218,23 @@ private struct LineupScreen: View {
 
     var body: some View {
         StartView(viewModel: viewModel, leagueID: leagueID)
+    }
+}
+
+/// A league's Matchup: owns its view model for the league it shows; the view polls while on screen.
+private struct MatchupTab: View {
+    @State private var viewModel: MatchupViewModel
+    private let leagueID: String
+
+    init(environment: AppEnvironment, leagueID: String, expired: @escaping @MainActor () -> Void) {
+        _viewModel = State(initialValue: MatchupViewModel(
+            api: environment.api, cache: environment.cache, clock: environment.clock, onSignedOut: expired
+        ))
+        self.leagueID = leagueID
+    }
+
+    var body: some View {
+        MatchupView(viewModel: viewModel, leagueID: leagueID)
     }
 }
 

@@ -48,8 +48,9 @@ import { CARD, unreadBasis } from '../../web/src/lib/player/card.ts';
 import { railItemLabel } from '../../web/src/lib/run/week-names.ts';
 import type { Scoreboard } from '../../web/src/lib/league/inseason/api.ts';
 import { LINEUP_OUTPUT, lineupAt, moveWords, withWrites } from './lineup-parity.ts';
+import type { LineupAdvice, MatchupBox } from '../../web/src/lib/league/inseason/api.ts';
+import { gapsOf, MATCHUP_OUTPUT, matchupAt } from './matchup-parity.ts';
 import { BOARD_OUTPUT, renderBoard } from './board-parity.ts';
-import type { LineupAdvice } from '../../web/src/lib/league/inseason/api.ts';
 import {
 	GAME_STATE_OUTPUT,
 	lineRows,
@@ -378,6 +379,38 @@ export async function renderLineup(host: LeagueSync['host']): Promise<string> {
 	return `${JSON.stringify(lineup, null, '\t')}\n`;
 }
 
+/** The Matchup at every clock as the fixture's league reads it, the same reads without the box
+ * answer, and the gap sentences with no matchup (matchup-parity.ts). */
+export async function renderMatchup(): Promise<string> {
+	const reads: [string, LeagueSync, MatchupBox][] = [];
+	for (const clock of CLOCKS)
+		reads.push([
+			clock,
+			await answer<LeagueSync>(`sync-${LEAGUE}-${clock}.json`),
+			await answer<MatchupBox>(`matchup-${LEAGUE}-${clock}.json`)
+		]);
+	const at = (withBox: boolean) =>
+		Object.fromEntries(
+			reads.map(([clock, sync, box]) => [
+				clock,
+				matchupAt(sync, withBox ? box : null, instantOf(clock), ZONE)
+			])
+		);
+	const [first] = reads;
+	if (first === undefined) throw new Error('No fixture clock to read the Matchup at.');
+	const matchup = {
+		about: generatedBy(
+			SCRIPT,
+			'web/src/lib/league/box/matchup.ts, basis.ts and MatchupPanel.svelte over shared/fixtures/inseason'
+		),
+		zone: ZONE,
+		clocks: at(true),
+		withoutBox: at(false),
+		gaps: gapsOf(first[1], instantOf(first[0]))
+	};
+	return `${JSON.stringify(matchup, null, '\t')}\n`;
+}
+
 export async function generate(): Promise<Outputs> {
 	const sync = await answer<LeagueSync>(`leagues-attached-${LEAGUE}.json`);
 	const boards = new Map<string, Scoreboard>();
@@ -393,6 +426,7 @@ export async function generate(): Promise<Outputs> {
 		[SHELL_OUTPUT, renderShell(await answer<SwitchLeague[]>('leagues-attached.json'))],
 		[GAME_STATE_OUTPUT, renderGameState(about, await gameStateRows(boards))],
 		[LINEUP_OUTPUT, await renderLineup(sync.host)],
+		[MATCHUP_OUTPUT, await renderMatchup()],
 		[
 			BOARD_OUTPUT,
 			renderBoard(
