@@ -104,7 +104,7 @@ export function clockPart(iso: string): string {
  * score (Lane 183); the Waivers answer at every clock, and on each ESPN stand-in at the week's clock
  * its Waivers and the claim of its first pickup planned and made, done, refused and pending (Lane
  * 186); the trade finder at every clock, and at the week's and the Sunday's clocks the check of each
- * trade the strip names (Lane 189). */
+ * trade the strip names (Lane 189); the account and its paired devices at the week's clock (Lane 198). */
 export function fixturePlan(source: FixtureSource): { clock: string; files: FixtureFile[] }[] {
 	const id = source.leagueId;
 	const { week, ...rest } = source.clocks;
@@ -198,6 +198,19 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 					route: `GET /leagues/attached/${id}/sync`,
 					clock: week,
 					about: "the FFPC league: teams, standings, moves, terms, the member's matchup"
+				},
+				{
+					file: 'me.json',
+					route: 'GET /me',
+					clock: week,
+					about: "the account (the Account screen's name, email and plan, and the switch's leagues)"
+				},
+				{
+					file: 'devices.json',
+					route: 'GET /devices',
+					clock: week,
+					about:
+						"the account's paired devices: the member's iPhone and a browser extension never used"
 				},
 				{
 					file: 'games-week.json',

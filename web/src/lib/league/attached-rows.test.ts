@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { AttachedLeague } from './api.ts';
-import { ATTACHED_WORDS, attachedRow } from './attached-rows.ts';
+import { ATTACHED_WORDS, attachedCount, attachedRow } from './attached-rows.ts';
 
 const NOW = new Date('2026-10-17T15:12:00.000Z');
 
@@ -53,4 +53,12 @@ void test('before a read, out of season and with no playoff week, each says so',
 		attachedRow({ ...league, last_read_at: '2026-10-12T12:00:00.000Z' }, NOW).read,
 		'Oct 12'
 	);
+});
+
+void test("the table's head counts the leagues newest first, and its verbs are the table's own words (Lane 198)", () => {
+	assert.equal(attachedCount(3), '3, newest first');
+	assert.equal(attachedCount(1), '1, newest first');
+	assert.equal(ATTACHED_WORDS.detach, 'Detach');
+	assert.equal(ATTACHED_WORDS.detached, 'Detached.');
+	assert.equal(ATTACHED_WORDS.undo, 'Undo');
 });

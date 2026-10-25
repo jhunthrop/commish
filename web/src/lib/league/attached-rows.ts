@@ -29,8 +29,24 @@ export const ATTACHED_WORDS = {
 	record: 'Record',
 	season: 'Season',
 	lastRead: 'Last read',
-	inSeason: 'In season'
+	inSeason: 'In season',
+	/** The table's verbs and states (Lane 198, read by the apps as well). */
+	open: 'Open',
+	detach: 'Detach',
+	detaching: 'Detaching',
+	detached: 'Detached.',
+	undo: 'Undo',
+	unread: "Your leagues can't be read right now.",
+	none: 'No leagues yet',
+	followFirst: 'Follow your league',
+	followAnother: 'Follow another league',
+	newestFirst: 'newest first'
 } as const;
+
+/** The table head's count: "3, newest first". */
+export function attachedCount(count: number): string {
+	return `${String(count)}, ${ATTACHED_WORDS.newestFirst}`;
+}
 
 function seasonWords(league: AttachedLeague, now: Date, zone: string | undefined): string {
 	if (league.phase !== 'in_season') return phaseWord(league, now, zone);

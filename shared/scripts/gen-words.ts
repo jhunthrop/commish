@@ -39,6 +39,7 @@ const LINEUP_MODULE = 'web/src/lib/league/box/lineup.ts';
 const DESIGNATION_MODULE = 'web/src/lib/format/designation.ts';
 const WAIVERS_MODULE = 'web/src/lib/league/box/waivers.ts';
 const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
+const ACCOUNT_MODULE = 'web/src/lib/account/words.ts';
 
 /** Every table the apps print from, the League home's first, then the box score's: its heads, the
  * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
@@ -50,7 +51,9 @@ const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
  * (Lane 190): a tier band's words, what its count counts, the run's stamp and a past bye's word; then the
  * Waivers' (Lane 186): its table, strip and drop panel, the heads' basis, the Stash group, the season
  * figures' heads and the strip's mark; then the Trades' (Lane 189): the trade table's words, the
- * picker's first choice and the close call's chip, and the builder's lines. */
+ * picker's first choice and the close call's chip, and the builder's lines; then the Account's (Lane 198): the
+ * page's own words, the free season's plan card, the leagues table's, the paired devices', the push
+ * switches', the page's foot and the address it names. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -301,6 +304,48 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/league/inseason/builder.ts',
 		picks: ['BUILDER_LINES'],
 		json: 'shared/words/league-builder.json'
+	},
+	{
+		name: 'Account',
+		module: ACCOUNT_MODULE,
+		picks: ['ACCOUNT_WORDS'],
+		json: 'shared/words/account.json'
+	},
+	{
+		name: 'FreePlan',
+		module: ACCOUNT_MODULE,
+		picks: ['FREE_PLAN_WORDS', ['see', 'FREE_SEE']],
+		json: 'shared/words/account-free-plan.json'
+	},
+	{
+		name: 'Attached',
+		module: 'web/src/lib/league/attached-rows.ts',
+		picks: ['ATTACHED_WORDS'],
+		json: 'shared/words/account-attached.json'
+	},
+	{
+		name: 'Devices',
+		module: 'web/src/lib/hosts/device-words.ts',
+		picks: ['DEVICES'],
+		json: 'shared/words/account-devices.json'
+	},
+	{
+		name: 'Push',
+		module: 'web/src/lib/account/push-words.ts',
+		picks: ['PUSH'],
+		json: 'shared/words/account-push.json'
+	},
+	{
+		name: 'AccountFoot',
+		module: 'web/src/lib/account/foot-words.ts',
+		picks: ['ACCOUNT_FOOT'],
+		json: 'shared/words/account-foot.json'
+	},
+	{
+		name: 'Support',
+		module: 'web/src/lib/legal/contact.ts',
+		picks: [['email', 'SUPPORT_EMAIL']],
+		json: 'shared/words/account-support.json'
 	}
 ];
 export const OUTPUT = {

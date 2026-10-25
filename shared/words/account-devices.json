@@ -1,0 +1,12 @@
+{
+	"title": "Paired devices",
+	"unpair": "Unpair",
+	"unpairing": "Unpairing",
+	"paired": "Paired",
+	"lastUsed": "last used",
+	"notUsed": "not used yet",
+	"pair": "Pair a device",
+	"codeNote": "Type these six words where the device asks. They work once, for ten minutes.",
+	"thisPhone": "This phone",
+	"functions": []
+}

@@ -476,4 +476,78 @@ object Words {
         const val notNow = "Not now"
         const val full = "Two picked, tap one to put him back"
     }
+
+    object Account {
+        const val plan = "Plan"
+        const val signOut = "Sign out"
+        const val withUsSince = "with us since"
+        const val failed = "That did not go through. Try again."
+    }
+
+    object FreePlan {
+        const val title = "Free this season"
+        const val line = "Every tool is on your account through the 2026 season."
+        const val see = "See what's free"
+    }
+
+    object Attached {
+        const val title = "Leagues attached"
+        const val league = "League"
+        const val record = "Record"
+        const val season = "Season"
+        const val lastRead = "Last read"
+        const val inSeason = "In season"
+        const val open = "Open"
+        const val detach = "Detach"
+        const val detaching = "Detaching"
+        const val detached = "Detached."
+        const val undo = "Undo"
+        const val unread = "Your leagues can't be read right now."
+        const val none = "No leagues yet"
+        const val followFirst = "Follow your league"
+        const val followAnother = "Follow another league"
+        const val newestFirst = "newest first"
+    }
+
+    object Devices {
+        const val title = "Paired devices"
+        const val unpair = "Unpair"
+        const val unpairing = "Unpairing"
+        const val paired = "Paired"
+        const val lastUsed = "last used"
+        const val notUsed = "not used yet"
+        const val pair = "Pair a device"
+        const val codeNote = "Type these six words where the device asks. They work once, for ten minutes."
+        const val thisPhone = "This phone"
+    }
+
+    object Push {
+        const val title = "Notifications"
+        const val thursday = "The Thursday read"
+        const val thursdayLine = "When the week's rankings are out"
+        const val status = "A starter's status"
+        const val statusLine = "When a player in your lineup is ruled out or listed questionable"
+        const val waivers = "Waivers clearing"
+        const val waiversLine = "When your platform runs waivers and your claims go through or miss"
+        const val quiet = "Quiet hours"
+        const val quietLine = "Nothing arrives between these times, on your phone's clock"
+        const val from = "From"
+        const val to = "To"
+        const val savedHere = "Saved on this phone"
+        const val notYet = "Nothing is sent yet. These take effect when notifications start."
+    }
+
+    object AccountFoot {
+        const val label = "Your data"
+        const val before = "To delete your account, write to "
+        const val after = " from the email you sign in with. What we keep is in the "
+        const val privacy = "Privacy Policy"
+        const val joint = " and the "
+        const val terms = "Terms of Service"
+        const val end = "."
+    }
+
+    object Support {
+        const val email = "help@trycommish.app"
+    }
 }

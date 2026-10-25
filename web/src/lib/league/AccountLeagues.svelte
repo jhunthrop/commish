@@ -11,7 +11,8 @@
 	import type { AttachedList } from './attached-list.svelte.ts';
 	import { followedCount, followingWords } from './follow-many.ts';
 	import { followedName } from './model.ts';
-	import { ATTACHED_WORDS, attachedRow } from './attached-rows.ts';
+	import { ATTACHED_WORDS, attachedCount, attachedRow } from './attached-rows.ts';
+	import { ACCOUNT_WORDS } from '#lib/account/words.ts';
 
 	interface Props {
 		/** What the account may use (/me, Can): many_leagues follows more than one league. */
@@ -51,7 +52,7 @@
 		try {
 			await step();
 		} catch (error) {
-			problem = error instanceof ApiError ? error.message : 'That did not go through. Try again.';
+			problem = error instanceof ApiError ? error.message : ACCOUNT_WORDS.failed;
 		} finally {
 			busy = null;
 		}
@@ -78,10 +79,10 @@
 <section id={LEAGUES_ANCHOR} aria-label={ATTACHED_WORDS.title}>
 	<div class="sec-h">
 		<h2>{ATTACHED_WORDS.title}</h2>
-		{#if leagues}<span>{leagues.length}, newest first</span>{/if}
+		{#if leagues}<span>{attachedCount(leagues.length)}</span>{/if}
 	</div>
 	{#if failed}
-		<p class="text">Your leagues can't be read right now.</p>
+		<p class="text">{ATTACHED_WORDS.unread}</p>
 	{:else if leagues && leagues.length > 0}
 		{#if followed !== null}<p class="text" role="status">{followingWords(followed)}</p>{/if}
 		<table class="set">
@@ -114,19 +115,23 @@
 						</th>
 						<td><span class="st"><b class="num">{row.record}</b><span>{row.place}</span></span></td>
 						<td class="ph-hide">{row.season}</td>
-						<td class="read"><span class="ph-only">Last read&nbsp;</span>{row.read}</td>
+						<td class="read"
+							><span class="ph-only">{ATTACHED_WORDS.lastRead}&nbsp;</span>{row.read}</td
+						>
 						<td class="act">
 							{#if detached.has(league.id)}
 								<span class="undo" role="status">
-									<span class="text">Detached.</span>
+									<span class="text">{ATTACHED_WORDS.detached}</span>
 									<Quiet size="sm" disabled={busy !== null} onclick={() => void undo(league)}
-										>Undo</Quiet
+										>{ATTACHED_WORDS.undo}</Quiet
 									>
 								</span>
 							{:else}
-								<Quiet size="sm" href={resolve('/league/[id]', { id: league.id })}>Open</Quiet>
+								<Quiet size="sm" href={resolve('/league/[id]', { id: league.id })}
+									>{ATTACHED_WORDS.open}</Quiet
+								>
 								<Quiet size="sm" disabled={busy !== null} onclick={() => void detach(league)}
-									>{busy === league.id ? 'Detaching' : 'Detach'}</Quiet
+									>{busy === league.id ? ATTACHED_WORDS.detaching : ATTACHED_WORDS.detach}</Quiet
 								>
 							{/if}
 						</td>
@@ -137,12 +142,13 @@
 		{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 		<div class="tfoot">
 			{#if many}
-				<Quiet size="sm" href={links.leagueNew()}>Follow another league</Quiet>
+				<Quiet size="sm" href={links.leagueNew()}>{ATTACHED_WORDS.followAnother}</Quiet>
 			{/if}
 		</div>
 	{:else if leagues}
-		<EmptyState level={3} title="No leagues yet">
-			{#snippet actions()}<Quiet href={links.leagueNew()}>Follow your league</Quiet>{/snippet}
+		<EmptyState level={3} title={ATTACHED_WORDS.none}>
+			{#snippet actions()}<Quiet href={links.leagueNew()}>{ATTACHED_WORDS.followFirst}</Quiet
+				>{/snippet}
 		</EmptyState>
 	{/if}
 </section>

@@ -474,4 +474,78 @@ public enum Words {
         public static let notNow = "Not now"
         public static let full = "Two picked, tap one to put him back"
     }
+
+    public enum Account {
+        public static let plan = "Plan"
+        public static let signOut = "Sign out"
+        public static let withUsSince = "with us since"
+        public static let failed = "That did not go through. Try again."
+    }
+
+    public enum FreePlan {
+        public static let title = "Free this season"
+        public static let line = "Every tool is on your account through the 2026 season."
+        public static let see = "See what's free"
+    }
+
+    public enum Attached {
+        public static let title = "Leagues attached"
+        public static let league = "League"
+        public static let record = "Record"
+        public static let season = "Season"
+        public static let lastRead = "Last read"
+        public static let inSeason = "In season"
+        public static let `open` = "Open"
+        public static let detach = "Detach"
+        public static let detaching = "Detaching"
+        public static let detached = "Detached."
+        public static let undo = "Undo"
+        public static let unread = "Your leagues can't be read right now."
+        public static let none = "No leagues yet"
+        public static let followFirst = "Follow your league"
+        public static let followAnother = "Follow another league"
+        public static let newestFirst = "newest first"
+    }
+
+    public enum Devices {
+        public static let title = "Paired devices"
+        public static let unpair = "Unpair"
+        public static let unpairing = "Unpairing"
+        public static let paired = "Paired"
+        public static let lastUsed = "last used"
+        public static let notUsed = "not used yet"
+        public static let pair = "Pair a device"
+        public static let codeNote = "Type these six words where the device asks. They work once, for ten minutes."
+        public static let thisPhone = "This phone"
+    }
+
+    public enum Push {
+        public static let title = "Notifications"
+        public static let thursday = "The Thursday read"
+        public static let thursdayLine = "When the week's rankings are out"
+        public static let status = "A starter's status"
+        public static let statusLine = "When a player in your lineup is ruled out or listed questionable"
+        public static let waivers = "Waivers clearing"
+        public static let waiversLine = "When your platform runs waivers and your claims go through or miss"
+        public static let quiet = "Quiet hours"
+        public static let quietLine = "Nothing arrives between these times, on your phone's clock"
+        public static let from = "From"
+        public static let to = "To"
+        public static let savedHere = "Saved on this phone"
+        public static let notYet = "Nothing is sent yet. These take effect when notifications start."
+    }
+
+    public enum AccountFoot {
+        public static let label = "Your data"
+        public static let before = "To delete your account, write to "
+        public static let after = " from the email you sign in with. What we keep is in the "
+        public static let privacy = "Privacy Policy"
+        public static let joint = " and the "
+        public static let terms = "Terms of Service"
+        public static let end = "."
+    }
+
+    public enum Support {
+        public static let email = "help@trycommish.app"
+    }
 }

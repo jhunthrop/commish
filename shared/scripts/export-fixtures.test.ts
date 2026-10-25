@@ -97,6 +97,22 @@ void test("the board file is the API's PPR board: its basis, its capture, its pl
 	);
 });
 
+void test("the Account's answers: the account and its two paired devices, the phone's first (Lane 198)", () => {
+	const names = fixturePlan({ leagueId: LEAGUE, clocks: CLOCKS })
+		.flatMap((step) => step.files)
+		.map((f) => `${f.route} ${f.file}`);
+	assert.ok(names.includes('GET /me me.json'));
+	assert.ok(names.includes('GET /devices devices.json'));
+	const account = answer('me.json').data as { email: string; leagues: unknown[] };
+	assert.ok(account.email.length > 0);
+	const devices = answer('devices.json').data as { kind: string; last_used_at: string | null }[];
+	assert.deepEqual(
+		devices.map((d) => d.kind),
+		['ios', 'extension']
+	);
+	assert.equal(devices[1]?.last_used_at, null);
+});
+
 void test('the league file carries the league: its id, its platform and its teams', () => {
 	const league = answer(`leagues-attached-${LEAGUE}.json`).data as Record<string, unknown>;
 	assert.equal(league.id, LEAGUE);
