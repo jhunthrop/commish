@@ -125,15 +125,8 @@ enum LineupBasis {
             : "\(Words.Box.pts) are \(platform)'s team points alone."
     }
 
-    /// basis.ts uncountedPart: the rules our stats lack, framed by whether any row counts the
-    /// platform's points; an answer without the list says its note as sent.
+    /// basis.ts uncountedPart over the lineup's answer.
     static func uncounted(_ advice: LineupAdvice, lines: [PlayerLine]) -> String? {
-        let names = advice.basisNoteList ?? ""
-        guard !names.isEmpty else {
-            return advice.basisNote
-        }
-        return lines.contains { platformGame($0) != nil }
-            ? "Our stats omit \(names)."
-            : "\(Words.Box.avg) and \(Words.Box.last) are our stats, which omit \(names)."
+        BasisParts.uncounted(note: advice.basisNote, list: advice.basisNoteList, lines: lines)
     }
 }

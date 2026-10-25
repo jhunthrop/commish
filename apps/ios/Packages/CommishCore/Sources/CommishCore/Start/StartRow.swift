@@ -88,7 +88,8 @@ enum StartRows {
     static let rankedClubs = 32
     static let precipitationNamedFrom = 20.0
 
-    static func row(_ line: PlayerLine, slot: String, zone: TimeZone, now: Date) -> StartRow {
+    /// ranked draws his rest-of-season rank (box.ts boxRow's ranked): the Waivers rows leave it out.
+    static func row(_ line: PlayerLine, slot: String, zone: TimeZone, now: Date, ranked: Bool = true) -> StartRow {
         let facts = line.facts
         let player = line.player
         let read = LineRead.game(line, now: now)
@@ -101,7 +102,8 @@ enum StartRows {
             id: player.hostId, boardID: player.boardId, slot: slot, name: player.name,
             fit: mark ? lastName(withoutDefense(player.name)) : initialName(player.name),
             slug: line.slug, clubMark: mark, club: player.team, position: positionWord(player.position),
-            rank: ["QB", "RB", "WR", "TE", "K", "DST"].contains(player.position) && !listed ? line.positionRank : nil,
+            rank: ranked && ["QB", "RB", "WR", "TE", "K", "DST"].contains(player.position) && !listed
+                ? line.positionRank : nil,
             status: status, reserve: onReserve(line), game: game(line, read: read, zone: zone),
             expected: read.toPlay ? expected(facts) : nil, weather: read.toPlay ? weather(facts) : nil,
             proj: listed ? nil : line.weekProjection, pts: facts.pointsThisWeek, read: read,

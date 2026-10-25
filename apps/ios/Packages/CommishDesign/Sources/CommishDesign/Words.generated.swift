@@ -336,4 +336,54 @@ public enum Words {
         public static let mock = "Start a mock draft"
         public static let sheet = "Build your cheat sheet"
     }
+
+    public enum Waivers {
+        public static let close = "Close"
+        public static let beats = "Beats"
+        public static let rest = "A game"
+        public static let starter = "Starter"
+        public static let bench = "Bench"
+        public static let onBye = "bye"
+        public static let find = "Find a player"
+        public static let noneFound = "No player free to add by that name."
+        public static let gain = "Gain a week"
+        public static let thisWeek = "Proj this week"
+        public static let copied = "Copied"
+        public static let copyFailed = "This browser would not copy his name."
+        public static let noPickup = "No pickup beats your roster"
+        public static let openSpot = "Open spot"
+        public static let dropRule = "Its drop costs least."
+        public static let clears = "Clears"
+        public static let noGain = "No gain over your roster"
+        public static let irBench = "IR, on your bench"
+    }
+
+    public enum WaiverHeads {
+        public static let rest = "is our rest-of-season points a game"
+        public static let avg = "his season average"
+        public static let beats = "the player he would replace in your rest-of-season lineup"
+        public static let separator = ", "
+    }
+
+    public enum Stash {
+        public static let head = "Stash"
+        public static let verb = "Stash"
+        public static let backNow = "Back this week"
+        public static let slot = "IR slot"
+        public static let `open` = "Open"
+        public static let drop = "Drop"
+        public static let line = "Stash rows come back by the listed return date. A game is our rest-of-season points a game."
+        public static let undated = "IR and out players without a return date are not listed."
+        public static let late = "IR and out players back after the regular season are not listed."
+    }
+
+    public enum Season {
+        public static let perGame = "A game"
+        public static let gain = "Gain"
+        public static let gainAWeek = "Gain a week"
+    }
+
+    public enum Strip {
+        public static let best = "Best"
+    }
 }

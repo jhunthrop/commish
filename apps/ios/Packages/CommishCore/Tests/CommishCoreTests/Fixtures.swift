@@ -53,6 +53,16 @@ enum Fixtures {
         try APIDecoding.envelopeData(RoomBoard.self, from: data("fixtures/inseason/boards-ppr.json"))
     }
 
+    /// The players free to add in a league at a clock (GET /leagues/attached/{id}/waivers).
+    static func waivers(_ id: String, _ clock: String) throws -> WaiverAdvice {
+        try APIDecoding.envelopeData(WaiverAdvice.self, from: data("fixtures/inseason/waivers-\(id)-\(clock).json"))
+    }
+
+    /// A claim's plan or its outcome on an ESPN stand-in (POST .../moves/plan, POST .../moves).
+    static func claim<T: Decodable>(_ type: T.Type, _ file: String) throws -> T {
+        try APIDecoding.envelopeData(type, from: data("fixtures/inseason/\(file)"))
+    }
+
     /// A file clock as its instant: `2026-10-18T18-56-00Z` as 18:56 UTC that day.
     static func instant(_ clock: String) -> Date {
         let text = clock.replacingOccurrences(

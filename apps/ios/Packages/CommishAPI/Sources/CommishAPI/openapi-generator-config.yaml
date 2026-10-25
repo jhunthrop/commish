@@ -20,3 +20,4 @@ filter:
     - makeHostMove
     - leagueMatchup
     - roomBoard
+    - leagueWaivers
