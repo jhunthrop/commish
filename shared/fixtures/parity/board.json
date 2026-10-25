@@ -924,5 +924,32 @@
 			"gap": "+1.8"
 		}
 	],
-	"noGap": "--"
+	"noGap": "--",
+	"zone": "America/Chicago",
+	"captures": [
+		{
+			"readAt": "2026-10-14T02:03:35.613Z",
+			"checkedAt": null,
+			"now": "2026-10-16T17:00:00.000Z",
+			"text": "Status as of Oct 13, over 36 hours ago."
+		},
+		{
+			"readAt": "2026-10-14T02:03:35.613Z",
+			"checkedAt": null,
+			"now": "2026-10-17T17:00:00.000Z",
+			"text": "Status as of Oct 13, over 36 hours ago."
+		},
+		{
+			"readAt": "2026-10-14T02:03:35.613Z",
+			"checkedAt": "2026-10-16T15:00:00.000Z",
+			"now": "2026-10-16T17:00:00.000Z",
+			"text": "Status read Oct 16."
+		},
+		{
+			"readAt": "2026-10-14T02:03:35.613Z",
+			"checkedAt": "2026-10-16T15:00:00.000Z",
+			"now": "2026-10-17T17:00:00.000Z",
+			"text": "Status read Oct 16."
+		}
+	]
 }
