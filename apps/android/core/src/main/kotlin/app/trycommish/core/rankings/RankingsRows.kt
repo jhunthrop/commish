@@ -71,11 +71,13 @@ data class RankingsPlayer(
     val weather: WeatherCell?,
     /** His face for the sheet's head (the row draws his initials, as the web's box rows at 390 do). */
     val headshot: String?,
+    /** His board id, by which the sheet reads his week where the run's index names no page for him. */
+    val boardId: String?,
 ) {
     /** The player his name opens in the sheet, by his id: null where the site has no page for him (a
      * kicker, a defense), as the web's row draws no link. */
     val sheetPlayer: SheetPlayer?
-        get() = slug?.let { SheetPlayer(key, it, name, position, rank, club, headshot) }
+        get() = slug?.let { SheetPlayer(key, it, name, position, rank, club, headshot, boardId) }
 }
 
 /** One row of our order as the phone draws it (OrderTable.svelte at 390). */
@@ -160,6 +162,7 @@ internal object RankingsRows {
             expected = if (row.expected == null) null else expectedScore(line.facts, line.player.team),
             weather = row.weather,
             headshot = if (defense) null else headshotOf(line.headshot),
+            boardId = line.player.boardId,
         )
     }
 

@@ -154,6 +154,18 @@ class WaiverModel(
      * waivers". */
     fun verb(source: WaiverRow): String = WaiverWords.addVerb(shown.moves, source.add.player.hostId, platform)
 
+    /** The sheet's verb on his row (WaiverScreen.svelte shelfOffer): a stash an open IR slot takes with no
+     * drop, the stash verb with his week under it; else the claim in the screen's words with the pair and
+     * its gain (a stash's week in place of a gain) under it, the advice's drop first. */
+    fun sheetOffer(row: PoolRow): Pair<String, String> {
+        val stash = row.stash
+        if (stash != null && stash.slotTakesHim && !stash.drops) return Words.Stash.verb to stash.back
+        val advised = drops(row).firstOrNull()
+        val paired = WaiverRows.with(row.source, advised)
+        val tail = stash?.back ?: WaiverWords.cardGains(paired.weekGain, paired.gain)
+        return verb(paired) to "${pairWords(row.source, advised)}, $tail"
+    }
+
     /** Whether an add's claim is made from here. */
     fun claimsHere(source: WaiverRow): Boolean = WaiverWords.claimsAdd(shown.moves, source.add.player.hostId)
 
