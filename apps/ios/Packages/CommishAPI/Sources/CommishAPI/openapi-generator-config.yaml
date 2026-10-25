@@ -45,3 +45,14 @@ filter:
     - createCompanion
     - getCompanion
     - companionReport
+    - createMock
+    - getMock
+    - pickMock
+    - undoMock
+    - autopickMock
+    - finishMock
+    - queueMock
+    - mockCard
+    - mockReport
+    - sharedMock
+    - sharedMockReport

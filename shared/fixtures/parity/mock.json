@@ -7941,7 +7941,28 @@
 				"4431452",
 				"4723086"
 			],
-			"call": null,
+			"call": {
+				"tag": "Our call at 5.05",
+				"chanceHead": "Still there 6.08",
+				"verb": "Draft him",
+				"rows": [
+					{
+						"id": "3916387",
+						"value": "+48.1",
+						"chance": "13%"
+					},
+					{
+						"id": "4723086",
+						"value": "+25.3",
+						"chance": "<1%"
+					},
+					{
+						"id": "4431459",
+						"value": "+22.5",
+						"chance": "<1%"
+					}
+				]
+			},
 			"since": {
 				"lead": "8",
 				"lines": [
@@ -8018,9 +8039,9 @@
 			},
 			"pool": {
 				"line": "448 left to draft, ranked by points over replacement",
-				"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Still there lands with our call.",
-				"chanceLabel": "your last pick",
-				"missing": "with our call",
+				"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Still there at 6.08: 200 runs of this room, each seat drafting as it has so far.",
+				"chanceLabel": "still there at 6.08",
+				"missing": "not read",
 				"filters": [
 					{
 						"filter": "All",
@@ -8033,8 +8054,8 @@
 									"text": "+48.1",
 									"heat": "heat-3"
 								},
-								"chance": null,
-								"call": false,
+								"chance": "13%",
+								"call": true,
 								"queued": false
 							},
 							{
@@ -8043,7 +8064,7 @@
 									"text": "+34.8",
 									"heat": "heat-4"
 								},
-								"chance": null,
+								"chance": "42%",
 								"call": false,
 								"queued": true
 							},
@@ -8053,7 +8074,7 @@
 									"text": "+25.3",
 									"heat": "heat-4"
 								},
-								"chance": null,
+								"chance": "<1%",
 								"call": false,
 								"queued": true
 							},
@@ -8063,7 +8084,7 @@
 									"text": "+22.5",
 									"heat": "heat-4"
 								},
-								"chance": null,
+								"chance": "<1%",
 								"call": false,
 								"queued": false
 							},
@@ -8073,7 +8094,7 @@
 									"text": "+22.2",
 									"heat": "heat-4"
 								},
-								"chance": null,
+								"chance": "<1%",
 								"call": false,
 								"queued": false
 							},
@@ -8083,7 +8104,7 @@
 									"text": "+21.1",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "28%",
 								"call": false,
 								"queued": false
 							},
@@ -8093,7 +8114,7 @@
 									"text": "+19.1",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "9%",
 								"call": false,
 								"queued": false
 							},
@@ -8103,7 +8124,7 @@
 									"text": "+18.2",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8113,7 +8134,7 @@
 									"text": "+14.8",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8123,7 +8144,7 @@
 									"text": "+10.1",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8133,7 +8154,7 @@
 									"text": "+9.2",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "13%",
 								"call": false,
 								"queued": false
 							},
@@ -8143,7 +8164,7 @@
 									"text": "+8.9",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "39%",
 								"call": false,
 								"queued": false
 							},
@@ -8153,7 +8174,7 @@
 									"text": "+8.8",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8163,7 +8184,7 @@
 									"text": "+8.6",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "57%",
 								"call": false,
 								"queued": false
 							}
@@ -8180,8 +8201,8 @@
 									"text": "+48.1",
 									"heat": "heat-3"
 								},
-								"chance": null,
-								"call": false,
+								"chance": "13%",
+								"call": true,
 								"queued": false
 							},
 							{
@@ -8190,7 +8211,7 @@
 									"text": "+34.8",
 									"heat": "heat-4"
 								},
-								"chance": null,
+								"chance": "42%",
 								"call": false,
 								"queued": true
 							},
@@ -8200,7 +8221,7 @@
 									"text": "+22.2",
 									"heat": "heat-4"
 								},
-								"chance": null,
+								"chance": "<1%",
 								"call": false,
 								"queued": false
 							},
@@ -8210,7 +8231,7 @@
 									"text": "+18.2",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8220,7 +8241,7 @@
 									"text": "+14.8",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8230,7 +8251,7 @@
 									"text": "+8.8",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8240,7 +8261,7 @@
 									"text": "+4.8",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8250,7 +8271,7 @@
 									"text": "+3.8",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8260,7 +8281,7 @@
 									"text": "+0.8",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8270,7 +8291,7 @@
 									"text": "+0.0",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8280,7 +8301,7 @@
 									"text": "−4.0",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8290,7 +8311,7 @@
 									"text": "−16.4",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8300,7 +8321,7 @@
 									"text": "−19.3",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": "76%",
 								"call": false,
 								"queued": false
 							},
@@ -8310,7 +8331,7 @@
 									"text": "−21.6",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							}
@@ -8327,7 +8348,7 @@
 									"text": "+9.2",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "13%",
 								"call": false,
 								"queued": false
 							},
@@ -8337,7 +8358,7 @@
 									"text": "+7.8",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "10%",
 								"call": false,
 								"queued": false
 							},
@@ -8347,7 +8368,7 @@
 									"text": "+3.6",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "40%",
 								"call": false,
 								"queued": true
 							},
@@ -8357,7 +8378,7 @@
 									"text": "−1.0",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8367,7 +8388,7 @@
 									"text": "−5.6",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8377,7 +8398,7 @@
 									"text": "−8.4",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8387,7 +8408,7 @@
 									"text": "−8.5",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": "63%",
 								"call": false,
 								"queued": false
 							},
@@ -8397,7 +8418,7 @@
 									"text": "−9.0",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8407,7 +8428,7 @@
 									"text": "−19.5",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8417,7 +8438,7 @@
 									"text": "−23.9",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8427,7 +8448,7 @@
 									"text": "−26.1",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": "51%",
 								"call": false,
 								"queued": false
 							},
@@ -8437,7 +8458,7 @@
 									"text": "−28.3",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": "21%",
 								"call": false,
 								"queued": false
 							},
@@ -8447,7 +8468,7 @@
 									"text": "−28.8",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8457,7 +8478,7 @@
 									"text": "−28.8",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							}
@@ -8474,7 +8495,7 @@
 									"text": "+21.1",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "28%",
 								"call": false,
 								"queued": false
 							},
@@ -8484,7 +8505,7 @@
 									"text": "+19.1",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "9%",
 								"call": false,
 								"queued": false
 							},
@@ -8494,7 +8515,7 @@
 									"text": "+8.9",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "39%",
 								"call": false,
 								"queued": false
 							},
@@ -8504,7 +8525,7 @@
 									"text": "+8.1",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "59%",
 								"call": false,
 								"queued": false
 							},
@@ -8514,7 +8535,7 @@
 									"text": "+6.9",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "4%",
 								"call": false,
 								"queued": false
 							},
@@ -8524,7 +8545,7 @@
 									"text": "+5.4",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8534,7 +8555,7 @@
 									"text": "+2.9",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "17%",
 								"call": false,
 								"queued": false
 							},
@@ -8544,7 +8565,7 @@
 									"text": "+1.4",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "94%",
 								"call": false,
 								"queued": false
 							},
@@ -8554,7 +8575,7 @@
 									"text": "+1.4",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8564,7 +8585,7 @@
 									"text": "+0.0",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8574,7 +8595,7 @@
 									"text": "−0.9",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": "68%",
 								"call": false,
 								"queued": false
 							},
@@ -8584,7 +8605,7 @@
 									"text": "−1.6",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8594,7 +8615,7 @@
 									"text": "−11.6",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8604,7 +8625,7 @@
 									"text": "−11.9",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							}
@@ -8621,7 +8642,7 @@
 									"text": "+25.3",
 									"heat": "heat-4"
 								},
-								"chance": null,
+								"chance": "<1%",
 								"call": false,
 								"queued": true
 							},
@@ -8631,7 +8652,7 @@
 									"text": "+22.5",
 									"heat": "heat-4"
 								},
-								"chance": null,
+								"chance": "<1%",
 								"call": false,
 								"queued": false
 							},
@@ -8641,7 +8662,7 @@
 									"text": "+10.1",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8651,7 +8672,7 @@
 									"text": "+8.6",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "57%",
 								"call": false,
 								"queued": false
 							},
@@ -8661,7 +8682,7 @@
 									"text": "+6.7",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8671,7 +8692,7 @@
 									"text": "+6.6",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8681,7 +8702,7 @@
 									"text": "+3.1",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8691,7 +8712,7 @@
 									"text": "+1.9",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8701,7 +8722,7 @@
 									"text": "+0.9",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8711,7 +8732,7 @@
 									"text": "+0.0",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8721,7 +8742,7 @@
 									"text": "−2.5",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8731,7 +8752,7 @@
 									"text": "−2.8",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8741,7 +8762,7 @@
 									"text": "−8.6",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8751,7 +8772,7 @@
 									"text": "−13.0",
 									"heat": "heat-neg"
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							}
@@ -8768,7 +8789,7 @@
 									"text": "Draft order 1",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8778,7 +8799,7 @@
 									"text": "Draft order 2",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8788,7 +8809,7 @@
 									"text": "Draft order 3",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8798,7 +8819,7 @@
 									"text": "Draft order 4",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8808,7 +8829,7 @@
 									"text": "Draft order 5",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8818,7 +8839,7 @@
 									"text": "Draft order 6",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8828,7 +8849,7 @@
 									"text": "Draft order 7",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8838,7 +8859,7 @@
 									"text": "Draft order 8",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8848,7 +8869,7 @@
 									"text": "Draft order 9",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8858,7 +8879,7 @@
 									"text": "Draft order 10",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8868,7 +8889,7 @@
 									"text": "Draft order 11",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8878,7 +8899,7 @@
 									"text": "Draft order 12",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8888,7 +8909,7 @@
 									"text": "Draft order 13",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8898,7 +8919,7 @@
 									"text": "Draft order 14",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							}
@@ -8915,7 +8936,7 @@
 									"text": "Draft order 1",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8925,7 +8946,7 @@
 									"text": "Draft order 2",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8935,7 +8956,7 @@
 									"text": "Draft order 3",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8945,7 +8966,7 @@
 									"text": "Draft order 4",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8955,7 +8976,7 @@
 									"text": "Draft order 5",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8965,7 +8986,7 @@
 									"text": "Draft order 6",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8975,7 +8996,7 @@
 									"text": "Draft order 7",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8985,7 +9006,7 @@
 									"text": "Draft order 8",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -8995,7 +9016,7 @@
 									"text": "Draft order 9",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -9005,7 +9026,7 @@
 									"text": "Draft order 10",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -9015,7 +9036,7 @@
 									"text": "Draft order 11",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -9025,7 +9046,7 @@
 									"text": "Draft order 12",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -9035,7 +9056,7 @@
 									"text": "Draft order 13",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							},
@@ -9045,7 +9066,7 @@
 									"text": "Draft order 14",
 									"heat": null
 								},
-								"chance": null,
+								"chance": ">99%",
 								"call": false,
 								"queued": false
 							}
@@ -9062,7 +9083,7 @@
 									"text": "+34.8",
 									"heat": "heat-4"
 								},
-								"chance": null,
+								"chance": "42%",
 								"call": false,
 								"queued": true
 							},
@@ -9072,7 +9093,7 @@
 									"text": "+3.6",
 									"heat": "none"
 								},
-								"chance": null,
+								"chance": "40%",
 								"call": false,
 								"queued": true
 							},
@@ -9082,7 +9103,7 @@
 									"text": "+25.3",
 									"heat": "heat-4"
 								},
-								"chance": null,
+								"chance": "<1%",
 								"call": false,
 								"queued": true
 							}
@@ -13299,7 +13320,7 @@
 		"words": "Back to 4.08. Jameson Williams is in the pool again. Same bots, same seed, so the room drafts the same until your pick goes another way."
 	},
 	"noCall": {
-		"verb": "Draft Gibbs",
+		"verb": "Draft Smith-Njigba",
 		"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. No call for this pick.",
 		"missing": "no call"
 	},

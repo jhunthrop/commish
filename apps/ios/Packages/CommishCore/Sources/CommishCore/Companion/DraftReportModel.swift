@@ -125,13 +125,17 @@ public struct DraftReportModel: Equatable, Sendable {
     static let exposureRows = 8
 
     /// `names` are the seats' names, slot 1 first; `seats` who the other seats are ("Your league on
-    /// Sleeper"); `reshuffled` who stands in for them in the runs.
-    public init(_ report: MockReport, names: [String], seats: String, reshuffled: String) {
+    /// Sleeper"); `reshuffled` who stands in for them in the runs; `sharedBy`, set for someone else's
+    /// draft read through its link (its drafter's handle, or nil with none), tells it of them.
+    public init(
+        _ report: MockReport, names: [String], seats: String, reshuffled: String, sharedBy: String?? = nil
+    ) {
+        let whose = sharedBy == nil ? "your" : "their"
         let board = RoomBoardView(report.board.value1, teams: report.teams)
         let head = Self.standing(report)
-        title = "Your draft from slot \(report.slot)"
+        title = "\(Self.whoseDraft(sharedBy)) from slot \(report.slot)"
         points = head.map { Formatting.count($0.points) }
-        caption = "points from your QB, RB, WR and TE starters"
+        caption = "points from \(whose) QB, RB, WR and TE starters"
         cells = (head?.cells ?? []) + Self.settings(report, seats: seats)
         basis = Self.basis(board.basis, couldWaitFrom: report.couldWaitFrom)
         fieldNote = "projected starting points, \(report.teams) teams"
@@ -143,9 +147,11 @@ public struct DraftReportModel: Equatable, Sendable {
             )
         }
         picksNote = "\(report.picks.count) picks, starters by slot"
-        picks = Self.picks(report, board: board)
-        runs = Self.runs(report.runs, teams: report.teams, rank: head?.rank ?? 0, reshuffled: reshuffled)
-        exposureTitle = "Who you end up with"
+        picks = Self.picks(report, board: board, shared: sharedBy != nil)
+        runs = Self.runs(
+            report.runs, teams: report.teams, rank: head?.rank ?? 0, reshuffled: reshuffled, whose: whose
+        )
+        exposureTitle = "Who \(sharedBy == nil ? "you" : "they") end up with"
         exposureAside = "share of \(report.runs.runs) runs"
         exposure = report.runs.exposure.prefix(Self.exposureRows).compactMap { entry in
             board.byID[entry.playerId].map {
@@ -194,7 +200,15 @@ public struct DraftReportModel: Equatable, Sendable {
             + "defenses there), plus is later. Still there: the room's read at that pick, tinted from \(from)%."
     }
 
-    static func picks(_ report: MockReport, board: RoomBoardView) -> [ReportPickLine] {
+    /// headline.ts reportTitle's whose: "Your draft", "jh's draft", "A shared draft".
+    static func whoseDraft(_ sharedBy: String??) -> String {
+        guard let sharedBy else {
+            return "Your draft"
+        }
+        return sharedBy.map { "\($0)'s draft" } ?? "A shared draft"
+    }
+
+    static func picks(_ report: MockReport, board: RoomBoardView, shared: Bool = false) -> [ReportPickLine] {
         let slotOf = Dictionary(
             report.starters.compactMap { starter in starter.playerId.map { ($0, Self.slotLabel(starter.slot)) } },
             uniquingKeysWith: { first, _ in first }
@@ -211,7 +225,7 @@ public struct DraftReportModel: Equatable, Sendable {
                 figure: figure.text, figureMuted: figure.muted,
                 adp: kept ? nil : pick.adpGap.map { Self.later($0, decimals: 1) },
                 ours: kept ? nil : pick.boardGap.map { Self.later(Double($0), decimals: 0) },
-                still: still.text, stillWait: still.wait, stillMuted: still.muted, madeBy: Self.madeBy(pick),
+                still: still.text, stillWait: still.wait, stillMuted: still.muted, madeBy: Self.madeBy(pick, shared: shared),
                 mine: pick.madeBy.value1 == .you
             )
         }
@@ -260,16 +274,16 @@ public struct DraftReportModel: Equatable, Sendable {
         return StillThere(text: DraftFormat.chanceShort(chance), wait: chance >= couldWaitFrom, muted: false)
     }
 
-    /// headline.ts byWords, for your own draft: who made the pick, or Kept for a keeper.
-    static func madeBy(_ pick: Components.Schemas.ReportPick) -> String {
+    /// headline.ts byWords: who made the pick, of your draft or a shared one, or Kept for a keeper.
+    static func madeBy(_ pick: Components.Schemas.ReportPick, shared: Bool = false) -> String {
         if pick.chip.value1 == .kept {
             return "Kept"
         }
         switch pick.madeBy.value1 {
-        case .you?: return "You"
+        case .you?: return shared ? "Them" : "You"
         case .forYou?: return "Pick for me"
-        case .queue?: return "Your queue"
-        case .clock?: return "Your clock"
+        case .queue?: return shared ? "Their queue" : "Your queue"
+        case .clock?: return shared ? "Their clock" : "Your clock"
         case nil: return pick.madeBy.value2 ?? ""
         }
     }
@@ -280,7 +294,8 @@ public struct DraftReportModel: Equatable, Sendable {
         _ runs: Components.Schemas.ReportRuns,
         teams: Int,
         rank: Int,
-        reshuffled: String
+        reshuffled: String,
+        whose: String = "your"
     ) -> ReportRunsModel {
         let low = runs.points.first ?? 0
         let high = runs.points.last ?? 0
@@ -291,7 +306,7 @@ public struct DraftReportModel: Equatable, Sendable {
         }
         return ReportRunsModel(
             title: "The same draft, \(runs.runs) more times",
-            note: "your picks on autopick from the board, \(reshuffled) reshuffled each run",
+            note: "\(whose) picks on autopick from the board, \(reshuffled) reshuffled each run",
             bins: counts, medianBin: min(bins - 1, Int(((runs.median - low) / width).rounded(.down))),
             low: Formatting.count(low), high: Formatting.count(high), median: Formatting.count(runs.median),
             middle: "\(Formatting.count(runs.middleLow)) to \(Formatting.count(runs.middleHigh))",

@@ -125,10 +125,15 @@ async function answer<T>(file: string): Promise<T> {
 	return envelope.data;
 }
 
-/** The turn's card: the one the answer carries, else the one read from the route at that pick. */
-async function cardFor(room: MockRoom): Promise<RoomCard | null> {
+/** The turn's card as the room page settles it: a write that keeps the turn keeps its card; a new
+ * turn takes the card its answer carries, else the one read from the route at that pick. */
+async function cardFor(
+	room: MockRoom,
+	held: { pick: number; card: RoomCard | null } | null
+): Promise<RoomCard | null> {
 	if (!room.waiting) return null;
 	if (room.card?.pick_number === room.pick_number) return room.card;
+	if (held?.pick === room.pick_number) return held.card;
 	const read = await answer<RoomCard>('card-first');
 	return read.pick_number === room.pick_number ? read : null;
 }
@@ -350,9 +355,12 @@ export async function renderMock(about: string): Promise<string> {
 	if (!first.board) throw new Error('The first answer came back without its board.');
 	const board = boardOf(first.board, first.teams);
 	const states: Record<string, unknown> = {};
+	let held: { pick: number; card: RoomCard | null } | null = null;
 	for (const state of STATES) {
 		const r = await answer<MockRoom>(state);
-		states[state] = room(r, board, await cardFor(r), false);
+		const card = await cardFor(r, held);
+		held = { pick: r.pick_number, card };
+		states[state] = room(r, board, card, false);
 	}
 	const round5 = await answer<MockRoom>('round5');
 	const undone = round5.picks.filter((p) => p.seat === round5.slot).at(-1);
@@ -381,7 +389,7 @@ export async function renderMock(about: string): Promise<string> {
 			words: undone ? undoneWords(undone.pick, round5.teams, undonePlayer?.name ?? null) : null
 		},
 		noCall: {
-			verb: draftNamed(board.players[0]?.name ?? ''),
+			verb: draftNamed(poolRows(board, draftedSet(first.picks), 'All', [], '')[0]?.name ?? ''),
 			basis: poolBasis(board, null, first.teams, true),
 			missing: chanceMissing(true, false)
 		},
