@@ -174,6 +174,12 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 					about: 'the PPR draft board as a dev API answered it (record-boards.ts), the Board screen'
 				},
 				...atClock(week, 'Saturday noon Central, every Sunday game to come'),
+				{
+					file: `waivers-${id}-DEF-${clockPart(week)}.json`,
+					route: `GET /leagues/attached/${id}/waivers?position=DEF`,
+					clock: week,
+					about: 'the players free to add narrowed to defenses, as the D/ST chip reads them'
+				},
 				...claims
 			]
 		},

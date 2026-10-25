@@ -127,6 +127,7 @@ void test("each ESPN stand-in's Waivers, its claim planned then made, at the wee
 		assert.equal(planned.route, `POST /leagues/attached/${id}/moves/plan`);
 		assert.deepEqual(made?.claim, { waivers: pool, plan: `claim-plan-${id}.json` });
 	}
+	assert.ok(week.some((f) => f.route.endsWith('/waivers?position=DEF')));
 	// The claims come after the answers their bodies are built from.
 	const order = week.map((f) => f.file);
 	assert.ok(

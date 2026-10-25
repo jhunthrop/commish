@@ -6,7 +6,7 @@
  * the Stash group with its line), each row's verb and its drop panel, the pinned verb with the line
  * under it, the arrival line, the phone's basis; and the claim's words (move.ts) for each platform
  * and each outcome, the bid's label and its problem. Written by export-parity.ts beside the others. */
-import { BOX, boxNumber } from '../../web/src/lib/league/box/box.ts';
+import { BOX, boxNumber, positionWord } from '../../web/src/lib/league/box/box.ts';
 import { drawnText } from '../../web/src/lib/league/box/basis.ts';
 import {
 	addressedWeek,
@@ -23,6 +23,8 @@ import {
 	cardName,
 	copiedWords,
 	DEFAULT_SORT,
+	findRows,
+	nextSort,
 	dropLead,
 	dropRows,
 	dropTitle,
@@ -46,13 +48,16 @@ import {
 	WAIVERS,
 	waiverBasis,
 	withDrop,
-	type PoolRow
+	type PoolRow,
+	type Sort,
+	type SortKey
 } from '../../web/src/lib/league/box/waivers.ts';
 import type { LeagueHost } from '../../web/src/lib/league/api.ts';
 import type {
 	HostBid,
 	HostMoveResult,
-	WaiverAdvice
+	WaiverAdvice,
+	WaiverPosition
 } from '../../web/src/lib/league/inseason/api.ts';
 import {
 	bidLabel,
@@ -134,22 +139,54 @@ function dropsOf(entry: PoolRow, advice: WaiverAdvice, zone: string, now: number
 	};
 }
 
-/** The Waivers at one clock, as the web's phone draws it. */
+/** The sortable heads the phone draws at 390 (WaiverTable.svelte: Player, Proj, Beats), each read
+ * both ways. */
+const PHONE_SORTS: readonly Sort[] = (['name', 'proj', 'beats'] as const).flatMap((key) => [
+	{ key, down: true },
+	{ key, down: false }
+]);
+/** Searches the parity holds: a part of a name in any case, padding, and one that finds no one. */
+const FINDS = ['john', 'CHIEFS', '  ', 'zzz'] as const;
+/** The positions the route narrows to, in the board's order (WaiverScreen.svelte POSITIONS). */
+const POSITIONS: readonly WaiverPosition[] = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+
+/** The table's rows by key in a sort, found by a search: the rows that gain, the rest, the Stash group. */
+function tableKeys(
+	pool: readonly PoolRow[],
+	stash: readonly PoolRow[],
+	sort: Sort,
+	query: string
+): { gaining: string[]; rest: string[]; stash: string[] } {
+	const groups = gainGroups(findRows(sortRows(pool, sort), query));
+	return {
+		gaining: groups.gaining.map((r) => r.key),
+		rest: groups.rest.map((r) => r.key),
+		stash: findRows(sortRows(stash, sort), query).map((r) => r.key)
+	};
+}
+
+/** The Waivers at one clock, as the web's phone draws it: `advice` the page's answer, `shown` the
+ * answer for the chosen position (WaiverScreen's `narrowed ?? advice`), its rows drawn at `now`. */
 export function waiversAt(
 	advice: WaiverAdvice,
 	host: LeagueHost,
 	now: string,
-	zone: string
+	zone: string,
+	shown: WaiverAdvice = advice
 ): unknown {
 	const at = Date.parse(now);
-	const pool = poolRows(advice, zone, at);
+	const pool = poolRows(
+		{ rows: shown.rows, pickups: advice.pickups, roster: shown.roster },
+		zone,
+		at
+	);
 	const sorted = sortRows(pool, DEFAULT_SORT);
 	const groups = gainGroups(sorted);
-	const stash = sortRows(stashRows(advice, zone, at), DEFAULT_SORT);
+	const stash = sortRows(stashRows({ ...shown, pickups: advice.pickups }, zone, at), DEFAULT_SORT);
 	const cards = pickupCards(advice);
-	const names = namesOnScreen(advice);
+	const names = namesOnScreen(shown);
 	const card = cards[0] ?? null;
-	const lines = [...advice.rows.map((r) => r.add), ...advice.roster];
+	const lines = [...shown.rows.map((r) => r.add), ...shown.roster];
 	const sum = pickupSum(advice, cards);
 	return {
 		now,
@@ -164,32 +201,72 @@ export function waiversAt(
 			move: moveWords(c),
 			why: dropWhyWords(c.dropWhy),
 			gains: cardGains(c),
-			verb: addVerbWords(advice.moves, c.source.add.player.host_id, host)
+			verb: addVerbWords(shown.moves, c.source.add.player.host_id, host)
 		})),
-		projected: weekProjected(advice),
-		arrives: arrivesPart(advice, addressedWeek(advice), zone),
+		positions: POSITIONS.filter((p) => advice.rows.some((r) => r.add.player.position === p)).map(
+			(p) => ({ position: p, word: positionWord(p) })
+		),
+		projected: weekProjected(shown),
+		arrives: arrivesPart(shown, addressedWeek(shown), zone),
 		heads: headBasisText(
-			headBasis(advice.projection_previous_read_at, weekProjected(advice), { zone, zoned: false })
+			headBasis(shown.projection_previous_read_at, weekProjected(shown), { zone, zoned: false })
 		),
-		gaining: groups.gaining.map((e) => rowOf(e, advice, host)),
-		rest: groups.rest.map((e) => rowOf(e, advice, host)),
-		stash: stash.map((e) => rowOf(e, advice, host)),
-		stashLine: stashBasis(advice),
+		gaining: groups.gaining.map((e) => rowOf(e, shown, host)),
+		rest: groups.rest.map((e) => rowOf(e, shown, host)),
+		stash: stash.map((e) => rowOf(e, shown, host)),
+		stashLine: stashBasis(shown),
+		empty: WAIVERS.noneFound,
+		sorts: PHONE_SORTS.map((sort) => ({ ...sort, ...tableKeys(pool, stash, sort, '') })),
+		finds: FINDS.map((query) => ({ query, ...tableKeys(pool, stash, DEFAULT_SORT, query) })),
 		drops: Object.fromEntries(
-			[...sorted.slice(0, 3), ...stash].map((e) => [e.key, dropsOf(e, advice, zone, at)])
+			[...sorted.slice(0, 3), ...stash].map((e) => [e.key, dropsOf(e, shown, zone, at)])
 		),
-		onHost: claimsOnHost(advice),
+		onHost: claimsOnHost(shown),
 		pinned: {
-			verb: card === null ? null : addVerbWords(advice.moves, card.source.add.player.host_id, host),
-			line: advice.moves.reason ?? advice.host_note ?? advice.moves.note ?? '',
-			url: advice.host_waivers_url
+			verb: card === null ? null : addVerbWords(shown.moves, card.source.add.player.host_id, host),
+			line: shown.moves.reason ?? shown.host_note ?? shown.moves.note ?? '',
+			url: shown.host_waivers_url
 		},
 		copied:
 			card === null ? null : copiedWords(host, cardName(card.source.add.player.name, names), true),
 		copyFailed:
 			card === null ? null : copiedWords(host, cardName(card.source.add.player.name, names), false),
-		basis: drawnText(waiverBasis(advice, lines, { zone, zoned: false }, at), 'phone')
+		basis: drawnText(
+			waiverBasis({ ...shown, pickups: advice.pickups }, lines, { zone, zoned: false }, at),
+			'phone'
+		)
 	};
+}
+
+/** waivers.ts nextSort from the default through each phone head and on: a head chosen again turns it
+ * around, a new head starts highest first, a name A to Z, a game soonest first. */
+export function sortSteps(): Sort[] {
+	const keys: readonly SortKey[] = ['name', 'name', 'proj', 'proj', 'beats', 'game'];
+	return keys.reduce<Sort[]>(
+		(steps, key) => [...steps, nextSort(steps.at(-1) ?? DEFAULT_SORT, key)],
+		[]
+	);
+}
+
+/** The Stash group's and a clearing day's cases (Lane 186 review M1), over the inputs of
+ * web/src/lib/league/box/stash.test.ts: the stand-in's stored answer with the sense check's IR case and
+ * an open IR slot (Achane Stash naming his drop, Royer Add), with none (both Add), and with a bench spot
+ * open as well (Achane Stash naming the slot, opening the platform's page); each with a clearing day on
+ * its first add and its first stash. */
+export function stashCases(
+	withSlot: WaiverAdvice,
+	noSlot: WaiverAdvice
+): Record<string, WaiverAdvice> {
+	const benchOpen: WaiverAdvice = {
+		...withSlot,
+		stash: (withSlot.stash ?? []).map((r) => ({ ...r, drop: null, drops: [] }))
+	};
+	const clearing = (a: WaiverAdvice): WaiverAdvice => ({
+		...a,
+		rows: a.rows.map((r, i) => (i === 0 ? { ...r, clears: '2026-10-21' } : r)),
+		stash: (a.stash ?? []).map((r, i) => (i === 0 ? { ...r, clears: '2026-10-22' } : r))
+	});
+	return { withSlot: clearing(withSlot), noSlot: clearing(noSlot), benchOpen: clearing(benchOpen) };
 }
 
 /** A claim's outcomes as the API words them, for the words built over them: the fixture's three
