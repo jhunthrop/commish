@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeFalse
 import org.junit.Before
 import org.junit.Test
 import java.io.File
@@ -44,6 +45,8 @@ class RecordMockTest {
 
     @Test
     fun everyReferenceIsSmallEnoughToKeep() {
+        // The record job draws the references in this same task, so it checks them on the run after.
+        assumeFalse(System.getProperty("paparazzi.test.record") == "true")
         val folder = File("src/test/snapshots/images")
         val images = requireNotNull(folder.listFiles()) { "no references at ${folder.absolutePath}" }
         assertEquals(REFERENCES, images.count { it.name.contains("_record-") })
