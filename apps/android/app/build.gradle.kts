@@ -71,6 +71,7 @@ kotlin { jvmToolchain(17) }
 dependencies {
     implementation(project(":core"))
     implementation(project(":feature:leaguehome"))
+    implementation(project(":feature:shell"))
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)

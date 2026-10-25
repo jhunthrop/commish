@@ -15,9 +15,13 @@ import app.trycommish.core.SystemClock
 import app.trycommish.core.leaguehome.ApiLeagueReads
 import app.trycommish.core.leaguehome.LeagueHomeViewModel
 import app.trycommish.core.leaguehome.LeagueReads
+import app.trycommish.core.shell.AccountReads
+import app.trycommish.core.shell.ApiAccountReads
+import app.trycommish.core.shell.ShellViewModel
 import app.trycommish.core.signin.ApiPairing
 import app.trycommish.core.signin.SignIn
 import app.trycommish.core.signin.SignInResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -46,6 +50,7 @@ class AppGraph(
     private val cache: Cache = FileCache(context.cacheDir.resolve("answers")) { what, e -> Log.w(TAG, what, e) }
     private val transport = Transport(apiBaseUrl, token = { session.token })
     private val reads: LeagueReads = ApiLeagueReads(transport)
+    private val account: AccountReads = ApiAccountReads(transport)
 
     /** Work that must outlive a screen or a rotation: the sign-in's pairing, once its verifier is spent. */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -72,6 +77,29 @@ class AppGraph(
         }
 
     fun leagueHomeViewModel(): LeagueHomeViewModel = LeagueHomeViewModel(reads, cache, clock, zone, sessionEnd)
+
+    fun shellViewModel(): ShellViewModel = ShellViewModel(account, cache, clock, zone, sessionEnd)
+
+    /** The member signs this phone out: the API forgets its sign-in when it can be reached, and the
+     * phone forgets its token and every kept answer whatever the API said. */
+    fun signOut() {
+        appScope.launch {
+            try {
+                session.deviceId?.let { account.revokeDevice(it) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: Exception,
+            ) {
+                Log.w(TAG, "revoke device", e)
+            } finally {
+                session.signOut()
+                cache.clear()
+                signInMessageState.value = null
+                signedInState.value = false
+            }
+        }
+    }
 
     /** Completes a sign-in from its return link in the app's scope, so a rotation cannot cancel it. */
     fun completeSignIn(link: String) {
