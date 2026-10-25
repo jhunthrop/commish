@@ -6,7 +6,8 @@ import SwiftUI
 /// What the screen's controls do: a row opens the player sheet, a chip chooses.
 struct BoardActions {
     let open: (SheetPlayer) -> Void
-    let format: (BoardFormat) -> Void
+    /// A format chip, by the run's format id ("ppr-12").
+    let format: (String) -> Void
     let position: (BoardPosition?) -> Void
 
     /// Controls that do nothing: a snapshot's.
@@ -15,8 +16,8 @@ struct BoardActions {
     }
 }
 
-/// The board's head (web PageHead at 390): the heading in the number face, and the stamp of a saved
-/// read under it.
+/// The board's head (web PageHead at 390): the heading in the number face, the run's stamp, in season
+/// the weeks the board ranks, and over a saved board why it shows.
 struct BoardHeadView: View {
     @Environment(\.colorScheme) private var colorScheme
     let model: BoardModel
@@ -30,10 +31,21 @@ struct BoardHeadView: View {
                 .textCase(.uppercase)
                 .foregroundStyle(theme.color(Tokens.Color.ink))
                 .accessibilityAddTraits(.isHeader)
+            Text(model.stamp)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
+                .foregroundStyle(theme.color(Tokens.Color.ink3))
+            if let rest = model.restLine {
+                Text(rest)
+                    .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .medium))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(theme.color(Tokens.Color.ink2))
+            }
             if let stamp {
                 Text(stamp)
                     .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
                     .foregroundStyle(theme.color(Tokens.Color.accentText))
+                    .padding(.top, Tokens.Space.s1)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -48,7 +60,10 @@ struct BoardChipsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s2) {
-            ChipRow(chips: model.formats, choose: actions.format, live: live)
+            // A run of one format has no other to choose.
+            if model.formats.count > 1 {
+                ChipRow(chips: model.formats, choose: actions.format, live: live)
+            }
             ChipRow(chips: model.positions, choose: actions.position, live: live)
         }
     }
@@ -81,7 +96,8 @@ struct ChipRow<Value: Hashable & Sendable>: View {
     }
 }
 
-/// The rows: the heads once, each section's rows, a head over the season-long run. `live` draws rows
+/// The rows: the heads once, each section's rows under its tier's band or its head (the season-long
+/// run). `live` draws rows
 /// as they scroll in (the screen, over a whole board); a snapshot draws every row it is given.
 struct BoardTableView: View {
     let columns: BoardColumns
@@ -101,6 +117,9 @@ struct BoardTableView: View {
     private var content: some View {
         BoardHeadRow(columns: columns)
         ForEach(sections) { section in
+            if let band = section.band {
+                TierStripView(band: band)
+            }
             if let head = section.head {
                 BoardSectionHead(title: head)
             }
@@ -163,7 +182,7 @@ public struct BoardScreen: View {
     }
 }
 
-/// The Board with its view model: each format's saved board at once, then the API's; a pull reads
+/// The Board with its view model: each format's saved board at once, then the run's; a pull reads
 /// again; the chips choose through the view model, which holds them while the player sheet is open
 /// and after; a row opens the sheet by his id, and the sheet keeps him when the board reads again
 /// under it; the one verb pinned above the bar opens its page.
@@ -199,7 +218,10 @@ public struct BoardView: View {
             case let .failed(sentence):
                 VStack(spacing: Tokens.Space.s4) {
                     // Another format's board may be saved: its chips stay, so the member can turn back.
-                    ChipRow(chips: BoardModel.formatChips(viewModel.filter.format), choose: actions.format)
+                    ChipRow(
+                        chips: BoardModel.formatChips(viewModel.formats, chosen: viewModel.filter.format),
+                        choose: actions.format
+                    )
                     BasisText(sentence).padding(.horizontal, Tokens.Space.s3)
                     QuietButton(AppWords.Failure.tryAgain) {
                         Task { await viewModel.load() }
