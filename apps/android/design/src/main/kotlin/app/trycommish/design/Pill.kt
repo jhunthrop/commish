@@ -7,6 +7,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /** What a pill says by its colour, always beside its word: plain, you, a gain, a loss. */
@@ -30,16 +32,28 @@ fun Pill(
     PillText(text, ground, ink, modifier)
 }
 
+/** A player's position (and his rank at it, "WR 4"), the web's monochrome pill: the ink on the second
+ * surface, bold, never a colour per position. */
+@Composable
+fun PositionPill(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    val c = CommishTheme.colors
+    PillText(text, c.surface2, c.ink, modifier, Faces.label.copy(fontWeight = FontWeight.Bold))
+}
+
 @Composable
 private fun PillText(
     text: String,
     ground: Color,
     ink: Color,
     modifier: Modifier,
+    style: TextStyle = Faces.label,
 ) {
     Text(
         text = text,
-        style = Faces.label,
+        style = style,
         color = ink,
         maxLines = 1,
         modifier =
