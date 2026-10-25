@@ -126,7 +126,8 @@ export function resultWords(
 }
 
 /** When a call fails before the move could have left: nothing was sent. */
-const NOT_REACHED = 'We could not reach Commish, and nothing was sent. Try again in a moment.';
+export const NOT_REACHED =
+	'We could not reach Commish, and nothing was sent. Try again in a moment.';
 
 /** The panel when a call fails: the API's own sentence for its refusal (an expired or spent
  * token says so in fields), never a raw error. When the move's call fails with no answer at all,

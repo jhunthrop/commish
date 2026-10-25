@@ -11,6 +11,7 @@ import {
 	SHELL_OUTPUT,
 	SITE_PHASES
 } from './export-parity.ts';
+import { LINEUP_OUTPUT } from './lineup-parity.ts';
 
 void test('a file clock reads back as its instant', () => {
 	assert.equal(instantOf('2026-10-18T18-56-00Z'), '2026-10-18T18:56:00.000Z');
@@ -70,4 +71,39 @@ void test("the switch's phase words appear only where the leagues' phases differ
 	const unnamed = shell.cases.find((c) => c.set === 'withUnnamed');
 	assert.equal(unnamed?.names['6f1d1c52-2626-4a26-9a26-000000000099'], 'Your Yahoo league');
 	assert.match(shell.sheetLoading, /read as the page opens\.$/);
+});
+
+void test('the Lineup at every clock: changes offered before kickoff, held once their players kick off', async () => {
+	const lineup = JSON.parse((await generate()).get(LINEUP_OUTPUT) ?? '{}') as {
+		clocks: Record<
+			string,
+			{
+				title: string;
+				starters: { move: string | null; state: string | null }[];
+				pinned: { verb: string | null };
+				basis: string;
+			}
+		>;
+		writes: Record<string, { pinned: { verb: string | null } }>;
+		moves: { host: string; verb: string; results: { outcome: string }[] }[];
+	};
+	assert.deepEqual(Object.keys(lineup.clocks), [...CLOCKS]);
+	const saturday = lineup.clocks['2026-10-17T17-00-00Z'];
+	assert.equal(saturday?.title, 'Three changes');
+	assert.equal(saturday?.pinned.verb, 'Copy the lineup');
+	assert.equal(lineup.writes['2026-10-17T17-00-00Z']?.pinned.verb, 'Make these changes');
+	for (const clock of CLOCKS) {
+		const at = lineup.clocks[clock];
+		assert.ok(
+			at?.starters.every((row) => row.move === null || row.state === 'upcoming'),
+			`${clock}: a move only on a row still to come`
+		);
+		assert.match(at?.basis ?? '', /^Our pick is each slot's highest Proj/, clock);
+	}
+	assert.equal(lineup.clocks['2026-10-18T18-56-00Z']?.pinned.verb, null);
+	assert.equal(lineup.moves.find((m) => m.host === 'espn')?.verb, 'Set it on ESPN');
+	assert.deepEqual(
+		lineup.moves[0]?.results.map((r) => r.outcome),
+		['done', 'refused', 'pending']
+	);
 });

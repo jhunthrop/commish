@@ -1,0 +1,13 @@
+{
+	"projected": "Projected",
+	"points": "Points",
+	"perGame": "A game",
+	"avg": "Avg",
+	"week": "Wk",
+	"restFrom": "from week {week}",
+	"restFromPartial": "from week {week}'s games left",
+	"freeAgentClub": "FA",
+	"freeAgent": "a free agent",
+	"overReplacement": "his points less a free pickup's",
+	"functions": []
+}

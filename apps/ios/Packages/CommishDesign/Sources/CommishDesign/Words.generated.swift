@@ -201,4 +201,104 @@ public enum Words {
         public static let findOnWaivers = "Find him on Waivers"
         public static let none = "--"
     }
+
+    public enum Lineup {
+        public static let make = "Make these changes"
+        public static let copy = "Copy the lineup"
+        public static let set = "Your lineup is set"
+        public static let sit = "Sit"
+        public static let pastWeeks = "Past weeks of our order, on Our record"
+        public static let copied = "Copied."
+        public static let setItOn = "Set it on"
+        public static let copyFailed = "This browser would not copy it."
+        public static let noOneCanPlay = "no one on your roster can play this week"
+        public static let noOneHere = "No one on your roster can play here this week"
+        public static let heldEmpty = "has kicked off, the spot stays empty"
+        public static let swapIn = "in"
+        public static let swapOut = "out"
+    }
+
+    public enum Against {
+        public static let QB = "quarterbacks"
+        public static let RB = "running backs"
+        public static let WR = "receivers"
+        public static let TE = "tight ends"
+        public static let K = "kickers"
+    }
+
+    public enum Move {
+        public static let title = "Your lineup move"
+        public static let claimTitle = "Your claim"
+        public static let notNow = "Not now"
+        public static let done = "Done"
+        public static let notReached = "We could not reach Commish, and nothing was sent. Try again in a moment."
+    }
+
+    public enum InSeason {
+        public static let overRepl = "over repl a week"
+        public static let unranked = "Unranked"
+        public static let noProjection = "No projection"
+        public static let aWeek = "a week"
+        public static let aGame = "a game"
+        public static let all = "All"
+        public static let position = "Position"
+        public static let waiverAdds = "Waiver adds"
+        public static let orderRecord = "How the order has done"
+        public static let notFoundBar = "Page not found"
+        public static let notFound = "Not found"
+        public static let notFoundLine = "Nothing lives at this address."
+        public static let toBoard = "Go to the board"
+        public static let add = "Add"
+        public static let chosen = "Up top"
+        public static let sit = "Sit"
+        public static let bench = "Bench"
+        public static let ourCall = "Our call"
+        public static let reading = "Reading your league"
+        public static let noBench = "Nobody on your bench"
+        public static let tradesHolding = "Trades holding"
+        public static let yourPlayers = "Your players"
+        public static let theirPlayers = "Their players"
+        public static let signInLine = "A league lives on your account. Following one is free."
+        public static let signIn = "Sign in"
+        public static let missingTitle = "This league is not on your account"
+        public static let missingLine = "Paste its link again to follow it."
+        public static let follow = "Follow a league"
+        public static let lastRead = "Your league could not be read just now. The page shows the last read."
+        public static let unreadable = "Your league could not be read just now."
+        public static let leaguesUnread = "Your leagues could not be read just now. We try again in a minute."
+        public static let narrowingUnread = "These could not be read just now. The last read stands."
+    }
+
+    public enum Designation {
+        public static let questionable = "Questionable"
+        public static let doubtful = "Doubtful"
+        public static let out = "Out"
+        public static let injured_reserve = "On injured reserve"
+        public static let suspended = "Suspended"
+        public static let pup = "On the PUP list"
+        public static let nfi = "On the NFI list"
+    }
+
+    public enum DesignationRank {
+        public static let questionable = "Q"
+        public static let doubtful = "D"
+        public static let out = "Out"
+        public static let injured_reserve = "IR"
+        public static let suspended = "Susp"
+        public static let pup = "PUP"
+        public static let nfi = "NFI"
+    }
+
+    public enum Figure {
+        public static let projected = "Projected"
+        public static let points = "Points"
+        public static let perGame = "A game"
+        public static let avg = "Avg"
+        public static let week = "Wk"
+        public static let restFrom = "from week {week}"
+        public static let restFromPartial = "from week {week}'s games left"
+        public static let freeAgentClub = "FA"
+        public static let freeAgent = "a free agent"
+        public static let overReplacement = "his points less a free pickup's"
+    }
 }

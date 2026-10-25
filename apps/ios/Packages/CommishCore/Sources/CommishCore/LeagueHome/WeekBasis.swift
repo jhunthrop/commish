@@ -107,12 +107,18 @@ enum WeekBasis {
         let bugs = facts.bugs
         let scoring = board.projectionScoring
         let started = bugs.contains { $0.state != .upcoming }
-        let bonus = scoring.leagueOwn || cuts.teBonus ? nil : teBonusSentence(scoring.teBonus, host: facts.host)
+        let bonus = scoring.leagueOwn || cuts.teBonus ? nil : BasisParts.teBonusSentence(
+            scoring.teBonus,
+            host: facts.host
+        )
         let when = board.projectionReadAt.map {
             "read \(Formatting.weekdayTime($0, zone: facts.zone)) \(Formatting.zoneWord(facts.zone))"
         } ?? "not in yet for this week"
         let said = [
-            projFinalPhone(started: bugsPlaying(listedOnly(bugs)), missing: bugsMissFinal(lineupSidesOnly(bugs))),
+            BasisParts.projFinalPhone(
+                started: bugsPlaying(listedOnly(bugs)),
+                missing: bugsMissFinal(lineupSidesOnly(bugs))
+            ),
             bugsFinalNone(bugs) ? finalNonePart(platform) : "",
             unlistedPart(platform, drawn: UnlistedDrawn(bugs), form: cuts.unlistedForm),
         ].filter { !$0.isEmpty }.joined(separator: " ")
@@ -120,7 +126,7 @@ enum WeekBasis {
         let extra = bonus.map { " \($0)" } ?? ""
         let final = said.isEmpty ? "" : " \(said)"
         let box = Words.Box.self
-        let whose = scoringWords(scoring, host: facts.host)
+        let whose = BasisParts.scoringWords(scoring, host: facts.host)
         return "A team's \(box.proj) adds its starters' published projections\(whose), \(when)\(asOf).\(extra) "
             + "\(box.pts) are \(platform)'s so far.\(final)"
     }
@@ -152,41 +158,6 @@ enum WeekBasis {
     }
 
     // MARK: the parts (basis.ts)
-
-    private static func scoringWords(
-        _ scoring: Components.Schemas.ProjectionScoring,
-        host: Components.Schemas.LeagueHost
-    ) -> String {
-        let format = ValueWords.format(scoring.format)
-        if scoring.leagueOwn {
-            return " on your rules"
-        }
-        guard scoring.teBonus != nil else {
-            return ", \(format) nearest your rules"
-        }
-        return ", \(format) shown, nearest \(rulesOwner(host))'s rules"
-    }
-
-    private static func teBonusSentence(_ bonus: Double?, host: Components.Schemas.LeagueHost) -> String? {
-        let owner = sentenceStart(rulesOwner(host))
-        return bonus.map { "\(owner) adds \(Formatting.number($0)) a catch for TEs." }
-    }
-
-    /// names.ts rulesOwner: FFPC fixes its own rules; on any other platform the league's commissioner does.
-    private static func rulesOwner(_ host: Components.Schemas.LeagueHost) -> String {
-        host.value1 == .ffpc ? ValueWords.platform(host) : "your league"
-    }
-
-    private static func sentenceStart(_ words: String) -> String {
-        words.prefix(1).uppercased() + words.dropFirst()
-    }
-
-    private static func projFinalPhone(started: Bool, missing: Bool) -> String {
-        guard started else {
-            return ""
-        }
-        return missing ? Words.Basis.noProjFinalPart : Words.Basis.projFinalPart
-    }
 
     private static func finalNonePart(_ platform: String) -> String {
         "A \(Words.Box.final) of \(Words.Box.none) is a score \(platform) does not send us."

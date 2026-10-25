@@ -1,0 +1,10 @@
+{
+	"questionable": "Questionable",
+	"doubtful": "Doubtful",
+	"out": "Out",
+	"injured_reserve": "On injured reserve",
+	"suspended": "Suspended",
+	"pup": "On the PUP list",
+	"nfi": "On the NFI list",
+	"functions": []
+}

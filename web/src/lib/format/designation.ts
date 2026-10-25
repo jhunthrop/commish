@@ -6,7 +6,7 @@ import { memberZone, monthDay, shortDay, stampAt, weekdayTime } from './clock.ts
 
 export type DesignationStatus = components['schemas']['DesignationStatus'];
 
-const DESIGNATION_WORDS: Readonly<Record<DesignationStatus, string>> = {
+export const DESIGNATION_WORDS: Readonly<Record<DesignationStatus, string>> = {
 	questionable: 'Questionable',
 	doubtful: 'Doubtful',
 	out: 'Out',
@@ -17,7 +17,7 @@ const DESIGNATION_WORDS: Readonly<Record<DesignationStatus, string>> = {
 };
 
 /** The status as the rank cell prints it for a player on a season-long list: "IR". */
-const RANK_WORDS: Readonly<Record<DesignationStatus, string>> = {
+export const RANK_WORDS: Readonly<Record<DesignationStatus, string>> = {
 	questionable: 'Q',
 	doubtful: 'D',
 	out: 'Out',

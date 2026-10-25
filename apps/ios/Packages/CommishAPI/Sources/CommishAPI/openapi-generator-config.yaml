@@ -15,3 +15,6 @@ filter:
     - pairDevice
     - getMe
     - selectLeague
+    - leagueLineup
+    - planHostMove
+    - makeHostMove

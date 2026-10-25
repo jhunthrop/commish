@@ -50,6 +50,15 @@ public enum AppWords {
         public static let tryAgain = "Try again"
     }
 
+    /// The Start screen's own words, where the web has no such state.
+    public enum Start {
+        /// Under the verb, disabled, while the lineup shown is a saved read: a lineup set from it may
+        /// not be the platform's now, so the phone reads it again first.
+        public static func stale(_ stamp: String) -> String {
+            "\(stamp). Pull down to read your lineup again before you set it."
+        }
+    }
+
     /// The league the app opens until the Leagues screen lets the member pick one.
     public enum LeagueList {
         public static let none = "Follow a league on trycommish.app and it shows here."
