@@ -68,10 +68,13 @@ type Socket struct {
 	// Devices re-reads the device token of a socket an app opened, at
 	// every ping, so a revoked or lapsed token closes it.
 	Devices DeviceSessions
-	// PingEvery is the heartbeat, pingEvery when zero.
-	PingEvery time.Duration
-	Now       func() time.Time
-	Log       *slog.Logger
+	// Heartbeat starts a socket's heartbeat: its ticks and their stop. Nil
+	// is a ticker every pingEvery; the tests tick by hand.
+	Heartbeat func() (ticks <-chan time.Time, stop func())
+	// PingWait is how long a ping waits for its pong, pingTimeout when zero.
+	PingWait time.Duration
+	Now      func() time.Time
+	Log      *slog.Logger
 
 	presence presence
 	limits   seatLimits
@@ -271,12 +274,11 @@ func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, acco
 	commands := make(chan apitypes.RoomCommand)
 	readErr := make(chan error, 1)
 	go func() { readErr <- readCommands(ctx, conn, commands) }()
-	every := s.PingEvery
-	if every <= 0 {
-		every = pingEvery
-	}
-	ticker := time.NewTicker(every)
-	defer ticker.Stop()
+	ticks, stopTicks := s.heartbeat()
+	defer stopTicks()
+	// At most one ping is out at a time, and its result comes back here.
+	pings := make(chan error, 1)
+	pinging := false
 	// Drops are this socket's own: one socket abusing the seat's budget is
 	// closed, the seat's other tabs stay.
 	dropped := 0
@@ -301,27 +303,65 @@ func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, acco
 			if sent, err = s.catchUp(ctx, conn, roomID, seat, sent); err != nil {
 				return err
 			}
-		case <-ticker.C:
-			pingCtx, cancel := context.WithTimeout(ctx, pingTimeout)
-			err := conn.Ping(pingCtx)
-			cancel()
+		case <-ticks:
+			// The pong is read by readCommands, so the ping waits off the
+			// loop: a command arriving meanwhile is taken at once instead of
+			// parking the reader with the pong behind it (B192). A tick while
+			// a ping is still out is skipped; that ping's own wait ends it.
+			if !pinging {
+				pinging = true
+				go s.ping(ctx, conn, pings)
+			}
+		case err := <-pings:
+			pinging = false
 			if err != nil {
 				return err
 			}
-			if closed, err := s.stillSignedIn(ctx, conn, signedIn); closed || err != nil {
-				return err
-			}
-			// The seat is present while a socket pings (see lobby.Seat).
-			if err := s.Lobby.Touch(ctx, roomID, account); err != nil {
-				return err
-			}
-			// A notification lost while the hub was reconnecting is caught
-			// up here, at the latest one ping later.
-			if sent, err = s.catchUp(ctx, conn, roomID, seat, sent); err != nil {
+			var done bool
+			if sent, done, err = s.beat(ctx, conn, roomID, account, seat, sent, signedIn); done {
 				return err
 			}
 		}
 	}
+}
+
+// heartbeat is the socket's ticks: the injected heartbeat, or a ticker.
+func (s *Socket) heartbeat() (<-chan time.Time, func()) {
+	if s.Heartbeat != nil {
+		return s.Heartbeat()
+	}
+	t := time.NewTicker(pingEvery)
+	return t.C, t.Stop
+}
+
+// ping sends one ping and reports its pong, or its failure, on result,
+// which holds one: it never blocks, and it returns within the wait or as
+// soon as the socket closes.
+func (s *Socket) ping(ctx context.Context, conn *websocket.Conn, result chan<- error) {
+	wait := s.PingWait
+	if wait <= 0 {
+		wait = pingTimeout
+	}
+	pingCtx, cancel := context.WithTimeout(ctx, wait)
+	defer cancel()
+	result <- conn.Ping(pingCtx)
+}
+
+// beat is a heartbeat's work once its pong is back: an app socket's token
+// re-read, the seat marked present, the rows a lost notification left
+// behind caught up. done reports that the socket ends here.
+func (s *Socket) beat(ctx context.Context, conn *websocket.Conn, roomID, account uuid.UUID, seat int, sent int64, signedIn func(context.Context) error) (int64, bool, error) {
+	if closed, err := s.stillSignedIn(ctx, conn, signedIn); closed || err != nil {
+		return sent, true, err
+	}
+	// The seat is present while a socket pings (see lobby.Seat).
+	if err := s.Lobby.Touch(ctx, roomID, account); err != nil {
+		return sent, true, err
+	}
+	// A notification lost while the hub was reconnecting is caught up
+	// here, at the latest one ping later.
+	sent, err := s.catchUp(ctx, conn, roomID, seat, sent)
+	return sent, err != nil, err
 }
 
 // stillSignedIn re-reads an app socket's device token: a revoked or

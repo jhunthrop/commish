@@ -29,9 +29,9 @@ import (
 
 const socketTestPassword = "a-room-socket-test-cookie-password-32+"
 
-// testPing is the heartbeat in these tests, so a revocation is read
-// within a few milliseconds instead of ten seconds.
-const testPing = 40 * time.Millisecond
+// testPingWait bounds a ping's wait for its pong in these tests; the
+// heartbeat itself is ticked by hand (roomHarness.tick).
+const testPingWait = 2 * time.Second
 
 func socketNow() time.Time { return time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC) }
 
@@ -47,6 +47,7 @@ type roomHarness struct {
 	sessions *auth.Sessions
 	accounts *auth.Store
 	room     uuid.UUID
+	ticks    chan time.Time
 	alice    auth.Account
 	bob      auth.Account
 }
@@ -81,14 +82,17 @@ func newRoomHarness(t *testing.T) roomHarness {
 	if err != nil {
 		t.Fatal(err)
 	}
-	socket := &rooms.Socket{Lobby: store, Hub: &rooms.Hub{Log: quietLog()}, Devices: bearer, PingEvery: testPing, Now: socketNow, Log: quietLog()}
+	ticks := make(chan time.Time)
+	heartbeat := func() (<-chan time.Time, func()) { return ticks, func() {} }
+	socket := &rooms.Socket{Lobby: store, Hub: &rooms.Hub{Log: quietLog()}, Devices: bearer,
+		Heartbeat: heartbeat, PingWait: testPingWait, Now: socketNow, Log: quietLog()}
 	mux := http.NewServeMux()
 	if err := server.Mount(mux, socket.Routes(), sessions, bearer, socketNow); err != nil {
 		t.Fatal(err)
 	}
 	srv := httptest.NewServer(httpx.RequestID()(mux))
 	t.Cleanup(srv.Close)
-	return roomHarness{t: t, pool: pool, srv: srv, bearer: bearer, sessions: sessions, accounts: accounts, room: room, alice: alice, bob: bob}
+	return roomHarness{t: t, pool: pool, srv: srv, bearer: bearer, sessions: sessions, accounts: accounts, room: room, ticks: ticks, alice: alice, bob: bob}
 }
 
 // pair inserts a device for the account with kind's scopes, created at
@@ -106,6 +110,45 @@ func (h roomHarness) pair(account uuid.UUID, kind auth.DeviceKind, created time.
 		h.t.Fatal(err)
 	}
 	return token, id
+}
+
+// tick is one heartbeat, taken by the open socket's loop.
+func (h roomHarness) tick() {
+	h.t.Helper()
+	select {
+	case h.ticks <- socketNow():
+	case <-time.After(5 * time.Second):
+		h.t.Fatal("no socket took the tick")
+	}
+}
+
+// command sends one command without reading.
+func (h roomHarness) command(conn *websocket.Conn, cmd any) {
+	h.t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := wsjson.Write(ctx, conn, cmd); err != nil {
+		h.t.Fatalf("send: %v", err)
+	}
+}
+
+// queueCommand is a queue edit; in a room still filling it is answered
+// with the room's refusal, one error frame per command.
+func queueCommand() apitypes.RoomCommand {
+	ids := []string{"9509"}
+	return apitypes.RoomCommand{Type: apitypes.RoomCommandTypeQueue, PlayerIds: &ids}
+}
+
+// answer reads the next frame as an error frame.
+func (h roomHarness) answer(conn *websocket.Conn) apitypes.RoomError {
+	h.t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var frame apitypes.RoomError
+	if err := wsjson.Read(ctx, conn, &frame); err != nil {
+		h.t.Fatalf("no frame: %v", err)
+	}
+	return frame
 }
 
 func (h roomHarness) revoke(id uuid.UUID) {
@@ -256,6 +299,7 @@ func TestRevokedTokenClosesItsSocket(t *testing.T) {
 	}
 	h.welcome(conn)
 	h.revoke(id)
+	h.tick()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var frame apitypes.RoomError
@@ -273,8 +317,8 @@ func TestRevokedTokenClosesItsSocket(t *testing.T) {
 }
 
 // A cookie's socket is not re-read by the device check: across several
-// pings nothing is sent to it and it is not closed. The client answers
-// pings only while it reads, so it reads until its own deadline.
+// heartbeats nothing is sent to it and it stays open, each sentinel
+// command's answer the first frame after its tick.
 func TestCookieSocketIsNotDeviceChecked(t *testing.T) {
 	h := newRoomHarness(t)
 	conn, status := h.dial("", "", h.signIn(h.alice.ID))
@@ -282,10 +326,42 @@ func TestCookieSocketIsNotDeviceChecked(t *testing.T) {
 		t.Fatalf("refused: %d", status)
 	}
 	h.welcome(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 6*testPing)
-	defer cancel()
-	_, _, err := conn.Read(ctx)
-	if ctx.Err() == nil || websocket.CloseStatus(err) != -1 {
-		t.Fatalf("a cookie's socket was sent something or closed: %v", err)
+	for i := 0; i < 3; i++ {
+		h.tick()
+		h.command(conn, queueCommand())
+		if frame := h.answer(conn); frame.Code != httpx.CodeConflict {
+			t.Fatalf("beat %d: the first frame was not the command's answer: %+v", i, frame)
+		}
+	}
+}
+
+// A ping out does not stall the commands behind it (B192): commands sent
+// while each ping waits for its pong are all answered, in order, and the
+// socket stays open. Before the fix the reader parked on the first
+// command, the pong behind it went unread and the socket dropped.
+func TestCommandsWhileAPingIsOut(t *testing.T) {
+	h := newRoomHarness(t)
+	token, _ := h.pair(h.alice.ID, auth.KindIOS, socketNow())
+	conn, status := h.dial("", token, nil)
+	if status != http.StatusSwitchingProtocols {
+		t.Fatalf("refused: %d", status)
+	}
+	h.welcome(conn)
+	const commands = 9 // with the last, the queue budget's burst of 10
+	for i := 0; i < commands; i++ {
+		// The client does not read until the end, so the first ping's pong
+		// stays unread the whole time: every command arrives with a ping out.
+		h.tick()
+		h.command(conn, queueCommand())
+	}
+	for i := 0; i < commands; i++ {
+		if frame := h.answer(conn); frame.Type != apitypes.RoomErrorTypeError || frame.Code != httpx.CodeConflict {
+			t.Fatalf("command %d: %+v", i, frame)
+		}
+	}
+	h.tick()
+	h.command(conn, queueCommand())
+	if frame := h.answer(conn); frame.Code != httpx.CodeConflict {
+		t.Fatalf("the socket after the pings: %+v", frame)
 	}
 }
