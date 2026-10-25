@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import app.trycommish.api.Transport
+import app.trycommish.core.AppWords
 import app.trycommish.core.Cache
 import app.trycommish.core.Clock
 import app.trycommish.core.EncryptedSession
@@ -13,7 +14,6 @@ import app.trycommish.core.SessionEnd
 import app.trycommish.core.SystemClock
 import app.trycommish.core.leaguehome.ApiLeagueReads
 import app.trycommish.core.leaguehome.LeagueHomeViewModel
-import app.trycommish.core.leaguehome.LeagueHomeWords
 import app.trycommish.core.leaguehome.LeagueReads
 import app.trycommish.core.signin.ApiPairing
 import app.trycommish.core.signin.SignIn
@@ -67,7 +67,7 @@ class AppGraph(
         SessionEnd {
             session.signOut()
             cache.clear()
-            signInMessageState.value = LeagueHomeWords.signedOut
+            signInMessageState.value = AppWords.signedOut
             signedInState.value = false
         }
 

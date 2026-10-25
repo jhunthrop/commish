@@ -22,7 +22,7 @@ import app.trycommish.api.models.GameState as SideScheduleState
 private const val MINUTE_SECONDS = 60L
 
 /** A team the league's read does not name: "Team 7". */
-internal fun teamFallback(rosterId: Int): String = LeagueHomeWords.fill(LeagueHomeWords.teamFallback, "id" to rosterId.toString())
+internal fun teamFallback(rosterId: Int): String = "Team $rosterId"
 
 private const val HOUR_SECONDS = 3600L
 
@@ -89,10 +89,10 @@ private fun sideFigures(
     final: Boolean,
     headFinal: Boolean,
 ): Pair<String, String> {
-    val proj = side.projection?.let { Format.fixed(it) } ?: LeagueHomeWords.none
+    val proj = side.projection?.let { Format.fixed(it) } ?: Words.Box.none
     if (state == GameState.Upcoming) return "" to proj
-    val pts = if (side.pointsRead) Format.fixed(side.points) else LeagueHomeWords.none
-    if (!final) return (side.projectedFinal?.let { Format.fixed(it) } ?: LeagueHomeWords.none) to pts
+    val pts = if (side.pointsRead) Format.fixed(side.points) else Words.Box.none
+    if (!final) return (side.projectedFinal?.let { Format.fixed(it) } ?: Words.Box.none) to pts
     return (if (headFinal) pts else "${Words.LeagueHome.final} $pts") to pts
 }
 
@@ -110,7 +110,7 @@ private fun headWords(
 ): Pair<String, String> =
     when (head.state) {
         GameState.Final -> Words.LeagueHome.final to ""
-        GameState.KickedOff -> LeagueHomeWords.kickedOff to readCell
+        GameState.KickedOff -> Words.Box.kickedOff to readCell
         GameState.Upcoming ->
             head.next?.let { Format.weekdayTime(it, zone) to Words.LeagueHome.nextKickoff } ?: ("" to "")
     }
@@ -124,16 +124,16 @@ internal fun gameBugs(
 ): List<GameBug> {
     val teams = sync.teams.associateBy { it.rosterId }
     val seconds = Duration.between(Instant.parse(board.readAt), now).seconds.coerceAtLeast(0)
-    val readCell = "${LeagueHomeWords.platform(sync.host)} ${agoCell(seconds)}"
+    val readCell = "${ValueWords.platform(sync.host)} ${agoCell(seconds)}"
     return board.games.mapIndexed { i, game ->
         val head = gameHead(game.state, game.nextKickoff, now)
         val finals = game.sides.map { sideFinal(it, head.state) }
         val allFinal = finals.isNotEmpty() && finals.all { it }
         val (smallHead, bigHead) =
             when {
-                head.state == GameState.Upcoming -> "" to LeagueHomeWords.proj
-                allFinal -> Words.LeagueHome.final to LeagueHomeWords.pts
-                else -> LeagueHomeWords.projFinal to LeagueHomeWords.pts
+                head.state == GameState.Upcoming -> "" to Words.Box.proj
+                allFinal -> Words.LeagueHome.final to Words.Box.pts
+                else -> Words.Box.projFinal to Words.Box.pts
             }
         val (title, words) = headWords(head, readCell, zone)
         GameBug(

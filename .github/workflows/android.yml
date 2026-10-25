@@ -51,7 +51,7 @@ jobs:
       run:
         working-directory: apps/android
     # The Play key and the upload keystore are never in the job's environment: one step says whether
-    # they exist, and only the upload step reads them.
+    # they exist, Fastlane installs with neither, and only the upload step reads them.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -89,6 +89,12 @@ jobs:
         if: github.ref == 'refs/heads/main' && steps.play.outputs.has_key == 'true'
         with: { ruby-version: "3.3" }
 
+      # Fastlane installed in a step of its own, with no secret in its environment (B150): a gem's
+      # install hooks never see the Play key or the keystore.
+      - name: Install Fastlane
+        if: github.ref == 'refs/heads/main' && steps.play.outputs.has_key == 'true'
+        run: gem install fastlane --no-document
+
       - name: Upload to Play internal
         if: github.ref == 'refs/heads/main' && steps.play.outputs.has_key == 'true'
         env:
@@ -101,5 +107,4 @@ jobs:
         run: |
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
           export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/upload.jks"
-          gem install fastlane --no-document
           fastlane internal

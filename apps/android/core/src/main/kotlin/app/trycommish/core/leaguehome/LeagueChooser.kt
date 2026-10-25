@@ -4,6 +4,7 @@ import app.trycommish.api.Unauthorized
 import app.trycommish.api.decodeEnvelope
 import app.trycommish.api.models.AttachedLeague
 import app.trycommish.api.models.LeaguePhase
+import app.trycommish.core.AppWords
 import app.trycommish.core.Cache
 import app.trycommish.core.Cached
 import app.trycommish.core.Clock
@@ -38,9 +39,9 @@ sealed interface LeagueChoice {
     fun message(): String? =
         when (this) {
             is Chosen -> null
-            NoLeague -> LeagueHomeWords.noLeague
-            Unreachable -> LeagueHomeWords.cannotLoad
-            SignedOut -> LeagueHomeWords.signedOut
+            NoLeague -> AppWords.noLeague
+            Unreachable -> AppWords.cannotLoad
+            SignedOut -> AppWords.signedOut
         }
 }
 

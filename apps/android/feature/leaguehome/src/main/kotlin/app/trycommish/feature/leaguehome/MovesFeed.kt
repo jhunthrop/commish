@@ -13,8 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.trycommish.core.AppWords
 import app.trycommish.core.leaguehome.FeedPlayer
-import app.trycommish.core.leaguehome.LeagueHomeWords
 import app.trycommish.core.leaguehome.MoveRow
 import app.trycommish.core.leaguehome.MovesFeed
 import app.trycommish.design.CommishTheme
@@ -54,7 +54,7 @@ private fun Move(row: MoveRow) {
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp)) {
-            Pill(row.kind, if (row.kind == LeagueHomeWords.trade) PillTone.Accent else PillTone.Plain)
+            Pill(row.kind, if (row.kind == Words.MoveKind.trade) PillTone.Accent else PillTone.Plain)
             Text(
                 row.teams.joinToString(", "),
                 style = Faces.body,
@@ -65,7 +65,7 @@ private fun Move(row: MoveRow) {
             )
             Text(row.whenText, style = Faces.small, color = c.ink3)
         }
-        row.adds.forEach { Player(it, into = if (row.kind == LeagueHomeWords.trade) null else true) }
+        row.adds.forEach { Player(it, into = if (row.kind == Words.MoveKind.trade) null else true) }
         row.drops.forEach { Player(it, into = false) }
         if (row.detail.isNotEmpty()) Text(row.detail, style = Faces.small, color = c.ink2)
     }
@@ -83,7 +83,7 @@ private fun Player(
         Text("${player.club} ${player.position}", style = Faces.small, color = c.ink3)
         player.to?.let {
             Text(
-                "${LeagueHomeWords.to} $it",
+                "${AppWords.to} $it",
                 style = Faces.small,
                 color = c.ink2,
                 maxLines = 1,

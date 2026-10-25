@@ -3,7 +3,6 @@ package app.trycommish.feature.leaguehome
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
-import app.trycommish.core.leaguehome.LeagueHomeWords
 import app.trycommish.core.leaguehome.Standings
 import app.trycommish.core.leaguehome.StandingsRow
 import app.trycommish.design.Basis
@@ -42,7 +41,7 @@ private fun columns(
         StandingsColumn(BoxColumn(words.record, RECORD_W)) { it.record },
         StandingsColumn(BoxColumn(words.pointsFor, POINTS_W)) { it.pointsFor },
         StandingsColumn(BoxColumn(words.pointsAgainst, POINTS_W)) { it.pointsAgainst }.takeUnless { compact },
-        StandingsColumn(BoxColumn(LeagueHomeWords.proj, PROJ_W)) { it.proj }.takeIf { standings.projected },
+        StandingsColumn(BoxColumn(Words.Box.proj, PROJ_W)) { it.proj }.takeIf { standings.projected },
         standings.waiverHead?.let { head -> StandingsColumn(BoxColumn(head, WAIVER_W)) { it.waiver } }?.takeUnless { compact },
     )
 }

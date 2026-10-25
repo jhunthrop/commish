@@ -130,7 +130,7 @@ fun leagueHomeModel(
     LeagueHomeModel(
         leagueId = sync.id.toString(),
         name = sync.name,
-        platform = LeagueHomeWords.platform(sync.host),
+        platform = ValueWords.platform(sync.host),
         week = "${Words.LeagueHome.week} ${board?.week ?: sync.week}",
         games = board?.let { gameBugs(it, sync, now, zone) }.orEmpty(),
         standings = standings(sync, board, now),

@@ -6,6 +6,7 @@ import app.trycommish.api.Unauthorized
 import app.trycommish.api.decodeEnvelope
 import app.trycommish.api.models.LeagueSync
 import app.trycommish.api.models.Scoreboard
+import app.trycommish.core.AppWords
 import app.trycommish.core.Cache
 import app.trycommish.core.Cached
 import app.trycommish.core.Clock
@@ -97,9 +98,9 @@ class LeagueHomeViewModel(
         when (fresh) {
             is LeagueChoice.Chosen -> loadLeague(fresh.leagueId, keptShown = fresh == kept)
             LeagueChoice.SignedOut -> signOut()
-            LeagueChoice.NoLeague -> mutableState.value = LeagueHomeState.Failed(LeagueHomeWords.noLeague)
+            LeagueChoice.NoLeague -> mutableState.value = LeagueHomeState.Failed(AppWords.noLeague)
             LeagueChoice.Unreachable ->
-                if (kept is LeagueChoice.Chosen) markStale() else mutableState.value = LeagueHomeState.Failed(LeagueHomeWords.cannotLoad)
+                if (kept is LeagueChoice.Chosen) markStale() else mutableState.value = LeagueHomeState.Failed(AppWords.cannotLoad)
         }
     }
 
@@ -124,7 +125,7 @@ class LeagueHomeViewModel(
     /** The refresh failed: the kept page stays, marked stale; with none, the sentence. */
     private fun markStale() {
         mutableState.value = (mutableState.value as? LeagueHomeState.Loaded)?.copy(stale = true)
-            ?: LeagueHomeState.Failed(LeagueHomeWords.cannotLoad)
+            ?: LeagueHomeState.Failed(AppWords.cannotLoad)
     }
 
     private fun signOut() {

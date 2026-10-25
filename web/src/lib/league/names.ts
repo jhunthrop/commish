@@ -6,7 +6,7 @@ type Schemas = components['schemas'];
 type LeagueHost = Schemas['LeagueHost'];
 type ScoringPreset = Schemas['ScoringPreset'];
 
-const HOST_WORDS: Readonly<Record<LeagueHost, string>> = {
+export const HOST_WORDS: Readonly<Record<LeagueHost, string>> = {
 	sleeper: 'Sleeper',
 	mfl: 'MyFantasyLeague',
 	ffpc: 'FFPC',

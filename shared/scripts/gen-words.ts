@@ -13,26 +13,97 @@ import { join } from 'node:path';
 export type WordTable = Readonly<Record<string, unknown>>;
 
 export interface NamedTable {
-	/** The screen's name, the enum and object the apps read it from (`LeagueHome`). */
+	/** The table's name, the enum and object the apps read it from (`LeagueHome`, `Box`). */
 	name: string;
 	table: WordTable;
 }
 
-/** One table the generator reads: its module, its export and the JSON it writes. */
+/** What a table takes from its module: an exported table whole (`'BOX'`), or one exported string
+ * under the key the apps read it by (`['drop', 'DROP_WORD']`), for words the web keeps beside its
+ * functions rather than in a table. */
+export type Pick = string | readonly [key: string, exportName: string];
+
+/** One table the generator writes: its module, what it takes from it and the JSON it writes. */
 interface TableSource {
 	name: string;
 	module: string;
-	exportName: string;
+	picks: readonly Pick[];
 	json: string;
 }
 
 const SCRIPT = 'shared/scripts/gen-words.ts';
+const HOME_MODULE = 'web/src/lib/league/home/home.ts';
+const BOX_MODULE = 'web/src/lib/league/box/box.ts';
+const BASIS_MODULE = 'web/src/lib/league/box/basis.ts';
+
+/** Every table the apps print from, the League home's first, then the box score's: its heads, the
+ * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
+ * tiebreak and waiver order, the platforms' names. */
 export const TABLES: readonly TableSource[] = [
+	{ name: 'LeagueHome', module: HOME_MODULE, picks: ['HOME'], json: 'shared/words/league-home.json' },
+	{ name: 'Box', module: BOX_MODULE, picks: ['BOX'], json: 'shared/words/league-box.json' },
 	{
-		name: 'LeagueHome',
-		module: 'web/src/lib/league/home/home.ts',
-		exportName: 'HOME',
-		json: 'shared/words/league-home.json'
+		name: 'BoxFormat',
+		module: BOX_MODULE,
+		picks: ['FORMAT_WORDS'],
+		json: 'shared/words/league-box-format.json'
+	},
+	{
+		name: 'Basis',
+		module: BASIS_MODULE,
+		picks: [
+			['asOfKickoff', 'AS_OF_KICKOFF'],
+			['projFinalPart', 'PROJ_FINAL_PART'],
+			['noProjFinalPart', 'NO_PROJ_FINAL_PART'],
+			['paceClause', 'PACE_CLAUSE'],
+			['paceClauseShort', 'PACE_CLAUSE_SHORT'],
+			['oppPart', 'OPP_PART'],
+			['rankOppPart', 'RANK_OPP_PART'],
+			['rankPart', 'RANK_PART'],
+			['pickPart', 'PICK_PART'],
+			['rankOppPhone', 'RANK_OPP_PHONE'],
+			['oppPhone', 'OPP_PHONE'],
+			['statsByWednesday', 'STATS_BY_WEDNESDAY'],
+			['kickedOffPart', 'KICKED_OFF_PART'],
+			['forRostered', 'FOR_ROSTERED']
+		],
+		json: 'shared/words/league-basis.json'
+	},
+	{
+		name: 'BestLineupFrom',
+		module: BASIS_MODULE,
+		picks: ['BEST_LINEUP_FROM'],
+		json: 'shared/words/league-best-lineup-from.json'
+	},
+	{
+		name: 'Kickoff',
+		module: 'web/src/lib/league/box/kickoff.ts',
+		picks: ['KICKOFF'],
+		json: 'shared/words/league-kickoff.json'
+	},
+	{
+		name: 'MoveKind',
+		module: HOME_MODULE,
+		picks: ['KIND_WORDS', ['drop', 'DROP_WORD']],
+		json: 'shared/words/league-move-kind.json'
+	},
+	{
+		name: 'Tiebreak',
+		module: HOME_MODULE,
+		picks: ['TIEBREAK_WORDS'],
+		json: 'shared/words/league-tiebreak.json'
+	},
+	{
+		name: 'WaiverOrder',
+		module: HOME_MODULE,
+		picks: ['WAIVER_ORDER_WORDS'],
+		json: 'shared/words/league-waiver-order.json'
+	},
+	{
+		name: 'Platform',
+		module: 'web/src/lib/league/names.ts',
+		picks: ['HOST_WORDS'],
+		json: 'shared/words/league-platform.json'
 	}
 ];
 export const OUTPUT = {
@@ -110,8 +181,8 @@ export function renderWords(tables: readonly NamedTable[]): { swift: string; kot
 		swift: `// ${generatedBy(SCRIPT, source)}
 // swiftlint:disable all
 
-/// The web's words, one enum per screen. A word built from data is a function on the web and is
-/// listed under \`functions\` in shared/words, not here.
+/// The web's words, one enum per web word table. A word built from data is a function on the web, is
+/// listed under \`functions\` in shared/words, not here, and is a function in the app too.
 public enum Words {
 ${swift}
 }
@@ -121,8 +192,8 @@ ${swift}
 
 package app.trycommish.design
 
-/** The web's words, one object per screen. A word built from data is a function on the web and is
- * listed under \`functions\` in shared/words, not here. */
+/** The web's words, one object per web word table. A word built from data is a function on the web, is
+ * listed under \`functions\` in shared/words, not here, and is a function in the app too. */
 object Words {
 ${kotlin}
 }
@@ -130,12 +201,34 @@ ${kotlin}
 	};
 }
 
+/** One table from a module's exports by its picks, or an error naming the export that is missing,
+ * not the kind its pick says, or a key given twice. */
+export function gather(
+	module: Readonly<Record<string, unknown>>,
+	picks: readonly Pick[],
+	where: string
+): WordTable {
+	const entries = picks.flatMap((pick): [string, unknown][] => {
+		const exportName = typeof pick === 'string' ? pick : pick[1];
+		if (!(exportName in module)) throw new Error(`${where} exports no ${exportName}.`);
+		const value = module[exportName];
+		if (typeof pick !== 'string') {
+			if (typeof value !== 'string')
+				throw new Error(`${where} ${exportName} is a ${typeof value}, not a string.`);
+			return [[pick[0], value]];
+		}
+		if (typeof value !== 'object' || value === null)
+			throw new Error(`${where} ${exportName} is a ${typeof value}, not a table.`);
+		return Object.entries(value);
+	});
+	const twice = entries.find(([key], i) => entries.findIndex(([other]) => other === key) !== i);
+	if (twice !== undefined) throw new Error(`${where} gives ${twice[0]} twice.`);
+	return Object.fromEntries(entries);
+}
+
 async function readTable(source: TableSource): Promise<NamedTable> {
 	const module = (await import(join(REPOSITORY, source.module))) as Record<string, unknown>;
-	const table = module[source.exportName];
-	if (typeof table !== 'object' || table === null)
-		throw new Error(`${source.module} exports no ${source.exportName} table.`);
-	return { name: source.name, table: table as WordTable };
+	return { name: source.name, table: gather(module, source.picks, source.module) };
 }
 
 export async function generate(): Promise<Outputs> {

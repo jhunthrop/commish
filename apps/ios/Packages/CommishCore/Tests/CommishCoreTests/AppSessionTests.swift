@@ -79,6 +79,23 @@ struct AppSessionTests {
         #expect(await store.token() == nil)
         #expect(await account.revoked == ["d-9"])
     }
+
+    @Test func anExpiredSignInForgetsTheSavedHome() async throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("commish-session-tests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let cache = FileCache(folder: folder)
+        let route = "/leagues/attached/\(Fixtures.league)/home"
+        await cache.write("saved home", route: route, stamp: Date(timeIntervalSince1970: 1_760_000_000))
+        let store = MemorySessionStore()
+        try await store.save(token: "t", deviceID: "d")
+        let session = AppSession(account: StubAccount(), store: store, cache: cache, defaults: Self.defaults())
+        #expect(await cache.read(String.self, route: route) != nil)
+        await session.expire()
+        #expect(await cache.read(String.self, route: route) == nil)
+        #expect(await store.token() == nil)
+        #expect(session.state == .signedOut)
+    }
 }
 
 actor StubAccount: AccountAPI {

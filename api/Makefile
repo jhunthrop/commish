@@ -53,8 +53,12 @@ gen-types: web-deps
 # tracked at all (git diff alone would pass an untracked file). Then the
 # shared sources' generated files (shared/scripts/check-gen.ts, Lane 171):
 # the design tokens and the words for the web and the apps, and the
-# fixtures, each regenerated into a temp dir and compared byte for byte.
+# fixtures, each regenerated into a temp dir and compared byte for byte
+# (the iOS client's spec, apps/ios/scripts/gen-openapi.ts, among them).
+# Last the Android shell from the web (the mark, the window colours, the
+# phone bar and its glyphs), apps/android/scripts/web-shell.ts --check.
 SHARED_CHECK := ../shared/scripts/check-gen.ts
+ANDROID_SHELL_CHECK := ../apps/android/scripts/web-shell.ts
 
 check-gen: gen
 	@git ls-files --error-unmatch $(WEB_DIR)/$(WEB_TYPES) >/dev/null
@@ -62,6 +66,7 @@ check-gen: gen
 	  if [ -n "$$out" ]; then echo "generated types differ from openapi.yaml:"; echo "$$out"; \
 	  git diff -- $(GO_TYPES) $(WEB_DIR)/$(WEB_TYPES) | head -40; exit 1; fi
 	node $(SHARED_CHECK)
+	node $(ANDROID_SHELL_CHECK) --check
 
 image:
 	docker build --build-arg VERSION=$(VERSION) -t commish-api:local .

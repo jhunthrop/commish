@@ -1,6 +1,6 @@
 package app.trycommish.android
 
-import app.trycommish.core.leaguehome.LeagueHomeWords
+import app.trycommish.core.AppWords
 import app.trycommish.core.signin.SignInWords
 import app.trycommish.design.Rail
 import app.trycommish.design.Words
@@ -18,7 +18,8 @@ import java.lang.reflect.Modifier
 /**
  * The app's copy guard, the web's (web/src/lib/format/copy-guard.ts) over the same list
  * (shared/words/banned-words.json): no betting or trading word, never "host", no em dash, en dash or
- * semicolon, in strings.xml or in any word table the screens print from.
+ * semicolon, in strings.xml, in any word table the screens print from (every table of the generated
+ * Words, the app's own), or in any string the core's readers build a sentence from.
  */
 class CopyGuardTest {
     private val repository = File(requireNotNull(System.getProperty("repository")))
@@ -50,8 +51,8 @@ class CopyGuardTest {
 
     private fun bannedIn(text: String): String? = pattern.find(text)?.value
 
-    /** Every string constant a word table holds, and every value of its maps (the platforms, the
-     * kinds, the tiebreaks). A Kotlin object's properties are static fields of its class. */
+    /** Every string constant a word table holds, and every value of its maps. A Kotlin object's
+     * properties are static fields of its class. */
     private fun table(owner: Class<*>): List<String> =
         owner.declaredFields
             .filter { Modifier.isStatic(it.modifiers) }
@@ -63,6 +64,24 @@ class CopyGuardTest {
                     else -> emptyList()
                 }
             }
+
+    /** Every table of the generated web words (Words.LeagueHome, Words.Box, Words.Platform...). */
+    private fun generated(): List<String> = Words::class.java.declaredClasses.flatMap(::table)
+
+    /** The string literals of the core's sources (comments are not copy), where the readers ported from
+     * the web build their sentences ("Standings follow $platform's record"), a template's slots
+     * dropped: a slot is data or a word a table holds. */
+    private fun coreLiterals(): List<String> {
+        val literal = Regex("\"((?:[^\"\\\\]|\\\\.)*)\"")
+        val slot = Regex("\\$\\{[^}]*\\}|\\$[A-Za-z_][A-Za-z0-9_]*")
+        return File(repository, "apps/android/core/src/main")
+            .walkTopDown()
+            .filter { it.extension == "kt" }
+            .flatMap { it.readLines() }
+            .filterNot { it.trimStart().let { line -> line.startsWith("//") || line.startsWith("*") || line.startsWith("/*") } }
+            .flatMap { line -> literal.findAll(line).map { slot.replace(it.groupValues[1], " ") } }
+            .toList()
+    }
 
     /** The bar's labels, every phase's. */
     private fun railLabels(): List<String> = (Rail.byKey.values.flatten() + Rail.withoutLeague).map { it.label }
@@ -82,17 +101,18 @@ class CopyGuardTest {
     @Test
     fun `no word the app prints is on the list`() {
         val printed =
-            stringsXml() + table(Words.LeagueHome::class.java) + table(LeagueHomeWords::class.java) + table(SignInWords::class.java) +
-                railLabels()
+            stringsXml() + generated() + table(AppWords::class.java) + table(SignInWords::class.java) + railLabels() +
+                coreLiterals()
         assertEquals(emptyList<String>(), printed.filter { bannedIn(it) != null })
     }
 
     @Test
     fun `the word tables are read, not empty`() {
         assert(stringsXml().isNotEmpty())
-        assert(table(LeagueHomeWords::class.java).contains(LeagueHomeWords.cannotLoad))
-        assert(table(LeagueHomeWords::class.java).contains("MyFantasyLeague"))
-        assert(table(LeagueHomeWords::class.java).contains(LeagueHomeWords.standingsBasis))
+        assert(table(AppWords::class.java).contains(AppWords.cannotLoad))
+        assert(generated().contains(Words.Platform.mfl))
+        assert(generated().contains(Words.Box.totals))
+        assert(coreLiterals().any { it.startsWith("Standings follow ") })
         assert(railLabels().contains("Matchup"))
         assert(table(Words.LeagueHome::class.java).contains(Words.LeagueHome.noMoves))
     }

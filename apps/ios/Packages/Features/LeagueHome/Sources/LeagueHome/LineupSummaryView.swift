@@ -25,7 +25,7 @@ struct LineupSummaryView: View {
         } + [
             BoxRow(
                 id: "team",
-                cells: [BoxCell(PortedWords.Box.totals, tone: .strong), BoxCell(section.total, tone: .strong)]
+                cells: [BoxCell(Words.Box.totals, tone: .strong), BoxCell(section.total, tone: .strong)]
             ),
         ]
     }

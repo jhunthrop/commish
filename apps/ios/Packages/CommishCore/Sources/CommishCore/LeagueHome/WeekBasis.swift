@@ -20,7 +20,7 @@ struct UnlistedDrawn: Equatable {
     }
 
     init(_ bugs: [ScoreBug]) {
-        let none = PortedWords.Box.none
+        let none = Words.Box.none
         let drawn = bugs.flatMap { bug in
             bug.sides.filter(\.unlisted).compactMap { side -> (BugSide, String)? in
                 let figure = bug.state == .upcoming ? side.big : side.final ? nil : side.small
@@ -56,7 +56,6 @@ struct TeamCuts: Equatable {
 /// weekBasisText): a port, with no Lineup read so no Game sentence, held to the web's phone paragraph
 /// by the parity file.
 enum WeekBasis {
-    typealias Words = PortedWords.Basis
     static let phoneRoom = (lines: 8, chars: 70)
 
     struct Facts {
@@ -104,23 +103,23 @@ enum WeekBasis {
 
     /// home.ts teamBasis, with no player's points (no Lineup read on this screen yet).
     static func team(_ facts: Facts, board: Scoreboard, cuts: TeamCuts) -> String {
-        let platform = PortedWords.platform(facts.host)
+        let platform = ValueWords.platform(facts.host)
         let bugs = facts.bugs
         let scoring = board.projectionScoring
         let started = bugs.contains { $0.state != .upcoming }
         let bonus = scoring.leagueOwn || cuts.teBonus ? nil : teBonusSentence(scoring.teBonus, host: facts.host)
         let when = board.projectionReadAt.map {
             "read \(Formatting.weekdayTime($0, zone: facts.zone)) \(Formatting.zoneWord(facts.zone))"
-        } ?? Words.notInYet
+        } ?? "not in yet for this week"
         let said = [
             projFinalPhone(started: bugsPlaying(listedOnly(bugs)), missing: bugsMissFinal(lineupSidesOnly(bugs))),
             bugsFinalNone(bugs) ? finalNonePart(platform) : "",
             unlistedPart(platform, drawn: UnlistedDrawn(bugs), form: cuts.unlistedForm),
         ].filter { !$0.isEmpty }.joined(separator: " ")
-        let asOf = started && !cuts.asOf ? ", \(Words.asOfKickoff)" : ""
+        let asOf = started && !cuts.asOf ? ", \(Words.Basis.asOfKickoff)" : ""
         let extra = bonus.map { " \($0)" } ?? ""
         let final = said.isEmpty ? "" : " \(said)"
-        let box = PortedWords.Box.self
+        let box = Words.Box.self
         let whose = scoringWords(scoring, host: facts.host)
         return "A team's \(box.proj) adds its starters' published projections\(whose), \(when)\(asOf).\(extra) "
             + "\(box.pts) are \(platform)'s so far.\(final)"
@@ -128,22 +127,22 @@ enum WeekBasis {
 
     /// home.ts standingsBasis.
     static func standings(host: Components.Schemas.LeagueHost, terms: Components.Schemas.LeagueTerms) -> String {
-        let platform = PortedWords.platform(host)
-        let home = CommishDesign.Words.LeagueHome.self
-        let tiebreak = terms.tiebreak.flatMap { PortedWords.tiebreak($0.value1) }.map { "then \($0)" }
+        let platform = ValueWords.platform(host)
+        let home = Words.LeagueHome.self
+        let tiebreak = terms.tiebreak.flatMap { ValueWords.tiebreak($0.value1) }.map { "then \($0)" }
             ?? "then points for, as \(platform) lists them"
         return "Standings follow \(platform)'s record, \(tiebreak). \(home.pointsFor) and \(home.pointsAgainst) are "
             + "points for and against, \(home.streak) the current run\(waiverBasis(platform, terms: terms))."
     }
 
     private static func waiverBasis(_ platform: String, terms: Components.Schemas.LeagueTerms) -> String {
-        let home = CommishDesign.Words.LeagueHome.self
+        let home = Words.LeagueHome.self
         switch terms.waivers?.value1 {
         case .budget:
             let budget = terms.waiverBudget.map { " of \(Formatting.dollars($0))" } ?? ""
             return ", \(home.budget) the budget left\(budget)"
         case .order:
-            let how = terms.waiverOrder.flatMap { PortedWords.waiverOrder($0.value1) }
+            let how = terms.waiverOrder.flatMap { ValueWords.waiverOrder($0.value1) }
                 .map { "\($0), \(home.firstPicks)" }
                 ?? home.firstPicks
             return ", \(home.order) the place in \(platform)'s order (\(how))"
@@ -158,7 +157,7 @@ enum WeekBasis {
         _ scoring: Components.Schemas.ProjectionScoring,
         host: Components.Schemas.LeagueHost
     ) -> String {
-        let format = PortedWords.format(scoring.format)
+        let format = ValueWords.format(scoring.format)
         if scoring.leagueOwn {
             return " on your rules"
         }
@@ -175,7 +174,7 @@ enum WeekBasis {
 
     /// names.ts rulesOwner: FFPC fixes its own rules; on any other platform the league's commissioner does.
     private static func rulesOwner(_ host: Components.Schemas.LeagueHost) -> String {
-        host.value1 == .ffpc ? PortedWords.platform(host) : "your league"
+        host.value1 == .ffpc ? ValueWords.platform(host) : "your league"
     }
 
     private static func sentenceStart(_ words: String) -> String {
@@ -186,17 +185,17 @@ enum WeekBasis {
         guard started else {
             return ""
         }
-        return missing ? Words.noProjFinalPart : Words.projFinalPart
+        return missing ? Words.Basis.noProjFinalPart : Words.Basis.projFinalPart
     }
 
     private static func finalNonePart(_ platform: String) -> String {
-        "A \(PortedWords.Box.final) of \(PortedWords.Box.none) is a score \(platform) does not send us."
+        "A \(Words.Box.final) of \(Words.Box.none) is a score \(platform) does not send us."
     }
 
     private static func unlistedPart(_ platform: String, drawn: UnlistedDrawn, form: UnlistedForm) -> String {
-        let box = PortedWords.Box.self
-        let from = drawn.skipped ? Words.fromProjected : Words.fromRosters
-        let paceWords = form == .full ? Words.paceClause : Words.paceClauseShort
+        let box = Words.Box.self
+        let from = drawn.skipped ? Words.BestLineupFrom.projected : Words.BestLineupFrom.rosters
+        let paceWords = form == .full ? Words.Basis.paceClause : Words.Basis.paceClauseShort
         let pace = drawn.paced ? ", \(paceWords)" : ""
         if form == .one, drawn.bestLineup, drawn.noRoster {
             return "Teams \(platform) sends no lineup for show our best lineup from \(from)\(pace), "
@@ -220,7 +219,7 @@ enum WeekBasis {
 
     private static func bugsMissFinal(_ bugs: [ScoreBug]) -> Bool {
         bugs.contains { bug in
-            bug.state != .upcoming && bug.sides.contains { !$0.final && $0.small == PortedWords.Box.none }
+            bug.state != .upcoming && bug.sides.contains { !$0.final && $0.small == Words.Box.none }
         }
     }
 
@@ -229,7 +228,7 @@ enum WeekBasis {
     }
 
     private static func bugsFinalNone(_ bugs: [ScoreBug]) -> Bool {
-        bugs.contains { bug in bug.sides.contains { $0.final && $0.small.hasSuffix(PortedWords.Box.none) } }
+        bugs.contains { bug in bug.sides.contains { $0.final && $0.small.hasSuffix(Words.Box.none) } }
     }
 }
 

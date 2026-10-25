@@ -1,6 +1,7 @@
 package app.trycommish.core.leaguehome
 
 import app.trycommish.api.Unauthorized
+import app.trycommish.core.AppWords
 import app.trycommish.core.Cached
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
@@ -139,7 +140,7 @@ class LeagueHomeViewModelTest {
             vm.load(Fixtures.LEAGUE_ID)
             advanceUntilIdle()
             val state = assertInstanceOf(LeagueHomeState.Failed::class.java, vm.state.value)
-            assertEquals(LeagueHomeWords.cannotLoad, state.message)
+            assertEquals(AppWords.cannotLoad, state.message)
         }
 
     @Test
@@ -226,6 +227,6 @@ class LeagueHomeViewModelTest {
             val vm = viewModel(reads, MemoryCache())
             vm.open()
             advanceUntilIdle()
-            assertEquals(LeagueHomeState.Failed(LeagueHomeWords.noLeague), vm.state.value)
+            assertEquals(LeagueHomeState.Failed(AppWords.noLeague), vm.state.value)
         }
 }
