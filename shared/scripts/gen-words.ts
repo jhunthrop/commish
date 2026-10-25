@@ -47,8 +47,8 @@ const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
  * Matchup's (Lane 183): the words beside its box scores; then the Board's (Lane 182): its chips and heads,
  * its formats' chips, the Gap's definition, and the season pages' verbs; then the run's board on the Board
  * (Lane 190): a tier band's words, what its count counts, the run's stamp and a past bye's word; then the
- * player sheet's and page's (Lane 192): a held page's words, the week tile's, the page's facts and the
- * read's figures' labels. */
+ * player sheet's and page's (Lane 192): a held page's words, the week tile's, the page's facts, the
+ * read's figures' labels and the words in place of a read not ready. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -281,6 +281,12 @@ export const TABLES: readonly TableSource[] = [
 			['restOfSeason', 'REST_OF_SEASON']
 		],
 		json: 'shared/words/player-read-figures.json'
+	},
+	{
+		name: 'Unwritten',
+		module: 'web/src/lib/run/unwritten-words.ts',
+		picks: [['read', 'UNWRITTEN_READ']],
+		json: 'shared/words/player-unwritten.json'
 	}
 ];
 export const OUTPUT = {

@@ -380,7 +380,7 @@ public enum Words {
         public static let underShownRead = "Moved under 0.5 since our read was written"
         public static let notInRead = "Not in our read"
         public static let changePart = "Proj change is its move since the earlier read, shown from 0.5."
-        public static let changePartRead = "Proj change is its move since our read was written, shown from 0.5; the read is withheld from the same move."
+        public static let changePartRead = "Proj change is its move since our read was written, shown from 0.5. The read is withheld from the same move."
     }
 
     public enum PlayerPage {
@@ -392,5 +392,9 @@ public enum Words {
         public static let preseasonProjection = "Preseason projection"
         public static let preseasonTiers = "Preseason tiers"
         public static let restOfSeason = "Rest of season"
+    }
+
+    public enum Unwritten {
+        public static let read = "Our written read of him is not ready. Here is what it will be built from."
     }
 }
