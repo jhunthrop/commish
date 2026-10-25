@@ -33,28 +33,28 @@
 		},
 		{
 			"state": "playing",
-			"next_kickoff": "2026-10-19T00:20:00.000Z",
-			"to_play": "3 to play",
+			"next_kickoff": "2026-10-18T20:05:00.000Z",
+			"to_play": "10 to play",
 			"sides": [
 				{
 					"roster_id": 2,
-					"points": 14.4,
+					"points": 26.7,
 					"points_read": true,
-					"projection": 28.1,
+					"projection": 93.4,
 					"starters": 10,
-					"played": 2,
-					"projected_final": 25.5,
-					"to_play": "1 to play"
+					"played": 4,
+					"projected_final": null,
+					"to_play": "6 to play"
 				},
 				{
 					"roster_id": 6,
-					"points": 6.5,
+					"points": 43.6,
 					"points_read": true,
-					"projection": 20,
+					"projection": 85.5,
 					"starters": 10,
-					"played": 1,
+					"played": 5,
 					"projected_final": null,
-					"to_play": "2 to play"
+					"to_play": "4 to play"
 				}
 			]
 		},

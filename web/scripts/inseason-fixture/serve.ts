@@ -50,7 +50,13 @@ import {
 	FFPC_ROSTERLESS_OPPONENT_VARIABLE
 } from './ffpc.ts';
 import { afterSundayOf, momentAt, SUNDAY, sundayOf } from './sunday.ts';
-import { askedRoster, NOT_ROSTER_WORDS, otherGameBox, ROSTER_WORDS } from './other-game.ts';
+import {
+	askedRoster,
+	NOT_ROSTER_WORDS,
+	otherGameBox,
+	otherGameLines,
+	ROSTER_WORDS
+} from './other-game.ts';
 import { linesOf, recordedMatchups, scoreboardAt } from './scoreboard-at.ts';
 import { inSeason, noWeek } from './member-week.ts';
 import { inTenths, roundTenth } from './tenths.ts';
@@ -206,7 +212,7 @@ const recordedWeek = {
 	me: sync.me,
 	week: sync.week,
 	matchups: await recordedMatchups(),
-	lines: linesOf({ lineup, waivers, trades, matchup: matchupBox }),
+	lines: linesOf({ lineup, waivers, trades, matchup: matchupBox }, await otherGameLines()),
 	box: matchupBox
 };
 

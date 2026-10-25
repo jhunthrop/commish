@@ -57,6 +57,7 @@ import {
 	type Game
 } from './run-lines.ts';
 import { standInLineup } from './stand-in-lineup.ts';
+import { club, weekProjectionOf, type Projection } from './week-projection.ts';
 import {
 	accepts,
 	better,
@@ -89,20 +90,6 @@ const PREVIOUS_READ_AT = '2026-10-16T02:00:00.000Z';
 /** The recorded league scores by rules of its own, closest to PPR: the API's projection_scoring. */
 const PROJECTION_SCORING: LineupAdvice['projection_scoring'] = { format: 'ppr', league_own: false };
 const DEFENSE = 'DEF';
-const KICKER = 'K';
-const PROVIDER_KICKER = 'PK';
-
-interface ProjectionRow {
-	position: string;
-	team: string;
-	ppr: number;
-	half: number;
-	standard: number;
-}
-interface Projection {
-	players: Record<string, ProjectionRow>;
-	defenses: Record<string, number>;
-}
 
 async function load<T>(name: string): Promise<T> {
 	return JSON.parse(await readFile(new URL(`${name}.json`, DATA), 'utf8')) as T;
@@ -117,27 +104,7 @@ const [games, projection, sync, lineup, waivers, trades] = await Promise.all([
 	load<TradeAdvice>('trades')
 ]);
 
-/** The provider's club codes in the board's (boards.ProductTeam). */
-const PRODUCT_TEAM: Readonly<Record<string, string>> = { WAS: 'WSH', LA: 'LAR' };
-const club = (code: string): string => PRODUCT_TEAM[code] ?? code;
-
-const kickers = new Map<string, number | null>();
-for (const row of Object.values(projection.players)) {
-	if (row.position !== PROVIDER_KICKER) continue;
-	const team = club(row.team);
-	kickers.set(team, kickers.has(team) ? null : row.ppr);
-}
-const defenses = new Map(Object.entries(projection.defenses).map(([c, v]) => [club(c), v]));
-
-function weekProjection(line: PlayerLine): number | null {
-	const { player, facts } = line;
-	// A club with no game this week has no projection, whatever the snapshot holds (the API's rule).
-	if (facts.bye || facts.opponent === null) return null;
-	if (player.position === DEFENSE) return defenses.get(club(player.team)) ?? null;
-	const own = player.board_id === null ? undefined : projection.players[player.board_id];
-	if (own) return own.ppr;
-	return player.position === KICKER ? (kickers.get(club(player.team)) ?? null) : null;
-}
+const weekProjection = weekProjectionOf(projection);
 
 /** Every player line in an answer, stamped, however deep. */
 /** Two stand-in designations, so a shot shows Lane 63's pill both ways (review M2): one starter
