@@ -63,7 +63,12 @@ private data class LogCells(
     val lead: String,
     val sub: String,
     val values: List<String>,
+    /** The column drawn wider than a one-digit column (the log's share of snaps), null for none. */
+    val wide: Int? = null,
 )
+
+/** A share's column ("Snap %"): wider, so its figure never runs into the one before it. */
+private const val WIDE_WEIGHT = 1.4f
 
 /**
  * His season (the page's "This season" over GameLog.svelte at 390): the head with its aside, the game log
@@ -80,21 +85,27 @@ fun SeasonBlock(season: SeasonView) {
         if (line == null) {
             Text(season.none, style = Faces.body, color = c.ink2)
         } else {
+            // The figures after Pts: a share's column is the wide one.
+            val wide =
+                season.heads
+                    .indexOfFirst { it.short.endsWith("%") }
+                    .takeIf { it >= 0 }
+                    ?.plus(1)
             Column {
                 LogLine(
-                    LogCells(Words.Figure.week, Words.Box.opp, listOf(season.pointsHead.short) + season.heads.map { it.short }),
+                    LogCells(Words.Figure.week, Words.Box.opp, listOf(season.pointsHead.short) + season.heads.map { it.short }, wide),
                     head = true,
                 )
                 season.rows.forEach { row ->
                     val sub = if (row.note.isEmpty()) row.opponent else "${row.opponent} ${row.note}"
                     LogLine(
-                        LogCells(row.week.toString(), sub, listOf(row.points.orEmpty()) + row.cells.orEmpty()),
+                        LogCells(row.week.toString(), sub, listOf(row.points.orEmpty()) + row.cells.orEmpty(), wide),
                         quiet =
                             row.tone != SeasonView.Tone.Played,
                     )
                 }
-                LogLine(LogCells(line.lead, line.sub, listOf(line.total) + line.cells.map { it.value }), total = true)
-                if (season.prior.isNotEmpty()) EarlierSeasons(season.prior)
+                LogLine(LogCells(line.lead, line.sub, listOf(line.total) + line.cells.map { it.value }, wide), total = true)
+                if (season.prior.isNotEmpty()) EarlierSeasons(season.prior, wide)
             }
         }
         if (season.ahead.isNotEmpty()) StillToPlay(season.ahead)
@@ -104,7 +115,10 @@ fun SeasonBlock(season: SeasonView) {
 
 /** His earlier seasons, folded under the season line until opened. */
 @Composable
-private fun EarlierSeasons(prior: List<SeasonView.Prior>) {
+private fun EarlierSeasons(
+    prior: List<SeasonView.Prior>,
+    wide: Int?,
+) {
     var open by rememberSaveable { mutableStateOf(false) }
     val c = CommishTheme.colors
     Row(
@@ -124,7 +138,7 @@ private fun EarlierSeasons(prior: List<SeasonView.Prior>) {
         )
         Text(Words.Card.earlierSeasons, style = Faces.small.copy(fontWeight = FontWeight.SemiBold), color = c.ink2)
     }
-    if (open) prior.forEach { LogLine(LogCells(it.season.toString(), it.sub, listOf(it.total) + it.cells)) }
+    if (open) prior.forEach { LogLine(LogCells(it.season.toString(), it.sub, listOf(it.total) + it.cells, wide)) }
 }
 
 /** The weeks still to play, each with its day or the game's state. */
@@ -184,7 +198,15 @@ private fun LogLine(
                     color = ink,
                     textAlign = TextAlign.End,
                     maxLines = if (head) HEAD_LINES else 1,
-                    modifier = Modifier.weight(if (index == 0) leadWeight else 1f).padding(start = Tokens.Space.s2.dp),
+                    modifier =
+                        Modifier
+                            .weight(
+                                when (index) {
+                                    0 -> leadWeight
+                                    cells.wide -> WIDE_WEIGHT
+                                    else -> 1f
+                                },
+                            ).padding(start = Tokens.Space.s1.dp),
                 )
             }
         }
