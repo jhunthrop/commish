@@ -31,6 +31,8 @@ data class RowCells(
     /** The Opp rank's own words, tinted by [ease] while his game is to come. */
     val oppRank: String?,
     val ease: Ease,
+    /** His rest-of-season points a game, "--" without one (the Trades rows' last cell). */
+    val season: String = Words.Box.none,
 ) {
     val id: String get() = row.id
 
@@ -73,8 +75,16 @@ data class RowCells(
                 evidence = (listOfNotNull(opp?.let { "${Words.Box.opp} $it" }) + pairs).joinToString(", "),
                 oppRank = opp,
                 ease = row.oppRank?.let { if (row.toCome) StartRows.ease(it, row.oppOf) else Ease.Even } ?: Ease.Even,
+                season = StartWords.number(row.season),
             )
         }
+
+        /** A trade's row (TradeFinder's opened players): which way he moves for the member, his side in
+         * the slot's cell. */
+        fun trade(
+            row: StartRow,
+            move: Move,
+        ): RowCells = of(null, row, null).copy(move = move)
     }
 }
 
