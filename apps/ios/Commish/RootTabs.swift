@@ -16,8 +16,8 @@ import Waivers
 
 /// The phone's five, the web's bar for the shown league's phase or, with none, the site's season
 /// (PhoneRail, held to rail-order.ts), each under the top bar: the league switch, the player search
-/// and the account's way in, which opens the Account. Choosing a league opens its home: the League tab where the bar has one,
-/// else the home pushed on the tab in view (B149). League, Lineup, Matchup, Waivers, Trades, the board
+/// and the account's way in, which opens the Account. Choosing a league opens its home: the League
+/// tab where the bar has one, else the home pushed on the tab in view (B149). League, Lineup, Matchup, Waivers, Trades, the board
 /// (the Board item, and Rest of season in season with no league), Rankings and Our record are live, and
 /// the search opens Rankings with its letters; the others say their screen's name until their lane
 /// lands. Every screen presents the player sheet through the one host; its Full page and a player's
