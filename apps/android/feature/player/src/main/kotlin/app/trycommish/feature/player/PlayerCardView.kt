@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.trycommish.core.player.CardHead
@@ -143,13 +142,7 @@ private fun TileCell(
         modifier.padding(horizontal = Tokens.Space.s3.dp, vertical = Tokens.Space.s2.dp),
         verticalArrangement = Arrangement.spacedBy(Tokens.Space.s1.dp),
     ) {
-        Text(
-            tile.label.uppercase(),
-            style = Faces.label.copy(fontWeight = FontWeight.Bold),
-            color = CommishTheme.colors.ink3,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        FitText(tile.label.uppercase(), Faces.label.copy(fontWeight = FontWeight.Bold), CommishTheme.colors.ink3)
         Text(tile.value, style = Faces.number(NumWeight.Bold, Tokens.Type.xl.sp), color = inkOf(tile.tone), maxLines = 1)
     }
 }

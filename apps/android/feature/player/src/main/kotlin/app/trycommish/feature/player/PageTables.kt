@@ -176,7 +176,7 @@ private fun LogLine(
                         head -> Faces.label.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.sp)
                         else -> Faces.number(if (index == 0) NumWeight.Bold else NumWeight.Medium)
                     }
-                Text(
+                FitText(
                     if (head) value.uppercase() else value,
                     style = style,
                     color = ink,
@@ -190,7 +190,7 @@ private fun LogLine(
     }
 }
 
-private const val HEAD_LINES = 4
+private const val HEAD_LINES = 3
 
 /** The first figure (Pts, a total) takes more of the row, so a season total prints whole. */
 private const val LEAD_FIGURE_WEIGHT = 1.5f
