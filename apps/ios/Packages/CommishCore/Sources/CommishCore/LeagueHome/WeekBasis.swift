@@ -19,6 +19,13 @@ struct UnlistedDrawn: Equatable {
         bestLineup && noRoster && paced ? .one : .short
     }
 
+    init(bestLineup: Bool = false, noRoster: Bool = false, paced: Bool = false, skipped: Bool = false) {
+        self.bestLineup = bestLineup
+        self.noRoster = noRoster
+        self.paced = paced
+        self.skipped = skipped
+    }
+
     init(_ bugs: [ScoreBug]) {
         let none = Words.Box.none
         let drawn = bugs.flatMap { bug in
@@ -119,8 +126,8 @@ enum WeekBasis {
                 started: bugsPlaying(listedOnly(bugs)),
                 missing: bugsMissFinal(lineupSidesOnly(bugs))
             ),
-            bugsFinalNone(bugs) ? finalNonePart(platform) : "",
-            unlistedPart(platform, drawn: UnlistedDrawn(bugs), form: cuts.unlistedForm),
+            bugsFinalNone(bugs) ? BasisParts.finalNonePart(platform) : "",
+            BasisParts.unlistedPart(platform, drawn: UnlistedDrawn(bugs), form: cuts.unlistedForm),
         ].filter { !$0.isEmpty }.joined(separator: " ")
         let asOf = started && !cuts.asOf ? ", \(Words.Basis.asOfKickoff)" : ""
         let extra = bonus.map { " \($0)" } ?? ""
@@ -155,27 +162,6 @@ enum WeekBasis {
         case nil:
             return ""
         }
-    }
-
-    // MARK: the parts (basis.ts)
-
-    private static func finalNonePart(_ platform: String) -> String {
-        "A \(Words.Box.final) of \(Words.Box.none) is a score \(platform) does not send us."
-    }
-
-    private static func unlistedPart(_ platform: String, drawn: UnlistedDrawn, form: UnlistedForm) -> String {
-        let box = Words.Box.self
-        let from = drawn.skipped ? Words.BestLineupFrom.projected : Words.BestLineupFrom.rosters
-        let paceWords = form == .full ? Words.Basis.paceClause : Words.Basis.paceClauseShort
-        let pace = drawn.paced ? ", \(paceWords)" : ""
-        if form == .one, drawn.bestLineup, drawn.noRoster {
-            return "Teams \(platform) sends no lineup for show our best lineup from \(from)\(pace), "
-                + "or \(box.none) with none."
-        }
-        let best = drawn.bestLineup
-            ? "\(box.proj) for teams \(platform) sends no lineup for is our best lineup from \(from)\(pace)." : ""
-        let none = drawn.noRoster ? "Teams \(platform) sends no lineup or roster for show \(box.none)." : ""
-        return [best, none].filter { !$0.isEmpty }.joined(separator: " ")
     }
 
     // MARK: the bugs' flags (home.ts)

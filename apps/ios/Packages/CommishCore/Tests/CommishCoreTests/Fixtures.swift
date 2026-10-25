@@ -38,6 +38,16 @@ enum Fixtures {
         try APIDecoding.envelopeData(LineupAdvice.self, from: data("fixtures/inseason/lineup-\(league)-\(clock).json"))
     }
 
+    /// The league read at a clock, its matchup's score as then (GET /leagues/attached/{id}/sync).
+    static func matchupSync(_ clock: String) throws -> LeagueSync {
+        try APIDecoding.envelopeData(LeagueSync.self, from: data("fixtures/inseason/sync-\(league)-\(clock).json"))
+    }
+
+    /// The week's matchup as a box score at a clock (GET /leagues/attached/{id}/matchup).
+    static func matchupBox(_ clock: String) throws -> MatchupBox {
+        try APIDecoding.envelopeData(MatchupBox.self, from: data("fixtures/inseason/matchup-\(league)-\(clock).json"))
+    }
+
     /// A file clock as its instant: `2026-10-18T18-56-00Z` as 18:56 UTC that day.
     static func instant(_ clock: String) -> Date {
         let text = clock.replacingOccurrences(
