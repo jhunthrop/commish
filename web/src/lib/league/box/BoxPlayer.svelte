@@ -9,7 +9,7 @@
 	import { tagMarks } from '#lib/sheet/tags.ts';
 	import StatusChip from '#lib/ui/StatusChip.svelte';
 	import StatusPill from '#lib/ui/StatusPill.svelte';
-	import { HELD } from '../inseason/words.ts';
+	import { HELD, tagCountWords } from '../inseason/words.ts';
 	import { fitName, initialName, type BoxRow } from './box.ts';
 	import BoxGame from './BoxGame.svelte';
 
@@ -74,6 +74,10 @@
 	/** The screen's player shelf (Lane 113): his name opens his card over the screen, his page
 	 * stays the link's for a new tab. Undefined where no screen holds one. */
 	const shelf = shelfOpener();
+	/** His tags as the chips draw them: Held when the sheet's own tags are not in, else the tags. */
+	const tagLabels = $derived(
+		row.held && tags.length === 0 ? [HELD] : tagMarks(tags).map((mark) => mark.label)
+	);
 </script>
 
 <!-- Held is the sheet's Hold tag, said by the API: drawn when the sheet's own tags are not in. -->
@@ -126,16 +130,25 @@
 					position={row.pill.position}
 					positionRank={row.pill.rank ?? undefined}
 					status={row.status}
-				/>{/if}{@render after?.()}</span
+				/>{/if}{#if after}<span class="club-after">{@render after()}</span>{/if}</span
 		>
 		{#if tags.length > 0 || row.held}
 			<span class="tags">{@render tagChips()}</span>
 		{/if}
 		<span class="phone-game" class:compact
 			>{#if line}<span class="line-game"><BoxGame {row} facts={false} glyph {clears} {note} /></span
-				>{#if row.status}<StatusChip
-						status={row.status}
-					/>{/if}{#if tags.length > 0 || row.held}<span class="line-tags">{@render tagChips()}</span
+				>{#if row.status}<StatusChip status={row.status} />{/if}{#if after}<span class="line-after"
+						>{@render after()}</span
+					>{/if}{#if tagLabels.length > 0}<span
+						class="line-tags"
+						role="img"
+						aria-label={tagLabels.join(', ')}
+						title={tagLabels.join(', ')}
+						><TagChip
+							label={tagLabels.length === 1
+								? (tagLabels[0] ?? HELD)
+								: tagCountWords(tagLabels.length)}
+						/></span
 					>{/if}{:else}<BoxGame {row} facts={!compact && phoneFacts} {clears} {note} />{/if}</span
 		>
 		{@render children?.()}
@@ -215,6 +228,11 @@
 
 	.phone-game {
 		display: none;
+	}
+
+	/* The screen's mark after the pill, laid out as if unwrapped. */
+	.club-after {
+		display: contents;
 	}
 
 	.phone-game.compact {
@@ -300,7 +318,7 @@
 	   the screen's big figure starts; the line under it his game as one cell, his status and tags, and
 	   ends at the screen's verb; the screen's own line (its strip) runs across under both. Nothing
 	   wraps, so every row is one height down the list. */
-	@media (max-width: 760px) {
+	@media (max-width: 1100px) {
 		.pl.line {
 			align-items: flex-start;
 			gap: var(--s-2);
@@ -308,6 +326,9 @@
 		}
 
 		.who.line {
+			/* The pill's slot and the club code's, fixed so the column lines up (review M1). */
+			--line-pill: 50px;
+			--line-club: 3.2ch;
 			flex: 1;
 			display: grid;
 			grid-template-columns: minmax(0, 1fr) auto;
@@ -323,6 +344,8 @@
 			flex-wrap: nowrap;
 		}
 
+		/* His pill and club, a column of fixed width beside the big figure, so the pills line up down
+		   the list whatever the club code (review M1). */
 		.who.line .club {
 			grid-column: 2;
 			grid-row: 1;
@@ -331,46 +354,78 @@
 			margin-right: var(--line-end, 0px);
 		}
 
-		/* His pill, then his club, in a column of their own beside the big figure. */
-		.who.line .club > span:first-child {
-			order: 1;
+		.who.line .club > :global(.pos) {
+			min-width: var(--line-pill);
+			justify-content: center;
 		}
 
-		/* The pill keeps the face's line; his status goes to the game's line. */
+		.who.line .club > span:first-child {
+			order: 1;
+			width: var(--line-club);
+		}
+
+		/* The pill keeps the face's line; his status, his roster mark and his tags go to the game's. */
 		.who.line .club > :global(.status-chip),
+		.who.line .club-after,
 		.who.line .tags {
 			display: none;
 		}
 
+		/* The game's line: the game, his status whole, his roster mark, his tags counted. What does not
+		   fit wraps to a second game line, never cut (review M2). */
 		.who.line .phone-game {
+			display: flex;
 			grid-column: 1 / -1;
 			grid-row: 2;
 			flex-direction: row;
+			flex-wrap: wrap;
 			align-items: center;
-			gap: 6px;
-			height: 22px;
+			column-gap: 6px;
+			row-gap: 2px;
+			min-height: 22px;
 			min-width: 0;
-			overflow: hidden;
 			white-space: nowrap;
 			margin-right: var(--line-end-2, 0px);
 		}
 
 		.line-game {
 			display: flex;
-			flex: none;
 			gap: 4px;
 		}
 
+		.line-after,
 		.line-tags {
-			display: flex;
-			gap: 4px;
+			display: inline-flex;
+			flex: none;
+		}
+
+		/* The game's cell may break between its words before anything is cut. */
+		.line-game {
+			flex: 0 1 auto;
 			min-width: 0;
+		}
+
+		.line-game :global(.opp) {
+			flex-wrap: wrap;
+			white-space: normal;
 		}
 
 		.who.line > :global(:last-child:not(.phone-game)) {
 			grid-column: 1 / -1;
 			grid-row: 3;
 			margin-left: calc(-1 * var(--strip-pull, 0px));
+		}
+	}
+
+	/* The narrowest phones: the name keeps its room, the club code gives way to the pill (his club's
+	   game is on the line under it). */
+	@media (max-width: 359px) {
+		.who.line {
+			--line-pill: 44px;
+		}
+
+		.who.line .club > span:first-child {
+			display: none;
 		}
 	}
 </style>

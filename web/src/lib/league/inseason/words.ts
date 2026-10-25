@@ -1,7 +1,7 @@
 /** The in-season screens' words (spec §4 to §6): each screen's decision line, its one verb with the
  * host as the mechanism, and a player row's facts for this week. Pure functions over the API's
  * answers, so every sentence a screen prints is tested here. */
-import { fixed, signed } from '#lib/format/number.ts';
+import { fixed, plural, signed } from '#lib/format/number.ts';
 import { listWords } from '#lib/format/list.ts';
 import { monthDayLabel } from '#lib/format/date.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
@@ -171,6 +171,13 @@ export function noTradeWith(name: string): string {
 
 /** A player the drafter tags Hold on a sheet: never a drop, never given in a trade. */
 export const HELD = 'Held';
+
+/** A phone's two-line row folds a player's tags into one counted chip, "2 tags", where the game's
+ * line has no room for each (Lane 209, review M2); one tag shows itself, and the chip's label names
+ * them all. */
+export function tagCountWords(count: number): string {
+	return plural(count, 'tag');
+}
 
 /** The signed-out panel's title, naming the screen it is for. */
 export function signInTitle(screen: LeagueScreen): string {

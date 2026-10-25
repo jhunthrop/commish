@@ -258,9 +258,9 @@ void test('below a wide screen the figures are labelled cells, never a sentence 
 		cells.filter((c) => c.key === true).map((c) => c.head),
 		['Over repl.']
 	);
-	// The week's figure has its own column above a phone, so the strip draws it on a phone alone.
+	// The week's short figure takes a narrower share, so the longer heads keep their room.
 	assert.deepEqual(
-		cells.filter((c) => c.phoneOnly === true).map((c) => c.head),
+		cells.filter((c) => c.narrow === true).map((c) => c.head),
 		['Wk 6']
 	);
 	for (const cell of cells) assert.doesNotMatch(cell.value, /,/u, cell.value);

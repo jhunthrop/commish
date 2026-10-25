@@ -118,7 +118,7 @@
 
 	/* A phone's Rankings row names its verb: "Add" in a quiet outline beside the plus, the row's one
 	   verb, at the height of its game line. */
-	@media (max-width: 760px) {
+	@media (max-width: 1100px) {
 		.named {
 			height: 24px;
 			gap: 4px;
