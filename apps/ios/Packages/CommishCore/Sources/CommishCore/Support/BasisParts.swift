@@ -27,13 +27,25 @@ enum BasisParts {
         return bonus.map { "\(owner) adds \(Formatting.number($0)) a catch for TEs." }
     }
 
-    /// names.ts rulesOwner: FFPC fixes its own rules; on any other platform, or with none named, the
+    /// names.ts rulesOwner: FFPC fixes its own rules; on any other platform, and with none named, the
     /// league's commissioner does.
     static func rulesOwner(_ host: Components.Schemas.LeagueHost?) -> String {
         guard let host, host.value1 == .ffpc else {
             return "your league"
         }
         return ValueWords.platform(host)
+    }
+
+    /// basis.ts uncountedPart: the rules our stats lack, framed by whether any row counts the platform's
+    /// points; an answer without the list says its note as sent.
+    static func uncounted(note: String, list: String?, lines: [PlayerLine]) -> String? {
+        let names = list ?? ""
+        guard !names.isEmpty else {
+            return note
+        }
+        return lines.contains { LineupBasis.platformGame($0) != nil }
+            ? "Our stats omit \(names)."
+            : "\(Words.Box.avg) and \(Words.Box.last) are our stats, which omit \(names)."
     }
 
     static func sentenceStart(_ words: String) -> String {

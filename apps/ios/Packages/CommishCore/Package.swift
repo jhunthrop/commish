@@ -27,6 +27,7 @@ let package = Package(
             name: "CommishCoreTests",
             dependencies: [
                 "CommishCore",
+                .product(name: "RunFixtures", package: "CommishAPI"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "HTTPTypes", package: "swift-http-types"),
             ]

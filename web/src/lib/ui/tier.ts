@@ -1,3 +1,12 @@
+/** A tier band's words (TierStrip.svelte), in one table the apps print from too (shared/scripts/gen-words.ts,
+ * Lane 190): "Tier 3", "16.9 PPR pts to tier 4", "Last tier". */
+export const TIER_WORDS = {
+	tier: 'Tier',
+	/** Between the drop's unit and the next tier's number. */
+	toTier: 'to tier',
+	lastTier: 'Last tier'
+} as const;
+
 /** Seven steps of the one ink ramp (tokens.css, B47), tier 1 the full ink. The ramp never wraps: a
  * position's tiers past the last step share its lightest ink (fix round 1, HIGH-2), and the printed
  * tier number keeps them apart. */

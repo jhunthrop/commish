@@ -1,3 +1,4 @@
+import CommishAPI
 import CommishDesign
 import Foundation
 
@@ -50,7 +51,7 @@ public struct BoardCover: Equatable, Sendable {
 
 /// The board's words as the web's season pages say them (season-words.ts boardWords, ported and held to
 /// shared/fixtures/parity/board.json): the bar's word, the document's title, the heading and the one
-/// verb. In season the board is the rest of the season where it ranks it, and the verb follows the
+/// verb. In season the board is the rest of the season where the run ranks it, and the verb follows the
 /// league: none once a league is followed, following one until then; before the draft, the mock.
 public struct BoardWords: Equatable, Sendable {
     public let bar: String
@@ -87,6 +88,60 @@ public struct BoardWords: Equatable, Sendable {
     static let captureBehind: TimeInterval = 36 * 60 * 60
 }
 
+/// The run's words beside its board, each on the clock the site prints a run's dates on (format/date.ts,
+/// US Eastern, the NFL's), held to shared/fixtures/parity/board-run.json.
+public enum RunWords {
+    /// format/date.ts ZONE.
+    static let eastern = TimeZone(identifier: "America/New_York")!
+
+    /// run/stamp.ts runStampText: "Updated Oct 21", "Stand-in, updated Sep 1" before the first real run.
+    public static func stamp(_ manifest: RunManifest) -> String {
+        let words = manifest.standIn ? Words.RunStamp.standIn : Words.RunStamp.updated
+        return "\(words) \(Formatting.shortDay(manifest.runAt, zone: eastern))"
+    }
+
+    /// site/offline-words.ts offlineLead: the reason a saved board shows, said with its run's day.
+    public static func offline(_ manifest: RunManifest) -> String {
+        "You're offline, so this is the last board this device saved, updated "
+            + "\(Formatting.shortDay(manifest.runAt, zone: eastern))."
+    }
+
+    /// run/rest-from.ts restFromWords: "from week 7", "from week 7's games left" while a game of it
+    /// had kicked off at the run.
+    static func restFrom(week: Int, partial: Bool) -> String {
+        (partial ? Words.Figure.restFromPartial : Words.Figure.restFrom)
+            .replacingOccurrences(of: "{week}", with: String(week))
+    }
+
+    /// run/rest-words.ts restCaption: "PPR points for the rest of the 2026 season from week 7, refreshed
+    /// October 21"; nil on a board of the full season.
+    public static func restCaption(_ format: RunFormat, season: Int) -> String? {
+        guard let rest = restOfSeason(format, season: season), let refreshed = format.refreshedAt else {
+            return nil
+        }
+        return "\(format.label) points for \(rest), refreshed \(Formatting.monthDay(refreshed, zone: eastern))"
+    }
+
+    /// "the rest of the 2026 season from week 7", nil before the run ranks the rest.
+    static func restOfSeason(_ format: RunFormat, season: Int) -> String? {
+        format.rosFromWeek.map {
+            "the rest of the \(season) season \(restFrom(week: $0, partial: format.rosFromWeekPartial == true))"
+        }
+    }
+
+    /// run/adp-drafts.ts adpDrafts: the drafts behind a format's ADP with their window, "PPR drafts, Sep 9".
+    static func adpDrafts(_ sources: [RunAdpSource], format: String) -> [String] {
+        sources.filter { $0.formats.contains(format) }.map { "\($0.drafts), \(window($0.window))" }
+    }
+
+    /// format/date.ts windowLabel: "Sep 9", "Sep 5 to Sep 9".
+    static func window(_ window: Components.Schemas.RunWindow) -> String {
+        let from = Formatting.shortDay(window.from, zone: eastern)
+        let to = Formatting.shortDay(window.to, zone: eastern)
+        return from == to ? from : "\(from) to \(to)"
+    }
+}
+
 /// A board row's figures as the phone prints them (web/src/lib/format/number.ts and gap.ts).
 public enum BoardFigures {
     /// format/number.ts MINUS: a negative figure's sign.
@@ -112,64 +167,46 @@ public enum BoardFigures {
     }
 }
 
-/// Each player's page on the site by his slug, the rule the API names its lines' pages by
-/// (api/internal/inseason/faces.go slugOf and pages): accents dropped, lower case, words joined by
-/// hyphens; a name two players share gets no page, and a kicker or a defense has none.
-public enum PlayerPages {
-    /// faces.go slugOf.
-    public static func slug(_ name: String) -> String {
-        let stripped = String(String.UnicodeScalarView(
-            name.decomposedStringWithCanonicalMapping.unicodeScalars.filter {
-                $0.properties.generalCategory != .nonspacingMark
-            }
-        ))
-        var slug = ""
-        var joining = false
-        for scalar in stripped.lowercased().unicodeScalars {
-            if ("a" ... "z").contains(scalar) || ("0" ... "9").contains(scalar) {
-                if joining, !slug.isEmpty {
-                    slug.append("-")
-                }
-                slug.unicodeScalars.append(scalar)
-                joining = false
-            } else {
-                joining = true
-            }
-        }
-        return slug
-    }
-
-    /// The slugs no two names share, among every name given.
-    public static func unshared(_ names: [String]) -> Set<String> {
-        var seen: [String: Int] = [:]
-        for name in names {
-            seen[slug(name), default: 0] += 1
-        }
-        return Set(seen.filter { !$0.key.isEmpty && $0.value == 1 }.keys)
-    }
-}
-
 /// The board's basis on a phone as the web says it (run/board-basis.ts boardBasis, site/market.ts
-/// marketBasis), held to shared/fixtures/parity/board.json: our board's sentence and, where the Gap
-/// column shows, its definition; a kicker's or a defense's view says the drafts' order instead. The
-/// web's "ADP from <drafts>." and "Tiers are drawn within WR." wait for the run's board on the API.
+/// marketBasis), held to shared/fixtures/parity/board-run.json: our board's sentence (the rest of the
+/// season's from its week, once the run ranks it), the tiers' position on a position's view, the drafts
+/// behind the ADP before the season, and the Gap's definition where its column shows; a kicker's or a
+/// defense's view says the drafts' order instead.
 public enum BoardBasis {
-    /// The teams GET /boards/{format} values its board for (openapi.yaml roomBoard).
-    public static let teams = 12
-
-    /// board-basis.ts ourBoard for a board of the full season.
-    public static func ourBoard(label: String, teams: Int = teams) -> String {
-        "Our \(label) board, by points over replacement for \(teams) teams."
+    /// What a view's basis is said over.
+    struct Facts {
+        let format: RunFormat
+        let season: Int
+        /// The ranked position the view's tiers are drawn within; nil for All.
+        let position: BoardPosition?
+        let sources: [RunAdpSource]
+        let gap: Bool
     }
 
-    /// market.ts marketBasis with no drafts named.
-    public static let draftOrder =
-        "Kickers and defenses the drafters take rank in their draft order, with no projected points and no tiers."
-
-    public static func lines(_ columns: BoardColumns, label: String) -> [String] {
-        switch columns {
-        case let .ranked(gap): [ourBoard(label: label)] + (gap ? [Words.BoardBasis.gap] : [])
-        case .draftOrder: [draftOrder]
+    /// board-basis.ts ourBoard.
+    static func ourBoard(_ format: RunFormat, season: Int) -> String {
+        let league = "for \(format.teams) teams"
+        guard let rest = RunWords.restOfSeason(format, season: season), let refreshed = format.refreshedAt else {
+            return "Our \(format.label) board, by points over replacement \(league)."
         }
+        return "Our \(format.label) board, \(rest), by points over replacement \(league), refreshed "
+            + "\(Formatting.monthDay(refreshed, zone: RunWords.eastern))."
+    }
+
+    /// market.ts marketBasis: the drafts the order is taken from, where the run names them.
+    static func draftOrder(_ format: RunFormat, sources: [RunAdpSource]) -> String {
+        let source = sources.first { $0.id == format.marketOrder }
+        let from = source.map { " from \($0.drafts), \(RunWords.window($0.window))" } ?? ""
+        return "Kickers and defenses the drafters take rank in their draft order\(from), "
+            + "with no projected points and no tiers."
+    }
+
+    /// The phone's parts of a ranked view's basis.
+    static func ranked(_ facts: Facts) -> [String] {
+        let drafts = RunWords.adpDrafts(facts.sources, format: facts.format.id).joined(separator: " and ")
+        return [ourBoard(facts.format, season: facts.season)]
+            + (facts.position.map { ["Tiers are drawn within \($0.label)."] } ?? [])
+            + (facts.format.rosFromWeek == nil ? ["ADP from \(drafts)."] : [])
+            + (facts.gap ? [Words.BoardBasis.gap] : [])
     }
 }

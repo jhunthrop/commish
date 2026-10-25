@@ -42,7 +42,9 @@ public enum PhoneRail {
     /// The Matchup tab's key: the selected league's week as a box score.
     public static let matchupKey = "matchup"
     static let matchup = RailTab(key: matchupKey, label: AppWords.Tab.matchup)
-    static let waivers = RailTab(key: "waivers", label: AppWords.Tab.waivers)
+    /// The Waivers tab's key: the selected league's players free to add.
+    public static let waiversKey = "waivers"
+    static let waivers = RailTab(key: waiversKey, label: AppWords.Tab.waivers)
     /// The Trades tab's key: the selected league's trade finder.
     public static let tradesKey = "trades"
     static let trades = RailTab(key: tradesKey, label: AppWords.Tab.trades)

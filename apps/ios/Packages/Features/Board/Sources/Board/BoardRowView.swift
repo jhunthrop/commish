@@ -77,8 +77,8 @@ struct BoardSectionHead: View {
 }
 
 /// One player's row (web Row.svelte at 390): his face, his name the biggest thing, his position pill
-/// with his number there, his club and bye, his status chip; then Projected, the row's one big figure,
-/// Over repl. and the Gap in its tone, or a kicker's or a defense's draft order and ADP. The whole row
+/// with his number there, his club and bye, his status chip; then Projected, the row's one big figure, Over
+/// repl. on its round's tint and the Gap in its tone, or a kicker's or a defense's draft order and ADP. The whole row
 /// opens the player sheet where the site has a page for him.
 struct BoardRowView: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -145,10 +145,10 @@ struct BoardRowView: View {
                 .frame(width: BoardColumn.projected, alignment: .trailing)
             figure(row.overReplacement, width: BoardColumn.overReplacement, ink: Tokens.Color.ink2, theme: theme)
                 .background(alignment: .trailing) {
-                    // Below replacement, the rose tile (ui/heat.ts heat-neg).
-                    if row.belowReplacement {
+                    // The round's tint, rounds 1 to 4, the rose below replacement (ui/heat.ts heatFor).
+                    if let tint = Self.tint(row.heat) {
                         RoundedRectangle(cornerRadius: Tokens.Radius.sm)
-                            .fill(theme.color(Tokens.Color.heatNeg))
+                            .fill(theme.color(tint))
                             .frame(height: 26)
                             .padding(.leading, -6)
                     }
@@ -170,6 +170,18 @@ struct BoardRowView: View {
             .minimumScaleFactor(0.8)
             .foregroundStyle(theme.color(text == Words.Box.none ? Tokens.Color.ink3 : ink))
             .frame(width: width, alignment: .trailing)
+    }
+
+    /// The tile under Over repl. (Row.svelte .heat-1 to .heat-4, .heat-neg), none past the fourth round.
+    static func tint(_ heat: Heat) -> ThemedColor? {
+        switch heat {
+        case .round(1): Tokens.Color.heat1
+        case .round(2): Tokens.Color.heat2
+        case .round(3): Tokens.Color.heat3
+        case .round(4): Tokens.Color.heat4
+        case .below: Tokens.Color.heatNeg
+        case .round, .none: nil
+        }
     }
 
     /// The Gap's tone (gap-picks.ts): plus green, minus rose, zero neither.

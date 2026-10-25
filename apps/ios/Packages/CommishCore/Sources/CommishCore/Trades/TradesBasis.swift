@@ -27,7 +27,8 @@ enum TradesBasis {
             arrives(facts) ?? proj(facts),
             finals(facts),
             facts.opened ? Words.Basis.oppPhone : nil,
-            facts.opened ? uncounted(advice, lines: facts.lines) : nil,
+            facts.opened
+                ? BasisParts.uncounted(note: advice.basisNote, list: advice.basisNoteList, lines: facts.lines) : nil,
         ]
         return parts.compactMap(\.self).filter { !$0.isEmpty }.joined(separator: " ")
     }
@@ -87,16 +88,5 @@ enum TradesBasis {
         }
         return "\(Words.Box.avg) and \(Words.Box.last) count \(LineupBasis.weeksWord(game.week, counted.facts.week)) "
             + "finals from \(platform)'s points, our stats \(Words.Basis.statsByWednesday)"
-    }
-
-    /// basis.ts uncountedPart over the trades' answer.
-    static func uncounted(_ advice: TradeAdvice, lines: [PlayerLine]) -> String? {
-        let names = advice.basisNoteList ?? ""
-        guard !names.isEmpty else {
-            return advice.basisNote
-        }
-        return lines.contains { LineupBasis.platformGame($0) != nil }
-            ? "Our stats omit \(names)."
-            : "\(Words.Box.avg) and \(Words.Box.last) are our stats, which omit \(names)."
     }
 }

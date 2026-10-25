@@ -33,6 +33,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/metrics"
 	"github.com/jhunthrop/commish/api/internal/mocks"
 	"github.com/jhunthrop/commish/api/internal/names"
+	"github.com/jhunthrop/commish/api/internal/runs"
 	"github.com/jhunthrop/commish/api/internal/season"
 	"github.com/jhunthrop/commish/api/internal/server"
 	"github.com/jhunthrop/commish/api/internal/sheets"
@@ -218,6 +219,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		billingService.Routes(),
 		(&mocks.Handler{Store: mockStore, Log: log}).Routes(),
 		solo.Routes(),
+		(&runs.Handler{Reader: runReader(cfg, now, log), Log: log}).Routes(),
 		lobbies.Routes(),
 		companions.Routes(),
 		deviceService.Routes(),
@@ -260,6 +262,21 @@ func objects(cfg config.API, log *slog.Logger) exports.Objects {
 		return nil
 	}
 	return r2
+}
+
+// runReader is the published nightly run, or nil (the /run routes answer
+// 503) when the runs' bucket has no keys here.
+func runReader(cfg config.API, now func() time.Time, log *slog.Logger) *runs.Reader {
+	if !cfg.Runs.Configured() {
+		log.Warn("runs bucket not configured", "effect", "the /run routes answer 503")
+		return nil
+	}
+	objects, err := runs.NewR2Objects(cfg.Runs)
+	if err != nil {
+		log.Error("runs", "err", err)
+		return nil
+	}
+	return runs.NewReader(objects, now, log)
 }
 
 func usage() error {

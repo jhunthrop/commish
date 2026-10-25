@@ -76,7 +76,7 @@ public enum Formatting {
         format(date, "EEE h:mm a", zone: zone)
     }
 
-    /// "Thursday": the day of an instant on the member's clock, as the web's weekdayName.
+    /// "Thursday": an instant's day on the member's clock, as the web's weekdayName writes it.
     public static func weekdayName(_ date: Date, zone: TimeZone) -> String {
         format(date, "EEEE", zone: zone)
     }
@@ -89,6 +89,11 @@ public enum Formatting {
     /// "Oct 21": a day on the member's clock, as the web's shortDay.
     public static func shortDay(_ date: Date, zone: TimeZone) -> String {
         format(date, "MMM d", zone: zone)
+    }
+
+    /// "October 21": a day with its month in words, as the web's monthDayLabel.
+    public static func monthDay(_ date: Date, zone: TimeZone) -> String {
+        format(date, "MMMM d", zone: zone)
     }
 
     /// Whether two instants fall on the same calendar day on the member's clock (the web's sameDay).

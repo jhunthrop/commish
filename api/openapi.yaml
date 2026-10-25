@@ -28,6 +28,7 @@ tags:
   - { name: companions }
   - { name: devices }
   - { name: hosts }
+  - { name: run }
 
 paths:
   /healthz:
@@ -1233,6 +1234,717 @@ paths:
                   - $ref: "#/components/schemas/Envelope"
                   - properties: { data: { $ref: "#/components/schemas/RoomBoard" } }
         "400": { $ref: "#/components/responses/ErrorResponse" }
+  /run/manifest:
+    get:
+      tags: [run]
+      operationId: runManifest
+      summary: >-
+        The published nightly run's manifest (Lane 185): its id, when it finished, its season, every format it carries
+        (the default first) with the week its rest of season ranks from, and how many players have a page. The run is
+        the one runs/latest.json names, the same the site is built from, and never one whose manifest is missing or
+        names another run. Only the members the site's reader names are sent; the sources block is provenance and is
+        never sent. Every /run route answers a weak ETag (the run id and the file; designations, rewritten beside the run every
+        hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a
+        matching If-None-Match. 503 storage_unavailable when the run cannot be read here.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: the manifest
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunManifestAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-manifest
+                data:
+                  run_id: 2026-10-21T12-ros
+                  manifest:
+                    runId: 2026-10-21T12-ros
+                    runAt: "2026-10-21T12:00:00.000Z"
+                    season: 2026
+                    implementation: python
+                    standIn: false
+                    formats:
+                      - id: ppr-12
+                        label: PPR
+                        unit: PPR pts
+                        teams: 12
+                        basis:
+                          - PPR, rest of the 2026 season from week 7, refreshed October 21
+                          - ranked by points over replacement in a 12-team league
+                          - tiers drawn within each position
+                        rosFromWeek: 7
+                        rosFromWeekPartial: false
+                        rosThroughWeek: 5
+                        refreshedAt: "2026-10-21T12:00:00.000Z"
+                        marketOrder: ffc_adp_ppr_12
+                    players: 4
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/boards/{format}:
+    parameters:
+      - name: format
+        in: path
+        required: true
+        description: a format the published run carries, as its manifest names it (ppr-12)
+        schema: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*-[0-9]{1,2}$" }
+      - $ref: "#/components/parameters/IfNoneMatch"
+    get:
+      tags: [run]
+      operationId: runBoard
+      summary: >-
+        The published run's board in one format (boards/<format>.json), as the site draws it: the ranked rows in the
+        run's order, each with its tier, its tier's drop, its round and its ADP, and the kickers and defenses apart in
+        the drafters' order. Every row is the run's as written. 404 for a format the run does not carry.
+      responses:
+        "200":
+          description: the board
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunBoardAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-board
+                data:
+                  run_id: 2026-10-21T12-ros
+                  format: ppr-12
+                  rows:
+                    - id: "4429795"
+                      slug: jahmyr-gibbs
+                      name: Jahmyr Gibbs
+                      position: RB
+                      positionRank: 1
+                      team: DET
+                      headshot: https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png
+                      orderBasis: projection
+                      ourRank: 1
+                      vorRound: 1
+                      adp: 1.4
+                      gap: 0.4
+                      projected: 242.5
+                      vor: 153.6
+                      expectedGames: 10
+                      floor: null
+                      median: null
+                      ceiling: null
+                      tier: 1
+                      tierDrop: 18.2
+                      preseasonRank: 5
+                      preseasonPoints: 262.1
+                      preseasonPerGame: 17.6
+                      preseasonShare: 40
+                      blendedPerGame: 24.2
+                      ratePerGame: 24.1
+                      restFromWeek: 7
+                      gamePoints: 24.1
+                  market:
+                    - id: DST-SEA
+                      slug: seattle-seahawks
+                      name: Seattle Seahawks
+                      position: DST
+                      positionRank: 1
+                      team: SEA
+                      headshot: null
+                      orderBasis: market
+                      ourRank: 401
+                      adp: 81
+                      gap: null
+                      vorRound: null
+                      projected: null
+                      vor: null
+                      expectedGames: null
+                      floor: null
+                      median: null
+                      ceiling: null
+                      tier: null
+                      tierDrop: null
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/index:
+    get:
+      tags: [run]
+      operationId: runIndex
+      summary: >-
+        The published run's index (index.json): every player with a page and his season so far in two numbers, and the
+        kickers and defenses the boards carry apart, with no page and no season.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: the index
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunIndexAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-index
+                data:
+                  run_id: 2026-10-21T12-ros
+                  pages:
+                    - id: "4429795"
+                      slug: jahmyr-gibbs
+                      name: Jahmyr Gibbs
+                      team: DET
+                      position: RB
+                      headshot: https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png
+                      orderBasis: projection
+                      season: { games: 5, pointsPerGame: 30.7 }
+                  market:
+                    - id: DST-SEA
+                      slug: seattle-seahawks
+                      name: Seattle Seahawks
+                      team: SEA
+                      position: DST
+                      headshot: null
+                      orderBasis: market
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/adp:
+    get:
+      tags: [run]
+      operationId: runAdp
+      summary: >-
+        The published run's ADP (adp.json): every source, the drafts behind it and the formats whose boards blend it,
+        with its window, and each player's ADP per source id. A board's ADP basis is its format's sources' drafts and
+        windows.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: the ADP
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunAdpAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-adp
+                data:
+                  run_id: 2026-10-21T12-ros
+                  adp:
+                    sources:
+                      - id: ffc_adp_ppr_12
+                        drafts: PPR drafts
+                        formats: [ppr-12]
+                        window: { from: "2026-09-09T07:00:00.000Z", to: "2026-09-09T07:00:00.000Z" }
+                    players:
+                      "4429795": { ffc_adp_ppr_12: 1.4 }
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/designations:
+    get:
+      tags: [run]
+      operationId: runDesignations
+      summary: >-
+        The newest hourly injury capture beside the published run (designations.json): each ranked player it lists,
+        by id. designations is null when the run carries none, and the screens then show no status. It is written
+        again every publish hour under the same run, so its ETag carries a digest of what it holds. Its source is
+        provenance and is never sent.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: the designations
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunDesignationsAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-designations
+                data:
+                  run_id: 2026-10-21T12-ros
+                  designations:
+                    readAt: "2026-10-14T02:03:35.613Z"
+                    checkedAt: null
+                    players:
+                      "4047365": { status: out, seasonLong: false, since: null }
+                      "2991662":
+                        status: injured_reserve
+                        seasonLong: true
+                        since: "2026-10-10T22:00:00.000Z"
+                        returning: "2026-10-25"
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/players/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: "a player id the run's index gives a page, as the site's player page takes it (4429795)"
+        schema: { type: string, pattern: "^[\\w-]+$" }
+      - $ref: "#/components/parameters/IfNoneMatch"
+    get:
+      tags: [run]
+      operationId: runPlayer
+      summary: >-
+        A player's page in the published run (players/<id>.json, Lane 188), as the site's player page reads it: his
+        numbers in every format whose board ranks him, the capsule as the writer wrote it with its pull figures, the
+        week-ahead read, his season so far with every week's game log, his earlier seasons and the club his newest line
+        was for. 404 for an id the run gives no page (a kicker, a defense, anyone the index does not list), and for a
+        page the nightly held this run: /run/held names it, and /run/held/{id} answers its copy when there is one.
+      responses:
+        "200":
+          description: his page
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunPlayerAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-player
+                data:
+                  run_id: 2026-10-21T12-ros
+                  player:
+                    id: "4429795"
+                    slug: jahmyr-gibbs
+                    name: Jahmyr Gibbs
+                    position: RB
+                    team: DET
+                    headshot: https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png
+                    formats:
+                      ppr-12:
+                        positionRank: 1
+                        ourRank: 1
+                        vorRound: 1
+                        adp: 1.4
+                        gap: 0.4
+                        projected: 242.5
+                        vor: 153.6
+                        expectedGames: 10
+                        floor: null
+                        median: null
+                        ceiling: null
+                        tier: 1
+                        tierDrop: 18.2
+                        preseasonRank: 5
+                        preseasonPoints: 262.1
+                        preseasonPerGame: 17.6
+                        preseasonShare: 40
+                        blendedPerGame: 24.2
+                        ratePerGame: 24.1
+                        restFromWeek: 7
+                        gamePoints: 24.1
+                    capsule:
+                      body: |-
+                        He has 31 touches in his last game and the backfield to himself.
+
+                        Draft him in the first round.
+                      pulls:
+                        - { figure: "31", caption: touches in his last game }
+                      writtenAt: "2026-10-21T11:40:00.000Z"
+                    weekRead:
+                      week: 8
+                      body: Start him against a front that gives up 5.1 yards a carry.
+                      caption: Written Fri 9:00 pm Central, for week 8
+                      status: null
+                      call: start
+                      writtenAt: "2026-10-24T02:00:00.000Z"
+                      factsAt: "2026-10-24T01:30:00.000Z"
+                      projection: 22.4
+                      movedCaption: The live read below is newer.
+                    season:
+                      season: 2026
+                      format: ppr-12
+                      weeks: 2
+                      through: 1
+                      games: 1
+                      pointsPerGame: 30.7
+                      totals:
+                        pass_attempts: null
+                        completions: null
+                        passing_yards: null
+                        passing_touchdowns: null
+                        interceptions: null
+                        carries: 20
+                        rushing_yards: 121
+                        rushing_touchdowns: 1
+                        targets: 6
+                        receptions: 5
+                        receiving_yards: 46
+                        receiving_touchdowns: 1
+                        fumbles_lost: 0
+                        field_goals_made: null
+                        extra_points_made: null
+                        sacks: null
+                        defensive_interceptions: null
+                        defensive_touchdowns: null
+                        snapShare: 0.71
+                        points: 30.7
+                      log:
+                        - week: 1
+                          opponent: GB
+                          home: true
+                          status: played
+                          pass_attempts: null
+                          completions: null
+                          passing_yards: null
+                          passing_touchdowns: null
+                          interceptions: null
+                          carries: 20
+                          rushing_yards: 121
+                          rushing_touchdowns: 1
+                          targets: 6
+                          receptions: 5
+                          receiving_yards: 46
+                          receiving_touchdowns: 1
+                          fumbles_lost: 0
+                          field_goals_made: null
+                          extra_points_made: null
+                          sacks: null
+                          defensive_interceptions: null
+                          defensive_touchdowns: null
+                          snapShare: 0.71
+                          points: 30.7
+                        - week: 2
+                          opponent: null
+                          home: null
+                          status: inactive
+                          unnamedGame: true
+                          pass_attempts: null
+                          completions: null
+                          passing_yards: null
+                          passing_touchdowns: null
+                          interceptions: null
+                          carries: null
+                          rushing_yards: null
+                          rushing_touchdowns: null
+                          targets: null
+                          receptions: null
+                          receiving_yards: null
+                          receiving_touchdowns: null
+                          fumbles_lost: null
+                          field_goals_made: null
+                          extra_points_made: null
+                          sacks: null
+                          defensive_interceptions: null
+                          defensive_touchdowns: null
+                          snapShare: null
+                          points: null
+                    priorSeasons:
+                      - season: 2025
+                        games: 1
+                        pointsPerGame: 30.7
+                        totals:
+                          pass_attempts: null
+                          completions: null
+                          passing_yards: null
+                          passing_touchdowns: null
+                          interceptions: null
+                          carries: 20
+                          rushing_yards: 121
+                          rushing_touchdowns: 1
+                          targets: 6
+                          receptions: 5
+                          receiving_yards: 46
+                          receiving_touchdowns: 1
+                          fumbles_lost: 0
+                          field_goals_made: null
+                          extra_points_made: null
+                          sacks: null
+                          defensive_interceptions: null
+                          defensive_touchdowns: null
+                          snapShare: 0.71
+                          points: 30.7
+                    lastGameClub: { club: NYJ, week: 1, specialTeams: true }
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/held:
+    get:
+      tags: [run]
+      operationId: runHeld
+      summary: >-
+        The pages the nightly's schema gate held back this run (held.json, Lane 136): each by id, with the earlier run
+        its copy is from, or null when there is no copy (his page is then his board rows' figures alone). held is null
+        on a run that held none. What the reader said of each page is the run's report and is never sent.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: the held pages
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunHeldAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-held
+                data:
+                  run_id: 2026-10-21T12-ros
+                  held:
+                    pages:
+                      - id: "4429023"
+                        copy: { runId: 2026-10-20T12-ros, runAt: "2026-10-20T12:00:00.000Z" }
+                      - id: "3918298"
+                        copy: null
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/held/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: a held page's player id, as /run/held names it
+        schema: { type: string, pattern: "^[\\w-]+$" }
+      - $ref: "#/components/parameters/IfNoneMatch"
+    get:
+      tags: [run]
+      operationId: runHeldCopy
+      summary: >-
+        A held page's copy (held/<id>.json): his page as an earlier run published it, in the same shape as
+        /run/players/{id}; /run/held names the run it is from. 404 for an id the run does not hold with a copy.
+      responses:
+        "200":
+          description: his page as the earlier run published it
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunPlayerAnswer" } }
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/record:
+    get:
+      tags: [run]
+      operationId: runRecord
+      summary: >-
+        The published run's record (record.json): every week of the season and where it stands, each graded week's lines
+        (ours, ADP, the published projection and ESPN's on the same players) and its players' places, the season to date,
+        and the weekly and draft records, as written.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: the record
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunRecordAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-record
+                data:
+                  run_id: 2026-10-21T12-ros
+                  record:
+                    season: 2026
+                    format: ppr-12
+                    statistic: { agreement: order matched, placesOff: places off, starters: starters called }
+                    scale: 1.00 is a perfect match of the week's finishing order, 0.00 is none.
+                    startersBasis: the top 12 QBs, 24 RBs, 24 WRs and 12 TEs of the week
+                    method: Each week our board is frozen before the first kickoff and graded on the week's games.
+                    publishedFromWeek: 3
+                    honest: null
+                    weeks:
+                      - week: 1
+                        status: graded
+                        frozenAt: "2026-09-08T12:00:16.244Z"
+                        frozenBy: 2026-09-08T12
+                        gradedAt: "2026-09-16T07:36:40.448Z"
+                        order: preseason
+                        population: 341
+                        orderAsOf: "2026-09-08T12:00:00.000Z"
+                        lines:
+                          - position: All
+                            ours: { graded: 193, agreement: 0.5, placesOff: 43.0, starters: 50, startersOf: 84 }
+                            adp: { graded: 193, agreement: 0.41, placesOff: 47.9, starters: 52, startersOf: 84 }
+                            published: null
+                            oursOnPublished: null
+                            espn: { graded: 180, agreement: 0.47, placesOff: 44.1, starters: 49, startersOf: 84 }
+                            oursOnEspn: null
+                        players:
+                          - { position: RB, ours: 1, adp: 2, published: null, espn: 1, finish: 3 }
+                        espnNote: ESPN's projection for week 1 was read after our rankings were set.
+                      - week: 2
+                        status: missed
+                        frozenAt: null
+                        frozenBy: null
+                        gradedAt: null
+                        order: null
+                        population: 0
+                        lines: []
+                        note: Our nightly run failed that week.
+                      - week: 3
+                        status: frozen
+                        frozenAt: "2026-09-22T12:00:00.000Z"
+                        frozenBy: 2026-09-22T12
+                        gradedAt: null
+                        order: rest_of_season
+                        population: 0
+                        lines: []
+                        gradesFrom: "2026-09-30T07:00:00.000Z"
+                    toDate:
+                      - position: All
+                        ours: { graded: 193, agreement: 0.5, placesOff: 43.0, starters: 50, startersOf: 84 }
+                        adp: { graded: 193, agreement: 0.41, placesOff: 47.9, starters: 52, startersOf: 84 }
+                        published: null
+                        oursOnPublished: null
+                    weekly:
+                      fromWeek: 7
+                      statistic: { agreement: order matched, placesOff: places off, starters: starters called }
+                      scale: 1.00 is a perfect match of the week's finishing order, 0.00 is none.
+                      startersBasis: null
+                      method: Our weekly rankings are set before each week's first kickoff and graded on its games.
+                      honest: null
+                      weeks:
+                        - week: 7
+                          status: upcoming
+                          frozenAt: "2026-10-23T00:15:00.000Z"
+                          frozenBy: null
+                          gradedAt: null
+                          order: null
+                          population: 0
+                          lines: []
+                      toDate: []
+                    draft:
+                      setAt: "2026-09-08T12:00:00.000Z"
+                      boardAsOf: "2026-09-08T11:00:00.000Z"
+                      throughWeek: 6
+                      namedBasis: the top 24 at each position
+                      honest: null
+                      lines:
+                        - position: All
+                          ours: { graded: 300, agreement: 0.61, placesOff: 38.2, starters: 70, startersOf: 84 }
+                          adp: { graded: 300, agreement: 0.58, placesOff: 40.1, starters: 68, startersOf: 84 }
+                      progress:
+                        - { week: 6, ours: 0.61, adp: 0.58 }
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/clubs:
+    get:
+      tags: [run]
+      operationId: runClubs
+      summary: The published run's clubs (clubs.json), the 32 with their names and bye weeks, in the file's order.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: the clubs
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunClubsAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-clubs
+                data:
+                  run_id: 2026-10-21T12-ros
+                  clubs:
+                    - { abbr: DET, city: Detroit, nickname: Lions, bye: 8 }
+                    - { abbr: SEA, city: Seattle, nickname: Seahawks, bye: null }
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/schedule:
+    get:
+      tags: [run]
+      operationId: runSchedule
+      summary: >-
+        The published run's schedule (schedule.json): every club's slate with each game's kickoff and state at the run,
+        the slate's strength and rank with how it is measured, its rest of season, and the value each opponent counts.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: the schedule
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunScheduleAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-schedule
+                data:
+                  run_id: 2026-10-21T12-ros
+                  schedule:
+                    season: 2026
+                    opponentValues: { GB: 10.5, MIN: 9.5 }
+                    opponentBasis: expected wins
+                    unit: "opponents' average win total"
+                    slates:
+                      - abbr: DET
+                        games:
+                          - { week: 1, opponent: GB, home: true, kickoff: "2026-09-13T17:00:00.000Z", state: final }
+                          - { week: 2, opponent: MIN, home: false, kickoff: "2026-09-20T17:00:00.000Z", state: upcoming }
+                        strength: 10.0
+                        rank: 4
+                        method: "the average of each club's opponents' expected wins for the season"
+                        window: { from: "2026-09-01T07:00:00.000Z", to: "2026-09-09T07:00:00.000Z" }
+                        rest: { strength: 9.5, rank: 9, method: "the average of the expected wins of the opponents left" }
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
   /order:
     parameters:
       - name: position
@@ -1924,7 +2636,20 @@ components:
         in X-Anon-CSRF-Token, never the session's cookie or header. Sign-in moves the token's mocks to the account and
         expires both cookies. An unclaimed mock is deleted after 90 days idle, or after 24 hours with no pick.
 
+  headers:
+    RunETag:
+      description: weak, the run id and the file, one value per run and file (the gzip and the plain body share it)
+      schema: { type: string }
+    RunCacheControl:
+      description: public, with a short max-age
+      schema: { type: string }
   parameters:
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      description: an ETag a /run answer gave; a match answers 304 with no body
+      schema: { type: string }
     TierMates:
       name: tier
       in: query
@@ -1979,6 +2704,11 @@ components:
       schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
 
   responses:
+    RunNotModified:
+      description: the run and the file are the ones the If-None-Match names; no body
+      headers:
+        ETag: { $ref: "#/components/headers/RunETag" }
+        Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
     ErrorResponse:
       description: the error envelope
       content:
@@ -3542,6 +4272,758 @@ components:
       description: >-
         which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API
         reads it)
+    # The published run's files (Lane 185), mirroring web/src/lib/run/schema.ts field for field: the run's own
+    # camelCase names and nullability, a field the run may leave out not required. web/src/lib/run/api-parity.test.ts
+    # holds each schema to its zod schema and parses every /run example with it.
+    RunPosition:
+      type: string
+      enum: [QB, RB, WR, TE, K, DST]
+    RunMarketPosition:
+      type: string
+      description: a kicker or a defense, the positions every board carries in the drafters' order
+      enum: [K, DST]
+    RunWindow:
+      type: object
+      description: the first and last moments a feed's numbers were captured, read from the data's own stamps
+      required: [from, to]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+    RunFormat:
+      type: object
+      required: [id, label, unit, teams, basis]
+      properties:
+        id: { type: string, description: "the format id: ppr-12" }
+        label: { type: string, description: "as a chip prints it: PPR, Half PPR" }
+        unit: { type: string, description: "what the points are in, as a cell label prints it: PPR pts" }
+        teams: { type: integer, minimum: 2 }
+        basis:
+          type: array
+          items: { type: string }
+          description: the basis of every number on this format's board, phrase by phrase, as the board's lead prints them
+        rosFromWeek:
+          type: integer
+          minimum: 1
+          description: in season, the first week the board ranks the rest of the season from; absent preseason
+        rosFromWeekPartial:
+          type: boolean
+          description: >-
+            in season, set while a game of rosFromWeek had kicked off at the run: its clubs count from their next week.
+            Absent preseason and on a run older than the field
+        rosThroughWeek:
+          type: integer
+          minimum: 0
+          description: in season, the last week whose games are in the season figures
+        refreshedAt:
+          type: string
+          format: date-time
+          description: in season, when the run refreshed the rest-of-season board
+        marketOrder:
+          type: string
+          description: the ADP source id whose draft order the board's kickers and defenses take
+    RunManifest:
+      type: object
+      description: the run's manifest.json, the members the site's reader names less the sources block (provenance)
+      required: [runId, runAt, season, implementation, standIn, formats, players]
+      properties:
+        runId: { type: string, description: "the run's id: 2026-10-12T05" }
+        runAt: { type: string, format: date-time, description: when the run finished, the date every page prints }
+        season: { type: integer }
+        implementation: { type: string, description: the code that produced the run }
+        standIn: { type: boolean, description: true for the stand-in run }
+        formats:
+          type: array
+          items: { $ref: "#/components/schemas/RunFormat" }
+          description: every format the run carries, the default first
+        players: { type: integer, minimum: 1, description: every player with a page, as the index lists them }
+    RunManifestAnswer:
+      type: object
+      required: [run_id, manifest]
+      properties:
+        run_id: { type: string, description: the published run every /run answer is read from }
+        manifest: { $ref: "#/components/schemas/RunManifest" }
+    RunBoardRow:
+      type: object
+      description: a ranked row of boards/<format>.json, ranked by our projection
+      required:
+        [id, slug, name, position, positionRank, team, headshot, ourRank, vorRound, adp, projected, vor, expectedGames, floor, median, ceiling, tier]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        position: { $ref: "#/components/schemas/RunPosition" }
+        positionRank: { type: integer, minimum: 1 }
+        team: { type: string }
+        headshot: { type: string }
+        orderBasis:
+          type: string
+          enum: [projection]
+          description: absent on a run older than the kickers' and defenses' rows
+        ourRank: { type: integer, minimum: 1, description: his place on this board, by points over replacement }
+        vorRound: { type: integer, minimum: 1, description: the round of this format's draft his place falls in }
+        adp: { type: number, nullable: true, description: "the blended ADP of this format's sources, null when none has him" }
+        gap:
+          type: number
+          nullable: true
+          description: >-
+            the drafters' ADP less our rank, to a tenth: plus when drafters take him later than we rank him; null without
+            an ADP, absent on a run older than the column
+        projected: { type: number }
+        vor: { type: number }
+        expectedGames: { type: number, minimum: 0 }
+        floor: { type: number, nullable: true, description: null in season }
+        median: { type: number, nullable: true, description: null in season }
+        ceiling: { type: number, nullable: true, description: null in season }
+        tier: { type: integer, minimum: 1, description: his tier within his position, 1 the top }
+        tierDrop:
+          type: number
+          nullable: true
+          description: >-
+            his tier's drop to the next tier at his position, to a tenth: the tier's last player's projected points less
+            the next tier's first; null in his position's last tier, absent on a run older than the column
+        preseasonRank:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: in season, where the preseason board ranked him; null when it did not
+        preseasonPoints: { type: number, nullable: true, description: "in season, the preseason board's points for the full season" }
+        preseasonPerGame: { type: number, nullable: true, description: in season, the preseason pace a game his figure starts from }
+        preseasonShare:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+          description: in season, the share of his rate a game that pace carries, a whole percent
+        blendedPerGame: { type: number, nullable: true, description: in season, his season blended with his usage a game }
+        ratePerGame: { type: number, nullable: true, description: "in season, the model's rate a game he plays" }
+        restFromWeek:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: in season, the week his rest of season starts from, null with no game left
+        gamePoints:
+          type: number
+          nullable: true
+          description: >-
+            in season, his points for one more game of his club; null preseason, absent on a run older than the
+            field
+    RunMarketRow:
+      type: object
+      description: >-
+        a kicker or a defense on a board, after the ranked rows in the drafters' order, with no projected points and no
+        tier: every figure of ours is always null
+      required:
+        [id, slug, name, position, positionRank, team, headshot, orderBasis, ourRank, adp, vorRound, projected, vor, expectedGames, floor, median, ceiling, tier]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        position: { $ref: "#/components/schemas/RunMarketPosition" }
+        positionRank: { type: integer, minimum: 1, description: his place in the drafters' order at his position }
+        team: { type: string }
+        headshot: { type: string, nullable: true, description: "null for a defense (its face is its club's mark)" }
+        orderBasis: { type: string, enum: [market] }
+        ourRank: { type: integer, minimum: 1, description: his place on the whole board, after every ranked row }
+        adp: { type: number, description: "this format's ADP" }
+        gap: { type: number, nullable: true, description: always null when sent }
+        vorRound: { type: integer, nullable: true, description: always null }
+        projected: { type: number, nullable: true, description: always null }
+        vor: { type: number, nullable: true, description: always null }
+        expectedGames: { type: number, nullable: true, description: always null }
+        floor: { type: number, nullable: true, description: always null }
+        median: { type: number, nullable: true, description: always null }
+        ceiling: { type: number, nullable: true, description: always null }
+        tier: { type: integer, nullable: true, description: always null }
+        tierDrop: { type: number, nullable: true, description: always null when sent }
+    RunBoardAnswer:
+      type: object
+      required: [run_id, format, rows, market]
+      properties:
+        run_id: { type: string }
+        format: { type: string }
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/RunBoardRow" }
+          description: the ranked rows, in the file's order
+        market:
+          type: array
+          items: { $ref: "#/components/schemas/RunMarketRow" }
+          description: the kickers and defenses, in the file's order
+    RunIndexSeason:
+      type: object
+      required: [games, pointsPerGame]
+      properties:
+        games: { type: integer, minimum: 0 }
+        pointsPerGame: { type: number, nullable: true, description: null exactly when he has no game }
+    RunIndexEntry:
+      type: object
+      required: [id, slug, name, team, position, headshot, season]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        team: { type: string }
+        position: { $ref: "#/components/schemas/RunPosition" }
+        headshot: { type: string }
+        orderBasis:
+          type: string
+          enum: [projection]
+          description: absent on a run older than the kickers' and defenses' entries
+        season: { $ref: "#/components/schemas/RunIndexSeason" }
+    RunMarketEntry:
+      type: object
+      required: [id, slug, name, team, position, headshot, orderBasis]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        team: { type: string }
+        position: { $ref: "#/components/schemas/RunMarketPosition" }
+        headshot: { type: string, nullable: true }
+        orderBasis: { type: string, enum: [market] }
+    RunIndexAnswer:
+      type: object
+      required: [run_id, pages, market]
+      properties:
+        run_id: { type: string }
+        pages:
+          type: array
+          items: { $ref: "#/components/schemas/RunIndexEntry" }
+          description: every player with a page, in the file's order
+        market:
+          type: array
+          items: { $ref: "#/components/schemas/RunMarketEntry" }
+          description: the kickers and defenses, in the file's order
+    RunAdpSource:
+      type: object
+      required: [id, drafts, formats, window]
+      properties:
+        id: { type: string }
+        drafts: { type: string, description: "the drafts behind the numbers, in a drafter's words: PPR drafts" }
+        formats:
+          type: array
+          items: { type: string }
+          description: the formats whose boards blend this source
+        window: { $ref: "#/components/schemas/RunWindow" }
+    RunAdp:
+      type: object
+      required: [sources, players]
+      properties:
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/RunAdpSource" }
+        players:
+          type: object
+          description: each player's ADP per source id; a missing key is a source that does not have him
+          additionalProperties:
+            type: object
+            additionalProperties: { type: number, format: double }
+    RunAdpAnswer:
+      type: object
+      required: [run_id, adp]
+      properties:
+        run_id: { type: string }
+        adp: { $ref: "#/components/schemas/RunAdp" }
+    RunPlayerStatus:
+      type: object
+      required: [status, seasonLong, since]
+      properties:
+        status: { $ref: "#/components/schemas/DesignationStatus" }
+        seasonLong: { type: boolean }
+        since:
+          type: string
+          format: date-time
+          nullable: true
+          description: the first capture of his unbroken run under a season-long status; null for a week's designation
+        returning:
+          type: string
+          format: date
+          description: the day he is due back from a season-long list, absent without one
+    RunDesignations:
+      type: object
+      description: the run's designations.json, less its source (provenance)
+      required: [readAt, checkedAt, players]
+      properties:
+        readAt: { type: string, format: date-time, description: "the capture's stamp: when the list last changed" }
+        checkedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: the capture job's last successful check of the list, null when the store records none
+        players:
+          type: object
+          description: by player id, every ranked player the capture lists
+          additionalProperties: { $ref: "#/components/schemas/RunPlayerStatus" }
+    RunDesignationsAnswer:
+      type: object
+      required: [run_id, designations]
+      properties:
+        run_id: { type: string }
+        designations:
+          nullable: true
+          description: null when the run carries no capture
+          allOf: [{ $ref: "#/components/schemas/RunDesignations" }]
+    # A player's file (players/<id>.json, Lane 188): his numbers in every format whose board ranks him, the capsule,
+    # the week-ahead read, his season so far and his earlier seasons, as web/src/lib/run/schema.ts and season.ts name them.
+    RunPlayerFormat:
+      type: object
+      description: one format's numbers for him, his board row without the identity
+      required: [positionRank, ourRank, vorRound, adp, projected, vor, expectedGames, floor, median, ceiling, tier]
+      properties:
+        positionRank: { type: integer, minimum: 1 }
+        ourRank: { type: integer, minimum: 1, description: his place on this format's board, by points over replacement }
+        vorRound: { type: integer, minimum: 1, description: the round of this format's draft his place falls in }
+        adp: { type: number, nullable: true, description: "the blended ADP of this format's sources, null when none has him" }
+        gap: { type: number, nullable: true, description: "the drafters' ADP less our rank, to a tenth; absent on a run older than the column" }
+        projected: { type: number }
+        vor: { type: number }
+        expectedGames: { type: number, minimum: 0 }
+        floor: { type: number, nullable: true, description: null in season }
+        median: { type: number, nullable: true, description: null in season }
+        ceiling: { type: number, nullable: true, description: null in season }
+        tier: { type: integer, minimum: 1, description: his tier within his position, 1 the top }
+        tierDrop: { type: number, nullable: true, description: "his tier's drop to the next tier at his position; absent on a run older than the column" }
+        preseasonRank: { type: integer, minimum: 1, nullable: true, description: in season, where the preseason board ranked him }
+        preseasonPoints: { type: number, nullable: true, description: "in season, the preseason board's points for the full season" }
+        preseasonPerGame: { type: number, nullable: true, description: in season, the preseason pace a game his figure starts from }
+        preseasonShare: { type: integer, minimum: 0, maximum: 100, nullable: true, description: in season, the share of his rate a game that pace carries }
+        blendedPerGame: { type: number, nullable: true, description: in season, his season blended with his usage a game }
+        ratePerGame: { type: number, nullable: true, description: "in season, the model's rate a game he plays" }
+        restFromWeek: { type: integer, minimum: 1, nullable: true, description: in season, the week his rest of season starts from }
+        gamePoints: { type: number, nullable: true, description: in season, his points for one more game of his club }
+    RunPullFigure:
+      type: object
+      required: [figure, caption]
+      properties:
+        figure: { type: string, description: "a number exactly as the capsule writes it" }
+        caption: { type: string, description: what it counts, in a few words }
+    RunCapsule:
+      type: object
+      description: "the writer's read of him, as written: paragraphs apart by a blank line, each pull figure in the prose"
+      required: [body, pulls]
+      properties:
+        body: { type: string }
+        pulls:
+          type: array
+          items: { $ref: "#/components/schemas/RunPullFigure" }
+        writtenAt: { type: string, format: date-time, description: "when the writer wrote it; absent on a run from before" }
+    RunWeekRead:
+      type: object
+      description: >-
+        the week-ahead read: its text, null when his status changed since it was written (the caption says when the
+        new one is due), the call, the status it was written against
+      required: [week, body, caption, status, call, writtenAt, factsAt]
+      properties:
+        week: { type: integer, minimum: 1 }
+        body: { type: string, nullable: true }
+        caption: { type: string, description: "Written Fri 9:00 pm Central, for week 6" }
+        status: { type: string, nullable: true }
+        call: { type: string, nullable: true, enum: [start, sit, hold, none], description: "the writer's call, null when withheld" }
+        writtenAt: { type: string, format: date-time }
+        factsAt: { type: string, format: date-time, nullable: true, description: the newest stamp of the facts it was written from }
+        projection: { type: number, nullable: true, description: "the published projection it quotes, in PPR; absent on a run from before" }
+        movedCaption: { type: string, description: "the words the page shows once the live read prints another; absent on a run from before" }
+    RunStatLine:
+      type: object
+      description: a stat line in the research store's names; a field is null when the records do not carry it
+      required:
+        [pass_attempts, completions, passing_yards, passing_touchdowns, interceptions, carries, rushing_yards, rushing_touchdowns, targets, receptions, receiving_yards, receiving_touchdowns, fumbles_lost, field_goals_made, extra_points_made, sacks, defensive_interceptions, defensive_touchdowns, snapShare, points]
+      properties:
+        pass_attempts: { type: number, nullable: true }
+        completions: { type: number, nullable: true }
+        passing_yards: { type: number, nullable: true }
+        passing_touchdowns: { type: number, nullable: true }
+        interceptions: { type: number, nullable: true }
+        carries: { type: number, nullable: true }
+        rushing_yards: { type: number, nullable: true }
+        rushing_touchdowns: { type: number, nullable: true }
+        targets: { type: number, nullable: true }
+        receptions: { type: number, nullable: true }
+        receiving_yards: { type: number, nullable: true }
+        receiving_touchdowns: { type: number, nullable: true }
+        fumbles_lost: { type: number, nullable: true }
+        field_goals_made: { type: number, nullable: true }
+        extra_points_made: { type: number, nullable: true }
+        sacks: { type: number, nullable: true }
+        defensive_interceptions: { type: number, nullable: true }
+        defensive_touchdowns: { type: number, nullable: true }
+        snapShare: { type: number, minimum: 0, maximum: 1, nullable: true, description: "his share of his team's offensive snaps" }
+        points: { type: number, nullable: true, description: "the line scored in the block's format" }
+    RunGameLogRow:
+      type: object
+      description: one week of his log, its stat line beside where the week stands for him
+      required:
+        [pass_attempts, completions, passing_yards, passing_touchdowns, interceptions, carries, rushing_yards, rushing_touchdowns, targets, receptions, receiving_yards, receiving_touchdowns, fumbles_lost, field_goals_made, extra_points_made, sacks, defensive_interceptions, defensive_touchdowns, snapShare, points, week, opponent, home, status]
+      properties:
+        pass_attempts: { type: number, nullable: true }
+        completions: { type: number, nullable: true }
+        passing_yards: { type: number, nullable: true }
+        passing_touchdowns: { type: number, nullable: true }
+        interceptions: { type: number, nullable: true }
+        carries: { type: number, nullable: true }
+        rushing_yards: { type: number, nullable: true }
+        rushing_touchdowns: { type: number, nullable: true }
+        targets: { type: number, nullable: true }
+        receptions: { type: number, nullable: true }
+        receiving_yards: { type: number, nullable: true }
+        receiving_touchdowns: { type: number, nullable: true }
+        fumbles_lost: { type: number, nullable: true }
+        field_goals_made: { type: number, nullable: true }
+        extra_points_made: { type: number, nullable: true }
+        sacks: { type: number, nullable: true }
+        defensive_interceptions: { type: number, nullable: true }
+        defensive_touchdowns: { type: number, nullable: true }
+        snapShare: { type: number, minimum: 0, maximum: 1, nullable: true }
+        points: { type: number, nullable: true }
+        week: { type: integer, minimum: 1 }
+        opponent: { type: string, nullable: true, description: "the club he plays; null on his bye, and where the run cannot say whose he was" }
+        home: { type: boolean, nullable: true, description: true at home, false away, null where the opponent is }
+        status: { $ref: "#/components/schemas/RunGameStatus" }
+        unnamedGame: { type: boolean, description: "always true when sent: an inactive week he played in a game the run cannot name" }
+    RunGameStatus:
+      type: string
+      description: where a week stands for him
+      enum: [played, inactive, bye, upcoming]
+    RunSeason:
+      type: object
+      description: his season so far, scored in one format, a row for every week of the regular season
+      required: [season, format, weeks, through, games, pointsPerGame, totals, log]
+      properties:
+        season: { type: integer }
+        format: { type: string, description: the format every point in the block is scored in }
+        weeks: { type: integer, minimum: 1, description: "the regular season's length; the log has this many rows" }
+        through: { type: integer, minimum: 0, description: the last week whose games are all final with their lines in }
+        games: { type: integer, minimum: 0 }
+        pointsPerGame: { type: number, nullable: true, description: null before his first game }
+        totals: { $ref: "#/components/schemas/RunStatLine" }
+        log:
+          type: array
+          items: { $ref: "#/components/schemas/RunGameLogRow" }
+    RunPriorSeason:
+      type: object
+      description: a season before this one, its regular season summed in the same format
+      required: [season, games, pointsPerGame, totals]
+      properties:
+        season: { type: integer }
+        games: { type: integer, minimum: 1 }
+        pointsPerGame: { type: number, nullable: true }
+        totals: { $ref: "#/components/schemas/RunStatLine" }
+    RunLastGameClub:
+      type: object
+      description: the club his newest game line was for and its week, when it is not his club
+      required: [club, week]
+      properties:
+        club: { type: string }
+        week: { type: integer, minimum: 1 }
+        specialTeams: { type: boolean, description: "always true when sent: that week he was on the field for special teams alone" }
+    RunPlayer:
+      type: object
+      description: the run's players/<id>.json, as written
+      required: [id, slug, name, position, team, headshot, formats, capsule, season]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        position: { $ref: "#/components/schemas/RunPosition" }
+        team: { type: string }
+        headshot: { type: string }
+        formats:
+          type: object
+          description: keyed by format id, every format the run carries that ranks him
+          additionalProperties: { $ref: "#/components/schemas/RunPlayerFormat" }
+        capsule:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/RunCapsule" }]
+        weekRead:
+          nullable: true
+          description: "absent on a run from before the nightly wrote it, null when the writer did not write for the week ahead"
+          allOf: [{ $ref: "#/components/schemas/RunWeekRead" }]
+        season: { $ref: "#/components/schemas/RunSeason" }
+        priorSeasons:
+          type: array
+          description: his earlier seasons, newest first; absent on a run from before
+          items: { $ref: "#/components/schemas/RunPriorSeason" }
+        lastGameClub:
+          nullable: true
+          description: "null when his newest line was for his club; absent on a run from before"
+          allOf: [{ $ref: "#/components/schemas/RunLastGameClub" }]
+    RunPlayerAnswer:
+      type: object
+      required: [run_id, player]
+      properties:
+        run_id: { type: string }
+        player: { $ref: "#/components/schemas/RunPlayer" }
+    # The pages the nightly's schema gate held back (held.json, Lane 136).
+    RunHeldCopy:
+      type: object
+      description: the earlier run his copy is from, and when that run was written
+      required: [runId, runAt]
+      properties:
+        runId: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}(-[a-z0-9-]+)?$", description: "the run id: 2026-10-20T12-ros" }
+        runAt: { type: string, format: date-time }
+    RunHeldPage:
+      type: object
+      description: a held page, less what the reader said of it (the run's report)
+      required: [id, copy]
+      properties:
+        id: { type: string }
+        copy:
+          nullable: true
+          description: "null when no earlier run had a page of his: his page is then his board rows' figures alone"
+          allOf: [{ $ref: "#/components/schemas/RunHeldCopy" }]
+    RunHeld:
+      type: object
+      required: [pages]
+      properties:
+        pages:
+          type: array
+          items: { $ref: "#/components/schemas/RunHeldPage" }
+    RunHeldAnswer:
+      type: object
+      required: [run_id, held]
+      properties:
+        run_id: { type: string }
+        held:
+          nullable: true
+          description: null when the run held no page
+          allOf: [{ $ref: "#/components/schemas/RunHeld" }]
+    # The record (record.json, Lane 188): our orders graded against the season's games.
+    RunScore:
+      type: object
+      description: how well one order matched the finish
+      required: [graded, agreement, placesOff, starters, startersOf]
+      properties:
+        graded: { type: integer, minimum: 0, description: players this order had an opinion about, among those graded }
+        agreement: { type: number, minimum: -1, maximum: 1, nullable: true, description: rank agreement with the finish, null when the sample cannot support one }
+        placesOff: { type: number, minimum: 0, nullable: true, description: the typical miss in places, null with no sample }
+        starters: { type: integer, minimum: 0, description: "the week's top players at each position this order also put there" }
+        startersOf: { type: integer, minimum: 0 }
+    RunRecordPosition:
+      type: string
+      description: a position, or All
+      enum: [All, QB, RB, WR, TE, K, DST]
+    RunRecordLine:
+      type: object
+      required: [position, ours, adp, published, oursOnPublished]
+      properties:
+        position: { $ref: "#/components/schemas/RunRecordPosition" }
+        ours: { $ref: "#/components/schemas/RunScore" }
+        adp:
+          nullable: true
+          description: ADP on the same players; null on the weekly record
+          allOf: [{ $ref: "#/components/schemas/RunScore" }]
+        published:
+          nullable: true
+          description: "the week's published projection on the same players, null before the freeze kept it"
+          allOf: [{ $ref: "#/components/schemas/RunScore" }]
+        oursOnPublished:
+          nullable: true
+          description: the season to date only, ours over the weeks that graded the published projection
+          allOf: [{ $ref: "#/components/schemas/RunScore" }]
+        espn:
+          nullable: true
+          description: "ESPN's weekly projection on the same players; absent or null before it was kept"
+          allOf: [{ $ref: "#/components/schemas/RunScore" }]
+        oursOnEspn:
+          nullable: true
+          description: "the season to date only, ours over the weeks that graded ESPN's projection; absent or null before"
+          allOf: [{ $ref: "#/components/schemas/RunScore" }]
+    RunPlacedPlayer:
+      type: object
+      description: "one graded player of a week: each order's place among the week's graded players, and his finish"
+      required: [position, ours, adp, published, finish]
+      properties:
+        position: { $ref: "#/components/schemas/RunPosition" }
+        ours: { type: integer, minimum: 1, nullable: true }
+        adp: { type: integer, minimum: 1, nullable: true }
+        published: { type: integer, minimum: 1, nullable: true }
+        espn: { type: integer, minimum: 1, nullable: true, description: absent or null before ESPN's projection was kept }
+        finish: { type: integer, minimum: 1 }
+    RunRecordWeekStatus:
+      type: string
+      description: "graded, frozen and waiting on its stats, missed (its first kickoff passed with no board frozen), or upcoming"
+      enum: [graded, frozen, missed, upcoming]
+    RunRecordWeek:
+      type: object
+      required: [week, status, frozenAt, frozenBy, gradedAt, order, population, lines]
+      properties:
+        week: { type: integer, minimum: 1 }
+        status: { $ref: "#/components/schemas/RunRecordWeekStatus" }
+        frozenAt: { type: string, format: date-time, nullable: true, description: "when our board was frozen; an upcoming week's first kickoff" }
+        frozenBy: { type: string, nullable: true, description: the run whose board was frozen }
+        gradedAt: { type: string, format: date-time, nullable: true }
+        order: { allOf: [{ $ref: "#/components/schemas/OrderBasis" }], nullable: true, description: the order the week's freeze graded }
+        population: { type: integer, minimum: 0, description: frozen players with a stat line for the week }
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/RunRecordLine" }
+        note: { type: string, description: "why a missed week was not frozen, one sentence; present only for a missed week" }
+        orderAsOf: { type: string, format: date-time, description: when the graded order was last refreshed before the week was set }
+        gradesFrom: { type: string, format: date-time, description: "a frozen week's earliest grading instant" }
+        players:
+          type: array
+          description: a graded week's players, in the finish's order
+          items: { $ref: "#/components/schemas/RunPlacedPlayer" }
+        espnNote: { type: string, description: "one sentence the weekly record prints under the week's row" }
+    RunRecordStatistic:
+      type: object
+      description: the statistics the record grades with, as its column heads print them
+      required: [agreement, placesOff, starters]
+      properties:
+        agreement: { type: string }
+        placesOff: { type: string }
+        starters: { type: string }
+    RunWeeklyRecord:
+      type: object
+      description: our weekly rankings against the weekly experts, from the first week the shipped order was set
+      required: [fromWeek, statistic, scale, startersBasis, method, honest, weeks, toDate]
+      properties:
+        fromWeek: { type: integer, minimum: 1 }
+        statistic: { $ref: "#/components/schemas/RunRecordStatistic" }
+        scale: { type: string }
+        startersBasis: { type: string, nullable: true }
+        method: { type: string }
+        honest: { type: string, nullable: true, description: "the sentence printed when a yardstick called the weeks better on any figure" }
+        weeks:
+          type: array
+          items: { $ref: "#/components/schemas/RunRecordWeek" }
+        toDate:
+          type: array
+          items: { $ref: "#/components/schemas/RunRecordLine" }
+    RunDraftLine:
+      type: object
+      required: [position, ours, adp]
+      properties:
+        position: { $ref: "#/components/schemas/RunRecordPosition" }
+        ours: { $ref: "#/components/schemas/RunScore" }
+        adp: { $ref: "#/components/schemas/RunScore" }
+    RunDraftProgress:
+      type: object
+      description: order matched, all positions, on the season's points through a counted week
+      required: [week, ours, adp]
+      properties:
+        week: { type: integer, minimum: 1 }
+        ours: { type: number, minimum: -1, maximum: 1, nullable: true }
+        adp: { type: number, minimum: -1, maximum: 1, nullable: true }
+    RunDraftRecord:
+      type: object
+      description: our draft board against ADP on the season's points so far
+      required: [setAt, boardAsOf, throughWeek, namedBasis, honest, lines, progress]
+      properties:
+        setAt: { type: string, format: date-time }
+        boardAsOf: { type: string, format: date-time }
+        throughWeek: { type: integer, minimum: 1, nullable: true }
+        namedBasis: { type: string, nullable: true }
+        honest: { type: string, nullable: true }
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/RunDraftLine" }
+        progress:
+          type: array
+          items: { $ref: "#/components/schemas/RunDraftProgress" }
+    RunRecord:
+      type: object
+      description: the run's record.json, as written
+      required: [season, format, statistic, scale, startersBasis, method, publishedFromWeek, honest, weeks, toDate]
+      properties:
+        season: { type: integer }
+        format: { type: string, description: the format every frozen board ranks in }
+        statistic: { $ref: "#/components/schemas/RunRecordStatistic" }
+        scale: { type: string }
+        startersBasis: { type: string, nullable: true }
+        method: { type: string }
+        publishedFromWeek: { type: integer, minimum: 1, nullable: true }
+        honest: { type: string, nullable: true }
+        weeks:
+          type: array
+          items: { $ref: "#/components/schemas/RunRecordWeek" }
+        toDate:
+          type: array
+          items: { $ref: "#/components/schemas/RunRecordLine" }
+        weekly: { $ref: "#/components/schemas/RunWeeklyRecord" }
+        draft: { $ref: "#/components/schemas/RunDraftRecord" }
+    RunRecordAnswer:
+      type: object
+      required: [run_id, record]
+      properties:
+        run_id: { type: string }
+        record: { $ref: "#/components/schemas/RunRecord" }
+    # The clubs and their slates (clubs.json and schedule.json, Lane 188).
+    RunClub:
+      type: object
+      required: [abbr, city, nickname, bye]
+      properties:
+        abbr: { type: string }
+        city: { type: string }
+        nickname: { type: string }
+        bye: { type: integer, minimum: 1, nullable: true, description: the week the club does not play, null before the schedule is out }
+    RunClubsAnswer:
+      type: object
+      required: [run_id, clubs]
+      properties:
+        run_id: { type: string }
+        clubs:
+          type: array
+          description: the 32 clubs, in the file's order
+          items: { $ref: "#/components/schemas/RunClub" }
+    RunGameState:
+      type: string
+      description: "the game's state at the run's instant: final once either side's result or line is in"
+      enum: [upcoming, kicked_off, final]
+    RunGame:
+      type: object
+      required: [week, opponent, home, kickoff]
+      properties:
+        week: { type: integer, minimum: 1 }
+        opponent: { type: string }
+        home: { type: boolean }
+        kickoff: { type: string, format: date-time, description: "an unset time is the start of its day on the Eastern clock" }
+        state: { $ref: "#/components/schemas/RunGameState" }
+    RunRestSlate:
+      type: object
+      description: "a slate's games left at the run's instant: their strength, its rank (1 the hardest), and how it is measured"
+      required: [strength, rank, method]
+      properties:
+        strength: { type: number }
+        rank: { type: integer, minimum: 1, maximum: 32 }
+        method: { type: string }
+    RunSlate:
+      type: object
+      required: [abbr, games, strength, rank, method, window]
+      properties:
+        abbr: { type: string }
+        games:
+          type: array
+          items: { $ref: "#/components/schemas/RunGame" }
+        strength: { type: number, description: "the slate's strength in the method's unit" }
+        rank: { type: integer, minimum: 1, maximum: 32, description: 1 is the hardest slate of the 32 }
+        method: { type: string, description: how strength is measured, as the page prints it beside the number }
+        window: { $ref: "#/components/schemas/RunWindow" }
+        rest:
+          nullable: true
+          description: the rest of the season, null with no game left; absent on a run from before
+          allOf: [{ $ref: "#/components/schemas/RunRestSlate" }]
+    RunSchedule:
+      type: object
+      description: the run's schedule.json, as written
+      required: [season, opponentValues, opponentBasis, unit, slates]
+      properties:
+        season: { type: integer }
+        opponentValues:
+          type: object
+          description: the number each opponent contributes to the strength, keyed by club
+          additionalProperties: { type: number, format: double }
+        opponentBasis: { type: string, description: what one opponent value is, as a column head prints it }
+        unit: { type: string, description: "a slate's strength as a short caption under its number" }
+        slates:
+          type: array
+          items: { $ref: "#/components/schemas/RunSlate" }
+    RunScheduleAnswer:
+      type: object
+      required: [run_id, schedule]
+      properties:
+        run_id: { type: string }
+        schedule: { $ref: "#/components/schemas/RunSchedule" }
     DesignationStatus:
       type: string
       enum: [questionable, doubtful, out, injured_reserve, suspended, pup, nfi]

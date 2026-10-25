@@ -91,7 +91,8 @@ enum StartRows {
     static let rankedClubs = 32
     static let precipitationNamedFrom = 20.0
 
-    /// `ranked` false draws no rank (box.ts boxRow's ranked: the Trades' rows, a roster not a lineup).
+    /// ranked draws his rest-of-season rank (box.ts boxRow's ranked): the Waivers' and the Trades' rows
+    /// leave it out.
     static func row(_ line: PlayerLine, slot: String, zone: TimeZone, now: Date, ranked: Bool = true) -> StartRow {
         let facts = line.facts
         let player = line.player

@@ -1,0 +1,12 @@
+{
+	"ok": true,
+	"data": {
+		"status": "ready",
+		"sentence": "Add Mason Taylor, drop Jaxson Dart, on ESPN now. He is a free agent, so the add is made at once.",
+		"confirm": "fixture-token",
+		"expires_at": "2026-10-17T17:10:00.000Z",
+		"host_url": "https://fantasy.espn.com/football/league?leagueId=1081607624&seasonId=2026",
+		"bid": null
+	},
+	"error": null
+}

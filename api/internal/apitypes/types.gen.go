@@ -1449,6 +1449,240 @@ func (e RosterSpotSlot) Valid() bool {
 	}
 }
 
+// Defines values for RunBoardRowOrderBasis.
+const (
+	RunBoardRowOrderBasisProjection RunBoardRowOrderBasis = "projection"
+)
+
+// Valid indicates whether the value is a known member of the RunBoardRowOrderBasis enum.
+func (e RunBoardRowOrderBasis) Valid() bool {
+	switch e {
+	case RunBoardRowOrderBasisProjection:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunGameState.
+const (
+	RunGameStateFinal     RunGameState = "final"
+	RunGameStateKickedOff RunGameState = "kicked_off"
+	RunGameStateUpcoming  RunGameState = "upcoming"
+)
+
+// Valid indicates whether the value is a known member of the RunGameState enum.
+func (e RunGameState) Valid() bool {
+	switch e {
+	case RunGameStateFinal:
+		return true
+	case RunGameStateKickedOff:
+		return true
+	case RunGameStateUpcoming:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunGameStatus.
+const (
+	RunGameStatusBye      RunGameStatus = "bye"
+	RunGameStatusInactive RunGameStatus = "inactive"
+	RunGameStatusPlayed   RunGameStatus = "played"
+	RunGameStatusUpcoming RunGameStatus = "upcoming"
+)
+
+// Valid indicates whether the value is a known member of the RunGameStatus enum.
+func (e RunGameStatus) Valid() bool {
+	switch e {
+	case RunGameStatusBye:
+		return true
+	case RunGameStatusInactive:
+		return true
+	case RunGameStatusPlayed:
+		return true
+	case RunGameStatusUpcoming:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunIndexEntryOrderBasis.
+const (
+	RunIndexEntryOrderBasisProjection RunIndexEntryOrderBasis = "projection"
+)
+
+// Valid indicates whether the value is a known member of the RunIndexEntryOrderBasis enum.
+func (e RunIndexEntryOrderBasis) Valid() bool {
+	switch e {
+	case RunIndexEntryOrderBasisProjection:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunMarketEntryOrderBasis.
+const (
+	RunMarketEntryOrderBasisMarket RunMarketEntryOrderBasis = "market"
+)
+
+// Valid indicates whether the value is a known member of the RunMarketEntryOrderBasis enum.
+func (e RunMarketEntryOrderBasis) Valid() bool {
+	switch e {
+	case RunMarketEntryOrderBasisMarket:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunMarketPosition.
+const (
+	RunMarketPositionDST RunMarketPosition = "DST"
+	RunMarketPositionK   RunMarketPosition = "K"
+)
+
+// Valid indicates whether the value is a known member of the RunMarketPosition enum.
+func (e RunMarketPosition) Valid() bool {
+	switch e {
+	case RunMarketPositionDST:
+		return true
+	case RunMarketPositionK:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunMarketRowOrderBasis.
+const (
+	RunMarketRowOrderBasisMarket RunMarketRowOrderBasis = "market"
+)
+
+// Valid indicates whether the value is a known member of the RunMarketRowOrderBasis enum.
+func (e RunMarketRowOrderBasis) Valid() bool {
+	switch e {
+	case RunMarketRowOrderBasisMarket:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunPosition.
+const (
+	RunPositionDST RunPosition = "DST"
+	RunPositionK   RunPosition = "K"
+	RunPositionQB  RunPosition = "QB"
+	RunPositionRB  RunPosition = "RB"
+	RunPositionTE  RunPosition = "TE"
+	RunPositionWR  RunPosition = "WR"
+)
+
+// Valid indicates whether the value is a known member of the RunPosition enum.
+func (e RunPosition) Valid() bool {
+	switch e {
+	case RunPositionDST:
+		return true
+	case RunPositionK:
+		return true
+	case RunPositionQB:
+		return true
+	case RunPositionRB:
+		return true
+	case RunPositionTE:
+		return true
+	case RunPositionWR:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunRecordPosition.
+const (
+	RunRecordPositionAll RunRecordPosition = "All"
+	RunRecordPositionDST RunRecordPosition = "DST"
+	RunRecordPositionK   RunRecordPosition = "K"
+	RunRecordPositionQB  RunRecordPosition = "QB"
+	RunRecordPositionRB  RunRecordPosition = "RB"
+	RunRecordPositionTE  RunRecordPosition = "TE"
+	RunRecordPositionWR  RunRecordPosition = "WR"
+)
+
+// Valid indicates whether the value is a known member of the RunRecordPosition enum.
+func (e RunRecordPosition) Valid() bool {
+	switch e {
+	case RunRecordPositionAll:
+		return true
+	case RunRecordPositionDST:
+		return true
+	case RunRecordPositionK:
+		return true
+	case RunRecordPositionQB:
+		return true
+	case RunRecordPositionRB:
+		return true
+	case RunRecordPositionTE:
+		return true
+	case RunRecordPositionWR:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunRecordWeekStatus.
+const (
+	RunRecordWeekStatusFrozen   RunRecordWeekStatus = "frozen"
+	RunRecordWeekStatusGraded   RunRecordWeekStatus = "graded"
+	RunRecordWeekStatusMissed   RunRecordWeekStatus = "missed"
+	RunRecordWeekStatusUpcoming RunRecordWeekStatus = "upcoming"
+)
+
+// Valid indicates whether the value is a known member of the RunRecordWeekStatus enum.
+func (e RunRecordWeekStatus) Valid() bool {
+	switch e {
+	case RunRecordWeekStatusFrozen:
+		return true
+	case RunRecordWeekStatusGraded:
+		return true
+	case RunRecordWeekStatusMissed:
+		return true
+	case RunRecordWeekStatusUpcoming:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunWeekReadCall.
+const (
+	RunWeekReadCallHold  RunWeekReadCall = "hold"
+	RunWeekReadCallNone  RunWeekReadCall = "none"
+	RunWeekReadCallSit   RunWeekReadCall = "sit"
+	RunWeekReadCallStart RunWeekReadCall = "start"
+)
+
+// Valid indicates whether the value is a known member of the RunWeekReadCall enum.
+func (e RunWeekReadCall) Valid() bool {
+	switch e {
+	case RunWeekReadCallHold:
+		return true
+	case RunWeekReadCallNone:
+		return true
+	case RunWeekReadCallSit:
+		return true
+	case RunWeekReadCallStart:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ScoreboardGameState.
 const (
 	ScoreboardGameStateFinal    ScoreboardGameState = "final"
@@ -4094,6 +4328,855 @@ type RosterSpot struct {
 // RosterSpotSlot defines model for RosterSpot.Slot.
 type RosterSpotSlot string
 
+// RunAdp defines model for RunAdp.
+type RunAdp struct {
+	// Players each player's ADP per source id; a missing key is a source that does not have him
+	Players map[string]map[string]float64 `json:"players"`
+	Sources []RunAdpSource                `json:"sources"`
+}
+
+// RunAdpAnswer defines model for RunAdpAnswer.
+type RunAdpAnswer struct {
+	Adp   RunAdp `json:"adp"`
+	RunId string `json:"run_id"`
+}
+
+// RunAdpSource defines model for RunAdpSource.
+type RunAdpSource struct {
+	// Drafts the drafts behind the numbers, in a drafter's words: PPR drafts
+	Drafts string `json:"drafts"`
+
+	// Formats the formats whose boards blend this source
+	Formats []string `json:"formats"`
+	Id      string   `json:"id"`
+
+	// Window the first and last moments a feed's numbers were captured, read from the data's own stamps
+	Window RunWindow `json:"window"`
+}
+
+// RunBoardAnswer defines model for RunBoardAnswer.
+type RunBoardAnswer struct {
+	Format string `json:"format"`
+
+	// Market the kickers and defenses, in the file's order
+	Market []RunMarketRow `json:"market"`
+
+	// Rows the ranked rows, in the file's order
+	Rows  []RunBoardRow `json:"rows"`
+	RunId string        `json:"run_id"`
+}
+
+// RunBoardRow a ranked row of boards/<format>.json, ranked by our projection
+type RunBoardRow struct {
+	// Adp the blended ADP of this format's sources, null when none has him
+	Adp *float32 `json:"adp"`
+
+	// BlendedPerGame in season
+	BlendedPerGame *float32 `json:"blendedPerGame,omitempty"`
+
+	// Ceiling null in season
+	Ceiling       *float32 `json:"ceiling"`
+	ExpectedGames float32  `json:"expectedGames"`
+
+	// Floor null in season
+	Floor *float32 `json:"floor"`
+
+	// GamePoints in season, his points for one more game of his club; null preseason, absent on a run older than the field
+	GamePoints *float32 `json:"gamePoints,omitempty"`
+
+	// Gap the drafters' ADP less our rank, to a tenth: plus when drafters take him later than we rank him; null without an ADP, absent on a run older than the column
+	Gap      *float32 `json:"gap,omitempty"`
+	Headshot string   `json:"headshot"`
+	Id       string   `json:"id"`
+
+	// Median null in season
+	Median *float32 `json:"median"`
+	Name   string   `json:"name"`
+
+	// OrderBasis absent on a run older than the kickers' and defenses' rows
+	OrderBasis *RunBoardRowOrderBasis `json:"orderBasis,omitempty"`
+
+	// OurRank his place on this board
+	OurRank      int         `json:"ourRank"`
+	Position     RunPosition `json:"position"`
+	PositionRank int         `json:"positionRank"`
+
+	// PreseasonPerGame in season
+	PreseasonPerGame *float32 `json:"preseasonPerGame,omitempty"`
+
+	// PreseasonPoints in season, the preseason board's points for the full season
+	PreseasonPoints *float32 `json:"preseasonPoints,omitempty"`
+
+	// PreseasonRank in season, where the preseason board ranked him; null when it did not
+	PreseasonRank *int `json:"preseasonRank,omitempty"`
+
+	// PreseasonShare in season, the share of his rate a game that pace carries, a whole percent
+	PreseasonShare *int    `json:"preseasonShare,omitempty"`
+	Projected      float32 `json:"projected"`
+
+	// RatePerGame in season, the model's rate a game he plays
+	RatePerGame *float32 `json:"ratePerGame,omitempty"`
+
+	// RestFromWeek in season, the week his rest of season starts from, null with no game left
+	RestFromWeek *int   `json:"restFromWeek,omitempty"`
+	Slug         string `json:"slug"`
+	Team         string `json:"team"`
+
+	// Tier his tier within his position
+	Tier int `json:"tier"`
+
+	// TierDrop his tier's drop to the next tier at his position, to a tenth: the tier's last player's projected points less the next tier's first; null in his position's last tier, absent on a run older than the column
+	TierDrop *float32 `json:"tierDrop,omitempty"`
+	Vor      float32  `json:"vor"`
+
+	// VorRound the round of this format's draft his place falls in
+	VorRound int `json:"vorRound"`
+}
+
+// RunBoardRowOrderBasis absent on a run older than the kickers' and defenses' rows
+type RunBoardRowOrderBasis string
+
+// RunCapsule the writer's read of him, as written: paragraphs apart by a blank line, each pull figure in the prose
+type RunCapsule struct {
+	Body  string          `json:"body"`
+	Pulls []RunPullFigure `json:"pulls"`
+
+	// WrittenAt when the writer wrote it; absent on a run from before
+	WrittenAt *time.Time `json:"writtenAt,omitempty"`
+}
+
+// RunClub defines model for RunClub.
+type RunClub struct {
+	Abbr string `json:"abbr"`
+
+	// Bye the week the club does not play
+	Bye      *int   `json:"bye"`
+	City     string `json:"city"`
+	Nickname string `json:"nickname"`
+}
+
+// RunClubsAnswer defines model for RunClubsAnswer.
+type RunClubsAnswer struct {
+	// Clubs the 32 clubs, in the file's order
+	Clubs []RunClub `json:"clubs"`
+	RunId string    `json:"run_id"`
+}
+
+// RunDesignations the run's designations.json, less its source (provenance)
+type RunDesignations struct {
+	// CheckedAt the capture job's last successful check of the list, null when the store records none
+	CheckedAt *time.Time `json:"checkedAt"`
+
+	// Players by player id, every ranked player the capture lists
+	Players map[string]RunPlayerStatus `json:"players"`
+
+	// ReadAt the capture's stamp: when the list last changed
+	ReadAt time.Time `json:"readAt"`
+}
+
+// RunDesignationsAnswer defines model for RunDesignationsAnswer.
+type RunDesignationsAnswer struct {
+	// Designations null when the run carries no capture
+	Designations *RunDesignations `json:"designations"`
+	RunId        string           `json:"run_id"`
+}
+
+// RunDraftLine defines model for RunDraftLine.
+type RunDraftLine struct {
+	// Adp how well one order matched the finish
+	Adp RunScore `json:"adp"`
+
+	// Ours how well one order matched the finish
+	Ours RunScore `json:"ours"`
+
+	// Position a position, or All
+	Position RunRecordPosition `json:"position"`
+}
+
+// RunDraftProgress order matched, all positions, on the season's points through a counted week
+type RunDraftProgress struct {
+	Adp  *float32 `json:"adp"`
+	Ours *float32 `json:"ours"`
+	Week int      `json:"week"`
+}
+
+// RunDraftRecord our draft board against ADP on the season's points so far
+type RunDraftRecord struct {
+	BoardAsOf   time.Time          `json:"boardAsOf"`
+	Honest      *string            `json:"honest"`
+	Lines       []RunDraftLine     `json:"lines"`
+	NamedBasis  *string            `json:"namedBasis"`
+	Progress    []RunDraftProgress `json:"progress"`
+	SetAt       time.Time          `json:"setAt"`
+	ThroughWeek *int               `json:"throughWeek"`
+}
+
+// RunFormat defines model for RunFormat.
+type RunFormat struct {
+	// Basis the basis of every number on this format's board, phrase by phrase, as the board's lead prints them
+	Basis []string `json:"basis"`
+
+	// Id the format id: ppr-12
+	Id string `json:"id"`
+
+	// Label as a chip prints it: PPR, Half PPR
+	Label string `json:"label"`
+
+	// MarketOrder the ADP source id whose draft order the board's kickers and defenses take
+	MarketOrder *string `json:"marketOrder,omitempty"`
+
+	// RefreshedAt in season, when the run refreshed the rest-of-season board
+	RefreshedAt *time.Time `json:"refreshedAt,omitempty"`
+
+	// RosFromWeek in season, the first week the board ranks the rest of the season from; absent preseason
+	RosFromWeek *int `json:"rosFromWeek,omitempty"`
+
+	// RosFromWeekPartial in season, set while a game of rosFromWeek had kicked off at the run: its clubs count from their next week. Absent preseason and on a run older than the field
+	RosFromWeekPartial *bool `json:"rosFromWeekPartial,omitempty"`
+
+	// RosThroughWeek in season, the last week whose games are in the season figures
+	RosThroughWeek *int `json:"rosThroughWeek,omitempty"`
+	Teams          int  `json:"teams"`
+
+	// Unit what the points are in, as a cell label prints it: PPR pts
+	Unit string `json:"unit"`
+}
+
+// RunGame defines model for RunGame.
+type RunGame struct {
+	Home bool `json:"home"`
+
+	// Kickoff an unset time is the start of its day on the Eastern clock
+	Kickoff  time.Time `json:"kickoff"`
+	Opponent string    `json:"opponent"`
+
+	// State the game's state at the run's instant: final once either side's result or line is in
+	State *RunGameState `json:"state,omitempty"`
+	Week  int           `json:"week"`
+}
+
+// RunGameLogRow one week of his log, its stat line beside where the week stands for him
+type RunGameLogRow struct {
+	Carries                *float32 `json:"carries"`
+	Completions            *float32 `json:"completions"`
+	DefensiveInterceptions *float32 `json:"defensive_interceptions"`
+	DefensiveTouchdowns    *float32 `json:"defensive_touchdowns"`
+	ExtraPointsMade        *float32 `json:"extra_points_made"`
+	FieldGoalsMade         *float32 `json:"field_goals_made"`
+	FumblesLost            *float32 `json:"fumbles_lost"`
+
+	// Home true at home
+	Home          *bool    `json:"home"`
+	Interceptions *float32 `json:"interceptions"`
+
+	// Opponent the club he plays; null on his bye, and where the run cannot say whose he was
+	Opponent            *string  `json:"opponent"`
+	PassAttempts        *float32 `json:"pass_attempts"`
+	PassingTouchdowns   *float32 `json:"passing_touchdowns"`
+	PassingYards        *float32 `json:"passing_yards"`
+	Points              *float32 `json:"points"`
+	ReceivingTouchdowns *float32 `json:"receiving_touchdowns"`
+	ReceivingYards      *float32 `json:"receiving_yards"`
+	Receptions          *float32 `json:"receptions"`
+	RushingTouchdowns   *float32 `json:"rushing_touchdowns"`
+	RushingYards        *float32 `json:"rushing_yards"`
+	Sacks               *float32 `json:"sacks"`
+	SnapShare           *float32 `json:"snapShare"`
+
+	// Status where a week stands for him
+	Status  RunGameStatus `json:"status"`
+	Targets *float32      `json:"targets"`
+
+	// UnnamedGame always true when sent: an inactive week he played in a game the run cannot name
+	UnnamedGame *bool `json:"unnamedGame,omitempty"`
+	Week        int   `json:"week"`
+}
+
+// RunGameState the game's state at the run's instant: final once either side's result or line is in
+type RunGameState string
+
+// RunGameStatus where a week stands for him
+type RunGameStatus string
+
+// RunHeld defines model for RunHeld.
+type RunHeld struct {
+	Pages []RunHeldPage `json:"pages"`
+}
+
+// RunHeldAnswer defines model for RunHeldAnswer.
+type RunHeldAnswer struct {
+	// Held null when the run held no page
+	Held  *RunHeld `json:"held"`
+	RunId string   `json:"run_id"`
+}
+
+// RunHeldCopy the earlier run his copy is from, and when that run was written
+type RunHeldCopy struct {
+	RunAt time.Time `json:"runAt"`
+
+	// RunId the run id: 2026-10-20T12-ros
+	RunId string `json:"runId"`
+}
+
+// RunHeldPage a held page, less what the reader said of it (the run's report)
+type RunHeldPage struct {
+	// Copy null when no earlier run had a page of his: his page is then his board rows' figures alone
+	Copy *RunHeldCopy `json:"copy"`
+	Id   string       `json:"id"`
+}
+
+// RunIndexAnswer defines model for RunIndexAnswer.
+type RunIndexAnswer struct {
+	// Market the kickers and defenses, in the file's order
+	Market []RunMarketEntry `json:"market"`
+
+	// Pages every player with a page, in the file's order
+	Pages []RunIndexEntry `json:"pages"`
+	RunId string          `json:"run_id"`
+}
+
+// RunIndexEntry defines model for RunIndexEntry.
+type RunIndexEntry struct {
+	Headshot string `json:"headshot"`
+	Id       string `json:"id"`
+	Name     string `json:"name"`
+
+	// OrderBasis absent on a run older than the kickers' and defenses' entries
+	OrderBasis *RunIndexEntryOrderBasis `json:"orderBasis,omitempty"`
+	Position   RunPosition              `json:"position"`
+	Season     RunIndexSeason           `json:"season"`
+	Slug       string                   `json:"slug"`
+	Team       string                   `json:"team"`
+}
+
+// RunIndexEntryOrderBasis absent on a run older than the kickers' and defenses' entries
+type RunIndexEntryOrderBasis string
+
+// RunIndexSeason defines model for RunIndexSeason.
+type RunIndexSeason struct {
+	Games int `json:"games"`
+
+	// PointsPerGame null exactly when he has no game
+	PointsPerGame *float32 `json:"pointsPerGame"`
+}
+
+// RunLastGameClub the club his newest game line was for and its week, when it is not his club
+type RunLastGameClub struct {
+	Club string `json:"club"`
+
+	// SpecialTeams always true when sent: that week he was on the field for special teams alone
+	SpecialTeams *bool `json:"specialTeams,omitempty"`
+	Week         int   `json:"week"`
+}
+
+// RunManifest the run's manifest.json, the members the site's reader names less the sources block (provenance)
+type RunManifest struct {
+	// Formats every format the run carries, the default first
+	Formats []RunFormat `json:"formats"`
+
+	// Implementation the code that produced the run
+	Implementation string `json:"implementation"`
+
+	// Players every player with a page
+	Players int `json:"players"`
+
+	// RunAt when the run finished
+	RunAt time.Time `json:"runAt"`
+
+	// RunId the run's id: 2026-10-12T05
+	RunId  string `json:"runId"`
+	Season int    `json:"season"`
+
+	// StandIn true for the stand-in run
+	StandIn bool `json:"standIn"`
+}
+
+// RunManifestAnswer defines model for RunManifestAnswer.
+type RunManifestAnswer struct {
+	// Manifest the run's manifest.json, the members the site's reader names less the sources block (provenance)
+	Manifest RunManifest `json:"manifest"`
+
+	// RunId the published run every /run answer is read from
+	RunId string `json:"run_id"`
+}
+
+// RunMarketEntry defines model for RunMarketEntry.
+type RunMarketEntry struct {
+	Headshot   *string                  `json:"headshot"`
+	Id         string                   `json:"id"`
+	Name       string                   `json:"name"`
+	OrderBasis RunMarketEntryOrderBasis `json:"orderBasis"`
+
+	// Position a kicker or a defense, the positions every board carries in the drafters' order
+	Position RunMarketPosition `json:"position"`
+	Slug     string            `json:"slug"`
+	Team     string            `json:"team"`
+}
+
+// RunMarketEntryOrderBasis defines model for RunMarketEntry.OrderBasis.
+type RunMarketEntryOrderBasis string
+
+// RunMarketPosition a kicker or a defense, the positions every board carries in the drafters' order
+type RunMarketPosition string
+
+// RunMarketRow a kicker or a defense on a board, after the ranked rows in the drafters' order, with no projected points and no tier: every figure of ours is always null
+type RunMarketRow struct {
+	// Adp this format's ADP
+	Adp float32 `json:"adp"`
+
+	// Ceiling always null
+	Ceiling *float32 `json:"ceiling"`
+
+	// ExpectedGames always null
+	ExpectedGames *float32 `json:"expectedGames"`
+
+	// Floor always null
+	Floor *float32 `json:"floor"`
+
+	// Gap always null when sent
+	Gap *float32 `json:"gap,omitempty"`
+
+	// Headshot null for a defense (its face is its club's mark)
+	Headshot *string `json:"headshot"`
+	Id       string  `json:"id"`
+
+	// Median always null
+	Median     *float32               `json:"median"`
+	Name       string                 `json:"name"`
+	OrderBasis RunMarketRowOrderBasis `json:"orderBasis"`
+
+	// OurRank his place on the whole board
+	OurRank int `json:"ourRank"`
+
+	// Position a kicker or a defense, the positions every board carries in the drafters' order
+	Position RunMarketPosition `json:"position"`
+
+	// PositionRank his place in the drafters' order at his position
+	PositionRank int `json:"positionRank"`
+
+	// Projected always null
+	Projected *float32 `json:"projected"`
+	Slug      string   `json:"slug"`
+	Team      string   `json:"team"`
+
+	// Tier always null
+	Tier *int `json:"tier"`
+
+	// TierDrop always null when sent
+	TierDrop *float32 `json:"tierDrop,omitempty"`
+
+	// Vor always null
+	Vor *float32 `json:"vor"`
+
+	// VorRound always null
+	VorRound *int `json:"vorRound"`
+}
+
+// RunMarketRowOrderBasis defines model for RunMarketRow.OrderBasis.
+type RunMarketRowOrderBasis string
+
+// RunPlacedPlayer one graded player of a week: each order's place among the week's graded players, and his finish
+type RunPlacedPlayer struct {
+	Adp *int `json:"adp"`
+
+	// Espn absent or null before ESPN's projection was kept
+	Espn      *int        `json:"espn,omitempty"`
+	Finish    int         `json:"finish"`
+	Ours      *int        `json:"ours"`
+	Position  RunPosition `json:"position"`
+	Published *int        `json:"published"`
+}
+
+// RunPlayer the run's players/<id>.json, as written
+type RunPlayer struct {
+	Capsule *RunCapsule `json:"capsule"`
+
+	// Formats keyed by format id, every format the run carries that ranks him
+	Formats  map[string]RunPlayerFormat `json:"formats"`
+	Headshot string                     `json:"headshot"`
+	Id       string                     `json:"id"`
+
+	// LastGameClub null when his newest line was for his club; absent on a run from before
+	LastGameClub *RunLastGameClub `json:"lastGameClub,omitempty"`
+	Name         string           `json:"name"`
+	Position     RunPosition      `json:"position"`
+
+	// PriorSeasons his earlier seasons, newest first; absent on a run from before
+	PriorSeasons *[]RunPriorSeason `json:"priorSeasons,omitempty"`
+
+	// Season his season so far, scored in one format, a row for every week of the regular season
+	Season RunSeason `json:"season"`
+	Slug   string    `json:"slug"`
+	Team   string    `json:"team"`
+
+	// WeekRead absent on a run from before the nightly wrote it, null when the writer did not write for the week ahead
+	WeekRead *RunWeekRead `json:"weekRead,omitempty"`
+}
+
+// RunPlayerAnswer defines model for RunPlayerAnswer.
+type RunPlayerAnswer struct {
+	// Player the run's players/<id>.json, as written
+	Player RunPlayer `json:"player"`
+	RunId  string    `json:"run_id"`
+}
+
+// RunPlayerFormat one format's numbers for him, his board row without the identity
+type RunPlayerFormat struct {
+	// Adp the blended ADP of this format's sources, null when none has him
+	Adp *float32 `json:"adp"`
+
+	// BlendedPerGame in season
+	BlendedPerGame *float32 `json:"blendedPerGame,omitempty"`
+
+	// Ceiling null in season
+	Ceiling       *float32 `json:"ceiling"`
+	ExpectedGames float32  `json:"expectedGames"`
+
+	// Floor null in season
+	Floor *float32 `json:"floor"`
+
+	// GamePoints in season
+	GamePoints *float32 `json:"gamePoints,omitempty"`
+
+	// Gap the drafters' ADP less our rank, to a tenth; absent on a run older than the column
+	Gap *float32 `json:"gap,omitempty"`
+
+	// Median null in season
+	Median *float32 `json:"median"`
+
+	// OurRank his place on this format's board
+	OurRank      int `json:"ourRank"`
+	PositionRank int `json:"positionRank"`
+
+	// PreseasonPerGame in season
+	PreseasonPerGame *float32 `json:"preseasonPerGame,omitempty"`
+
+	// PreseasonPoints in season, the preseason board's points for the full season
+	PreseasonPoints *float32 `json:"preseasonPoints,omitempty"`
+
+	// PreseasonRank in season
+	PreseasonRank *int `json:"preseasonRank,omitempty"`
+
+	// PreseasonShare in season
+	PreseasonShare *int    `json:"preseasonShare,omitempty"`
+	Projected      float32 `json:"projected"`
+
+	// RatePerGame in season, the model's rate a game he plays
+	RatePerGame *float32 `json:"ratePerGame,omitempty"`
+
+	// RestFromWeek in season
+	RestFromWeek *int `json:"restFromWeek,omitempty"`
+
+	// Tier his tier within his position
+	Tier int `json:"tier"`
+
+	// TierDrop his tier's drop to the next tier at his position; absent on a run older than the column
+	TierDrop *float32 `json:"tierDrop,omitempty"`
+	Vor      float32  `json:"vor"`
+
+	// VorRound the round of this format's draft his place falls in
+	VorRound int `json:"vorRound"`
+}
+
+// RunPlayerStatus defines model for RunPlayerStatus.
+type RunPlayerStatus struct {
+	// Returning the day he is due back from a season-long list, absent without one
+	Returning  *openapi_types.Date `json:"returning,omitempty"`
+	SeasonLong bool                `json:"seasonLong"`
+
+	// Since the first capture of his unbroken run under a season-long status; null for a week's designation
+	Since  *time.Time        `json:"since"`
+	Status DesignationStatus `json:"status"`
+}
+
+// RunPosition defines model for RunPosition.
+type RunPosition string
+
+// RunPriorSeason a season before this one, its regular season summed in the same format
+type RunPriorSeason struct {
+	Games         int      `json:"games"`
+	PointsPerGame *float32 `json:"pointsPerGame"`
+	Season        int      `json:"season"`
+
+	// Totals a stat line in the research store's names; a field is null when the records do not carry it
+	Totals RunStatLine `json:"totals"`
+}
+
+// RunPullFigure defines model for RunPullFigure.
+type RunPullFigure struct {
+	// Caption what it counts
+	Caption string `json:"caption"`
+
+	// Figure a number exactly as the capsule writes it
+	Figure string `json:"figure"`
+}
+
+// RunRecord the run's record.json, as written
+type RunRecord struct {
+	// Draft our draft board against ADP on the season's points so far
+	Draft *RunDraftRecord `json:"draft,omitempty"`
+
+	// Format the format every frozen board ranks in
+	Format            string  `json:"format"`
+	Honest            *string `json:"honest"`
+	Method            string  `json:"method"`
+	PublishedFromWeek *int    `json:"publishedFromWeek"`
+	Scale             string  `json:"scale"`
+	Season            int     `json:"season"`
+	StartersBasis     *string `json:"startersBasis"`
+
+	// Statistic the statistics the record grades with, as its column heads print them
+	Statistic RunRecordStatistic `json:"statistic"`
+	ToDate    []RunRecordLine    `json:"toDate"`
+
+	// Weekly our weekly rankings against the weekly experts, from the first week the shipped order was set
+	Weekly *RunWeeklyRecord `json:"weekly,omitempty"`
+	Weeks  []RunRecordWeek  `json:"weeks"`
+}
+
+// RunRecordAnswer defines model for RunRecordAnswer.
+type RunRecordAnswer struct {
+	// Record the run's record.json, as written
+	Record RunRecord `json:"record"`
+	RunId  string    `json:"run_id"`
+}
+
+// RunRecordLine defines model for RunRecordLine.
+type RunRecordLine struct {
+	// Adp ADP on the same players; null on the weekly record
+	Adp *RunScore `json:"adp"`
+
+	// Espn ESPN's weekly projection on the same players; absent or null before it was kept
+	Espn *RunScore `json:"espn,omitempty"`
+
+	// Ours how well one order matched the finish
+	Ours RunScore `json:"ours"`
+
+	// OursOnEspn the season to date only, ours over the weeks that graded ESPN's projection; absent or null before
+	OursOnEspn *RunScore `json:"oursOnEspn,omitempty"`
+
+	// OursOnPublished the season to date only, ours over the weeks that graded the published projection
+	OursOnPublished *RunScore `json:"oursOnPublished"`
+
+	// Position a position, or All
+	Position RunRecordPosition `json:"position"`
+
+	// Published the week's published projection on the same players, null before the freeze kept it
+	Published *RunScore `json:"published"`
+}
+
+// RunRecordPosition a position, or All
+type RunRecordPosition string
+
+// RunRecordStatistic the statistics the record grades with, as its column heads print them
+type RunRecordStatistic struct {
+	Agreement string `json:"agreement"`
+	PlacesOff string `json:"placesOff"`
+	Starters  string `json:"starters"`
+}
+
+// RunRecordWeek defines model for RunRecordWeek.
+type RunRecordWeek struct {
+	// EspnNote one sentence the weekly record prints under the week's row
+	EspnNote *string `json:"espnNote,omitempty"`
+
+	// FrozenAt when our board was frozen; an upcoming week's first kickoff
+	FrozenAt *time.Time `json:"frozenAt"`
+
+	// FrozenBy the run whose board was frozen
+	FrozenBy *string    `json:"frozenBy"`
+	GradedAt *time.Time `json:"gradedAt"`
+
+	// GradesFrom a frozen week's earliest grading instant
+	GradesFrom *time.Time      `json:"gradesFrom,omitempty"`
+	Lines      []RunRecordLine `json:"lines"`
+
+	// Note why a missed week was not frozen, one sentence; present only for a missed week
+	Note *string `json:"note,omitempty"`
+
+	// Order the order the week's freeze graded
+	Order *OrderBasis `json:"order"`
+
+	// OrderAsOf when the graded order was last refreshed before the week was set
+	OrderAsOf *time.Time `json:"orderAsOf,omitempty"`
+
+	// Players a graded week's players, in the finish's order
+	Players *[]RunPlacedPlayer `json:"players,omitempty"`
+
+	// Population frozen players with a stat line for the week
+	Population int `json:"population"`
+
+	// Status graded, frozen and waiting on its stats, missed (its first kickoff passed with no board frozen), or upcoming
+	Status RunRecordWeekStatus `json:"status"`
+	Week   int                 `json:"week"`
+}
+
+// RunRecordWeekStatus graded, frozen and waiting on its stats, missed (its first kickoff passed with no board frozen), or upcoming
+type RunRecordWeekStatus string
+
+// RunRestSlate a slate's games left at the run's instant: their strength, its rank (1 the hardest), and how it is measured
+type RunRestSlate struct {
+	Method   string  `json:"method"`
+	Rank     int     `json:"rank"`
+	Strength float32 `json:"strength"`
+}
+
+// RunSchedule the run's schedule.json, as written
+type RunSchedule struct {
+	// OpponentBasis what one opponent value is
+	OpponentBasis string `json:"opponentBasis"`
+
+	// OpponentValues the number each opponent contributes to the strength, keyed by club
+	OpponentValues map[string]float64 `json:"opponentValues"`
+	Season         int                `json:"season"`
+	Slates         []RunSlate         `json:"slates"`
+
+	// Unit a slate's strength as a short caption under its number
+	Unit string `json:"unit"`
+}
+
+// RunScheduleAnswer defines model for RunScheduleAnswer.
+type RunScheduleAnswer struct {
+	RunId string `json:"run_id"`
+
+	// Schedule the run's schedule.json, as written
+	Schedule RunSchedule `json:"schedule"`
+}
+
+// RunScore how well one order matched the finish
+type RunScore struct {
+	// Agreement rank agreement with the finish
+	Agreement *float32 `json:"agreement"`
+
+	// Graded players this order had an opinion about
+	Graded int `json:"graded"`
+
+	// PlacesOff the typical miss in places
+	PlacesOff *float32 `json:"placesOff"`
+
+	// Starters the week's top players at each position this order also put there
+	Starters   int `json:"starters"`
+	StartersOf int `json:"startersOf"`
+}
+
+// RunSeason his season so far, scored in one format, a row for every week of the regular season
+type RunSeason struct {
+	// Format the format every point in the block is scored in
+	Format string          `json:"format"`
+	Games  int             `json:"games"`
+	Log    []RunGameLogRow `json:"log"`
+
+	// PointsPerGame null before his first game
+	PointsPerGame *float32 `json:"pointsPerGame"`
+	Season        int      `json:"season"`
+
+	// Through the last week whose games are all final with their lines in
+	Through int `json:"through"`
+
+	// Totals a stat line in the research store's names; a field is null when the records do not carry it
+	Totals RunStatLine `json:"totals"`
+
+	// Weeks the regular season's length; the log has this many rows
+	Weeks int `json:"weeks"`
+}
+
+// RunSlate defines model for RunSlate.
+type RunSlate struct {
+	Abbr  string    `json:"abbr"`
+	Games []RunGame `json:"games"`
+
+	// Method how strength is measured
+	Method string `json:"method"`
+
+	// Rank 1 is the hardest slate of the 32
+	Rank int `json:"rank"`
+
+	// Rest the rest of the season, null with no game left; absent on a run from before
+	Rest *RunRestSlate `json:"rest,omitempty"`
+
+	// Strength the slate's strength in the method's unit
+	Strength float32 `json:"strength"`
+
+	// Window the first and last moments a feed's numbers were captured, read from the data's own stamps
+	Window RunWindow `json:"window"`
+}
+
+// RunStatLine a stat line in the research store's names; a field is null when the records do not carry it
+type RunStatLine struct {
+	Carries                *float32 `json:"carries"`
+	Completions            *float32 `json:"completions"`
+	DefensiveInterceptions *float32 `json:"defensive_interceptions"`
+	DefensiveTouchdowns    *float32 `json:"defensive_touchdowns"`
+	ExtraPointsMade        *float32 `json:"extra_points_made"`
+	FieldGoalsMade         *float32 `json:"field_goals_made"`
+	FumblesLost            *float32 `json:"fumbles_lost"`
+	Interceptions          *float32 `json:"interceptions"`
+	PassAttempts           *float32 `json:"pass_attempts"`
+	PassingTouchdowns      *float32 `json:"passing_touchdowns"`
+	PassingYards           *float32 `json:"passing_yards"`
+
+	// Points the line scored in the block's format
+	Points              *float32 `json:"points"`
+	ReceivingTouchdowns *float32 `json:"receiving_touchdowns"`
+	ReceivingYards      *float32 `json:"receiving_yards"`
+	Receptions          *float32 `json:"receptions"`
+	RushingTouchdowns   *float32 `json:"rushing_touchdowns"`
+	RushingYards        *float32 `json:"rushing_yards"`
+	Sacks               *float32 `json:"sacks"`
+
+	// SnapShare his share of his team's offensive snaps
+	SnapShare *float32 `json:"snapShare"`
+	Targets   *float32 `json:"targets"`
+}
+
+// RunWeekRead the week-ahead read: its text, null when his status changed since it was written (the caption says when the new one is due), the call, the status it was written against
+type RunWeekRead struct {
+	Body *string `json:"body"`
+
+	// Call the writer's call, null when withheld
+	Call *RunWeekReadCall `json:"call"`
+
+	// Caption Written Fri 9:00 pm Central, for week 6
+	Caption string `json:"caption"`
+
+	// FactsAt the newest stamp of the facts it was written from
+	FactsAt *time.Time `json:"factsAt"`
+
+	// MovedCaption the words the page shows once the live read prints another; absent on a run from before
+	MovedCaption *string `json:"movedCaption,omitempty"`
+
+	// Projection the published projection it quotes, in PPR; absent on a run from before
+	Projection *float32  `json:"projection,omitempty"`
+	Status     *string   `json:"status"`
+	Week       int       `json:"week"`
+	WrittenAt  time.Time `json:"writtenAt"`
+}
+
+// RunWeekReadCall the writer's call, null when withheld
+type RunWeekReadCall string
+
+// RunWeeklyRecord our weekly rankings against the weekly experts, from the first week the shipped order was set
+type RunWeeklyRecord struct {
+	FromWeek int `json:"fromWeek"`
+
+	// Honest the sentence printed when a yardstick called the weeks better on any figure
+	Honest        *string `json:"honest"`
+	Method        string  `json:"method"`
+	Scale         string  `json:"scale"`
+	StartersBasis *string `json:"startersBasis"`
+
+	// Statistic the statistics the record grades with, as its column heads print them
+	Statistic RunRecordStatistic `json:"statistic"`
+	ToDate    []RunRecordLine    `json:"toDate"`
+	Weeks     []RunRecordWeek    `json:"weeks"`
+}
+
+// RunWindow the first and last moments a feed's numbers were captured, read from the data's own stamps
+type RunWindow struct {
+	From time.Time `json:"from"`
+	To   time.Time `json:"to"`
+}
+
 // Scoreboard defines model for Scoreboard.
 type Scoreboard struct {
 	// Games the drafter's game first, then the rest in the host's order
@@ -4971,6 +6054,9 @@ type ClaimCode = string
 // ID defines model for ID.
 type ID = openapi_types.UUID
 
+// IfNoneMatch defines model for IfNoneMatch.
+type IfNoneMatch = string
+
 // Page defines model for Page.
 type Page = int
 
@@ -5419,6 +6505,72 @@ type PlayerWeekParams struct {
 
 	// TierFormat the format the tier is in, PPR when absent
 	TierFormat *TierFormat `form:"tier_format,omitempty" json:"tier_format,omitempty"`
+}
+
+// RunAdpParams defines parameters for RunAdp.
+type RunAdpParams struct {
+	// IfNoneMatch an ETag a /run answer gave; a match answers 304 with no body
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// RunBoardParams defines parameters for RunBoard.
+type RunBoardParams struct {
+	// IfNoneMatch an ETag a /run answer gave; a match answers 304 with no body
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// RunClubsParams defines parameters for RunClubs.
+type RunClubsParams struct {
+	// IfNoneMatch an ETag a /run answer gave; a match answers 304 with no body
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// RunDesignationsParams defines parameters for RunDesignations.
+type RunDesignationsParams struct {
+	// IfNoneMatch an ETag a /run answer gave; a match answers 304 with no body
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// RunHeldParams defines parameters for RunHeld.
+type RunHeldParams struct {
+	// IfNoneMatch an ETag a /run answer gave; a match answers 304 with no body
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// RunHeldCopyParams defines parameters for RunHeldCopy.
+type RunHeldCopyParams struct {
+	// IfNoneMatch an ETag a /run answer gave; a match answers 304 with no body
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// RunIndexParams defines parameters for RunIndex.
+type RunIndexParams struct {
+	// IfNoneMatch an ETag a /run answer gave; a match answers 304 with no body
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// RunManifestParams defines parameters for RunManifest.
+type RunManifestParams struct {
+	// IfNoneMatch an ETag a /run answer gave; a match answers 304 with no body
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// RunPlayerParams defines parameters for RunPlayer.
+type RunPlayerParams struct {
+	// IfNoneMatch an ETag a /run answer gave; a match answers 304 with no body
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// RunRecordParams defines parameters for RunRecord.
+type RunRecordParams struct {
+	// IfNoneMatch an ETag a /run answer gave; a match answers 304 with no body
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// RunScheduleParams defines parameters for RunSchedule.
+type RunScheduleParams struct {
+	// IfNoneMatch an ETag a /run answer gave; a match answers 304 with no body
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
 }
 
 // ListSheetsParams defines parameters for ListSheets.
