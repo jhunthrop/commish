@@ -4,21 +4,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.trycommish.core.AppWords
 import app.trycommish.core.shell.SheetPlayer
@@ -27,11 +23,10 @@ import app.trycommish.core.start.StartPin
 import app.trycommish.core.start.StartState
 import app.trycommish.core.start.StartUi
 import app.trycommish.design.CommishTheme
-import app.trycommish.design.Faces
-import app.trycommish.design.Mark
-import app.trycommish.design.QuietButton
 import app.trycommish.design.Tokens
+import app.trycommish.feature.boxscore.BasisText
 import app.trycommish.feature.boxscore.RowActions
+import app.trycommish.feature.boxscore.ScreenFailed
 
 /** What the screen's controls do: a row's name opens the player sheet by his id, the chevron its
  * evidence line, a link its page; the pin's verb, confirmation and way out; a pull reads again. */
@@ -68,8 +63,8 @@ fun StartScreen(
         PullToRefreshBox(isRefreshing = refreshing, onRefresh = actions.refresh, modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (val state = ui.state) {
                 StartState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-                is StartState.Failed -> Failed(state.message, actions.refresh)
-                StartState.SignedOut -> Failed(AppWords.signedOut, null)
+                is StartState.Failed -> ScreenFailed(state.message, actions.refresh)
+                StartState.SignedOut -> ScreenFailed(AppWords.signedOut, null)
                 is StartState.Loaded ->
                     StartPage(
                         state.model,
@@ -108,37 +103,9 @@ internal fun StartPage(
                 }
                 StartPart.Bench -> {
                     BenchTable(model, actions)
-                    BasisLine(model.basis)
+                    BasisText(model.basis)
                 }
             }
         }
-    }
-}
-
-/** What the numbers are, said once under the rows, in the interface's face at the box score's size (the
- * reading face reads as a document in season). */
-@Composable
-private fun BasisLine(text: String) {
-    Text(
-        text,
-        style = Faces.label.copy(fontWeight = Faces.small.fontWeight, letterSpacing = Faces.small.letterSpacing),
-        color = CommishTheme.colors.ink3,
-    )
-}
-
-@Composable
-private fun Failed(
-    message: String,
-    retry: (() -> Unit)?,
-) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Tokens.Space.s5.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Mark(size = 48.dp)
-        Spacer(Modifier.height(Tokens.Space.s4.dp))
-        Text(message, style = Faces.body, color = CommishTheme.colors.ink2, textAlign = TextAlign.Center)
-        retry?.let { QuietButton(AppWords.tryAgain, onClick = it) }
     }
 }

@@ -237,3 +237,14 @@ fun Figure(
         modifier = Modifier.width(width),
     )
 }
+
+/** What the numbers are, said once under the rows, in the interface's face at the box score's size (the
+ * reading face reads as a document in season); a screen's notes in the same voice. */
+@Composable
+fun BasisText(text: String) {
+    Text(
+        text,
+        style = Faces.label.copy(fontWeight = Faces.small.fontWeight, letterSpacing = Faces.small.letterSpacing),
+        color = CommishTheme.colors.ink3,
+    )
+}
