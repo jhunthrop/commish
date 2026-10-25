@@ -11,7 +11,6 @@ import app.trycommish.core.waivers.WaiverModel
 import app.trycommish.core.waivers.WaiverRows
 import app.trycommish.design.Words
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -40,17 +39,19 @@ class ScreenOffersTest {
         val week = (model as MatchupModel.Week).week
         val mine =
             week.boxes
-                .first { it.mine }
-                .starters
+                .filter { it.mine }
+                .flatMap { it.starters + it.bench }
                 .mapNotNull { it.sheetPlayer }
+        // FFPC hides the opponent's lineup at this clock, so his rows that open the sheet are his bench's.
         val theirs =
             week.boxes
                 .filterNot { it.mine }
-                .flatMap { it.starters }
+                .flatMap { it.starters + it.bench }
                 .mapNotNull { it.sheetPlayer }
-        assertTrue(mine.isNotEmpty())
+        assertTrue(mine.isNotEmpty(), "the member's rows open the sheet")
+        assertTrue(theirs.isNotEmpty(), "the opponent's rows open the sheet")
         assertTrue(mine.all(week::isMine))
-        assertFalse(theirs.any(week::isMine))
+        assertTrue(theirs.none(week::isMine))
     }
 
     @Test
