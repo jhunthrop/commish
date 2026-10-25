@@ -50,7 +50,8 @@ struct BoardCells {
             draftOrder: String(row.positionRank),
             adp: row.adp.map { Formatting.fixed($0) } ?? Words.Box.none,
             sheetPlayer: SheetPlayer(
-                id: row.id, slug: row.slug, name: row.name, position: label, rank: rank, club: row.team
+                id: row.id, slug: row.slug, name: row.name, position: label, rank: rank, club: row.team,
+                boardID: row.id
             )
         )
     }

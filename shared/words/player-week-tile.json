@@ -1,0 +1,13 @@
+{
+	"published": "published projection",
+	"sinceEarlier": "since the earlier read",
+	"underShown": "Moved under 0.5 since the earlier read",
+	"sinceRead": "since our read was written",
+	"underShownRead": "Moved under 0.5 since our read was written",
+	"notInRead": "Not in our read",
+	"changePart": "Proj change is its move since the earlier read, shown from 0.5.",
+	"changePartRead": "Proj change is its move since our read was written, shown from 0.5. The read is withheld from the same move.",
+	"functions": [
+		"atRead"
+	]
+}
