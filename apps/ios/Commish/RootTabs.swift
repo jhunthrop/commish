@@ -6,11 +6,12 @@ import Matchup
 import Shell
 import Start
 import SwiftUI
+import Waivers
 
 /// The phone's five, the web's bar for the shown league's phase or, with none, the site's season
 /// (PhoneRail, held to rail-order.ts), each under the top bar: the league switch, the player search
 /// and the account's way in. Choosing a league opens its home: the League tab where the bar has one,
-/// else the home pushed on the tab in view (B149). League, Lineup and Matchup are live; the others say
+/// else the home pushed on the tab in view (B149). League, Lineup, Matchup and Waivers are live; the others say
 /// their screen's name until their lane lands. Every screen presents the player sheet through the one host.
 struct RootTabs: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -111,7 +112,11 @@ struct RootTabs: View {
         case let (PhoneRail.matchupKey, league?):
             MatchupTab(environment: environment, leagueID: league.id, expired: expired)
                 .id(league.id)
-        case (PhoneRail.leagueKey, nil), (PhoneRail.lineupKey, nil), (PhoneRail.matchupKey, nil):
+        case let (PhoneRail.waiversKey, league?):
+            WaiversTab(environment: environment, league: league, expired: expired)
+                .id(league.id)
+        case (PhoneRail.leagueKey, nil), (PhoneRail.lineupKey, nil), (PhoneRail.matchupKey, nil),
+             (PhoneRail.waiversKey, nil):
             BasisText(AppWords.LeagueList.none).padding(Tokens.Space.s5)
         default:
             NamedScreen(tab.label)
@@ -223,5 +228,30 @@ private struct MatchupTab: View {
 
     var body: some View {
         MatchupView(viewModel: viewModel, leagueID: leagueID)
+    }
+}
+
+/// A league's Waivers: owns its view model for the league it shows; a name copied to the system
+/// clipboard and the platform's waiver page opened where the claim is not made here.
+private struct WaiversTab: View {
+    @State private var viewModel: WaiverViewModel
+    private let leagueID: String
+
+    init(environment: AppEnvironment, league: FollowedLeague, expired: @escaping @MainActor () -> Void) {
+        _viewModel = State(initialValue: WaiverViewModel(
+            api: environment.api, cache: environment.cache, clock: environment.clock, host: league.host,
+            zone: .current,
+            copy: { text in
+                UIPasteboard.general.string = text
+                return true
+            },
+            openPage: { UIApplication.shared.open($0) },
+            onSignedOut: expired
+        ))
+        leagueID = league.id
+    }
+
+    var body: some View {
+        WaiverView(viewModel: viewModel, leagueID: leagueID)
     }
 }

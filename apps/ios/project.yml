@@ -39,6 +39,8 @@ packages:
     path: Packages/Features/BoxScore
   Matchup:
     path: Packages/Features/Matchup
+  Waivers:
+    path: Packages/Features/Waivers
 targets:
   Commish:
     type: application
@@ -54,6 +56,7 @@ targets:
       - package: Start
       - package: BoxScore
       - package: Matchup
+      - package: Waivers
     entitlements:
       path: Commish/Commish.entitlements
       properties:
