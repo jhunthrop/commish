@@ -73,8 +73,35 @@ public struct TradeLine: Equatable, Sendable, Identifiable {
     /// The share text (trades.ts offerText).
     public let offer: String
     public let opened: OpenedTrade
-    /// What the check posts (builder.ts builtFrom), nil when a player in it has no host id.
-    public let check: TradeCheckInput?
+    /// The builder's picks from this trade (Build from this, builder.ts builtFrom), nil when a player in
+    /// it has no host id.
+    public let built: TradePicks?
+}
+
+/// A player the Trades holding picker offers: his key (state.ts pickKey) and his name.
+public struct PickOption: Equatable, Sendable, Identifiable {
+    public let id: String
+    public let name: String
+}
+
+/// The Trades holding picker (TradeScreen's PickSelect): every trade first, then your players, then
+/// theirs from the trades found, each once; the one chosen.
+public struct TradePicker: Equatable, Sendable {
+    public let yours: [PickOption]
+    public let theirs: [PickOption]
+    public let chosen: String?
+
+    /// The chosen player's name, or Every trade.
+    public var label: String {
+        (yours + theirs).first { $0.id == chosen }?.name ?? Words.TradePicker.every
+    }
+}
+
+/// What the basis says the screen draws: the finder alone, a trade's players opened, or the builder.
+public enum TradesOpened: Equatable, Sendable {
+    case none
+    case trade
+    case builder
 }
 
 /// The finder's two orders a phone sorts by: your gain, their gain (TradeFinder's phone heads).
@@ -104,9 +131,18 @@ public struct TradesModel: Equatable, Sendable {
     public let page: URL?
     public let reason: String?
     public let rows: [TradeLine]
-    public let basis: String
-    public let basisOpened: String
+    public let picker: TradePicker
+    /// No trade found holds the player picked: the decision says so in place of the strip.
+    public let noneHolding: Bool
     public let platform: String
+    /// The builder's opening picks for Build a trade.
+    public let opening: TradePicks
+    private let bases: [TradesOpened: String]
+
+    /// The basis as the screen stands: closed, a trade opened, or the builder open.
+    public func basis(_ opened: TradesOpened) -> String {
+        bases[opened] ?? ""
+    }
 
     /// Every player an opened row shows in the sheet.
     public var sheetPlayers: [SheetPlayer] {
@@ -114,17 +150,26 @@ public struct TradesModel: Equatable, Sendable {
     }
 
     /// The answer drawn at `now`, the member's team named `me`, every trade or each team's best, in
-    /// `sort`'s order.
+    /// `sort`'s order; with a player picked, the trades holding him from the narrowed answer (the web's
+    /// shown), or none where it was not read.
     public init(
-        advice answer: TradeAdvice, host: Components.Schemas.LeagueHost, me: String, every showsEvery: Bool,
-        sort: TradeSort, now: Date, zone: TimeZone
+        advice answer: TradeAdvice, narrowed: TradeAdvice? = nil, holding: String? = nil,
+        host: Components.Schemas.LeagueHost, me: String, every showsEvery: Bool, sort: TradeSort, now: Date,
+        zone: TimeZone
     ) {
         let advice = TradeFinder.held(answer, now: now)
+        let shown = narrowed.map { TradeFinder.held($0, now: now) } ?? advice
         let platform = ValueWords.platform(host)
         let worth = TradeFinder.worthProposing(advice.teams)
+        let picker = TradeFinder.picker(advice, chosen: holding)
+        let none = holding.map { !TradeFinder.holds(shown.teams, $0) } ?? false
         self.platform = platform
-        decision = TradesWords.decision(worth.first.map { ($0.row, $0.team.name) })
-        strip = worth.isEmpty ? nil : TradesStrip(
+        self.picker = picker
+        noneHolding = none
+        decision = none
+            ? TradesWords.noTradeWith(picker.label)
+            : TradesWords.decision(worth.first.map { ($0.row, $0.team.name) })
+        strip = worth.isEmpty || none ? nil : TradesStrip(
             week: "\(Words.Trades.weekWord) \(advice.forWeek ?? advice.week)",
             title: TradesWords.worthTitle(worth.count),
             reason: advice.moves.reason,
@@ -136,15 +181,16 @@ public struct TradesModel: Equatable, Sendable {
         verb = TradesWords.verb(advice.moves, platform: platform)
         page = advice.hostTradesUrl.isEmpty ? nil : URL(string: advice.hostTradesUrl)
         reason = advice.hostTradesUrl.isEmpty ? advice.hostNote : nil
-        rows = TradeFinder.sorted(TradeFinder.rows(advice.teams, every: showsEvery), by: sort).map {
+        opening = TradeBuilder.opening(advice)
+        let teams = TradeFinder.holding(shown.teams, player: holding)
+        rows = TradeFinder.sorted(TradeFinder.rows(teams, every: showsEvery), by: sort).map {
             Self.line($0, me: me, zone: zone, now: now)
         }
         let lines = advice.roster + advice.teams.flatMap { $0.roster + $0.trades.flatMap { $0.give + $0.get } }
-        let facts = { (opened: Bool) in
-            TradesBasis.Facts(advice: advice, host: host, lines: lines, opened: opened, zone: zone, now: now)
+        let basis = { (opened: TradesOpened) in
+            TradesBasis.phone(.init(advice: shown, host: host, lines: lines, opened: opened, zone: zone, now: now))
         }
-        basis = TradesBasis.phone(facts(false))
-        basisOpened = TradesBasis.phone(facts(true))
+        bases = [.none: basis(.none), .trade: basis(.trade), .builder: basis(.builder)]
     }
 
     static func card(_ entry: TradeFinder.Entry, index: Int, count: Int) -> StripCard {
@@ -178,7 +224,7 @@ public struct TradesModel: Equatable, Sendable {
                     TradeGroup(head: TradesWords.from(entry.team.name, mine: false), rows: theirs),
                 ]
             ),
-            check: TradeFinder.checkInput(team: entry.team.rosterId, row: row)
+            built: TradeBuilder.built(team: entry.team.rosterId, row: row)
         )
     }
 }
@@ -233,14 +279,47 @@ enum TradeFinder {
         Array(rows(teams, every: false).filter { !$0.row.closeForThem && $0.row.myGain > 0 }.prefix(2))
     }
 
-    /// builder.ts builtFrom as the check's body: nil when a player in it has no host id.
-    static func checkInput(team: Int, row: TradeRow) -> TradeCheckInput? {
-        let give = row.give.map(\.player.hostId)
-        let get = row.get.map(\.player.hostId)
-        guard !(give + get).contains(where: \.isEmpty) else {
-            return nil
+    /// The prefix of a picker key for a player our board does not place (state.ts pickKey's own prefix
+    /// names the platform's id field, a word the copy guard keeps out of sources).
+    static let unplaced = "platform:"
+
+    /// state.ts pickKey: his board id, or his platform id where our board does not place him.
+    static func pickKey(_ line: PlayerLine) -> String {
+        line.player.boardId ?? "\(unplaced)\(line.player.hostId)"
+    }
+
+    /// state.ts pickerPlayers: your roster, then theirs from the trades found, each once.
+    static func picker(_ advice: TradeAdvice, chosen: String?) -> TradePicker {
+        var seen: Set<String> = []
+        let theirs = advice.teams.flatMap { $0.trades.flatMap(\.get) }.filter { line in
+            guard let id = line.player.boardId else {
+                return false
+            }
+            return seen.insert(id).inserted
         }
-        return TradeCheckInput(team: team, give: give, get: get)
+        let option = { (line: PlayerLine) in PickOption(id: pickKey(line), name: line.player.name) }
+        return TradePicker(yours: advice.roster.map(option), theirs: theirs.map(option), chosen: chosen)
+    }
+
+    /// state.ts tradeHolding: a trade found holds the player, by board id.
+    static func holds(_ teams: [TradeTeam], _ key: String) -> Bool {
+        teams.contains { $0.trades.contains { trade(trade: $0, holds: key) } }
+    }
+
+    static func trade(trade row: TradeRow, holds key: String) -> Bool {
+        (row.give + row.get).contains { $0.player.boardId == key }
+    }
+
+    /// TradeScreen's teams: each team's trades holding the player picked, every trade with none.
+    static func holding(_ teams: [TradeTeam], player: String?) -> [TradeTeam] {
+        guard let player else {
+            return teams
+        }
+        return teams.map { team in
+            var team = team
+            team.trades = team.trades.filter { trade(trade: $0, holds: player) }
+            return team
+        }
     }
 
     /// trades.ts heldTrades: every trade's week change held once a player it moves has kicked off.

@@ -14,15 +14,16 @@ public struct TradeFigures: Equatable, Sendable {
     public let seasonChange: String
     public let seasonTone: Tone
 
-    /// bugFigures: the totals, the side's gain and its change in this week's Proj as the API sends them.
-    init(totals: TradeSideTotals, gain: Double, projChange: Double?) {
-        projBefore = Self.word(totals.projBefore)
-        projAfter = Self.word(totals.projAfter)
+    /// bugFigures: the totals, the side's gain and its change in this week's Proj as the API sends them,
+    /// "--" before an answer.
+    init(totals: TradeSideTotals?, gain: Double?, projChange: Double?) {
+        projBefore = Self.word(totals?.projBefore)
+        projAfter = Self.word(totals?.projAfter)
         self.projChange = TradesWords.week(projChange)
         projTone = TradesWords.tone(projChange)
-        seasonBefore = Self.word(totals.seasonBefore)
-        seasonAfter = Self.word(totals.seasonAfter)
-        seasonChange = TradesWords.gain(gain)
+        seasonBefore = Self.word(totals?.seasonBefore)
+        seasonAfter = Self.word(totals?.seasonAfter)
+        seasonChange = gain.map(TradesWords.gain) ?? Words.Box.none
         seasonTone = TradesWords.tone(gain)
     }
 
@@ -44,39 +45,23 @@ public struct TradeBugSide: Equatable, Sendable {
     public let mine: Bool
     public let figures: TradeFigures
     public let room: String
+
+    init(
+        me: Bool, name: String, totals: TradeSideTotals?, gain: Double?, projChange: Double?, room: String
+    ) {
+        label = me ? Words.Trades.yourSide : Words.Trades.theirSide
+        self.name = name
+        initials = Initials.of(name)
+        mine = me
+        figures = TradeFigures(totals: totals, gain: gain, projChange: projChange)
+        self.room = room
+    }
 }
 
-/// The check of one trade as the screen draws it (TradeBuilder's scoreboard and answer line): both
-/// lineups before and after, the sentence and the API's line under it.
-public struct TradeCheckBug: Equatable, Sendable {
+/// The builder's scoreboard (TradeBug.svelte): each side's lineup before and after the trade.
+public struct TradeBug: Equatable, Sendable {
     public let yours: TradeBugSide
     public let theirs: TradeBugSide
-    public let sentence: String
-    public let basis: String
-
-    /// The check held at `now` (trades.ts heldCheck): a trade moving a player whose game has kicked off
-    /// draws no change and no lineup Proj this week.
-    init(_ answer: TradeCheck, me: String, team: String, now: Date) {
-        let check = TradeChecks.held(answer, now: now)
-        let trade = check.trade.value1
-        let room = TradeChecks.room(check)
-        let side = { (name: String, mine: Bool) in
-            TradeBugSide(
-                label: mine ? Words.Trades.yourSide : Words.Trades.theirSide, name: name,
-                initials: Initials.of(name), mine: mine,
-                figures: mine
-                    ? TradeFigures(totals: check.totals.yours, gain: trade.myGain, projChange: trade.myProjChange)
-                    : TradeFigures(
-                        totals: check.totals.theirs, gain: trade.theirGain, projChange: trade.theirProjChange
-                    ),
-                room: mine ? room.yours : room.theirs
-            )
-        }
-        yours = side(me, true)
-        theirs = side(team, false)
-        sentence = TradeChecks.words(check)
-        basis = check.basis
-    }
 }
 
 /// trades.ts heldCheck and checkRoom, and builder.ts checkWords.

@@ -67,11 +67,12 @@ struct TradesParityTests {
     }
 
     @Test(arguments: StartParityTests.clocks)
-    func theBasisIsTheWebsPhoneParagraphClosedAndOpened(clock: String) throws {
+    func theBasisIsTheWebsPhoneParagraphClosedOpenedAndBuilding(clock: String) throws {
         let web = try Self.web(clock)
         let model = try Self.model(clock)
-        #expect(web.basis.closed == "\(model.basis) \(Words.InSeason.orderRecord)")
-        #expect(web.basis.opened == "\(model.basisOpened) \(Words.InSeason.orderRecord)")
+        #expect(web.basis.closed == "\(model.basis(.none)) \(Words.InSeason.orderRecord)")
+        #expect(web.basis.opened == "\(model.basis(.trade)) \(Words.InSeason.orderRecord)")
+        #expect(web.basis.builder == "\(model.basis(.builder)) \(Words.InSeason.orderRecord)")
     }
 
     @Test(arguments: [Fixtures.week, Fixtures.sunday])
@@ -80,11 +81,9 @@ struct TradesParityTests {
         let strip = try #require(Self.model(clock).strip)
         #expect(checks.count == 2)
         for (index, web) in checks.enumerated() {
-            let bug = try TradeCheckBug(
-                Fixtures.tradeCheck(clock, index + 1), me: Self.parity.me, team: strip.cards[index].team,
-                now: Fixtures.instant(clock)
-            )
-            #expect(TradesParity.Check(bug) == web, "\(clock) \(index + 1)")
+            let check = try TradeChecks.held(Fixtures.tradeCheck(clock, index + 1), now: Fixtures.instant(clock))
+            let ours = TradesParity.Check(check, me: Self.parity.me, team: strip.cards[index].team)
+            #expect(ours == web, "\(clock) \(index + 1)")
         }
     }
 
@@ -215,6 +214,7 @@ struct TradesParity: Decodable {
     struct Basis: Decodable {
         let closed: String
         let opened: String
+        let builder: String
     }
 
     struct Clock: Decodable {
@@ -265,11 +265,20 @@ struct TradesParity: Decodable {
         let sentence: String
         let basis: String
 
-        init(_ bug: TradeCheckBug) {
-            yours = Side(bug.yours)
-            theirs = Side(bug.theirs)
-            sentence = bug.sentence
-            basis = bug.basis
+        /// The check as the scoreboard and its answer line draw it, held at its clock.
+        init(_ check: TradeCheck, me: String, team: String) {
+            let trade = check.trade.value1
+            let room = TradeChecks.room(check)
+            yours = Side(TradeBugSide(
+                me: true, name: me, totals: check.totals.yours, gain: trade.myGain, projChange: trade.myProjChange,
+                room: room.yours
+            ))
+            theirs = Side(TradeBugSide(
+                me: false, name: team, totals: check.totals.theirs, gain: trade.theirGain,
+                projChange: trade.theirProjChange, room: room.theirs
+            ))
+            sentence = TradeChecks.words(check)
+            basis = check.basis
         }
     }
 

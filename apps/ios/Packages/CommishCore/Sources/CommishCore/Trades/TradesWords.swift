@@ -136,6 +136,11 @@ public enum TradesWords {
         return "Week \(forWeek), \(Words.Box.proj)"
     }
 
+    /// words.ts noTradeWith: "No trade we found includes Josh Downs."
+    static func noTradeWith(_ name: String) -> String {
+        "No trade we found includes \(name)."
+    }
+
     /// words.ts gainAmount: "2.1", "under 0.1" for a gain under what a page shows.
     static func gainAmount(_ gain: Double) -> String {
         gain > 0 && gain < 0.05 ? "under \(Formatting.fixed(0.1, 1))" : Formatting.fixed(gain, 1)

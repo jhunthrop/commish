@@ -8,26 +8,31 @@ import Foundation
 /// the rules our stats lack; the record's link follows it. A port, held to the web's paragraph at every
 /// clock by the parity file.
 enum TradesBasis {
+    /// basis.ts DEFENSES_CLAUSE: the Proj sentence's clause where a defense is drawn.
+    static let defensesClause = ", defenses on default scoring"
+
     struct Facts {
         let advice: TradeAdvice
         let host: Components.Schemas.LeagueHost
         /// Every line the finder and its opened trades can show (TradeScreen's lines).
         let lines: [PlayerLine]
-        /// A trade is opened: its players' columns are on the screen.
-        let opened: Bool
+        /// What is open: a trade's players' columns, or the builder's rosters, are on the screen.
+        let opened: TradesOpened
         let zone: TimeZone
         let now: Date
     }
 
     static func phone(_ facts: Facts) -> String {
         let advice = facts.advice
+        let open = facts.opened != .none
         let parts: [String?] = [
             advice.basis,
-            facts.opened ? advice.perGameBasis : nil,
+            open ? advice.perGameBasis : nil,
             arrives(facts) ?? proj(facts),
             finals(facts),
-            facts.opened ? Words.Basis.oppPhone : nil,
-            facts.opened
+            // The builder's phone rows draw no Opp rank (TradeBox), so its sentence is the desk's there.
+            facts.opened == .trade ? Words.Basis.oppPhone : nil,
+            open
                 ? BasisParts.uncounted(note: advice.basisNote, list: advice.basisNoteList, lines: facts.lines) : nil,
         ]
         return parts.compactMap(\.self).filter { !$0.isEmpty }.joined(separator: " ")
@@ -53,8 +58,11 @@ enum TradesBasis {
         let week = LineupBasis.weeksWord(addressed, advice.week)
         let read = advice.projectionReadAt.map { "read \(Formatting.weekdayTime($0, zone: facts.zone))" }
             ?? "not in yet"
+        // The builder's boxes draw a defense; a trade never holds one (Lane 66g).
+        let defense = facts.opened == .builder && facts.lines.contains { $0.player.position == "DEF" }
+            ? defensesClause : ""
         let said = "\(Words.Box.proj) is \(week) published projection"
-            + "\(BasisParts.scoringWords(scoring, host: nil)), \(read)."
+            + "\(BasisParts.scoringWords(scoring, host: nil))\(defense), \(read)."
         return BasisParts.teBonusSentence(scoring.teBonus, host: nil).map { "\(said) \($0)" } ?? said
     }
 
@@ -67,7 +75,7 @@ enum TradesBasis {
             return nil
         }
         guard timing != nil, full != timing else {
-            return facts.opened && full == Words.Basis.kickedOffPart ? nil : full
+            return facts.opened != .none && full == Words.Basis.kickedOffPart ? nil : full
         }
         return "\(Words.Box.avg) and \(Words.Box.last) count \(ValueWords.platform(facts.host))'s finals, "
             + "our stats \(Words.Basis.statsByWednesday)"
