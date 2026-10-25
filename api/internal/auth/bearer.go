@@ -201,29 +201,47 @@ func (b *Bearer) TokenKey(r *http.Request) (string, bool) {
 	return "d:" + hex.EncodeToString(TokenHash(token)[:16]), true
 }
 
+// SessionDevice is the request's device and its account when the
+// request's token is a live device carrying ScopeSession, the one check
+// the api's session routes and the room's socket share. Anything else is
+// ErrNoDevice: no token, a token that is not ours, an unknown, revoked or
+// lapsed one, and the extension's, which never carries the scope. Only a
+// well-formed token costs a device read, and that read notes its use.
+func (b *Bearer) SessionDevice(ctx context.Context, r *http.Request) (Account, Device, error) {
+	token, ok := b.parse(r)
+	if !ok {
+		return Account{}, Device{}, ErrNoDevice
+	}
+	acct, dev, err := b.store.DeviceAccount(ctx, TokenHash(token), b.now())
+	if err != nil {
+		return Account{}, Device{}, err
+	}
+	if !dev.Has(ScopeSession) {
+		return Account{}, Device{}, ErrNoDevice
+	}
+	return acct, dev, nil
+}
+
 // SessionOr serves a session route (httpx.SignedIn, httpx.Public). A
-// request whose token is a live device carrying ScopeSession goes to
-// signedIn with that device's account and the device on its context: the
-// cookie is not read and no CSRF token is asked for, since nothing a
-// browser sends on its own carries the header. Every other request goes
-// to cookie, the session path, unchanged: no token, a token that is not
-// ours, an unknown or revoked one, and the extension's, which never
-// carries the scope. Only a well-formed token costs a device read.
+// request SessionDevice resolves goes to signedIn with that device's
+// account and the device on its context: the cookie is not read, even
+// when one rides along (that is logged), and no CSRF token is asked for,
+// since nothing a browser sends on its own carries the header. Every
+// other request goes to cookie, the session path, unchanged.
 func (b *Bearer) SessionOr(signedIn, cookie http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, ok := b.parse(r)
-		if !ok {
-			cookie.ServeHTTP(w, r)
-			return
-		}
-		acct, dev, err := b.store.DeviceAccount(r.Context(), TokenHash(token), b.now())
+		acct, dev, err := b.SessionDevice(r.Context(), r)
 		switch {
-		case errors.Is(err, ErrNoDevice), err == nil && !dev.Has(ScopeSession):
+		case errors.Is(err, ErrNoDevice):
 			cookie.ServeHTTP(w, r)
 			return
 		case err != nil:
 			httpx.WriteInternal(w, r, b.log, "auth: device session", err)
 			return
+		}
+		if _, err := r.Cookie(SessionCookie); err == nil {
+			b.log.Info("auth: a device token and a session cookie on one request, the token used",
+				"request_id", httpx.RequestIDFrom(r.Context()), "device", dev.ID)
 		}
 		ctx := WithDevice(WithAccount(r.Context(), acct), dev)
 		signedIn.ServeHTTP(w, r.WithContext(ctx))

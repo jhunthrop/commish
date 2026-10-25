@@ -65,9 +65,9 @@ class LeagueHomeSnapshotTest {
 
     @Test fun screenSmallDark() = screen("screen-small", dark = true)
 
-    @Test fun scoreboardLight() = snap("scoreboard", dark = false) { ScoreBoard(model.week, model.games) }
+    @Test fun scoreboardLight() = snap("scoreboard", dark = false) { ScoreBoard(model.week, model.games) {} }
 
-    @Test fun scoreboardDark() = snap("scoreboard", dark = true) { ScoreBoard(model.week, model.games) }
+    @Test fun scoreboardDark() = snap("scoreboard", dark = true) { ScoreBoard(model.week, model.games) {} }
 
     @Test fun standingsLight() = snap("standings", dark = false) { Standings(model.standings) }
 

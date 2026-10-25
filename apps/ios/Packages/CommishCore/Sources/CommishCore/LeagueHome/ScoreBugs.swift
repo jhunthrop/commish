@@ -81,6 +81,12 @@ public struct ScoreBug: Sendable, Equatable, Identifiable {
     public let small: String
     public let big: String
     public let sides: [BugSide]
+
+    /// The roster the bug opens the game of (game.ts bugRoster, Lane 204): none for the member's game,
+    /// which is the Matchup's own, else its first side's.
+    public var roster: Int? {
+        mine ? nil : sides.first?.rosterID
+    }
 }
 
 /// home.ts bugsOf and its helpers, over the generated types.

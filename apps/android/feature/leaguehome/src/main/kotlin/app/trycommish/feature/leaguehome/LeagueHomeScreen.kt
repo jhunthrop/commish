@@ -37,7 +37,8 @@ import java.time.ZoneId
 /**
  * The League home (web route /league/[id]): the week's scoreboard, the standings, the member's lineup
  * and the league's moves, in the web's order, under the league's name and the answer's stamp. Pull
- * down to read again. The screen's one verb is Open Lineup.
+ * down to read again. The screen's one verb is Open Lineup; a score bug opens its game (`onOpenGame`, null
+ * for the member's, else the roster of the game's first side).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +49,7 @@ fun LeagueHomeScreen(
     onRefresh: () -> Unit,
     onOpenLineup: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenGame: (Int?) -> Unit = {},
 ) {
     PullToRefreshBox(
         isRefreshing = refreshing,
@@ -57,7 +59,7 @@ fun LeagueHomeScreen(
         when (state) {
             LeagueHomeState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             is LeagueHomeState.Failed -> Failed(state.message)
-            is LeagueHomeState.Loaded -> Loaded(state.model, stampText(state.stamp, state.stale, zone), onOpenLineup)
+            is LeagueHomeState.Loaded -> Loaded(state.model, stampText(state.stamp, state.stale, zone), onOpenLineup, onOpenGame)
             LeagueHomeState.SignedOut -> Failed(AppWords.signedOut)
         }
     }
@@ -88,8 +90,9 @@ private fun Loaded(
     model: LeagueHomeModel,
     stamp: String,
     onOpenLineup: () -> Unit,
+    onOpenGame: (Int?) -> Unit,
 ) {
-    LeagueHomePage(model, stamp, onOpenLineup, Modifier.fillMaxSize().verticalScroll(rememberScrollState()))
+    LeagueHomePage(model, stamp, onOpenLineup, Modifier.fillMaxSize().verticalScroll(rememberScrollState()), onOpenGame)
 }
 
 /** The page itself, every section at its full height: the screen scrolls it, a snapshot draws it whole.
@@ -100,10 +103,11 @@ fun LeagueHomePage(
     stamp: String,
     onOpenLineup: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenGame: (Int?) -> Unit = {},
 ) {
     Column(modifier.background(CommishTheme.colors.bg)) {
         Head(model, stamp)
-        if (model.games.isNotEmpty()) ScoreBoard(model.week, model.games)
+        if (model.games.isNotEmpty()) ScoreBoard(model.week, model.games, onOpenGame)
         Standings(model.standings)
         LineupSummary(model.lineup, onOpenLineup)
         model.moves?.let { MovesFeed(it) }

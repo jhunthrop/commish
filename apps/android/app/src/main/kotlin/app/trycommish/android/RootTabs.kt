@@ -19,10 +19,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -30,6 +33,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.trycommish.core.phoneBar
+import app.trycommish.core.shell.FollowedLeague
 import app.trycommish.core.shell.LEAGUE_PAGE
 import app.trycommish.core.shell.LINEUP_PAGE
 import app.trycommish.core.shell.MATCHUP_PAGE
@@ -38,8 +42,10 @@ import app.trycommish.core.shell.ShellDestination
 import app.trycommish.core.shell.ShellRoute
 import app.trycommish.core.shell.ShellState
 import app.trycommish.core.shell.ShellViewModel
+import app.trycommish.core.shell.SiteLinks
 import app.trycommish.core.shell.TRADES_PAGE
 import app.trycommish.core.shell.WAIVERS_PAGE
+import app.trycommish.core.shell.gameOf
 import app.trycommish.core.shell.homeOf
 import app.trycommish.core.shell.lineupOf
 import app.trycommish.core.shell.searchRoute
@@ -72,6 +78,12 @@ private object Routes {
     const val ACCOUNT = "account"
     const val LEAGUE_HOME = "league-home/{id}"
     const val PLAYER = "player/{slug}"
+    const val GAME = "game/{id}?roster={roster}"
+    const val ADP = "adp?format={format}"
+    const val COMPARE = "compare?a={a}&b={b}"
+    const val CLUBS = "clubs"
+    const val CLUB = "club/{abbr}"
+    const val SCHEDULE = "schedule"
 
     fun of(route: ShellRoute): String =
         when (route) {
@@ -79,6 +91,12 @@ private object Routes {
             ShellRoute.Account -> ACCOUNT
             is ShellRoute.LeagueHome -> "league-home/${route.id}"
             is ShellRoute.Player -> "player/${route.slug}"
+            is ShellRoute.Game -> "game/${route.leagueId}" + (route.roster?.let { "?roster=$it" } ?: "")
+            is ShellRoute.Adp -> "adp?format=${route.format.orEmpty()}"
+            is ShellRoute.Compare -> "compare?a=${route.first.orEmpty()}&b=${route.second.orEmpty()}"
+            ShellRoute.Clubs -> CLUBS
+            is ShellRoute.Club -> "club/${route.abbr}"
+            ShellRoute.Schedule -> SCHEDULE
         }
 }
 
@@ -118,6 +136,15 @@ fun Shell(
         nav.navigate(Routes.of(route))
     }
 
+    // A site link a screen follows: a reference page (ADP, Compare, the clubs, a club, the schedule) or a
+    // player's page is pushed on the tab in view, as the web links them; any other opens on the site.
+    val uri = LocalUriHandler.current
+    val link: (String) -> Unit = { url ->
+        SiteLinks.reference(url)?.let(::push)
+            ?: SiteLinks.playerSlug(url)?.let { push(ShellRoute.Player(it)) }
+            ?: uri.openUri(url)
+    }
+
     // Signed in, the account is read; signed out (Sign out, or a refused token), every tab's stack is let go
     // and the League tab, the sign-in screen, is shown.
     LaunchedEffect(signedIn) {
@@ -150,6 +177,14 @@ fun Shell(
         lineupOf(id, shown, bar)?.let { openTab(it.page) } ?: onOpenLineup(id)
     }
 
+    // A score bug's game: the member's on the Matchup tab where the bar has one, every other pushed.
+    val openGame: (String, Int?) -> Unit = { id, roster ->
+        when (val game = gameOf(roster, id, (state as? ShellState.Ready)?.selected?.id, bar)) {
+            is ShellDestination.Tab -> openTab(game.page)
+            is ShellDestination.Push -> push(game.route)
+        }
+    }
+
     CompositionLocalProvider(LocalPlayerSheet provides sheet) {
         Scaffold(
             containerColor = CommishTheme.colors.bg,
@@ -179,7 +214,7 @@ fun Shell(
         ) { padding ->
             // The bars' room counted as taken, so a pin's imePadding lifts it only by what the keyboard adds.
             Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
-                Pages(graph, nav, state, bar, PageVerbs(shell::open, openLineup, ::openTab, choose))
+                Pages(graph, nav, state, bar, PageVerbs(shell::open, openLineup, ::openTab, choose, link, openGame))
                 if (switchOpen) {
                     Box(
                         Modifier
@@ -199,12 +234,15 @@ fun Shell(
 }
 
 /** What the pages ask of the shell: read the account again (a retry, or the Account's leagues changed), a
- * league's lineup, a tab, and a league chosen as the switch chooses it. */
+ * league's lineup, a tab, a league chosen as the switch chooses it, and a game of a league's week. */
 private class PageVerbs(
     val retry: () -> Unit,
     val onOpenLineup: (leagueId: String) -> Unit,
     val openTab: (String) -> Unit,
     val choose: (String) -> Unit,
+    /** A site link: a reference page or a player's page pushed, any other on the site. */
+    val link: (String) -> Unit,
+    val openGame: (leagueId: String, roster: Int?) -> Unit,
 )
 
 /** The tabs' pages and the pushed screens. */
@@ -221,14 +259,14 @@ private fun Pages(
     val openTab = verbs.openTab
     val selected = (state as? ShellState.Ready)?.selected
     NavHost(nav, startDestination = LEAGUE_PAGE) {
-        composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup) }
+        composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup, verbs.openGame) }
         composable(LINEUP_PAGE) { StartTab(graph, state, retry) }
         composable(MATCHUP_PAGE) { MatchupTab(graph, state, retry) { openTab(LINEUP_PAGE) } }
         composable(WAIVERS_PAGE) { WaiversTab(graph, state, retry) }
         composable(TRADES_PAGE) { TradesTab(graph, state, retry) }
         composable(BOARD_PAGE) {
             val following = (state as? ShellState.Ready)?.selected != null
-            boardInSeason(bar)?.let { BoardTab(graph, it, following) }
+            boardInSeason(bar)?.let { BoardTab(graph, it, following, verbs.link) }
         }
         composable(PLAYERS_PAGE) { RankingsTab(graph, state, query = "") }
         composable(RECORD_PAGE) { RecordTab(graph) }
@@ -241,11 +279,52 @@ private fun Pages(
         composable(Routes.PLAYER, listOf(navArgument("slug") { type = NavType.StringType })) { entry ->
             entry.arguments?.getString("slug")?.let { PlayerPage(graph, it, selected, bar, openTab) }
         }
+        reference(graph, selected, verbs.link)
         composable(Routes.ACCOUNT) { AccountTab(graph, leaguesChanged = retry, openLeague = verbs.choose) }
         composable(Routes.LEAGUE_HOME) { entry ->
-            entry.arguments?.getString("id")?.let { LeagueHome(graph, it, onOpenLineup) }
+            entry.arguments?.getString("id")?.let { LeagueHome(graph, it, onOpenLineup, verbs.openGame) }
+        }
+        composable(
+            Routes.GAME,
+            listOf(
+                navArgument("id") { type = NavType.StringType },
+                navArgument("roster") {
+                    type = NavType.StringType
+                    nullable = true
+                },
+            ),
+        ) { entry ->
+            val id = entry.arguments?.getString("id") ?: return@composable
+            val roster = entry.arguments?.getString("roster")?.toIntOrNull()
+            // Open Lineup as a home's: the Lineup tab for the league shown where the bar has one, else the site.
+            GameScreen(graph, GameOf(id, roster), openLineup = { onOpenLineup(id) }, yourGame = { verbs.openGame(id, null) })
         }
     }
+}
+
+/** The reference pages' routes (ADP, Compare, the clubs, a club, the schedule), each its own screen. */
+private fun NavGraphBuilder.reference(
+    graph: AppGraph,
+    league: FollowedLeague?,
+    link: (String) -> Unit,
+) {
+    val optional = { name: String ->
+        navArgument(name) {
+            type = NavType.StringType
+            defaultValue = ""
+        }
+    }
+
+    fun NavBackStackEntry.text(name: String): String? = arguments?.getString(name)?.takeIf { it.isNotEmpty() }
+    composable(Routes.ADP, listOf(optional("format"))) { ReferenceScreen(graph, ShellRoute.Adp(it.text("format")), league, link) }
+    composable(Routes.COMPARE, listOf(optional("a"), optional("b"))) {
+        ReferenceScreen(graph, ShellRoute.Compare(it.text("a"), it.text("b")), league, link)
+    }
+    composable(Routes.CLUBS) { ReferenceScreen(graph, ShellRoute.Clubs, league, link) }
+    composable(Routes.CLUB, listOf(navArgument("abbr") { type = NavType.StringType })) { entry ->
+        entry.text("abbr")?.let { ReferenceScreen(graph, ShellRoute.Club(it), league, link) }
+    }
+    composable(Routes.SCHEDULE) { ReferenceScreen(graph, ShellRoute.Schedule, league, link) }
 }
 
 /** Signed out: back to the League tab with nothing above it, and no tab's saved stack kept for the next

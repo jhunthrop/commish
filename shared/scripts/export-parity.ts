@@ -71,7 +71,7 @@ import {
 	tradesAt,
 	wordCases
 } from './trades-parity.ts';
-import { HOLDING_PLAYER } from './export-fixtures.ts';
+import { HOLDING_PLAYER, OTHER_GAME_ROSTER } from './export-fixtures.ts';
 import { ACCOUNT_OUTPUT, renderAccount } from './account-parity.ts';
 import { COMPANION_OUTPUT, renderCompanion } from './companion-parity.ts';
 import type { Account } from '../../web/src/lib/account/account-api.ts';
@@ -412,8 +412,25 @@ export async function renderLineup(host: LeagueSync['host']): Promise<string> {
 	return `${JSON.stringify(lineup, null, '\t')}\n`;
 }
 
+/** Another team's game at every clock (Lane 206): its box asked by roster with the league read and the
+ * scoreboard it is drawn with, all three as the Sleeper league reads them. */
+async function otherGameAt(): Promise<Record<string, unknown>> {
+	const games: Record<string, unknown> = {};
+	for (const clock of CLOCKS)
+		games[clock] = matchupAt(
+			await answer<LeagueSync>(`sync-${LEAGUE}-sleeper-${clock}.json`),
+			await answer<MatchupBox>(
+				`matchup-${LEAGUE}-roster-${String(OTHER_GAME_ROSTER)}-${clock}.json`
+			),
+			instantOf(clock),
+			ZONE,
+			await answer<Scoreboard>(`scoreboard-${LEAGUE}-sleeper-${clock}.json`)
+		);
+	return games;
+}
+
 /** The Matchup at every clock as the fixture's league reads it, the same reads without the box
- * answer, and the gap sentences with no matchup (matchup-parity.ts). */
+ * answer, the gap sentences with no matchup, and another team's game (matchup-parity.ts). */
 export async function renderMatchup(): Promise<string> {
 	const reads: [string, LeagueSync, MatchupBox][] = [];
 	for (const clock of CLOCKS)
@@ -439,7 +456,8 @@ export async function renderMatchup(): Promise<string> {
 		zone: ZONE,
 		clocks: at(true),
 		withoutBox: at(false),
-		gaps: gapsOf(first[1], instantOf(first[0]))
+		gaps: gapsOf(first[1], instantOf(first[0])),
+		otherGame: await otherGameAt()
 	};
 	return `${JSON.stringify(matchup, null, '\t')}\n`;
 }

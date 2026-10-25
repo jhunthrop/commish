@@ -5,11 +5,23 @@
 // no answer lists is left out, as scoreboard-at.ts counts him). The box is another team's game: it
 // says so (viewer_side) and carries no standing, whose words are the member's. serve.ts restates it
 // at its moment as it does the member's box.
+import { readFile } from 'node:fs/promises';
 import type { MatchupBox, PlayerLine } from '../../src/lib/league/inseason/api.ts';
 import type { Recorded, SleeperMatchup } from './scoreboard-at.ts';
 
 type BoxSide = MatchupBox['sides'][number];
 type Slot = BoxSide['starters'][number]['slot'];
+
+/** The roster whose game the shots tap (Carried by QJs, against Bower Rangers): the one other game
+ * the fixture holds full lines for (other-game-lines.ts, review 204 M2). */
+export const TAPPED_ROSTER = 2;
+
+/** The full lines of the tapped game's players (data/other-game-lines.json). */
+export async function otherGameLines(): Promise<PlayerLine[]> {
+	return JSON.parse(
+		await readFile(new URL('./data/other-game-lines.json', import.meta.url), 'utf8')
+	) as PlayerLine[];
+}
 
 /** The query field the Matchup's box takes another roster by (service.go fieldRoster). */
 export const ROSTER_PARAM = 'roster';

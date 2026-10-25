@@ -3,6 +3,7 @@ package auth_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -224,5 +225,89 @@ func TestScopesByKind(t *testing.T) {
 		if _, ok := auth.ParseDeviceKind(raw); ok {
 			t.Fatalf("%q parsed as a kind", raw)
 		}
+	}
+}
+
+// An app's token beside another account's session cookie is the token's
+// request: the cookie is not read, so the account is the device's and a
+// write asks no CSRF token.
+func TestSessionTokenWinsBesideACookie(t *testing.T) {
+	h := newBearerHarness(t)
+	h.live.acct = auth.Account{ID: uuid.MustParse("00000000-0000-0000-0000-0000000000b2")}
+	cookies := h.signIn()
+	token := h.pair(auth.ScopesFor(auth.KindAndroid)...)
+	want := h.devices.acct.ID.String()
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		if status, who := h.call(method, "/leagues/attached", token, cookies); status != http.StatusOK || who != want {
+			t.Fatalf("%s with a token and a cookie: %d %q, want the token's account", method, status, who)
+		}
+	}
+	if status, who := h.call(http.MethodGet, "/leagues/attached", "", cookies); status != http.StatusOK || who != h.live.acct.ID.String() {
+		t.Fatalf("the cookie alone: %d %q", status, who)
+	}
+}
+
+// SessionDevice, the check the api's session routes and the room's socket
+// share: a live app token resolves, and every other request is
+// ErrNoDevice, a token in the query string among them; only the header
+// is read, and only a well-formed token costs a device read.
+func TestSessionDevice(t *testing.T) {
+	h := newBearerHarness(t)
+	app := h.pair(auth.ScopesFor(auth.KindIOS)...)
+	ext := h.pair(auth.ScopesFor(auth.KindExtension)...)
+	request := func(target, token string) *http.Request {
+		r := httptest.NewRequest(http.MethodGet, target, nil)
+		if token != "" {
+			r.Header.Set("Authorization", "Bearer "+token)
+		}
+		return r
+	}
+	acct, dev, err := h.bearer.SessionDevice(context.Background(), request("/rooms/x/ws", app))
+	if err != nil || acct.ID != h.devices.acct.ID || !dev.Has(auth.ScopeSession) {
+		t.Fatalf("an app token: %v %v %v", acct.ID, dev, err)
+	}
+	before := h.devices.lookups
+	for name, r := range map[string]*http.Request{
+		"no token":           request("/rooms/x/ws", ""),
+		"query string token": request("/rooms/x/ws?token="+app, ""),
+		"query access_token": request("/rooms/x/ws?access_token="+app, ""),
+		"a token not ours":   request("/rooms/x/ws", "cmd1.not-ours.AAAA"),
+		"not a device token": request("/rooms/x/ws", "abc"),
+	} {
+		if _, _, err := h.bearer.SessionDevice(context.Background(), r); !errors.Is(err, auth.ErrNoDevice) {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+	if h.devices.lookups != before {
+		t.Fatalf("%d device reads for requests with no well-formed token", h.devices.lookups-before)
+	}
+	if _, _, err := h.bearer.SessionDevice(context.Background(), request("/rooms/x/ws", ext)); !errors.Is(err, auth.ErrNoDevice) {
+		t.Fatalf("the extension's token: %v", err)
+	}
+}
+
+// A request carrying both a live app token and a session cookie is
+// logged, by request id and device, never by the token.
+func TestBothTokenAndCookieIsLogged(t *testing.T) {
+	var logs strings.Builder
+	devs := &fakeDevices{acct: auth.Account{ID: uuid.New()}, byHash: map[string]auth.Device{}}
+	bearer, err := auth.NewBearer(bearerTestPassword, 0, devs, fixedNow, slog.New(slog.NewTextHandler(&logs, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, hash := bearer.Mint()
+	devs.byHash[string(hash)] = auth.Device{ID: uuid.New(), AccountID: devs.acct.ID, Scopes: auth.ScopesFor(auth.KindIOS)}
+	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	h := bearer.SessionOr(ok, ok)
+	r := httptest.NewRequest(http.MethodGet, "/x", nil)
+	r.Header.Set("Authorization", "Bearer "+token)
+	h.ServeHTTP(httptest.NewRecorder(), r)
+	if logs.Len() != 0 {
+		t.Fatalf("a token alone was logged: %s", logs.String())
+	}
+	r.AddCookie(&http.Cookie{Name: auth.SessionCookie, Value: "sealed"})
+	h.ServeHTTP(httptest.NewRecorder(), r)
+	if !strings.Contains(logs.String(), "the token used") || strings.Contains(logs.String(), token) {
+		t.Fatalf("log %q", logs.String())
 	}
 }

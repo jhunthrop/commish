@@ -8,6 +8,7 @@ import app.trycommish.api.Unauthorized
 import app.trycommish.api.decodeEnvelope
 import app.trycommish.api.models.LeagueSync
 import app.trycommish.api.models.MatchupBox
+import app.trycommish.api.models.Scoreboard
 import app.trycommish.core.AppWords
 import app.trycommish.core.Cache
 import app.trycommish.core.Cached
@@ -58,18 +59,20 @@ fun matchupStamp(
     return if (loaded.stale) "${AppWords.lastRead} ${Format.weekdayTime(loaded.stamp, zone)}" else null
 }
 
-/** The two bodies the Matchup reads, kept together under one stamp: the league read and the box score,
- * null where the API has none. */
+/** The bodies the Matchup reads, kept together under one stamp: the league read, the box score (null
+ * where the API has none) and, for another team's game, the scoreboard (null where it was not read). */
 @Serializable
 internal data class MatchupBodies(
     val sync: String,
     val box: String?,
+    val board: String? = null,
 )
 
-/** What the Matchup draws from: the league read and the box score. */
+/** What the Matchup draws from: the league read, the box score and another team's scoreboard. */
 private data class MatchupAnswer(
     val sync: LeagueSync,
     val box: MatchupBox?,
+    val board: Scoreboard?,
 )
 
 /**
@@ -78,7 +81,8 @@ private data class MatchupAnswer(
  * the app started) it reads again on the web's cadence (model.ts POLL_MS, once a minute) and stops the
  * moment it is hidden, backgrounded or the view model is cleared with its screen (the poll runs in the
  * view model's scope). A read that fails keeps the week shown with its stamp, never blank; a 401 signs
- * out and stops the poll.
+ * out and stops the poll. The game is the member's (`roster` null) or the one a score bug's roster plays
+ * in (Lane 207), each kept under its own key.
  */
 class MatchupViewModel(
     private val reads: MatchupReads,
@@ -86,6 +90,8 @@ class MatchupViewModel(
     private val clock: Clock,
     private val zone: ZoneId,
     private val sessionEnd: SessionEnd,
+    /** The game's first side, a score bug's (Lane 204's `?roster=`); null for the member's own game. */
+    private val roster: Int? = null,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow<MatchupState>(MatchupState.Loading)
     private val mutableRefreshing = MutableStateFlow(false)
@@ -144,13 +150,13 @@ class MatchupViewModel(
     /** The saved week at once on the first open, then the API's; a failed read keeps the week shown,
      * dated, redrawn at the clock it failed at; a refused token signs out. */
     private suspend fun read(leagueId: String) {
-        val key = MatchupKeys.matchup(leagueId)
+        val key = MatchupKeys.matchup(leagueId, roster)
         if (mutableState.value == MatchupState.Loading) {
             cache.read(key)?.let { saved -> decoded(saved.body)?.let { show(it, saved.stamp, stale = true) } }
         }
         try {
             val bodies = fresh(leagueId)
-            val decoded = MatchupAnswer(decodeEnvelope(bodies.sync), bodies.box?.let { decodeEnvelope<MatchupBox>(it) })
+            val decoded = answerOf(bodies)
             val stamp = clock.now()
             cache.write(key, Cached(CommishJson.encodeToString(MatchupBodies.serializer(), bodies), stamp))
             show(decoded, stamp, stale = false)
@@ -168,12 +174,26 @@ class MatchupViewModel(
         }
     }
 
-    /** Both reads at once, as the web's Promise.all. */
+    /** The reads at once, as the web's Promise.all: for another team's game the scoreboard too, whose
+     * failure never fails the box that arrived (review 204 M1): the score then reads as unread. */
     private suspend fun fresh(leagueId: String): MatchupBodies =
         coroutineScope {
-            val box = async { reads.matchup(leagueId) }
+            val box = async { reads.matchup(leagueId, roster) }
+            val board = roster?.let { async { boardOrNull(leagueId) } }
             val sync = reads.sync(leagueId)
-            MatchupBodies(sync, box.await())
+            MatchupBodies(sync, box.await(), board?.await())
+        }
+
+    /** The scoreboard's body, null where it did not read or does not decode. */
+    private suspend fun boardOrNull(leagueId: String): String? =
+        try {
+            reads.scoreboard(leagueId).takeIf { decodedBoard(it) != null }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            null
         }
 
     private fun show(
@@ -185,15 +205,30 @@ class MatchupViewModel(
         mutableState.value = MatchupState.Loaded(model(shown), stamp, stale)
     }
 
-    private fun model(shown: MatchupAnswer): MatchupModel = matchupModel(shown.sync, shown.box, clock.now(), zone)
+    private fun model(shown: MatchupAnswer): MatchupModel = matchupModel(shown.sync, shown.box, clock.now(), zone, shown.board)
 
     /** With nothing shown: the API's own sentence where it answered one, else no connection. */
     private fun failure(e: Exception): String = (e as? ApiFailure)?.message?.takeIf { it.isNotEmpty() } ?: AppWords.cannotLoad
 
     private fun decoded(body: String): MatchupAnswer? =
         try {
-            val bodies = CommishJson.decodeFromString(MatchupBodies.serializer(), body)
-            MatchupAnswer(decodeEnvelope(bodies.sync), bodies.box?.let { decodeEnvelope<MatchupBox>(it) })
+            answerOf(CommishJson.decodeFromString(MatchupBodies.serializer(), body))
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            null
+        }
+
+    private fun answerOf(bodies: MatchupBodies): MatchupAnswer =
+        MatchupAnswer(
+            decodeEnvelope(bodies.sync),
+            bodies.box?.let { decodeEnvelope<MatchupBox>(it) },
+            bodies.board?.let(::decodedBoard),
+        )
+
+    private fun decodedBoard(body: String): Scoreboard? =
+        try {
+            decodeEnvelope<Scoreboard>(body)
         } catch (
             @Suppress("TooGenericExceptionCaught") e: Exception,
         ) {

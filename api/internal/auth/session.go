@@ -22,6 +22,10 @@ const (
 	CSRFHeader    = "X-CSRF-Token"
 )
 
+// SignInMessage is what a signed-out request is told, on a 401 and on the
+// room's error frame before it closes a socket whose device signed out.
+const SignInMessage = "Sign in to do that"
+
 type ctxKey int
 
 const accountKey ctxKey = 1
@@ -156,7 +160,7 @@ func (s *Sessions) Middleware(next http.Handler) http.Handler {
 func RequireSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := AccountFrom(r.Context()); !ok {
-			httpx.WriteError(w, r, http.StatusUnauthorized, httpx.CodeUnauthorized, "Sign in to do that", nil)
+			httpx.WriteError(w, r, http.StatusUnauthorized, httpx.CodeUnauthorized, SignInMessage, nil)
 			return
 		}
 		next.ServeHTTP(w, r)

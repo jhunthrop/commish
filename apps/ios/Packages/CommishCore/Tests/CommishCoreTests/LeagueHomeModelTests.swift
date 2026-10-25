@@ -39,6 +39,16 @@ struct LeagueHomeModelTests {
         #expect(bugs == web.bugs)
     }
 
+    /// Each bug opens its own game (game.ts bugRoster, Lane 206): the member's none, the Matchup's
+    /// own; every other its first side's roster.
+    @Test(arguments: clocks)
+    func eachBugOpensItsOwnGame(clock: String) throws {
+        let bugs = try model(at: clock).bugs
+        #expect(bugs.filter(\.mine).allSatisfy { $0.roster == nil })
+        #expect(bugs.filter { !$0.mine }.allSatisfy { $0.roster == $0.sides.first?.rosterID && $0.roster != nil })
+        #expect(bugs.contains { $0.roster == 2 })
+    }
+
     @Test(arguments: clocks)
     func standingsMatchTheWeb(clock: String) throws {
         let web = try #require(Fixtures.parity().clocks[clock])

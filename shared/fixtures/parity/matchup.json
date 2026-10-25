@@ -11135,5 +11135,8521 @@
 				"scoreGap": "We could not read your score for this week from Sleeper. Read from Sleeper 2 hours ago. Reading again."
 			}
 		]
+	},
+	"otherGame": {
+		"2026-10-16T02-00-00Z": {
+			"clock": "2026-10-16T02:00:00.000Z",
+			"now": "2026-10-16T01:56:00.000Z",
+			"whose": {
+				"head": "Their game",
+				"link": "Your game"
+			},
+			"week": "Week 6",
+			"title": {
+				"mine": "Carried by QJs",
+				"opponent": "Bower Rangers"
+			},
+			"bug": {
+				"week": "Week 6",
+				"mine": {
+					"label": "",
+					"name": "Carried by QJs",
+					"big": "--",
+					"bigLabel": "Pts",
+					"small": "Proj final --",
+					"toPlay": ""
+				},
+				"opponent": {
+					"label": "",
+					"name": "Bower Rangers",
+					"big": "--",
+					"bigLabel": "Pts",
+					"small": "Proj final --",
+					"toPlay": ""
+				},
+				"kickoff": {
+					"head": "Next kickoff",
+					"words": "Sun 8:30 am, JAX vs HOU"
+				},
+				"started": true,
+				"read": "Sleeper 4 min ago",
+				"standing": null
+			},
+			"allPlay": null,
+			"scoreGap": null,
+			"noOpponent": null,
+			"boxes": [
+				{
+					"team": "Carried by QJs",
+					"mine": false,
+					"empty": null,
+					"starters": [
+						{
+							"key": "8183",
+							"slot": "QB",
+							"move": null,
+							"idle": false,
+							"name": "Brock Purdy",
+							"fit": "B. Purdy",
+							"slug": "brock-purdy",
+							"boardId": "4361741",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "SF",
+							"position": "QB",
+							"status": null,
+							"rank": "15",
+							"game": {
+								"where": "vs WSH",
+								"when": "Mon 7:15 pm"
+							},
+							"note": null,
+							"expected": "29 to 21.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "63°, 13 mph"
+							},
+							"proj": "14.4",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "7588",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "Javonte Williams",
+							"fit": "J. Williams",
+							"slug": "javonte-williams",
+							"boardId": "4361579",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DAL",
+							"position": "RB",
+							"status": null,
+							"rank": "18",
+							"game": {
+								"where": "at GB",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "25.5 to 27",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "10.1",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12489",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "RJ Harvey",
+							"fit": "R. Harvey",
+							"slug": "rj-harvey",
+							"boardId": "4568490",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DEN",
+							"position": "RB",
+							"status": null,
+							"rank": "28",
+							"game": {
+								"where": "vs SEA",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "9.1",
+							"pts": "--",
+							"evidence": "Opp 30th, Avg 10.2, Last 0.7",
+							"oppRank": "30th",
+							"ease": "even",
+							"delta": "0.0",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "6786",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "CeeDee Lamb",
+							"fit": "C. Lamb",
+							"slug": "ceedee-lamb",
+							"boardId": "4241389",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DAL",
+							"position": "WR",
+							"status": null,
+							"rank": "5",
+							"game": {
+								"where": "at GB",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "25.5 to 27",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "18.2",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "3634",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Kalif Raymond",
+							"fit": "K. Raymond",
+							"slug": "kalif-raymond",
+							"boardId": "2973405",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "WR",
+							"status": null,
+							"rank": "102",
+							"game": {
+								"where": "at ATL",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "26.5 to 23",
+							"weather": {
+								"glyph": "roof",
+								"words": "Roof TBD"
+							},
+							"proj": "3.2",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "13279",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Carnell Tate",
+							"fit": "C. Tate",
+							"slug": "carnell-tate",
+							"boardId": "4871023",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "TEN",
+							"position": "WR",
+							"status": null,
+							"rank": "34",
+							"game": {
+								"where": "at IND",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "19 to 25.5",
+							"weather": {
+								"glyph": "roof",
+								"words": "Roof TBD"
+							},
+							"proj": "11.3",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "9484",
+							"slot": "TE",
+							"move": null,
+							"idle": false,
+							"name": "Tucker Kraft",
+							"fit": "T. Kraft",
+							"slug": "tucker-kraft",
+							"boardId": "4572680",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "TE",
+							"status": null,
+							"rank": "10",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "11.1",
+							"pts": "--",
+							"evidence": "Opp 23rd, Avg 11.6, Last 11.6",
+							"oppRank": "23rd",
+							"ease": "easy",
+							"delta": "+0.2",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12504",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Kaleb Johnson",
+							"fit": "K. Johnson",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "9480",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Brenton Strange",
+							"fit": "B. Strange",
+							"slug": "brenton-strange",
+							"boardId": "4430539",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "JAX",
+							"position": "TE",
+							"status": null,
+							"rank": "20",
+							"game": {
+								"where": "vs HOU",
+								"when": "Sun 8:30 am"
+							},
+							"note": null,
+							"expected": "23 to 19.5",
+							"weather": {
+								"glyph": "abroad",
+								"words": "Abroad, no forecast"
+							},
+							"proj": "7.9",
+							"pts": "--",
+							"evidence": "Opp 21st, Avg 12.2, Last 13.8",
+							"oppRank": "21st",
+							"ease": "even",
+							"delta": "−0.1",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "LAR",
+							"slot": "D/ST",
+							"move": null,
+							"idle": false,
+							"name": "Los Angeles Rams",
+							"fit": "Rams",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Rams defense"
+							},
+							"club": "LAR",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs ARI",
+								"when": "Sun 3:05 pm"
+							},
+							"note": null,
+							"expected": "32.5 to 20",
+							"weather": {
+								"glyph": "indoors",
+								"words": "Indoors"
+							},
+							"proj": "8.1",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						}
+					],
+					"team_row": {
+						"note": "Kaleb Johnson has no Proj",
+						"live": true,
+						"caption": "Proj final",
+						"proj": "--",
+						"pts": "--"
+					},
+					"bench": [
+						{
+							"key": "11566",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jayden Daniels",
+							"fit": "J. Daniels",
+							"slug": "jayden-daniels",
+							"boardId": "4426348",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "WAS",
+							"position": "QB",
+							"status": null,
+							"rank": "14",
+							"game": {
+								"where": "at SF",
+								"when": "Mon 7:15 pm"
+							},
+							"note": null,
+							"expected": "21.5 to 29",
+							"weather": {
+								"glyph": "wind",
+								"words": "63°, 13 mph"
+							},
+							"proj": "14.6",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "11630",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Roman Wilson",
+							"fit": "R. Wilson",
+							"slug": "roman-wilson",
+							"boardId": "4431492",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "PIT",
+							"position": "WR",
+							"status": null,
+							"rank": "109",
+							"game": {
+								"where": "at TB",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "22 to 18.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "74°, 15 mph"
+							},
+							"proj": "2.9",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "3321",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tyreek Hill",
+							"fit": "T. Hill",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "",
+							"position": "WR",
+							"status": null,
+							"rank": "--",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "4039",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Cooper Kupp",
+							"fit": "C. Kupp",
+							"slug": "cooper-kupp",
+							"boardId": "2977187",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "SEA",
+							"position": "WR",
+							"status": null,
+							"rank": "61",
+							"game": {
+								"where": "at DEN",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.0",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "4199",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Aaron Jones",
+							"fit": "A. Jones",
+							"slug": "aaron-jones-sr",
+							"boardId": "3042519",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "MIN",
+							"position": "RB",
+							"status": null,
+							"rank": "29",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "4866",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Saquon Barkley",
+							"fit": "S. Barkley",
+							"slug": "saquon-barkley",
+							"boardId": "3929630",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "PHI",
+							"position": "RB",
+							"status": null,
+							"rank": "6",
+							"game": {
+								"where": "vs CAR",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "21.5 to 20",
+							"weather": {
+								"glyph": "wind",
+								"words": "52°, 7 mph"
+							},
+							"proj": "14.4",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "5844",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "T.J. Hockenson",
+							"fit": "T. Hockenson",
+							"slug": "t-j-hockenson",
+							"boardId": "4036133",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "MIN",
+							"position": "TE",
+							"status": null,
+							"rank": "22",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "6801",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tee Higgins",
+							"fit": "T. Higgins",
+							"slug": "tee-higgins",
+							"boardId": "4239993",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CIN",
+							"position": "WR",
+							"status": null,
+							"rank": "15",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "9508",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tyjae Spears",
+							"fit": "T. Spears",
+							"slug": "tyjae-spears",
+							"boardId": "4428557",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "TEN",
+							"position": "RB",
+							"status": null,
+							"rank": "36",
+							"game": {
+								"where": "at IND",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "19 to 25.5",
+							"weather": {
+								"glyph": "roof",
+								"words": "Roof TBD"
+							},
+							"proj": "6.6",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "CIN",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Cincinnati Bengals",
+							"fit": "Bengals",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Bengals defense"
+							},
+							"club": "CIN",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						}
+					]
+				},
+				{
+					"team": "Bower Rangers",
+					"mine": false,
+					"empty": null,
+					"starters": [
+						{
+							"key": "9228",
+							"slot": "QB",
+							"move": null,
+							"idle": false,
+							"name": "Bryce Young",
+							"fit": "B. Young",
+							"slug": "bryce-young",
+							"boardId": "4685720",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CAR",
+							"position": "QB",
+							"status": null,
+							"rank": "28",
+							"game": {
+								"where": "at PHI",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "20 to 21.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "52°, 7 mph"
+							},
+							"proj": "10.5",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "9221",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "Jahmyr Gibbs",
+							"fit": "J. Gibbs",
+							"slug": "jahmyr-gibbs",
+							"boardId": "4429795",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DET",
+							"position": "RB",
+							"status": null,
+							"rank": "1",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "11581",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "MarShawn Lloyd",
+							"fit": "M. Lloyd",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Opp 22nd, Avg --, Last --",
+							"oppRank": "22nd",
+							"ease": "easy",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "7569",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Nico Collins",
+							"fit": "N. Collins",
+							"slug": "nico-collins",
+							"boardId": "4258173",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "HOU",
+							"position": "WR",
+							"status": null,
+							"rank": "10",
+							"game": {
+								"where": "at JAX",
+								"when": "Sun 8:30 am"
+							},
+							"note": null,
+							"expected": "20 to 22.5",
+							"weather": {
+								"glyph": "abroad",
+								"words": "Abroad, no forecast"
+							},
+							"proj": "15.8",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "5927",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Terry McLaurin",
+							"fit": "T. McLaurin",
+							"slug": "terry-mclaurin",
+							"boardId": "3121422",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "WAS",
+							"position": "WR",
+							"status": null,
+							"rank": "26",
+							"game": {
+								"where": "at SF",
+								"when": "Mon 7:15 pm"
+							},
+							"note": null,
+							"expected": "21.5 to 29",
+							"weather": {
+								"glyph": "wind",
+								"words": "63°, 13 mph"
+							},
+							"proj": "12.3",
+							"pts": "--",
+							"evidence": "Opp 25th, Avg 12.3, Last 10.2",
+							"oppRank": "25th",
+							"ease": "easy",
+							"delta": "+0.4",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12501",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Matthew Golden",
+							"fit": "M. Golden",
+							"slug": "matthew-golden",
+							"boardId": "4701936",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "WR",
+							"status": null,
+							"rank": "49",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "8.5",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12517",
+							"slot": "TE",
+							"move": null,
+							"idle": false,
+							"name": "Colston Loveland",
+							"fit": "C. Loveland",
+							"slug": "colston-loveland",
+							"boardId": "4723086",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "TE",
+							"status": null,
+							"rank": "3",
+							"game": {
+								"where": "at ATL",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "26.5 to 23",
+							"weather": {
+								"glyph": "roof",
+								"words": "Roof TBD"
+							},
+							"proj": "10.3",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "13346",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Denzel Boston",
+							"fit": "D. Boston",
+							"slug": "denzel-boston",
+							"boardId": "4832800",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CLE",
+							"position": "WR",
+							"status": null,
+							"rank": "60",
+							"game": {
+								"where": "vs BAL",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "18 to 22.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "57°, 7 mph"
+							},
+							"proj": "7.7",
+							"pts": "--",
+							"evidence": "Opp 12th, Avg 10.9, Last 13.6",
+							"oppRank": "12th",
+							"ease": "even",
+							"delta": "−0.4",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "11604",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Brock Bowers",
+							"fit": "B. Bowers",
+							"slug": "brock-bowers",
+							"boardId": "4432665",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LV",
+							"position": "TE",
+							"status": null,
+							"rank": "2",
+							"game": {
+								"where": "vs BUF",
+								"when": "Sun 3:25 pm"
+							},
+							"note": null,
+							"expected": "23.5 to 29",
+							"weather": {
+								"glyph": "indoors",
+								"words": "Indoors"
+							},
+							"proj": "13.4",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "CLE",
+							"slot": "D/ST",
+							"move": null,
+							"idle": false,
+							"name": "Cleveland Browns",
+							"fit": "Browns",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Browns defense"
+							},
+							"club": "CLE",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs BAL",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "18 to 22.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "57°, 7 mph"
+							},
+							"proj": "7.0",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						}
+					],
+					"team_row": {
+						"note": "MarShawn Lloyd has no Proj",
+						"live": true,
+						"caption": "Proj final",
+						"proj": "--",
+						"pts": "--"
+					},
+					"bench": [
+						{
+							"key": "10213",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tre Tucker",
+							"fit": "T. Tucker",
+							"slug": "tre-tucker",
+							"boardId": "4428718",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LV",
+							"position": "WR",
+							"status": null,
+							"rank": "44",
+							"game": {
+								"where": "vs BUF",
+								"when": "Sun 3:25 pm"
+							},
+							"note": null,
+							"expected": "23.5 to 29",
+							"weather": {
+								"glyph": "indoors",
+								"words": "Indoors"
+							},
+							"proj": "8.7",
+							"pts": "--",
+							"evidence": "Opp 27th, Avg 8.1, Last 7.5",
+							"oppRank": "27th",
+							"ease": "easy",
+							"delta": "+0.3",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "11563",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Bo Nix",
+							"fit": "B. Nix",
+							"slug": "bo-nix",
+							"boardId": "4426338",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DEN",
+							"position": "QB",
+							"status": null,
+							"rank": "13",
+							"game": {
+								"where": "vs SEA",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.7",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "11583",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jonathon Brooks",
+							"fit": "J. Brooks",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CAR",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "at PHI",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "20 to 21.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "52°, 7 mph"
+							},
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Opp 28th, Avg --, Last --",
+							"oppRank": "28th",
+							"ease": "easy",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "11625",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Adonai Mitchell",
+							"fit": "A. Mitchell",
+							"slug": "adonai-mitchell",
+							"boardId": "4597500",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NYJ",
+							"position": "WR",
+							"status": null,
+							"rank": "63",
+							"game": {
+								"where": "at NE",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "18.5 to 25",
+							"weather": {
+								"glyph": "wind",
+								"words": "48°, 5 mph"
+							},
+							"proj": "6.7",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12534",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Kyle Monangai",
+							"fit": "K. Monangai",
+							"slug": "kyle-monangai",
+							"boardId": "4608686",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "RB",
+							"status": null,
+							"rank": "33",
+							"game": {
+								"where": "at ATL",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "26.5 to 23",
+							"weather": {
+								"glyph": "roof",
+								"words": "Roof TBD"
+							},
+							"proj": "7.5",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12718",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Konata Mumpfield",
+							"fit": "K. Mumpfield",
+							"slug": "konata-mumpfield",
+							"boardId": "4710855",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LAR",
+							"position": "WR",
+							"status": null,
+							"rank": "96",
+							"game": {
+								"where": "vs ARI",
+								"when": "Sun 3:05 pm"
+							},
+							"note": null,
+							"expected": "32.5 to 20",
+							"weather": {
+								"glyph": "indoors",
+								"words": "Indoors"
+							},
+							"proj": "3.5",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "13281",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jordyn Tyson",
+							"fit": "J. Tyson",
+							"slug": "jordyn-tyson",
+							"boardId": "4880281",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NO",
+							"position": "WR",
+							"status": null,
+							"rank": "147",
+							"game": {
+								"where": "at NYG",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "22 to 23.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "54°, 7 mph"
+							},
+							"proj": "5.7",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "13337",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Emmett Johnson",
+							"fit": "E. Johnson",
+							"slug": "emmett-johnson",
+							"boardId": "4832955",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "KC",
+							"position": "RB",
+							"status": null,
+							"rank": "49",
+							"game": {
+								"where": "vs LAC",
+								"when": "Sun 3:25 pm"
+							},
+							"note": null,
+							"expected": "25.5 to 17",
+							"weather": {
+								"glyph": "wind",
+								"words": "66°, 10 mph"
+							},
+							"proj": "4.6",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "4177",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Mack Hollins",
+							"fit": "M. Hollins",
+							"slug": "mack-hollins",
+							"boardId": "2991662",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NE",
+							"position": "WR",
+							"status": null,
+							"rank": "149",
+							"game": {
+								"where": "vs NYJ",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "25.5 to 18",
+							"weather": {
+								"glyph": "wind",
+								"words": "48°, 5 mph"
+							},
+							"proj": "5.4",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "5850",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Josh Jacobs",
+							"fit": "J. Jacobs",
+							"slug": "josh-jacobs",
+							"boardId": "4047365",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "35",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "6.9",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						}
+					]
+				}
+			],
+			"basis": "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Proj final adds the Pts and the Proj each starter has left. No Proj final while a starter still to play has no Proj. Our rank is his place at his position in our order. Pts are Sleeper's points so far, Team adds the rows. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Final lands the hour after a game, stats by Wednesday."
+		},
+		"2026-10-17T17-00-00Z": {
+			"clock": "2026-10-17T17:00:00.000Z",
+			"now": "2026-10-17T16:56:00.000Z",
+			"whose": {
+				"head": "Their game",
+				"link": "Your game"
+			},
+			"week": "Week 6",
+			"title": {
+				"mine": "Carried by QJs",
+				"opponent": "Bower Rangers"
+			},
+			"bug": {
+				"week": "Week 6",
+				"mine": {
+					"label": "",
+					"name": "Carried by QJs",
+					"big": "--",
+					"bigLabel": "Pts",
+					"small": "Proj final --",
+					"toPlay": ""
+				},
+				"opponent": {
+					"label": "",
+					"name": "Bower Rangers",
+					"big": "--",
+					"bigLabel": "Pts",
+					"small": "Proj final --",
+					"toPlay": ""
+				},
+				"kickoff": {
+					"head": "Next kickoff",
+					"words": "Sun 8:30 am, JAX vs HOU"
+				},
+				"started": true,
+				"read": "Sleeper 4 min ago",
+				"standing": null
+			},
+			"allPlay": null,
+			"scoreGap": null,
+			"noOpponent": null,
+			"boxes": [
+				{
+					"team": "Carried by QJs",
+					"mine": false,
+					"empty": null,
+					"starters": [
+						{
+							"key": "8183",
+							"slot": "QB",
+							"move": null,
+							"idle": false,
+							"name": "Brock Purdy",
+							"fit": "B. Purdy",
+							"slug": "brock-purdy",
+							"boardId": "4361741",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "SF",
+							"position": "QB",
+							"status": null,
+							"rank": "15",
+							"game": {
+								"where": "vs WSH",
+								"when": "Mon 7:15 pm"
+							},
+							"note": null,
+							"expected": "29 to 21.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "63°, 13 mph"
+							},
+							"proj": "14.4",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "7588",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "Javonte Williams",
+							"fit": "J. Williams",
+							"slug": "javonte-williams",
+							"boardId": "4361579",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DAL",
+							"position": "RB",
+							"status": null,
+							"rank": "18",
+							"game": {
+								"where": "at GB",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "25.5 to 27",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "10.1",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12489",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "RJ Harvey",
+							"fit": "R. Harvey",
+							"slug": "rj-harvey",
+							"boardId": "4568490",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DEN",
+							"position": "RB",
+							"status": null,
+							"rank": "28",
+							"game": {
+								"where": "vs SEA",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "9.1",
+							"pts": "--",
+							"evidence": "Opp 30th, Avg 10.2, Last 0.7",
+							"oppRank": "30th",
+							"ease": "even",
+							"delta": "0.0",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "6786",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "CeeDee Lamb",
+							"fit": "C. Lamb",
+							"slug": "ceedee-lamb",
+							"boardId": "4241389",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DAL",
+							"position": "WR",
+							"status": null,
+							"rank": "5",
+							"game": {
+								"where": "at GB",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "25.5 to 27",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "18.2",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "3634",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Kalif Raymond",
+							"fit": "K. Raymond",
+							"slug": "kalif-raymond",
+							"boardId": "2973405",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "WR",
+							"status": null,
+							"rank": "102",
+							"game": {
+								"where": "at ATL",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "26.5 to 23",
+							"weather": {
+								"glyph": "roof",
+								"words": "Roof TBD"
+							},
+							"proj": "3.2",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "13279",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Carnell Tate",
+							"fit": "C. Tate",
+							"slug": "carnell-tate",
+							"boardId": "4871023",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "TEN",
+							"position": "WR",
+							"status": null,
+							"rank": "34",
+							"game": {
+								"where": "at IND",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "19 to 25.5",
+							"weather": {
+								"glyph": "roof",
+								"words": "Roof TBD"
+							},
+							"proj": "11.3",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "9484",
+							"slot": "TE",
+							"move": null,
+							"idle": false,
+							"name": "Tucker Kraft",
+							"fit": "T. Kraft",
+							"slug": "tucker-kraft",
+							"boardId": "4572680",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "TE",
+							"status": null,
+							"rank": "10",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "11.1",
+							"pts": "--",
+							"evidence": "Opp 23rd, Avg 11.6, Last 11.6",
+							"oppRank": "23rd",
+							"ease": "easy",
+							"delta": "+0.2",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12504",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Kaleb Johnson",
+							"fit": "K. Johnson",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "9480",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Brenton Strange",
+							"fit": "B. Strange",
+							"slug": "brenton-strange",
+							"boardId": "4430539",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "JAX",
+							"position": "TE",
+							"status": null,
+							"rank": "20",
+							"game": {
+								"where": "vs HOU",
+								"when": "Sun 8:30 am"
+							},
+							"note": null,
+							"expected": "23 to 19.5",
+							"weather": {
+								"glyph": "abroad",
+								"words": "Abroad, no forecast"
+							},
+							"proj": "7.9",
+							"pts": "--",
+							"evidence": "Opp 21st, Avg 12.2, Last 13.8",
+							"oppRank": "21st",
+							"ease": "even",
+							"delta": "−0.1",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "LAR",
+							"slot": "D/ST",
+							"move": null,
+							"idle": false,
+							"name": "Los Angeles Rams",
+							"fit": "Rams",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Rams defense"
+							},
+							"club": "LAR",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs ARI",
+								"when": "Sun 3:05 pm"
+							},
+							"note": null,
+							"expected": "32.5 to 20",
+							"weather": {
+								"glyph": "indoors",
+								"words": "Indoors"
+							},
+							"proj": "8.1",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						}
+					],
+					"team_row": {
+						"note": "Kaleb Johnson has no Proj",
+						"live": true,
+						"caption": "Proj final",
+						"proj": "--",
+						"pts": "--"
+					},
+					"bench": [
+						{
+							"key": "11566",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jayden Daniels",
+							"fit": "J. Daniels",
+							"slug": "jayden-daniels",
+							"boardId": "4426348",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "WAS",
+							"position": "QB",
+							"status": null,
+							"rank": "14",
+							"game": {
+								"where": "at SF",
+								"when": "Mon 7:15 pm"
+							},
+							"note": null,
+							"expected": "21.5 to 29",
+							"weather": {
+								"glyph": "wind",
+								"words": "63°, 13 mph"
+							},
+							"proj": "14.6",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "11630",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Roman Wilson",
+							"fit": "R. Wilson",
+							"slug": "roman-wilson",
+							"boardId": "4431492",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "PIT",
+							"position": "WR",
+							"status": null,
+							"rank": "109",
+							"game": {
+								"where": "at TB",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "22 to 18.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "74°, 15 mph"
+							},
+							"proj": "2.9",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "3321",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tyreek Hill",
+							"fit": "T. Hill",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "",
+							"position": "WR",
+							"status": null,
+							"rank": "--",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "4039",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Cooper Kupp",
+							"fit": "C. Kupp",
+							"slug": "cooper-kupp",
+							"boardId": "2977187",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "SEA",
+							"position": "WR",
+							"status": null,
+							"rank": "61",
+							"game": {
+								"where": "at DEN",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.0",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "4199",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Aaron Jones",
+							"fit": "A. Jones",
+							"slug": "aaron-jones-sr",
+							"boardId": "3042519",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "MIN",
+							"position": "RB",
+							"status": null,
+							"rank": "29",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "4866",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Saquon Barkley",
+							"fit": "S. Barkley",
+							"slug": "saquon-barkley",
+							"boardId": "3929630",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "PHI",
+							"position": "RB",
+							"status": null,
+							"rank": "6",
+							"game": {
+								"where": "vs CAR",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "21.5 to 20",
+							"weather": {
+								"glyph": "wind",
+								"words": "52°, 7 mph"
+							},
+							"proj": "14.4",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "5844",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "T.J. Hockenson",
+							"fit": "T. Hockenson",
+							"slug": "t-j-hockenson",
+							"boardId": "4036133",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "MIN",
+							"position": "TE",
+							"status": null,
+							"rank": "22",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "6801",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tee Higgins",
+							"fit": "T. Higgins",
+							"slug": "tee-higgins",
+							"boardId": "4239993",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CIN",
+							"position": "WR",
+							"status": null,
+							"rank": "15",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "9508",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tyjae Spears",
+							"fit": "T. Spears",
+							"slug": "tyjae-spears",
+							"boardId": "4428557",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "TEN",
+							"position": "RB",
+							"status": null,
+							"rank": "36",
+							"game": {
+								"where": "at IND",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "19 to 25.5",
+							"weather": {
+								"glyph": "roof",
+								"words": "Roof TBD"
+							},
+							"proj": "6.6",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "CIN",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Cincinnati Bengals",
+							"fit": "Bengals",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Bengals defense"
+							},
+							"club": "CIN",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						}
+					]
+				},
+				{
+					"team": "Bower Rangers",
+					"mine": false,
+					"empty": null,
+					"starters": [
+						{
+							"key": "9228",
+							"slot": "QB",
+							"move": null,
+							"idle": false,
+							"name": "Bryce Young",
+							"fit": "B. Young",
+							"slug": "bryce-young",
+							"boardId": "4685720",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CAR",
+							"position": "QB",
+							"status": null,
+							"rank": "28",
+							"game": {
+								"where": "at PHI",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "20 to 21.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "52°, 7 mph"
+							},
+							"proj": "10.5",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "9221",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "Jahmyr Gibbs",
+							"fit": "J. Gibbs",
+							"slug": "jahmyr-gibbs",
+							"boardId": "4429795",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DET",
+							"position": "RB",
+							"status": null,
+							"rank": "1",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "11581",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "MarShawn Lloyd",
+							"fit": "M. Lloyd",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Opp 22nd, Avg --, Last --",
+							"oppRank": "22nd",
+							"ease": "easy",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "7569",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Nico Collins",
+							"fit": "N. Collins",
+							"slug": "nico-collins",
+							"boardId": "4258173",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "HOU",
+							"position": "WR",
+							"status": null,
+							"rank": "10",
+							"game": {
+								"where": "at JAX",
+								"when": "Sun 8:30 am"
+							},
+							"note": null,
+							"expected": "20 to 22.5",
+							"weather": {
+								"glyph": "abroad",
+								"words": "Abroad, no forecast"
+							},
+							"proj": "15.8",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "5927",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Terry McLaurin",
+							"fit": "T. McLaurin",
+							"slug": "terry-mclaurin",
+							"boardId": "3121422",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "WAS",
+							"position": "WR",
+							"status": null,
+							"rank": "26",
+							"game": {
+								"where": "at SF",
+								"when": "Mon 7:15 pm"
+							},
+							"note": null,
+							"expected": "21.5 to 29",
+							"weather": {
+								"glyph": "wind",
+								"words": "63°, 13 mph"
+							},
+							"proj": "12.3",
+							"pts": "--",
+							"evidence": "Opp 25th, Avg 12.3, Last 10.2",
+							"oppRank": "25th",
+							"ease": "easy",
+							"delta": "+0.4",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12501",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Matthew Golden",
+							"fit": "M. Golden",
+							"slug": "matthew-golden",
+							"boardId": "4701936",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "WR",
+							"status": null,
+							"rank": "49",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "8.5",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12517",
+							"slot": "TE",
+							"move": null,
+							"idle": false,
+							"name": "Colston Loveland",
+							"fit": "C. Loveland",
+							"slug": "colston-loveland",
+							"boardId": "4723086",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "TE",
+							"status": null,
+							"rank": "3",
+							"game": {
+								"where": "at ATL",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "26.5 to 23",
+							"weather": {
+								"glyph": "roof",
+								"words": "Roof TBD"
+							},
+							"proj": "10.3",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "13346",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Denzel Boston",
+							"fit": "D. Boston",
+							"slug": "denzel-boston",
+							"boardId": "4832800",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CLE",
+							"position": "WR",
+							"status": null,
+							"rank": "60",
+							"game": {
+								"where": "vs BAL",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "18 to 22.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "57°, 7 mph"
+							},
+							"proj": "7.7",
+							"pts": "--",
+							"evidence": "Opp 12th, Avg 10.9, Last 13.6",
+							"oppRank": "12th",
+							"ease": "even",
+							"delta": "−0.4",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "11604",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Brock Bowers",
+							"fit": "B. Bowers",
+							"slug": "brock-bowers",
+							"boardId": "4432665",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LV",
+							"position": "TE",
+							"status": null,
+							"rank": "2",
+							"game": {
+								"where": "vs BUF",
+								"when": "Sun 3:25 pm"
+							},
+							"note": null,
+							"expected": "23.5 to 29",
+							"weather": {
+								"glyph": "indoors",
+								"words": "Indoors"
+							},
+							"proj": "13.4",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "CLE",
+							"slot": "D/ST",
+							"move": null,
+							"idle": false,
+							"name": "Cleveland Browns",
+							"fit": "Browns",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Browns defense"
+							},
+							"club": "CLE",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs BAL",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "18 to 22.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "57°, 7 mph"
+							},
+							"proj": "7.0",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						}
+					],
+					"team_row": {
+						"note": "MarShawn Lloyd has no Proj",
+						"live": true,
+						"caption": "Proj final",
+						"proj": "--",
+						"pts": "--"
+					},
+					"bench": [
+						{
+							"key": "10213",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tre Tucker",
+							"fit": "T. Tucker",
+							"slug": "tre-tucker",
+							"boardId": "4428718",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LV",
+							"position": "WR",
+							"status": null,
+							"rank": "44",
+							"game": {
+								"where": "vs BUF",
+								"when": "Sun 3:25 pm"
+							},
+							"note": null,
+							"expected": "23.5 to 29",
+							"weather": {
+								"glyph": "indoors",
+								"words": "Indoors"
+							},
+							"proj": "8.7",
+							"pts": "--",
+							"evidence": "Opp 27th, Avg 8.1, Last 7.5",
+							"oppRank": "27th",
+							"ease": "easy",
+							"delta": "+0.3",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "11563",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Bo Nix",
+							"fit": "B. Nix",
+							"slug": "bo-nix",
+							"boardId": "4426338",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DEN",
+							"position": "QB",
+							"status": null,
+							"rank": "13",
+							"game": {
+								"where": "vs SEA",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.7",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11583",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jonathon Brooks",
+							"fit": "J. Brooks",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CAR",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "at PHI",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "20 to 21.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "52°, 7 mph"
+							},
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Opp 28th, Avg --, Last --",
+							"oppRank": "28th",
+							"ease": "easy",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "11625",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Adonai Mitchell",
+							"fit": "A. Mitchell",
+							"slug": "adonai-mitchell",
+							"boardId": "4597500",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NYJ",
+							"position": "WR",
+							"status": null,
+							"rank": "63",
+							"game": {
+								"where": "at NE",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "18.5 to 25",
+							"weather": {
+								"glyph": "wind",
+								"words": "48°, 5 mph"
+							},
+							"proj": "6.7",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12534",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Kyle Monangai",
+							"fit": "K. Monangai",
+							"slug": "kyle-monangai",
+							"boardId": "4608686",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "RB",
+							"status": null,
+							"rank": "33",
+							"game": {
+								"where": "at ATL",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "26.5 to 23",
+							"weather": {
+								"glyph": "roof",
+								"words": "Roof TBD"
+							},
+							"proj": "7.5",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12718",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Konata Mumpfield",
+							"fit": "K. Mumpfield",
+							"slug": "konata-mumpfield",
+							"boardId": "4710855",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LAR",
+							"position": "WR",
+							"status": null,
+							"rank": "96",
+							"game": {
+								"where": "vs ARI",
+								"when": "Sun 3:05 pm"
+							},
+							"note": null,
+							"expected": "32.5 to 20",
+							"weather": {
+								"glyph": "indoors",
+								"words": "Indoors"
+							},
+							"proj": "3.5",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "13281",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jordyn Tyson",
+							"fit": "J. Tyson",
+							"slug": "jordyn-tyson",
+							"boardId": "4880281",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NO",
+							"position": "WR",
+							"status": null,
+							"rank": "147",
+							"game": {
+								"where": "at NYG",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "22 to 23.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "54°, 7 mph"
+							},
+							"proj": "5.7",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "13337",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Emmett Johnson",
+							"fit": "E. Johnson",
+							"slug": "emmett-johnson",
+							"boardId": "4832955",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "KC",
+							"position": "RB",
+							"status": null,
+							"rank": "49",
+							"game": {
+								"where": "vs LAC",
+								"when": "Sun 3:25 pm"
+							},
+							"note": null,
+							"expected": "25.5 to 17",
+							"weather": {
+								"glyph": "wind",
+								"words": "66°, 10 mph"
+							},
+							"proj": "4.6",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "4177",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Mack Hollins",
+							"fit": "M. Hollins",
+							"slug": "mack-hollins",
+							"boardId": "2991662",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NE",
+							"position": "WR",
+							"status": null,
+							"rank": "149",
+							"game": {
+								"where": "vs NYJ",
+								"when": "Sun 12:00 pm"
+							},
+							"note": null,
+							"expected": "25.5 to 18",
+							"weather": {
+								"glyph": "wind",
+								"words": "48°, 5 mph"
+							},
+							"proj": "5.4",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "5850",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Josh Jacobs",
+							"fit": "J. Jacobs",
+							"slug": "josh-jacobs",
+							"boardId": "4047365",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "35",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "6.9",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						}
+					]
+				}
+			],
+			"basis": "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Proj final adds the Pts and the Proj each starter has left. No Proj final while a starter still to play has no Proj. Our rank is his place at his position in our order. Pts are Sleeper's points so far, Team adds the rows. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Final lands the hour after a game, stats by Wednesday."
+		},
+		"2026-10-18T18-56-00Z": {
+			"clock": "2026-10-18T18:56:00.000Z",
+			"now": "2026-10-18T18:52:00.000Z",
+			"whose": {
+				"head": "Their game",
+				"link": "Your game"
+			},
+			"week": "Week 6",
+			"title": {
+				"mine": "Carried by QJs",
+				"opponent": "Bower Rangers"
+			},
+			"bug": {
+				"week": "Week 6",
+				"mine": {
+					"label": "",
+					"name": "Carried by QJs",
+					"big": "26.7",
+					"bigLabel": "Pts",
+					"small": "Proj final --",
+					"toPlay": "6 to play"
+				},
+				"opponent": {
+					"label": "",
+					"name": "Bower Rangers",
+					"big": "43.6",
+					"bigLabel": "Pts",
+					"small": "Proj final --",
+					"toPlay": "4 to play"
+				},
+				"kickoff": {
+					"head": "Next kickoff",
+					"words": "Sun 3:05 pm, LAR vs ARI"
+				},
+				"started": true,
+				"read": "Sleeper 4 min ago",
+				"standing": null
+			},
+			"allPlay": null,
+			"scoreGap": null,
+			"noOpponent": null,
+			"boxes": [
+				{
+					"team": "Carried by QJs",
+					"mine": false,
+					"empty": null,
+					"starters": [
+						{
+							"key": "8183",
+							"slot": "QB",
+							"move": null,
+							"idle": false,
+							"name": "Brock Purdy",
+							"fit": "B. Purdy",
+							"slug": "brock-purdy",
+							"boardId": "4361741",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "SF",
+							"position": "QB",
+							"status": null,
+							"rank": "15",
+							"game": {
+								"where": "vs WSH",
+								"when": "Mon 7:15 pm"
+							},
+							"note": null,
+							"expected": "29 to 21.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "63°, 13 mph"
+							},
+							"proj": "14.4",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "7588",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "Javonte Williams",
+							"fit": "J. Williams",
+							"slug": "javonte-williams",
+							"boardId": "4361579",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DAL",
+							"position": "RB",
+							"status": null,
+							"rank": "18",
+							"game": {
+								"where": "at GB",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "25.5 to 27",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "10.1",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12489",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "RJ Harvey",
+							"fit": "R. Harvey",
+							"slug": "rj-harvey",
+							"boardId": "4568490",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DEN",
+							"position": "RB",
+							"status": null,
+							"rank": "28",
+							"game": {
+								"where": "vs SEA",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "9.1",
+							"pts": "7.7",
+							"evidence": "Opp 30th, Avg 9.6, Last 7.7",
+							"oppRank": "30th",
+							"ease": "even",
+							"delta": "0.0",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "6786",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "CeeDee Lamb",
+							"fit": "C. Lamb",
+							"slug": "ceedee-lamb",
+							"boardId": "4241389",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DAL",
+							"position": "WR",
+							"status": null,
+							"rank": "5",
+							"game": {
+								"where": "at GB",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "25.5 to 27",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "18.2",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "3634",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Kalif Raymond",
+							"fit": "K. Raymond",
+							"slug": "kalif-raymond",
+							"boardId": "2973405",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "WR",
+							"status": null,
+							"rank": "102",
+							"game": {
+								"where": "at ATL",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "3.2",
+							"pts": "2.7",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "13279",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Carnell Tate",
+							"fit": "C. Tate",
+							"slug": "carnell-tate",
+							"boardId": "4871023",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "TEN",
+							"position": "WR",
+							"status": null,
+							"rank": "34",
+							"game": {
+								"where": "at IND",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "11.3",
+							"pts": "9.6",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "9484",
+							"slot": "TE",
+							"move": null,
+							"idle": false,
+							"name": "Tucker Kraft",
+							"fit": "T. Kraft",
+							"slug": "tucker-kraft",
+							"boardId": "4572680",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "TE",
+							"status": null,
+							"rank": "10",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "11.1",
+							"pts": "--",
+							"evidence": "Opp 23rd, Avg 11.6, Last 11.6",
+							"oppRank": "23rd",
+							"ease": "easy",
+							"delta": "+0.2",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12504",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Kaleb Johnson",
+							"fit": "K. Johnson",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "9480",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Brenton Strange",
+							"fit": "B. Strange",
+							"slug": "brenton-strange",
+							"boardId": "4430539",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "JAX",
+							"position": "TE",
+							"status": null,
+							"rank": "20",
+							"game": {
+								"where": "vs HOU",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.9",
+							"pts": "6.7",
+							"evidence": "Opp 21st, Avg 10.8, Last 6.7",
+							"oppRank": "21st",
+							"ease": "even",
+							"delta": "−0.1",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "LAR",
+							"slot": "D/ST",
+							"move": null,
+							"idle": false,
+							"name": "Los Angeles Rams",
+							"fit": "Rams",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Rams defense"
+							},
+							"club": "LAR",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs ARI",
+								"when": "Sun 3:05 pm"
+							},
+							"note": null,
+							"expected": "32.5 to 20",
+							"weather": {
+								"glyph": "indoors",
+								"words": "Indoors"
+							},
+							"proj": "8.1",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						}
+					],
+					"team_row": {
+						"note": "Kaleb Johnson has no Proj",
+						"live": true,
+						"caption": "Proj final",
+						"proj": "--",
+						"pts": "26.7"
+					},
+					"bench": [
+						{
+							"key": "11566",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jayden Daniels",
+							"fit": "J. Daniels",
+							"slug": "jayden-daniels",
+							"boardId": "4426348",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "WAS",
+							"position": "QB",
+							"status": null,
+							"rank": "14",
+							"game": {
+								"where": "at SF",
+								"when": "Mon 7:15 pm"
+							},
+							"note": null,
+							"expected": "21.5 to 29",
+							"weather": {
+								"glyph": "wind",
+								"words": "63°, 13 mph"
+							},
+							"proj": "14.6",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "11630",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Roman Wilson",
+							"fit": "R. Wilson",
+							"slug": "roman-wilson",
+							"boardId": "4431492",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "PIT",
+							"position": "WR",
+							"status": null,
+							"rank": "109",
+							"game": {
+								"where": "at TB",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "2.9",
+							"pts": "2.5",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "3321",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tyreek Hill",
+							"fit": "T. Hill",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "",
+							"position": "WR",
+							"status": null,
+							"rank": "--",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "4039",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Cooper Kupp",
+							"fit": "C. Kupp",
+							"slug": "cooper-kupp",
+							"boardId": "2977187",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "SEA",
+							"position": "WR",
+							"status": null,
+							"rank": "61",
+							"game": {
+								"where": "at DEN",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.0",
+							"pts": "6.0",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "4199",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Aaron Jones",
+							"fit": "A. Jones",
+							"slug": "aaron-jones-sr",
+							"boardId": "3042519",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "MIN",
+							"position": "RB",
+							"status": null,
+							"rank": "29",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "4866",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Saquon Barkley",
+							"fit": "S. Barkley",
+							"slug": "saquon-barkley",
+							"boardId": "3929630",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "PHI",
+							"position": "RB",
+							"status": null,
+							"rank": "6",
+							"game": {
+								"where": "vs CAR",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.4",
+							"pts": "12.2",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "5844",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "T.J. Hockenson",
+							"fit": "T. Hockenson",
+							"slug": "t-j-hockenson",
+							"boardId": "4036133",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "MIN",
+							"position": "TE",
+							"status": null,
+							"rank": "22",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "6801",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tee Higgins",
+							"fit": "T. Higgins",
+							"slug": "tee-higgins",
+							"boardId": "4239993",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CIN",
+							"position": "WR",
+							"status": null,
+							"rank": "15",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "9508",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tyjae Spears",
+							"fit": "T. Spears",
+							"slug": "tyjae-spears",
+							"boardId": "4428557",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "TEN",
+							"position": "RB",
+							"status": null,
+							"rank": "36",
+							"game": {
+								"where": "at IND",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "6.6",
+							"pts": "5.6",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "CIN",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Cincinnati Bengals",
+							"fit": "Bengals",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Bengals defense"
+							},
+							"club": "CIN",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						}
+					]
+				},
+				{
+					"team": "Bower Rangers",
+					"mine": false,
+					"empty": null,
+					"starters": [
+						{
+							"key": "9228",
+							"slot": "QB",
+							"move": null,
+							"idle": false,
+							"name": "Bryce Young",
+							"fit": "B. Young",
+							"slug": "bryce-young",
+							"boardId": "4685720",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CAR",
+							"position": "QB",
+							"status": null,
+							"rank": "28",
+							"game": {
+								"where": "at PHI",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "10.5",
+							"pts": "8.9",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "9221",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "Jahmyr Gibbs",
+							"fit": "J. Gibbs",
+							"slug": "jahmyr-gibbs",
+							"boardId": "4429795",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DET",
+							"position": "RB",
+							"status": null,
+							"rank": "1",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "11581",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "MarShawn Lloyd",
+							"fit": "M. Lloyd",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Opp 22nd, Avg --, Last --",
+							"oppRank": "22nd",
+							"ease": "easy",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "7569",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Nico Collins",
+							"fit": "N. Collins",
+							"slug": "nico-collins",
+							"boardId": "4258173",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "HOU",
+							"position": "WR",
+							"status": null,
+							"rank": "10",
+							"game": {
+								"where": "at JAX",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "15.8",
+							"pts": "13.4",
+							"evidence": "Avg 3.4, Last 13.4",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "5927",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Terry McLaurin",
+							"fit": "T. McLaurin",
+							"slug": "terry-mclaurin",
+							"boardId": "3121422",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "WAS",
+							"position": "WR",
+							"status": null,
+							"rank": "26",
+							"game": {
+								"where": "at SF",
+								"when": "Mon 7:15 pm"
+							},
+							"note": null,
+							"expected": "21.5 to 29",
+							"weather": {
+								"glyph": "wind",
+								"words": "63°, 13 mph"
+							},
+							"proj": "12.3",
+							"pts": "--",
+							"evidence": "Opp 25th, Avg 12.3, Last 10.2",
+							"oppRank": "25th",
+							"ease": "easy",
+							"delta": "+0.4",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12501",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Matthew Golden",
+							"fit": "M. Golden",
+							"slug": "matthew-golden",
+							"boardId": "4701936",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "WR",
+							"status": null,
+							"rank": "49",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "8.5",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12517",
+							"slot": "TE",
+							"move": null,
+							"idle": false,
+							"name": "Colston Loveland",
+							"fit": "C. Loveland",
+							"slug": "colston-loveland",
+							"boardId": "4723086",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "TE",
+							"status": null,
+							"rank": "3",
+							"game": {
+								"where": "at ATL",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "10.3",
+							"pts": "8.8",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "13346",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Denzel Boston",
+							"fit": "D. Boston",
+							"slug": "denzel-boston",
+							"boardId": "4832800",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CLE",
+							"position": "WR",
+							"status": null,
+							"rank": "60",
+							"game": {
+								"where": "vs BAL",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.7",
+							"pts": "6.5",
+							"evidence": "Opp 12th, Avg 10.9, Last 13.6",
+							"oppRank": "12th",
+							"ease": "even",
+							"delta": "−0.4",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "11604",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Brock Bowers",
+							"fit": "B. Bowers",
+							"slug": "brock-bowers",
+							"boardId": "4432665",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LV",
+							"position": "TE",
+							"status": null,
+							"rank": "2",
+							"game": {
+								"where": "vs BUF",
+								"when": "Sun 3:25 pm"
+							},
+							"note": null,
+							"expected": "23.5 to 29",
+							"weather": {
+								"glyph": "indoors",
+								"words": "Indoors"
+							},
+							"proj": "13.4",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "CLE",
+							"slot": "D/ST",
+							"move": null,
+							"idle": false,
+							"name": "Cleveland Browns",
+							"fit": "Browns",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Browns defense"
+							},
+							"club": "CLE",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs BAL",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.0",
+							"pts": "6.0",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						}
+					],
+					"team_row": {
+						"note": "MarShawn Lloyd has no Proj",
+						"live": true,
+						"caption": "Proj final",
+						"proj": "--",
+						"pts": "43.6"
+					},
+					"bench": [
+						{
+							"key": "10213",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tre Tucker",
+							"fit": "T. Tucker",
+							"slug": "tre-tucker",
+							"boardId": "4428718",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LV",
+							"position": "WR",
+							"status": null,
+							"rank": "44",
+							"game": {
+								"where": "vs BUF",
+								"when": "Sun 3:25 pm"
+							},
+							"note": null,
+							"expected": "23.5 to 29",
+							"weather": {
+								"glyph": "indoors",
+								"words": "Indoors"
+							},
+							"proj": "8.7",
+							"pts": "--",
+							"evidence": "Opp 27th, Avg 8.1, Last 7.5",
+							"oppRank": "27th",
+							"ease": "easy",
+							"delta": "+0.3",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "11563",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Bo Nix",
+							"fit": "B. Nix",
+							"slug": "bo-nix",
+							"boardId": "4426338",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DEN",
+							"position": "QB",
+							"status": null,
+							"rank": "13",
+							"game": {
+								"where": "vs SEA",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.7",
+							"pts": "12.5",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11583",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jonathon Brooks",
+							"fit": "J. Brooks",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CAR",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "at PHI",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "0.0",
+							"evidence": "Opp 28th, Avg --, Last --",
+							"oppRank": "28th",
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "11625",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Adonai Mitchell",
+							"fit": "A. Mitchell",
+							"slug": "adonai-mitchell",
+							"boardId": "4597500",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NYJ",
+							"position": "WR",
+							"status": null,
+							"rank": "63",
+							"game": {
+								"where": "at NE",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "6.7",
+							"pts": "5.7",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "12534",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Kyle Monangai",
+							"fit": "K. Monangai",
+							"slug": "kyle-monangai",
+							"boardId": "4608686",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "RB",
+							"status": null,
+							"rank": "33",
+							"game": {
+								"where": "at ATL",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.5",
+							"pts": "6.4",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "12718",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Konata Mumpfield",
+							"fit": "K. Mumpfield",
+							"slug": "konata-mumpfield",
+							"boardId": "4710855",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LAR",
+							"position": "WR",
+							"status": null,
+							"rank": "96",
+							"game": {
+								"where": "vs ARI",
+								"when": "Sun 3:05 pm"
+							},
+							"note": null,
+							"expected": "32.5 to 20",
+							"weather": {
+								"glyph": "indoors",
+								"words": "Indoors"
+							},
+							"proj": "3.5",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "13281",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jordyn Tyson",
+							"fit": "J. Tyson",
+							"slug": "jordyn-tyson",
+							"boardId": "4880281",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NO",
+							"position": "WR",
+							"status": null,
+							"rank": "147",
+							"game": {
+								"where": "at NYG",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "5.7",
+							"pts": "4.8",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "13337",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Emmett Johnson",
+							"fit": "E. Johnson",
+							"slug": "emmett-johnson",
+							"boardId": "4832955",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "KC",
+							"position": "RB",
+							"status": null,
+							"rank": "49",
+							"game": {
+								"where": "vs LAC",
+								"when": "Sun 3:25 pm"
+							},
+							"note": null,
+							"expected": "25.5 to 17",
+							"weather": {
+								"glyph": "wind",
+								"words": "66°, 10 mph"
+							},
+							"proj": "4.6",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "4177",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Mack Hollins",
+							"fit": "M. Hollins",
+							"slug": "mack-hollins",
+							"boardId": "2991662",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NE",
+							"position": "WR",
+							"status": null,
+							"rank": "149",
+							"game": {
+								"where": "vs NYJ",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "5.4",
+							"pts": "4.6",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "5850",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Josh Jacobs",
+							"fit": "J. Jacobs",
+							"slug": "josh-jacobs",
+							"boardId": "4047365",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "35",
+							"game": {
+								"where": "vs DAL",
+								"when": "Sun 7:20 pm"
+							},
+							"note": null,
+							"expected": "27 to 25.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "55°, 9 mph"
+							},
+							"proj": "6.9",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						}
+					]
+				}
+			],
+			"basis": "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Proj final adds the Pts and the Proj each starter has left. No Proj final while a starter still to play has no Proj. Our rank is his place at his position in our order. Pts are Sleeper's points so far, Team adds the rows. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Avg and Last count Sleeper's finals, our stats by Wednesday."
+		},
+		"2026-10-19T16-00-00Z": {
+			"clock": "2026-10-19T16:00:00.000Z",
+			"now": "2026-10-19T15:56:00.000Z",
+			"whose": {
+				"head": "Their game",
+				"link": "Your game"
+			},
+			"week": "Week 6",
+			"title": {
+				"mine": "Carried by QJs",
+				"opponent": "Bower Rangers"
+			},
+			"bug": {
+				"week": "Week 6",
+				"mine": {
+					"label": "",
+					"name": "Carried by QJs",
+					"big": "67.1",
+					"bigLabel": "Pts",
+					"small": "Proj final 81.5",
+					"toPlay": "1 to play"
+				},
+				"opponent": {
+					"label": "",
+					"name": "Bower Rangers",
+					"big": "62.2",
+					"bigLabel": "Pts",
+					"small": "Proj final 74.5",
+					"toPlay": "1 to play"
+				},
+				"kickoff": {
+					"head": "Next kickoff",
+					"words": "Mon 7:15 pm, SF vs WSH"
+				},
+				"started": true,
+				"read": "Sleeper 4 min ago",
+				"standing": null
+			},
+			"allPlay": null,
+			"scoreGap": null,
+			"noOpponent": null,
+			"boxes": [
+				{
+					"team": "Carried by QJs",
+					"mine": false,
+					"empty": null,
+					"starters": [
+						{
+							"key": "8183",
+							"slot": "QB",
+							"move": null,
+							"idle": false,
+							"name": "Brock Purdy",
+							"fit": "B. Purdy",
+							"slug": "brock-purdy",
+							"boardId": "4361741",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "SF",
+							"position": "QB",
+							"status": null,
+							"rank": "15",
+							"game": {
+								"where": "vs WSH",
+								"when": "Mon 7:15 pm"
+							},
+							"note": null,
+							"expected": "29 to 21.5",
+							"weather": {
+								"glyph": "wind",
+								"words": "63°, 13 mph"
+							},
+							"proj": "14.4",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "7588",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "Javonte Williams",
+							"fit": "J. Williams",
+							"slug": "javonte-williams",
+							"boardId": "4361579",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DAL",
+							"position": "RB",
+							"status": null,
+							"rank": "18",
+							"game": {
+								"where": "at GB",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "10.1",
+							"pts": "8.6",
+							"evidence": "Avg 2.2, Last 8.6",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12489",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "RJ Harvey",
+							"fit": "R. Harvey",
+							"slug": "rj-harvey",
+							"boardId": "4568490",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DEN",
+							"position": "RB",
+							"status": null,
+							"rank": "28",
+							"game": {
+								"where": "vs SEA",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "9.1",
+							"pts": "7.7",
+							"evidence": "Opp 30th, Avg 9.6, Last 7.7",
+							"oppRank": "30th",
+							"ease": "even",
+							"delta": "0.0",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "6786",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "CeeDee Lamb",
+							"fit": "C. Lamb",
+							"slug": "ceedee-lamb",
+							"boardId": "4241389",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DAL",
+							"position": "WR",
+							"status": null,
+							"rank": "5",
+							"game": {
+								"where": "at GB",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "18.2",
+							"pts": "15.5",
+							"evidence": "Avg 3.9, Last 15.5",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "3634",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Kalif Raymond",
+							"fit": "K. Raymond",
+							"slug": "kalif-raymond",
+							"boardId": "2973405",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "WR",
+							"status": null,
+							"rank": "102",
+							"game": {
+								"where": "at ATL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "3.2",
+							"pts": "2.7",
+							"evidence": "Avg 0.7, Last 2.7",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "13279",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Carnell Tate",
+							"fit": "C. Tate",
+							"slug": "carnell-tate",
+							"boardId": "4871023",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "TEN",
+							"position": "WR",
+							"status": null,
+							"rank": "34",
+							"game": {
+								"where": "at IND",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "11.3",
+							"pts": "9.6",
+							"evidence": "Avg 2.4, Last 9.6",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "9484",
+							"slot": "TE",
+							"move": null,
+							"idle": false,
+							"name": "Tucker Kraft",
+							"fit": "T. Kraft",
+							"slug": "tucker-kraft",
+							"boardId": "4572680",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "TE",
+							"status": null,
+							"rank": "10",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "11.1",
+							"pts": "9.4",
+							"evidence": "Opp 23rd, Avg 11.0, Last 9.4",
+							"oppRank": "23rd",
+							"ease": "even",
+							"delta": "+0.2",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12504",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Kaleb Johnson",
+							"fit": "K. Johnson",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "0.0",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "9480",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Brenton Strange",
+							"fit": "B. Strange",
+							"slug": "brenton-strange",
+							"boardId": "4430539",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "JAX",
+							"position": "TE",
+							"status": null,
+							"rank": "20",
+							"game": {
+								"where": "vs HOU",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.9",
+							"pts": "6.7",
+							"evidence": "Opp 21st, Avg 10.8, Last 6.7",
+							"oppRank": "21st",
+							"ease": "even",
+							"delta": "−0.1",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "LAR",
+							"slot": "D/ST",
+							"move": null,
+							"idle": false,
+							"name": "Los Angeles Rams",
+							"fit": "Rams",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Rams defense"
+							},
+							"club": "LAR",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs ARI",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "8.1",
+							"pts": "6.9",
+							"evidence": "Avg 6.9, Last 6.9",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						}
+					],
+					"team_row": {
+						"note": "Kaleb Johnson had no Proj",
+						"live": true,
+						"caption": "Proj final",
+						"proj": "81.5",
+						"pts": "67.1"
+					},
+					"bench": [
+						{
+							"key": "11566",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jayden Daniels",
+							"fit": "J. Daniels",
+							"slug": "jayden-daniels",
+							"boardId": "4426348",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "WAS",
+							"position": "QB",
+							"status": null,
+							"rank": "14",
+							"game": {
+								"where": "at SF",
+								"when": "Mon 7:15 pm"
+							},
+							"note": null,
+							"expected": "21.5 to 29",
+							"weather": {
+								"glyph": "wind",
+								"words": "63°, 13 mph"
+							},
+							"proj": "14.6",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "11630",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Roman Wilson",
+							"fit": "R. Wilson",
+							"slug": "roman-wilson",
+							"boardId": "4431492",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "PIT",
+							"position": "WR",
+							"status": null,
+							"rank": "109",
+							"game": {
+								"where": "at TB",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "2.9",
+							"pts": "2.5",
+							"evidence": "Avg 0.6, Last 2.5",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "3321",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tyreek Hill",
+							"fit": "T. Hill",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "",
+							"position": "WR",
+							"status": null,
+							"rank": "--",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "4039",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Cooper Kupp",
+							"fit": "C. Kupp",
+							"slug": "cooper-kupp",
+							"boardId": "2977187",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "SEA",
+							"position": "WR",
+							"status": null,
+							"rank": "61",
+							"game": {
+								"where": "at DEN",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.0",
+							"pts": "6.0",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "4199",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Aaron Jones",
+							"fit": "A. Jones",
+							"slug": "aaron-jones-sr",
+							"boardId": "3042519",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "MIN",
+							"position": "RB",
+							"status": null,
+							"rank": "29",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "4866",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Saquon Barkley",
+							"fit": "S. Barkley",
+							"slug": "saquon-barkley",
+							"boardId": "3929630",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "PHI",
+							"position": "RB",
+							"status": null,
+							"rank": "6",
+							"game": {
+								"where": "vs CAR",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.4",
+							"pts": "12.2",
+							"evidence": "Avg 3.1, Last 12.2",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "5844",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "T.J. Hockenson",
+							"fit": "T. Hockenson",
+							"slug": "t-j-hockenson",
+							"boardId": "4036133",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "MIN",
+							"position": "TE",
+							"status": null,
+							"rank": "22",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "6801",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tee Higgins",
+							"fit": "T. Higgins",
+							"slug": "tee-higgins",
+							"boardId": "4239993",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CIN",
+							"position": "WR",
+							"status": null,
+							"rank": "15",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "9508",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tyjae Spears",
+							"fit": "T. Spears",
+							"slug": "tyjae-spears",
+							"boardId": "4428557",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "TEN",
+							"position": "RB",
+							"status": null,
+							"rank": "36",
+							"game": {
+								"where": "at IND",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "6.6",
+							"pts": "5.6",
+							"evidence": "Avg 1.4, Last 5.6",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "CIN",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Cincinnati Bengals",
+							"fit": "Bengals",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Bengals defense"
+							},
+							"club": "CIN",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						}
+					]
+				},
+				{
+					"team": "Bower Rangers",
+					"mine": false,
+					"empty": null,
+					"starters": [
+						{
+							"key": "9228",
+							"slot": "QB",
+							"move": null,
+							"idle": false,
+							"name": "Bryce Young",
+							"fit": "B. Young",
+							"slug": "bryce-young",
+							"boardId": "4685720",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CAR",
+							"position": "QB",
+							"status": null,
+							"rank": "28",
+							"game": {
+								"where": "at PHI",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "10.5",
+							"pts": "8.9",
+							"evidence": "Avg 2.2, Last 8.9",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "9221",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "Jahmyr Gibbs",
+							"fit": "J. Gibbs",
+							"slug": "jahmyr-gibbs",
+							"boardId": "4429795",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DET",
+							"position": "RB",
+							"status": null,
+							"rank": "1",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "11581",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "MarShawn Lloyd",
+							"fit": "M. Lloyd",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "0.0",
+							"evidence": "Opp 22nd, Avg --, Last --",
+							"oppRank": "22nd",
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "7569",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Nico Collins",
+							"fit": "N. Collins",
+							"slug": "nico-collins",
+							"boardId": "4258173",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "HOU",
+							"position": "WR",
+							"status": null,
+							"rank": "10",
+							"game": {
+								"where": "at JAX",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "15.8",
+							"pts": "13.4",
+							"evidence": "Avg 3.4, Last 13.4",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "5927",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Terry McLaurin",
+							"fit": "T. McLaurin",
+							"slug": "terry-mclaurin",
+							"boardId": "3121422",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "WAS",
+							"position": "WR",
+							"status": null,
+							"rank": "26",
+							"game": {
+								"where": "at SF",
+								"when": "Mon 7:15 pm"
+							},
+							"note": null,
+							"expected": "21.5 to 29",
+							"weather": {
+								"glyph": "wind",
+								"words": "63°, 13 mph"
+							},
+							"proj": "12.3",
+							"pts": "--",
+							"evidence": "Opp 25th, Avg 12.3, Last 10.2",
+							"oppRank": "25th",
+							"ease": "easy",
+							"delta": "+0.4",
+							"state": "upcoming",
+							"why": null
+						},
+						{
+							"key": "12501",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Matthew Golden",
+							"fit": "M. Golden",
+							"slug": "matthew-golden",
+							"boardId": "4701936",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "WR",
+							"status": null,
+							"rank": "49",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "8.5",
+							"pts": "7.2",
+							"evidence": "Avg 1.8, Last 7.2",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12517",
+							"slot": "TE",
+							"move": null,
+							"idle": false,
+							"name": "Colston Loveland",
+							"fit": "C. Loveland",
+							"slug": "colston-loveland",
+							"boardId": "4723086",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "TE",
+							"status": null,
+							"rank": "3",
+							"game": {
+								"where": "at ATL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "10.3",
+							"pts": "8.8",
+							"evidence": "Avg 2.2, Last 8.8",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "13346",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Denzel Boston",
+							"fit": "D. Boston",
+							"slug": "denzel-boston",
+							"boardId": "4832800",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CLE",
+							"position": "WR",
+							"status": null,
+							"rank": "60",
+							"game": {
+								"where": "vs BAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.7",
+							"pts": "6.5",
+							"evidence": "Opp 12th, Avg 9.8, Last 6.5",
+							"oppRank": "12th",
+							"ease": "even",
+							"delta": "−0.4",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11604",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Brock Bowers",
+							"fit": "B. Bowers",
+							"slug": "brock-bowers",
+							"boardId": "4432665",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LV",
+							"position": "TE",
+							"status": null,
+							"rank": "2",
+							"game": {
+								"where": "vs BUF",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "13.4",
+							"pts": "11.4",
+							"evidence": "Avg 2.9, Last 11.4",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "CLE",
+							"slot": "D/ST",
+							"move": null,
+							"idle": false,
+							"name": "Cleveland Browns",
+							"fit": "Browns",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Browns defense"
+							},
+							"club": "CLE",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs BAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.0",
+							"pts": "6.0",
+							"evidence": "Avg 6.0, Last 6.0",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						}
+					],
+					"team_row": {
+						"note": "MarShawn Lloyd had no Proj",
+						"live": true,
+						"caption": "Proj final",
+						"proj": "74.5",
+						"pts": "62.2"
+					},
+					"bench": [
+						{
+							"key": "10213",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tre Tucker",
+							"fit": "T. Tucker",
+							"slug": "tre-tucker",
+							"boardId": "4428718",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LV",
+							"position": "WR",
+							"status": null,
+							"rank": "44",
+							"game": {
+								"where": "vs BUF",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "8.7",
+							"pts": "7.4",
+							"evidence": "Opp 27th, Avg 7.9, Last 7.4",
+							"oppRank": "27th",
+							"ease": "even",
+							"delta": "+0.3",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11563",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Bo Nix",
+							"fit": "B. Nix",
+							"slug": "bo-nix",
+							"boardId": "4426338",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DEN",
+							"position": "QB",
+							"status": null,
+							"rank": "13",
+							"game": {
+								"where": "vs SEA",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.7",
+							"pts": "12.5",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11583",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jonathon Brooks",
+							"fit": "J. Brooks",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CAR",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "at PHI",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "0.0",
+							"evidence": "Opp 28th, Avg --, Last --",
+							"oppRank": "28th",
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11625",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Adonai Mitchell",
+							"fit": "A. Mitchell",
+							"slug": "adonai-mitchell",
+							"boardId": "4597500",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NYJ",
+							"position": "WR",
+							"status": null,
+							"rank": "63",
+							"game": {
+								"where": "at NE",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "6.7",
+							"pts": "5.7",
+							"evidence": "Avg 1.9, Last 5.7",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12534",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Kyle Monangai",
+							"fit": "K. Monangai",
+							"slug": "kyle-monangai",
+							"boardId": "4608686",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "RB",
+							"status": null,
+							"rank": "33",
+							"game": {
+								"where": "at ATL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.5",
+							"pts": "6.4",
+							"evidence": "Avg 1.6, Last 6.4",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12718",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Konata Mumpfield",
+							"fit": "K. Mumpfield",
+							"slug": "konata-mumpfield",
+							"boardId": "4710855",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LAR",
+							"position": "WR",
+							"status": null,
+							"rank": "96",
+							"game": {
+								"where": "vs ARI",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "3.5",
+							"pts": "3.0",
+							"evidence": "Avg 0.8, Last 3.0",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "13281",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jordyn Tyson",
+							"fit": "J. Tyson",
+							"slug": "jordyn-tyson",
+							"boardId": "4880281",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NO",
+							"position": "WR",
+							"status": null,
+							"rank": "147",
+							"game": {
+								"where": "at NYG",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "5.7",
+							"pts": "4.8",
+							"evidence": "Avg 4.8, Last 4.8",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "13337",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Emmett Johnson",
+							"fit": "E. Johnson",
+							"slug": "emmett-johnson",
+							"boardId": "4832955",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "KC",
+							"position": "RB",
+							"status": null,
+							"rank": "49",
+							"game": {
+								"where": "vs LAC",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "4.6",
+							"pts": "3.9",
+							"evidence": "Avg 1.0, Last 3.9",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "4177",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Mack Hollins",
+							"fit": "M. Hollins",
+							"slug": "mack-hollins",
+							"boardId": "2991662",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NE",
+							"position": "WR",
+							"status": null,
+							"rank": "149",
+							"game": {
+								"where": "vs NYJ",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "5.4",
+							"pts": "4.6",
+							"evidence": "Avg 1.2, Last 4.6",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "5850",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Josh Jacobs",
+							"fit": "J. Jacobs",
+							"slug": "josh-jacobs",
+							"boardId": "4047365",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "35",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "6.9",
+							"pts": "5.9",
+							"evidence": "Avg 5.9, Last 5.9",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						}
+					]
+				}
+			],
+			"basis": "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Proj final adds the Pts and the Proj each starter has left. Our rank is his place at his position in our order. Pts are Sleeper's points so far, Team adds the rows. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Avg and Last count Sleeper's finals, our stats by Wednesday."
+		},
+		"2026-10-20T00-40-00Z": {
+			"clock": "2026-10-20T00:40:00.000Z",
+			"now": "2026-10-20T00:36:00.000Z",
+			"whose": {
+				"head": "Their game",
+				"link": "Your game"
+			},
+			"week": "Week 6",
+			"title": {
+				"mine": "Carried by QJs",
+				"opponent": "Bower Rangers"
+			},
+			"bug": {
+				"week": "Week 6",
+				"mine": {
+					"label": "",
+					"name": "Carried by QJs",
+					"big": "79.3",
+					"bigLabel": "Pts",
+					"small": "Proj final 81.5",
+					"toPlay": "1 playing"
+				},
+				"opponent": {
+					"label": "",
+					"name": "Bower Rangers",
+					"big": "72.7",
+					"bigLabel": "Pts",
+					"small": "Proj final 74.5",
+					"toPlay": "1 playing"
+				},
+				"kickoff": {
+					"head": "Kicked off",
+					"words": ""
+				},
+				"started": true,
+				"read": "Sleeper 4 min ago",
+				"standing": null
+			},
+			"allPlay": null,
+			"scoreGap": null,
+			"noOpponent": null,
+			"boxes": [
+				{
+					"team": "Carried by QJs",
+					"mine": false,
+					"empty": null,
+					"starters": [
+						{
+							"key": "8183",
+							"slot": "QB",
+							"move": null,
+							"idle": false,
+							"name": "Brock Purdy",
+							"fit": "B. Purdy",
+							"slug": "brock-purdy",
+							"boardId": "4361741",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "SF",
+							"position": "QB",
+							"status": null,
+							"rank": "15",
+							"game": {
+								"where": "vs WSH",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.4",
+							"pts": "12.2",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "7588",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "Javonte Williams",
+							"fit": "J. Williams",
+							"slug": "javonte-williams",
+							"boardId": "4361579",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DAL",
+							"position": "RB",
+							"status": null,
+							"rank": "18",
+							"game": {
+								"where": "at GB",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "10.1",
+							"pts": "8.6",
+							"evidence": "Avg 2.2, Last 8.6",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12489",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "RJ Harvey",
+							"fit": "R. Harvey",
+							"slug": "rj-harvey",
+							"boardId": "4568490",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DEN",
+							"position": "RB",
+							"status": null,
+							"rank": "28",
+							"game": {
+								"where": "vs SEA",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "9.1",
+							"pts": "7.7",
+							"evidence": "Opp 30th, Avg 9.6, Last 7.7",
+							"oppRank": "30th",
+							"ease": "even",
+							"delta": "0.0",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "6786",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "CeeDee Lamb",
+							"fit": "C. Lamb",
+							"slug": "ceedee-lamb",
+							"boardId": "4241389",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DAL",
+							"position": "WR",
+							"status": null,
+							"rank": "5",
+							"game": {
+								"where": "at GB",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "18.2",
+							"pts": "15.5",
+							"evidence": "Avg 3.9, Last 15.5",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "3634",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Kalif Raymond",
+							"fit": "K. Raymond",
+							"slug": "kalif-raymond",
+							"boardId": "2973405",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "WR",
+							"status": null,
+							"rank": "102",
+							"game": {
+								"where": "at ATL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "3.2",
+							"pts": "2.7",
+							"evidence": "Avg 0.7, Last 2.7",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "13279",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Carnell Tate",
+							"fit": "C. Tate",
+							"slug": "carnell-tate",
+							"boardId": "4871023",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "TEN",
+							"position": "WR",
+							"status": null,
+							"rank": "34",
+							"game": {
+								"where": "at IND",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "11.3",
+							"pts": "9.6",
+							"evidence": "Avg 2.4, Last 9.6",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "9484",
+							"slot": "TE",
+							"move": null,
+							"idle": false,
+							"name": "Tucker Kraft",
+							"fit": "T. Kraft",
+							"slug": "tucker-kraft",
+							"boardId": "4572680",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "TE",
+							"status": null,
+							"rank": "10",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "11.1",
+							"pts": "9.4",
+							"evidence": "Opp 23rd, Avg 11.0, Last 9.4",
+							"oppRank": "23rd",
+							"ease": "even",
+							"delta": "+0.2",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12504",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Kaleb Johnson",
+							"fit": "K. Johnson",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "0.0",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "9480",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Brenton Strange",
+							"fit": "B. Strange",
+							"slug": "brenton-strange",
+							"boardId": "4430539",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "JAX",
+							"position": "TE",
+							"status": null,
+							"rank": "20",
+							"game": {
+								"where": "vs HOU",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.9",
+							"pts": "6.7",
+							"evidence": "Opp 21st, Avg 10.8, Last 6.7",
+							"oppRank": "21st",
+							"ease": "even",
+							"delta": "−0.1",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "LAR",
+							"slot": "D/ST",
+							"move": null,
+							"idle": false,
+							"name": "Los Angeles Rams",
+							"fit": "Rams",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Rams defense"
+							},
+							"club": "LAR",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs ARI",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "8.1",
+							"pts": "6.9",
+							"evidence": "Avg 6.9, Last 6.9",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						}
+					],
+					"team_row": {
+						"note": "Kaleb Johnson had no Proj",
+						"live": true,
+						"caption": "Proj final",
+						"proj": "81.5",
+						"pts": "79.3"
+					},
+					"bench": [
+						{
+							"key": "11566",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jayden Daniels",
+							"fit": "J. Daniels",
+							"slug": "jayden-daniels",
+							"boardId": "4426348",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "WAS",
+							"position": "QB",
+							"status": null,
+							"rank": "14",
+							"game": {
+								"where": "at SF",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.6",
+							"pts": "12.4",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "11630",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Roman Wilson",
+							"fit": "R. Wilson",
+							"slug": "roman-wilson",
+							"boardId": "4431492",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "PIT",
+							"position": "WR",
+							"status": null,
+							"rank": "109",
+							"game": {
+								"where": "at TB",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "2.9",
+							"pts": "2.5",
+							"evidence": "Avg 0.6, Last 2.5",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "3321",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tyreek Hill",
+							"fit": "T. Hill",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "",
+							"position": "WR",
+							"status": null,
+							"rank": "--",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "4039",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Cooper Kupp",
+							"fit": "C. Kupp",
+							"slug": "cooper-kupp",
+							"boardId": "2977187",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "SEA",
+							"position": "WR",
+							"status": null,
+							"rank": "61",
+							"game": {
+								"where": "at DEN",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.0",
+							"pts": "6.0",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "4199",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Aaron Jones",
+							"fit": "A. Jones",
+							"slug": "aaron-jones-sr",
+							"boardId": "3042519",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "MIN",
+							"position": "RB",
+							"status": null,
+							"rank": "29",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "4866",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Saquon Barkley",
+							"fit": "S. Barkley",
+							"slug": "saquon-barkley",
+							"boardId": "3929630",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "PHI",
+							"position": "RB",
+							"status": null,
+							"rank": "6",
+							"game": {
+								"where": "vs CAR",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.4",
+							"pts": "12.2",
+							"evidence": "Avg 3.1, Last 12.2",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "5844",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "T.J. Hockenson",
+							"fit": "T. Hockenson",
+							"slug": "t-j-hockenson",
+							"boardId": "4036133",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "MIN",
+							"position": "TE",
+							"status": null,
+							"rank": "22",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "6801",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tee Higgins",
+							"fit": "T. Higgins",
+							"slug": "tee-higgins",
+							"boardId": "4239993",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CIN",
+							"position": "WR",
+							"status": null,
+							"rank": "15",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "9508",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tyjae Spears",
+							"fit": "T. Spears",
+							"slug": "tyjae-spears",
+							"boardId": "4428557",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "TEN",
+							"position": "RB",
+							"status": null,
+							"rank": "36",
+							"game": {
+								"where": "at IND",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "6.6",
+							"pts": "5.6",
+							"evidence": "Avg 1.4, Last 5.6",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "CIN",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Cincinnati Bengals",
+							"fit": "Bengals",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Bengals defense"
+							},
+							"club": "CIN",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						}
+					]
+				},
+				{
+					"team": "Bower Rangers",
+					"mine": false,
+					"empty": null,
+					"starters": [
+						{
+							"key": "9228",
+							"slot": "QB",
+							"move": null,
+							"idle": false,
+							"name": "Bryce Young",
+							"fit": "B. Young",
+							"slug": "bryce-young",
+							"boardId": "4685720",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CAR",
+							"position": "QB",
+							"status": null,
+							"rank": "28",
+							"game": {
+								"where": "at PHI",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "10.5",
+							"pts": "8.9",
+							"evidence": "Avg 2.2, Last 8.9",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "9221",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "Jahmyr Gibbs",
+							"fit": "J. Gibbs",
+							"slug": "jahmyr-gibbs",
+							"boardId": "4429795",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DET",
+							"position": "RB",
+							"status": null,
+							"rank": "1",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "11581",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "MarShawn Lloyd",
+							"fit": "M. Lloyd",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "0.0",
+							"evidence": "Opp 22nd, Avg --, Last --",
+							"oppRank": "22nd",
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "7569",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Nico Collins",
+							"fit": "N. Collins",
+							"slug": "nico-collins",
+							"boardId": "4258173",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "HOU",
+							"position": "WR",
+							"status": null,
+							"rank": "10",
+							"game": {
+								"where": "at JAX",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "15.8",
+							"pts": "13.4",
+							"evidence": "Avg 3.4, Last 13.4",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "5927",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Terry McLaurin",
+							"fit": "T. McLaurin",
+							"slug": "terry-mclaurin",
+							"boardId": "3121422",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "WAS",
+							"position": "WR",
+							"status": null,
+							"rank": "26",
+							"game": {
+								"where": "at SF",
+								"when": "Kicked off"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "12.3",
+							"pts": "10.5",
+							"evidence": "Opp 25th, Avg 12.3, Last 10.2",
+							"oppRank": "25th",
+							"ease": "even",
+							"delta": "+0.4",
+							"state": "kicked_off",
+							"why": null
+						},
+						{
+							"key": "12501",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Matthew Golden",
+							"fit": "M. Golden",
+							"slug": "matthew-golden",
+							"boardId": "4701936",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "WR",
+							"status": null,
+							"rank": "49",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "8.5",
+							"pts": "7.2",
+							"evidence": "Avg 1.8, Last 7.2",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12517",
+							"slot": "TE",
+							"move": null,
+							"idle": false,
+							"name": "Colston Loveland",
+							"fit": "C. Loveland",
+							"slug": "colston-loveland",
+							"boardId": "4723086",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "TE",
+							"status": null,
+							"rank": "3",
+							"game": {
+								"where": "at ATL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "10.3",
+							"pts": "8.8",
+							"evidence": "Avg 2.2, Last 8.8",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "13346",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Denzel Boston",
+							"fit": "D. Boston",
+							"slug": "denzel-boston",
+							"boardId": "4832800",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CLE",
+							"position": "WR",
+							"status": null,
+							"rank": "60",
+							"game": {
+								"where": "vs BAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.7",
+							"pts": "6.5",
+							"evidence": "Opp 12th, Avg 9.8, Last 6.5",
+							"oppRank": "12th",
+							"ease": "even",
+							"delta": "−0.4",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11604",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Brock Bowers",
+							"fit": "B. Bowers",
+							"slug": "brock-bowers",
+							"boardId": "4432665",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LV",
+							"position": "TE",
+							"status": null,
+							"rank": "2",
+							"game": {
+								"where": "vs BUF",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "13.4",
+							"pts": "11.4",
+							"evidence": "Avg 2.9, Last 11.4",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "CLE",
+							"slot": "D/ST",
+							"move": null,
+							"idle": false,
+							"name": "Cleveland Browns",
+							"fit": "Browns",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Browns defense"
+							},
+							"club": "CLE",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs BAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.0",
+							"pts": "6.0",
+							"evidence": "Avg 6.0, Last 6.0",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						}
+					],
+					"team_row": {
+						"note": "MarShawn Lloyd had no Proj",
+						"live": true,
+						"caption": "Proj final",
+						"proj": "74.5",
+						"pts": "72.7"
+					},
+					"bench": [
+						{
+							"key": "10213",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tre Tucker",
+							"fit": "T. Tucker",
+							"slug": "tre-tucker",
+							"boardId": "4428718",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LV",
+							"position": "WR",
+							"status": null,
+							"rank": "44",
+							"game": {
+								"where": "vs BUF",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "8.7",
+							"pts": "7.4",
+							"evidence": "Opp 27th, Avg 7.9, Last 7.4",
+							"oppRank": "27th",
+							"ease": "even",
+							"delta": "+0.3",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11563",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Bo Nix",
+							"fit": "B. Nix",
+							"slug": "bo-nix",
+							"boardId": "4426338",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DEN",
+							"position": "QB",
+							"status": null,
+							"rank": "13",
+							"game": {
+								"where": "vs SEA",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.7",
+							"pts": "12.5",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11583",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jonathon Brooks",
+							"fit": "J. Brooks",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CAR",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "at PHI",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "0.0",
+							"evidence": "Opp 28th, Avg --, Last --",
+							"oppRank": "28th",
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11625",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Adonai Mitchell",
+							"fit": "A. Mitchell",
+							"slug": "adonai-mitchell",
+							"boardId": "4597500",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NYJ",
+							"position": "WR",
+							"status": null,
+							"rank": "63",
+							"game": {
+								"where": "at NE",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "6.7",
+							"pts": "5.7",
+							"evidence": "Avg 1.9, Last 5.7",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12534",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Kyle Monangai",
+							"fit": "K. Monangai",
+							"slug": "kyle-monangai",
+							"boardId": "4608686",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "RB",
+							"status": null,
+							"rank": "33",
+							"game": {
+								"where": "at ATL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.5",
+							"pts": "6.4",
+							"evidence": "Avg 1.6, Last 6.4",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12718",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Konata Mumpfield",
+							"fit": "K. Mumpfield",
+							"slug": "konata-mumpfield",
+							"boardId": "4710855",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LAR",
+							"position": "WR",
+							"status": null,
+							"rank": "96",
+							"game": {
+								"where": "vs ARI",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "3.5",
+							"pts": "3.0",
+							"evidence": "Avg 0.8, Last 3.0",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "13281",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jordyn Tyson",
+							"fit": "J. Tyson",
+							"slug": "jordyn-tyson",
+							"boardId": "4880281",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NO",
+							"position": "WR",
+							"status": null,
+							"rank": "147",
+							"game": {
+								"where": "at NYG",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "5.7",
+							"pts": "4.8",
+							"evidence": "Avg 4.8, Last 4.8",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "13337",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Emmett Johnson",
+							"fit": "E. Johnson",
+							"slug": "emmett-johnson",
+							"boardId": "4832955",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "KC",
+							"position": "RB",
+							"status": null,
+							"rank": "49",
+							"game": {
+								"where": "vs LAC",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "4.6",
+							"pts": "3.9",
+							"evidence": "Avg 1.0, Last 3.9",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "4177",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Mack Hollins",
+							"fit": "M. Hollins",
+							"slug": "mack-hollins",
+							"boardId": "2991662",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NE",
+							"position": "WR",
+							"status": null,
+							"rank": "149",
+							"game": {
+								"where": "vs NYJ",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "5.4",
+							"pts": "4.6",
+							"evidence": "Avg 1.2, Last 4.6",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "5850",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Josh Jacobs",
+							"fit": "J. Jacobs",
+							"slug": "josh-jacobs",
+							"boardId": "4047365",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "35",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "6.9",
+							"pts": "5.9",
+							"evidence": "Avg 5.9, Last 5.9",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						}
+					]
+				}
+			],
+			"basis": "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Proj final adds the Pts and the Proj each starter has left. Our rank is his place at his position in our order. Pts are Sleeper's points so far, Team adds the rows. Avg and Last count Sleeper's finals, our stats by Wednesday."
+		},
+		"2026-10-20T17-00-00Z": {
+			"clock": "2026-10-20T17:00:00.000Z",
+			"now": "2026-10-20T16:56:00.000Z",
+			"whose": {
+				"head": "Their game",
+				"link": "Your game"
+			},
+			"week": "Week 6",
+			"title": {
+				"mine": "Carried by QJs",
+				"opponent": "Bower Rangers"
+			},
+			"bug": {
+				"week": "Week 6",
+				"mine": {
+					"label": "",
+					"name": "Carried by QJs",
+					"big": "79.3",
+					"bigLabel": "Pts",
+					"small": "Final 79.3",
+					"toPlay": ""
+				},
+				"opponent": {
+					"label": "",
+					"name": "Bower Rangers",
+					"big": "72.7",
+					"bigLabel": "Pts",
+					"small": "Final 72.7",
+					"toPlay": ""
+				},
+				"kickoff": {
+					"head": "Final",
+					"words": ""
+				},
+				"started": true,
+				"read": null,
+				"standing": null
+			},
+			"allPlay": null,
+			"scoreGap": null,
+			"noOpponent": null,
+			"boxes": [
+				{
+					"team": "Carried by QJs",
+					"mine": false,
+					"empty": null,
+					"starters": [
+						{
+							"key": "8183",
+							"slot": "QB",
+							"move": null,
+							"idle": false,
+							"name": "Brock Purdy",
+							"fit": "B. Purdy",
+							"slug": "brock-purdy",
+							"boardId": "4361741",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "SF",
+							"position": "QB",
+							"status": null,
+							"rank": "15",
+							"game": {
+								"where": "vs WSH",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.4",
+							"pts": "12.2",
+							"evidence": "Avg 3.1, Last 12.2",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "7588",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "Javonte Williams",
+							"fit": "J. Williams",
+							"slug": "javonte-williams",
+							"boardId": "4361579",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DAL",
+							"position": "RB",
+							"status": null,
+							"rank": "18",
+							"game": {
+								"where": "at GB",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "10.1",
+							"pts": "8.6",
+							"evidence": "Avg 2.2, Last 8.6",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12489",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "RJ Harvey",
+							"fit": "R. Harvey",
+							"slug": "rj-harvey",
+							"boardId": "4568490",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DEN",
+							"position": "RB",
+							"status": null,
+							"rank": "28",
+							"game": {
+								"where": "vs SEA",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "9.1",
+							"pts": "7.7",
+							"evidence": "Opp 30th, Avg 9.6, Last 7.7",
+							"oppRank": "30th",
+							"ease": "even",
+							"delta": "0.0",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "6786",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "CeeDee Lamb",
+							"fit": "C. Lamb",
+							"slug": "ceedee-lamb",
+							"boardId": "4241389",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DAL",
+							"position": "WR",
+							"status": null,
+							"rank": "5",
+							"game": {
+								"where": "at GB",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "18.2",
+							"pts": "15.5",
+							"evidence": "Avg 3.9, Last 15.5",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "3634",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Kalif Raymond",
+							"fit": "K. Raymond",
+							"slug": "kalif-raymond",
+							"boardId": "2973405",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "WR",
+							"status": null,
+							"rank": "102",
+							"game": {
+								"where": "at ATL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "3.2",
+							"pts": "2.7",
+							"evidence": "Avg 0.7, Last 2.7",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "13279",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Carnell Tate",
+							"fit": "C. Tate",
+							"slug": "carnell-tate",
+							"boardId": "4871023",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "TEN",
+							"position": "WR",
+							"status": null,
+							"rank": "34",
+							"game": {
+								"where": "at IND",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "11.3",
+							"pts": "9.6",
+							"evidence": "Avg 2.4, Last 9.6",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "9484",
+							"slot": "TE",
+							"move": null,
+							"idle": false,
+							"name": "Tucker Kraft",
+							"fit": "T. Kraft",
+							"slug": "tucker-kraft",
+							"boardId": "4572680",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "TE",
+							"status": null,
+							"rank": "10",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "11.1",
+							"pts": "9.4",
+							"evidence": "Opp 23rd, Avg 11.0, Last 9.4",
+							"oppRank": "23rd",
+							"ease": "even",
+							"delta": "+0.2",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12504",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Kaleb Johnson",
+							"fit": "K. Johnson",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "0.0",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "9480",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Brenton Strange",
+							"fit": "B. Strange",
+							"slug": "brenton-strange",
+							"boardId": "4430539",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "JAX",
+							"position": "TE",
+							"status": null,
+							"rank": "20",
+							"game": {
+								"where": "vs HOU",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.9",
+							"pts": "6.7",
+							"evidence": "Opp 21st, Avg 10.8, Last 6.7",
+							"oppRank": "21st",
+							"ease": "even",
+							"delta": "−0.1",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "LAR",
+							"slot": "D/ST",
+							"move": null,
+							"idle": false,
+							"name": "Los Angeles Rams",
+							"fit": "Rams",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Rams defense"
+							},
+							"club": "LAR",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs ARI",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "8.1",
+							"pts": "6.9",
+							"evidence": "Avg 6.9, Last 6.9",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						}
+					],
+					"team_row": {
+						"note": "Kaleb Johnson had no Proj",
+						"live": true,
+						"caption": "Final",
+						"proj": "79.3",
+						"pts": "79.3"
+					},
+					"bench": [
+						{
+							"key": "11566",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jayden Daniels",
+							"fit": "J. Daniels",
+							"slug": "jayden-daniels",
+							"boardId": "4426348",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "WAS",
+							"position": "QB",
+							"status": null,
+							"rank": "14",
+							"game": {
+								"where": "at SF",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.6",
+							"pts": "12.4",
+							"evidence": "Avg 3.1, Last 12.4",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11630",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Roman Wilson",
+							"fit": "R. Wilson",
+							"slug": "roman-wilson",
+							"boardId": "4431492",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "PIT",
+							"position": "WR",
+							"status": null,
+							"rank": "109",
+							"game": {
+								"where": "at TB",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "2.9",
+							"pts": "2.5",
+							"evidence": "Avg 0.6, Last 2.5",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "3321",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tyreek Hill",
+							"fit": "T. Hill",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "",
+							"position": "WR",
+							"status": null,
+							"rank": "--",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "4039",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Cooper Kupp",
+							"fit": "C. Kupp",
+							"slug": "cooper-kupp",
+							"boardId": "2977187",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "SEA",
+							"position": "WR",
+							"status": null,
+							"rank": "61",
+							"game": {
+								"where": "at DEN",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.0",
+							"pts": "6.0",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "4199",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Aaron Jones",
+							"fit": "A. Jones",
+							"slug": "aaron-jones-sr",
+							"boardId": "3042519",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "MIN",
+							"position": "RB",
+							"status": null,
+							"rank": "29",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "4866",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Saquon Barkley",
+							"fit": "S. Barkley",
+							"slug": "saquon-barkley",
+							"boardId": "3929630",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "PHI",
+							"position": "RB",
+							"status": null,
+							"rank": "6",
+							"game": {
+								"where": "vs CAR",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.4",
+							"pts": "12.2",
+							"evidence": "Avg 3.1, Last 12.2",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "5844",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "T.J. Hockenson",
+							"fit": "T. Hockenson",
+							"slug": "t-j-hockenson",
+							"boardId": "4036133",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "MIN",
+							"position": "TE",
+							"status": null,
+							"rank": "22",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "6801",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tee Higgins",
+							"fit": "T. Higgins",
+							"slug": "tee-higgins",
+							"boardId": "4239993",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CIN",
+							"position": "WR",
+							"status": null,
+							"rank": "15",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "9508",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tyjae Spears",
+							"fit": "T. Spears",
+							"slug": "tyjae-spears",
+							"boardId": "4428557",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "TEN",
+							"position": "RB",
+							"status": null,
+							"rank": "36",
+							"game": {
+								"where": "at IND",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "6.6",
+							"pts": "5.6",
+							"evidence": "Avg 1.4, Last 5.6",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "CIN",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Cincinnati Bengals",
+							"fit": "Bengals",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Bengals defense"
+							},
+							"club": "CIN",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						}
+					]
+				},
+				{
+					"team": "Bower Rangers",
+					"mine": false,
+					"empty": null,
+					"starters": [
+						{
+							"key": "9228",
+							"slot": "QB",
+							"move": null,
+							"idle": false,
+							"name": "Bryce Young",
+							"fit": "B. Young",
+							"slug": "bryce-young",
+							"boardId": "4685720",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CAR",
+							"position": "QB",
+							"status": null,
+							"rank": "28",
+							"game": {
+								"where": "at PHI",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "10.5",
+							"pts": "8.9",
+							"evidence": "Avg 2.2, Last 8.9",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "9221",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "Jahmyr Gibbs",
+							"fit": "J. Gibbs",
+							"slug": "jahmyr-gibbs",
+							"boardId": "4429795",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DET",
+							"position": "RB",
+							"status": null,
+							"rank": "1",
+							"game": "bye",
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "--",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": null,
+							"why": null
+						},
+						{
+							"key": "11581",
+							"slot": "RB",
+							"move": null,
+							"idle": false,
+							"name": "MarShawn Lloyd",
+							"fit": "M. Lloyd",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "0.0",
+							"evidence": "Opp 22nd, Avg --, Last --",
+							"oppRank": "22nd",
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "7569",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Nico Collins",
+							"fit": "N. Collins",
+							"slug": "nico-collins",
+							"boardId": "4258173",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "HOU",
+							"position": "WR",
+							"status": null,
+							"rank": "10",
+							"game": {
+								"where": "at JAX",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "15.8",
+							"pts": "13.4",
+							"evidence": "Avg 3.4, Last 13.4",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "5927",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Terry McLaurin",
+							"fit": "T. McLaurin",
+							"slug": "terry-mclaurin",
+							"boardId": "3121422",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "WAS",
+							"position": "WR",
+							"status": null,
+							"rank": "26",
+							"game": {
+								"where": "at SF",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "12.3",
+							"pts": "10.5",
+							"evidence": "Opp 25th, Avg 11.9, Last 10.5",
+							"oppRank": "25th",
+							"ease": "even",
+							"delta": "+0.4",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12501",
+							"slot": "WR",
+							"move": null,
+							"idle": false,
+							"name": "Matthew Golden",
+							"fit": "M. Golden",
+							"slug": "matthew-golden",
+							"boardId": "4701936",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "WR",
+							"status": null,
+							"rank": "49",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "8.5",
+							"pts": "7.2",
+							"evidence": "Avg 1.8, Last 7.2",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12517",
+							"slot": "TE",
+							"move": null,
+							"idle": false,
+							"name": "Colston Loveland",
+							"fit": "C. Loveland",
+							"slug": "colston-loveland",
+							"boardId": "4723086",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "TE",
+							"status": null,
+							"rank": "3",
+							"game": {
+								"where": "at ATL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "10.3",
+							"pts": "8.8",
+							"evidence": "Avg 2.2, Last 8.8",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "13346",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Denzel Boston",
+							"fit": "D. Boston",
+							"slug": "denzel-boston",
+							"boardId": "4832800",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CLE",
+							"position": "WR",
+							"status": null,
+							"rank": "60",
+							"game": {
+								"where": "vs BAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.7",
+							"pts": "6.5",
+							"evidence": "Opp 12th, Avg 9.8, Last 6.5",
+							"oppRank": "12th",
+							"ease": "even",
+							"delta": "−0.4",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11604",
+							"slot": "Flex",
+							"move": null,
+							"idle": false,
+							"name": "Brock Bowers",
+							"fit": "B. Bowers",
+							"slug": "brock-bowers",
+							"boardId": "4432665",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LV",
+							"position": "TE",
+							"status": null,
+							"rank": "2",
+							"game": {
+								"where": "vs BUF",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "13.4",
+							"pts": "11.4",
+							"evidence": "Avg 2.9, Last 11.4",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "CLE",
+							"slot": "D/ST",
+							"move": null,
+							"idle": false,
+							"name": "Cleveland Browns",
+							"fit": "Browns",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": true,
+								"alt": "Browns defense"
+							},
+							"club": "CLE",
+							"position": "D/ST",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "vs BAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.0",
+							"pts": "6.0",
+							"evidence": "Avg 6.0, Last 6.0",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						}
+					],
+					"team_row": {
+						"note": "MarShawn Lloyd had no Proj",
+						"live": true,
+						"caption": "Final",
+						"proj": "72.7",
+						"pts": "72.7"
+					},
+					"bench": [
+						{
+							"key": "10213",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Tre Tucker",
+							"fit": "T. Tucker",
+							"slug": "tre-tucker",
+							"boardId": "4428718",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LV",
+							"position": "WR",
+							"status": null,
+							"rank": "44",
+							"game": {
+								"where": "vs BUF",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "8.7",
+							"pts": "7.4",
+							"evidence": "Opp 27th, Avg 7.9, Last 7.4",
+							"oppRank": "27th",
+							"ease": "even",
+							"delta": "+0.3",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11563",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Bo Nix",
+							"fit": "B. Nix",
+							"slug": "bo-nix",
+							"boardId": "4426338",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "DEN",
+							"position": "QB",
+							"status": null,
+							"rank": "13",
+							"game": {
+								"where": "vs SEA",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "14.7",
+							"pts": "12.5",
+							"evidence": "Avg --, Last --",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11583",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jonathon Brooks",
+							"fit": "J. Brooks",
+							"slug": null,
+							"boardId": null,
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CAR",
+							"position": "RB",
+							"status": null,
+							"rank": "--",
+							"game": {
+								"where": "at PHI",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "--",
+							"pts": "0.0",
+							"evidence": "Opp 28th, Avg --, Last --",
+							"oppRank": "28th",
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "11625",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Adonai Mitchell",
+							"fit": "A. Mitchell",
+							"slug": "adonai-mitchell",
+							"boardId": "4597500",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NYJ",
+							"position": "WR",
+							"status": null,
+							"rank": "63",
+							"game": {
+								"where": "at NE",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "6.7",
+							"pts": "5.7",
+							"evidence": "Avg 1.9, Last 5.7",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12534",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Kyle Monangai",
+							"fit": "K. Monangai",
+							"slug": "kyle-monangai",
+							"boardId": "4608686",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "CHI",
+							"position": "RB",
+							"status": null,
+							"rank": "33",
+							"game": {
+								"where": "at ATL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "7.5",
+							"pts": "6.4",
+							"evidence": "Avg 1.6, Last 6.4",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "12718",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Konata Mumpfield",
+							"fit": "K. Mumpfield",
+							"slug": "konata-mumpfield",
+							"boardId": "4710855",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "LAR",
+							"position": "WR",
+							"status": null,
+							"rank": "96",
+							"game": {
+								"where": "vs ARI",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "3.5",
+							"pts": "3.0",
+							"evidence": "Avg 0.8, Last 3.0",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "13281",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Jordyn Tyson",
+							"fit": "J. Tyson",
+							"slug": "jordyn-tyson",
+							"boardId": "4880281",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NO",
+							"position": "WR",
+							"status": null,
+							"rank": "147",
+							"game": {
+								"where": "at NYG",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "5.7",
+							"pts": "4.8",
+							"evidence": "Avg 4.8, Last 4.8",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "13337",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Emmett Johnson",
+							"fit": "E. Johnson",
+							"slug": "emmett-johnson",
+							"boardId": "4832955",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "KC",
+							"position": "RB",
+							"status": null,
+							"rank": "49",
+							"game": {
+								"where": "vs LAC",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "4.6",
+							"pts": "3.9",
+							"evidence": "Avg 1.0, Last 3.9",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "4177",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Mack Hollins",
+							"fit": "M. Hollins",
+							"slug": "mack-hollins",
+							"boardId": "2991662",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "NE",
+							"position": "WR",
+							"status": null,
+							"rank": "149",
+							"game": {
+								"where": "vs NYJ",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "5.4",
+							"pts": "4.6",
+							"evidence": "Avg 1.2, Last 4.6",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						},
+						{
+							"key": "5850",
+							"slot": "",
+							"move": null,
+							"idle": false,
+							"name": "Josh Jacobs",
+							"fit": "J. Jacobs",
+							"slug": "josh-jacobs",
+							"boardId": "4047365",
+							"face": {
+								"mark": false,
+								"alt": ""
+							},
+							"club": "GB",
+							"position": "RB",
+							"status": null,
+							"rank": "35",
+							"game": {
+								"where": "vs DAL",
+								"when": "Final"
+							},
+							"note": null,
+							"expected": null,
+							"weather": null,
+							"proj": "6.9",
+							"pts": "5.9",
+							"evidence": "Avg 5.9, Last 5.9",
+							"oppRank": null,
+							"ease": "even",
+							"delta": "--",
+							"state": "final",
+							"why": null
+						}
+					]
+				}
+			],
+			"basis": "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Our rank is his place at his position in our order. Pts are Sleeper's points so far, Team adds the rows. Avg and Last count Sleeper's finals, our stats by Wednesday."
+		}
 	}
 }

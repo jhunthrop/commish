@@ -28,6 +28,9 @@ const SERVE = 'web/scripts/inseason-fixture/serve.ts';
 const FROZEN_CLOCK = join(REPOSITORY, 'shared/scripts/frozen-clock.ts');
 /** The cookie the fixture API reads the FFPC stand-in of the recorded league by. */
 const FFPC_COOKIE = 'fixture_platform=ffpc';
+/** The cookie the fixture API reads the recorded Sleeper league's Sunday afternoon by, as the web's
+ * Sunday shots do (serve.ts SUNDAY_WEEK): its noon games under way, their points so far stated. */
+const SUNDAY_COOKIE = 'fixture_week=sunday';
 const START_TIMEOUT_MS = 30_000;
 const POLL_MS = 100;
 
@@ -79,7 +82,15 @@ export interface FixtureFile {
 	about: string;
 	claim?: ClaimRead;
 	check?: CheckRead;
+	/** The cookie it is read with where it is not the FFPC stand-in's: null for the recorded Sleeper
+	 * league itself, as another team's game is read (Lane 206), which the platform stand-ins do not
+	 * draw. */
+	cookie?: string | null;
 }
+
+/** The roster whose game the other-game reads ask for: the one other game the fixture holds full
+ * lines for (web/scripts/inseason-fixture/other-game.ts TAPPED_ROSTER, Carried by QJs). */
+export const OTHER_GAME_ROSTER = 2;
 
 /** The player the Trades holding picker narrows to in the fixtures, by board id: the member's Aaron
  * Rodgers, whom the strip's best trade gives (Lane 189 fix round 1). */
@@ -172,6 +183,34 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 			about: `the check of the strip's trade ${String(index + 1)}, ${name}`,
 			check: { trades: trades(clock, name).file, index }
 		}));
+	// Another team's game (Lane 206): its box by roster, and the league read and the scoreboard it
+	// draws its names and score from, all three as the recorded Sleeper league reads them (on its
+	// Sunday afternoon as the web's Sunday shots read it).
+	const sleeper = (clock: string): string | null =>
+		clock === source.clocks.sunday ? SUNDAY_COOKIE : null;
+	const otherGame = (clock: string, name: string): FixtureFile[] => [
+		{
+			file: `matchup-${id}-roster-${String(OTHER_GAME_ROSTER)}-${clockPart(clock)}.json`,
+			route: `GET /leagues/attached/${id}/matchup?roster=${String(OTHER_GAME_ROSTER)}`,
+			clock,
+			about: `another team's game as a box score, as the Sleeper league reads it, ${name}`,
+			cookie: sleeper(clock)
+		},
+		{
+			file: `sync-${id}-sleeper-${clockPart(clock)}.json`,
+			route: `GET /leagues/attached/${id}/sync`,
+			clock,
+			about: `the league read as the Sleeper league reads it, ${name}`,
+			cookie: sleeper(clock)
+		},
+		{
+			file: `scoreboard-${id}-sleeper-${clockPart(clock)}.json`,
+			route: `GET /leagues/attached/${id}/scoreboard`,
+			clock,
+			about: `the week's scoreboard as the Sleeper league reads it, ${name}`,
+			cookie: sleeper(clock)
+		}
+	];
 	const checked = new Set([source.clocks.week, source.clocks.sunday]);
 	const orders = (clock: string, name: string): FixtureFile[] => orderFiles(clock, name);
 	const atClock = (clock: string, name: string): FixtureFile[] => [
@@ -179,6 +218,7 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 		lineup(clock, name),
 		matchup(clock, name),
 		sync(clock, name),
+		...otherGame(clock, name),
 		waivers(id, clock, name),
 		trades(clock, name),
 		...(checked.has(clock) ? checks(clock, name) : []),
@@ -404,6 +444,12 @@ export function checkBody(file: FixtureFile, answers: ReadonlyMap<string, unknow
 /** A file posted after the answers its body is built from: a claim or a check. */
 const posted = (file: FixtureFile): boolean => file.claim !== undefined || file.check !== undefined;
 
+/** The cookie header a file is read with: the FFPC stand-in's unless the file names its own or none. */
+function cookieOf(file: FixtureFile): { cookie?: string } {
+	const cookie = file.cookie === undefined ? FFPC_COOKIE : file.cookie;
+	return cookie === null ? {} : { cookie };
+}
+
 /** Starts the fixture API on `clock`, stopped there, reads each file's route and stops it. */
 async function readAt(clock: string, files: readonly FixtureFile[]): Promise<[string, string][]> {
 	const port = await freePort();
@@ -422,7 +468,10 @@ async function readAt(clock: string, files: readonly FixtureFile[]): Promise<[st
 		const [method = 'GET', path = ''] = file.route.split(' ');
 		const response = await fetch(`${origin}${path}`, {
 			method,
-			headers: { cookie: FFPC_COOKIE, 'content-type': 'application/json' },
+			headers: {
+				...cookieOf(file),
+				'content-type': 'application/json'
+			},
 			...(body === undefined ? {} : { body: JSON.stringify(body) })
 		});
 		if (!response.ok)
@@ -480,7 +529,9 @@ The apps' view-model and snapshot tests read these, so the iOS app, the Android 
 tested on the same data. Each in-season file is one answer of the fixture API (the stand-in of the
 request API the web's shots run against) exactly as it sends it, the envelope (\`ok\`, \`data\`,
 \`error\`) included, read with its clock stopped at the instant named. The league is the recorded
-Sleeper league as the FFPC stand-in reads it (cookie \`${FFPC_COOKIE}\`), id \`${source.leagueId}\`.
+Sleeper league as the FFPC stand-in reads it (cookie \`${FFPC_COOKIE}\`), id \`${source.leagueId}\`,
+save another team's game and the reads it is drawn with, read as the Sleeper league itself (no cookie,
+or \`${SUNDAY_COOKIE}\` at the Sunday clock).
 A test that draws a screen at a clock passes the same instant as its injected clock.
 
 | File | Route | Clock | What it holds |

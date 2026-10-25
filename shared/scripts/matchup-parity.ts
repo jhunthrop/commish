@@ -6,8 +6,9 @@
  * row, the bench, the sentence in place of starters a platform does not send) and the phone's basis.
  * The screen draws at the league read's instant and ages the read cell by the page's clock, as
  * MatchupScreen passes them. A second set reads each clock's league without the box answer (the API
- * refusing it), the read's starters alone; a third the gap sentences with no matchup. Written by
- * export-parity.ts beside the Lineup's. */
+ * refusing it), the read's starters alone; a third the gap sentences with no matchup; a fourth another
+ * team's game (Lane 206), its box asked by roster, its head and score the scoreboard's (game.ts
+ * otherGame), none of the member's words. Written by export-parity.ts beside the Lineup's. */
 import {
 	BOX,
 	boxNumber,
@@ -24,6 +25,7 @@ import {
 	matchupFinal,
 	matchupNoFinal,
 	matchupStarted,
+	MATCHUP,
 	matchupUnlisted,
 	nextKickoff,
 	showsTotal,
@@ -35,7 +37,8 @@ import {
 } from '../../web/src/lib/league/box/matchup.ts';
 import { readCell } from '../../web/src/lib/league/home/home.ts';
 import type { LeagueSync, MatchupSide } from '../../web/src/lib/league/api.ts';
-import type { MatchupBox } from '../../web/src/lib/league/inseason/api.ts';
+import type { MatchupBox, Scoreboard } from '../../web/src/lib/league/inseason/api.ts';
+import { isOtherGame, otherGame } from '../../web/src/lib/league/box/game.ts';
 import { matchupGap, scoreGap, scoreUnread, teamName } from '../../web/src/lib/league/model.ts';
 import { cells } from './lineup-parity.ts';
 
@@ -67,15 +70,19 @@ function boxOf(team: string, mine: boolean, side: SideBox, empty: string | null)
 }
 
 /** The Matchup at one clock as the web's phone draws it: at the read's instant, the read cell aged by
- * the page's clock (`clock`). */
+ * the page's clock (`clock`). Another team's game (the box's own viewer_side) is drawn from the box
+ * and the scoreboard (`board`) as MatchupPanel draws it: its head says whose game it is, its bug no
+ * You or Opponent, no note of the member's, no box of the member's. */
 export function matchupAt(
 	sync: LeagueSync,
 	box: MatchupBox | null,
 	clock: string,
-	zone: string
+	zone: string,
+	board: Scoreboard | null = null
 ): unknown {
 	const now = Date.parse(sync.read_at);
-	const matchup = sync.matchup;
+	const other = isOtherGame(box);
+	const matchup = other ? otherGame(box, board) : sync.matchup;
 	if (matchup === null) return { gap: matchupGap(sync, new Date(now)) };
 	const starterLines = (box?.sides ?? []).flatMap((s) => s.starters.map((st) => st.line));
 	const started = matchupStarted(starterLines, now);
@@ -116,7 +123,7 @@ export function matchupAt(
 			? readCell({ host: sync.host, readAt: sync.read_at }, Date.parse(clock))
 			: null;
 	const bugSide = (s: MatchupSide, side: SideBox, me: boolean): unknown => ({
-		label: me ? BOX.you : BOX.opponent,
+		label: other ? '' : me ? BOX.you : BOX.opponent,
 		name: teamName(sync, s.roster_id),
 		...bugFigures(side.totals, started),
 		toPlay: countOf(s.roster_id)
@@ -145,6 +152,7 @@ export function matchupAt(
 	return {
 		clock,
 		now: sync.read_at,
+		...(other ? { whose: { head: MATCHUP.theirGame, link: MATCHUP.yourGame } } : {}),
 		week: `Week ${String(matchup.week)}`,
 		title: {
 			mine: teamName(sync, matchup.mine.roster_id),
@@ -159,11 +167,16 @@ export function matchupAt(
 			read,
 			standing: standingLine(box, started)
 		},
-		allPlay: sync.week_all_play ? allPlayWords(sync.host) : null,
-		scoreGap: scoreUnread(matchup.mine) ? scoreGap(sync, new Date(now)) : null,
+		allPlay: sync.week_all_play && !other ? allPlayWords(sync.host) : null,
+		scoreGap: scoreUnread(matchup.mine) && !other ? scoreGap(sync, new Date(now)) : null,
 		noOpponent: !opponent && !sync.week_all_play ? BOX.noOpponent : null,
 		boxes: [
-			boxOf(teamName(sync, matchup.mine.roster_id), true, mine, null),
+			boxOf(
+				teamName(sync, matchup.mine.roster_id),
+				!other,
+				mine,
+				other && sync.host === 'ffpc' ? yoursOnlyWords(sync.host) : null
+			),
 			...(opponent && theirs
 				? [
 						boxOf(

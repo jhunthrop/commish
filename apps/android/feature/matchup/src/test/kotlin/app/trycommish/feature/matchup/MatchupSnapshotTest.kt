@@ -34,7 +34,9 @@ import org.junit.runners.Parameterized
  * the first kickoff (Saturday noon: each side's Proj, the first kickoff), during the games with mixed
  * states (Sunday 18:56Z: kicked off, still to come and final rows, the live score with its read), after
  * Sunday (Monday morning: Sunday's starters final, Monday night still to come) and final (Tuesday noon);
- * and a poll that failed on Sunday, the week kept with its stamp. Each as the phone's first screen (the
+ * and a poll that failed on Sunday, the week kept with its stamp; and another team's game on Sunday, opened
+ * from its score bug (Lane 207, as iOS Lane 206), at the top and at its second roster, and kept with its
+ * stamp by a failed poll. Each as the phone's first screen (the
  * title, the bug and the top of the member's box), then the member's box and the opponent's with the
  * basis in full. Both themes, a Pixel 9 and a small phone
  * (the Nexus 5's 360 by 640 dp). The persona panel reads these images.
@@ -50,12 +52,21 @@ class MatchupSnapshotTest(
         val id: String,
         val clock: String,
         val parts: List<Part>,
+        /** The roster whose game the scene draws: null for the member's own. */
+        val roster: Int? = null,
     ) {
         Before("before", MatchupFixtures.BEFORE, listOf(Part.Phone, Part.Mine, Part.Theirs)),
         Sunday("sunday", MatchupFixtures.SUNDAY, listOf(Part.Phone, Part.Mine, Part.Theirs)),
         Monday("monday", MatchupFixtures.MONDAY, listOf(Part.Phone, Part.Mine, Part.Theirs)),
         Final("final", MatchupFixtures.FINAL, listOf(Part.Phone, Part.Mine, Part.Theirs)),
         Stale("stale", MatchupFixtures.SUNDAY, listOf(Part.Phone)),
+
+        /** Another team's game, Carried by QJs against Bower Rangers (roster 2's). */
+        Other("other", MatchupFixtures.SUNDAY, listOf(Part.Phone, Part.Theirs), MatchupFixtures.OTHER_ROSTER),
+        OtherStale("other-stale", MatchupFixtures.SUNDAY, listOf(Part.Phone), MatchupFixtures.OTHER_ROSTER),
+        ;
+
+        val stale: Boolean get() = this == Stale || this == OtherStale
     }
 
     enum class Part(
@@ -120,11 +131,22 @@ private fun twoX(
     )
 
 /** The screen's state at a scene, as the view model holds it: the week read at the scene's clock, or that
- * read kept after a poll that found no signal. */
+ * read kept after a poll that found no signal; another team's game with the Sleeper league's reads. */
 private fun stateOf(scene: MatchupSnapshotTest.Scene): MatchupState.Loaded {
     val now = StartFixtures.instant(scene.clock)
-    val model = matchupModel(MatchupFixtures.sync(scene.clock), MatchupFixtures.box(scene.clock), now, Fixtures.zone)
-    return MatchupState.Loaded(model, now, stale = scene == MatchupSnapshotTest.Scene.Stale)
+    val model =
+        if (scene.roster == null) {
+            matchupModel(MatchupFixtures.sync(scene.clock), MatchupFixtures.box(scene.clock), now, Fixtures.zone)
+        } else {
+            matchupModel(
+                MatchupFixtures.otherSync(scene.clock),
+                MatchupFixtures.otherBox(scene.clock),
+                now,
+                Fixtures.zone,
+                MatchupFixtures.otherBoard(scene.clock),
+            )
+        }
+    return MatchupState.Loaded(model, now, stale = scene.stale)
 }
 
 @Composable

@@ -44,6 +44,15 @@ import app.trycommish.core.rankings.RankingsViewModel
 import app.trycommish.core.record.ApiRecordReads
 import app.trycommish.core.record.RecordReads
 import app.trycommish.core.record.RecordViewModel
+import app.trycommish.core.reference.AdpModel
+import app.trycommish.core.reference.ClubPageModel
+import app.trycommish.core.reference.ClubScreens
+import app.trycommish.core.reference.ClubsModel
+import app.trycommish.core.reference.CompareModel
+import app.trycommish.core.reference.CompareReader
+import app.trycommish.core.reference.ReferenceReads
+import app.trycommish.core.reference.RunScreenViewModel
+import app.trycommish.core.reference.ScheduleModel
 import app.trycommish.core.shell.AccountReads
 import app.trycommish.core.shell.ApiAccountReads
 import app.trycommish.core.shell.FollowedLeague
@@ -123,8 +132,9 @@ class AppGraph(
 
     fun leagueHomeViewModel(): LeagueHomeViewModel = LeagueHomeViewModel(reads, cache, clock, zone, sessionEnd)
 
-    /** A league's Matchup, read again once a minute while it is on screen. */
-    fun matchupViewModel(): MatchupViewModel = MatchupViewModel(matchups, cache, clock, zone, sessionEnd)
+    /** A league's Matchup, the member's game (`roster` null) or another team's by its first side's roster,
+     * read again once a minute while it is on screen. */
+    fun matchupViewModel(roster: Int? = null): MatchupViewModel = MatchupViewModel(matchups, cache, clock, zone, sessionEnd, roster)
 
     /** The board from the run: the draft's Board, or in season the Rest of season, with the verb that
      * follows whether the member follows a league. */
@@ -194,6 +204,25 @@ class AppGraph(
         slug: String,
         league: FollowedLeague?,
     ): PlayerPageViewModel = PlayerPageViewModel(slug, players, league)
+
+    /** The reference screens' reads (ADP, Compare, the clubs, a club, the schedule): the run's files, each
+     * kept under its own key with its ETag, shared with the sheet and the page. */
+    private val references: ReferenceReads by lazy { ReferenceReads(runs, ApiPlayerReads(transport), cache, clock) }
+
+    /** ADP in a format as the run names it, null for the run's default. */
+    fun adpViewModel(format: String?): RunScreenViewModel<AdpModel> = AdpModel.viewModel(format, references, zone, sessionEnd)
+
+    /** Compare with its sides by their pages' slugs, in the followed league's format where the run carries it. */
+    fun compareViewModel(
+        slugs: List<String?>,
+        league: FollowedLeague?,
+    ): RunScreenViewModel<CompareModel> = CompareReader.viewModel(slugs, league, references, zone, sessionEnd)
+
+    fun clubsViewModel(): RunScreenViewModel<ClubsModel> = ClubScreens.clubs(references, zone, sessionEnd)
+
+    fun clubViewModel(abbr: String): RunScreenViewModel<ClubPageModel> = ClubScreens.club(abbr, references, zone, sessionEnd)
+
+    fun scheduleViewModel(): RunScreenViewModel<ScheduleModel> = ClubScreens.schedule(references, zone, sessionEnd)
 
     /** The platform's own page for a verb the app cannot make: his name on the clipboard first, so its
      * search takes it, then the page in the browser. */

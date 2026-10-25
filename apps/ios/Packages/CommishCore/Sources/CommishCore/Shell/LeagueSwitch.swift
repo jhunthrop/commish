@@ -61,6 +61,9 @@ public enum ShellRoute: Hashable, Sendable {
     case club(abbr: String)
     /// The strength of schedule.
     case schedule
+    /// A game of the league's week (Lane 206): another team's by its first side's roster, pushed from
+    /// its score bug; the member's own (roster nil) where the bar has no Matchup tab.
+    case game(league: String, roster: Int?)
     /// The live-draft companion's start page (/companion/new), with the development replay when asked.
     case companionNew(replay: Bool)
     /// A followed draft (/companion/<id>).
@@ -75,6 +78,13 @@ public enum ShellRoute: Hashable, Sendable {
     /// (the tab shows the selected league), else the home pushed on the tab in view.
     public static func home(of league: String, in tabs: [RailTab]) -> Destination {
         tabs.contains { $0.key == PhoneRail.leagueKey } ? .tab(PhoneRail.leagueKey) : .push(.leagueHome(id: league))
+    }
+
+    /// Where a score bug opens its game: the member's on the Matchup tab where the bar has one, else
+    /// pushed on the tab in view, as every other team's game is.
+    public static func game(of roster: Int?, league: String, in tabs: [RailTab]) -> Destination {
+        roster == nil && tabs.contains { $0.key == PhoneRail.matchupKey }
+            ? .tab(PhoneRail.matchupKey) : .push(.game(league: league, roster: roster))
     }
 
     /// The Players screen for what was typed, nil when nothing was.

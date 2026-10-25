@@ -3,12 +3,12 @@ package app.trycommish.android
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.trycommish.core.board.BoardModel
 import app.trycommish.core.board.BoardState
 import app.trycommish.core.board.BoardViewModel
+import app.trycommish.core.shell.SheetOffer
 import app.trycommish.design.RailItem
 import app.trycommish.feature.board.BoardActions
 import app.trycommish.feature.board.BoardScreen
@@ -35,13 +35,15 @@ const val BOARD_PAGE = "board"
  * The Board tab, reached from the bar as the web's rail reaches it: its own view model per season and
  * league state, which holds the chips while the player sheet is open over it and after. The saved board
  * at once, then the run's; a pull reads again; a row opens the one player sheet by his id, which keeps
- * him as the board reads again under it; the one verb opens its page on the site.
+ * him as the board reads again under it, with Compare as its verb; the head's links (ADP, the schedule)
+ * and a row's club chip push their pages through `link`; the one verb opens its page on the site.
  */
 @Composable
 fun BoardTab(
     graph: AppGraph,
     inSeason: Boolean,
     following: Boolean,
+    link: (String) -> Unit,
 ) {
     val vm: BoardViewModel = viewModel(key = "board-$inSeason-$following") { graph.boardViewModel(inSeason, following) }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -49,7 +51,6 @@ fun BoardTab(
     val formats by vm.formats.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     val sheet = LocalPlayerSheet.current
-    val uri = LocalUriHandler.current
     LaunchedEffect(vm) { if (vm.state.value == BoardState.Loading) vm.load() }
     LaunchedEffect(state) {
         (state as? BoardState.Loaded)?.model?.let { model -> sheet.parentRefreshed(model.rows.mapNotNull { it.sheetPlayer }) }
@@ -61,11 +62,12 @@ fun BoardTab(
         refreshing = refreshing && state is BoardState.Loaded,
         actions =
             BoardActions(
-                open = sheet::open,
+                // The sheet's verb here is Compare, with him on one side (shelf-state.ts compareOffer).
+                open = { sheet.open(it, SheetOffer.compare(it, link)) },
                 format = { vm.choose(it) },
                 position = vm::choose,
                 refresh = { vm.load() },
-                openPage = uri::openUri,
+                openPage = link,
             ),
     )
 }
