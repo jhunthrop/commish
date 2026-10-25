@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,6 +33,9 @@ const limitPerMinute = 120
 
 // maxPlayerParam bounds ?player=, a board id.
 const maxPlayerParam = 64
+
+// maxRosterParam bounds ?roster=, a roster id's digits.
+const maxRosterParam = 9
 
 // Leagues answers the account's followed league for a request, or
 // answers the request itself and reports false.
@@ -131,6 +135,8 @@ const (
 	positionWords = "Pick a position: QB, RB, WR, TE, K or DEF"
 	playerWords   = "That player is not on a roster in this league"
 	noTeamWords   = "We could not find your team in this league's last read"
+	// gameRosterWords is the Matchup's ?roster= refused (fieldRoster, Lane 204).
+	gameRosterWords = "That team is not in this league's last read"
 )
 
 // screenWeek is the week a screen's advisor reads (Lane 95).
@@ -267,14 +273,48 @@ func (s *Service) lineup(w http.ResponseWriter, r *http.Request) {
 	s.answer(w, r, out, ok)
 }
 
-// matchup is the week's matchup as a box score.
+// matchup is the week's matchup as a box score: the member's game, or
+// with ?roster= the game of the roster it names (Lane 204). A roster that
+// is not a whole number answers 400 before the league is read; one the
+// league's last read does not list answers 404, each naming the field.
 func (s *Service) matchup(w http.ResponseWriter, r *http.Request) {
+	asked, ok := rosterParam(r)
+	if !ok {
+		httpx.WriteInvalid(w, r, map[string]string{fieldRoster: gameRosterWords})
+		return
+	}
 	a, ok := s.advisorFor(w, r)
 	if !ok {
 		return
 	}
-	out, ok := a.Matchup()
+	roster := a.Me
+	if asked != nil {
+		if _, listed := a.Snap.TeamByRoster(*asked); !listed {
+			httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, gameRosterWords, map[string]string{fieldRoster: gameRosterWords})
+			return
+		}
+		roster = *asked
+	}
+	out, ok := a.Matchup(roster)
 	s.answer(w, r, out, ok)
+}
+
+// rosterParam is ?roster=, nil when absent; false when it is not a whole
+// number a roster id can be.
+func rosterParam(r *http.Request) (*int, bool) {
+	q := r.URL.Query()
+	if !q.Has(fieldRoster) {
+		return nil, true
+	}
+	text := q.Get(fieldRoster)
+	if len(text) > maxRosterParam {
+		return nil, false
+	}
+	n, err := strconv.Atoi(text)
+	if err != nil || n < 0 {
+		return nil, false
+	}
+	return &n, true
 }
 
 func (s *Service) scoreboard(w http.ResponseWriter, r *http.Request) {

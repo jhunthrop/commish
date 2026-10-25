@@ -31,7 +31,7 @@ func TestTheAnswersReadThePerPlatformRule(t *testing.T) {
 			t.Fatal(err)
 		}
 		lineup, _ := a.Lineup()
-		box, _ := a.Matchup()
+		box, _ := a.Matchup(a.Me)
 		if lineup.PlayerPoints != c.want || box.Sides[0].PlayerPoints != c.want || box.Sides[1].PlayerPoints != c.want {
 			t.Fatalf("%s: lineup %v, sides %v %v", c.host, lineup.PlayerPoints, box.Sides[0].PlayerPoints, box.Sides[1].PlayerPoints)
 		}

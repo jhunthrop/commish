@@ -99,7 +99,7 @@ func TestBothScreensSayTheProjectionsScoring(t *testing.T) {
 	f := pairedFixture(t)
 	a := newFixtureAdvisor(t, f, nil)
 	lineup, _ := a.Lineup()
-	box, _ := a.Matchup()
+	box, _ := a.Matchup(a.Me)
 	want := apitypes.ProjectionScoring{Format: apitypes.ProjectionScoringFormatPpr, LeagueOwn: true}
 	if lineup.ProjectionScoring != want || box.ProjectionScoring != want {
 		t.Fatalf("lineup %+v, matchup %+v", lineup.ProjectionScoring, box.ProjectionScoring)
@@ -139,7 +139,7 @@ func TestTheAnswersSayWhetherTheHostGivesPlayersPoints(t *testing.T) {
 			t.Fatal(err)
 		}
 		lineup, _ := a.Lineup()
-		box, _ := a.Matchup()
+		box, _ := a.Matchup(a.Me)
 		if lineup.PlayerPoints != byPlayer || box.Sides[0].PlayerPoints != byPlayer || box.Sides[1].PlayerPoints != byPlayer {
 			t.Fatalf("by player %v: lineup %v, sides %v %v", byPlayer, lineup.PlayerPoints, box.Sides[0].PlayerPoints, box.Sides[1].PlayerPoints)
 		}
