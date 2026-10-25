@@ -4,6 +4,7 @@ import app.trycommish.core.AppWords
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
 import app.trycommish.core.MemorySession
+import app.trycommish.core.SignInState
 import app.trycommish.core.SignOut
 import app.trycommish.core.leaguehome.Fixtures
 import app.trycommish.design.Words
@@ -52,6 +53,8 @@ class AccountViewModelTest {
         store: PushStore = MemoryPushStore(),
         heard: Heard = Heard(),
         now: Instant = Fixtures.week,
+        signedIn: () -> Boolean = { true },
+        sessionEnd: () -> Unit = { heard.sessionEnds++ },
         signOut: () -> Unit = { heard.signOuts++ },
     ) = AccountViewModel(
         stub,
@@ -60,7 +63,7 @@ class AccountViewModelTest {
         Fixtures.zone,
         store,
         { AccountFixtures.PHONE },
-        AccountHooks(signOut, { heard.sessionEnds++ }, { heard.leaguesChanged++ }),
+        AccountHooks(signOut, { sessionEnd() }, { heard.leaguesChanged++ }, signedIn),
     )
 
     private fun AccountViewModel.loaded(): AccountState.Loaded = ui.value.state as AccountState.Loaded
@@ -249,24 +252,134 @@ class AccountViewModelTest {
             val stub = StubAccountScreen()
             val session = MemorySession("token", AccountFixtures.PHONE)
             val cache = MemoryCache()
-            val signOut = SignOut(session, cache, stub::revokeDevice)
-            var signedIn = true
-            val vm =
-                opened(
-                    account(stub, cache) {
-                        launch {
-                            signOut()
-                            signedIn = false
-                        }
-                    },
-                )
+            val state = SignInState(session, cache, SignOut(session, cache, stub::revokeDevice))
+            val vm = opened(account(stub, cache, signedIn = state::holdsToken) { launch { state.signOut() } })
             vm.signOut()
             advanceUntilIdle()
             assertEquals(listOf(AccountFixtures.PHONE), stub.revoked)
             assertNull(session.token)
             assertNull(cache.read(AccountViewModel.ROUTE))
-            assertFalse(signedIn)
+            // The app's own state turned: signed out, and nothing said about a sign-in running out.
+            assertFalse(state.signedIn.value)
+            assertNull(state.message.value)
             assertEquals(Words.Account.signOut, vm.ui.value.busy)
+        }
+
+    @Test
+    fun `signing out inside an undo window writes nothing back and asks the switch nothing`() =
+        runTest(main) {
+            val stub = StubAccountScreen()
+            val session = MemorySession("token", AccountFixtures.PHONE)
+            val cache = MemoryCache()
+            val state = SignInState(session, cache, SignOut(session, cache, stub::revokeDevice))
+            val heard = Heard()
+            val vm =
+                opened(account(stub, cache, heard = heard, signedIn = state::holdsToken) { launch { state.signOut() } })
+            vm.detach(espn)
+            advanceTimeBy(1_000)
+            vm.signOut()
+            advanceTimeBy(1_000)
+            // The shell pops the Account: its entry's view model is cleared, which calls leave().
+            vm.leave()
+            advanceUntilIdle()
+            assertNull(cache.read(AccountViewModel.ROUTE))
+            assertEquals(0, heard.leaguesChanged)
+            assertFalse(state.signedIn.value)
+            assertNull(state.message.value)
+        }
+
+    @Test
+    fun `a sign-out that starts elsewhere during the window leaves nothing to do`() =
+        runTest(main) {
+            val cache = MemoryCache()
+            val heard = Heard()
+            var token = true
+            val vm = opened(account(cache = cache, heard = heard, signedIn = { token }))
+            vm.detach(espn)
+            advanceTimeBy(1_000)
+            // Another screen's 401 ended the session: the session and the cache are gone.
+            token = false
+            cache.clear()
+            advanceUntilIdle()
+            vm.leave()
+            assertNull(cache.read(AccountViewModel.ROUTE))
+            assertEquals(0, heard.leaguesChanged)
+        }
+
+    @Test
+    fun `a 401 inside the window ends the session and asks the switch nothing`() =
+        runTest(main) {
+            val stub = StubAccountScreen()
+            val heard = Heard()
+            var token = true
+            val vm =
+                opened(
+                    account(stub, heard = heard, signedIn = { token }, sessionEnd = {
+                        token = false
+                        heard.sessionEnds++
+                    }),
+                )
+            vm.detach(espn)
+            advanceTimeBy(1_000)
+            stub.refuse = true
+            vm.unpair(AccountFixtures.OTHER)
+            advanceUntilIdle()
+            vm.leave()
+            assertEquals(1, heard.sessionEnds)
+            assertEquals(0, heard.leaguesChanged)
+        }
+
+    @Test
+    fun `an Undo tapped at the window's end wins over the window`() =
+        runTest(main) {
+            val stub = StubAccountScreen().apply { restoreDelay = 5_000 }
+            val heard = Heard()
+            val vm = opened(account(stub, heard = heard))
+            vm.detach(espn)
+            advanceTimeBy(AccountViewModel.UNDO_WINDOW.toMillis() - 500)
+            vm.restore(espn)
+            advanceUntilIdle()
+            assertEquals(listOf(espn), stub.restored)
+            assertEquals(
+                listOf(false, false, false),
+                vm
+                    .loaded()
+                    .model.leagues
+                    ?.map { it.detached },
+            )
+            assertEquals(0, heard.leaguesChanged)
+        }
+
+    @Test
+    fun `a late Undo that fails says so and opens the window again`() =
+        runTest(main) {
+            val stub = StubAccountScreen().apply { restoreDelay = 5_000 }
+            val heard = Heard()
+            val vm = opened(account(stub, heard = heard))
+            vm.detach(espn)
+            advanceTimeBy(AccountViewModel.UNDO_WINDOW.toMillis() - 500)
+            stub.offline = true
+            vm.restore(espn)
+            advanceTimeBy(5_001)
+            assertEquals(AccountProblem(AccountSection.Leagues, Words.Account.failed), vm.ui.value.problem)
+            assertTrue(
+                vm
+                    .loaded()
+                    .model.leagues
+                    .orEmpty()
+                    .single { it.id == espn }
+                    .detached,
+            )
+            assertEquals(0, heard.leaguesChanged)
+            advanceUntilIdle()
+            assertEquals(
+                2,
+                vm
+                    .loaded()
+                    .model.leagues
+                    ?.size,
+            )
+            assertEquals(1, heard.leaguesChanged)
         }
 
     @Test
@@ -314,7 +427,7 @@ class AccountViewModelTest {
                     Fixtures.zone,
                     MemoryPushStore(),
                     { AccountFixtures.PHONE },
-                    AccountHooks({}, {}, {}),
+                    AccountHooks({}, {}, {}, { true }),
                 )
             assertNull(opened(vm).loaded().model.leagues)
         }

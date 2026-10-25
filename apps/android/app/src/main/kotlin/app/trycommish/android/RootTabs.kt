@@ -250,8 +250,8 @@ private fun Pages(
 
 /** Signed out: back to the League tab with nothing above it, and no tab's saved stack kept for the next
  * sign-in (an Account left open on another tab would come back with the last account's words). */
-private fun NavHostController.toSignIn() {
-    PAGES.forEach { clearBackStack(it.page) }
+internal fun NavHostController.toSignIn(pages: List<String> = PAGES.map { it.page }) {
+    pages.forEach { clearBackStack(it) }
     navigate(LEAGUE_PAGE) {
         popUpTo(graph.findStartDestination().id) { inclusive = false }
         launchSingleTop = true
@@ -259,7 +259,7 @@ private fun NavHostController.toSignIn() {
 }
 
 /** Opens a tab with its own back stack restored, never a second copy of it. */
-private fun NavHostController.openTab(route: String) {
+internal fun NavHostController.openTab(route: String) {
     navigate(route) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true

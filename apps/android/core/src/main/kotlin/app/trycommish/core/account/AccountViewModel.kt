@@ -61,11 +61,13 @@ data class AccountUi(
 )
 
 /** What the Account asks of the app: sign this phone out through the session (it revokes the device and
- * returns to sign-in), end a session the API refused, and tell the league switch the leagues changed. */
+ * returns to sign-in), end a session the API refused, tell the league switch the leagues changed, and
+ * whether the phone still holds a sign-in (once it does not, a pending detach needs no follow-up). */
 class AccountHooks(
     val signOut: () -> Unit,
     val sessionEnd: SessionEnd,
     val leaguesChanged: () -> Unit,
+    val signedIn: () -> Boolean,
 )
 
 /**
@@ -166,24 +168,37 @@ class AccountViewModel(
             if (!act(id, AccountSection.Leagues) { reads.detach(id) }) return@launch
             detached = detached + id
             redraw()
-            undoWindows = undoWindows +
-                (
-                    id to
-                        viewModelScope.launch {
-                            wait(UNDO_WINDOW)
-                            drop(id)
-                            hooks.leaguesChanged()
-                        }
-                )
+            openWindow(id)
         }
 
-    /** Takes a detach back within its window: the league is followed again with the seat it had, and the
-     * switch, never told of the detach, has nothing to hear. */
+    /** A detach's undo window: when it closes the row leaves and the switch hears of it, unless the phone
+     * was signed out meanwhile (the detach is final on the API already, and there is no account to tell). */
+    private fun openWindow(id: String) {
+        undoWindows[id]?.cancel()
+        undoWindows = undoWindows +
+            (
+                id to
+                    viewModelScope.launch {
+                        wait(UNDO_WINDOW)
+                        if (!hooks.signedIn()) return@launch forgetPending()
+                        drop(id)
+                        hooks.leaguesChanged()
+                    }
+            )
+    }
+
+    /** Takes a detach back within its window: the window stops before the API is asked (so an Undo at the
+     * window's end cannot lose to it), the league is followed again with the seat it had, and the switch,
+     * never told of the detach, has nothing to hear. A refused or failed restore says why under the list and
+     * opens the window again, the row still detached with its Undo (Lane 201 review M1). */
     fun restore(id: String): Job =
         viewModelScope.launch {
-            if (!act(id, AccountSection.Leagues) { reads.restore(id) }) return@launch
             undoWindows[id]?.cancel()
             undoWindows = undoWindows - id
+            if (!act(id, AccountSection.Leagues) { reads.restore(id) }) {
+                if (id in detached && hooks.signedIn()) openWindow(id)
+                return@launch
+            }
             detached = detached - id
             redraw()
         }
@@ -191,6 +206,7 @@ class AccountViewModel(
     /** The member left the Account: each detach still in its undo window is final now, its row leaves and
      * the switch hears of it once. */
     fun leave() {
+        if (!hooks.signedIn()) return forgetPending()
         val pending = detached
         if (pending.isEmpty()) return
         pending.forEach { id ->
@@ -216,8 +232,17 @@ class AccountViewModel(
 
     /** Signs this phone out: the session revokes it and returns to sign-in. */
     fun signOut() {
+        forgetPending()
         mutableUi.update { it.copy(busy = Words.Account.signOut) }
         hooks.signOut()
+    }
+
+    /** Signed out with detaches in their windows: each is final on the API already, so the windows stop and
+     * nothing is written or told, neither the cleared cache nor the switch (Lane 201 review H1). */
+    private fun forgetPending() {
+        undoWindows.values.forEach { it.cancel() }
+        undoWindows = emptyMap()
+        detached = emptySet()
     }
 
     fun set(
@@ -253,6 +278,7 @@ class AccountViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Unauthorized) {
+                forgetPending()
                 hooks.sessionEnd.signedOut()
                 AppWords.signedOut
             } catch (e: ApiFailure) {
@@ -280,6 +306,7 @@ class AccountViewModel(
     }
 
     private fun signedOut() {
+        forgetPending()
         hooks.sessionEnd.signedOut()
         mutableUi.update { it.copy(state = AccountState.SignedOut) }
     }
