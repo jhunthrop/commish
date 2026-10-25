@@ -317,6 +317,8 @@ object Words {
 
     object Matchup {
         const val vs = "vs"
+        const val theirGame = "Their game"
+        const val yourGame = "Your game"
         const val yoursOnly = "shows us your lineup only."
         const val allPlayOn = "An all-play week on"
         const val allPlaySet = "your score is set against every other team's."

@@ -23,7 +23,7 @@
 		type SideBox
 	} from './box/matchup.ts';
 	import { readCell } from './home/home.ts';
-	import type { LeagueHost, LeagueSync, MatchupSide } from './api.ts';
+	import type { LeagueHost, LeagueMatchup, LeagueSync, MatchupSide } from './api.ts';
 	import type { MatchupBox } from './inseason/api.ts';
 	import { matchupGap, scoreGap, scoreUnread, teamName } from './model.ts';
 	import { page } from '$app/state';
@@ -49,11 +49,18 @@
 		/** The platform the page's head names and the page's own clock in ms, ticking: the read beside
 		 * the live score names the one and is aged by the other. */
 		live?: { host: LeagueHost; clock: number };
+		/** Another team's game (Lane 204), its sides and score the scoreboard's; null for the member's
+		 * own, the sync answer's matchup. Their game carries none of the member's verbs or words. */
+		game?: LeagueMatchup | null;
+		/** The member's own game, linked from the head of another team's. */
+		yourGame?: string;
 	}
 
-	let { sync, box, now, live }: Props = $props();
+	let { sync, box, now, live, game = null, yourGame = '' }: Props = $props();
 
-	const matchup = $derived(sync.matchup);
+	/** The box is another team's game, not the member's. */
+	const other = $derived(game !== null);
+	const matchup = $derived(game ?? sync.matchup);
 
 	/** Both sides' starters' lines, the game's by the one rule: a side listing none (an FFPC opponent)
 	 * reads by the schedule (unlisted), never by his bench's games (Lane 137, B107). */
@@ -124,7 +131,7 @@
 	 * players; none for the opponent's. */
 	function shelfOffer({ key, boardId, position }: BoxRow): ScreenOffer | null {
 		const id = page.params.id ?? '';
-		if (boardId === null || !rowsOf(mine).some((r) => r.key === key)) return null;
+		if (other || boardId === null || !rowsOf(mine).some((r) => r.key === key)) return null;
 		return lineupOffer({
 			href: askedHref(tabHref('start', id), 'start', { id: boardId, position })
 		});
@@ -144,6 +151,13 @@
 
 {#if matchup && mine}
 	<div class="matchup">
+		{#if other}
+			<p class="whose">
+				<span>{MATCHUP.theirGame}</span>{#if yourGame !== ''}<a href={yourGame}
+						>{MATCHUP.yourGame}</a
+					>{/if}
+			</p>
+		{/if}
 		<h2 class="title">
 			<span class="wk">Week {matchup.week}</span>
 			{teamName(sync, matchup.mine.roster_id)}{#if matchup.opponent}
@@ -173,17 +187,19 @@
 			{started}
 			{read}
 			standing={standingLine(box, started)}
+			{other}
 		/>
-		{#if sync.week_all_play}
+		{#if sync.week_all_play && !other}
 			<p class="note">{allPlayWords(sync.host)}</p>
 		{/if}
-		{#if scoreUnread(matchup.mine)}<p class="note">{scoreGap(sync, now)}</p>{/if}
+		{#if scoreUnread(matchup.mine) && !other}<p class="note">{scoreGap(sync, now)}</p>{/if}
 		<div class="boxes">
 			<BoxTable
 				team={teamName(sync, matchup.mine.roster_id)}
-				mine
+				mine={!other}
 				ranked
-				tagsOf={sheetTags}
+				tagsOf={other ? undefined : sheetTags}
+				empty={other && sync.host === 'ffpc' ? hidden : null}
 				starters={mine.starters}
 				bench={mine.bench}
 				totals={mine.totals}
@@ -228,6 +244,24 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-4);
+	}
+
+	.whose {
+		display: flex;
+		align-items: baseline;
+		gap: var(--s-3);
+		margin: 0 0 calc(-1 * var(--s-3));
+		font-family: var(--font-num);
+		font-weight: 800;
+		font-size: var(--t-md);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--ink-2);
+	}
+
+	.whose a {
+		margin-left: auto;
+		color: var(--accent-text);
 	}
 
 	.title {

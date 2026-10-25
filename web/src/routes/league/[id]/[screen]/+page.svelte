@@ -14,6 +14,7 @@
 	import { LINES, SCREEN_TITLES, refreshedWords } from '#lib/league/inseason/words.ts';
 	import type { AdviceHead } from '#lib/league/inseason/api.ts';
 	import { ASKED_PARAM } from '#lib/league/box/asked.ts';
+	import { gameRoster } from '#lib/league/box/game.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { standingWords } from '#lib/league/model.ts';
@@ -28,6 +29,8 @@
 
 	/** The player a link named (?player=): Waivers keeps his row past its first page (review 66j N2). */
 	const asked = $derived(page.url.searchParams.get(ASKED_PARAM));
+	/** The game the Matchup draws (?roster=, Lane 204): another team's, null for the member's own. */
+	const roster = $derived(gameRoster(page.url.searchParams));
 
 	/** What an advice screen was read from: the order and when it was refreshed. */
 	const ordered = (advice: AdviceHead): string =>
@@ -40,7 +43,9 @@
 	const league = $derived(siteContext.leagues.find((l) => l.id === id) ?? null);
 </script>
 
-{#key `${id}-${data.screen}`}
+<!-- The Matchup's game is part of the key (Lane 204): moving between games, back or forward, draws
+     each game's own reads, never the last game's box. -->
+{#key `${id}-${data.screen}-${data.screen === 'matchup' ? String(roster) : ''}`}
 	{#if data.screen === 'start'}
 		<InSeasonPage
 			{id}
@@ -103,7 +108,7 @@
 			{/snippet}
 		</InSeasonPage>
 	{:else if data.screen === 'matchup'}
-		<MatchupScreen {id} />
+		<MatchupScreen {id} {roster} />
 	{:else}
 		<!-- The site's not-found in its own words. Drawn here, not by importing the root error page,
 		     which would split that page into another file every page loads. -->

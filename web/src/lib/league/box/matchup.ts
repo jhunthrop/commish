@@ -29,6 +29,10 @@ import {
 export const MATCHUP = {
 	/** Between the two teams' names in the screen's title. */
 	vs: 'vs',
+	/** Above the title of another team's game, opened from its score bug (Lane 204). */
+	theirGame: 'Their game',
+	/** The link from another team's game back to the member's own. */
+	yourGame: 'Your game',
 	/** After the platform's name in the opponent's box where the platform shows us the member's
 	 * lineup alone (FFPC is read as one member, so the API keeps only the viewer's own starters). */
 	yoursOnly: 'shows us your lineup only.',
