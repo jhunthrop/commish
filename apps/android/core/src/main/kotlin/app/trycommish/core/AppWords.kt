@@ -33,6 +33,13 @@ object AppWords {
     /** The Players screen's name (nav.ts PLAYERS_NAME), which the bar's search and a player's link open. */
     const val players = "Players"
 
+    /** web/src/lib/league/LeaguePage.svelte stampOf: a read whose latest try failed, "Last read Sat 12:00 pm". */
+    const val lastRead = "Last read"
+
+    /** Under the Start screen's verb, disabled, while the lineup shown is a saved read (the iOS app's
+     * words): a lineup set from it may not be the platform's now, so the phone reads it again first. */
+    const val readAgainToSet = "Pull down to read your lineup again before you set it."
+
     /** The account screen's one verb until its lane lands: this phone signs out. */
     const val signOut = "Sign out"
 }
