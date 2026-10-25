@@ -13,3 +13,4 @@ filter:
     - deviceMe
     - revokeDevice
     - pairDevice
+    - getSeason
