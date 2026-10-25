@@ -249,11 +249,11 @@ enum ScriptedStep: Sendable {
 
     /// The command a client step names, for the test to send through the socket.
     var command: RoomCommand? {
-        guard case let .client(text) = self, let value = try? JSONDecoder().decode(
-                  RoomValue.self,
-                  from: Data(text.utf8)
-              ),
-              case let .string(type) = value["type"] else {
+        guard case let .client(text) = self else {
+            return nil
+        }
+        let value = try? JSONDecoder().decode(RoomValue.self, from: Data(text.utf8))
+        guard case let .string(type) = value?["type"], let value else {
             return nil
         }
         switch type {
