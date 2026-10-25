@@ -31,7 +31,7 @@ import {
 	unlistedPart,
 	type UnlistedDrawn
 } from '#lib/league/box/basis.ts';
-import { gameHead } from '#lib/league/box/kickoff.ts';
+import { scoreboardHead } from '#lib/league/box/kickoff.ts';
 import { carriedMark, NEXT_WEEK } from '#lib/league/box/next-week.ts';
 import { agoWords } from '#lib/league/model.ts';
 import { hostWords } from '#lib/league/names.ts';
@@ -183,7 +183,7 @@ function firstOf(lines: readonly PlayerLine[], zone: string, now: Date): FrontLe
 	const rows = lines.map((line) => boxRow(line, '', zone, false, now.getTime()));
 	const names = rows.map((r) => shortName(r.name));
 	const who = names.length === 1 ? `${names.join('')} plays` : `${names.join(' and ')} play`;
-	const game = heldGame(gameOf(lead.facts, lead.player.team, zone, now.getTime()));
+	const game = heldGame(gameOf(lead, lead.player.team, zone, now.getTime()));
 	const where = game !== null ? `, ${game.where}` : '';
 	return { rows, words: `${who} first${where}` };
 }
@@ -346,7 +346,7 @@ export function leadOf(leagues: readonly WeekLeague[], chosen: string | null): W
 export function gameLive(league: Pick<WeekLeague, 'bug'>, now: Date): boolean {
 	const game = league.bug?.game;
 	if (game === undefined) return false;
-	const head = gameHead({ state: game.state, next: game.next_kickoff }, now.getTime());
+	const head = scoreboardHead(game, now.getTime());
 	return head.state === 'kicked_off' && game.sides.some((side) => (side.in_play ?? 0) > 0);
 }
 

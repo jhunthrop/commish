@@ -4,7 +4,13 @@
 import type { components } from '#lib/api/types.ts';
 import { kickoffAt, memberZone, stampAt, weekdayName } from '#lib/format/clock.ts';
 import { isFreeAgent } from '#lib/format/free-agent.ts';
-import { lineState, lineupOpen, pastKickoff, toPlay } from '../league/box/kickoff.ts';
+import {
+	lineState,
+	lineupOpen,
+	pastKickoff,
+	toPlay,
+	type GameLine
+} from '../league/box/kickoff.ts';
 import { signed } from '#lib/format/number.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
 import {
@@ -249,10 +255,10 @@ export type ScreenHref = (
  * has kicked off at the page's clock becomes the way to the lineup, as every league screen holds it. */
 export function heldVerb(
 	verb: NonNullable<PlayerWeek['verb']>,
-	facts: PlayerWeek['line']['facts'],
+	line: GameLine,
 	now: number
 ): NonNullable<PlayerWeek['verb']> {
-	return verb.kind === 'start' && pastKickoff(facts, now) ? { ...verb, kind: 'lineup' } : verb;
+	return verb.kind === 'start' && pastKickoff(line, now) ? { ...verb, kind: 'lineup' } : verb;
 }
 
 /** The verb the league's screens give him, the platform named. */
@@ -351,7 +357,7 @@ function readFigureWords(week: PlayerWeek, now: number, read: ReadQuote | null):
 		week: week.week,
 		scoring,
 		points: value,
-		state: lineState(week.line.facts, now)
+		state: lineState(week.line, now)
 	};
 	if (read === null) return null;
 	if (read.body === null || movedPastRead(read, card)) return null;
@@ -507,7 +513,7 @@ function deltaTile(week: PlayerWeek, zone: string, now: number, read: ReadQuote 
 	// A free agent has no game (Lane 123): no change to measure, and no kickoff to say.
 	if (isFreeAgent(week.line.player.team))
 		return { key: 'delta', label: CARD.delta, value: NONE, caption: '', tone: 'quiet' };
-	const ahead = toPlay(week.line.facts, now) || week.line.facts.bye;
+	const ahead = toPlay(week.line, now) || week.line.facts.bye;
 	const move = moveOf(week, read);
 	return {
 		key: 'delta',
@@ -515,7 +521,7 @@ function deltaTile(week: PlayerWeek, zone: string, now: number, read: ReadQuote 
 		value: ahead ? deltaWord(shownChange(move)) : NONE,
 		caption: ahead
 			? deltaCaption(week, move)
-			: lineState(week.line.facts, now) === 'final'
+			: lineState(week.line, now) === 'final'
 				? CARD.gameFinal
 				: CARD.kickedOff,
 		tone: 'quiet'
@@ -609,7 +615,7 @@ export function liveBasis(
 
 /** The card's head from the read: its week, and the game or the bye in it. */
 function headOf(week: PlayerWeek, zone: string, now: number): CardHead {
-	const game = gameOf(week.line.facts, week.line.player.team, zone, now);
+	const game = gameOf(week.line, week.line.player.team, zone, now);
 	const opponent =
 		game === null ? NONE : game === 'bye' ? BOX.bye : game === 'no-club' ? BOX.noClub : game.where;
 	return { week: week.week, opponent };
@@ -625,14 +631,15 @@ function nextOf(
 	listed = false
 ): { cell: NextCell | null; next: LogNext | null } {
 	const { facts } = week.line;
-	const game = heldGame(gameOf(facts, week.line.player.team, zone, now));
+	const game = heldGame(gameOf(week.line, week.line.player.team, zone, now));
 	if (game === null) return { cell: null, next: null };
 	// A listed player's game is not his (Lane 128): its expected score, weather and Proj are not drawn.
-	const ahead = toPlay(facts, now) && !listed;
+	const ahead = toPlay(week.line, now) && !listed;
 	const cell: NextCell = {
 		where: game.where,
 		// A kickoff still to come says its zone (Lane 139, C11); Final and Kicked off need none.
-		when: toPlay(facts, now) && facts.kickoff !== null ? kickoffAt(facts.kickoff, zone) : game.when,
+		when:
+			toPlay(week.line, now) && facts.kickoff !== null ? kickoffAt(facts.kickoff, zone) : game.when,
 		expected: ahead ? expectedScoreWords(facts, week.line.player.team) : null,
 		weather: ahead ? weatherCell(facts) : null
 	};
@@ -747,7 +754,7 @@ export function liveCard({
 	const verb =
 		league === null || leagueVerb === null || held
 			? null
-			: verbOf(heldVerb(leagueVerb, week.line.facts, now), league, player, screenHref);
+			: verbOf(heldVerb(leagueVerb, week.line, now), league, player, screenHref);
 	return {
 		week: week.week,
 		head: headOf(week, zone, now),
@@ -770,7 +777,7 @@ export function liveCard({
 			week: week.week,
 			scoring: week.projection_scoring.format,
 			points: week.line.week_projection,
-			state: lineState(week.line.facts, now)
+			state: lineState(week.line, now)
 		}
 	};
 }

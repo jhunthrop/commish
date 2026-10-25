@@ -180,6 +180,26 @@ void test('a bug before kickoff names the next kickoff and draws both sides alik
 	assert.ok(bug.mine);
 });
 
+void test("a cached field behind the page's clock: the bug turns at kickoff, the web's word (Lane 178)", () => {
+	const upcoming = board('upcoming');
+	const [game] = upcoming.games;
+	assert.ok(game);
+	const cached = {
+		...upcoming,
+		games: [{ ...game, game_state: { state: 'not_started' as const, word: 'Next kickoff' } }]
+	};
+	// Before the kickoff the field's state is the one shown, its word beside the time.
+	const [before] = bugsOf(cached, SYNC, SATURDAY, ZONE);
+	assert.ok(before);
+	assert.equal(before.head, 'Sun 3:25 pm');
+	assert.equal(before.words, 'Next kickoff');
+	// On Monday the page's clock is past the kickoff the field was read before: Kicked off.
+	const [after] = bugsOf(cached, SYNC, MONDAY, ZONE);
+	assert.ok(after);
+	assert.equal(after.state, 'kicked_off');
+	assert.equal(after.head, KICKOFF.kickedOff);
+});
+
 void test('once a game has started the side ahead is bright and the side behind muted', () => {
 	for (const state of ['playing', 'final'] as const) {
 		const [bug] = bugsOf(board(state), SYNC, SATURDAY, ZONE);

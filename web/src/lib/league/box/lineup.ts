@@ -242,7 +242,7 @@ export function idleWords(slot: string): string {
 /** A player whose game is past its kickoff by the API's state (Lane 80): the platform takes no move
  * on him, so no screen draws one (Lane 85). A bye is no game. */
 export function locked(line: PlayerLine, now: number): boolean {
-	return pastKickoff(line.facts, now);
+	return pastKickoff(line, now);
 }
 
 /** A spot the advice would fill that stays empty because its player has kicked off. */
@@ -398,8 +398,8 @@ export function lineupBox(
 	);
 	const proj = projTotal(counted);
 	const asSet = projTotal(setRows(placed, satRows));
-	const setGames = placed.map((p) => (p.slot.host ?? p.slot.ours).facts);
-	const read = linesRead(setGames, now);
+	const setLines = placed.map((p) => p.slot.host ?? p.slot.ours);
+	const read = linesRead(setLines, now);
 	return {
 		starters,
 		bench,
@@ -417,7 +417,7 @@ export function lineupBox(
 			proj,
 			pts: totalsPts(ours, advice.player_points, advice.team_points),
 			final: advice.projected_final ?? null,
-			live: setGames.some((facts) => pastKickoff(facts, now)),
+			live: setLines.some((line) => pastKickoff(line, now)),
 			allFinal: read.state === 'final',
 			note: totalsNote(counted, advice.projection_read_at !== null, advice.week)
 		},

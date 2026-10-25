@@ -193,7 +193,7 @@ export function gameCell(
 ): Pick<BoxRow, 'game' | 'expected'> {
 	const { facts } = line;
 	const { game } = box;
-	const ahead = typeof game === 'object' && game !== null && toPlay(facts, now);
+	const ahead = typeof game === 'object' && game !== null && toPlay(line, now);
 	return {
 		game:
 			ahead && facts.kickoff !== null ? { ...game, when: kickoffAt(facts.kickoff, zone) } : game,
@@ -206,7 +206,7 @@ export function gameCell(
  * off). Null for a final game with no points held yet, never his Proj beside a played game. */
 export function weekFigure(line: OrderRow['line'], now: number): number | null {
 	const { facts } = line;
-	if (lineState(facts, now) !== 'final') return line.week_projection;
+	if (lineState(line, now) !== 'final') return line.week_projection;
 	if (facts.points_this_week !== null) return facts.points_this_week;
 	return facts.last_games.find((g) => g.week === facts.week)?.points ?? null;
 }

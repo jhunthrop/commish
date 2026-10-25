@@ -225,7 +225,7 @@ export function rulesLeftOut(
  * lineState; a row with no game held keeps the API's section. */
 export function sectionAt(row: WeekOrderRow, now: number): WeekOrderRow['section'] {
 	if (row.section === 'bye') return 'bye';
-	const state = lineState(row.line.facts, now);
+	const state = lineState(row.line, now);
 	if (state === null) return row.section;
 	return state === 'upcoming' ? 'to_play' : 'kicked_off';
 }

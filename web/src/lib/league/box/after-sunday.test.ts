@@ -254,7 +254,9 @@ void test("Monday night: one predicate for a side's Final on the Matchup, the ho
 });
 
 /** The FFPC stand-in at a clock (Lane 121 fix round 2, Lane 124): the week as the stand-in API sends it,
- * the opponent unlisted, his state by his roster's games; `late` clubs' finals not held yet. */
+ * the opponent unlisted, his state by his roster's games; `late` clubs' finals not held yet. Stamped
+ * again once the stand-in has set each game's state, as serve.ts stamps every answer it sends, so a
+ * scoreboard game's game_state (Lane 176) is the state it carries (Lane 178). */
 function ffpcAt(clock: string, late?: ReadonlySet<string>): ReturnType<typeof ffpcAfterSunday> {
 	const now = Date.parse(clock);
 	const week = stamped(
@@ -262,7 +264,9 @@ function ffpcAt(clock: string, late?: ReadonlySet<string>): ReturnType<typeof ff
 		now,
 		late
 	) as ReturnType<typeof afterSundayOf>;
-	return ffpcAfterSunday(week, momentAt(now, late), week6);
+	return stamped(ffpcAfterSunday(week, momentAt(now, late), week6), now, late) as ReturnType<
+		typeof ffpcAfterSunday
+	>;
 }
 
 /** What the member's FFPC game reads at a clock on the home and the Matchup, side by side. */

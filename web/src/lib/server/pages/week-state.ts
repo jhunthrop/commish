@@ -36,10 +36,12 @@ function weekRead(
 	if (games.length === 0) return null;
 	return linesRead(
 		games.map((game) => ({
-			game_state: stateAt(game, now) ?? null,
-			played: false,
-			kickoff: game.kickoff,
-			bye: false
+			facts: {
+				game_state: stateAt(game, now) ?? null,
+				played: false,
+				kickoff: game.kickoff,
+				bye: false
+			}
 		})),
 		now
 	).state;

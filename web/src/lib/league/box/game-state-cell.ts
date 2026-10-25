@@ -1,14 +1,15 @@
 /** A game's state and word as the API sends them on the wire (Lane 176, `game_state` on PlayerLine
- * and ScoreboardGame): the web's own readers, lineState and gameHead (kickoff.ts), in the wire's
+ * and ScoreboardGame): the web's own computation, factsState and gameHead (kickoff.ts), in the wire's
  * terms. The fixture API stamps its answers with these, and shared/scripts/game-state-parity.ts writes
- * them as the parity file the API's Go test holds its rule to. No screen reads them yet: a later web
- * lane switches lineState to the field. Pure, tested in game-state-cell.test.ts. */
+ * them as the parity file the API's Go test holds its rule to. The screens read the field first
+ * (kickoff.ts lineState, Lane 178) and this computation only without it. Pure, tested in
+ * game-state-cell.test.ts. */
 import type { components } from '#lib/api/types.ts';
 import { isFreeAgent } from '#lib/format/free-agent.ts';
 import { BOX } from './box.ts';
-import { gameHead, KICKOFF, lineState, type LineGame } from './kickoff.ts';
+import { factsState, gameHead, KICKOFF, type GameStateCell, type LineGame } from './kickoff.ts';
 
-export type GameStateCell = components['schemas']['GameStateCell'];
+export type { GameStateCell };
 type ScoreboardGame = components['schemas']['ScoreboardGame'];
 
 /** A line as the rule reads it: his club and his week's game. */
@@ -17,10 +18,10 @@ export interface StatedLine {
 	facts: LineGame;
 }
 
-/** A line's game at `now` by lineState: Bye on a bye, No club for a free agent and no word for any
+/** A line's game at `now` by its facts (factsState): Bye on a bye, No club for a free agent and no word for any
  * other line with no game held (BoxGame.svelte's cells), "Next kickoff" before his kickoff. */
 export function lineCell(line: StatedLine, now: number): GameStateCell {
-	const state = lineState(line.facts, now);
+	const state = factsState(line.facts, now);
 	if (state === null) {
 		if (line.facts.bye) return { state: 'bye', word: BOX.bye };
 		return { state: 'no_game', word: isFreeAgent(line.player.team) ? BOX.noClub : '' };
