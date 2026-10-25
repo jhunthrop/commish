@@ -57,7 +57,10 @@ export function renderAccount(
 			words: attachedCount(count),
 			devices: deviceCount(count)
 		})),
-		reads: [null, ...READ_AGES.map(ago)].map((read) => ({ at: read, words: readWords(read, at) })),
+		reads: [null, ...READ_AGES.map(ago)].map((read) => ({
+			readAt: read,
+			words: readWords(read, at)
+		})),
 		devices: answers.devices.map((device) => ({ id: device.id, line: deviceLine(device) }))
 	};
 	return `${JSON.stringify(account, null, '\t')}\n`;

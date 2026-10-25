@@ -259,7 +259,7 @@ void test("the Account's words: who, the free season's plan, each league's row, 
 		leagues: { id: string; team: string; read: string }[];
 		counts: { count: number; words: string }[];
 		devices: { id: string; line: string }[];
-		reads: { at: string | null; words: string }[];
+		reads: { readAt: string | null; words: string }[];
 		freeSeason: { now: string; free: boolean }[];
 	};
 	assert.equal(account.who.line, 'fixture@example.com, with us since Sep 1');
