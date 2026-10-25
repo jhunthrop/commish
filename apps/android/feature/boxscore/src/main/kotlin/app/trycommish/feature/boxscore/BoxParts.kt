@@ -34,6 +34,7 @@ import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.start.TeamRow
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.NumWeight
 import app.trycommish.design.Tokens
 import app.trycommish.design.Words
 
@@ -180,7 +181,7 @@ fun TeamRowView(
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 Words.Box.totals.uppercase(),
-                style = Faces.cell.copy(fontWeight = FontWeight.Bold, letterSpacing = HEAD_TRACKING.em),
+                style = Faces.number(NumWeight.Bold).copy(letterSpacing = HEAD_TRACKING.em),
                 color = ink,
             )
             team.note?.let { Text(it, style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.sp), color = ink2) }
@@ -214,7 +215,7 @@ private fun TeamFigure(
 ) {
     Text(
         text,
-        style = if (big) Faces.figure else Faces.cell.copy(fontWeight = FontWeight.Bold),
+        style = if (big) Faces.figure else Faces.number(NumWeight.Bold),
         color = color,
         maxLines = 1,
         softWrap = false,
@@ -230,7 +231,7 @@ fun Figure(
 ) {
     Text(
         text,
-        style = Faces.cell.copy(fontWeight = FontWeight.Medium),
+        style = Faces.number(NumWeight.Medium),
         color = if (muted) CommishTheme.colors.ink3 else CommishTheme.colors.ink,
         textAlign = TextAlign.End,
         maxLines = 1,

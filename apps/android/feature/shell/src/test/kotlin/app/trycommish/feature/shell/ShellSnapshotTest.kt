@@ -148,4 +148,5 @@ private fun SheetMock(expanded: Boolean) {
 /** Material's expanded sheet leaves the status bar's room above it: a sliver of the screen. */
 private const val STATUS_SHARE = 0.04f
 private val SHEET_CORNER: Dp = 28.dp
-private val PLAYER = SheetPlayer("4983", "puka-nacua", "Puka Nacua", "WR", "4", "LAR")
+private val PLAYER =
+    SheetPlayer("4983", "puka-nacua", "Puka Nacua", "WR", "4", "LAR", "https://a.espncdn.com/i/headshots/nfl/players/full/4426515.png")

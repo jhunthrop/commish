@@ -8,6 +8,7 @@ import app.trycommish.api.models.RunPlayerStatus
 import app.trycommish.core.Format
 import app.trycommish.core.instantOrNull
 import app.trycommish.core.shell.SheetPlayer
+import app.trycommish.core.shell.headshotOf
 import app.trycommish.core.shell.initialsOf
 import app.trycommish.core.start.RowStatus
 import app.trycommish.core.start.RowStatuses
@@ -160,7 +161,7 @@ internal class BoardCells(
             id = row.id,
             name = row.name,
             initials = initialsOf(row.name),
-            headshot = face(row.headshot),
+            headshot = headshotOf(row.headshot),
             pill = "$label $rank",
             club = row.team,
             bye = bye(row.team),
@@ -172,7 +173,7 @@ internal class BoardCells(
             gapTone = GapTone.of(gap),
             draftOrder = row.positionRank.toString(),
             adp = row.adp?.let { Format.fixed(it.toDouble()) } ?: Words.Box.none,
-            sheetPlayer = SheetPlayer(row.id, row.slug, row.name, label, rank, row.team),
+            sheetPlayer = SheetPlayer(row.id, row.slug, row.name, label, rank, row.team, headshotOf(row.headshot)),
         )
     }
 
@@ -185,7 +186,7 @@ internal class BoardCells(
             id = row.id,
             name = row.name,
             initials = initialsOf(row.name),
-            headshot = row.headshot?.let(::face),
+            headshot = headshotOf(row.headshot),
             pill = listOfNotNull(label, status?.rank).joinToString(" "),
             club = row.team,
             bye = bye(row.team),
@@ -204,9 +205,6 @@ internal class BoardCells(
     companion object {
         fun byes(clubs: List<RunClub>): Map<String, Int> =
             clubs.mapNotNull { club -> club.bye?.let { club.abbr to it } }.distinctBy { it.first }.toMap()
-
-        /** His face where the run gives an https address. */
-        fun face(address: String): String? = address.takeIf { it.startsWith("https://") }
     }
 }
 

@@ -37,7 +37,18 @@ data class RowCells(
     /** The player the row's name opens in the sheet, by his platform id: null where the site has no page
      * for him (a kicker, a defense, a shared name), as the web's row draws no link. */
     val sheetPlayer: SheetPlayer?
-        get() = row.slug?.let { SheetPlayer(row.id, it, row.name, row.position, row.rank?.toString() ?: row.status?.rank, row.club) }
+        get() =
+            row.slug?.let {
+                SheetPlayer(
+                    row.id,
+                    it,
+                    row.name,
+                    row.position,
+                    row.rank?.toString() ?: row.status?.rank,
+                    row.club,
+                    row.headshot,
+                )
+            }
 
     companion object {
         fun of(

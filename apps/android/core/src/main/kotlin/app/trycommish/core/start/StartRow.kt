@@ -7,6 +7,7 @@ import app.trycommish.api.models.PlayerLine
 import app.trycommish.api.models.WeekFacts
 import app.trycommish.core.Format
 import app.trycommish.core.instantOrNull
+import app.trycommish.core.shell.headshotOf
 import app.trycommish.design.Words
 import java.time.Instant
 import java.time.ZoneId
@@ -57,6 +58,8 @@ data class StartRow(
     val slug: String?,
     /** A defense's club mark in place of a face. */
     val clubMark: Boolean,
+    /** His face (headshotOf), null for a defense and for a player the box has no line for. */
+    val headshot: String?,
     val club: String,
     val position: String,
     /** His rank at his position in our order, null unranked, on a list, or a defense. */
@@ -127,6 +130,7 @@ internal object StartRows {
             fit = if (mark) lastName(withoutDefense(player.name)) else initialName(player.name),
             slug = line.slug,
             clubMark = mark,
+            headshot = if (mark) null else headshotOf(line.headshot),
             club = player.team,
             position = positionWord(player.position),
             rank = if (ranked && player.position in rankedPositions && !listed) line.positionRank else null,
