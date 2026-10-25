@@ -16,7 +16,8 @@ struct AppEnvironment {
     let clock: any Clock
     /// A development build launched with `-CommishCompanionReplay YES` follows the API's recorded draft
     /// from the companion's start page (the web's /companion/new?replay=1, COMPANION_REPLAY on a
-    /// development API); a release build never does.
+    /// development API). The site's `?replay=1` link asks the same in any build, as the web reads it;
+    /// a production API refuses a replay with its own sentence.
     var companionReplay = false
 
     /// The API's base URL from the bundle, failing fast on a build that does not carry one.

@@ -43,24 +43,34 @@ public enum CompanionFixture {
 }
 
 /// The companion's API over the recorded replay: each read answers the next moment (or the one asked
-/// for), the report and the followed drafts as recorded; with `offline` every read fails with no
-/// connection; a refusal throws the API's sentence. Counts the reads and their `since`.
+/// for), edited by `edit` when given, the report and the followed drafts as recorded; with `offline`
+/// every read fails with no connection; with `notFound` a draft read answers the API's 404; with
+/// `reportFails` the report read answers a 502; a refusal throws the API's sentence. Counts the draft
+/// reads with their `since`, and the report reads.
 public actor StubCompanion: CompanionAPI {
     public private(set) var reads: [Int] = []
+    public private(set) var reportReads = 0
     public private(set) var followed: [CompanionCreate] = []
     private var moments: [CompanionFixture.Moment]
     private var offline: Bool
     private let refusal: String?
     private let signedOut: Bool
+    private let notFound: Bool
+    private let reportFails: Bool
+    private let edit: @Sendable (inout Companion) -> Void
 
     public init(
         moments: [CompanionFixture.Moment] = CompanionFixture.Moment.allCases, offline: Bool = false,
-        refusal: String? = nil, signedOut: Bool = false
+        refusal: String? = nil, signedOut: Bool = false, notFound: Bool = false, reportFails: Bool = false,
+        edit: @escaping @Sendable (inout Companion) -> Void = { _ in }
     ) {
         self.moments = moments
         self.offline = offline
         self.refusal = refusal
         self.signedOut = signedOut
+        self.notFound = notFound
+        self.reportFails = reportFails
+        self.edit = edit
     }
 
     /// From now on every read fails with no connection, or answers again.
@@ -85,12 +95,21 @@ public actor StubCompanion: CompanionAPI {
     public func companion(id _: String, since: Int) async throws -> Companion {
         reads.append(since)
         try fail()
+        if notFound {
+            throw APIError.envelope(code: "not_found", message: "No companion with that id.")
+        }
         let moment = moments.count > 1 ? moments.removeFirst() : moments[0]
-        return try CompanionFixture.answer(moment)
+        var answer = try CompanionFixture.answer(moment)
+        edit(&answer)
+        return answer
     }
 
     public func companionReport(id _: String) async throws -> MockReport {
+        reportReads += 1
         try fail()
+        if reportFails {
+            throw APIError.status(502)
+        }
         return try CompanionFixture.report()
     }
 
