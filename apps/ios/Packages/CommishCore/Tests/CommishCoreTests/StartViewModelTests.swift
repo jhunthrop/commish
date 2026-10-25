@@ -371,3 +371,21 @@ struct FailingLineupAPI: LineupAPI {
         throw URLError(.notConnectedToInternet)
     }
 }
+
+/// A row opens the player sheet by his platform id, with what the row drew of him.
+struct StartSheetTests {
+    @Test func aRowWithAPageOpensTheSheetByHisID() throws {
+        let advice = try Fixtures.lineup(Fixtures.week)
+        let model = StartModel(
+            advice: advice, host: .init(value1: .ffpc), now: Fixtures.instant(Fixtures.week), zone: Fixtures.zone
+        )
+        let mahomes = try #require(model.starters.first?.sheetPlayer)
+        #expect(mahomes == SheetPlayer(
+            id: "4046", slug: "patrick-mahomes", name: "Patrick Mahomes", position: "QB", rank: "12", club: "KC"
+        ))
+        let texans = try #require(model.starters.first { $0.row.position == "D/ST" })
+        #expect(texans.sheetPlayer == nil)
+        let dart = try #require(model.bench.first { $0.row.name == "Jaxson Dart" })
+        #expect(dart.sheetPlayer?.rank == "IR")
+    }
+}

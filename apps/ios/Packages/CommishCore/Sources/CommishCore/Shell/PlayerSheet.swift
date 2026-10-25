@@ -76,6 +76,9 @@ public enum SiteLinks {
     public static func player(_ slug: String) -> URL {
         origin.appendingPathComponent("players").appendingPathComponent(slug)
     }
+
+    /// Our record, past weeks of our order (the Lineup strip's link, web links.record()).
+    public static let record = origin.appendingPathComponent("record")
 }
 
 /// The sheet a screen presents from its rows: the player shown, by his id. A screen whose list reads

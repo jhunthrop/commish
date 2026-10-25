@@ -249,3 +249,16 @@ public struct StartModel: Equatable, Sendable {
         }
     }
 }
+
+public extension RowCells {
+    /// The player the row's name opens in the sheet, by his platform id: nil where the site has no
+    /// page for him (a kicker, a defense, a shared name), as the web's row draws no link.
+    var sheetPlayer: SheetPlayer? {
+        row.slug.map { slug in
+            SheetPlayer(
+                id: row.id, slug: slug, name: row.name, position: row.position,
+                rank: row.rank.map(String.init) ?? row.status?.rank, club: row.club
+            )
+        }
+    }
+}
