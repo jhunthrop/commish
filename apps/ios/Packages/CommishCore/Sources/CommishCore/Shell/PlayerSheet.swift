@@ -51,6 +51,16 @@ public struct SheetOffer: Sendable {
     }
 }
 
+public extension SheetOffer {
+    /// shelf-state.ts compareOffer: Compare, the comparison with him on one side (the card's word), opened
+    /// by its site link, which the app pushes as its own screen.
+    static func compare(_ player: SheetPlayer, open: @escaping @MainActor @Sendable (URL) -> Void) -> SheetOffer {
+        SheetOffer(label: Words.Card.compare, line: nil, lineup: false) {
+            open(SiteLinks.compare(first: player.slug))
+        }
+    }
+}
+
 /// The sheet's verb (shelf.ts shelfVerb): the screen's offer, or on a lineup screen once his game has
 /// kicked off the held words in its place, since no lineup move takes him then.
 public enum SheetVerb: Equatable, Sendable {
@@ -138,6 +148,32 @@ public enum SiteLinks {
 
     /// The cheat sheet (nav.ts, the sheet's rail item).
     public static let sheet = origin.appendingPathComponent("sheet")
+
+    /// ADP for a format as the run names it (links.ts adp): /adp/ppr-12.
+    public static func adp(_ format: String) -> URL {
+        origin.appendingPathComponent("adp").appendingPathComponent(format)
+    }
+
+    /// Every club (links.ts clubs).
+    public static let clubs = origin.appendingPathComponent("clubs")
+
+    /// A club's page by its abbreviation, lower case (links.ts club): /clubs/ari.
+    public static func club(_ abbr: String) -> URL {
+        clubs.appendingPathComponent(abbr.lowercased())
+    }
+
+    /// The strength of schedule (links.ts schedule).
+    public static let schedule = origin.appendingPathComponent("schedule")
+
+    /// Compare with the sides by their pages' slugs (links.ts compare): /compare?a=chris-olave&b=nico-collins.
+    public static func compare(first: String? = nil, second: String? = nil) -> URL {
+        let base = origin.appendingPathComponent("compare")
+        let items = [("a", first), ("b", second)].compactMap { name, slug in slug.map { URLQueryItem(
+            name: name,
+            value: $0
+        ) } }
+        return items.isEmpty ? base : base.appending(queryItems: items)
+    }
 }
 
 /// The sheet a screen presents from its rows: the player shown, by his id. A screen whose list reads

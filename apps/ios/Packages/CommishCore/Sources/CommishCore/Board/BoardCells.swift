@@ -56,17 +56,19 @@ struct BoardCells {
         )
     }
 
-    /// A kicker or a defense: his place is his Draft order column, so his pill is his position alone
-    /// (Row.svelte pillRank) or his list's word; the site has no page of his to open.
-    func market(_ row: RunMarketRow) -> BoardRow {
+    /// A kicker or a defense: on the board his place is his Draft order column, so his pill is his
+    /// position alone (Row.svelte pillRank) or his list's word; where no Draft order column is drawn
+    /// (ADP, `placed`) the pill carries his place. The site has no page of his to open.
+    func market(_ row: RunMarketRow, placed: Bool = false) -> BoardRow {
         let label = BoardPosition(rawValue: row.positionName)?.label ?? row.positionName
         let status = statuses[row.id].flatMap { BoardStatus.view($0, zone: zone) }
+        let place = status?.rank ?? (placed ? String(row.positionRank) : nil)
         return BoardRow(
             id: row.id,
             name: row.name,
             initials: Initials.of(row.name),
             headshot: row.headshot.flatMap(Self.face),
-            pill: [label, status?.rank].compactMap(\.self).joined(separator: " "),
+            pill: [label, place].compactMap(\.self).joined(separator: " "),
             club: row.team,
             bye: bye(row.team),
             status: status,

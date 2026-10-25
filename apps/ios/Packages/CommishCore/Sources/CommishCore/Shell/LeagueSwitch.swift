@@ -51,6 +51,16 @@ public enum ShellRoute: Hashable, Sendable {
     case leagueHome(id: String)
     /// A player's page, reached by his site link (the sheet's Full page, or a link from elsewhere).
     case player(slug: String)
+    /// ADP in a format as the run names it ("ppr-12"), nil for the run's default.
+    case adp(format: String?)
+    /// Compare with its sides by their pages' slugs.
+    case compare(first: String?, second: String?)
+    /// Every club.
+    case clubs
+    /// A club's page by its abbreviation.
+    case club(abbr: String)
+    /// The strength of schedule.
+    case schedule
 
     public enum Destination: Equatable, Sendable {
         case tab(String)

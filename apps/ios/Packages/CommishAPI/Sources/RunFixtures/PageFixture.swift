@@ -9,6 +9,13 @@ public extension RunFixture {
         try Self.envelope(["run_id": runID, "player": file("players/\(id).json")])
     }
 
+    /// The folder holds his page.
+    func hasPage(id: String) throws -> Bool {
+        let url = try Self.fixtures.appendingPathComponent(folder)
+            .appendingPathComponent("runs/\(runID)/players/\(id).json")
+        return FileManager.default.fileExists(atPath: url.path)
+    }
+
     func page(id: String) throws -> RunPlayer {
         try pageRead(id: id).player
     }
@@ -98,6 +105,10 @@ public struct StubPages: RunPagesAPI {
     public func page(id: String, tag: String?) async throws -> RunRead<RunPlayerAnswer> {
         guard heldPages[id] == nil else {
             throw APIError.envelope(code: "not_found", message: "The run held this page: read /run/held.")
+        }
+        // The API answers 404 for an id the run gives no page (Lane 188), before the bucket is asked.
+        guard try fixture.hasPage(id: id) else {
+            throw APIError.envelope(code: "not_found", message: "The run has no page for this player.")
         }
         return try read("players/\(id).json", tag: tag) { try fixture.pageRead(id: id) }
     }
