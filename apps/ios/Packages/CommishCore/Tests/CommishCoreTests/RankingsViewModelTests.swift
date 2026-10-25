@@ -167,7 +167,7 @@ struct RankingsViewModelTests {
         #expect(!stale)
         #expect(stamp == later)
         #expect(await api.unchanged == 2)
-        #expect(await api.tags == [RecordFixture.own.tag, RecordFixture.scheduleTag])
+        #expect(await Set(api.tags) == [RecordFixture.own.tag, RecordFixture.scheduleTag], "both read together")
         #expect(model.lead.hasPrefix("How the order we set before each week's kickoff"))
     }
 
