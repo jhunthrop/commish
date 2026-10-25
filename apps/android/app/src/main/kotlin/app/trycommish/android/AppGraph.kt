@@ -17,7 +17,14 @@ import app.trycommish.core.EncryptedSession
 import app.trycommish.core.FileCache
 import app.trycommish.core.Session
 import app.trycommish.core.SessionEnd
+import app.trycommish.core.SignOut
 import app.trycommish.core.SystemClock
+import app.trycommish.core.account.AccountHooks
+import app.trycommish.core.account.AccountScreenReads
+import app.trycommish.core.account.AccountViewModel
+import app.trycommish.core.account.ApiAccountScreenReads
+import app.trycommish.core.account.DevicePushStore
+import app.trycommish.core.account.PushStore
 import app.trycommish.core.board.ApiRunReads
 import app.trycommish.core.board.BoardViewModel
 import app.trycommish.core.board.RunReads
@@ -55,7 +62,6 @@ import app.trycommish.core.trades.TradesViewModel
 import app.trycommish.core.waivers.ApiWaiverReads
 import app.trycommish.core.waivers.WaiverReads
 import app.trycommish.core.waivers.WaiverViewModel
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -93,6 +99,8 @@ class AppGraph(
     private val runs: RunReads = ApiRunReads(transport)
     private val rankings: RankingsReads = ApiRankingsReads(transport)
     private val records: RecordReads = ApiRecordReads(transport)
+    private val accountScreen: AccountScreenReads = ApiAccountScreenReads(transport)
+    private val push: PushStore = DevicePushStore(context)
     private val appContext: Context = context.applicationContext
     private val clipboard: ClipboardManager? = context.getSystemService(ClipboardManager::class.java)
 
@@ -204,23 +212,32 @@ class AppGraph(
         openPage(url)
     }
 
+    /** The Account: its reads, the switches kept on this phone, this phone's id, and the app's hooks (sign
+     * out through the session, a refused token, and the league switch read again once the leagues
+     * changed). */
+    fun accountViewModel(leaguesChanged: () -> Unit): AccountViewModel =
+        AccountViewModel(
+            accountScreen,
+            cache,
+            clock,
+            zone,
+            push,
+            { session.deviceId },
+            AccountHooks(::signOut, sessionEnd, leaguesChanged),
+        )
+
     fun shellViewModel(): ShellViewModel = ShellViewModel(account, cache, clock, zone, sessionEnd)
 
-    /** The member signs this phone out: the API forgets its sign-in when it can be reached, and the
-     * phone forgets its token and every kept answer whatever the API said. */
+    private val signOutSession = SignOut(session, cache, account::revokeDevice) { Log.w(TAG, "revoke device", it) }
+
+    /** The member signs this phone out (the Account's Sign out, or its own row's): the API forgets its
+     * sign-in when it can be reached, the phone forgets its token and every kept answer whatever the API
+     * said, and the app returns to sign-in. */
     fun signOut() {
         appScope.launch {
             try {
-                session.deviceId?.let { account.revokeDevice(it) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (
-                @Suppress("TooGenericExceptionCaught") e: Exception,
-            ) {
-                Log.w(TAG, "revoke device", e)
+                signOutSession()
             } finally {
-                session.signOut()
-                cache.clear()
                 signInMessageState.value = null
                 signedInState.value = false
             }

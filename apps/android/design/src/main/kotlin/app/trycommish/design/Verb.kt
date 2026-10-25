@@ -58,15 +58,18 @@ fun Verb(
     }
 }
 
-/** A quiet verb: the accent's text, no fill (web Quiet.svelte). The screen's one solid verb is [Verb]. */
+/** A quiet verb: the accent's text, no fill (web Quiet.svelte); held, the third ink. The screen's one
+ * solid verb is [Verb]. */
 @Composable
 fun QuietButton(
     title: String,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    TextButton(onClick = onClick, modifier = modifier.heightIn(min = QUIET_HEIGHT)) {
-        Text(title, style = Faces.small.copy(fontWeight = FontWeight.SemiBold), color = CommishTheme.colors.accentText)
+    val c = CommishTheme.colors
+    TextButton(onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = QUIET_HEIGHT)) {
+        Text(title, style = Faces.small.copy(fontWeight = FontWeight.SemiBold), color = if (enabled) c.accentText else c.ink3)
     }
 }
 

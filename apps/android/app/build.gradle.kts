@@ -82,6 +82,7 @@ dependencies {
     implementation(project(":feature:player"))
     implementation(project(":feature:rankings"))
     implementation(project(":feature:record"))
+    implementation(project(":feature:account"))
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
