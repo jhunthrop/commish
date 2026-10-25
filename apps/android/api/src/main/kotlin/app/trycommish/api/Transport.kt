@@ -1,5 +1,6 @@
 package app.trycommish.api
 
+import app.trycommish.api.apis.AuthApi
 import app.trycommish.api.apis.DevicesApi
 import app.trycommish.api.apis.LeagueSyncApi
 import app.trycommish.api.infrastructure.HttpResponse
@@ -49,10 +50,13 @@ class Transport(
     /** Each generated client once per transport: each holds one HttpClient for the app's life. */
     private val leagueSyncApi by lazy { LeagueSyncApi(baseUrl, engine, config) }
     private val devicesApi by lazy { DevicesApi(baseUrl, engine, config) }
+    private val authApi by lazy { AuthApi(baseUrl, engine, config) }
 
     fun leagueSync(): LeagueSyncApi = leagueSyncApi
 
     fun devices(): DevicesApi = devicesApi
+
+    fun auth(): AuthApi = authApi
 }
 
 /** An answer's body whole, or Unauthorized when the API no longer takes the device's token. */
