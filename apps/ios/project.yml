@@ -35,6 +35,10 @@ packages:
     path: Packages/Features/Shell
   Start:
     path: Packages/Features/Start
+  BoxScore:
+    path: Packages/Features/BoxScore
+  Matchup:
+    path: Packages/Features/Matchup
 targets:
   Commish:
     type: application
@@ -48,6 +52,8 @@ targets:
       - package: LeagueHome
       - package: Shell
       - package: Start
+      - package: BoxScore
+      - package: Matchup
     entitlements:
       path: Commish/Commish.entitlements
       properties:

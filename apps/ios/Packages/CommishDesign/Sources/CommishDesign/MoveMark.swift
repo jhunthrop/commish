@@ -30,12 +30,21 @@ public struct MoveMark: View {
 }
 
 /// Lays its children in rows, wrapping to the next row where the width runs out (the web's
-/// `flex-wrap`): the strip's chips, every one in sight.
+/// `flex-wrap`): the strip's chips, every one in sight. Centred, each row sits in the middle of the
+/// width, as `justify-content: center` lays it (the Matchup bug's top line).
 public struct FlowRow: Layout {
-    private let spacing: Double
+    /// Where each row sits across the width.
+    public enum Alignment: Sendable {
+        case leading
+        case center
+    }
 
-    public init(spacing: Double = Tokens.Space.s1) {
+    private let spacing: Double
+    private let alignment: Alignment
+
+    public init(spacing: Double = Tokens.Space.s1, alignment: Alignment = .leading) {
         self.spacing = spacing
+        self.alignment = alignment
     }
 
     public func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
@@ -48,7 +57,7 @@ public struct FlowRow: Layout {
     public func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
         var top = bounds.minY
         for row in rows(width: bounds.width, subviews: subviews) {
-            var left = bounds.minX
+            var left = bounds.minX + Self.inset(row: row.width, in: bounds.width, alignment: alignment)
             for index in row.items {
                 let size = subviews[index].sizeThatFits(.unspecified)
                 subviews[index].place(
@@ -58,6 +67,11 @@ public struct FlowRow: Layout {
             }
             top += row.height + spacing
         }
+    }
+
+    /// How far in a row starts: none leading, half the slack centred, never past the leading edge.
+    public static func inset(row: Double, in width: Double, alignment: Alignment) -> Double {
+        alignment == .center ? max(0, width - row) / 2 : 0
     }
 
     private struct Row {

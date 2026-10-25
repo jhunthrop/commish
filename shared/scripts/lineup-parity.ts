@@ -49,8 +49,9 @@ import { lineupDecision, verbWords } from '../../web/src/lib/league/inseason/wor
 
 export const LINEUP_OUTPUT = 'shared/fixtures/parity/lineup.json';
 
-/** One row's cells as the phone draws them (BoxLine and BoxPlayer at 390). */
-interface RowCells {
+/** One row's cells as the phone draws them (BoxLine and BoxPlayer at 390), the Lineup's and the
+ * Matchup's boxes alike (matchup-parity.ts). */
+export interface RowCells {
 	key: string;
 	slot: string;
 	move: 'in' | 'out' | null;
@@ -96,7 +97,11 @@ function evidenceLine(row: BoxRow): string {
 	return [...(rank === null ? [] : [`${BOX.opp} ${oppRankWord(rank)}`]), ...pairs].join(', ');
 }
 
-function cells(entry: LineupRow | null, plain: BoxRow, reserve: 'bench' | 'slot' | null): RowCells {
+export function cells(
+	entry: LineupRow | null,
+	plain: BoxRow,
+	reserve: 'bench' | 'slot' | null
+): RowCells {
 	const row = reserveRow(plain, reserve);
 	const rank = row.evidence.oppRank;
 	return {

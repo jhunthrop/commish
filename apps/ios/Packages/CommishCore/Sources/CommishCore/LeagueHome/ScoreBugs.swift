@@ -18,18 +18,28 @@ struct GameHead: Equatable {
     let next: Date?
 
     init(state: Components.Schemas.ScoreboardGame.StatePayload, next: Date?, now: Date) {
-        let ahead = next.flatMap { $0 > now ? $0 : nil }
-        switch state.value1 {
-        case .final: (self.state, self.next) = (.final, nil)
-        case .playing: (self.state, self.next) = (.kickedOff, ahead)
         // A state this build does not know reads by its kickoff alone, as an upcoming game does.
-        case .upcoming, nil:
+        let read: GameHeadState = switch state.value1 {
+        case .final: .final
+        case .playing: .kickedOff
+        case .upcoming, nil: .upcoming
+        }
+        self.init(read: read, next: next, now: now)
+    }
+
+    /// kickoff.ts gameHead over a read's state (kicked off for the API's playing) and its next kickoff.
+    init(read: GameHeadState, next: Date?, now: Date) {
+        let ahead = next.flatMap { $0 > now ? $0 : nil }
+        switch read {
+        case .final: (state, self.next) = (.final, nil)
+        case .kickedOff: (state, self.next) = (.kickedOff, ahead)
+        case .upcoming:
             if next == nil {
-                (self.state, self.next) = (.upcoming, nil)
+                (state, self.next) = (.upcoming, nil)
             } else if let ahead {
-                (self.state, self.next) = (.upcoming, ahead)
+                (state, self.next) = (.upcoming, ahead)
             } else {
-                (self.state, self.next) = (.kickedOff, nil)
+                (state, self.next) = (.kickedOff, nil)
             }
         }
     }
@@ -119,7 +129,7 @@ enum ScoreBugs {
         let state = drawn.state
         let final = drawn.final
         let (small, big) = figures(side, state: state, final: final, headFinal: drawn.headFinal)
-        let name = team?.name ?? "Team \(side.rosterId)"
+        let name = team?.name ?? LeagueNames.unnamedTeam(side.rosterId)
         return BugSide(
             rosterID: side.rosterId,
             name: name,

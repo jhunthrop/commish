@@ -42,7 +42,8 @@ const DESIGNATION_MODULE = 'web/src/lib/format/designation.ts';
  * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
  * tiebreak and waiver order, the platforms' names; then the Start screen's (Lane 180): the lineup's
  * strip and verb, the positions an opponent's rank is against, the move's confirmation, the in-season
- * screens' lines, a status in words and in a rank's few characters, and the figures' heads. */
+ * screens' lines, a status in words and in a rank's few characters, and the figures' heads; then the
+ * Matchup's (Lane 183): the words beside its box scores. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -188,6 +189,12 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/format/figure-words.ts',
 		picks: ['FIGURE'],
 		json: 'shared/words/figure.json'
+	},
+	{
+		name: 'Matchup',
+		module: 'web/src/lib/league/box/matchup.ts',
+		picks: ['MATCHUP'],
+		json: 'shared/words/league-matchup.json'
 	}
 ];
 export const OUTPUT = {

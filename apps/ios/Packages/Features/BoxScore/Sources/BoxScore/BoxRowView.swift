@@ -4,24 +4,33 @@ import SwiftUI
 
 /// One player's row (web BoxLine.svelte and BoxPlayer.svelte at 390): the slot with the move's arrow,
 /// his face, his name (whole where it fits, else his short form), his club, position and status, his
-/// game in one line, the expected score and weather while it is to come, the evidence line, then Our
-/// rank, Proj and Pts; a moved-in row tinted in the accent with the chevron that opens its evidence.
-struct LineupRowView: View {
+/// game in one line, the expected score and weather while it is to come, the Lineup's evidence line,
+/// then Our rank, Proj and Pts; on the Lineup a moved-in row tinted in the accent with the chevron that
+/// opens its evidence.
+public struct BoxRowView: View {
     @Environment(\.colorScheme) private var colorScheme
-    let cells: RowCells
-    let bench: Bool
-    let actions: RowActions
+    private let cells: RowCells
+    private let bench: Bool
+    private let actions: RowActions
+    private let style: BoxStyle
+
+    public init(cells: RowCells, bench: Bool, actions: RowActions, style: BoxStyle = .lineup) {
+        self.cells = cells
+        self.bench = bench
+        self.actions = actions
+        self.style = style
+    }
 
     private var open: Bool {
         actions.opened.contains(cells.id)
     }
 
-    var body: some View {
+    public var body: some View {
         let theme = Theme(colorScheme)
         VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 0) {
                 slot(theme)
-                PlayerCell(cells: cells, open: actions.open)
+                PlayerCell(cells: cells, evidence: style.evidence, open: actions.open)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text(cells.rank)
                     .font(Faces.font(.num, size: Tokens.TypeScale.lg, weight: .medium))
@@ -31,7 +40,9 @@ struct LineupRowView: View {
                     .padding(.leading, Tokens.Space.s1)
                 Figure(text: cells.proj, width: Column.proj, muted: cells.proj == Words.Box.none)
                 Figure(text: cells.pts, width: Column.pts, muted: cells.pts == Words.Box.none)
-                why(theme)
+                if style.why {
+                    why(theme)
+                }
             }
             .padding(.horizontal, Tokens.Space.s2)
             .padding(.vertical, 6)
@@ -108,11 +119,12 @@ struct LineupRowView: View {
     }
 }
 
-/// The player cell: face, name, club line, game line, facts and evidence, folded as the phone folds
-/// them. His name opens the player sheet where the site has a page for him.
+/// The player cell: face, name, club line, game line, facts and, on the Lineup, the evidence, folded as
+/// the phone folds them. His name opens the player sheet where the site has a page for him.
 struct PlayerCell: View {
     @Environment(\.colorScheme) private var colorScheme
     let cells: RowCells
+    let evidence: Bool
     let open: (SheetPlayer) -> Void
 
     var body: some View {
@@ -125,9 +137,11 @@ struct PlayerCell: View {
                 club(theme)
                 game(theme)
                 facts(theme)
-                Text(evidence(theme))
-                    .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
-                    .fixedSize(horizontal: false, vertical: true)
+                if evidence {
+                    Text(evidenceLine(theme))
+                        .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .foregroundStyle(theme.color(cells.idle ? Tokens.Color.ink3 : Tokens.Color.ink))
@@ -220,7 +234,7 @@ struct PlayerCell: View {
     }
 
     /// "Opp 2nd, Avg 23.3, Last 19.0": the opponent's rank in the ease's ink while his game is to come.
-    private func evidence(_ theme: Theme) -> AttributedString {
+    private func evidenceLine(_ theme: Theme) -> AttributedString {
         var said = AttributedString(cells.evidence)
         said.foregroundColor = theme.color(Tokens.Color.ink2)
         if let rank = cells.oppRank, let range = said.range(of: rank), cells.ease != .even {
