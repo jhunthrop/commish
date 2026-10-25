@@ -3,6 +3,7 @@ package app.trycommish.api
 import app.trycommish.api.apis.AuthApi
 import app.trycommish.api.apis.DevicesApi
 import app.trycommish.api.apis.LeagueSyncApi
+import app.trycommish.api.apis.RunApi
 import app.trycommish.api.infrastructure.HttpResponse
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
@@ -52,12 +53,17 @@ class Transport(
     private val leagueSyncApi by lazy { LeagueSyncApi(baseUrl, engine, config) }
     private val devicesApi by lazy { DevicesApi(baseUrl, engine, config) }
     private val authApi by lazy { AuthApi(baseUrl, engine, config) }
+    private val runApi by lazy { RunApi(baseUrl, engine, config) }
 
     fun leagueSync(): LeagueSyncApi = leagueSyncApi
 
     fun devices(): DevicesApi = devicesApi
 
     fun auth(): AuthApi = authApi
+
+    /** The published run's files (the GET /run routes): each takes the ETag kept for it and answers 304 when it
+     * still stands. No HTTP cache is installed on this client, so a 304 always reaches the caller. */
+    fun run(): RunApi = runApi
 }
 
 /** An answer's body whole, or Unauthorized when the API no longer takes the device's token. */
