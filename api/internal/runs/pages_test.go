@@ -197,7 +197,7 @@ func TestPlayerPageOfAnotherRefused(t *testing.T) {
 	if n := s.objs.readsOf(key); n != 1 {
 		t.Fatalf("a refused page read %d times within failureTTL; want 1", n)
 	}
-	s.advance(failureTTL)
+	*s.now = s.now.Add(failureTTL)
 	if rec := s.get(t, "/run/players/"+fixturePlayer, nil); rec.Code != http.StatusServiceUnavailable || s.objs.readsOf(key) != 2 {
 		t.Fatalf("after failureTTL: %d, %d reads; want 503 and a second read", rec.Code, s.objs.readsOf(key))
 	}
@@ -240,7 +240,7 @@ func flipRuns(t *testing.T, a, b string, files map[string]string) *server {
 		}
 		objs.afterGet = nil
 		writeRun(t, root, runB, nil)
-		s.advance(PointerTTL)
+		*s.now = s.now.Add(PointerTTL)
 	}
 	return s
 }

@@ -8,19 +8,27 @@ import (
 )
 
 // Matchup is the week's matchup as a box score (Lane 66d): the
-// drafter's side, then the opponent's when the week pairs them, each
-// with its host starters in the league's slots and its bench, every
-// player a line. The score and the teams stay on the sync answer.
-func (a *advisor) Matchup() (apitypes.MatchupBox, bool) {
-	team, ok := a.Snap.TeamByRoster(a.Me)
+// roster's side, then its opponent's when the week pairs them, each with
+// its host starters in the league's slots and its bench, every player a
+// line. The score and the teams stay on the sync answer. roster is the
+// member's (a.Me) for their own game, or any roster the read lists for
+// another game of the week (Lane 204): the one function draws both, and
+// another team's game carries no standing, whose words are the member's.
+func (a *advisor) Matchup(roster int) (apitypes.MatchupBox, bool) {
+	team, ok := a.Snap.TeamByRoster(roster)
 	if !ok {
 		return apitypes.MatchupBox{}, false
 	}
+	viewer := apitypes.MatchupBoxViewerSideMine
+	if roster != a.Me {
+		viewer = apitypes.MatchupBoxViewerSideOther
+	}
+	first := a.side(roster)
 	out := apitypes.MatchupBox{Week: a.Snap.Week, ReadAt: a.Snap.ReadAt, ProjectionReadAt: a.projectionReadAt(),
-		ProjectionScoring: projectionScoring(a.settings, a.preset),
-		Sides:             []apitypes.MatchupBoxSide{a.boxSide(team, a.side(a.Me))}}
-	sides := []*leaguesync.Side{a.side(a.Me)}
-	if opp := a.opponent(); opp != nil {
+		ProjectionScoring: projectionScoring(a.settings, a.preset), ViewerSide: &viewer,
+		Sides: []apitypes.MatchupBoxSide{a.boxSide(team, first)}}
+	sides := []*leaguesync.Side{first}
+	if opp := a.opponentOf(roster); opp != nil {
 		if t, ok := a.Snap.TeamByRoster(opp.RosterID); ok {
 			out.Sides = append(out.Sides, a.boxSide(t, opp))
 			sides = append(sides, opp)
@@ -65,21 +73,25 @@ func (a *advisor) Matchup() (apitypes.MatchupBox, bool) {
 		out.Sides[i].ToPlay = own[i].toPlay(state)
 		out.Sides[i].ScheduleState = scheduleStateOf(unlisted[i])
 	}
-	// Where the member stands, under the bug's two scores (Lane 99, B31).
+	// Where the member stands, under the bug's two scores (Lane 99, B31); on another team's game
+	// whether it is decided alone, the standing's words being the member's (Lane 204).
 	out.Standing, out.Decided = standingFields(standingOf(state, sides, starters))
+	if viewer == apitypes.MatchupBoxViewerSideOther {
+		out.Standing = nil
+	}
 	return out, true
 }
 
-// opponent is the side the drafter's plays this week, nil without one
+// opponentOf is the side the roster's plays this week, nil without one
 // (no game, an all-play week).
-func (a *advisor) opponent() *leaguesync.Side {
-	mine := a.side(a.Me)
-	if mine == nil || mine.Game == 0 {
+func (a *advisor) opponentOf(roster int) *leaguesync.Side {
+	own := a.side(roster)
+	if own == nil || own.Game == 0 {
 		return nil
 	}
 	for i := range a.Snap.Matchups {
 		s := &a.Snap.Matchups[i]
-		if s.Game == mine.Game && s.RosterID != a.Me {
+		if s.Game == own.Game && s.RosterID != roster {
 			return s
 		}
 	}

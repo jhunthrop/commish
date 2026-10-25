@@ -2,22 +2,34 @@
 	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
-	import { ApiError, leagueApi, type LeagueHost, type LeagueSync } from './api.ts';
-	import { inSeasonApi, type MatchupBox } from './inseason/api.ts';
+	import {
+		ApiError,
+		leagueApi,
+		type LeagueHost,
+		type LeagueMatchup,
+		type LeagueSync
+	} from './api.ts';
+	import { otherGame } from './box/game.ts';
+	import { inSeasonApi, type MatchupBox, type Scoreboard } from './inseason/api.ts';
 	import InSeasonPage from './inseason/InSeasonPage.svelte';
 	import { SCREEN_TITLES } from './inseason/words.ts';
 	import MatchupPanel from './MatchupPanel.svelte';
+	import { tabHref } from './inseason/tabs.ts';
 
 	/** A followed league's Matchup screen (spec 2026-10-16 §3, Lane 66d): this week's game as a box
 	 * score. The league's read names the teams and keeps the score; the API's box answer gives every
 	 * player's row (his game and its facts, this week's projection, his points so far). Both read on
 	 * open and once a minute, as the other screens are. A league the box cannot answer for (no saved
-	 * scoring, no current week) keeps the read's starters and their points. */
+	 * scoring, no current week) keeps the read's starters and their points. With a roster (a score
+	 * bug of another team's, Lane 204) the box is that roster's game, its score the scoreboard's; an
+	 * API that draws only the member's game answers theirs, which the screen then draws. */
 	interface Props {
 		id: string;
+		/** Another team's game by its first side's roster (?roster=), null for the member's own. */
+		roster?: number | null;
 	}
 
-	let { id }: Props = $props();
+	let { id, roster = null }: Props = $props();
 
 	/** How many rows the screen holds while it is read: a lineup's starters. */
 	const RESERVE_ROWS = 9;
@@ -25,6 +37,8 @@
 	interface Week {
 		sync: LeagueSync;
 		box: MatchupBox | null;
+		/** Another team's game as the head draws it, null for the member's own. */
+		game: LeagueMatchup | null;
 		read_at: string;
 	}
 
@@ -32,19 +46,38 @@
 	 * a team missing from the read. Signed out and a server failure fail the read, as the league's do. */
 	const STANDS_WITHOUT = new Set([404, 409, 422]);
 
-	/** The box answer, null when the API refuses it for this league. */
-	async function readBox(): Promise<MatchupBox | null> {
+	/** An answer, null when the API refuses it for this league. */
+	async function orNone<T>(answer: Promise<T>): Promise<T | null> {
 		try {
-			return await inSeasonApi.matchup(id);
+			return await answer;
 		} catch (error) {
 			if (error instanceof ApiError && STANDS_WITHOUT.has(error.status)) return null;
 			throw error;
 		}
 	}
 
+	/** The scoreboard for another team's score, null on any failure: the box that arrived still
+	 * draws, its points unread (review 204 M1). */
+	async function readBoard(): Promise<Scoreboard | null> {
+		try {
+			return await inSeasonApi.scoreboard(id);
+		} catch {
+			return null;
+		}
+	}
+
+	// The screen is created per game ({#key} in the route), so its roster is fixed for its life.
+	// svelte-ignore state_referenced_locally
+	const asked = roster;
+
 	async function read(): Promise<Week> {
-		const [sync, box] = await Promise.all([leagueApi.sync(id), readBox()]);
-		return { sync, box, read_at: sync.read_at };
+		const [sync, box, board] = await Promise.all([
+			leagueApi.sync(id),
+			orNone(inSeasonApi.matchup(id, asked)),
+			// Another team's score is the scoreboard's, as the League page's bug draws it.
+			asked === null ? null : readBoard()
+		]);
+		return { sync, box, game: otherGame(box, board), read_at: sync.read_at };
 	}
 
 	// Your sheet's tags mark your own rows once the sheet is in (review L7).
@@ -67,6 +100,8 @@
 		<MatchupPanel
 			sync={week.sync}
 			box={week.box}
+			game={week.game}
+			yourGame={tabHref('matchup', id)}
 			now={new Date(week.read_at)}
 			live={{ host, clock }}
 		/>

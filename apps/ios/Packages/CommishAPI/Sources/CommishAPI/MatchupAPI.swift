@@ -22,6 +22,9 @@ extension APIClient: MatchupAPI {
             return try Self.payload(answer.body.json.value2.data)
         case .notFound, .conflict, .unprocessableContent:
             return nil
+        case let .badRequest(answer):
+            // Only a roster asked (Lane 204) is refused so; this read asks none until B178.
+            throw try Self.problem(answer.body.json)
         case let .badGateway(answer):
             throw try Self.problem(answer.body.json)
         case let .undocumented(status, _):

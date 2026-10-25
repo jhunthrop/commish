@@ -39,7 +39,7 @@ func (h *Handler) Routes() []httpx.Route {
 		return func(w http.ResponseWriter, r *http.Request) { h.serve(w, r, a) }
 	}
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/run/manifest", Access: httpx.Public, Limit: limit, Handler: h.handleManifest},
+		{Method: http.MethodGet, Path: "/run/manifest", Access: httpx.Public, Limit: limit, Handler: file(manifestFile)},
 		{Method: http.MethodGet, Path: "/run/boards/{format}", Access: httpx.Public, Limit: limit, Handler: h.handleBoard},
 		{Method: http.MethodGet, Path: "/run/index", Access: httpx.Public, Limit: limit, Handler: file(indexFile)},
 		{Method: http.MethodGet, Path: "/run/adp", Access: httpx.Public, Limit: limit, Handler: file(adpFile)},
@@ -51,35 +51,6 @@ func (h *Handler) Routes() []httpx.Route {
 		{Method: http.MethodGet, Path: "/run/clubs", Access: httpx.Public, Limit: limit, Handler: file(clubsFile)},
 		{Method: http.MethodGet, Path: "/run/schedule", Access: httpx.Public, Limit: limit, Handler: file(scheduleFile)},
 	}
-}
-
-// handleManifest answers the manifest with the run's season reach beside
-// it (Lane 203), both from one run, once the run's reach pass has landed
-// (reach_pass.go). It never waits on the pass: until it lands, or while a
-// failed pass backs off, the manifest answers at once without the reach,
-// with no ETag and not to be kept, so no client holds the lesser answer
-// under the run's tag. A client already holding the run's answer, the
-// reach in it, is answered 304 and keeps it.
-func (h *Handler) handleManifest(w http.ResponseWriter, r *http.Request) {
-	if !h.ready(w, r) {
-		return
-	}
-	manifest, err := h.Reader.Read(r.Context(), manifestFile)
-	if err != nil {
-		h.unavailable(w, r, err)
-		return
-	}
-	if reached, ok := h.Reader.Reached(manifest.RunID); ok {
-		h.respond(w, r, reached)
-		return
-	}
-	if matches(r.Header.Get("If-None-Match"), manifest.ETag) {
-		w.Header().Set("ETag", manifest.ETag)
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-	w.Header().Set("Cache-Control", "no-store")
-	httpx.WriteOK(w, r, http.StatusOK, manifest.Data)
 }
 
 // handleBoard answers a format the published run's manifest lists, and

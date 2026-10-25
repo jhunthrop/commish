@@ -366,7 +366,7 @@ export interface paths {
 			};
 			cookie?: never;
 		};
-		/** The week's matchup as a box score: each side's starters in the host's slots and its bench, every player with his line (his game's facts, his points so far once his game has kicked off, the week's published projection). Reads the league as the sync route does; the sync answer's matchup keeps the score and the teams. */
+		/** The week's matchup as a box score: each side's starters in the host's slots and its bench, every player with his line (his game's facts, his points so far once his game has kicked off, the week's published projection). Reads the league as the sync route does; the sync answer's matchup keeps the score and the teams. Any game of the week is drawn when roster names one of its sides (Lane 204). */
 		get: operations['leagueMatchup'];
 		put?: never;
 		post?: never;
@@ -1106,7 +1106,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** The published nightly run's manifest (Lane 185): its id, when it finished, its season, every format it carries (the default first) with the week its rest of season ranks from, and how many players have a page. The run is the one runs/latest.json names, the same the site is built from, and never one whose manifest is missing or names another run. Only the members the site's reader names are sent; the sources block is provenance and is never sent. Every /run route answers a weak ETag (the run id and the file; designations, rewritten beside the run every hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a matching If-None-Match. 503 storage_unavailable when the run cannot be read here. Beside the manifest, the run's season reach (Lane 203): what every basis's "through week" says, counted over every own page of the run as the site counts it, worked out once per run in the background. It is absent while that first pass runs (a request never waits on it) and while a failed pass waits to run again; that answer carries no ETag and is not to be kept, and a client holding the run's answer is answered 304. */
+		/** The published nightly run's manifest (Lane 185): its id, when it finished, its season, every format it carries (the default first) with the week its rest of season ranks from, and how many players have a page. The run is the one runs/latest.json names, the same the site is built from, and never one whose manifest is missing or names another run. Only the members the site's reader names are sent; the sources block is provenance and is never sent. Every /run route answers a weak ETag (the run id and the file; designations, rewritten beside the run every hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a matching If-None-Match. 503 storage_unavailable when the run cannot be read here. The manifest carries the run's season reach (manifest.reach, Lane 205) when the run wrote it: the nightly counts it once, through the site's own reader, and writes it into manifest.json. */
 		get: operations['runManifest'];
 		put?: never;
 		post?: never;
@@ -3144,15 +3144,15 @@ export interface components {
 			formats: components['schemas']['RunFormat'][];
 			/** @description every player with a page */
 			players: number;
+			/** @description the run's season reach, written by the run (Lane 205); absent on a run from before it */
+			reach?: components['schemas']['RunReach'];
 		};
 		RunManifestAnswer: {
 			/** @description the published run every /run answer is read from */
 			run_id: string;
 			manifest: components['schemas']['RunManifest'];
-			/** @description the run's season reach (Lane 203), absent on an API from before it, while the run's first pass runs, and while a failed pass waits to run again */
-			reach?: components['schemas']['RunReach'];
 		};
-		/** @description how far the run's season figures reach, as the site's bases say it (web/src/lib/run/reach.ts runReach): counted over every own page of the run (never a held page's copy), his club's game by his log, never a game final by its status alone */
+		/** @description how far the run's season figures reach, as the site's bases say it (web/src/lib/run/reach.ts runReach), written by the run: the nightly's schema gate counts it through the site's own reader over every own page of the run (never a held page's copy), his club's game by his log, never a game final by its status alone */
 		RunReach: {
 			/** @description the format every season block is scored in: ppr-12 */
 			format: string;
@@ -4407,11 +4407,16 @@ export interface components {
 			 * @description when the week's published projection the rows' week_projection read was captured, null with none
 			 */
 			projection_read_at: string | null;
-			/** @description the drafter's side first, then the opponent's when the week pairs them */
+			/** @description the drafter's side first, then the opponent's when the week pairs them; with roster asked, that roster's side first, then its opponent's */
 			sides: components['schemas']['MatchupBoxSide'][];
-			/** @description where the member stands, said under the score bug's two scores from their side: while the game plays the margin and who is left ("Up 3.2, 2 of yours and 1 of theirs to play", "Down 14.1 with nobody left, McCaffrey and Kittle playing for them"), once final the result ("Won by 6.4", "Lost by 30.4", "Tied"); null before the first kickoff, without an opponent, with either score unread, where the platform shows us no starters for a side, or absent from an older answer */
+			/**
+			 * @description whose game the box is (Lane 204): mine for the member's own (roster absent, or the member's), other for another team's game asked by roster; absent from an older answer, which is always the member's
+			 * @enum {string}
+			 */
+			viewer_side?: 'mine' | 'other';
+			/** @description where the member stands, said under the score bug's two scores from their side: while the game plays the margin and who is left ("Up 3.2, 2 of yours and 1 of theirs to play", "Down 14.1 with nobody left, McCaffrey and Kittle playing for them"), once final the result ("Won by 6.4", "Lost by 30.4", "Tied"); null before the first kickoff, without an opponent, with either score unread, where the platform shows us no starters for a side, on another team's game (viewer_side other: the words are the member's), or absent from an older answer */
 			standing?: string | null;
-			/** @description while the game plays, the side behind has nobody left to score and the leader cannot fall back to it (no QB or D/ST of the leader's still to score, or a lead of 10 points or more): the bug says Decided in place of the game's state; present whenever standing is, absent from an older answer */
+			/** @description while the game plays, the side behind has nobody left to score and the leader cannot fall back to it (no QB or D/ST of the leader's still to score, or a lead of 10 points or more): the bug says Decided in place of the game's state; present whenever standing is and on another team's game where the member's would be, absent from an older answer */
 			decided?: boolean | null;
 		};
 		/** @description the Beats column (Lane 98): for the move the strip offers, the player that move drops (gain the move's week_gain); for any other row, the player his move takes out of the rest-of-season lineup the row's gain is measured on (the same fill); or the open spot he fills, a slot that lineup leaves empty. The player is labelled by his place in that rest-of-season lineup (Lane 108, B81) */
@@ -6073,7 +6078,10 @@ export interface operations {
 	};
 	leagueMatchup: {
 		parameters: {
-			query?: never;
+			query?: {
+				/** @description a roster id from the scoreboard's sides (ScoreboardSide.roster_id): the box is that roster's game, its side first and its opponent second when the week pairs them, by the same rules as the member's. Absent, the member's own game, as before (Lane 204). Not an integer answers 400; a roster the league's last read does not list answers 404, each naming the roster field */
+				roster?: number;
+			};
 			header?: never;
 			path: {
 				/** @description the attached league's id (AttachedLeague.id) */
@@ -6084,6 +6092,7 @@ export interface operations {
 		requestBody?: never;
 		responses: {
 			200: components['responses']['MatchupBoxResponse'];
+			400: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 			422: components['responses']['ErrorResponse'];
@@ -7021,14 +7030,14 @@ export interface operations {
 					 *               "marketOrder": "ffc_adp_ppr_12"
 					 *             }
 					 *           ],
-					 *           "players": 4
-					 *         },
-					 *         "reach": {
-					 *           "format": "ppr-12",
-					 *           "scoring": "PPR",
-					 *           "through": "through week 5",
-					 *           "complete": 5,
-					 *           "partial": null
+					 *           "players": 4,
+					 *           "reach": {
+					 *             "format": "ppr-12",
+					 *             "scoring": "PPR",
+					 *             "through": "through week 5",
+					 *             "complete": 5,
+					 *             "partial": null
+					 *           }
 					 *         }
 					 *       }
 					 *     }

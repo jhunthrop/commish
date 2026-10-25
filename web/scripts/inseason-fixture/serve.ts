@@ -50,6 +50,7 @@ import {
 	FFPC_ROSTERLESS_OPPONENT_VARIABLE
 } from './ffpc.ts';
 import { afterSundayOf, momentAt, SUNDAY, sundayOf } from './sunday.ts';
+import { askedRoster, NOT_ROSTER_WORDS, otherGameBox, ROSTER_WORDS } from './other-game.ts';
 import { linesOf, recordedMatchups, scoreboardAt } from './scoreboard-at.ts';
 import { inSeason, noWeek } from './member-week.ts';
 import { inTenths, roundTenth } from './tenths.ts';
@@ -634,6 +635,24 @@ function standInAsked(req: IncomingMessage, id: string): StandIn | null {
 	return id === LEAGUE ? { ...sleeperOnSunday, ...live } : null;
 }
 
+/** Another roster's game on the recorded league (Lane 204, ?roster=), restated at the moment the
+ * request's stand-in reads the member's box at: the same moments, never a second rule. Null for a
+ * roster the recorded week does not list, and on the platform stand-ins (ESPN, Yahoo, FFPC), whose
+ * other games the fixture does not draw: the API's 404, which the web stands without. */
+function otherMatchup(req: IncomingMessage, id: string, roster: number): MatchupBox | null {
+	if (id !== LEAGUE || platformAsked(req, id) !== null) return null;
+	const base = otherGameBox(roster, recordedWeek, matchupBox);
+	if (base === null) return null;
+	const standIn = standInAsked(req, id);
+	if (standIn === null) return { ...base, read_at: readAt() };
+	const restated = SUNDAY_WEEK.test(req.headers.cookie ?? '')
+		? sundayOf({ sync, lineup, matchup: base, scoreboardLive }).matchup
+		: afterSundayOf({ sync, lineup, matchup: base }, recordedWeek, now(), readAt()).matchup;
+	// The standing's words are the member's: another team's game carries none (matchup.go).
+	const box: MatchupBox = { ...restated, standing: null, read_at: standIn.readAt };
+	return platformed(box, platformGames(sync.host, { lineup: standIn.lineup, matchup: box }, now()));
+}
+
 /** A request's JSON body, or null when it has none. */
 async function bodyOf(req: IncomingMessage): Promise<unknown> {
 	const chunks: Buffer[] = [];
@@ -1054,6 +1073,18 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			return;
 		}
 		if (id === SLOW) await new Promise((resolve) => setTimeout(resolve, HOLD_MS));
+		// Another roster's game (Lane 204): refused as the API refuses it, the member's own unchanged.
+		const roster = route === 'matchup' ? askedRoster(url.searchParams) : null;
+		if (roster === 'invalid') {
+			send(req, res, HTTP.badRequest, NOT_ROSTER_WORDS, 'invalid');
+			return;
+		}
+		if (roster !== null && roster !== sync.me) {
+			const other = otherMatchup(req, id ?? '', roster);
+			if (other === null) send(req, res, HTTP.notFound, ROSTER_WORDS, 'not_found');
+			else send(req, res, HTTP.ok, other);
+			return;
+		}
 		const standIn = standInAsked(req, id ?? '');
 		if (standIn && (route === 'lineup' || route === 'matchup' || route === 'scoreboard')) {
 			const games = platformGames(standIn.sync.host, standIn, now());
