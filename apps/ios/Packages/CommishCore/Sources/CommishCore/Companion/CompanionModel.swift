@@ -208,7 +208,7 @@ public struct CompanionModel: Equatable, Sendable {
             return nil
         }
         return RoomPlayer(
-            id: "host:\(pick.hostPlayerId)", name: pick.name, position: position, positionRank: 0, team: pick.team,
+            id: "unplaced:\(pick.hostPlayerId)", name: pick.name, position: position, positionRank: 0, team: pick.team,
             headshot: "", adp: nil, points: nil, vor: nil, gap: nil, vorRound: nil, bye: nil
         )
     }
