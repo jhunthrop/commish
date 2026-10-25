@@ -279,7 +279,7 @@ public struct PlayerCell: View {
     }
 
     /// The weather glyph the web's WeatherGlyph draws, as the system's symbol.
-    static func glyph(_ name: String) -> String {
+    public static func glyph(_ name: String) -> String {
         switch name {
         case "wind": "wind"
         case "indoors": "house"

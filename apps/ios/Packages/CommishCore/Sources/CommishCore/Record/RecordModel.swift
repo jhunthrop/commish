@@ -10,6 +10,12 @@ public struct RecordCell: Equatable, Sendable, Identifiable {
     /// "Ours 0.42": ours pooled again over the weeks that graded this yardstick; nil for ours and ADP.
     public let same: String?
 
+    public init(head: String, value: String, same: String?) {
+        self.head = head
+        self.value = value
+        self.same = same
+    }
+
     public var id: String {
         head
     }

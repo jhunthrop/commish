@@ -113,6 +113,11 @@ public struct RankingsSection<Row: Equatable & Sendable & Identifiable>: Equatab
     public var id: String {
         key
     }
+
+    /// The section with other rows: a snapshot's first rows of it.
+    public func with(rows: [Row]) -> RankingsSection {
+        RankingsSection(key: key, head: head, rows: rows)
+    }
 }
 
 /// order.ts orderView and week.ts weekView over the API's rows, ported.

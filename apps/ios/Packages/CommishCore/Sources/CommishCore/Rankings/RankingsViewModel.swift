@@ -42,6 +42,8 @@ public final class RankingsViewModel {
     public private(set) var chip: RankingsChip?
     public private(set) var query: String
     public private(set) var limit = RankingsViewModel.pageRows
+    /// Letters typed on our order that its next read has not asked for yet.
+    public private(set) var searchPending = false
 
     private let api: any RankingsAPI
     private let cache: any AnswerCache
@@ -118,6 +120,7 @@ public final class RankingsViewModel {
     /// The chips' and the search's read: its saved answer at once when nothing of it is shown, then the
     /// API's; a failed read keeps what is shown, stale; a refused token signs out.
     public func load() async {
+        searchPending = false
         latest += 1
         let mine = latest
         let route = route
@@ -167,6 +170,7 @@ public final class RankingsViewModel {
     public func find(_ letters: String) {
         query = letters
         limit = Self.pageRows
+        searchPending = searchReads
         if let shown, case .week = shown.answer {
             show(shown)
         }
