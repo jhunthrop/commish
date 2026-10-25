@@ -48,6 +48,41 @@ internal object BasisParts {
             missing -> Words.Basis.noProjFinalPart
             else -> Words.Basis.projFinalPart
         }
+
+    /** basis.ts finalNonePart: why a side's Final reads "--". */
+    fun finalNonePart(platform: String): String = "A ${Words.Box.final} of ${Words.Box.none} is a score $platform does not send us."
+
+    /** basis.ts unlistedPart: what the teams a platform sends no lineup for draw, said once. */
+    fun unlistedPart(
+        platform: String,
+        drawn: UnlistedDrawn,
+        form: UnlistedForm,
+    ): String {
+        val from = if (drawn.skipped) Words.BestLineupFrom.projected else Words.BestLineupFrom.rosters
+        val paceWords = if (form == UnlistedForm.Full) Words.Basis.paceClause else Words.Basis.paceClauseShort
+        val pace = if (drawn.paced) ", $paceWords" else ""
+        if (form == UnlistedForm.One && drawn.bestLineup && drawn.noRoster) {
+            return "Teams $platform sends no lineup for show our best lineup from $from$pace, or ${Words.Box.none} with none."
+        }
+        val best =
+            if (drawn.bestLineup) "${Words.Box.proj} for teams $platform sends no lineup for is our best lineup from $from$pace." else ""
+        val none = if (drawn.noRoster) "Teams $platform sends no lineup or roster for show ${Words.Box.none}." else ""
+        return listOf(best, none).filter { it.isNotEmpty() }.joinToString(" ")
+    }
+}
+
+/** How much of the unlisted sides' words a basis says (basis.ts UnlistedForm). */
+enum class UnlistedForm { Full, Short, One }
+
+/** What the sides a platform lists no starters for draw (basis.ts UnlistedDrawn). */
+data class UnlistedDrawn(
+    val bestLineup: Boolean = false,
+    val noRoster: Boolean = false,
+    val paced: Boolean = false,
+    val skipped: Boolean = false,
+) {
+    /** basis.ts unlistedLong. */
+    val long: Boolean get() = bestLineup && (paced || skipped || noRoster)
 }
 
 /**
@@ -69,7 +104,7 @@ internal object LineupBasis {
     )
 
     private val pickPhone = "Our pick is each slot's highest ${Words.Box.proj},"
-    private val finalLands = "${Words.Box.final} lands the hour after a game"
+    val finalLands = "${Words.Box.final} lands the hour after a game"
 
     fun phone(facts: Facts): String {
         val advice = facts.advice
@@ -80,7 +115,7 @@ internal object LineupBasis {
             listOf(
                 pickProj(facts, kicked),
                 BasisParts.projFinalPhone(projFinal, noFinal),
-                gamePart(facts),
+                gamePart(facts.lines, facts.zone, facts.now),
                 if (drawsFacts(facts)) null else finalsPhone(facts),
                 Words.Basis.rankOppPhone,
                 ptsPhone(advice.playerPoints, ValueWords.platform(facts.league)),
@@ -104,18 +139,17 @@ internal object LineupBasis {
     }
 
     /** basis.ts gamePart 'full': the oldest read of any game still to be played. */
-    private fun gamePart(facts: Facts): String? =
-        facts.lines
-            .filter { LineRead.game(it, facts.now).toPlay }
+    fun gamePart(
+        lines: List<PlayerLine>,
+        zone: ZoneId,
+        now: Instant,
+    ): String? =
+        lines
+            .filter { LineRead.game(it, now).toPlay }
             .flatMap { listOfNotNull(it.facts.gameTotal?.readAt, it.facts.weather?.readAt) }
             .mapNotNull(::instantOrNull)
             .minOrNull()
-            ?.let {
-                "${Words.Box.game} is each club's expected points, his first, and weather, read ${Format.weekdayTime(
-                    it,
-                    facts.zone,
-                )}."
-            }
+            ?.let { "${Words.Box.game} is each club's expected points, his first, and weather, read ${Format.weekdayTime(it, zone)}." }
 
     /** Whether a row still to be played draws its expected score or weather (basis.ts drawsFacts): the
      * phone then keeps those cells' sentence and leaves when Final lands to the desk. */
@@ -127,7 +161,7 @@ internal object LineupBasis {
     /** basis.ts finalsParts as the phone draws them: when Final and the stats land while a row waits, the
      * platform's points named where a row counts them. */
     private fun finalsPhone(facts: Facts): String? {
-        val timing = kickedOffPart(facts)
+        val timing = kickedOffPart(facts.lines, facts.now)
         val counted = facts.lines.firstOrNull { platformGame(it) != null } ?: return timing
         val game = platformGame(counted) ?: return timing
         val platform = ValueWords.platform(facts.league)
@@ -143,22 +177,26 @@ internal object LineupBasis {
 
     /** basis.ts kickedOffPartAt: when Final and the stats land, while a row is in play or final with the
      * week's stats not in his games yet. */
-    private fun kickedOffPart(facts: Facts): String? {
+    fun kickedOffPart(
+        lines: List<PlayerLine>,
+        now: Instant,
+    ): String? {
         val waiting =
-            facts.lines.any { line ->
-                val read = LineRead.game(line, facts.now)
+            lines.any { line ->
+                val read = LineRead.game(line, now)
                 val ours = line.facts.lastGames.any { it.week == line.facts.week && !fromPlatform(it) }
                 read == GameRead.KickedOff || (read == GameRead.Final && !ours)
             }
         return if (waiting) Words.Basis.kickedOffPart else null
     }
 
-    private fun platformGame(line: PlayerLine): GamePoints? = line.facts.lastGames.firstOrNull(::fromPlatform)
+    /** The first game a line counts from the platform's points, null with none. */
+    fun platformGame(line: PlayerLine): GamePoints? = line.facts.lastGames.firstOrNull(::fromPlatform)
 
     private fun fromPlatform(game: GamePoints): Boolean = game.source == GamePoints.Source.platform
 
     /** basis.ts weeksWord: "this week's", or "week 7's" on a page turned past the platform's week. */
-    private fun weeksWord(
+    fun weeksWord(
         week: Int,
         platformWeek: Int,
     ): String = if (week == platformWeek) "this week's" else "week $week's"

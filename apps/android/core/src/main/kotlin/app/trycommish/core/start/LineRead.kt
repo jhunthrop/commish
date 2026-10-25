@@ -3,6 +3,7 @@ package app.trycommish.core.start
 import app.trycommish.api.models.GameStateCell
 import app.trycommish.api.models.PlayerLine
 import app.trycommish.core.instantOrNull
+import app.trycommish.core.leaguehome.GameState
 import java.time.Instant
 
 /**
@@ -101,14 +102,42 @@ object LineRead {
     ): Boolean = lines.any { started(it, now) }
 
     /** kickoff.ts linesRead's state over a set of lines: final once every one with a game is, playing
-     * once any has kicked off, else upcoming. */
+     * once any has kicked off, else upcoming. One rule with [linesRead]. */
     fun setState(
         lines: List<PlayerLine>,
         now: Instant,
-    ): GameRead {
+    ): GameRead =
+        when (linesRead(lines, now).state) {
+            GameState.Final -> GameRead.Final
+            GameState.KickedOff -> GameRead.KickedOff
+            GameState.Upcoming -> GameRead.Upcoming
+        }
+
+    /** kickoff.ts linesRead: final once every game is, under way once any has kicked off, the earliest
+     * kickoff still to come next; each line's game by its field. */
+    fun linesRead(
+        lines: List<PlayerLine>,
+        now: Instant,
+    ): GamesRead {
         val held = setOf(GameRead.Upcoming, GameRead.KickedOff, GameRead.Final)
-        val reads = lines.filter { it.facts.kickoff != null }.map { game(it, now) }.filter { it in held }
-        if (reads.isNotEmpty() && reads.all { it == GameRead.Final }) return GameRead.Final
-        return if (reads.any { it != GameRead.Upcoming }) GameRead.KickedOff else GameRead.Upcoming
+        val states =
+            lines.mapNotNull { line ->
+                val kickoff = instantOrNull(line.facts.kickoff) ?: return@mapNotNull null
+                game(line, now).takeIf { it in held }?.let { it to kickoff }
+            }
+        val ahead = states.filter { it.first == GameRead.Upcoming }.map { it.second }.sorted()
+        val state =
+            when {
+                states.isNotEmpty() && states.all { it.first == GameRead.Final } -> GameState.Final
+                ahead.size < states.size -> GameState.KickedOff
+                else -> GameState.Upcoming
+            }
+        return GamesRead(state, ahead.firstOrNull())
     }
 }
+
+/** A set of games as one read (kickoff.ts GameRead): its state and the earliest kickoff still to come. */
+data class GamesRead(
+    val state: GameState,
+    val next: Instant?,
+)
