@@ -10,12 +10,14 @@ struct CommishApp: App {
     @State private var session: AppSession
     @State private var flow: SignInFlow
     @State private var signIn = SignInModel()
+    @State private var linked: ShellRoute?
 
     init() {
         let environment = AppEnvironment.live()
         self.environment = environment
         _session = State(initialValue: AppSession(
-            account: environment.api, store: environment.session, cache: environment.cache
+            account: environment.api, store: environment.session, cache: environment.cache,
+            clock: environment.clock
         ))
         let signIn = SignIn(pairing: environment.pairing, store: environment.session, deviceName: UIDevice.current.name)
         _flow = State(initialValue: SignInFlow(signIn: signIn, base: environment.baseURL))
@@ -25,7 +27,7 @@ struct CommishApp: App {
         WindowGroup {
             content
                 .task { await session.restore() }
-                .onOpenURL { link in Task { await finish(link) } }
+                .onOpenURL { link in route(link) }
         }
     }
 
@@ -42,14 +44,27 @@ struct CommishApp: App {
                     ended: { signIn.ended() }
                 )
             }
-        case let .signedIn(league):
+        case .signedIn:
             RootTabs(
                 environment: environment,
-                league: league,
-                tabs: session.tabs,
+                session: session,
+                linked: $linked,
                 signOut: { Task { await session.signOut() } },
                 expired: { Task { await session.expire() } }
             )
+        }
+    }
+
+    /// A site link the app opened with: the sign-in return to the sign-in flow, a player's page to his
+    /// screen once signed in; anything else is the browser's.
+    private func route(_ link: URL) {
+        switch AppLink.of(link) {
+        case .signIn:
+            Task { await finish(link) }
+        case let .player(slug):
+            linked = .player(slug: slug)
+        case nil:
+            break
         }
     }
 

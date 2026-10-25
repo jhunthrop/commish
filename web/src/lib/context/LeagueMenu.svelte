@@ -8,6 +8,7 @@
 	import Label from '#lib/ui/Label.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import { SHELL } from '#lib/ui/shell-words.ts';
 	import { choose, switchProblem } from './choose.svelte.ts';
 	import { signInReturn } from './sign-in.ts';
 	import { followThen } from './then-path.ts';
@@ -106,8 +107,8 @@
 
 <div class="menu">
 	{#if siteContext.leagues.length > 0}
-		<section class="leagues" aria-label="Your leagues">
-			<Label>Your leagues</Label>
+		<section class="leagues" aria-label={SHELL.yourLeagues}>
+			<Label>{SHELL.yourLeagues}</Label>
 			{#each siteContext.leagues as candidate (candidate.id)}
 				<button
 					type="button"

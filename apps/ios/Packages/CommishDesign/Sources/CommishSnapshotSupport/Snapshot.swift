@@ -5,16 +5,21 @@ import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// A phone a snapshot is drawn at: its width in points and its own pixel scale, which the persona
-/// renders use. The references are drawn at 1x (review M3): small to keep, and still every point.
+/// A phone a snapshot is drawn at: its width and its screen's height in points and its own pixel
+/// scale, which the persona renders use. The references are drawn at 1x (review M3): small to keep,
+/// and still every point. The height sizes what fills a part of the screen (a sheet at a detent).
 public struct SnapshotDevice: Sendable, Equatable {
     public let name: String
     public let width: Double
+    public let height: Double
     public let scale: Double
 
-    public static let iPhone15 = SnapshotDevice(name: "iPhone15", width: 393, scale: 3)
-    public static let iPhoneSE = SnapshotDevice(name: "iPhoneSE", width: 375, scale: 2)
+    public static let iPhone15 = SnapshotDevice(name: "iPhone15", width: 393, height: 852, scale: 3)
+    public static let iPhone17Pro = SnapshotDevice(name: "iPhone17Pro", width: 402, height: 874, scale: 3)
+    public static let iPhoneSE = SnapshotDevice(name: "iPhoneSE", width: 375, height: 667, scale: 2)
     public static let all = [iPhone15, iPhoneSE]
+    /// The two phones the screens plan draws every screen at (plan 2026-10-24-mobile-screens).
+    public static let screens = [iPhone17Pro, iPhoneSE]
 }
 
 /// What a comparison found.

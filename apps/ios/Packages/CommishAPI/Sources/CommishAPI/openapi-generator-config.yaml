@@ -13,3 +13,5 @@ filter:
     - deviceMe
     - revokeDevice
     - pairDevice
+    - getMe
+    - selectLeague

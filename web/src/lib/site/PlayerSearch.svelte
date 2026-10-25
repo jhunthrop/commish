@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import Search from '#lib/ui/Search.svelte';
+	import { SHELL } from '#lib/ui/shell-words.ts';
 	import type SearchMenuType from '#lib/ui/SearchMenu.svelte';
 	import type { SearchSession } from './search-session.svelte.ts';
 
@@ -50,7 +51,7 @@
 	<Search
 		bind:value={query}
 		{placeholder}
-		label="Search players"
+		label={SHELL.searchPlayers}
 		onfirstfocus={() => void start()}
 		oninput={(value: string) => session?.typed(value)}
 		controls={MENU_ID}

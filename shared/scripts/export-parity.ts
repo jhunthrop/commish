@@ -32,8 +32,19 @@ import {
 } from '../../web/src/lib/league/home/home.ts';
 import { leagueWeekParts, weekBasisText } from '../../web/src/lib/league/home/week-basis.ts';
 import type { LeagueSync } from '../../web/src/lib/league/api.ts';
-import { LEAGUE_PHASES, PHONE_RAIL_ITEMS } from '../../web/src/lib/ui/nav.ts';
-import { RAIL_WITHOUT_LEAGUE, railFor } from '../../web/src/lib/ui/rail-order.ts';
+import {
+	LEAGUE_PHASES,
+	PHONE_RAIL_ITEMS,
+	RAIL_FOOT,
+	railKey,
+	railPhase,
+	type SitePhase
+} from '../../web/src/lib/ui/nav.ts';
+import { RAIL_WITHOUT_LEAGUE, railFor, railShown } from '../../web/src/lib/ui/rail-order.ts';
+import { leagueLine, phaseWords } from '../../web/src/lib/context/menu-words.ts';
+import type { ContextLeague } from '../../web/src/lib/context/words.ts';
+import { followedName } from '../../web/src/lib/league/names.ts';
+import { CARD, unreadBasis } from '../../web/src/lib/player/card.ts';
 import { railItemLabel } from '../../web/src/lib/run/week-names.ts';
 import type { Scoreboard } from '../../web/src/lib/league/inseason/api.ts';
 import {
@@ -47,6 +58,14 @@ import {
 const SCRIPT = 'shared/scripts/export-parity.ts';
 export const OUTPUT = 'shared/fixtures/parity/league-home.json';
 export const RAIL_OUTPUT = 'shared/fixtures/parity/phone-rail.json';
+export const SHELL_OUTPUT = 'shared/fixtures/parity/shell.json';
+/** The site's own seasons (GET /season's phase), each read with no league followed. */
+export const SITE_PHASES: readonly SitePhase[] = [
+	'preseason',
+	'in_season',
+	'playoffs',
+	'offseason'
+];
 /** A week the season has named: the in-season rails' week item says Rankings then. */
 const NAMED_WEEK = 7;
 const INSEASON = 'shared/fixtures/inseason';
@@ -75,7 +94,10 @@ const figure = (value: number | null): string => (value === null ? BOX.none : fi
  * sentence), each exactly as the web's readers give them. */
 export function homeAt(sync: LeagueSync, board: Scoreboard, now: string): unknown {
 	const at = Date.parse(now);
-	const bugs = bugsOf(board, sync, at, ZONE, { host: sync.host, readAt: board.read_at });
+	const bugs = bugsOf(board, sync, at, ZONE, {
+		host: sync.host,
+		readAt: board.read_at
+	});
 	const started = bugs.some((b) => b.state !== 'upcoming');
 	return {
 		now,
@@ -148,8 +170,17 @@ export function renderParity(sync: LeagueSync, boards: ReadonlyMap<string, Score
 			when: r.when,
 			kind: r.kind,
 			teams: r.teams.map((t) => t.name),
-			adds: r.adds.map((p) => ({ name: p.name, position: p.position, club: p.club, to: p.to })),
-			drops: r.drops.map((p) => ({ name: p.name, position: p.position, club: p.club })),
+			adds: r.adds.map((p) => ({
+				name: p.name,
+				position: p.position,
+				club: p.club,
+				to: p.to
+			})),
+			drops: r.drops.map((p) => ({
+				name: p.name,
+				position: p.position,
+				club: p.club
+			})),
 			detail: r.detail,
 			mine: r.mine
 		})),
@@ -174,8 +205,10 @@ const phoneFive = (
 		.map((item) => ({ key: item.key, label: railItemLabel(item, NAMED_WEEK) }));
 
 /** The phone's bottom bar for each phase of a followed league (web/src/lib/ui/rail-order.ts railFor),
- * the playoffs with waivers open and closed, and the bar with no league followed, as the web draws
- * them with the season's week named. The apps' bars are held to it. */
+ * the playoffs with waivers open and closed, the bar with no league followed, and that bar by the
+ * site's own season (GET /season: the draft's bar before the season and after it, the season's bar
+ * without a league in it, railShown), as the web draws them with the season's week named, and the
+ * account's way in by its label. The apps' bars are held to it. */
 export function renderRail(): string {
 	const phases = Object.fromEntries(
 		LEAGUE_PHASES.flatMap((phase) =>
@@ -190,9 +223,101 @@ export function renderRail(): string {
 	const rail = {
 		about: generatedBy(SCRIPT, 'web/src/lib/ui/rail-order.ts'),
 		phases,
-		withoutLeague: phoneFive(RAIL_WITHOUT_LEAGUE)
+		withoutLeague: phoneFive(RAIL_WITHOUT_LEAGUE),
+		withoutLeagueBySeason: Object.fromEntries(
+			SITE_PHASES.map((season) => [
+				season,
+				phoneFive(railShown(railKey(railPhase(null, season)), false))
+			])
+		),
+		account: { key: RAIL_FOOT.key, label: RAIL_FOOT.label }
 	};
 	return `${JSON.stringify(rail, null, '\t')}\n`;
+}
+
+/** A followed league as the switch reads it: the attached league's id, name, platform, phase and
+ * draft time. */
+type SwitchLeague = Pick<ContextLeague, 'id' | 'name' | 'host' | 'phase' | 'draft_at'>;
+
+/** The switch's clocks: the fixture's week (a draft today, one in four days), its Thursday night (a
+ * draft in two days), its Tuesday (a draft tomorrow, one under way), and nine days before a draft
+ * (named by its date). */
+const SWITCH_NOWS = [
+	'2026-10-17T17:00:00.000Z',
+	'2026-10-16T02:00:00.000Z',
+	'2026-10-20T17:00:00.000Z',
+	'2026-10-12T17:00:00.000Z'
+] as const;
+
+/** The leagues the switch is held on: the fixture account's twelve, one more before a draft with no
+ * time and no name read yet (its platform names it), and the season's seven alone (one phase, so no
+ * phase words). */
+function switchSets(attached: readonly SwitchLeague[]): Record<string, readonly SwitchLeague[]> {
+	const unnamed: SwitchLeague = {
+		id: '6f1d1c52-2626-4a26-9a26-000000000099',
+		name: '',
+		host: 'yahoo',
+		phase: 'pre_draft',
+		draft_at: null
+	};
+	return {
+		account: attached,
+		withUnnamed: [...attached, unnamed],
+		oneSeason: attached.filter((league) => league.phase === 'in_season')
+	};
+}
+
+/** The line under a league in the switch (context/menu-words.ts leagueLine) for every platform, every
+ * scoring preset and both the boards a league can read on that change it (PPR, superflex). */
+function switchLines(): { host: string; scoring: string; format: string; line: string }[] {
+	const hosts = ['sleeper', 'mfl', 'ffpc', 'yahoo', 'espn'] as const;
+	const scorings = ['ppr', 'half_ppr', 'standard', 'te_premium'] as const;
+	const formats = ['ppr', 'superflex'] as const;
+	return hosts.flatMap((host) =>
+		scorings.flatMap((scoring) =>
+			formats.map((format) => ({
+				host,
+				scoring,
+				format,
+				line: leagueLine({ host, scoring, format } as ContextLeague)
+			}))
+		)
+	);
+}
+
+/** The league switch as the web's menu words it (context/menu-words.ts phaseWords, league/names.ts
+ * followedName) for each set of leagues at each clock in the fixture's zone, and the player shelf's
+ * basis line while his week is read (player/card.ts unreadBasis, the shelf's words as it opens). */
+export function renderShell(attached: readonly SwitchLeague[]): string {
+	const sets = switchSets(attached);
+	const cases = Object.entries(sets).flatMap(([set, leagues]) =>
+		SWITCH_NOWS.map((now) => ({
+			set,
+			now,
+			leagues: leagues.map((league) => ({
+				id: league.id,
+				name: league.name,
+				host: league.host,
+				phase: league.phase,
+				draft_at: league.draft_at
+			})),
+			names: Object.fromEntries(leagues.map((league) => [league.id, followedName(league)])),
+			phases: Object.fromEntries(
+				phaseWords(leagues as readonly ContextLeague[], new Date(now), ZONE)
+			)
+		}))
+	);
+	const shell = {
+		about: generatedBy(
+			SCRIPT,
+			'web/src/lib/context/menu-words.ts and web/src/lib/player/card.ts over shared/fixtures/inseason'
+		),
+		zone: ZONE,
+		cases,
+		lines: switchLines(),
+		sheetLoading: unreadBasis(false, CARD.proj)
+	};
+	return `${JSON.stringify(shell, null, '\t')}\n`;
 }
 
 async function answer<T>(file: string): Promise<T> {
@@ -231,6 +356,7 @@ export async function generate(): Promise<Outputs> {
 	return new Map([
 		[OUTPUT, renderParity(sync, boards)],
 		[RAIL_OUTPUT, renderRail()],
+		[SHELL_OUTPUT, renderShell(await answer<SwitchLeague[]>('leagues-attached.json'))],
 		[GAME_STATE_OUTPUT, renderGameState(about, await gameStateRows(boards))]
 	]);
 }

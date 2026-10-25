@@ -4,7 +4,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { OUTPUT, TABLES, gather, generate, renderWords, renderTable } from './gen-words.ts';
 
-const TABLE = { week: 'Week', noMoves: 'No moves yet', f: (x: number): number => x };
+const TABLE = {
+	week: 'Week',
+	noMoves: 'No moves yet',
+	f: (x: number): number => x
+};
 
 void test('the JSON: every string as is, every function named under functions', () => {
 	assert.deepEqual(JSON.parse(renderTable(TABLE, 'Tiny').json), {
@@ -48,7 +52,10 @@ void test('a member that is neither a string nor a function fails with its key n
 });
 
 void test('a table gathered from a module: an object export spread, a string export under its key', () => {
-	const module = { KINDS: { add: 'Free agent', trade: 'Trade' }, DROP_WORD: 'Drop' };
+	const module = {
+		KINDS: { add: 'Free agent', trade: 'Trade' },
+		DROP_WORD: 'Drop'
+	};
 	assert.deepEqual(gather(module, ['KINDS', ['drop', 'DROP_WORD']], 'm.ts'), {
 		add: 'Free agent',
 		trade: 'Trade',
@@ -71,11 +78,14 @@ void test('several tables: each its own enum and object inside Words, in the ord
 		{ name: 'Box', table: { proj: 'Proj' } },
 		{ name: 'Platform', table: { espn: 'ESPN' } }
 	]);
-	assert.match(swift, /public enum Box \{\s*public static let proj = "Proj"\s*\}\s*public enum Platform \{/);
+	assert.match(
+		swift,
+		/public enum Box \{\s*public static let proj = "Proj"\s*\}\s*public enum Platform \{/
+	);
 	assert.match(kotlin, /object Box \{\s*const val proj = "Proj"\s*\}\s*object Platform \{/);
 });
 
-void test("the tables: the League home's and the box score's, each with its own JSON", () => {
+void test("the tables: the League home's, the box score's, then the shell's and the player shelf's, each with its own JSON", () => {
 	assert.deepEqual(
 		TABLES.map((t) => t.name),
 		[
@@ -88,7 +98,12 @@ void test("the tables: the League home's and the box score's, each with its own 
 			'MoveKind',
 			'Tiebreak',
 			'WaiverOrder',
-			'Platform'
+			'Platform',
+			'Shell',
+			'LeagueSwitch',
+			'Scoring',
+			'Shelf',
+			'Card'
 		]
 	);
 	assert.equal(new Set(TABLES.map((t) => t.json)).size, TABLES.length);
@@ -102,8 +117,16 @@ void test("the web's own words land in the JSON, the Swift and the Kotlin", asyn
 	assert.equal(json('shared/words/league-platform.json').mfl, 'MyFantasyLeague');
 	assert.equal(json('shared/words/league-move-kind.json').drop, 'Drop');
 	assert.equal(json('shared/words/league-basis.json').paceClauseShort, 'in-play players at pace');
+	assert.equal(json('shared/words/shell.json').searchPlayers, 'Search players');
+	assert.equal(json('shared/words/shell-league-switch.json').followFirst, 'Follow your league');
+	assert.equal(json('shared/words/player-shelf.json').fullPage, 'Full page');
+	assert.equal(json('shared/words/league-scoring.json').half_ppr, 'half PPR');
+	assert.equal(json('shared/words/player-card.json').none, '--');
 	const swift = outputs.get(OUTPUT.swift) ?? '';
 	const kotlin = outputs.get(OUTPUT.kotlin) ?? '';
-	assert.match(swift, /public enum Tiebreak \{[^}]*public static let head_to_head = "head to head"/);
+	assert.match(
+		swift,
+		/public enum Tiebreak \{[^}]*public static let head_to_head = "head to head"/
+	);
 	assert.match(kotlin, /object Kickoff \{[^}]*const val decided = "Decided"/);
 });

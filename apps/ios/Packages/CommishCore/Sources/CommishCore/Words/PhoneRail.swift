@@ -1,4 +1,5 @@
 import CommishAPI
+import CommishDesign
 
 /// One tab of the phone's bottom bar: the web's rail item key and its label.
 public struct RailTab: Equatable, Sendable, Identifiable {
@@ -16,7 +17,9 @@ public struct RailTab: Equatable, Sendable, Identifiable {
 public enum PhoneRail {
     typealias Phase = Components.Schemas.LeaguePhaseKnown
 
-    static let league = RailTab(key: "league", label: AppWords.Tab.league)
+    /// The League tab's key: the selected league's home.
+    public static let leagueKey = "league"
+    static let league = RailTab(key: leagueKey, label: AppWords.Tab.league)
     static let lineup = RailTab(key: "lineup", label: AppWords.Tab.lineup)
     static let matchup = RailTab(key: "matchup", label: AppWords.Tab.matchup)
     static let waivers = RailTab(key: "waivers", label: AppWords.Tab.waivers)
@@ -46,7 +49,22 @@ public enum PhoneRail {
         }
     }
 
-    /// The five with no league followed (RAIL_WITHOUT_LEAGUE).
+    /// The account's way in: the top bar's last cell (the rail's foot at a desk, nav.ts RAIL_FOOT).
+    public static let account = RailTab(key: "account", label: Words.Shell.account)
+
+    /// The five with no league followed, by the site's season (GET /season), as the web's railShown
+    /// over railPhase(null, season): the draft's bar before the season (preseason reads as before the
+    /// draft) and after it, the season's bar without a league in it. No season read (an API from
+    /// before the route, or no signal) and a season this build does not know read as in season.
+    public static func withoutLeague(season: SitePhase?) -> [RailTab] {
+        switch season {
+        case .preseason: tabs(phase: .preDraft, waiversOpen: false)
+        case .offseason: tabs(phase: .offseason, waiversOpen: false)
+        case .inSeason, .playoffs, nil: withoutLeague
+        }
+    }
+
+    /// The season's five with no league followed (RAIL_WITHOUT_LEAGUE).
     public static let withoutLeague: [RailTab] = [
         league,
         RailTab(key: "rest_first", label: AppWords.Tab.restOfSeason),

@@ -28,6 +28,16 @@ public enum ValueWords {
         }
     }
 
+    /// names.ts SCORING_WORDS[preset]: "PPR", "half PPR", "standard", "TE premium".
+    public static func scoring(_ preset: Components.Schemas.ScoringPresetKnown) -> String {
+        switch preset {
+        case .ppr: Words.Scoring.ppr
+        case .halfPpr: Words.Scoring.half_ppr
+        case .standard: Words.Scoring.standard
+        case .tePremium: Words.Scoring.te_premium
+        }
+    }
+
     /// home.ts TIEBREAK_WORDS[rule]; nil for a rule this build does not know, said as no rule stated.
     public static func tiebreak(_ rule: Components.Schemas.Tiebreak) -> String? {
         switch rule.value1 {

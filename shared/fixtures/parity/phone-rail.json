@@ -155,5 +155,99 @@
 			"key": "record",
 			"label": "Our record"
 		}
-	]
+	],
+	"withoutLeagueBySeason": {
+		"preseason": [
+			{
+				"key": "board",
+				"label": "Board"
+			},
+			{
+				"key": "players",
+				"label": "Players"
+			},
+			{
+				"key": "mock",
+				"label": "Mock draft"
+			},
+			{
+				"key": "sheet",
+				"label": "Cheat sheet"
+			},
+			{
+				"key": "advisor",
+				"label": "Advisor"
+			}
+		],
+		"in_season": [
+			{
+				"key": "league",
+				"label": "League"
+			},
+			{
+				"key": "rest_first",
+				"label": "Rest of season"
+			},
+			{
+				"key": "week",
+				"label": "Rankings"
+			},
+			{
+				"key": "mock",
+				"label": "Mock draft"
+			},
+			{
+				"key": "record",
+				"label": "Our record"
+			}
+		],
+		"playoffs": [
+			{
+				"key": "league",
+				"label": "League"
+			},
+			{
+				"key": "rest_first",
+				"label": "Rest of season"
+			},
+			{
+				"key": "week",
+				"label": "Rankings"
+			},
+			{
+				"key": "mock",
+				"label": "Mock draft"
+			},
+			{
+				"key": "record",
+				"label": "Our record"
+			}
+		],
+		"offseason": [
+			{
+				"key": "board",
+				"label": "Board"
+			},
+			{
+				"key": "players",
+				"label": "Players"
+			},
+			{
+				"key": "mock",
+				"label": "Mock draft"
+			},
+			{
+				"key": "sheet",
+				"label": "Cheat sheet"
+			},
+			{
+				"key": "advisor",
+				"label": "Advisor"
+			}
+		]
+	},
+	"account": {
+		"key": "account",
+		"label": "Account"
+	}
 }

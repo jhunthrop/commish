@@ -2,7 +2,15 @@
 // are held to. Run with `node --test shared/scripts/*.test.ts`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CLOCKS, generate, instantOf, OUTPUT } from './export-parity.ts';
+import {
+	CLOCKS,
+	generate,
+	instantOf,
+	OUTPUT,
+	RAIL_OUTPUT,
+	SHELL_OUTPUT,
+	SITE_PHASES
+} from './export-parity.ts';
 
 void test('a file clock reads back as its instant', () => {
 	assert.equal(instantOf('2026-10-18T18-56-00Z'), '2026-10-18T18:56:00.000Z');
@@ -24,4 +32,42 @@ void test('every clock carries the bugs, the twelve standings rows and a team ba
 	}
 	assert.equal(parity.moves.length, 15);
 	assert.match(parity.seeding ?? '', /^FFPC seeds 4 for the playoffs/);
+});
+
+void test('with no league the bar follows the site season: the draft bar outside it, the season bar in it', async () => {
+	const rail = JSON.parse((await generate()).get(RAIL_OUTPUT) ?? '{}') as {
+		phases: Record<string, { key: string }[]>;
+		withoutLeague: { key: string }[];
+		withoutLeagueBySeason: Record<string, { key: string }[]>;
+		account: { key: string; label: string };
+	};
+	assert.deepEqual(Object.keys(rail.withoutLeagueBySeason), [...SITE_PHASES]);
+	assert.deepEqual(rail.withoutLeagueBySeason.preseason, rail.phases.pre_draft);
+	assert.deepEqual(rail.withoutLeagueBySeason.offseason, rail.phases.offseason);
+	assert.deepEqual(rail.withoutLeagueBySeason.in_season, rail.withoutLeague);
+	assert.deepEqual(rail.withoutLeagueBySeason.playoffs, rail.withoutLeague);
+	assert.deepEqual(rail.account, { key: 'account', label: 'Account' });
+});
+
+void test("the switch's phase words appear only where the leagues' phases differ", async () => {
+	const shell = JSON.parse((await generate()).get(SHELL_OUTPUT) ?? '{}') as {
+		cases: {
+			set: string;
+			leagues: { id: string; name: string }[];
+			names: Record<string, string>;
+			phases: Record<string, string>;
+		}[];
+		sheetLoading: string;
+		lines: { line: string }[];
+	};
+	assert.equal(shell.cases.length, 12);
+	assert.equal(shell.lines.length, 40);
+	assert.ok(shell.lines.some((l) => l.line === 'FFPC, half PPR, superflex'));
+	for (const c of shell.cases) {
+		assert.equal(Object.keys(c.names).length, c.leagues.length, c.set);
+		assert.equal(Object.keys(c.phases).length, c.set === 'oneSeason' ? 0 : c.leagues.length, c.set);
+	}
+	const unnamed = shell.cases.find((c) => c.set === 'withUnnamed');
+	assert.equal(unnamed?.names['6f1d1c52-2626-4a26-9a26-000000000099'], 'Your Yahoo league');
+	assert.match(shell.sheetLoading, /read as the page opens\.$/);
 });

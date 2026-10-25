@@ -40,7 +40,12 @@ const BASIS_MODULE = 'web/src/lib/league/box/basis.ts';
  * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
  * tiebreak and waiver order, the platforms' names. */
 export const TABLES: readonly TableSource[] = [
-	{ name: 'LeagueHome', module: HOME_MODULE, picks: ['HOME'], json: 'shared/words/league-home.json' },
+	{
+		name: 'LeagueHome',
+		module: HOME_MODULE,
+		picks: ['HOME'],
+		json: 'shared/words/league-home.json'
+	},
 	{ name: 'Box', module: BOX_MODULE, picks: ['BOX'], json: 'shared/words/league-box.json' },
 	{
 		name: 'BoxFormat',
@@ -104,6 +109,39 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/league/names.ts',
 		picks: ['HOST_WORDS'],
 		json: 'shared/words/league-platform.json'
+	},
+	{
+		name: 'Shell',
+		module: 'web/src/lib/ui/shell-words.ts',
+		picks: ['SHELL'],
+		json: 'shared/words/shell.json'
+	},
+	{
+		name: 'LeagueSwitch',
+		module: 'web/src/lib/context/menu-words.ts',
+		picks: [
+			['followFirst', 'FOLLOW_FIRST'],
+			['tePremium', 'TE_PREMIUM_WORDS']
+		],
+		json: 'shared/words/shell-league-switch.json'
+	},
+	{
+		name: 'Scoring',
+		module: 'web/src/lib/league/names.ts',
+		picks: ['SCORING_WORDS'],
+		json: 'shared/words/league-scoring.json'
+	},
+	{
+		name: 'Shelf',
+		module: 'web/src/lib/player/shelf.ts',
+		picks: ['SHELF'],
+		json: 'shared/words/player-shelf.json'
+	},
+	{
+		name: 'Card',
+		module: 'web/src/lib/player/card.ts',
+		picks: ['CARD', ['none', 'NONE']],
+		json: 'shared/words/player-card.json'
 	}
 ];
 export const OUTPUT = {

@@ -3,6 +3,7 @@ import CommishAPI
 import CommishCore
 import CommishDesign
 import Foundation
+import Shell
 import Testing
 
 /// What only the app on a simulator can say: its build settings, its tabs' glyphs, and that iOS
@@ -20,9 +21,10 @@ struct CommishTests {
 
     @Test func everyTabOfEveryPhaseHasItsGlyph() {
         let phases: [Components.Schemas.LeaguePhaseKnown?] = Components.Schemas.LeaguePhaseKnown.allCases + [nil]
-        let tabs = phases.flatMap { PhoneRail.tabs(phase: $0, waiversOpen: false) } + PhoneRail.withoutLeague
+        let tabs = phases.flatMap { PhoneRail.tabs(phase: $0, waiversOpen: false) }
+            + PhoneRail.withoutLeague + [PhoneRail.account]
         for tab in tabs {
-            #expect(RootTabs.symbol(tab.key) != "circle", "\(tab.key)")
+            #expect(TabSymbols.symbol(tab.key) != "circle", "\(tab.key)")
         }
     }
 

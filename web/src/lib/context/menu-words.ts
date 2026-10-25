@@ -6,7 +6,7 @@ import { phaseWord } from '#lib/league/phase-words.ts';
 import type { ContextLeague } from './words.ts';
 
 /** TE premium in words a first-timer can read, as the league line says it. */
-const TE_PREMIUM_WORDS = 'extra points per catch for tight ends';
+export const TE_PREMIUM_WORDS = 'extra points per catch for tight ends';
 
 /** A league's line under its name in the switch: its host and its scoring, "FFPC, extra points per
  * catch for tight ends", and the lineup when it reads on its own board, "Sleeper, half PPR,
