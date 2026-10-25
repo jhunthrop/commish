@@ -90,6 +90,9 @@ const val LINEUP_PAGE = "start"
 /** The Matchup tab's page, the selected league's week as a box score. */
 const val MATCHUP_PAGE = "matchup"
 
+/** The Waivers tab's page, the selected league's players free to add. */
+const val WAIVERS_PAGE = "waivers"
+
 /** Where a league home's Open Lineup goes: the Lineup tab where the bar has one and the home is the
  * league the tabs show; null where it has none (a home pushed for a league whose bar has no Lineup),
  * which the app opens on the site. */

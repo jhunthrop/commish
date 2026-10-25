@@ -101,16 +101,18 @@ internal object StartRows {
     const val RANKED_CLUBS = 32
     private const val PRECIPITATION_NAMED_FROM = 20.0
     private const val HALF = 0.5
-    private val ranked = setOf("QB", "RB", "WR", "TE", "K", "DST")
+    private val rankedPositions = setOf("QB", "RB", "WR", "TE", "K", "DST")
     private val suffixes = setOf("Jr.", "Sr.", "II", "III", "IV", "V")
     private val defense = Regex("\\s+D/ST$")
     private val whitespace = Regex("\\s+")
 
+    /** `ranked` draws his rest-of-season rank (box.ts boxRow's ranked): the Waivers rows leave it out. */
     fun row(
         line: PlayerLine,
         slot: String,
         zone: ZoneId,
         now: Instant,
+        ranked: Boolean = true,
     ): StartRow {
         val facts = line.facts
         val player = line.player
@@ -127,7 +129,7 @@ internal object StartRows {
             clubMark = mark,
             club = player.team,
             position = positionWord(player.position),
-            rank = if (player.position in ranked && !listed) line.positionRank else null,
+            rank = if (ranked && player.position in rankedPositions && !listed) line.positionRank else null,
             status = status,
             reserve = onReserve(line),
             game = game(line, read, zone),
