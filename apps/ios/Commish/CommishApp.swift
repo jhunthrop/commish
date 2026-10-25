@@ -15,7 +15,8 @@ struct CommishApp: App {
         let environment = AppEnvironment.live()
         self.environment = environment
         _session = State(initialValue: AppSession(
-            account: environment.api, store: environment.session, cache: environment.cache
+            account: environment.api, store: environment.session, cache: environment.cache,
+            clock: environment.clock
         ))
         let signIn = SignIn(pairing: environment.pairing, store: environment.session, deviceName: UIDevice.current.name)
         _flow = State(initialValue: SignInFlow(signIn: signIn, base: environment.baseURL))
@@ -42,11 +43,10 @@ struct CommishApp: App {
                     ended: { signIn.ended() }
                 )
             }
-        case let .signedIn(league):
+        case .signedIn:
             RootTabs(
                 environment: environment,
-                league: league,
-                tabs: session.tabs,
+                session: session,
                 signOut: { Task { await session.signOut() } },
                 expired: { Task { await session.expire() } }
             )
