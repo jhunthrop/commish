@@ -193,10 +193,11 @@ struct Note: View {
 struct Cells: View {
     @Environment(\.colorScheme) private var colorScheme
     let cells: [MockCell]
+    var spacing = Tokens.Space.s4
 
     var body: some View {
         let theme = Theme(colorScheme)
-        HStack(alignment: .bottom, spacing: Tokens.Space.s4) {
+        HStack(alignment: .bottom, spacing: spacing) {
             ForEach(cells) { cell in
                 VStack(alignment: .leading, spacing: 1) {
                     Text(cell.value)

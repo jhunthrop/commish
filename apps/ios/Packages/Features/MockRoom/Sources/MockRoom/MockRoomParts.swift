@@ -53,7 +53,8 @@ struct MockBarView: View {
         let theme = Theme(colorScheme)
         VStack(alignment: .leading, spacing: Tokens.Space.s2) {
             // The web's bar wraps (SoloBar's flex-wrap): the pick and its cells on one line where they
-            // fit, the cells under the pick where they do not, so your next pick is never cut off.
+            // fit, the cells under the pick where they do not, closer together on the small phone, so your next
+            // pick is never cut off.
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .bottom, spacing: Tokens.Space.s4) {
                     head(theme)
@@ -62,6 +63,10 @@ struct MockBarView: View {
                 VStack(alignment: .leading, spacing: Tokens.Space.s2) {
                     head(theme)
                     Cells(cells: bar.cells)
+                }
+                VStack(alignment: .leading, spacing: Tokens.Space.s2) {
+                    head(theme)
+                    Cells(cells: bar.cells, spacing: Tokens.Space.s2)
                 }
                 VStack(alignment: .leading, spacing: Tokens.Space.s2) {
                     head(theme)
