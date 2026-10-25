@@ -12,6 +12,15 @@ plugins {
 val siteUrl = "https://trycommish.app"
 val returnTo = "$siteUrl/app/signed-in"
 
+/**
+ * The version Play shows, and the version code under every upload: CI's run number (ANDROID_RUN_NUMBER,
+ * github.run_number) above a fixed offset, so each upload's code rises and none is hand-edited; a
+ * local build without it is the offset alone, below every CI code.
+ */
+val marketingVersion = "0.1.0"
+val versionCodeOffset = 1000
+val runNumber = System.getenv("ANDROID_RUN_NUMBER")?.toInt() ?: 0
+
 android {
     namespace = "app.trycommish.android"
     compileSdk = 35
@@ -20,8 +29,8 @@ android {
         applicationId = "app.trycommish.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInt()
-        versionName = "0.1.0"
+        versionCode = versionCodeOffset + runNumber
+        versionName = marketingVersion
         buildConfigField("String", "SITE_URL", "\"$siteUrl\"")
         buildConfigField("String", "RETURN_TO", "\"$returnTo\"")
     }
