@@ -154,7 +154,11 @@ public struct MatchupView: View {
         }
         .background(theme.color(Tokens.Color.bg))
         .onAppear { onScreen = true }
-        .onDisappear { onScreen = false }
+        .onDisappear {
+            // Said here, not through onChange, which a screen being torn down may never run.
+            onScreen = false
+            viewModel.setVisible(false, leagueID: leagueID)
+        }
         .onChange(of: onScreen && scenePhase == .active, initial: true) { _, visible in
             viewModel.setVisible(visible, leagueID: leagueID)
         }

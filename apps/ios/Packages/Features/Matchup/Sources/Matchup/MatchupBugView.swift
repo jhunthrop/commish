@@ -47,7 +47,7 @@ struct MatchupBugView: View {
 
     /// "Week 6 · Next kickoff · Sun 3:05 pm, ARI at LAR · FFPC 4 min ago", wrapping between its parts.
     private func middle(_ theme: Theme) -> some View {
-        FlowRow(spacing: Tokens.Space.s2) {
+        FlowRow(spacing: Tokens.Space.s2, alignment: .center) {
             Text(bug.week)
                 .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
                 .textCase(.uppercase)
@@ -70,7 +70,7 @@ struct MatchupBugView: View {
                     .monospacedDigit()
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
         .padding(.vertical, 6)
         .padding(.horizontal, Tokens.Space.s3)
         .background(theme.color(Tokens.Color.scoreboard2))
