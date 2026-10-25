@@ -249,11 +249,3 @@ struct Figure: View {
             .frame(width: width, alignment: .trailing)
     }
 }
-
-struct Hairline: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        Rectangle().fill(Theme(colorScheme).color(Tokens.Color.line)).frame(height: 1)
-    }
-}
