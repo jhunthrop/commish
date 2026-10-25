@@ -3,30 +3,6 @@ import CommishDesign
 import Foundation
 import Observation
 
-/// The claim's bid field (MovePanel.svelte), where the league bids: its label with its basis, the bid as
-/// typed, what is wrong with it, and whether it can be changed (not while the claim is on its way).
-public struct BidField: Equatable, Sendable {
-    public let label: String
-    public let typed: String
-    public let problem: String?
-    public let editable: Bool
-}
-
-/// What the pin above the bar shows: the pair an open row's verb makes, the one verb and whether it can
-/// be pressed, the line under it; or the claim's confirmation (with its bid) in the verb's place.
-public struct WaiverPin: Equatable, Sendable {
-    public let pair: String?
-    public let verb: String?
-    public let enabled: Bool
-    public let foot: [[FootRun]]
-    public let panel: MovePanel?
-    public let bid: BidField?
-
-    public var isEmpty: Bool {
-        verb == nil && foot.isEmpty && panel == nil
-    }
-}
-
 /// The Waivers screen's view model (the Start screen's pattern): the API, the cache and the clock
 /// injected; the saved answer at once, then the API's; the card or open row the one verb acts on; the
 /// claim planned (and planned again for a typed bid) and made once with its token, or the platform's
@@ -45,7 +21,7 @@ public final class WaiverViewModel {
     /// The card the pinned verb acts on, by key; the first card until another is chosen.
     public private(set) var chosenCard: String?
     /// The row whose drop panel is open, and the drop chosen there.
-    public private(set) var openRow: String?
+    public internal(set) var openRow: String?
     public private(set) var chosenDrop: String?
     /// The line under the verb once his name is copied for the platform's page.
     public private(set) var copied: [[FootRun]]?
@@ -53,24 +29,37 @@ public final class WaiverViewModel {
     public private(set) var typed = ""
     public private(set) var bid: HostBid?
     public private(set) var replanning = false
+    /// The position chosen (nil: every position), whether its read is on its way, and why it failed.
+    public internal(set) var position: WaiverPosition?
+    public internal(set) var reading = false
+    public internal(set) var problem: String?
+    /// The table's sort and search.
+    public internal(set) var sort: WaiverSort = .initial
+    public internal(set) var query = ""
+    /// The chosen position's own read and its instant, which its rows draw at (WaiverScreen's narrowedAt).
+    var narrowed: (advice: WaiverAdvice, at: Date)?
+    /// Which position read is the latest: an earlier one's answer is overtaken (state.ts Narrowing).
+    var latestNarrowing = 0
+    /// The page's answer and the instant it was read, which the strip and the chips are drawn from.
+    private var answer: (advice: WaiverAdvice, at: Date)?
 
-    private let api: any WaiversAPI
+    let api: any WaiversAPI
     private let cache: any AnswerCache
     private let clock: any Clock
     private let zone: TimeZone
     private let host: Components.Schemas.LeagueHost
-    private let copy: @MainActor (String) -> Bool
+    private let copy: @MainActor (String) -> Void
     private let openPage: @MainActor (URL) -> Void
     private let onSignedOut: @MainActor () -> Void
     /// The claim as last planned: the one the token makes, whatever is typed meanwhile.
     private var planned: HostMoveInput?
     private var claiming: WaiverRow?
 
-    /// `copy` puts a name on the clipboard and says whether it took; `openPage` opens the platform's page;
+    /// `copy` puts a name on the clipboard (the phone's always takes it); `openPage` opens the platform's page;
     /// `onSignedOut` runs when the API refuses the device token.
     public init(
         api: any WaiversAPI, cache: any AnswerCache, clock: any Clock, host: Components.Schemas.LeagueHost,
-        zone: TimeZone, copy: @escaping @MainActor (String) -> Bool,
+        zone: TimeZone, copy: @escaping @MainActor (String) -> Void,
         openPage: @escaping @MainActor (URL) -> Void = { _ in }, onSignedOut: @escaping @MainActor () -> Void = {}
     ) {
         self.api = api
@@ -202,7 +191,7 @@ public final class WaiverViewModel {
             show(saved.value, stamp: saved.stamp, stale: true)
         }
         do {
-            let fresh = try await api.waivers(id: leagueID)
+            let fresh = try await api.waivers(id: leagueID, position: nil)
             let stamp = clock.now
             await cache.write(fresh, route: route, stamp: stamp)
             show(fresh, stamp: stamp, stale: false)
@@ -234,7 +223,10 @@ public final class WaiverViewModel {
             return
         }
         if row.opensPage {
-            openPlatform(row.source)
+            // The platform's page is held on a saved read, as the verb is (review L1).
+            if case .loaded(_, _, false) = state {
+                openPlatform(row.source)
+            }
             return
         }
         openRow = openRow == key ? nil : key
@@ -357,11 +349,11 @@ public final class WaiverViewModel {
         guard let model else {
             return
         }
-        let didCopy = copy(source.add.player.name)
+        copy(source.add.player.name)
         if let page = model.page {
             openPage(page)
         }
-        let words = WaiverWords.copied(platform, name: model.shortName(source), didCopy: didCopy)
+        let words = WaiverWords.copied(platform, name: model.shortName(source), didCopy: true)
         copied = [[
             FootRun(text: "\(words.said) ", url: nil),
             FootRun(text: words.page, url: model.page),
@@ -370,6 +362,34 @@ public final class WaiverViewModel {
     }
 
     private func show(_ advice: WaiverAdvice, stamp: Date, stale: Bool) {
-        state = .loaded(WaiverModel(advice: advice, host: host, now: clock.now, zone: zone), stamp: stamp, stale: stale)
+        answer = (advice, clock.now)
+        redraw(stamp: stamp, stale: stale)
+    }
+
+    /// The model again from the page's answer and the position's own read, keeping the stamp.
+    func redraw() {
+        if case let .loaded(_, stamp, stale) = state {
+            redraw(stamp: stamp, stale: stale)
+        }
+    }
+
+    private func redraw(stamp: Date, stale: Bool) {
+        guard let answer else {
+            return
+        }
+        let model = WaiverModel(
+            advice: answer.advice, shown: narrowed?.advice, host: host, now: narrowed?.at ?? answer.at, zone: zone
+        )
+        state = .loaded(model, stamp: stamp, stale: stale)
+    }
+
+    /// A refused token: the screen signs out.
+    func signedOut() {
+        state = .failed(AppWords.Failure.signedOut)
+        onSignedOut()
+    }
+
+    var now: Date {
+        clock.now
     }
 }

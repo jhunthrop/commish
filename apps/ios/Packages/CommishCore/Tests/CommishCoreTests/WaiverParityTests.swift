@@ -8,7 +8,9 @@ import Testing
 /// the line under the heads, every row's cells and Beats cell in the table's order, each row's verb, the
 /// drop panels, the pinned verb with its line, the arrival line and the phone's basis at all six fixture
 /// clocks on the FFPC stand-in and at the week's clock on each ESPN stand-in; and the claim's words for
-/// every platform, each outcome, the bid's label and its problems.
+/// every platform, each outcome, the bid's label and its problems. Then the D/ST chip's read over the
+/// page's answer, the Stash group and a clearing day over stash.test.ts's inputs, and every screen's
+/// chips, sorts and searches.
 struct WaiverParityTests {
     static let parity: WaiversParity = {
         do {
@@ -19,13 +21,37 @@ struct WaiverParityTests {
     }()
 
     /// Each screen the parity holds: the FFPC stand-in at each clock, each ESPN stand-in at the week's.
-    static let screens: [String] = StartParityTests.clocks + ["done", "refused", "pending"]
+    static let screens: [String] = StartParityTests.clocks + ["done", "refused", "pending", "DEF"]
+        + ["withSlot", "noSlot", "benchOpen"]
 
     static func web(_ name: String) throws -> WaiversParity.Screen {
-        try #require(parity.clocks[name] ?? parity.espn[name]?.screen)
+        try #require(
+            parity.clocks[name] ?? parity.espn[name]?.screen ?? parity.narrowed[name]
+                ?? parity.stashed[name]?.screen
+        )
+    }
+
+    /// A synthetic answer the parity file carries (the Stash cases), read as the API sends it.
+    static func synthetic(_ name: String) throws -> WaiverAdvice {
+        let file = try JSONSerialization.jsonObject(with: Fixtures.data("fixtures/parity/waivers.json"))
+        let stashed = try #require((file as? [String: Any])?["stashed"] as? [String: Any])
+        let advice = try #require((stashed[name] as? [String: Any])?["advice"])
+        let envelope = try JSONSerialization.data(withJSONObject: ["ok": true, "data": advice])
+        return try APIDecoding.envelopeData(WaiverAdvice.self, from: envelope)
     }
 
     static func model(_ name: String) throws -> WaiverModel {
+        let week = Fixtures.instant(Fixtures.week)
+        if parity.narrowed[name] != nil {
+            return try WaiverModel(
+                advice: Fixtures.waivers(Fixtures.league, Fixtures.week),
+                shown: Fixtures.waivers(Fixtures.league, "\(name)-\(Fixtures.week)"), host: Fixtures.sync().host,
+                now: week, zone: Fixtures.zone
+            )
+        }
+        if parity.stashed[name] != nil {
+            return try WaiverModel(advice: synthetic(name), host: Fixtures.sync().host, now: week, zone: Fixtures.zone)
+        }
         if let espn = parity.espn[name] {
             return try WaiverModel(
                 advice: Fixtures.waivers(espn.id, parity.espnClock), host: .init(value1: .espn),
@@ -94,6 +120,52 @@ struct WaiverParityTests {
         }
     }
 
+    @Test(arguments: screens)
+    func theChipsEverySortAndEverySearchAreTheWebs(name: String) throws {
+        let web = try Self.web(name)
+        let model = try Self.model(name)
+        #expect(model.positions.map { WaiversParity.Chip(position: $0.position.rawValue, word: $0.word) }
+            == web.positions)
+        for sort in web.sorts {
+            let key = try #require(WaiverSortKey(rawValue: sort.key))
+            let table = model.table(WaiverSort(key: key, down: sort.down))
+            #expect(table.gaining.map(\.key) == sort.gaining, "\(name) \(sort.key) \(sort.down)")
+            #expect(table.rest.map(\.key) == sort.rest, "\(name) \(sort.key) \(sort.down)")
+            #expect(table.stash.map(\.key) == sort.stash, "\(name) \(sort.key) \(sort.down)")
+        }
+        for find in web.finds {
+            let table = model.table(query: find.query)
+            #expect(
+                [table.gaining.map(\.key), table.rest.map(\.key), table.stash.map(\.key)]
+                    == [find.gaining, find.rest, find.stash],
+                "\(name) \(find.query)"
+            )
+        }
+        #expect(Words.Waivers.noneFound == web.empty)
+    }
+
+    @Test func eachHeadChosenInTurnSortsAsTheWebs() {
+        let keys: [WaiverSortKey] = [.name, .name, .proj, .proj, .beats, .game]
+        var sort = WaiverSort.initial
+        var steps: [WaiversParity.Step] = []
+        for key in keys {
+            sort = sort.next(key)
+            steps.append(WaiversParity.Step(key: sort.key.rawValue, down: sort.down))
+        }
+        #expect(steps == Self.parity.sortSteps)
+    }
+
+    @Test func theStashCasesHoldEachVerbAndAClearingDay() throws {
+        let slot = try Self.web("withSlot")
+        #expect(slot.stash.map(\.button) == ["Stash", "Add"])
+        #expect(slot.stash.first?.clears == "Clears Thu")
+        #expect(slot.gaining.contains { $0.clears == "Clears Wed" } || slot.rest.contains { $0.clears == "Clears Wed" })
+        let open = try Self.web("benchOpen")
+        #expect(open.stash.first?.opensPage == true)
+        #expect(open.stash.first?.beats.who == WaiversParity.Who(name: "IR slot", place: "Open"))
+        #expect(try Self.web("noSlot").stash.allSatisfy { $0.button == "Add" })
+    }
+
     @Test func everyLineOfTheTableCarriesTheAPIsGameState() throws {
         for name in Self.screens {
             let model = try Self.model(name)
@@ -142,218 +214,4 @@ struct WaiverParityTests {
         #expect(WaiverWords.back(9, addressed: 7) == "Back week 9")
         #expect(WaiverWords.back(7, addressed: 7) == "Back this week")
     }
-}
-
-/// shared/fixtures/parity/waivers.json, as the web's Waivers wrote it.
-struct WaiversParity: Decodable {
-    struct Sum: Decodable, Equatable {
-        let figure: String
-        let words: String
-        let gain: String
-    }
-
-    struct Card: Decodable, Equatable {
-        let key: String
-        let slot: String
-        let mark: String?
-        let move: String
-        let why: String?
-        let gains: String
-        let verb: String
-
-        init(_ card: PickupCard) {
-            key = card.key
-            slot = card.slot
-            mark = card.mark
-            move = card.move
-            why = card.why
-            gains = card.gains
-            verb = card.verb
-        }
-    }
-
-    struct Who: Decodable, Equatable {
-        let name: String
-        let place: String
-    }
-
-    struct Beats: Decodable, Equatable {
-        let who: Who?
-        let figure: String?
-        let loud: Bool
-        let week: String?
-    }
-
-    /// A row as the table draws it: the box row's cells the Lineup's parity holds, then the Waivers' own.
-    struct Row: Decodable, Equatable {
-        let key: String
-        let name: String
-        let fit: String
-        let slug: String?
-        let club: String
-        let position: String
-        let status: LineupParity.Status?
-        let rank: String
-        let game: LineupParity.RowGameCell
-        let proj: String
-        let evidence: String
-        let oppRank: String?
-        let ease: String
-        let state: String?
-        let rest: String
-        let clears: String?
-        let away: String?
-        let named: Bool
-        let gains: Bool
-        let beats: Beats
-        let button: String
-        let opensPage: Bool
-        let verb: String
-        let claimsHere: Bool
-
-        init(_ pool: PoolRow, _ model: WaiverModel) {
-            let cells = pool.cells
-            let row = cells.row
-            key = pool.key
-            name = row.name
-            fit = row.fit
-            slug = row.slug
-            club = row.club
-            position = row.position
-            status = row.status.map { LineupParity.Status(mark: $0.mark, sits: $0.sits) }
-            rank = cells.rank
-            game = LineupParity.RowGameCell(cells.game)
-            proj = cells.proj
-            evidence = pool.evidence
-            oppRank = cells.oppRank
-            ease = cells.ease.rawValue
-            state = row.read.stateName
-            rest = StartWords.number(pool.stash == nil
-                ? pool.source.add.restOfSeasonPerGame : pool.source.stash?.value1.perGame)
-            clears = pool.clears
-            away = pool.away
-            named = pool.named
-            gains = pool.gains
-            beats = Beats(
-                who: pool.beats.who.map { Who(name: $0.name, place: $0.place) }, figure: pool.beats.figure,
-                loud: pool.beats.loud, week: pool.beats.week
-            )
-            button = pool.button
-            opensPage = pool.opensPage
-            verb = model.verb(pool.source)
-            claimsHere = model.claimsHere(pool.source)
-        }
-    }
-
-    struct Drop: Decodable, Equatable {
-        let key: String
-        let evidence: String
-        let gain: String
-        let week: String?
-        let starter: String?
-
-        init(_ drop: DropRow) {
-            key = drop.key
-            evidence = drop.evidence
-            gain = drop.gain
-            week = drop.week
-            starter = drop.starter
-        }
-    }
-
-    struct Panel: Decodable {
-        let title: String
-        let lead: String
-        let rows: [Drop]
-        let pair: String
-    }
-
-    struct Pinned: Decodable {
-        let verb: String?
-        let line: String
-        let url: String
-    }
-
-    struct Copied: Decodable {
-        let said: String
-        let page: String
-    }
-
-    struct Screen: Decodable {
-        let week: Int
-        let title: String
-        let decision: String
-        let sum: Sum?
-        let cards: [Card]
-        let projected: Bool
-        let arrives: String?
-        let heads: String
-        let gaining: [Row]
-        let rest: [Row]
-        let stash: [Row]
-        let stashLine: [String]
-        let drops: [String: Panel]
-        let pinned: Pinned
-        let copied: Copied?
-        let copyFailed: Copied?
-        let basis: String
-    }
-
-    struct Espn: Decodable {
-        let id: String
-        let screen: Screen
-    }
-
-    struct Bid: Decodable {
-        let amount: Int
-        let min: Int
-        let max: Int
-        let leftKnown: Bool
-
-        enum CodingKeys: String, CodingKey {
-            case amount, min, max
-            case leftKnown = "left_known"
-        }
-    }
-
-    struct Problem: Decodable {
-        let typed: String
-        let problem: String?
-    }
-
-    struct BidTerms: Decodable {
-        let bid: Bid
-        let label: String
-        let problems: [Problem]
-    }
-
-    struct Result: Decodable {
-        let outcome: String
-        let sentence: String
-        let processesAt: String?
-        let hostWords: String?
-        let words: String
-        let said: String?
-    }
-
-    struct Host: Decodable {
-        let host: String
-        let verb: String
-        let reading: String
-        let setting: String
-        let open: String
-        let lost: String
-        let results: [Result]
-        let bids: [BidTerms]
-    }
-
-    struct Claim: Decodable {
-        let title: String
-        let hosts: [Host]
-    }
-
-    let clocks: [String: Screen]
-    let espnClock: String
-    let espn: [String: Espn]
-    let claim: Claim
 }

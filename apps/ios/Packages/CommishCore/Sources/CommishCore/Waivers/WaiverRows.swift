@@ -47,6 +47,8 @@ public struct PoolRow: Equatable, Sendable, Identifiable {
     public let stash: StashCell?
     /// The default sort's figure: the season Gain, or a stash's rate from his return.
     let order: Double
+    /// His rest-of-season points a game (a stash's from his return), the A game column's figure.
+    let rest: Double?
     public let source: WaiverRow
 
     public var id: String {
@@ -144,11 +146,15 @@ enum WaiverRows {
         "\(cells.evidence), \(Words.Waivers.rest) \(StartWords.number(rest))"
     }
 
-    /// waivers.ts poolRows then sortRows by the default (Beats, highest first, ties in the answer's order).
-    static func pool(_ advice: WaiverAdvice, zone: TimeZone, now: Date) -> [PoolRow] {
-        let cards = Dictionary(advice.pickups.map { (key($0), $0) }, uniquingKeysWith: { first, _ in first })
-        let names = names(advice)
-        return sorted(advice.rows.map { source in
+    /// waivers.ts poolRows over the shown answer's rows and roster, the page answer's pickups tinting the
+    /// strip's own, in the answer's order.
+    static func pool(_ shown: WaiverAdvice, pickups: [WaiverRow], zone: TimeZone, now: Date) -> [PoolRow] {
+        let cards = Dictionary(pickups.map { (key($0), $0) }, uniquingKeysWith: { first, _ in first })
+        var named = shown
+        named.pickups = pickups
+        named.stash = nil
+        let names = names(named)
+        return shown.rows.map { source in
             let card = cards[key(source)]
             let gains = card != nil || (WaiverWords.positive(source.gain) && source.beats != nil)
             let cells = cells(source.add, reserve: nil, zone: zone, now: now)
@@ -156,16 +162,16 @@ enum WaiverRows {
                 key: key(source), cells: cells, evidence: evidence(cells, rest: source.add.restOfSeasonPerGame),
                 clears: WaiverWords.clears(source.clears), away: nil, named: card != nil, gains: gains,
                 beats: beats(source, gains: gains, card: card, names: names), stash: nil, order: source.gain,
-                source: source
+                rest: source.add.restOfSeasonPerGame, source: source
             )
-        })
+        }
     }
 
-    /// waivers.ts stashRows, sorted as the table's.
+    /// waivers.ts stashRows, in the answer's order.
     static func stash(_ advice: WaiverAdvice, zone: TimeZone, now: Date) -> [PoolRow] {
         let names = names(advice)
         let addressed = advice.forWeek ?? advice.week
-        return sorted((advice.stash ?? []).compactMap { source in
+        return (advice.stash ?? []).compactMap { source in
             guard let stash = source.stash?.value1 else {
                 return nil
             }
@@ -185,16 +191,9 @@ enum WaiverRows {
                     back: WaiverWords.back(stash.backWeek, addressed: addressed), slotTakesHim: stash.irSlot,
                     drops: source.drop != nil
                 ),
-                order: stash.perGame ?? -.infinity, source: source
+                order: stash.perGame ?? -.infinity, rest: stash.perGame, source: source
             )
-        })
-    }
-
-    /// waivers.ts sortRows by DEFAULT_SORT: highest first, ties in the answer's order.
-    static func sorted(_ rows: [PoolRow]) -> [PoolRow] {
-        rows.enumerated().sorted { lhs, rhs in
-            lhs.element.order == rhs.element.order ? lhs.offset < rhs.offset : lhs.element.order > rhs.element.order
-        }.map(\.element)
+        }
     }
 
     /// waivers.ts beatsOf: whom the API names, with the row's season Gain; a row that gains nothing names
@@ -226,7 +225,7 @@ enum WaiverRows {
     }
 
     /// waivers.ts pickupCards with the card's verb, in the API's order.
-    static func cards(_ advice: WaiverAdvice, platform: String) -> [PickupCard] {
+    static func cards(_ advice: WaiverAdvice, platform: String, moves: Components.Schemas.WaiverMoves) -> [PickupCard] {
         let names = names(advice)
         return advice.pickups.enumerated().map { index, source in
             let add = WaiverWords.cardName(source.add.player.name, onScreen: names)
@@ -236,7 +235,7 @@ enum WaiverRows {
                 mark: index == 0 && advice.pickups.count > 1 ? Words.Strip.best : nil,
                 move: WaiverWords.move(add: add, drop: drop), why: WaiverWords.dropWhy(dropWhy(source)),
                 gains: WaiverWords.cardGains(week: source.weekGain, gain: source.gain),
-                verb: WaiverWords.addVerb(advice.moves, hostID: source.add.player.hostId, platform: platform),
+                verb: WaiverWords.addVerb(moves, hostID: source.add.player.hostId, platform: platform),
                 source: source
             )
         }

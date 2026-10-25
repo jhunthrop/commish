@@ -25,7 +25,7 @@ struct WaiverViewModelTests {
 
     private func model(
         _ api: any WaiversAPI, host: Components.Schemas.LeagueHost = espn, cache: (any AnswerCache)? = nil,
-        clock: any Clock = FixedClock(saturday), copy: @escaping @MainActor (String) -> Bool = { _ in true },
+        clock: any Clock = FixedClock(saturday), copy: @escaping @MainActor (String) -> Void = { _ in },
         openPage: @escaping @MainActor (URL) -> Void = { _ in }, onSignedOut: @escaping @MainActor () -> Void = {}
     ) -> WaiverViewModel {
         WaiverViewModel(
@@ -114,7 +114,6 @@ struct WaiverViewModelTests {
         ))
         let viewModel = model(offline, host: Self.ffpc, cache: cache, copy: {
             copies.append($0)
-            return true
         })
         await viewModel.load(leagueID: Fixtures.league)
         #expect(viewModel.pin.verb == "Open FFPC waivers")
@@ -228,7 +227,6 @@ struct WaiverViewModelTests {
         let stub = try WaiverStub(advice: Fixtures.waivers(Fixtures.league, Fixtures.week))
         let viewModel = model(stub, host: Self.ffpc, copy: {
             copies.append($0)
-            return true
         }, openPage: { opened.append($0) })
         await viewModel.load(leagueID: Fixtures.league)
         #expect(viewModel.pin.foot.map { $0.map(\.text).joined() }
@@ -263,55 +261,89 @@ struct WaiverViewModelTests {
     }
 }
 
-/// The Waivers routes as a stub over the fixture API's answers: each read answers the advice, the plan
-/// the fixture's plan with the bid asked for, the make the fixture's outcome (or no answer at all); each
-/// call kept.
-actor WaiverStub: WaiversAPI {
-    struct Made: Sendable {
-        let move: HostMoveInput
-        let token: String
+extension WaiverViewModelTests {
+    /// The FFPC stand-in's page cut to one wide receiver, as the API's first 60 rows leave the rest of a
+    /// deep pool out, and the WR chip's own read holding every wide receiver (the route's position query).
+    static func paged() throws -> (page: WaiverAdvice, receivers: WaiverAdvice) {
+        let full = try Fixtures.waivers(Fixtures.league, Fixtures.week)
+        let isReceiver = { (row: WaiverRow) in row.add.player.position == "WR" }
+        let first = try #require(full.rows.first(where: isReceiver))
+        var page = full
+        page.rows = full.rows.filter { !isReceiver($0) || $0 == first }
+        var receivers = full
+        receivers.rows = full.rows.filter(isReceiver)
+        receivers.pickups = full.pickups.filter(isReceiver)
+        return (page, receivers)
     }
 
-    private let advice: WaiverAdvice
-    private let plan: HostMovePlan?
-    private let result: HostMoveResult?
-    private var failsMake = false
-    private(set) var reads = 0
-    private(set) var planned: [HostMoveInput] = []
-    private(set) var made: [Made] = []
-
-    init(advice: WaiverAdvice, plan: HostMovePlan? = nil, result: HostMoveResult? = nil) {
-        self.advice = advice
-        self.plan = plan
-        self.result = result
+    @Test func aPlayerPastThePagesRowsIsReachedByHisPositionsChipAndTheSearch() async throws {
+        let (page, receivers) = try Self.paged()
+        let stub = WaiverStub(advice: page, positions: [.wr: receivers])
+        let viewModel = model(stub, host: Self.ffpc)
+        await viewModel.load(leagueID: Fixtures.league)
+        #expect(viewModel.table.rows.contains { $0.cells.row.name == "Jahan Dotson" } == false)
+        #expect(viewModel.model?.positions.map(\.word) == ["QB", "WR", "TE", "D/ST"])
+        await viewModel.choose(position: .wr, leagueID: Fixtures.league)
+        #expect(await stub.asked == [nil, .wr])
+        #expect(viewModel.reading == false)
+        viewModel.find("dotson")
+        let found = viewModel.table.rows
+        #expect(found.map(\.cells.row.name) == ["Jahan Dotson"])
+        try viewModel.tap(row: #require(found.first?.key))
+        #expect(viewModel.pin.verb == "Open FFPC waivers")
+        // The strip stays the page's: its cards and sum are the API's for every position.
+        #expect(viewModel.model?.title == "Two pickups")
+        await viewModel.choose(position: nil, leagueID: Fixtures.league)
+        viewModel.find("")
+        #expect(viewModel.table.rows.count == page.rows.count)
     }
 
-    func failMake() {
-        failsMake = true
+    @Test func aPositionThatCannotBeReadSaysSoAndTheLastReadStands() async throws {
+        let stub = try WaiverStub(advice: Fixtures.waivers(Fixtures.league, Fixtures.week))
+        await stub.failPosition()
+        let viewModel = model(stub, host: Self.ffpc)
+        await viewModel.load(leagueID: Fixtures.league)
+        let before = viewModel.table.rows.count
+        await viewModel.choose(position: .qb, leagueID: Fixtures.league)
+        #expect(viewModel.problem == "These could not be read just now. The last read stands.")
+        #expect(viewModel.reading == false)
+        #expect(viewModel.table.rows.count == before)
     }
 
-    func waivers(id _: String) async throws -> WaiverAdvice {
-        reads += 1
-        return advice
+    @Test func aHeadChosenSortsTheTableAndTurnsAroundWhenChosenAgain() async throws {
+        let stub = try WaiverStub(advice: Fixtures.waivers(Fixtures.league, Fixtures.week))
+        let viewModel = model(stub, host: Self.ffpc)
+        await viewModel.load(leagueID: Fixtures.league)
+        viewModel.sort(by: .name)
+        #expect(viewModel.sort == WaiverSort(key: .name, down: false))
+        let names = viewModel.table.gaining.map(\.cells.row.name)
+        #expect(names == names.sorted())
+        viewModel.sort(by: .name)
+        #expect(viewModel.table.gaining.map(\.cells.row.name) == names.sorted().reversed())
+        viewModel.sort(by: .proj)
+        #expect(viewModel.sort == WaiverSort(key: .proj, down: true))
     }
 
-    func planMove(id _: String, move: HostMoveInput) async throws -> HostMovePlan {
-        planned.append(move)
-        guard var answer = plan else {
-            throw APIError.status(500)
-        }
-        if var bid = answer.bid?.value1, let asked = move.claim?.value1.bid {
-            bid.amount = asked
-            answer.bid = .init(value1: bid)
-        }
-        return answer
-    }
-
-    func makeMove(id _: String, move: HostMoveInput, confirm: String) async throws -> HostMoveResult {
-        made.append(Made(move: move, token: confirm))
-        guard !failsMake, let result else {
-            throw URLError(.networkConnectionLost)
-        }
-        return result
+    @Test func aStashThatOpensThePlatformsPageIsHeldOnASavedRead() async throws {
+        let parity = WaiverParityTests.parity
+        let advice = try WaiverParityTests.synthetic("benchOpen")
+        let cache = FileCache(folder: folder)
+        await cache.write(advice, route: WaiverViewModel.route(Fixtures.league), stamp: Self.saturday)
+        var copies: [String] = []
+        let offline = APIClient(client: Client(
+            serverURL: Self.base, transport: FailingTransport(URLError(.notConnectedToInternet))
+        ))
+        let viewModel = model(offline, host: Self.ffpc, cache: cache, copy: { copies.append($0) })
+        await viewModel.load(leagueID: Fixtures.league)
+        let stash = try #require(parity.stashed["benchOpen"]?.screen.stash.first { $0.opensPage })
+        viewModel.tap(row: stash.key)
+        #expect(copies.isEmpty)
+        #expect(viewModel.openRow == nil)
+        // Read fresh, the same tap copies his name and opens the page.
+        let fresh = WaiverStub(advice: advice)
+        let live = model(fresh, host: Self.ffpc, copy: { copies.append($0) })
+        await live.load(leagueID: Fixtures.league)
+        live.tap(row: stash.key)
+        #expect(copies == ["De'Von Achane"])
     }
 }

@@ -255,7 +255,8 @@ public enum WaiverWords {
         return "\(platform) takes bids from $\(bid.min) to $\(bid.max) in this league."
     }
 
-    /// A typed bid as JavaScript's Number reads a whole number: digits with an optional sign; nil else.
+    /// A typed bid as a whole number: digits with an optional sign; nil else. Stricter than JavaScript's
+    /// Number, which also takes "1e1" or "0x0A" (review L3): the number pad types neither.
     static func bidValue(_ typed: String) -> Int? {
         guard !typed.isEmpty, typed.range(of: #"^[+-]?[0-9]+(\.0*)?$"#, options: .regularExpression) != nil
         else {
