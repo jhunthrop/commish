@@ -4,7 +4,7 @@
  * a basis over a Sunday player's GP never claims his week 6, even once his game is final by the
  * hourly status; the schedule sets back every game final by its state (finalsReach). */
 import { weekdayWord } from '#lib/format/date.ts';
-import type { Format, Game, Player, Slate } from './schema.ts';
+import type { Format, Game, Player, RunReach, Slate } from './schema.ts';
 import type { GameLogRow, PlayerSeason } from './season.ts';
 
 /** What a season's reach reads of a season block: its through week and its log's statuses. */
@@ -139,23 +139,16 @@ export function playedThroughWords(reach: Reach): string {
 	return `${parts.join(' and ')} ${many ? 'are' : 'is'} played`;
 }
 
-/** The run's season reach as the API's /run/manifest sends it (Lane 203): the format every season
- * block is scored in, that format's chip label, the bases' "through week" words, the complete week,
- * and the counted partial week's days. Counted over tonight's own pages only (never a held page's
- * copy); the first page's block names the format and the complete week, which every block in the run
- * shares (season-checks.ts). */
-export interface RunReach {
-	format: string;
-	scoring: string;
-	through: string;
-	complete: number;
-	partial: { week: number; days: string[] } | null;
-}
-
 type ReachPage = Pick<Player, 'team'> & {
 	season: CountedSeason & Pick<Player['season'], 'format'>;
 };
 
+/** The run's season reach (schema.ts reachSchema): the format every season block is scored in, that
+ * format's chip label, the bases' "through week" words, the complete week, and the counted partial
+ * week's days. Counted over tonight's own pages only (never a held page's copy); the first page's
+ * block names the format and the complete week, which every block in the run shares
+ * (season-checks.ts). The nightly's schema gate counts it once and writes it into the manifest
+ * (Lane 205). */
 export function runReach(
 	pages: readonly ReachPage[],
 	slates: readonly SlateGames[],

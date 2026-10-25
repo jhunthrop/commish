@@ -1023,6 +1023,24 @@ func (e LobbySeatViewKind) Valid() bool {
 	}
 }
 
+// Defines values for MatchupBoxViewerSide.
+const (
+	MatchupBoxViewerSideMine  MatchupBoxViewerSide = "mine"
+	MatchupBoxViewerSideOther MatchupBoxViewerSide = "other"
+)
+
+// Valid indicates whether the value is a known member of the MatchupBoxViewerSide enum.
+func (e MatchupBoxViewerSide) Valid() bool {
+	switch e {
+	case MatchupBoxViewerSideMine:
+		return true
+	case MatchupBoxViewerSideOther:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MembershipStateSource.
 const (
 	MembershipStateSourceGrant        MembershipStateSource = "grant"
@@ -3504,7 +3522,7 @@ type MFLConnectInput struct {
 
 // MatchupBox defines model for MatchupBox.
 type MatchupBox struct {
-	// Decided while the game plays, the side behind has nobody left to score and the leader cannot fall back to it (no QB or D/ST of the leader's still to score, or a lead of 10 points or more): the bug says Decided in place of the game's state; present whenever standing is, absent from an older answer
+	// Decided while the game plays, the side behind has nobody left to score and the leader cannot fall back to it (no QB or D/ST of the leader's still to score, or a lead of 10 points or more): the bug says Decided in place of the game's state; present whenever standing is and on another team's game where the member's would be, absent from an older answer
 	Decided *bool `json:"decided,omitempty"`
 
 	// ProjectionReadAt when the week's published projection the rows' week_projection read was captured, null with none
@@ -3516,13 +3534,19 @@ type MatchupBox struct {
 	// ReadAt the league's last host read
 	ReadAt time.Time `json:"read_at"`
 
-	// Sides the drafter's side first, then the opponent's when the week pairs them
+	// Sides the drafter's side first, then the opponent's when the week pairs them; with roster asked, that roster's side first, then its opponent's
 	Sides []MatchupBoxSide `json:"sides"`
 
-	// Standing where the member stands, said under the score bug's two scores from their side: while the game plays the margin and who is left ("Up 3.2, 2 of yours and 1 of theirs to play", "Down 14.1 with nobody left, McCaffrey and Kittle playing for them"), once final the result ("Won by 6.4", "Lost by 30.4", "Tied"); null before the first kickoff, without an opponent, with either score unread, where the platform shows us no starters for a side, or absent from an older answer
+	// Standing where the member stands, said under the score bug's two scores from their side: while the game plays the margin and who is left ("Up 3.2, 2 of yours and 1 of theirs to play", "Down 14.1 with nobody left, McCaffrey and Kittle playing for them"), once final the result ("Won by 6.4", "Lost by 30.4", "Tied"); null before the first kickoff, without an opponent, with either score unread, where the platform shows us no starters for a side, on another team's game (viewer_side other: the words are the member's), or absent from an older answer
 	Standing *string `json:"standing,omitempty"`
-	Week     int     `json:"week"`
+
+	// ViewerSide whose game the box is (Lane 204): mine for the member's own (roster absent, or the member's), other for another team's game asked by roster; absent from an older answer, which is always the member's
+	ViewerSide *MatchupBoxViewerSide `json:"viewer_side,omitempty"`
+	Week       int                   `json:"week"`
 }
+
+// MatchupBoxViewerSide whose game the box is (Lane 204): mine for the member's own (roster absent, or the member's), other for another team's game asked by roster; absent from an older answer, which is always the member's
+type MatchupBoxViewerSide string
 
 // MatchupBoxSide defines model for MatchupBoxSide.
 type MatchupBoxSide struct {
@@ -4680,6 +4704,9 @@ type RunManifest struct {
 	// Players every player with a page
 	Players int `json:"players"`
 
+	// Reach the run's season reach, written by the run (Lane 205); absent on a run from before it
+	Reach *RunReach `json:"reach,omitempty"`
+
 	// RunAt when the run finished
 	RunAt time.Time `json:"runAt"`
 
@@ -4695,9 +4722,6 @@ type RunManifest struct {
 type RunManifestAnswer struct {
 	// Manifest the run's manifest.json, the members the site's reader names less the sources block (provenance)
 	Manifest RunManifest `json:"manifest"`
-
-	// Reach the run's season reach (Lane 203), absent on an API from before it, while the run's first pass runs, and while a failed pass waits to run again
-	Reach *RunReach `json:"reach,omitempty"`
 
 	// RunId the published run every /run answer is read from
 	RunId string `json:"run_id"`
@@ -4914,7 +4938,7 @@ type RunPullFigure struct {
 	Figure string `json:"figure"`
 }
 
-// RunReach how far the run's season figures reach, as the site's bases say it (web/src/lib/run/reach.ts runReach): counted over every own page of the run (never a held page's copy), his club's game by his log, never a game final by its status alone
+// RunReach how far the run's season figures reach, as the site's bases say it (web/src/lib/run/reach.ts runReach), written by the run: the nightly's schema gate counts it through the site's own reader over every own page of the run (never a held page's copy), his club's game by his log, never a game final by its status alone
 type RunReach struct {
 	// Complete the last week whose games are all in
 	Complete int `json:"complete"`
@@ -6441,6 +6465,12 @@ type YahooCallbackParams struct {
 type ListLeaguesParams struct {
 	Page    *Page    `form:"page,omitempty" json:"page,omitempty"`
 	PerPage *PerPage `form:"per_page,omitempty" json:"per_page,omitempty"`
+}
+
+// LeagueMatchupParams defines parameters for LeagueMatchup.
+type LeagueMatchupParams struct {
+	// Roster a roster id from the scoreboard's sides (ScoreboardSide.roster_id): the box is that roster's game, its side first and its opponent second when the week pairs them, by the same rules as the member's. Absent, the member's own game, as before (Lane 204). Not an integer answers 400; a roster the league's last read does not list answers 404, each naming the roster field
+	Roster *int `form:"roster,omitempty" json:"roster,omitempty"`
 }
 
 // LeagueOrderParams defines parameters for LeagueOrder.

@@ -47,7 +47,13 @@ class _Reader:
         held = root / "runs" / run_id / "held.json"
         self.saw.append(json.loads(held.read_text()) if held.is_file() else None)
         reasons = tuple(self.passes.pop(0))
-        return ReaderRead(reasons, _SUMMARY.replace("0 refusals", f"{len(reasons)} refusals"))
+        # Every pass says a reach of its own, a refused one too: the gate keeps a clean last read's alone.
+        return ReaderRead(reasons, _SUMMARY.replace("0 refusals", f"{len(reasons)} refusals"), _reach(len(self.saw)))
+
+
+def _reach(read: int) -> Json:
+    """The reach the stand-in's `read`th pass counts (Lane 205)."""
+    return {"format": "ppr-12", "scoring": "PPR", "through": f"through week {read}", "complete": read, "partial": None}
 
 
 def _store(root: Path, held: Json | None = None) -> LocalRunStore:
@@ -202,3 +208,32 @@ def test_an_earlier_run_that_does_not_read_costs_the_copies_never_the_night(tmp_
     assert gate.record.passed
     assert gate.held[0].copy is None
     assert any(line.startswith("schema: no earlier copies of the held pages") for line in lines)
+
+
+# LANE 205: the run's season reach rides the gate's last clean read into the final manifest.
+
+
+def test_a_run_the_reader_takes_whole_carries_its_reach(tmp_path: Path) -> None:
+    gate, _ = _gate(tmp_path, _Reader([[]]), _store(tmp_path / "bucket"))
+    assert gate.reach == _reach(1)
+
+
+def test_a_run_with_a_held_page_carries_the_reach_of_the_read_the_build_makes(tmp_path: Path) -> None:
+    gate, _ = _gate(tmp_path, _Reader([[_refusal("3914151")], []]), _store(tmp_path / "bucket"))
+    assert gate.record.passed
+    # Counted over the run as staged with its held page, never over the first read's pages.
+    assert gate.reach == _reach(2)
+
+
+@pytest.mark.parametrize(
+    "passes",
+    [
+        [["schema:boards/ppr-12.json:boards/ppr-12.json says it is the standard-12 board."]],
+        [[_refusal(str(4000000 + n)) for n in range(11)]],
+        [[_refusal("3914151")], [_refusal("4430681")]],
+    ],
+)
+def test_a_run_the_gate_refuses_carries_no_reach(tmp_path: Path, passes: list[list[str]]) -> None:
+    gate, _ = _gate(tmp_path, _Reader(passes), _store(tmp_path / "bucket"))
+    assert not gate.record.passed
+    assert gate.reach is None

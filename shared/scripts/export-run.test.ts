@@ -11,6 +11,7 @@ import {
   heldToIndex,
   pageIds,
   runFiles,
+  withReach,
 } from "./export-run.ts";
 import { REPOSITORY } from "./generated.ts";
 
@@ -55,9 +56,35 @@ void test("the latest pointer names the run, whose manifest says it is that run"
   assert.equal(manifest.runId, RUN_ID);
 });
 
-void test("the manifest, the board, the index, the ADP, the pages, the record, the clubs and the schedule are the run's files byte for byte", () => {
+void test("the manifest is the run's byte for byte with the season reach after its last member", () => {
+  const written = fixture(`runs/${RUN_ID}/manifest.json`);
+  const run = readFileSync(join(CONTRACT, "manifest.json"), "utf8");
+  const { reach } = JSON.parse(written) as { reach: unknown };
+  assert.ok(reach, "the fixture's manifest carries the reach");
+  assert.equal(
+    written,
+    `${run.slice(0, -1)},"reach":${JSON.stringify(reach)}}`,
+  );
+});
+
+void test("a reach goes after the manifest's last member and nothing else moves", () => {
+  const reach = {
+    format: "ppr-12",
+    scoring: "PPR",
+    through: "through week 5",
+    complete: 5,
+    partial: null,
+  };
+  assert.equal(
+    withReach('{"runId":"r","players":4}\n', reach),
+    `{"runId":"r","players":4,"reach":${JSON.stringify(reach)}}\n`,
+  );
+  assert.throws(() => withReach('{"reach":{}}', reach), /already carries/);
+  assert.throws(() => withReach("[]", reach), /not one JSON object/);
+});
+
+void test("the board, the index, the ADP, the pages, the record, the clubs and the schedule are the run's files byte for byte", () => {
   const copied = [
-    "manifest.json",
     `boards/${PPR_FORMAT}.json`,
     "index.json",
     "adp.json",

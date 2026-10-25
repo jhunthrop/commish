@@ -38,6 +38,8 @@ import {
 	playerSchema,
 	playerStatusSchema,
 	pullFigureSchema,
+	reachPartialSchema,
+	reachSchema,
 	recordLineSchema,
 	recordSchema,
 	recordWeekSchema,
@@ -88,6 +90,9 @@ const MIRRORS: Record<string, { zod: AnyObject; withheld?: string[] }> = {
 	RunWindow: { zod: windowSchema },
 	RunFormat: { zod: formatSchema },
 	RunManifest: { zod: manifestSchema, withheld: ['sources'] },
+	// The season reach the nightly writes into the manifest (Lane 205).
+	RunReach: { zod: reachSchema },
+	RunReachPartial: { zod: reachPartialSchema },
 	RunBoardRow: { zod: boardRowSchema },
 	RunMarketRow: { zod: marketRowSchema },
 	RunIndexSeason: { zod: indexSeasonSchema },
@@ -210,14 +215,9 @@ const isTrueLiteral = (values: readonly unknown[]): boolean =>
 
 const sorted = (values: readonly unknown[]): string[] => values.map(String).sort();
 
-/** What the API works out from the run rather than reads from one file, each held by its own test. */
-const DERIVED = new Set(['RunReach', 'RunReachPartial']);
-
 void test('every Run schema of the API is mirrored here or is an answer wrapper', () => {
 	const run = Object.keys(schemas).filter((name) => name.startsWith('Run'));
-	for (const name of run) {
-		assert.ok(name in MIRRORS || WRAPPERS.has(name) || DERIVED.has(name), name);
-	}
+	for (const name of run) assert.ok(name in MIRRORS || WRAPPERS.has(name), name);
 	for (const name of Object.keys(MIRRORS)) assert.ok(name in schemas, name);
 });
 
@@ -413,7 +413,7 @@ function fixtureRunFile<T>(runId: string, path: string, schema: z.ZodType<T>): T
 	return schema.parse(JSON.parse(readFileSync(new URL(`${runId}/${path}`, FIXTURE_RUNS), 'utf8')));
 }
 
-void test("the API's reach is the web's seasonReach over the fixture run (Lane 203)", () => {
+void test("the reach the fixture run's manifest carries is the one the web counts over it (Lane 205)", () => {
 	const { runId } = z
 		.object({ runId: z.string() })
 		.parse(JSON.parse(readFileSync(new URL('latest.json', FIXTURE_RUNS), 'utf8')));
@@ -424,20 +424,12 @@ void test("the API's reach is the web's seasonReach over the fixture run (Lane 2
 		fixtureRunFile(runId, RUN_PATHS.player(entry.id), playerSchema)
 	);
 	const { slates } = fixtureRunFile(runId, RUN_PATHS.schedule, scheduleSchema);
-	const web = runReach(players, slates, run.formats);
+	const counted = runReach(players, slates, run.formats);
 
+	// Counted once and written: the written reach is the counted one, and the example sends it.
+	assert.deepEqual(run.reach, counted);
 	const data = namedExample('/run/manifest', 'RunManifestAnswer');
 	assert.equal(data.run_id, runId, 'the example is the fixture run');
-	assert.deepEqual(data.reach, web);
-
-	// The contract names exactly what the web's reach holds, every member required, partial nullable.
-	const reachSchema = schemas.RunReach;
-	const partialSchema = schemas.RunReachPartial;
-	assert.ok(reachSchema && partialSchema);
-	assert.deepEqual(Object.keys(reachSchema.properties).sort(), Object.keys(web).sort());
-	assert.deepEqual([...(reachSchema.required ?? [])].sort(), Object.keys(web).sort());
-	assert.equal(reachSchema.properties.partial?.nullable, true);
-	assert.deepEqual([...(partialSchema.required ?? [])].sort(), ['days', 'week']);
-	assert.deepEqual(Object.keys(partialSchema.properties).sort(), ['days', 'week']);
-	assert.ok(!(schemas.RunManifestAnswer?.required ?? []).includes('reach'), 'reach is optional');
+	assert.deepEqual((data.manifest as { reach?: unknown }).reach, counted);
+	assert.ok(!(schemas.RunManifest?.required ?? []).includes('reach'), 'reach is optional');
 });
