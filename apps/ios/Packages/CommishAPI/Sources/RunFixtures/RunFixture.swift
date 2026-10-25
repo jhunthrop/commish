@@ -37,6 +37,13 @@ public struct RunFixture: Sendable {
         try envelope(["run_id": runID, "manifest": runFile("manifest.json")])
     }
 
+    /// The folder holds a board for the format.
+    public func hasBoard(format: String) throws -> Bool {
+        let url = try Self.fixtures.appendingPathComponent(folder)
+            .appendingPathComponent("runs/\(runID)/boards/\(format).json")
+        return FileManager.default.fileExists(atPath: url.path)
+    }
+
     public func boardAnswer(format: String) throws -> Data {
         let file = try runFile("boards/\(format).json")
         let rows = file["rows"] as? [[String: Any]] ?? []
@@ -134,7 +141,11 @@ public struct StubRun: RunAPI {
     }
 
     public func board(format: String, tag: String?) async throws -> RunRead<RunBoardAnswer> {
-        try read("boards/\(format).json", tag: tag) { try fixture.board(format: format) }
+        // The API answers 404 for a format the run does not carry (Lane 185).
+        guard try fixture.hasBoard(format: format) || offline else {
+            throw APIError.envelope(code: "not_found", message: "The run has no board for this format.")
+        }
+        return try read("boards/\(format).json", tag: tag) { try fixture.board(format: format) }
     }
 
     public func adpSources(tag: String?) async throws -> RunRead<[RunAdpSource]> {

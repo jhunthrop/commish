@@ -39,7 +39,7 @@ public struct AdpModel: Equatable, Sendable {
     public let verb: PageVerb
 
     public var heads: [String] {
-        [Words.Board.adp, Words.Box.player, Words.AdpPage.rank, Words.Box.proj, Words.Board.overReplShort]
+        [Words.Board.adp, Words.Box.player, Words.Figure.projected, Words.Board.overReplShort]
             + (gap ? [Words.Board.gap] : [])
     }
 
@@ -106,12 +106,29 @@ public extension RunScreenViewModel where Model == AdpModel {
         )
     }
 
-    /// A format chip: ADP in that format.
+    /// The format the member last chose: the one asked for while its read is in flight, else the
+    /// one shown.
+    var chosenFormat: String? {
+        if case let .adp(format)? = ask {
+            return format
+        }
+        guard case let .loaded(model, _) = state else {
+            return nil
+        }
+        return model.format
+    }
+
+    /// A format chip: ADP in that format, built on the newest choice so a tap during a read wins; a
+    /// format whose board the run lacks leaves the screen shown, saying so.
     func choose(format: String) async {
-        guard case let .loaded(model, _) = state, model.format != format else {
+        guard case let .loaded(model, _) = state, format != chosenFormat else {
             return
         }
-        await rebuild(AdpModel.build(format: format, clock: clock, zone: zone))
+        let label = model.formats.first { $0.value == format }?.label ?? format
+        await rebuild(
+            AdpModel.build(format: format, clock: clock, zone: zone), ask: .adp(format: format),
+            absent: RunWords.absent(label)
+        )
     }
 }
 

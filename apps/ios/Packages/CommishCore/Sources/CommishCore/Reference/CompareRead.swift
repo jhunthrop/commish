@@ -43,20 +43,37 @@ public extension RunScreenViewModel where Model == CompareModel {
 
     /// A player picked for a side (0 the first, 1 the second), or the side cleared with nil.
     func choose(slot: Int, slug: String?) async {
-        guard case let .loaded(model, _) = state, model.slots.indices.contains(slot) else {
+        guard let current = compareAsk, current.slugs.indices.contains(slot) else {
             return
         }
-        let ask = CompareAsk(slugs: model.slugs, format: model.format, leagueFormat: nil)
-        await rebuild(CompareReader.build(ask.with(slot: slot, slug: slug)))
+        let wanted = current.with(slot: slot, slug: slug)
+        await rebuild(CompareReader.build(wanted), ask: .compare(wanted))
     }
 
     /// A format chip: the same two in that format.
     func choose(format: String) async {
-        guard case let .loaded(model, _) = state, model.format != format else {
+        guard let current = compareAsk, current.format != format, case let .loaded(model, _) = state else {
             return
         }
-        let ask = CompareAsk(slugs: model.slugs, format: format, leagueFormat: nil)
-        await rebuild(CompareReader.build(ask))
+        let wanted = current.with(format: format)
+        let label = model.formats.first { $0.value == format }?.label ?? format
+        await rebuild(CompareReader.build(wanted), ask: .compare(wanted), absent: RunWords.absent(label))
+    }
+
+    /// The format the member last chose, pressed on the chips while its read is in flight.
+    var chosenFormat: String? {
+        compareAsk?.format
+    }
+
+    /// The member's newest ask: the one in flight, else the screen shown's.
+    private var compareAsk: CompareAsk? {
+        if case let .compare(asked)? = ask {
+            return asked
+        }
+        guard case let .loaded(model, _) = state else {
+            return nil
+        }
+        return CompareAsk(slugs: model.slugs, format: model.format, leagueFormat: nil)
     }
 }
 
@@ -88,13 +105,7 @@ enum CompareReader {
             }
             marks += sides.flatMap(\.marks)
             let pages = sides.compactMap(\.page)
-            let statuses = captureRead?.value?.players.additionalProperties ?? [:]
-            let players = sides.map { side -> CompareFound in
-                guard case let .player(player) = side.found else {
-                    return side.found
-                }
-                return .player(player.with(status: statuses[player.id], season: manifest.value.season))
-            }
+            let players = found(sides, capture: captureRead?.value, season: manifest.value.season)
             let underway = RunReach.underway(manifest.value, schedule: scheduleRead.value)
             let (complete, completeMarks) = try await completeWeek(
                 pages,
@@ -108,10 +119,33 @@ enum CompareReader {
             let input = CompareInput(
                 manifest: manifest.value, format: format, sources: sourcesRead.value, clubs: clubsRead.value,
                 underway: underway,
-                reach: RunReach.counted(pages, slates: scheduleRead.value.slates, complete: complete),
+                reach: heldSide(sides) ? .none
+                    : RunReach.counted(pages, slates: scheduleRead.value.slates, complete: complete),
                 scoring: scoring, index: indexRead.value, sides: players
             )
             return BuiltScreen(model: CompareModel(input), manifest: manifest.value, reads: marks)
+        }
+    }
+
+    /// Each side found, a player with his status on the capture and last season's line.
+    private static func found(_ sides: [ReadSide], capture: RunDesignations?, season: Int) -> [CompareFound] {
+        let statuses = capture?.players.additionalProperties ?? [:]
+        return sides.map { side -> CompareFound in
+            guard case let .player(player) = side.found else {
+                return side.found
+            }
+            return .player(player.with(status: statuses[player.id], season: season))
+        }
+    }
+
+    /// A side read from a held copy or the board has no log of his own to count, so the basis names no
+    /// week rather than one his cells may pass (review L1).
+    static func heldSide(_ sides: [ReadSide]) -> Bool {
+        sides.contains { side in
+            if case .player = side.found {
+                return side.page == nil
+            }
+            return false
         }
     }
 

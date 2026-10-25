@@ -4,6 +4,8 @@ import RunFixtures
 /// shared/fixtures/parity/reference.json as the reference screens' parity tests read it.
 extension ReferenceParityTests {
     struct Parity: Decodable {
+        /// site/absent.ts absentWords' title for Half PPR.
+        let absent: String
         let runs: [Run]
     }
 

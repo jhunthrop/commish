@@ -3,20 +3,20 @@ import CommishCore
 import CommishDesign
 import SwiftUI
 
-/// ADP's phone columns (board-columns.ts in the drafters' order): the ADP leading, the player taking the
-/// rest (no face: the phone's room goes to his name and where our board has him), then where our board has him, his
-/// points, his value and the Gap.
+/// ADP's phone columns (board-columns.ts in the drafters' order, the phone band): the ADP leading, his
+/// face, the player taking the rest, then his points, his value and the Gap. Where our board has him is
+/// his pill's number and, before the draft, the Gap.
 enum AdpColumn {
     static let adp: Double = 40
-    static let rank: Double = 32
-    static let projected: Double = 52
-    static let overReplacement: Double = 54
+    static let face: Double = 32
+    static let projected: Double = 62
+    static let overReplacement: Double = 58
     static let gap: Double = 44
     static let spacing: Double = 4
 
     /// The figures after the player, in the heads' order.
     static func trailing(gap: Bool) -> [Double] {
-        [rank, projected, overReplacement] + (gap ? [Self.gap] : [])
+        [projected, overReplacement] + (gap ? [Self.gap] : [])
     }
 }
 
@@ -30,6 +30,7 @@ struct AdpHeadRow: View {
         HStack(spacing: AdpColumn.spacing) {
             ColumnHead(words: heads[0]).frame(width: AdpColumn.adp)
             ColumnHead(words: heads[1], alignment: .leading)
+                .padding(.leading, AdpColumn.face + AdpColumn.spacing)
             ForEach(Array(zip(heads.dropFirst(2), AdpColumn.trailing(gap: model.gap))), id: \.0) { words, width in
                 ColumnHead(words: words).frame(width: width)
             }
@@ -43,7 +44,7 @@ struct AdpHeadRow: View {
 }
 
 /// One row (AdpView.svelte's Row at 390): his ADP leading in the number face, his face, name, pill,
-/// club chip and bye, his status, then Rk, Projected, Over repl on its round's tint and the Gap in its
+/// club chip and bye, his status, then Projected, Over repl on its round's tint and the Gap in its
 /// tone. The row opens his sheet; a kicker's or a defense's, which has no page, opens his club.
 struct AdpRowView: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -55,8 +56,8 @@ struct AdpRowView: View {
         let theme = Theme(colorScheme)
         HStack(alignment: .center, spacing: AdpColumn.spacing) {
             RowFigure(text: row.adp, ink: Tokens.Color.ink).frame(width: AdpColumn.adp, alignment: .trailing)
+            Headshot(row.row.headshot, initials: row.row.initials, side: AdpColumn.face)
             who(theme).frame(maxWidth: .infinity, alignment: .leading)
-            RowFigure(text: row.rank, size: Tokens.TypeScale.md).frame(width: AdpColumn.rank, alignment: .trailing)
             RowFigure(text: row.row.projected, ink: Tokens.Color.ink)
                 .frame(width: AdpColumn.projected, alignment: .trailing)
             RowFigure(text: row.row.overReplacement)
@@ -176,12 +177,14 @@ public struct AdpScreen: View {
     let format: (String) -> Void
     var rows: [AdpRow]?
     var live = true
+    /// The chips as the member last pressed them, while that format's read is in flight.
+    var formats: [BoardChip<String>]?
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s4) {
             ReferenceHead(heading: model.heading, stamp: model.stamp, stale: stamp)
             if model.formats.count > 1 {
-                ChipRow(chips: model.formats, choose: format, live: live)
+                ChipRow(chips: formats ?? model.formats, choose: format, live: live)
             }
             table
             BoardBasisView(lines: model.basis)
@@ -218,9 +221,11 @@ public struct AdpView: View {
 
     public var body: some View {
         RunScreenContainer(viewModel: viewModel) { model, stamp in
-            AdpScreen(model: model, stamp: stamp, actions: .live(sheet: sheet, openURL: openURL)) { format in
-                Task { await viewModel.choose(format: format) }
-            }
+            AdpScreen(
+                model: model, stamp: stamp, actions: .live(sheet: sheet, openURL: openURL),
+                format: { format in Task { await viewModel.choose(format: format) } },
+                formats: model.formats.pressing(viewModel.chosenFormat)
+            )
         } pin: { model in
             PagePin(verb: model.verb)
         }

@@ -181,7 +181,10 @@ struct ReferenceParityTests {
                     continue
                 }
                 let gapless = basis.filter { $0 != Words.BoardBasis.gap }
-                #expect(table.basis == basis || table.basis == gapless, "\(run.fixture) \(format)")
+                // Exactly the one basis the table prints: the Gap's sentence only beside a Gap row.
+                let gapRow = table.rows.contains { $0.label == CompareRows.gapLabel }
+                #expect(table.basis == (gapRow ? basis : gapless), "\(run.fixture) \(format)")
+                #expect(gapRow == basis.contains(Words.BoardBasis.gap), "a format that compares draws the Gap")
             }
         }
     }

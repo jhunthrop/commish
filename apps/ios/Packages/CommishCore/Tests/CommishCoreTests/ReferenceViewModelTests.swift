@@ -92,22 +92,6 @@ struct ReferenceViewModelTests {
         #expect(viewModel.state == .failed(AppWords.Failure.offline))
     }
 
-    @Test func adpsFormatChipReadsThatFormatsBoard() async throws {
-        let viewModel = RunScreenViewModel.adp(
-            format: nil, run: StubRun(.contract), pages: StubPages(.contract), cache: cache(),
-            clock: FixedClock(Self.now), zone: Fixtures.zone
-        )
-        await viewModel.load()
-        #expect(try #require(loaded(viewModel)).0.formats.map(\.label) == ["PPR", "Half PPR", "Standard"])
-        // The contract run lists three formats and carries PPR's board alone: Half PPR is not read, and
-        // PPR's rows never show under its chip.
-        await viewModel.choose(format: "half-ppr-12")
-        guard case .failed = viewModel.state else {
-            Issue.record("expected the half PPR board to fail, got \(viewModel.state)")
-            return
-        }
-    }
-
     @Test func compareOpensInTheFollowedLeaguesFormatWhereTheRunCarriesIt() async throws {
         let viewModel = RunScreenViewModel.compare(
             slugs: ["jahmyr-gibbs", "josh-allen"], league: Self.league(format: .halfPpr), run: StubRun(.contract),

@@ -112,6 +112,9 @@ public struct CompareRow: Equatable, Sendable, Identifiable {
 /// Compare's table row by row (web/src/lib/site/compare-rows.ts), ported and held to
 /// shared/fixtures/parity/reference.json.
 enum CompareRows {
+    /// The Gap row's label, which the basis reads to say the Gap's sentence only beside it.
+    static let gapLabel = "Gap"
+
     /// Which figure is better: the higher or the lower.
     enum Better {
         case higher
@@ -200,7 +203,7 @@ enum CompareRows {
     private static func gapRow(_ gaps: (Double?, Double?)) -> [CompareRow] {
         let cell = { (value: Double?) in CompareCell(text: BoardFigures.gap(value), wins: nil, tone: GapTone(value)) }
         return gaps.0 != nil || gaps.1 != nil
-            ? [CompareRow(label: "Gap", cells: [cell(gaps.0), cell(gaps.1)], range: false)] : []
+            ? [CompareRow(label: gapLabel, cells: [cell(gaps.0), cell(gaps.1)], range: false)] : []
     }
 
     /// The Floor to ceiling row, only when one of the pair carries a range: bars, or the empty mark.

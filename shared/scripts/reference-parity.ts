@@ -53,6 +53,7 @@ import { winsBasis } from '../../web/src/lib/run/strength-words.ts';
 import { compareRows, type Side } from '../../web/src/lib/site/compare-rows.ts';
 import { firstStep } from '../../web/src/lib/site/compare-words.ts';
 import type { PlayerData } from '../../web/src/lib/site/player-data.ts';
+import { absentWords } from '../../web/src/lib/site/absent.ts';
 import { CLUB_PAGE, SCHEDULE_PAGE, filled } from '../../web/src/lib/site/reference-words.ts';
 import { verdict } from '../../web/src/lib/site/verdict.ts';
 import { heatFor } from '../../web/src/lib/ui/heat.ts';
@@ -424,5 +425,6 @@ async function runCase(run: ReferenceRun) {
 export async function renderReference(about: string): Promise<string> {
 	const runs = [];
 	for (const run of REFERENCE_RUNS) runs.push(await runCase(run));
-	return `${JSON.stringify({ about, runs }, null, '\t')}\n`;
+	const absent = absentWords('Half PPR', '', ['PPR']).title;
+	return `${JSON.stringify({ about, absent, runs }, null, '\t')}\n`;
 }

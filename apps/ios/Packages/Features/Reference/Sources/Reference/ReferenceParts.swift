@@ -120,7 +120,7 @@ struct RunScreenContainer<Model: Equatable & Sendable, Content: View, Pin: View>
             case .loading:
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             case let .loaded(model, _):
-                ScrollView { content(model, viewModel.stampWords) }
+                ScrollView { content(model, viewModel.staleWords) }
                     .refreshable { await viewModel.load() }
                     .safeAreaInset(edge: .bottom, spacing: 0) { pin(model) }
             case let .failed(sentence):

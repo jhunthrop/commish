@@ -262,12 +262,14 @@ public struct CompareScreen: View {
     let stamp: String?
     let actions: CompareActions
     var live = true
+    /// The chips as the member last pressed them, while that format's read is in flight.
+    var formats: [BoardChip<String>]?
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s4) {
             ReferenceHead(heading: model.title, stamp: nil, lead: model.lead, stale: stamp)
             if model.formats.count > 1 {
-                ChipRow(chips: model.formats, choose: actions.format, live: live)
+                ChipRow(chips: formats ?? model.formats, choose: actions.format, live: live)
             }
             VStack(spacing: Tokens.Space.s3) {
                 ForEach(Array(model.slots.enumerated()), id: \.offset) { index, slot in
@@ -318,7 +320,7 @@ public struct CompareView: View {
                 pick: { slot, slug in Task { await viewModel.choose(slot: slot, slug: slug) } },
                 format: { format in Task { await viewModel.choose(format: format) } },
                 open: { sheet.open($0) }
-            ))
+            ), formats: model.formats.pressing(viewModel.chosenFormat))
         } pin: { _ in
             EmptyView()
         }
