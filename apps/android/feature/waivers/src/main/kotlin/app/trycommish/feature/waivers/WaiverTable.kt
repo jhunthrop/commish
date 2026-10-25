@@ -105,6 +105,12 @@ enum class TableGroup {
 
     /** Only the open row with its drop panel, the heads over it. */
     Opened,
+    ;
+
+    companion object {
+        /** The whole table: the rows that gain, the rest, the Stash group, under one set of heads. */
+        val Page: Set<TableGroup> = setOf(Gaining, Rest, Stash)
+    }
 }
 
 /** The players free to add (WaiverTable.svelte at 390): the heads with the line under them said once,

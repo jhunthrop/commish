@@ -108,6 +108,9 @@ fun WaiverPage(
         modifier.background(CommishTheme.colors.bg).padding(horizontal = Tokens.Space.s3.dp, vertical = Tokens.Space.s4.dp),
         verticalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp),
     ) {
+        // The whole page is one table, its heads drawn once (review M1); a part alone (a snapshot) draws
+        // its own rows under its own heads.
+        val whole = WaiverPart.Top in parts && WaiverPart.Foot in parts
         parts.forEach { part ->
             when (part) {
                 WaiverPart.Top -> {
@@ -126,10 +129,10 @@ fun WaiverPage(
                         ),
                     )
                     model.arrives?.let { BasisText(it) }
-                    WaiverTableView(model, setOf(TableGroup.Gaining), table)
+                    WaiverTableView(model, if (whole) TableGroup.Page else setOf(TableGroup.Gaining), table)
                 }
                 WaiverPart.Foot -> {
-                    WaiverTableView(model, setOf(TableGroup.Rest, TableGroup.Stash), table)
+                    if (!whole) WaiverTableView(model, setOf(TableGroup.Rest, TableGroup.Stash), table)
                     BasisText(model.basis)
                 }
             }
