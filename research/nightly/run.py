@@ -148,6 +148,13 @@ def _judge(deps: RunDeps, assembled: Assembled, steps: list[StepOutcome], draft:
     return Judged(records, scores)
 
 
+def with_reach(manifest: Json, reach: Json | None) -> Json:
+    """The final manifest with the run's season reach the schema gate's reader counted (Lane 205), which
+    the web build and the API read rather than count again; as it was when the gate refused the run and
+    counted none. The staged manifest the gate reads never carries it."""
+    return manifest if reach is None else {**manifest, "reach": reach}
+
+
 def _stage(run_id: str, files: Mapping[str, Any], staging: LocalRunStore) -> ArtifactWriter:
     writer = ArtifactWriter(staging, run_id, [])
     for path, value in files.items():
@@ -220,7 +227,10 @@ def _finish(  # noqa: PLR0913, PLR0917 - the run's parts, handed on from `run_ni
     passed = all(g.passed for g in judged.gates) and all(
         s.record.status != "failed" for s in steps if s.record.name not in ADVISORY
     )
-    manifest = manifest_of(run_id, finished, assembled, "passed" if passed else "failed", deps.store, frozen_by)
+    manifest = with_reach(
+        manifest_of(run_id, finished, assembled, "passed" if passed else "failed", deps.store, frozen_by),
+        schema.reach,
+    )
     report: Json = {
         "runId": run_id,
         "status": manifest["status"],

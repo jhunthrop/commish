@@ -80,6 +80,29 @@ export const formatSchema = z.object({
 	marketOrder: z.string().min(1).optional()
 });
 
+/** A reach's partial week: its number and the days of its counted games in kickoff order on the
+ * Eastern clock, none when a counted club's game is not on the schedule ("part of week 6"). */
+export const reachPartialSchema = z.object({
+	week: z.number().int().min(1),
+	days: z.array(phrase)
+});
+
+/** The run's season reach (Lane 205): what every basis's "through week" says, counted over the run's
+ * own pages by the web's reader (run/reach.ts runReach) at the nightly's schema gate and written into
+ * the manifest once, so the build and the API read it rather than count it again. */
+export const reachSchema = z.object({
+	/** The format every season block is scored in: "ppr-12". */
+	format: formatId,
+	/** That format as a chip prints it: "PPR". */
+	scoring: phrase,
+	/** "through week 5", "through week 5 and week 6's Thursday game"; empty before week 1's games. */
+	through: z.string(),
+	/** The last week whose games are all in, 0 before week 1's. */
+	complete: z.number().int().min(0),
+	/** The week after it with some counted games in, null with none. */
+	partial: reachPartialSchema.nullable()
+});
+
 export const manifestSchema = z.object({
 	runId: runIdSchema,
 	/** When the run finished, the date every nightly page prints in its top bar. */
@@ -94,7 +117,10 @@ export const manifestSchema = z.object({
 	/** Every player with a page, matching index.json. */
 	players: z.number().int().min(1),
 	/** Each feed's vendor and window. Provenance, never printed on a screen. */
-	sources: z.array(sourceSchema).min(1)
+	sources: z.array(sourceSchema).min(1),
+	/** The season reach the nightly wrote (Lane 205); absent on the manifest its schema gate reads and
+	 * on every run from before, where the reader counts it (server/run.ts runSeasonReach). */
+	reach: reachSchema.optional()
 });
 
 export const boardRowSchema = z.object({
@@ -681,6 +707,7 @@ export const heldSchema = z.object({ pages: z.array(heldPageSchema).min(1) });
 
 export type HeldPage = z.infer<typeof heldPageSchema>;
 export type Manifest = z.infer<typeof manifestSchema>;
+export type RunReach = z.infer<typeof reachSchema>;
 export type Source = z.infer<typeof sourceSchema>;
 export type Window = z.infer<typeof windowSchema>;
 export type BoardRow = z.infer<typeof boardRowSchema>;

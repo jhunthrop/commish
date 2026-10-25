@@ -1,9 +1,9 @@
 /** The web's fixture run as the bucket holds it, under shared/fixtures/run, for the API's run routes
  * test (api/internal/runs) and the apps: the nightly's contract fixture run the web's shots build
- * from (CONTRACT_RUN_ID, web/scripts/inseason-fixture/run-ids.ts), its manifest, its PPR board, its
- * index, its ADP, every player's page, its record, its clubs and its schedule exactly as written
- * (Lane 188 added the pages, the record, the clubs and the schedule), the latest pointer naming it,
- * and its designations: the
+ * from (CONTRACT_RUN_ID, web/scripts/inseason-fixture/run-ids.ts): its PPR board, its index, its
+ * ADP, every player's page, its record, its clubs and its schedule exactly as written
+ * (Lane 188 added the pages, the record, the clubs and the schedule), the manifest with the season
+ * reach the nightly writes into it (Lane 205), the latest pointer naming it, and its designations: the
  * stand-in's injury capture (web/scripts/standin-designations.json) held to the players the run
  * indexes, the way the stand-in writes a run's designations. README.md, written beside them, lists
  * each file with the route that answers it.
@@ -11,6 +11,14 @@
  *   node shared/scripts/export-run.ts */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { runReach } from "../../web/src/lib/run/reach.ts";
+import {
+  RUN_PATHS,
+  manifestSchema,
+  playerSchema,
+  scheduleSchema,
+  type RunReach,
+} from "../../web/src/lib/run/schema.ts";
 import {
   REPOSITORY,
   generatedBy,
@@ -28,10 +36,10 @@ const DESIGNATIONS = "web/scripts/standin-designations.json";
 export const PPR_FORMAT = "ppr-12";
 /** The kickers' and defenses' orderBasis in the index: no page of their own. */
 const MARKET_BASIS = "market";
-/** The run's files copied byte for byte, every player's page among them. */
+/** The run's files copied byte for byte, every player's page among them; the manifest is copied with
+ * the season reach the nightly writes into it (withReach). */
 function copiedFiles(players: readonly string[]): string[] {
   return [
-    "manifest.json",
     `boards/${PPR_FORMAT}.json`,
     "index.json",
     "adp.json",
@@ -72,7 +80,8 @@ export function runFiles(runId: string, players: readonly string[]): RunFile[] {
     {
       path: at("manifest.json"),
       route: "GET /run/manifest",
-      about: "the run: its formats, its players and its sources",
+      about:
+        "the run: its formats, its players, its sources and its season reach",
     },
     {
       path: at(`boards/${PPR_FORMAT}.json`),
@@ -135,6 +144,39 @@ export function heldToIndex(
   };
 }
 
+/** The manifest's text with the season reach after its last member, as the nightly writes it (Lane 205:
+ * research/nightly/run.py with_reach), every byte before it the run's own. */
+export function withReach(manifest: string, reach: RunReach): string {
+  const body = manifest.trimEnd();
+  if (!body.endsWith("}"))
+    throw new Error("The manifest is not one JSON object.");
+  const parsed = JSON.parse(body) as Record<string, unknown>;
+  if ("reach" in parsed)
+    throw new Error("The manifest already carries a reach.");
+  return `${body.slice(0, -1)},"reach":${JSON.stringify(reach)}}${manifest.slice(body.length)}`;
+}
+
+/** The run's season reach as the nightly's schema gate counts it: the web's runReach over the run's
+ * own pages (the contract run holds none back), its schedule and its formats, each read through the
+ * web's schema. */
+async function seasonReachOf(
+  read: (path: string) => Promise<string>,
+  players: readonly string[],
+): Promise<RunReach> {
+  const parsed = async <T>(
+    path: string,
+    schema: { parse: (value: unknown) => T },
+  ): Promise<T> => schema.parse(JSON.parse(await read(path)));
+  const [manifest, schedule, pages] = await Promise.all([
+    parsed(RUN_PATHS.manifest, manifestSchema),
+    parsed(RUN_PATHS.schedule, scheduleSchema),
+    Promise.all(
+      players.map((id) => parsed(RUN_PATHS.player(id), playerSchema)),
+    ),
+  ]);
+  return runReach(pages, schedule.slates, manifest.formats);
+}
+
 async function contractRunId(): Promise<string> {
   const ids = (await import(join(REPOSITORY, RUN_IDS))) as {
     CONTRACT_RUN_ID?: unknown;
@@ -160,9 +202,10 @@ ${generatedBy(SCRIPT, `${CONTRACT_RUNS}/${runId} and ${DESIGNATIONS}`)}
 The nightly's contract fixture run \`${runId}\` as the bucket holds it (\`runs/latest.json\` and
 \`runs/<runId>/\`), the run the web's shots build from. The API's run routes test reads this folder
 as its bucket and holds every answer equal to its file; the apps may read the same files. The
-manifest, the board, the index, the ADP, the pages, the record, the clubs and the schedule are the
-run's files byte for byte; the designations are the stand-in's capture held to the players the run
-indexes. The run held no page, so it carries no \`held.json\`. The run is older than the boards' Gap
+board, the index, the ADP, the pages, the record, the clubs and the schedule are the run's files
+byte for byte; the manifest is the run's with the season reach the nightly writes into it (\`reach\`,
+counted by the web's own runReach over this run); the designations are the stand-in's capture held
+to the players the run indexes. The run held no page, so it carries no \`held.json\`. The run is older than the boards' Gap
 and Drop columns and the kickers' and defenses' rows, so its board carries none of them: the API's
 examples for the run routes (api/openapi.yaml) carry each, and the web's test parses them.
 
@@ -190,8 +233,14 @@ export async function generate(): Promise<Outputs> {
       await text(source(path)),
     ]),
   );
+  const fromRun = (path: string): Promise<string> => text(source(path));
+  const manifest = withReach(
+    await fromRun(RUN_PATHS.manifest),
+    await seasonReachOf(fromRun, players),
+  );
   return new Map([
     [`${RUN_FIXTURE}/runs/latest.json`, `${JSON.stringify({ runId })}\n`],
+    [`${RUN_FIXTURE}/runs/${runId}/${RUN_PATHS.manifest}`, manifest],
     ...copied,
     [
       `${RUN_FIXTURE}/runs/${runId}/designations.json`,

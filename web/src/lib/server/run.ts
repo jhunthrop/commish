@@ -27,6 +27,7 @@ import {
 	type Manifest,
 	type Player,
 	type PlayerFormat,
+	type RunReach,
 	type RunRecord,
 	type Schedule
 } from '#lib/run/schema.ts';
@@ -285,13 +286,23 @@ export interface SeasonReach {
 	complete: number;
 }
 
+/** The run's season reach (run/reach.ts runReach): the one its manifest carries, which the nightly's
+ * schema gate counted with this very function and wrote (Lane 205), or, on a manifest without it (the
+ * one that gate reads, and every run from before), counted here. */
+export function runSeasonReach(): Promise<RunReach> {
+	return once('season:run-reach', async () => {
+		const run = await manifest();
+		if (run.reach) return run.reach;
+		// Tonight's own pages: a held page's copy is an earlier run's season (Lane 136). Counted games
+		// only (review finding 1): his club's game, by his log, never a status final alone.
+		const [players, slate] = await Promise.all([ownPages(), schedule()]);
+		return runReach(players, slate.slates, run.formats);
+	});
+}
+
 export function seasonReach(): Promise<SeasonReach> {
 	return once('season:reach', async () => {
-		// Tonight's own pages: a held page's copy is an earlier run's season (Lane 136). Counted games
-		// only (review finding 1): his club's game, by his log, never a status final alone. The API's
-		// /run/manifest sends the same reach (run/reach.ts runReach, Lane 203).
-		const [players, slate, run] = await Promise.all([ownPages(), schedule(), manifest()]);
-		const { format, scoring, through, complete } = runReach(players, slate.slates, run.formats);
+		const { format, scoring, through, complete } = await runSeasonReach();
 		return { format, scoring, through, complete };
 	});
 }

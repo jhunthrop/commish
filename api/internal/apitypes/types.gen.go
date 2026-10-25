@@ -4704,6 +4704,9 @@ type RunManifest struct {
 	// Players every player with a page
 	Players int `json:"players"`
 
+	// Reach the run's season reach, written by the run (Lane 205); absent on a run from before it
+	Reach *RunReach `json:"reach,omitempty"`
+
 	// RunAt when the run finished
 	RunAt time.Time `json:"runAt"`
 
@@ -4719,9 +4722,6 @@ type RunManifest struct {
 type RunManifestAnswer struct {
 	// Manifest the run's manifest.json, the members the site's reader names less the sources block (provenance)
 	Manifest RunManifest `json:"manifest"`
-
-	// Reach the run's season reach (Lane 203), absent on an API from before it, while the run's first pass runs, and while a failed pass waits to run again
-	Reach *RunReach `json:"reach,omitempty"`
 
 	// RunId the published run every /run answer is read from
 	RunId string `json:"run_id"`
@@ -4938,7 +4938,7 @@ type RunPullFigure struct {
 	Figure string `json:"figure"`
 }
 
-// RunReach how far the run's season figures reach, as the site's bases say it (web/src/lib/run/reach.ts runReach): counted over every own page of the run (never a held page's copy), his club's game by his log, never a game final by its status alone
+// RunReach how far the run's season figures reach, as the site's bases say it (web/src/lib/run/reach.ts runReach), written by the run: the nightly's schema gate counts it through the site's own reader over every own page of the run (never a held page's copy), his club's game by his log, never a game final by its status alone
 type RunReach struct {
 	// Complete the last week whose games are all in
 	Complete int `json:"complete"`

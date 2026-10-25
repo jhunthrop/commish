@@ -70,10 +70,13 @@ class HeldPage:
 
 @dataclass(frozen=True, slots=True)
 class HeldGate:
-    """The schema gate's verdict, and the pages it held for a run that passed (none for one that failed)."""
+    """The schema gate's verdict, the pages it held for a run that passed (none for one that failed), and
+    the run's season reach as the reader counted it on its last read (Lane 205; none for a run it
+    refused)."""
 
     record: GateRecord
     held: tuple[HeldPage, ...]
+    reach: Json | None = None
 
     def files(self) -> dict[str, Json]:
         return held_files(self.held)
@@ -153,7 +156,7 @@ def hold_refused_pages(  # noqa: PLR0913, PLR0917 - the staged run, the store it
     first = read(root, run_id, web_dir)
     refused = first.refused("players")
     if first.run_reasons or not refused:
-        return HeldGate(gate_record("schema", first.reasons, first.summary), ())
+        return HeldGate(gate_record("schema", first.reasons, first.summary), (), None if first.reasons else first.reach)
     limit = held_limit(pages)
     if len(refused) > limit:
         over = f"{len(refused)} pages refused, more than the {limit} a run of {pages} pages may hold"
@@ -177,7 +180,7 @@ def _read_held(root: Path, run_id: str, web_dir: Path, held: tuple[HeldPage, ...
         return HeldGate(gate_record("schema", again.reasons, again.summary), ())
     pages = "page" if len(held) == 1 else "pages"
     words = f"{len(held)} {pages} held: {' | '.join(h.words() for h in held)}"
-    return HeldGate(gate_record("schema", (), f"{again.summary}; {words}"), held)
+    return HeldGate(gate_record("schema", (), f"{again.summary}; {words}"), held, again.reach)
 
 
 def _stage_and_read(root: Path, run_id: str, web_dir: Path, held: tuple[HeldPage, ...], read: Reader) -> ReaderRead:
