@@ -511,6 +511,135 @@ public enum Words {
         public static let read = "Our written read of him is not ready. Here is what it will be built from."
     }
 
+    public enum Order {
+        public static let rank = "#"
+        public static let rankGroup = "Our rest-of-season order"
+        public static let roster = "Roster"
+        public static let restGroup = "Rest of season"
+        public static let total = "Projected"
+        public static let overRepl = "Over repl."
+        public static let perGame = "A game"
+        public static let yours = "Yours"
+        public static let free = "Free"
+        public static let tradeFor = "Trade for him"
+        public static let noReturn = "no return date"
+        public static let backLate = "back after the regular season"
+        public static let every = "All"
+        public static let everyone = "Everyone"
+        public static let search = "Find a player or a club"
+        public static let moreRows = "Show more"
+        public static let none = "No player in our order matches."
+        public static let unread = "We could not read our order just now. Try again in a minute."
+        public static let reading = "Reading our order"
+        public static let needsScript = "Our rest-of-season order needs JavaScript."
+    }
+
+    public enum OrderWeek {
+        public static let reading = "Reading this week's rows"
+        public static let needsScript = "This week's rows need JavaScript."
+        public static let byeIn = "Bye in week"
+    }
+
+    public enum PagePurpose {
+        public static let players = "Every QB, RB, WR and TE in our order, and this week's kickers and defenses, to look up and to compare."
+        public static let rest = "Our order in your league's view: who holds each player, the free agents, and this week's kickers and defenses."
+    }
+
+    public enum WeekTab {
+        public static let unread = "We could not read this week just now. Try again in a minute."
+        public static let kickedOff = "Kicked off"
+        public static let played = "Played"
+        public static let byeIn = "Bye in week"
+        public static let add = "Add"
+    }
+
+    public enum DefenseScoring {
+        public static let league = "in your scoring"
+        public static let standard = "on standard defense scoring"
+    }
+
+    public enum WeekMany {
+        public static let K = "kickers"
+        public static let DEF = "defenses"
+        public static let thisWeek = "this week"
+    }
+
+    public enum PageName {
+        public static let players = "Players"
+        public static let rankings = "Rankings"
+    }
+
+    public enum Pool {
+        public static let ranked = "ranked"
+        public static let rosters = "on NFL rosters today"
+        public static let board = "on our board"
+        public static let boardWithMarket = "on our board with kickers and defenses"
+        public static let room = "left to draft"
+    }
+
+    public enum Record {
+        public static let placesOff = "Places off is how many places a player finished from his rank, lower is better."
+        public static let notPlayed = "not played yet"
+        public static let underway = "under way"
+        public static let noneSet = "weeks graded. Our first order is set before the first kickoff"
+    }
+
+    public enum RecordBox {
+        public static let week = "Week"
+        public static let players = "Players graded"
+        public static let status = "Status"
+        public static let ours = "Ours"
+        public static let adp = "ADP"
+        public static let espn = "ESPN"
+        public static let published = "Published"
+        public static let toDate = "To date"
+        public static let none = "--"
+        public static let chart = "Order matched by week"
+        public static let league = "Your lineup, our picks"
+    }
+
+    public enum RecordOrder {
+        public static let preseason = "Our preseason order"
+        public static let rest_of_season = "Our rest-of-season order"
+    }
+
+    public enum Records {
+        public static let lead = "Two records, each graded against what it competes with: our weekly rankings against ESPN and the week's published projection, and our draft board against ADP."
+        public static let weekly = "Weekly record"
+        public static let weeklyWhat = "Our weekly rankings against ESPN and the week's published projection"
+        public static let draft = "Draft record"
+        public static let draftWhat = "Our draft board against ADP, on the season's points so far"
+        public static let notPlayed = "not played yet"
+        public static let underway = "under way"
+        public static let gradesLater = "grades when the stats land"
+        public static let setUnknown = "set before its first kickoff"
+        public static let espnBasis = "ESPN's is its own public PPR projection, read before the week's first kickoff."
+        public static let espnReadAfter = "ESPN's projection this week was read after our weekly rankings were set, still before the first kickoff."
+        public static let espnUnread = "ESPN's projection was not read before this week's first kickoff, so the week is graded against the week's published projection alone."
+        public static let noYardstick = "No yardstick was read before this week's first kickoff, so the week is graded on its own order alone."
+        public static let waiting = "This record is written by the next nightly run."
+        public static let position = "Position"
+        public static let players = "Players graded"
+        public static let all = "All"
+        public static let named = "Top named"
+        public static let draftPositions = "Each position is graded on its own, All by players graded."
+        public static let draftLeftOut = "Kickers and defenses are left out, and a player past his bye has one game fewer counted."
+        public static let draftScale = "Order matched is how closely an order ranked the players to the season's finish so far: 1.00 is the same order, 0.00 no closer than chance, below 0.00 the order runs backwards."
+        public static let lowerBetter = "lower is better"
+        public static let draftChart = "Order matched, season to date, through each week"
+        public static let rostered = "Rostered"
+        public static let lineupOurs = "Our picks"
+        public static let lineupEspn = "ESPN's picks"
+        public static let leagueRow = "Your league's row grades its rostered players and both lineups."
+        public static let setEach = "set each week before kickoff"
+    }
+
+    public enum Pair {
+        public static let ours = "Ours"
+        public static let level = "level"
+        public static let oursBy = "ours"
+    }
+
     public enum Account {
         public static let plan = "Plan"
         public static let signOut = "Sign out"

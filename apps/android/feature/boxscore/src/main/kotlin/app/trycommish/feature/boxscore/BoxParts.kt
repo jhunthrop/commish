@@ -47,17 +47,30 @@ object BoxColumn {
     val pts = 42.dp
     val why = 30.dp
     val face = 28.dp
+
+    /** The Trades' last cell, his rest-of-season points a game under "A game". */
+    val season = 50.dp
 }
 
 /** What a box draws beyond the shared columns: the Lineup's evidence line under each player and its why
- * cell; the Matchup draws neither, as the web's matchup box does not. */
+ * cell; the Matchup draws neither, as the web's matchup box does not; the Trades' opened rows (BoxLine
+ * with season and shortOnPhone, no facts on the phone's game line) draw the evidence line, his short
+ * name, no rank, and his points a game where the others draw Pts. */
 data class BoxStyle(
     val evidence: Boolean,
     val why: Boolean,
+    val rank: Boolean = true,
+    /** The expected score and weather under his game while it is to come. */
+    val facts: Boolean = true,
+    /** The last cell is his rest-of-season points a game, in place of Pts. */
+    val season: Boolean = false,
+    /** His short form, "A. Rodgers", whatever the room. */
+    val shortName: Boolean = false,
 ) {
     companion object {
         val Lineup = BoxStyle(evidence = true, why = true)
         val Matchup = BoxStyle(evidence = false, why = false)
+        val Trade = BoxStyle(evidence = true, why = false, rank = false, facts = false, season = true, shortName = true)
     }
 }
 
@@ -89,7 +102,8 @@ fun TableFrame(content: @Composable ColumnScope.() -> Unit) {
 @Composable
 fun Hairline() = HorizontalDivider(color = CommishTheme.colors.line)
 
-/** The column heads: Slot, Player, Our rank on two lines over the rank alone, Proj, Pts. */
+/** The column heads: Slot, Player, Our rank on two lines over the rank alone, Proj, Pts; on the Trades',
+ * the side (no head, TradeFinder's hidden "Give"), Player, Proj and A game. */
 @Composable
 fun HeadRow(style: BoxStyle = BoxStyle.Lineup) {
     val c = CommishTheme.colors
@@ -102,11 +116,15 @@ fun HeadRow(style: BoxStyle = BoxStyle.Lineup) {
             .clearAndSetSemantics {},
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Head(Words.Box.slot, Modifier.width(BoxColumn.slot))
+        Head(if (style.season) "" else Words.Box.slot, Modifier.width(BoxColumn.slot))
         Head(Words.Box.player, Modifier.weight(1f))
-        Head(Words.Box.ourRank, Modifier.width(BoxColumn.rank))
+        if (style.rank) Head(Words.Box.ourRank, Modifier.width(BoxColumn.rank))
         Head(Words.Box.proj, Modifier.width(BoxColumn.proj), TextAlign.End)
-        Head(Words.Box.pts, Modifier.width(BoxColumn.pts), TextAlign.End)
+        if (style.season) {
+            Head(Words.Trades.perGame, Modifier.width(BoxColumn.season), TextAlign.End)
+        } else {
+            Head(Words.Box.pts, Modifier.width(BoxColumn.pts), TextAlign.End)
+        }
         if (style.why) Spacer(Modifier.width(BoxColumn.why))
     }
     Hairline()
