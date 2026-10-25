@@ -28,6 +28,7 @@
 	import { matchupGap, scoreGap, scoreUnread, teamName } from './model.ts';
 	import { page } from '$app/state';
 	import { askedHref } from './box/asked.ts';
+	import { isOtherGame } from './box/game.ts';
 	import type { BoxRow } from './box/box.ts';
 	import { tabHref } from './inseason/tabs.ts';
 	import { lineupOffer, rowBySlug, type ScreenOffer } from '#lib/player/shelf-state.ts';
@@ -58,9 +59,10 @@
 
 	let { sync, box, now, live, game = null, yourGame = '' }: Props = $props();
 
-	/** The box is another team's game, not the member's. */
-	const other = $derived(game !== null);
-	const matchup = $derived(game ?? sync.matchup);
+	/** The box is another team's game, by the API's own word (viewer_side, review 204 M1): never the
+	 * member's sync matchup under another game's box. */
+	const other = $derived(isOtherGame(box));
+	const matchup = $derived(other ? game : sync.matchup);
 
 	/** Both sides' starters' lines, the game's by the one rule: a side listing none (an FFPC opponent)
 	 * reads by the schedule (unlisted), never by his bench's games (Lane 137, B107). */

@@ -10,7 +10,7 @@
 		type LeagueSync
 	} from './api.ts';
 	import { otherGame } from './box/game.ts';
-	import { inSeasonApi, type MatchupBox } from './inseason/api.ts';
+	import { inSeasonApi, type MatchupBox, type Scoreboard } from './inseason/api.ts';
 	import InSeasonPage from './inseason/InSeasonPage.svelte';
 	import { SCREEN_TITLES } from './inseason/words.ts';
 	import MatchupPanel from './MatchupPanel.svelte';
@@ -56,6 +56,16 @@
 		}
 	}
 
+	/** The scoreboard for another team's score, null on any failure: the box that arrived still
+	 * draws, its points unread (review 204 M1). */
+	async function readBoard(): Promise<Scoreboard | null> {
+		try {
+			return await inSeasonApi.scoreboard(id);
+		} catch {
+			return null;
+		}
+	}
+
 	// The screen is created per game ({#key} in the route), so its roster is fixed for its life.
 	// svelte-ignore state_referenced_locally
 	const asked = roster;
@@ -65,7 +75,7 @@
 			leagueApi.sync(id),
 			orNone(inSeasonApi.matchup(id, asked)),
 			// Another team's score is the scoreboard's, as the League page's bug draws it.
-			asked === null ? null : orNone(inSeasonApi.scoreboard(id))
+			asked === null ? null : readBoard()
 		]);
 		return { sync, box, game: otherGame(box, board), read_at: sync.read_at };
 	}

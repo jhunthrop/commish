@@ -71,9 +71,51 @@ void test("the member's box, and an API's from before viewer_side, draw the memb
 	assert.equal(otherGame(box, board), null);
 	assert.equal(otherGame({ ...box, viewer_side: 'mine' }, board), null);
 	assert.equal(isOtherGame(box), false);
-	assert.equal(otherGame(theirs, null), null);
 	assert.equal(otherGame(null, board), null);
 	assert.equal(otherGame({ ...theirs, sides: [] }, board), null);
+});
+
+/** The box of a game the member is not in: the scoreboard's second game, the box's sides relabelled. */
+const elsewhere = ((): MatchupBox => {
+	const game = board.games.find((g) => g.sides.every((s) => s.roster_id !== sync.me));
+	assert.ok(game);
+	return {
+		...theirs,
+		sides: box.sides.map((side, i) => ({ ...side, roster_id: game.sides[i]?.roster_id ?? -1 }))
+	};
+})();
+
+void test("another team's game with no scoreboard read is the box's own sides, points unread (review 204 M1)", () => {
+	for (const unread of [null, { games: [] }]) {
+		const game = otherGame(elsewhere, unread);
+		assert.ok(game, 'the box that arrived draws nothing');
+		assert.deepEqual(
+			[game.mine.roster_id, game.opponent?.roster_id],
+			elsewhere.sides.map((s) => s.roster_id)
+		);
+		assert.ok(
+			[game.mine, game.opponent].every((s) => s?.points_read === false),
+			'a side reads its points as read with no scoreboard'
+		);
+		// Never the member's game, the sync answer's matchup.
+		const sides = [game.mine.roster_id, game.opponent?.roster_id];
+		assert.ok(!sides.includes(sync.me), "the member's roster is on another team's game");
+		assert.notDeepEqual(game, sync.matchup);
+	}
+	// With the scoreboard read, the same sides carry its points.
+	const read = otherGame(elsewhere, board);
+	assert.equal(read?.mine.points_read, true);
+});
+
+void test("the Matchup decides another team's game by the box alone, and the scoreboard read fails soft", () => {
+	const read = (file: string): string => readFileSync(new URL(file, import.meta.url), 'utf8');
+	const panel = read('../MatchupPanel.svelte');
+	assert.match(panel, /const other = \$derived\(isOtherGame\(box\)\)/);
+	assert.match(panel, /const matchup = \$derived\(other \? game : sync\.matchup\)/);
+	assert.match(
+		read('../MatchupScreen.svelte'),
+		/async function readBoard\(\)[\s\S]*?catch \{\s*return null;/
+	);
 });
 
 /** A .svelte file compiled for the server as a data URL, its imports pointed at the files they name

@@ -50,7 +50,7 @@ import {
 	FFPC_ROSTERLESS_OPPONENT_VARIABLE
 } from './ffpc.ts';
 import { afterSundayOf, momentAt, SUNDAY, sundayOf } from './sunday.ts';
-import { askedRoster, otherGameBox, ROSTER_WORDS } from './other-game.ts';
+import { askedRoster, NOT_ROSTER_WORDS, otherGameBox, ROSTER_WORDS } from './other-game.ts';
 import { linesOf, recordedMatchups, scoreboardAt } from './scoreboard-at.ts';
 import { inSeason, noWeek } from './member-week.ts';
 import { inTenths, roundTenth } from './tenths.ts';
@@ -1074,7 +1074,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		// Another roster's game (Lane 204): refused as the API refuses it, the member's own unchanged.
 		const roster = route === 'matchup' ? askedRoster(url.searchParams) : null;
 		if (roster === 'invalid') {
-			send(req, res, HTTP.badRequest, ROSTER_WORDS, 'invalid');
+			send(req, res, HTTP.badRequest, NOT_ROSTER_WORDS, 'invalid');
 			return;
 		}
 		if (roster !== null && roster !== sync.me) {
