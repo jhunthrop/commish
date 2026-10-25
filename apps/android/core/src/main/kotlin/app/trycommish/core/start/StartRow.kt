@@ -80,6 +80,8 @@ data class StartRow(
     /** His rest-of-season points a game on our board, the Trades rows' last cell (box.ts
      * RowEvidence.season). */
     val season: Double? = null,
+    /** His board id, by which his week and page are read; null where the platform's player has none. */
+    val boardId: String? = null,
 ) {
     /** Still to come at the screen's clock: the Opp rank's tint draws only then. */
     val toCome: Boolean get() = read.toPlay
@@ -128,6 +130,7 @@ internal object StartRows {
         val listed = status?.onList == true
         val mark = player.position == "DEF" && player.team.isNotEmpty()
         return StartRow(
+            boardId = player.boardId,
             id = player.hostId,
             slot = slot,
             name = player.name,
@@ -238,7 +241,7 @@ internal object StartRows {
     fun positionWord(position: String): String = if (position == "DEF") "D/ST" else position
 
     /** game-facts.ts halves: a whole number as it is, else one decimal. */
-    private fun halves(points: Double): String = if (points == floor(points)) Format.number(points) else Format.fixed(points, 1)
+    fun halves(points: Double): String = if (points == floor(points)) Format.number(points) else Format.fixed(points, 1)
 
     /** JavaScript's Math.round: half up, toward positive infinity. */
     fun jsRound(value: Double): Int = floor(value + HALF).toInt()

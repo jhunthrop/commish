@@ -52,6 +52,9 @@ object AppWords {
     const val board = "Board"
     const val restOfSeason = "Rest of season"
 
+    /** The record page's name as the bar names it (web nav.ts), the iOS AppWords.Tab.record. */
+    const val record = "Our record"
+
     /** site/offline-words.ts offlineLead, before the run's day: why a saved board shows with no signal. */
     const val offlineBoard = "You're offline, so this is the last board this device saved, updated"
 
