@@ -35,6 +35,7 @@ import app.trycommish.design.QuietButton
 import app.trycommish.design.Tokens
 import app.trycommish.design.Verb
 import app.trycommish.design.Words
+import app.trycommish.feature.boxscore.edgeRule
 
 private val PANEL_EDGE = 4.dp
 private val PIN_SHADOW = 8.dp

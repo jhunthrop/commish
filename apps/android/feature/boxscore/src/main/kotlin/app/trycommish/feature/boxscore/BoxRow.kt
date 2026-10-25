@@ -1,4 +1,4 @@
-package app.trycommish.feature.start
+package app.trycommish.feature.boxscore
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -63,12 +63,14 @@ private val EDGE = 3.dp
 /** One player's row (web BoxLine.svelte and BoxPlayer.svelte at 390): the slot with the move's arrow,
  * his face, his name (whole where it fits, else his short form), his club, position and status, his
  * game, the expected score and weather while it is to come, the evidence line, then Our rank, Proj and
- * Pts; a moved-in row tinted in the accent with the chevron that opens its evidence. */
+ * Pts; a moved-in row tinted in the accent with the chevron that opens its evidence. The Lineup and the
+ * Matchup draw it; the Matchup's style leaves out the evidence line and the why cell. */
 @Composable
-internal fun LineupRow(
+fun BoxRow(
     cells: RowCells,
     bench: Boolean,
     actions: RowActions,
+    style: BoxStyle = BoxStyle.Lineup,
 ) {
     val c = CommishTheme.colors
     val open = cells.id in actions.opened
@@ -85,16 +87,16 @@ internal fun LineupRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SlotCell(cells, bench)
-                PlayerCell(cells, actions, Modifier.weight(1f))
+                PlayerCell(cells, actions, style.evidence, Modifier.weight(1f))
                 Text(
                     cells.rank,
                     style = Faces.cell.copy(fontWeight = FontWeight.Medium),
                     color = if (cells.rank == Words.Box.none) c.ink3 else c.ink,
-                    modifier = Modifier.width(Column.rank).padding(start = Tokens.Space.s1.dp),
+                    modifier = Modifier.width(BoxColumn.rank).padding(start = Tokens.Space.s1.dp),
                 )
-                Figure(cells.proj, Column.proj)
-                Figure(cells.pts, Column.pts)
-                WhyCell(cells, open, actions)
+                Figure(cells.proj, BoxColumn.proj)
+                Figure(cells.pts, BoxColumn.pts)
+                if (style.why) WhyCell(cells, open, actions)
             }
             val why = cells.why
             if (open && why != null) {
@@ -104,7 +106,7 @@ internal fun LineupRow(
                     color = c.ink,
                     modifier =
                         Modifier.padding(
-                            start = Column.slot + Tokens.Space.s2.dp,
+                            start = BoxColumn.slot + Tokens.Space.s2.dp,
                             end = Tokens.Space.s3.dp,
                             bottom = Tokens.Space.s3.dp,
                         ),
@@ -121,7 +123,11 @@ private fun SlotCell(
     bench: Boolean,
 ) {
     val c = CommishTheme.colors
-    Row(Modifier.width(Column.slot), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(
+        Modifier.width(BoxColumn.slot),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
         cells.move?.let { ArrowMark(starts = it == Move.Into, side = 18.dp) }
         Text(
             cells.row.slot,
@@ -140,7 +146,7 @@ private fun WhyCell(
     actions: RowActions,
 ) {
     val c = CommishTheme.colors
-    Box(Modifier.width(Column.why), contentAlignment = Alignment.CenterEnd) {
+    Box(Modifier.width(BoxColumn.why), contentAlignment = Alignment.CenterEnd) {
         val why = cells.why ?: return@Box
         val shape = RoundedCornerShape(Tokens.Radius.sm.dp)
         Box(
@@ -192,19 +198,22 @@ private fun edge(cells: RowCells): Color =
 private fun PlayerCell(
     cells: RowCells,
     actions: RowActions,
+    evidence: Boolean,
     modifier: Modifier,
 ) {
     val c = CommishTheme.colors
     val row = cells.row
     val ink = if (cells.idle) c.ink3 else c.ink
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp)) {
-        Avatar(if (row.clubMark) row.club else initialsOf(row.name), Column.face)
+        Avatar(if (row.clubMark) row.club else initialsOf(row.name), BoxColumn.face)
         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
             NameLine(cells, ink, actions)
             ClubLine(cells)
             GameLine(cells)
             Facts(cells)
-            Text(evidence(cells), style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.sp), color = c.ink2)
+            if (evidence) {
+                Text(evidence(cells), style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.sp), color = c.ink2)
+            }
         }
     }
 }
