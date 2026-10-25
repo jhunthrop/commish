@@ -61,6 +61,7 @@ import { BOARD_RUN_OUTPUT, renderBoardRun } from './board-run-parity.ts';
 import { PLAYER_SHEET_OUTPUT, renderPlayerSheet } from './player-sheet-parity.ts';
 import { RANKINGS_OUTPUT, renderRankings } from './rankings-parity.ts';
 import { RECORD_OUTPUT, renderRecord } from './record-parity.ts';
+import { REFERENCE_OUTPUT, renderReference } from './reference-parity.ts';
 import {
 	builderAt,
 	checkAt,
@@ -661,6 +662,15 @@ export async function generate(): Promise<Outputs> {
 				},
 				instantOf(WEEK_CLOCK),
 				ZONE
+			)
+		],
+		[
+			REFERENCE_OUTPUT,
+			await renderReference(
+				generatedBy(
+					SCRIPT,
+					'web/src/lib/server/pages/adp.ts, routes/(run)/compare and web/src/lib/run/schedule-view.ts (the clubs, a club and the strength of schedule) over the two fixture runs'
+				)
 			)
 		]
 	]);

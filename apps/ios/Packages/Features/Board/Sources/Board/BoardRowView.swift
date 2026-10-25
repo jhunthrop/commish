@@ -22,11 +22,15 @@ enum BoardColumn {
 }
 
 /// The column heads, said once over the rows: Player, then the view's figures.
-struct BoardHeadRow: View {
+public struct BoardHeadRow: View {
     @Environment(\.colorScheme) private var colorScheme
     let columns: BoardColumns
 
-    var body: some View {
+    public init(columns: BoardColumns) {
+        self.columns = columns
+    }
+
+    public var body: some View {
         let theme = Theme(colorScheme)
         HStack(spacing: 6) {
             head(Words.Box.player).frame(maxWidth: .infinity, alignment: .leading)
@@ -55,11 +59,15 @@ struct BoardHeadRow: View {
 }
 
 /// A head inside the table over a run of rows: a position's players on a season-long list.
-struct BoardSectionHead: View {
+public struct BoardSectionHead: View {
     @Environment(\.colorScheme) private var colorScheme
     let title: String
 
-    var body: some View {
+    public init(title: String) {
+        self.title = title
+    }
+
+    public var body: some View {
         let theme = Theme(colorScheme)
         Text(title)
             .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .bold))
@@ -80,20 +88,47 @@ struct BoardSectionHead: View {
 /// with his number there, his club and bye, his status chip; then Projected, the row's one big figure, Over
 /// repl. on its round's tint and the Gap in its tone, or a kicker's or a defense's draft order and ADP. The whole row
 /// opens the player sheet where the site has a page for him.
-struct BoardRowView: View {
+public struct BoardRowView: View {
     @Environment(\.colorScheme) private var colorScheme
     let row: BoardRow
     let columns: BoardColumns
     let open: (SheetPlayer) -> Void
+    /// His club's page, from the club chip (links.ts club); nil where the screen links none, and never
+    /// for a free agent.
+    let club: ((String) -> Void)?
 
-    var body: some View {
+    public init(
+        row: BoardRow, columns: BoardColumns, open: @escaping (SheetPlayer) -> Void, club: ((String) -> Void)? = nil
+    ) {
+        self.row = row
+        self.columns = columns
+        self.open = open
+        self.club = club
+    }
+
+    public var body: some View {
         if let player = row.sheetPlayer {
-            Button { open(player) } label: { line }
-                .buttonStyle(.plain)
+            // The row opens his sheet; the club chip in it is its own tap, which takes it first.
+            line
+                .onTapGesture { open(player) }
                 .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { open(player) }
                 .accessibilityHint(Words.Shelf.fullPage)
         } else {
             line.accessibilityElement(children: .combine)
+        }
+    }
+
+    /// The club chip: a link to its page where the screen gives one.
+    @ViewBuilder
+    private func clubChip(_ theme: Theme) -> some View {
+        if let club, row.club != Words.Figure.freeAgentClub {
+            Button { club(row.club) } label: { Text(row.club).modifier(Small(theme: theme)) }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(.isLink)
+        } else {
+            Text(row.club).modifier(Small(theme: theme))
         }
     }
 
@@ -121,7 +156,7 @@ struct BoardRowView: View {
                 .foregroundStyle(theme.color(Tokens.Color.ink))
             HStack(spacing: 6) {
                 PositionPill(row.pill)
-                Text(row.club).modifier(Small(theme: theme))
+                clubChip(theme)
                 if let bye = row.bye {
                     Text(bye).modifier(Small(theme: theme))
                 }
@@ -173,7 +208,7 @@ struct BoardRowView: View {
     }
 
     /// The tile under Over repl. (Row.svelte .heat-1 to .heat-4, .heat-neg), none past the fourth round.
-    static func tint(_ heat: Heat) -> ThemedColor? {
+    public static func tint(_ heat: Heat) -> ThemedColor? {
         switch heat {
         case .round(1): Tokens.Color.heat1
         case .round(2): Tokens.Color.heat2

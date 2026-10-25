@@ -51,7 +51,7 @@ struct RootTabs: View {
         .tint(Theme(colorScheme).color(Tokens.Color.accent))
         .environment(sheet)
         // The sheet's Full page is his page in the app: the sheet closes onto it, pushed on the tab in view.
-        .playerSheet(sheet, openPage: { open(.player(slug: $0)) }, content: { player in
+        .playerSheet(sheet, openPage: { open(.player(slug: $0)) }, openRoute: open, content: { player in
             PlayerSheetContainer(player: player, offer: sheet.offer, close: sheet.close) { player in
                 PlayerSheetViewModel(
                     player: player, run: environment.api, pages: environment.api, weeks: environment.api,
@@ -181,6 +181,9 @@ struct RootTabs: View {
             }
         case let .leagueHome(id):
             LeagueScreen(environment: environment, leagueID: id, expired: expired) {}
+        case .adp, .compare, .clubs, .club, .schedule:
+            ReferenceScreen(route: route, environment: environment, league: selectedLeague, expired: expired)
+                .id(route)
         }
     }
 
@@ -326,22 +329,6 @@ private struct TradesTab: View {
 
     var body: some View {
         TradesView(viewModel: viewModel, leagueID: leagueID)
-    }
-}
-
-/// The board's tab: owns its view model, which holds the chips while the player sheet is open over it.
-private struct BoardTab: View {
-    @State private var viewModel: BoardViewModel
-
-    init(environment: AppEnvironment, inSeason: Bool, following: Bool, expired: @escaping @MainActor () -> Void) {
-        _viewModel = State(initialValue: BoardViewModel(
-            api: environment.api, cache: environment.cache, clock: environment.clock, inSeason: inSeason,
-            following: following, onSignedOut: expired
-        ))
-    }
-
-    var body: some View {
-        BoardView(viewModel: viewModel)
     }
 }
 

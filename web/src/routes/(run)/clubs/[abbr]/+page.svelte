@@ -17,6 +17,7 @@
 	import Table from '#lib/ui/Table.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { boardColumns } from '#lib/ui/board-columns.ts';
+	import { CLUB_PAGE, filled } from '#lib/site/reference-words.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -71,13 +72,15 @@
 <SiteShell title={name} head={data.head} run={data.run}>
 	{#snippet tail()}
 		{#if pair.length === 2}<Verb href={links.compare(pair[0]?.slug, pair[1]?.slug)}
-				>Compare two of them</Verb
+				>{CLUB_PAGE.comparePair}</Verb
 			>{/if}
 	{/snippet}
 	<main class="club">
-		<Crumb trail={[{ label: 'Clubs', href: links.clubs() }, { label: name }]} />
+		<Crumb trail={[{ label: CLUB_PAGE.clubs, href: links.clubs() }, { label: name }]} />
 		<HeroCard title={name}>
-			{#snippet meta()}<Label>{club.abbr} · bye week {club.bye ?? 'not set'}</Label>{/snippet}
+			{#snippet meta()}<Label
+					>{club.abbr} · {CLUB_PAGE.byeWeek} {club.bye ?? CLUB_PAGE.byeNotSet}</Label
+				>{/snippet}
 			{#snippet aside()}
 				{#if page.hero}
 					<div class="figures">
@@ -103,7 +106,7 @@
 		<BasisLine parts={page.basis} tail={words?.capture ?? null} />
 
 		<section aria-label="On our board">
-			<PanelHead title="On our {page.format.label} board" />
+			<PanelHead title={filled(CLUB_PAGE.onBoard, page.format.label)} />
 			{#if page.rows.length > 0}
 				<BoardTable {columns} label="{name} on our {page.format.label} board">
 					{#each page.rows as player (player.id)}
@@ -120,13 +123,13 @@
 					{/each}
 				</BoardTable>
 			{:else}
-				<Label>Nobody from {club.city} is on this board</Label>
+				<Label>{filled(CLUB_PAGE.nobody, club.city)}</Label>
 			{/if}
 		</section>
 
 		{#if page.market.length > 0}
 			<section aria-label="Kickers and defense">
-				<PanelHead title="Kickers and defense, in draft order" />
+				<PanelHead title={CLUB_PAGE.kickers} />
 				<BoardTable columns={kickers} label="{name} kickers and defense">
 					{#each page.market as player (player.id)}
 						<Row
@@ -147,17 +150,17 @@
 				caption={page.scheduleCaption}
 				showCaption
 				columns={[
-					{ label: 'Week' },
-					{ label: 'Opponent' },
-					{ label: 'Expected wins', align: 'end' }
+					{ label: CLUB_PAGE.week },
+					{ label: CLUB_PAGE.opponent },
+					{ label: CLUB_PAGE.expectedWins, align: 'end' }
 				]}
 			>
 				{#each page.games as game (game.week)}
 					{@const opponent = names.get(game.opponent)}
 					<tr class:played={game.played}>
-						<td>Week {game.week}</td>
+						<td>{CLUB_PAGE.week} {game.week}</td>
 						<td>
-							{game.home ? 'vs' : 'at'}
+							{game.home ? CLUB_PAGE.home : CLUB_PAGE.away}
 							<a href={links.club(game.opponent)}
 								>{opponent ? `${opponent.city} ${opponent.nickname}` : game.opponent}</a
 							>

@@ -728,4 +728,72 @@ object Words {
     object FreeSeason {
         const val ends = "2027-03-01T00:00:00Z"
     }
+
+    object AdpPage {
+        const val heading = "ADP"
+        const val board = "Board"
+        const val rank = "Rk"
+        const val scheduleLink = "Schedule strength"
+    }
+
+    object ComparePage {
+        const val title = "Compare"
+        const val firstPlayer = "First player"
+        const val secondPlayer = "Second player"
+        const val pickAnother = "Pick someone else"
+        const val missingTitle = "We couldn't find that player"
+        const val missingLine = "Nobody here goes by that name."
+        const val sameTitle = "Pick two different players"
+        const val addToSheet = "Add him to your sheet"
+        const val onSheet = "{name} is on your sheet"
+    }
+
+    object Compare {
+        const val failed = "The players are not loading. Try again in a moment."
+    }
+
+    object Verdict {
+        const val samePlayer = "That is the same player twice. Pick someone else on one side."
+    }
+
+    object ClubPage {
+        const val clubs = "Clubs"
+        const val byeWeek = "bye week"
+        const val byeNotSet = "not set"
+        const val ourRank = "Our rank"
+        const val player = "player"
+        const val onOurBoard = "on our board"
+        const val onBoard = "On our {format} board"
+        const val nobody = "Nobody from {city} is on this board"
+        const val kickers = "Kickers and defense, in draft order"
+        const val week = "Week"
+        const val opponent = "Opponent"
+        const val expectedWins = "Expected wins"
+        const val home = "vs"
+        const val away = "at"
+        const val comparePair = "Compare two of them"
+    }
+
+    object SchedulePage {
+        const val heading = "schedule strength"
+        const val title = "Schedule strength"
+        const val caption = "Every club's schedule"
+        const val captionHardest = "Every club's schedule, hardest first"
+        const val club = "Club"
+        const val rank = "Rank"
+        const val week = "Wk"
+        const val bye = "Bye"
+        const val legendHard = "{value} or more"
+        const val legendPlayed = "Played"
+    }
+
+    object Strength {
+        const val rest = "Rest of season strength"
+        const val preseason = "Preseason strength"
+    }
+
+    object StrengthColumn {
+        const val rest = "Rest of season"
+        const val preseason = "Preseason"
+    }
 }

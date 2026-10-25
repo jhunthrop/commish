@@ -22,6 +22,7 @@
 	import { lazySheet } from './lazy-sheet.svelte.ts';
 	import { isFreeAgent } from '#lib/format/free-agent.ts';
 	import { links } from './links.ts';
+	import { ADP_PAGE } from './reference-words.ts';
 
 	interface Props {
 		page: AdpPage;
@@ -99,17 +100,23 @@
 	}
 </script>
 
-<SiteShell title="{page.format.label} ADP" heading="ADP" head={page.head} {run}>
+<SiteShell
+	title="{page.format.label} {ADP_PAGE.heading}"
+	heading={ADP_PAGE.heading}
+	head={page.head}
+	{run}
+>
 	{#snippet tail()}<Verb href={sectionHref('mock')}>Start a mock draft</Verb>{/snippet}
 	<main class="adp">
 		<div class="lead">
-			<PageHead title="{run.season} ADP">
-				{#snippet actions()}<Quiet href={links.board(page.format.id)} size="sm">Board</Quiet
+			<PageHead title="{run.season} {ADP_PAGE.heading}">
+				{#snippet actions()}<Quiet href={links.board(page.format.id)} size="sm"
+						>{ADP_PAGE.board}</Quiet
 					>{/snippet}
 			</PageHead>
 			<BasisLine parts={page.basis} tail={words?.capture ?? null} />
 		</div>
-		<BoardTable {columns} label="{page.format.label} ADP" {sort} {onsort}>
+		<BoardTable {columns} label="{page.format.label} {ADP_PAGE.heading}" {sort} {onsort}>
 			{#each rows as player, i (player.id)}
 				{#if player.orderBasis === 'market'}
 					{@const face = player.face}

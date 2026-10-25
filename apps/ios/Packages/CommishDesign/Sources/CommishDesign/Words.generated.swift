@@ -726,4 +726,72 @@ public enum Words {
     public enum FreeSeason {
         public static let ends = "2027-03-01T00:00:00Z"
     }
+
+    public enum AdpPage {
+        public static let heading = "ADP"
+        public static let board = "Board"
+        public static let rank = "Rk"
+        public static let scheduleLink = "Schedule strength"
+    }
+
+    public enum ComparePage {
+        public static let title = "Compare"
+        public static let firstPlayer = "First player"
+        public static let secondPlayer = "Second player"
+        public static let pickAnother = "Pick someone else"
+        public static let missingTitle = "We couldn't find that player"
+        public static let missingLine = "Nobody here goes by that name."
+        public static let sameTitle = "Pick two different players"
+        public static let addToSheet = "Add him to your sheet"
+        public static let onSheet = "{name} is on your sheet"
+    }
+
+    public enum Compare {
+        public static let failed = "The players are not loading. Try again in a moment."
+    }
+
+    public enum Verdict {
+        public static let samePlayer = "That is the same player twice. Pick someone else on one side."
+    }
+
+    public enum ClubPage {
+        public static let clubs = "Clubs"
+        public static let byeWeek = "bye week"
+        public static let byeNotSet = "not set"
+        public static let ourRank = "Our rank"
+        public static let player = "player"
+        public static let onOurBoard = "on our board"
+        public static let onBoard = "On our {format} board"
+        public static let nobody = "Nobody from {city} is on this board"
+        public static let kickers = "Kickers and defense, in draft order"
+        public static let week = "Week"
+        public static let opponent = "Opponent"
+        public static let expectedWins = "Expected wins"
+        public static let home = "vs"
+        public static let away = "at"
+        public static let comparePair = "Compare two of them"
+    }
+
+    public enum SchedulePage {
+        public static let heading = "schedule strength"
+        public static let title = "Schedule strength"
+        public static let caption = "Every club's schedule"
+        public static let captionHardest = "Every club's schedule, hardest first"
+        public static let club = "Club"
+        public static let rank = "Rank"
+        public static let week = "Wk"
+        public static let bye = "Bye"
+        public static let legendHard = "{value} or more"
+        public static let legendPlayed = "Played"
+    }
+
+    public enum Strength {
+        public static let rest = "Rest of season strength"
+        public static let preseason = "Preseason strength"
+    }
+
+    public enum StrengthColumn {
+        public static let rest = "Rest of season"
+        public static let preseason = "Preseason"
+    }
 }

@@ -100,6 +100,11 @@ public enum RunWords {
         return "\(words) \(Formatting.shortDay(manifest.runAt, zone: eastern))"
     }
 
+    /// site/absent.ts absentWords' title: "Half PPR is not on our board yet", a format the run lacks.
+    public static func absent(_ label: String) -> String {
+        "\(label) is not on our board yet"
+    }
+
     /// site/offline-words.ts offlineLead: the reason a saved board shows, said with its run's day.
     public static func offline(_ manifest: RunManifest) -> String {
         "You're offline, so this is the last board this device saved, updated "

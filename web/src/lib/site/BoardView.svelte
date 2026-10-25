@@ -38,6 +38,7 @@
 	import { weekPositionOf, weekReadKey } from '#lib/order/week-head.ts';
 	import type { WeekSaid } from '#lib/order/week.ts';
 	import { ORDER, PAGE_PURPOSE, WEEK } from '#lib/order/words.ts';
+	import { ADP_PAGE } from './reference-words.ts';
 
 	interface Props {
 		page: BoardPage;
@@ -227,8 +228,8 @@
 		<div class="lead">
 			<PageHead title={said?.heading ?? heading} lead={ordered ? PAGE_PURPOSE.rest : undefined}>
 				{#snippet actions()}
-					<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
-					<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>
+					<Quiet href={links.adp(page.format.id)} size="sm">{ADP_PAGE.heading}</Quiet>
+					<Quiet href={links.schedule()} size="sm">{ADP_PAGE.scheduleLink}</Quiet>
 				{/snippet}
 			</PageHead>
 			{#if ordered}{@render leagueNote()}{/if}

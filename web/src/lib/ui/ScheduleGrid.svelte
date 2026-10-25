@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { CLUB_PAGE, SCHEDULE_PAGE } from '#lib/site/reference-words.ts';
 	import Face from './Face.svelte';
 	import type { ScheduleRow } from './schedule-grid.ts';
 
@@ -30,13 +31,14 @@
 		<caption>{caption}</caption>
 		<thead>
 			<tr>
-				<th scope="col" class="club">Club</th>
+				<th scope="col" class="club">{SCHEDULE_PAGE.club}</th>
 				{#if strengthLabel !== null}
-					<th scope="col" class="rank">Rank</th>
+					<th scope="col" class="rank">{SCHEDULE_PAGE.rank}</th>
 					<th scope="col" class="strength">{strengthLabel}</th>
 				{/if}
 				{#each weeks as week (week)}
-					<th scope="col" class="week" class:played={week <= played}>Wk {week}</th>
+					<th scope="col" class="week" class:played={week <= played}>{SCHEDULE_PAGE.week} {week}</th
+					>
 				{/each}
 			</tr>
 		</thead>
@@ -60,10 +62,12 @@
 					{/if}
 					{#each row.cells as cell (cell.week)}
 						{#if cell.opponent === null}
-							<td class="week bye" class:played={cell.played}>Bye</td>
+							<td class="week bye" class:played={cell.played}>{SCHEDULE_PAGE.bye}</td>
 						{:else}
 							<td class="week" class:hard={cell.hard} class:played={cell.played}>
-								<span class="opp">{cell.home ? 'vs' : 'at'} {cell.opponent}</span>
+								<span class="opp"
+									>{cell.home ? CLUB_PAGE.home : CLUB_PAGE.away} {cell.opponent}</span
+								>
 								<span class="value">{cell.value}</span>
 							</td>
 						{/if}

@@ -7,6 +7,7 @@
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import PlayerLine from '#lib/ui/PlayerLine.svelte';
 	import Tile from '#lib/ui/Tile.svelte';
+	import { CLUB_PAGE } from '#lib/site/reference-words.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -15,16 +16,16 @@
 	const lead = $derived(page.lead);
 </script>
 
-<SiteShell title="Clubs" head={data.head} run={data.run}>
+<SiteShell title={CLUB_PAGE.clubs} head={data.head} run={data.run}>
 	<main class="clubs">
-		<PageHead title="Clubs" {lead} />
+		<PageHead title={CLUB_PAGE.clubs} {lead} />
 		<ul>
 			{#each page.clubs as club (club.abbr)}
 				<li>
 					<Tile
 						title="{club.city} {club.nickname}"
 						href={links.club(club.abbr)}
-						meta="{club.abbr} · bye week {club.bye ?? 'not set'}"
+						meta="{club.abbr} · {CLUB_PAGE.byeWeek} {club.bye ?? CLUB_PAGE.byeNotSet}"
 					>
 						{#if club.strength}
 							<Figure value={club.strength.value} size="md" caption={club.strength.caption} />
@@ -38,10 +39,11 @@
 								headshot={club.lead.headshot}
 								href={links.player(club.lead.slug)}
 							>
-								{#snippet trailing()}<Label>Our rank {club.lead?.ourRank}</Label>{/snippet}
+								{#snippet trailing()}<Label>{CLUB_PAGE.ourRank} {club.lead?.ourRank}</Label
+									>{/snippet}
 							</PlayerLine>
 						{/if}
-						<Label>{plural(club.players, 'player')} on our board</Label>
+						<Label>{plural(club.players, CLUB_PAGE.player)} {CLUB_PAGE.onOurBoard}</Label>
 					</Tile>
 				</li>
 			{/each}

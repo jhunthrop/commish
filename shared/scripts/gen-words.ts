@@ -43,6 +43,8 @@ const ORDER_WORDS_MODULE = 'web/src/lib/order/words.ts';
 const WEEK_MODULE = 'web/src/lib/order/week.ts';
 const RECORD_MODULE = 'web/src/lib/run/record.ts';
 const ACCOUNT_MODULE = 'web/src/lib/account/words.ts';
+const REFERENCE_MODULE = 'web/src/lib/site/reference-words.ts';
+const STRENGTH_MODULE = 'web/src/lib/run/strength-words.ts';
 
 /** Every table the apps print from, the League home's first, then the box score's: its heads, the
  * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
@@ -61,7 +63,8 @@ const ACCOUNT_MODULE = 'web/src/lib/account/words.ts';
  * and the record's words, its box's heads, the orders a week graded, the two records' words and a
  * pair's; then the Account's (Lane 198): the page's own words, the free season's plan card and end,
  * the leagues table's, the paired devices', the push switches', the page's foot and the address it
- * names. */
+ * names; then the reference screens' (Lane 199): ADP's, Compare's with its failure and its same-player
+ * sentence, the clubs' and a club's, the schedule grid's, and schedule strength's heads. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -484,6 +487,54 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/pass/free-season.ts',
 		picks: [['ends', 'FREE_SEASON_ENDS']],
 		json: 'shared/words/account-free-season.json'
+	},
+	{
+		name: 'AdpPage',
+		module: REFERENCE_MODULE,
+		picks: ['ADP_PAGE'],
+		json: 'shared/words/reference-adp.json'
+	},
+	{
+		name: 'ComparePage',
+		module: REFERENCE_MODULE,
+		picks: ['COMPARE_PAGE'],
+		json: 'shared/words/reference-compare.json'
+	},
+	{
+		name: 'Compare',
+		module: 'web/src/lib/site/compare-words.ts',
+		picks: [['failed', 'COMPARE_FAILED']],
+		json: 'shared/words/compare.json'
+	},
+	{
+		name: 'Verdict',
+		module: 'web/src/lib/site/verdict.ts',
+		picks: [['samePlayer', 'SAME_PLAYER']],
+		json: 'shared/words/verdict.json'
+	},
+	{
+		name: 'ClubPage',
+		module: REFERENCE_MODULE,
+		picks: ['CLUB_PAGE'],
+		json: 'shared/words/reference-club.json'
+	},
+	{
+		name: 'SchedulePage',
+		module: REFERENCE_MODULE,
+		picks: ['SCHEDULE_PAGE'],
+		json: 'shared/words/reference-schedule.json'
+	},
+	{
+		name: 'Strength',
+		module: STRENGTH_MODULE,
+		picks: ['STRENGTH_HEADS'],
+		json: 'shared/words/strength.json'
+	},
+	{
+		name: 'StrengthColumn',
+		module: STRENGTH_MODULE,
+		picks: ['STRENGTH_COLUMNS'],
+		json: 'shared/words/strength-column.json'
 	}
 ];
 export const OUTPUT = {

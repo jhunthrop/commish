@@ -269,7 +269,7 @@ private struct ViewRows {
         }
         guard !position.draftOrder else {
             let rows = BoardOrder.withStatuses(BoardOrder.at(board.market, position: position), statuses)
-            sections = [BoardSection(id: position.rawValue, head: nil, band: nil, rows: rows.map(cells.market))]
+            sections = [BoardSection(id: position.rawValue, head: nil, band: nil, rows: rows.map { cells.market($0) })]
             carriesGap = false
             return
         }
