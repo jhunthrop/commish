@@ -157,6 +157,12 @@ export const TABLES: readonly TableSource[] = [
 		json: 'shared/words/league-scoring.json'
 	},
 	{
+		name: 'FormatLabel',
+		module: 'web/src/lib/sheet/format.ts',
+		picks: ['FORMAT_LABELS'],
+		json: 'shared/words/format-labels.json'
+	},
+	{
 		name: 'Shelf',
 		module: 'web/src/lib/player/shelf.ts',
 		picks: ['SHELF'],

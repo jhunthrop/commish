@@ -11,7 +11,10 @@ import app.trycommish.core.matchup.MatchupModel
 import app.trycommish.core.matchup.MatchupState
 import app.trycommish.core.matchup.MatchupViewModel
 import app.trycommish.core.shell.FollowedLeague
+import app.trycommish.core.shell.SheetOffer
+import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.shell.ShellState
+import app.trycommish.design.Words
 import app.trycommish.feature.matchup.MatchupActions
 import app.trycommish.feature.matchup.MatchupScreen
 import app.trycommish.feature.shell.LocalPlayerSheet
@@ -23,10 +26,11 @@ fun MatchupTab(
     graph: AppGraph,
     shell: ShellState,
     onRetry: () -> Unit,
+    openLineup: () -> Unit,
 ) {
     val league = (shell as? ShellState.Ready)?.selected
     if (league != null) {
-        LeagueMatchup(graph, league)
+        LeagueMatchup(graph, league, openLineup)
         return
     }
     val waiting =
@@ -39,6 +43,17 @@ fun MatchupTab(
     MatchupScreen(waiting, null, refreshing = false, actions = MatchupActions(refresh = onRetry))
 }
 
+/** The sheet's verb on the Matchup (MatchupPanel.svelte's lineupOffer): the way to the member's lineup on
+ * his own rows, none on the opponent's. */
+private fun lineupOffer(
+    state: MatchupState,
+    player: SheetPlayer,
+    openLineup: () -> Unit,
+): SheetOffer? {
+    val week = ((state as? MatchupState.Loaded)?.model as? MatchupModel.Week)?.week ?: return null
+    return if (week.isMine(player)) SheetOffer(Words.Card.openLineup, null, lineup = true, act = openLineup) else null
+}
+
 /** One league's Matchup, its own view model per league: the saved week at once, then the API's. While
  * the tab is on screen with the app started it reads again once a minute; it stops when the tab is left,
  * the app goes to the background, or the screen is torn down (the view model is cleared with it). A pull
@@ -48,6 +63,7 @@ fun MatchupTab(
 private fun LeagueMatchup(
     graph: AppGraph,
     league: FollowedLeague,
+    openLineup: () -> Unit,
 ) {
     val vm: MatchupViewModel = viewModel(key = "matchup-${league.id}") { graph.matchupViewModel() }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -67,6 +83,6 @@ private fun LeagueMatchup(
         state = state,
         stamp = vm.stampWords(state),
         refreshing = refreshing && state is MatchupState.Loaded,
-        actions = MatchupActions(open = sheet::open, refresh = { vm.load(id) }),
+        actions = MatchupActions(open = { sheet.open(it, lineupOffer(state, it, openLineup)) }, refresh = { vm.load(id) }),
     )
 }

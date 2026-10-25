@@ -36,8 +36,7 @@ internal object BasisParts {
 
     /** names.ts rulesOwner: FFPC fixes its own rules; on any other platform, and with none named, the
      * league's commissioner does. */
-    private fun rulesOwner(league: LeagueHost?): String =
-        if (league == LeagueHost.ffpc) ValueWords.platform(LeagueHost.ffpc) else "your league"
+    fun rulesOwner(league: LeagueHost?): String = if (league == LeagueHost.ffpc) ValueWords.platform(LeagueHost.ffpc) else "your league"
 
     /** basis.ts uncountedPart: the rules our stats lack, framed by whether any row counts the platform's
      * points; an answer without the list says its note as sent. */

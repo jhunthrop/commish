@@ -27,9 +27,14 @@ import app.trycommish.core.leaguehome.LeagueReads
 import app.trycommish.core.matchup.ApiMatchupReads
 import app.trycommish.core.matchup.MatchupReads
 import app.trycommish.core.matchup.MatchupViewModel
+import app.trycommish.core.player.ApiPlayerReads
+import app.trycommish.core.player.PlayerPageViewModel
+import app.trycommish.core.player.PlayerReadsGraph
+import app.trycommish.core.player.PlayerSheetViewModel
 import app.trycommish.core.shell.AccountReads
 import app.trycommish.core.shell.ApiAccountReads
 import app.trycommish.core.shell.FollowedLeague
+import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.shell.ShellViewModel
 import app.trycommish.core.signin.ApiPairing
 import app.trycommish.core.signin.SignIn
@@ -151,6 +156,34 @@ class AppGraph(
             Log.w(TAG, "copy to the clipboard", e)
             false
         }
+    }
+
+    /** The reads every player sheet and page is made over: the run's files, his page and his week. */
+    private val players: PlayerReadsGraph by lazy {
+        val reads = ApiPlayerReads(transport)
+        PlayerReadsGraph(runs, reads, reads, cache, clock, zone, sessionEnd)
+    }
+
+    /** The sheet's view model for the player it opened on, his week read in the league shown. */
+    fun playerSheetViewModel(
+        player: SheetPlayer,
+        league: FollowedLeague?,
+    ): PlayerSheetViewModel = PlayerSheetViewModel(player, players, league)
+
+    /** A player's page by his slug, his week read in the league shown. */
+    fun playerPageViewModel(
+        slug: String,
+        league: FollowedLeague?,
+    ): PlayerPageViewModel = PlayerPageViewModel(slug, players, league)
+
+    /** The platform's own page for a verb the app cannot make: his name on the clipboard first, so its
+     * search takes it, then the page in the browser. */
+    fun copyAndOpen(
+        name: String,
+        url: String,
+    ) {
+        copy(name)
+        openPage(url)
     }
 
     fun shellViewModel(): ShellViewModel = ShellViewModel(account, cache, clock, zone, sessionEnd)

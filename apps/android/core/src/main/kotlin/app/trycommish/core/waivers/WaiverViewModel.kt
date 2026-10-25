@@ -158,6 +158,20 @@ class WaiverViewModel(
         mutableUi.update { it.copy(openRow = if (it.openRow == key) null else key, chosenDrop = null, copied = null) }
     }
 
+    /** The sheet's verb on his row: the platform's page for a stash with no drop, else his row opened with
+     * the advice's drop and the claim pressed, as the web's shelf acts on the pair. */
+    fun claimFromSheet(
+        key: String,
+        leagueId: String,
+    ): Job? {
+        val row =
+            ui.value.model
+                ?.rows
+                ?.firstOrNull { it.key == key } ?: return null
+        if (row.opensPage || ui.value.openRow != key) tapRow(key)
+        return if (row.opensPage) null else press(leagueId)
+    }
+
     /** A drop chosen in the open panel. */
     fun chooseDrop(key: String) {
         mutableUi.update { it.copy(chosenDrop = key, copied = null) }
