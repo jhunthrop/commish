@@ -120,14 +120,40 @@ public struct BoxRowView: View {
 }
 
 /// The player cell: face, name, club line, game line, facts and, on the Lineup, the evidence, folded as
-/// the phone folds them. His name opens the player sheet where the site has a page for him.
-struct PlayerCell: View {
+/// the phone folds them. His name opens the player sheet where the site has a page for him. The Waivers
+/// rows (BoxLine with phoneFacts off) draw no facts, their own evidence line with A game after it, the
+/// day a claim clears after the kickoff, and a Stash row's week in place of his game.
+public struct PlayerCell: View {
     @Environment(\.colorScheme) private var colorScheme
     let cells: RowCells
     let evidence: Bool
     let open: (SheetPlayer) -> Void
+    let sheetPlayer: SheetPlayer?
+    let evidenceText: String?
+    let facts: Bool
+    let clears: String?
+    let note: String?
 
-    var body: some View {
+    init(cells: RowCells, evidence: Bool, open: @escaping (SheetPlayer) -> Void) {
+        self.init(cells: cells, sheetPlayer: cells.sheetPlayer, evidence: evidence ? cells.evidence : nil, open: open)
+    }
+
+    /// `evidence` is the line under the game, nil for none; `facts` draws the expected score and weather.
+    public init(
+        cells: RowCells, sheetPlayer: SheetPlayer?, evidence: String?, facts: Bool = true, clears: String? = nil,
+        note: String? = nil, open: @escaping (SheetPlayer) -> Void
+    ) {
+        self.cells = cells
+        self.sheetPlayer = sheetPlayer
+        self.evidence = evidence != nil
+        evidenceText = evidence
+        self.facts = facts
+        self.clears = clears
+        self.note = note ?? cells.note
+        self.open = open
+    }
+
+    public var body: some View {
         let theme = Theme(colorScheme)
         let row = cells.row
         HStack(alignment: .center, spacing: Tokens.Space.s2) {
@@ -136,7 +162,9 @@ struct PlayerCell: View {
                 name(theme)
                 club(theme)
                 game(theme)
-                facts(theme)
+                if facts {
+                    facts(theme)
+                }
                 if evidence {
                     Text(evidenceLine(theme))
                         .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
@@ -153,7 +181,7 @@ struct PlayerCell: View {
             nameText(cells.row.name)
             nameText(cells.row.fit)
         }
-        if let player = cells.sheetPlayer {
+        if let player = sheetPlayer {
             Button { open(player) } label: { label }
                 .buttonStyle(.plain)
                 .accessibilityLabel(cells.row.name)
@@ -185,7 +213,7 @@ struct PlayerCell: View {
     @ViewBuilder
     private func game(_ theme: Theme) -> some View {
         let font = Faces.font(.ui, size: Tokens.TypeScale.sm)
-        if let note = cells.note {
+        if let note {
             Text(note).font(font).foregroundStyle(theme.color(Tokens.Color.ink2)).lineLimit(1)
         } else {
             switch cells.game {
@@ -230,12 +258,18 @@ struct PlayerCell: View {
         opponent.font = Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold)
         var time = AttributedString(when)
         time.foregroundColor = theme.color(Tokens.Color.ink2)
-        return opponent + AttributedString(" ") + time
+        guard let clears else {
+            return opponent + AttributedString(" ") + time
+        }
+        var day = AttributedString(clears)
+        day.foregroundColor = theme.color(Tokens.Color.accentText)
+        day.font = Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold)
+        return opponent + AttributedString(" ") + time + AttributedString(" ") + day
     }
 
     /// "Opp 2nd, Avg 23.3, Last 19.0": the opponent's rank in the ease's ink while his game is to come.
     private func evidenceLine(_ theme: Theme) -> AttributedString {
-        var said = AttributedString(cells.evidence)
+        var said = AttributedString(evidenceText ?? cells.evidence)
         said.foregroundColor = theme.color(Tokens.Color.ink2)
         if let rank = cells.oppRank, let range = said.range(of: rank), cells.ease != .even {
             said[range].foregroundColor = theme.color(cells.ease == .hard ? Tokens.Color.lossInk : Tokens.Color.gainInk)
