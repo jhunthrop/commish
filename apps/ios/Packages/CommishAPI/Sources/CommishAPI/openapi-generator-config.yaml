@@ -31,3 +31,4 @@ filter:
     - runSchedule
     - playerWeek
     - leaguePlayerWeek
+    - leagueWaivers

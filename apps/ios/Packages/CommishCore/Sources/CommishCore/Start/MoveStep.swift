@@ -2,6 +2,53 @@ import CommishAPI
 import CommishDesign
 import Foundation
 
+/// The two moves made from our screens (move.ts MoveKind): the Start screen's lineup and the Waivers
+/// screen's claim, whose queued answer is said on the member's clock.
+public enum MoveKind: Equatable, Sendable {
+    case lineup
+    case claim(zone: TimeZone)
+
+    /// words.ts verbWords: "Set it on ESPN", "Claim on ESPN".
+    func verb(_ platform: String) -> String {
+        switch self {
+        case .lineup: StartWords.setItOn(platform)
+        case .claim: WaiverWords.claimOn(platform)
+        }
+    }
+
+    /// move.ts readingWords.
+    func reading(_ platform: String) -> String {
+        switch self {
+        case .lineup: StartWords.reading(platform)
+        case .claim: WaiverWords.reading(platform)
+        }
+    }
+
+    /// move.ts settingWords.
+    func setting(_ platform: String) -> String {
+        switch self {
+        case .lineup: StartWords.setting(platform)
+        case .claim: WaiverWords.claiming(platform)
+        }
+    }
+
+    /// move.ts lostWords.
+    func lost(_ platform: String) -> String {
+        switch self {
+        case .lineup: StartWords.lost(platform)
+        case .claim: WaiverWords.lost(platform)
+        }
+    }
+
+    /// move.ts resultWords: a claim the platform's queue holds says when it runs.
+    func result(_ platform: String, _ result: HostMoveResult) -> String {
+        switch self {
+        case .lineup: result.sentence
+        case let .claim(zone): WaiverWords.result(platform, result, zone: zone)
+        }
+    }
+}
+
 /// Where the move's confirmation is (move.ts MoveStep): reading the lineup on the platform, the move
 /// in the API's words to confirm with its token, on its way, what it came to, unavailable here (the
 /// platform's page), or failed (the API's sentence, or ours when no answer came).
@@ -33,13 +80,15 @@ public enum MoveStep: Equatable, Sendable {
     /// move.ts failedStep: the API's own sentence for a refusal it answered; with no answer, nothing
     /// was sent when the plan failed, and the move may have left when the make failed, so the member
     /// is sent to check the platform.
-    static func failed(_ error: any Error, stage: Stage, platform: String, page: URL?) -> MoveStep {
+    static func failed(
+        _ error: any Error, stage: Stage, platform: String, page: URL?, kind: MoveKind = .lineup
+    ) -> MoveStep {
         if case let APIError.envelope(_, message) = error, !message.isEmpty {
             return .failed(sentence: message, page: nil)
         }
         switch stage {
         case .plan: return .failed(sentence: Words.Move.notReached, page: nil)
-        case .make: return .failed(sentence: StartWords.lost(platform), page: page)
+        case .make: return .failed(sentence: kind.lost(platform), page: page)
         }
     }
 
@@ -73,23 +122,23 @@ public struct MovePanel: Equatable, Sendable {
         case problem
     }
 
-    public init?(step: MoveStep, platform: String) {
-        let setIt = StartWords.setItOn(platform)
+    public init?(step: MoveStep, platform: String, kind: MoveKind = .lineup) {
+        let setIt = kind.verb(platform)
         let open = { (url: URL?) in url.map { FootRun(text: StartWords.open(platform), url: $0) } }
         switch step {
         case .closed:
             return nil
         case .planning:
-            self.init(line: StartWords.reading(platform), tone: .quiet)
+            self.init(line: kind.reading(platform), tone: .quiet)
         case let .confirm(sentence, _):
             self.init(line: sentence, verb: setIt, verbEnabled: true, close: Words.Move.notNow)
         case let .sending(sentence):
-            self.init(line: sentence, verb: StartWords.setting(platform))
+            self.init(line: sentence, verb: kind.setting(platform))
         case let .answered(result):
             let refused = result.outcome.value1 == .refused
             let done = result.outcome.value1 == .done
             self.init(
-                line: result.sentence,
+                line: kind.result(platform, result),
                 said: refused ? result.hostWords.map { StartWords.hostSaid(platform, $0) } : nil,
                 page: done ? nil : open(URL(string: result.hostUrl)),
                 close: Words.Move.done
@@ -102,6 +151,15 @@ public struct MovePanel: Equatable, Sendable {
         case let .failed(sentence, page):
             self.init(line: sentence, tone: .problem, page: open(page), close: Words.Move.notNow)
         }
+    }
+
+    /// The panel with its verb held while it waits (a claim planned again for a new bid: the verb makes
+    /// only the bid the sentence names).
+    func waiting(_ waits: Bool) -> MovePanel {
+        MovePanel(
+            line: line, tone: tone, said: said, verb: verb, verbEnabled: verbEnabled && !waits, page: page,
+            pageSolid: pageSolid, close: close
+        )
     }
 
     private init(

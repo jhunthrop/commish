@@ -120,6 +120,11 @@ void test("the tables: the League home's, the box score's, then the shell's and 
 			'TierGroup',
 			'RunStamp',
 			'Bye',
+			'Waivers',
+			'WaiverHeads',
+			'Stash',
+			'Season',
+			'Strip',
 			'HeldPage',
 			'WeekTile',
 			'PlayerPage',
@@ -153,6 +158,11 @@ void test("the web's own words land in the JSON, the Swift and the Kotlin", asyn
 		/^Gap, drafters' ADP less our rank/
 	);
 	assert.equal(json('shared/words/player-card.json').none, '--');
+	assert.equal(json('shared/words/league-waivers.json').noGain, 'No gain over your roster');
+	assert.equal(json('shared/words/league-stash.json').backNow, 'Back this week');
+	assert.deepEqual(json('shared/words/league-stash.json').functions, ['back', 'taken']);
+	assert.equal(json('shared/words/league-waiver-heads.json').separator, ', ');
+	assert.equal(json('shared/words/league-season.json').gainAWeek, 'Gain a week');
 	assert.equal(json('shared/words/player-held.json').log, 'His game log is not written yet.');
 	assert.equal(json('shared/words/player-week-tile.json').sinceRead, 'since our read was written');
 	assert.deepEqual(json('shared/words/player-week-tile.json').functions, ['atRead']);

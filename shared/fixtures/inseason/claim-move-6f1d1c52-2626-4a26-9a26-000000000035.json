@@ -1,0 +1,12 @@
+{
+	"ok": true,
+	"data": {
+		"outcome": "done",
+		"sentence": "Done on ESPN. He is on your roster there now.",
+		"host_words": null,
+		"host_url": "https://fantasy.espn.com/football/league?leagueId=1081607624&seasonId=2026",
+		"move_id": "6f1d1c52-2626-4a26-9a26-0000000000f2",
+		"processes_at": null
+	},
+	"error": null
+}

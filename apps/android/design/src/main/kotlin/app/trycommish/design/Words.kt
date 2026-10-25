@@ -369,6 +369,56 @@ object Words {
         const val done = "Done"
     }
 
+    object Waivers {
+        const val close = "Close"
+        const val beats = "Beats"
+        const val rest = "A game"
+        const val starter = "Starter"
+        const val bench = "Bench"
+        const val onBye = "bye"
+        const val find = "Find a player"
+        const val noneFound = "No player free to add by that name."
+        const val gain = "Gain a week"
+        const val thisWeek = "Proj this week"
+        const val copied = "Copied"
+        const val copyFailed = "This browser would not copy his name."
+        const val noPickup = "No pickup beats your roster"
+        const val openSpot = "Open spot"
+        const val dropRule = "Its drop costs least."
+        const val clears = "Clears"
+        const val noGain = "No gain over your roster"
+        const val irBench = "IR, on your bench"
+    }
+
+    object WaiverHeads {
+        const val rest = "is our rest-of-season points a game"
+        const val avg = "his season average"
+        const val beats = "the player he would replace in your rest-of-season lineup"
+        const val separator = ", "
+    }
+
+    object Stash {
+        const val head = "Stash"
+        const val verb = "Stash"
+        const val backNow = "Back this week"
+        const val slot = "IR slot"
+        const val open = "Open"
+        const val drop = "Drop"
+        const val line = "Stash rows come back by the listed return date. A game is our rest-of-season points a game."
+        const val undated = "IR and out players without a return date are not listed."
+        const val late = "IR and out players back after the regular season are not listed."
+    }
+
+    object Season {
+        const val perGame = "A game"
+        const val gain = "Gain"
+        const val gainAWeek = "Gain a week"
+    }
+
+    object Strip {
+        const val best = "Best"
+    }
+
     object HeldPage {
         const val log = "His game log is not written yet."
         const val basis = "His figures are the board's. His game log and our read of him are not written yet."

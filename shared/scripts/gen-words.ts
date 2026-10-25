@@ -37,6 +37,7 @@ const BOX_MODULE = 'web/src/lib/league/box/box.ts';
 const BASIS_MODULE = 'web/src/lib/league/box/basis.ts';
 const LINEUP_MODULE = 'web/src/lib/league/box/lineup.ts';
 const DESIGNATION_MODULE = 'web/src/lib/format/designation.ts';
+const WAIVERS_MODULE = 'web/src/lib/league/box/waivers.ts';
 const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
 
 /** Every table the apps print from, the League home's first, then the box score's: its heads, the
@@ -47,8 +48,11 @@ const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
  * Matchup's (Lane 183): the words beside its box scores; then the Board's (Lane 182): its chips and heads,
  * its formats' chips, the Gap's definition, and the season pages' verbs; then the run's board on the Board
  * (Lane 190): a tier band's words, what its count counts, the run's stamp and a past bye's word; then the
- * player sheet's and page's (Lane 192): a held page's words, the week tile's, the page's facts, the
- * read's figures' labels and the words in place of a read not ready. */
+ * its formats' chips, the Gap's definition, and the season pages' verbs; then the Waivers' (Lane 186): its
+ * table, strip and drop panel, the heads' basis, the Stash group, the season figures' heads and the strip's
+ * mark; then the run's board on the Board (Lane 190): a tier band's words, what its count counts, the run's
+ * stamp and a past bye's word; then the player sheet's and page's (Lane 192): a held page's words, the
+ * week tile's, the page's facts, the read's figures' labels and the words in place of a read not ready. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -253,6 +257,36 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/format/bye.ts',
 		picks: ['BYE_WORDS'],
 		json: 'shared/words/bye.json'
+	},
+	{
+		name: 'Waivers',
+		module: WAIVERS_MODULE,
+		picks: ['WAIVERS'],
+		json: 'shared/words/league-waivers.json'
+	},
+	{
+		name: 'WaiverHeads',
+		module: WAIVERS_MODULE,
+		picks: ['HEAD_BASIS', ['separator', 'HEAD_SEPARATOR']],
+		json: 'shared/words/league-waiver-heads.json'
+	},
+	{
+		name: 'Stash',
+		module: WAIVERS_MODULE,
+		picks: ['STASH'],
+		json: 'shared/words/league-stash.json'
+	},
+	{
+		name: 'Season',
+		module: 'web/src/lib/league/box/season.ts',
+		picks: ['SEASON', ['gainAWeek', 'GAIN_A_WEEK']],
+		json: 'shared/words/league-season.json'
+	},
+	{
+		name: 'Strip',
+		module: 'web/src/lib/league/box/strip.ts',
+		picks: ['STRIP'],
+		json: 'shared/words/league-strip.json'
 	},
 	{
 		name: 'HeldPage',
