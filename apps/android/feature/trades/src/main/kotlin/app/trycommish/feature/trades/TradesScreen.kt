@@ -22,11 +22,18 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -119,6 +126,12 @@ fun TradesScreen(
     actions: TradeActions,
     modifier: Modifier = Modifier,
 ) {
+    val scroll = rememberScrollState()
+    var builderAt by remember { mutableIntStateOf(0) }
+    val open = ui.builder != null
+    // Build a trade or Build from this opens the builder above the finder: bring its head into view, so
+    // the tap lands on the scoreboard rather than in the middle of a roster pushed down under it.
+    LaunchedEffect(open) { if (open) scroll.animateScrollTo(builderAt) }
     Column(modifier.fillMaxSize().background(CommishTheme.colors.bg)) {
         PullToRefreshBox(isRefreshing = refreshing, onRefresh = actions.refresh, modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (val state = ui.state) {
@@ -132,7 +145,8 @@ fun TradesScreen(
                         stamp,
                         actions,
                         TradesPart.entries,
-                        Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                        Modifier.fillMaxSize().verticalScroll(scroll),
+                        onBuilderAt = { builderAt = it },
                     )
             }
         }
@@ -153,12 +167,23 @@ fun TradesPage(
     actions: TradeActions,
     parts: List<TradesPart>,
     modifier: Modifier = Modifier,
+    /** Where the builder's run starts in the page, so the screen can scroll to it when it opens. */
+    onBuilderAt: (Int) -> Unit = {},
 ) {
     Column(
         modifier.background(CommishTheme.colors.bg).padding(vertical = Tokens.Space.s4.dp),
         verticalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp),
     ) {
-        parts.forEach { part -> TradesPartView(part, model, ui, stamp, actions) }
+        // A closed builder draws nothing, and takes no gap in the column.
+        parts.filter { it != TradesPart.Builder || ui.builder != null }.forEach { part ->
+            val place =
+                if (part == TradesPart.Builder) {
+                    Modifier.onGloballyPositioned { onBuilderAt(it.positionInParent().y.toInt()) }
+                } else {
+                    Modifier
+                }
+            Box(place) { TradesPartView(part, model, ui, stamp, actions) }
+        }
     }
 }
 
