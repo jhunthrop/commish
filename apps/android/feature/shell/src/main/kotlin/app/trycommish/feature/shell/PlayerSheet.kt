@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,8 +29,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -77,12 +83,18 @@ fun PlayerSheet(
         // How much of the sheet is below the screen while it is partly open: the foot is lifted by it,
         // so the verb stays pinned at the sheet's visible foot at either height.
         var hidden by remember { mutableIntStateOf(0) }
+        val navigationBar = WindowInsets.navigationBars.getBottom(LocalDensity.current)
         ModalBottomSheet(onDismissRequest = host::close, sheetState = state, containerColor = CommishTheme.colors.bg) {
             PlayerSheetFrame(
                 playerSheetModel(player),
                 close,
                 { link -> host.followFullPage(link)?.let(openPlayer) },
-                Modifier.fillMaxHeight().onGloballyPositioned { hidden = it.size.height - it.boundsInWindow().height.toInt() },
+                Modifier.fillMaxHeight().onGloballyPositioned { frame ->
+                    // The frame's bottom past the window's foot above the navigation bar.
+                    val bottom = frame.positionInWindow().y + frame.size.height
+                    val usable = frame.findRootCoordinates().size.height - navigationBar
+                    hidden = (bottom - usable).toInt().coerceAtLeast(0)
+                },
                 footLift = hidden,
                 foot = { foot(player, close) },
             ) {
@@ -118,7 +130,13 @@ fun PlayerSheetFrame(
             SheetHead(model)
             content()
         }
-        Box(Modifier.offset { IntOffset(0, -footLift) }) { foot() }
+        val ground = CommishTheme.colors.bg
+        Box(
+            Modifier
+                .offset { IntOffset(0, -footLift) }
+                // The sheet's ground under the lifted foot, down to the frame's bottom, so no body shows below it.
+                .drawBehind { drawRect(ground, size = Size(size.width, size.height + footLift)) },
+        ) { foot() }
     }
 }
 
