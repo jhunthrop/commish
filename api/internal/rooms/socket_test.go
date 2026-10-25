@@ -2,12 +2,14 @@ package rooms_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -54,6 +56,13 @@ type roomHarness struct {
 
 func newRoomHarness(t *testing.T) roomHarness {
 	t.Helper()
+	return newRoomHarnessWith(t, func(b *auth.Bearer) rooms.DeviceSessions { return b })
+}
+
+// newRoomHarnessWith mounts the room with the bearer as cmd/room does,
+// the socket's re-read of a device token being devicesFor's.
+func newRoomHarnessWith(t *testing.T, devicesFor func(*auth.Bearer) rooms.DeviceSessions) roomHarness {
+	t.Helper()
 	pool := dbtest.Pool(t)
 	ctx := context.Background()
 	accounts := &auth.Store{Pool: pool}
@@ -84,7 +93,7 @@ func newRoomHarness(t *testing.T) roomHarness {
 	}
 	ticks := make(chan time.Time)
 	heartbeat := func() (<-chan time.Time, func()) { return ticks, func() {} }
-	socket := &rooms.Socket{Lobby: store, Hub: &rooms.Hub{Log: quietLog()}, Devices: bearer,
+	socket := &rooms.Socket{Lobby: store, Hub: &rooms.Hub{Log: quietLog()}, Devices: devicesFor(bearer),
 		Heartbeat: heartbeat, PingWait: testPingWait, Now: socketNow, Log: quietLog()}
 	mux := http.NewServeMux()
 	if err := server.Mount(mux, socket.Routes(), sessions, bearer, socketNow); err != nil {
@@ -178,6 +187,41 @@ func (h roomHarness) url(query string) string {
 // and answers the upgrade's status.
 func (h roomHarness) dial(query, token string, cookies []*http.Cookie) (*websocket.Conn, int) {
 	h.t.Helper()
+	conn, status, _ := h.dialBody(query, token, cookies)
+	return conn, status
+}
+
+// envelope is the API's error envelope on a refused upgrade.
+type envelope struct {
+	OK        bool    `json:"ok"`
+	Data      *string `json:"data"`
+	RequestID string  `json:"request_id"`
+	Error     struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+// refused dials, wants status, and answers the refusal's envelope.
+func (h roomHarness) refused(name, query, token string, cookies []*http.Cookie, status int) envelope {
+	h.t.Helper()
+	_, got, body := h.dialBody(query, token, cookies)
+	if got != status {
+		h.t.Fatalf("%s: %d, want %d", name, got, status)
+	}
+	var env envelope
+	if err := json.Unmarshal(body, &env); err != nil {
+		h.t.Fatalf("%s: the body %q is not the envelope: %v", name, body, err)
+	}
+	if env.OK || env.Data != nil || env.RequestID == "" {
+		h.t.Fatalf("%s: envelope %+v", name, env)
+	}
+	return env
+}
+
+// dialBody is dial with the refused upgrade's body.
+func (h roomHarness) dialBody(query, token string, cookies []*http.Cookie) (*websocket.Conn, int, []byte) {
+	h.t.Helper()
 	header := http.Header{}
 	if token != "" {
 		header.Set("Authorization", "Bearer "+token)
@@ -188,17 +232,19 @@ func (h roomHarness) dial(query, token string, cookies []*http.Cookie) (*websock
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	conn, resp, err := websocket.Dial(ctx, h.url(query), &websocket.DialOptions{HTTPHeader: header})
+	var body []byte
 	if resp != nil && resp.Body != nil {
+		body, _ = io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 	}
 	if err != nil {
 		if resp == nil {
 			h.t.Fatalf("dial: %v", err)
 		}
-		return nil, resp.StatusCode
+		return nil, resp.StatusCode, body
 	}
 	h.t.Cleanup(func() { _ = conn.CloseNow() })
-	return conn, http.StatusSwitchingProtocols
+	return conn, http.StatusSwitchingProtocols, nil
 }
 
 // welcome sends the hello and reads the welcome.
@@ -258,8 +304,9 @@ func TestBearerRefusals(t *testing.T) {
 		{"none", "", ""},
 	}
 	for _, c := range cases {
-		if _, status := h.dial(c.query, c.token, nil); status != http.StatusUnauthorized {
-			t.Fatalf("%s: %d, want 401", c.name, status)
+		env := h.refused(c.name, c.query, c.token, nil, http.StatusUnauthorized)
+		if env.Error.Code != httpx.CodeUnauthorized || env.Error.Message != auth.SignInMessage {
+			t.Fatalf("%s: %+v, want the api's 401", c.name, env.Error)
 		}
 	}
 }
@@ -275,8 +322,9 @@ func TestCookieStillWorksAndBearerWinsBesideIt(t *testing.T) {
 	}
 	h.welcome(conn)
 	bobCookies := h.signIn(h.bob.ID)
-	if _, status := h.dial("", "", bobCookies); status != http.StatusForbidden {
-		t.Fatalf("bob's cookie: %d, want 403", status)
+	env := h.refused("bob's cookie", "", "", bobCookies, http.StatusForbidden)
+	if env.Error.Code != httpx.CodeForbidden || env.Error.Message != "You do not have a seat in this room" {
+		t.Fatalf("bob's cookie: %+v", env.Error)
 	}
 	token, _ := h.pair(h.alice.ID, auth.KindIOS, socketNow())
 	conn, status = h.dial("", token, bobCookies)
@@ -363,5 +411,100 @@ func TestCommandsWhileAPingIsOut(t *testing.T) {
 	h.command(conn, queueCommand())
 	if frame := h.answer(conn); frame.Code != httpx.CodeConflict {
 		t.Fatalf("the socket after the pings: %+v", frame)
+	}
+}
+
+// flakyDevices is the socket's re-read of a device token answering errs
+// in turn, then auth.ErrNoDevice; each call is signalled on called.
+type flakyDevices struct {
+	mu     sync.Mutex
+	errs   []error
+	called chan struct{}
+}
+
+func (f *flakyDevices) SessionDevice(context.Context, *http.Request) (auth.Account, auth.Device, error) {
+	f.mu.Lock()
+	err := auth.ErrNoDevice
+	if len(f.errs) > 0 {
+		err, f.errs = f.errs[0], f.errs[1:]
+	}
+	f.mu.Unlock()
+	f.called <- struct{}{}
+	return auth.Account{}, auth.Device{}, err
+}
+
+func (f *flakyDevices) wait(t *testing.T) {
+	t.Helper()
+	select {
+	case <-f.called:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the beat did not re-read the token")
+	}
+}
+
+// readResult is one frame a background reader read, or its end.
+type readResult struct {
+	frame apitypes.RoomError
+	err   error
+}
+
+// reader reads every frame in the background, so the client answers the
+// server's pings while the test waits on something else.
+func reader(conn *websocket.Conn) <-chan readResult {
+	out := make(chan readResult, 8)
+	go func() {
+		for {
+			var frame apitypes.RoomError
+			err := wsjson.Read(context.Background(), conn, &frame)
+			out <- readResult{frame, err}
+			if err != nil {
+				return
+			}
+		}
+	}()
+	return out
+}
+
+// A failed re-read (a database blip) keeps the app's socket: only the
+// next beat's definite "revoked" closes it with the 401's frame and 1008.
+func TestTransientDeviceReadKeepsTheSocket(t *testing.T) {
+	flaky := &flakyDevices{errs: []error{errors.New("devices: resolve: connection reset")}, called: make(chan struct{}, 4)}
+	h := newRoomHarnessWith(t, func(*auth.Bearer) rooms.DeviceSessions { return flaky })
+	token, _ := h.pair(h.alice.ID, auth.KindIOS, socketNow())
+	conn, status := h.dial("", token, nil)
+	if status != http.StatusSwitchingProtocols {
+		t.Fatalf("refused: %d", status)
+	}
+	h.welcome(conn)
+	frames := reader(conn)
+	h.tick()
+	flaky.wait(t)
+	h.command(conn, queueCommand())
+	if r := <-frames; r.err != nil || r.frame.Code != httpx.CodeConflict {
+		t.Fatalf("after the failed read the socket did not answer its command first: %+v", r)
+	}
+	h.tick()
+	flaky.wait(t)
+	if r := <-frames; r.err != nil || r.frame.Code != httpx.CodeUnauthorized || r.frame.Message != auth.SignInMessage {
+		t.Fatalf("after the revocation: %+v", r)
+	}
+	r := <-frames
+	var closeErr websocket.CloseError
+	if !errors.As(r.err, &closeErr) || closeErr.Code != websocket.StatusPolicyViolation || closeErr.Reason != "signed out" {
+		t.Fatalf("close: %v", r.err)
+	}
+}
+
+// A device upgrade on a room with no device check is refused (500) and
+// never upgraded, rather than left unchecked.
+func TestDeviceSocketWithoutACheckIsRefused(t *testing.T) {
+	h := newRoomHarnessWith(t, func(*auth.Bearer) rooms.DeviceSessions { return nil })
+	token, _ := h.pair(h.alice.ID, auth.KindIOS, socketNow())
+	env := h.refused("no device check", "", token, nil, http.StatusInternalServerError)
+	if env.Error.Code != httpx.CodeInternal {
+		t.Fatalf("%+v", env.Error)
+	}
+	if _, status := h.dial("", "", h.signIn(h.alice.ID)); status != http.StatusSwitchingProtocols {
+		t.Fatalf("the cookie upgrade beside it: %d", status)
 	}
 }

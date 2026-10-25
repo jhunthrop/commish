@@ -147,8 +147,14 @@ func (s *Socket) serve(w http.ResponseWriter, r *http.Request) {
 // deviceCheck is how a socket opened with an app's device token is
 // re-read while it stays open: nil for a cookie's socket. A device socket
 // on a service with no Devices is refused, never left unchecked.
+//
+// The check answers auth.ErrNoDevice only when the token is definitely
+// revoked or lapsed. A failed read (a database blip) is logged and
+// answers nil: the socket stays and is re-read at the next beat, since
+// the token was good one beat earlier.
 func (s *Socket) deviceCheck(w http.ResponseWriter, r *http.Request) (func(context.Context) error, bool) {
-	if _, byDevice := auth.DeviceFrom(r.Context()); !byDevice {
+	dev, byDevice := auth.DeviceFrom(r.Context())
+	if !byDevice {
 		return nil, true
 	}
 	if s.Devices == nil {
@@ -156,7 +162,14 @@ func (s *Socket) deviceCheck(w http.ResponseWriter, r *http.Request) (func(conte
 		return nil, false
 	}
 	return func(ctx context.Context) error {
-		_, _, err := s.Devices.SessionDevice(ctx, r)
+		readCtx, cancel := context.WithTimeout(ctx, commandTimeout)
+		defer cancel()
+		_, _, err := s.Devices.SessionDevice(readCtx, r)
+		if err != nil && !errors.Is(err, auth.ErrNoDevice) {
+			s.Log.Warn("rooms: device re-read failed, kept until the next beat",
+				"request_id", httpx.RequestIDFrom(r.Context()), "device", dev.ID, "err", err)
+			return nil
+		}
 		return err
 	}, true
 }
@@ -366,14 +379,11 @@ func (s *Socket) beat(ctx context.Context, conn *websocket.Conn, roomID, account
 
 // stillSignedIn re-reads an app socket's device token: a revoked or
 // lapsed one gets the 401's error frame and the socket is closed with
-// 1008, so the app signs out as on a 401. closed reports that close.
+// 1008, so the app signs out as on a 401. closed reports that close; any
+// other answer keeps the socket (deviceCheck logs a failed read).
 func (s *Socket) stillSignedIn(ctx context.Context, conn *websocket.Conn, signedIn func(context.Context) error) (closed bool, err error) {
-	if signedIn == nil {
+	if signedIn == nil || !errors.Is(signedIn(ctx), auth.ErrNoDevice) {
 		return false, nil
-	}
-	err = signedIn(ctx)
-	if !errors.Is(err, auth.ErrNoDevice) {
-		return false, err
 	}
 	_ = s.refuse(ctx, conn, httpx.CodeUnauthorized, auth.SignInMessage)
 	return true, conn.Close(websocket.StatusPolicyViolation, signedOutReason)

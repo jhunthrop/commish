@@ -10,7 +10,7 @@ document is fixed.
 
 The room's state is its log, `app.room_actions`: every row has a `seq`, one more than the row before
 it. A client keeps the last `seq` it applied and nothing else it cannot rebuild, so a socket that
-drops reconnects by the room id and that `seq` and loses nothing (socket.go:5-6).
+drops reconnects by the room id and that `seq` and loses nothing (socket.go, the package comment).
 
 ## 1. Where the socket is
 
@@ -44,8 +44,8 @@ The service answers these as plain HTTP with the API's error envelope, before an
 | Status | Code | When |
 | --- | --- | --- |
 | 401 | `unauthorized` | not signed in |
-| 403 | `forbidden` | the account holds no seat in the room, now or before it left (socket.go:140-143, "You do not have a seat in this room") |
-| 404 | `not_found` | no such room (socket.go:132-134) |
+| 403 | `forbidden` | the account holds no seat in the room, now or before it left (`admit`, "You do not have a seat in this room") |
+| 404 | `not_found` | no such room (`admit`) |
 | 429 | `rate_limited` | more than 30 upgrades a minute |
 
 A browser never sees an upgrade's status, so the web asks `GET /lobbies/{id}` when a socket closes
@@ -72,9 +72,9 @@ The first frame is the client's, sent as soon as the socket opens (lobby-socket.
 { "type": "hello", "last_seq": 0 }
 ```
 
-The service waits 10 seconds for it (`helloTimeout`, socket.go:35). Anything else first, or a
+The service waits 10 seconds for it (`helloTimeout`). Anything else first, or a
 negative `last_seq`, is answered with an error frame and the socket is closed with 1008
-(socket.go:199-202):
+(`session`):
 
 ```json
 { "type": "error", "code": "invalid", "message": "The first message must be a hello with the last seq you applied" }
@@ -85,7 +85,7 @@ Close: code `1008`, reason `hello expected`.
 ## 4. The welcome
 
 The service answers the hello with every row after `last_seq`, the room's latest `seq` and its own
-clock (socket.go:222-232). On connecting, a drafter who had left is given the seat back
+clock (`session`). On connecting, a drafter who had left is given the seat back
 (`SEAT_RETURNED`) and marked present.
 
 ```json
@@ -111,8 +111,8 @@ clock (socket.go:222-232). On connecting, a drafter who had left is given the se
 ## 5. Updates
 
 Every write to the room's log goes out to every socket on the room in `seq` order, as an update with
-the rows after the last one that socket was sent (`catchUp`, socket.go:288-296). A notification lost
-while the hub reconnected is caught up at the latest one ping later (socket.go:275-279).
+the rows after the last one that socket was sent (`catchUp`). A notification lost
+while the hub reconnected is caught up at the latest one ping later (`beat`).
 
 ```json
 {
@@ -130,7 +130,7 @@ while the hub reconnected is caught up at the latest one ping later (socket.go:2
 ```
 
 The client applies rows strictly in `seq` order and records the highest `seq` it applied
-(lobby-socket.ts:111-115). What a row carries (openapi.yaml `RoomAction`, socket.go:159-183):
+(lobby-socket.ts:111-115). What a row carries (openapi.yaml `RoomAction`, `wire`):
 
 - `SEAT_JOINED` (payload `handle`), `SEAT_LEFT` (payload `freed` when a filling room gave the seat
   up, otherwise its stand-in drafts), `SEAT_RETURNED`, `ROOM_STARTED` (payload `bots`, the seats bots
@@ -173,7 +173,7 @@ update. The command itself has no acknowledgement frame: the client sees its pic
 ### Refused
 
 A refused command is answered with an error frame and the socket stays open
-(socket.go:312-349). The message is the room's own words, shown to the drafter as they are
+(`command`). The message is the room's own words, shown to the drafter as they are
 (`onrefused`, lobby-socket.ts:102-104):
 
 ```json
@@ -192,7 +192,7 @@ A refused command is answered with an error frame and the socket stays open
 The command budget is per seat, shared by every socket the seat holds on the instance, one bucket
 per type (api/internal/rooms/limits.go:13-30): `queue` 5 a second with a burst of 10, `pick` 2 with
 3, `leave` 1 with 2, any other 1 with 2. A socket that has had 30 commands dropped
-(`abusiveDropped`) is closed with 1008, reason `too many commands` (socket.go:248-251).
+(`abusiveDropped`) is closed with 1008, reason `too many commands` (`session`).
 
 ## 7. Closing, and the 1008 close
 
@@ -201,11 +201,11 @@ sends an error frame saying why first:
 
 | Reason on the close | Error frame first | Where |
 | --- | --- | --- |
-| `hello expected` | `invalid`: "The first message must be a hello with the last seq you applied" | socket.go:199-202 |
-| `seat over its socket budget` | `rate_limited`: "This seat already has three tabs open on the room. Close one and reload." | socket.go:108-112, limits.go:47 |
-| `seat over its socket budget` | `rate_limited`: "This seat is reconnecting too fast. Wait a few seconds and reload." | socket.go:108-112, limits.go:48 |
-| `too many commands` | none for the closing command itself, only the `rate_limited` refusals before it | socket.go:248-251 |
-| `signed out` | `unauthorized`: "Sign in to do that" | an app's socket whose device token was revoked or lapsed, read at every ping (socket.go `stillSignedIn`); the app signs out as on a 401. A cookie's socket is not re-read. |
+| `hello expected` | `invalid`: "The first message must be a hello with the last seq you applied" | `session` |
+| `seat over its socket budget` | `rate_limited`: "This seat already has three tabs open on the room. Close one and reload." | `serve`, limits.go `open` |
+| `seat over its socket budget` | `rate_limited`: "This seat is reconnecting too fast. Wait a few seconds and reload." | `serve`, limits.go `open` |
+| `too many commands` | none for the closing command itself, only the `rate_limited` refusals before it | `session` |
+| `signed out` | `unauthorized`: "Sign in to do that" | an app's socket whose device token was revoked, read at every beat (`beat`, `stillSignedIn`); the app signs out as on a 401. Each read notes the token's use (hourly), so an open socket keeps its token from lapsing: in practice this close is a revocation. A failed read (a database blip) keeps the socket until the next beat. A cookie's socket is not re-read. |
 
 The socket budget is per seat on the instance (limits.go:32-43): at most 3 sockets open at once, a
 new one at most 12 a minute after a burst of 6; a seat with no socket for 10 minutes is forgotten.
@@ -215,15 +215,15 @@ A client that is closed with 1008 stops for good and shows the error frame's mes
 
 A client leaving the room closes with 1000, reason `left the page` (lobby-socket.ts:124-128), and
 stops retrying. When a drafter's last socket on an instance closes, the seat goes to its stand-in at
-once (`Disconnect`, socket.go:207-215); the drafter's next socket takes it back.
+once (`Disconnect`, from `session`); the drafter's next socket takes it back.
 
 ## 8. Keeping the socket alive
 
-The service pings every 10 seconds and gives a pong 5 (socket.go:36-37); a peer that misses it is
+The service pings every 10 seconds and gives a pong 5 (`pingEvery`, `pingTimeout`), the ping waiting off the command loop so commands keep flowing while a pong is due (`ping`); a peer that misses it is
 dropped, well inside a 30 second pick clock, so its seat drafts by its stand-in before the clock
 would have run out. Each ping also marks the seat present. A client answers pings as the WebSocket
 protocol says (every platform's WebSocket does so by itself) and sends nothing of its own to keep
-the socket open. Frames are JSON text, at most 8 KiB from the client (`maxMessage`, socket.go:40).
+the socket open. Frames are JSON text, at most 8 KiB from the client (`maxMessage`).
 
 ## 9. Reconnecting: the retry ladder
 
