@@ -161,6 +161,8 @@ private fun LogLine(
     head: Boolean = false,
     quiet: Boolean = false,
     total: Boolean = false,
+    /** The first figure's share of the row: a log's Pts is wider than its columns, a table's rank is not. */
+    leadWeight: Float = LEAD_FIGURE_WEIGHT,
 ) {
     val c = CommishTheme.colors
     val ink = if (head || quiet) c.ink3 else c.ink
@@ -182,7 +184,7 @@ private fun LogLine(
                     color = ink,
                     textAlign = TextAlign.End,
                     maxLines = if (head) HEAD_LINES else 1,
-                    modifier = Modifier.weight(if (index == 0) LEAD_FIGURE_WEIGHT else 1f).padding(start = 2.dp),
+                    modifier = Modifier.weight(if (index == 0) leadWeight else 1f).padding(start = 2.dp),
                 )
             }
         }
@@ -282,8 +284,8 @@ fun TierBoxView(box: TierBox) {
 fun FormatsTableView(table: FormatsTable) {
     Column(Modifier.fillMaxWidth()) {
         val heads = listOf(Words.Box.ourRank, table.head, Words.PlayerPage.overReplacement, Words.PlayerPage.tier)
-        LogLine(LogCells(Words.PlayerPage.format, "", heads), head = true)
-        table.rows.forEach { LogLine(LogCells("", it.label, listOf(it.rank, it.points, it.vor, it.tier))) }
+        LogLine(LogCells(Words.PlayerPage.format, "", heads), head = true, leadWeight = 1f)
+        table.rows.forEach { LogLine(LogCells("", it.label, listOf(it.rank, it.points, it.vor, it.tier)), leadWeight = 1f) }
         table.note?.let { BasisLines(listOf(it)) }
     }
 }
