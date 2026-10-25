@@ -381,7 +381,8 @@ struct StartSheetTests {
         )
         let mahomes = try #require(model.starters.first?.sheetPlayer)
         #expect(mahomes == SheetPlayer(
-            id: "4046", slug: "patrick-mahomes", name: "Patrick Mahomes", position: "QB", rank: "12", club: "KC"
+            id: "4046", slug: "patrick-mahomes", name: "Patrick Mahomes", position: "QB", rank: "12", club: "KC",
+            boardID: "3139477"
         ))
         let texans = try #require(model.starters.first { $0.row.position == "D/ST" })
         #expect(texans.sheetPlayer == nil)

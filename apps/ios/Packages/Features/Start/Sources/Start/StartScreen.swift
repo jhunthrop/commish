@@ -75,6 +75,13 @@ public struct StartView: View {
         self.leagueID = leagueID
     }
 
+    /// The sheet's verb on the Lineup (StartScreen.svelte's backToLineupOffer): back onto his row, his
+    /// swap said under it where the advice makes one.
+    static func offer(_ model: StartModel, _ player: SheetPlayer) -> SheetOffer {
+        let row = (model.starters + model.bench + model.reserve).first { $0.sheetPlayer?.id == player.id }?.row
+        return SheetOffer(label: Words.Shelf.backToLineup, line: row.flatMap(model.swapLine), lineup: true) {}
+    }
+
     public var body: some View {
         let theme = Theme(colorScheme)
         Group {
@@ -85,7 +92,7 @@ public struct StartView: View {
                 ScrollView {
                     StartScreen(
                         model: model, stamp: viewModel.stampWords, opened: viewModel.opened,
-                        open: { sheet.open($0) }, toggleWhy: { viewModel.toggleWhy($0) }
+                        open: { sheet.open($0, offer: Self.offer(model, $0)) }, toggleWhy: { viewModel.toggleWhy($0) }
                     )
                 }
                 .refreshable { await viewModel.load(leagueID: leagueID) }

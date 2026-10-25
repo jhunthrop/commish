@@ -58,6 +58,7 @@ import { withRuleList } from '../../web/scripts/inseason-fixture/week.ts';
 import type { HostMoveResult, WaiverAdvice } from '../../web/src/lib/league/inseason/api.ts';
 import { BOARD_OUTPUT, renderBoard } from './board-parity.ts';
 import { BOARD_RUN_OUTPUT, renderBoardRun } from './board-run-parity.ts';
+import { PLAYER_SHEET_OUTPUT, renderPlayerSheet } from './player-sheet-parity.ts';
 import {
 	builderAt,
 	checkAt,
@@ -296,7 +297,12 @@ function switchSets(attached: readonly SwitchLeague[]): Record<string, readonly 
 
 /** The line under a league in the switch (context/menu-words.ts leagueLine) for every platform, every
  * scoring preset and both the boards a league can read on that change it (PPR, superflex). */
-function switchLines(): { host: string; scoring: string; format: string; line: string }[] {
+function switchLines(): {
+	host: string;
+	scoring: string;
+	format: string;
+	line: string;
+}[] {
 	const hosts = ['sleeper', 'mfl', 'ffpc', 'yahoo', 'espn'] as const;
 	const scorings = ['ppr', 'half_ppr', 'standard', 'te_premium'] as const;
 	const formats = ['ppr', 'superflex'] as const;
@@ -611,6 +617,15 @@ export async function generate(): Promise<Outputs> {
 			)
 		],
 		[WAIVERS_OUTPUT, await renderWaivers(sync.host)],
+		[
+			PLAYER_SHEET_OUTPUT,
+			await renderPlayerSheet(
+				generatedBy(
+					SCRIPT,
+					"web/src/lib/player (the shelf: week-read.ts, status-held.ts, week-words.ts, shelf.ts) and server/pages/player.ts (the page's words) over the fixture runs and shared/fixtures/inseason"
+				)
+			)
+		],
 		[TRADES_OUTPUT, await renderTrades(sync.host)],
 		[
 			ACCOUNT_OUTPUT,

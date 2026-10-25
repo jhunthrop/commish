@@ -107,9 +107,12 @@ struct SheetHead: View {
 
 public extension View {
     /// Presents the player sheet over this screen for the player the host shows, as a native sheet at
-    /// half the screen and the whole of it; `content` fills its body for that player.
+    /// half the screen and the whole of it; `content` fills its body for that player. A player's page
+    /// opened from inside it (its Full page) closes the sheet and goes to `openPage` with his slug: the
+    /// override sits outside the sheet, where the sheet's content takes its environment from.
     func playerSheet(
         _ host: PlayerSheetHost,
+        openPage: @escaping @MainActor (String) -> Void,
         @ViewBuilder content: @escaping (SheetPlayer) -> some View
     ) -> some View {
         sheet(item: Binding(get: { host.shown }, set: { host.shown = $0 })) { player in
@@ -117,5 +120,13 @@ public extension View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .environment(\.openURL, OpenURLAction { url in
+            guard case let .player(slug)? = AppLink.of(url) else {
+                return .systemAction
+            }
+            host.close()
+            openPage(slug)
+            return .handled
+        })
     }
 }

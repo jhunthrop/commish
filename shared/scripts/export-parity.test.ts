@@ -16,6 +16,8 @@ import { WAIVERS_OUTPUT } from './waivers-parity.ts';
 import { TRADES_OUTPUT } from './trades-parity.ts';
 import { BOARD_OUTPUT } from './board-parity.ts';
 import { BOARD_RUN_OUTPUT } from './board-run-parity.ts';
+import { PLAYER_SHEET_OUTPUT } from './player-sheet-parity.ts';
+import { SHEET_PLAYER_IDS } from './sheet-players.ts';
 import { ACCOUNT_OUTPUT } from './account-parity.ts';
 import { GAP_WORDS } from '../../web/src/lib/run/board-basis.ts';
 
@@ -184,6 +186,77 @@ void test("the board's run parity: the stand-in's tiers and cliffs, the fixture 
 		rest?.views.every((view) => view.basis.every((part) => !part.startsWith('ADP from'))),
 		'the rest of the season names no drafts'
 	);
+});
+
+void test("the player sheet's parity: every held read, each sheet player at each clock, every page's words", async () => {
+	const parity = JSON.parse((await generate()).get(PLAYER_SHEET_OUTPUT) ?? '{}') as {
+		weekRead: { shown: { withheld: boolean; words?: string } }[];
+		noRead: { state: string | null; words: string }[];
+		statusHeld: { built: { body: string | null } }[];
+		sheets: {
+			player: string;
+			read: { written: boolean; withheld?: boolean; words?: string };
+			tiles: { label: string; value: string }[];
+		}[];
+		pages: { run: string; underway: boolean; words: { drafters: string } }[];
+		verbs: { label: string }[];
+	};
+	const words = parity.weekRead.flatMap((c) => (c.shown.withheld ? [c.shown.words] : []));
+	assert.ok(words.includes('The published projection moved since this read was written.'), 'moved');
+	assert.ok(
+		words.includes('Our read for this game was not written.'),
+		'not written once kicked off'
+	);
+	assert.ok(
+		parity.weekRead.some((c) => !c.shown.withheld),
+		'a read that stands'
+	);
+	assert.deepEqual(
+		parity.noRead.map((c) => c.words),
+		[
+			'Our read for his next game is not written yet.',
+			'Our read for his next game is not written yet.',
+			'Our read for this game was not written.',
+			'Our read for this game was not written.'
+		]
+	);
+	assert.ok(
+		parity.statusHeld.some((c) => c.built.body === null),
+		'a read held for his status'
+	);
+	assert.ok(
+		parity.statusHeld.some((c) => c.built.body !== null),
+		'a read that stands'
+	);
+	for (const id of SHEET_PLAYER_IDS)
+		assert.ok(
+			parity.sheets.some((c) => c.player === id),
+			id
+		);
+	const reads = parity.sheets.map((c) => c.read);
+	assert.ok(
+		reads.some((r) => r.written && r.withheld === false),
+		'a written read on a sheet'
+	);
+	assert.ok(
+		reads.some((r) => !r.written),
+		'a sheet with no read written'
+	);
+	assert.ok(
+		reads.some((r) => r.words?.startsWith('His status changed since this read was written.')),
+		'a sheet held for his status'
+	);
+	assert.ok(
+		parity.sheets.every((c) => c.tiles.length === 6),
+		'six tiles on every sheet'
+	);
+	assert.ok(
+		parity.sheets.some((c) => c.tiles[0]?.label === 'Pts'),
+		'Pts once kicked off'
+	);
+	assert.deepEqual([...new Set(parity.pages.map((p) => p.underway))].sort(), [false, true]);
+	assert.ok(parity.pages.every((p) => p.words.drafters.length > 0));
+	assert.equal(parity.verbs.length, 35);
 });
 
 void test("the Waivers at every clock, each ESPN stand-in's with its claim made here, and the claim's words (Lane 186)", async () => {
