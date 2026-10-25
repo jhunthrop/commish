@@ -110,6 +110,10 @@ const ALLOWED: Readonly<Record<string, Site>> = {
 		why: "the stand-in Disney session's times, set against the live widget's clock"
 	},
 	'scripts/room-shots.ts': { reads: 2, why: 'a wait deadline, nothing drawn' },
+	'scripts/record-companion.ts': {
+		reads: 2,
+		why: 'the moments after the replay starts to read it at, nothing drawn'
+	},
 	'scripts/week-order-shots.ts': { reads: 2, why: 'a wait deadline, nothing drawn' },
 	'scripts/shots.ts': { reads: 2, why: 'a server start deadline, nothing drawn' },
 	'scripts/run-from-mock-data.ts': {
