@@ -8,6 +8,9 @@ namingStrategy: idiomatic
 filter:
   operations:
     - listAttached
+    - detachLeague
+    - restoreLeague
+    - listDevices
     - leagueSync
     - leagueScoreboard
     - deviceMe
