@@ -37,7 +37,7 @@ struct ReferenceChipTests {
     }
 
     /// Waits until the gate holds a read, so the next tap is made while that read is in flight.
-    private func untilHeld(_ gate: Gate) async {
+    private func untilHeld(_ gate: ReadGate) async {
         while await !gate.holding {
             await Task.yield()
         }
@@ -64,7 +64,7 @@ struct ReferenceChipTests {
     }
 
     @Test func aChipTappedBackDuringAReadEndsOnTheLastTap() async throws {
-        let gate = Gate(holding: "half-ppr-12")
+        let gate = ReadGate(holding: "half-ppr-12")
         let viewModel = adp(SwitchingRun(gate: gate), cache: cache())
         await viewModel.load()
         let slow = Task { await viewModel.choose(format: "half-ppr-12") }
@@ -80,7 +80,7 @@ struct ReferenceChipTests {
     }
 
     @Test func aChipAndAPickCloseTogetherBothLand() async throws {
-        let gate = Gate(holding: "half-ppr-12")
+        let gate = ReadGate(holding: "half-ppr-12")
         let viewModel = RunScreenViewModel.compare(
             slugs: ["jahmyr-gibbs", "josh-allen"], run: SwitchingRun(gate: gate), pages: StubPages(.contract),
             cache: cache(), clock: FixedClock(Self.now), zone: Fixtures.zone
@@ -145,7 +145,7 @@ struct ReferenceChipTests {
 }
 
 /// Holds one read until released: the board of `holding`, or, when armed, the next ADP read.
-actor Gate {
+actor ReadGate {
     let format: String
     private var adpArmed = false
     private var waiting: CheckedContinuation<Void, Never>?
@@ -189,10 +189,10 @@ actor Gate {
 /// anew), so a format switch can be read; each file with its own ETag; a gate holding a read.
 actor SwitchingRun: RunAPI {
     let run = StubRun(.contract)
-    let gate: Gate?
+    let gate: ReadGate?
     private(set) var unchangedBoards = 0
 
-    init(gate: Gate? = nil) {
+    init(gate: ReadGate? = nil) {
         self.gate = gate
     }
 
