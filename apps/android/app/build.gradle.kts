@@ -72,6 +72,7 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":feature:leaguehome"))
     implementation(project(":feature:matchup"))
+    implementation(project(":feature:board"))
     implementation(project(":feature:shell"))
     implementation(project(":feature:start"))
     implementation(libs.activity.compose)

@@ -59,7 +59,7 @@ private val PAGES: List<RailItem> =
     (Rail.byKey.values.flatten() + Rail.withoutLeague + Rail.withoutLeagueBySeason.values.flatten()).distinctBy { it.page }
 
 /** The tabs drawn by their own screens; the rest show their name until their lane lands. */
-private val LIVE_PAGES = setOf(LEAGUE_PAGE, LINEUP_PAGE, MATCHUP_PAGE)
+private val LIVE_PAGES = setOf(LEAGUE_PAGE, LINEUP_PAGE, MATCHUP_PAGE, BOARD_PAGE)
 
 /** The pushed screens' routes, one per ShellRoute. */
 private object Routes {
@@ -82,7 +82,8 @@ private object Routes {
  * the account's way in) and the web's phone bar for the shown league's phase, or with none the site's
  * season (Rail.generated.kt), a back stack per tab, and the one player sheet over all of it. Choosing
  * a league shows it, writes it to the site, and opens its home: the League tab where the bar has one,
- * else the home pushed on the tab in view (B149). League, Lineup and Matchup are live; the rest show their name.
+ * else the home pushed on the tab in view (B149). League, Lineup, Matchup and the board (the Board item, and Rest of season in season with no
+ * league) are live; the rest show their name.
  * A home's Open Lineup opens the Lineup tab for the league shown, else the lineup on the site.
  */
 @Composable
@@ -161,7 +162,7 @@ fun Shell(
             bottomBar = { PhoneTabBar(bar, tab) { openTab(it.page) } },
         ) { padding ->
             Box(Modifier.padding(padding)) {
-                Pages(graph, nav, state, shell::open, openLineup)
+                Pages(graph, nav, state, bar, shell::open, openLineup)
                 if (switchOpen) {
                     Box(
                         Modifier
@@ -186,6 +187,7 @@ private fun Pages(
     graph: AppGraph,
     nav: NavHostController,
     state: ShellState,
+    bar: List<RailItem>,
     retry: () -> Unit,
     onOpenLineup: (leagueId: String) -> Unit,
 ) {
@@ -193,6 +195,10 @@ private fun Pages(
         composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup) }
         composable(LINEUP_PAGE) { StartTab(graph, state, retry) }
         composable(MATCHUP_PAGE) { MatchupTab(graph, state, retry) }
+        composable(BOARD_PAGE) {
+            val following = (state as? ShellState.Ready)?.selected != null
+            boardInSeason(bar)?.let { BoardTab(graph, it, following) }
+        }
         PAGES.filter { it.page !in LIVE_PAGES }.forEach { item ->
             composable(item.page) { NamedScreen(item.label) }
         }
