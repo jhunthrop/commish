@@ -149,9 +149,6 @@ public enum RunWords {
 
 /// A board row's figures as the phone prints them (web/src/lib/format/number.ts and gap.ts).
 public enum BoardFigures {
-    /// format/number.ts MINUS: a negative figure's sign.
-    static let minus = "\u{2212}"
-
     /// His projected points, "262.1"; the empty figure for none.
     public static func projected(_ value: Double?) -> String {
         value.map { Formatting.fixed($0) } ?? Words.Box.none
@@ -159,8 +156,7 @@ public enum BoardFigures {
 
     /// number.ts signed: "+113.9", "−12.5", "+0.0" for a figure that rounds to nothing.
     public static func signed(_ value: Double) -> String {
-        let magnitude = Formatting.fixed(abs(value))
-        return value < 0 && Double(magnitude) != 0 ? "\(minus)\(magnitude)" : "+\(magnitude)"
+        Formatting.signed(value)
     }
 
     /// gap.ts gapText: "+1.8", "−4.5", "0.0", the empty figure for none.

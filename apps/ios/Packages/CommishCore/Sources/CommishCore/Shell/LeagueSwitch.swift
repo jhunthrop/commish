@@ -61,6 +61,10 @@ public enum ShellRoute: Hashable, Sendable {
     case club(abbr: String)
     /// The strength of schedule.
     case schedule
+    /// The live-draft companion's start page (/companion/new), with the development replay when asked.
+    case companionNew(replay: Bool)
+    /// A followed draft (/companion/<id>).
+    case companion(id: String)
 
     public enum Destination: Equatable, Sendable {
         case tab(String)
