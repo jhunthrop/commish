@@ -92,6 +92,9 @@ class SignOutReturnTest {
         compose.waitForIdle()
         assertEquals(listOf(AccountFixtures.SHOWN[1]), stub.detached)
 
+        // The member goes back to the League tab: the Matchup tab's stack, the Account in it, is saved.
+        compose.runOnIdle { nav.openTab(LEAGUE) }
+        compose.waitForIdle()
         // Sign out inside the window, then the shell's reaction to signedIn turning false.
         compose.runOnIdle { vm.signOut() }
         assertFalse(state.signedIn.value)
