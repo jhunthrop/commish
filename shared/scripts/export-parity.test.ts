@@ -1,27 +1,80 @@
 // The parity export: the web's League home readers over the shared fixtures, the file the apps' ports
 // are held to. Run with `node --test shared/scripts/*.test.ts`.
-import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { CLOCKS, generate, instantOf, OUTPUT } from './export-parity.ts';
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import {
+  CLOCKS,
+  generate,
+  instantOf,
+  OUTPUT,
+  RAIL_OUTPUT,
+  SHELL_OUTPUT,
+  SITE_PHASES,
+} from "./export-parity.ts";
 
-void test('a file clock reads back as its instant', () => {
-	assert.equal(instantOf('2026-10-18T18-56-00Z'), '2026-10-18T18:56:00.000Z');
+void test("a file clock reads back as its instant", () => {
+  assert.equal(instantOf("2026-10-18T18-56-00Z"), "2026-10-18T18:56:00.000Z");
 });
 
-void test('every clock carries the bugs, the twelve standings rows and a team basis', async () => {
-	const parity = JSON.parse((await generate()).get(OUTPUT) ?? '{}') as {
-		clocks: Record<string, { bugs: unknown[]; standings: { me: boolean }[]; teamBasis: string }>;
-		moves: unknown[];
-		seeding: string | null;
-	};
-	assert.deepEqual(Object.keys(parity.clocks), [...CLOCKS]);
-	for (const clock of CLOCKS) {
-		const home = parity.clocks[clock];
-		assert.equal(home?.bugs.length, 6, clock);
-		assert.equal(home?.standings.length, 12, clock);
-		assert.equal(home?.standings.filter((r) => r.me).length, 1, clock);
-		assert.match(home?.teamBasis ?? '', /^A team's Proj adds/, clock);
-	}
-	assert.equal(parity.moves.length, 15);
-	assert.match(parity.seeding ?? '', /^FFPC seeds 4 for the playoffs/);
+void test("every clock carries the bugs, the twelve standings rows and a team basis", async () => {
+  const parity = JSON.parse((await generate()).get(OUTPUT) ?? "{}") as {
+    clocks: Record<
+      string,
+      { bugs: unknown[]; standings: { me: boolean }[]; teamBasis: string }
+    >;
+    moves: unknown[];
+    seeding: string | null;
+  };
+  assert.deepEqual(Object.keys(parity.clocks), [...CLOCKS]);
+  for (const clock of CLOCKS) {
+    const home = parity.clocks[clock];
+    assert.equal(home?.bugs.length, 6, clock);
+    assert.equal(home?.standings.length, 12, clock);
+    assert.equal(home?.standings.filter((r) => r.me).length, 1, clock);
+    assert.match(home?.teamBasis ?? "", /^A team's Proj adds/, clock);
+  }
+  assert.equal(parity.moves.length, 15);
+  assert.match(parity.seeding ?? "", /^FFPC seeds 4 for the playoffs/);
+});
+
+void test("with no league the bar follows the site season: the draft bar outside it, the season bar in it", async () => {
+  const rail = JSON.parse((await generate()).get(RAIL_OUTPUT) ?? "{}") as {
+    phases: Record<string, { key: string }[]>;
+    withoutLeague: { key: string }[];
+    withoutLeagueBySeason: Record<string, { key: string }[]>;
+    account: { key: string; label: string };
+  };
+  assert.deepEqual(Object.keys(rail.withoutLeagueBySeason), [...SITE_PHASES]);
+  assert.deepEqual(rail.withoutLeagueBySeason.preseason, rail.phases.pre_draft);
+  assert.deepEqual(rail.withoutLeagueBySeason.offseason, rail.phases.offseason);
+  assert.deepEqual(rail.withoutLeagueBySeason.in_season, rail.withoutLeague);
+  assert.deepEqual(rail.withoutLeagueBySeason.playoffs, rail.withoutLeague);
+  assert.deepEqual(rail.account, { key: "account", label: "Account" });
+});
+
+void test("the switch's phase words appear only where the leagues' phases differ", async () => {
+  const shell = JSON.parse((await generate()).get(SHELL_OUTPUT) ?? "{}") as {
+    cases: {
+      set: string;
+      leagues: { id: string; name: string }[];
+      names: Record<string, string>;
+      phases: Record<string, string>;
+    }[];
+    sheetLoading: string;
+  };
+  assert.equal(shell.cases.length, 12);
+  for (const c of shell.cases) {
+    assert.equal(Object.keys(c.names).length, c.leagues.length, c.set);
+    assert.equal(
+      Object.keys(c.phases).length,
+      c.set === "oneSeason" ? 0 : c.leagues.length,
+      c.set,
+    );
+  }
+  const unnamed = shell.cases.find((c) => c.set === "withUnnamed");
+  assert.equal(
+    unnamed?.names["6f1d1c52-2626-4a26-9a26-000000000099"],
+    "Your Yahoo league",
+  );
+  assert.match(shell.sheetLoading, /read as the page opens\.$/);
 });

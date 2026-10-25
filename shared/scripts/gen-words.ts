@@ -104,6 +104,30 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/league/names.ts',
 		picks: ['HOST_WORDS'],
 		json: 'shared/words/league-platform.json'
+	},
+	{
+		name: 'Shell',
+		module: 'web/src/lib/ui/shell-words.ts',
+		picks: ['SHELL'],
+		json: 'shared/words/shell.json'
+	},
+	{
+		name: 'LeagueSwitch',
+		module: 'web/src/lib/context/menu-words.ts',
+		picks: [['followFirst', 'FOLLOW_FIRST']],
+		json: 'shared/words/shell-league-switch.json'
+	},
+	{
+		name: 'Shelf',
+		module: 'web/src/lib/player/shelf.ts',
+		picks: ['SHELF'],
+		json: 'shared/words/player-shelf.json'
+	},
+	{
+		name: 'Card',
+		module: 'web/src/lib/player/card.ts',
+		picks: ['CARD', ['none', 'NONE']],
+		json: 'shared/words/player-card.json'
 	}
 ];
 export const OUTPUT = {

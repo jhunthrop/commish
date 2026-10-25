@@ -142,4 +142,55 @@ public enum Words {
         public static let yahoo = "Yahoo"
         public static let espn = "ESPN"
     }
+
+    public enum Shell {
+        public static let searchPlayers = "Search players"
+        public static let account = "Account"
+        public static let yourLeagues = "Your leagues"
+    }
+
+    public enum LeagueSwitch {
+        public static let followFirst = "Follow your league"
+    }
+
+    public enum Shelf {
+        public static let fullPage = "Full page"
+        public static let close = "Close"
+        public static let backToLineup = "Back to your lineup"
+    }
+
+    public enum Card {
+        public static let startHim = "Start him"
+        public static let openLineup = "Open your lineup"
+        public static let proj = "Proj"
+        public static let readOnOpen = "Read as the page opens"
+        public static let rest = "Rest of season"
+        public static let projected = "Projected"
+        public static let opp = "Opp rank"
+        public static let avg = "Avg"
+        public static let last = "Last"
+        public static let delta = "Proj change"
+        public static let compare = "Compare"
+        public static let week = "Week"
+        public static let writtenFrom = "from his facts through last season"
+        public static let tier = "His tier"
+        public static let ourRead = "Our read"
+        public static let readNotYet = "Our read for his next game is not written yet."
+        public static let readNotWritten = "Our read for this game was not written."
+        public static let nextProjNotIn = "Not in yet"
+        public static let byeWeek = "Bye this week"
+        public static let freeAgentWeek = "A free agent, no game this week"
+        public static let projNotIn = "This week's projection is not in yet"
+        public static let projNotHim = "Not in this week's published projection"
+        public static let noEarlierRead = "No earlier read this week"
+        public static let noProjToCompare = "No projection to compare"
+        public static let notInEarlier = "Not in the earlier read"
+        public static let kickedOff = "His game has kicked off"
+        public static let gameFinal = "His game is final"
+        public static let notRanked = "not ranked yet"
+        public static let earlierSeasons = "Earlier seasons"
+        public static let listedWeek = "Wk, Opp rank and Proj change are his once he is back."
+        public static let findOnWaivers = "Find him on Waivers"
+        public static let none = "--"
+    }
 }

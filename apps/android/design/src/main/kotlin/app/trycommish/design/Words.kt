@@ -144,4 +144,55 @@ object Words {
         const val yahoo = "Yahoo"
         const val espn = "ESPN"
     }
+
+    object Shell {
+        const val searchPlayers = "Search players"
+        const val account = "Account"
+        const val yourLeagues = "Your leagues"
+    }
+
+    object LeagueSwitch {
+        const val followFirst = "Follow your league"
+    }
+
+    object Shelf {
+        const val fullPage = "Full page"
+        const val close = "Close"
+        const val backToLineup = "Back to your lineup"
+    }
+
+    object Card {
+        const val startHim = "Start him"
+        const val openLineup = "Open your lineup"
+        const val proj = "Proj"
+        const val readOnOpen = "Read as the page opens"
+        const val rest = "Rest of season"
+        const val projected = "Projected"
+        const val opp = "Opp rank"
+        const val avg = "Avg"
+        const val last = "Last"
+        const val delta = "Proj change"
+        const val compare = "Compare"
+        const val week = "Week"
+        const val writtenFrom = "from his facts through last season"
+        const val tier = "His tier"
+        const val ourRead = "Our read"
+        const val readNotYet = "Our read for his next game is not written yet."
+        const val readNotWritten = "Our read for this game was not written."
+        const val nextProjNotIn = "Not in yet"
+        const val byeWeek = "Bye this week"
+        const val freeAgentWeek = "A free agent, no game this week"
+        const val projNotIn = "This week's projection is not in yet"
+        const val projNotHim = "Not in this week's published projection"
+        const val noEarlierRead = "No earlier read this week"
+        const val noProjToCompare = "No projection to compare"
+        const val notInEarlier = "Not in the earlier read"
+        const val kickedOff = "His game has kicked off"
+        const val gameFinal = "His game is final"
+        const val notRanked = "not ranked yet"
+        const val earlierSeasons = "Earlier seasons"
+        const val listedWeek = "Wk, Opp rank and Proj change are his once he is back."
+        const val findOnWaivers = "Find him on Waivers"
+        const val none = "--"
+    }
 }

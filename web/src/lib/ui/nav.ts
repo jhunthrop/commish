@@ -1,5 +1,6 @@
 import type { components } from '#lib/api/types.ts';
 import type { RailIconName } from './rail-icons.ts';
+import { SHELL } from './shell-words.ts';
 
 type Schemas = components['schemas'];
 /** A followed league's place in its season (spec 2026-10-16 §1). */
@@ -211,7 +212,7 @@ export function railIconId(name: RailIconName): string {
 export const RAIL_FOOT: RailItem = {
 	key: 'account',
 	section: 'account',
-	label: 'Account',
+	label: SHELL.account,
 	href: '/account',
 	icon: 'account',
 	owns: ['account', 'pass']
