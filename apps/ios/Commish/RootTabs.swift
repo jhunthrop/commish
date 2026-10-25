@@ -3,13 +3,14 @@ import CommishCore
 import CommishDesign
 import LeagueHome
 import Shell
+import Start
 import SwiftUI
 
 /// The phone's five, the web's bar for the shown league's phase or, with none, the site's season
 /// (PhoneRail, held to rail-order.ts), each under the top bar: the league switch, the player search
 /// and the account's way in. Choosing a league opens its home: the League tab where the bar has one,
-/// else the home pushed on the tab in view (B149). Only League is live; the others say their screen's
-/// name until their lane lands. Every screen presents the player sheet through the one host.
+/// else the home pushed on the tab in view (B149). League and Lineup are live; the others say their
+/// screen's name until their lane lands. Every screen presents the player sheet through the one host.
 struct RootTabs: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var selection = PhoneRail.leagueKey
@@ -99,9 +100,14 @@ struct RootTabs: View {
     private func screen(_ tab: RailTab) -> some View {
         switch (tab.key, selectedLeague) {
         case let (PhoneRail.leagueKey, league?):
-            LeagueScreen(environment: environment, leagueID: league.id, expired: expired) { selection = "lineup" }
+            LeagueScreen(environment: environment, leagueID: league.id, expired: expired) {
+                selection = PhoneRail.lineupKey
+            }
+            .id(league.id)
+        case let (PhoneRail.lineupKey, league?):
+            LineupScreen(environment: environment, league: league, expired: expired)
                 .id(league.id)
-        case (PhoneRail.leagueKey, nil):
+        case (PhoneRail.leagueKey, nil), (PhoneRail.lineupKey, nil):
             BasisText(AppWords.LeagueList.none).padding(Tokens.Space.s5)
         default:
             NamedScreen(tab.label)
@@ -173,5 +179,28 @@ private struct LeagueScreen: View {
 
     var body: some View {
         LeagueHomeView(viewModel: viewModel, leagueID: leagueID, openLineup: openLineup)
+    }
+}
+
+/// A league's Start screen: owns its view model for the league it shows; the lineup copied to the
+/// system clipboard.
+private struct LineupScreen: View {
+    @State private var viewModel: StartViewModel
+    private let leagueID: String
+
+    init(environment: AppEnvironment, league: FollowedLeague, expired: @escaping @MainActor () -> Void) {
+        _viewModel = State(initialValue: StartViewModel(
+            api: environment.api, cache: environment.cache, clock: environment.clock, host: league.host,
+            copy: { text in
+                UIPasteboard.general.string = text
+                return true
+            },
+            onSignedOut: expired
+        ))
+        leagueID = league.id
+    }
+
+    var body: some View {
+        StartView(viewModel: viewModel, leagueID: leagueID)
     }
 }
