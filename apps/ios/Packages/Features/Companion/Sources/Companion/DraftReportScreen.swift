@@ -186,9 +186,11 @@ struct PickByPickView: View {
                                 PositionPill(player.pill).fixedSize()
                                 Text(player.team)
                                     .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
+                                    .fixedSize()
                                     .foregroundStyle(theme.color(Tokens.Color.ink3))
                             }
                             Text(line.madeBy)
+                                .lineLimit(1)
                                 .font(Faces.font(
                                     .ui,
                                     size: Tokens.TypeScale.xs,

@@ -19,9 +19,9 @@ import Waivers
 /// tab where the bar has one, else the home pushed on the tab in view (B149). League, Lineup,
 /// Matchup, Waivers, Trades, the board (the Board item, and Rest of season in season with no league),
 /// Rankings, Our record and the Advisor (the live-draft companion) are live, and the search opens
-/// Rankings with its letters; the others say their screen's name until their lane lands. A score bug
-/// opens its game: the member's on the Matchup tab, another team's pushed on the tab in view (Lane
-/// 206). Every screen presents the player sheet through the one
+/// Rankings with its letters; the others say
+/// their screen's name until their lane lands. A score bug opens its game: the member's on the Matchup
+/// tab, another team's pushed on the tab in view (Lane 206). Every screen presents the player sheet through the one
 /// host; its Full page and a player's site link push his page on the tab in view.
 struct RootTabs: View {
     @Environment(\.colorScheme) private var colorScheme
