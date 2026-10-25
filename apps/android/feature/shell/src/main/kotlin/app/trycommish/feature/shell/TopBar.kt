@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -144,6 +145,8 @@ private fun SearchField(
 ) {
     val c = CommishTheme.colors
     val shape = RoundedCornerShape(Tokens.Radius.md.dp)
+    // The keyboard goes with the search: the Players screen opens under a clear bar.
+    val focus = LocalFocusManager.current
     BasicTextField(
         value = query,
         onValueChange = onQuery,
@@ -151,7 +154,11 @@ private fun SearchField(
         textStyle = Faces.body.copy(color = c.ink),
         cursorBrush = SolidColor(c.accent),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { submit(query) }),
+        keyboardActions =
+            KeyboardActions(onSearch = {
+                submit(query)
+                focus.clearFocus()
+            }),
         modifier =
             Modifier
                 .fillMaxWidth()
