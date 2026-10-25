@@ -1,10 +1,12 @@
 package app.trycommish.design
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
-/** A face is asked of the site's image route at its drawn width (web headshot.ts headshotAt), so the
- * disk cache holds thumbnails; any other address is asked as it is. */
+/** A face is asked of the site's image route at the web's widths (headshot.ts headshotAt and
+ * headshotSources), so the disk cache holds thumbnails; any other address draws the initials and is
+ * never asked of its host. */
 class HeadshotsTest {
     private val espn = "https://a.espncdn.com/i/headshots/nfl/players/full/4426515.png"
 
@@ -24,16 +26,18 @@ class HeadshotsTest {
     }
 
     @Test
-    fun `any other address is asked as it is`() {
-        val other = "https://example.com/face.png"
-        assertEquals(other, Headshots.sized(other, 96))
-        val league = "https://a.espncdn.com/i/headshots/nba/players/full/1.png"
-        assertEquals(league, Headshots.sized(league, 96))
+    fun `any other address is none, so the row draws the initials`() {
+        assertNull(Headshots.sized("https://example.com/face.png", 96))
+        assertNull(Headshots.sized("https://a.espncdn.com/i/headshots/nba/players/full/1.png", 96))
+        assertNull(Headshots.sized("http://a.espncdn.com/i/headshots/nfl/players/full/4426515.png", 96))
+        assertNull(Headshots.sized("https://a.espncdn.com/i/headshots/nfl/players/full/4426515.png?x=1", 96))
     }
 
     @Test
-    fun `a face asks for its side overfilled as the web's does`() {
-        assertEquals(113, Headshots.widthFor(80.5f))
-        assertEquals(56, Headshots.widthFor(40f))
+    fun `a face asks for the web's two widths, overfilled at 1x and twice that on a denser screen`() {
+        assertEquals(56, Headshots.widthFor(40f, 1f))
+        assertEquals(112, Headshots.widthFor(40f, 2f))
+        assertEquals(112, Headshots.widthFor(40f, 2.625f))
+        assertEquals(45, Headshots.widthFor(32f, 1f))
     }
 }
