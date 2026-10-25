@@ -52,6 +52,11 @@ registerHooks({
 const web = await import(
   pathToFileURL(resolve(webDir, "src/lib/server/run.ts")).href
 );
+// The schema the web build reads the written reach with (Lane 205 review M1), so a reach it would refuse
+// fails the gate here rather than the build that reads the published manifest.
+const { reachSchema } = await import(
+  pathToFileURL(resolve(webDir, "src/lib/run/schema.ts")).href
+);
 
 interface Entry {
   id: string;
@@ -169,6 +174,22 @@ const reach =
         return web.runSeasonReach();
       })
     : null;
+// The reach as the build's manifestSchema will read it: a value reachSchema refuses is a refusal of the
+// manifest it would be written into, and no reach line is printed.
+if (reach !== null) {
+  const parsed = reachSchema.safeParse(reach);
+  if (!parsed.success) {
+    const message = oneLine(
+      parsed.error.issues
+        .map(
+          (issue: { path: PropertyKey[]; message: string }) =>
+            `reach.${issue.path.map(String).join(".")}: ${issue.message}`,
+        )
+        .join("; "),
+    );
+    refusals.set("reach", `schema:manifest.json:${message}`);
+  }
+}
 
 for (const line of refusals.values()) process.stdout.write(`${line}\n`);
 if (refusals.size === 0 && reach !== null)

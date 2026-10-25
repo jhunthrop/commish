@@ -19,7 +19,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, TypeGuard
 
 from research.nightly.gates import GateRecord, gate_record
 
@@ -132,9 +132,38 @@ def reach_of(stdout: str) -> Json | None:
     if len(found) > 1:
         raise ValueError(f"the web's reader printed {len(found)} reach lines; it prints one")
     reach = json.loads(found[0])
-    if not isinstance(reach, dict) or set(reach) != _REACH_MEMBERS:
+    if not _is_reach(reach):
         raise ValueError(f"the web's reader printed a reach that is not one: {found[0]}")
     return reach
+
+
+def _is_count(value: object, least: int) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= least
+
+
+def _is_phrase(value: object) -> bool:
+    return isinstance(value, str) and value != ""
+
+
+def _is_reach(value: object) -> TypeGuard[Json]:
+    """The web's `reachSchema` at the boundary: its members, each of its type, the partial's too."""
+    if not isinstance(value, dict) or set(value) != _REACH_MEMBERS:
+        return False
+    partial = value["partial"]
+    partial_ok = partial is None or (
+        isinstance(partial, dict)
+        and set(partial) == {"week", "days"}
+        and _is_count(partial["week"], 1)
+        and isinstance(partial["days"], list)
+        and all(_is_phrase(day) for day in partial["days"])
+    )
+    return (
+        partial_ok
+        and _is_phrase(value["format"])
+        and _is_phrase(value["scoring"])
+        and isinstance(value["through"], str)
+        and _is_count(value["complete"], 0)
+    )
 
 
 def _stderr_head(stderr: str) -> str:

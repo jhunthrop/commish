@@ -499,3 +499,51 @@ def test_a_manifest_the_gate_counted_no_reach_for_is_written_as_it_was() -> None
     manifest = _read(_FIXTURE / "runs" / _RUN / "manifest.json")
     assert "reach" not in manifest
     assert with_reach(manifest, None) is manifest
+
+
+# Review M1: the reach the contract script prints is parsed with the web's reachSchema first. A web whose count
+# returns a value that schema refuses (here a complete week of -1) fails the gate on the manifest it would be
+# written into, and no reach reaches the manifest.
+_REACH_RETURN: Final = "return { format, scoring: found.label, through: reachWords(reach), complete, partial };"
+
+
+def _web_counting(root: Path, returned: str) -> Path:
+    """The web contract laid out as the image lays it out (research/Dockerfile, web-contract), its runReach
+    returning `returned` in place of the reach it counts."""
+    web = contract_dir(os.environ)
+    repository = web.parent
+    copy = root / "web"
+    for part in ("src/lib/run", "src/lib/format"):
+        shutil.copytree(web / part, copy / part)
+    for part in ("src/lib/types/player.ts", "src/lib/server/run.ts", "package.json"):
+        (copy / part).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(web / part, copy / part)
+    (copy / "node_modules").symlink_to(web / "node_modules")
+    for part in ("api/internal/figurewords/words.json", "shared/words/banned-words.json"):
+        (root / part).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(repository / part, root / part)
+    reach = copy / "src/lib/run/reach.ts"
+    source = reach.read_text()
+    assert _REACH_RETURN in source, "runReach's return moved; the test's stand-in needs it"
+    reach.write_text(source.replace(_REACH_RETURN, returned))
+    return copy
+
+
+def test_a_reach_the_webs_schema_refuses_fails_the_gate(tmp_path: Path) -> None:
+    shutil.copytree(_FIXTURE / "runs" / _RUN, tmp_path / "staging" / "runs" / _RUN)
+    web = _web_counting(
+        tmp_path / "contract",
+        "return { format, scoring: found.label, through: reachWords(reach), complete: -1, partial };",
+    )
+    gate = hold_refused_pages(tmp_path / "staging", _RUN, web, LocalRunStore(tmp_path / "empty"), _NIGHT_PAGES, print)
+    assert not gate.record.passed
+    assert gate.reach is None
+    assert any(r.startswith("schema:manifest.json:reach.complete:") for r in gate.record.reasons), gate.record.reasons
+
+
+def test_a_reach_the_webs_schema_takes_passes_the_gate_from_the_same_copy(tmp_path: Path) -> None:
+    shutil.copytree(_FIXTURE / "runs" / _RUN, tmp_path / "staging" / "runs" / _RUN)
+    web = _web_counting(tmp_path / "contract", _REACH_RETURN)
+    gate = hold_refused_pages(tmp_path / "staging", _RUN, web, LocalRunStore(tmp_path / "empty"), _NIGHT_PAGES, print)
+    assert gate.record.passed, gate.record.reasons
+    assert gate.reach == _read(_SHARED_MANIFEST)["reach"]

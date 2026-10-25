@@ -95,7 +95,15 @@ def test_the_reach_line_is_neither_a_refusal_nor_the_summary() -> None:
     assert summary == _SUMMARY
 
 
-@pytest.mark.parametrize("reach", [_REACH, _PARTIAL])
+@pytest.mark.parametrize(
+    "reach",
+    [
+        _REACH,
+        _PARTIAL,
+        {**_REACH, "through": "", "complete": 0},
+        {**_PARTIAL, "through": "through week 5 and part of week 6", "partial": {"week": 6, "days": []}},
+    ],
+)
 def test_the_reach_line_is_read_as_the_reader_counted_it(reach: dict[str, object]) -> None:
     assert reach_of(f"{_reach_line(reach)}\n{_SUMMARY}\n") == reach
 
@@ -112,6 +120,18 @@ def test_a_reader_that_printed_no_reach_has_none() -> None:
         f"{_reach_line({k: v for k, v in _REACH.items() if k != 'partial'})}\n",
         f"{_reach_line([_REACH])}\n",
         f"{_reach_line(_REACH)}\n{_reach_line(_PARTIAL)}\n",
+        # Review M1: the members' types and the nested partial, as the web's reachSchema reads them.
+        f"{_reach_line({'format': 1, 'scoring': '', 'through': '', 'complete': -1, 'partial': {'x': 1}})}\n",
+        f"{_reach_line({**_REACH, 'format': ''})}\n",
+        f"{_reach_line({**_REACH, 'scoring': 3})}\n",
+        f"{_reach_line({**_REACH, 'through': None})}\n",
+        f"{_reach_line({**_REACH, 'complete': -1})}\n",
+        f"{_reach_line({**_REACH, 'complete': 5.5})}\n",
+        f"{_reach_line({**_REACH, 'complete': True})}\n",
+        f"{_reach_line({**_PARTIAL, 'partial': {'x': 1}})}\n",
+        f"{_reach_line({**_PARTIAL, 'partial': {'week': 0, 'days': []}})}\n",
+        f"{_reach_line({**_PARTIAL, 'partial': {'week': 6, 'days': ['']}})}\n",
+        f"{_reach_line({**_PARTIAL, 'partial': {'week': 6, 'days': 'Thursday'}})}\n",
     ],
 )
 def test_a_reach_line_that_is_not_one_reach_is_never_taken(stdout: str) -> None:
