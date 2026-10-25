@@ -3,8 +3,10 @@ import CommishCore
 import CommishDesign
 import SwiftUI
 
-/// The player page (web /players/[slug] at 390), drawn from its model: the hero, the one big number
-/// with its basis, the facts, our read and the foot, with the league's one verb pinned above the bar.
+/// The player page (web /players/[slug] at 390), drawn from its model in the web's order: his head, the
+/// card (the next game and the six tiles, the sheet's card), before the season the facts, his season,
+/// our read, his tier box or the held tier, the every-format table, the basis lines and the run's
+/// stamp, with the league's one verb pinned above the bar.
 public struct PlayerPageScreen: View {
     private let model: PlayerPageModel
     private let stamp: String?
@@ -19,15 +21,7 @@ public struct PlayerPageScreen: View {
 
     public var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Tokens.Space.s5) {
-                PageTop(model: model, stamp: stamp)
-                PageFacts(model: model)
-                if let read = model.read {
-                    PageRead(read: read)
-                }
-                PageFoot(model: model)
-            }
-            .padding(Tokens.Space.s4)
+            PageSectionsView(model: model, stamp: stamp)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let verb = model.verb, let action = act(verb, model.hero.name) {
@@ -37,10 +31,8 @@ public struct PlayerPageScreen: View {
     }
 }
 
-/// The page's top: his face, name, club, position pill and status, then the one big number, its unit
-/// and its basis.
-public struct PageTop: View {
-    @Environment(\.colorScheme) private var colorScheme
+/// The page's sections, top to bottom.
+public struct PageSectionsView: View {
     let model: PlayerPageModel
     let stamp: String?
 
@@ -50,9 +42,46 @@ public struct PageTop: View {
     }
 
     public var body: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.s5) {
+            VStack(alignment: .leading, spacing: Tokens.Space.s3) {
+                PageHero(hero: model.hero, stamp: stamp)
+                PlayerCardView(card: model.card, stamp: nil)
+            }
+            if let facts = model.facts {
+                PageFacts(facts: facts)
+            }
+            SeasonBlock(season: model.season)
+            if let read = model.read {
+                PageRead(read: read)
+            }
+            if let held = model.heldTier {
+                PanelTitle(held)
+            } else if let tier = model.tier {
+                TierBoxView(box: tier)
+            }
+            if let formats = model.formats {
+                FormatsTableView(table: formats)
+            }
+            PageFoot(model: model)
+        }
+        .padding(Tokens.Space.s4)
+    }
+}
+
+/// The page's head: his face, name, club, position pill and status.
+public struct PageHero: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let hero: PlayerPageModel.Hero
+    let stamp: String?
+
+    public init(hero: PlayerPageModel.Hero, stamp: String?) {
+        self.hero = hero
+        self.stamp = stamp
+    }
+
+    public var body: some View {
         let theme = Theme(colorScheme)
-        let hero = model.hero
-        VStack(alignment: .leading, spacing: Tokens.Space.s4) {
+        VStack(alignment: .leading, spacing: Tokens.Space.s3) {
             if let stamp {
                 Text(stamp)
                     .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
@@ -78,152 +107,42 @@ public struct PageTop: View {
                     }
                 }
             }
-            VStack(alignment: .leading, spacing: Tokens.Space.s1) {
-                HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s2) {
-                    Text(model.figure)
-                        .font(Faces.font(.num, size: Tokens.TypeScale.xxxl, weight: .bold))
-                        .foregroundStyle(theme.color(Tokens.Color.ink))
-                    Text(model.unit)
-                        .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold))
-                        .foregroundStyle(theme.color(Tokens.Color.ink3))
-                }
-                Text(model.caption)
+        }
+    }
+}
+
+/// A section's title in the number face (PanelHead.svelte), its aside under it.
+struct PanelTitle: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let title: String
+    let aside: String?
+
+    init(_ title: String, aside: String? = nil) {
+        self.title = title
+        self.aside = aside
+    }
+
+    var body: some View {
+        let theme = Theme(colorScheme)
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(Faces.font(.num, size: Tokens.TypeScale.xl, weight: .bold))
+                .textCase(.uppercase)
+                .foregroundStyle(theme.color(Tokens.Color.ink))
+                .accessibilityAddTraits(.isHeader)
+            if let aside {
+                Text(aside)
                     .font(Faces.font(.ui, size: Tokens.TypeScale.sm))
-                    .foregroundStyle(theme.color(Tokens.Color.ink2))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .accessibilityElement(children: .combine)
-        }
-    }
-}
-
-/// The facts beside the number (Fact.svelte): where drafters take him, his value over a pickup's with
-/// its round's tint, and his floor, median and ceiling; a listed player's held tier under them.
-public struct PageFacts: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let model: PlayerPageModel
-
-    public init(model: PlayerPageModel) {
-        self.model = model
-    }
-
-    public var body: some View {
-        let theme = Theme(colorScheme)
-        VStack(alignment: .leading, spacing: 0) {
-            FactRow(fact: model.drafters, tint: nil)
-            FactRow(fact: model.overReplacement, tint: Self.tint(model.heat))
-            if let outcomes = model.outcomes {
-                OutcomesRow(outcomes: outcomes)
-            }
-            if let held = model.heldTier {
-                Text(held)
-                    .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold))
-                    .foregroundStyle(theme.color(Tokens.Color.ink2))
-                    .padding(.vertical, Tokens.Space.s3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .overlay(alignment: .top) { Hairline() }
+                    .foregroundStyle(theme.color(Tokens.Color.ink3))
             }
         }
-        .overlay(alignment: .bottom) { Hairline() }
-    }
-
-    static func tint(_ heat: Heat) -> ThemedColor? {
-        switch heat {
-        case .round(1): Tokens.Color.heat1
-        case .round(2): Tokens.Color.heat2
-        case .round(3): Tokens.Color.heat3
-        case .round: Tokens.Color.heat4
-        case .below: Tokens.Color.heatNeg
-        case .none: nil
-        }
-    }
-}
-
-/// One fact: its label, its figure (tinted where the board tints it) and the sentence under it.
-struct FactRow: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let fact: PlayerPageModel.Fact
-    let tint: ThemedColor?
-
-    var body: some View {
-        let theme = Theme(colorScheme)
-        VStack(alignment: .leading, spacing: Tokens.Space.s1) {
-            Text(fact.label)
-                .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .bold))
-                .textCase(.uppercase)
-                .tracking(0.6)
-                .foregroundStyle(theme.color(Tokens.Color.ink3))
-            HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s1) {
-                Text(fact.figure)
-                    .font(Faces.font(.num, size: Tokens.TypeScale.xl, weight: .bold))
-                    .foregroundStyle(theme.color(Tokens.Color.ink))
-                    .padding(.horizontal, tint == nil ? 0 : Tokens.Space.s1)
-                    .background(tint.map { RoundedRectangle(cornerRadius: Tokens.Radius.sm).fill(theme.color($0)) })
-                if let unit = fact.unit {
-                    Text(unit)
-                        .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
-                        .foregroundStyle(theme.color(Tokens.Color.ink3))
-                }
-            }
-            Text(fact.words)
-                .font(Faces.font(.ui, size: Tokens.TypeScale.sm))
-                .foregroundStyle(theme.color(Tokens.Color.ink2))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.vertical, Tokens.Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .top) { Hairline() }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// Floor, median and ceiling as the web's outcome bar: the range from his low case to his high case
-/// with the median marked, each figure under its place.
-struct OutcomesRow: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let outcomes: PlayerPageModel.Outcomes
-
-    var body: some View {
-        let theme = Theme(colorScheme)
-        let span = max(outcomes.ceiling - outcomes.floor, 1)
-        let median = (outcomes.median - outcomes.floor) / span
-        VStack(alignment: .leading, spacing: Tokens.Space.s1) {
-            Text(outcomes.label)
-                .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .bold))
-                .textCase(.uppercase)
-                .tracking(0.6)
-                .foregroundStyle(theme.color(Tokens.Color.ink3))
-            GeometryReader { space in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(theme.color(Tokens.Color.surface2)).frame(height: 8)
-                    Capsule().fill(theme.color(Tokens.Color.ink2)).frame(width: 3, height: 16)
-                        .offset(x: max(0, min(space.size.width - 3, space.size.width * median - 1.5)))
-                }
-                .frame(maxHeight: .infinity)
-            }
-            .frame(height: 16)
-            HStack {
-                Text(Formatting.fixed(outcomes.floor))
-                Spacer()
-                Text(Formatting.fixed(outcomes.median))
-                Spacer()
-                Text(Formatting.fixed(outcomes.ceiling))
-            }
-            .font(Faces.font(.num, size: Tokens.TypeScale.lg, weight: .bold))
-            .foregroundStyle(theme.color(Tokens.Color.ink))
-            Text(outcomes.caption)
-                .font(Faces.font(.ui, size: Tokens.TypeScale.sm))
-                .foregroundStyle(theme.color(Tokens.Color.ink2))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.vertical, Tokens.Space.s3)
-        .overlay(alignment: .top) { Hairline() }
-        .accessibilityElement(children: .combine)
     }
 }
 
 /// Our read on his page: in season the week's read as the shelf prints it; before the season the
-/// writer's capsule in the reading face, its stamp in the face's caption, its figures beside it.
+/// writer's capsule in the reading face, its stamp in the face's caption, its figures beside it, or the
+/// words for a read not ready with what it will be built from.
 public struct PageRead: View {
     @Environment(\.colorScheme) private var colorScheme
     let read: PlayerPageModel.Read
@@ -239,16 +158,20 @@ public struct PageRead: View {
             WeekReadView(read: .shown(shown))
         case let .weekNone(words):
             WeekReadView(read: .none(words))
-        case let .unwritten(words):
-            VStack(alignment: .leading, spacing: Tokens.Space.s1) {
-                ReadHead()
+        case let .unwritten(words, lines):
+            VStack(alignment: .leading, spacing: Tokens.Space.s2) {
+                SmallHead(Words.Card.ourRead).accessibilityAddTraits(.isHeader)
                 Text(words)
                     .font(Faces.font(.ui, size: Tokens.TypeScale.md))
                     .foregroundStyle(theme.color(Tokens.Color.ink2))
+                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(lines) { line in
+                    UnwrittenRow(line: line)
+                }
             }
         case let .prose(paragraphs, byline, figures):
             VStack(alignment: .leading, spacing: Tokens.Space.s3) {
-                ReadHead()
+                SmallHead(Words.Card.ourRead).accessibilityAddTraits(.isHeader)
                 if let byline {
                     Text(byline)
                         .font(Faces.font(.read, size: Tokens.TypeScale.sm).italic())
@@ -269,26 +192,38 @@ public struct PageRead: View {
     }
 }
 
+/// A fact the read will be built from (LineList.svelte): its lead and figure over its sentence.
+struct UnwrittenRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let line: UnwrittenLine
+
+    var body: some View {
+        let theme = Theme(colorScheme)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                SmallHead(line.lead)
+                Spacer()
+                Text(line.figure)
+                    .font(Faces.font(.num, size: Tokens.TypeScale.lg, weight: .bold))
+                    .foregroundStyle(theme.color(Tokens.Color.ink))
+            }
+            Text(line.text)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.sm))
+                .foregroundStyle(theme.color(Tokens.Color.ink2))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, Tokens.Space.s2)
+        .overlay(alignment: .top) { Hairline() }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 /// The capsule's sizes (Capsule.svelte): its lead paragraph's, its body's (--t-read), and the room
 /// between lines past the face's own.
 enum ReadType {
     static let lead: Double = 22
     static let body: Double = 19
     static let leading: Double = 0.4
-}
-
-/// The read's head: "Our read".
-struct ReadHead: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        Text(Words.Card.ourRead)
-            .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .bold))
-            .textCase(.uppercase)
-            .tracking(0.6)
-            .foregroundStyle(Theme(colorScheme).color(Tokens.Color.ink3))
-            .accessibilityAddTraits(.isHeader)
-    }
 }
 
 /// The figures set beside the capsule after its first paragraph, each naming its basis where it has one.
@@ -302,10 +237,7 @@ struct ReadFiguresRow: View {
             ForEach(Array(figures.enumerated()), id: \.offset) { _, figure in
                 VStack(alignment: .leading, spacing: 4) {
                     if let label = figure.label {
-                        Text(label)
-                            .font(Faces.font(.ui, size: 10, weight: .bold))
-                            .textCase(.uppercase)
-                            .foregroundStyle(theme.color(Tokens.Color.ink3))
+                        SmallHead(label)
                     }
                     Text(figure.figure)
                         .font(Faces.font(.read, size: Tokens.TypeScale.xxl, weight: .medium))
@@ -324,7 +256,7 @@ struct ReadFiguresRow: View {
     }
 }
 
-/// The page's foot: a held page's words, and the run's stamp the page is from.
+/// The page's foot: the basis lines once, then the run's stamp the page is from.
 public struct PageFoot: View {
     let model: PlayerPageModel
 
@@ -334,9 +266,7 @@ public struct PageFoot: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s1) {
-            if let held = model.heldBasis {
-                BasisText(held)
-            }
+            ForEach(model.basis, id: \.self, content: BasisText.init)
             BasisText(model.stamp)
         }
     }

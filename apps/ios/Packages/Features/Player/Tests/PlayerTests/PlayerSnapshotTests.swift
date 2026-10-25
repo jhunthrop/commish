@@ -40,6 +40,8 @@ struct PlayerSnapshotTests {
         case pageProse = "page-prose"
         case pageHeld = "page-held"
         case pageSeason = "page-season"
+        case pageLog = "page-log"
+        case pageTier = "page-tier"
 
         var sheet: SheetPlayer? {
             switch self {
@@ -66,9 +68,27 @@ struct PlayerSnapshotTests {
                     id: "4239996", slug: "travis-etienne-jr", name: "Travis Etienne Jr.", position: "RB", rank: "14",
                     club: "NO"
                 )
-            case .pageHero, .pageProse, .pageHeld, .pageSeason:
+            case .pageHero, .pageProse, .pageHeld, .pageSeason, .pageLog, .pageTier:
                 nil
             }
+        }
+
+        /// The screen's verb the sheet pins: the Lineup's way back with his swap (held once his game has
+        /// kicked off), the Matchup's way to the lineup; none on a saved sheet.
+        var offer: SheetOffer? {
+            switch self {
+            case .writtenMedium, .writtenLarge, .unwrittenMedium, .unwrittenLarge:
+                SheetOffer(label: Words.Shelf.backToLineup, line: nil, lineup: true) {}
+            case .heldMedium, .heldLarge:
+                SheetOffer(label: Words.Card.openLineup, line: nil, lineup: true) {}
+            default:
+                nil
+            }
+        }
+
+        /// The page scenes in season, from the contract run.
+        var inSeason: Bool {
+            self == .pageSeason || self == .pageTier
         }
 
         var clock: String {
@@ -132,7 +152,7 @@ struct PlayerSnapshotTests {
     }
 
     static func page(_ scene: Scene) async -> PlayerPageViewModel {
-        let season = scene == .pageSeason
+        let season = scene.inSeason
         let fixture: RunFixture = season ? .contract : .standIn
         let held: [String: RunFixture?] = scene == .pageHeld ? ["4431299": nil] : [:]
         let viewModel = PlayerPageViewModel(
@@ -148,8 +168,8 @@ struct PlayerSnapshotTests {
         if let player = item.scene.sheet {
             let viewModel = await sheet(item.scene, player: player)
             return AnyView(SheetMock(
-                player: player, state: viewModel.state, stamp: viewModel.stampWords, device: item.device,
-                large: item.scene.large
+                player: player, state: viewModel.state, stamp: viewModel.stampWords, offer: item.scene.offer,
+                device: item.device, large: item.scene.large
             ))
         }
         let viewModel = await page(item.scene)
@@ -213,6 +233,7 @@ struct SheetMock: View {
     let player: SheetPlayer
     let state: PlayerSheetViewModel.State
     let stamp: String?
+    let offer: SheetOffer?
     let device: SnapshotDevice
     let large: Bool
 
@@ -232,6 +253,11 @@ struct SheetMock: View {
                     model: PlayerSheetModel(player: player), close: {},
                     content: { PlayerSheetState(state: state, stamp: stamp) }
                 )
+                .frame(maxHeight: .infinity, alignment: .top)
+                .clipped()
+                if let verb = SheetVerb.of(offer, game: PlayerSheetBody.game(state)) {
+                    SheetVerbView(verb: verb) {}.padding(.horizontal, Tokens.Space.s4)
+                }
             }
             .frame(height: height, alignment: .top)
             .clipped()
@@ -242,9 +268,10 @@ struct SheetMock: View {
     }
 }
 
-/// The page as the mock draws it: its first screen between the top bar and the tab bar with the verb
-/// pinned over its foot (the hero and number, a held page, the page in season), or the read alone as
-/// it scrolls into view (the prose).
+/// The page as the mock draws it, from the screen's own parts (PlayerPageScreen draws PageSectionsView
+/// under the pinned verb): its first screen between the top bar and the tab bar with the verb pinned over
+/// its foot (before the season, a held page, in season); and further down as it scrolls into view, the
+/// season block, the read, and the tier box with the every-format table and the basis.
 struct PageMock: View {
     let model: PlayerPageModel
     let scene: PlayerSnapshotTests.Scene
@@ -259,22 +286,28 @@ struct PageMock: View {
     }
 
     var body: some View {
-        if scene == .pageProse {
+        switch scene {
+        case .pageProse:
             model.read.map { PageRead(read: $0).padding(Tokens.Space.s4) }
-        } else {
-            VStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: Tokens.Space.s5) {
-                    PageTop(model: model, stamp: nil)
-                    PageFacts(model: model)
-                    if let read = model.read {
-                        PageRead(read: read)
-                    }
-                    PageFoot(model: model)
+        case .pageLog:
+            SeasonBlock(season: model.season).padding(Tokens.Space.s4)
+        case .pageTier:
+            VStack(alignment: .leading, spacing: Tokens.Space.s5) {
+                if let tier = model.tier {
+                    TierBoxView(box: tier)
                 }
-                .padding(Tokens.Space.s4)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(height: room - (model.verb == nil ? 0 : Self.pinHeight), alignment: .top)
-                .clipped()
+                if let formats = model.formats {
+                    FormatsTableView(table: formats)
+                }
+                PageFoot(model: model)
+            }
+            .padding(Tokens.Space.s4)
+        default:
+            VStack(spacing: 0) {
+                PageSectionsView(model: model, stamp: nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(height: room - (model.verb == nil ? 0 : Self.pinHeight), alignment: .top)
+                    .clipped()
                 if let verb = model.verb {
                     PinnedVerb(verb: verb) {}
                 }

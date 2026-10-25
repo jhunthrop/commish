@@ -27,13 +27,17 @@ public struct PlayerCardView: View {
                     .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
                     .foregroundStyle(theme.color(Tokens.Color.accentText))
             }
-            GameLine(head: card.head, cell: card.cell)
+            if let head = card.head {
+                GameLine(head: head, cell: card.cell)
+            }
             TileGrid(tiles: card.tiles)
             if let read = card.read {
                 WeekReadView(read: read)
             }
-            VStack(alignment: .leading, spacing: Tokens.Space.s1) {
-                ForEach(card.basis, id: \.self, content: BasisText.init)
+            if !card.basis.isEmpty {
+                VStack(alignment: .leading, spacing: Tokens.Space.s1) {
+                    ForEach(card.basis, id: \.self, content: BasisText.init)
+                }
             }
         }
     }
