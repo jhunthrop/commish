@@ -1,0 +1,2739 @@
+{
+	"ok": true,
+	"data": {
+		"week": 6,
+		"read_at": "2026-10-16T01:56:00.000Z",
+		"projection_read_at": "2026-10-17T02:00:00.000Z",
+		"projection_scoring": {
+			"format": "ppr",
+			"league_own": false
+		},
+		"sides": [
+			{
+				"roster_id": 2,
+				"player_points": true,
+				"team_total": false,
+				"starters": [
+					{
+						"slot": "QB",
+						"line": {
+							"player": {
+								"host_id": "8183",
+								"board_id": "4361741",
+								"name": "Brock Purdy",
+								"position": "QB",
+								"team": "SF",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4361741.png",
+							"slug": "brock-purdy",
+							"position_rank": 15,
+							"points_over_replacement": -1.3,
+							"rest_of_season_per_game": 14.4,
+							"week_projection": 14.4,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "WSH",
+								"home": true,
+								"kickoff": "2026-10-20T00:15:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 17.16
+									},
+									{
+										"week": 4,
+										"points": 21.62
+									},
+									{
+										"week": 3,
+										"points": 35.28
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 50.5,
+									"team_points": 29,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "win",
+									"points": 7.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 63,
+									"wind_mph": 12.7,
+									"precipitation_chance": 2,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "RB",
+						"line": {
+							"player": {
+								"host_id": "7588",
+								"board_id": "4361579",
+								"name": "Javonte Williams",
+								"position": "RB",
+								"team": "DAL",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4361579.png",
+							"slug": "javonte-williams",
+							"position_rank": 18,
+							"points_over_replacement": 0.8,
+							"rest_of_season_per_game": 10.1,
+							"week_projection": 10.1,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "GB",
+								"home": false,
+								"kickoff": "2026-10-19T00:20:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 14.2
+									},
+									{
+										"week": 4,
+										"points": 31.3
+									},
+									{
+										"week": 3,
+										"points": 18.3
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "lose",
+									"points": 1.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "RB",
+						"line": {
+							"player": {
+								"host_id": "12489",
+								"board_id": "4568490",
+								"name": "RJ Harvey",
+								"position": "RB",
+								"team": "DEN",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4568490.png",
+							"slug": "rj-harvey",
+							"position_rank": 28,
+							"points_over_replacement": -0.6,
+							"rest_of_season_per_game": 8.7,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "SEA",
+								"home": true,
+								"kickoff": "2026-10-16T00:15:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 0.7
+									},
+									{
+										"week": 4,
+										"points": 19.3
+									},
+									{
+										"week": 3,
+										"points": 10.7
+									}
+								],
+								"allowed_to_position": {
+									"points_a_game": 12,
+									"rank": 30,
+									"of": 32,
+									"position": "RB"
+								},
+								"game_total": {
+									"points": 40.5,
+									"team_points": 19,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "lose",
+									"points": 3,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": false
+								},
+								"weather": null,
+								"game_state": "kicked_off"
+							},
+							"week_projection": 9.1,
+							"projection_delta": 0,
+							"opp_rank": 30,
+							"season_avg": 10.2,
+							"last_points": 0.7,
+							"game_state": {
+								"state": "kicked_off",
+								"word": "Kicked off"
+							}
+						}
+					},
+					{
+						"slot": "WR",
+						"line": {
+							"player": {
+								"host_id": "6786",
+								"board_id": "4241389",
+								"name": "CeeDee Lamb",
+								"position": "WR",
+								"team": "DAL",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4241389.png",
+							"slug": "ceedee-lamb",
+							"position_rank": 5,
+							"points_over_replacement": 6.5,
+							"rest_of_season_per_game": 18.2,
+							"week_projection": 18.2,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "GB",
+								"home": false,
+								"kickoff": "2026-10-19T00:20:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 2.9
+									},
+									{
+										"week": 4,
+										"points": 41.3
+									},
+									{
+										"week": 3,
+										"points": 18.2
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "lose",
+									"points": 1.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "WR",
+						"line": {
+							"player": {
+								"host_id": "3634",
+								"board_id": "2973405",
+								"name": "Kalif Raymond",
+								"position": "WR",
+								"team": "CHI",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/2973405.png",
+							"slug": "kalif-raymond",
+							"position_rank": 102,
+							"points_over_replacement": -7.6,
+							"rest_of_season_per_game": 3.2,
+							"week_projection": 3.2,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "ATL",
+								"home": false,
+								"kickoff": "2026-10-18T17:00:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 3.4
+									},
+									{
+										"week": 4,
+										"points": 2.6
+									},
+									{
+										"week": 3,
+										"points": 21
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 49.5,
+									"team_points": 26.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "win",
+									"points": 3,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "retractable",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 59,
+									"wind_mph": 12.7,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "WR",
+						"line": {
+							"player": {
+								"host_id": "13279",
+								"board_id": "4871023",
+								"name": "Carnell Tate",
+								"position": "WR",
+								"team": "TEN",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4871023.png",
+							"slug": "carnell-tate",
+							"position_rank": 34,
+							"points_over_replacement": 0,
+							"rest_of_season_per_game": 11.3,
+							"week_projection": 11.3,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "IND",
+								"home": false,
+								"kickoff": "2026-10-18T17:00:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 1.6
+									},
+									{
+										"week": 4,
+										"points": 21.5
+									},
+									{
+										"week": 3,
+										"points": 11.8
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 44.5,
+									"team_points": 19,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "lose",
+									"points": 7,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "retractable",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 58,
+									"wind_mph": 5.8,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "TE",
+						"line": {
+							"player": {
+								"host_id": "9484",
+								"board_id": "4572680",
+								"name": "Tucker Kraft",
+								"position": "TE",
+								"team": "GB",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4572680.png",
+							"slug": "tucker-kraft",
+							"position_rank": 10,
+							"points_over_replacement": 0.3,
+							"rest_of_season_per_game": 8.9,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "DAL",
+								"home": true,
+								"kickoff": "2026-10-19T00:20:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 11.6
+									},
+									{
+										"week": 4,
+										"points": 16.5
+									},
+									{
+										"week": 3,
+										"points": 6.6
+									}
+								],
+								"allowed_to_position": {
+									"points_a_game": 16.2,
+									"rank": 23,
+									"of": 32,
+									"position": "TE"
+								},
+								"game_total": {
+									"points": 52.5,
+									"team_points": 27,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "win",
+									"points": 1.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"week_projection": 11.1,
+							"projection_delta": 0.2,
+							"opp_rank": 23,
+							"season_avg": 11.6,
+							"last_points": 11.6,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "FLEX",
+						"line": {
+							"player": {
+								"host_id": "12504",
+								"board_id": null,
+								"name": "Kaleb Johnson",
+								"position": "RB",
+								"team": "GB",
+								"injured_reserve": false
+							},
+							"headshot": null,
+							"slug": null,
+							"position_rank": null,
+							"points_over_replacement": null,
+							"rest_of_season_per_game": null,
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "DAL",
+								"home": true,
+								"kickoff": "2026-10-19T00:20:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [],
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 27,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "win",
+									"points": 1.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "FLEX",
+						"line": {
+							"player": {
+								"host_id": "9480",
+								"board_id": "4430539",
+								"name": "Brenton Strange",
+								"position": "TE",
+								"team": "JAX",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4430539.png",
+							"slug": "brenton-strange",
+							"position_rank": 20,
+							"points_over_replacement": -0.2,
+							"rest_of_season_per_game": 6.1,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "HOU",
+								"home": true,
+								"kickoff": "2026-10-18T13:30:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 13.8
+									},
+									{
+										"week": 4,
+										"points": 16.5
+									},
+									{
+										"week": 3,
+										"points": 6.2
+									}
+								],
+								"allowed_to_position": {
+									"points_a_game": 17.4,
+									"rank": 21,
+									"of": 32,
+									"position": "TE"
+								},
+								"game_total": {
+									"points": 42.5,
+									"team_points": 23,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "win",
+									"points": 3,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": true
+								},
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": 7.9,
+							"projection_delta": -0.1,
+							"opp_rank": 21,
+							"season_avg": 12.2,
+							"last_points": 13.8,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "DEF",
+						"line": {
+							"player": {
+								"host_id": "LAR",
+								"board_id": null,
+								"name": "Los Angeles Rams",
+								"position": "DEF",
+								"team": "LAR",
+								"injured_reserve": false
+							},
+							"headshot": null,
+							"slug": null,
+							"position_rank": null,
+							"points_over_replacement": null,
+							"rest_of_season_per_game": null,
+							"week_projection": 8.1,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "ARI",
+								"home": true,
+								"kickoff": "2026-10-18T20:05:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [],
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 32.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "win",
+									"points": 12.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "dome",
+									"abroad": false
+								},
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					}
+				],
+				"bench": [
+					{
+						"player": {
+							"host_id": "11566",
+							"board_id": "4426348",
+							"name": "Jayden Daniels",
+							"position": "QB",
+							"team": "WAS",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4426348.png",
+						"slug": "jayden-daniels",
+						"position_rank": 14,
+						"points_over_replacement": -1.1,
+						"rest_of_season_per_game": 14.6,
+						"week_projection": 14.6,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "SF",
+							"home": false,
+							"kickoff": "2026-10-20T00:15:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 5,
+									"points": 30.26
+								},
+								{
+									"week": 2,
+									"points": 15.74
+								},
+								{
+									"week": 1,
+									"points": 19.66
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 50.5,
+								"team_points": 21.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "lose",
+								"points": 7.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "outdoors",
+								"abroad": false
+							},
+							"weather": {
+								"temperature_f": 63,
+								"wind_mph": 12.7,
+								"precipitation_chance": 2,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							},
+							"game_state": "upcoming"
+						},
+						"game_state": {
+							"state": "not_started",
+							"word": "Next kickoff"
+						}
+					},
+					{
+						"player": {
+							"host_id": "11630",
+							"board_id": "4431492",
+							"name": "Roman Wilson",
+							"position": "WR",
+							"team": "PIT",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4431492.png",
+						"slug": "roman-wilson",
+						"position_rank": 109,
+						"points_over_replacement": -7.9,
+						"rest_of_season_per_game": 2.9,
+						"week_projection": 2.9,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "TB",
+							"home": false,
+							"kickoff": "2026-10-18T17:00:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 5,
+									"points": 0
+								},
+								{
+									"week": 4,
+									"points": 16.4
+								},
+								{
+									"week": 3,
+									"points": 15
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 40.5,
+								"team_points": 22,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "win",
+								"points": 3,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "outdoors",
+								"abroad": false
+							},
+							"weather": {
+								"temperature_f": 74,
+								"wind_mph": 15,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							},
+							"game_state": "upcoming"
+						},
+						"game_state": {
+							"state": "not_started",
+							"word": "Next kickoff"
+						}
+					},
+					{
+						"player": {
+							"host_id": "3321",
+							"board_id": null,
+							"name": "Tyreek Hill",
+							"position": "WR",
+							"team": "",
+							"injured_reserve": false
+						},
+						"headshot": null,
+						"slug": null,
+						"position_rank": null,
+						"points_over_replacement": null,
+						"rest_of_season_per_game": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": null,
+							"home": null,
+							"kickoff": null,
+							"bye": true,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [],
+							"allowed_to_position": null,
+							"game_total": null,
+							"spread": null,
+							"roof": null,
+							"weather": null,
+							"game_state": null
+						},
+						"week_projection": null,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"game_state": {
+							"state": "bye",
+							"word": "Bye"
+						}
+					},
+					{
+						"player": {
+							"host_id": "4039",
+							"board_id": "2977187",
+							"name": "Cooper Kupp",
+							"position": "WR",
+							"team": "SEA",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/2977187.png",
+						"slug": "cooper-kupp",
+						"position_rank": 61,
+						"points_over_replacement": -4,
+						"rest_of_season_per_game": 7,
+						"week_projection": 7,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "DEN",
+							"home": false,
+							"kickoff": "2026-10-16T00:15:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 6,
+									"points": 10
+								},
+								{
+									"week": 5,
+									"points": 3.5
+								},
+								{
+									"week": 4,
+									"points": 2.3
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 40.5,
+								"team_points": 22,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "win",
+								"points": 3,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "outdoors",
+								"abroad": false
+							},
+							"weather": null,
+							"game_state": "kicked_off"
+						},
+						"game_state": {
+							"state": "kicked_off",
+							"word": "Kicked off"
+						}
+					},
+					{
+						"player": {
+							"host_id": "4199",
+							"board_id": "3042519",
+							"name": "Aaron Jones",
+							"position": "RB",
+							"team": "MIN",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3042519.png",
+						"slug": "aaron-jones-sr",
+						"position_rank": 29,
+						"points_over_replacement": -1.1,
+						"rest_of_season_per_game": 8,
+						"week_projection": null,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": null,
+							"home": null,
+							"kickoff": null,
+							"bye": true,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 5,
+									"points": 18.7
+								},
+								{
+									"week": 4,
+									"points": 16.8
+								},
+								{
+									"week": 3,
+									"points": 14.2
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": null,
+							"spread": null,
+							"roof": null,
+							"weather": null,
+							"game_state": null
+						},
+						"game_state": {
+							"state": "bye",
+							"word": "Bye"
+						}
+					},
+					{
+						"player": {
+							"host_id": "4866",
+							"board_id": "3929630",
+							"name": "Saquon Barkley",
+							"position": "RB",
+							"team": "PHI",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3929630.png",
+						"slug": "saquon-barkley",
+						"position_rank": 6,
+						"points_over_replacement": 4.9,
+						"rest_of_season_per_game": 14.4,
+						"week_projection": 14.4,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "CAR",
+							"home": true,
+							"kickoff": "2026-10-18T17:00:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 4,
+									"points": 2
+								},
+								{
+									"week": 3,
+									"points": 9
+								},
+								{
+									"week": 2,
+									"points": 3
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 41.5,
+								"team_points": 21.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "win",
+								"points": 1.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "outdoors",
+								"abroad": false
+							},
+							"weather": {
+								"temperature_f": 52,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							},
+							"game_state": "upcoming"
+						},
+						"game_state": {
+							"state": "not_started",
+							"word": "Next kickoff"
+						}
+					},
+					{
+						"player": {
+							"host_id": "5844",
+							"board_id": "4036133",
+							"name": "T.J. Hockenson",
+							"position": "TE",
+							"team": "MIN",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4036133.png",
+						"slug": "t-j-hockenson",
+						"position_rank": 22,
+						"points_over_replacement": -2.8,
+						"rest_of_season_per_game": 5.8,
+						"week_projection": null,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": null,
+							"home": null,
+							"kickoff": null,
+							"bye": true,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 5,
+									"points": 1.7
+								},
+								{
+									"week": 4,
+									"points": 24.9
+								},
+								{
+									"week": 3,
+									"points": 3.1
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": null,
+							"spread": null,
+							"roof": null,
+							"weather": null,
+							"game_state": null
+						},
+						"game_state": {
+							"state": "bye",
+							"word": "Bye"
+						}
+					},
+					{
+						"player": {
+							"host_id": "6801",
+							"board_id": "4239993",
+							"name": "Tee Higgins",
+							"position": "WR",
+							"team": "CIN",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4239993.png",
+						"slug": "tee-higgins",
+						"position_rank": 15,
+						"points_over_replacement": 2.9,
+						"rest_of_season_per_game": 14.3,
+						"week_projection": null,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": null,
+							"home": null,
+							"kickoff": null,
+							"bye": true,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 5,
+									"points": 4.2
+								},
+								{
+									"week": 4,
+									"points": 26.7
+								},
+								{
+									"week": 3,
+									"points": 21
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": null,
+							"spread": null,
+							"roof": null,
+							"weather": null,
+							"game_state": null
+						},
+						"game_state": {
+							"state": "bye",
+							"word": "Bye"
+						}
+					},
+					{
+						"player": {
+							"host_id": "9508",
+							"board_id": "4428557",
+							"name": "Tyjae Spears",
+							"position": "RB",
+							"team": "TEN",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4428557.png",
+						"slug": "tyjae-spears",
+						"position_rank": 36,
+						"points_over_replacement": -2.5,
+						"rest_of_season_per_game": 6.6,
+						"week_projection": 6.6,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "IND",
+							"home": false,
+							"kickoff": "2026-10-18T17:00:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 5,
+									"points": 9.8
+								},
+								{
+									"week": 4,
+									"points": 1.6
+								},
+								{
+									"week": 3,
+									"points": 0.5
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 44.5,
+								"team_points": 19,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "lose",
+								"points": 7,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "retractable",
+								"abroad": false
+							},
+							"weather": {
+								"temperature_f": 58,
+								"wind_mph": 5.8,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							},
+							"game_state": "upcoming"
+						},
+						"game_state": {
+							"state": "not_started",
+							"word": "Next kickoff"
+						}
+					},
+					{
+						"player": {
+							"host_id": "CIN",
+							"board_id": null,
+							"name": "Cincinnati Bengals",
+							"position": "DEF",
+							"team": "CIN",
+							"injured_reserve": false
+						},
+						"headshot": null,
+						"slug": null,
+						"position_rank": null,
+						"points_over_replacement": null,
+						"rest_of_season_per_game": null,
+						"week_projection": null,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": null,
+							"home": null,
+							"kickoff": null,
+							"bye": true,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [],
+							"allowed_to_position": null,
+							"game_total": null,
+							"spread": null,
+							"roof": null,
+							"weather": null,
+							"game_state": null
+						},
+						"game_state": {
+							"state": "bye",
+							"word": "Bye"
+						}
+					}
+				]
+			},
+			{
+				"roster_id": 6,
+				"player_points": true,
+				"team_total": false,
+				"starters": [
+					{
+						"slot": "QB",
+						"line": {
+							"player": {
+								"host_id": "9228",
+								"board_id": "4685720",
+								"name": "Bryce Young",
+								"position": "QB",
+								"team": "CAR",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4685720.png",
+							"slug": "bryce-young",
+							"position_rank": 28,
+							"points_over_replacement": -5,
+							"rest_of_season_per_game": 10.5,
+							"week_projection": 10.5,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "PHI",
+								"home": false,
+								"kickoff": "2026-10-18T17:00:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 4,
+										"points": 23.46
+									},
+									{
+										"week": 3,
+										"points": 15.64
+									},
+									{
+										"week": 2,
+										"points": 27.08
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 41.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "lose",
+									"points": 1.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 52,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "RB",
+						"line": {
+							"player": {
+								"host_id": "9221",
+								"board_id": "4429795",
+								"name": "Jahmyr Gibbs",
+								"position": "RB",
+								"team": "DET",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png",
+							"slug": "jahmyr-gibbs",
+							"position_rank": 1,
+							"points_over_replacement": 6.7,
+							"rest_of_season_per_game": 16.4,
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": null,
+								"home": null,
+								"kickoff": null,
+								"bye": true,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 37.7
+									},
+									{
+										"week": 4,
+										"points": 17.7
+									},
+									{
+										"week": 3,
+										"points": 41.4
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": null
+							},
+							"game_state": {
+								"state": "bye",
+								"word": "Bye"
+							}
+						}
+					},
+					{
+						"slot": "RB",
+						"line": {
+							"player": {
+								"host_id": "11581",
+								"board_id": null,
+								"name": "MarShawn Lloyd",
+								"position": "RB",
+								"team": "GB",
+								"injured_reserve": false
+							},
+							"headshot": null,
+							"slug": null,
+							"position_rank": null,
+							"points_over_replacement": null,
+							"rest_of_season_per_game": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "DAL",
+								"home": true,
+								"kickoff": "2026-10-19T00:20:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [],
+								"allowed_to_position": {
+									"points_a_game": 16.8,
+									"rank": 22,
+									"of": 32,
+									"position": "RB"
+								},
+								"game_total": {
+									"points": 52.5,
+									"team_points": 27,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "win",
+									"points": 1.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 22,
+							"season_avg": null,
+							"last_points": null,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "WR",
+						"line": {
+							"player": {
+								"host_id": "7569",
+								"board_id": "4258173",
+								"name": "Nico Collins",
+								"position": "WR",
+								"team": "HOU",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4258173.png",
+							"slug": "nico-collins",
+							"position_rank": 10,
+							"points_over_replacement": 4.3,
+							"rest_of_season_per_game": 15.8,
+							"week_projection": 15.8,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "JAX",
+								"home": false,
+								"kickoff": "2026-10-18T13:30:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 10.6
+									},
+									{
+										"week": 4,
+										"points": 30.8
+									},
+									{
+										"week": 1,
+										"points": 21.2
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "lose",
+									"points": 3,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": true
+								},
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "WR",
+						"line": {
+							"player": {
+								"host_id": "5927",
+								"board_id": "3121422",
+								"name": "Terry McLaurin",
+								"position": "WR",
+								"team": "WAS",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3121422.png",
+							"slug": "terry-mclaurin",
+							"position_rank": 26,
+							"points_over_replacement": -0.4,
+							"rest_of_season_per_game": 12.4,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "SF",
+								"home": false,
+								"kickoff": "2026-10-20T00:15:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 10.2
+									},
+									{
+										"week": 3,
+										"points": 19.7
+									},
+									{
+										"week": 2,
+										"points": 7
+									}
+								],
+								"allowed_to_position": {
+									"points_a_game": 15,
+									"rank": 25,
+									"of": 32,
+									"position": "WR"
+								},
+								"game_total": {
+									"points": 50.5,
+									"team_points": 21.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "lose",
+									"points": 7.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 63,
+									"wind_mph": 12.7,
+									"precipitation_chance": 2,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"week_projection": 12.3,
+							"projection_delta": 0.4,
+							"opp_rank": 25,
+							"season_avg": 12.3,
+							"last_points": 10.2,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "WR",
+						"line": {
+							"player": {
+								"host_id": "12501",
+								"board_id": "4701936",
+								"name": "Matthew Golden",
+								"position": "WR",
+								"team": "GB",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4701936.png",
+							"slug": "matthew-golden",
+							"position_rank": 49,
+							"points_over_replacement": -2.6,
+							"rest_of_season_per_game": 8.5,
+							"week_projection": 8.5,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "DAL",
+								"home": true,
+								"kickoff": "2026-10-19T00:20:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 18.3
+									},
+									{
+										"week": 4,
+										"points": 11.7
+									},
+									{
+										"week": 3,
+										"points": 21
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 27,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "win",
+									"points": 1.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "TE",
+						"line": {
+							"player": {
+								"host_id": "12517",
+								"board_id": "4723086",
+								"name": "Colston Loveland",
+								"position": "TE",
+								"team": "CHI",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4723086.png",
+							"slug": "colston-loveland",
+							"position_rank": 3,
+							"points_over_replacement": 1.5,
+							"rest_of_season_per_game": 10.3,
+							"week_projection": 10.3,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "ATL",
+								"home": false,
+								"kickoff": "2026-10-18T17:00:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 3.9
+									},
+									{
+										"week": 4,
+										"points": 11.7
+									},
+									{
+										"week": 3,
+										"points": 7.1
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 49.5,
+									"team_points": 26.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "win",
+									"points": 3,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "retractable",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 59,
+									"wind_mph": 12.7,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "FLEX",
+						"line": {
+							"player": {
+								"host_id": "13346",
+								"board_id": "4832800",
+								"name": "Denzel Boston",
+								"position": "WR",
+								"team": "CLE",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4832800.png",
+							"slug": "denzel-boston",
+							"position_rank": 60,
+							"points_over_replacement": 0.5,
+							"rest_of_season_per_game": 7.4,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "BAL",
+								"home": true,
+								"kickoff": "2026-10-18T17:00:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 13.6
+									},
+									{
+										"week": 4,
+										"points": 12.9
+									},
+									{
+										"week": 3,
+										"points": 6.1
+									}
+								],
+								"allowed_to_position": {
+									"points_a_game": 22.8,
+									"rank": 12,
+									"of": 32,
+									"position": "WR"
+								},
+								"game_total": {
+									"points": 40.5,
+									"team_points": 18,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "lose",
+									"points": 4.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 57,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"week_projection": 7.7,
+							"projection_delta": -0.4,
+							"opp_rank": 12,
+							"season_avg": 10.9,
+							"last_points": 13.6,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "FLEX",
+						"line": {
+							"player": {
+								"host_id": "11604",
+								"board_id": "4432665",
+								"name": "Brock Bowers",
+								"position": "TE",
+								"team": "LV",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4432665.png",
+							"slug": "brock-bowers",
+							"position_rank": 2,
+							"points_over_replacement": 4.3,
+							"rest_of_season_per_game": 13.4,
+							"week_projection": 13.4,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "BUF",
+								"home": true,
+								"kickoff": "2026-10-18T20:25:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 23
+									},
+									{
+										"week": 4,
+										"points": 20.6
+									},
+									{
+										"week": 3,
+										"points": 27.6
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 23.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "lose",
+									"points": 6,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "dome",
+									"abroad": false
+								},
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					},
+					{
+						"slot": "DEF",
+						"line": {
+							"player": {
+								"host_id": "CLE",
+								"board_id": null,
+								"name": "Cleveland Browns",
+								"position": "DEF",
+								"team": "CLE",
+								"injured_reserve": false
+							},
+							"headshot": null,
+							"slug": null,
+							"position_rank": null,
+							"points_over_replacement": null,
+							"rest_of_season_per_game": null,
+							"week_projection": 7,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"held": false,
+							"facts": {
+								"week": 6,
+								"opponent": "BAL",
+								"home": true,
+								"kickoff": "2026-10-18T17:00:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [],
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 18,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": {
+									"side": "lose",
+									"points": 4.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"roof": {
+									"kind": "outdoors",
+									"abroad": false
+								},
+								"weather": {
+									"temperature_f": 57,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								},
+								"game_state": "upcoming"
+							},
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						}
+					}
+				],
+				"bench": [
+					{
+						"player": {
+							"host_id": "10213",
+							"board_id": "4428718",
+							"name": "Tre Tucker",
+							"position": "WR",
+							"team": "LV",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4428718.png",
+						"slug": "tre-tucker",
+						"position_rank": 44,
+						"points_over_replacement": 1.4,
+						"rest_of_season_per_game": 9.9,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "BUF",
+							"home": true,
+							"kickoff": "2026-10-18T20:25:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 5,
+									"points": 7.5
+								},
+								{
+									"week": 4,
+									"points": 8.4
+								},
+								{
+									"week": 3,
+									"points": 8.3
+								}
+							],
+							"allowed_to_position": {
+								"points_a_game": 13.8,
+								"rank": 27,
+								"of": 32,
+								"position": "WR"
+							},
+							"game_total": {
+								"points": 52.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "lose",
+								"points": 6,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "dome",
+								"abroad": false
+							},
+							"weather": null,
+							"game_state": "upcoming"
+						},
+						"week_projection": 8.7,
+						"projection_delta": 0.3,
+						"opp_rank": 27,
+						"season_avg": 8.1,
+						"last_points": 7.5,
+						"game_state": {
+							"state": "not_started",
+							"word": "Next kickoff"
+						}
+					},
+					{
+						"player": {
+							"host_id": "11563",
+							"board_id": "4426338",
+							"name": "Bo Nix",
+							"position": "QB",
+							"team": "DEN",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4426338.png",
+						"slug": "bo-nix",
+						"position_rank": 13,
+						"points_over_replacement": -1,
+						"rest_of_season_per_game": 14.7,
+						"week_projection": 14.7,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "SEA",
+							"home": true,
+							"kickoff": "2026-10-16T00:15:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 6,
+									"points": 4.48
+								},
+								{
+									"week": 5,
+									"points": 8.92
+								},
+								{
+									"week": 4,
+									"points": 14.56
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 40.5,
+								"team_points": 19,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "lose",
+								"points": 3,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "outdoors",
+								"abroad": false
+							},
+							"weather": null,
+							"game_state": "kicked_off"
+						},
+						"game_state": {
+							"state": "kicked_off",
+							"word": "Kicked off"
+						}
+					},
+					{
+						"player": {
+							"host_id": "11583",
+							"board_id": null,
+							"name": "Jonathon Brooks",
+							"position": "RB",
+							"team": "CAR",
+							"injured_reserve": false
+						},
+						"headshot": null,
+						"slug": null,
+						"position_rank": null,
+						"points_over_replacement": null,
+						"rest_of_season_per_game": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "PHI",
+							"home": false,
+							"kickoff": "2026-10-18T17:00:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [],
+							"allowed_to_position": {
+								"points_a_game": 13.2,
+								"rank": 28,
+								"of": 32,
+								"position": "RB"
+							},
+							"game_total": {
+								"points": 41.5,
+								"team_points": 20,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "lose",
+								"points": 1.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "outdoors",
+								"abroad": false
+							},
+							"weather": {
+								"temperature_f": 52,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							},
+							"game_state": "upcoming"
+						},
+						"week_projection": null,
+						"projection_delta": null,
+						"opp_rank": 28,
+						"season_avg": null,
+						"last_points": null,
+						"game_state": {
+							"state": "not_started",
+							"word": "Next kickoff"
+						}
+					},
+					{
+						"player": {
+							"host_id": "11625",
+							"board_id": "4597500",
+							"name": "Adonai Mitchell",
+							"position": "WR",
+							"team": "NYJ",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4597500.png",
+						"slug": "adonai-mitchell",
+						"position_rank": 63,
+						"points_over_replacement": -4.3,
+						"rest_of_season_per_game": 6.7,
+						"week_projection": 6.7,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "NE",
+							"home": false,
+							"kickoff": "2026-10-18T17:00:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 2,
+									"points": 12.3
+								},
+								{
+									"week": 1,
+									"points": 9
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 43.5,
+								"team_points": 18.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "lose",
+								"points": 7,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "outdoors",
+								"abroad": false
+							},
+							"weather": {
+								"temperature_f": 48,
+								"wind_mph": 4.6,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							},
+							"game_state": "upcoming"
+						},
+						"game_state": {
+							"state": "not_started",
+							"word": "Next kickoff"
+						}
+					},
+					{
+						"player": {
+							"host_id": "12534",
+							"board_id": "4608686",
+							"name": "Kyle Monangai",
+							"position": "RB",
+							"team": "CHI",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4608686.png",
+						"slug": "kyle-monangai",
+						"position_rank": 33,
+						"points_over_replacement": -1.7,
+						"rest_of_season_per_game": 7.5,
+						"week_projection": 7.5,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "ATL",
+							"home": false,
+							"kickoff": "2026-10-18T17:00:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 4,
+									"points": 28
+								},
+								{
+									"week": 3,
+									"points": 3.1
+								},
+								{
+									"week": 2,
+									"points": 7.8
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 49.5,
+								"team_points": 26.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "win",
+								"points": 3,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "retractable",
+								"abroad": false
+							},
+							"weather": {
+								"temperature_f": 59,
+								"wind_mph": 12.7,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							},
+							"game_state": "upcoming"
+						},
+						"game_state": {
+							"state": "not_started",
+							"word": "Next kickoff"
+						}
+					},
+					{
+						"player": {
+							"host_id": "12718",
+							"board_id": "4710855",
+							"name": "Konata Mumpfield",
+							"position": "WR",
+							"team": "LAR",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4710855.png",
+						"slug": "konata-mumpfield",
+						"position_rank": 96,
+						"points_over_replacement": -7.3,
+						"rest_of_season_per_game": 3.5,
+						"week_projection": 3.5,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "ARI",
+							"home": true,
+							"kickoff": "2026-10-18T20:05:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 5,
+									"points": 0
+								},
+								{
+									"week": 4,
+									"points": 1.7
+								},
+								{
+									"week": 3,
+									"points": 19.3
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 52.5,
+								"team_points": 32.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "win",
+								"points": 12.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "dome",
+								"abroad": false
+							},
+							"weather": null,
+							"game_state": "upcoming"
+						},
+						"game_state": {
+							"state": "not_started",
+							"word": "Next kickoff"
+						}
+					},
+					{
+						"player": {
+							"host_id": "13281",
+							"board_id": "4880281",
+							"name": "Jordyn Tyson",
+							"position": "WR",
+							"team": "NO",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4880281.png",
+						"slug": "jordyn-tyson",
+						"position_rank": 147,
+						"points_over_replacement": -5.2,
+						"rest_of_season_per_game": 5.7,
+						"week_projection": 5.7,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "NYG",
+							"home": false,
+							"kickoff": "2026-10-18T17:00:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [],
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 22,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "lose",
+								"points": 1.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "outdoors",
+								"abroad": false
+							},
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							},
+							"game_state": "upcoming"
+						},
+						"game_state": {
+							"state": "not_started",
+							"word": "Next kickoff"
+						}
+					},
+					{
+						"player": {
+							"host_id": "13337",
+							"board_id": "4832955",
+							"name": "Emmett Johnson",
+							"position": "RB",
+							"team": "KC",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4832955.png",
+						"slug": "emmett-johnson",
+						"position_rank": 49,
+						"points_over_replacement": -4.3,
+						"rest_of_season_per_game": 4.6,
+						"week_projection": 4.6,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "LAC",
+							"home": true,
+							"kickoff": "2026-10-18T20:25:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 4,
+									"points": 2
+								},
+								{
+									"week": 3,
+									"points": 1.7
+								},
+								{
+									"week": 2,
+									"points": 5.5
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 42.5,
+								"team_points": 25.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "win",
+								"points": 8.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "outdoors",
+								"abroad": false
+							},
+							"weather": {
+								"temperature_f": 66,
+								"wind_mph": 10.4,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							},
+							"game_state": "upcoming"
+						},
+						"game_state": {
+							"state": "not_started",
+							"word": "Next kickoff"
+						}
+					},
+					{
+						"player": {
+							"host_id": "4177",
+							"board_id": "2991662",
+							"name": "Mack Hollins",
+							"position": "WR",
+							"team": "NE",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/2991662.png",
+						"slug": "mack-hollins",
+						"position_rank": 149,
+						"points_over_replacement": -5.5,
+						"rest_of_season_per_game": 5.4,
+						"week_projection": 5.4,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "NYJ",
+							"home": true,
+							"kickoff": "2026-10-18T17:00:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [
+								{
+									"week": 4,
+									"points": 8.3
+								},
+								{
+									"week": 3,
+									"points": 14.7
+								},
+								{
+									"week": 2,
+									"points": 3.8
+								}
+							],
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 43.5,
+								"team_points": 25.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "win",
+								"points": 7,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "outdoors",
+								"abroad": false
+							},
+							"weather": {
+								"temperature_f": 48,
+								"wind_mph": 4.6,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							},
+							"game_state": "upcoming"
+						},
+						"game_state": {
+							"state": "not_started",
+							"word": "Next kickoff"
+						}
+					},
+					{
+						"player": {
+							"host_id": "5850",
+							"board_id": "4047365",
+							"name": "Josh Jacobs",
+							"position": "RB",
+							"team": "GB",
+							"injured_reserve": false
+						},
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4047365.png",
+						"slug": "josh-jacobs",
+						"position_rank": 35,
+						"points_over_replacement": -2.2,
+						"rest_of_season_per_game": 6.9,
+						"week_projection": 6.9,
+						"projection_delta": null,
+						"opp_rank": null,
+						"season_avg": null,
+						"last_points": null,
+						"held": false,
+						"facts": {
+							"week": 6,
+							"opponent": "DAL",
+							"home": true,
+							"kickoff": "2026-10-19T00:20:00.000Z",
+							"bye": false,
+							"designation": null,
+							"played": false,
+							"points_this_week": null,
+							"last_games": [],
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 52.5,
+								"team_points": 27,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": {
+								"side": "win",
+								"points": 1.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"roof": {
+								"kind": "outdoors",
+								"abroad": false
+							},
+							"weather": {
+								"temperature_f": 55,
+								"wind_mph": 9.2,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							},
+							"game_state": "upcoming"
+						},
+						"game_state": {
+							"state": "not_started",
+							"word": "Next kickoff"
+						}
+					}
+				]
+			}
+		],
+		"viewer_side": "other",
+		"standing": null,
+		"decided": null
+	},
+	"error": null
+}

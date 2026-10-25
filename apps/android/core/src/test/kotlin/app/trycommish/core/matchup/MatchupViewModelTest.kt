@@ -71,10 +71,15 @@ class MatchupViewModelTest {
             return syncBody
         }
 
-        override suspend fun matchup(leagueId: String): String? {
+        override suspend fun matchup(
+            leagueId: String,
+            roster: Int?,
+        ): String? {
             if (!signal) throw IOException("no signal")
             return boxBody
         }
+
+        override suspend fun scoreboard(leagueId: String): String = error("the member's game reads no scoreboard")
     }
 
     private class Ends : SessionEnd {

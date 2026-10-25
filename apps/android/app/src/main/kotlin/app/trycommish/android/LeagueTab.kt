@@ -21,6 +21,7 @@ fun LeagueTab(
     shell: ShellState,
     onRetry: () -> Unit,
     onOpenLineup: (leagueId: String) -> Unit,
+    onOpenGame: (leagueId: String, roster: Int?) -> Unit,
 ) {
     val signedIn by graph.signedIn.collectAsStateWithLifecycle()
     if (!signedIn) {
@@ -31,7 +32,7 @@ fun LeagueTab(
     }
     val league = (shell as? ShellState.Ready)?.selected
     if (league != null) {
-        LeagueHome(graph, league.id, onOpenLineup)
+        LeagueHome(graph, league.id, onOpenLineup, onOpenGame)
         return
     }
     val waiting =
@@ -44,12 +45,14 @@ fun LeagueTab(
 }
 
 /** One league's home, its own view model per screen it is on (the League tab's, or one pushed from the
- * league switch): the kept page at once, the API's after; a pull reads it again. */
+ * league switch): the kept page at once, the API's after; a pull reads it again; a score bug opens its
+ * game. */
 @Composable
 fun LeagueHome(
     graph: AppGraph,
     leagueId: String,
     onOpenLineup: (leagueId: String) -> Unit,
+    onOpenGame: (leagueId: String, roster: Int?) -> Unit,
     vm: LeagueHomeViewModel = viewModel { graph.leagueHomeViewModel() },
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -61,5 +64,6 @@ fun LeagueHome(
         refreshing = refreshing && state is LeagueHomeState.Loaded,
         onRefresh = { vm.load(leagueId) },
         onOpenLineup = { onOpenLineup(leagueId) },
+        onOpenGame = { onOpenGame(leagueId, it) },
     )
 }

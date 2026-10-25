@@ -68,12 +68,16 @@ actor ManualTimer: PollTimer {
     }
 }
 
-/// The Matchup's two reads as the fixture answers them at a clock, counted; or failing as told.
+/// The Matchup's reads as the fixture answers them at a clock, counted, each box read's roster kept;
+/// or failing as told, the scoreboard on its own.
 actor MatchupStub: MatchupAPI {
     private let answer: MatchupAnswer
     private let box: Bool
     private var failure: (any Error)?
+    private var boardFailure: (any Error)?
     private(set) var reads = 0
+    private(set) var rosters: [Int?] = []
+    private(set) var boardReads = 0
 
     init(answer: MatchupAnswer, box: Bool = true) {
         self.answer = answer
@@ -84,6 +88,10 @@ actor MatchupStub: MatchupAPI {
         failure = error
     }
 
+    func failBoard(_ error: (any Error)?) {
+        boardFailure = error
+    }
+
     func leagueSync(id _: String) async throws -> LeagueSync {
         reads += 1
         if let failure {
@@ -92,10 +100,22 @@ actor MatchupStub: MatchupAPI {
         return answer.sync
     }
 
-    func matchup(id _: String) async throws -> MatchupBox? {
+    func matchup(id _: String, roster: Int?) async throws -> MatchupBox? {
+        rosters.append(roster)
         if let failure {
             throw failure
         }
         return box ? answer.box : nil
+    }
+
+    func scoreboard(id _: String) async throws -> Scoreboard {
+        boardReads += 1
+        if let error = failure ?? boardFailure {
+            throw error
+        }
+        guard let board = answer.board else {
+            throw URLError(.badServerResponse)
+        }
+        return board
     }
 }

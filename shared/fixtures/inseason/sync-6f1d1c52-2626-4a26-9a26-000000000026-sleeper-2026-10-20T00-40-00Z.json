@@ -1,0 +1,1787 @@
+{
+	"ok": true,
+	"data": {
+		"id": "6f1d1c52-2626-4a26-9a26-000000000026",
+		"host": "sleeper",
+		"host_league_id": "1382163311038038016",
+		"season": 2026,
+		"name": "S.U.C.K. - Severely Underrated Carolina Keepers",
+		"status": "in_season",
+		"week": 6,
+		"week_all_play": false,
+		"me": 1,
+		"settings_league_id": null,
+		"settings_note": null,
+		"scoring_like": "ppr",
+		"scoring_dropped": [],
+		"scoring_defaulted": [],
+		"teams": [
+			{
+				"roster_id": 10,
+				"name": "Muttdogs",
+				"owner": "muttdog",
+				"wins": 5,
+				"losses": 0,
+				"ties": 0,
+				"points_for": 818.2,
+				"points_against": 659.1,
+				"streak": "W5",
+				"waiver_order": 6,
+				"waiver_budget_left": 675,
+				"avatar": "https://sleepercdn.com/avatars/thumbs/2aea7c4ff143abb0f01f2ddbec933afc"
+			},
+			{
+				"roster_id": 3,
+				"name": "Keeper? I Hardly Know Her",
+				"owner": "JeffHaseleyFBG",
+				"wins": 4,
+				"losses": 1,
+				"ties": 0,
+				"points_for": 739.4,
+				"points_against": 584.8,
+				"streak": "W1",
+				"waiver_order": 10,
+				"waiver_budget_left": 780,
+				"avatar": "https://sleepercdn.com/avatars/thumbs/4eb86e314bcc8b55e36499065d6b1a02"
+			},
+			{
+				"roster_id": 12,
+				"name": "Nacua Matata",
+				"owner": "Rad_Thad1",
+				"wins": 3,
+				"losses": 2,
+				"ties": 0,
+				"points_for": 784.1,
+				"points_against": 665.1,
+				"streak": "W2",
+				"waiver_order": 3,
+				"waiver_budget_left": 800,
+				"avatar": "https://sleepercdn.com/avatars/thumbs/bbe6128d8abd7990ce5599e7c18568cf"
+			},
+			{
+				"roster_id": 6,
+				"name": "Bower Rangers",
+				"owner": "pricej07",
+				"wins": 3,
+				"losses": 2,
+				"ties": 0,
+				"points_for": 732.9,
+				"points_against": 643.1,
+				"streak": "W3",
+				"waiver_order": 9,
+				"waiver_budget_left": 863,
+				"avatar": "https://sleepercdn.com/avatars/thumbs/8eb8f8bf999945d523f2c4033f70473e"
+			},
+			{
+				"roster_id": 2,
+				"name": "Carried by QJs",
+				"owner": "PeakedInHighSkool",
+				"wins": 3,
+				"losses": 2,
+				"ties": 0,
+				"points_for": 652.7,
+				"points_against": 603.3,
+				"streak": "L1",
+				"waiver_order": 12,
+				"waiver_budget_left": 700,
+				"avatar": "https://sleepercdn.com/avatars/thumbs/cf730b8ae44c68201303f4305431a495"
+			},
+			{
+				"roster_id": 5,
+				"name": "Ball Snatchers",
+				"owner": "Quinnifer",
+				"wins": 3,
+				"losses": 2,
+				"ties": 0,
+				"points_for": 638.9,
+				"points_against": 673.3,
+				"streak": "W2",
+				"waiver_order": 2,
+				"waiver_budget_left": 664,
+				"avatar": "https://sleepercdn.com/avatars/thumbs/f0edbf4278f53f9425db175073df6584"
+			},
+			{
+				"roster_id": 4,
+				"name": "Dad Runners",
+				"owner": "jjzachariason",
+				"wins": 2,
+				"losses": 3,
+				"ties": 0,
+				"points_for": 661.5,
+				"points_against": 711,
+				"streak": "W1",
+				"waiver_order": 8,
+				"waiver_budget_left": 915,
+				"avatar": "https://sleepercdn.com/avatars/thumbs/ce80fd6a38801322244d46b4abe79a23"
+			},
+			{
+				"roster_id": 9,
+				"name": "Aaron Donald Dependent",
+				"owner": "Nowlan",
+				"wins": 2,
+				"losses": 3,
+				"ties": 0,
+				"points_for": 660.2,
+				"points_against": 640.5,
+				"streak": "L3",
+				"waiver_order": 4,
+				"waiver_budget_left": 911,
+				"avatar": "https://sleepercdn.com/avatars/thumbs/10e06bc82409ab5dd7c3bdd78b76067d"
+			},
+			{
+				"roster_id": 11,
+				"name": "OnlyFannins",
+				"owner": "jordanp2323",
+				"wins": 2,
+				"losses": 3,
+				"ties": 0,
+				"points_for": 655.2,
+				"points_against": 666.1,
+				"streak": "L1",
+				"waiver_order": 7,
+				"waiver_budget_left": 556,
+				"avatar": "https://sleepercdn.com/avatars/thumbs/754537eae5522ba30eaa24f0e74066fb"
+			},
+			{
+				"roster_id": 8,
+				"name": "Max_Jensen10",
+				"owner": "Max_Jensen10",
+				"wins": 1,
+				"losses": 4,
+				"ties": 0,
+				"points_for": 608.7,
+				"points_against": 781.8,
+				"streak": "L3",
+				"waiver_order": 11,
+				"waiver_budget_left": 830,
+				"avatar": "https://sleepercdn.com/avatars/thumbs/15d7cf259bc30eab8f6120f45f652fb6"
+			},
+			{
+				"roster_id": 7,
+				"name": "thatmattkelley",
+				"owner": "thatmattkelley",
+				"wins": 1,
+				"losses": 4,
+				"ties": 0,
+				"points_for": 580.1,
+				"points_against": 740.7,
+				"streak": "L2",
+				"waiver_order": 5,
+				"waiver_budget_left": 959,
+				"avatar": "https://sleepercdn.com/avatars/thumbs/3814e6fcad19a6a4c1dde448c6828a54"
+			},
+			{
+				"roster_id": 1,
+				"name": "McConkey Kong Country",
+				"owner": "GMenJay",
+				"wins": 1,
+				"losses": 4,
+				"ties": 0,
+				"points_for": 567,
+				"points_against": 730.3,
+				"streak": "L2",
+				"waiver_order": 1,
+				"waiver_budget_left": 1000,
+				"avatar": "https://sleepercdn.com/avatars/thumbs/c4861381cb205d951bdde51e296c673f"
+			}
+		],
+		"roster": [
+			{
+				"player": {
+					"host_id": "96",
+					"board_id": "8439",
+					"name": "Aaron Rodgers",
+					"position": "QB",
+					"team": "PIT",
+					"injured_reserve": false
+				},
+				"slot": "starter"
+			},
+			{
+				"player": {
+					"host_id": "13287",
+					"board_id": "4870808",
+					"name": "Jeremiyah Love",
+					"position": "RB",
+					"team": "ARI",
+					"injured_reserve": false
+				},
+				"slot": "starter"
+			},
+			{
+				"player": {
+					"host_id": "7567",
+					"board_id": "4371733",
+					"name": "Kenny Gainwell",
+					"position": "RB",
+					"team": "TB",
+					"injured_reserve": false
+				},
+				"slot": "starter"
+			},
+			{
+				"player": {
+					"host_id": "7564",
+					"board_id": "4362628",
+					"name": "Ja'Marr Chase",
+					"position": "WR",
+					"team": "CIN",
+					"injured_reserve": false
+				},
+				"slot": "starter"
+			},
+			{
+				"player": {
+					"host_id": "11620",
+					"board_id": "4431299",
+					"name": "Rome Odunze",
+					"position": "WR",
+					"team": "CHI",
+					"injured_reserve": false
+				},
+				"slot": "starter"
+			},
+			{
+				"player": {
+					"host_id": "13301",
+					"board_id": "5081432",
+					"name": "Antonio Williams",
+					"position": "WR",
+					"team": "WAS",
+					"injured_reserve": false
+				},
+				"slot": "starter"
+			},
+			{
+				"player": {
+					"host_id": "10859",
+					"board_id": "4430027",
+					"name": "Sam LaPorta",
+					"position": "TE",
+					"team": "DET",
+					"injured_reserve": false
+				},
+				"slot": "starter"
+			},
+			{
+				"player": {
+					"host_id": "11635",
+					"board_id": "4612826",
+					"name": "Ladd McConkey",
+					"position": "WR",
+					"team": "LAC",
+					"injured_reserve": false
+				},
+				"slot": "starter"
+			},
+			{
+				"player": {
+					"host_id": "5947",
+					"board_id": "3916433",
+					"name": "Jakobi Meyers",
+					"position": "WR",
+					"team": "JAX",
+					"injured_reserve": false
+				},
+				"slot": "starter"
+			},
+			{
+				"player": {
+					"host_id": "MIN",
+					"board_id": null,
+					"name": "Minnesota Vikings",
+					"position": "DEF",
+					"team": "MIN",
+					"injured_reserve": false
+				},
+				"slot": "starter"
+			},
+			{
+				"player": {
+					"host_id": "10235",
+					"board_id": "4426386",
+					"name": "Roschon Johnson",
+					"position": "RB",
+					"team": "CHI",
+					"injured_reserve": false
+				},
+				"slot": "bench"
+			},
+			{
+				"player": {
+					"host_id": "12508",
+					"board_id": "4689114",
+					"name": "Jaxson Dart",
+					"position": "QB",
+					"team": "NYG",
+					"injured_reserve": false
+				},
+				"slot": "bench"
+			},
+			{
+				"player": {
+					"host_id": "4046",
+					"board_id": "3139477",
+					"name": "Patrick Mahomes",
+					"position": "QB",
+					"team": "KC",
+					"injured_reserve": false
+				},
+				"slot": "bench"
+			},
+			{
+				"player": {
+					"host_id": "4950",
+					"board_id": "3895856",
+					"name": "Christian Kirk",
+					"position": "WR",
+					"team": "SF",
+					"injured_reserve": false
+				},
+				"slot": "bench"
+			},
+			{
+				"player": {
+					"host_id": "7543",
+					"board_id": "4239996",
+					"name": "Travis Etienne",
+					"position": "RB",
+					"team": "NO",
+					"injured_reserve": false
+				},
+				"slot": "bench"
+			},
+			{
+				"player": {
+					"host_id": "8210",
+					"board_id": "4360635",
+					"name": "Chig Okonkwo",
+					"position": "TE",
+					"team": "WAS",
+					"injured_reserve": false
+				},
+				"slot": "bench"
+			},
+			{
+				"player": {
+					"host_id": "9225",
+					"board_id": "4429013",
+					"name": "Tank Bigsby",
+					"position": "RB",
+					"team": "PHI",
+					"injured_reserve": false
+				},
+				"slot": "bench"
+			},
+			{
+				"player": {
+					"host_id": "9753",
+					"board_id": "4426385",
+					"name": "Zach Charbonnet",
+					"position": "RB",
+					"team": "SEA",
+					"injured_reserve": false
+				},
+				"slot": "bench"
+			},
+			{
+				"player": {
+					"host_id": "9756",
+					"board_id": "4429205",
+					"name": "Jordan Addison",
+					"position": "WR",
+					"team": "MIN",
+					"injured_reserve": false
+				},
+				"slot": "bench"
+			},
+			{
+				"player": {
+					"host_id": "HOU",
+					"board_id": null,
+					"name": "Houston Texans",
+					"position": "DEF",
+					"team": "HOU",
+					"injured_reserve": false
+				},
+				"slot": "bench"
+			}
+		],
+		"matchup": {
+			"week": 6,
+			"mine": {
+				"roster_id": 1,
+				"points": 63.5,
+				"points_read": true,
+				"player_points": true,
+				"team_total": false,
+				"starters": [
+					{
+						"player": {
+							"host_id": "96",
+							"board_id": "8439",
+							"name": "Aaron Rodgers",
+							"position": "QB",
+							"team": "PIT",
+							"injured_reserve": false
+						},
+						"points": 13.4
+					},
+					{
+						"player": {
+							"host_id": "13287",
+							"board_id": "4870808",
+							"name": "Jeremiyah Love",
+							"position": "RB",
+							"team": "ARI",
+							"injured_reserve": false
+						},
+						"points": 10.5
+					},
+					{
+						"player": {
+							"host_id": "7567",
+							"board_id": "4371733",
+							"name": "Kenny Gainwell",
+							"position": "RB",
+							"team": "TB",
+							"injured_reserve": false
+						},
+						"points": 8.1
+					},
+					{
+						"player": {
+							"host_id": "7564",
+							"board_id": "4362628",
+							"name": "Ja'Marr Chase",
+							"position": "WR",
+							"team": "CIN",
+							"injured_reserve": false
+						},
+						"points": 0
+					},
+					{
+						"player": {
+							"host_id": "11620",
+							"board_id": "4431299",
+							"name": "Rome Odunze",
+							"position": "WR",
+							"team": "CHI",
+							"injured_reserve": false
+						},
+						"points": 9.4
+					},
+					{
+						"player": {
+							"host_id": "13301",
+							"board_id": "5081432",
+							"name": "Antonio Williams",
+							"position": "WR",
+							"team": "WAS",
+							"injured_reserve": false
+						},
+						"points": 2.7
+					},
+					{
+						"player": {
+							"host_id": "10859",
+							"board_id": "4430027",
+							"name": "Sam LaPorta",
+							"position": "TE",
+							"team": "DET",
+							"injured_reserve": false
+						},
+						"points": 0
+					},
+					{
+						"player": {
+							"host_id": "11635",
+							"board_id": "4612826",
+							"name": "Ladd McConkey",
+							"position": "WR",
+							"team": "LAC",
+							"injured_reserve": false
+						},
+						"points": 11.2
+					},
+					{
+						"player": {
+							"host_id": "5947",
+							"board_id": "3916433",
+							"name": "Jakobi Meyers",
+							"position": "WR",
+							"team": "JAX",
+							"injured_reserve": false
+						},
+						"points": 8.2
+					},
+					{
+						"player": {
+							"host_id": "MIN",
+							"board_id": null,
+							"name": "Minnesota Vikings",
+							"position": "DEF",
+							"team": "MIN",
+							"injured_reserve": false
+						},
+						"points": 0
+					}
+				]
+			},
+			"opponent": {
+				"roster_id": 7,
+				"points": 83.7,
+				"points_read": true,
+				"player_points": true,
+				"team_total": false,
+				"starters": [
+					{
+						"player": {
+							"host_id": "3257",
+							"board_id": "2578570",
+							"name": "Jacoby Brissett",
+							"position": "QB",
+							"team": "ARI",
+							"injured_reserve": false
+						},
+						"points": 12.8
+					},
+					{
+						"player": {
+							"host_id": "12512",
+							"board_id": "4685702",
+							"name": "Quinshon Judkins",
+							"position": "RB",
+							"team": "CLE",
+							"injured_reserve": false
+						},
+						"points": 10.4
+					},
+					{
+						"player": {
+							"host_id": "12474",
+							"board_id": "4429059",
+							"name": "Woody Marks",
+							"position": "RB",
+							"team": "HOU",
+							"injured_reserve": false
+						},
+						"points": 6.5
+					},
+					{
+						"player": {
+							"host_id": "13298",
+							"board_id": "4870653",
+							"name": "KC Concepcion",
+							"position": "WR",
+							"team": "CLE",
+							"injured_reserve": false
+						},
+						"points": 7.6
+					},
+					{
+						"player": {
+							"host_id": "8146",
+							"board_id": "4569618",
+							"name": "Garrett Wilson",
+							"position": "WR",
+							"team": "NYJ",
+							"injured_reserve": false
+						},
+						"points": 11.6
+					},
+					{
+						"player": {
+							"host_id": "12535",
+							"board_id": "5123663",
+							"name": "Isaac TeSlaa",
+							"position": "WR",
+							"team": "DET",
+							"injured_reserve": false
+						},
+						"points": 0
+					},
+					{
+						"player": {
+							"host_id": "12518",
+							"board_id": "4431459",
+							"name": "Tyler Warren",
+							"position": "TE",
+							"team": "IND",
+							"injured_reserve": false
+						},
+						"points": 10.8
+					},
+					{
+						"player": {
+							"host_id": "4035",
+							"board_id": "3054850",
+							"name": "Alvin Kamara",
+							"position": "RB",
+							"team": "NO",
+							"injured_reserve": false
+						},
+						"points": 3
+					},
+					{
+						"player": {
+							"host_id": "8138",
+							"board_id": "4379399",
+							"name": "James Cook",
+							"position": "RB",
+							"team": "BUF",
+							"injured_reserve": false
+						},
+						"points": 13
+					},
+					{
+						"player": {
+							"host_id": "NYJ",
+							"board_id": null,
+							"name": "New York Jets",
+							"position": "DEF",
+							"team": "NYJ",
+							"injured_reserve": false
+						},
+						"points": 8
+					}
+				]
+			}
+		},
+		"moves": [
+			{
+				"kind": "add",
+				"at": "2026-10-11T16:44:07.309Z",
+				"roster_ids": [
+					1
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "10235",
+							"board_id": "4426386",
+							"name": "Roschon Johnson",
+							"position": "RB",
+							"team": "CHI",
+							"injured_reserve": false
+						},
+						"roster_id": 1
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "12048",
+							"board_id": "4429835",
+							"name": "George Holani",
+							"position": "RB",
+							"team": "SEA",
+							"injured_reserve": false
+						},
+						"roster_id": 1
+					}
+				],
+				"bid": null
+			},
+			{
+				"kind": "add",
+				"at": "2026-10-11T16:43:42.369Z",
+				"roster_ids": [
+					1
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "96",
+							"board_id": "8439",
+							"name": "Aaron Rodgers",
+							"position": "QB",
+							"team": "PIT",
+							"injured_reserve": false
+						},
+						"roster_id": 1
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "13288",
+							"board_id": "4685555",
+							"name": "Nicholas Singleton",
+							"position": "RB",
+							"team": "TEN",
+							"injured_reserve": false
+						},
+						"roster_id": 1
+					}
+				],
+				"bid": null
+			},
+			{
+				"kind": "add",
+				"at": "2026-10-11T13:23:58.523Z",
+				"roster_ids": [
+					8
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "8116",
+							"board_id": null,
+							"name": "Pierre Strong",
+							"position": "RB",
+							"team": "GB",
+							"injured_reserve": false
+						},
+						"roster_id": 8
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "13264",
+							"board_id": "4384852",
+							"name": "Dohnte Meyers",
+							"position": "WR",
+							"team": "CIN",
+							"injured_reserve": false
+						},
+						"roster_id": 8
+					}
+				],
+				"bid": null
+			},
+			{
+				"kind": "add",
+				"at": "2026-10-11T13:10:57.616Z",
+				"roster_ids": [
+					5
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "13150",
+							"board_id": "4715355",
+							"name": "Darius Cooper",
+							"position": "WR",
+							"team": "PHI",
+							"injured_reserve": false
+						},
+						"roster_id": 5
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "9226",
+							"board_id": "4429160",
+							"name": "De'Von Achane",
+							"position": "RB",
+							"team": "MIA",
+							"injured_reserve": false
+						},
+						"roster_id": 5
+					}
+				],
+				"bid": null
+			},
+			{
+				"kind": "add",
+				"at": "2026-10-11T10:21:04.224Z",
+				"roster_ids": [
+					7
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "12535",
+							"board_id": "5123663",
+							"name": "Isaac TeSlaa",
+							"position": "WR",
+							"team": "DET",
+							"injured_reserve": false
+						},
+						"roster_id": 7
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "11608",
+							"board_id": "4569371",
+							"name": "Isaiah Williams",
+							"position": "WR",
+							"team": "NYJ",
+							"injured_reserve": false
+						},
+						"roster_id": 7
+					}
+				],
+				"bid": null
+			},
+			{
+				"kind": "add",
+				"at": "2026-10-11T10:19:01.988Z",
+				"roster_ids": [
+					7
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "NYJ",
+							"board_id": null,
+							"name": "New York Jets",
+							"position": "DEF",
+							"team": "NYJ",
+							"injured_reserve": false
+						},
+						"roster_id": 7
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "IND",
+							"board_id": null,
+							"name": "Indianapolis Colts",
+							"position": "DEF",
+							"team": "IND",
+							"injured_reserve": false
+						},
+						"roster_id": 7
+					}
+				],
+				"bid": null
+			},
+			{
+				"kind": "waiver",
+				"at": "2026-10-10T15:20:26.085Z",
+				"roster_ids": [
+					8
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "4454",
+							"board_id": "3045523",
+							"name": "Kendrick Bourne",
+							"position": "WR",
+							"team": "ARI",
+							"injured_reserve": false
+						},
+						"roster_id": 8
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "10218",
+							"board_id": "4686422",
+							"name": "Xavier Hutchinson",
+							"position": "WR",
+							"team": "HOU",
+							"injured_reserve": false
+						},
+						"roster_id": 8
+					}
+				],
+				"bid": 75
+			},
+			{
+				"kind": "waiver",
+				"at": "2026-10-09T21:57:12.447Z",
+				"roster_ids": [
+					3
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "13405",
+							"board_id": "4685246",
+							"name": "Kaytron Allen",
+							"position": "RB",
+							"team": "MIA",
+							"injured_reserve": false
+						},
+						"roster_id": 3
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "13424",
+							"board_id": "4686468",
+							"name": "Seth McGowan",
+							"position": "RB",
+							"team": "IND",
+							"injured_reserve": false
+						},
+						"roster_id": 3
+					}
+				],
+				"bid": 105
+			},
+			{
+				"kind": "waiver",
+				"at": "2026-10-09T18:52:17.982Z",
+				"roster_ids": [
+					2
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "LAR",
+							"board_id": null,
+							"name": "Los Angeles Rams",
+							"position": "DEF",
+							"team": "LAR",
+							"injured_reserve": false
+						},
+						"roster_id": 2
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "BAL",
+							"board_id": null,
+							"name": "Baltimore Ravens",
+							"position": "DEF",
+							"team": "BAL",
+							"injured_reserve": false
+						},
+						"roster_id": 2
+					}
+				],
+				"bid": 0
+			},
+			{
+				"kind": "add",
+				"at": "2026-10-09T02:53:36.945Z",
+				"roster_ids": [
+					9
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "LV",
+							"board_id": null,
+							"name": "Las Vegas Raiders",
+							"position": "DEF",
+							"team": "LV",
+							"injured_reserve": false
+						},
+						"roster_id": 9
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "LAR",
+							"board_id": null,
+							"name": "Los Angeles Rams",
+							"position": "DEF",
+							"team": "LAR",
+							"injured_reserve": false
+						},
+						"roster_id": 9
+					}
+				],
+				"bid": null
+			},
+			{
+				"kind": "waiver",
+				"at": "2026-10-08T17:42:27.035Z",
+				"roster_ids": [
+					2
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "12504",
+							"board_id": "4819231",
+							"name": "Kaleb Johnson",
+							"position": "RB",
+							"team": "GB",
+							"injured_reserve": false
+						},
+						"roster_id": 2
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "12497",
+							"board_id": "4597703",
+							"name": "Tory Horton",
+							"position": "WR",
+							"team": "SEA",
+							"injured_reserve": false
+						},
+						"roster_id": 2
+					}
+				],
+				"bid": 31
+			},
+			{
+				"kind": "add",
+				"at": "2026-10-08T16:52:31.875Z",
+				"roster_ids": [
+					7
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "8129",
+							"board_id": null,
+							"name": "Dameon Pierce",
+							"position": "RB",
+							"team": "PHI",
+							"injured_reserve": false
+						},
+						"roster_id": 7
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "12504",
+							"board_id": "4819231",
+							"name": "Kaleb Johnson",
+							"position": "RB",
+							"team": "GB",
+							"injured_reserve": false
+						},
+						"roster_id": 7
+					}
+				],
+				"bid": null
+			},
+			{
+				"kind": "add",
+				"at": "2026-10-08T16:13:20.019Z",
+				"roster_ids": [
+					7
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "IND",
+							"board_id": null,
+							"name": "Indianapolis Colts",
+							"position": "DEF",
+							"team": "IND",
+							"injured_reserve": false
+						},
+						"roster_id": 7
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "GB",
+							"board_id": null,
+							"name": "Green Bay Packers",
+							"position": "DEF",
+							"team": "GB",
+							"injured_reserve": false
+						},
+						"roster_id": 7
+					}
+				],
+				"bid": null
+			},
+			{
+				"kind": "trade",
+				"at": "2026-10-07T13:43:02.584Z",
+				"roster_ids": [
+					4,
+					7
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "10232",
+							"board_id": "4360761",
+							"name": "Michael Wilson",
+							"position": "WR",
+							"team": "ARI",
+							"injured_reserve": false
+						},
+						"roster_id": 4
+					},
+					{
+						"player": {
+							"host_id": "12512",
+							"board_id": "4685702",
+							"name": "Quinshon Judkins",
+							"position": "RB",
+							"team": "CLE",
+							"injured_reserve": false
+						},
+						"roster_id": 7
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "10232",
+							"board_id": "4360761",
+							"name": "Michael Wilson",
+							"position": "WR",
+							"team": "ARI",
+							"injured_reserve": false
+						},
+						"roster_id": 7
+					},
+					{
+						"player": {
+							"host_id": "12512",
+							"board_id": "4685702",
+							"name": "Quinshon Judkins",
+							"position": "RB",
+							"team": "CLE",
+							"injured_reserve": false
+						},
+						"roster_id": 4
+					}
+				],
+				"bid": null
+			},
+			{
+				"kind": "waiver",
+				"at": "2026-10-07T11:37:50.879Z",
+				"roster_ids": [
+					6
+				],
+				"adds": [
+					{
+						"player": {
+							"host_id": "CLE",
+							"board_id": null,
+							"name": "Cleveland Browns",
+							"position": "DEF",
+							"team": "CLE",
+							"injured_reserve": false
+						},
+						"roster_id": 6
+					}
+				],
+				"drops": [
+					{
+						"player": {
+							"host_id": "CHI",
+							"board_id": null,
+							"name": "Chicago Bears",
+							"position": "DEF",
+							"team": "CHI",
+							"injured_reserve": false
+						},
+						"roster_id": 6
+					}
+				],
+				"bid": 7
+			}
+		],
+		"held_by": {
+			"8439": 1,
+			"12483": 12,
+			"14880": 9,
+			"15818": 8,
+			"15847": 3,
+			"16737": 8,
+			"16800": 9,
+			"2576925": 9,
+			"2577417": 12,
+			"2578570": 7,
+			"2969939": 11,
+			"2973405": 2,
+			"2976212": 8,
+			"2977187": 2,
+			"2991662": 6,
+			"3040151": 10,
+			"3042519": 2,
+			"3043078": 3,
+			"3045523": 8,
+			"3046439": 12,
+			"3046779": 3,
+			"3052587": 10,
+			"3054850": 7,
+			"3116164": 9,
+			"3116165": 7,
+			"3116365": 10,
+			"3116389": 4,
+			"3117251": 4,
+			"3117256": 10,
+			"3121023": 4,
+			"3121422": 6,
+			"3126486": 12,
+			"3128429": 12,
+			"3139477": 1,
+			"3886598": 12,
+			"3895856": 1,
+			"3912547": 10,
+			"3915416": 3,
+			"3915511": 10,
+			"3916148": 11,
+			"3916387": 11,
+			"3916433": 1,
+			"3917315": 8,
+			"3918298": 12,
+			"3929630": 2,
+			"3929645": 8,
+			"4032473": 9,
+			"4035538": 5,
+			"4035687": 11,
+			"4036133": 2,
+			"4036378": 4,
+			"4038441": 3,
+			"4038815": 12,
+			"4038941": 7,
+			"4040715": 9,
+			"4047365": 6,
+			"4047646": 7,
+			"4047650": 4,
+			"4239934": 12,
+			"4239993": 2,
+			"4239996": 1,
+			"4241389": 2,
+			"4241416": 12,
+			"4241457": 11,
+			"4241463": 5,
+			"4241474": 8,
+			"4241478": 4,
+			"4241985": 3,
+			"4242335": 11,
+			"4242355": 9,
+			"4243331": 7,
+			"4248528": 10,
+			"4258173": 6,
+			"4259545": 5,
+			"4262921": 11,
+			"4360078": 5,
+			"4360248": 3,
+			"4360310": 5,
+			"4360569": 8,
+			"4360635": 1,
+			"4360689": 4,
+			"4360761": 4,
+			"4360939": 3,
+			"4361050": 3,
+			"4361307": 5,
+			"4361370": 10,
+			"4361411": 4,
+			"4361432": 3,
+			"4361579": 2,
+			"4361741": 2,
+			"4362238": 4,
+			"4362619": 8,
+			"4362628": 1,
+			"4371733": 1,
+			"4372016": 8,
+			"4373626": 5,
+			"4373678": 10,
+			"4374302": 8,
+			"4379399": 7,
+			"4385690": 9,
+			"4426338": 6,
+			"4426348": 2,
+			"4426354": 11,
+			"4426385": 1,
+			"4426386": 1,
+			"4426388": 5,
+			"4426502": 4,
+			"4426515": 12,
+			"4427366": 12,
+			"4428331": 11,
+			"4428557": 2,
+			"4428718": 6,
+			"4428850": 3,
+			"4429013": 1,
+			"4429025": 10,
+			"4429059": 7,
+			"4429086": 5,
+			"4429096": 10,
+			"4429205": 1,
+			"4429501": 8,
+			"4429615": 3,
+			"4429795": 6,
+			"4430027": 1,
+			"4430539": 2,
+			"4430737": 12,
+			"4430807": 9,
+			"4430871": 10,
+			"4430878": 3,
+			"4430968": 5,
+			"4431299": 1,
+			"4431452": 3,
+			"4431459": 7,
+			"4431492": 2,
+			"4431545": 10,
+			"4431611": 5,
+			"4432577": 11,
+			"4432620": 4,
+			"4432665": 6,
+			"4432708": 5,
+			"4432710": 9,
+			"4432773": 3,
+			"4567048": 10,
+			"4567750": 8,
+			"4568490": 2,
+			"4569173": 4,
+			"4569559": 11,
+			"4569587": 5,
+			"4569603": 12,
+			"4569618": 7,
+			"4569987": 12,
+			"4570037": 4,
+			"4572680": 2,
+			"4575131": 7,
+			"4576297": 9,
+			"4586312": 11,
+			"4595342": 9,
+			"4595348": 9,
+			"4596334": 4,
+			"4596448": 10,
+			"4597500": 6,
+			"4599739": 8,
+			"4600981": 5,
+			"4601080": 7,
+			"4608686": 6,
+			"4612826": 1,
+			"4635008": 9,
+			"4682648": 11,
+			"4682745": 12,
+			"4683062": 10,
+			"4685246": 3,
+			"4685247": 12,
+			"4685261": 11,
+			"4685278": 4,
+			"4685350": 12,
+			"4685382": 8,
+			"4685472": 9,
+			"4685512": 9,
+			"4685702": 7,
+			"4685720": 6,
+			"4686612": 8,
+			"4688813": 4,
+			"4689114": 1,
+			"4695883": 9,
+			"4696044": 4,
+			"4696981": 8,
+			"4697815": 11,
+			"4701936": 6,
+			"4702555": 7,
+			"4710714": 5,
+			"4710855": 6,
+			"4711533": 11,
+			"4715355": 5,
+			"4723086": 6,
+			"4723820": 11,
+			"4819231": 2,
+			"4831959": 3,
+			"4832800": 6,
+			"4832846": 7,
+			"4832955": 6,
+			"4837248": 9,
+			"4869645": 7,
+			"4869961": 3,
+			"4870653": 7,
+			"4870795": 9,
+			"4870808": 1,
+			"4870847": 10,
+			"4871023": 2,
+			"4880281": 6,
+			"4882093": 8,
+			"4887558": 5,
+			"4890973": 10,
+			"5081432": 1,
+			"5083076": 11,
+			"5083315": 11,
+			"5083754": 12,
+			"5123663": 7,
+			"5220680": 3
+		},
+		"rostered": [
+			"12483",
+			"14880",
+			"15818",
+			"15847",
+			"16737",
+			"16800",
+			"2576925",
+			"2577417",
+			"2578570",
+			"2969939",
+			"2973405",
+			"2976212",
+			"2977187",
+			"2991662",
+			"3040151",
+			"3042519",
+			"3043078",
+			"3045523",
+			"3046439",
+			"3046779",
+			"3052587",
+			"3054850",
+			"3116164",
+			"3116165",
+			"3116365",
+			"3116389",
+			"3117251",
+			"3117256",
+			"3121023",
+			"3121422",
+			"3126486",
+			"3128429",
+			"3139477",
+			"3886598",
+			"3895856",
+			"3912547",
+			"3915416",
+			"3915511",
+			"3916148",
+			"3916387",
+			"3916433",
+			"3917315",
+			"3918298",
+			"3929630",
+			"3929645",
+			"4032473",
+			"4035538",
+			"4035687",
+			"4036133",
+			"4036378",
+			"4038441",
+			"4038815",
+			"4038941",
+			"4040715",
+			"4047365",
+			"4047646",
+			"4047650",
+			"4239934",
+			"4239993",
+			"4239996",
+			"4241389",
+			"4241416",
+			"4241457",
+			"4241463",
+			"4241474",
+			"4241478",
+			"4241985",
+			"4242335",
+			"4242355",
+			"4243331",
+			"4248528",
+			"4258173",
+			"4259545",
+			"4262921",
+			"4360078",
+			"4360248",
+			"4360310",
+			"4360569",
+			"4360635",
+			"4360689",
+			"4360761",
+			"4360939",
+			"4361050",
+			"4361307",
+			"4361370",
+			"4361411",
+			"4361432",
+			"4361579",
+			"4361741",
+			"4362238",
+			"4362619",
+			"4362628",
+			"4371733",
+			"4372016",
+			"4373626",
+			"4373678",
+			"4374302",
+			"4379399",
+			"4385690",
+			"4426338",
+			"4426348",
+			"4426354",
+			"4426385",
+			"4426386",
+			"4426388",
+			"4426502",
+			"4426515",
+			"4427366",
+			"4428331",
+			"4428557",
+			"4428718",
+			"4428850",
+			"4429013",
+			"4429025",
+			"4429059",
+			"4429086",
+			"4429096",
+			"4429205",
+			"4429501",
+			"4429615",
+			"4429795",
+			"4430027",
+			"4430539",
+			"4430737",
+			"4430807",
+			"4430871",
+			"4430878",
+			"4430968",
+			"4431299",
+			"4431452",
+			"4431459",
+			"4431492",
+			"4431545",
+			"4431611",
+			"4432577",
+			"4432620",
+			"4432665",
+			"4432708",
+			"4432710",
+			"4432773",
+			"4567048",
+			"4567750",
+			"4568490",
+			"4569173",
+			"4569559",
+			"4569587",
+			"4569603",
+			"4569618",
+			"4569987",
+			"4570037",
+			"4572680",
+			"4575131",
+			"4576297",
+			"4586312",
+			"4595342",
+			"4595348",
+			"4596334",
+			"4596448",
+			"4597500",
+			"4599739",
+			"4600981",
+			"4601080",
+			"4608686",
+			"4612826",
+			"4635008",
+			"4682648",
+			"4682745",
+			"4683062",
+			"4685246",
+			"4685247",
+			"4685261",
+			"4685278",
+			"4685350",
+			"4685382",
+			"4685472",
+			"4685512",
+			"4685702",
+			"4685720",
+			"4686612",
+			"4688813",
+			"4689114",
+			"4695883",
+			"4696044",
+			"4696981",
+			"4697815",
+			"4701936",
+			"4702555",
+			"4710714",
+			"4710855",
+			"4711533",
+			"4715355",
+			"4723086",
+			"4723820",
+			"4819231",
+			"4831959",
+			"4832800",
+			"4832846",
+			"4832955",
+			"4837248",
+			"4869645",
+			"4869961",
+			"4870653",
+			"4870795",
+			"4870808",
+			"4870847",
+			"4871023",
+			"4880281",
+			"4882093",
+			"4887558",
+			"4890973",
+			"5081432",
+			"5083076",
+			"5083315",
+			"5083754",
+			"5123663",
+			"5220680",
+			"8439"
+		],
+		"board_format": "ppr",
+		"byes": {
+			"ARI": 14,
+			"ATL": 11,
+			"BAL": 13,
+			"BUF": 7,
+			"CAR": 5,
+			"CHI": 10,
+			"CIN": 6,
+			"CLE": 11,
+			"DAL": 14,
+			"DEN": 10,
+			"DET": 6,
+			"GB": 11,
+			"HOU": 8,
+			"IND": 13,
+			"JAX": 7,
+			"KC": 5,
+			"LAC": 7,
+			"LAR": 11,
+			"LV": 13,
+			"MIA": 6,
+			"MIN": 6,
+			"NE": 11,
+			"NO": 8,
+			"NYG": 8,
+			"NYJ": 13,
+			"PHI": 10,
+			"PIT": 9,
+			"SEA": 11,
+			"SF": 8,
+			"TB": 10,
+			"TEN": 9,
+			"WSH": 7
+		},
+		"placement": {
+			"by_espn_id": 0,
+			"by_defense": 0,
+			"by_name": 217,
+			"unplaced": 8
+		},
+		"read_at": "2026-10-20T00:36:00.000Z",
+		"host_stale_seconds": 0,
+		"host_failed": false,
+		"host_signed_out": false,
+		"terms": {
+			"waivers": "budget",
+			"waiver_budget": 1000,
+			"playoff_teams": 6,
+			"playoff_weeks": {
+				"first": 15,
+				"last": 17
+			},
+			"roster": {
+				"qb": 1,
+				"rb": 2,
+				"wr": 3,
+				"te": 1,
+				"flex": 2,
+				"super_flex": 0,
+				"k": 0,
+				"def": 1,
+				"bench": 10
+			},
+			"scoring": {
+				"points_per_passing_yard": 0.04,
+				"points_per_passing_touchdown": 5,
+				"points_per_interception": -1,
+				"points_per_rushing_yard": 0.1,
+				"points_per_rushing_touchdown": 6,
+				"points_per_receiving_yard": 0.1,
+				"points_per_receiving_touchdown": 6,
+				"points_per_reception": 1,
+				"points_per_fumble_lost": -2,
+				"te_reception_bonus": 0.5,
+				"points_per_field_goal": 3,
+				"points_per_extra_point": 1,
+				"points_per_sack": 1,
+				"points_per_defensive_interception": 2,
+				"points_per_defensive_touchdown": 6,
+				"points_per_two_point_conversion": 2,
+				"points_per_field_goal_missed": -1,
+				"points_per_extra_point_missed": -1,
+				"points_per_return_touchdown": 6,
+				"points_per_defensive_fumble_recovery": 2,
+				"points_per_safety": 2,
+				"points_per_field_goal_40_49": 4,
+				"points_per_field_goal_50_plus": 5,
+				"points_allowed_0": 10,
+				"points_allowed_1_6": 7,
+				"points_allowed_7_13": 4,
+				"points_allowed_14_17": 1,
+				"points_allowed_18_20": 1,
+				"points_allowed_21": 0,
+				"points_allowed_22_27": 0,
+				"points_allowed_28_34": -1,
+				"points_allowed_35_45": -4,
+				"points_allowed_46_plus": -4,
+				"yards_allowed_0_99": 0,
+				"yards_allowed_100_199": 0,
+				"yards_allowed_200_299": 0,
+				"yards_allowed_300_349": 0,
+				"yards_allowed_350_399": 0,
+				"yards_allowed_400_449": 0,
+				"yards_allowed_450_499": 0,
+				"yards_allowed_500_549": 0,
+				"yards_allowed_550_plus": 0
+			},
+			"scoring_unstated": [
+				"points_per_return_touchdown"
+			],
+			"scoring_extra": [
+				{
+					"group": "offense",
+					"rule": "fumble recovered for a touchdown",
+					"points": 6
+				},
+				{
+					"group": "defense",
+					"rule": "blocked kick",
+					"points": 2
+				},
+				{
+					"group": "defense",
+					"rule": "forced fumble",
+					"points": 1
+				},
+				{
+					"group": "defense",
+					"rule": "forced fumble on defense or special teams",
+					"points": 1
+				},
+				{
+					"group": "defense",
+					"rule": "fumble recovery on defense or special teams",
+					"points": 1
+				},
+				{
+					"group": "defense",
+					"rule": "special teams forced fumble",
+					"points": 1
+				},
+				{
+					"group": "defense",
+					"rule": "special teams fumble recovery",
+					"points": 1
+				},
+				{
+					"group": "defense",
+					"rule": "special teams touchdown",
+					"points": 6
+				},
+				{
+					"group": "defense",
+					"rule": "touchdown on defense or special teams",
+					"points": 6
+				}
+			],
+			"host_settings_url": "https://sleeper.com/leagues/1382163311038038016"
+		},
+		"moves_read": true
+	},
+	"error": null
+}

@@ -48,6 +48,17 @@ enum Fixtures {
         try APIDecoding.envelopeData(MatchupBox.self, from: data("fixtures/inseason/matchup-\(league)-\(clock).json"))
     }
 
+    /// Another team's game at a clock (Lane 206), as the Sleeper league reads it: its box asked by
+    /// roster 2 (GET .../matchup?roster=2), the league read and the scoreboard it is drawn with.
+    static func otherGame(_ clock: String) throws -> MatchupAnswer {
+        let file = { (name: String) in try data("fixtures/inseason/\(name)-\(clock).json") }
+        return try MatchupAnswer(
+            sync: APIDecoding.envelopeData(LeagueSync.self, from: file("sync-\(league)-sleeper")),
+            box: APIDecoding.envelopeData(MatchupBox.self, from: file("matchup-\(league)-roster-2")),
+            board: APIDecoding.envelopeData(Scoreboard.self, from: file("scoreboard-\(league)-sleeper"))
+        )
+    }
+
     /// The trade finder at a clock (GET /leagues/attached/{id}/trades).
     static func trades(_ clock: String) throws -> TradeAdvice {
         try APIDecoding.envelopeData(TradeAdvice.self, from: data("fixtures/inseason/trades-\(league)-\(clock).json"))

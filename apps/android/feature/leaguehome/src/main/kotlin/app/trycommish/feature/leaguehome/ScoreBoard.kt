@@ -31,26 +31,32 @@ private val SMALL_W = 76.dp
 private val BIG_W = 60.dp
 
 /** Every game of the week as a score bug, the member's first: the state at its head, each side's two
- * figures under the column heads, the side ahead drawn bright. */
+ * figures under the column heads, the side ahead drawn bright. A tap on a bug opens its game (Lane 207):
+ * `openGame` with null for the member's, else the roster of the game's first side. */
 @Composable
 internal fun ScoreBoard(
     week: String,
     games: List<GameBug>,
+    openGame: (Int?) -> Unit,
 ) {
     Section(week, Words.LeagueHome.scoreboardAside) {
         Column(
             Modifier.padding(horizontal = Tokens.Space.s4.dp),
             verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp),
         ) {
-            games.forEach { Bug(it) }
+            games.forEach { game -> Bug(game) { openGame(game.roster) } }
         }
     }
 }
 
 @Composable
-private fun Bug(game: GameBug) {
+private fun Bug(
+    game: GameBug,
+    onClick: () -> Unit,
+) {
     val c = CommishTheme.colors
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(Tokens.Radius.md.dp),
         color = c.surface,
         border = BorderStroke(if (game.mine) 2.dp else 1.dp, if (game.mine) c.accent else c.line),

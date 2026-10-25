@@ -12,7 +12,9 @@ import Testing
 /// first kickoff), during the games with mixed states (Sunday 18:56Z: kicked off, still to come and
 /// final rows, the live score with its read), after Sunday (Monday morning: the member's Sunday
 /// starters final, Monday night still to come) and final (Tuesday noon: every game final); and a poll
-/// that failed on Sunday, the week kept with its stamp. Each as the phone's first screen, then the
+/// that failed on Sunday, the week kept with its stamp; and another team's game on Sunday, opened from
+/// its score bug (Lane 206), at the top and at its second roster, and kept with its stamp by a failed
+/// poll. Each as the phone's first screen, then the
 /// member's box and the opponent's with the basis in full. Each state is the view model's, read from
 /// the shared fixtures through a stub of the API. With SNAPSHOT_SHOTS set each is also written at its
 /// phone's own scale for the persona panel.
@@ -31,18 +33,34 @@ struct MatchupSnapshotTests {
         case monday
         case final
         case stale
+        /// Another team's game, Carried by QJs against Bower Rangers (roster 2's).
+        case other
+        case otherStale = "other-stale"
 
         var clock: String {
             switch self {
             case .before: "2026-10-17T17-00-00Z"
-            case .sunday, .stale: "2026-10-18T18-56-00Z"
+            case .sunday, .stale, .other, .otherStale: "2026-10-18T18-56-00Z"
             case .monday: "2026-10-19T16-00-00Z"
             case .final: "2026-10-20T17-00-00Z"
             }
         }
 
         var parts: [Part] {
-            self == .stale ? [.phone] : [.phone, .mine, .theirs]
+            switch self {
+            case .stale, .otherStale: [.phone]
+            case .other: [.phone, .theirs]
+            default: [.phone, .mine, .theirs]
+            }
+        }
+
+        /// The roster whose game the scene draws: nil for the member's own.
+        var roster: Int? {
+            self == .other || self == .otherStale ? 2 : nil
+        }
+
+        var failsAPoll: Bool {
+            self == .stale || self == .otherStale
         }
     }
 
@@ -74,24 +92,39 @@ struct MatchupSnapshotTests {
         ))!
     }
 
-    static func answer<T: Decodable>(_: T.Type, _ route: String, _ clock: String) throws -> T {
-        let data = try Data(contentsOf: inseason.appendingPathComponent("\(route)-\(league)-\(clock).json"))
+    /// A fixture answer by its file's name: `<route>-<league>[-<variant>]-<clock>.json`.
+    static func answer<T: Decodable>(_: T.Type, _ route: String, _ clock: String, variant: String? = nil) throws -> T {
+        let name = [route, league, variant, clock].compactMap(\.self).joined(separator: "-")
+        let data = try Data(contentsOf: inseason.appendingPathComponent("\(name).json"))
         return try APIDecoding.envelopeData(T.self, from: data)
+    }
+
+    /// The scene's reads: the member's league read and box, or another team's game with the league
+    /// read and the scoreboard as the Sleeper league reads them.
+    static func stub(_ scene: Scene) throws -> StubMatchup {
+        guard let roster = scene.roster else {
+            return try StubMatchup(
+                sync: answer(LeagueSync.self, "sync", scene.clock), box: answer(MatchupBox.self, "matchup", scene.clock)
+            )
+        }
+        return try StubMatchup(
+            sync: answer(LeagueSync.self, "sync", scene.clock, variant: "sleeper"),
+            box: answer(MatchupBox.self, "matchup", scene.clock, variant: "roster-\(roster)"),
+            board: answer(Scoreboard.self, "scoreboard", scene.clock, variant: "sleeper")
+        )
     }
 
     /// The view model at the scene's state, through the stub: loaded, or loaded and then a poll that
     /// found no signal.
     static func viewModel(_ scene: Scene) async throws -> MatchupViewModel {
-        let stub = try StubMatchup(
-            sync: answer(LeagueSync.self, "sync", scene.clock), box: answer(MatchupBox.self, "matchup", scene.clock)
-        )
+        let stub = try stub(scene)
         let cache = FileCache(folder: FileManager.default.temporaryDirectory
             .appendingPathComponent("matchup-snapshots-\(UUID().uuidString)"))
         let viewModel = MatchupViewModel(
-            api: stub, cache: cache, clock: FixedClock(instant(scene.clock)), zone: zone
+            api: stub, cache: cache, clock: FixedClock(instant(scene.clock)), zone: zone, roster: scene.roster
         )
         await viewModel.load(leagueID: league)
-        if scene == .stale {
+        if scene.failsAPoll {
             await stub.dropSignal()
             await viewModel.load(leagueID: league)
         }
@@ -155,15 +188,17 @@ struct MatchupMock: View {
     }
 }
 
-/// The Matchup's two reads as the fixture answers them at a clock, or no signal.
+/// The Matchup's reads as the fixture answers them at a clock, or no signal.
 actor StubMatchup: MatchupAPI {
     let sync: LeagueSync
     let box: MatchupBox
+    let board: Scoreboard?
     private var offline = false
 
-    init(sync: LeagueSync, box: MatchupBox) {
+    init(sync: LeagueSync, box: MatchupBox, board: Scoreboard? = nil) {
         self.sync = sync
         self.box = box
+        self.board = board
     }
 
     func dropSignal() {
@@ -177,10 +212,17 @@ actor StubMatchup: MatchupAPI {
         return sync
     }
 
-    func matchup(id _: String) async throws -> MatchupBox? {
+    func matchup(id _: String, roster _: Int?) async throws -> MatchupBox? {
         if offline {
             throw URLError(.notConnectedToInternet)
         }
         return box
+    }
+
+    func scoreboard(id _: String) async throws -> Scoreboard {
+        guard !offline, let board else {
+            throw URLError(.notConnectedToInternet)
+        }
+        return board
     }
 }
