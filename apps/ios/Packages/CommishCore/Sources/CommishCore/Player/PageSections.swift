@@ -92,10 +92,8 @@ enum PageSections {
             ? "Projected \(format.label) points, \(season)"
             : "Projected \(format.label) points for the rest of \(season), \(restSpan(his))"
         let title = "Tier \(row.tier) \(position.group.many)"
-        guard !BoardOrder.heldOut(row, statuses),
-              let group = BoardOrder.tiers(board.rows, position: position, statuses)
-                  .first(where: { $0.tier == row.tier })
-        else {
+        let tiers = BoardOrder.tiers(board.rows, position: position, statuses)
+        guard !BoardOrder.heldOut(row, statuses), let group = tiers.first(where: { $0.tier == row.tier }) else {
             return TierBox(tier: row.tier, title: title, drop: nil, mates: [], basis: basis)
         }
         let count = Formatting.plural(group.rows.count, "player")
