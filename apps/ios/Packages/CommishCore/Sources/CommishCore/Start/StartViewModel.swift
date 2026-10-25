@@ -80,7 +80,7 @@ public final class StartViewModel {
         guard case let .loaded(_, stamp, true) = state else {
             return nil
         }
-        return "\(AppWords.lastRead) \(Formatting.weekdayTime(stamp, zone: zone))"
+        return AppWords.lastRead(stamp, zone: zone)
     }
 
     /// The pin: the confirmation while it is open; else the verb, disabled with the stamp's reason

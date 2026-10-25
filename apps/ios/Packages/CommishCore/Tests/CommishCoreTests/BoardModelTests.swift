@@ -150,9 +150,34 @@ struct BoardModelTests {
         ))
     }
 
-    @Test func theBasisIsSaidOnceTheAPIsSentenceThenTheCapture() {
+    @Test func theBasisIsTheWebsOurBoardTheGapsDefinitionThenTheCapture() {
+        let capture = "Status as of Oct 13, over 36 hours ago."
         #expect(Self.model(nil).basis == [
-            Self.board.basis, "Status as of Oct 13, over 36 hours ago.",
+            "Our PPR board, by points over replacement for 12 teams.", Words.BoardBasis.gap, capture,
         ])
+        #expect(Self.model(.receiver, inSeason: true).basis == [
+            "Our PPR board, by points over replacement for 12 teams.", capture,
+        ], "no Gap column in season, so no Gap sentence")
+        #expect(Self.model(.kicker).basis == [BoardBasis.draftOrder, capture])
+    }
+
+    @Test func everyRankedRowWithAPageOpensTheSheetOnTheAPIsPlayer() {
+        let names = Self.board.players.map(\.name)
+        let unshared = PlayerPages.unshared(names)
+        for position in [BoardPosition.quarterback, .runningBack, .receiver, .tightEnd] {
+            for row in Self.model(position).rows where unshared.contains(PlayerPages.slug(row.name)) {
+                #expect(row.sheetPlayer?.id == row.id, "\(row.name)")
+                #expect(row.sheetPlayer?.slug == PlayerPages.slug(row.name))
+            }
+        }
+    }
+
+    @Test func aRowCarriesHisFaceAndItsTintBelowReplacement() throws {
+        let rows = Self.model(.receiver).rows
+        let puka = try #require(rows.first)
+        #expect(puka.headshot?.absoluteString == Self.byID[puka.id]?.headshot)
+        #expect(!puka.belowReplacement)
+        #expect(rows.contains { $0.belowReplacement && $0.overReplacement.hasPrefix("\u{2212}") })
+        #expect(Self.model(.defense).rows.allSatisfy { $0.headshot == nil }, "a defense has no face")
     }
 }

@@ -31,6 +31,7 @@ public final class BoardViewModel {
     private var shown: Shown?
 
     private struct Shown {
+        let format: BoardFormat
         let board: RoomBoard
         let stamp: Date
         let stale: Bool
@@ -63,7 +64,7 @@ public final class BoardViewModel {
         guard case let .loaded(_, stamp, true) = state else {
             return nil
         }
-        return "\(AppWords.lastRead) \(Formatting.weekdayTime(stamp, zone: zone))"
+        return AppWords.lastRead(stamp, zone: zone)
     }
 
     /// The format's saved board at once when nothing of it is shown, then the API's; a failed read
@@ -71,7 +72,7 @@ public final class BoardViewModel {
     public func load() async {
         let format = filter.format
         let route = Self.route(format)
-        if shown == nil, let saved = await cache.read(RoomBoard.self, route: route) {
+        if shown == nil, let saved = await cache.read(RoomBoard.self, route: route), filter.format == format {
             show(saved.value, stamp: saved.stamp, stale: true)
         }
         do {
@@ -89,7 +90,7 @@ public final class BoardViewModel {
             guard filter.format == format else {
                 return
             }
-            if let shown {
+            if let shown, shown.format == format {
                 show(shown.board, stamp: shown.stamp, stale: true)
             } else {
                 state = .failed(LeagueHomeViewModel.sentence(for: error))
@@ -117,7 +118,7 @@ public final class BoardViewModel {
     }
 
     private func show(_ board: RoomBoard, stamp: Date, stale: Bool) {
-        shown = Shown(board: board, stamp: stamp, stale: stale)
+        shown = Shown(format: filter.format, board: board, stamp: stamp, stale: stale)
         state = .loaded(
             BoardModel(
                 board: board, filter: filter, inSeason: inSeason, following: following, now: clock.now, zone: zone

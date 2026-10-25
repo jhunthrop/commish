@@ -115,6 +115,20 @@ struct BoardViewModelTests {
         #expect(viewModel.state == .failed(AppWords.Failure.offline))
     }
 
+    @Test func aFormatsSavedBoardNeverShowsUnderAnotherFormatsChip() async throws {
+        let cache = FileCache(folder: folder)
+        try await cache.write(Fixtures.board(), route: BoardViewModel.route(.ppr), stamp: Self.saturday)
+        let viewModel = model(BoardStub(boards: [:]), cache: cache)
+        await viewModel.load()
+        #expect(viewModel.stampWords == "Last read Sat 12:00 pm")
+        await viewModel.choose(format: .std)
+        #expect(viewModel.state == .failed(AppWords.Failure.offline), "PPR's saved rows are not standard's")
+        await viewModel.choose(format: .ppr)
+        let (board, stale) = try #require(loaded(viewModel))
+        #expect(stale)
+        #expect(board.formats.filter(\.pressed).map(\.value) == [.ppr])
+    }
+
     @Test func aRefusedTokenSignsOut() async {
         var signedOut = false
         let refused = APIClient(client: Client(serverURL: Self.base, transport: StatusTransport(status: .unauthorized)))

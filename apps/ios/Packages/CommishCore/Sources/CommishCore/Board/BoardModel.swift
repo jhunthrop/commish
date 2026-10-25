@@ -82,6 +82,8 @@ public struct BoardRow: Equatable, Sendable, Identifiable {
     public let id: String
     public let name: String
     public let initials: String
+    /// His face (the API's headshot), nil for a defense, which has none; the initials stand in.
+    public let headshot: URL?
     /// "WR 4", "RB IR", "DST 1".
     public let pill: String
     public let club: String
@@ -92,6 +94,8 @@ public struct BoardRow: Equatable, Sendable, Identifiable {
     public let projected: String
     /// Over replacement, signed.
     public let overReplacement: String
+    /// Below replacement: the web tints the figure rose (ui/heat.ts heatFor), whatever its round.
+    public let belowReplacement: Bool
     public let gap: String
     public let gapTone: GapTone?
     /// A kicker's or a defense's place in the drafts' order.
@@ -140,7 +144,7 @@ public struct BoardModel: Equatable, Sendable {
     public let positions: [BoardChip<BoardPosition?>]
     public let columns: BoardColumns
     public let sections: [BoardSection]
-    /// What the numbers are, then the capture the statuses come from.
+    /// What the numbers are as the web's board says them, then the capture the statuses come from.
     public let basis: [String]
 
     public var rows: [BoardRow] {
@@ -172,7 +176,7 @@ public struct BoardModel: Equatable, Sendable {
         columns = filter.position?.draftOrder == true
             ? .draftOrder
             : .ranked(gap: !inSeason && shown.contains { $0.gapTone != nil })
-        basis = [board.basis] + (board.statusRead.map {
+        basis = BoardBasis.lines(columns, label: label) + (board.statusRead.map {
             BoardWords.capture(asOf: $0.asOf, checkedAt: $0.checkedAt, now: now, zone: zone)
         }.map { [$0] } ?? [])
     }
@@ -208,12 +212,14 @@ public struct BoardModel: Equatable, Sendable {
             id: player.id,
             name: player.name,
             initials: Initials.of(player.name),
+            headshot: URL(string: player.headshot).flatMap { $0.scheme == "https" ? $0 : nil },
             pill: [label, pillRank].compactMap(\.self).joined(separator: " "),
             club: player.team,
             bye: player.bye.map { "\(Words.Board.bye) \($0)" },
             status: status,
             projected: BoardFigures.projected(player.points),
             overReplacement: player.vor.map(BoardFigures.signed) ?? Words.Box.none,
+            belowReplacement: (player.vor ?? 0) < 0,
             gap: BoardFigures.gap(gap),
             gapTone: GapTone(gap),
             draftOrder: String(player.positionRank),

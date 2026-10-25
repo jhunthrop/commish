@@ -44,6 +44,13 @@ struct BoardParityTests {
         let noGap: String
         let zone: String
         let captures: [Capture]
+        let teams: Int
+        let basis: [Basis]
+    }
+
+    struct Basis: Decodable {
+        let view: String
+        let parts: [String]
     }
 
     static let parity: Parity = {
@@ -96,6 +103,18 @@ struct BoardParityTests {
                 zone: zone
             )
             #expect(said == capture.text)
+        }
+    }
+
+    /// The web's basis less the two sentences the API's board cannot feed yet: the drafts behind ADP
+    /// and the tiers (their fields come with the run's board on the API).
+    @Test func theBasisIsTheWebsLessTheDraftsAndTheTiers() {
+        #expect(Self.parity.teams == BoardBasis.teams)
+        let waiting = ["ADP from ", "Tiers are drawn"]
+        for item in Self.parity.basis {
+            let web = item.parts.filter { part in !waiting.contains { part.hasPrefix($0) } }
+            let columns: BoardColumns = item.view == "draftOrder" ? .draftOrder : .ranked(gap: true)
+            #expect(BoardBasis.lines(columns, label: Self.parity.label) == web, "\(item.view)")
         }
     }
 

@@ -148,3 +148,28 @@ public enum PlayerPages {
         return Set(seen.filter { !$0.key.isEmpty && $0.value == 1 }.keys)
     }
 }
+
+/// The board's basis on a phone as the web says it (run/board-basis.ts boardBasis, site/market.ts
+/// marketBasis), held to shared/fixtures/parity/board.json: our board's sentence and, where the Gap
+/// column shows, its definition; a kicker's or a defense's view says the drafts' order instead. The
+/// web's "ADP from <drafts>." and "Tiers are drawn within WR." wait for the run's board on the API.
+public enum BoardBasis {
+    /// The teams GET /boards/{format} values its board for (openapi.yaml roomBoard).
+    public static let teams = 12
+
+    /// board-basis.ts ourBoard for a board of the full season.
+    public static func ourBoard(label: String, teams: Int = teams) -> String {
+        "Our \(label) board, by points over replacement for \(teams) teams."
+    }
+
+    /// market.ts marketBasis with no drafts named.
+    public static let draftOrder =
+        "Kickers and defenses the drafters take rank in their draft order, with no projected points and no tiers."
+
+    public static func lines(_ columns: BoardColumns, label: String) -> [String] {
+        switch columns {
+        case let .ranked(gap): [ourBoard(label: label)] + (gap ? [Words.BoardBasis.gap] : [])
+        case .draftOrder: [draftOrder]
+        }
+    }
+}
