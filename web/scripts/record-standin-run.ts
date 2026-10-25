@@ -34,6 +34,14 @@ async function read<S extends z.ZodType>(schema: S, file: URL): Promise<z.infer<
 	return schema.parse(JSON.parse(await readFile(file, 'utf8')));
 }
 
+/** The members the API never sends: provenance (api/internal/runs project.go). */
+const PROVENANCE = { manifest: 'sources', designations: 'source' } as const;
+
+/** A copy of the object without one member. */
+function without<T extends object, K extends keyof T>(value: T, key: K): Omit<T, K> {
+	return Object.fromEntries(Object.entries(value).filter(([name]) => name !== key)) as Omit<T, K>;
+}
+
 async function write(file: URL, value: unknown): Promise<void> {
 	await mkdir(dirname(fileURLToPath(file)), { recursive: true });
 	await writeFile(file, `${JSON.stringify(value)}\n`);
@@ -45,13 +53,13 @@ async function record(): Promise<void> {
 		throw new Error(`The latest run is ${runId}, not the stand-in: run npm run standin first.`);
 	}
 	const run = new URL(`${runId}/`, RUNS);
-	const { sources: _sources, ...manifest } = await read(
-		manifestSchema,
-		new URL('manifest.json', run)
+	const manifest = without(
+		await read(manifestSchema, new URL('manifest.json', run)),
+		PROVENANCE.manifest
 	);
-	const { source: _source, ...designations } = await read(
-		designationsSchema,
-		new URL('designations.json', run)
+	const designations = without(
+		await read(designationsSchema, new URL('designations.json', run)),
+		PROVENANCE.designations
 	);
 	const board = await read(boardSchema, new URL(`boards/${FORMAT}.json`, run));
 	const adp = await read(adpSchema, new URL('adp.json', run));
