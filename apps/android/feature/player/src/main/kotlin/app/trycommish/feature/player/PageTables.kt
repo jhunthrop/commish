@@ -184,7 +184,7 @@ private fun LogLine(
                     color = ink,
                     textAlign = TextAlign.End,
                     maxLines = if (head) HEAD_LINES else 1,
-                    modifier = Modifier.weight(if (index == 0) leadWeight else 1f).padding(start = 2.dp),
+                    modifier = Modifier.weight(if (index == 0) leadWeight else 1f).padding(start = Tokens.Space.s2.dp),
                 )
             }
         }
