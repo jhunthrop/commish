@@ -2,10 +2,11 @@ import CommishCore
 import CommishDesign
 import SwiftUI
 
-/// The Trades' decision as a strip (TradeStrip.svelte at 390): the week, how many trades are worth
-/// proposing and the platform's reason, then each card with the other team, both sides, both gains, the
-/// need it fills, its week, the drop, and its verb: the first card's solid and marked Best, every other
-/// card's the same words quiet. The stamp of a saved read under the title.
+/// The Trades' decision as a strip (TradeStrip.svelte at 390): the week and how many trades are worth
+/// proposing (the platform's reason left to the desk, as TradeStrip hides it under 760 px), then each
+/// card with the other team, both sides, both gains, the need it fills, its week, the drop, and its
+/// verb: the first card's solid and marked Best, every other card's the same words quiet. The stamp of a
+/// saved read under the title.
 struct TradeStripView: View {
     @Environment(\.colorScheme) private var colorScheme
     let strip: TradesStrip
@@ -48,12 +49,6 @@ struct TradeStripView: View {
                 .accessibilityAddTraits(.isHeader)
             if let stamp {
                 StampText(stamp)
-            }
-            if let reason = strip.reason {
-                Text(reason)
-                    .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
-                    .foregroundStyle(theme.color(Tokens.Color.ink3))
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

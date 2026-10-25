@@ -19,7 +19,7 @@ struct TradeFinderView: View {
                 FinderRowView(line: line, open: open, sort: shown.sort) { actions.toggle(line.id) }
                 if open {
                     OpenedTradeView(
-                        line: line, model: model, check: shown.checks[line.id], copied: shown.copied[line.id],
+                        line: line, model: model, copied: shown.copied[line.id],
                         actions: actions
                     )
                 }
@@ -180,15 +180,14 @@ enum TradeInk {
     }
 }
 
-/// A trade opened (TradeFinder's opened row at 390): its week in one line and the drop's sentence; the
-/// check's scoreboard of both lineups before and after with its sentence; both sides' players as
-/// box-score rows (Give and Drop from the member's roster, Get from theirs), each name opening the
-/// player sheet; the verb and the line under it.
+/// A trade opened (TradeFinder's opened row at 390): its week in one line and the drop's sentence; both
+/// sides' players as box-score rows (Give and Drop from the member's roster, Get from theirs), each name
+/// opening the player sheet; Build from this, which opens the builder with the trade and its check; the
+/// verb and the line under it.
 struct OpenedTradeView: View {
     @Environment(\.colorScheme) private var colorScheme
     let line: TradeLine
     let model: TradesModel
-    let check: TradeCheckState?
     let copied: CopiedLine?
     let actions: TradeActions
 
@@ -200,7 +199,6 @@ struct OpenedTradeView: View {
                     .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            CheckView(check: check)
             TableFrame {
                 HeadRow(style: .trade)
                 ForEach(line.opened.groups) { group in
@@ -220,38 +218,28 @@ struct OpenedTradeView: View {
 
     private func verb(_ theme: Theme) -> some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s1) {
-            QuietButton(model.verb) { actions.press(line.id) }
-                .padding(.horizontal, Tokens.Space.s3)
-                .background(RoundedRectangle(cornerRadius: Tokens.Radius.md).fill(theme.color(Tokens.Color.surface)))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Tokens.Radius.md)
-                        .strokeBorder(theme.color(Tokens.Color.lineStrong))
-                )
-                .disabled(model.page == nil)
+            HStack(spacing: Tokens.Space.s2) {
+                if line.built != nil {
+                    QuietButton(Words.Trades.fromThis) { actions.builder.from(line.id) }
+                        .padding(.horizontal, Tokens.Space.s2)
+                }
+                Spacer(minLength: 0)
+                QuietButton(model.verb) { actions.press(line.id) }
+                    .padding(.horizontal, Tokens.Space.s3)
+                    .background(
+                        RoundedRectangle(cornerRadius: Tokens.Radius.md).fill(theme.color(Tokens.Color.surface))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Tokens.Radius.md)
+                            .strokeBorder(theme.color(Tokens.Color.lineStrong))
+                    )
+                    .disabled(model.page == nil)
+            }
             if let copied {
                 CopiedText(line: copied, page: model.page)
             } else if let reason = model.reason {
                 BasisText(reason)
             }
-        }
-    }
-}
-
-/// The check where it stands: being read, the scoreboard with its sentence and line, nothing on an API
-/// older than the check, or why it could not be read.
-struct CheckView: View {
-    let check: TradeCheckState?
-
-    var body: some View {
-        switch check {
-        case let .answered(bug)?:
-            TradeBugView(bug: bug)
-        case let .failed(sentence)?:
-            BasisText(sentence)
-        case .reading?:
-            ProgressView().frame(maxWidth: .infinity)
-        case .absent?, nil:
-            EmptyView()
         }
     }
 }

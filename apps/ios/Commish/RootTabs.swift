@@ -248,7 +248,7 @@ private struct MatchupTab: View {
 }
 
 /// A league's Trades: owns its view model for the league it shows; the offer copied to the system
-/// clipboard, the member's team named as the switch names it.
+/// clipboard, the member's team and standing as the switch names them.
 private struct TradesTab: View {
     @State private var viewModel: TradesViewModel
     private let leagueID: String
@@ -256,7 +256,7 @@ private struct TradesTab: View {
     init(environment: AppEnvironment, league: FollowedLeague, expired: @escaping @MainActor () -> Void) {
         _viewModel = State(initialValue: TradesViewModel(
             api: environment.api, cache: environment.cache, clock: environment.clock, host: league.host,
-            me: league.teamName ?? "",
+            me: TradeMe(league: league),
             copy: { text in
                 UIPasteboard.general.string = text
                 return true

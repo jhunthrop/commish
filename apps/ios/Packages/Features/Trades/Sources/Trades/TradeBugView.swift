@@ -2,32 +2,25 @@ import CommishCore
 import CommishDesign
 import SwiftUI
 
-/// The check's scoreboard on the lit board (TradeBug.svelte as a phone stacks it): the two sides side
-/// by side, each with You or With and the team, this week's Proj and the rest-of-season Gain each
-/// before, after and its change, and its room; the answer's sentence and the API's line under the
-/// board.
+/// The builder's scoreboard on the lit board as a phone stacks it (TradeBug.svelte under 760 px): the
+/// member's half over theirs, each with You or With and the team, this week's Proj and the
+/// rest-of-season Gain each before, after and its change; the room and the verb left to the builder's
+/// line and its pin, as the web's phone leaves them.
 struct TradeBugView: View {
     @Environment(\.colorScheme) private var colorScheme
-    let bug: TradeCheckBug
+    let bug: TradeBug
 
     var body: some View {
         let theme = Theme(colorScheme)
-        VStack(alignment: .leading, spacing: Tokens.Space.s2) {
-            HStack(alignment: .top, spacing: 0) {
-                half(bug.yours, theme: theme)
-                Rectangle().fill(theme.color(Tokens.Color.scoreboardLine)).frame(width: 1)
-                half(bug.theirs, theme: theme)
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            .foregroundStyle(theme.color(Tokens.Color.scoreboardInk))
-            .background(theme.color(Tokens.Color.scoreboard))
-            .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.md))
-            .accessibilityElement(children: .combine)
-            Text(bug.sentence)
-                .font(Faces.font(.ui, size: Tokens.TypeScale.sm))
-                .fixedSize(horizontal: false, vertical: true)
-            BasisText(bug.basis)
+        VStack(spacing: 0) {
+            half(bug.yours, theme: theme)
+            Rectangle().fill(theme.color(Tokens.Color.scoreboardLine)).frame(height: 1)
+            half(bug.theirs, theme: theme)
         }
+        .foregroundStyle(theme.color(Tokens.Color.scoreboardInk))
+        .background(theme.color(Tokens.Color.scoreboard))
+        .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.md))
+        .accessibilityElement(children: .combine)
     }
 
     private func half(_ side: TradeBugSide, theme: Theme) -> some View {
@@ -38,20 +31,18 @@ struct TradeBugView: View {
                     label(side.label, theme: theme)
                     Text(side.name)
                         .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .bold))
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(1)
                 }
             }
-            figure(Words.Trades.weekHead, Swing.week(side.figures), theme: theme)
-            figure(Words.Trades.gainHead, Swing.season(side.figures), theme: theme)
-            VStack(alignment: .leading, spacing: 0) {
-                label(Words.Trades.room, theme: theme)
-                Text(side.room)
-                    .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold))
+            HStack(alignment: .top, spacing: Tokens.Space.s4) {
+                figure(Words.Trades.weekHead, Swing.week(side.figures), theme: theme)
+                figure(Words.Trades.gainHead, Swing.season(side.figures), theme: theme)
+                Spacer(minLength: 0)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Tokens.Space.s3)
+        .padding(.horizontal, Tokens.Space.s3)
+        .padding(.vertical, Tokens.Space.s2)
     }
 
     /// "THIS WEEK, PROJ" over "98.9 to 109.0 +10.1": before quiet, after strong, the change in its ink.
