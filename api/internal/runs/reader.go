@@ -1,0 +1,195 @@
+package runs
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+	"path"
+	"sync"
+	"time"
+
+	"golang.org/x/sync/singleflight"
+)
+
+// PointerTTL is how long the published run is taken as read before
+// runs/latest.json is read again, and an hourly file with it. The
+// answers' max-age is the same, so a client never holds a run longer.
+const PointerTTL = time.Minute
+
+// readTimeout bounds one shared read of the bucket, apart from the
+// request that started it, so one caller leaving cancels no other's.
+const readTimeout = 10 * time.Second
+
+// hourlyTagBytes is how much of an hourly file's digest its ETag carries.
+const hourlyTagBytes = 8
+
+// Answer is one file's answer from the published run: the envelope's
+// data, and the ETag that names it.
+type Answer struct {
+	RunID string
+	ETag  string
+	Data  json.RawMessage
+}
+
+type cached struct {
+	answer Answer
+	readAt time.Time
+}
+
+// Reader is the published run, its pointer read every PointerTTL and its
+// files read once each per run (an hourly file once per PointerTTL).
+type Reader struct {
+	objects Objects
+	now     func() time.Time
+	log     *slog.Logger
+	group   singleflight.Group
+
+	mu        sync.Mutex
+	runID     string
+	checkedAt time.Time
+	// answers are the published run's alone, by file path: a new run
+	// drops the last one's.
+	answers map[string]cached
+}
+
+// NewReader reads the published run from objects.
+func NewReader(objects Objects, now func() time.Time, log *slog.Logger) *Reader {
+	return &Reader{objects: objects, now: now, log: log, answers: map[string]cached{}}
+}
+
+// Published is the run runs/latest.json names. A run whose manifest is
+// missing or names another run is refused, as the web's reader refuses
+// it. When the pointer cannot be read the run already published stays,
+// read again after PointerTTL.
+func (r *Reader) Published(ctx context.Context) (string, error) {
+	r.mu.Lock()
+	current, checkedAt := r.runID, r.checkedAt
+	r.mu.Unlock()
+	if current != "" && r.now().Sub(checkedAt) < PointerTTL {
+		return current, nil
+	}
+	v, err, _ := r.group.Do("pointer", func() (any, error) {
+		return r.readPointer(ctx, current)
+	})
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.checkedAt = r.now()
+	if err != nil {
+		if r.runID == "" {
+			return "", err
+		}
+		r.log.Warn("runs: the latest pointer did not read; the published run stays", "run_id", r.runID, "err", err)
+		return r.runID, nil
+	}
+	if id := v.(string); id != r.runID {
+		r.runID, r.answers = id, map[string]cached{}
+	}
+	return r.runID, nil
+}
+
+func (r *Reader) readPointer(ctx context.Context, current string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), readTimeout)
+	defer cancel()
+	raw, err := r.objects.Get(ctx, path.Join(runsPrefix, latestPointer))
+	if err != nil {
+		return "", err
+	}
+	var pointer struct {
+		RunID string `json:"runId"`
+	}
+	if err := json.Unmarshal(raw, &pointer); err != nil {
+		return "", fmt.Errorf("runs: %s: %w", latestPointer, err)
+	}
+	if !runIDPattern.MatchString(pointer.RunID) {
+		return "", fmt.Errorf("runs: %s names %q, not a run id", latestPointer, pointer.RunID)
+	}
+	if pointer.RunID == current {
+		return current, nil
+	}
+	return pointer.RunID, r.checkManifest(ctx, pointer.RunID)
+}
+
+// checkManifest refuses a run whose manifest is missing (a run still
+// being written) or says it is another run.
+func (r *Reader) checkManifest(ctx context.Context, runID string) error {
+	raw, err := r.objects.Get(ctx, fileKey(runID, manifestPath))
+	if err != nil {
+		return fmt.Errorf("runs: run %s has no manifest it can be read by: %w", runID, err)
+	}
+	var manifest struct {
+		RunID string `json:"runId"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		return fmt.Errorf("runs: run %s manifest: %w", runID, err)
+	}
+	if manifest.RunID != runID {
+		return fmt.Errorf("runs: the manifest of run %s says it is run %q", runID, manifest.RunID)
+	}
+	return nil
+}
+
+// Read is a file's answer from the published run.
+func (r *Reader) Read(ctx context.Context, a artifact) (Answer, error) {
+	runID, err := r.Published(ctx)
+	if err != nil {
+		return Answer{}, err
+	}
+	r.mu.Lock()
+	hit, ok := r.answers[a.path]
+	r.mu.Unlock()
+	if ok && hit.answer.RunID == runID && (!a.hourly || r.now().Sub(hit.readAt) < PointerTTL) {
+		return hit.answer, nil
+	}
+	v, err, _ := r.group.Do(fileKey(runID, a.path), func() (any, error) {
+		return r.load(ctx, runID, a)
+	})
+	if err != nil {
+		return Answer{}, err
+	}
+	answer := v.(Answer)
+	r.mu.Lock()
+	if r.runID == runID {
+		r.answers[a.path] = cached{answer: answer, readAt: r.now()}
+	}
+	r.mu.Unlock()
+	return answer, nil
+}
+
+func (r *Reader) load(ctx context.Context, runID string, a artifact) (Answer, error) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), readTimeout)
+	defer cancel()
+	var fields []field
+	raw, err := r.objects.Get(ctx, fileKey(runID, a.path))
+	switch {
+	case errors.Is(err, ErrNotFound) && a.optional:
+		fields = []field{{a.name, json.RawMessage("null")}}
+	case err != nil:
+		return Answer{}, err
+	default:
+		if fields, err = a.shape(raw); err != nil {
+			return Answer{}, fmt.Errorf("runs: run %s: %w", runID, err)
+		}
+	}
+	data, err := encodeAnswer(runID, fields)
+	if err != nil {
+		return Answer{}, fmt.Errorf("runs: run %s %s: %w", runID, a.path, err)
+	}
+	return Answer{RunID: runID, ETag: etag(runID, a, data), Data: data}, nil
+}
+
+// etag names the run and the file; an hourly file's adds a digest of
+// what it holds, since the run's id stays while it is written again.
+func etag(runID string, a artifact, data []byte) string {
+	tag := runID + "/" + a.path
+	if a.hourly {
+		sum := sha256.Sum256(data)
+		tag += "@" + hex.EncodeToString(sum[:hourlyTagBytes])
+	}
+	return `"` + tag + `"`
+}
+
+func fileKey(runID, file string) string { return path.Join(runsPrefix, runID, file) }
