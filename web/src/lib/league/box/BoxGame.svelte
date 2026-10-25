@@ -13,9 +13,12 @@
 		clears?: string | null;
 		/** Said in place of the game: why a bench player on injured reserve is a drop (Lane 98). */
 		note?: string | null;
+		/** The weather as its glyph alone after the kickoff, its words the glyph's label (a phone's
+		 * Rankings row, Lane 209: the game in one cell on one line). */
+		glyph?: boolean;
 	}
 
-	let { row, facts = true, clears = null, note = null }: Props = $props();
+	let { row, facts = true, clears = null, note = null, glyph = false }: Props = $props();
 </script>
 
 {#if note}
@@ -26,9 +29,12 @@
 	<span class="bye">{BOX.noClub}</span>
 {:else if row.game}
 	<span class="opp"
-		><b>{row.game.where}</b> <span>{row.game.when}</span>{#if clears}<span class="clears"
-				>{clears}</span
-			>{/if}</span
+		><b>{row.game.where}</b> <span>{row.game.when}</span>{#if glyph && row.weather}<span
+				class="wx-glyph"
+				role="img"
+				aria-label={row.weather.words}
+				title={row.weather.words}><WeatherGlyph glyph={row.weather.glyph} /></span
+			>{/if}{#if clears}<span class="clears">{clears}</span>{/if}</span
 	>
 {/if}
 {#if facts && (row.expected !== null || row.weather !== null)}
@@ -77,6 +83,12 @@
 		font-weight: 600;
 		letter-spacing: 0.02em;
 		color: var(--ink-2);
+	}
+
+	.wx-glyph {
+		display: inline-flex;
+		align-items: center;
+		color: var(--ink-3);
 	}
 
 	.wx {

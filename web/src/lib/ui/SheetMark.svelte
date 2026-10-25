@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { ordinal } from '#lib/format/number.ts';
 	import Icon from './Icon.svelte';
 	import Place from './Place.svelte';
+	import { SHEET_MARK, addLabel, placeLabel } from './sheet-mark.ts';
 
 	/** A board row's sheet control. Before he is on your sheet: a quiet plus that a Row shows on its
 	 * hover and focus, opening to the words "Add to my sheet". After: a state, not a button, an ink
@@ -14,18 +14,29 @@
 		/** Your sheet's page. */
 		sheetHref: string;
 		onadd: () => void;
+		/** On a phone the plus says its word, "Add", with no hover to open it (the Rankings row, Lane
+		 * 209: one verb per row, named). */
+		named?: boolean;
 	}
 
-	let { name, place, sheetHref, onadd }: Props = $props();
+	let { name, place, sheetHref, onadd, named = false }: Props = $props();
 </script>
 
 {#if place === null}
-	<button type="button" class="add" data-reveal aria-label="Add {name} to my sheet" onclick={onadd}>
-		<span class="words">Add to my sheet</span>
+	<button
+		type="button"
+		class="add"
+		class:named
+		data-reveal
+		aria-label={addLabel(name)}
+		onclick={onadd}
+	>
+		<span class="words">{SHEET_MARK.add}</span>
+		{#if named}<span class="short" aria-hidden="true">{SHEET_MARK.addShort}</span>{/if}
 		<span class="disc"><Icon name="plus" size={16} /></span>
 	</button>
 {:else}
-	<a class="on" href={sheetHref} aria-label="{name} is {ordinal(place)} on your sheet">
+	<a class="on" class:named href={sheetHref} aria-label={placeLabel(name, place)}>
 		<span class="disc"><Icon name="check" size={16} /></span>
 		<Place {place} ordinal />
 	</a>
@@ -68,7 +79,8 @@
 		border: 1px solid var(--line-strong);
 	}
 
-	.words {
+	.words,
+	.short {
 		display: none;
 	}
 
@@ -102,5 +114,41 @@
 	.on:hover .disc {
 		outline: 2px solid var(--line-strong);
 		outline-offset: 1px;
+	}
+
+	/* A phone's Rankings row names its verb: "Add" in a quiet outline beside the plus, the row's one
+	   verb, at the height of its game line. */
+	@media (max-width: 760px) {
+		.named {
+			height: 24px;
+			gap: 4px;
+			font-size: var(--t-xs);
+			font-weight: 600;
+		}
+
+		.add.named {
+			padding-left: var(--s-2);
+			border-color: var(--line-strong);
+		}
+
+		.add.named .short {
+			display: inline;
+		}
+
+		.add.named .disc {
+			width: 18px;
+			height: 18px;
+			border: 0;
+		}
+
+		.add.named:hover .words,
+		.add.named:focus-visible .words {
+			display: none;
+		}
+
+		.on.named .disc {
+			width: 20px;
+			height: 20px;
+		}
 	}
 </style>
