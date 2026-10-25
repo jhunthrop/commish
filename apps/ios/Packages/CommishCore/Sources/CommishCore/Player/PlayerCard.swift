@@ -70,7 +70,8 @@ public enum SheetRead: Equatable, Sendable {
 /// basis lines once, and his status from the week's line. Pure, held to
 /// shared/fixtures/parity/player-sheet.json.
 public struct PlayerCard: Equatable, Sendable {
-    public let head: CardHead
+    /// Nil where the run holds no week ahead for him.
+    public let head: CardHead?
     public let cell: NextCell?
     public let tiles: [CardTile]
     public let basis: [String]
@@ -85,6 +86,14 @@ public struct PlayerCard: Equatable, Sendable {
 /// What the card is built from: his week from the API, his page from the run (nil where it cannot be
 /// read) in the format the page leads with, the run's season, the capture beside the run, whether the
 /// week was read in the member's league, and the screen's clock and zone.
+public extension PlayerCard {
+    /// The card as the page draws it: its read, its basis and his status left to the page's own
+    /// sections (the status in the page's head, from the run's capture).
+    var onPage: PlayerCard {
+        PlayerCard(head: head, cell: cell, tiles: tiles, basis: [], read: nil, status: nil, game: game)
+    }
+}
+
 public struct CardInput: Sendable {
     public let week: PlayerWeek
     public let page: RunPlayer?
@@ -94,10 +103,12 @@ public struct CardInput: Sendable {
     public let league: Bool
     public let zone: TimeZone
     public let now: Date
+    /// His figure in the format where no page carries it (a held page's board row), else nil.
+    public let projected: Double?
 
     public init(
         week: PlayerWeek, page: RunPlayer?, format: RunFormat?, season: Int, capture: RunDesignations?,
-        league: Bool, zone: TimeZone, now: Date
+        league: Bool, zone: TimeZone, now: Date, projected: Double? = nil
     ) {
         self.week = week
         self.page = page
@@ -107,6 +118,7 @@ public struct CardInput: Sendable {
         self.league = league
         self.zone = zone
         self.now = now
+        self.projected = projected
     }
 }
 

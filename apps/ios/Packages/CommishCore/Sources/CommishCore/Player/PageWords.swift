@@ -170,6 +170,11 @@ enum PageWords {
         }
     }
 
+    /// page-words.ts PLAYER_PAGE.outcomesCaption: "2026 PPR points, from his low case to his high case".
+    static func outcomesCaption(season: Int, scoring: String) -> String {
+        "\(season) \(scoring) points, from his low case to his high case"
+    }
+
     /// player-card.ts readStamp: "Written Oct 13, from his facts through last season".
     static func readStamp(_ capsule: RunCapsule?) -> String? {
         capsule?.writtenAt

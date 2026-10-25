@@ -154,6 +154,18 @@ struct PlayerSheetViewModelTests {
         ))
     }
 
+    @Test func aSlugTheIndexDoesNotNameKeepsHisWeeksCardByTheRowsBoardID() async throws {
+        let player = SheetPlayer(
+            id: "11620", slug: "not-a-page", name: "Rome Odunze", position: "WR", rank: "25", club: "CHI",
+            boardID: "4431299"
+        )
+        let viewModel = model(player, clock: Fixtures.week)
+        await viewModel.load()
+        let (card, _) = try #require(loaded(viewModel))
+        #expect(card.tiles.first?.value == "11.0", "his week")
+        #expect(card.read == nil, "no page found, so no read drawn")
+    }
+
     @Test func aRefusedTokenSignsOut() async {
         var signedOut = false
         let viewModel = model(
@@ -242,7 +254,7 @@ actor CountingPages: RunPagesAPI {
         return try await pages.index(tag: tag)
     }
 
-    func page(id: String, tag: String?) async throws -> RunRead<RunPlayer> {
+    func page(id: String, tag: String?) async throws -> RunRead<RunPlayerAnswer> {
         tags.append(tag)
         return try await pages.page(id: id, tag: tag)
     }

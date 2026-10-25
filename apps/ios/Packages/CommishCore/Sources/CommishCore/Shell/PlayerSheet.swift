@@ -16,14 +16,60 @@ public struct SheetPlayer: Equatable, Hashable, Sendable, Identifiable {
     public let rank: String?
     /// His club as the row draws it.
     public let club: String?
+    /// His board id where the row carries it: his week is read by it when the run's index names no page
+    /// for his slug.
+    public let boardID: String?
 
-    public init(id: String, slug: String, name: String, position: String?, rank: String?, club: String?) {
+    public init(
+        id: String, slug: String, name: String, position: String?, rank: String?, club: String?,
+        boardID: String? = nil
+    ) {
         self.id = id
         self.slug = slug
         self.name = name
         self.position = position
         self.rank = rank
         self.club = club
+        self.boardID = boardID
+    }
+}
+
+/// What the screen under the sheet offers him (shelf-state.ts ScreenOffer): the verb in the screen's
+/// words, the line under it, what it does there, and whether the screen is one of the lineup's, whose
+/// verb gives way to his game's state once it has kicked off (shelf.ts LINEUP_SCREENS).
+public struct SheetOffer: Sendable {
+    public let label: String
+    public let line: String?
+    public let lineup: Bool
+    public let act: @MainActor @Sendable () -> Void
+
+    public init(label: String, line: String?, lineup: Bool, act: @escaping @MainActor @Sendable () -> Void) {
+        self.label = label
+        self.line = line
+        self.lineup = lineup
+        self.act = act
+    }
+}
+
+/// The sheet's verb (shelf.ts shelfVerb): the screen's offer, or on a lineup screen once his game has
+/// kicked off the held words in its place, since no lineup move takes him then.
+public enum SheetVerb: Equatable, Sendable {
+    case act(label: String, line: String?)
+    case held(String)
+
+    public static func of(_ offer: SheetOffer?, game: GameRead?) -> SheetVerb? {
+        guard let offer else {
+            return nil
+        }
+        if offer.lineup {
+            if game == .final {
+                return .held(Words.Card.gameFinal)
+            }
+            if game == .kickedOff {
+                return .held(Words.Card.kickedOff)
+            }
+        }
+        return .act(label: offer.label, line: offer.line)
     }
 }
 
@@ -59,7 +105,11 @@ public struct PlayerSheetModel: Equatable, Sendable {
 public enum PlayerSheetWords {
     /// card.ts unreadBasis for a player on no list: what the week's tiles are, read as the sheet
     /// opens, or why they show "--".
-    public static func unreadBasis(failed: Bool, weekTile: String) -> String {
+    public static func unreadBasis(failed: Bool, weekTile: String, listed: String? = nil) -> String {
+        // A listed player's week tiles say his list, read or not (Lane 128).
+        if listed != nil {
+            return Words.Card.listedWeek
+        }
         let tiles = "\(weekTile), \(Words.Card.opp) and \(Words.Card.delta)"
         return failed
             ? "\(tiles) show \"\(Words.Card.none)\" because this week's figures could not be read just now."
@@ -99,15 +149,19 @@ public final class PlayerSheetHost {
     /// The player the sheet shows, nil while it is closed; the sheet's binding sets it nil when the
     /// member swipes it away.
     public var shown: SheetPlayer?
+    /// What the screen the sheet opened from offers him, nil where it offers none.
+    public private(set) var offer: SheetOffer?
 
     public init() {}
 
-    public func open(_ player: SheetPlayer) {
+    public func open(_ player: SheetPlayer, offer: SheetOffer? = nil) {
         shown = player
+        self.offer = offer
     }
 
     public func close() {
         shown = nil
+        offer = nil
     }
 
     /// The screen under the sheet read its list again: the sheet keeps its player.

@@ -42,11 +42,17 @@ struct PlayerPageViewModelTests {
         #expect(page.hero.name == "Rome Odunze")
         #expect(page.hero.club == "Chicago Bears")
         #expect(page.hero.pill == "WR 25")
-        #expect(page.figure == "199.2")
-        #expect(page.caption == "projected PPR points in 2026, over 13.7 expected games")
-        #expect(page.drafters.figure == "Pick 55")
-        #expect(page.drafters.words.hasPrefix("We have him at pick 50, so drafters take him 4.8 picks later."))
-        #expect(page.outcomes?.caption == "2026 PPR points, from his low case to his high case")
+        let facts = try #require(page.facts, "the facts before the season")
+        #expect(facts.drafters.figure == "Pick 55")
+        #expect(facts.drafters.words.hasPrefix("We have him at pick 50, so drafters take him 4.8 picks later."))
+        #expect(facts.outcomes?.caption == "2026 PPR points, from his low case to his high case")
+        // The card is his week's, read in the league: the week's figure and his game, the six tiles.
+        #expect(page.card.head == CardHead(week: 6, opponent: "at ATL"))
+        #expect(page.card.tiles.map(\.value) == ["11.0", "199.2", "12th", "9.3", "5.0", "\u{2212}1.4"])
+        #expect(page.season.rows.count == 5)
+        #expect(page.tier?.title == "Tier 5 WRs")
+        #expect(page.formats == nil, "one format, no table")
+        #expect(page.basis.first?.hasPrefix("Wk 6 is this week's published projection") == true)
         guard case let .prose(paragraphs, byline, _) = page.read else {
             Issue.record("his capsule, got \(page.read)")
             return
@@ -62,9 +68,12 @@ struct PlayerPageViewModelTests {
         let viewModel = model("jahmyr-gibbs", pages: StubPages(.contract), run: StubRun(.contract))
         await viewModel.load()
         let (page, _) = try #require(loaded(viewModel))
-        #expect(page.caption == "PPR points for the rest of 2026 through week 17, our rank 1")
-        #expect(page.drafters.label == "ADP")
+        #expect(page.facts == nil, "the facts are the draft's: the page shows none in season")
         #expect(page.read == .weekNone("Our read for his next game is not written yet."))
+        #expect(page.formats?.rows.map(\.label) == ["PPR", "Half PPR", "Standard"])
+        // No week read: the card as built, and the basis says why the week's tiles show "--".
+        #expect(page.card.tiles.first?.value == "--")
+        #expect(page.basis.first?.hasSuffix("could not be read just now.") == true)
         #expect(page.verb == nil, "the fixture league holds no week for him")
     }
 
@@ -76,7 +85,7 @@ struct PlayerPageViewModelTests {
         let (page, _) = try #require(loaded(viewModel))
         #expect(page.hero.name == "Rome Odunze")
         #expect(page.stamp == "Updated Sep 1", "the copy's own run, not the stand-in's")
-        #expect(page.heldBasis == nil)
+        #expect(!page.basis.contains(Words.HeldPage.basis))
     }
 
     @Test func aHeldPageWithNoCopyIsTheBoardsFiguresAndTheHeldWords() async throws {
@@ -84,9 +93,10 @@ struct PlayerPageViewModelTests {
         let viewModel = model("rome-odunze", pages: pages)
         await viewModel.load()
         let (page, _) = try #require(loaded(viewModel))
-        #expect(page.heldBasis == Words.HeldPage.basis)
+        #expect(page.basis.contains(Words.HeldPage.basis))
         #expect(page.read == nil, "the held words say once that our read is not written")
-        #expect(page.figure == "199.2", "the board's figure")
+        #expect(page.season.none == Words.HeldPage.log)
+        #expect(page.card.tiles[1].value == "199.2", "the board's figure")
     }
 
     @Test func eachVerbOpensItsLeagueScreensTabOrThePlatformsPage() throws {
@@ -133,7 +143,7 @@ struct RefusedPages: RunPagesAPI {
         throw APIError.status(401)
     }
 
-    func page(id _: String, tag _: String?) async throws -> RunRead<RunPlayer> {
+    func page(id _: String, tag _: String?) async throws -> RunRead<RunPlayerAnswer> {
         throw APIError.status(401)
     }
 

@@ -105,6 +105,8 @@ public struct StartModel: Equatable, Sendable {
     public let done: String?
     public let missed: String?
     public let chips: [StripChip]
+    /// The advice's swaps, which the sheet's verb says under it for the row they name.
+    public let swaps: [Swap]
     public let starters: [RowCells]
     /// Spots empty on the platform that no one who can play fills: their slot words.
     public let empty: [String]
@@ -137,6 +139,7 @@ public struct StartModel: Equatable, Sendable {
         self.done = done
         missed = advice.missed
         chips = done == nil ? box.idle.map(StripChip.idle) + box.swaps.map(StripChip.swap) : []
+        swaps = box.swaps
         starters = box.starters.map { RowCells($0, row: $0.row, reserve: nil) }
         empty = box.empty
         let small = StartWords.teamSmall(box.totals)
@@ -257,8 +260,17 @@ public extension RowCells {
         row.slug.map { slug in
             SheetPlayer(
                 id: row.id, slug: slug, name: row.name, position: row.position,
-                rank: row.rank.map(String.init) ?? row.status?.rank, club: row.club
+                rank: row.rank.map(String.init) ?? row.status?.rank, club: row.club, boardID: row.boardID
             )
         }
+    }
+}
+
+public extension StartModel {
+    /// lineup.ts swapOf and swapWords: the swap that names his row, as the strip says it ("QB, Dart in,
+    /// Rodgers out"); nil where none does.
+    func swapLine(_ row: StartRow) -> String? {
+        let short = LineupBoxes.shortName(row.name)
+        return swaps.first { $0.id == row.id || $0.out == short }.map(StartWords.swap)
     }
 }

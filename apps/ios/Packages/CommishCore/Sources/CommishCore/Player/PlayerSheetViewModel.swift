@@ -55,31 +55,36 @@ public final class PlayerSheetViewModel {
     }
 
     /// His card from the run and his week; a refused token signs out; with no week read and none saved,
-    /// the shelf's words for a week that could not be read.
+    /// the shelf's words for a week that could not be read. A slug the run's index does not name keeps
+    /// his week's card by the row's board id, with no read (his page cannot be found).
     public func load() async {
         do {
-            let (index, entry) = try await lookup.entry(slug: player.slug)
-            guard let entry else {
+            let looked = try await indexEntry()
+            guard let id = looked?.entry?.id ?? player.boardID else {
                 state = .failed(PlayerSheetWords.unreadBasis(failed: true, weekTile: Words.Card.proj))
                 return
             }
             async let manifest = lookup.manifest()
             async let capture = lookup.designations()
-            async let week = weeks.read(player: entry.id, league: league)
+            async let week = weeks.read(player: id, league: league)
             let (read, inLeague) = try await week
-            let runManifest = try await manifest
+            let runManifest = try? await manifest
             let runCapture = try? await capture
-            let (source, sourceReads) = await (try? lookup.source(entry, manifest: runManifest.value)) ?? (nil, [])
+            let (source, sourceReads) = await source(looked?.entry, manifest: runManifest?.value)
             let page = Self.page(source)
             let format = page.flatMap { page in
-                runManifest.value.formats.first { page.formats.additionalProperties[$0.id] != nil }
+                runManifest?.value.formats.first { page.formats.additionalProperties[$0.id] != nil }
             }
             let card = PlayerCards.card(CardInput(
-                week: read.value, page: page, format: format, season: runManifest.value.season,
+                week: read.value, page: page, format: format, season: runManifest?.value.season ?? 0,
                 capture: runCapture.flatMap(\.value), league: inLeague, zone: zone, now: clock.now
             ))
-            let reads = [(index.stamp, index.saved), (runManifest.stamp, runManifest.saved), (read.stamp, read.saved)]
-                + sourceReads + (runCapture.map { [($0.stamp, $0.saved)] } ?? [])
+            let reads = [(read.stamp, read.saved)] + sourceReads
+                + [
+                    looked.map { ($0.index.stamp, $0.index.saved) },
+                    runManifest.map { ($0.stamp, $0.saved) },
+                    runCapture.map { ($0.stamp, $0.saved) },
+                ].compactMap(\.self)
             state = .loaded(card, Freshness.of(reads) ?? Freshness(stamp: clock.now, saved: nil))
         } catch where APIError.signsOut(error) {
             state = .failed(AppWords.Failure.signedOut)
@@ -87,6 +92,26 @@ public final class PlayerSheetViewModel {
         } catch {
             state = .failed(PlayerSheetWords.unreadBasis(failed: true, weekTile: Words.Card.proj))
         }
+    }
+
+    /// The run's index entry for his slug; nil where the index cannot be read, a refused token thrown.
+    private func indexEntry() async throws -> (index: FileRead<[RunIndexEntry]>, entry: RunIndexEntry?)? {
+        do {
+            let (index, entry) = try await lookup.entry(slug: player.slug)
+            return (index, entry)
+        } catch where !APIError.signsOut(error) {
+            return nil
+        }
+    }
+
+    /// His page in the run, none where the index names none or it cannot be read.
+    private func source(
+        _ entry: RunIndexEntry?, manifest: RunManifest?
+    ) async -> (PageSource?, [(stamp: Date, saved: SavedReason?)]) {
+        guard let entry, let manifest else {
+            return (nil, [])
+        }
+        return await (try? lookup.source(entry, manifest: manifest)) ?? (nil, [])
     }
 
     /// His page, or an earlier run's copy of it; nil for the board's figures alone, which hold no read.

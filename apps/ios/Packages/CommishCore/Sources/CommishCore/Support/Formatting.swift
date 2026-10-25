@@ -47,6 +47,16 @@ public enum Formatting {
         value.formatted(.number.grouping(.automatic).locale(Locale(identifier: "en_US")))
     }
 
+    /// number.ts count: a figure as a reader reads a count, whole and grouped, "1,467".
+    public static func count(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 0
+        formatter.roundingMode = .halfUp
+        return formatter.string(from: NSNumber(value: value)) ?? String(value)
+    }
+
     /// "$1,000".
     public static func dollars(_ value: Int) -> String {
         "$\(grouped(value))"

@@ -75,7 +75,7 @@ public final class PlayerPageViewModel {
                 source: found, manifest: manifest.value, sources: files.sources.value,
                 capture: files.capture.flatMap(\.value),
                 clubs: files.clubs.value, schedule: files.schedule.value,
-                boardSize: files.board.map { $0.value.rows.count + $0.value.market.count },
+                board: files.board?.value,
                 week: answer?.0.value, host: answer?.1 == true ? league?.host : nil, zone: zone, now: clock.now
             )) else {
                 state = .failed(Words.InSeason.notFoundLine)

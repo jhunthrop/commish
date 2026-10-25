@@ -25,7 +25,7 @@ struct LivePlayerTests {
         // His week reads the API's own store: a lane database holds no board or games, so a dev API on
         // one answers no week and the sheet says so; against a store with them the card draws.
         if case let .loaded(card, _) = sheet.state {
-            print("sheet: \(card.head.label) \(card.head.opponent) \(card.game)")
+            print("sheet: \(card.head?.label ?? "-") \(card.head?.opponent ?? "-") \(card.game)")
             print("  tiles: " + card.tiles.map { "\($0.label) \($0.value)" }.joined(separator: " | "))
             print("  read: \(String(describing: card.read))")
         } else {
@@ -40,9 +40,10 @@ struct LivePlayerTests {
             return
         }
         print("page: \(model.hero.name), \(model.hero.club), \(model.hero.pill), \(model.stamp)")
-        print("  \(model.figure) \(model.unit): \(model.caption)")
-        print("  \(model.drafters.label) \(model.drafters.figure): \(model.drafters.words)")
-        print("  \(model.overReplacement.figure): \(model.overReplacement.words)")
+        print("  tiles: " + model.card.tiles.map { "\($0.label) \($0.value)" }.joined(separator: " | "))
+        print("  season: \(model.season.aside), \(model.season.rows.count) weeks, \(model.season.ahead.count) to play")
+        print("  tier: \(model.tier?.title ?? "-"), formats: \(model.formats?.rows.map(\.label) ?? [])")
+        print("  facts: \(model.facts == nil ? "none in season" : "before the season")")
         print("  read: \(String(describing: model.read))")
         let counted = CountedPages(client)
         let again = PlayerPageViewModel(
@@ -68,7 +69,7 @@ actor CountedPages: RunPagesAPI {
         try await count(pages.index(tag: tag))
     }
 
-    func page(id: String, tag: String?) async throws -> RunRead<RunPlayer> {
+    func page(id: String, tag: String?) async throws -> RunRead<RunPlayerAnswer> {
         try await count(pages.page(id: id, tag: tag))
     }
 

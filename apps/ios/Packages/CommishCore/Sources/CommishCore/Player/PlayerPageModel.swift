@@ -2,10 +2,12 @@ import CommishAPI
 import CommishDesign
 import Foundation
 
-/// The player page from the run (web/src/routes/(run)/players/[slug] over server/pages/player.ts at
-/// 390): his face, name, club and position with his status, the one big number with its basis, where
-/// drafters take him, his value, his floor, median and ceiling, our read, and the verb the league's
-/// screens give him. Pure: the view decides nothing.
+/// The player page from the run, in the web's order (web/src/routes/(run)/players/[slug] over
+/// server/pages/player.ts at 390): the card (his face, name, club, pill and status, the next game with
+/// its expected score and weather, the six tiles), before the season the facts (where drafters take
+/// him, Over replacement, his range), his season (the game log, Still to play, earlier seasons), our
+/// read, his tier box or the held tier, the every-format table, the basis lines, and the verb the
+/// league's screens give him. Pure: the view decides nothing.
 public struct PlayerPageModel: Equatable, Sendable {
     public struct Hero: Equatable, Sendable {
         public let name: String
@@ -18,7 +20,7 @@ public struct PlayerPageModel: Equatable, Sendable {
         public let status: RowStatus?
     }
 
-    /// A fact beside the big number (Fact.svelte): its label, its figure and the sentence under it.
+    /// A fact (Fact.svelte): its label, its figure and the sentence under it.
     public struct Fact: Equatable, Sendable {
         public let label: String
         public let figure: String
@@ -34,33 +36,40 @@ public struct PlayerPageModel: Equatable, Sendable {
         public let caption: String
     }
 
+    /// The facts the page shows before the season only, as the web does.
+    public struct Facts: Equatable, Sendable {
+        public let drafters: Fact
+        public let overReplacement: Fact
+        public let heat: Heat
+        public let outcomes: Outcomes?
+    }
+
     /// Our read as the page shows it: in season the week's read or the words for none written; before
-    /// the season the writer's capsule as written, or the words for none ready.
+    /// the season the writer's capsule as written, or the words for none ready with what it will be
+    /// built from.
     public enum Read: Equatable, Sendable {
         case week(ShownRead)
         case weekNone(String)
         case prose(paragraphs: [String], byline: String?, figures: [ReadFigure])
-        case unwritten(String)
+        case unwritten(String, lines: [UnwrittenLine])
     }
 
     public let hero: Hero
-    /// The one big number, "199.2", its unit and its basis.
-    public let figure: String
-    public let unit: String
-    public let caption: String
-    public let drafters: Fact
-    public let overReplacement: Fact
-    public let heat: Heat
-    public let outcomes: Outcomes?
+    /// The card: the next game and the six tiles (its read and basis are the page's own sections).
+    public let card: PlayerCard
+    public let facts: Facts?
+    public let season: SeasonView
+    /// Nil for a page held back with no copy: its basis says once that our read is not written.
+    public let read: Read?
     /// In place of his tier for a player on a season-long list: "On IR, not ranked".
     public let heldTier: String?
-    /// Nil for a page held back with no copy: its foot says once that our read is not written.
-    public let read: Read?
+    public let tier: TierBox?
+    public let formats: FormatsTable?
+    /// Every number's basis, once: the week's, then the season's.
+    public let basis: [String]
     public let verb: CardVerb?
     /// The run's stamp the page is from: the earlier run's for a held page's copy.
     public let stamp: String
-    /// A page held back with no copy says once that his log and our read are not written yet.
-    public let heldBasis: String?
 }
 
 /// His page as read: his own, an earlier run's copy of a held one with that run's stamp, or for a
@@ -69,6 +78,13 @@ public enum PageSource: Equatable, Sendable {
     case page(RunPlayer)
     case copy(RunPlayer, from: RunHeldCopy)
     case facts(RunIndexEntry, RunBoardRow)
+
+    var player: RunPlayer? {
+        switch self {
+        case let .page(player), let .copy(player, _): player
+        case .facts: nil
+        }
+    }
 }
 
 /// Everything the page is built from, read from the run's routes and the week.
@@ -79,8 +95,8 @@ public struct PageInput: Sendable {
     public let capture: RunDesignations?
     public let clubs: [RunClub]
     public let schedule: RunSchedule
-    /// How many players the leading format's board ranks, nil where it was not read.
-    public let boardSize: Int?
+    /// The leading format's board, nil where it was not read: its size and his tier.
+    public let board: RunBoardAnswer?
     /// His week, the league's with its verb where one is followed; nil where it could not be read.
     public let week: PlayerWeek?
     public let host: Components.Schemas.LeagueHost?
@@ -89,7 +105,7 @@ public struct PageInput: Sendable {
 
     public init(
         source: PageSource, manifest: RunManifest, sources: [RunAdpSource], capture: RunDesignations?,
-        clubs: [RunClub], schedule: RunSchedule, boardSize: Int?, week: PlayerWeek?,
+        clubs: [RunClub], schedule: RunSchedule, board: RunBoardAnswer?, week: PlayerWeek?,
         host: Components.Schemas.LeagueHost?, zone: TimeZone, now: Date
     ) {
         self.source = source
@@ -98,11 +114,15 @@ public struct PageInput: Sendable {
         self.capture = capture
         self.clubs = clubs
         self.schedule = schedule
-        self.boardSize = boardSize
+        self.board = board
         self.week = week
         self.host = host
         self.zone = zone
         self.now = now
+    }
+
+    var boardSize: Int? {
+        board.map { $0.rows.count + $0.market.count }
     }
 }
 
@@ -115,42 +135,41 @@ public enum PlayerPages {
         }
         let listed = input.capture?.players.additionalProperties[who.id]
         let status = listed.flatMap { BoardStatus.view($0, zone: input.zone) }
-        let heldOut = listed?.seasonLong == true
         let underway = underway(input)
-        let words = PageWords.line(
-            format, numbers: numbers, sources: RunWords.adpDrafts(input.sources, format: format.id),
-            boardSize: input.boardSize,
-            season: .init(year: input.manifest.season, underway: underway, heldOut: heldOut)
-        )
+        let season = season(input, who: who, format: format)
+        let card = card(input, format: format, projected: numbers.projected, held: status?.rank)
         return PlayerPageModel(
             hero: .init(
                 name: who.name, initials: Initials.of(who.name), headshot: BoardCells.face(who.headshot),
                 club: PageWords.clubName(who.team, clubs: input.clubs),
                 pill: "\(who.position) \(status?.rank ?? String(numbers.positionRank))", status: status
             ),
-            figure: Formatting.fixed(numbers.projected), unit: format.unit, caption: words.caption,
-            drafters: .init(label: words.draftersLabel, figure: words.draftersFigure, unit: nil, words: words.drafters),
-            overReplacement: .init(
-                label: Words.PlayerPage.overReplacement, figure: BoardFigures.signed(numbers.vor), unit: format.unit,
-                words: words.value
+            card: card.card,
+            facts: underway ? nil : facts(input, format: format, numbers: numbers, heldOut: listed?.seasonLong == true),
+            season: season,
+            read: input.source.player == nil ? nil : read(
+                input,
+                underway: underway,
+                format: format,
+                held: status?.rank
             ),
-            heat: Heat.of(vor: numbers.vor, round: numbers.vorRound),
-            outcomes: outcomes(numbers, format: format, season: input.manifest.season),
-            heldTier: heldOut ? listed?.status.value1.flatMap(PageWords.heldTier) : nil,
-            read: heldBasis(input.source) == nil
-                ? read(input, underway: underway, projection: numbers.projected) : nil,
+            heldTier: listed?.seasonLong == true ? listed?.status.value1.flatMap(PageWords.heldTier) : nil,
+            tier: input.board.flatMap {
+                PageSections.tier(
+                    $0,
+                    player: who.id,
+                    format: format,
+                    season: input.manifest.season,
+                    capture: input.capture
+                )
+            },
+            formats: input.source.player.flatMap {
+                PageSections.formats(PageSections.lines($0, formats: input.manifest.formats), held: status?.rank)
+            },
+            basis: card.basis + [season.basis].compactMap(\.self),
             verb: verb(input),
-            stamp: stamp(input),
-            heldBasis: heldBasis(input.source)
+            stamp: stamp(input)
         )
-    }
-
-    /// A page held back with no copy: his figures are the board's, his log and our read not written.
-    static func heldBasis(_ source: PageSource) -> String? {
-        guard case .facts = source else {
-            return nil
-        }
-        return Words.HeldPage.basis
     }
 
     /// The format the page leads with, the first of the run's that ranks him, and his numbers in it.
@@ -176,44 +195,95 @@ public enum PlayerPages {
         schedule.slates.flatMap(\.games).filter { $0.week == week }.map(\.kickoff).max()
     }
 
+    /// The card: his week's read over the page's build where the week answered (the sheet's card), the
+    /// build alone where it did not, with the basis the web says for an unread week.
+    static func card(
+        _ input: PageInput, format: RunFormat, projected: Double, held: String?
+    ) -> (card: PlayerCard, basis: [String]) {
+        if let week = input.week {
+            let card = PlayerCards.card(CardInput(
+                week: week, page: input.source.player, format: format, season: input.manifest.season,
+                capture: input.capture, league: input.host != nil, zone: input.zone, now: input.now,
+                projected: projected
+            ))
+            return (card.onPage, card.basis)
+        }
+        let next = input.source.player.flatMap { PageSections.weekAhead($0.season) }
+        let tiles = PageSections.builtTiles(page: input.source.player, format: format, next: next, projected: projected)
+        let basis = PlayerSheetWords.unreadBasis(failed: true, weekTile: tiles[0].label, listed: held)
+        return (
+            PlayerCard(head: next, cell: nil, tiles: tiles, basis: [], read: nil, status: nil, game: .noGame),
+            [basis]
+        )
+    }
+
+    static func season(_ input: PageInput, who: Who, format: RunFormat) -> SeasonView {
+        input.source.player.flatMap {
+            SeasonViews.view($0, formats: input.manifest.formats, slates: input.schedule.slates)
+        } ?? SeasonViews.held(year: input.manifest.season, position: who.position, format: format)
+    }
+
+    static func facts(_ input: PageInput, format: RunFormat, numbers: LineNumbers, heldOut: Bool) -> PlayerPageModel
+        .Facts {
+        let words = PageWords.line(
+            format, numbers: numbers, sources: RunWords.adpDrafts(input.sources, format: format.id),
+            boardSize: input.boardSize, season: .init(year: input.manifest.season, underway: false, heldOut: heldOut)
+        )
+        return .init(
+            drafters: .init(label: words.draftersLabel, figure: words.draftersFigure, unit: nil, words: words.drafters),
+            overReplacement: .init(
+                label: Words.PlayerPage.overReplacement, figure: BoardFigures.signed(numbers.vor), unit: format.unit,
+                words: words.value
+            ),
+            heat: Heat.of(vor: numbers.vor, round: numbers.vorRound),
+            outcomes: outcomes(numbers, format: format, season: input.manifest.season)
+        )
+    }
+
     static func outcomes(_ numbers: LineNumbers, format: RunFormat, season: Int) -> PlayerPageModel.Outcomes? {
         guard let floor = numbers.floor, let median = numbers.median, let ceiling = numbers.ceiling else {
             return nil
         }
         return .init(
             label: Words.PlayerPage.outcomes, floor: floor, median: median, ceiling: ceiling,
-            caption: "\(season) \(format.label) points, from his low case to his high case"
+            caption: PageWords.outcomesCaption(season: season, scoring: format.label)
         )
     }
 
     /// In season the week's read beside the week's projection, the words for none written with none;
-    /// before the season the capsule as the writer wrote it, its paragraphs split by a blank line.
-    static func read(_ input: PageInput, underway: Bool, projection: Double) -> PlayerPageModel.Read {
-        let player: RunPlayer? = switch input.source {
-        case let .page(player), let .copy(player, _): player
-        case .facts: nil
-        }
+    /// before the season the capsule as the writer wrote it, its paragraphs split by a blank line, or
+    /// with none the words for a read not ready and what it will be built from.
+    static func read(_ input: PageInput, underway: Bool, format: RunFormat, held: String?) -> PlayerPageModel.Read {
+        let player = input.source.player
         let game = input.week.map { LineRead.game($0.line, now: input.now) }
         let state = game.flatMap(PlayerCards.readState)
         if underway {
             guard let read = player?.weekRead?.value1 else {
                 return .weekNone(WeekReads.noRead(state))
             }
-            let held = StatusHeld.read(read, capture: input.capture, player: player?.id ?? "", now: input.now)
+            let shown = StatusHeld.read(read, capture: input.capture, player: player?.id ?? "", now: input.now)
             let card = input.week.map {
                 CardProjection(
                     week: $0.week, ppr: $0.projectionScoring.format.value1 == .ppr, points: $0.line.weekProjection,
                     state: state
                 )
             }
-            return .week(WeekReads.shown(held, card: card))
+            return .week(WeekReads.shown(shown, card: card))
         }
-        guard let capsule = player?.capsule?.value1 else {
-            return .unwritten(Words.Unwritten.read)
+        guard let player, let capsule = player.capsule?.value1 else {
+            let numbers = player?.formats.additionalProperties[format.id]
+            let lines = numbers.map {
+                PageSections.unwritten($0, .init(
+                    position: Who(input.source).position, boardSize: input.boardSize ?? 0, format: format,
+                    year: input.manifest.season, held: held
+                ))
+            } ?? []
+            return .unwritten(Words.Unwritten.read, lines: lines)
         }
+        let projected = player.formats.additionalProperties[format.id]?.projected ?? 0
         return .prose(
             paragraphs: paragraphs(capsule.body), byline: PageWords.readStamp(capsule),
-            figures: ReadFigures.preseason(capsule.pulls, projection: projection)
+            figures: ReadFigures.preseason(capsule.pulls, projection: projected)
         )
     }
 

@@ -15,7 +15,7 @@ enum CardTiles {
     /// Last and the change.
     static func live(_ input: CardInput, read: RunWeekRead?, game: GameRead) -> [CardTile] {
         let week = input.week
-        let built = builtTiles(input)
+        let built = builtTiles(page: input.page, format: input.format, projected: input.projected)
         let after = week.line.facts.bye ? week.afterBye?.value1 : nil
         return [
             projTile(week),
@@ -62,16 +62,14 @@ enum CardTiles {
 
     /// player-card.ts cardBuild and restTile: rest of season (or the season's projection on a preseason
     /// board) in the page's format, Avg and Last from his season so far; "--" with no page.
-    static func builtTiles(_ input: CardInput) -> Built {
-        let page = input.page
-        let format = input.format
-        let numbers = format.flatMap { page?.formats.additionalProperties[$0.id] }
+    static func builtTiles(page: RunPlayer?, format: RunFormat?, projected: Double? = nil) -> Built {
+        let figure = format.flatMap { page?.formats.additionalProperties[$0.id] }?.projected ?? projected
         let preseason = format != nil && format?.rosFromWeek == nil
         let last = page?.season.log.last { $0.status.value1 == .played && $0.points != nil }?.points
         return Built(
             rest: CardTile(
                 key: .rest, label: preseason ? Words.Card.projected : Words.Card.rest,
-                value: numbers.map { Formatting.fixed($0.projected) } ?? none, tone: nil
+                value: figure.map { Formatting.fixed($0) } ?? none, tone: nil
             ),
             avg: CardTile(
                 key: .avg, label: Words.Card.avg,

@@ -35,9 +35,17 @@ struct PlayerLookup: Sendable {
     ) async throws -> (PageSource?, [(stamp: Date, saved: SavedReason?)]) {
         let id = entry.id
         do {
-            let page = try await files
-                .read("/run/players/\(id)") { [pages] tag in try await pages.page(id: id, tag: tag) }
-            return (.page(page.value), [(page.stamp, page.saved)])
+            let route = "/run/players/\(id)"
+            var page = try await files.read(route) { [pages] tag in try await pages.page(id: id, tag: tag) }
+            // A page of another run than the manifest (the pointer moved between the reads) is read
+            // again afresh, once, as the Board's reader reads its board (RunBoardReader.read).
+            if page.saved == nil, page.value.runId != manifest.runId {
+                page = try await files.read(route) { [pages] _ in try await pages.page(id: id, tag: nil) }
+                guard page.value.runId == manifest.runId else {
+                    throw RunReadError.runTurned
+                }
+            }
+            return (.page(page.value.player), [(page.stamp, page.saved)])
         } catch where RunFiles.refused(error) {
             return try await held(entry, manifest: manifest)
         }
