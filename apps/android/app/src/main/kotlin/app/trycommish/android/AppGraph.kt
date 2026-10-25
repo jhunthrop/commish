@@ -27,6 +27,12 @@ import app.trycommish.core.leaguehome.LeagueReads
 import app.trycommish.core.matchup.ApiMatchupReads
 import app.trycommish.core.matchup.MatchupReads
 import app.trycommish.core.matchup.MatchupViewModel
+import app.trycommish.core.rankings.ApiRankingsReads
+import app.trycommish.core.rankings.RankingsReads
+import app.trycommish.core.rankings.RankingsViewModel
+import app.trycommish.core.record.ApiRecordReads
+import app.trycommish.core.record.RecordReads
+import app.trycommish.core.record.RecordViewModel
 import app.trycommish.core.shell.AccountReads
 import app.trycommish.core.shell.ApiAccountReads
 import app.trycommish.core.shell.FollowedLeague
@@ -80,6 +86,8 @@ class AppGraph(
     private val waivers: WaiverReads = ApiWaiverReads(transport)
     private val trades: TradeReads = ApiTradeReads(transport)
     private val runs: RunReads = ApiRunReads(transport)
+    private val rankings: RankingsReads = ApiRankingsReads(transport)
+    private val records: RecordReads = ApiRecordReads(transport)
     private val appContext: Context = context.applicationContext
     private val clipboard: ClipboardManager? = context.getSystemService(ClipboardManager::class.java)
 
@@ -152,6 +160,16 @@ class AppGraph(
             false
         }
     }
+
+    /** The Rankings with no league: our order and the kickers' and defenses' week, named for the season,
+     * opened with the search's letters where the shell's search opened it. */
+    fun rankingsViewModel(
+        inSeason: Boolean,
+        query: String,
+    ): RankingsViewModel = RankingsViewModel(rankings, cache, clock, zone, inSeason, query, sessionEnd)
+
+    /** Our record from the run, with the schedule its weeks are read by. */
+    fun recordViewModel(): RecordViewModel = RecordViewModel(records, cache, clock, zone, sessionEnd)
 
     fun shellViewModel(): ShellViewModel = ShellViewModel(account, cache, clock, zone, sessionEnd)
 

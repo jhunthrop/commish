@@ -107,7 +107,8 @@ internal object RecordWords {
         line: RunRecordLine?,
         source: RecordSource,
         figure: RecordFigure,
-    ): Pair<String, String?> = figure(score(line, source), figure) to oursOn(line, source)?.let { "${Words.RecordBox.ours} ${figure(it, figure)}" }
+    ): Pair<String, String?> =
+        figure(score(line, source), figure) to oursOn(line, source)?.let { "${Words.RecordBox.ours} ${figure(it, figure)}" }
 
     // Weeks.
 

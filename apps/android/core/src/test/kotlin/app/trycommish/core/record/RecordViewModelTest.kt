@@ -55,7 +55,10 @@ class RecordViewModelTest {
             advanceUntilIdle()
             val loaded = vm.ui.value.state as RecordState.Loaded
             assertFalse(loaded.stale)
-            assertEquals("Weekly record" to "Our weekly rankings against ESPN and the week's published projection", loaded.model.weekly.head)
+            assertEquals(
+                "Weekly record" to "Our weekly rankings against ESPN and the week's published projection",
+                loaded.model.weekly.head,
+            )
             val saved = CommishJson.decodeFromString(RecordBodies.serializer(), requireNotNull(cache.read(RecordViewModel.ROUTE)).body)
             assertEquals(RecordFixture.Graded.tag, saved.record.tag)
             assertEquals(RecordFixture.SCHEDULE_TAG, saved.schedule.tag)
