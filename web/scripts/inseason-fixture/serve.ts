@@ -70,6 +70,7 @@ import { tradeChecker } from './trade-check.ts';
 import { proposedTrades } from './trade-needs.ts';
 import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
 import { servedWaivers } from './run-lines.ts';
+import { FIXTURE_DEVICES } from './devices.ts';
 import { finalWords, rateWords, titleWeekHorizon, withRuleList } from './week.ts';
 import { lineupSpent, TURNED_WEEK, turnedLineup, turnedTrades, turnedWaivers } from './turn.ts';
 import {
@@ -902,8 +903,9 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		send(req, res, HTTP.ok, signedIn);
 		return;
 	}
+	// The account's paired devices (Lane 198): the member's iPhone and a browser extension.
 	if (url.pathname === '/devices') {
-		send(req, res, HTTP.ok, []);
+		send(req, res, HTTP.ok, FIXTURE_DEVICES);
 		return;
 	}
 	if (url.pathname === '/leagues/attached') {

@@ -4,7 +4,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Account } from './account-api.ts';
-import { FREE_SEASON_PLAN, draftToolsRecede, planWords } from './words.ts';
+import {
+	FREE_PLAN_WORDS,
+	FREE_SEASON_PLAN,
+	draftToolsRecede,
+	planWords,
+	whoLine
+} from './words.ts';
 
 void test('the draft tools recede in the regular season and the NFL playoffs', () => {
 	assert.equal(draftToolsRecede({ phase: 'in_season' }), true);
@@ -28,4 +34,12 @@ void test("the plan card follows the free season the catalog's flag says, and th
 		action: null
 	});
 	assert.doesNotMatch(`${notFree.title} ${notFree.line}`, /\$|price|paid|Draft Pass|Membership/i);
+});
+
+void test("the line under the account's name says its email and the day it joined, on the site's clock (Lane 198)", () => {
+	assert.equal(
+		whoLine({ email: 'm@example.invalid', created_at: '2026-09-01T03:00:00Z' }),
+		'm@example.invalid, with us since Aug 31'
+	);
+	assert.deepEqual(FREE_SEASON_PLAN, { ...FREE_PLAN_WORDS, action: null });
 });

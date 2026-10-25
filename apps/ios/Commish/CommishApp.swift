@@ -1,3 +1,4 @@
+import Account
 import CommishAPI
 import CommishCore
 import CommishDesign
@@ -49,7 +50,6 @@ struct CommishApp: App {
                 environment: environment,
                 session: session,
                 linked: $linked,
-                signOut: { Task { await session.signOut() } },
                 expired: { Task { await session.expire() } }
             )
         }

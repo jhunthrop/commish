@@ -14,6 +14,8 @@ A test that draws a screen at a clock passes the same instant as its injected cl
 | `mock-2026-ppr.json` | none | none | the mock's 2026 PPR data, every export of `web/src/fixtures/mock-2026-ppr.ts` by name |
 | `inseason/leagues-attached.json` | `GET /leagues/attached` | 2026-10-17T17:00:00.000Z | the account's leagues, the FFPC league among the fixture's stand-ins |
 | `inseason/leagues-attached-6f1d1c52-2626-4a26-9a26-000000000026.json` | `GET /leagues/attached/6f1d1c52-2626-4a26-9a26-000000000026/sync` | 2026-10-17T17:00:00.000Z | the FFPC league: teams, standings, moves, terms, the member's matchup |
+| `inseason/me.json` | `GET /me` | 2026-10-17T17:00:00.000Z | the account (the Account screen's name, email and plan, and the switch's leagues) |
+| `inseason/devices.json` | `GET /devices` | 2026-10-17T17:00:00.000Z | the account's paired devices: the member's iPhone and a browser extension never used |
 | `inseason/games-week.json` | `GET /games/week` | 2026-10-17T17:00:00.000Z | the week's NFL games with their facts, as the platform games are drawn from |
 | `inseason/boards-ppr.json` | `GET /boards/ppr` | 2026-10-17T17:00:00.000Z | the PPR draft board as a dev API answered it (record-boards.ts), the Board screen |
 | `inseason/scoreboard-6f1d1c52-2626-4a26-9a26-000000000026-2026-10-17T17-00-00Z.json` | `GET /leagues/attached/6f1d1c52-2626-4a26-9a26-000000000026/scoreboard` | 2026-10-17T17:00:00.000Z | the week's scoreboard, Saturday noon Central, every Sunday game to come |

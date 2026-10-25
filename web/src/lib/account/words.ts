@@ -87,12 +87,29 @@ export function boughtMembership(account: Pick<Account, 'membership'>): boolean 
 	return account.membership?.source === 'subscription';
 }
 
-/** The plan card in the free season (Lane 150): every tool is on every account. */
-export const FREE_SEASON_PLAN: PlanWords = {
+/** The plan card's words in the free season (Lane 150): every tool is on every account. The apps'
+ * Account screens print them too (Lane 198, through shared/scripts/gen-words.ts). */
+export const FREE_PLAN_WORDS = {
 	title: 'Free this season',
-	line: 'Every tool is on your account through the 2026 season.',
-	action: null
-};
+	line: 'Every tool is on your account through the 2026 season.'
+} as const;
+
+/** The plan card in the free season. */
+export const FREE_SEASON_PLAN: PlanWords = { ...FREE_PLAN_WORDS, action: null };
+
+/** The account page's own words beside its plan and lists (Lane 198), read by the apps as well. */
+export const ACCOUNT_WORDS = {
+	plan: 'Plan',
+	signOut: 'Sign out',
+	withUsSince: 'with us since',
+	/** An action the API did not answer with its own sentence. */
+	failed: 'That did not go through. Try again.'
+} as const;
+
+/** The line under the account's name: "m@example.com, with us since Oct 12". */
+export function whoLine(account: Pick<Account, 'email' | 'created_at'>): string {
+	return `${account.email}, ${ACCOUNT_WORDS.withUsSince} ${dayLabel(account.created_at)}`;
+}
 
 /** The plan card's way to the free page, in the free season. */
 export const FREE_SEE = "See what's free";

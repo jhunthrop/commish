@@ -2,14 +2,21 @@ import CommishCore
 import CommishDesign
 import SwiftUI
 
-/// Signed out: the mark, what Commish is, and the one verb.
-struct SignInView: View {
+/// Signed out: the mark, what Commish is, and the one verb. Where sign out returns the phone (Lane
+/// 198 moved it beside the Account screen so its snapshot is the signed-out return's mock).
+public struct SignInView: View {
     @Environment(\.colorScheme) private var colorScheme
     let working: Bool
     let problem: String?
     let signIn: () -> Void
 
-    var body: some View {
+    public init(working: Bool, problem: String?, signIn: @escaping () -> Void) {
+        self.working = working
+        self.problem = problem
+        self.signIn = signIn
+    }
+
+    public var body: some View {
         let theme = Theme(colorScheme)
         VStack(alignment: .leading, spacing: Tokens.Space.s4) {
             Spacer()

@@ -146,7 +146,15 @@ void test("the tables: the League home's, the box score's, then the shell's and 
 			'RecordBox',
 			'RecordOrder',
 			'Records',
-			'Pair'
+			'Pair',
+			'Account',
+			'FreePlan',
+			'Attached',
+			'Devices',
+			'Push',
+			'AccountFoot',
+			'Support',
+			'FreeSeason'
 		]
 	);
 	assert.equal(new Set(TABLES.map((t) => t.json)).size, TABLES.length);
@@ -157,6 +165,16 @@ void test("the web's own words land in the JSON, the Swift and the Kotlin", asyn
 	const json = (path: string): Record<string, unknown> =>
 		JSON.parse(outputs.get(path) ?? '{}') as Record<string, unknown>;
 	assert.equal(json('shared/words/league-box.json').totals, 'Team');
+	assert.equal(json('shared/words/account-attached.json').detach, 'Detach');
+	assert.deepEqual(json('shared/words/account-devices.json').functions, []);
+	assert.equal(json('shared/words/account-free-plan.json').see, "See what's free");
+	assert.equal(json('shared/words/account-support.json').email, 'help@trycommish.app');
+	assert.equal(json('shared/words/account-free-season.json').ends, '2027-03-01T00:00:00Z');
+	assert.equal(
+		json('shared/words/shell-league-switch.json').followAnother,
+		'Follow another league'
+	);
+	assert.equal(json('shared/words/account-attached.json').followFirst, undefined);
 	assert.equal(json('shared/words/league-platform.json').mfl, 'MyFantasyLeague');
 	assert.equal(json('shared/words/league-move-kind.json').drop, 'Drop');
 	assert.equal(json('shared/words/league-basis.json').paceClauseShort, 'in-play players at pace');

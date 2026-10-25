@@ -1,3 +1,4 @@
+import CommishDesign
 import Foundation
 
 /// The app's own words: what the web has no table for because the web has no such screen part (the
@@ -26,7 +27,7 @@ public enum AppWords {
     public static let unknownPlatform = "your platform"
 
     /// web/src/lib/league/LeaguePage.svelte stampOf: a read whose latest try failed.
-    public static let lastRead = "Last read"
+    public static let lastRead = Words.Attached.lastRead
 
     /// "Last read Sun 3:05 pm": the stamp a screen shows over a saved read.
     public static func lastRead(_ stamp: Date, zone: TimeZone) -> String {
@@ -43,7 +44,6 @@ public enum AppWords {
         public static let lead = "Your leagues on ESPN, Sleeper, Yahoo, MyFantasyLeague and FFPC, in one place."
         public static let verb = "Sign in"
         public static let working = "Signing in"
-        public static let signOut = "Sign out"
     }
 
     /// Said in place of a screen when nothing can be shown: the API's own sentence where it sent one,
