@@ -12,6 +12,7 @@ import app.trycommish.core.board.RunFixture
 import app.trycommish.core.board.RunRead
 import app.trycommish.core.board.RunReads
 import app.trycommish.core.board.StubRunReads
+import app.trycommish.core.player.PlayerPageReads
 import app.trycommish.core.player.SavedReason
 import app.trycommish.core.player.StubPages
 import app.trycommish.core.player.fixtureLeague
@@ -180,11 +181,9 @@ class ReferenceViewModelTest {
             assertEquals("half-ppr-12", model.formats.single { it.pressed }.value)
             val before = run.inner.answered.size
             vm.load().join()
-            assertTrue(
-                run.inner.answered
-                    .drop(before)
-                    .all { it == 304 },
-            )
+            val again = run.inner.answered.drop(before)
+            assertTrue(again.isNotEmpty(), "the reread read something")
+            assertTrue(again.all { it == 304 }, "$again")
         }
 
     @Test
@@ -286,4 +285,57 @@ class ReferenceViewModelTest {
             assertEquals("standard-12", model.format)
             assertEquals(listOf(slugs[0], slugs[1]), model.slugs)
         }
+
+    /** The page routes with one player's page answering 404 and none held for him (the iOS MissingPage). */
+    private class MissingPage(
+        private val inner: StubPages,
+        private val id: String,
+    ) : PlayerPageReads by inner {
+        override suspend fun page(
+            id: String,
+            tag: String?,
+        ): RunRead {
+            if (id == this.id) throw ApiFailure(NOT_FOUND, "not_found", "The run has no page for this player.")
+            return inner.page(id, tag)
+        }
+    }
+
+    @Test
+    fun `a page the run cannot give shows the absent words too`() =
+        runTest {
+            // The index names him, but his page is gone and the run held none: the route answers 404.
+            val pages = MissingPage(StubPages(RunFixture.Contract), "4429795")
+            val reads = ReferenceReads(StubRunReads(RunFixture.Contract), pages, MemoryCache(), FixedClock(RunFixture.inSeason))
+            val vm = CompareReader.viewModel(listOf("jahmyr-gibbs", "josh-allen"), null, reads, zone, SessionEnd {})
+            vm.load().join()
+            val model = loadedModel(vm)
+            assertEquals(CompareSlot.Missing, model.slots[0])
+            assertInstanceOf(CompareSlot.Picked::class.java, model.slots[1])
+            assertEquals(CompareOutcome.None, model.outcome)
+        }
+
+    @Test
+    fun `picking and clearing a side rebuilds the table`() =
+        runTest {
+            val vm = CompareReader.viewModel(listOf(null, null), null, reads(StubRunReads(RunFixture.Contract)), zone, SessionEnd {})
+            vm.load().join()
+            val empty = loadedModel(vm)
+            assertEquals(CompareModel.firstStep(0), empty.lead)
+            assertEquals(listOf("Josh Allen"), empty.search("all").map { it.name })
+            assertEquals(listOf("Josh Allen", "Josh Jacobs"), empty.search("JOSH").map { it.name })
+            vm.choose(0, "josh-allen")?.join()
+            vm.choose(1, "josh-jacobs")?.join()
+            val both = loadedModel(vm)
+            assertNull(both.lead)
+            val table = assertInstanceOf(CompareOutcome.Table::class.java, both.outcome).table
+            assertEquals(listOf("Josh Allen", "Josh Jacobs"), table.heads.map { it.name })
+            vm.choose(0, null)?.join()
+            assertEquals(CompareSlot.Open, loadedModel(vm).slots[0])
+            vm.choose(0, "josh-jacobs")?.join()
+            assertInstanceOf(CompareOutcome.Same::class.java, loadedModel(vm).outcome)
+        }
+
+    private companion object {
+        const val NOT_FOUND = 404
+    }
 }

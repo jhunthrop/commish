@@ -65,6 +65,9 @@ private object Widths {
 }
 
 private val GAP = 6.dp
+
+/** The meta line's spacing where it holds one line (ADP's), as iOS draws it on the SE. */
+private val META_GAP = 4.dp
 private val ROW_HEIGHT = 52.dp
 private val HEAD_HEIGHT = 34.dp
 private val SECTION_HEAD_HEIGHT = 32.dp
@@ -167,18 +170,29 @@ fun RowWho(
     row: BoardRow,
     club: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
+    /** The meta line may wrap: the Board's guard for a large font scale. ADP keeps it to one line, its
+     * figure columns narrowed on a small phone instead. */
+    wraps: Boolean = true,
 ) {
     val c = CommishTheme.colors
     Column(modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(row.name, style = Faces.body.copy(fontWeight = FontWeight.SemiBold), color = c.ink, maxLines = 2)
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(GAP),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            val middle = Modifier.align(Alignment.CenterVertically)
-            PositionPill(row.pill, middle)
-            ClubChip(row.club, club, middle)
-            row.bye?.let { SmallCaps(it, middle) }
+        if (wraps) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(GAP),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                val middle = Modifier.align(Alignment.CenterVertically)
+                PositionPill(row.pill, middle)
+                ClubChip(row.club, club, middle)
+                row.bye?.let { SmallCaps(it, middle) }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(META_GAP), verticalAlignment = Alignment.CenterVertically) {
+                PositionPill(row.pill)
+                ClubChip(row.club, club)
+                row.bye?.let { SmallCaps(it) }
+            }
         }
         row.status?.let { Pill(it.mark, if (it.sits) PillTone.Loss else PillTone.Plain) }
     }
@@ -226,7 +240,7 @@ private fun Figures(
             Figure(row.projected, Widths.projected, c.ink, Faces.figure)
             // The round's tint, reaching a gap's width past the cell's left edge (Row.svelte .heat-*).
             val tile = roundTint(row.heat)
-            Figure(row.overReplacement, Widths.overReplacement, c.ink2, modifier = tile?.let { Modifier.tintTile(it) } ?: Modifier)
+            Figure(row.overReplacement, Widths.overReplacement, c.ink2, modifier = tile?.let { Modifier.tintTile(it, GAP) } ?: Modifier)
             if (columns.gap) Figure(row.gap, Widths.gap, gapInk(row.gapTone))
         }
         BoardColumns.DraftOrder -> {
@@ -249,9 +263,12 @@ private fun Figure(
 }
 
 /** The tint's tile behind a figure: the row's tint height, from a gap left of the cell to its end. */
-fun Modifier.tintTile(color: Color): Modifier =
+fun Modifier.tintTile(
+    color: Color,
+    reach: Dp,
+): Modifier =
     drawBehind {
-        val reach = GAP.toPx()
+        val reach = reach.toPx()
         val height = TINT_HEIGHT.toPx()
         drawRoundRect(
             color = color,

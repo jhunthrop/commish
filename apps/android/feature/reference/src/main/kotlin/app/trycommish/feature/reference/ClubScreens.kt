@@ -242,7 +242,8 @@ fun ClubScreen(
                 Text(nobody, style = Faces.small, color = c.ink3, modifier = Modifier.padding(Tokens.Space.s3.dp))
             } else {
                 BoardHeadRow(model.columns)
-                model.rows.forEach { BoardRowView(it, model.columns, club = actions::club, open = actions.open) }
+                // No club chip link here: the page is that club's own (review L2).
+                model.rows.forEach { BoardRowView(it, model.columns, open = actions.open) }
             }
         }
         if (model.market.isNotEmpty()) {

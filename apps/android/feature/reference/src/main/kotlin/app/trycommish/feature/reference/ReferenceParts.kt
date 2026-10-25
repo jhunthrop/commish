@@ -104,7 +104,7 @@ fun RowFigure(
     align: TextAlign = TextAlign.End,
 ) {
     val color = if (text == Words.Box.none) CommishTheme.colors.ink3 else ink
-    Text(text, style = style, color = color, maxLines = 1, textAlign = align, modifier = modifier)
+    FitText(text, style, color, modifier, textAlign = align)
 }
 
 /** The basis, said once at the foot. */
