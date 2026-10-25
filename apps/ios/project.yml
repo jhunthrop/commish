@@ -41,6 +41,8 @@ packages:
     path: Packages/Features/Matchup
   Board:
     path: Packages/Features/Board
+  Trades:
+    path: Packages/Features/Trades
 targets:
   Commish:
     type: application
@@ -57,6 +59,7 @@ targets:
       - package: BoxScore
       - package: Matchup
       - package: Board
+      - package: Trades
     entitlements:
       path: Commish/Commish.entitlements
       properties:
