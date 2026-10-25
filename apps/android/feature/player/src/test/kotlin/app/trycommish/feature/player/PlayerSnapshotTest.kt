@@ -292,13 +292,15 @@ private fun SheetMock(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(Modifier.padding(top = Tokens.Space.s3.dp).size(HANDLE_WIDTH.dp, 4.dp).background(c.lineStrong, RoundedCornerShape(2.dp)))
-            Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
-                PlayerSheetFrame(playerSheetModel(player), {}, {}, Modifier.wrapContentHeight(Alignment.Top, unbounded = true)) {
-                    PlayerSheetState(state, stamp)
-                }
-            }
-            SheetVerb.of(scene.offer, gameOf(state))?.let { verb ->
-                Box(Modifier.padding(horizontal = Tokens.Space.s4.dp).padding(bottom = Tokens.Space.s3.dp)) { SheetVerbView(verb) {} }
+            // The app's own frame at the sheet's visible height: the body scrolls, the verb pinned at its foot.
+            PlayerSheetFrame(
+                playerSheetModel(player),
+                {},
+                {},
+                Modifier.weight(1f).padding(bottom = Tokens.Space.s3.dp),
+                foot = { SheetVerb.of(scene.offer, gameOf(state))?.let { SheetVerbView(it) {} } },
+            ) {
+                PlayerSheetState(state, stamp)
             }
         }
     }
