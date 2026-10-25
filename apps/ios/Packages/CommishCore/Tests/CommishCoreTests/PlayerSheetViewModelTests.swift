@@ -38,7 +38,7 @@ struct PlayerSheetViewModelTests {
         )
     }
 
-    private func card(_ viewModel: PlayerSheetViewModel) -> (PlayerCard, Freshness)? {
+    private func loaded(_ viewModel: PlayerSheetViewModel) -> (PlayerCard, Freshness)? {
         guard case let .loaded(card, freshness) = viewModel.state else {
             Issue.record("Expected his card, got \(viewModel.state)")
             return nil
@@ -49,7 +49,7 @@ struct PlayerSheetViewModelTests {
     @Test func aWrittenReadStandsFromKickoffAndHisPtsTakeTheWeeksPlace() async throws {
         let viewModel = model(Self.odunze, clock: Fixtures.sunday)
         await viewModel.load()
-        let (card, freshness) = try #require(card(viewModel))
+        let (card, freshness) = try #require(loaded(viewModel))
         guard case let .shown(.written(body, caption)) = card.read else {
             Issue.record("a written read, got \(String(describing: card.read))")
             return
@@ -66,7 +66,7 @@ struct PlayerSheetViewModelTests {
     @Test func beforeKickoffHisStatusAndHisGameSay() async throws {
         let viewModel = model(Self.odunze, clock: Fixtures.week)
         await viewModel.load()
-        let (card, _) = try #require(card(viewModel))
+        let (card, _) = try #require(loaded(viewModel))
         #expect(card.status?.mark == "Questionable")
         #expect(card.cell?.when == "Sun 12:00 pm CT")
         #expect(card.tiles.map(\.value) == ["11.0", "199.2", "12th", "9.3", "5.0", "\u{2212}1.4"])
@@ -76,7 +76,7 @@ struct PlayerSheetViewModelTests {
     @Test func aReadWrittenBeforeHeWasDueBackIsHeldForHisStatus() async throws {
         let viewModel = model(Self.etienne, clock: Fixtures.week)
         await viewModel.load()
-        let (card, _) = try #require(card(viewModel))
+        let (card, _) = try #require(loaded(viewModel))
         #expect(card.read == .shown(.withheld(
             "His status changed since this read was written. A new read is due by Sat Oct 17, 1:00 pm CT."
         )))
@@ -85,7 +85,7 @@ struct PlayerSheetViewModelTests {
     @Test func withNoReadWrittenThePlaceSaysSoAndAListedPlayersWeekIsHisList() async throws {
         let viewModel = model(Self.dart, clock: Fixtures.week)
         await viewModel.load()
-        let (card, _) = try #require(card(viewModel))
+        let (card, _) = try #require(loaded(viewModel))
         #expect(card.read == .none("Our read for his next game is not written yet."))
         #expect(card.status?.rank == "IR")
         #expect(card.tiles.filter { [.proj, .opp, .delta].contains($0.key) }.allSatisfy { $0.value == "--" })
@@ -94,12 +94,12 @@ struct PlayerSheetViewModelTests {
     @Test func withNoLeagueOrWhenTheLeaguesCannotAnswerThePublicWeekStands() async throws {
         let none = model(Self.odunze, clock: Fixtures.week, league: nil)
         await none.load()
-        let (alone, _) = try #require(card(none))
+        let (alone, _) = try #require(loaded(none))
         #expect(alone.basis.first?.contains("in PPR") == true, "the public week's scoring")
         let refused = FixtureWeeks(clock: Fixtures.week, leagueFails: true)
         let stood = model(Self.odunze, clock: Fixtures.week, weeks: refused)
         await stood.load()
-        let (card, _) = try #require(card(stood))
+        let (card, _) = try #require(loaded(stood))
         #expect(card.basis.first?.contains("in PPR") == true)
         #expect(await refused.asked == ["league", "public"])
     }
@@ -122,7 +122,7 @@ struct PlayerSheetViewModelTests {
             await run.asked.dropFirst(runRead).allSatisfy { $0.tag != nil },
             "the manifest and the capture by theirs"
         )
-        let (card, freshness) = try #require(card(again))
+        let (card, freshness) = try #require(loaded(again))
         #expect(card.tiles.first?.label == "Pts", "the copy kept, his week read again")
         #expect(freshness.stamp == Fixtures.instant(Fixtures.sunday), "a 304 refreshes the stamp")
     }
@@ -136,7 +136,7 @@ struct PlayerSheetViewModelTests {
             cache: cache
         )
         await offline.load()
-        let (card, freshness) = try #require(card(offline))
+        let (card, freshness) = try #require(loaded(offline))
         #expect(freshness.saved == .offline)
         #expect(freshness.stamp == Fixtures.instant(Fixtures.week))
         #expect(offline.stampWords == "Last read Sat 12:00 pm")

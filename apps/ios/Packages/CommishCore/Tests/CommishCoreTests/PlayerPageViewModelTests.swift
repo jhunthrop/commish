@@ -27,7 +27,7 @@ struct PlayerPageViewModelTests {
         )
     }
 
-    private func page(_ viewModel: PlayerPageViewModel) -> (PlayerPageModel, Freshness)? {
+    private func loaded(_ viewModel: PlayerPageViewModel) -> (PlayerPageModel, Freshness)? {
         guard case let .loaded(page, freshness) = viewModel.state else {
             Issue.record("Expected his page, got \(viewModel.state)")
             return nil
@@ -38,7 +38,7 @@ struct PlayerPageViewModelTests {
     @Test func beforeTheSeasonThePageIsHisCapsuleHisADPAndHisRange() async throws {
         let viewModel = model("rome-odunze")
         await viewModel.load()
-        let (page, freshness) = try #require(page(viewModel))
+        let (page, freshness) = try #require(loaded(viewModel))
         #expect(page.hero.name == "Rome Odunze")
         #expect(page.hero.club == "Chicago Bears")
         #expect(page.hero.pill == "WR 25")
@@ -61,7 +61,7 @@ struct PlayerPageViewModelTests {
     @Test func inSeasonTheWeeksReadStandsInTheCapsulesPlace() async throws {
         let viewModel = model("jahmyr-gibbs", pages: StubPages(.contract), run: StubRun(.contract))
         await viewModel.load()
-        let (page, _) = try #require(page(viewModel))
+        let (page, _) = try #require(loaded(viewModel))
         #expect(page.caption == "PPR points for the rest of 2026 through week 17, our rank 1")
         #expect(page.drafters.label == "ADP")
         #expect(page.read == .weekNone("Our read for his next game is not written yet."))
@@ -73,7 +73,7 @@ struct PlayerPageViewModelTests {
         let pages = StubPages(.standIn, held: ["4431299": .standIn])
         let viewModel = model("rome-odunze", pages: pages)
         await viewModel.load()
-        let (page, _) = try #require(page(viewModel))
+        let (page, _) = try #require(loaded(viewModel))
         #expect(page.hero.name == "Rome Odunze")
         #expect(page.stamp == "Updated Sep 1", "the copy's own run, not the stand-in's")
         #expect(page.heldBasis == nil)
@@ -83,7 +83,7 @@ struct PlayerPageViewModelTests {
         let pages = StubPages(.standIn, held: ["4431299": nil])
         let viewModel = model("rome-odunze", pages: pages)
         await viewModel.load()
-        let (page, _) = try #require(page(viewModel))
+        let (page, _) = try #require(loaded(viewModel))
         #expect(page.heldBasis == Words.HeldPage.basis)
         #expect(page.read == nil, "the held words say once that our read is not written")
         #expect(page.figure == "199.2", "the board's figure")
@@ -111,7 +111,7 @@ struct PlayerPageViewModelTests {
             cache: cache
         )
         await offline.load()
-        let (page, freshness) = try #require(page(offline))
+        let (page, freshness) = try #require(loaded(offline))
         #expect(freshness.saved == .offline)
         #expect(offline.stampWords == "Last read Sat 12:00 pm")
         #expect(page.hero.name == "Rome Odunze")
