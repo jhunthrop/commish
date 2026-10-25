@@ -16,6 +16,15 @@ export const POSITION_NAMES: Readonly<Record<Position, GroupName>> = {
 	DST: { one: 'defense', many: 'defenses' }
 };
 
+/** POSITION_NAMES flat, as the apps' word tables carry it (shared/scripts/gen-words.ts, Lane 190): "WROne"
+ * is "WR", "WRMany" is "WRs", what a tier band's count counts. */
+export const GROUP_WORDS: Readonly<Record<string, string>> = Object.fromEntries(
+	Object.entries(POSITION_NAMES).flatMap(([position, name]) => [
+		[`${position}One`, name.one],
+		[`${position}Many`, name.many]
+	])
+);
+
 /** The URL segment of a position view: /board/ppr-12/wr. */
 export function positionSegment(position: Position): string {
 	return position.toLowerCase();

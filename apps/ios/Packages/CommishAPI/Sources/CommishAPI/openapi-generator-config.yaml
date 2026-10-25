@@ -19,5 +19,9 @@ filter:
     - planHostMove
     - makeHostMove
     - leagueMatchup
-    - roomBoard
+    - runManifest
+    - runBoard
+    - runAdp
+    - runDesignations
+    - runClubs
     - leagueWaivers

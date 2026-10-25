@@ -1,0 +1,1 @@
+{"runId":"2026-10-12T00-standin","runAt":"2026-09-01T12:00:00.000Z","season":2026,"implementation":"TypeScript core","standIn":true,"formats":[{"id":"ppr-12","label":"PPR","unit":"PPR pts","teams":12,"basis":["PPR, full 2026 season","ranked by points over replacement","tiers drawn within each position"]}],"players":400}

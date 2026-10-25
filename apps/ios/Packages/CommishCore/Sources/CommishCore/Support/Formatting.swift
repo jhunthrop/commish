@@ -91,6 +91,11 @@ public enum Formatting {
         format(date, "MMM d", zone: zone)
     }
 
+    /// "October 21": a day with its month in words, as the web's monthDayLabel.
+    public static func monthDay(_ date: Date, zone: TimeZone) -> String {
+        format(date, "MMMM d", zone: zone)
+    }
+
     /// Whether two instants fall on the same calendar day on the member's clock (the web's sameDay).
     public static func sameDay(_ lhs: Date, _ rhs: Date, zone: TimeZone) -> Bool {
         var calendar = Calendar(identifier: .gregorian)

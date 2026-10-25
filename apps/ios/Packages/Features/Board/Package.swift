@@ -1,8 +1,8 @@
 // swift-tools-version: 6.0
-// The Board screen (the web's board at /board/[format]/[position]): the format and position chips,
-// the rows as a box score in our order, each player's number the API's own, the season-long players
-// under their head, the basis once, and the one verb pinned above the bar. Its snapshots, both themes
-// at two phone sizes, are the screen's mock.
+// The Board screen (the web's board at /board/[format]/[position], drawn from the run): the chips,
+// the rows as a box score in our order, each player's number the run's own, a position's tiers with
+// their cliffs, the season-long players under their head, the basis once, and the one verb pinned
+// above the bar. Its snapshots, both themes at two phone sizes, are the screen's mock.
 import PackageDescription
 
 let package = Package(
@@ -28,6 +28,7 @@ let package = Package(
             dependencies: [
                 "Board",
                 .product(name: "CommishAPI", package: "CommishAPI"),
+                .product(name: "RunFixtures", package: "CommishAPI"),
                 .product(name: "CommishSnapshotSupport", package: "CommishDesign"),
             ],
             exclude: ["__Snapshots__"]

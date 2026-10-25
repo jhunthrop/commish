@@ -4,46 +4,53 @@ import CommishCore
 import CommishDesign
 import CommishSnapshotSupport
 import Foundation
+import RunFixtures
 import SwiftUI
 import Testing
 
-/// The Board's mock: the API's PPR board (shared/fixtures/inseason/boards-ppr.json) through the view
-/// model at the fixture's Saturday clock, both themes, iPhone 17 Pro and iPhone SE, at 1x. The phone's
-/// first screen with the verb pinned: the PPR board at the top, a position view (WR), a kicker's view
-/// in the drafts' order, the board in season as Rest of season with its verb to follow a league, and a
-/// saved read with no signal, dated; mid-list, a position's last available players and the season-long
-/// run under its head; and the foot, the last rows with the basis under them, the All view's and a
-/// kicker's. A face draws its initials here (a snapshot loads no image). With SNAPSHOT_SHOTS set each is also written
-/// at its phone's own
-/// scale for the persona panel.
+/// The Board's mock: the run through the view model at each run's clock, both themes, iPhone 17 Pro and
+/// iPhone SE, at 1x. Before the draft, the stand-in's PPR board (shared/fixtures/standin-run): the top of
+/// the All view, a position's view (WR) at its first tier and its cliff, a tier's cliff mid-list, a
+/// kicker's view in the drafts' order, and the WR view's foot with the complete basis under its last
+/// rows. In season, the contract run (shared/fixtures/run): the rest of the season's head with its
+/// weeks and the verb to follow a league, and the same board saved and read with no signal, stale with
+/// its reason. A face draws its initials here (a snapshot loads no image). With SNAPSHOT_SHOTS set each
+/// is also written at its phone's own scale for the persona panel.
 @MainActor
 struct BoardSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         .appendingPathComponent("__Snapshots__")
-    static let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-        .appendingPathComponent("../../../../../../../shared/fixtures/inseason/boards-ppr.json").standardized
     static let zone = TimeZone(identifier: "America/Chicago")!
-    static let saturday = APIDecoding.parseDate("2026-10-17T17:00:00Z")!
+    static let preDraft = APIDecoding.parseDate("2026-09-01T17:00:00Z")!
+    static let inSeason = APIDecoding.parseDate("2026-10-22T17:00:00Z")!
 
     enum Scene: String, CaseIterable, Sendable {
         case top
         case position
+        /// A tier's cliff mid-list: the last rows of one tier, the next tier's band and its first rows.
+        case cliff
         case kicker
-        case rest
-        case stale
-        case held
-        /// The foot: the All view's last rows and the basis under them.
+        /// The foot: the WR view's last rows and the basis under them.
         case foot
-        /// A kicker's view's foot with its own basis.
-        case kickerFoot = "kicker-foot"
+        /// In season: the rest of the season's head.
+        case rest
+        /// In season, saved and read with no signal.
+        case stale
 
         var position: BoardPosition? {
             switch self {
-            case .position: .receiver
-            case .kicker, .kickerFoot: .kicker
-            case .held: .runningBack
+            case .position, .cliff, .foot: .receiver
+            case .kicker: .kicker
             default: nil
             }
+        }
+
+        var inSeason: Bool {
+            self == .rest || self == .stale
+        }
+
+        var fixture: RunFixture {
+            inSeason ? .contract : .standIn
         }
     }
 
@@ -59,22 +66,23 @@ struct BoardSnapshotTests {
         }
     }
 
-    static func board() throws -> RoomBoard {
-        try APIDecoding.envelopeData(RoomBoard.self, from: Data(contentsOf: fixture))
-    }
-
-    /// The view model at the scene's state, through the stub: read fresh, or saved with no signal.
+    /// The view model at the scene's state: read fresh through the run's routes, or saved and then read
+    /// with no signal.
     static func viewModel(_ scene: Scene) async throws -> BoardViewModel {
-        let board = try board()
+        let now = scene.inSeason ? inSeason : preDraft
         let cache = FileCache(folder: FileManager.default.temporaryDirectory
             .appendingPathComponent("board-snapshots-\(UUID().uuidString)"))
         if scene == .stale {
-            await cache.write(board, route: BoardViewModel.route(.ppr), stamp: saturday)
+            let saved = BoardViewModel(
+                api: StubRun(scene.fixture), cache: cache, clock: FixedClock(now), inSeason: true,
+                following: false, zone: zone
+            )
+            await saved.load()
         }
         let viewModel = BoardViewModel(
-            api: StubBoard(board: scene == .stale ? nil : board), cache: cache,
-            clock: FixedClock(saturday.addingTimeInterval(scene == .stale ? 1800 : 0)),
-            inSeason: scene == .rest, following: false, zone: zone
+            api: StubRun(scene.fixture, offline: scene == .stale), cache: cache,
+            clock: FixedClock(now.addingTimeInterval(scene == .stale ? 1800 : 0)),
+            inSeason: scene.inSeason, following: false, zone: zone
         )
         await viewModel.load()
         viewModel.choose(position: scene.position)
@@ -103,6 +111,21 @@ struct BoardSnapshotTests {
         #expect(Snapshot.oversized(in: Self.folder).isEmpty, "\(Snapshot.oversized(in: Self.folder))")
     }
 
+    @Test func theCliffSceneShowsADropBetweenTwoTiers() async throws {
+        let viewModel = try await Self.viewModel(.cliff)
+        guard case let .loaded(model, _, _) = viewModel.state else {
+            throw SceneError.notLoaded("cliff")
+        }
+        let shown = BoardMock.aroundCliff(model.sections)
+        #expect(shown.count == 2)
+        #expect(shown.first?.band?.drop != nil, "the tier above says its drop")
+    }
+
+    @Test func theStaleSceneSaysWhyItsBoardShows() async throws {
+        let viewModel = try await Self.viewModel(.stale)
+        #expect(viewModel.stampWords == "You're offline, so this is the last board this device saved, updated Oct 21.")
+    }
+
     enum SceneError: Error {
         case notLoaded(String)
     }
@@ -110,7 +133,7 @@ struct BoardSnapshotTests {
 
 /// The screen as the mock draws it. The phone's first screen is the room between the top bar and the
 /// tab bar (the app draws both natively), the board's top with the verb pinned over its foot; mid-list
-/// is the table alone around the season-long head.
+/// is the table alone around a tier's cliff; the foot the last rows over the basis.
 struct BoardMock: View {
     let model: BoardModel
     let stamp: String?
@@ -119,8 +142,8 @@ struct BoardMock: View {
 
     /// Rows enough to fill the first screen of the tallest phone.
     static let firstRows = 12
-    /// The available players drawn above the season-long head, and those on the list under it.
-    static let aroundHead = 4
+    /// The rows drawn on each side of a tier's cliff, and above the basis.
+    static let around = 4
 
     /// The status bar, the top bar and the tab bar the screen sits between, by phone.
     private var room: Double {
@@ -128,16 +151,19 @@ struct BoardMock: View {
     }
 
     var body: some View {
-        if scene == .held {
-            BoardTableView(columns: model.columns, sections: aroundHead, open: { _ in }, live: false)
-                .padding(.vertical, Tokens.Space.s4)
-        } else if scene == .foot || scene == .kickerFoot {
+        switch scene {
+        case .cliff:
+            BoardTableView(
+                columns: model.columns, sections: Self.aroundCliff(model.sections), open: { _ in }, live: false
+            )
+            .padding(.vertical, Tokens.Space.s4)
+        case .foot:
             VStack(alignment: .leading, spacing: Tokens.Space.s4) {
                 BoardTableView(columns: model.columns, sections: lastRows, open: { _ in }, live: false)
                 BoardBasisView(lines: model.basis)
             }
             .padding(.vertical, Tokens.Space.s4)
-        } else {
+        default:
             VStack(spacing: 0) {
                 BoardScreen(model: model, stamp: stamp, actions: .none, sections: firstScreen, live: false)
                     .fixedSize(horizontal: false, vertical: true)
@@ -156,34 +182,39 @@ struct BoardMock: View {
         model.words.verb == nil ? 0 : 64
     }
 
+    /// The sections the first screen reaches, their rows up to the tallest phone's first screen.
     private var firstScreen: [BoardSection] {
-        model.sections.prefix(1).map { $0.with(rows: Array($0.rows.prefix(Self.firstRows))) }
+        var left = Self.firstRows
+        return model.sections.compactMap { section in
+            guard left > 0 else {
+                return nil
+            }
+            let kept = Array(section.rows.prefix(left))
+            left -= kept.count
+            return section.with(rows: kept)
+        }
     }
 
     /// The last rows of the view, above its basis.
     private var lastRows: [BoardSection] {
-        model.sections.suffix(1).map { $0.with(rows: Array($0.rows.suffix(Self.aroundHead))) }
+        model.sections.suffix(1).map { $0.with(rows: Array($0.rows.suffix(Self.around))) }
     }
 
-    private var aroundHead: [BoardSection] {
-        guard let available = model.sections.first, let held = model.sections.dropFirst().first else {
+    /// The first tier from the fourth on whose band says its drop: its band and last rows, then the next
+    /// tier's band and its first rows.
+    static func aroundCliff(_ sections: [BoardSection]) -> [BoardSection] {
+        let banded = sections.filter { $0.band != nil }
+        let firstMidList = 3
+        guard let index = banded.indices.dropFirst(firstMidList).first(where: {
+            banded[$0].band?.drop != nil && banded.indices.contains($0 + 1)
+        }) else {
             return []
         }
+        let above = banded[index]
+        let below = banded[index + 1]
         return [
-            available.with(rows: Array(available.rows.suffix(Self.aroundHead))),
-            held.with(rows: Array(held.rows.prefix(Self.aroundHead))),
+            above.with(rows: Array(above.rows.suffix(around))),
+            below.with(rows: Array(below.rows.prefix(around))),
         ]
-    }
-}
-
-/// The board route as the fixture answers it, or no signal.
-struct StubBoard: BoardAPI {
-    let board: RoomBoard?
-
-    func board(format _: BoardFormat) async throws -> RoomBoard {
-        guard let board else {
-            throw URLError(.notConnectedToInternet)
-        }
-        return board
     }
 }

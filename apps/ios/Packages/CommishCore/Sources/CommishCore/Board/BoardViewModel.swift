@@ -2,45 +2,76 @@ import CommishAPI
 import Foundation
 import Observation
 
-/// The Board screen's view model (the League home's pattern): the API, the cache and the clock
-/// injected; each format's saved board at once, dated, then the API's (the board is read in the
-/// stadium, with no signal); the chips' choice held here, so the sheet opened from a row and closed
-/// again, or a pull that reads the board again, leaves them as they were. The view decides nothing.
+/// What the Board's chips have chosen: the run's format and the view. Held by the screen's view model,
+/// so a sheet opened over the board and closed again finds the same chips pressed.
+public struct BoardFilter: Equatable, Hashable, Sendable {
+    /// The format as the run's manifest names it ("ppr-12"); nil for the run's default, its first.
+    public let format: String?
+    /// nil is the All view.
+    public let position: BoardPosition?
+
+    public init(format: String? = nil, position: BoardPosition? = nil) {
+        self.format = format
+        self.position = position
+    }
+
+    public func with(format: String?) -> BoardFilter {
+        BoardFilter(format: format, position: position)
+    }
+
+    public func with(position: BoardPosition?) -> BoardFilter {
+        BoardFilter(format: format, position: position)
+    }
+}
+
+/// Why a board shown is a saved one: no connection, or the latest read failed another way.
+public enum BoardStale: Equatable, Sendable {
+    case offline
+    case failed
+}
+
+/// The Board screen's view model (the League home's pattern): the run's routes, the cache and the
+/// clock injected; each format's saved read at once, dated, then the run read again naming the ETags
+/// kept, so an unchanged run costs four 304s and only refreshes the read's stamp. A failed read keeps
+/// the saved board, stale with its reason. The chips' choice is held here, so the sheet opened from a
+/// row and closed again, or a pull that reads the board again, leaves them as they were. The view
+/// decides nothing.
 @MainActor
 @Observable
 public final class BoardViewModel {
     public enum State: Equatable, Sendable {
         case loading
-        /// The board, when its answer was read, and whether that read is older than this open (the
-        /// saved one, shown at once or because the latest read failed).
-        case loaded(BoardModel, stamp: Date, stale: Bool)
+        /// The board, when its read was made, and why it is a saved one, nil for this open's read.
+        case loaded(BoardModel, stamp: Date, stale: BoardStale?)
         case failed(String)
     }
 
     public private(set) var state: State = .loading
     public private(set) var filter: BoardFilter
+    /// The run's formats as last read, for the format chips over a board that could not be read.
+    public private(set) var formats: [RunFormat] = []
 
-    private let api: any BoardAPI
+    private let api: any RunAPI
     private let cache: any AnswerCache
     private let clock: any Clock
     private let zone: TimeZone
     private let inSeason: Bool
     private let following: Bool
     private let onSignedOut: @MainActor () -> Void
-    /// The answer shown and its read, so a chip redraws it without a read.
+    /// The read shown, so a position chip redraws it without a read.
     private var shown: Shown?
 
     private struct Shown {
-        let format: BoardFormat
-        let board: RoomBoard
+        let format: String?
+        let read: RunBoardRead
         let stamp: Date
-        let stale: Bool
+        let stale: BoardStale?
     }
 
     /// `inSeason` is the bar's season (the Rest of season item); `following` whether the member follows
     /// a league; `onSignedOut` runs when the API refuses the device token.
     public init(
-        api: any BoardAPI, cache: any AnswerCache, clock: any Clock, inSeason: Bool, following: Bool,
+        api: any RunAPI, cache: any AnswerCache, clock: any Clock, inSeason: Bool, following: Bool,
         filter: BoardFilter = BoardFilter(), zone: TimeZone = .current,
         onSignedOut: @escaping @MainActor () -> Void = {}
     ) {
@@ -54,35 +85,41 @@ public final class BoardViewModel {
         self.onSignedOut = onSignedOut
     }
 
-    /// The cache key of a format's board.
-    public static func route(_ format: BoardFormat) -> String {
-        "/boards/\(format.rawValue)"
+    /// The cache key of a format's read, the run's default under its own.
+    public static func route(_ format: String?) -> String {
+        format.map { "/run/boards/\($0)" } ?? "/run/boards"
     }
 
-    /// "Last read Sat 12:00 pm" while the board shown is a saved one.
+    /// Said over a saved board: "You're offline, so this is the last board this device saved, updated
+    /// Oct 21." with no connection, "Last read Sat 12:00 pm" when the read failed another way.
     public var stampWords: String? {
-        guard case let .loaded(_, stamp, true) = state else {
+        guard case let .loaded(_, stamp, stale?) = state, let read = shown?.read else {
             return nil
         }
-        return AppWords.lastRead(stamp, zone: zone)
+        switch stale {
+        case .offline: return RunWords.offline(read.manifest.value)
+        case .failed: return AppWords.lastRead(stamp, zone: zone)
+        }
     }
 
-    /// The format's saved board at once when nothing of it is shown, then the API's; a failed read
-    /// keeps the board shown, dated; a refused token signs out.
+    /// The format's saved read at once when nothing of it is shown, then the run's routes, each naming
+    /// its kept ETag; a failed read keeps the board shown, stale with its reason; a refused token signs
+    /// out.
     public func load() async {
         let format = filter.format
         let route = Self.route(format)
-        if shown == nil, let saved = await cache.read(RoomBoard.self, route: route), filter.format == format {
-            show(saved.value, stamp: saved.stamp, stale: true)
+        let saved = await cache.read(RunBoardRead.self, route: route)
+        if shown == nil, let saved, filter.format == format {
+            show(saved.value, stamp: saved.stamp, stale: .failed)
         }
         do {
-            let fresh = try await api.board(format: format)
+            let fresh = try await RunBoardReader.read(api, format: format, kept: shown?.read ?? saved?.value)
             let stamp = clock.now
             await cache.write(fresh, route: route, stamp: stamp)
             guard filter.format == format else {
                 return
             }
-            show(fresh, stamp: stamp, stale: false)
+            show(fresh, stamp: stamp, stale: nil)
         } catch where APIError.signsOut(error) {
             state = .failed(AppWords.Failure.signedOut)
             onSignedOut()
@@ -91,7 +128,7 @@ public final class BoardViewModel {
                 return
             }
             if let shown, shown.format == format {
-                show(shown.board, stamp: shown.stamp, stale: true)
+                show(shown.read, stamp: shown.stamp, stale: error is URLError ? .offline : .failed)
             } else {
                 state = .failed(LeagueHomeViewModel.sentence(for: error))
             }
@@ -99,8 +136,8 @@ public final class BoardViewModel {
     }
 
     /// A format chip: that format's board, saved or read, in the same view.
-    public func choose(format: BoardFormat) async {
-        guard format != filter.format else {
+    public func choose(format: String) async {
+        guard format != (filter.format ?? formats.first?.id) else {
             return
         }
         filter = filter.with(format: format)
@@ -113,15 +150,17 @@ public final class BoardViewModel {
     public func choose(position: BoardPosition?) {
         filter = filter.with(position: position)
         if let shown {
-            show(shown.board, stamp: shown.stamp, stale: shown.stale)
+            show(shown.read, stamp: shown.stamp, stale: shown.stale)
         }
     }
 
-    private func show(_ board: RoomBoard, stamp: Date, stale: Bool) {
-        shown = Shown(format: filter.format, board: board, stamp: stamp, stale: stale)
+    private func show(_ read: RunBoardRead, stamp: Date, stale: BoardStale?) {
+        shown = Shown(format: filter.format, read: read, stamp: stamp, stale: stale)
+        formats = read.manifest.value.formats
         state = .loaded(
             BoardModel(
-                board: board, filter: filter, inSeason: inSeason, following: following, now: clock.now, zone: zone
+                read: read, position: filter.position, inSeason: inSeason, following: following, now: clock.now,
+                zone: zone
             ),
             stamp: stamp, stale: stale
         )

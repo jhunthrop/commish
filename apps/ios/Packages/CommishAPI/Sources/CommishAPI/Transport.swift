@@ -43,6 +43,35 @@ public struct DeviceAuthMiddleware: ClientMiddleware {
     }
 }
 
+/// The If-None-Match a run route's read names, sent as the API gave the ETag. The generator writes a
+/// header's value URI-encoded (the quotes and the slash escaped), and the API compares an ETag byte for
+/// byte, so the kept ETag would never match; this middleware puts the header back as it was given.
+public struct ETagMiddleware: ClientMiddleware {
+    public static let ifNoneMatch = HTTPField.Name("If-None-Match")!
+
+    public init() {}
+
+    public func intercept(
+        _ request: HTTPRequest,
+        body: HTTPBody?,
+        baseURL: URL,
+        operationID _: String,
+        next: @Sendable (HTTPRequest, HTTPBody?, URL) async throws -> (HTTPResponse, HTTPBody?)
+    ) async throws -> (HTTPResponse, HTTPBody?) {
+        try await next(Self.asGiven(request), body, baseURL)
+    }
+
+    /// The request with its If-None-Match decoded: a copy, the caller's left as it was.
+    public static func asGiven(_ request: HTTPRequest) -> HTTPRequest {
+        guard let sent = request.headerFields[ifNoneMatch], let given = sent.removingPercentEncoding else {
+            return request
+        }
+        var decoded = request
+        decoded.headerFields[ifNoneMatch] = given
+        return decoded
+    }
+}
+
 /// The API's dates: Go writes RFC 3339 with the fraction trimmed (none on a whole second), the
 /// fixtures with milliseconds, so both read.
 public struct APIDateTranscoder: DateTranscoder {
@@ -60,14 +89,25 @@ public struct APIDateTranscoder: DateTranscoder {
     }
 }
 
-/// The generated client over URLSession with the device middleware.
+/// The generated client over URLSession with the device middleware and the ETag's.
 public enum Transport {
-    public static func client(baseURL: URL, tokens: any TokenSource, session: URLSession = .shared) -> Client {
+    /// The app's session: no URL cache. The app keeps every answer itself (AnswerCache) and a run
+    /// route's ETag with it, so a read always reaches the API and a 304 comes back as a 304; URLSession's
+    /// own cache would answer a run route from its copy for the route's max-age, and turn a 304 into
+    /// that copy's 200 after it.
+    public static let session: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration)
+    }()
+
+    public static func client(baseURL: URL, tokens: any TokenSource, session: URLSession = session) -> Client {
         Client(
             serverURL: baseURL,
             configuration: Configuration(dateTranscoder: APIDateTranscoder()),
             transport: URLSessionTransport(configuration: .init(session: session)),
-            middlewares: [DeviceAuthMiddleware(tokens: tokens)]
+            middlewares: [DeviceAuthMiddleware(tokens: tokens), ETagMiddleware()]
         )
     }
 }
