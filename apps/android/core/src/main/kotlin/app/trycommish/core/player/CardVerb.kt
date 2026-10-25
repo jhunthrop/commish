@@ -6,6 +6,7 @@ import app.trycommish.api.models.PlayerVerb
 import app.trycommish.api.models.PlayerWeek
 import app.trycommish.core.leaguehome.ValueWords
 import app.trycommish.core.shell.LINEUP_PAGE
+import app.trycommish.core.shell.TRADES_PAGE
 import app.trycommish.core.shell.WAIVERS_PAGE
 import app.trycommish.core.start.LineRead
 import app.trycommish.design.Words
@@ -32,9 +33,6 @@ data class CardVerb(
         ) : Target
     }
 }
-
-/** The bar's Trades page (Rail.generated.kt's trades item). */
-private const val TRADES_PAGE = "trades"
 
 /** The bar's page the verb opens, null for the platform's own page. */
 val CardVerb.Target.page: String?

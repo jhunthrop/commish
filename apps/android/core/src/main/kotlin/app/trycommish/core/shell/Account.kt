@@ -5,6 +5,7 @@ import app.trycommish.api.models.BoardFormat
 import app.trycommish.api.models.ContextLeague
 import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.LeaguePhase
+import app.trycommish.api.models.LeagueStanding
 import app.trycommish.api.models.ScoringPreset
 import app.trycommish.api.models.SiteSeason
 import kotlinx.serialization.Serializable
@@ -27,6 +28,10 @@ data class FollowedLeague(
     val phase: LeaguePhase,
     val draftAt: Instant?,
     val waiversOpen: Boolean,
+    /** The member's team at the last read, empty when unread (the Trades' own side). */
+    val teamName: String = "",
+    /** Where the member's team stands, null when unread. */
+    val standing: LeagueStanding? = null,
 )
 
 /**
@@ -71,6 +76,8 @@ private fun followed(league: ContextLeague): FollowedLeague =
         phase = league.phase,
         draftAt = league.draftAt?.let(::instantOrNull),
         waiversOpen = league.waiversOpen,
+        teamName = league.teamName,
+        standing = league.standing,
     )
 
 private fun instantOrNull(text: String): Instant? =
