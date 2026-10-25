@@ -1,4 +1,4 @@
-// The app: the five tabs, sign-in through a Custom Tab onto the device bearer path, the League and Lineup live,
+// The app: the five tabs, sign-in through a Custom Tab onto the device bearer path, the League, Lineup, Matchup and Waivers live,
 // the hand-built graph that wires the modules. A debug build reads the API on the host machine from the
 // emulator (10.0.2.2); a release build reads production. Release signing comes from the environment
 // (CI secrets), never from the repository.
@@ -74,6 +74,7 @@ dependencies {
     implementation(project(":feature:matchup"))
     implementation(project(":feature:shell"))
     implementation(project(":feature:start"))
+    implementation(project(":feature:waivers"))
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
