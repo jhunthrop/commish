@@ -53,10 +53,12 @@ const RECORD_MODULE = 'web/src/lib/run/record.ts';
  * (Lane 190): a tier band's words, what its count counts, the run's stamp and a past bye's word; then the
  * Waivers' (Lane 186): its table, strip and drop panel, the heads' basis, the Stash group, the season
  * figures' heads and the strip's mark; then the Trades' (Lane 189): the trade table's words, the
- * picker's first choice and the close call's chip, and the builder's lines; then the Rankings' and Our
- * record's (Lane 194): the order's table, its week's kickers and defenses, the page's purpose and name,
- * the pool's counts, and the record's words, its box's heads, the orders a week graded, the two
- * records' words and a pair's. */
+ * picker's first choice and the close call's chip, and the builder's lines; then the player sheet's
+ * and page's (Lane 192): a held page's words, the week tile's, the page's facts, the read's figures'
+ * labels and the words in place of a read not ready; then the Rankings' and Our record's (Lane 194):
+ * the order's table, its week's kickers and defenses, the page's purpose and name, the pool's counts,
+ * and the record's words, its box's heads, the orders a week graded, the two records' words and a
+ * pair's. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -312,6 +314,40 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/league/inseason/builder.ts',
 		picks: ['BUILDER_LINES'],
 		json: 'shared/words/league-builder.json'
+	},
+	{
+		name: 'HeldPage',
+		module: 'web/src/lib/player/held-words.ts',
+		picks: ['HELD_PAGE_WORDS'],
+		json: 'shared/words/player-held.json'
+	},
+	{
+		name: 'WeekTile',
+		module: 'web/src/lib/player/week-words.ts',
+		picks: ['WEEK_TILE'],
+		json: 'shared/words/player-week-tile.json'
+	},
+	{
+		name: 'PlayerPage',
+		module: 'web/src/lib/player/page-words.ts',
+		picks: ['PLAYER_PAGE'],
+		json: 'shared/words/player-page.json'
+	},
+	{
+		name: 'ReadFigures',
+		module: 'web/src/lib/run/read-figures.ts',
+		picks: [
+			['preseasonProjection', 'PRESEASON_PROJECTION'],
+			['preseasonTiers', 'PRESEASON_TIERS'],
+			['restOfSeason', 'REST_OF_SEASON']
+		],
+		json: 'shared/words/player-read-figures.json'
+	},
+	{
+		name: 'Unwritten',
+		module: 'web/src/lib/run/unwritten-words.ts',
+		picks: [['read', 'UNWRITTEN_READ']],
+		json: 'shared/words/player-unwritten.json'
 	},
 	{
 		name: 'Order',

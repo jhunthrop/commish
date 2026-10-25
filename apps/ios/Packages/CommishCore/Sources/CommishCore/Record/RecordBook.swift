@@ -80,7 +80,7 @@ struct WeekStates: Equatable, Sendable {
         self.underway = underway
     }
 
-    init(_ book: RecordBook, schedule: RunRecordSchedule, now: Date) {
+    init(_ book: RecordBook, schedule: RunSchedule, now: Date) {
         let games = schedule.slates.flatMap(\.games)
         let frozen = book.weeks.filter { RecordBook.status($0) == .frozen }.map(\.week)
         let read = { (week: Int) in Self.read(games.filter { $0.week == week }, now: now) }
@@ -124,7 +124,7 @@ struct NextGrade: Equatable, Sendable {
     let week: Int
     let lastKickoff: Date?
 
-    init?(_ book: RecordBook, schedule: RunRecordSchedule) {
+    init?(_ book: RecordBook, schedule: RunSchedule) {
         guard let week = book.weeks.first(where: { RecordBook.status($0) != .graded })?.week else {
             return nil
         }

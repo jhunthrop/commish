@@ -477,6 +477,41 @@ object Words {
         const val full = "Two picked, tap one to put him back"
     }
 
+    object HeldPage {
+        const val log = "His game log is not written yet."
+        const val basis = "His figures are the board's. His game log and our read of him are not written yet."
+    }
+
+    object WeekTile {
+        const val published = "published projection"
+        const val sinceEarlier = "since the earlier read"
+        const val underShown = "Moved under 0.5 since the earlier read"
+        const val sinceRead = "since our read was written"
+        const val underShownRead = "Moved under 0.5 since our read was written"
+        const val notInRead = "Not in our read"
+        const val changePart = "Proj change is its move since the earlier read, shown from 0.5."
+        const val changePartRead = "Proj change is its move since our read was written, shown from 0.5. The read is withheld from the same move."
+    }
+
+    object PlayerPage {
+        const val overReplacement = "Over replacement"
+        const val outcomes = "Floor, median, ceiling"
+        const val thisSeason = "This season"
+        const val stillToPlay = "Still to play"
+        const val format = "Format"
+        const val tier = "Tier"
+    }
+
+    object ReadFigures {
+        const val preseasonProjection = "Preseason projection"
+        const val preseasonTiers = "Preseason tiers"
+        const val restOfSeason = "Rest of season"
+    }
+
+    object Unwritten {
+        const val read = "Our written read of him is not ready. Here is what it will be built from."
+    }
+
     object Order {
         const val rank = "#"
         const val rankGroup = "Our rest-of-season order"

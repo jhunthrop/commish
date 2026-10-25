@@ -76,7 +76,7 @@ struct RankingsAPITests {
         let transport = try TaggedTransport(
             status: .ok, tag: RecordFixture.scheduleTag, body: RecordFixture.scheduleAnswer()
         )
-        guard case let .fresh(schedule, _) = try await Self.client(transport).recordSchedule(tag: nil) else {
+        guard case let .fresh(schedule, _) = try await Self.client(transport).schedule(tag: nil) else {
             Issue.record("a first read is fresh")
             return
         }

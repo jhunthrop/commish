@@ -7,7 +7,7 @@ import Observation
 /// API gave it, sent back on the next read.
 public struct RecordRead: Codable, Sendable, Equatable {
     public let record: Kept<RunRecord>
-    public let schedule: Kept<RunRecordSchedule>
+    public let schedule: Kept<RunSchedule>
 }
 
 /// The Our record screen's view model (the League home's pattern): the record's routes, the cache and
@@ -70,7 +70,7 @@ public final class RecordViewModel {
         let kept = shown?.read ?? saved?.value
         do {
             async let record = api.record(tag: kept?.record.tag)
-            async let schedule = api.recordSchedule(tag: kept?.schedule.tag)
+            async let schedule = api.schedule(tag: kept?.schedule.tag)
             let fresh = try await RecordRead(
                 record: RunBoardReader.resolve(record, kept: kept?.record),
                 schedule: RunBoardReader.resolve(schedule, kept: kept?.schedule)

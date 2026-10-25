@@ -12,6 +12,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { REPOSITORY, generatedBy, writeOutputs, type Outputs } from './generated.ts';
+import { PUBLIC_SHEET_PLAYER_IDS, SHEET_PLAYER_IDS } from './sheet-players.ts';
 import { claimMove } from '../../web/src/lib/league/inseason/move.ts';
 import type {
 	HostMovePlan,
@@ -97,6 +98,10 @@ export function clockPart(iso: string): string {
 		.replace(/:/g, '-');
 }
 
+/** The clocks the player sheet's weeks are read at (Lane 192): its game to come, the Sunday with the
+ * noon games under way, and the Monday with them final. */
+export const SHEET_CLOCKS: readonly ('week' | 'sunday' | 'monday')[] = ['week', 'sunday', 'monday'];
+
 /** The answers to read at each clock, the League home's reads: the league list and the league once,
  * at the week's clock, with the week's games, and the scoreboard and the member's lineup at every
  * clock (the lineup's lines carry each player's game, which the game-state parity reads, Lane 176);
@@ -104,7 +109,8 @@ export function clockPart(iso: string): string {
  * score (Lane 183); the Waivers answer at every clock, and on each ESPN stand-in at the week's clock
  * its Waivers and the claim of its first pickup planned and made, done, refused and pending (Lane
  * 186); the trade finder at every clock, and at the week's and the Sunday's clocks the check of each
- * trade the strip names (Lane 189). */
+ * trade the strip names (Lane 189); and at the sheet's clocks each sheet player's week, in the league
+ * and, at the week's clock, with none (Lane 192). */
 export function fixturePlan(source: FixtureSource): { clock: string; files: FixtureFile[] }[] {
 	const id = source.leagueId;
 	const { week, ...rest } = source.clocks;
@@ -132,6 +138,19 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 		clock,
 		about: `the league read with its matchup's score, ${name}`
 	});
+	const player = (clock: string, name: string, board: string): FixtureFile => ({
+		file: `player-${id}-${board}-${clockPart(clock)}.json`,
+		route: `GET /leagues/attached/${id}/players/${board}`,
+		clock,
+		about: `a player sheet's week in the league, his verb with it, ${name}`
+	});
+	const publicPlayer = (clock: string, name: string, board: string): FixtureFile => ({
+		file: `player-${board}-${clockPart(clock)}.json`,
+		route: `GET /players/${board}/week`,
+		clock,
+		about: `a player sheet's week with no league, in PPR, ${name}`
+	});
+	const sheetClocks = new Set<string>(SHEET_CLOCKS.map((key) => source.clocks[key]));
 	const waivers = (league: string, clock: string, name: string): FixtureFile => ({
 		file: `waivers-${league}-${clockPart(clock)}.json`,
 		route: `GET /leagues/attached/${league}/waivers`,
@@ -161,7 +180,11 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 		sync(clock, name),
 		waivers(id, clock, name),
 		trades(clock, name),
-		...(checked.has(clock) ? checks(clock, name) : [])
+		...(checked.has(clock) ? checks(clock, name) : []),
+		...(sheetClocks.has(clock) ? SHEET_PLAYER_IDS.map((board) => player(clock, name, board)) : []),
+		...(clock === week
+			? PUBLIC_SHEET_PLAYER_IDS.map((board) => publicPlayer(clock, name, board))
+			: [])
 	];
 	const claims = Object.entries(source.espn ?? {}).flatMap(([outcome, league]): FixtureFile[] => {
 		const pool = waivers(league, week, `the ESPN stand-in whose claim is ${outcome}`);

@@ -78,7 +78,7 @@ public enum RecordFixture: Sendable, Equatable {
         ])
     }
 
-    public static func schedule() throws -> RunRecordSchedule {
+    public static func schedule() throws -> RunSchedule {
         try APIDecoding.envelopeData(Components.Schemas.RunScheduleAnswer.self, from: scheduleAnswer()).schedule
     }
 }
@@ -98,7 +98,7 @@ public struct StubRecord: RecordAPI {
         try read(tag: tag, current: fixture.tag) { try fixture.record() }
     }
 
-    public func recordSchedule(tag: String?) async throws -> RunRead<RunRecordSchedule> {
+    public func schedule(tag: String?) async throws -> RunRead<RunSchedule> {
         try read(tag: tag, current: RecordFixture.scheduleTag) { try RecordFixture.schedule() }
     }
 

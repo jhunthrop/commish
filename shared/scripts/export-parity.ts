@@ -58,6 +58,7 @@ import { withRuleList } from '../../web/scripts/inseason-fixture/week.ts';
 import type { HostMoveResult, WaiverAdvice } from '../../web/src/lib/league/inseason/api.ts';
 import { BOARD_OUTPUT, renderBoard } from './board-parity.ts';
 import { BOARD_RUN_OUTPUT, renderBoardRun } from './board-run-parity.ts';
+import { PLAYER_SHEET_OUTPUT, renderPlayerSheet } from './player-sheet-parity.ts';
 import { RANKINGS_OUTPUT, renderRankings } from './rankings-parity.ts';
 import { RECORD_OUTPUT, renderRecord } from './record-parity.ts';
 import {
@@ -614,6 +615,15 @@ export async function generate(): Promise<Outputs> {
 			)
 		],
 		[WAIVERS_OUTPUT, await renderWaivers(sync.host)],
+		[
+			PLAYER_SHEET_OUTPUT,
+			await renderPlayerSheet(
+				generatedBy(
+					SCRIPT,
+					"web/src/lib/player (the shelf: week-read.ts, status-held.ts, week-words.ts, shelf.ts) and server/pages/player.ts (the page's words) over the fixture runs and shared/fixtures/inseason"
+				)
+			)
+		],
 		[TRADES_OUTPUT, await renderTrades(sync.host)],
 		[
 			RANKINGS_OUTPUT,

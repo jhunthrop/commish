@@ -166,7 +166,7 @@ public struct RecordModel: Equatable, Sendable {
     public let weekly: RecordSectionModel
     public let draft: DraftSectionModel
 
-    public init(record run: RunRecord, schedule: RunRecordSchedule, scoring: String, now: Date) {
+    public init(record run: RunRecord, schedule: RunSchedule, scoring: String, now: Date) {
         title = AppWords.Tab.record
         let own = RecordBook(own: run)
         let states = WeekStates(own, schedule: schedule, now: now)

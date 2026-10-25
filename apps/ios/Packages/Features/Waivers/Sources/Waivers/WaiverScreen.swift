@@ -139,9 +139,24 @@ public struct WaiverView: View {
         }
     }
 
+    /// The sheet's verb on Waivers (WaiverScreen.svelte's shelfOffer): the claim in the screen's words
+    /// with the pair and its gain under it, made from his row.
+    private func offer(_ model: WaiverModel, _ player: SheetPlayer) -> SheetOffer? {
+        guard let row = model.rows.first(where: { $0.sheetPlayer?.id == player.id }) else {
+            return nil
+        }
+        let said = model.sheetOffer(row)
+        let viewModel = viewModel
+        let leagueID = leagueID
+        return SheetOffer(label: said.label, line: said.line, lineup: false) {
+            Task { await viewModel.claimFromSheet(row: row.key, leagueID: leagueID) }
+        }
+    }
+
     private func actions(_ model: WaiverModel) -> TableActions {
         TableActions(
-            open: { sheet.open($0) }, tap: { viewModel.tap(row: $0) }, chooseDrop: { viewModel.choose(drop: $0) },
+            open: { sheet.open($0, offer: offer(model, $0)) }, tap: { viewModel.tap(row: $0) },
+            chooseDrop: { viewModel.choose(drop: $0) },
             opened: viewModel.openRow, drops: viewModel.drops, chosenDrop: viewModel.chosenDrop,
             dropHead: viewModel.opened.map { model.dropHead($0) }, table: viewModel.table, sort: viewModel.sort,
             onSort: { viewModel.sort(by: $0) }, reading: viewModel.reading

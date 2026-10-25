@@ -15,7 +15,7 @@ struct LiveRankingsTests {
     func theLiveRecordReadsDrawsAndAnswers304sToItsETags() async throws {
         let client = try APIClient(baseURL: #require(Self.api), tokens: LiveRunTests.NoToken())
         guard case let .fresh(record, recordTag) = try await client.record(tag: nil),
-              case let .fresh(schedule, scheduleTag) = try await client.recordSchedule(tag: nil)
+              case let .fresh(schedule, scheduleTag) = try await client.schedule(tag: nil)
         else {
             Issue.record("a first read is fresh")
             return
@@ -31,7 +31,7 @@ struct LiveRankingsTests {
         }
         print("draft: \(model.draft.span ?? model.draft.waiting ?? "-")")
         let again = try await client.record(tag: recordTag)
-        let scheduleAgain = try await client.recordSchedule(tag: scheduleTag)
+        let scheduleAgain = try await client.schedule(tag: scheduleTag)
         guard case .unchanged = again, case .unchanged = scheduleAgain else {
             Issue.record("a read naming the kept ETag is a 304")
             return

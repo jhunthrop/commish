@@ -169,7 +169,8 @@ struct BoardModelTests {
         #expect(puka.gapTone == .gain)
         #expect(puka.headshot?.absoluteString.hasPrefix("https://") == true)
         #expect(puka.sheetPlayer == SheetPlayer(
-            id: puka.id, slug: "puka-nacua", name: "Puka Nacua", position: "WR", rank: "1", club: "LAR"
+            id: puka.id, slug: "puka-nacua", name: "Puka Nacua", position: "WR", rank: "1", club: "LAR",
+            boardID: puka.id
         ))
         #expect(rows.contains { $0.heat == .below && $0.overReplacement.hasPrefix("\u{2212}") })
         #expect(Heat.of(vor: 10, round: 5) == .none)

@@ -238,9 +238,9 @@ actor CountingRecord: RecordAPI {
         return try await count(stub.record(tag: tag))
     }
 
-    func recordSchedule(tag: String?) async throws -> RunRead<RunRecordSchedule> {
+    func schedule(tag: String?) async throws -> RunRead<RunSchedule> {
         tags.append(tag)
-        return try await count(stub.recordSchedule(tag: tag))
+        return try await count(stub.schedule(tag: tag))
     }
 
     private func count<Value>(_ read: RunRead<Value>) -> RunRead<Value> {
