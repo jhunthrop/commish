@@ -133,7 +133,20 @@ void test("the tables: the League home's, the box score's, then the shell's and 
 			'WeekTile',
 			'PlayerPage',
 			'ReadFigures',
-			'Unwritten'
+			'Unwritten',
+			'Order',
+			'OrderWeek',
+			'PagePurpose',
+			'WeekTab',
+			'DefenseScoring',
+			'WeekMany',
+			'PageName',
+			'Pool',
+			'Record',
+			'RecordBox',
+			'RecordOrder',
+			'Records',
+			'Pair'
 		]
 	);
 	assert.equal(new Set(TABLES.map((t) => t.json)).size, TABLES.length);

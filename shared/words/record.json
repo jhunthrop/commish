@@ -1,0 +1,14 @@
+{
+	"placesOff": "Places off is how many places a player finished from his rank, lower is better.",
+	"notPlayed": "not played yet",
+	"underway": "under way",
+	"noneSet": "weeks graded. Our first order is set before the first kickoff",
+	"functions": [
+		"missedOne",
+		"missedMany",
+		"waiting",
+		"standing",
+		"ofSet",
+		"frontStarters"
+	]
+}
