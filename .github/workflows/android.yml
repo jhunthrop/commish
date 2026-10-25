@@ -20,6 +20,8 @@ on:
       - "web/src/lib/ui/rail-order.ts"
       - "web/src/lib/ui/rail-icons.ts"
       - "web/src/lib/ui/icons.ts"
+      - "web/src/lib/ui/shell-words.ts"
+      - "web/src/lib/run/week-names.ts"
       - "web/src/lib/site/app-manifest.ts"
       - ".github/workflows/android.yml"
   pull_request:
@@ -32,6 +34,8 @@ on:
       - "web/src/lib/ui/rail-order.ts"
       - "web/src/lib/ui/rail-icons.ts"
       - "web/src/lib/ui/icons.ts"
+      - "web/src/lib/ui/shell-words.ts"
+      - "web/src/lib/run/week-names.ts"
       - "web/src/lib/site/app-manifest.ts"
       - ".github/workflows/android.yml"
   workflow_dispatch:

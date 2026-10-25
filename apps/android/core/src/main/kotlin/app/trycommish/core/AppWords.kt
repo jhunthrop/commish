@@ -26,4 +26,13 @@ object AppWords {
 
     /** A traded player's new team, "to Dad Runners" (web/src/lib/league/home/MovesFeed.svelte). */
     const val to = "to"
+
+    /** The league switch opened with no league followed: where to follow one (the iOS app's words). */
+    const val followNone = "Follow a league on trycommish.app and it shows here."
+
+    /** The Players screen's name (nav.ts PLAYERS_NAME), which the bar's search and a player's link open. */
+    const val players = "Players"
+
+    /** The account screen's one verb until its lane lands: this phone signs out. */
+    const val signOut = "Sign out"
 }

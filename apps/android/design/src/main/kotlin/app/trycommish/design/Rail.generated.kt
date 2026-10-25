@@ -37,7 +37,7 @@ object Rail {
             RailItem("lineup", "start", "Lineup", R.drawable.rail_lineup),
             RailItem("matchup", "matchup", "Matchup", R.drawable.rail_matchup),
             RailItem("trades", "trades", "Trades", R.drawable.rail_trades),
-            RailItem("week", "players", "Players", R.drawable.rail_players),
+            RailItem("week", "players", "Rankings", R.drawable.rail_players),
         ),
         "offseason" to listOf(
             RailItem("board", "board", "Board", R.drawable.rail_board),
@@ -59,8 +59,41 @@ object Rail {
     val withoutLeague: List<RailItem> = listOf(
             RailItem("league", "league", "League", R.drawable.rail_standings),
             RailItem("rest_first", "board", "Rest of season", R.drawable.rail_board),
-            RailItem("week", "players", "Players", R.drawable.rail_players),
+            RailItem("week", "players", "Rankings", R.drawable.rail_players),
             RailItem("mock", "mock", "Mock draft", R.drawable.rail_mock),
             RailItem("record", "record", "Our record", R.drawable.rail_record),
         )
+
+    /** No league followed, by the site's season (railShown over railPhase(null, season)): the draft's
+     * bar before the season and after it, the season's bar without a league in it. */
+    val withoutLeagueBySeason: Map<String, List<RailItem>> = mapOf(
+        "preseason" to listOf(
+            RailItem("board", "board", "Board", R.drawable.rail_board),
+            RailItem("players", "players", "Players", R.drawable.rail_players),
+            RailItem("mock", "mock", "Mock draft", R.drawable.rail_mock),
+            RailItem("sheet", "sheet", "Cheat sheet", R.drawable.rail_sheet),
+            RailItem("advisor", "advisor", "Advisor", R.drawable.rail_advisor),
+        ),
+        "in_season" to listOf(
+            RailItem("league", "league", "League", R.drawable.rail_standings),
+            RailItem("rest_first", "board", "Rest of season", R.drawable.rail_board),
+            RailItem("week", "players", "Rankings", R.drawable.rail_players),
+            RailItem("mock", "mock", "Mock draft", R.drawable.rail_mock),
+            RailItem("record", "record", "Our record", R.drawable.rail_record),
+        ),
+        "playoffs" to listOf(
+            RailItem("league", "league", "League", R.drawable.rail_standings),
+            RailItem("rest_first", "board", "Rest of season", R.drawable.rail_board),
+            RailItem("week", "players", "Rankings", R.drawable.rail_players),
+            RailItem("mock", "mock", "Mock draft", R.drawable.rail_mock),
+            RailItem("record", "record", "Our record", R.drawable.rail_record),
+        ),
+        "offseason" to listOf(
+            RailItem("board", "board", "Board", R.drawable.rail_board),
+            RailItem("players", "players", "Players", R.drawable.rail_players),
+            RailItem("mock", "mock", "Mock draft", R.drawable.rail_mock),
+            RailItem("sheet", "sheet", "Cheat sheet", R.drawable.rail_sheet),
+            RailItem("advisor", "advisor", "Advisor", R.drawable.rail_advisor),
+        ),
+    )
 }
