@@ -38,6 +38,9 @@ type dirObjects struct {
 	reads map[string]int
 	// fail answers every read of a key with an error.
 	fail map[string]error
+	// afterGet runs after each read, with the key read (a test moves the
+	// pointer between two reads of one request with it).
+	afterGet func(key string)
 }
 
 func newDirObjects(fsys fs.FS) *dirObjects {
@@ -48,7 +51,11 @@ func (d *dirObjects) Get(_ context.Context, key string) ([]byte, error) {
 	d.mu.Lock()
 	d.reads[key]++
 	failure := d.fail[key]
+	after := d.afterGet
 	d.mu.Unlock()
+	if after != nil {
+		defer after(key)
+	}
 	if failure != nil {
 		return nil, failure
 	}
