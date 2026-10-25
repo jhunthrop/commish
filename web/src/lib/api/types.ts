@@ -1106,7 +1106,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** The published nightly run's manifest (Lane 185): its id, when it finished, its season, every format it carries (the default first) with the week its rest of season ranks from, and how many players have a page. The run is the one runs/latest.json names, the same the site is built from, and never one whose manifest is missing or names another run. Only the members the site's reader names are sent; the sources block is provenance and is never sent. Every /run route answers a weak ETag (the run id and the file; designations, rewritten beside the run every hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a matching If-None-Match. 503 storage_unavailable when the run cannot be read here. */
+		/** The published nightly run's manifest (Lane 185): its id, when it finished, its season, every format it carries (the default first) with the week its rest of season ranks from, and how many players have a page. The run is the one runs/latest.json names, the same the site is built from, and never one whose manifest is missing or names another run. Only the members the site's reader names are sent; the sources block is provenance and is never sent. Every /run route answers a weak ETag (the run id and the file; designations, rewritten beside the run every hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a matching If-None-Match. 503 storage_unavailable when the run cannot be read here. Beside the manifest, the run's season reach (Lane 203): what every basis's "through week" says, counted over every own page of the run as the site counts it, worked out once per run in the background. It is absent while that first pass runs (a request never waits on it) and while a failed pass waits to run again; that answer carries no ETag and is not to be kept, and a client holding the run's answer is answered 304. */
 		get: operations['runManifest'];
 		put?: never;
 		post?: never;
@@ -3149,6 +3149,26 @@ export interface components {
 			/** @description the published run every /run answer is read from */
 			run_id: string;
 			manifest: components['schemas']['RunManifest'];
+			/** @description the run's season reach (Lane 203), absent on an API from before it, while the run's first pass runs, and while a failed pass waits to run again */
+			reach?: components['schemas']['RunReach'];
+		};
+		/** @description how far the run's season figures reach, as the site's bases say it (web/src/lib/run/reach.ts runReach): counted over every own page of the run (never a held page's copy), his club's game by his log, never a game final by its status alone */
+		RunReach: {
+			/** @description the format every season block is scored in: ppr-12 */
+			format: string;
+			/** @description that format as a chip prints it: PPR */
+			scoring: string;
+			/** @description what a basis's "through week" says: "through week 5", "through week 5 and week 6's Thursday game"; empty before week 1's games */
+			through: string;
+			/** @description the last week whose games are all in */
+			complete: number;
+			/** @description the week after it with some counted games in, null with none */
+			partial: components['schemas']['RunReachPartial'] | null;
+		};
+		RunReachPartial: {
+			week: number;
+			/** @description the days of its counted games in kickoff order on the Eastern clock ("Thursday"), empty when a counted club's game is not on the schedule ("part of week 6") */
+			days: string[];
 		};
 		/** @description a ranked row of boards/<format>.json, ranked by our projection */
 		RunBoardRow: {
@@ -7002,6 +7022,13 @@ export interface operations {
 					 *             }
 					 *           ],
 					 *           "players": 4
+					 *         },
+					 *         "reach": {
+					 *           "format": "ppr-12",
+					 *           "scoring": "PPR",
+					 *           "through": "through week 5",
+					 *           "complete": 5,
+					 *           "partial": null
 					 *         }
 					 *       }
 					 *     }

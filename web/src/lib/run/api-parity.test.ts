@@ -10,8 +10,10 @@ import { test } from 'node:test';
 import { parse } from 'yaml';
 import { z } from 'zod';
 import { POSITIONS } from '#lib/types/player.ts';
-import { MARKET_POSITIONS } from './market.ts';
+import { MARKET_POSITIONS, splitIndex } from './market.ts';
+import { runReach } from './reach.ts';
 import {
+	RUN_PATHS,
 	adpSchema,
 	adpSourceSchema,
 	boardRowSchema,
@@ -208,9 +210,14 @@ const isTrueLiteral = (values: readonly unknown[]): boolean =>
 
 const sorted = (values: readonly unknown[]): string[] => values.map(String).sort();
 
+/** What the API works out from the run rather than reads from one file, each held by its own test. */
+const DERIVED = new Set(['RunReach', 'RunReachPartial']);
+
 void test('every Run schema of the API is mirrored here or is an answer wrapper', () => {
 	const run = Object.keys(schemas).filter((name) => name.startsWith('Run'));
-	for (const name of run) assert.ok(name in MIRRORS || WRAPPERS.has(name), name);
+	for (const name of run) {
+		assert.ok(name in MIRRORS || WRAPPERS.has(name) || DERIVED.has(name), name);
+	}
 	for (const name of Object.keys(MIRRORS)) assert.ok(name in schemas, name);
 });
 
@@ -396,4 +403,41 @@ void test('the walker refuses a member the API does not name, at any depth', () 
 	assert.throws(() => {
 		assertNamed(stray, { $ref: `${SCHEMAS_REF}RunPlayer` }, 'player');
 	}, /season\.internalNote/);
+});
+
+/** The shared fixture run as the bucket holds it (shared/scripts/export-run.ts), the one the API's
+ * own test reads and the /run/manifest example names. */
+const FIXTURE_RUNS = new URL('../../../../shared/fixtures/run/runs/', import.meta.url);
+
+function fixtureRunFile<T>(runId: string, path: string, schema: z.ZodType<T>): T {
+	return schema.parse(JSON.parse(readFileSync(new URL(`${runId}/${path}`, FIXTURE_RUNS), 'utf8')));
+}
+
+void test("the API's reach is the web's seasonReach over the fixture run (Lane 203)", () => {
+	const { runId } = z
+		.object({ runId: z.string() })
+		.parse(JSON.parse(readFileSync(new URL('latest.json', FIXTURE_RUNS), 'utf8')));
+	const run = fixtureRunFile(runId, RUN_PATHS.manifest, manifestSchema);
+	const { pages } = splitIndex(fixtureRunFile(runId, RUN_PATHS.index, indexSchema));
+	// The fixture run holds no page, so every page the index gives is its own (server/run.ts ownPages).
+	const players = pages.map((entry) =>
+		fixtureRunFile(runId, RUN_PATHS.player(entry.id), playerSchema)
+	);
+	const { slates } = fixtureRunFile(runId, RUN_PATHS.schedule, scheduleSchema);
+	const web = runReach(players, slates, run.formats);
+
+	const data = namedExample('/run/manifest', 'RunManifestAnswer');
+	assert.equal(data.run_id, runId, 'the example is the fixture run');
+	assert.deepEqual(data.reach, web);
+
+	// The contract names exactly what the web's reach holds, every member required, partial nullable.
+	const reachSchema = schemas.RunReach;
+	const partialSchema = schemas.RunReachPartial;
+	assert.ok(reachSchema && partialSchema);
+	assert.deepEqual(Object.keys(reachSchema.properties).sort(), Object.keys(web).sort());
+	assert.deepEqual([...(reachSchema.required ?? [])].sort(), Object.keys(web).sort());
+	assert.equal(reachSchema.properties.partial?.nullable, true);
+	assert.deepEqual([...(partialSchema.required ?? [])].sort(), ['days', 'week']);
+	assert.deepEqual(Object.keys(partialSchema.properties).sort(), ['days', 'week']);
+	assert.ok(!(schemas.RunManifestAnswer?.required ?? []).includes('reach'), 'reach is optional');
 });
