@@ -21,6 +21,12 @@ struct TableActions {
     let drops: [DropRow]
     let chosenDrop: String?
     let dropHead: (title: String, lead: String)?
+    /// The rows in the sort and the search, the sort and what choosing a head does, and whether a
+    /// position is being read (its last rows stand, quieter).
+    let table: WaiverTable
+    let sort: WaiverSort
+    let onSort: (WaiverSortKey) -> Void
+    let reading: Bool
 }
 
 /// The players free to add (WaiverTable.svelte at 390): the heads with the line under them said once,
@@ -44,30 +50,33 @@ struct WaiverTableView: View {
     }
 
     var body: some View {
+        let table = actions.table
         TableFrame {
-            WaiverHeadRow(projected: model.projected)
+            WaiverHeadRow(projected: model.projected, sort: actions.sort, onSort: actions.onSort)
             HeadsLine(text: model.heads)
             if groups.contains(.gaining) {
-                ForEach(model.gaining) { row in entry(row) }
+                ForEach(table.gaining) { row in entry(row) }
             }
             if groups.contains(.opened) {
-                ForEach(model.rows.filter { $0.key == actions.opened }) { row in entry(row) }
+                ForEach(table.rows.filter { $0.key == actions.opened }) { row in entry(row) }
             }
-            if groups.contains(.rest), !model.rest.isEmpty {
+            if groups.contains(.rest), !table.rest.isEmpty {
                 SectionRow(title: Words.Waivers.noGain)
-                ForEach(model.rest) { row in entry(row) }
+                ForEach(table.rest) { row in entry(row) }
             }
-            if groups.contains(.gaining), model.gaining.isEmpty, model.rest.isEmpty {
+            if groups.contains(.gaining), table.gaining.isEmpty, table.rest.isEmpty {
                 NoteRow(text: Words.Waivers.noneFound)
             }
-            if groups.contains(.stash), !model.stash.isEmpty || !model.stashLine.isEmpty {
+            if groups.contains(.stash), !table.stash.isEmpty || !model.stashLine.isEmpty {
                 SectionRow(title: Words.Stash.head)
                 if !model.stashLine.isEmpty {
                     NoteRow(text: model.stashLine.joined(separator: " "))
                 }
-                ForEach(model.stash) { row in entry(row) }
+                ForEach(table.stash) { row in entry(row) }
             }
         }
+        .opacity(actions.reading ? 0.6 : 1)
+        .accessibilityLabel(Words.InSeason.waiverAdds)
     }
 
     @ViewBuilder
@@ -76,37 +85,6 @@ struct WaiverTableView: View {
         if actions.opened == row.key {
             DropPanel(projected: model.projected, actions: actions)
         }
-    }
-}
-
-/// The heads: Player, Proj (once the week's projection is read), Beats.
-struct WaiverHeadRow: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let projected: Bool
-
-    var body: some View {
-        let theme = Theme(colorScheme)
-        HStack(spacing: 0) {
-            head(Words.Box.player).frame(maxWidth: .infinity, alignment: .leading)
-            if projected {
-                head(Words.Box.proj).frame(width: WaiverColumn.proj, alignment: .trailing)
-            }
-            head(Words.Waivers.beats).frame(width: WaiverColumn.beats, alignment: .trailing)
-            Color.clear.frame(width: WaiverColumn.act, height: 1)
-        }
-        .padding(.horizontal, Tokens.Space.s2)
-        .frame(minHeight: 32)
-        .background(theme.color(Tokens.Color.bg))
-        .overlay(alignment: .bottom) { Hairline() }
-        .accessibilityHidden(true)
-    }
-
-    private func head(_ words: String) -> some View {
-        Text(words)
-            .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
-            .textCase(.uppercase)
-            .tracking(Tokens.TypeScale.xs * 0.06)
-            .foregroundStyle(Theme(colorScheme).color(Tokens.Color.ink3))
     }
 }
 

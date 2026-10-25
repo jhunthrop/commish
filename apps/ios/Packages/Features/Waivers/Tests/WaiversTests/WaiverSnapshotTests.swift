@@ -39,10 +39,18 @@ struct WaiverSnapshotTests {
         case refused
         case done
         case stale
+        /// The D/ST chip chosen: the defenses' own read under the page's strip.
+        case narrowed
+        /// The table sorted by name, A to Z, its head lit with the caret.
+        case sorted
+        /// A wide receiver past the page's rows reached: the WR chip's read, his name searched.
+        case reach
 
         var parts: [Part] {
             switch self {
             case .before: [.phone, .top, .foot]
+            case .narrowed, .sorted: [.top]
+            case .reach: [.top, .foot]
             case .drops: [.panel, .pin]
             case .faab, .pending, .refused, .done: [.pin]
             case .stale: [.phone]
@@ -51,7 +59,7 @@ struct WaiverSnapshotTests {
 
         var league: String {
             switch self {
-            case .before: WaiverSnapshotTests.ffpc
+            case .before, .narrowed, .sorted, .reach: WaiverSnapshotTests.ffpc
             case .refused: WaiverSnapshotTests.espn.refused
             case .done: WaiverSnapshotTests.espn.done
             default: WaiverSnapshotTests.espn.pending
@@ -98,7 +106,16 @@ struct WaiverSnapshotTests {
     /// panel open, or the claim pressed, planned and made.
     static func viewModel(_ scene: Scene) async throws -> WaiverViewModel {
         let league = scene.league
-        let advice = try answer(WaiverAdvice.self, "waivers-\(league)-\(clock).json")
+        var advice = try answer(WaiverAdvice.self, "waivers-\(league)-\(clock).json")
+        let full = advice
+        let isReceiver = { (row: WaiverRow) in row.add.player.position == "WR" }
+        if scene == .reach, let first = advice.rows.first(where: isReceiver) {
+            // The page as the API's first rows leave a deep pool: one wide receiver of the eleven.
+            advice.rows = full.rows.filter { !isReceiver($0) || $0 == first }
+        }
+        var receivers = full
+        receivers.rows = full.rows.filter(isReceiver)
+        receivers.pickups = full.pickups.filter(isReceiver)
         let espn = league != ffpc
         let cache = FileCache(folder: FileManager.default.temporaryDirectory
             .appendingPathComponent("waiver-snapshots-\(UUID().uuidString)"))
@@ -108,11 +125,14 @@ struct WaiverSnapshotTests {
         let stub = try StubWaivers(
             advice: scene == .stale ? nil : advice,
             plan: espn ? answer(HostMovePlan.self, "claim-plan-\(league).json") : nil,
-            result: espn ? answer(HostMoveResult.self, "claim-move-\(league).json") : nil
+            result: espn ? answer(HostMoveResult.self, "claim-move-\(league).json") : nil,
+            positions: espn ? [:] : [
+                .def: answer(WaiverAdvice.self, "waivers-\(league)-DEF-\(clock).json"), .wr: receivers,
+            ]
         )
         let viewModel = WaiverViewModel(
             api: stub, cache: cache, clock: FixedClock(now.addingTimeInterval(scene == .stale ? 1800 : 0)),
-            host: .init(value1: espn ? .espn : .ffpc), zone: zone, copy: { _ in true }
+            host: .init(value1: espn ? .espn : .ffpc), zone: zone, copy: { _ in }
         )
         await viewModel.load(leagueID: league)
         switch scene {
@@ -125,6 +145,13 @@ struct WaiverSnapshotTests {
         case .pending, .refused, .done:
             await viewModel.press(leagueID: league)
             await viewModel.confirm(leagueID: league)
+        case .narrowed:
+            await viewModel.choose(position: .def, leagueID: league)
+        case .sorted:
+            viewModel.sort(by: .name)
+        case .reach:
+            await viewModel.choose(position: .wr, leagueID: league)
+            viewModel.find("dotson")
         case .before, .stale:
             break
         }
@@ -141,9 +168,14 @@ struct WaiverSnapshotTests {
             actions: TableActions(
                 open: { _ in }, tap: { _ in }, chooseDrop: { _ in }, opened: viewModel.openRow,
                 drops: viewModel.drops, chosenDrop: viewModel.chosenDrop,
-                dropHead: viewModel.opened.map { model.dropHead($0) }
+                dropHead: viewModel.opened.map { model.dropHead($0) }, table: viewModel.table,
+                sort: viewModel.sort, onSort: { _ in }, reading: viewModel.reading
             ),
-            chosenCard: viewModel.card?.key
+            chosenCard: viewModel.card?.key,
+            filters: FiltersView(
+                positions: model.positions, chosen: viewModel.position, choose: { _ in }, query: viewModel.query,
+                find: { _ in }, problem: viewModel.problem, still: true
+            )
         )
     }
 
@@ -172,6 +204,11 @@ struct WaiverSnapshotTests {
         #expect(stale.pin.enabled == false)
         let drops = try await Self.viewModel(.drops)
         #expect(drops.pin.pair != nil)
+        let reach = try await Self.viewModel(.reach)
+        #expect(reach.table.rows.map(\.cells.row.name) == ["Jahan Dotson"])
+        let narrowed = try await Self.viewModel(.narrowed)
+        #expect(narrowed.position == .def)
+        #expect(narrowed.table.rows.allSatisfy { $0.cells.row.position == "D/ST" })
     }
 
     enum SceneError: Error {
@@ -189,6 +226,7 @@ struct WaiverMock: View {
     let device: SnapshotDevice
     let actions: TableActions
     let chosenCard: String?
+    let filters: FiltersView
 
     /// The status bar, the top bar and the tab bar the screen sits between, by phone.
     private var room: Double {
@@ -221,7 +259,8 @@ struct WaiverMock: View {
 
     private func screen(_ part: WaiverPart) -> WaiverPartView {
         WaiverPartView(
-            part: part, model: model, stamp: stamp, chosenCard: chosenCard, chooseCard: { _ in }, actions: actions
+            part: part, model: model, stamp: stamp, chosenCard: chosenCard, chooseCard: { _ in }, actions: actions,
+            filters: filters
         )
     }
 
@@ -237,8 +276,13 @@ struct StubWaivers: WaiversAPI {
     let advice: WaiverAdvice?
     let plan: HostMovePlan?
     let result: HostMoveResult?
+    /// Each position's own read.
+    let positions: [WaiverPosition: WaiverAdvice]
 
-    func waivers(id _: String) async throws -> WaiverAdvice {
+    func waivers(id _: String, position: WaiverPosition?) async throws -> WaiverAdvice {
+        if let position, let narrowed = positions[position] {
+            return narrowed
+        }
         guard let advice else {
             throw URLError(.notConnectedToInternet)
         }

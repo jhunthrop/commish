@@ -269,10 +269,7 @@ private struct WaiversTab: View {
         _viewModel = State(initialValue: WaiverViewModel(
             api: environment.api, cache: environment.cache, clock: environment.clock, host: league.host,
             zone: .current,
-            copy: { text in
-                UIPasteboard.general.string = text
-                return true
-            },
+            copy: { UIPasteboard.general.string = $0 },
             openPage: { UIApplication.shared.open($0) },
             onSignedOut: expired
         ))

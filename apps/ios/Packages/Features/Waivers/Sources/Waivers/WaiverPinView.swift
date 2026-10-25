@@ -67,6 +67,7 @@ struct BidFieldView: View {
     let field: BidField
     let change: (String) -> Void
     let still: Bool
+    @FocusState private var typing: Bool
 
     var body: some View {
         let theme = Theme(colorScheme)
@@ -82,10 +83,18 @@ struct BidFieldView: View {
                 } else {
                     TextField(field.label, text: Binding(get: { field.typed }, set: change))
                         .labelsHidden()
+                        .focused($typing)
                     #if os(iOS)
                         .keyboardType(.numberPad)
                     #endif
                         .disabled(!field.editable)
+                        // The number pad has no return key: Done above it puts the keyboard away.
+                        .toolbar {
+                            ToolbarItemGroup(placement: .keyboard) {
+                                Spacer()
+                                Button(Words.Move.done) { typing = false }
+                            }
+                        }
                 }
             }
             .font(Faces.font(.num, size: Tokens.TypeScale.lg, weight: .medium))

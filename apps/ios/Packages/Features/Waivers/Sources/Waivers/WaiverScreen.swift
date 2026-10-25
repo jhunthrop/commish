@@ -12,6 +12,7 @@ public struct WaiverScreen: View {
     let chosenCard: String?
     let chooseCard: (String) -> Void
     let actions: TableActions
+    let filters: FiltersView
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s4) {
@@ -24,7 +25,8 @@ public struct WaiverScreen: View {
 
     func partView(_ part: WaiverPart) -> WaiverPartView {
         WaiverPartView(
-            part: part, model: model, stamp: stamp, chosenCard: chosenCard, chooseCard: chooseCard, actions: actions
+            part: part, model: model, stamp: stamp, chosenCard: chosenCard, chooseCard: chooseCard, actions: actions,
+            filters: filters
         )
     }
 }
@@ -45,12 +47,14 @@ struct WaiverPartView: View {
     let chosenCard: String?
     let chooseCard: (String) -> Void
     let actions: TableActions
+    let filters: FiltersView
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s4) {
             switch part {
             case .top:
                 WaiverStripView(model: model, stamp: stamp, chosen: chosenCard, choose: chooseCard)
+                filters
                 if let arrives = model.arrives {
                     BasisText(arrives)
                 }
@@ -90,7 +94,14 @@ public struct WaiverView: View {
                 ScrollView {
                     WaiverScreen(
                         model: model, stamp: viewModel.stampWords, chosenCard: viewModel.card?.key,
-                        chooseCard: { viewModel.choose(card: $0) }, actions: actions(model)
+                        chooseCard: { viewModel.choose(card: $0) }, actions: actions(model),
+                        filters: FiltersView(
+                            positions: model.positions, chosen: viewModel.position,
+                            choose: { position in
+                                Task { await viewModel.choose(position: position, leagueID: leagueID) }
+                            },
+                            query: viewModel.query, find: { viewModel.find($0) }, problem: viewModel.problem
+                        )
                     )
                 }
                 .refreshable { await viewModel.load(leagueID: leagueID) }
@@ -132,7 +143,8 @@ public struct WaiverView: View {
         TableActions(
             open: { sheet.open($0) }, tap: { viewModel.tap(row: $0) }, chooseDrop: { viewModel.choose(drop: $0) },
             opened: viewModel.openRow, drops: viewModel.drops, chosenDrop: viewModel.chosenDrop,
-            dropHead: viewModel.opened.map { model.dropHead($0) }
+            dropHead: viewModel.opened.map { model.dropHead($0) }, table: viewModel.table, sort: viewModel.sort,
+            onSort: { viewModel.sort(by: $0) }, reading: viewModel.reading
         )
     }
 }

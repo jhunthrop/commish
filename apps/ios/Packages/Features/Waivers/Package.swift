@@ -20,6 +20,7 @@ let package = Package(
             name: "Waivers",
             dependencies: [
                 .product(name: "BoxScore", package: "BoxScore"),
+                .product(name: "CommishAPI", package: "CommishAPI"),
                 .product(name: "CommishCore", package: "CommishCore"),
                 .product(name: "CommishDesign", package: "CommishDesign"),
             ]
