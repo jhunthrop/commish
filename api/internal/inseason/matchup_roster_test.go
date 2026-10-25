@@ -100,13 +100,18 @@ func TestMatchupRosterRefusals(t *testing.T) {
 		{"matchup?roster=-2", http.StatusBadRequest, httpx.CodeInvalid},
 		{"matchup?roster=1.5", http.StatusBadRequest, httpx.CodeInvalid},
 		{"matchup?roster=1234567890", http.StatusBadRequest, httpx.CodeInvalid},
+		{"matchup?roster=%2B1", http.StatusBadRequest, httpx.CodeInvalid},
 		{"matchup?roster=42", http.StatusNotFound, httpx.CodeNotFound},
 	} {
 		code, env := serve(t, s, leaguePath+c.path)
 		if code != c.code || env.Ok || env.Error == nil || env.Error.Code != c.err {
 			t.Fatalf("%s: %d %+v", c.path, code, env.Error)
 		}
-		if env.Error.Fields[fieldRoster] != gameRosterWords {
+		words := gameRosterWords
+		if c.code == http.StatusBadRequest {
+			words = notRosterWords
+		}
+		if env.Error.Fields[fieldGameRoster] != words {
 			t.Fatalf("%s: fields %v", c.path, env.Error.Fields)
 		}
 	}

@@ -135,8 +135,13 @@ const (
 	positionWords = "Pick a position: QB, RB, WR, TE, K or DEF"
 	playerWords   = "That player is not on a roster in this league"
 	noTeamWords   = "We could not find your team in this league's last read"
-	// gameRosterWords is the Matchup's ?roster= refused (fieldRoster, Lane 204).
+	// fieldGameRoster is the Matchup's ?roster=, a roster id (Lane 204); the
+	// Order's ?roster= (fieldRoster) is a roster mark, another field.
+	fieldGameRoster = "roster"
+	// gameRosterWords is ?roster= naming no team of the league's last read
+	// (404); notRosterWords is one that is not a roster id at all (400).
 	gameRosterWords = "That team is not in this league's last read"
+	notRosterWords  = "Pick a team from the scoreboard"
 )
 
 // screenWeek is the week a screen's advisor reads (Lane 95).
@@ -280,7 +285,7 @@ func (s *Service) lineup(w http.ResponseWriter, r *http.Request) {
 func (s *Service) matchup(w http.ResponseWriter, r *http.Request) {
 	asked, ok := rosterParam(r)
 	if !ok {
-		httpx.WriteInvalid(w, r, map[string]string{fieldRoster: gameRosterWords})
+		httpx.WriteInvalid(w, r, map[string]string{fieldGameRoster: notRosterWords})
 		return
 	}
 	a, ok := s.advisorFor(w, r)
@@ -290,7 +295,7 @@ func (s *Service) matchup(w http.ResponseWriter, r *http.Request) {
 	roster := a.Me
 	if asked != nil {
 		if _, listed := a.Snap.TeamByRoster(*asked); !listed {
-			httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, gameRosterWords, map[string]string{fieldRoster: gameRosterWords})
+			httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, gameRosterWords, map[string]string{fieldGameRoster: gameRosterWords})
 			return
 		}
 		roster = *asked
@@ -303,18 +308,20 @@ func (s *Service) matchup(w http.ResponseWriter, r *http.Request) {
 // number a roster id can be.
 func rosterParam(r *http.Request) (*int, bool) {
 	q := r.URL.Query()
-	if !q.Has(fieldRoster) {
+	if !q.Has(fieldGameRoster) {
 		return nil, true
 	}
-	text := q.Get(fieldRoster)
+	text := q.Get(fieldGameRoster)
 	if len(text) > maxRosterParam {
 		return nil, false
 	}
-	n, err := strconv.Atoi(text)
-	if err != nil || n < 0 {
+	// Digits only: ParseUint takes no sign, so "+1" is refused as the schema refuses it (review L1).
+	n, err := strconv.ParseUint(text, 10, 31)
+	if err != nil {
 		return nil, false
 	}
-	return &n, true
+	roster := int(n)
+	return &roster, true
 }
 
 func (s *Service) scoreboard(w http.ResponseWriter, r *http.Request) {

@@ -68,6 +68,11 @@ async function context(theme: string, width: number): Promise<BrowserContext> {
 async function settle(page: Page): Promise<void> {
 	await page.waitForLoadState('networkidle', { timeout: READY_TIMEOUT_MS });
 	await page.evaluate(() => document.fonts.ready);
+	// A full-page shot measures the page once: wait for the frame after the last paint, so a box still
+	// laying out never cuts the shot at the viewport (fix round 1).
+	await page.evaluate(
+		() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+	);
 }
 
 async function shoot(page: Page, name: string): Promise<void> {

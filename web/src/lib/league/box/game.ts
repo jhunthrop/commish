@@ -36,32 +36,31 @@ export function isOtherGame(box: Pick<MatchupBox, 'viewer_side'> | null): boolea
 	return box?.viewer_side === 'other';
 }
 
-/** Another team's game as the Matchup draws its head and score: its sides in the box's order, each
- * with the scoreboard's points (the platform's own, as the member's sync side carries them) and the
- * box's flags; no starters of the platform's own read, as the box holds every row. Null where the
- * box is the member's game or the scoreboard has no such game. */
+/** Another team's game as the Matchup draws its head and score (whose game it is the box's own
+ * viewer_side, never the scoreboard's): its sides in the box's order, each with the box's flags and
+ * the scoreboard's points (the platform's own, as the member's sync side carries them), or its points
+ * unread where the scoreboard was not read or lists no such side (review 204 M1); no starters of the
+ * platform's own read, as the box holds every row. Null where the box is the member's game or has no
+ * side. */
 export function otherGame(
 	box: Pick<MatchupBox, 'week' | 'sides' | 'viewer_side'> | null,
 	board: Pick<Scoreboard, 'games'> | null
 ): LeagueMatchup | null {
-	if (box === null || board === null || !isOtherGame(box)) return null;
-	const first = box.sides[0];
-	if (first === undefined) return null;
-	const game = board.games.find((g) => g.sides.some((s) => s.roster_id === first.roster_id));
-	if (game === undefined) return null;
-	const sides = box.sides.map((b): MatchupSide | null => {
-		const side = game.sides.find((s) => s.roster_id === b.roster_id);
-		return side === undefined
-			? null
-			: {
-					roster_id: b.roster_id,
-					points: side.points,
-					points_read: side.points_read,
-					player_points: b.player_points,
-					team_total: b.team_total,
-					starters: []
-				};
+	if (box === null || !isOtherGame(box)) return null;
+	const scored = new Map(
+		(board?.games ?? []).flatMap((g) => g.sides.map((s) => [s.roster_id, s] as const))
+	);
+	const sides = box.sides.map((b): MatchupSide => {
+		const side = scored.get(b.roster_id);
+		return {
+			roster_id: b.roster_id,
+			points: side?.points ?? 0,
+			points_read: side?.points_read ?? false,
+			player_points: b.player_points,
+			team_total: b.team_total,
+			starters: []
+		};
 	});
 	const [mine, opponent = null] = sides;
-	return mine === null || mine === undefined ? null : { week: box.week, mine, opponent };
+	return mine === undefined ? null : { week: box.week, mine, opponent };
 }

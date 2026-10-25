@@ -15,6 +15,8 @@ type Slot = BoxSide['starters'][number]['slot'];
 export const ROSTER_PARAM = 'roster';
 /** The API's words for a roster it refuses (service.go gameRosterWords). */
 export const ROSTER_WORDS = "That team is not in this league's last read";
+/** The API's words for a roster that is no roster id at all (service.go notRosterWords). */
+export const NOT_ROSTER_WORDS = 'Pick a team from the scoreboard';
 /** Digits a roster id can be (service.go maxRosterParam). */
 const ROSTER = /^\d{1,9}$/;
 /** A starter spot the platform left empty. */
