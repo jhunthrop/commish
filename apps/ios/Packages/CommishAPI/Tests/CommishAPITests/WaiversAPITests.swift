@@ -28,7 +28,7 @@ struct WaiversAPITests {
     @Test(arguments: LineupAPITests.clocks)
     func theAddsReadAtEveryClockWithEachLinesGameStateAndThePickupRule(clock: String) async throws {
         let body = try LineupAPITests.answered("waivers-\(Fixture.league)-\(clock).json")
-        let advice = try await Self.client(.ok, body).waivers(id: Fixture.league)
+        let advice = try await Self.client(.ok, body).waivers(id: Fixture.league, position: nil)
         #expect(advice.rows.isEmpty == false)
         #expect(advice.basis.isEmpty == false, "the pickup rule is the API's sentence")
         let lines = advice.rows.map(\.add) + advice.roster
@@ -39,7 +39,7 @@ struct WaiversAPITests {
 
     @Test func theESPNStandInOpensTheClaim() async throws {
         let body = try LineupAPITests.answered("waivers-\(Self.pending)-\(Self.week).json")
-        let advice = try await Self.client(.ok, body).waivers(id: Self.pending)
+        let advice = try await Self.client(.ok, body).waivers(id: Self.pending, position: nil)
         #expect(advice.moves.claim.value1 == .available)
         #expect(advice.pickups.first?.add.player.hostId == "4808766")
     }
@@ -72,13 +72,24 @@ struct WaiversAPITests {
         #expect((made.processesAt != nil) == (outcome == "pending"))
     }
 
+    @Test func aPositionIsSentAsTheRoutesQuery() async throws {
+        let body = try LineupAPITests.answered("waivers-\(Fixture.league)-DEF-\(Self.week).json")
+        let transport = RecordingTransport(status: .ok, body: body)
+        let advice = try await Self.client(transport).waivers(id: Fixture.league, position: .def)
+        #expect(advice.rows.allSatisfy { $0.add.player.position == "DEF" })
+        let sent = await transport.sent
+        #expect(sent.first?.path == "/leagues/attached/\(Fixture.league)/waivers?position=DEF")
+        _ = try await Self.client(transport).waivers(id: Fixture.league, position: nil)
+        #expect(await transport.sent.last?.path == "/leagues/attached/\(Fixture.league)/waivers")
+    }
+
     @Test func aRefusedReadThrowsItsSentenceAndAFailedOneItsStatus() async {
         let body = LineupAPITests.problem("host_failed", "FFPC is not answering.")
         await #expect(throws: APIError.envelope(code: "host_failed", message: "FFPC is not answering.")) {
-            try await Self.client(.badGateway, body).waivers(id: Fixture.league)
+            try await Self.client(.badGateway, body).waivers(id: Fixture.league, position: nil)
         }
         await #expect(throws: APIError.status(401)) {
-            try await Self.client(.unauthorized, Data()).waivers(id: Fixture.league)
+            try await Self.client(.unauthorized, Data()).waivers(id: Fixture.league, position: nil)
         }
     }
 }

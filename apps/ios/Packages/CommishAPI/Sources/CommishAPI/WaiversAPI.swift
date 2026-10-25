@@ -4,13 +4,17 @@ import OpenAPIRuntime
 public typealias WaiverAdvice = Components.Schemas.WaiverAdvice
 public typealias WaiverRow = Components.Schemas.WaiverRow
 public typealias HostBid = Components.Schemas.HostBid
+/// A position the adds narrow to (the route's `position` query): QB, RB, WR, TE, K, DEF.
+public typealias WaiverPosition = Operations.LeagueWaivers.Input.Query.PositionPayload
 
 /// The Waivers screen's reads and writes (web/src/lib/league/inseason/WaiverScreen.svelte): the players
 /// free to add with the API's pickup rule, and the claim planned in words with a confirm token (and the
 /// bid where the league bids) then made once with it, through the same move routes the Start screen
 /// uses (spec §10.2). The seam the view model's tests replace with a stub.
 public protocol WaiversAPI: Sendable {
-    func waivers(id: String) async throws -> WaiverAdvice
+    /// The adds, every position (nil) or one: the API pages at 60 rows, and a position is a read of its
+    /// own, how a player past the first page is reached (WaiverScreen.svelte narrow).
+    func waivers(id: String, position: WaiverPosition?) async throws -> WaiverAdvice
     /// Plans the claim against a fresh read of the league: nothing is sent to the platform.
     func planMove(id: String, move: HostMoveInput) async throws -> HostMovePlan
     /// Makes the planned claim once with its token: sent to the platform once, never retried.
@@ -18,8 +22,11 @@ public protocol WaiversAPI: Sendable {
 }
 
 extension APIClient: WaiversAPI {
-    public func waivers(id: String) async throws -> WaiverAdvice {
-        switch try await Self.unwrapped({ try await client.leagueWaivers(path: .init(id: id)) }) {
+    public func waivers(id: String, position: WaiverPosition?) async throws -> WaiverAdvice {
+        let output = try await Self.unwrapped {
+            try await client.leagueWaivers(path: .init(id: id), query: .init(position: position))
+        }
+        switch output {
         case let .ok(answer):
             return try Self.payload(answer.body.json.value2.data)
         case let .badRequest(answer):
