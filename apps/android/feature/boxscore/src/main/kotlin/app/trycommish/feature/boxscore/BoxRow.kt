@@ -49,6 +49,7 @@ import app.trycommish.design.ArrowMark
 import app.trycommish.design.Avatar
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.NumWeight
 import app.trycommish.design.Pill
 import app.trycommish.design.PillTone
 import app.trycommish.design.R
@@ -91,7 +92,7 @@ fun BoxRow(
                 PlayerCell(cells, actions.open, Modifier.weight(1f), evidence = if (style.evidence) cells.evidence else null)
                 Text(
                     cells.rank,
-                    style = Faces.cell.copy(fontWeight = FontWeight.Medium),
+                    style = Faces.number(NumWeight.Medium),
                     color = if (cells.rank == Words.Box.none) c.ink3 else c.ink,
                     modifier = Modifier.width(BoxColumn.rank).padding(start = Tokens.Space.s1.dp),
                 )
@@ -132,7 +133,7 @@ private fun SlotCell(
         cells.move?.let { ArrowMark(starts = it == Move.Into, side = 18.dp) }
         Text(
             cells.row.slot,
-            style = Faces.cell.copy(fontSize = Tokens.Type.md.sp, fontWeight = FontWeight.Bold),
+            style = Faces.number(NumWeight.Bold, Tokens.Type.md.sp),
             color = if (bench) c.ink3 else c.ink2,
             maxLines = 1,
             softWrap = false,

@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import app.trycommish.core.board.TierBand
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.NumWeight
 import app.trycommish.design.Tokens
 import app.trycommish.design.resolve
 
@@ -75,7 +76,7 @@ internal fun TierStrip(band: TierBand) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.width(STRIP).fillMaxHeight().background(shade), contentAlignment = Alignment.Center) {
-                Text(band.tier.toString(), style = number(FontWeight.ExtraBold), color = INKS[step(band.tier)].resolve(c.dark))
+                Text(band.tier.toString(), style = number(NumWeight.Bold), color = INKS[step(band.tier)].resolve(c.dark))
             }
             Row(
                 Modifier.weight(1f),
@@ -90,7 +91,7 @@ internal fun TierStrip(band: TierBand) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.Bottom,
             ) {
-                band.drop?.let { Text(it, style = number(FontWeight.SemiBold), color = c.ink) }
+                band.drop?.let { Text(it, style = number(NumWeight.SemiBold), color = c.ink) }
                 Quiet(band.dropWords, c.ink2)
             }
         }
@@ -104,7 +105,7 @@ internal fun TierStrip(band: TierBand) {
     }
 }
 
-private fun number(weight: FontWeight) = Faces.cell.copy(fontSize = Tokens.Type.md.sp, fontWeight = weight)
+private fun number(weight: NumWeight) = Faces.number(weight, Tokens.Type.md.sp)
 
 @Composable
 private fun Quiet(
