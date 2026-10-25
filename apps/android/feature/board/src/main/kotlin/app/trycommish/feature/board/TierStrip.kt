@@ -75,7 +75,7 @@ internal fun TierStrip(band: TierBand) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.width(STRIP).fillMaxHeight().background(shade), contentAlignment = Alignment.Center) {
-                Text(band.tier.toString(), style = number(), color = INKS[step(band.tier)].resolve(c.dark))
+                Text(band.tier.toString(), style = number(FontWeight.ExtraBold), color = INKS[step(band.tier)].resolve(c.dark))
             }
             Row(
                 Modifier.weight(1f),
@@ -104,7 +104,7 @@ internal fun TierStrip(band: TierBand) {
     }
 }
 
-private fun number(weight: FontWeight = FontWeight.Bold) = Faces.cell.copy(fontSize = Tokens.Type.md.sp, fontWeight = weight)
+private fun number(weight: FontWeight) = Faces.cell.copy(fontSize = Tokens.Type.md.sp, fontWeight = weight)
 
 @Composable
 private fun Quiet(
