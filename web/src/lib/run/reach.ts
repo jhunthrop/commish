@@ -4,7 +4,7 @@
  * a basis over a Sunday player's GP never claims his week 6, even once his game is final by the
  * hourly status; the schedule sets back every game final by its state (finalsReach). */
 import { weekdayWord } from '#lib/format/date.ts';
-import type { Game, Slate } from './schema.ts';
+import type { Format, Game, Player, Slate } from './schema.ts';
 import type { GameLogRow, PlayerSeason } from './season.ts';
 
 /** What a season's reach reads of a season block: its through week and its log's statuses. */
@@ -137,4 +137,40 @@ export function playedThroughWords(reach: Reach): string {
 	if (parts.length === 0) return '';
 	const many = complete > 1 || parts.length > 1 || (partial?.games ?? 0) > 1;
 	return `${parts.join(' and ')} ${many ? 'are' : 'is'} played`;
+}
+
+/** The run's season reach as the API's /run/manifest sends it (Lane 203): the format every season
+ * block is scored in, that format's chip label, the bases' "through week" words, the complete week,
+ * and the counted partial week's days. Counted over tonight's own pages only (never a held page's
+ * copy); the first page's block names the format and the complete week, which every block in the run
+ * shares (season-checks.ts). */
+export interface RunReach {
+	format: string;
+	scoring: string;
+	through: string;
+	complete: number;
+	partial: { week: number; days: string[] } | null;
+}
+
+type ReachPage = Pick<Player, 'team'> & {
+	season: CountedSeason & Pick<Player['season'], 'format'>;
+};
+
+export function runReach(
+	pages: readonly ReachPage[],
+	slates: readonly SlateGames[],
+	formats: readonly Pick<Format, 'id' | 'label'>[]
+): RunReach {
+	const [first] = pages;
+	if (!first) throw new Error('The run has no page the reader took.');
+	const { format, through: complete } = first.season;
+	const found = formats.find((candidate) => candidate.id === format);
+	if (!found) {
+		const carried = formats.map((candidate) => candidate.id).join(', ');
+		throw new Error(`The run has no ${format} format. It carries ${carried}.`);
+	}
+	const counted = pages.map((page) => ({ ...page.season, team: page.team }));
+	const reach = countedReach(counted, slates, complete);
+	const partial = reach.partial && { week: reach.partial.week, days: reach.partial.days };
+	return { format, scoring: found.label, through: reachWords(reach), complete, partial };
 }

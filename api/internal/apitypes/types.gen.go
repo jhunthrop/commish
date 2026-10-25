@@ -4696,6 +4696,9 @@ type RunManifestAnswer struct {
 	// Manifest the run's manifest.json, the members the site's reader names less the sources block (provenance)
 	Manifest RunManifest `json:"manifest"`
 
+	// Reach the run's season reach (Lane 203), absent on an API from before it and when the run's pages cannot be read for it
+	Reach *RunReach `json:"reach,omitempty"`
+
 	// RunId the published run every /run answer is read from
 	RunId string `json:"run_id"`
 }
@@ -4909,6 +4912,31 @@ type RunPullFigure struct {
 
 	// Figure a number exactly as the capsule writes it
 	Figure string `json:"figure"`
+}
+
+// RunReach how far the run's season figures reach, as the site's bases say it (web/src/lib/run/reach.ts runReach): counted over every own page of the run (never a held page's copy), his club's game by his log, never a game final by its status alone
+type RunReach struct {
+	// Complete the last week whose games are all in
+	Complete int `json:"complete"`
+
+	// Format the format every season block is scored in: ppr-12
+	Format string `json:"format"`
+
+	// Partial the week after it with some counted games in, null with none
+	Partial *RunReachPartial `json:"partial"`
+
+	// Scoring that format as a chip prints it: PPR
+	Scoring string `json:"scoring"`
+
+	// Through what a basis's "through week" says: "through week 5", "through week 5 and week 6's Thursday game"; empty before week 1's games
+	Through string `json:"through"`
+}
+
+// RunReachPartial defines model for RunReachPartial.
+type RunReachPartial struct {
+	// Days the days of its counted games in kickoff order on the Eastern clock ("Thursday"), empty when a counted club's game is not on the schedule ("part of week 6")
+	Days []string `json:"days"`
+	Week int      `json:"week"`
 }
 
 // RunRecord the run's record.json, as written

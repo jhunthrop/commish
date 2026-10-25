@@ -39,7 +39,7 @@ func (h *Handler) Routes() []httpx.Route {
 		return func(w http.ResponseWriter, r *http.Request) { h.serve(w, r, a) }
 	}
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/run/manifest", Access: httpx.Public, Limit: limit, Handler: file(manifestFile)},
+		{Method: http.MethodGet, Path: "/run/manifest", Access: httpx.Public, Limit: limit, Handler: h.handleManifest},
 		{Method: http.MethodGet, Path: "/run/boards/{format}", Access: httpx.Public, Limit: limit, Handler: h.handleBoard},
 		{Method: http.MethodGet, Path: "/run/index", Access: httpx.Public, Limit: limit, Handler: file(indexFile)},
 		{Method: http.MethodGet, Path: "/run/adp", Access: httpx.Public, Limit: limit, Handler: file(adpFile)},
@@ -51,6 +51,31 @@ func (h *Handler) Routes() []httpx.Route {
 		{Method: http.MethodGet, Path: "/run/clubs", Access: httpx.Public, Limit: limit, Handler: file(clubsFile)},
 		{Method: http.MethodGet, Path: "/run/schedule", Access: httpx.Public, Limit: limit, Handler: file(scheduleFile)},
 	}
+}
+
+// handleManifest answers the manifest with the run's season reach beside
+// it (Lane 203), both from one run. When the reach cannot be worked out
+// (a page will not read) the manifest still answers, without the reach,
+// with no ETag and not to be kept, so no client holds the lesser answer
+// under the run's tag; the pass is tried again after failureTTL.
+func (h *Handler) handleManifest(w http.ResponseWriter, r *http.Request) {
+	if !h.ready(w, r) {
+		return
+	}
+	manifest, err := h.Reader.Read(r.Context(), manifestFile)
+	if err != nil {
+		h.unavailable(w, r, err)
+		return
+	}
+	reached, err := h.Reader.ReadIn(r.Context(), manifest.RunID, reachedManifest)
+	if err != nil {
+		h.Log.Warn("runs: the season reach did not work out; the manifest answers without it",
+			"request_id", httpx.RequestIDFrom(r.Context()), "run_id", manifest.RunID, "err", err)
+		w.Header().Set("Cache-Control", "no-store")
+		httpx.WriteOK(w, r, http.StatusOK, manifest.Data)
+		return
+	}
+	h.respond(w, r, reached)
 }
 
 // handleBoard answers a format the published run's manifest lists, and

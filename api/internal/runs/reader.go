@@ -209,6 +209,13 @@ func (r *Reader) keep(runID, file string, c cached) {
 func (r *Reader) load(ctx context.Context, runID string, a artifact) (Answer, error) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), readTimeout)
 	defer cancel()
+	if a.compose != nil {
+		fields, err := a.compose(ctx, r, runID)
+		if err != nil {
+			return Answer{}, fmt.Errorf("runs: run %s %s: %w", runID, a.path, err)
+		}
+		return answerOf(runID, a, fields)
+	}
 	var fields []field
 	raw, err := r.objects.Get(ctx, fileKey(runID, a.path))
 	switch {
@@ -221,6 +228,10 @@ func (r *Reader) load(ctx context.Context, runID string, a artifact) (Answer, er
 			return Answer{}, fmt.Errorf("runs: run %s: %w", runID, err)
 		}
 	}
+	return answerOf(runID, a, fields)
+}
+
+func answerOf(runID string, a artifact, fields []field) (Answer, error) {
 	data, err := encodeAnswer(runID, fields)
 	if err != nil {
 		return Answer{}, fmt.Errorf("runs: run %s %s: %w", runID, a.path, err)
@@ -228,11 +239,16 @@ func (r *Reader) load(ctx context.Context, runID string, a artifact) (Answer, er
 	return Answer{RunID: runID, ETag: etag(runID, a, data), Data: data}, nil
 }
 
-// etag names the run and the file; an hourly file's adds a digest of
-// what it holds, since the run's id stays while it is written again. It
-// is weak: the gzip and the plain body of one answer share it.
+// etag names the run and the file (a composed answer's, the file it
+// names); an hourly file's adds a digest of what it holds, since the
+// run's id stays while it is written again. It is weak: the gzip and the
+// plain body of one answer share it.
 func etag(runID string, a artifact, data []byte) string {
-	tag := runID + "/" + a.path
+	file := a.path
+	if a.tagged != "" {
+		file = a.tagged
+	}
+	tag := runID + "/" + file
 	if a.hourly {
 		sum := sha256.Sum256(data)
 		tag += "@" + hex.EncodeToString(sum[:hourlyTagBytes])

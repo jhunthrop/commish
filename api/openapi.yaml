@@ -1245,7 +1245,10 @@ paths:
         names another run. Only the members the site's reader names are sent; the sources block is provenance and is
         never sent. Every /run route answers a weak ETag (the run id and the file; designations, rewritten beside the run every
         hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a
-        matching If-None-Match. 503 storage_unavailable when the run cannot be read here.
+        matching If-None-Match. 503 storage_unavailable when the run cannot be read here. Beside the manifest, the
+        run's season reach (Lane 203): what every basis's "through week" says, counted over every own page of the run as
+        the site counts it, worked out once per run. It is absent only when the run's pages cannot be read for it; that
+        answer carries no ETag and is not to be kept.
       parameters:
         - $ref: "#/components/parameters/IfNoneMatch"
       responses:
@@ -1287,6 +1290,12 @@ paths:
                         refreshedAt: "2026-10-21T12:00:00.000Z"
                         marketOrder: ffc_adp_ppr_12
                     players: 4
+                  reach:
+                    format: ppr-12
+                    scoring: PPR
+                    through: through week 5
+                    complete: 5
+                    partial: null
         "304": { $ref: "#/components/responses/RunNotModified" }
         "503": { $ref: "#/components/responses/ErrorResponse" }
   /run/boards/{format}:
@@ -4342,6 +4351,42 @@ components:
       properties:
         run_id: { type: string, description: the published run every /run answer is read from }
         manifest: { $ref: "#/components/schemas/RunManifest" }
+        reach:
+          allOf: [{ $ref: "#/components/schemas/RunReach" }]
+          description: >-
+            the run's season reach (Lane 203), absent on an API from before it and when the run's pages cannot be read
+            for it
+    RunReach:
+      type: object
+      description: >-
+        how far the run's season figures reach, as the site's bases say it (web/src/lib/run/reach.ts runReach): counted
+        over every own page of the run (never a held page's copy), his club's game by his log, never a game final by
+        its status alone
+      required: [format, scoring, through, complete, partial]
+      properties:
+        format: { type: string, description: "the format every season block is scored in: ppr-12" }
+        scoring: { type: string, description: "that format as a chip prints it: PPR" }
+        through:
+          type: string
+          description: >-
+            what a basis's "through week" says: "through week 5", "through week 5 and week 6's Thursday game"; empty
+            before week 1's games
+        complete: { type: integer, minimum: 0, description: the last week whose games are all in, 0 before week 1's }
+        partial:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/RunReachPartial" }]
+          description: the week after it with some counted games in, null with none
+    RunReachPartial:
+      type: object
+      required: [week, days]
+      properties:
+        week: { type: integer, minimum: 1 }
+        days:
+          type: array
+          items: { type: string }
+          description: >-
+            the days of its counted games in kickoff order on the Eastern clock ("Thursday"), empty when a counted
+            club's game is not on the schedule ("part of week 6")
     RunBoardRow:
       type: object
       description: a ranked row of boards/<format>.json, ranked by our projection
