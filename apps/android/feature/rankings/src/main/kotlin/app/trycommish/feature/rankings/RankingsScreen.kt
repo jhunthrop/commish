@@ -4,11 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -83,8 +85,7 @@ fun RankingsScreen(
             RankingsState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             RankingsState.SignedOut -> ScreenFailed(AppWords.signedOut, null)
             is RankingsState.Failed -> ScreenFailed(state.message, actions.refresh)
-            is RankingsState.Loaded ->
-                RankingsPage(state.content, ui, head, actions, Modifier.fillMaxSize().verticalScroll(rememberScrollState()))
+            is RankingsState.Loaded -> RankingsList(state.content, ui, head, actions)
         }
     }
 }
@@ -108,13 +109,7 @@ fun RankingsPage(
         modifier.background(CommishTheme.colors.bg).padding(horizontal = Tokens.Space.s3.dp, vertical = Tokens.Space.s4.dp),
         verticalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp),
     ) {
-        PageHead(head.name, head.lead, head.stamp)
-        val hits = (content as? RankingsContent.Order)?.model?.hits
-        Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp)) {
-            SearchField(ui.query, Words.Order.search, hits, actions.find, still)
-            ChipRow(CHIPS, ui.chip, actions.choose, still, Words.InSeason.position)
-        }
-        ProblemLine(ui.problem)
+        RankingsTop(content, ui, head, actions, still)
         when (content) {
             is RankingsContent.Order -> {
                 OrderTable(content.model, first(content.model.sections, rows), actions.open)
@@ -125,6 +120,83 @@ fun RankingsPage(
             }
             is RankingsContent.Week -> WeekTable(content.model, first(content.model.sections, rows), actions.open)
         }
+    }
+}
+
+/**
+ * The Rankings on the phone (review M2): the same page as [RankingsPage] in a lazy list, our order's rows
+ * as keyed items, so a new answer (a chip, a search, Show more to 400) lays out only the rows in view, as
+ * the Board does. The table's frame is drawn slice by slice, each item its part of it.
+ */
+@Composable
+private fun RankingsList(
+    content: RankingsContent,
+    ui: RankingsUi,
+    head: RankingsHead,
+    actions: RankingsActions,
+) {
+    val gap = Tokens.Space.s4.dp
+    LazyColumn(
+        Modifier.fillMaxSize().background(CommishTheme.colors.bg),
+        contentPadding = PaddingValues(horizontal = Tokens.Space.s3.dp, vertical = gap),
+    ) {
+        item(key = "top") { Box(Modifier.padding(bottom = gap)) { RankingsTop(content, ui, head, actions, still = false) } }
+        when (content) {
+            is RankingsContent.Order -> orderItems(content.model, ui, actions)
+            is RankingsContent.Week -> item(key = "week") { WeekTable(content.model, content.model.sections, actions.open) }
+        }
+    }
+}
+
+/** Our order as keyed items: the heads, each section's head and rows, then Show more and the basis. */
+private fun LazyListScope.orderItems(
+    model: RankingsModel,
+    ui: RankingsUi,
+    actions: RankingsActions,
+) {
+    val none = model.none
+    if (none != null) {
+        item(key = "none") {
+            Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp)) {
+                BasisText(none)
+                BasisText(model.basis)
+            }
+        }
+        return
+    }
+    val last = model.rows.lastOrNull()
+    item(key = "heads") { Column(Modifier.tableSlice(first = true)) { RankingsHeadRow(model.heads) } }
+    model.sections.forEach { section ->
+        section.head?.let { words -> item(key = "section-${section.key}") { Column(Modifier.tableSlice()) { SectionRow(words) } } }
+        items(section.rows, key = { "row-${it.player.key}" }) { row ->
+            Column(Modifier.tableSlice(last = row === last)) { RankingsRowView(row, actions.open) }
+        }
+    }
+    item(key = "foot") {
+        Column(Modifier.padding(top = Tokens.Space.s4.dp), verticalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp)) {
+            if (ui.more) QuietButton(Words.Order.moreRows, Modifier.fillMaxWidth(), actions.more)
+            BasisText(model.basis)
+        }
+    }
+}
+
+/** The page's head, the search with the hits, the chips, and why a chip or search could not be read. */
+@Composable
+private fun RankingsTop(
+    content: RankingsContent,
+    ui: RankingsUi,
+    head: RankingsHead,
+    actions: RankingsActions,
+    still: Boolean,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp)) {
+        PageHead(head.name, head.lead, head.stamp)
+        val hits = (content as? RankingsContent.Order)?.model?.hits
+        Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp)) {
+            SearchField(ui.query, Words.Order.search, hits, actions.find, still)
+            ChipRow(CHIPS, ui.chip, actions.choose, still, Words.InSeason.position)
+        }
+        ProblemLine(ui.problem)
     }
 }
 
