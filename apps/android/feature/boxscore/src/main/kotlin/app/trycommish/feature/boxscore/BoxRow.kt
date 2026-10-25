@@ -89,15 +89,24 @@ fun BoxRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SlotCell(cells, bench)
-                PlayerCell(cells, actions.open, Modifier.weight(1f), evidence = if (style.evidence) cells.evidence else null)
-                Text(
-                    cells.rank,
-                    style = Faces.number(NumWeight.Medium),
-                    color = if (cells.rank == Words.Box.none) c.ink3 else c.ink,
-                    modifier = Modifier.width(BoxColumn.rank).padding(start = Tokens.Space.s1.dp),
+                PlayerCell(
+                    cells,
+                    actions.open,
+                    Modifier.weight(1f),
+                    evidence = if (style.evidence) cells.evidence else null,
+                    facts = style.facts,
+                    shortName = style.shortName,
                 )
+                if (style.rank) {
+                    Text(
+                        cells.rank,
+                        style = Faces.number(NumWeight.Medium),
+                        color = if (cells.rank == Words.Box.none) c.ink3 else c.ink,
+                        modifier = Modifier.width(BoxColumn.rank).padding(start = Tokens.Space.s1.dp),
+                    )
+                }
                 Figure(cells.proj, BoxColumn.proj)
-                Figure(cells.pts, BoxColumn.pts)
+                if (style.season) Figure(cells.season, BoxColumn.season) else Figure(cells.pts, BoxColumn.pts)
                 if (style.why) WhyCell(cells, open, actions)
             }
             val why = cells.why
@@ -211,6 +220,8 @@ fun PlayerCell(
     clears: String? = null,
     /** Said in place of his game. */
     note: String? = cells.note,
+    /** His short form, "A. Rodgers", whatever the room (the Trades' rows). */
+    shortName: Boolean = false,
 ) {
     val c = CommishTheme.colors
     val row = cells.row
@@ -218,7 +229,7 @@ fun PlayerCell(
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp)) {
         Avatar(if (row.clubMark) row.club else initialsOf(row.name), BoxColumn.face)
         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            NameLine(cells, ink, sheetPlayer, open)
+            NameLine(cells, ink, sheetPlayer, open, shortName)
             ClubLine(cells)
             GameLine(cells, note, clears)
             if (facts) Facts(cells)
@@ -233,20 +244,22 @@ fun PlayerCell(
     }
 }
 
-/** His name whole where it fits in one line, else his short form ("P. Mahomes"); it opens the sheet. */
+/** His name whole where it fits in one line, else his short form ("P. Mahomes"), the short form always
+ * where the box asks for it; it opens the sheet. */
 @Composable
 private fun NameLine(
     cells: RowCells,
     ink: Color,
     player: SheetPlayer?,
     open: (SheetPlayer) -> Unit,
+    short: Boolean,
 ) {
     val row = cells.row
     val style = Faces.body.copy(fontWeight = FontWeight.SemiBold)
     val measurer = rememberTextMeasurer()
     BoxWithConstraints {
         val whole = measurer.measure(row.name, style, maxLines = 1, softWrap = false).size.width
-        val fits = whole <= constraints.maxWidth
+        val fits = !short && whole <= constraints.maxWidth
         Text(
             if (fits) row.name else row.fit,
             style = style,
