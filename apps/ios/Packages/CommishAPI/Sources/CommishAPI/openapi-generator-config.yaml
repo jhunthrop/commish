@@ -25,3 +25,7 @@ filter:
     - runDesignations
     - runClubs
     - leagueWaivers
+    - order
+    - weekOrder
+    - runRecord
+    - runSchedule
