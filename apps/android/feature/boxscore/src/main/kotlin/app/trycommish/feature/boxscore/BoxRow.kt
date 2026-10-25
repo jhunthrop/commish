@@ -222,7 +222,11 @@ fun PlayerCell(
             GameLine(cells, note, clears)
             if (facts) Facts(cells)
             if (evidence != null) {
-                Text(evidence(cells, evidence), style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.sp), color = c.ink2)
+                Text(
+                    evidence(cells, evidence),
+                    style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.sp),
+                    color = c.ink2,
+                )
             }
         }
     }
@@ -285,7 +289,9 @@ private fun GameLine(
                     withStyle(SpanStyle(color = c.ink2)) { append(game.time) }
                     clears?.let {
                         append(" ")
-                        withStyle(SpanStyle(color = c.accentText, fontWeight = FontWeight.SemiBold, fontSize = Tokens.Type.xs.sp)) { append(it) }
+                        withStyle(
+                            SpanStyle(color = c.accentText, fontWeight = FontWeight.SemiBold, fontSize = Tokens.Type.xs.sp),
+                        ) { append(it) }
                     }
                 },
                 style = Faces.small,
