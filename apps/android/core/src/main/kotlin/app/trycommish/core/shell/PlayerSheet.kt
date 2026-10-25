@@ -87,6 +87,9 @@ object SiteLinks {
     /** The site, whose assetlinks.json hands its app-link paths to the app. */
     const val ORIGIN = "https://trycommish.app"
 
+    /** Our record, past weeks of our order (the Lineup strip's link, web links.record()). */
+    const val RECORD = "$ORIGIN/record"
+
     /** A player's page, /players/<slug>. */
     fun player(slug: String): String = "$ORIGIN/players/$slug"
 

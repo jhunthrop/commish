@@ -23,7 +23,8 @@ private const val TIMEOUT_MS = 15_000L
 /**
  * The one way the app reaches the API: the generated clients, each sharing one engine and one
  * configuration that adds the device token as a bearer (when there is one) and a fresh request id
- * on every request. `token` is read per request, so a sign-in or a sign-out takes effect at once.
+ * on every request, a request's body written with [CommishRequestJson]. `token` is read per request,
+ * so a sign-in or a sign-out takes effect at once.
  */
 class Transport(
     private val baseUrl: String,
@@ -32,7 +33,7 @@ class Transport(
     private val requestId: () -> String = { UUID.randomUUID().toString() },
 ) {
     private val config: (HttpClientConfig<*>) -> Unit = { client ->
-        client.install(ContentNegotiation) { json(CommishJson) }
+        client.install(ContentNegotiation) { json(CommishRequestJson) }
         client.install(HttpTimeout) {
             requestTimeoutMillis = TIMEOUT_MS
             connectTimeoutMillis = TIMEOUT_MS
