@@ -37,12 +37,27 @@ internal fun gameHead(
     next: String?,
     now: Instant,
 ): Head {
-    if (state == ScoreboardGame.State.final) return Head(GameState.Final, null)
-    val kickoff = next?.let(Instant::parse)
-    val ahead = kickoff?.takeIf { it.isAfter(now) }
+    // A state this build does not know reads by its kickoff alone, as an upcoming game does.
+    val read =
+        when (state) {
+            ScoreboardGame.State.final -> GameState.Final
+            ScoreboardGame.State.playing -> GameState.KickedOff
+            else -> GameState.Upcoming
+        }
+    return gameHead(read, next?.let(Instant::parse), now)
+}
+
+/** kickoff.ts gameHead over a read's state (kicked off for the API's playing) and its next kickoff. */
+internal fun gameHead(
+    read: GameState,
+    next: Instant?,
+    now: Instant,
+): Head {
+    val ahead = next?.takeIf { it.isAfter(now) }
     return when {
-        state == ScoreboardGame.State.playing -> Head(GameState.KickedOff, ahead)
-        kickoff == null -> Head(GameState.Upcoming, null)
+        read == GameState.Final -> Head(GameState.Final, null)
+        read == GameState.KickedOff -> Head(GameState.KickedOff, ahead)
+        next == null -> Head(GameState.Upcoming, null)
         ahead == null -> Head(GameState.KickedOff, null)
         else -> Head(GameState.Upcoming, ahead)
     }
@@ -55,6 +70,13 @@ internal fun agoCell(seconds: Long): String =
         seconds < HOUR_SECONDS -> "${seconds / MINUTE_SECONDS} ${Words.LeagueHome.minAgo}"
         else -> "${seconds / HOUR_SECONDS} ${Words.LeagueHome.hrAgo}"
     }
+
+/** home.ts readCell: "FFPC 4 min ago". */
+internal fun readCell(
+    platform: String,
+    readAt: Instant,
+    now: Instant,
+): String = "$platform ${agoCell(Duration.between(readAt, now).seconds.coerceAtLeast(0))}"
 
 /** Every side's starters with a game are final; never before the first kickoff. */
 private fun sideFinal(
@@ -123,8 +145,7 @@ internal fun gameBugs(
     zone: ZoneId,
 ): List<GameBug> {
     val teams = sync.teams.associateBy { it.rosterId }
-    val seconds = Duration.between(Instant.parse(board.readAt), now).seconds.coerceAtLeast(0)
-    val readCell = "${ValueWords.platform(sync.host)} ${agoCell(seconds)}"
+    val readCell = readCell(ValueWords.platform(sync.host), Instant.parse(board.readAt), now)
     return board.games.mapIndexed { i, game ->
         val head = gameHead(game.state, game.nextKickoff, now)
         val finals = game.sides.map { sideFinal(it, head.state) }

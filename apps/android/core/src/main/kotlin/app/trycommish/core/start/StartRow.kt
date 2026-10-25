@@ -243,7 +243,7 @@ internal object StartRows {
     fun withoutDefense(name: String): String = name.replace(defense, "")
 
     /** box.ts initialName: "A. Rodgers", a one-word name as it is. */
-    private fun initialName(name: String): String {
+    fun initialName(name: String): String {
         val trimmed = name.trim()
         val first = trimmed.split(whitespace).firstOrNull().orEmpty()
         val last = lastName(trimmed)
