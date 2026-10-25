@@ -155,6 +155,23 @@ void test('the game cell: the opponent and kickoff, Final once played, the bye',
 	assert.equal(BOX.noClub, 'No club');
 });
 
+void test("a cached field behind the page's clock: the row turns at kickoff, the web's word (Lane 178)", () => {
+	const cached = line(
+		{ game_state: { state: 'not_started', word: 'Next kickoff' } },
+		{ kickoff: SUNDAY_NOON, game_state: 'upcoming' }
+	);
+	const before = boxRow(cached, 'QB', ZONE, true, NOW);
+	assert.equal(before.state, 'upcoming');
+	assert.deepEqual(before.game, { where: 'at ATL', when: 'Sun 12:00 pm' });
+	// On Monday the page's clock is past the kickoff the field was read before.
+	const monday = Date.parse('2026-10-19T16:00:00.000Z');
+	const after = boxRow(cached, 'QB', ZONE, true, monday);
+	assert.equal(after.state, 'kicked_off');
+	assert.equal(after.toCome, false);
+	assert.deepEqual(after.game, { where: 'at ATL', when: 'Kicked off' });
+	assert.equal(after.expected, null);
+});
+
 void test('the game cell reads the API field first and prints its word (Lane 178)', () => {
 	const upcoming = facts({ kickoff: SUNDAY_NOON });
 	assert.deepEqual(
