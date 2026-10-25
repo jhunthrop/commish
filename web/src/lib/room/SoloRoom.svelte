@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { lastName, pickLabel, snakeSlot } from '#lib/format/draft.ts';
+	import { lastName, snakeSlot } from '#lib/format/draft.ts';
 	import Keys from '#lib/ui/Keys.svelte';
 	import LiveRegion from '#lib/ui/LiveRegion.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
@@ -26,7 +26,8 @@
 	import SharedHead from './SharedHead.svelte';
 	import SoloBar from './SoloBar.svelte';
 	import Wall from './Wall.svelte';
-	import { botNames, pickBarCells } from './words.ts';
+	import { MOCK, chanceLabel as chanceWords, readingWords } from './mock-words.ts';
+	import { ROOM, botNames, pickBarCells } from './words.ts';
 
 	/** A shared draft: read by someone else, never drafted in, with one verb that runs it as theirs. */
 	interface Shared {
@@ -146,9 +147,7 @@
 	});
 	const callReady = $derived(call !== null && paintedFor === room.pick_number);
 	const chance = $derived(card?.still_there ?? {});
-	const chanceLabel = $derived(
-		card?.next_pick ? `still there at ${pickLabel(card.next_pick, teams)}` : 'your last pick'
-	);
+	const chanceLabel = $derived(chanceWords(card?.next_pick ?? null, teams));
 	/** The marked player, else our call, else with no call coming the pool's top row. */
 	const selectedId = $derived(
 		marked !== null && !drafted.has(marked)
@@ -162,7 +161,7 @@
 	/** The drafter's seat on the wall: you, or in a shared draft the drafter by handle. */
 	const names = $derived(
 		botNames(teams, room.slot).map((n, i) =>
-			readonly && i + 1 === room.slot ? (room.shared_by ?? 'Drafter') : n
+			readonly && i + 1 === room.slot ? (room.shared_by ?? MOCK.drafter) : n
 		)
 	);
 	const lastMine = $derived(mine.at(-1)?.pick ?? null);
@@ -271,12 +270,12 @@
 		<SinceStrip since={prev} {went} {teams} {whose} queue={queueAll.size > 0} />
 	{/if}
 	{#if noCall}
-		<Panel as="section" label="No call for this pick" padding="md" edge="quiet">
+		<Panel as="section" label={MOCK.noCall} padding="md" edge="quiet">
 			<div class="nocall" role="status">
-				<p>No call for this pick. Draft from the pool.</p>
+				<p>{MOCK.noCall}</p>
 				{#if selectedId !== null && selectedName !== null}
 					<Verb key="Enter" disabled={busy} onclick={() => draft(selectedId)}
-						>Draft <span data-name>{lastName(selectedName)}</span></Verb
+						>{MOCK.draft} <span data-name>{lastName(selectedName)}</span></Verb
 					>
 				{/if}
 			</div>
@@ -286,7 +285,7 @@
 			view={frame}
 			reading={readingFor === null
 				? undefined
-				: `Reading the room for ${pickLabel(readingFor, teams)}`}
+				: readingWords(readingFor, teams)}
 			action={{
 				label: draftWords(frame.player.position),
 				key: 'Enter',
@@ -331,7 +330,7 @@
 	/>
 	{#snippet dock()}
 		<TeamPanel
-			title={readonly ? 'Their team' : 'Your team'}
+			title={readonly ? MOCK.theirTeam : ROOM.yourTeam}
 			slots={teamSlots(room.settings, mine, board)}
 			rosterSize={room.rounds}
 			{teams}

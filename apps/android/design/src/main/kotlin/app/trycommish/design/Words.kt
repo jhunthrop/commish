@@ -879,4 +879,53 @@ object Words {
         const val medianPoints = "median starting points"
         const val middleRuns = "the middle 80% of runs"
     }
+
+    object Mock {
+        const val undo = "Undo"
+        const val more = "More"
+        const val finish = "Finish the draft"
+        const val share = "Save and share"
+        const val copied = "Link copied"
+        const val queue = "Queue"
+        const val queued = "Queued"
+        const val draft = "Draft"
+        const val noCall = "No call for this pick. Draft from the pool."
+        const val theirTeam = "Their team"
+        const val drafter = "Drafter"
+        const val lastPick = "your last pick"
+        const val newMock = "New mock"
+        const val setupTitle = "New mock"
+        const val scoring = "Scoring"
+        const val teams = "Teams"
+        const val slot = "Your slot"
+        const val random = "Random"
+        const val lineup = "Lineup"
+        const val start = "Start against bots"
+        const val tryAnother = "Try another slot"
+        const val copyLink = "Copy a share link"
+        const val botsByAdp = "Bots by ADP"
+        const val setUpOwn = "Set up your own"
+        const val stillThere = "Still there"
+        const val reshuffled = "the bots"
+        const val unreachable = "The room could not be reached. Check the connection and reload."
+        const val sharedNote = "It starts from the first pick with the same settings and bots, so they draft the same way until a pick of yours changes the board."
+    }
+
+    object MockSetup {
+        const val ppr = "PPR"
+        const val half_ppr = "Half PPR"
+        const val standard = "Standard"
+        const val te_premium = "TE premium"
+        const val lineupStandard = "Standard"
+        const val superflex = "Superflex"
+        const val twoFlex = "2 flex"
+    }
+
+    object MockClocks {
+        const val label = "The clocks"
+        const val botClock = "Clock against bots"
+        const val none = "None"
+        const val lobbyClock = "Clock in a lobby"
+        const val lobbyStarts = "A lobby starts"
+    }
 }

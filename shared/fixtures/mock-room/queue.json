@@ -1,0 +1,411 @@
+{
+	"data": {
+		"created_at": "2026-10-25T16:00:29.497-05:00",
+		"id": "98cd4c08-d008-455a-8e8b-2ad04ac81ae9",
+		"league_id": null,
+		"on_clock": 5,
+		"pick_number": 53,
+		"picks": [
+			{
+				"auto": false,
+				"pick": 1,
+				"player_id": "4430807",
+				"round": 1,
+				"seat": 1
+			},
+			{
+				"auto": false,
+				"pick": 2,
+				"player_id": "4429795",
+				"round": 1,
+				"seat": 2
+			},
+			{
+				"auto": false,
+				"pick": 3,
+				"player_id": "4362628",
+				"round": 1,
+				"seat": 3
+			},
+			{
+				"auto": false,
+				"pick": 4,
+				"player_id": "4426515",
+				"round": 1,
+				"seat": 4
+			},
+			{
+				"auto": false,
+				"pick": 5,
+				"player_id": "4241389",
+				"round": 1,
+				"seat": 5
+			},
+			{
+				"auto": false,
+				"pick": 6,
+				"player_id": "4429160",
+				"round": 1,
+				"seat": 6
+			},
+			{
+				"auto": false,
+				"pick": 7,
+				"player_id": "4374302",
+				"round": 1,
+				"seat": 7
+			},
+			{
+				"auto": false,
+				"pick": 8,
+				"player_id": "3117251",
+				"round": 1,
+				"seat": 8
+			},
+			{
+				"auto": false,
+				"pick": 9,
+				"player_id": "4430878",
+				"round": 1,
+				"seat": 9
+			},
+			{
+				"auto": false,
+				"pick": 10,
+				"player_id": "4362238",
+				"round": 1,
+				"seat": 10
+			},
+			{
+				"auto": false,
+				"pick": 11,
+				"player_id": "4262921",
+				"round": 1,
+				"seat": 11
+			},
+			{
+				"auto": false,
+				"pick": 12,
+				"player_id": "4047646",
+				"round": 1,
+				"seat": 12
+			},
+			{
+				"auto": false,
+				"pick": 13,
+				"player_id": "4426502",
+				"round": 2,
+				"seat": 12
+			},
+			{
+				"auto": false,
+				"pick": 14,
+				"player_id": "4242335",
+				"round": 2,
+				"seat": 11
+			},
+			{
+				"auto": false,
+				"pick": 15,
+				"player_id": "4428331",
+				"round": 2,
+				"seat": 10
+			},
+			{
+				"auto": false,
+				"pick": 16,
+				"player_id": "3043078",
+				"round": 2,
+				"seat": 9
+			},
+			{
+				"auto": false,
+				"pick": 17,
+				"player_id": "4379399",
+				"round": 2,
+				"seat": 8
+			},
+			{
+				"auto": false,
+				"pick": 18,
+				"player_id": "4426354",
+				"round": 2,
+				"seat": 7
+			},
+			{
+				"auto": false,
+				"pick": 19,
+				"player_id": "4567048",
+				"round": 2,
+				"seat": 6
+			},
+			{
+				"auto": false,
+				"pick": 20,
+				"player_id": "4361370",
+				"round": 2,
+				"seat": 5
+			},
+			{
+				"auto": false,
+				"pick": 21,
+				"player_id": "3929630",
+				"round": 2,
+				"seat": 4
+			},
+			{
+				"auto": false,
+				"pick": 22,
+				"player_id": "4258173",
+				"round": 2,
+				"seat": 3
+			},
+			{
+				"auto": false,
+				"pick": 23,
+				"player_id": "4685382",
+				"round": 2,
+				"seat": 2
+			},
+			{
+				"auto": false,
+				"pick": 24,
+				"player_id": "4890973",
+				"round": 2,
+				"seat": 1
+			},
+			{
+				"auto": false,
+				"pick": 25,
+				"player_id": "4429615",
+				"round": 3,
+				"seat": 1
+			},
+			{
+				"auto": false,
+				"pick": 26,
+				"player_id": "4870808",
+				"round": 3,
+				"seat": 2
+			},
+			{
+				"auto": false,
+				"pick": 27,
+				"player_id": "4595348",
+				"round": 3,
+				"seat": 3
+			},
+			{
+				"auto": false,
+				"pick": 28,
+				"player_id": "4361579",
+				"round": 3,
+				"seat": 4
+			},
+			{
+				"auto": false,
+				"pick": 29,
+				"player_id": "4432665",
+				"round": 3,
+				"seat": 5
+			},
+			{
+				"auto": false,
+				"pick": 30,
+				"player_id": "4569618",
+				"round": 3,
+				"seat": 6
+			},
+			{
+				"auto": false,
+				"pick": 31,
+				"player_id": "4361307",
+				"round": 3,
+				"seat": 7
+			},
+			{
+				"auto": false,
+				"pick": 32,
+				"player_id": "4685472",
+				"round": 3,
+				"seat": 8
+			},
+			{
+				"auto": false,
+				"pick": 33,
+				"player_id": "4430737",
+				"round": 3,
+				"seat": 9
+			},
+			{
+				"auto": false,
+				"pick": 34,
+				"player_id": "4241478",
+				"round": 3,
+				"seat": 10
+			},
+			{
+				"auto": false,
+				"pick": 35,
+				"player_id": "3918298",
+				"round": 3,
+				"seat": 11
+			},
+			{
+				"auto": false,
+				"pick": 36,
+				"player_id": "4427366",
+				"round": 3,
+				"seat": 12
+			},
+			{
+				"auto": false,
+				"pick": 37,
+				"player_id": "4239996",
+				"round": 4,
+				"seat": 12
+			},
+			{
+				"auto": false,
+				"pick": 38,
+				"player_id": "4696981",
+				"round": 4,
+				"seat": 11
+			},
+			{
+				"auto": false,
+				"pick": 39,
+				"player_id": "4239993",
+				"round": 4,
+				"seat": 10
+			},
+			{
+				"auto": false,
+				"pick": 40,
+				"player_id": "4567750",
+				"round": 4,
+				"seat": 9
+			},
+			{
+				"auto": false,
+				"pick": 41,
+				"player_id": "3915416",
+				"round": 4,
+				"seat": 8
+			},
+			{
+				"auto": false,
+				"pick": 42,
+				"player_id": "16800",
+				"round": 4,
+				"seat": 7
+			},
+			{
+				"auto": false,
+				"pick": 43,
+				"player_id": "4612826",
+				"round": 4,
+				"seat": 6
+			},
+			{
+				"auto": false,
+				"pick": 44,
+				"player_id": "4426388",
+				"round": 4,
+				"seat": 5
+			},
+			{
+				"auto": false,
+				"pick": 45,
+				"player_id": "4259545",
+				"round": 4,
+				"seat": 4
+			},
+			{
+				"auto": false,
+				"pick": 46,
+				"player_id": "4596448",
+				"round": 4,
+				"seat": 3
+			},
+			{
+				"auto": false,
+				"pick": 47,
+				"player_id": "4372016",
+				"round": 4,
+				"seat": 2
+			},
+			{
+				"auto": false,
+				"pick": 48,
+				"player_id": "3121422",
+				"round": 4,
+				"seat": 1
+			},
+			{
+				"auto": false,
+				"pick": 49,
+				"player_id": "4685702",
+				"round": 5,
+				"seat": 1
+			},
+			{
+				"auto": false,
+				"pick": 50,
+				"player_id": "3915511",
+				"round": 5,
+				"seat": 2
+			},
+			{
+				"auto": false,
+				"pick": 51,
+				"player_id": "4882093",
+				"round": 5,
+				"seat": 3
+			},
+			{
+				"auto": false,
+				"pick": 52,
+				"player_id": "16737",
+				"round": 5,
+				"seat": 4
+			}
+		],
+		"queue": [
+			"4431452",
+			"4035538",
+			"4723086"
+		],
+		"rounds": 15,
+		"seed": 213,
+		"seq": 54,
+		"settings": {
+			"bot_style": "adp",
+			"keepers": [],
+			"lineup": "standard",
+			"roster": {
+				"bench": 6,
+				"dst": 1,
+				"k": 1,
+				"qb": 1,
+				"rb": 2,
+				"te": 1,
+				"wr": 2
+			},
+			"scoring": {
+				"preset": "ppr"
+			},
+			"slot": 5,
+			"teams": 12
+		},
+		"share_code": "HI1BbuswDAXvMmsuviTH3-VVgqCQI6IN4sqqpLYogty9sDbkEHyD9-Ab9UJDH6x7f239dzOUmArC3axYbej5Imy3bF8FpfWYU6wJoe6tWx2y5es7OgupddQJ9zE_17HqOnq6jeunov4ptOteb_nt8Eu1Zh2llMrx2vaOng4lfjTUjbxZQr0LQkHPTH5yYXlBmMLswv9_B03Bz_NpkJ_DsnARMsoWs3kXeP4NAA.PaiCW1M0MwfAIhpraH2Klw",
+		"shared_by": "lane213",
+		"slot": 5,
+		"status": "active",
+		"teams": 12,
+		"waiting": true
+	},
+	"error": null,
+	"ok": true,
+	"request_id": "66721dd07485e147"
+}

@@ -10,6 +10,7 @@
 	import { gapText, gapTone } from '#lib/format/gap.ts';
 	import { isMarketPosition } from '#lib/run/market.ts';
 	import type { RoomPlayer } from './model.ts';
+	import { MOCK } from './mock-words.ts';
 
 	interface Props {
 		player: RoomPlayer;
@@ -103,9 +104,9 @@
 		>{/if}
 	{#if !readonly}
 		<span class="acts">
-			<span class="q"><Quiet size="sm" onclick={onqueue}>{queued ? 'Queued' : 'Queue'}</Quiet></span
+			<span class="q"><Quiet size="sm" onclick={onqueue}>{queued ? MOCK.queued : MOCK.queue}</Quiet></span
 			>
-			{#if draftShown}<Quiet size="sm" disabled={!canDraft} onclick={ondraft}>Draft</Quiet>{/if}
+			{#if draftShown}<Quiet size="sm" disabled={!canDraft} onclick={ondraft}>{MOCK.draft}</Quiet>{/if}
 		</span>
 	{/if}
 </div>

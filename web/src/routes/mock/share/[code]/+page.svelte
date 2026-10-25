@@ -7,6 +7,7 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { runShared } from '#lib/room/actions.ts';
+	import { MOCK, runSharedWords } from '#lib/room/mock-words.ts';
 	import { botNames } from '#lib/room/words.ts';
 	import { type MockReport, type MockRoom, rooms } from '#lib/room/api.ts';
 	import { type Board, boardOf } from '#lib/room/model.ts';
@@ -60,7 +61,7 @@
 			/>{/if}
 	{/snippet}
 	{#snippet tail()}
-		<Quiet href={resolve('/mock/new')}>New mock</Quiet>
+		<Quiet href={resolve('/mock/new')}>{MOCK.newMock}</Quiet>
 	{/snippet}
 	{#if error}
 		<div class="notice">
@@ -69,16 +70,16 @@
 	{/if}
 	{#if report && room}
 		{@const r = report}
-		{@const sharer = room.shared_by ?? 'Drafter'}
+		{@const sharer = room.shared_by ?? MOCK.drafter}
 		<Report
 			report={r}
 			names={botNames(r.teams, r.slot).map((n, i) => (i + 1 === r.slot ? sharer : n))}
-			seats="Bots by ADP"
+			seats={MOCK.botsByAdp}
 			shared={{ by: room.shared_by ?? null }}
 		>
 			{#snippet verbs()}
-				<Verb onclick={run} disabled={starting}>Run this draft from slot {r.slot}</Verb>
-				<Quiet href={resolve('/mock/new')}>Set up your own</Quiet>
+				<Verb onclick={run} disabled={starting}>{runSharedWords(r.slot)}</Verb>
+				<Quiet href={resolve('/mock/new')}>{MOCK.setUpOwn}</Quiet>
 			{/snippet}
 		</Report>
 	{:else if room && board}
