@@ -41,5 +41,6 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
     // The specimen is a Paparazzi rule, a JUnit 4 test, run on the platform beside the JUnit 5 ones.
     testImplementation(libs.junit4)
+    testImplementation(libs.coroutines.test)
     testRuntimeOnly(libs.junit.vintage.engine)
 }

@@ -13,12 +13,14 @@ class FaceWeightTest {
     @Test
     fun `the roles are iOS's CSS numbers and each draws heavier than it asks`() {
         assertEquals(listOf(500, 600, 700), NumWeight.entries.map { it.css })
+        assertEquals(listOf(625, 675, 750), NumWeight.entries.map { it.drawn })
         NumWeight.entries.forEach { assert(it.drawn >= it.css) { "${it.name} draws at ${it.drawn}, under its CSS ${it.css}" } }
     }
 
     @Test
     fun `the interface face answers every CSS weight a screen asks for, drawn heavier as iOS draws it`() {
         assertEquals(listOf(400, 500, 600, 700), UiWeight.entries.map { it.css })
+        assertEquals(listOf(475, 575, 675, 775), UiWeight.entries.map { it.drawn })
         assertEquals(
             listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold).map { it.weight },
             UiWeight.entries.map { it.css },
@@ -60,6 +62,7 @@ class FaceWeightTest {
                 Regex("""Faces\.(cell|figure|head|number\([^)]*\))\.copy\((?:[^()]|\([^()]*\))*fontWeight"""),
                 Regex("""FontWeight\.(ExtraBold|Black)"""),
                 Regex("""FontVariation"""),
+                Regex("""FontWeight\(\d"""),
             )
     }
 }
