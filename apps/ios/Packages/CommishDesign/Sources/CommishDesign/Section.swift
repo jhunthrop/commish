@@ -78,14 +78,17 @@ public struct QuietButton: View {
     }
 }
 
-/// The screen's one solid verb, in the accent (web Verb.svelte).
+/// The screen's one solid verb, in the accent (web Verb.svelte); disabled, quiet on the surface, with
+/// the reason said beside it by the screen.
 public struct Verb: View {
     @Environment(\.colorScheme) private var colorScheme
     private let title: String
+    private let enabled: Bool
     private let action: () -> Void
 
-    public init(_ title: String, action: @escaping () -> Void) {
+    public init(_ title: String, enabled: Bool = true, action: @escaping () -> Void) {
         self.title = title
+        self.enabled = enabled
         self.action = action
     }
 
@@ -94,10 +97,14 @@ public struct Verb: View {
         Button(action: action) {
             Text(title)
                 .font(Faces.font(.ui, size: Tokens.TypeScale.md, weight: .bold))
-                .foregroundStyle(theme.color(Tokens.Color.accentInk))
+                .foregroundStyle(theme.color(enabled ? Tokens.Color.accentInk : Tokens.Color.ink3))
                 .frame(maxWidth: .infinity, minHeight: 48)
-                .background(RoundedRectangle(cornerRadius: Tokens.Radius.md).fill(theme.color(Tokens.Color.accent)))
+                .background(
+                    RoundedRectangle(cornerRadius: Tokens.Radius.md)
+                        .fill(theme.color(enabled ? Tokens.Color.accent : Tokens.Color.surface2))
+                )
         }
         .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 }
