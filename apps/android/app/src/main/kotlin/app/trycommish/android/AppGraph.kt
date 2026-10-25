@@ -123,8 +123,9 @@ class AppGraph(
 
     fun leagueHomeViewModel(): LeagueHomeViewModel = LeagueHomeViewModel(reads, cache, clock, zone, sessionEnd)
 
-    /** A league's Matchup, read again once a minute while it is on screen. */
-    fun matchupViewModel(): MatchupViewModel = MatchupViewModel(matchups, cache, clock, zone, sessionEnd)
+    /** A league's Matchup, the member's game (`roster` null) or another team's by its first side's roster,
+     * read again once a minute while it is on screen. */
+    fun matchupViewModel(roster: Int? = null): MatchupViewModel = MatchupViewModel(matchups, cache, clock, zone, sessionEnd, roster)
 
     /** The board from the run: the draft's Board, or in season the Rest of season, with the verb that
      * follows whether the member follows a league. */

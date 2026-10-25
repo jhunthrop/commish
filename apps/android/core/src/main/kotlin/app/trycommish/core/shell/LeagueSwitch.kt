@@ -68,6 +68,13 @@ sealed interface ShellRoute {
     data class Player(
         val slug: String,
     ) : ShellRoute
+
+    /** A game of the league's week (Lane 207): another team's by its first side's roster, pushed from its
+     * score bug; the member's own (roster null) where the bar has no Matchup tab for the league. */
+    data class Game(
+        val leagueId: String,
+        val roster: Int?,
+    ) : ShellRoute
 }
 
 /** Where a choice in the shell lands: a tab of the bar, or a screen pushed on the tab in view. */
@@ -115,3 +122,17 @@ fun homeOf(
 
 /** The Players screen for what was typed, null when nothing was. */
 fun searchRoute(typed: String): ShellRoute.Players? = typed.trim().takeIf { it.isNotEmpty() }?.let(ShellRoute::Players)
+
+/** Where a score bug opens its game: the member's on the Matchup tab where the bar has one and the league
+ * is the one the tabs show, else pushed on the tab in view, as every other team's game is. */
+fun gameOf(
+    roster: Int?,
+    leagueId: String,
+    shown: String?,
+    bar: List<RailItem>,
+): ShellDestination =
+    if (roster == null && leagueId == shown && bar.any { it.page == MATCHUP_PAGE }) {
+        ShellDestination.Tab(MATCHUP_PAGE)
+    } else {
+        ShellDestination.Push(ShellRoute.Game(leagueId, roster))
+    }

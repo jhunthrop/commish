@@ -199,6 +199,59 @@ class MatchupParityTest {
         }
     }
 
+    /** Another team's game at every clock (Lane 207, as iOS Lane 206): drawn from its own box and the
+     * Sleeper league's scoreboard, its head the web's whose line, no You or Opponent, no note and no box
+     * or row of the member's, every cell and the basis the web's. */
+    @ParameterizedTest
+    @MethodSource("clocks")
+    fun `another team's game is the web's`(clock: String) {
+        val web =
+            parity
+                .getValue("otherGame")
+                .jsonObject
+                .getValue(clock)
+                .jsonObject
+        val model =
+            matchupModel(
+                MatchupFixtures.otherSync(clock),
+                MatchupFixtures.otherBox(clock),
+                StartFixtures.instant(clock),
+                Fixtures.zone,
+                MatchupFixtures.otherBoard(clock),
+            )
+        val week = (model as? MatchupModel.Week)?.week ?: error("no week at $clock")
+        val whose = web.getValue("whose").jsonObject
+        assertEquals(GameWhose(whose.text("head").orEmpty(), whose.text("link").orEmpty()), week.whose)
+        val title = web.getValue("title").jsonObject
+        val bug = web.getValue("bug").jsonObject
+        val kickoff = bug["kickoff"] as? JsonObject
+        assertEquals(web.text("week"), week.week)
+        assertEquals(title.text("mine"), week.mine)
+        assertEquals(title.text("opponent"), week.opponent)
+        assertEquals(sideOf(bug["mine"] as? JsonObject), sideOf(week.bug.mine), clock)
+        assertEquals(sideOf(bug["opponent"] as? JsonObject), sideOf(week.bug.opponent), clock)
+        assertTrue(!week.bug.mine.me && week.bug.opponent?.me != true)
+        assertEquals(kickoff?.text("head"), week.bug.head)
+        assertEquals(kickoff?.text("words").orEmpty(), week.bug.words)
+        assertEquals(bug.text("read"), week.bug.read)
+        assertEquals(bug.text("standing"), week.bug.standing)
+        assertEquals(listOfNotNull(web.text("allPlay"), web.text("scoreGap")), week.notes)
+        val boxes = web.getValue("boxes").jsonArray.map { it.jsonObject }
+        assertEquals(boxes.map { it.text("team") }, week.boxes.map { it.team })
+        assertEquals(boxes.map { it.getValue("mine").jsonPrimitive.boolean }, week.boxes.map { it.mine })
+        boxes.zip(week.boxes).forEach { (theirs, ours) ->
+            val label = "$clock ${ours.team}"
+            assertEquals(theirs.text("empty"), ours.empty, label)
+            assertEquals(theirs.rows("starters"), ours.starters.map(::rowOf), label)
+            val team = theirs.getValue("team_row").jsonObject
+            assertEquals(team.text("proj").orEmpty(), ours.teamRow.proj, label)
+            assertEquals(team.text("pts").orEmpty(), ours.teamRow.pts, label)
+            assertEquals(theirs.rows("bench"), ours.bench.map(::rowOf), "$label bench")
+        }
+        assertEquals(web.text("basis"), week.basis)
+        assertTrue(week.sheetPlayers.none(week::isMine))
+    }
+
     /** No screen computes game state: every line the fixture's boxes hold carries the API's field. */
     @ParameterizedTest
     @MethodSource("clocks")

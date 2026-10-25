@@ -103,6 +103,21 @@ class LeagueSwitchTest {
         assertNull(lineupOf(preDraft.id, preDraft.id, phoneBar(preDraft, null)))
     }
 
+    /** A score bug opens its game (Lane 207): the member's on the Matchup tab for the league the tabs show;
+     * another team's, or the member's where the bar has no Matchup for that league, pushed. */
+    @Test
+    fun `a score bug opens its game`() {
+        val (season, preDraft) = ShellFixtures.three().let { it[0] to it[1] }
+        val bar = phoneBar(season, null)
+        assertEquals(ShellDestination.Tab(MATCHUP_PAGE), gameOf(null, season.id, season.id, bar))
+        assertEquals(ShellDestination.Push(ShellRoute.Game(season.id, 2)), gameOf(2, season.id, season.id, bar))
+        assertEquals(ShellDestination.Push(ShellRoute.Game("another", null)), gameOf(null, "another", season.id, bar))
+        assertEquals(
+            ShellDestination.Push(ShellRoute.Game(preDraft.id, null)),
+            gameOf(null, preDraft.id, preDraft.id, phoneBar(preDraft, null)),
+        )
+    }
+
     @Test
     fun `the search opens Players with what was typed, and nothing for nothing`() {
         assertEquals(ShellRoute.Players("puka"), searchRoute("  puka "))

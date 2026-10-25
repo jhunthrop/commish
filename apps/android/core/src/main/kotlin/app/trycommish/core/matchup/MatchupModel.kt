@@ -6,6 +6,7 @@ import app.trycommish.api.models.LeagueSync
 import app.trycommish.api.models.MatchupBox
 import app.trycommish.api.models.MatchupBoxSide
 import app.trycommish.api.models.MatchupSide
+import app.trycommish.api.models.Scoreboard
 import app.trycommish.core.instantOrNull
 import app.trycommish.core.leaguehome.ValueWords
 import app.trycommish.core.leaguehome.readCell
@@ -19,7 +20,8 @@ import app.trycommish.design.Words
 import java.time.Instant
 import java.time.ZoneId
 
-/** One side of the Matchup's score bug (MatchupBug.svelte): You or Opponent, the team, its big figure
+/** One side of the Matchup's score bug (MatchupBug.svelte): You or Opponent (neither on another team's
+ * game, Lane 207), the team, its big figure
  * with its label (Proj before the first kickoff, Pts from it), the small one under, and where its
  * starters stand while the game is under way. */
 data class BugTeam(
@@ -62,6 +64,8 @@ data class TeamBox(
 
 /** The week's matchup as the screen draws it. */
 data class MatchupWeek(
+    /** "Their game" with the way to the member's own, over another team's game; null over the member's. */
+    val whose: GameWhose?,
     val week: String,
     val mine: String,
     val opponent: String?,
@@ -95,16 +99,20 @@ sealed interface MatchupModel {
 }
 
 /** The screen drawn at the league read's instant, as the web draws it (MatchupScreen passes the read's
- * time), the read beside a live score aged by `clock`, the screen's own clock. Pure. */
+ * time), the read beside a live score aged by `clock`, the screen's own clock. Another team's game, by the
+ * box's own word, is drawn from the box and the scoreboard (`board`), its score unread where the
+ * scoreboard was not read. Pure. */
 fun matchupModel(
     sync: LeagueSync,
     box: MatchupBox?,
     clock: Instant,
     zone: ZoneId,
+    board: Scoreboard? = null,
 ): MatchupModel {
     val now = instantOrNull(sync.readAt) ?: clock
-    val matchup = sync.matchup ?: return MatchupModel.Gap(MatchupWords.gap(sync, now))
-    return MatchupModel.Week(MatchupDraw(sync, box, matchup, now, zone).week(clock))
+    val other = OtherGame.isOther(box)
+    val matchup = (if (other) OtherGame.matchup(box, board) else sync.matchup) ?: return MatchupModel.Gap(MatchupWords.gap(sync, now))
+    return MatchupModel.Week(MatchupDraw(sync, box, matchup, other, now, zone).week(clock))
 }
 
 /** MatchupPanel.svelte's reads over one answer. */
@@ -112,6 +120,8 @@ private class MatchupDraw(
     private val sync: LeagueSync,
     private val box: MatchupBox?,
     private val matchup: LeagueMatchup,
+    /** Another team's game: none of the member's words, marks or verbs. */
+    private val other: Boolean,
     private val now: Instant,
     private val zone: ZoneId,
 ) {
@@ -165,24 +175,25 @@ private class MatchupDraw(
         val mineName = MatchupWords.teamName(sync, matchup.mine.rosterId)
         val theirName = opponentSide?.let { MatchupWords.teamName(sync, it.rosterId) }
         val sides = listOfNotNull(mine, theirs)
+        val hidden = if (sync.host == LeagueHost.ffpc) MatchupWords.yoursOnly(platform) else null
         val boxes =
             listOfNotNull(
-                teamBox(matchup.mine.rosterId, mineName, mine, mine = true, empty = null),
+                teamBox(matchup.mine.rosterId, mineName, mine, mine = !other, empty = if (other) hidden else null),
                 if (opponentSide != null && theirs != null && theirName != null) {
-                    val hidden = if (sync.host == LeagueHost.ffpc) MatchupWords.yoursOnly(platform) else null
                     teamBox(opponentSide.rosterId, theirName, theirs, mine = false, empty = hidden)
                 } else {
                     null
                 },
             )
         return MatchupWeek(
+            whose = if (other) GameWhose.theirs else null,
             week = week,
             mine = mineName,
             opponent = theirName,
             bug =
                 MatchupBug(
                     week = week,
-                    mine = bugTeam(matchup.mine.rosterId, mineName, mine, me = true),
+                    mine = bugTeam(matchup.mine.rosterId, mineName, mine, me = !other),
                     opponent =
                         if (opponentSide != null && theirs != null) {
                             bugTeam(opponentSide.rosterId, theirName.orEmpty(), theirs, me = false)
@@ -226,10 +237,14 @@ private class MatchupDraw(
         )
 
     private fun notes(): List<String> =
-        listOfNotNull(
-            if (sync.weekAllPlay) MatchupWords.allPlay(platform) else null,
-            if (!matchup.mine.pointsRead) MatchupWords.scoreGap(sync, now) else null,
-        )
+        if (other) {
+            emptyList()
+        } else {
+            listOfNotNull(
+                if (sync.weekAllPlay) MatchupWords.allPlay(platform) else null,
+                if (!matchup.mine.pointsRead) MatchupWords.scoreGap(sync, now) else null,
+            )
+        }
 
     private fun bugTeam(
         rosterId: Int,
@@ -239,7 +254,12 @@ private class MatchupDraw(
     ): BugTeam {
         val figures = MatchupSides.bugFigures(side.totals, started)
         return BugTeam(
-            label = if (me) Words.Box.you else Words.Box.opponent,
+            label =
+                when {
+                    other -> ""
+                    me -> Words.Box.you
+                    else -> Words.Box.opponent
+                },
             name = name,
             initials = initialsOf(name),
             me = me,
