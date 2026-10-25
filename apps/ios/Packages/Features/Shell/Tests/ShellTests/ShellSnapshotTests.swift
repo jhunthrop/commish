@@ -43,14 +43,14 @@ struct ShellSnapshotTests {
     }
 
     /// The fixture account's FFPC league in season, a Sleeper league before its draft and one in its
-    /// playoffs.
+    /// playoffs, each scoring PPR as the fixture API's GET /me says (its stand-ins all read on PPR).
     static func leagues() throws -> [FollowedLeague] {
         let data = try Data(contentsOf: shared.appendingPathComponent("leagues-attached.json"))
         let all = try APIDecoding.envelopeData([Components.Schemas.AttachedLeague].self, from: data)
         return all.filter { ["026", "040", "042"].contains(String($0.id.suffix(3))) }.map {
             FollowedLeague(
-                id: $0.id, name: $0.name, host: $0.host, phase: $0.phase.value1, draftAt: $0.draftAt,
-                waiversOpen: $0.waiversOpen
+                id: $0.id, name: $0.name, host: $0.host, scoring: .ppr, format: .ppr, phase: $0.phase.value1,
+                draftAt: $0.draftAt, waiversOpen: $0.waiversOpen
             )
         }
     }

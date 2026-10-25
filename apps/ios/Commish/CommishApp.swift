@@ -10,6 +10,7 @@ struct CommishApp: App {
     @State private var session: AppSession
     @State private var flow: SignInFlow
     @State private var signIn = SignInModel()
+    @State private var linked: ShellRoute?
 
     init() {
         let environment = AppEnvironment.live()
@@ -26,7 +27,7 @@ struct CommishApp: App {
         WindowGroup {
             content
                 .task { await session.restore() }
-                .onOpenURL { link in Task { await finish(link) } }
+                .onOpenURL { link in route(link) }
         }
     }
 
@@ -47,9 +48,23 @@ struct CommishApp: App {
             RootTabs(
                 environment: environment,
                 session: session,
+                linked: $linked,
                 signOut: { Task { await session.signOut() } },
                 expired: { Task { await session.expire() } }
             )
+        }
+    }
+
+    /// A site link the app opened with: the sign-in return to the sign-in flow, a player's page to his
+    /// screen once signed in; anything else is the browser's.
+    private func route(_ link: URL) {
+        switch AppLink.of(link) {
+        case .signIn:
+            Task { await finish(link) }
+        case let .player(slug):
+            linked = .player(slug: slug)
+        case nil:
+            break
         }
     }
 

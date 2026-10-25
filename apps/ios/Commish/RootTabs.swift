@@ -19,6 +19,8 @@ struct RootTabs: View {
     @State private var sheet = PlayerSheetHost()
     let environment: AppEnvironment
     let session: AppSession
+    /// A site link the app was opened with (a player's page), pushed on the tab in view once.
+    @Binding var linked: ShellRoute?
     let signOut: () -> Void
     /// The API refused the token on a signed-in read: the app signs out and shows sign-in.
     let expired: @MainActor () -> Void
@@ -38,9 +40,19 @@ struct RootTabs: View {
         .environment(sheet)
         .playerSheet(sheet) { player in BasisText(PlayerSheetModel(player: player).loading) }
         .onChange(of: session.tabs) { _, tabs in
+            // A tab the new bar does not show takes its pushed screens with it.
+            paths = paths.filter { key, _ in tabs.contains { $0.key == key } }
             if !tabs.contains(where: { $0.key == selection }), let first = tabs.first {
                 selection = first.key
             }
+        }
+        .onChange(of: linked, initial: true) { _, route in
+            guard let route else {
+                return
+            }
+            sheet.close()
+            open(route)
+            linked = nil
         }
     }
 
@@ -59,7 +71,12 @@ struct RootTabs: View {
                     actions: TopBarActions(
                         toggleSwitch: { switchOpen.toggle() },
                         openAccount: { open(.account) },
-                        search: { typed in ShellRoute.search(typed).map(open) }
+                        search: { typed in
+                            if let route = ShellRoute.search(typed) {
+                                query = ""
+                                open(route)
+                            }
+                        }
                     )
                 )
             }
@@ -94,7 +111,10 @@ struct RootTabs: View {
     @ViewBuilder
     private func destination(_ route: ShellRoute) -> some View {
         switch route {
-        case .players:
+        case let .players(query):
+            NamedScreen(AppWords.Tab.players, aside: query)
+        case .player:
+            // The player page's lane (S6) fills this from the slug.
             NamedScreen(AppWords.Tab.players)
         case .account:
             NamedScreen(PhoneRail.account.label, verb: (AppWords.SignIn.signOut, signOut))

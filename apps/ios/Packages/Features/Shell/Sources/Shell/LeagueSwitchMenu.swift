@@ -3,9 +3,9 @@ import CommishDesign
 import SwiftUI
 
 /// The switch opened, under the bar across the screen as the web's menu is on a phone
-/// (LeagueMenu.svelte): every followed league, the selected one first and marked, its platform under
-/// its name and its phase beside it where the leagues differ, one tap each to its home. With none
-/// followed, where to follow one.
+/// (LeagueMenu.svelte): every followed league in GET /me's order, the selected one marked in place,
+/// its platform and scoring under its name and its phase beside it where the leagues differ, one tap
+/// each to its home. With none followed, where to follow one.
 public struct LeagueSwitchMenu: View {
     @Environment(\.colorScheme) private var colorScheme
     private let model: LeagueSwitchModel
