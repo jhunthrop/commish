@@ -321,6 +321,10 @@ object Words {
         const val std = "Standard"
     }
 
+    object BoardBasis {
+        const val gap = "Gap, drafters' ADP less our rank: green when they wait, rose when they reach."
+    }
+
     object PageVerb {
         const val follow = "Follow your league"
         const val open_league = "Open your league"

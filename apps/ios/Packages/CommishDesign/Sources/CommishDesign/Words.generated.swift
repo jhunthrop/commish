@@ -319,6 +319,10 @@ public enum Words {
         public static let std = "Standard"
     }
 
+    public enum BoardBasis {
+        public static let gap = "Gap, drafters' ADP less our rank: green when they wait, rose when they reach."
+    }
+
     public enum PageVerb {
         public static let follow = "Follow your league"
         public static let open_league = "Open your league"

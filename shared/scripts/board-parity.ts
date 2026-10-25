@@ -3,10 +3,14 @@
  * every rail, view and league state (season-words.ts boardWords: the bar's word, the heading and the
  * one verb), and a row's figures as the phone prints them (format/number.ts signed and fixed for Over
  * repl. and Projected, format/gap.ts gapText for the Gap), and the capture the statuses are read from
- * (format/designation.ts captureShort). Written by export-parity.ts beside the other screens' parity. */
+ * (format/designation.ts captureShort), and the basis (run/board-basis.ts boardBasis, site/market.ts
+ * marketBasis). Written by export-parity.ts beside the other screens' parity. */
 import { captureShort } from '../../web/src/lib/format/designation.ts';
 import { gapText } from '../../web/src/lib/format/gap.ts';
 import { fixed, signed } from '../../web/src/lib/format/number.ts';
+import { boardBasis } from '../../web/src/lib/run/board-basis.ts';
+import type { Format } from '../../web/src/lib/run/schema.ts';
+import { marketBasis } from '../../web/src/lib/site/market.ts';
 import { boardWords } from '../../web/src/lib/site/season-words.ts';
 import { RAIL_KEYS } from '../../web/src/lib/ui/nav.ts';
 
@@ -28,6 +32,34 @@ const CAPTURES = [
 	{ readAt: '2026-10-14T02:03:35.613Z', checkedAt: '2026-10-16T15:00:00.000Z' }
 ] as const;
 const CAPTURE_CLOCKS = ['2026-10-16T17:00:00.000Z', '2026-10-17T17:00:00.000Z'] as const;
+/** The teams GET /boards/{format} values its board for (openapi.yaml roomBoard). */
+const TEAMS = 12;
+/** The drafts the fixture's case names, standing in for the run's adpDrafts. */
+const DRAFTS = ['PPR drafts, Aug 1 to Sep 9'];
+
+/** The board's basis on a phone as the web says it for the PPR board of the full season, the All view
+ * with its Gap and the WR view, and the kickers' and defenses' view with no drafts named (the API's
+ * board names none). */
+export function basisCases(): { view: string; parts: string[] }[] {
+	const format = { label: LABEL, teams: TEAMS } as Pick<Format, 'label' | 'teams'>;
+	const said = (position: string | null): string[] =>
+		boardBasis({
+			format,
+			season: SEASON,
+			order: 'board',
+			position,
+			adpBasis: DRAFTS,
+			gap: true,
+			reach: null
+		})
+			.filter((part) => part.phone)
+			.map((part) => part.text);
+	return [
+		{ view: 'all', parts: said(null) },
+		{ view: 'WR', parts: said('WR') },
+		{ view: 'draftOrder', parts: [marketBasis({} as Pick<Format, 'marketOrder'>, [])] }
+	];
+}
 
 export interface BoardWordsCase {
 	rail: string;
@@ -66,6 +98,8 @@ export function renderBoard(about: string): string {
 			gap: gapText(value)
 		})),
 		noGap: gapText(null),
+		teams: TEAMS,
+		basis: basisCases(),
 		zone: ZONE,
 		captures: CAPTURES.flatMap((capture) =>
 			CAPTURE_CLOCKS.map((now) => ({

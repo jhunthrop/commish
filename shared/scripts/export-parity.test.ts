@@ -13,6 +13,7 @@ import {
 } from './export-parity.ts';
 import { LINEUP_OUTPUT } from './lineup-parity.ts';
 import { BOARD_OUTPUT } from './board-parity.ts';
+import { GAP_WORDS } from '../../web/src/lib/run/board-basis.ts';
 
 void test('a file clock reads back as its instant', () => {
 	assert.equal(instantOf('2026-10-18T18-56-00Z'), '2026-10-18T18:56:00.000Z');
@@ -122,6 +123,7 @@ void test("the board's parity: every rail's words for the board, the row's figur
 		words: BoardWordsCase[];
 		figures: { value: number; overReplacement: string; gap: string }[];
 		noGap: string;
+		basis: { view: string; parts: string[] }[];
 	};
 	const before = board.words.find(
 		(c) => c.rail === 'pre_draft' && c.position === null && !c.following && c.rosFromWeek === null
@@ -140,4 +142,9 @@ void test("the board's parity: every rail's words for the board, the row's figur
 	assert.equal(board.figures.find((f) => f.value === -0.04)?.overReplacement, '+0.0');
 	assert.equal(board.figures.find((f) => f.value === -3.6)?.gap, '−3.6');
 	assert.equal(board.noGap, '--');
+	assert.ok(board.basis.find((c) => c.view === 'all')?.parts.includes(GAP_WORDS));
+	assert.match(
+		board.basis.find((c) => c.view === 'draftOrder')?.parts[0] ?? '',
+		/^Kickers and defenses/
+	);
 });

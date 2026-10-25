@@ -925,6 +925,32 @@
 		}
 	],
 	"noGap": "--",
+	"teams": 12,
+	"basis": [
+		{
+			"view": "all",
+			"parts": [
+				"Our PPR board, by points over replacement for 12 teams.",
+				"ADP from PPR drafts, Aug 1 to Sep 9.",
+				"Gap, drafters' ADP less our rank: green when they wait, rose when they reach."
+			]
+		},
+		{
+			"view": "WR",
+			"parts": [
+				"Our PPR board, by points over replacement for 12 teams.",
+				"Tiers are drawn within WR.",
+				"ADP from PPR drafts, Aug 1 to Sep 9.",
+				"Gap, drafters' ADP less our rank: green when they wait, rose when they reach."
+			]
+		},
+		{
+			"view": "draftOrder",
+			"parts": [
+				"Kickers and defenses the drafters take rank in their draft order, with no projected points and no tiers."
+			]
+		}
+	],
 	"zone": "America/Chicago",
 	"captures": [
 		{
