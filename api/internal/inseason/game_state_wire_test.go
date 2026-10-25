@@ -112,9 +112,20 @@ func linesOf(t *testing.T, raw json.RawMessage) []apitypes.PlayerLine {
 	return out
 }
 
+// thursdayPair is the club pair the engine test moves to the week 6
+// Thursday night game (thursdayKickoff, Lane 176 review M2), so a clock
+// between it and Sunday's sees lines kicked off beside lines still to
+// come: the pair: the first two clubs (fixtureData pairs them),
+// team 1's quarterback's club among them.
+func thursdayPair() map[string]bool {
+	clubs := fixtureTeams()
+	return map[string]bool{clubs[0]: true, clubs[1]: true}
+}
+
 // noGameFixture is the paired fixture with two bench players of team 1's
 // that have no game: a free agent and a club the schedule does not hold;
-// and week 7 scheduled, every club playing, for a screen that turns to it.
+// the first club pair's week 6 game on the Thursday night; and week 7
+// scheduled, every club playing, for a screen that turns to it.
 func noGameFixture(t *testing.T) fixture {
 	t.Helper()
 	f := pairedFixture(t)
@@ -133,6 +144,11 @@ func noGameFixture(t *testing.T) fixture {
 			f.league.Snap.Teams[i].Players = append(f.league.Snap.Teams[i].Players, "hfa", "hzz")
 		}
 	}
+	for i := range f.data.Games {
+		if g := &f.data.Games[i]; g.Week == 6 && thursdayPair()[g.Team] {
+			g.Kickoff = thursdayKickoff
+		}
+	}
 	clubs := fixtureTeams()
 	week7 := time.Date(2026, 10, 25, 13, 0, 0, 0, east)
 	for i := 0; i+1 < len(clubs); i += 2 {
@@ -147,39 +163,62 @@ func byeClubs() map[string]bool {
 	return map[string]bool{clubs[len(clubs)-1]: true, clubs[len(clubs)-2]: true}
 }
 
-// wantLine is what a line of the fixture says at a clock: the week 6
-// game's state for a club playing that week (week 7's, every club
-// playing, for a line of the week after), Bye for a club on bye, and no
-// game for the two with none.
-func wantLine(line apitypes.PlayerLine, week6 apitypes.GameStateCell) apitypes.GameStateCell {
+// wantLine is what a line of the fixture says at a clock: his club's
+// week 6 game's state by the clock (week 7's, every club playing, for a
+// line of the week after), Bye for a club on bye, and no game for the two
+// with none.
+func wantLine(line apitypes.PlayerLine, week6 func(club string) apitypes.GameStateCell) apitypes.GameStateCell {
 	switch {
 	case line.Player.Team == figurewords.Table.FreeAgentClub:
 		return apitypes.GameStateCell{State: apitypes.GameStateCellStateNoGame, Word: "No club"}
 	case line.Player.Team == "ZZZ":
 		return apitypes.GameStateCell{State: apitypes.GameStateCellStateNoGame}
 	case line.Facts.Week == 7:
-		return apitypes.GameStateCell{State: apitypes.GameStateCellStateNotStarted, Word: "Next kickoff"}
+		return notStartedCell
 	case byeClubs()[line.Player.Team]:
 		return apitypes.GameStateCell{State: apitypes.GameStateCellStateBye, Word: "Bye"}
 	}
-	return week6
+	return week6(line.Player.Team)
+}
+
+var (
+	notStartedCell = apitypes.GameStateCell{State: apitypes.GameStateCellStateNotStarted, Word: "Next kickoff"}
+	kickedOffCell  = apitypes.GameStateCell{State: apitypes.GameStateCellStateKickedOff, Word: "Kicked off"}
+	finalCell      = apitypes.GameStateCell{State: apitypes.GameStateCellStateFinal, Word: "Final"}
+)
+
+// every is a clock at which every week 6 game reads the same.
+func every(cell apitypes.GameStateCell) func(string) apitypes.GameStateCell {
+	return func(string) apitypes.GameStateCell { return cell }
 }
 
 // Every in-season screen's lines and the scoreboard's games carry
 // game_state at the request's clock, through the engine with the clock
-// injected (Lane 176): before Sunday's kickoff, during the games and once
-// they are final, a bye club's players Bye and a player with no game
-// named so at each.
+// injected (Lane 176): before any kickoff, on the Thursday night with one
+// club pair's game under way and every other still to come (one answer
+// carrying both), during Sunday's games and once they are final; a bye
+// club's players Bye and a player with no game named so at each.
 func TestGameStateOnEveryLineAtTheRequestsClock(t *testing.T) {
+	thursdayNight := func(club string) apitypes.GameStateCell {
+		if thursdayPair()[club] {
+			return kickedOffCell
+		}
+		return notStartedCell
+	}
 	clocks := []struct {
 		name  string
 		now   time.Time
 		final bool
-		state apitypes.GameStateCell
+		week6 func(string) apitypes.GameStateCell
+		// states is what the clock's lines must read among them, beside Bye and no game.
+		states []apitypes.GameStateCellState
+		board  apitypes.GameStateCell
 	}{
-		{"before kickoff", fixtureNow, false, apitypes.GameStateCell{State: apitypes.GameStateCellStateNotStarted, Word: "Next kickoff"}},
-		{"during the games", sundayKickoff.Add(30 * time.Minute), false, apitypes.GameStateCell{State: apitypes.GameStateCellStateKickedOff, Word: "Kicked off"}},
-		{"final", sundayKickoff.Add(21 * time.Hour), true, apitypes.GameStateCell{State: apitypes.GameStateCellStateFinal, Word: "Final"}},
+		{"before kickoff", fixtureNow, false, every(notStartedCell), []apitypes.GameStateCellState{apitypes.GameStateCellStateNotStarted}, notStartedCell},
+		{"Thursday night", thursdayKickoff.Add(45 * time.Minute), false, thursdayNight,
+			[]apitypes.GameStateCellState{apitypes.GameStateCellStateKickedOff, apitypes.GameStateCellStateNotStarted}, kickedOffCell},
+		{"during the games", sundayKickoff.Add(30 * time.Minute), false, every(kickedOffCell), []apitypes.GameStateCellState{apitypes.GameStateCellStateKickedOff}, kickedOffCell},
+		{"final", sundayKickoff.Add(21 * time.Hour), true, every(finalCell), []apitypes.GameStateCellState{apitypes.GameStateCellStateFinal}, finalCell},
 	}
 	routes := []string{leaguePath + "lineup", leaguePath + "matchup", leaguePath + "waivers", leaguePath + "trades",
 		leaguePath + "order/week?position=DEF", "/order/week?position=K", leaguePath + "players/p000", "/players/p000/week"}
@@ -203,7 +242,7 @@ func TestGameStateOnEveryLineAtTheRequestsClock(t *testing.T) {
 				t.Fatalf("%s %s: no lines", clock.name, route)
 			}
 			for _, line := range lines {
-				want := wantLine(line, clock.state)
+				want := wantLine(line, clock.week6)
 				if line.GameState == nil || *line.GameState != want {
 					t.Errorf("%s %s %s (%s): %+v, want %+v", clock.name, route, line.Player.Name, line.Player.Team, line.GameState, want)
 					continue
@@ -211,14 +250,18 @@ func TestGameStateOnEveryLineAtTheRequestsClock(t *testing.T) {
 				seen[want.State] = true
 			}
 		}
-		for _, state := range []apitypes.GameStateCellState{clock.state.State, apitypes.GameStateCellStateBye, apitypes.GameStateCellStateNoGame} {
+		for _, state := range append(clock.states, apitypes.GameStateCellStateBye, apitypes.GameStateCellStateNoGame) {
 			if !seen[state] {
 				t.Errorf("%s: no line read %s", clock.name, state)
 			}
 		}
-		for _, g := range scoreboardOf(t, s).Games {
-			if g.GameState == nil || *g.GameState != clock.state {
-				t.Errorf("%s: scoreboard game %+v, want %+v", clock.name, g.GameState, clock.state)
+		games := scoreboardOf(t, s).Games
+		if len(games) == 0 {
+			t.Fatalf("%s: the scoreboard holds no game", clock.name)
+		}
+		for _, g := range games {
+			if g.GameState == nil || *g.GameState != clock.board {
+				t.Errorf("%s: scoreboard game %+v, want %+v", clock.name, g.GameState, clock.board)
 			}
 		}
 	}
