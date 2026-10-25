@@ -1190,6 +1190,120 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/run/players/{id}': {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path: {
+				/** @description a player id the run's index gives a page, as the site's player page takes it (4429795) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		/** A player's page in the published run (players/<id>.json, Lane 188), as the site's player page reads it: his numbers in every format whose board ranks him, the capsule as the writer wrote it with its pull figures, the week-ahead read, his season so far with every week's game log, his earlier seasons and the club his newest line was for. 404 for an id the run gives no page (a kicker, a defense, anyone the index does not list), and for a page the nightly held this run: /run/held names it, and /run/held/{id} answers its copy when there is one. */
+		get: operations['runPlayer'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/run/held': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The pages the nightly's schema gate held back this run (held.json, Lane 136): each by id, with the earlier run its copy is from, or null when there is no copy (his page is then his board rows' figures alone). held is null on a run that held none. What the reader said of each page is the run's report and is never sent. */
+		get: operations['runHeld'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/run/held/{id}': {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path: {
+				/** @description a held page's player id, as /run/held names it */
+				id: string;
+			};
+			cookie?: never;
+		};
+		/** A held page's copy (held/<id>.json): his page as an earlier run published it, in the same shape as /run/players/{id}; /run/held names the run it is from. 404 for an id the run does not hold with a copy. */
+		get: operations['runHeldCopy'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/run/record': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The published run's record (record.json): every week of the season and where it stands, each graded week's lines (ours, ADP, the published projection and ESPN's on the same players) and its players' places, the season to date, and the weekly and draft records, as written. */
+		get: operations['runRecord'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/run/clubs': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The published run's clubs (clubs.json), the 32 with their names and bye weeks, in the file's order. */
+		get: operations['runClubs'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/run/schedule': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The published run's schedule (schedule.json): every club's slate with each game's kickoff and state at the run, the slate's strength and rank with how it is measured, its rest of season, and the value each opponent counts. */
+		get: operations['runSchedule'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/order': {
 		parameters: {
 			query?: {
@@ -3220,6 +3334,423 @@ export interface components {
 			run_id: string;
 			/** @description null when the run carries no capture */
 			designations: components['schemas']['RunDesignations'] | null;
+		};
+		/** @description one format's numbers for him, his board row without the identity */
+		RunPlayerFormat: {
+			positionRank: number;
+			/** @description his place on this format's board */
+			ourRank: number;
+			/** @description the round of this format's draft his place falls in */
+			vorRound: number;
+			/** @description the blended ADP of this format's sources, null when none has him */
+			adp: number | null;
+			/** @description the drafters' ADP less our rank, to a tenth; absent on a run older than the column */
+			gap?: number | null;
+			projected: number;
+			vor: number;
+			expectedGames: number;
+			/** @description null in season */
+			floor: number | null;
+			/** @description null in season */
+			median: number | null;
+			/** @description null in season */
+			ceiling: number | null;
+			/** @description his tier within his position */
+			tier: number;
+			/** @description his tier's drop to the next tier at his position; absent on a run older than the column */
+			tierDrop?: number | null;
+			/** @description in season */
+			preseasonRank?: number | null;
+			/** @description in season, the preseason board's points for the full season */
+			preseasonPoints?: number | null;
+			/** @description in season */
+			preseasonPerGame?: number | null;
+			/** @description in season */
+			preseasonShare?: number | null;
+			/** @description in season */
+			blendedPerGame?: number | null;
+			/** @description in season, the model's rate a game he plays */
+			ratePerGame?: number | null;
+			/** @description in season */
+			restFromWeek?: number | null;
+			/** @description in season */
+			gamePoints?: number | null;
+		};
+		RunPullFigure: {
+			/** @description a number exactly as the capsule writes it */
+			figure: string;
+			/** @description what it counts */
+			caption: string;
+		};
+		/** @description the writer's read of him, as written: paragraphs apart by a blank line, each pull figure in the prose */
+		RunCapsule: {
+			body: string;
+			pulls: components['schemas']['RunPullFigure'][];
+			/**
+			 * Format: date-time
+			 * @description when the writer wrote it; absent on a run from before
+			 */
+			writtenAt?: string;
+		};
+		/** @description the week-ahead read: its text, null when his status changed since it was written (the caption says when the new one is due), the call, the status it was written against */
+		RunWeekRead: {
+			week: number;
+			body: string | null;
+			/** @description Written Fri 9:00 pm Central, for week 6 */
+			caption: string;
+			status: string | null;
+			/**
+			 * @description the writer's call, null when withheld
+			 * @enum {string|null}
+			 */
+			call: 'start' | 'sit' | 'hold' | 'none' | null;
+			/** Format: date-time */
+			writtenAt: string;
+			/**
+			 * Format: date-time
+			 * @description the newest stamp of the facts it was written from
+			 */
+			factsAt: string | null;
+			/** @description the published projection it quotes, in PPR; absent on a run from before */
+			projection?: number | null;
+			/** @description the words the page shows once the live read prints another; absent on a run from before */
+			movedCaption?: string;
+		};
+		/** @description a stat line in the research store's names; a field is null when the records do not carry it */
+		RunStatLine: {
+			pass_attempts: number | null;
+			completions: number | null;
+			passing_yards: number | null;
+			passing_touchdowns: number | null;
+			interceptions: number | null;
+			carries: number | null;
+			rushing_yards: number | null;
+			rushing_touchdowns: number | null;
+			targets: number | null;
+			receptions: number | null;
+			receiving_yards: number | null;
+			receiving_touchdowns: number | null;
+			fumbles_lost: number | null;
+			field_goals_made: number | null;
+			extra_points_made: number | null;
+			sacks: number | null;
+			defensive_interceptions: number | null;
+			defensive_touchdowns: number | null;
+			/** @description his share of his team's offensive snaps */
+			snapShare: number | null;
+			/** @description the line scored in the block's format */
+			points: number | null;
+		};
+		/** @description one week of his log, its stat line beside where the week stands for him */
+		RunGameLogRow: {
+			pass_attempts: number | null;
+			completions: number | null;
+			passing_yards: number | null;
+			passing_touchdowns: number | null;
+			interceptions: number | null;
+			carries: number | null;
+			rushing_yards: number | null;
+			rushing_touchdowns: number | null;
+			targets: number | null;
+			receptions: number | null;
+			receiving_yards: number | null;
+			receiving_touchdowns: number | null;
+			fumbles_lost: number | null;
+			field_goals_made: number | null;
+			extra_points_made: number | null;
+			sacks: number | null;
+			defensive_interceptions: number | null;
+			defensive_touchdowns: number | null;
+			snapShare: number | null;
+			points: number | null;
+			week: number;
+			/** @description the club he plays; null on his bye, and where the run cannot say whose he was */
+			opponent: string | null;
+			/** @description true at home */
+			home: boolean | null;
+			status: components['schemas']['RunGameStatus'];
+			/** @description always true when sent: an inactive week he played in a game the run cannot name */
+			unnamedGame?: boolean;
+		};
+		/**
+		 * @description where a week stands for him
+		 * @enum {string}
+		 */
+		RunGameStatus: 'played' | 'inactive' | 'bye' | 'upcoming';
+		/** @description his season so far, scored in one format, a row for every week of the regular season */
+		RunSeason: {
+			season: number;
+			/** @description the format every point in the block is scored in */
+			format: string;
+			/** @description the regular season's length; the log has this many rows */
+			weeks: number;
+			/** @description the last week whose games are all final with their lines in */
+			through: number;
+			games: number;
+			/** @description null before his first game */
+			pointsPerGame: number | null;
+			totals: components['schemas']['RunStatLine'];
+			log: components['schemas']['RunGameLogRow'][];
+		};
+		/** @description a season before this one, its regular season summed in the same format */
+		RunPriorSeason: {
+			season: number;
+			games: number;
+			pointsPerGame: number | null;
+			totals: components['schemas']['RunStatLine'];
+		};
+		/** @description the club his newest game line was for and its week, when it is not his club */
+		RunLastGameClub: {
+			club: string;
+			week: number;
+			/** @description always true when sent: that week he was on the field for special teams alone */
+			specialTeams?: boolean;
+		};
+		/** @description the run's players/<id>.json, as written */
+		RunPlayer: {
+			id: string;
+			slug: string;
+			name: string;
+			position: components['schemas']['RunPosition'];
+			team: string;
+			headshot: string;
+			/** @description keyed by format id, every format the run carries that ranks him */
+			formats: Record<string, components['schemas']['RunPlayerFormat']>;
+			capsule: components['schemas']['RunCapsule'] | null;
+			/** @description absent on a run from before the nightly wrote it, null when the writer did not write for the week ahead */
+			weekRead?: components['schemas']['RunWeekRead'] | null;
+			season: components['schemas']['RunSeason'];
+			/** @description his earlier seasons, newest first; absent on a run from before */
+			priorSeasons?: components['schemas']['RunPriorSeason'][];
+			/** @description null when his newest line was for his club; absent on a run from before */
+			lastGameClub?: components['schemas']['RunLastGameClub'] | null;
+		};
+		RunPlayerAnswer: {
+			run_id: string;
+			player: components['schemas']['RunPlayer'];
+		};
+		/** @description the earlier run his copy is from, and when that run was written */
+		RunHeldCopy: {
+			runId: string;
+			/** Format: date-time */
+			runAt: string;
+		};
+		/** @description a held page, less what the reader said of it (the run's report) */
+		RunHeldPage: {
+			id: string;
+			/** @description null when no earlier run had a page of his: his page is then his board rows' figures alone */
+			copy: components['schemas']['RunHeldCopy'] | null;
+		};
+		RunHeld: {
+			pages: components['schemas']['RunHeldPage'][];
+		};
+		RunHeldAnswer: {
+			run_id: string;
+			/** @description null when the run held no page */
+			held: components['schemas']['RunHeld'] | null;
+		};
+		/** @description how well one order matched the finish */
+		RunScore: {
+			/** @description players this order had an opinion about */
+			graded: number;
+			/** @description rank agreement with the finish */
+			agreement: number | null;
+			/** @description the typical miss in places */
+			placesOff: number | null;
+			/** @description the week's top players at each position this order also put there */
+			starters: number;
+			startersOf: number;
+		};
+		/**
+		 * @description a position, or All
+		 * @enum {string}
+		 */
+		RunRecordPosition: 'All' | 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DST';
+		RunRecordLine: {
+			position: components['schemas']['RunRecordPosition'];
+			ours: components['schemas']['RunScore'];
+			/** @description ADP on the same players; null on the weekly record */
+			adp: components['schemas']['RunScore'] | null;
+			/** @description the week's published projection on the same players, null before the freeze kept it */
+			published: components['schemas']['RunScore'] | null;
+			/** @description the season to date only, ours over the weeks that graded the published projection */
+			oursOnPublished: components['schemas']['RunScore'] | null;
+			/** @description ESPN's weekly projection on the same players; absent or null before it was kept */
+			espn?: components['schemas']['RunScore'] | null;
+			/** @description the season to date only, ours over the weeks that graded ESPN's projection; absent or null before */
+			oursOnEspn?: components['schemas']['RunScore'] | null;
+		};
+		/** @description one graded player of a week: each order's place among the week's graded players, and his finish */
+		RunPlacedPlayer: {
+			position: components['schemas']['RunPosition'];
+			ours: number | null;
+			adp: number | null;
+			published: number | null;
+			/** @description absent or null before ESPN's projection was kept */
+			espn?: number | null;
+			finish: number;
+		};
+		/**
+		 * @description graded, frozen and waiting on its stats, missed (its first kickoff passed with no board frozen), or upcoming
+		 * @enum {string}
+		 */
+		RunRecordWeekStatus: 'graded' | 'frozen' | 'missed' | 'upcoming';
+		RunRecordWeek: {
+			week: number;
+			status: components['schemas']['RunRecordWeekStatus'];
+			/**
+			 * Format: date-time
+			 * @description when our board was frozen; an upcoming week's first kickoff
+			 */
+			frozenAt: string | null;
+			/** @description the run whose board was frozen */
+			frozenBy: string | null;
+			/** Format: date-time */
+			gradedAt: string | null;
+			/** @description the order the week's freeze graded */
+			order: components['schemas']['OrderBasis'] | null;
+			/** @description frozen players with a stat line for the week */
+			population: number;
+			lines: components['schemas']['RunRecordLine'][];
+			/** @description why a missed week was not frozen, one sentence; present only for a missed week */
+			note?: string;
+			/**
+			 * Format: date-time
+			 * @description when the graded order was last refreshed before the week was set
+			 */
+			orderAsOf?: string;
+			/**
+			 * Format: date-time
+			 * @description a frozen week's earliest grading instant
+			 */
+			gradesFrom?: string;
+			/** @description a graded week's players, in the finish's order */
+			players?: components['schemas']['RunPlacedPlayer'][];
+			/** @description one sentence the weekly record prints under the week's row */
+			espnNote?: string;
+		};
+		/** @description the statistics the record grades with, as its column heads print them */
+		RunRecordStatistic: {
+			agreement: string;
+			placesOff: string;
+			starters: string;
+		};
+		/** @description our weekly rankings against the weekly experts, from the first week the shipped order was set */
+		RunWeeklyRecord: {
+			fromWeek: number;
+			statistic: components['schemas']['RunRecordStatistic'];
+			scale: string;
+			startersBasis: string | null;
+			method: string;
+			/** @description the sentence printed when a yardstick called the weeks better on any figure */
+			honest: string | null;
+			weeks: components['schemas']['RunRecordWeek'][];
+			toDate: components['schemas']['RunRecordLine'][];
+		};
+		RunDraftLine: {
+			position: components['schemas']['RunRecordPosition'];
+			ours: components['schemas']['RunScore'];
+			adp: components['schemas']['RunScore'];
+		};
+		/** @description order matched, all positions, on the season's points through a counted week */
+		RunDraftProgress: {
+			week: number;
+			ours: number | null;
+			adp: number | null;
+		};
+		/** @description our draft board against ADP on the season's points so far */
+		RunDraftRecord: {
+			/** Format: date-time */
+			setAt: string;
+			/** Format: date-time */
+			boardAsOf: string;
+			throughWeek: number | null;
+			namedBasis: string | null;
+			honest: string | null;
+			lines: components['schemas']['RunDraftLine'][];
+			progress: components['schemas']['RunDraftProgress'][];
+		};
+		/** @description the run's record.json, as written */
+		RunRecord: {
+			season: number;
+			/** @description the format every frozen board ranks in */
+			format: string;
+			statistic: components['schemas']['RunRecordStatistic'];
+			scale: string;
+			startersBasis: string | null;
+			method: string;
+			publishedFromWeek: number | null;
+			honest: string | null;
+			weeks: components['schemas']['RunRecordWeek'][];
+			toDate: components['schemas']['RunRecordLine'][];
+			weekly?: components['schemas']['RunWeeklyRecord'];
+			draft?: components['schemas']['RunDraftRecord'];
+		};
+		RunRecordAnswer: {
+			run_id: string;
+			record: components['schemas']['RunRecord'];
+		};
+		RunClub: {
+			abbr: string;
+			city: string;
+			nickname: string;
+			/** @description the week the club does not play */
+			bye: number | null;
+		};
+		RunClubsAnswer: {
+			run_id: string;
+			/** @description the 32 clubs, in the file's order */
+			clubs: components['schemas']['RunClub'][];
+		};
+		/**
+		 * @description the game's state at the run's instant: final once either side's result or line is in
+		 * @enum {string}
+		 */
+		RunGameState: 'upcoming' | 'kicked_off' | 'final';
+		RunGame: {
+			week: number;
+			opponent: string;
+			home: boolean;
+			/**
+			 * Format: date-time
+			 * @description an unset time is the start of its day on the Eastern clock
+			 */
+			kickoff: string;
+			state?: components['schemas']['RunGameState'];
+		};
+		/** @description a slate's games left at the run's instant: their strength, its rank (1 the hardest), and how it is measured */
+		RunRestSlate: {
+			strength: number;
+			rank: number;
+			method: string;
+		};
+		RunSlate: {
+			abbr: string;
+			games: components['schemas']['RunGame'][];
+			/** @description the slate's strength in the method's unit */
+			strength: number;
+			/** @description 1 is the hardest slate of the 32 */
+			rank: number;
+			/** @description how strength is measured */
+			method: string;
+			window: components['schemas']['RunWindow'];
+			/** @description the rest of the season, null with no game left; absent on a run from before */
+			rest?: components['schemas']['RunRestSlate'] | null;
+		};
+		/** @description the run's schedule.json, as written */
+		RunSchedule: {
+			season: number;
+			/** @description the number each opponent contributes to the strength, keyed by club */
+			opponentValues: Record<string, number>;
+			/** @description what one opponent value is */
+			opponentBasis: string;
+			/** @description a slate's strength as a short caption under its number */
+			unit: string;
+			slates: components['schemas']['RunSlate'][];
+		};
+		RunScheduleAnswer: {
+			run_id: string;
+			schedule: components['schemas']['RunSchedule'];
 		};
 		/** @enum {string} */
 		DesignationStatus:
@@ -6757,6 +7288,651 @@ export interface operations {
 					 */
 					'application/json': components['schemas']['Envelope'] & {
 						data?: components['schemas']['RunDesignationsAnswer'];
+					};
+				};
+			};
+			304: components['responses']['RunNotModified'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	runPlayer: {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path: {
+				/** @description a player id the run's index gives a page, as the site's player page takes it (4429795) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description his page */
+			200: {
+				headers: {
+					ETag: components['headers']['RunETag'];
+					'Cache-Control': components['headers']['RunCacheControl'];
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "ok": true,
+					 *       "error": null,
+					 *       "request_id": "3f0c2a9e-run-player",
+					 *       "data": {
+					 *         "run_id": "2026-10-21T12-ros",
+					 *         "player": {
+					 *           "id": "4429795",
+					 *           "slug": "jahmyr-gibbs",
+					 *           "name": "Jahmyr Gibbs",
+					 *           "position": "RB",
+					 *           "team": "DET",
+					 *           "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png",
+					 *           "formats": {
+					 *             "ppr-12": {
+					 *               "positionRank": 1,
+					 *               "ourRank": 1,
+					 *               "vorRound": 1,
+					 *               "adp": 1.4,
+					 *               "gap": 0.4,
+					 *               "projected": 242.5,
+					 *               "vor": 153.6,
+					 *               "expectedGames": 10,
+					 *               "floor": null,
+					 *               "median": null,
+					 *               "ceiling": null,
+					 *               "tier": 1,
+					 *               "tierDrop": 18.2,
+					 *               "preseasonRank": 5,
+					 *               "preseasonPoints": 262.1,
+					 *               "preseasonPerGame": 17.6,
+					 *               "preseasonShare": 40,
+					 *               "blendedPerGame": 24.2,
+					 *               "ratePerGame": 24.1,
+					 *               "restFromWeek": 7,
+					 *               "gamePoints": 24.1
+					 *             }
+					 *           },
+					 *           "capsule": {
+					 *             "body": "He has 31 touches in his last game and the backfield to himself.\n\nDraft him in the first round.",
+					 *             "pulls": [
+					 *               {
+					 *                 "figure": "31",
+					 *                 "caption": "touches in his last game"
+					 *               }
+					 *             ],
+					 *             "writtenAt": "2026-10-21T11:40:00.000Z"
+					 *           },
+					 *           "weekRead": {
+					 *             "week": 8,
+					 *             "body": "Start him against a front that gives up 5.1 yards a carry.",
+					 *             "caption": "Written Fri 9:00 pm Central, for week 8",
+					 *             "status": null,
+					 *             "call": "start",
+					 *             "writtenAt": "2026-10-24T02:00:00.000Z",
+					 *             "factsAt": "2026-10-24T01:30:00.000Z",
+					 *             "projection": 22.4,
+					 *             "movedCaption": "The live read below is newer."
+					 *           },
+					 *           "season": {
+					 *             "season": 2026,
+					 *             "format": "ppr-12",
+					 *             "weeks": 2,
+					 *             "through": 1,
+					 *             "games": 1,
+					 *             "pointsPerGame": 30.7,
+					 *             "totals": {
+					 *               "pass_attempts": null,
+					 *               "completions": null,
+					 *               "passing_yards": null,
+					 *               "passing_touchdowns": null,
+					 *               "interceptions": null,
+					 *               "carries": 20,
+					 *               "rushing_yards": 121,
+					 *               "rushing_touchdowns": 1,
+					 *               "targets": 6,
+					 *               "receptions": 5,
+					 *               "receiving_yards": 46,
+					 *               "receiving_touchdowns": 1,
+					 *               "fumbles_lost": 0,
+					 *               "field_goals_made": null,
+					 *               "extra_points_made": null,
+					 *               "sacks": null,
+					 *               "defensive_interceptions": null,
+					 *               "defensive_touchdowns": null,
+					 *               "snapShare": 0.71,
+					 *               "points": 30.7
+					 *             },
+					 *             "log": [
+					 *               {
+					 *                 "week": 1,
+					 *                 "opponent": "GB",
+					 *                 "home": true,
+					 *                 "status": "played",
+					 *                 "pass_attempts": null,
+					 *                 "completions": null,
+					 *                 "passing_yards": null,
+					 *                 "passing_touchdowns": null,
+					 *                 "interceptions": null,
+					 *                 "carries": 20,
+					 *                 "rushing_yards": 121,
+					 *                 "rushing_touchdowns": 1,
+					 *                 "targets": 6,
+					 *                 "receptions": 5,
+					 *                 "receiving_yards": 46,
+					 *                 "receiving_touchdowns": 1,
+					 *                 "fumbles_lost": 0,
+					 *                 "field_goals_made": null,
+					 *                 "extra_points_made": null,
+					 *                 "sacks": null,
+					 *                 "defensive_interceptions": null,
+					 *                 "defensive_touchdowns": null,
+					 *                 "snapShare": 0.71,
+					 *                 "points": 30.7
+					 *               },
+					 *               {
+					 *                 "week": 2,
+					 *                 "opponent": null,
+					 *                 "home": null,
+					 *                 "status": "inactive",
+					 *                 "unnamedGame": true,
+					 *                 "pass_attempts": null,
+					 *                 "completions": null,
+					 *                 "passing_yards": null,
+					 *                 "passing_touchdowns": null,
+					 *                 "interceptions": null,
+					 *                 "carries": null,
+					 *                 "rushing_yards": null,
+					 *                 "rushing_touchdowns": null,
+					 *                 "targets": null,
+					 *                 "receptions": null,
+					 *                 "receiving_yards": null,
+					 *                 "receiving_touchdowns": null,
+					 *                 "fumbles_lost": null,
+					 *                 "field_goals_made": null,
+					 *                 "extra_points_made": null,
+					 *                 "sacks": null,
+					 *                 "defensive_interceptions": null,
+					 *                 "defensive_touchdowns": null,
+					 *                 "snapShare": null,
+					 *                 "points": null
+					 *               }
+					 *             ]
+					 *           },
+					 *           "priorSeasons": [
+					 *             {
+					 *               "season": 2025,
+					 *               "games": 1,
+					 *               "pointsPerGame": 30.7,
+					 *               "totals": {
+					 *                 "pass_attempts": null,
+					 *                 "completions": null,
+					 *                 "passing_yards": null,
+					 *                 "passing_touchdowns": null,
+					 *                 "interceptions": null,
+					 *                 "carries": 20,
+					 *                 "rushing_yards": 121,
+					 *                 "rushing_touchdowns": 1,
+					 *                 "targets": 6,
+					 *                 "receptions": 5,
+					 *                 "receiving_yards": 46,
+					 *                 "receiving_touchdowns": 1,
+					 *                 "fumbles_lost": 0,
+					 *                 "field_goals_made": null,
+					 *                 "extra_points_made": null,
+					 *                 "sacks": null,
+					 *                 "defensive_interceptions": null,
+					 *                 "defensive_touchdowns": null,
+					 *                 "snapShare": 0.71,
+					 *                 "points": 30.7
+					 *               }
+					 *             }
+					 *           ],
+					 *           "lastGameClub": {
+					 *             "club": "DET",
+					 *             "week": 1,
+					 *             "specialTeams": true
+					 *           }
+					 *         }
+					 *       }
+					 *     }
+					 */
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['RunPlayerAnswer'];
+					};
+				};
+			};
+			304: components['responses']['RunNotModified'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	runHeld: {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the held pages */
+			200: {
+				headers: {
+					ETag: components['headers']['RunETag'];
+					'Cache-Control': components['headers']['RunCacheControl'];
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "ok": true,
+					 *       "error": null,
+					 *       "request_id": "3f0c2a9e-run-held",
+					 *       "data": {
+					 *         "run_id": "2026-10-21T12-ros",
+					 *         "held": {
+					 *           "pages": [
+					 *             {
+					 *               "id": "4429023",
+					 *               "copy": {
+					 *                 "runId": "2026-10-20T12-ros",
+					 *                 "runAt": "2026-10-20T12:00:00.000Z"
+					 *               }
+					 *             },
+					 *             {
+					 *               "id": "3918298",
+					 *               "copy": null
+					 *             }
+					 *           ]
+					 *         }
+					 *       }
+					 *     }
+					 */
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['RunHeldAnswer'];
+					};
+				};
+			};
+			304: components['responses']['RunNotModified'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	runHeldCopy: {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path: {
+				/** @description a held page's player id, as /run/held names it */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description his page as the earlier run published it */
+			200: {
+				headers: {
+					ETag: components['headers']['RunETag'];
+					'Cache-Control': components['headers']['RunCacheControl'];
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['RunPlayerAnswer'];
+					};
+				};
+			};
+			304: components['responses']['RunNotModified'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	runRecord: {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the record */
+			200: {
+				headers: {
+					ETag: components['headers']['RunETag'];
+					'Cache-Control': components['headers']['RunCacheControl'];
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "ok": true,
+					 *       "error": null,
+					 *       "request_id": "3f0c2a9e-run-record",
+					 *       "data": {
+					 *         "run_id": "2026-10-21T12-ros",
+					 *         "record": {
+					 *           "season": 2026,
+					 *           "format": "ppr-12",
+					 *           "statistic": {
+					 *             "agreement": "order matched",
+					 *             "placesOff": "places off",
+					 *             "starters": "starters called"
+					 *           },
+					 *           "scale": "1.00 is a perfect match of the week's finishing order, 0.00 is none.",
+					 *           "startersBasis": "the top 12 QBs, 24 RBs, 24 WRs and 12 TEs of the week",
+					 *           "method": "Each week our board is frozen before the first kickoff and graded on the week's games.",
+					 *           "publishedFromWeek": 3,
+					 *           "honest": null,
+					 *           "weeks": [
+					 *             {
+					 *               "week": 1,
+					 *               "status": "graded",
+					 *               "frozenAt": "2026-09-08T12:00:16.244Z",
+					 *               "frozenBy": "2026-09-08T12",
+					 *               "gradedAt": "2026-09-16T07:36:40.448Z",
+					 *               "order": "preseason",
+					 *               "population": 341,
+					 *               "orderAsOf": "2026-09-08T12:00:00.000Z",
+					 *               "lines": [
+					 *                 {
+					 *                   "position": "All",
+					 *                   "ours": {
+					 *                     "graded": 193,
+					 *                     "agreement": 0.5,
+					 *                     "placesOff": 43,
+					 *                     "starters": 50,
+					 *                     "startersOf": 84
+					 *                   },
+					 *                   "adp": {
+					 *                     "graded": 193,
+					 *                     "agreement": 0.41,
+					 *                     "placesOff": 47.9,
+					 *                     "starters": 52,
+					 *                     "startersOf": 84
+					 *                   },
+					 *                   "published": null,
+					 *                   "oursOnPublished": null,
+					 *                   "espn": {
+					 *                     "graded": 180,
+					 *                     "agreement": 0.47,
+					 *                     "placesOff": 44.1,
+					 *                     "starters": 49,
+					 *                     "startersOf": 84
+					 *                   },
+					 *                   "oursOnEspn": null
+					 *                 }
+					 *               ],
+					 *               "players": [
+					 *                 {
+					 *                   "position": "RB",
+					 *                   "ours": 1,
+					 *                   "adp": 2,
+					 *                   "published": null,
+					 *                   "espn": 1,
+					 *                   "finish": 3
+					 *                 }
+					 *               ],
+					 *               "espnNote": "ESPN's projection for week 1 was read after our rankings were set."
+					 *             },
+					 *             {
+					 *               "week": 2,
+					 *               "status": "missed",
+					 *               "frozenAt": null,
+					 *               "frozenBy": null,
+					 *               "gradedAt": null,
+					 *               "order": null,
+					 *               "population": 0,
+					 *               "lines": [],
+					 *               "note": "Our nightly run failed that week."
+					 *             },
+					 *             {
+					 *               "week": 3,
+					 *               "status": "frozen",
+					 *               "frozenAt": "2026-09-22T12:00:00.000Z",
+					 *               "frozenBy": "2026-09-22T12",
+					 *               "gradedAt": null,
+					 *               "order": "rest_of_season",
+					 *               "population": 0,
+					 *               "lines": [],
+					 *               "gradesFrom": "2026-09-30T07:00:00.000Z"
+					 *             }
+					 *           ],
+					 *           "toDate": [
+					 *             {
+					 *               "position": "All",
+					 *               "ours": {
+					 *                 "graded": 193,
+					 *                 "agreement": 0.5,
+					 *                 "placesOff": 43,
+					 *                 "starters": 50,
+					 *                 "startersOf": 84
+					 *               },
+					 *               "adp": {
+					 *                 "graded": 193,
+					 *                 "agreement": 0.41,
+					 *                 "placesOff": 47.9,
+					 *                 "starters": 52,
+					 *                 "startersOf": 84
+					 *               },
+					 *               "published": null,
+					 *               "oursOnPublished": null
+					 *             }
+					 *           ],
+					 *           "weekly": {
+					 *             "fromWeek": 7,
+					 *             "statistic": {
+					 *               "agreement": "order matched",
+					 *               "placesOff": "places off",
+					 *               "starters": "starters called"
+					 *             },
+					 *             "scale": "1.00 is a perfect match of the week's finishing order, 0.00 is none.",
+					 *             "startersBasis": null,
+					 *             "method": "Our weekly rankings are set before each week's first kickoff and graded on its games.",
+					 *             "honest": null,
+					 *             "weeks": [
+					 *               {
+					 *                 "week": 7,
+					 *                 "status": "upcoming",
+					 *                 "frozenAt": "2026-10-23T00:15:00.000Z",
+					 *                 "frozenBy": null,
+					 *                 "gradedAt": null,
+					 *                 "order": null,
+					 *                 "population": 0,
+					 *                 "lines": []
+					 *               }
+					 *             ],
+					 *             "toDate": []
+					 *           },
+					 *           "draft": {
+					 *             "setAt": "2026-09-08T12:00:00.000Z",
+					 *             "boardAsOf": "2026-09-08T11:00:00.000Z",
+					 *             "throughWeek": 6,
+					 *             "namedBasis": "the top 24 at each position",
+					 *             "honest": null,
+					 *             "lines": [
+					 *               {
+					 *                 "position": "All",
+					 *                 "ours": {
+					 *                   "graded": 300,
+					 *                   "agreement": 0.61,
+					 *                   "placesOff": 38.2,
+					 *                   "starters": 70,
+					 *                   "startersOf": 84
+					 *                 },
+					 *                 "adp": {
+					 *                   "graded": 300,
+					 *                   "agreement": 0.58,
+					 *                   "placesOff": 40.1,
+					 *                   "starters": 68,
+					 *                   "startersOf": 84
+					 *                 }
+					 *               }
+					 *             ],
+					 *             "progress": [
+					 *               {
+					 *                 "week": 6,
+					 *                 "ours": 0.61,
+					 *                 "adp": 0.58
+					 *               }
+					 *             ]
+					 *           }
+					 *         }
+					 *       }
+					 *     }
+					 */
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['RunRecordAnswer'];
+					};
+				};
+			};
+			304: components['responses']['RunNotModified'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	runClubs: {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the clubs */
+			200: {
+				headers: {
+					ETag: components['headers']['RunETag'];
+					'Cache-Control': components['headers']['RunCacheControl'];
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "ok": true,
+					 *       "error": null,
+					 *       "request_id": "3f0c2a9e-run-clubs",
+					 *       "data": {
+					 *         "run_id": "2026-10-21T12-ros",
+					 *         "clubs": [
+					 *           {
+					 *             "abbr": "DET",
+					 *             "city": "Detroit",
+					 *             "nickname": "Lions",
+					 *             "bye": 8
+					 *           },
+					 *           {
+					 *             "abbr": "SEA",
+					 *             "city": "Seattle",
+					 *             "nickname": "Seahawks",
+					 *             "bye": null
+					 *           }
+					 *         ]
+					 *       }
+					 *     }
+					 */
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['RunClubsAnswer'];
+					};
+				};
+			};
+			304: components['responses']['RunNotModified'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	runSchedule: {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the schedule */
+			200: {
+				headers: {
+					ETag: components['headers']['RunETag'];
+					'Cache-Control': components['headers']['RunCacheControl'];
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "ok": true,
+					 *       "error": null,
+					 *       "request_id": "3f0c2a9e-run-schedule",
+					 *       "data": {
+					 *         "run_id": "2026-10-21T12-ros",
+					 *         "schedule": {
+					 *           "season": 2026,
+					 *           "opponentValues": {
+					 *             "GB": 10.5,
+					 *             "MIN": 9.5
+					 *           },
+					 *           "opponentBasis": "expected wins",
+					 *           "unit": "opponents' average win total",
+					 *           "slates": [
+					 *             {
+					 *               "abbr": "DET",
+					 *               "games": [
+					 *                 {
+					 *                   "week": 1,
+					 *                   "opponent": "GB",
+					 *                   "home": true,
+					 *                   "kickoff": "2026-09-13T17:00:00.000Z",
+					 *                   "state": "final"
+					 *                 },
+					 *                 {
+					 *                   "week": 2,
+					 *                   "opponent": "MIN",
+					 *                   "home": false,
+					 *                   "kickoff": "2026-09-20T17:00:00.000Z",
+					 *                   "state": "upcoming"
+					 *                 }
+					 *               ],
+					 *               "strength": 10,
+					 *               "rank": 4,
+					 *               "method": "the average of each club's opponents' expected wins for the season",
+					 *               "window": {
+					 *                 "from": "2026-09-01T07:00:00.000Z",
+					 *                 "to": "2026-09-09T07:00:00.000Z"
+					 *               },
+					 *               "rest": {
+					 *                 "strength": 9.5,
+					 *                 "rank": 9,
+					 *                 "method": "the average of the expected wins of the opponents left"
+					 *               }
+					 *             }
+					 *           ]
+					 *         }
+					 *       }
+					 *     }
+					 */
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['RunScheduleAnswer'];
 					};
 				};
 			};

@@ -39,6 +39,12 @@ func (h *Handler) Routes() []httpx.Route {
 		{Method: http.MethodGet, Path: "/run/index", Access: httpx.Public, Limit: limit, Handler: file(indexFile)},
 		{Method: http.MethodGet, Path: "/run/adp", Access: httpx.Public, Limit: limit, Handler: file(adpFile)},
 		{Method: http.MethodGet, Path: "/run/designations", Access: httpx.Public, Limit: limit, Handler: file(designationsFile)},
+		{Method: http.MethodGet, Path: "/run/players/{id}", Access: httpx.Public, Limit: limit, Handler: h.handlePlayer},
+		{Method: http.MethodGet, Path: "/run/held", Access: httpx.Public, Limit: limit, Handler: file(heldFile)},
+		{Method: http.MethodGet, Path: "/run/held/{id}", Access: httpx.Public, Limit: limit, Handler: h.handleCopy},
+		{Method: http.MethodGet, Path: "/run/record", Access: httpx.Public, Limit: limit, Handler: file(recordFile)},
+		{Method: http.MethodGet, Path: "/run/clubs", Access: httpx.Public, Limit: limit, Handler: file(clubsFile)},
+		{Method: http.MethodGet, Path: "/run/schedule", Access: httpx.Public, Limit: limit, Handler: file(scheduleFile)},
 	}
 }
 

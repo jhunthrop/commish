@@ -1,6 +1,7 @@
 // Package runs serves the published nightly run's files to the apps
 // (Lane 185): the manifest, a format's board, the index, the ADP and the
-// designations, read from the runs' bucket the way the web's build reads
+// designations; and (Lane 188) a player's page, the held pages and their
+// copies, the record, the clubs and the schedule, read from the runs' bucket the way the web's build reads
 // them (web/src/lib/server/run.ts): the run runs/latest.json names, and
 // never a run whose manifest is missing or names another run. Each answer
 // is the run's JSON as written inside the envelope, the run id beside it,
