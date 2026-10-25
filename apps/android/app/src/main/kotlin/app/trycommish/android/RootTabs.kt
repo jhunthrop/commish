@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -161,7 +162,8 @@ fun Shell(
             },
             bottomBar = { PhoneTabBar(bar, tab) { openTab(it.page) } },
         ) { padding ->
-            Box(Modifier.padding(padding)) {
+            // The bars' room counted as taken, so a pin's imePadding lifts it only by what the keyboard adds.
+            Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
                 Pages(graph, nav, state, shell::open, openLineup)
                 if (switchOpen) {
                     Box(

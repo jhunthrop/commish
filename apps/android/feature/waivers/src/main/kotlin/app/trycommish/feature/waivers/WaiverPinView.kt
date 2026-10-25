@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,7 +62,8 @@ fun WaiverPinView(
     still: Boolean = false,
 ) {
     val c = CommishTheme.colors
-    Surface(color = c.bg, shadowElevation = PIN_SHADOW, modifier = modifier.fillMaxWidth()) {
+    // Above the keyboard while the bid is typed: edge to edge, the window is not resized for it (review M2).
+    Surface(color = c.bg, shadowElevation = PIN_SHADOW, modifier = modifier.fillMaxWidth().imePadding()) {
         Column(
             Modifier.padding(horizontal = Tokens.Space.s3.dp, vertical = Tokens.Space.s2.dp),
             verticalArrangement = Arrangement.spacedBy(Tokens.Space.s1.dp),
