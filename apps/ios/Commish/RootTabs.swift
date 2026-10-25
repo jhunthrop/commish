@@ -47,21 +47,15 @@ struct RootTabs: View {
         .tint(Theme(colorScheme).color(Tokens.Color.accent))
         .environment(sheet)
         // The sheet's Full page is his page in the app: the sheet closes onto it, pushed on the tab in view.
-        .environment(\.openURL, OpenURLAction { url in
-            guard case let .player(slug)? = AppLink.of(url) else {
-                return .systemAction
+        .playerSheet(sheet, openPage: { open(.player(slug: $0)) }, content: { player in
+            PlayerSheetContainer(player: player, offer: sheet.offer, close: sheet.close) { player in
+                PlayerSheetViewModel(
+                    player: player, run: environment.api, pages: environment.api, weeks: environment.api,
+                    cache: environment.cache, clock: environment.clock, league: selectedLeague, onSignedOut: expired
+                )
             }
-            sheet.close()
-            open(.player(slug: slug))
-            return .handled
-        })
-        .playerSheet(sheet) { player in
-            PlayerSheetBody(viewModel: PlayerSheetViewModel(
-                player: player, run: environment.api, pages: environment.api, weeks: environment.api,
-                cache: environment.cache, clock: environment.clock, league: selectedLeague, onSignedOut: expired
-            ))
             .id(player.id)
-        }
+        })
         .onChange(of: session.tabs) { _, tabs in
             // A tab the new bar does not show takes its pushed screens with it.
             paths = paths.filter { key, _ in tabs.contains { $0.key == key } }
@@ -130,8 +124,10 @@ struct RootTabs: View {
             LineupScreen(environment: environment, league: league, expired: expired)
                 .id(league.id)
         case let (PhoneRail.matchupKey, league?):
-            MatchupTab(environment: environment, leagueID: league.id, expired: expired)
-                .id(league.id)
+            MatchupTab(environment: environment, leagueID: league.id, expired: expired) {
+                selection = PhoneRail.lineupKey
+            }
+            .id(league.id)
         case let (PhoneRail.waiversKey, league?):
             WaiversTab(environment: environment, league: league, expired: expired)
                 .id(league.id)
@@ -270,16 +266,21 @@ private struct LineupScreen: View {
 private struct MatchupTab: View {
     @State private var viewModel: MatchupViewModel
     private let leagueID: String
+    private let openLineup: @MainActor @Sendable () -> Void
 
-    init(environment: AppEnvironment, leagueID: String, expired: @escaping @MainActor () -> Void) {
+    init(
+        environment: AppEnvironment, leagueID: String, expired: @escaping @MainActor () -> Void,
+        openLineup: @escaping @MainActor @Sendable () -> Void
+    ) {
         _viewModel = State(initialValue: MatchupViewModel(
             api: environment.api, cache: environment.cache, clock: environment.clock, onSignedOut: expired
         ))
         self.leagueID = leagueID
+        self.openLineup = openLineup
     }
 
     var body: some View {
-        MatchupView(viewModel: viewModel, leagueID: leagueID)
+        MatchupView(viewModel: viewModel, leagueID: leagueID, openLineup: openLineup)
     }
 }
 
