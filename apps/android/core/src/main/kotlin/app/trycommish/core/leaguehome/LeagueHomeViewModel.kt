@@ -43,9 +43,8 @@ sealed interface LeagueHomeState {
 }
 
 /**
- * The League tab: [open] chooses the member's league from the kept list and draws its kept page at
- * once, then asks the API for the list and the page. [load] draws one league: the kept page at once,
- * dated, then the API's. With no connection the kept page stays (stale); with nothing kept, a
+ * A league's home, the League tab's or one pushed from the league switch: [load] draws the league the
+ * shell shows (ShellViewModel, from GET /me): the kept page at once, dated, then the API's. With no connection the kept page stays (stale); with nothing kept, a
  * sentence; a 401 anywhere signs the device out. Each call cancels the one before it and runs in the
  * view model's scope, so leaving the tab or pulling twice never races.
  */
@@ -56,23 +55,23 @@ class LeagueHomeViewModel(
     private val zone: ZoneId,
     private val sessionEnd: SessionEnd,
 ) : ViewModel() {
-    private val chooser = LeagueChooser(reads, cache, clock)
     private val mutableState = MutableStateFlow<LeagueHomeState>(LeagueHomeState.Loading)
-    private val mutableChoice = MutableStateFlow<LeagueChoice?>(null)
     private val mutableRefreshing = MutableStateFlow(false)
     private var job: Job? = null
 
     val state: StateFlow<LeagueHomeState> = mutableState.asStateFlow()
 
-    /** What the tab opened, for the bottom bar. */
-    val choice: StateFlow<LeagueChoice?> = mutableChoice.asStateFlow()
-
     /** A read is running: the pull-to-refresh spinner. */
     val refreshing: StateFlow<Boolean> = mutableRefreshing.asStateFlow()
 
-    fun open(): Job = replace { openLeague() }
+    /** The league last asked for, so a screen coming back into view does not read it again. */
+    var shown: String? = null
+        private set
 
-    fun load(leagueId: String): Job = replace { loadLeague(leagueId) }
+    fun load(leagueId: String): Job {
+        shown = leagueId
+        return replace { loadLeague(leagueId) }
+    }
 
     private fun replace(block: suspend () -> Unit): Job {
         job?.cancel()
@@ -87,28 +86,8 @@ class LeagueHomeViewModel(
             }.also { job = it }
     }
 
-    private suspend fun openLeague() {
-        val kept = chooser.kept()
-        if (kept is LeagueChoice.Chosen) {
-            mutableChoice.value = kept
-            showKept(kept.leagueId)
-        }
-        val fresh = chooser.choose()
-        mutableChoice.value = if (fresh is LeagueChoice.Unreachable && kept != null) kept else fresh
-        when (fresh) {
-            is LeagueChoice.Chosen -> loadLeague(fresh.leagueId, keptShown = fresh == kept)
-            LeagueChoice.SignedOut -> signOut()
-            LeagueChoice.NoLeague -> mutableState.value = LeagueHomeState.Failed(AppWords.noLeague)
-            LeagueChoice.Unreachable ->
-                if (kept is LeagueChoice.Chosen) markStale() else mutableState.value = LeagueHomeState.Failed(AppWords.cannotLoad)
-        }
-    }
-
-    private suspend fun loadLeague(
-        leagueId: String,
-        keptShown: Boolean = false,
-    ) {
-        if (!keptShown) showKept(leagueId)
+    private suspend fun loadLeague(leagueId: String) {
+        showKept(leagueId)
         try {
             val drawn = fresh(leagueId)
             if (drawn != null) mutableState.value = drawn else markStale()

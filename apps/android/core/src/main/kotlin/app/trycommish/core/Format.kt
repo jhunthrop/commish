@@ -9,6 +9,8 @@ import java.util.Locale
  * same cell the web does for the same figure. */
 object Format {
     private val weekdayTime = DateTimeFormatter.ofPattern("EEE h:mm a", Locale.US)
+    private val timeOfDay = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
+    private val shortDay = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 
     /** "39.1": one decimal, as JavaScript's toFixed rounds it. */
     fun fixed(
@@ -44,11 +46,28 @@ object Format {
     fun weekdayTime(
         instant: Instant,
         zone: ZoneId,
-    ): String =
-        weekdayTime
-            .format(instant.atZone(zone))
-            .replace("AM", "am")
-            .replace("PM", "pm")
+    ): String = lowerPeriod(weekdayTime.format(instant.atZone(zone)))
+
+    /** "7:00 pm": a time of day on the member's clock (clock.ts timeOfDay). */
+    fun timeOfDay(
+        instant: Instant,
+        zone: ZoneId,
+    ): String = lowerPeriod(timeOfDay.format(instant.atZone(zone)))
+
+    /** "Oct 21": a day on the member's clock (clock.ts shortDay). */
+    fun shortDay(
+        instant: Instant,
+        zone: ZoneId,
+    ): String = shortDay.format(instant.atZone(zone))
+
+    /** Whether two instants fall on the same calendar day on the member's clock (clock.ts sameDay). */
+    fun sameDay(
+        a: Instant,
+        b: Instant,
+        zone: ZoneId,
+    ): Boolean = a.atZone(zone).toLocalDate() == b.atZone(zone).toLocalDate()
+
+    private fun lowerPeriod(text: String): String = text.replace("AM", "am").replace("PM", "pm")
 
     private const val TEN = 10
     private const val HUNDRED = 100

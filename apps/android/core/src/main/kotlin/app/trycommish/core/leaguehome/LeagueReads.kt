@@ -7,8 +7,6 @@ import java.util.UUID
 /** The League tab's reads as the API answers them, the envelope's body whole, so the cache keeps
  * exactly what the API sent. A 401 throws [app.trycommish.api.Unauthorized]. */
 interface LeagueReads {
-    suspend fun attached(): String
-
     suspend fun sync(leagueId: String): String
 
     suspend fun scoreboard(leagueId: String): String
@@ -18,8 +16,6 @@ interface LeagueReads {
 class ApiLeagueReads(
     private val transport: Transport,
 ) : LeagueReads {
-    override suspend fun attached(): String = transport.leagueSync().listAttached().bodyText()
-
     override suspend fun sync(leagueId: String): String = transport.leagueSync().leagueSync(UUID.fromString(leagueId)).bodyText()
 
     override suspend fun scoreboard(leagueId: String): String =
@@ -28,8 +24,6 @@ class ApiLeagueReads(
 
 /** The cache's keys, the routes the answers came from. */
 object LeagueHomeKeys {
-    const val ATTACHED = "/leagues/attached"
-
     fun sync(leagueId: String): String = "/leagues/attached/$leagueId/sync"
 
     fun scoreboard(leagueId: String): String = "/leagues/attached/$leagueId/scoreboard"

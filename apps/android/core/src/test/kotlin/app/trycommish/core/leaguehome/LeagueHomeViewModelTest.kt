@@ -54,11 +54,6 @@ class LeagueHomeViewModelTest {
                 Answer.Unauthorized -> throw Unauthorized()
             }
 
-        override suspend fun attached(): String {
-            gate?.await()
-            return respond { Fixtures.attachedBody() }
-        }
-
         override suspend fun sync(leagueId: String): String {
             gate?.await()
             return respond { Fixtures.syncBody() }
@@ -78,7 +73,6 @@ class LeagueHomeViewModelTest {
 
     private fun warmCache(): MemoryCache =
         MemoryCache().apply {
-            write(LeagueHomeKeys.ATTACHED, Cached(Fixtures.attachedBody(), earlier))
             write(LeagueHomeKeys.sync(Fixtures.LEAGUE_ID), Cached(Fixtures.syncBody(), earlier))
             write(LeagueHomeKeys.scoreboard(Fixtures.LEAGUE_ID), Cached(Fixtures.scoreboardBody(Fixtures.sunday), earlier))
         }
@@ -175,58 +169,5 @@ class LeagueHomeViewModelTest {
             advanceUntilIdle()
             assertEquals(LeagueHomeState.SignedOut, vm.state.value)
             assertEquals(1, ends.count)
-        }
-
-    @Test
-    fun `a 401 on the league list signs the device out too`() =
-        runTest(main) {
-            val ends = Ends()
-            val vm = viewModel(FakeReads(Answer.Unauthorized), MemoryCache(), ends)
-            vm.open()
-            advanceUntilIdle()
-            assertEquals(LeagueHomeState.SignedOut, vm.state.value)
-            assertEquals(1, ends.count)
-        }
-
-    @Test
-    fun `open draws the kept league before the API answers the list`() =
-        runTest(main) {
-            val gate = CompletableDeferred<Unit>()
-            val vm = viewModel(FakeReads(gate = gate), warmCache())
-            vm.open()
-            runCurrent()
-            val shown = assertInstanceOf(LeagueHomeState.Loaded::class.java, vm.state.value)
-            assertEquals(earlier, shown.stamp)
-            assertInstanceOf(LeagueChoice.Chosen::class.java, vm.choice.value)
-            gate.complete(Unit)
-            advanceUntilIdle()
-            assertEquals(Fixtures.sunday, assertInstanceOf(LeagueHomeState.Loaded::class.java, vm.state.value).stamp)
-        }
-
-    @Test
-    fun `open with no network keeps the kept league, stale`() =
-        runTest(main) {
-            val vm = viewModel(FakeReads(Answer.Offline), warmCache())
-            vm.open()
-            advanceUntilIdle()
-            assertTrue(assertInstanceOf(LeagueHomeState.Loaded::class.java, vm.state.value).stale)
-            assertInstanceOf(LeagueChoice.Chosen::class.java, vm.choice.value)
-        }
-
-    @Test
-    fun `open with no league attached says where to attach one`() =
-        runTest(main) {
-            val reads =
-                object : LeagueReads {
-                    override suspend fun attached() = """{"ok":true,"data":[],"error":null}"""
-
-                    override suspend fun sync(leagueId: String) = error("not read")
-
-                    override suspend fun scoreboard(leagueId: String) = error("not read")
-                }
-            val vm = viewModel(reads, MemoryCache())
-            vm.open()
-            advanceUntilIdle()
-            assertEquals(LeagueHomeState.Failed(AppWords.noLeague), vm.state.value)
         }
 }
