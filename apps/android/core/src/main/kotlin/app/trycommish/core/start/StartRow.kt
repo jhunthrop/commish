@@ -77,6 +77,9 @@ data class StartRow(
     val avg: Double?,
     val last: Double?,
     val delta: Double?,
+    /** His rest-of-season points a game on our board, the Trades rows' last cell (box.ts
+     * RowEvidence.season). */
+    val season: Double? = null,
 ) {
     /** Still to come at the screen's clock: the Opp rank's tint draws only then. */
     val toCome: Boolean get() = read.toPlay
@@ -109,7 +112,8 @@ internal object StartRows {
     private val defense = Regex("\\s+D/ST$")
     private val whitespace = Regex("\\s+")
 
-    /** `ranked` draws his rest-of-season rank (box.ts boxRow's ranked): the Waivers rows leave it out. */
+    /** `ranked` draws his rest-of-season rank (box.ts boxRow's ranked): the Waivers' and the Trades' rows
+     * leave it out. */
     fun row(
         line: PlayerLine,
         slot: String,
@@ -147,6 +151,7 @@ internal object StartRows {
             avg = line.seasonAvg,
             last = line.lastPoints,
             delta = if (listed) null else line.projectionDelta,
+            season = line.restOfSeasonPerGame,
         )
     }
 
