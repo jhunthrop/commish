@@ -11,6 +11,7 @@ filter:
     - detachLeague
     - restoreLeague
     - listDevices
+    - getPlans
     - leagueSync
     - leagueScoreboard
     - deviceMe

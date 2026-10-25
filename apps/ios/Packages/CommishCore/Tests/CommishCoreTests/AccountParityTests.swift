@@ -20,6 +20,7 @@ struct AccountParityTests {
 
         struct Free: Decodable {
             let now: String
+            let flag: Bool?
             let free: Bool
         }
 
@@ -88,12 +89,15 @@ struct AccountParityTests {
         #expect(AccountWords.displayName(me) == parity.who.name)
         #expect(AccountWords.whoLine(me) == parity.who.line)
         let now = try #require(APIDecoding.parseDate(parity.now))
-        let plan = try #require(PlanCard.of(me, now: now))
+        let plan = try #require(PlanCard.of(me, now: now, flag: nil))
         #expect(plan.title == parity.plan.title)
         #expect(plan.line == parity.plan.line)
         for free in parity.freeSeason {
             let instant = try #require(APIDecoding.parseDate(free.now))
-            #expect(PlanCard.freeSeason(at: instant) == free.free, "\(free.now)")
+            #expect(
+                PlanCard.freeSeason(at: instant, flag: free.flag) == free.free,
+                "\(free.now) \(String(describing: free.flag))"
+            )
         }
     }
 

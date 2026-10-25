@@ -10,7 +10,7 @@ import Testing
 /// phone across a relaunch, and sign out revoking this phone and returning to sign-in.
 @MainActor
 struct AccountViewModelTests {
-    static let phone = "6f1d1c52-2626-4a26-9a26-0000000000d1"
+    nonisolated static let phone = "6f1d1c52-2626-4a26-9a26-0000000000d1"
     static let extensionID = "6f1d1c52-2626-4a26-9a26-0000000000d2"
     static let now = Fixtures.instant(Fixtures.week)
 
@@ -78,14 +78,15 @@ struct AccountViewModelTests {
         #expect(calls.signedOut == 1)
     }
 
-    @Test func unpairingThisPhoneSignsItOut() async throws {
+    /// This phone's row says Sign out and signs out through the session, which revokes it (review L1).
+    @Test func unpairingThisPhoneSignsItOutThroughTheSession() async throws {
         let stub = try StubAccountScreen.fixture()
         let calls = Calls()
         let viewModel = Self.viewModel(stub, calls: calls)
         await viewModel.load()
         await viewModel.unpair(Self.phone)
-        #expect(await stub.revoked == [Self.phone])
-        #expect(calls.signedOut == 1)
+        #expect(calls.signOuts == 1)
+        #expect(await stub.revoked.isEmpty)
     }
 
     @Test func anUnpairTheAPIRefusesSaysItsSentenceAndKeepsTheDevice() async throws {
@@ -110,24 +111,85 @@ struct AccountViewModelTests {
         #expect(await stub.detached == [Fixtures.league])
         let marked = try #require(Self.loaded(viewModel).leagues?.first)
         #expect(marked.detached)
-        #expect(calls.leaguesChanged == 1)
+        // The switch is not told within the undo window (review M2).
+        #expect(calls.leaguesChanged == 0)
         await viewModel.restore(Fixtures.league)
         #expect(await stub.restored == [Fixtures.league])
         #expect(try Self.loaded(viewModel).leagues?.first?.detached == false)
-        #expect(calls.leaguesChanged == 2)
+        #expect(calls.leaguesChanged == 0)
         // The restore ends the undo's window: the league stays on the list.
         await viewModel.undoWindow?.value
         #expect(try Self.loaded(viewModel).leagues?.count == 12)
     }
 
     @Test func aDetachedLeagueLeavesTheListOnceItsUndoHasPassed() async throws {
-        let viewModel = try Self.viewModel(StubAccountScreen.fixture())
+        let calls = Calls()
+        let viewModel = try Self.viewModel(StubAccountScreen.fixture(), calls: calls)
         await viewModel.load()
         await viewModel.detach(Fixtures.league)
         await viewModel.undoWindow?.value
         let model = try Self.loaded(viewModel)
         #expect(model.leagues?.contains { $0.id == Fixtures.league } == false)
         #expect(model.leaguesAside == "11, newest first")
+        #expect(calls.leaguesChanged == 1)
+    }
+
+    @Test func leavingTheAccountMakesAPendingDetachFinal() async throws {
+        let calls = Calls()
+        let viewModel = try Self.viewModel(StubAccountScreen.fixture(), calls: calls, wait: Self.longWait)
+        await viewModel.load()
+        await viewModel.detach(Fixtures.league)
+        #expect(calls.leaguesChanged == 0)
+        viewModel.leave()
+        #expect(calls.leaguesChanged == 1)
+        #expect(try Self.loaded(viewModel).leagues?.contains { $0.id == Fixtures.league } == false)
+        viewModel.leave()
+        #expect(calls.leaguesChanged == 1)
+    }
+
+    /// Review M2: the member opened the Account from the Matchup tab and detached the only league. The
+    /// bar keeps Matchup (so the Account pushed on it stays) and the row keeps its Undo until the window
+    /// closes; then the session reads the account again and the bar becomes the no-league bar.
+    @Test func detachingTheOnlyLeagueKeepsTheAccountAndItsUndoUntilTheWindowCloses() async throws {
+        let store = MemorySessionStore()
+        await store.save(token: "t", deviceID: Self.phone)
+        let account = MutableAccount(leagues: [AppSessionTests.followed(Fixtures.league)])
+        let session = AppSession(
+            account: account, store: store, cache: NullCache(), defaults: AppSessionTests.defaults()
+        )
+        await session.restore()
+        #expect(session.tabs.contains { $0.key == PhoneRail.matchupKey })
+        let gate = Gate()
+        let viewModel = try AccountViewModel(
+            api: StubAccountScreen.fixture(), cache: NullCache(), clock: FixedClock(Self.now), zone: Fixtures.zone,
+            push: MemoryPushStore(), deviceID: { Self.phone }, signOut: {}, onSignedOut: {},
+            leaguesChanged: { Task { await session.restore() } }, wait: { _ in await gate.wait() }
+        )
+        await viewModel.load()
+        await viewModel.detach(Fixtures.league)
+        await account.set(leagues: [])
+        await Task.yield()
+        #expect(session.tabs.contains { $0.key == PhoneRail.matchupKey })
+        #expect(try Self.loaded(viewModel).leagues?.first?.detached == true)
+        await gate.open()
+        await viewModel.undoWindow?.value
+        // The session's read runs in its own task: wait for the bar to follow.
+        for _ in 0 ..< 100 where session.tabs.contains(where: { $0.key == PhoneRail.matchupKey }) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(session.tabs == PhoneRail.withoutLeague(season: .inSeason))
+    }
+
+    @Test func theAPIsFreeSeasonFlagDecidesBeforeTheDate() async throws {
+        let stub = try StubAccountScreen.fixture()
+        await stub.answerFreeSeason(false)
+        let viewModel = Self.viewModel(stub)
+        await viewModel.load()
+        #expect(Self.now < PlanCard.freeSeasonEnds)
+        #expect(try Self.loaded(viewModel).plan == nil)
+        await stub.answerFreeSeason(true)
+        await viewModel.load()
+        #expect(try Self.loaded(viewModel).plan?.title == Words.FreePlan.title)
     }
 
     @Test func aRestoreTheAPIRefusesKeepsTheLeagueDetachedWithItsSentence() async throws {
@@ -163,8 +225,8 @@ struct AccountViewModelTests {
         #expect(relaunched.push.on(.waivers))
         #expect(relaunched.push.quietFrom == 22 * 60)
         #expect(relaunched.push.quietTo == 7 * 60 + 30)
-        #expect(AccountWords.quietHours(relaunched.push) == "10:00 pm to 7:30 am")
-        #expect(AccountWords.quietHours(.standard) == "11:00 pm to 8:00 am")
+        #expect(AccountWords.clockTime(relaunched.push.quietFrom) == "10:00 pm")
+        #expect(AccountWords.clockTime(PushSettings.standard.quietTo) == "8:00 am")
     }
 
     @Test func signOutRevokesThisPhoneAndReturnsToSignIn() async throws {
@@ -221,93 +283,7 @@ struct AccountViewModelTests {
 
     @Test func aBoughtPlanOrTheSeasonsEndDrawsNoPlanCard() throws {
         let me = try AccountParityTests.answers().me
-        #expect(PlanCard.of(me, now: Self.now) != nil)
-        #expect(try PlanCard.of(me, now: #require(APIDecoding.parseDate("2027-03-01T00:00:00Z"))) == nil)
-    }
-}
-
-/// The Account routes as the fixture answers them, each write recorded, and the failures a test asks
-/// for.
-actor StubAccountScreen: AccountScreenAPI {
-    private let account: AccountAnswer
-    private let leagues: [AttachedLeague]
-    private let paired: [PairedDeviceRow]
-    private var readError: (any Error)?
-    private var writeError: (any Error)?
-    private var leaguesFail = false
-    private(set) var revoked: [String] = []
-    private(set) var detached: [String] = []
-    private(set) var restored: [String] = []
-
-    init(account: AccountAnswer, leagues: [AttachedLeague], paired: [PairedDeviceRow]) {
-        self.account = account
-        self.leagues = leagues
-        self.paired = paired
-    }
-
-    static func fixture() throws -> StubAccountScreen {
-        let answers = try AccountParityTests.answers()
-        return StubAccountScreen(account: answers.me, leagues: answers.attached, paired: answers.devices)
-    }
-
-    func refuseEveryRead() {
-        readError = APIError.status(401)
-    }
-
-    func failEveryRead(with error: any Error) {
-        readError = error
-    }
-
-    func failWrites(with error: any Error) {
-        writeError = error
-    }
-
-    func failLeagues() {
-        leaguesFail = true
-    }
-
-    func me() async throws -> AccountAnswer {
-        if let readError {
-            throw readError
-        }
-        return account
-    }
-
-    func attached() async throws -> [AttachedLeague] {
-        if let readError {
-            throw readError
-        }
-        if leaguesFail {
-            throw APIError.status(500)
-        }
-        return leagues
-    }
-
-    func devices() async throws -> [PairedDeviceRow] {
-        if let readError {
-            throw readError
-        }
-        return paired
-    }
-
-    func detach(id: String) async throws {
-        if let writeError {
-            throw writeError
-        }
-        detached.append(id)
-    }
-
-    func restore(id: String) async throws {
-        if let writeError {
-            throw writeError
-        }
-        restored.append(id)
-    }
-
-    func revokeDevice(id: String) async throws {
-        if let writeError {
-            throw writeError
-        }
-        revoked.append(id)
+        #expect(PlanCard.of(me, now: Self.now, flag: nil) != nil)
+        #expect(try PlanCard.of(me, now: #require(APIDecoding.parseDate("2027-03-01T00:00:00Z")), flag: nil) == nil)
     }
 }

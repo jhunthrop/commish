@@ -17,7 +17,7 @@ struct AccountLeaguesView: View {
             if let leagues = model.leagues {
                 if leagues.isEmpty {
                     BasisText(Words.Attached.none)
-                    QuietButton(Words.Attached.followFirst) { actions.openLink(SiteLinks.leagueStart) }
+                    QuietButton(Words.LeagueSwitch.followFirst) { actions.openLink(SiteLinks.leagueStart) }
                 } else {
                     VStack(spacing: 0) {
                         ForEach(leagues) { league in
@@ -28,7 +28,7 @@ struct AccountLeaguesView: View {
                         ProblemText(text: problem.text)
                     }
                     if model.followMore {
-                        QuietButton(Words.Attached.followAnother) { actions.openLink(SiteLinks.leagueStart) }
+                        QuietButton(Words.LeagueSwitch.followAnother) { actions.openLink(SiteLinks.leagueStart) }
                     }
                 }
             } else {

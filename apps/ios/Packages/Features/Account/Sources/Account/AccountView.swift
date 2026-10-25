@@ -46,6 +46,7 @@ public struct AccountView: View {
         .background(theme.color(Tokens.Color.bg))
         .navigationTitle(PhoneRail.account.label)
         .task { await viewModel.load() }
+        .onDisappear { viewModel.leave() }
         .sheet(item: $editing) { end in
             QuietHoursSheet(end: end, push: viewModel.push) { from, to in
                 viewModel.setQuiet(from: from, to: to)

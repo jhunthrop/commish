@@ -161,6 +161,10 @@ struct StubAccountScreen: AccountScreenAPI {
     func restore(id _: String) async throws {}
 
     func revokeDevice(id _: String) async throws {}
+
+    func freeSeasonFlag() async throws -> Bool? {
+        nil
+    }
 }
 
 /// No saved answers.

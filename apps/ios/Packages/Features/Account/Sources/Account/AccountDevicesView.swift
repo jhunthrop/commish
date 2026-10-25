@@ -32,10 +32,8 @@ struct AccountDevicesView: View {
                                     .foregroundStyle(theme.color(Tokens.Color.ink2))
                             }
                         } trailing: {
-                            QuietButton(state.busy == device.id ? Words.Devices.unpairing : Words.Devices.unpair) {
-                                unpair(device.id)
-                            }
-                            .disabled(state.busy != nil)
+                            QuietButton(verb(device)) { unpair(device.id) }
+                                .disabled(state.busy != nil)
                         }
                     }
                 }
@@ -44,5 +42,13 @@ struct AccountDevicesView: View {
                 }
             }
         }
+    }
+
+    /// This phone's verb is Sign out, what unpairing it does; another device's is Unpair.
+    private func verb(_ device: AccountDeviceRow) -> String {
+        if device.thisPhone {
+            return Words.Account.signOut
+        }
+        return state.busy == device.id ? Words.Devices.unpairing : Words.Devices.unpair
     }
 }

@@ -19,6 +19,9 @@ public protocol AccountScreenAPI: Sendable {
     func devices() async throws -> [PairedDeviceRow]
     /// Unpairs a device: its token opens nothing from the next request on.
     func revokeDevice(id: String) async throws
+    /// The founder's one switch, /billing/plans `free_season`: nil from an API older than the free
+    /// season, which sends none. Only the flag is read; the app never shows a price.
+    func freeSeasonFlag() async throws -> Bool?
 }
 
 extension APIClient: AccountScreenAPI {
@@ -63,6 +66,15 @@ extension APIClient: AccountScreenAPI {
             throw try Self.problem(answer.body.json)
         case let .conflict(answer):
             throw try Self.problem(answer.body.json)
+        case let .undocumented(status, _):
+            throw APIError.status(status)
+        }
+    }
+
+    public func freeSeasonFlag() async throws -> Bool? {
+        switch try await Self.unwrapped({ try await client.getPlans() }) {
+        case let .ok(answer):
+            return try Self.payload(answer.body.json.value2.data).freeSeason
         case let .undocumented(status, _):
             throw APIError.status(status)
         }

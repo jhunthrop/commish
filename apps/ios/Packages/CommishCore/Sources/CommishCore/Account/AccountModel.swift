@@ -42,18 +42,19 @@ public struct PlanCard: Equatable, Sendable {
 
     static let free = PlanCard(title: Words.FreePlan.title, line: Words.FreePlan.line, see: Words.FreePlan.see)
 
-    /// pass/free-season.ts FREE_SEASON_ENDS: the free season's end, the API's season.End(2026).
-    static let freeSeasonEnds = APIDecoding.parseDate("2027-03-01T00:00:00Z")!
+    /// pass/free-season.ts FREE_SEASON_ENDS, generated (Words.FreeSeason): the API's season.End(2026).
+    static let freeSeasonEnds = APIDecoding.parseDate(Words.FreeSeason.ends)!
 
-    /// free-season.ts freeSeasonAt by the clock rule: free until the season's end.
-    public static func freeSeason(at now: Date) -> Bool {
-        now < freeSeasonEnds
+    /// free-season.ts freeSeasonAt: the API's `free_season` whenever it answers one, true or false;
+    /// only without it (an older API, a failed read) the clock rule, free until the season's end.
+    public static func freeSeason(at now: Date, flag: Bool?) -> Bool {
+        flag ?? (now < freeSeasonEnds)
     }
 
     /// The card for this account at this instant: the free season's, unless the account bought a plan
     /// (words.ts boughtPlan), which keeps its own card on the web.
-    public static func of(_ account: AccountAnswer, now: Date) -> PlanCard? {
-        guard freeSeason(at: now), !bought(account) else {
+    public static func of(_ account: AccountAnswer, now: Date, flag: Bool?) -> PlanCard? {
+        guard freeSeason(at: now, flag: flag), !bought(account) else {
             return nil
         }
         return free
@@ -66,24 +67,31 @@ public struct PlanCard: Equatable, Sendable {
 }
 
 /// What the Account screen reads, kept on the phone for no signal: the account, the leagues followed
-/// (nil when they could not be read) and the paired devices.
+/// (nil when they could not be read), the paired devices and the API's free-season flag (nil when the
+/// API sent none or the read failed).
 public struct AccountScreenAnswer: Codable, Equatable, Sendable {
     public let me: AccountAnswer
     public let leagues: [AttachedLeague]?
     public let devices: [PairedDeviceRow]
+    public let freeSeason: Bool?
 
-    public init(me: AccountAnswer, leagues: [AttachedLeague]?, devices: [PairedDeviceRow]) {
+    public init(me: AccountAnswer, leagues: [AttachedLeague]?, devices: [PairedDeviceRow], freeSeason: Bool?) {
         self.me = me
         self.leagues = leagues
         self.devices = devices
+        self.freeSeason = freeSeason
     }
 
     func without(device id: String) -> AccountScreenAnswer {
-        AccountScreenAnswer(me: me, leagues: leagues, devices: devices.filter { $0.id != id })
+        AccountScreenAnswer(
+            me: me, leagues: leagues, devices: devices.filter { $0.id != id }, freeSeason: freeSeason
+        )
     }
 
     func without(league id: String) -> AccountScreenAnswer {
-        AccountScreenAnswer(me: me, leagues: leagues?.filter { $0.id != id }, devices: devices)
+        AccountScreenAnswer(
+            me: me, leagues: leagues?.filter { $0.id != id }, devices: devices, freeSeason: freeSeason
+        )
     }
 }
 
@@ -117,7 +125,7 @@ public struct AccountModel: Equatable, Sendable {
             )
         }
         devicesAside = AccountWords.deviceCount(answer.devices.count)
-        plan = PlanCard.of(answer.me, now: now)
+        plan = PlanCard.of(answer.me, now: now, flag: answer.freeSeason)
         followMore = answer.me.features.contains { $0.value1 == .manyLeagues }
     }
 }

@@ -120,16 +120,22 @@ public final class AccountViewModel {
         }
     }
 
-    /// The account must read; the leagues may fail (the web's sentence says so) and the devices then
-    /// list none, as the web's list does.
+    /// The account must read; the leagues may fail (the web's sentence says so), the devices then list
+    /// none, as the web's list does, and a failed plans read leaves the free season to the clock rule.
     private func readAll() async throws -> AccountScreenAnswer {
         async let leagues = try? api.attached()
         async let devices = try? api.devices()
+        async let flag = try? api.freeSeasonFlag()
         let me = try await api.me()
-        return await AccountScreenAnswer(me: me, leagues: leagues, devices: devices ?? [])
+        return await AccountScreenAnswer(
+            me: me, leagues: leagues, devices: devices ?? [], freeSeason: flag.flatMap(\.self)
+        )
     }
 
     /// Stops following a league: its row stays with its undo for the web's ten seconds, then leaves.
+    /// The league switch hears of it only then (or when the member leaves the Account first): a re-pick
+    /// of the shown league can change the bar, and the bar's change would take this screen and its Undo
+    /// with it (review M2).
     public func detach(_ id: String) async {
         await act(id, .leagues) { [api] in try await api.detach(id: id) }
         guard problem == nil else {
@@ -137,7 +143,6 @@ public final class AccountViewModel {
         }
         detached.insert(id)
         redraw()
-        leaguesChanged()
         lastDetached = id
         undoWindows[id] = Task { [wait] in
             await wait(Self.undoSeconds)
@@ -145,10 +150,12 @@ public final class AccountViewModel {
                 return
             }
             self.drop(id)
+            self.leaguesChanged()
         }
     }
 
-    /// Takes a detach back: the league is followed again with the seat it had.
+    /// Takes a detach back within its window: the league is followed again with the seat it had, and
+    /// the switch, never told of the detach, has nothing to hear.
     public func restore(_ id: String) async {
         await act(id, .leagues) { [api] in try await api.restore(id: id) }
         guard problem == nil else {
@@ -157,17 +164,31 @@ public final class AccountViewModel {
         undoWindows.removeValue(forKey: id)?.cancel()
         detached.remove(id)
         redraw()
+    }
+
+    /// The member left the Account: each detach still in its undo window is final now, its row leaves
+    /// and the switch hears of it once.
+    public func leave() {
+        let pending = detached
+        guard !pending.isEmpty else {
+            return
+        }
+        for id in pending {
+            undoWindows[id]?.cancel()
+            drop(id)
+        }
         leaguesChanged()
     }
 
-    /// Unpairs a device and takes it off the list; unpairing this phone signs it out, its token now dead.
+    /// Unpairs a device and takes it off the list. This phone's row says Sign out and signs out through
+    /// the session, which revokes it (review L1).
     public func unpair(_ id: String) async {
-        await act(id, .devices) { [api] in try await api.revokeDevice(id: id) }
-        guard problem == nil else {
+        if id == thisDevice {
+            await signOut()
             return
         }
-        if id == thisDevice {
-            onSignedOut()
+        await act(id, .devices) { [api] in try await api.revokeDevice(id: id) }
+        guard problem == nil else {
             return
         }
         answer = answer?.without(device: id)
@@ -221,6 +242,10 @@ public final class AccountViewModel {
         undoWindows.removeValue(forKey: id)
         answer = answer?.without(league: id)
         redraw()
+        if let answer {
+            let saved = (answer, stamp)
+            Task { await cache.write(saved.0, route: Self.route, stamp: saved.1) }
+        }
     }
 
     private func show(_ read: AccountScreenAnswer?, stamp: Date, stale: Bool) {
