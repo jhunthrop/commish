@@ -41,6 +41,7 @@ from research.nightly.held_pages import hold_refused_pages
 from research.nightly.publish import encode, run_key
 from research.nightly.reads.board import BoardEntry, FormatBoard, StoredBoard, StoredRow
 from research.nightly.reads.schedule import Game
+from research.nightly.run import with_reach
 from research.nightly.run_store import JSON_TYPE, LocalRunStore
 from research.nightly.schema_gate import schema_gate
 from research.web_contract import contract_dir
@@ -465,3 +466,36 @@ def test_a_held_page_on_a_run_with_a_broken_board_still_fails(tmp_path: Path) ->
     gate = _hold(tmp_path / "staging", _earlier_store(tmp_path / "bucket"))
     assert not gate.record.passed
     assert any(r.startswith("schema:boards/ppr-12.json:") for r in gate.record.reasons)
+    assert gate.reach is None
+
+
+# LANE 205: the reader counts the run's season reach once, at the gate, and the nightly writes it into the
+# final manifest. The shared fixture run (shared/scripts/export-run.ts) carries the reach the web's own
+# runReach counts over this same run, so the gate, the web and the API's fixture agree on one value.
+_SHARED_MANIFEST: Final = (
+    Path(__file__).resolve().parents[2] / "shared" / "fixtures" / "run" / "runs" / _RUN / "manifest.json"
+)
+
+
+def test_the_gate_counts_the_runs_reach_through_the_webs_reader(tmp_path: Path) -> None:
+    shutil.copytree(_FIXTURE / "runs" / _RUN, tmp_path / "staging" / "runs" / _RUN)
+    gate = _hold(tmp_path / "staging", LocalRunStore(tmp_path / "empty"))
+    assert gate.record.passed, gate.record.reasons
+    assert gate.reach == _read(_SHARED_MANIFEST)["reach"]
+    manifest = with_reach(_read(_FIXTURE / "runs" / _RUN / "manifest.json"), gate.reach)
+    assert manifest["reach"] == gate.reach
+
+
+def test_a_held_page_leaves_the_reach_counted_over_the_runs_own_pages(tmp_path: Path) -> None:
+    _break_gibbs(tmp_path / "staging")
+    gate = _hold(tmp_path / "staging", _earlier_store(tmp_path / "bucket"))
+    assert gate.record.passed, gate.record.reasons
+    assert gate.reach is not None
+    assert set(gate.reach) == {"format", "scoring", "through", "complete", "partial"}
+    assert gate.reach["format"] == PAGE_FORMAT.id
+
+
+def test_a_manifest_the_gate_counted_no_reach_for_is_written_as_it_was() -> None:
+    manifest = _read(_FIXTURE / "runs" / _RUN / "manifest.json")
+    assert "reach" not in manifest
+    assert with_reach(manifest, None) is manifest

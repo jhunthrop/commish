@@ -4,7 +4,11 @@ A reader that could not run fails the gate loudly: its exit code and the first l
 the reason, never "returned nothing" alone, and a reader that printed nothing never passes.
 """
 
-from research.nightly.schema_gate import reader_outcome
+import json
+
+import pytest
+
+from research.nightly.schema_gate import reach_of, reader_outcome
 
 # What node printed on main d8b72a19 when the image lacked `src/lib/format` (research.yml run 39216069123).
 _MISSING_MODULE = """node:internal/modules/esm/resolve:274
@@ -70,3 +74,46 @@ def test_a_clean_run_passes_with_the_readers_summary() -> None:
     reasons, summary = reader_outcome(0, f"{_SUMMARY}\n", "")
     assert reasons == []
     assert summary == _SUMMARY
+
+
+# LANE 205: the reader prints the run's season reach on one line of its own before the summary.
+_REACH = {"format": "ppr-12", "scoring": "PPR", "through": "through week 5", "complete": 5, "partial": None}
+_PARTIAL = {
+    **_REACH,
+    "through": "through week 5 and week 6's Thursday game",
+    "partial": {"week": 6, "days": ["Thursday"]},
+}
+
+
+def _reach_line(reach: object) -> str:
+    return f"reach:{json.dumps(reach)}"
+
+
+def test_the_reach_line_is_neither_a_refusal_nor_the_summary() -> None:
+    reasons, summary = reader_outcome(0, f"{_reach_line(_REACH)}\n{_SUMMARY}\n", "")
+    assert reasons == []
+    assert summary == _SUMMARY
+
+
+@pytest.mark.parametrize("reach", [_REACH, _PARTIAL])
+def test_the_reach_line_is_read_as_the_reader_counted_it(reach: dict[str, object]) -> None:
+    assert reach_of(f"{_reach_line(reach)}\n{_SUMMARY}\n") == reach
+
+
+def test_a_reader_that_printed_no_reach_has_none() -> None:
+    assert reach_of(f"{_SUMMARY}\n") is None
+
+
+@pytest.mark.parametrize(
+    "stdout",
+    [
+        "reach:{not json\n",
+        f"{_reach_line({**_REACH, 'games': 1})}\n",
+        f"{_reach_line({k: v for k, v in _REACH.items() if k != 'partial'})}\n",
+        f"{_reach_line([_REACH])}\n",
+        f"{_reach_line(_REACH)}\n{_reach_line(_PARTIAL)}\n",
+    ],
+)
+def test_a_reach_line_that_is_not_one_reach_is_never_taken(stdout: str) -> None:
+    with pytest.raises(ValueError, match=r"reach|Expecting"):
+        reach_of(stdout)

@@ -13,12 +13,13 @@ player page the reader refuses is a line of its own (`schema:players/<id>.json:.
 the nightly's gate (`held_pages.py`) may hold back instead of failing the run.
 """
 
+import json
 import re
 import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 from research.nightly.gates import GateRecord, gate_record
 
@@ -26,18 +27,25 @@ _SCRIPT: Final = Path(__file__).resolve().parent / "contract" / "run-contract.ts
 # One player file the reader refused (Lane 136): the run's own page, or a held page's earlier copy.
 _PAGE_LINE: Final = re.compile(r"^schema:(?P<where>players|held)/(?P<id>[\w-]+)\.json:(?P<message>.*)$")
 _TIMEOUT_SECONDS: Final = 600
+# The run's season reach, one line apart from the refusals (contract/run-contract.ts `REACH_PREFIX`), and
+# the members the web's `reachSchema` (web/src/lib/run/schema.ts) names.
+_REACH_PREFIX: Final = "reach:"
+_REACH_MEMBERS: Final = frozenset({"format", "scoring", "through", "complete", "partial"})
 # The head of a failed reader's stderr the reason carries: node prints the failing source line, a caret,
 # then the error itself (`Error [ERR_MODULE_NOT_FOUND]: Cannot find module ...`), so five lines reach it.
 _STDERR_LINES: Final = 5
 _STDERR_CHARACTERS: Final = 600
+Json = dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
 class ReaderRead:
-    """One pass of the web's reader over a run: every refusal line, and its summary line."""
+    """One pass of the web's reader over a run: every refusal line, its summary line, and the run's season
+    reach as the reader counted it (Lane 205), none when it refused anything or printed none."""
 
     reasons: tuple[str, ...]
     summary: str
+    reach: Json | None = None
 
     def refused(self, where: str) -> dict[str, str]:
         """The player files under `where` (`players` for the run's own pages, `held` for the copies of its
@@ -78,7 +86,15 @@ def read_run(runs_root: Path, run_id: str, web_dir: Path) -> ReaderRead:
         # Review N11: a reader that never answers is an unchecked run, never a crashed one.
         return ReaderRead((f"schema_unchecked:timeout after {_TIMEOUT_SECONDS} s",), "the web's reader timed out")
     reasons, summary = reader_outcome(completed.returncode, completed.stdout, completed.stderr)
-    return ReaderRead(tuple(reasons), summary)
+    if reasons:
+        return ReaderRead(tuple(reasons), summary)
+    try:
+        reach = reach_of(completed.stdout)
+    except ValueError as error:
+        # The reader and the gate disagree on the reach's line: the run is unchecked, never given a
+        # wrong reach.
+        return ReaderRead((f"schema_unchecked:{error}",), summary)
+    return ReaderRead((), summary, reach)
 
 
 def schema_gate(runs_root: Path, run_id: str, web_dir: Path) -> GateRecord:
@@ -96,7 +112,7 @@ def reader_outcome(returncode: int, stdout: str, stderr: str) -> tuple[list[str]
     exited non-zero, or printed no summary at all, was never read (Lane 76: an image missing a module the
     reader imports): the reason is the exit code and the head of stderr, where node names what failed.
     """
-    lines = [line for line in stdout.splitlines() if line.strip()]
+    lines = [line for line in stdout.splitlines() if line.strip() and not line.startswith(_REACH_PREFIX)]
     reasons = [line for line in lines if line.startswith("schema:")]
     summary = next((line for line in reversed(lines) if not line.startswith("schema:")), "")
     if reasons or (returncode == 0 and summary):
@@ -104,6 +120,21 @@ def reader_outcome(returncode: int, stdout: str, stderr: str) -> tuple[list[str]
     head = _stderr_head(stderr) or "the web's reader printed no summary and no stderr"
     unread = f"the web's reader did not read the run (exit {returncode})"
     return [f"schema_unchecked:exit {returncode}: {head}"], summary or unread
+
+
+def reach_of(stdout: str) -> Json | None:
+    """The run's season reach from the reader's one `reach:<json>` line (Lane 205), the shape the web's
+    `reachSchema` names; none when it printed no such line. A line that is not that shape is the reader
+    and the gate disagreeing, so it raises (`read_run` names it) rather than write a wrong reach."""
+    found = [line[len(_REACH_PREFIX) :] for line in stdout.splitlines() if line.startswith(_REACH_PREFIX)]
+    if not found:
+        return None
+    if len(found) > 1:
+        raise ValueError(f"the web's reader printed {len(found)} reach lines; it prints one")
+    reach = json.loads(found[0])
+    if not isinstance(reach, dict) or set(reach) != _REACH_MEMBERS:
+        raise ValueError(f"the web's reader printed a reach that is not one: {found[0]}")
+    return reach
 
 
 def _stderr_head(stderr: str) -> str:

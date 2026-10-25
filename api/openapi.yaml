@@ -1245,11 +1245,9 @@ paths:
         names another run. Only the members the site's reader names are sent; the sources block is provenance and is
         never sent. Every /run route answers a weak ETag (the run id and the file; designations, rewritten beside the run every
         hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a
-        matching If-None-Match. 503 storage_unavailable when the run cannot be read here. Beside the manifest, the
-        run's season reach (Lane 203): what every basis's "through week" says, counted over every own page of the run as
-        the site counts it, worked out once per run in the background. It is absent while that first pass runs (a
-        request never waits on it) and while a failed pass waits to run again; that answer carries no ETag and is not
-        to be kept, and a client holding the run's answer is answered 304.
+        matching If-None-Match. 503 storage_unavailable when the run cannot be read here. The manifest carries the
+        run's season reach (manifest.reach, Lane 205) when the run wrote it: the nightly counts it once, through the
+        site's own reader, and writes it into manifest.json.
       parameters:
         - $ref: "#/components/parameters/IfNoneMatch"
       responses:
@@ -1291,12 +1289,12 @@ paths:
                         refreshedAt: "2026-10-21T12:00:00.000Z"
                         marketOrder: ffc_adp_ppr_12
                     players: 4
-                  reach:
-                    format: ppr-12
-                    scoring: PPR
-                    through: through week 5
-                    complete: 5
-                    partial: null
+                    reach:
+                      format: ppr-12
+                      scoring: PPR
+                      through: through week 5
+                      complete: 5
+                      partial: null
         "304": { $ref: "#/components/responses/RunNotModified" }
         "503": { $ref: "#/components/responses/ErrorResponse" }
   /run/boards/{format}:
@@ -4346,23 +4344,22 @@ components:
           items: { $ref: "#/components/schemas/RunFormat" }
           description: every format the run carries, the default first
         players: { type: integer, minimum: 1, description: every player with a page, as the index lists them }
+        reach:
+          allOf: [{ $ref: "#/components/schemas/RunReach" }]
+          description: >-
+            the run's season reach, written by the run (Lane 205); absent on a run from before it
     RunManifestAnswer:
       type: object
       required: [run_id, manifest]
       properties:
         run_id: { type: string, description: the published run every /run answer is read from }
         manifest: { $ref: "#/components/schemas/RunManifest" }
-        reach:
-          allOf: [{ $ref: "#/components/schemas/RunReach" }]
-          description: >-
-            the run's season reach (Lane 203), absent on an API from before it, while the run's first pass runs, and
-            while a failed pass waits to run again
     RunReach:
       type: object
       description: >-
-        how far the run's season figures reach, as the site's bases say it (web/src/lib/run/reach.ts runReach): counted
-        over every own page of the run (never a held page's copy), his club's game by his log, never a game final by
-        its status alone
+        how far the run's season figures reach, as the site's bases say it (web/src/lib/run/reach.ts runReach), written
+        by the run: the nightly's schema gate counts it through the site's own reader over every own page of the run
+        (never a held page's copy), his club's game by his log, never a game final by its status alone
       required: [format, scoring, through, complete, partial]
       properties:
         format: { type: string, description: "the format every season block is scored in: ppr-12" }

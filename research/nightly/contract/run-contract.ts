@@ -14,7 +14,8 @@
 // node_modules with zod and aws4fetch (the web's own versions). The reader's one SvelteKit import,
 // `$app/env/public` (the build's PUBLIC_RUN_ID and PUBLIC_RUN_BASE_URL), is answered here with the run
 // to check. Every refusal is printed as one line, `schema:<file>:<message>`, and the exit status is 1
-// when there is any, 2 when the checker itself could not run.
+// when there is any, 2 when the checker itself could not run. A run with none prints its season reach
+// as one line, `reach:<json>` (Lane 205), before the summary line.
 //
 // Lane 136: each player page the reader refuses is its own line, `schema:players/<id>.json:<message>`,
 // and each held page's earlier copy it refuses `schema:held/<id>.json:<message>`, so the gate can hold
@@ -60,6 +61,8 @@ interface Format {
 }
 
 const oneLine = (text: string): string => text.replaceAll("\n", " ");
+/** The season reach's line, apart from the refusals (schema_gate.py `_REACH_PREFIX`). */
+const REACH_PREFIX = "reach:";
 
 // One line per refusal, named by the first file that met it: the reader shares one read per artifact,
 // so a broken schedule refuses every page through the same error. The player pages the reader refuses
@@ -155,8 +158,21 @@ for (const name of [
   }
   await check("run", () => web[name]());
 }
+// Lane 205: the run's season reach, counted by the web's own runSeasonReach over the run just read, on
+// one line `reach:<json>` that the gate writes into the final manifest. A run with any refusal has
+// none: the gate writes no reach for a run it refuses.
+const reach =
+  refusals.size === 0
+    ? await check("run", () => {
+        if (typeof web.runSeasonReach !== "function")
+          throw new Error("the web reader exports no runSeasonReach");
+        return web.runSeasonReach();
+      })
+    : null;
 
 for (const line of refusals.values()) process.stdout.write(`${line}\n`);
+if (refusals.size === 0 && reach !== null)
+  process.stdout.write(`${REACH_PREFIX}${JSON.stringify(reach)}\n`);
 process.stdout.write(
   `run ${runId}: ${refusals.size} refusals; ${manifest?.formats.length ?? 0} formats (${rows} board rows), ` +
     `${pages} of ${index?.length ?? 0} player pages parsed${heldWords}, adp, record, clubs, schedule, designations\n`,
