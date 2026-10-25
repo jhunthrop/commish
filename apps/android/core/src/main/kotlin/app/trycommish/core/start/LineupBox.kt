@@ -229,13 +229,13 @@ internal object LineupBoxes {
     fun shortName(name: String): String = StartRows.lastName(StartRows.withoutDefense(name))
 
     /** The API's tenths summed and cleaned back to the tenth they are (box.ts printedSum). */
-    private fun printedSum(values: List<Double?>): Double? = values.filterNotNull().takeIf { it.isNotEmpty() }?.let { tenth(it.sum()) }
+    fun printedSum(values: List<Double?>): Double? = values.filterNotNull().takeIf { it.isNotEmpty() }?.let { tenth(it.sum()) }
 
     /** Math.round(value * 10) / 10, half up as JavaScript rounds. */
     private fun tenth(value: Double): Double = floor(value * TEN + HALF) / TEN
 
     /** box.ts totalsNote. */
-    private fun totalsNote(
+    fun totalsNote(
         rows: List<StartRow>,
         landed: Boolean,
         week: Int,

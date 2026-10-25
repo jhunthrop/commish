@@ -25,6 +25,7 @@ kotlin { jvmToolchain(17) }
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":feature:boxscore"))
     implementation(libs.lifecycle.runtime.compose)
 
     testImplementation(libs.junit4)
