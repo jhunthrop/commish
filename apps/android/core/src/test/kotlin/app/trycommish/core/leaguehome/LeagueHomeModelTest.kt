@@ -59,6 +59,19 @@ class LeagueHomeModelTest {
         assertEquals(Words.Box.none, games[1].sides[0].small)
     }
 
+    /** Each bug opens its own game (game.ts bugRoster, Lane 207): the member's none, the Matchup's own;
+     * every other its first side's roster. */
+    @Test
+    fun `each bug opens its own game`() {
+        listOf(Fixtures.week, Fixtures.sunday, Fixtures.tuesday).forEach { clock ->
+            val games = model(clock).games
+            assertTrue(games.any { it.mine }, "$clock")
+            assertTrue(games.filter { it.mine }.all { it.roster == null }, "$clock")
+            assertTrue(games.filterNot { it.mine }.all { it.roster != null && it.roster == it.sides.first().rosterId }, "$clock")
+            assertTrue(games.any { it.roster == 2 }, "$clock")
+        }
+    }
+
     @Test
     fun `once every game is final a side's small figure is its total under the Final head`() {
         val game = model(Fixtures.tuesday).games[1]
@@ -66,8 +79,9 @@ class LeagueHomeModelTest {
         assertEquals(Words.LeagueHome.final, game.head)
         assertEquals("", game.words)
         assertEquals(Words.LeagueHome.final, game.smallHead)
-        assertEquals(listOf("23.8", "17.0"), game.sides.map { it.small })
-        assertEquals(listOf("23.8", "17.0"), game.sides.map { it.big })
+        // The fixture's other game carries its full lines since Lane 204's M2 (Carried by QJs, Bower Rangers).
+        assertEquals(listOf("79.3", "72.7"), game.sides.map { it.small })
+        assertEquals(listOf("79.3", "72.7"), game.sides.map { it.big })
     }
 
     @Test

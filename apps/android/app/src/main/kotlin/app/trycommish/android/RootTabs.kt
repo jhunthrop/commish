@@ -40,6 +40,7 @@ import app.trycommish.core.shell.ShellState
 import app.trycommish.core.shell.ShellViewModel
 import app.trycommish.core.shell.TRADES_PAGE
 import app.trycommish.core.shell.WAIVERS_PAGE
+import app.trycommish.core.shell.gameOf
 import app.trycommish.core.shell.homeOf
 import app.trycommish.core.shell.lineupOf
 import app.trycommish.core.shell.searchRoute
@@ -72,6 +73,7 @@ private object Routes {
     const val ACCOUNT = "account"
     const val LEAGUE_HOME = "league-home/{id}"
     const val PLAYER = "player/{slug}"
+    const val GAME = "game/{id}?roster={roster}"
 
     fun of(route: ShellRoute): String =
         when (route) {
@@ -79,6 +81,7 @@ private object Routes {
             ShellRoute.Account -> ACCOUNT
             is ShellRoute.LeagueHome -> "league-home/${route.id}"
             is ShellRoute.Player -> "player/${route.slug}"
+            is ShellRoute.Game -> "game/${route.leagueId}" + (route.roster?.let { "?roster=$it" } ?: "")
         }
 }
 
@@ -150,6 +153,14 @@ fun Shell(
         lineupOf(id, shown, bar)?.let { openTab(it.page) } ?: onOpenLineup(id)
     }
 
+    // A score bug's game: the member's on the Matchup tab where the bar has one, every other pushed.
+    val openGame: (String, Int?) -> Unit = { id, roster ->
+        when (val game = gameOf(roster, id, (state as? ShellState.Ready)?.selected?.id, bar)) {
+            is ShellDestination.Tab -> openTab(game.page)
+            is ShellDestination.Push -> push(game.route)
+        }
+    }
+
     CompositionLocalProvider(LocalPlayerSheet provides sheet) {
         Scaffold(
             containerColor = CommishTheme.colors.bg,
@@ -179,7 +190,7 @@ fun Shell(
         ) { padding ->
             // The bars' room counted as taken, so a pin's imePadding lifts it only by what the keyboard adds.
             Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
-                Pages(graph, nav, state, bar, PageVerbs(shell::open, openLineup, ::openTab, choose))
+                Pages(graph, nav, state, bar, PageVerbs(shell::open, openLineup, ::openTab, choose, openGame))
                 if (switchOpen) {
                     Box(
                         Modifier
@@ -199,12 +210,13 @@ fun Shell(
 }
 
 /** What the pages ask of the shell: read the account again (a retry, or the Account's leagues changed), a
- * league's lineup, a tab, and a league chosen as the switch chooses it. */
+ * league's lineup, a tab, a league chosen as the switch chooses it, and a game of a league's week. */
 private class PageVerbs(
     val retry: () -> Unit,
     val onOpenLineup: (leagueId: String) -> Unit,
     val openTab: (String) -> Unit,
     val choose: (String) -> Unit,
+    val openGame: (leagueId: String, roster: Int?) -> Unit,
 )
 
 /** The tabs' pages and the pushed screens. */
@@ -221,7 +233,7 @@ private fun Pages(
     val openTab = verbs.openTab
     val selected = (state as? ShellState.Ready)?.selected
     NavHost(nav, startDestination = LEAGUE_PAGE) {
-        composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup) }
+        composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup, verbs.openGame) }
         composable(LINEUP_PAGE) { StartTab(graph, state, retry) }
         composable(MATCHUP_PAGE) { MatchupTab(graph, state, retry) { openTab(LINEUP_PAGE) } }
         composable(WAIVERS_PAGE) { WaiversTab(graph, state, retry) }
@@ -243,7 +255,22 @@ private fun Pages(
         }
         composable(Routes.ACCOUNT) { AccountTab(graph, leaguesChanged = retry, openLeague = verbs.choose) }
         composable(Routes.LEAGUE_HOME) { entry ->
-            entry.arguments?.getString("id")?.let { LeagueHome(graph, it, onOpenLineup) }
+            entry.arguments?.getString("id")?.let { LeagueHome(graph, it, onOpenLineup, verbs.openGame) }
+        }
+        composable(
+            Routes.GAME,
+            listOf(
+                navArgument("id") { type = NavType.StringType },
+                navArgument("roster") {
+                    type = NavType.StringType
+                    nullable = true
+                },
+            ),
+        ) { entry ->
+            val id = entry.arguments?.getString("id") ?: return@composable
+            val roster = entry.arguments?.getString("roster")?.toIntOrNull()
+            // Open Lineup as a home's: the Lineup tab for the league shown where the bar has one, else the site.
+            GameScreen(graph, GameOf(id, roster), openLineup = { onOpenLineup(id) }, yourGame = { verbs.openGame(id, null) })
         }
     }
 }

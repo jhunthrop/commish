@@ -39,7 +39,11 @@ data class GameBug(
     val smallHead: String,
     val bigHead: String,
     val sides: List<BugSide>,
-)
+) {
+    /** The roster the bug opens the game of (game.ts bugRoster, Lane 204): none for the member's game,
+     * which is the Matchup's own, else its first side's. */
+    val roster: Int? get() = if (mine) null else sides.firstOrNull()?.rosterId
+}
 
 data class StandingsRow(
     val rosterId: Int,

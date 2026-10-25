@@ -41,7 +41,7 @@ private const val HEAD_FACE_TRACKING = 0.04
 
 /** The matchup's score bug on the lit board (MatchupBug.svelte at 390): across its top the week, the
  * game's head and its words and the read beside a live score, centred; under it the two teams side by
- * side, each with You or Opponent, its name, where its starters stand, its big figure and the small one;
+ * side, each with You or Opponent (neither on another team's game), its name, where its starters stand, its big figure and the small one;
  * across its foot the API's line on where the member stands. The member's figure in the board's number
  * colour. */
 @Composable
@@ -59,10 +59,10 @@ internal fun MatchupBugView(bug: MatchupBug) {
         Rule()
         // The two sides as tall as the taller, with the board's rule between them.
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            Side(bug.mine, Modifier.weight(1f))
+            Side(bug.mine, leading = true, Modifier.weight(1f))
             bug.opponent?.let { opponent ->
                 Box(Modifier.width(1.dp).fillMaxHeight().background(c.scoreboardLine))
-                Side(opponent, Modifier.weight(1f))
+                Side(opponent, leading = false, Modifier.weight(1f))
             }
         }
         bug.standing?.let { standing ->
@@ -126,21 +126,22 @@ private fun TopLine(bug: MatchupBug) {
 @Composable
 private fun label() = Faces.label.copy(fontWeight = FontWeight.SemiBold, letterSpacing = HEAD_TRACKING.em)
 
-/** One team: the opponent reads from the right edge in, as the web's does. */
+/** One team: the second reads from the right edge in, as the web's does. */
 @Composable
 private fun Side(
     team: BugTeam,
+    leading: Boolean,
     modifier: Modifier,
 ) {
     val c = CommishTheme.colors
-    val align = if (team.me) Alignment.Start else Alignment.End
-    val text = if (team.me) TextAlign.Start else TextAlign.End
+    val align = if (leading) Alignment.Start else Alignment.End
+    val text = if (leading) TextAlign.Start else TextAlign.End
     Column(
         modifier.padding(horizontal = Tokens.Space.s3.dp, vertical = Tokens.Space.s2.dp),
         horizontalAlignment = align,
         verticalArrangement = Arrangement.spacedBy(Tokens.Space.s1.dp),
     ) {
-        Text(team.label.uppercase(), style = label(), color = c.scoreboardInk2)
+        if (team.label.isNotEmpty()) Text(team.label.uppercase(), style = label(), color = c.scoreboardInk2)
         Text(
             team.name,
             style = Faces.small.copy(fontWeight = FontWeight.Bold),
