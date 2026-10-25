@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.trycommish.core.shell.PlayerSheetHost
 import app.trycommish.core.shell.PlayerSheetModel
 import app.trycommish.core.shell.SheetPlayer
+import app.trycommish.core.shell.ShellRoute
 import app.trycommish.core.shell.playerSheetModel
 import app.trycommish.design.Avatar
 import app.trycommish.design.CommishTheme
@@ -46,13 +47,13 @@ private val FACE = 64.dp
  * partly open first and dragged up to the whole screen, his frame in it and `content` as its body for
  * him. The sheet is keyed by his id, so a refresh of the list under it that hands the host the same
  * player with fresh facts redraws them in place and never reopens or swaps the sheet (plan Review
- * Focus 3).
+ * Focus 3). Full page closes the sheet as it opens his page (PlayerSheetHost.followFullPage).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerSheet(
     host: PlayerSheetHost,
-    openFullPage: (String) -> Unit,
+    openPlayer: (ShellRoute.Player) -> Unit,
     content: @Composable (SheetPlayer) -> Unit = { SheetBasis(playerSheetModel(it).loading) },
 ) {
     val shown by host.shown.collectAsStateWithLifecycle()
@@ -62,7 +63,9 @@ fun PlayerSheet(
         val scope = rememberCoroutineScope()
         val close: () -> Unit = { scope.launch { state.hide() }.invokeOnCompletion { host.close() } }
         ModalBottomSheet(onDismissRequest = host::close, sheetState = state, containerColor = CommishTheme.colors.bg) {
-            PlayerSheetFrame(playerSheetModel(player), close, { openFullPage(it) }) { content(player) }
+            PlayerSheetFrame(playerSheetModel(player), close, { link -> host.followFullPage(link)?.let(openPlayer) }) {
+                content(player)
+            }
         }
     }
 }

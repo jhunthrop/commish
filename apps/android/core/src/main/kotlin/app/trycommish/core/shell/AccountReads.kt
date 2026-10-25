@@ -12,9 +12,10 @@ import java.util.UUID
 interface AccountReads {
     suspend fun me(): String
 
-    /** PUT /me/league: the site selects this followed league, so the web opens on it too. Any answer
-     * but a 401 is no change for the app (a league the API no longer lists, an older API). */
-    suspend fun selectLeague(leagueId: String)
+    /** PUT /me/league: the site selects this followed league, so the web opens on it too. True when
+     * the site took it; any other answer but a 401 (a league the API no longer lists, an older API) is
+     * false and no change for the app. */
+    suspend fun selectLeague(leagueId: String): Boolean
 
     /** DELETE /devices/{id}: the API forgets this phone's sign-in. */
     suspend fun revokeDevice(deviceId: String)
@@ -26,9 +27,10 @@ class ApiAccountReads(
 ) : AccountReads {
     override suspend fun me(): String = transport.auth().getMe().bodyText()
 
-    override suspend fun selectLeague(leagueId: String) {
+    override suspend fun selectLeague(leagueId: String): Boolean {
         val answer = transport.leagueSync().selectLeague(LeagueChoice(leagueId = UUID.fromString(leagueId)))
         if (answer.status == HTTP_UNAUTHORIZED) throw Unauthorized()
+        return answer.success
     }
 
     override suspend fun revokeDevice(deviceId: String) {

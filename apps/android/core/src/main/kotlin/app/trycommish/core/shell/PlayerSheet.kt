@@ -116,6 +116,14 @@ class PlayerSheetHost {
         mutableShown.value = null
     }
 
+    /** The member tapped Full page: the sheet closes as his page opens, so the page is never under
+     * it. The route to his page, null (and the sheet left open) for a link that is not one. */
+    fun followFullPage(link: String): ShellRoute.Player? {
+        val slug = SiteLinks.playerSlug(link) ?: return null
+        close()
+        return ShellRoute.Player(slug)
+    }
+
     /** The screen under the sheet read its list again: the sheet keeps its player. */
     fun parentRefreshed(rows: List<SheetPlayer>) {
         val held = mutableShown.value ?: return

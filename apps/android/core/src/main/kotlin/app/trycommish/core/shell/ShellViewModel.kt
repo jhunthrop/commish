@@ -60,6 +60,12 @@ class ShellViewModel(
     private val mutableState = MutableStateFlow<ShellState>(ShellState.Restoring)
     private var job: Job? = null
 
+    /** The phone's last choice until the site takes it (its PUT lands) or a fresh read agrees. */
+    private var pending: String? = null
+
+    /** How many choices the member has made, so a read can tell one made while it was in flight. */
+    private var choicesMade = 0
+
     val state: StateFlow<ShellState> = mutableState.asStateFlow()
 
     /** The last choice's write to the site, kept so a test can wait on it; the app never does. */
@@ -78,6 +84,8 @@ class ShellViewModel(
         val ready = mutableState.value as? ShellState.Ready ?: return
         val league = ready.leagues.firstOrNull { it.id == leagueId } ?: return
         mutableState.value = ready.copy(selected = league)
+        pending = leagueId
+        choicesMade++
         cache.write(ShellKeys.LAST_LEAGUE, Cached(leagueId, clock.now()))
         selectionWrite = viewModelScope.launch { write(leagueId) }
     }
@@ -97,7 +105,8 @@ class ShellViewModel(
     private suspend fun restore() {
         val kept = cache.read(ShellKeys.ACCOUNT)?.body?.let(::decodeOrNull)
         val last = cache.read(ShellKeys.LAST_LEAGUE)?.body
-        kept?.let { show(it, listOf(last, it.selected)) }
+        kept?.let { show(it, listOf(pending, last, it.selected)) }
+        val asked = choicesMade
         val body =
             try {
                 reads.me()
@@ -114,10 +123,22 @@ class ShellViewModel(
         when {
             fresh != null -> {
                 cache.write(ShellKeys.ACCOUNT, Cached(requireNotNull(body), clock.now()))
-                show(fresh, listOf(fresh.selected, last))
+                show(fresh, listOf(held(fresh, chosenDuringRead = choicesMade != asked), fresh.selected, last))
             }
             kept == null -> mutableState.value = ShellState.Unreachable
         }
+    }
+
+    /** The phone's choice that a fresh read must not take back: one the site has not taken yet (its
+     * PUT failed or is still on its way) until the site's selection agrees, or one made while this read
+     * was in flight, whose answer predates it. Null when the site's selection leads. */
+    private fun held(
+        fresh: AccountContext,
+        chosenDuringRead: Boolean,
+    ): String? {
+        if (fresh.selected != null && fresh.selected == pending) pending = null
+        val shown = (mutableState.value as? ShellState.Ready)?.selected?.id
+        return pending ?: shown.takeIf { chosenDuringRead }
     }
 
     /** The account shown with the first of `choices` it follows, else its newest league. */
@@ -133,7 +154,8 @@ class ShellViewModel(
 
     private suspend fun write(leagueId: String) {
         try {
-            reads.selectLeague(leagueId)
+            // Taken by the site: the choice no longer needs holding against its reads.
+            if (reads.selectLeague(leagueId) && pending == leagueId) pending = null
         } catch (e: CancellationException) {
             throw e
         } catch (e: Unauthorized) {

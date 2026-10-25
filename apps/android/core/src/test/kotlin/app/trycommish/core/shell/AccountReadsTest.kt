@@ -11,6 +11,8 @@ import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
@@ -51,15 +53,15 @@ class AccountReadsTest {
     fun `the choice is PUT to me league with its id`() =
         runTest {
             val seen = mutableListOf<String>()
-            reads(HttpStatusCode.OK, seen = seen).selectLeague(leagues[1].id)
+            assertTrue(reads(HttpStatusCode.OK, seen = seen).selectLeague(leagues[1].id))
             assertEquals(listOf("""PUT /me/league {"league_id":"${leagues[1].id}"}"""), seen)
         }
 
     @Test
-    fun `a 404, 400 or 500 on the write is no change`() =
+    fun `a 404, 400 or 500 on the write is not taken, and throws nothing`() =
         runTest {
             listOf(HttpStatusCode.NotFound, HttpStatusCode.BadRequest, HttpStatusCode.InternalServerError).forEach {
-                reads(it, body = error).selectLeague(leagues[1].id)
+                assertFalse(reads(it, body = error).selectLeague(leagues[1].id))
             }
         }
 

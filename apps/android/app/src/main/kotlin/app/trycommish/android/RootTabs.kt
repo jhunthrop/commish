@@ -1,5 +1,6 @@
 package app.trycommish.android
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -35,7 +36,6 @@ import app.trycommish.core.shell.ShellDestination
 import app.trycommish.core.shell.ShellRoute
 import app.trycommish.core.shell.ShellState
 import app.trycommish.core.shell.ShellViewModel
-import app.trycommish.core.shell.SiteLinks
 import app.trycommish.core.shell.homeOf
 import app.trycommish.core.shell.searchRoute
 import app.trycommish.design.CommishTheme
@@ -105,6 +105,8 @@ fun Shell(
     }
 
     LaunchedEffect(signedIn) { if (signedIn) shell.open() }
+    // Back closes the open switch before it leaves the screen.
+    BackHandler(enabled = switchOpen) { switchOpen = false }
     // A bar that no longer holds the tab in view (the phase moved) opens its first tab.
     LaunchedEffect(bar) { if (bar.none { it.page == tab }) openTab(bar.first().page) }
 
@@ -162,7 +164,7 @@ fun Shell(
                 }
             }
         }
-        PlayerSheet(sheet, openFullPage = { link -> SiteLinks.playerSlug(link)?.let { push(ShellRoute.Player(it)) } })
+        PlayerSheet(sheet, openPlayer = { push(it) })
     }
 }
 

@@ -42,11 +42,12 @@ class ShellViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     /** The fake API: GET /me answers `me` (or throws it), PUT /me/league records the id and answers
-     * `write` (nothing, or what it throws). */
+     * `taken`, or throws `write`. */
     private class FakeAccount(
         private val me: () -> String,
         private val write: Exception? = null,
         private val gate: CompletableDeferred<Unit>? = null,
+        private val taken: Boolean = true,
     ) : AccountReads {
         val selected = mutableListOf<String>()
 
@@ -55,9 +56,10 @@ class ShellViewModelTest {
             return me.invoke()
         }
 
-        override suspend fun selectLeague(leagueId: String) {
+        override suspend fun selectLeague(leagueId: String): Boolean {
             selected += leagueId
             write?.let { throw it }
+            return taken
         }
 
         override suspend fun revokeDevice(deviceId: String) = Unit
@@ -189,6 +191,68 @@ class ShellViewModelTest {
             advanceUntilIdle()
             assertEquals(ShellState.SignedOut, vm.state.value)
             assertEquals(1, ends.count)
+        }
+
+    @Test
+    fun `a choice the site did not take holds against the next read, until a read agrees`() =
+        runTest(main) {
+            listOf(FakeAccount({ "" }, write = IOException("no signal")), FakeAccount({ "" }, taken = false)).forEach { failed ->
+                var site = leagues[0].id
+                val reads =
+                    object : AccountReads by failed {
+                        override suspend fun me(): String = ShellFixtures.meBody(leagues, site)
+                    }
+                val vm = viewModel(reads)
+                vm.open()
+                advanceUntilIdle()
+                vm.choose(leagues[2].id)
+                advanceUntilIdle()
+                // The PUT failed; a read (a retry, the app back in front) still answers the old selection.
+                vm.open()
+                advanceUntilIdle()
+                assertEquals(leagues[2].id, vm.ready().selected?.id)
+                // A read that agrees releases the hold; the web's next choice then shows again.
+                site = leagues[2].id
+                vm.open()
+                advanceUntilIdle()
+                site = leagues[1].id
+                vm.open()
+                advanceUntilIdle()
+                assertEquals(leagues[1].id, vm.ready().selected?.id)
+            }
+        }
+
+    @Test
+    fun `a read in flight when a choice is made does not take it back, even once the PUT lands`() =
+        runTest(main) {
+            val gate = CompletableDeferred<Unit>()
+            val cache = MemoryCache().apply { write(ShellKeys.ACCOUNT, Cached(ShellFixtures.meBody(leagues, leagues[0].id), earlier)) }
+            val reads = FakeAccount({ ShellFixtures.meBody(leagues, leagues[0].id) }, gate = gate)
+            val vm = viewModel(reads, cache)
+            vm.open()
+            runCurrent()
+            assertEquals(leagues[0].id, vm.ready().selected?.id)
+            vm.choose(leagues[1].id)
+            advanceUntilIdle()
+            assertEquals(listOf(leagues[1].id), reads.selected)
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(leagues[1].id, vm.ready().selected?.id)
+        }
+
+    @Test
+    fun `once the site takes the choice, its later selection leads again`() =
+        runTest(main) {
+            var site = leagues[0].id
+            val vm = viewModel(FakeAccount({ ShellFixtures.meBody(leagues, site) }))
+            vm.open()
+            advanceUntilIdle()
+            vm.choose(leagues[1].id)
+            advanceUntilIdle()
+            site = leagues[2].id
+            vm.open()
+            advanceUntilIdle()
+            assertEquals(leagues[2].id, vm.ready().selected?.id)
         }
 
     @Test

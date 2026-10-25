@@ -64,6 +64,17 @@ class PlayerSheetTest {
     }
 
     @Test
+    fun `Full page closes the sheet as it opens his page`() {
+        val host = PlayerSheetHost()
+        host.open(rows[0])
+        assertEquals(ShellRoute.Player("puka-nacua"), host.followFullPage(playerSheetModel(rows[0]).fullPage))
+        assertNull(host.shown.value)
+        host.open(rows[0])
+        assertNull(host.followFullPage("https://example.com/players/puka-nacua"))
+        assertEquals(rows[0], host.shown.value)
+    }
+
+    @Test
     fun `a parent refresh keeps the player the row named`() {
         val host = PlayerSheetHost()
         host.open(rows[1])
