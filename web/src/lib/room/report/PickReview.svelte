@@ -6,7 +6,7 @@
 	import type { MockReport } from '../api.ts';
 	import type { Board } from '../model.ts';
 	import { slotLabel } from '../words.ts';
-	import { adpLater, boardLater, byWords, pickFigure, stillThereCell } from './headline.ts';
+	import { REPORT, adpLater, boardLater, byWords, pickFigure, stillThereCell } from './headline.ts';
 
 	/** Pick by pick as a box score (Lane 66o): each pick's slot, his points over replacement (or his
 	 * place in draft order), where drafters and our board place him with how many picks later than
@@ -25,7 +25,7 @@
 
 	let { picks, starters, board, teams, couldWaitFrom, whose = 'your' }: Props = $props();
 
-	const BENCH = 'Bench';
+	const BENCH = REPORT.bench;
 
 	const slotOf = $derived(
 		new Map(
@@ -41,21 +41,21 @@
 	<thead>
 		<tr class="groups">
 			<th colspan="4"></th>
-			<th colspan="2" class="grp"><span>Drafters</span></th>
-			<th colspan="2" class="grp"><span>Our board</span></th>
+			<th colspan="2" class="grp"><span>{REPORT.drafters}</span></th>
+			<th colspan="2" class="grp"><span>{REPORT.ourBoard}</span></th>
 			<th colspan="2"></th>
 		</tr>
 		<tr>
-			<th scope="col" class="l">Pick</th>
-			<th scope="col" class="l">Player</th>
-			<th scope="col" class="wide">Slot</th>
-			<th scope="col">Over repl</th>
-			<th scope="col" class="wide">ADP</th>
-			<th scope="col"><span class="ph">ADP </span>Picks later</th>
-			<th scope="col" class="wide">Rank</th>
-			<th scope="col"><span class="ph">Ours </span>Picks later</th>
-			<th scope="col">Still there</th>
-			<th scope="col" class="wide">By</th>
+			<th scope="col" class="l">{REPORT.pick}</th>
+			<th scope="col" class="l">{REPORT.player}</th>
+			<th scope="col" class="wide">{REPORT.slot}</th>
+			<th scope="col">{REPORT.overRepl}</th>
+			<th scope="col" class="wide">{REPORT.adp}</th>
+			<th scope="col"><span class="ph">{REPORT.adp} </span>{REPORT.picksLater}</th>
+			<th scope="col" class="wide">{REPORT.rank}</th>
+			<th scope="col"><span class="ph">{REPORT.ours} </span>{REPORT.picksLater}</th>
+			<th scope="col">{REPORT.stillThere}</th>
+			<th scope="col" class="wide">{REPORT.by}</th>
 		</tr>
 	</thead>
 	<tbody>

@@ -18,7 +18,8 @@
 		type MockReport
 	} from './api.ts';
 	import CompanionRoom from './CompanionRoom.svelte';
-	import { POLL_MS, hostName, mergePicks, seatNames } from './model.ts';
+	import { POLL_MS, leagueOnWords, mergePicks, seatNames } from './model.ts';
+	import { COMPANION } from './words.ts';
 
 	/** One followed draft: read every three seconds while it runs, the report once Sleeper says it
 	 * is over. Everything is read in the browser; the shell paints first. */
@@ -84,42 +85,38 @@
 	<title
 		>{companion?.your_turn && companion.your_next_pick !== null
 			? `Your pick at ${pickLabel(companion.your_next_pick, companion.teams)} · Commish`
-			: 'Live draft · Commish'}</title
+			: `${COMPANION.title} · Commish`}</title
 	>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
-<Shell title="Live draft" active="advisor">
+<Shell title={COMPANION.title} active="advisor">
 	{#snippet tail()}
-		<Quiet href={links.companionNew()}>Follow another draft</Quiet>
+		<Quiet href={links.companionNew()}>{COMPANION.followAnother}</Quiet>
 	{/snippet}
 	{#if failure === 'signed-out'}
 		<div class="pad">
-			<EmptyState
-				title="Sign in to follow your draft"
-				line="A followed draft lives on your account."
-			>
-				{#snippet actions()}<Verb href={companions.signInUrl(here)}>Sign in</Verb>{/snippet}
+			<EmptyState title={COMPANION.signedOutTitle} line={COMPANION.signedOutLine}>
+				{#snippet actions()}<Verb href={companions.signInUrl(here)}>{COMPANION.signIn}</Verb
+					>{/snippet}
 			</EmptyState>
 		</div>
 	{:else if failure === 'missing'}
 		<div class="pad">
-			<EmptyState
-				title="This draft is not on your account"
-				line="Paste the draft link again to follow it."
-			>
-				{#snippet actions()}<Verb href={links.companionNew()}>Follow a draft</Verb>{/snippet}
+			<EmptyState title={COMPANION.missingTitle} line={COMPANION.missingLine}>
+				{#snippet actions()}<Verb href={links.companionNew()}>{COMPANION.followADraft}</Verb
+					>{/snippet}
 			</EmptyState>
 		</div>
 	{:else if failure === 'unreachable'}
 		<div class="pad">
-			<EmptyState title="Your draft can't be read right now" line="Reload in a moment." />
+			<EmptyState title={COMPANION.unreachableTitle} line={COMPANION.reloadLine} />
 		</div>
 	{:else if companion && board}
 		{#if retrying}
 			<div class="pad">
 				<Panel edge="quiet" padding="sm">
-					<p class="note" role="status">Reconnecting. The picks below are the last ones we read.</p>
+					<p class="note" role="status">{COMPANION.reconnecting}</p>
 				</Panel>
 			</div>
 		{/if}
@@ -127,11 +124,11 @@
 			<Report
 				{report}
 				{names}
-				seats={`Your league on ${hostName(companion.host)}`}
-				reshuffled="stand-ins for your league"
+				seats={leagueOnWords(companion.host)}
+				reshuffled={COMPANION.reshuffled}
 			>
 				{#snippet verbs()}
-					<Verb href={links.companionNew()}>Follow another draft</Verb>
+					<Verb href={links.companionNew()}>{COMPANION.followAnother}</Verb>
 				{/snippet}
 			</Report>
 		{:else}

@@ -136,3 +136,80 @@ const BY: Readonly<Record<'your' | 'their', MadeFor>> = {
 export function byWords(pick: Pick, whose: 'your' | 'their'): string {
 	return pick.chip === 'kept' ? 'Kept' : BY[whose][pick.made_by];
 }
+
+/** The report's words (Lane 210): its sections, the pick-by-pick heads and the runs' captions, in a
+ * table the apps print from (shared/scripts/gen-words.ts); the lines that carry a figure are built by
+ * the functions below. */
+export const REPORT = {
+	field: 'The field',
+	pickByPick: 'Pick by pick',
+	drafters: 'Drafters',
+	ourBoard: 'Our board',
+	pick: 'Pick',
+	player: 'Player',
+	slot: 'Slot',
+	overRepl: 'Over repl',
+	adp: 'ADP',
+	picksLater: 'Picks later',
+	/** Where the phone's second Picks later head names our board: "Ours Picks later". */
+	ours: 'Ours',
+	rank: 'Rank',
+	stillThere: 'Still there',
+	by: 'By',
+	bench: 'Bench',
+	median: 'median',
+	medianPoints: 'median starting points',
+	middleRuns: 'the middle 80% of runs'
+} as const;
+
+/** The report's title: "Your draft from slot 5", "jh's draft from slot 5", "A shared draft from
+ * slot 5". */
+export function reportTitle(slot: number, shared?: { by: string | null }): string {
+	const whose = shared ? `${shared.by ? `${shared.by}'s` : 'A shared'} draft` : 'Your draft';
+	return `${whose} from slot ${String(slot)}`;
+}
+
+/** The field's note: "projected starting points, 12 teams". */
+export function fieldNote(teams: number): string {
+	return `projected starting points, ${String(teams)} teams`;
+}
+
+/** Pick by pick's note: "20 picks, starters by slot". */
+export function picksNote(picks: number): string {
+	return `${String(picks)} picks, starters by slot`;
+}
+
+/** The runs' title: "The same draft, 200 more times". */
+export function runsTitle(runs: number): string {
+	return `The same draft, ${String(runs)} more times`;
+}
+
+/** The runs' note: "your picks on autopick from the board, the bots reshuffled each run". */
+export function runsNote(whose: 'your' | 'their', reshuffled: string): string {
+	return `${whose} picks on autopick from the board, ${reshuffled} reshuffled each run`;
+}
+
+/** The runs' middle 80%, whole: "1,402 to 1,566". */
+export function middleWords(low: number, high: number): string {
+	return `${points(low)} to ${points(high)}`;
+}
+
+/** The share of runs that finish near the top, under its figure: "of runs finish top 3 of 12". */
+export function topShareWords(topFinish: number, teams: number): string {
+	return `of runs finish top ${String(topFinish)} of ${String(teams)}`;
+}
+
+/** Who the runs land, as their panel's title: "Who you end up with". */
+export function exposureTitle(whose: 'your' | 'their'): string {
+	return `Who ${whose === 'your' ? 'you' : 'they'} end up with`;
+}
+
+/** The exposure panel's aside: "share of 200 runs". */
+export function exposureAside(runs: number): string {
+	return `share of ${String(runs)} runs`;
+}
+
+/** A seat's name on the field: its name, else "Seat 4". */
+export function seatName(names: readonly string[], seat: number): string {
+	return names[seat - 1] ?? `Seat ${String(seat)}`;
+}

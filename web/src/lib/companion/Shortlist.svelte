@@ -8,6 +8,7 @@
 	import PlayerLine from '#lib/ui/PlayerLine.svelte';
 	import RangeBar from '#lib/ui/RangeBar.svelte';
 	import type { OutcomeRange } from './api.ts';
+	import { COMPANION } from './words.ts';
 
 	/** The players we would take next, in order, each with his chance of lasting to your next pick.
 	 * With full_reasoning each carries our why; with range_of_outcomes his floor, median and ceiling
@@ -38,9 +39,9 @@
 	});
 </script>
 
-<Panel as="section" label="Who we would take next">
+<Panel as="section" label={COMPANION.nextTitle}>
 	<div class="list">
-		<PanelHead title="Who we would take next" aside="Chance he lasts" />
+		<PanelHead title={COMPANION.nextTitle} aside={COMPANION.nextAside} />
 		{#each rows as row (row.player.id)}
 			<div class="row">
 				<div class="who">

@@ -1,0 +1,21 @@
+{
+	"field": "The field",
+	"pickByPick": "Pick by pick",
+	"drafters": "Drafters",
+	"ourBoard": "Our board",
+	"pick": "Pick",
+	"player": "Player",
+	"slot": "Slot",
+	"overRepl": "Over repl",
+	"adp": "ADP",
+	"picksLater": "Picks later",
+	"ours": "Ours",
+	"rank": "Rank",
+	"stillThere": "Still there",
+	"by": "By",
+	"bench": "Bench",
+	"median": "median",
+	"medianPoints": "median starting points",
+	"middleRuns": "the middle 80% of runs",
+	"functions": []
+}
