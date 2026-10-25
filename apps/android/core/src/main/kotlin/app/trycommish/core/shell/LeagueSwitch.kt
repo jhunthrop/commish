@@ -68,6 +68,28 @@ sealed interface ShellRoute {
     data class Player(
         val slug: String,
     ) : ShellRoute
+
+    /** ADP in a format as the run names it ("ppr-12"), null for the run's default. */
+    data class Adp(
+        val format: String?,
+    ) : ShellRoute
+
+    /** Compare with its sides by their pages' slugs. */
+    data class Compare(
+        val first: String?,
+        val second: String?,
+    ) : ShellRoute
+
+    /** Every club. */
+    data object Clubs : ShellRoute
+
+    /** A club's page by its abbreviation. */
+    data class Club(
+        val abbr: String,
+    ) : ShellRoute
+
+    /** The strength of schedule. */
+    data object Schedule : ShellRoute
 }
 
 /** Where a choice in the shell lands: a tab of the bar, or a screen pushed on the tab in view. */
