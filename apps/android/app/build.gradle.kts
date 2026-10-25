@@ -12,6 +12,58 @@ plugins {
 val siteUrl = "https://trycommish.app"
 val returnTo = "$siteUrl/app/signed-in"
 
+/**
+ * The version Play shows, and the version code under every upload, never hand-edited: a fixed offset,
+ * then CI's run number (ANDROID_RUN_NUMBER, github.run_number) times ten, plus the attempt
+ * (ANDROID_RUN_ATTEMPT, github.run_attempt) less one. A re-run keeps its run number, so the attempt
+ * is what gives it a code Play has not used; ten attempts per run keep codes rising from one run to
+ * the next. A local build without either is the offset alone, below every CI code.
+ */
+val marketingVersion = "0.1.0"
+val versionCodeOffset = 1000
+val attemptsPerRun = 10
+
+fun versionCodeOf(
+    runNumber: Int,
+    runAttempt: Int,
+): Int {
+    require(runNumber >= 0) { "ANDROID_RUN_NUMBER must not be negative, not $runNumber" }
+    require(runAttempt in 1..attemptsPerRun) { "ANDROID_RUN_ATTEMPT must be 1 to $attemptsPerRun, not $runAttempt" }
+    return versionCodeOffset + runNumber * attemptsPerRun + (runAttempt - 1)
+}
+
+val appVersionCode =
+    versionCodeOf(
+        runNumber = System.getenv("ANDROID_RUN_NUMBER")?.toInt() ?: 0,
+        runAttempt = System.getenv("ANDROID_RUN_ATTEMPT")?.toInt() ?: 1,
+    )
+
+/** The rule's arithmetic, run before the unit tests: every case below must hold. */
+val verifyVersionCodeRule by tasks.registering {
+    group = "verification"
+    description = "Checks the version code rule against fixed runs and attempts."
+    doLast {
+        val cases =
+            listOf(
+                Triple(0, 1, 1000),
+                Triple(223, 1, 3230),
+                Triple(223, 2, 3231),
+                Triple(223, 10, 3239),
+                Triple(224, 1, 3240),
+            )
+        cases.forEach { (run, attempt, expected) ->
+            val actual = versionCodeOf(run, attempt)
+            check(actual == expected) { "run $run attempt $attempt gave $actual, not $expected" }
+        }
+        check(versionCodeOf(223, 10) < versionCodeOf(224, 1)) { "a run's last attempt must stay below the next run" }
+        listOf(0, attemptsPerRun + 1).forEach { attempt ->
+            check(runCatching { versionCodeOf(1, attempt) }.isFailure) { "attempt $attempt must be refused" }
+        }
+        check(runCatching { versionCodeOf(-1, 1) }.isFailure) { "a negative run number must be refused" }
+    }
+}
+tasks.matching { it.name == "testDebugUnitTest" }.configureEach { dependsOn(verifyVersionCodeRule) }
+
 android {
     namespace = "app.trycommish.android"
     compileSdk = 35
@@ -20,8 +72,8 @@ android {
         applicationId = "app.trycommish.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInt()
-        versionName = "0.1.0"
+        versionCode = appVersionCode
+        versionName = marketingVersion
         buildConfigField("String", "SITE_URL", "\"$siteUrl\"")
         buildConfigField("String", "RETURN_TO", "\"$returnTo\"")
     }
