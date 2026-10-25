@@ -1,0 +1,144 @@
+import CommishAPI
+@testable import CommishCore
+import CommishDesign
+import Foundation
+import RunFixtures
+import Testing
+
+/// The player page's view model over the run's routes: found by his slug; before the season his capsule
+/// as written with its stamp, his ADP words and his floor, median and ceiling; in season the week's read
+/// in its place; the league's verb; a held page's copy with that run's stamp, or with none the board's
+/// figures and the held words; the saved page with its stamp with no signal; a refused token signing out.
+@MainActor
+struct PlayerPageViewModelTests {
+    private let folder = FileManager.default.temporaryDirectory
+        .appendingPathComponent("commish-page-tests-\(UUID().uuidString)")
+
+    private func model(
+        _ slug: String, clock: String = Fixtures.week, pages: any RunPagesAPI = StubPages(.standIn),
+        run: any RunAPI = StubRun(.standIn), weeks: (any PlayerWeekAPI)? = nil,
+        league: FollowedLeague? = PlayerSheetViewModelTests.league, cache: (any AnswerCache)? = nil,
+        onSignedOut: @escaping @MainActor () -> Void = {}
+    ) -> PlayerPageViewModel {
+        PlayerPageViewModel(
+            slug: slug, run: run, pages: pages, weeks: weeks ?? FixtureWeeks(clock: clock),
+            cache: cache ?? FileCache(folder: folder), clock: FixedClock(Fixtures.instant(clock)), league: league,
+            zone: Fixtures.zone, onSignedOut: onSignedOut
+        )
+    }
+
+    private func page(_ viewModel: PlayerPageViewModel) -> (PlayerPageModel, Freshness)? {
+        guard case let .loaded(page, freshness) = viewModel.state else {
+            Issue.record("Expected his page, got \(viewModel.state)")
+            return nil
+        }
+        return (page, freshness)
+    }
+
+    @Test func beforeTheSeasonThePageIsHisCapsuleHisADPAndHisRange() async throws {
+        let viewModel = model("rome-odunze")
+        await viewModel.load()
+        let (page, freshness) = try #require(page(viewModel))
+        #expect(page.hero.name == "Rome Odunze")
+        #expect(page.hero.club == "Chicago Bears")
+        #expect(page.hero.pill == "WR 25")
+        #expect(page.figure == "199.2")
+        #expect(page.caption == "projected PPR points in 2026, over 13.7 expected games")
+        #expect(page.drafters.figure == "Pick 55")
+        #expect(page.drafters.words.hasPrefix("We have him at pick 50, so drafters take him 4.8 picks later."))
+        #expect(page.outcomes?.caption == "2026 PPR points, from his low case to his high case")
+        guard case let .prose(paragraphs, byline, _) = page.read else {
+            Issue.record("his capsule, got \(page.read)")
+            return
+        }
+        #expect(!paragraphs.isEmpty)
+        #expect(byline == "Written Oct 13, from his facts through last season")
+        #expect(page.verb == CardVerb(label: "Open your lineup", target: .lineup, note: nil))
+        #expect(page.stamp == "Stand-in, updated Sep 1")
+        #expect(freshness.saved == nil)
+    }
+
+    @Test func inSeasonTheWeeksReadStandsInTheCapsulesPlace() async throws {
+        let viewModel = model("jahmyr-gibbs", pages: StubPages(.contract), run: StubRun(.contract))
+        await viewModel.load()
+        let (page, _) = try #require(page(viewModel))
+        #expect(page.caption == "PPR points for the rest of 2026 through week 17, our rank 1")
+        #expect(page.drafters.label == "ADP")
+        #expect(page.read == .weekNone("Our read for his next game is not written yet."))
+        #expect(page.verb == nil, "the fixture league holds no week for him")
+    }
+
+    @Test func aHeldPageShowsItsCopyWithThatRunsStamp() async throws {
+        // The stand-in held his page, an earlier run's copy standing in: the copy carries its run's stamp.
+        let pages = StubPages(.standIn, held: ["4431299": .standIn])
+        let viewModel = model("rome-odunze", pages: pages)
+        await viewModel.load()
+        let (page, _) = try #require(page(viewModel))
+        #expect(page.hero.name == "Rome Odunze")
+        #expect(page.stamp == "Updated Sep 1", "the copy's own run, not the stand-in's")
+        #expect(page.heldBasis == nil)
+    }
+
+    @Test func aHeldPageWithNoCopyIsTheBoardsFiguresAndTheHeldWords() async throws {
+        let pages = StubPages(.standIn, held: ["4431299": nil])
+        let viewModel = model("rome-odunze", pages: pages)
+        await viewModel.load()
+        let (page, _) = try #require(page(viewModel))
+        #expect(page.heldBasis == Words.HeldPage.basis)
+        #expect(page.read == .unwritten(Words.Unwritten.read))
+        #expect(page.figure == "199.2", "the board's figure")
+    }
+
+    @Test func aSlugTheRunHasNoPageForSaysSo() async {
+        let viewModel = model("no-such-player")
+        await viewModel.load()
+        #expect(viewModel.state == .failed(Words.InSeason.notFoundLine))
+    }
+
+    @Test func withNoSignalTheSavedPageStandsWithItsStamp() async throws {
+        let cache = FileCache(folder: folder)
+        await model("rome-odunze", cache: cache).load()
+        let offline = model(
+            "rome-odunze", clock: Fixtures.sunday, pages: StubPages(.standIn, offline: true),
+            run: StubRun(.standIn, offline: true), weeks: FixtureWeeks(clock: Fixtures.sunday, offline: true),
+            cache: cache
+        )
+        await offline.load()
+        let (page, freshness) = try #require(page(offline))
+        #expect(freshness.saved == .offline)
+        #expect(offline.stampWords == "Last read Sat 12:00 pm")
+        #expect(page.hero.name == "Rome Odunze")
+    }
+
+    @Test func aRefusedTokenSignsOut() async {
+        var signedOut = false
+        let refused = RefusedPages()
+        let viewModel = model("rome-odunze", pages: refused, onSignedOut: { signedOut = true })
+        await viewModel.load()
+        #expect(signedOut)
+        #expect(viewModel.state == .failed(AppWords.Failure.signedOut))
+    }
+}
+
+/// The page routes refusing the device token.
+struct RefusedPages: RunPagesAPI {
+    func index(tag _: String?) async throws -> RunRead<[RunIndexEntry]> {
+        throw APIError.status(401)
+    }
+
+    func page(id _: String, tag _: String?) async throws -> RunRead<RunPlayer> {
+        throw APIError.status(401)
+    }
+
+    func held(tag _: String?) async throws -> RunRead<[RunHeldPage]?> {
+        throw APIError.status(401)
+    }
+
+    func heldCopy(id _: String, tag _: String?) async throws -> RunRead<RunPlayer> {
+        throw APIError.status(401)
+    }
+
+    func schedule(tag _: String?) async throws -> RunRead<RunSchedule> {
+        throw APIError.status(401)
+    }
+}

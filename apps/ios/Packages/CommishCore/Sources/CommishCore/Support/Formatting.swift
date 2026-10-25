@@ -108,6 +108,24 @@ public enum Formatting {
         return formatter.string(from: date)
     }
 
+    /// "CT": the zone's generic short name after a time, the same in summer and winter (clock.ts
+    /// zoneShort); the zone's id where none is named.
+    public static func zoneShort(_ zone: TimeZone) -> String {
+        zone.localizedName(for: .shortGeneric, locale: Locale(identifier: "en_US")) ?? zone.identifier
+    }
+
+    /// "Sun 3:25 pm CT": a kickoff with its zone (clock.ts kickoffAt).
+    public static func kickoffAt(_ date: Date, zone: TimeZone) -> String {
+        "\(weekdayTime(date, zone: zone)) \(zoneShort(zone))"
+    }
+
+    /// "Wed Oct 21, 11:12 am CT": the player page's one stamp format (clock.ts stampAt), as the nightly's
+    /// week read caption says its write.
+    public static func stampAt(_ date: Date, zone: TimeZone) -> String {
+        let day = format(date, "EEE", zone: zone)
+        return "\(day) \(shortDay(date, zone: zone)), \(timeOfDay(date, zone: zone)) \(zoneShort(zone))"
+    }
+
     /// The zone's short name, "Central" for Central Time, as the web's zoneWord says it.
     public static func zoneWord(_ zone: TimeZone) -> String {
         let name = zone.localizedName(for: .generic, locale: Locale(identifier: "en_US")) ?? zone.identifier

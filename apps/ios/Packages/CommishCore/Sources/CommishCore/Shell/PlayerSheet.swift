@@ -29,7 +29,7 @@ public struct SheetPlayer: Equatable, Hashable, Sendable, Identifiable {
 
 /// The sheet's frame (the web's player shelf, PlayerShelf.svelte): his name, position pill and club
 /// in the head from the row, his full page on the site, and the words the shelf shows while his week
-/// is read, which the body says until the player sheet's own lane fills it.
+/// is read, which the body says until his card (PlayerSheetViewModel) is read.
 public struct PlayerSheetModel: Equatable, Sendable {
     public let name: String
     /// His face where no headshot is drawn yet: his initials.
