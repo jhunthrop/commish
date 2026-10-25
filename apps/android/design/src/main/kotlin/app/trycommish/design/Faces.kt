@@ -67,6 +67,12 @@ object Faces {
             fontFeatureSettings = TABULAR,
         )
 
+    /** The interface face at a `wght` of its own, for the weight measurement only. */
+    internal fun uiAt(
+        wght: Int,
+        size: TextUnit,
+    ): TextStyle = TextStyle(fontFamily = FontFamily(font(R.font.outfit, wght)), fontWeight = FontWeight(wght), fontSize = size)
+
     /** A figure in the display face at a role's weight and a size, tabular. */
     fun number(
         weight: NumWeight,

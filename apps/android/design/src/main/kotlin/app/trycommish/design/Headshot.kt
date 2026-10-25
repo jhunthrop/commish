@@ -1,6 +1,8 @@
 package app.trycommish.design
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -8,9 +10,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -23,24 +28,75 @@ import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import coil3.disk.DiskCache
 import coil3.request.ImageRequest
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import okio.Path.Companion.toOkioPath
 import kotlin.math.ceil
 
 /**
- * The image loader every face draws through, one for the process: Coil's memory cache and a disk cache
- * under the app's cache directory, so a face drawn once draws again with no signal.
+ * Faces as the web serves them (web/src/lib/ui/headshot.ts): a provider headshot is asked of the site's
+ * image route at the width it is drawn, so the disk cache holds thumbnails; one image loader for the
+ * process with a disk cache under the app's cache directory, so a face drawn once draws again with no
+ * signal; and a count of the connections the device has gained, so a face that failed offline asks again.
  */
 object Headshots {
     private const val DIRECTORY = "headshots"
-    private const val DISK_BYTES = 32L * 1024 * 1024
+    private const val DISK_BYTES = 16L * 1024 * 1024
+
+    /** The image is drawn wider than the circle so the head fills it (headshot.ts FACE_OVERFILL). */
+    const val OVERFILL = 1.4
+
+    /** The widths the site's route serves (HEADSHOT_MIN_WIDTH, HEADSHOT_MAX_WIDTH). */
+    const val MIN_WIDTH = 16
+    const val MAX_WIDTH = 480
+
+    private val provider = Regex("""^https://a\.espncdn\.com/i/headshots/([a-z-]+)/players/full/(\d+)\.png$""")
+    private val leagues = setOf("nfl", "college-football")
+
+    /** headshot.ts headshotAt: a provider headshot's address on the site at a width in pixels, any
+     * other address as it is. */
+    fun sized(
+        url: String,
+        width: Int,
+    ): String {
+        val match = provider.matchEntire(url) ?: return url
+        val (league, id) = match.destructured
+        if (league !in leagues) return url
+        return "${Site.ORIGIN}/img/headshots/$league/$id/${width.coerceIn(MIN_WIDTH, MAX_WIDTH)}"
+    }
+
+    /** The width a face of this many pixels across asks for. */
+    fun widthFor(sidePixels: Float): Int = ceil(sidePixels * OVERFILL).toInt()
 
     @Volatile
     private var shared: ImageLoader? = null
+
+    @Volatile
+    private var connections: StateFlow<Int>? = null
 
     fun loader(context: Context): ImageLoader =
         shared ?: synchronized(this) {
             shared ?: build(context.applicationContext).also { shared = it }
         }
+
+    /** How many times the device has gained a connection since the first face asked. */
+    fun connections(context: Context): StateFlow<Int> =
+        connections ?: synchronized(this) {
+            connections ?: watch(context.applicationContext).also { connections = it }
+        }
+
+    private fun watch(context: Context): StateFlow<Int> {
+        val gained = MutableStateFlow(0)
+        context.getSystemService(ConnectivityManager::class.java)?.registerDefaultNetworkCallback(
+            object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    gained.value += 1
+                }
+            },
+        )
+        return gained.asStateFlow()
+    }
 
     private fun build(context: Context): ImageLoader =
         ImageLoader
@@ -57,8 +113,8 @@ object Headshots {
 /**
  * A player's face (web Face.svelte, iOS Headshot): his headshot in a circle, his initials (Avatar) while
  * it loads, when it cannot (no signal and none cached) and where he has none. The circle is its side
- * whatever the image does, so a row never waits on it. A preview or a snapshot loads nothing and draws
- * the initials.
+ * whatever the image does, so a row never waits on it. A face that failed asks again when it is next
+ * drawn or the connection returns. A preview or a snapshot loads nothing and draws the initials.
  */
 @Composable
 fun Headshot(
@@ -73,18 +129,24 @@ fun Headshot(
         return
     }
     val context = LocalContext.current
-    val pixels = with(LocalDensity.current) { ceil(side.toPx()).toInt() }
+    val pixels = with(LocalDensity.current) { side.toPx() }
+    val connections by Headshots.connections(context).collectAsState()
+    var attempt by remember(address) { mutableIntStateOf(0) }
     // Sized to the circle so it loads at once, without waiting for a draw to measure it.
     val request =
-        remember(address, pixels) {
+        remember(address, pixels, attempt) {
             ImageRequest
                 .Builder(context)
-                .data(address)
-                .size(pixels)
+                .data(Headshots.sized(address, Headshots.widthFor(pixels)))
+                .size(ceil(pixels).toInt())
                 .build()
         }
     val painter = rememberAsyncImagePainter(request, imageLoader = Headshots.loader(context), contentScale = ContentScale.Crop)
     val state by painter.state.collectAsState()
+    val failed = state is AsyncImagePainter.State.Error
+    LaunchedEffect(failed, connections) {
+        if (failed && connections != attempt) attempt = connections
+    }
     if (state is AsyncImagePainter.State.Success) {
         Box(modifier.size(side).clip(CircleShape).background(CommishTheme.colors.surface2)) {
             Image(painter, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
