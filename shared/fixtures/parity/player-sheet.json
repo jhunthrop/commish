@@ -4917,6 +4917,8 @@
 			"pulls": [],
 			"heldTier": null,
 			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"clubNote": null,
+			"statusNote": null,
 			"built": {
 				"next": {
 					"week": 6,
@@ -5383,6 +5385,8 @@
 			"pulls": [],
 			"heldTier": null,
 			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"clubNote": null,
+			"statusNote": "Expected back Sun Oct 18 on the latest report, which does not move his place on our board. These injury statuses are from the hourly capture, as the list stood Tue Oct 13, 9:03 pm CT, over a day and a half before now. Players keep them until a newer list is read.",
 			"built": {
 				"next": {
 					"week": 6,
@@ -5796,6 +5800,8 @@
 			"pulls": [],
 			"heldTier": "On IR, not ranked",
 			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"clubNote": null,
+			"statusNote": "On injured reserve since September 24. Our projection assumes he plays, so he sits below the available players. These injury statuses are from the hourly capture, as the list stood Tue Oct 13, 9:03 pm CT, over a day and a half before now. Players keep them until a newer list is read.",
 			"built": {
 				"next": {
 					"week": 6,
@@ -6123,6 +6129,8 @@
 			"pulls": [],
 			"heldTier": null,
 			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"clubNote": null,
+			"statusNote": null,
 			"built": {
 				"next": {
 					"week": 6,
@@ -6526,6 +6534,8 @@
 			"pulls": [],
 			"heldTier": null,
 			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"clubNote": null,
+			"statusNote": null,
 			"built": {
 				"next": {
 					"week": 6,
@@ -6983,6 +6993,8 @@
 			],
 			"heldTier": null,
 			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"clubNote": null,
+			"statusNote": null,
 			"built": {
 				"next": {
 					"week": 6,
@@ -7372,6 +7384,8 @@
 			],
 			"heldTier": null,
 			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"clubNote": null,
+			"statusNote": null,
 			"built": {
 				"next": {
 					"week": 6,
@@ -7733,6 +7747,8 @@
 			"pulls": [],
 			"heldTier": null,
 			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"clubNote": null,
+			"statusNote": null,
 			"built": {
 				"next": {
 					"week": 6,
@@ -8116,6 +8132,8 @@
 			],
 			"heldTier": null,
 			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"clubNote": null,
+			"statusNote": "Out on the latest report, which does not move his place on our board. These injury statuses are from the hourly capture, as the list stood Tue Oct 13, 9:03 pm CT, over a day and a half before now. Players keep them until a newer list is read.",
 			"built": {
 				"next": {
 					"week": 6,
@@ -8941,6 +8959,866 @@
 			"player": "4431299",
 			"clock": "2026-10-19T16:00:00.000Z",
 			"kind": "lineup"
+		}
+	],
+	"noteClock": "2026-10-17T17:00:00.000Z",
+	"clubNotes": [
+		{
+			"team": "MIA",
+			"lastGameClub": {
+				"club": "LAC",
+				"week": 5
+			},
+			"words": "Now with the Dolphins. His week 5 game was for the Chargers."
+		},
+		{
+			"team": "FA",
+			"lastGameClub": {
+				"club": "LAC",
+				"week": 5
+			},
+			"words": "Now a free agent. His week 5 game was for the Chargers."
+		},
+		{
+			"team": "SEA",
+			"lastGameClub": {
+				"club": "PHI",
+				"week": 4,
+				"specialTeams": true
+			},
+			"words": "Now with the Seahawks. His week 4 snaps were on special teams for the Eagles."
+		},
+		{
+			"team": "SEA",
+			"lastGameClub": {
+				"club": "PHI",
+				"week": 4,
+				"specialTeams": false
+			},
+			"words": "Now with the Seahawks. His week 4 game was for the Eagles."
+		}
+	],
+	"statusNotes": [
+		{
+			"status": {
+				"status": "doubtful",
+				"seasonLong": false,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": true,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "Doubtful on the latest report, which does not move his place on our board. Injury status from the hourly capture, read Sat Oct 17, 10:05 am CT."
+		},
+		{
+			"status": {
+				"status": "doubtful",
+				"seasonLong": false,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": false,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "Doubtful on the latest report, which does not move his place on our board. Injury status from the hourly capture, read Sat Oct 17, 10:05 am CT."
+		},
+		{
+			"status": {
+				"status": "doubtful",
+				"seasonLong": false,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": true,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "Doubtful on the latest report, which does not move his place on our board. These injury statuses are from the hourly capture, read Sat Oct 17, 10:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "doubtful",
+				"seasonLong": false,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": false,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "Doubtful on the latest report, which does not move his place on our board. These injury statuses are from the hourly capture, read Sat Oct 17, 10:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "doubtful",
+				"seasonLong": false,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": true,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "Doubtful on the latest report, which does not move his place on our board. Injury status from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT."
+		},
+		{
+			"status": {
+				"status": "doubtful",
+				"seasonLong": false,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": false,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "Doubtful on the latest report, which does not move his place on our board. Injury status from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT."
+		},
+		{
+			"status": {
+				"status": "doubtful",
+				"seasonLong": false,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": true,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "Doubtful on the latest report, which does not move his place on our board. These injury statuses are from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "doubtful",
+				"seasonLong": false,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": false,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "Doubtful on the latest report, which does not move his place on our board. These injury statuses are from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "questionable",
+				"seasonLong": false,
+				"since": null,
+				"returning": "2026-10-18"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": true,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "Expected back Sun Oct 18 on the latest report, which does not move his place on our board. Injury status from the hourly capture, read Sat Oct 17, 10:05 am CT."
+		},
+		{
+			"status": {
+				"status": "questionable",
+				"seasonLong": false,
+				"since": null,
+				"returning": "2026-10-18"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": false,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "Expected back Sun Oct 18 on the latest report, which does not move his place on our board. Injury status from the hourly capture, read Sat Oct 17, 10:05 am CT."
+		},
+		{
+			"status": {
+				"status": "questionable",
+				"seasonLong": false,
+				"since": null,
+				"returning": "2026-10-18"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": true,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "Expected back Sun Oct 18 on the latest report, which does not move his place on our board. These injury statuses are from the hourly capture, read Sat Oct 17, 10:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "questionable",
+				"seasonLong": false,
+				"since": null,
+				"returning": "2026-10-18"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": false,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "Expected back Sun Oct 18 on the latest report, which does not move his place on our board. These injury statuses are from the hourly capture, read Sat Oct 17, 10:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "questionable",
+				"seasonLong": false,
+				"since": null,
+				"returning": "2026-10-18"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": true,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "Expected back Sun Oct 18 on the latest report, which does not move his place on our board. Injury status from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT."
+		},
+		{
+			"status": {
+				"status": "questionable",
+				"seasonLong": false,
+				"since": null,
+				"returning": "2026-10-18"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": false,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "Expected back Sun Oct 18 on the latest report, which does not move his place on our board. Injury status from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT."
+		},
+		{
+			"status": {
+				"status": "questionable",
+				"seasonLong": false,
+				"since": null,
+				"returning": "2026-10-18"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": true,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "Expected back Sun Oct 18 on the latest report, which does not move his place on our board. These injury statuses are from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "questionable",
+				"seasonLong": false,
+				"since": null,
+				"returning": "2026-10-18"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": false,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "Expected back Sun Oct 18 on the latest report, which does not move his place on our board. These injury statuses are from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": "2026-09-24T15:00:00.000Z"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": true,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "On injured reserve since September 24. Our rest-of-season figure assumes he plays, so he sits below the available players. Injury status from the hourly capture, read Sat Oct 17, 10:05 am CT."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": "2026-09-24T15:00:00.000Z"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": false,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "On injured reserve since September 24. Our projection assumes he plays, so he sits below the available players. Injury status from the hourly capture, read Sat Oct 17, 10:05 am CT."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": "2026-09-24T15:00:00.000Z"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": true,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "On injured reserve since September 24. Our rest-of-season figure assumes he plays, so he sits below the available players. These injury statuses are from the hourly capture, read Sat Oct 17, 10:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": "2026-09-24T15:00:00.000Z"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": false,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "On injured reserve since September 24. Our projection assumes he plays, so he sits below the available players. These injury statuses are from the hourly capture, read Sat Oct 17, 10:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": "2026-09-24T15:00:00.000Z"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": true,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "On injured reserve since September 24. Our rest-of-season figure assumes he plays, so he sits below the available players. Injury status from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": "2026-09-24T15:00:00.000Z"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": false,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "On injured reserve since September 24. Our projection assumes he plays, so he sits below the available players. Injury status from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": "2026-09-24T15:00:00.000Z"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": true,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "On injured reserve since September 24. Our rest-of-season figure assumes he plays, so he sits below the available players. These injury statuses are from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": "2026-09-24T15:00:00.000Z"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": false,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "On injured reserve since September 24. Our projection assumes he plays, so he sits below the available players. These injury statuses are from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": true,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "On injured reserve as of October 16. Our rest-of-season figure assumes he plays, so he sits below the available players. Injury status from the hourly capture, read Sat Oct 17, 10:05 am CT."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": false,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "On injured reserve as of October 16. Our projection assumes he plays, so he sits below the available players. Injury status from the hourly capture, read Sat Oct 17, 10:05 am CT."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": true,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "On injured reserve as of October 16. Our rest-of-season figure assumes he plays, so he sits below the available players. These injury statuses are from the hourly capture, read Sat Oct 17, 10:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": false,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "On injured reserve as of October 16. Our projection assumes he plays, so he sits below the available players. These injury statuses are from the hourly capture, read Sat Oct 17, 10:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": true,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "On injured reserve as of October 16. Our rest-of-season figure assumes he plays, so he sits below the available players. Injury status from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": false,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "On injured reserve as of October 16. Our projection assumes he plays, so he sits below the available players. Injury status from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": true,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "On injured reserve as of October 16. Our rest-of-season figure assumes he plays, so he sits below the available players. These injury statuses are from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "injured_reserve",
+				"seasonLong": true,
+				"since": null
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": false,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "On injured reserve as of October 16. Our projection assumes he plays, so he sits below the available players. These injury statuses are from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "out",
+				"seasonLong": true,
+				"since": null,
+				"returning": "2026-11-08"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": true,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "Out as of October 16. Our rest-of-season figure assumes he plays, so he sits below the available players. Injury status from the hourly capture, read Sat Oct 17, 10:05 am CT."
+		},
+		{
+			"status": {
+				"status": "out",
+				"seasonLong": true,
+				"since": null,
+				"returning": "2026-11-08"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": false,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "Out as of October 16. Our projection assumes he plays, so he sits below the available players. Injury status from the hourly capture, read Sat Oct 17, 10:05 am CT."
+		},
+		{
+			"status": {
+				"status": "out",
+				"seasonLong": true,
+				"since": null,
+				"returning": "2026-11-08"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": true,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "Out as of October 16. Our rest-of-season figure assumes he plays, so he sits below the available players. These injury statuses are from the hourly capture, read Sat Oct 17, 10:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "out",
+				"seasonLong": true,
+				"since": null,
+				"returning": "2026-11-08"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": "2026-10-17T15:05:00.000Z"
+			},
+			"restOfSeason": false,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "Out as of October 16. Our projection assumes he plays, so he sits below the available players. These injury statuses are from the hourly capture, read Sat Oct 17, 10:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "out",
+				"seasonLong": true,
+				"since": null,
+				"returning": "2026-11-08"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": true,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "Out as of October 16. Our rest-of-season figure assumes he plays, so he sits below the available players. Injury status from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT."
+		},
+		{
+			"status": {
+				"status": "out",
+				"seasonLong": true,
+				"since": null,
+				"returning": "2026-11-08"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": false,
+			"now": "2026-10-17T17:00:00.000Z",
+			"words": "Out as of October 16. Our projection assumes he plays, so he sits below the available players. Injury status from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT."
+		},
+		{
+			"status": {
+				"status": "out",
+				"seasonLong": true,
+				"since": null,
+				"returning": "2026-11-08"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": true,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "Out as of October 16. Our rest-of-season figure assumes he plays, so he sits below the available players. These injury statuses are from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		},
+		{
+			"status": {
+				"status": "out",
+				"seasonLong": true,
+				"since": null,
+				"returning": "2026-11-08"
+			},
+			"capture": {
+				"readAt": "2026-10-16T14:05:00.000Z",
+				"checkedAt": null
+			},
+			"restOfSeason": false,
+			"now": "2026-10-20T12:00:00.000Z",
+			"words": "Out as of October 16. Our projection assumes he plays, so he sits below the available players. These injury statuses are from the hourly capture, as the list stood Fri Oct 16, 9:05 am CT, over a day and a half before now. Players keep them until a newer list is read."
+		}
+	],
+	"leagueLines": [
+		{
+			"league": {
+				"host": "espn",
+				"scoring": "ppr",
+				"format": "ppr"
+			},
+			"figures": "ppr",
+			"text": "Your league scores PPR."
+		},
+		{
+			"league": {
+				"host": "espn",
+				"scoring": "ppr",
+				"format": "ppr"
+			},
+			"figures": "half_ppr",
+			"text": "Your league scores PPR. We have no PPR board yet, so these figures are half PPR."
+		},
+		{
+			"league": {
+				"host": "espn",
+				"scoring": "ppr",
+				"format": "ppr"
+			},
+			"figures": "standard",
+			"text": "Your league scores PPR. We have no PPR board yet, so these figures are standard."
+		},
+		{
+			"league": {
+				"host": "sleeper",
+				"scoring": "half_ppr",
+				"format": "half_ppr"
+			},
+			"figures": "ppr",
+			"text": "Your league scores half PPR. We have no half PPR board yet, so these figures are PPR."
+		},
+		{
+			"league": {
+				"host": "sleeper",
+				"scoring": "half_ppr",
+				"format": "half_ppr"
+			},
+			"figures": "half_ppr",
+			"text": "Your league scores half PPR."
+		},
+		{
+			"league": {
+				"host": "sleeper",
+				"scoring": "half_ppr",
+				"format": "half_ppr"
+			},
+			"figures": "standard",
+			"text": "Your league scores half PPR. We have no half PPR board yet, so these figures are standard."
+		},
+		{
+			"league": {
+				"host": "yahoo",
+				"scoring": "standard",
+				"format": "standard"
+			},
+			"figures": "ppr",
+			"text": "Your league scores standard. We have no standard board yet, so these figures are PPR."
+		},
+		{
+			"league": {
+				"host": "yahoo",
+				"scoring": "standard",
+				"format": "standard"
+			},
+			"figures": "half_ppr",
+			"text": "Your league scores standard. We have no standard board yet, so these figures are half PPR."
+		},
+		{
+			"league": {
+				"host": "yahoo",
+				"scoring": "standard",
+				"format": "standard"
+			},
+			"figures": "standard",
+			"text": "Your league scores standard."
+		},
+		{
+			"league": {
+				"host": "sleeper",
+				"scoring": "ppr",
+				"format": "superflex"
+			},
+			"figures": "ppr",
+			"text": "Your league scores PPR. We have no superflex board yet, so these figures are PPR."
+		},
+		{
+			"league": {
+				"host": "sleeper",
+				"scoring": "ppr",
+				"format": "superflex"
+			},
+			"figures": "half_ppr",
+			"text": "Your league scores PPR. We have no superflex board yet, so these figures are half PPR."
+		},
+		{
+			"league": {
+				"host": "sleeper",
+				"scoring": "ppr",
+				"format": "superflex"
+			},
+			"figures": "standard",
+			"text": "Your league scores PPR. We have no superflex board yet, so these figures are standard."
+		},
+		{
+			"league": {
+				"host": "sleeper",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "ppr",
+			"text": "Your league gives tight ends extra points per catch. These figures are PPR, nearest your league's rules."
+		},
+		{
+			"league": {
+				"host": "sleeper",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "half_ppr",
+			"text": "Your league gives tight ends extra points per catch. We have no PPR board yet, so these figures are half PPR."
+		},
+		{
+			"league": {
+				"host": "sleeper",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "standard",
+			"text": "Your league gives tight ends extra points per catch. We have no PPR board yet, so these figures are standard."
+		},
+		{
+			"league": {
+				"host": "mfl",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "ppr",
+			"text": "Your league gives tight ends extra points per catch. These figures are PPR, nearest your league's rules."
+		},
+		{
+			"league": {
+				"host": "mfl",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "half_ppr",
+			"text": "Your league gives tight ends extra points per catch. We have no PPR board yet, so these figures are half PPR."
+		},
+		{
+			"league": {
+				"host": "mfl",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "standard",
+			"text": "Your league gives tight ends extra points per catch. We have no PPR board yet, so these figures are standard."
+		},
+		{
+			"league": {
+				"host": "ffpc",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "ppr",
+			"text": "Your league gives tight ends extra points per catch. These figures are PPR, nearest FFPC's rules."
+		},
+		{
+			"league": {
+				"host": "ffpc",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "half_ppr",
+			"text": "Your league gives tight ends extra points per catch. We have no PPR board yet, so these figures are half PPR."
+		},
+		{
+			"league": {
+				"host": "ffpc",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "standard",
+			"text": "Your league gives tight ends extra points per catch. We have no PPR board yet, so these figures are standard."
+		},
+		{
+			"league": {
+				"host": "yahoo",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "ppr",
+			"text": "Your league gives tight ends extra points per catch. These figures are PPR, nearest your league's rules."
+		},
+		{
+			"league": {
+				"host": "yahoo",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "half_ppr",
+			"text": "Your league gives tight ends extra points per catch. We have no PPR board yet, so these figures are half PPR."
+		},
+		{
+			"league": {
+				"host": "yahoo",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "standard",
+			"text": "Your league gives tight ends extra points per catch. We have no PPR board yet, so these figures are standard."
+		},
+		{
+			"league": {
+				"host": "espn",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "ppr",
+			"text": "Your league gives tight ends extra points per catch. These figures are PPR, nearest your league's rules."
+		},
+		{
+			"league": {
+				"host": "espn",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "half_ppr",
+			"text": "Your league gives tight ends extra points per catch. We have no PPR board yet, so these figures are half PPR."
+		},
+		{
+			"league": {
+				"host": "espn",
+				"scoring": "te_premium",
+				"format": "ppr"
+			},
+			"figures": "standard",
+			"text": "Your league gives tight ends extra points per catch. We have no PPR board yet, so these figures are standard."
 		}
 	]
 }

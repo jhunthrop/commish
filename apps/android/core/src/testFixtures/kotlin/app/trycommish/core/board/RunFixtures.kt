@@ -52,6 +52,34 @@ enum class RunFixture(
 
     fun designationsAnswer(): String = envelope("designations" to runFile("designations.json"))
 
+    /** His page as /run/players/{id} answers it: the run it is from and the page. */
+    fun pageAnswer(id: String): String = envelope("player" to runFile("players/$id.json"))
+
+    /** The run's schedule as /run/schedule answers it. */
+    fun scheduleAnswer(): String = envelope("schedule" to runFile("schedule.json"))
+
+    /** The pages the folder holds, each by the index's own fields, as /run/index answers them. */
+    fun indexAnswer(): String {
+        val entries =
+            playerIds().map { id ->
+                val page = runFile("players/$id.json").jsonObject
+                val season = page.getValue("season").jsonObject
+                val games = mapOf("games" to season.getValue("games"), "pointsPerGame" to (season["pointsPerGame"] ?: JsonNull))
+                JsonObject(INDEX_FIELDS.associateWith { page.getValue(it) } + mapOf("season" to JsonObject(games)))
+            }
+        return envelope("pages" to JsonArray(entries), "market" to JsonArray(emptyList()))
+    }
+
+    /** The ids of the pages the run holds, in file order. */
+    fun playerIds(): List<String> =
+        File(root, "runs/$runId/players")
+            .listFiles()
+            .orEmpty()
+            .map { it.name }
+            .filter { it.endsWith(".json") }
+            .sorted()
+            .map { it.removeSuffix(".json") }
+
     /** Whether the run carries a format's board. */
     fun carries(format: String): Boolean = File(root, "runs/$runId/boards/$format.json").exists()
 
@@ -89,6 +117,9 @@ enum class RunFixture(
 
     companion object {
         const val PPR = "ppr-12"
+
+        /** The page's own fields the run's index names each page by. */
+        private val INDEX_FIELDS = listOf("id", "slug", "name", "team", "position", "headshot")
 
         /** The member's zone the web's shots draw in. */
         val zone: ZoneId = ZoneId.of("America/Chicago")

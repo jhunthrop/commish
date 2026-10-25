@@ -42,25 +42,24 @@ interface RunReads {
 class ApiRunReads(
     private val transport: Transport,
 ) : RunReads {
-    override suspend fun manifest(tag: String?): RunRead = transport.run().runManifest(tag).read()
+    override suspend fun manifest(tag: String?): RunRead = transport.run().runManifest(tag).runRead()
 
     override suspend fun board(
         format: String,
         tag: String?,
-    ): RunRead = transport.run().runBoard(format, tag).read()
+    ): RunRead = transport.run().runBoard(format, tag).runRead()
 
-    override suspend fun adp(tag: String?): RunRead = transport.run().runAdp(tag).read()
+    override suspend fun adp(tag: String?): RunRead = transport.run().runAdp(tag).runRead()
 
-    override suspend fun designations(tag: String?): RunRead = transport.run().runDesignations(tag).read()
+    override suspend fun designations(tag: String?): RunRead = transport.run().runDesignations(tag).runRead()
 
-    override suspend fun clubs(tag: String?): RunRead = transport.run().runClubs(tag).read()
+    override suspend fun clubs(tag: String?): RunRead = transport.run().runClubs(tag).runRead()
+}
 
-    private suspend fun HttpResponse<*>.read(): RunRead {
-        val tag = response.headers[HttpHeaders.ETag]
-        return if (status == NOT_MODIFIED) RunRead.Unchanged(tag) else RunRead.Fresh(bodyText(), tag)
-    }
+private const val NOT_MODIFIED = 304
 
-    private companion object {
-        const val NOT_MODIFIED = 304
-    }
+/** A run file's answer with the ETag the API gave it, or the 304 saying the kept copy stands. */
+internal suspend fun HttpResponse<*>.runRead(): RunRead {
+    val tag = response.headers[HttpHeaders.ETag]
+    return if (status == NOT_MODIFIED) RunRead.Unchanged(tag) else RunRead.Fresh(bodyText(), tag)
 }

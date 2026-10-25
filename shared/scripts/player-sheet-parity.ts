@@ -14,6 +14,9 @@
  *   his club's name, the read's stamp, the figures beside the read, the held tier and whether the run
  *   is under way.
  * - `verbs`: the league verb's words for every kind on every platform (week-words.ts verbOf, heldVerb).
+ * - `clubNotes`, `statusNotes`, `leagueLines` and each page's `clubNote` and `statusNote` (B165): the
+ *   notes the page draws under its card (player.ts clubNoteOf, status-view.ts playerStatusWords' note
+ *   at `noteClock`, note-words.ts contextNote with "These figures are").
  *
  * Written by export-parity.ts beside the other screens' parity. */
 import { readFile } from 'node:fs/promises';
@@ -74,6 +77,12 @@ import { formatTable } from '../../web/src/lib/run/player-words.ts';
 import { PLAYER_PAGE } from '../../web/src/lib/player/page-words.ts';
 import { rankWord } from '../../web/src/lib/format/designation.ts';
 import { plural, signed } from '../../web/src/lib/format/number.ts';
+import { isFreeAgent } from '../../web/src/lib/format/free-agent.ts';
+import { lastGameClubWords } from '../../web/src/lib/player/club-words.ts';
+import { specialTeamsWeek } from '../../web/src/lib/server/pages/player-season.ts';
+import { playerStatusWords } from '../../web/src/lib/run/status-view.ts';
+import { contextNote } from '../../web/src/lib/context/note-words.ts';
+import type { BoardFormat, ContextLeague } from '../../web/src/lib/context/words.ts';
 import { REPOSITORY } from './generated.ts';
 import { SHEET_CLOCKS } from './export-fixtures.ts';
 import { PUBLIC_SHEET_PLAYER_IDS, SHEET_PLAYER_IDS } from './sheet-players.ts';
@@ -535,9 +544,126 @@ async function pageCases(run: Run, ids: readonly string[]): Promise<unknown[]> {
 				}),
 				heldTier: heldOut && listed ? heldTierWords(listed.status) : null,
 				outcomesCaption: PLAYER_PAGE.outcomesCaption(run.manifest.season, format.label),
+				clubNote: clubNoteOf(run.clubs, page.team, page.lastGameClub ?? null),
+				statusNote:
+					listed === undefined || run.capture === null
+						? null
+						: statusNoteOf(listed, run.capture, format.rosFromWeek !== undefined, NOTE_CLOCK),
 				...pageSections(run, page, format, underway, listed)
 			};
 		})
+	);
+}
+
+// MARK: the notes under the card (B165): the club and status footnotes and the league line
+
+/** The clock the page's status notes are said at, the fixture week's. */
+const NOTE_CLOCK = CLOCKS.week;
+
+type Clubs = Run['clubs'];
+type LastGameClub = NonNullable<Player['lastGameClub']>;
+
+/** server/pages/player.ts clubNoteOf: the line saying his newest game was for another club. */
+function clubNoteOf(clubs: Clubs, team: string, last: LastGameClub | null): string | null {
+	if (last === null) return null;
+	const clubOf = (abbr: string): Clubs[number] => {
+		const club = clubs.find((candidate) => candidate.abbr === abbr);
+		if (!club) throw new Error(`${abbr} is not among the run's clubs.`);
+		return club;
+	};
+	const kind = specialTeamsWeek(last) === null ? 'game' : 'specialTeams';
+	return lastGameClubWords(isFreeAgent(team) ? null : clubOf(team), last.week, clubOf(last.club), kind);
+}
+
+/** The page's status note (status-view.ts playerStatusWords' note) at a clock, in the parity's zone. */
+function statusNoteOf(
+	status: Designations['players'][string],
+	capture: Designations,
+	restOfSeason: boolean,
+	now: string
+): string {
+	return playerStatusWords(status, {
+		capture: { readAt: capture.readAt, checkedAt: capture.checkedAt },
+		restOfSeason,
+		zone: ZONE,
+		now: Date.parse(now)
+	}).note;
+}
+
+/** The club line's cases: a game for another club, a free agent's, and a special-teams week. */
+function clubNoteCases(clubs: Clubs): unknown[] {
+	const cases: { team: string; lastGameClub: LastGameClub }[] = [
+		{ team: 'MIA', lastGameClub: { club: 'LAC', week: 5 } },
+		{ team: 'FA', lastGameClub: { club: 'LAC', week: 5 } },
+		{ team: 'SEA', lastGameClub: { club: 'PHI', week: 4, specialTeams: true } },
+		{ team: 'SEA', lastGameClub: { club: 'PHI', week: 4, specialTeams: false } }
+	];
+	return cases.map((test) => ({
+		...test,
+		words: clubNoteOf(clubs, test.team, test.lastGameClub)
+	}));
+}
+
+/** The status note's cases: a week's designation, one due back, a season-long list with and without
+ * its start, on a capture checked and one only listed, recent and over a day and a half old, on a
+ * rest-of-season board and a preseason one. */
+function statusNoteCases(): unknown[] {
+	const recent: Designations = {
+		readAt: '2026-10-16T14:05:00.000Z',
+		checkedAt: '2026-10-17T15:05:00.000Z',
+		source: 'fixture',
+		players: {}
+	};
+	const listedOnly: Designations = { ...recent, checkedAt: null };
+	const statuses: Designations['players'][string][] = [
+		{ status: 'doubtful', seasonLong: false, since: null },
+		{ status: 'questionable', seasonLong: false, since: null, returning: '2026-10-18' },
+		{ status: 'injured_reserve', seasonLong: true, since: '2026-09-24T15:00:00.000Z' },
+		{ status: 'injured_reserve', seasonLong: true, since: null },
+		{ status: 'out', seasonLong: true, since: null, returning: '2026-11-08' }
+	];
+	const clocks = [NOTE_CLOCK, '2026-10-20T12:00:00.000Z'];
+	return statuses.flatMap((status) =>
+		[recent, listedOnly].flatMap((capture) =>
+			clocks.flatMap((now) =>
+				[true, false].map((restOfSeason) => ({
+					status,
+					capture: { readAt: capture.readAt, checkedAt: capture.checkedAt },
+					restOfSeason,
+					now,
+					words: statusNoteOf(status, capture, restOfSeason, now)
+				}))
+			)
+		)
+	);
+}
+
+/** The league line's cases (note-words.ts contextNote, a player page's "These figures are"): every
+ * scoring on its own board and on another, superflex, and a TE premium league on each platform, with no
+ * account's exact rules (the app draws the line alone, no mock draft to send it to). */
+function leagueLineCases(): unknown[] {
+	const league = (
+		host: ContextLeague['host'],
+		scoring: ContextLeague['scoring'],
+		format: BoardFormat
+	): ContextLeague =>
+		({ host, scoring, format, settings_league_id: null }) as unknown as ContextLeague;
+	const leagues = [
+		league('espn', 'ppr', 'ppr'),
+		league('sleeper', 'half_ppr', 'half_ppr'),
+		league('yahoo', 'standard', 'standard'),
+		league('sleeper', 'ppr', 'superflex'),
+		...(['sleeper', 'mfl', 'ffpc', 'yahoo', 'espn'] as const).map((host) =>
+			league(host, 'te_premium', 'ppr')
+		)
+	];
+	const figures: BoardFormat[] = ['ppr', 'half_ppr', 'standard'];
+	return leagues.flatMap((at) =>
+		figures.map((shown) => ({
+			league: { host: at.host, scoring: at.scoring, format: at.format },
+			figures: shown,
+			text: contextNote(at, shown, false, 'These figures are')?.text ?? null
+		}))
 	);
 }
 
@@ -783,7 +909,11 @@ export async function renderPlayerSheet(about: string): Promise<string> {
 		],
 		unwritten: await unwrittenCases(standin),
 		verbs: verbCases(),
-		heldVerbs: await heldVerbCases()
+		heldVerbs: await heldVerbCases(),
+		noteClock: NOTE_CLOCK,
+		clubNotes: clubNoteCases(standin.clubs),
+		statusNotes: statusNoteCases(),
+		leagueLines: leagueLineCases()
 	};
 	return `${JSON.stringify(parity, null, '\t')}\n`;
 }
