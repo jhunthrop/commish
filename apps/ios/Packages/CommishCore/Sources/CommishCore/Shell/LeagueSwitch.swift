@@ -64,6 +64,10 @@ public enum ShellRoute: Hashable, Sendable {
     /// A game of the league's week (Lane 206): another team's by its first side's roster, pushed from
     /// its score bug; the member's own (roster nil) where the bar has no Matchup tab.
     case game(league: String, roster: Int?)
+    /// The live-draft companion's start page (/companion/new), with the development replay when asked.
+    case companionNew(replay: Bool)
+    /// A followed draft (/companion/<id>).
+    case companion(id: String)
 
     public enum Destination: Equatable, Sendable {
         case tab(String)

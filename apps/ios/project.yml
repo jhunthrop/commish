@@ -55,6 +55,8 @@ packages:
     path: Packages/Features/Account
   Reference:
     path: Packages/Features/Reference
+  Companion:
+    path: Packages/Features/Companion
 targets:
   Commish:
     type: application
@@ -78,6 +80,7 @@ targets:
       - package: Record
       - package: Account
       - package: Reference
+      - package: Companion
     entitlements:
       path: Commish/Commish.entitlements
       properties:

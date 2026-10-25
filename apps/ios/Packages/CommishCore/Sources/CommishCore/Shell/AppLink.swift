@@ -9,6 +9,9 @@ public enum AppLink: Equatable, Sendable {
     /// A reference page the app draws (ADP, compare, the clubs, a club, the schedule), pushed where it
     /// is tapped: the site's links between those pages open them in the app.
     case reference(ShellRoute)
+    /// The live-draft companion: its start page (/companion/new, `?replay=1` for the development
+    /// replay, as the web reads it) or a followed draft (/companion/<id>).
+    case companion(ShellRoute)
 
     public static func of(_ url: URL) -> AppLink? {
         guard url.scheme == SiteLinks.origin.scheme, url.host() == SiteLinks.origin.host() else {
@@ -21,8 +24,12 @@ public enum AppLink: Equatable, Sendable {
         if parts.count == 2, parts[0] == "players", !parts[1].isEmpty {
             return .player(slug: parts[1])
         }
-        return reference(parts, query: URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [])
-            .map(AppLink.reference)
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        if parts.count == 2, parts[0] == "companion", !parts[1].isEmpty {
+            let replay = query.first { $0.name == "replay" }?.value == "1"
+            return .companion(parts[1] == "new" ? .companionNew(replay: replay) : .companion(id: parts[1]))
+        }
+        return reference(parts, query: query).map(AppLink.reference)
     }
 
     /// The reference pages by their site paths (web links.ts): /adp/<format>, /compare?a=&b=, /clubs,

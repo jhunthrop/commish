@@ -73,6 +73,7 @@ import {
 } from './trades-parity.ts';
 import { HOLDING_PLAYER, OTHER_GAME_ROSTER } from './export-fixtures.ts';
 import { ACCOUNT_OUTPUT, renderAccount } from './account-parity.ts';
+import { COMPANION_OUTPUT, renderCompanion } from './companion-parity.ts';
 import type { Account } from '../../web/src/lib/account/account-api.ts';
 import type { AttachedLeague } from '../../web/src/lib/league/api.ts';
 import type { Device } from '../../web/src/lib/hosts/api.ts';
@@ -688,6 +689,15 @@ export async function generate(): Promise<Outputs> {
 				generatedBy(
 					SCRIPT,
 					'web/src/lib/server/pages/adp.ts, routes/(run)/compare and web/src/lib/run/schedule-view.ts (the clubs, a club and the strength of schedule) over the two fixture runs'
+				)
+			)
+		],
+		[
+			COMPANION_OUTPUT,
+			await renderCompanion(
+				generatedBy(
+					SCRIPT,
+					'web/src/lib/companion (model.ts, the page and its room) with web/src/lib/room (call.ts, model.ts, words.ts, report/headline.ts) over the recorded replay in shared/fixtures/companion'
 				)
 			)
 		]

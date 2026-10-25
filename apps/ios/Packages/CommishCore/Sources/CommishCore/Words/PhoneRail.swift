@@ -38,6 +38,13 @@ public enum PhoneRail {
         }
     }
 
+    /// Whether a tab is the Advisor (nav.ts ADVISOR, drawn first on draft day as advisor_first), the
+    /// web's way to the live-draft companion (COMPANION_START).
+    public static func isAdvisor(_ key: String) -> Bool {
+        key == advisor.key || key == advisorFirstKey
+    }
+
+    static let advisorFirstKey = "advisor_first"
     static let lineup = RailTab(key: lineupKey, label: AppWords.Tab.lineup)
     /// The Matchup tab's key: the selected league's week as a box score.
     public static let matchupKey = "matchup"
@@ -67,7 +74,7 @@ public enum PhoneRail {
             [board, players, mock, sheet, advisor]
         case .draftDay:
             [
-                RailTab(key: "advisor_first", label: AppWords.Tab.advisor), board, players, sheet,
+                RailTab(key: advisorFirstKey, label: AppWords.Tab.advisor), board, players, sheet,
                 RailTab(key: "mock_late", label: AppWords.Tab.mock),
             ]
         case .playoffs where !waiversOpen:

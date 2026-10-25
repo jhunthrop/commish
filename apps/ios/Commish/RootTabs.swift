@@ -3,11 +3,10 @@ import Board
 import CommishAPI
 import CommishCore
 import CommishDesign
+import Companion
 import LeagueHome
 import Matchup
 import Player
-import Rankings
-import Record
 import Shell
 import Start
 import SwiftUI
@@ -19,9 +18,10 @@ import Waivers
 /// and the account's way in, which opens the Account. Choosing a league opens its home: the League
 /// tab where the bar has one, else the home pushed on the tab in view (B149). League, Lineup,
 /// Matchup, Waivers, Trades, the board (the Board item, and Rest of season in season with no league),
-/// Rankings and Our record are live, and the search opens Rankings with its letters; the others say
-/// their screen's name until their lane lands. A score bug opens its game: the member's on the Matchup
-/// tab, another team's pushed on the tab in view (Lane 206). Every screen presents the player sheet through the one
+/// Rankings, Our record and the Advisor (the live-draft companion) are live, and the search opens
+/// Rankings with its letters; the others say their screen's name until their lane lands. A score bug
+/// opens its game: the member's on the Matchup tab, another team's pushed on the tab in view (Lane
+/// 206). Every screen presents the player sheet through the one
 /// host; its Full page and a player's site link push his page on the tab in view.
 struct RootTabs: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -149,17 +149,27 @@ struct RootTabs: View {
         case (PhoneRail.recordKey, _):
             RecordTab(environment: environment, expired: expired)
         default:
-            if let inSeason = PhoneRail.boardInSeason(tab.key) {
-                BoardTab(
-                    environment: environment,
-                    inSeason: inSeason,
-                    following: selectedLeague != nil,
-                    expired: expired
-                )
-                .id("\(tab.key)-\(selectedLeague != nil)")
-            } else {
-                NamedScreen(tab.label)
+            draftScreen(tab)
+        }
+    }
+
+    /// A tab of the draft's bar: the Advisor's companion, the board, or the name of a screen to come.
+    @ViewBuilder
+    private func draftScreen(_ tab: RailTab) -> some View {
+        if PhoneRail.isAdvisor(tab.key) {
+            CompanionStartScreen(environment: environment, replay: false, expired: expired) { id in
+                open(.companion(id: id))
             }
+        } else if let inSeason = PhoneRail.boardInSeason(tab.key) {
+            BoardTab(
+                environment: environment,
+                inSeason: inSeason,
+                following: selectedLeague != nil,
+                expired: expired
+            )
+            .id("\(tab.key)-\(selectedLeague != nil)")
+        } else {
+            NamedScreen(tab.label)
         }
     }
 
@@ -193,6 +203,15 @@ struct RootTabs: View {
                 openLineup: { selection = PhoneRail.lineupKey }, yourGame: { openGame(nil, league: league) }
             )
             .id(route)
+        case let .companionNew(replay):
+            CompanionStartScreen(environment: environment, replay: replay, expired: expired) { id in
+                open(.companion(id: id))
+            }
+        case let .companion(id):
+            CompanionDraftScreen(environment: environment, id: id, expired: expired) {
+                open(.companionNew(replay: false))
+            }
+            .id(id)
         case .adp, .compare, .clubs, .club, .schedule:
             ReferenceScreen(route: route, environment: environment, league: selectedLeague, expired: expired)
                 .id(route)
@@ -328,36 +347,5 @@ private struct WaiversTab: View {
 
     var body: some View {
         WaiverView(viewModel: viewModel, leagueID: leagueID)
-    }
-}
-
-/// The Rankings: owns its view model, which holds the chips and the search while the sheet is open.
-private struct RankingsTab: View {
-    @State private var viewModel: RankingsViewModel
-
-    init(environment: AppEnvironment, inSeason: Bool, query: String, expired: @escaping @MainActor () -> Void) {
-        _viewModel = State(initialValue: RankingsViewModel(
-            api: environment.api, cache: environment.cache, clock: environment.clock, inSeason: inSeason,
-            query: query, onSignedOut: expired
-        ))
-    }
-
-    var body: some View {
-        RankingsView(viewModel: viewModel)
-    }
-}
-
-/// Our record: owns its view model, which holds the chips.
-private struct RecordTab: View {
-    @State private var viewModel: RecordViewModel
-
-    init(environment: AppEnvironment, expired: @escaping @MainActor () -> Void) {
-        _viewModel = State(initialValue: RecordViewModel(
-            api: environment.api, cache: environment.cache, clock: environment.clock, onSignedOut: expired
-        ))
-    }
-
-    var body: some View {
-        RecordView(viewModel: viewModel)
     }
 }

@@ -209,12 +209,7 @@ enum StartRows {
 
     /// draft.ts lastName: the last word, or the one before a suffix.
     static func lastName(_ name: String) -> String {
-        let parts = name.split(whereSeparator: \.isWhitespace).map(String.init)
-        guard let tail = parts.last else {
-            return name
-        }
-        return ["Jr.", "Sr.", "II", "III", "IV", "V"].contains(tail) && parts.count > 2
-            ? parts[parts.count - 2] : tail
+        DraftFormat.lastName(name)
     }
 
     /// "Saints" from "Saints D/ST": a defense named by its club.

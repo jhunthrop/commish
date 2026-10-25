@@ -1,0 +1,20 @@
+{
+	"title": "Follow your draft",
+	"lede": "At each of your picks you get our call, against the picks your league actually makes.",
+	"replay": "The recorded draft (development replay)",
+	"draftOn": "Your draft is on",
+	"linkLabel": "Your Sleeper draft link",
+	"linkPlaceholder": "sleeper.com/draft/nfl/1234567890",
+	"seatBy": "Find your seat by",
+	"bySlot": "My draft slot",
+	"byUsername": "My Sleeper username",
+	"slotLabel": "Your draft slot",
+	"usernameLabel": "Sleeper username",
+	"verb": "Follow my draft",
+	"failed": "That did not go through. Try again.",
+	"recentFailed": "The drafts you followed can't be read right now.",
+	"recentTitle": "Drafts you followed",
+	"unreachableTitle": "This page can't reach Commish right now",
+	"reloadLine": "Reload in a moment.",
+	"functions": []
+}

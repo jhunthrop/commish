@@ -34,6 +34,16 @@ public enum Formatting {
         return value < 0 ? "-\(text)" : text
     }
 
+    /// number.ts MINUS: a negative figure's sign, the width of a plus in tabular figures.
+    public static let minus = "\u{2212}"
+
+    /// number.ts signed: "+113.9", "−12.5", "+0.0" for a figure that rounds to nothing; `decimals` 0
+    /// for a whole count of picks, "+2".
+    public static func signed(_ value: Double, decimals: Int = 1) -> String {
+        let magnitude = fixed(abs(value), decimals)
+        return value < 0 && Double(magnitude) != 0 ? "\(minus)\(magnitude)" : "+\(magnitude)"
+    }
+
     /// A number as JavaScript's `String(n)` writes it: "0.5", "1", "-2".
     public static func number(_ value: Double) -> String {
         if value == value.rounded(), abs(value) < 1e15 {

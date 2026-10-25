@@ -1,0 +1,22 @@
+{
+	"title": "Live draft",
+	"followAnother": "Follow another draft",
+	"yourDraft": "Your draft",
+	"reconnecting": "Reconnecting. The picks below are the last ones we read.",
+	"signedOutTitle": "Sign in to follow your draft",
+	"signedOutLine": "A followed draft lives on your account.",
+	"signIn": "Sign in",
+	"missingTitle": "This draft is not on your account",
+	"missingLine": "Paste the draft link again to follow it.",
+	"followADraft": "Follow a draft",
+	"unreachableTitle": "Your draft can't be read right now",
+	"reloadLine": "Reload in a moment.",
+	"newestFirst": "newest first",
+	"you": "you",
+	"nextTitle": "Who we would take next",
+	"nextAside": "Chance he lasts",
+	"reachesHead": "Reaches",
+	"stillThereHead": "Still there",
+	"reshuffled": "stand-ins for your league",
+	"functions": []
+}

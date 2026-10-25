@@ -43,6 +43,14 @@ function stillThereBasis(card: RoomCard | null, teams: number, callMissing: bool
 	return `Still there at ${to}: ${String(card.runs)} runs of this room, each seat drafting as it has so far.`;
 }
 
+/** Where the call stands, its panel's tag: "Our call at 5.08", or off your clock "If the board holds
+ * to 5.08". */
+export function callTag(view: Pick<CallView, 'conditional' | 'forLabel'>): string {
+	return view.conditional
+		? `If the board holds to ${view.forLabel}`
+		: `Our call at ${view.forLabel}`;
+}
+
 /** The chance column's head: "Still there 6.05" on your clock, "Reaches 5.08" on a call that waits on
  * the board, none at your last pick. */
 export function chanceHead(view: CallView): string | null {

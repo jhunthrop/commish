@@ -2,7 +2,6 @@
 	import { adpFigure } from '#lib/format/draft.ts';
 	import { carriesGap } from '#lib/format/gap.ts';
 	import { GAP_WORDS } from '#lib/run/board-basis.ts';
-	import { poolCount } from '#lib/format/pool-words.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
@@ -10,6 +9,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import PoolRow from './PoolRow.svelte';
 	import type { PoolFilter, RoomPlayer } from './model.ts';
+	import { ROOM, chanceMissing as missingWords, poolEmpty, poolLine, showMore } from './words.ts';
 
 	interface Props {
 		rows: readonly RoomPlayer[];
@@ -80,17 +80,9 @@
 	const gapShown = $derived(carriesGap(rows));
 	/** Under a row with no chance to show, in words that fit the column: not in this card's chances,
 	 * on their way with the call, or none at all when no call is coming. */
-	const chanceMissing = $derived(
-		chanceGone ? 'no call' : Object.keys(chance).length > 0 ? 'not read' : 'with our call'
-	);
+	const chanceMissing = $derived(missingWords(chanceGone, Object.keys(chance).length > 0));
 	const visible = $derived(Math.max(shown, rows.findIndex((p) => p.id === selectedId) + 1));
-	const empty = $derived.by(() => {
-		const needle = search.trim();
-		const at = filter === 'All' || filter === 'Queue' ? '' : ` at ${filter}`;
-		if (needle !== '') return `Nobody named ${needle}${at} in the pool.`;
-		if (filter === 'Queue') return 'Nobody in your queue. Mark a player and press Q to add him.';
-		return `Nobody left${at}.`;
-	});
+	const empty = $derived(poolEmpty(search, filter));
 </script>
 
 <section
@@ -98,11 +90,11 @@
 	class:no-chance={!chanceShown}
 	class:readonly
 	data-pool-gap={gapShown ? '' : undefined}
-	aria-label="Pool"
+	aria-label={ROOM.pool}
 >
 	<div class="head">
-		<DisplayTitle size="panel">Pool</DisplayTitle>
-		<Label>{poolCount(left, 'room')}, ranked by points over replacement</Label>
+		<DisplayTitle size="panel">{ROOM.pool}</DisplayTitle>
+		<Label>{poolLine(left)}</Label>
 		<div class="chips">
 			<ChipGroup label="Position">
 				{#each filters as f (f)}
@@ -117,13 +109,14 @@
 	</p>
 	<div class="cols" aria-hidden="true">
 		<span></span>
-		<Label>Player</Label>
+		<Label>{ROOM.player}</Label>
 		<Label align="end"
-			><span class="wide">Over replacement</span><span class="narrow">Over repl</span></Label
+			><span class="wide">{ROOM.overReplacement}</span><span class="narrow">{ROOM.overRepl}</span
+			></Label
 		>
 		{#if chanceShown}<Label align="end">{chanceHead}</Label>{/if}
-		<span class="adp"><Label align="end">ADP</Label></span>
-		{#if gapShown}<span class="gapc"><Label align="end">Gap</Label></span>{/if}
+		<span class="adp"><Label align="end">{ROOM.adp}</Label></span>
+		{#if gapShown}<span class="gapc"><Label align="end">{ROOM.gap}</Label></span>{/if}
 		{#if !readonly}<span class="acts-head"></span>{/if}
 	</div>
 	{#each rows.slice(0, visible) as player (player.id)}
@@ -150,7 +143,7 @@
 	{#if rows.length > visible}
 		<div class="more">
 			<Quiet size="sm" onclick={() => (shown = visible + MORE_ROWS)}
-				>Show {Math.min(MORE_ROWS, rows.length - visible)} more</Quiet
+				>{showMore(Math.min(MORE_ROWS, rows.length - visible))}</Quiet
 			>
 		</div>
 	{/if}

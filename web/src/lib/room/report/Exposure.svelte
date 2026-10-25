@@ -4,6 +4,7 @@
 	import Panel from '#lib/ui/Panel.svelte';
 	import type { MockReport } from '../api.ts';
 	import type { Board } from '../model.ts';
+	import { exposureAside, exposureTitle } from './headline.ts';
 
 	interface Props {
 		runs: MockReport['runs'];
@@ -14,14 +15,12 @@
 
 	let { runs, board, whose = 'your' }: Props = $props();
 
-	const who = $derived(whose === 'your' ? 'you' : 'they');
-
 	/** Rows listed: the players you land most. */
 	const ROWS = 8;
 </script>
 
 <Panel>
-	<h3>Who {who} end up with<span>share of {runs.runs} runs</span></h3>
+	<h3>{exposureTitle(whose)}<span>{exposureAside(runs.runs)}</span></h3>
 	<div class="expo">
 		{#each runs.exposure.slice(0, ROWS) as e (e.player_id)}
 			{@const player = board.byId.get(e.player_id)}

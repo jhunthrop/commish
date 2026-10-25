@@ -1,15 +1,16 @@
 /** What the companion's page reads off the API's answers: the host's picks kept across polls, the
- * picks as the rooms' views take them, the strip of picks as they land, and the bar's words. Pure. */
+ * picks as the rooms' views take them, the strip of picks as they land, and the bar's words. Pure, and
+ * held by the apps' ports (shared/scripts/companion-parity.ts). */
 import { dayLabel } from '#lib/format/date.ts';
 import { pickLabel } from '#lib/format/draft.ts';
 import { plural } from '#lib/format/number.ts';
-import type { RoomPick } from '#lib/room/api.ts';
+import type { RoomCard, RoomPick } from '#lib/room/api.ts';
 import type { Board } from '#lib/room/model.ts';
 import type { PlayerRef, Position } from '#lib/types/player.ts';
 import { POSITIONS } from '#lib/types/player.ts';
 import type { StripPick } from '#lib/types/room.ts';
-import { links } from '#lib/site/links.ts';
 import type { Companion, CompanionPick, CompanionSummary } from './api.ts';
+import { COMPANION } from './words.ts';
 
 /** How often the page asks while the draft is on, and while it waits for it to start. */
 export const POLL_MS = 3000;
@@ -75,7 +76,10 @@ export function landingStrip(
 						{
 							key: p.pick,
 							player,
-							lines: [pickLabel(p.pick, teams), p.seat === you ? 'you' : (names[p.seat - 1] ?? '')],
+							lines: [
+								pickLabel(p.pick, teams),
+								p.seat === you ? COMPANION.you : (names[p.seat - 1] ?? '')
+							],
 							ring: i === 0 ? ('ink' as const) : undefined,
 							strong: p.seat === you
 						}
@@ -137,8 +141,11 @@ const STATUS_WORDS: Readonly<Record<CompanionSummary['status'], string>> = {
 	complete: 'over, the report is ready'
 };
 
-/** A followed draft as the start page lists it, a link back to it. */
-export function recentLine(r: CompanionSummary): {
+/** A followed draft as the start page lists it, a link back to it (`href`, its page's link). */
+export function recentLine(
+	r: CompanionSummary,
+	href: string
+): {
 	key: string;
 	lead: string;
 	text: string;
@@ -151,6 +158,106 @@ export function recentLine(r: CompanionSummary): {
 		key: r.id,
 		lead: r.name !== '' ? r.name : `${hostName(r.host)} draft ${r.host_draft_id}`,
 		text: `${seat} · ${STATUS_WORDS[r.status]} · followed ${dayLabel(r.created_at)}`,
-		href: links.companion(r.id)
+		href
 	};
+}
+
+/** The bar's big figure: "22 of 240". */
+export function pickCount(c: Pick<Companion, 'pick_count' | 'total_picks'>): string {
+	return `${String(c.pick_count)} of ${String(c.total_picks)}`;
+}
+
+/** What the bar's figure counts: "picks made on Sleeper". */
+export function picksMadeWords(host: Companion['host']): string {
+	return `picks made on ${hostName(host)}`;
+}
+
+/** The bar's section, as a reader is told it: "The draft on Sleeper". */
+export function draftOnWords(host: Companion['host']): string {
+	return `The draft on ${hostName(host)}`;
+}
+
+/** The bar's way back to the platform's draft room: "Open the draft on Sleeper". */
+export function openDraftWords(host: Companion['host']): string {
+	return `Open the draft on ${hostName(host)}`;
+}
+
+/** The draft's name as the bar titles it: the platform's, else "Your draft". */
+export function draftName(c: Pick<Companion, 'name'>): string {
+	return c.name || COMPANION.yourDraft;
+}
+
+/** The bar's line when the platform did not answer the last read, null while it is fresh. */
+export function staleWords(c: Pick<Companion, 'host' | 'host_stale_seconds'>): string | null {
+	return c.host_stale_seconds === null
+		? null
+		: `${hostName(c.host)} has not answered for ${String(c.host_stale_seconds)} seconds. These are its last picks.`;
+}
+
+/** The call's one verb at the drafter's turn: the pick is made on the platform. */
+export function makePickWords(host: Companion['host']): string {
+	return `Make the pick on ${hostName(host)}`;
+}
+
+/** The call's verb between turns: queue him on the platform. */
+export function queueWords(host: Companion['host']): string {
+	return `Queue him on ${hostName(host)}`;
+}
+
+/** The strip's first line under the newest pick: "just taken on Sleeper". */
+export function justTakenWords(host: Companion['host']): string {
+	return `just taken on ${hostName(host)}`;
+}
+
+/** The report's Other seats cell: "Your league on Sleeper". */
+export function leagueOnWords(host: Companion['host']): string {
+	return `Your league on ${hostName(host)}`;
+}
+
+/** What a chance is of, under it: "reaches 2.08" on a call that waits on the board, "still there at
+ * 3.05" at the drafter's turn, "your last pick" when no turn comes after. */
+export function chanceLabel(card: RoomCard | null, teams: number): string {
+	if (card?.conditional) return `reaches ${pickLabel(card.for_pick, teams)}`;
+	if (card?.next_pick) return `still there at ${pickLabel(card.next_pick, teams)}`;
+	return 'your last pick';
+}
+
+/** The pool's chance column: Reaches on a call that waits on the board, Still there at the turn. */
+export function chanceColumn(card: RoomCard | null): string {
+	return card?.conditional ? COMPANION.reachesHead : COMPANION.stillThereHead;
+}
+
+/** The line when our draft stops following the platform's, null while it follows. */
+export function lostWords(c: Pick<Companion, 'host' | 'lost_at' | 'teams'>): string | null {
+	return c.lost_at === null
+		? null
+		: `Pick ${pickLabel(c.lost_at, c.teams)} on ${hostName(c.host)} does not fit how our draft is set up, so our call stops there. The picks keep landing below.`;
+}
+
+/** The name-matched picks the page names at most, then "And 3 more placed by name." */
+export const NAMED_LINES = 2;
+
+/** The notes under the bar: picks we do not rank, the picks placed by name (`named`, the ones the
+ * drafter has not been told of), and traded picks. */
+export function companionNotes(
+	c: Pick<Companion, 'host' | 'unplaced' | 'traded'>,
+	named: Companion['placed_by_name']
+): string[] {
+	const host = hostName(c.host);
+	return [
+		c.unplaced > 0
+			? `${plural(c.unplaced, 'pick')} on ${host} ${c.unplaced === 1 ? 'is a player' : 'are players'} we do not rank. Each fills his team's roster and takes nobody from our board.`
+			: null,
+		...named.slice(0, NAMED_LINES).map(
+			(p) =>
+				// A name that ends in "Jr." ends the sentence too.
+				`${p.host_name} on ${host} is our ${p.board_name}${p.board_name.endsWith('.') ? '' : '.'}`
+		),
+		named.length > NAMED_LINES
+			? `And ${String(named.length - NAMED_LINES)} more placed by name.`
+			: null,
+		c.traded > 0
+			? `${plural(c.traded, 'pick')} changed hands on ${host}. Our call follows the draft order by slot.`
+			: null
+	].filter((n): n is string => n !== null);
 }

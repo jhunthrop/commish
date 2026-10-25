@@ -41,3 +41,7 @@ filter:
     - order
     - weekOrder
     - runRecord
+    - listCompanions
+    - createCompanion
+    - getCompanion
+    - companionReport

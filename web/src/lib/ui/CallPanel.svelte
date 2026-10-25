@@ -10,6 +10,7 @@
 	import PositionPill from './PositionPill.svelte';
 	import Quiet from './Quiet.svelte';
 	import Verb from './Verb.svelte';
+	import { ROOM } from '#lib/room/words.ts';
 
 	/** Our call as a box score (Lane 66o): our top three as rows on the pool's own grid, in the pool's
 	 * column order and widths (face, player, Over repl, the chance, ADP, the verb), so each figure
@@ -38,7 +39,7 @@
 
 {#snippet verb()}
 	{#if reading !== undefined}
-		<Quiet fill key={action.key} disabled>Waiting on the call</Quiet>
+		<Quiet fill key={action.key} disabled>{ROOM.waitingOnCall}</Quiet>
 	{:else if waiting}
 		<Quiet fill key={action.key} onclick={action.onclick}>{action.label}</Quiet>
 	{:else}
@@ -57,11 +58,11 @@
 		<span class="tag">{reading ?? tag}</span>
 		<div class="grid head" aria-hidden="true">
 			<span></span>
-			<span>Player</span>
-			<span class="n">Over repl</span>
+			<span>{ROOM.player}</span>
+			<span class="n">{ROOM.overRepl}</span>
 			<span class="n">{chanceHead ?? ''}</span>
-			<span class="n adp">ADP</span>
-			<span class="n adp gapc">Gap</span>
+			<span class="n adp">{ROOM.adp}</span>
+			<span class="n adp gapc">{ROOM.gap}</span>
 			<span class="go"></span>
 		</div>
 		{#each rows as row, i (row.player.id)}
