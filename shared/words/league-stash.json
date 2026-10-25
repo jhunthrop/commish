@@ -1,0 +1,15 @@
+{
+	"head": "Stash",
+	"verb": "Stash",
+	"backNow": "Back this week",
+	"slot": "IR slot",
+	"open": "Open",
+	"drop": "Drop",
+	"line": "Stash rows come back by the listed return date. A game is our rest-of-season points a game.",
+	"undated": "IR and out players without a return date are not listed.",
+	"late": "IR and out players back after the regular season are not listed.",
+	"functions": [
+		"back",
+		"taken"
+	]
+}

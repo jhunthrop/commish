@@ -1,0 +1,9 @@
+{
+	"rest": "is our rest-of-season points a game",
+	"avg": "his season average",
+	"beats": "the player he would replace in your rest-of-season lineup",
+	"separator": ", ",
+	"functions": [
+		"delta"
+	]
+}

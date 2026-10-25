@@ -1,0 +1,17 @@
+{
+	"ok": true,
+	"data": {
+		"status": "ready",
+		"sentence": "Add Mason Taylor, drop Jaxson Dart, bid $0. He is on waivers, so ESPN runs the claim on Wednesday.",
+		"confirm": "fixture-token",
+		"expires_at": "2026-10-17T17:10:00.000Z",
+		"host_url": "https://fantasy.espn.com/football/league?leagueId=1081607624&seasonId=2026",
+		"bid": {
+			"amount": 0,
+			"min": 0,
+			"max": 87,
+			"left_known": true
+		}
+	},
+	"error": null
+}

@@ -12,6 +12,7 @@ import {
 	SITE_PHASES
 } from './export-parity.ts';
 import { LINEUP_OUTPUT } from './lineup-parity.ts';
+import { WAIVERS_OUTPUT } from './waivers-parity.ts';
 
 void test('a file clock reads back as its instant', () => {
 	assert.equal(instantOf('2026-10-18T18-56-00Z'), '2026-10-18T18:56:00.000Z');
@@ -106,4 +107,27 @@ void test('the Lineup at every clock: changes offered before kickoff, held once 
 		lineup.moves[0]?.results.map((r) => r.outcome),
 		['done', 'refused', 'pending']
 	);
+});
+
+void test("the Waivers at every clock, each ESPN stand-in's with its claim made here, and the claim's words (Lane 186)", async () => {
+	const parity = JSON.parse((await generate()).get(WAIVERS_OUTPUT) ?? '{}') as {
+		clocks: Record<
+			string,
+			{ pinned: { verb: string | null }; gaining: unknown[]; onHost: boolean }
+		>;
+		espn: Record<string, { screen: { pinned: { verb: string | null }; onHost: boolean } }>;
+		claim: { title: string; hosts: { host: string; verb: string; results: { words: string }[] }[] };
+	};
+	assert.deepEqual(Object.keys(parity.clocks), [...CLOCKS]);
+	for (const clock of CLOCKS) {
+		const screen = parity.clocks[clock];
+		assert.equal(screen?.onHost, false, clock);
+		assert.ok((screen?.gaining.length ?? 0) > 0, clock);
+	}
+	assert.deepEqual(Object.keys(parity.espn), ['done', 'refused', 'pending']);
+	assert.equal(parity.espn.pending?.screen.pinned.verb, 'Add on ESPN');
+	assert.equal(parity.claim.title, 'Your claim');
+	const espn = parity.claim.hosts.find((h) => h.host === 'espn');
+	assert.equal(espn?.verb, 'Claim on ESPN');
+	assert.ok(espn?.results.some((r) => r.words.includes('processes it Wed 2:00 am')));
 });

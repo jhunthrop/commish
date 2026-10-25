@@ -37,13 +37,15 @@ const BOX_MODULE = 'web/src/lib/league/box/box.ts';
 const BASIS_MODULE = 'web/src/lib/league/box/basis.ts';
 const LINEUP_MODULE = 'web/src/lib/league/box/lineup.ts';
 const DESIGNATION_MODULE = 'web/src/lib/format/designation.ts';
+const WAIVERS_MODULE = 'web/src/lib/league/box/waivers.ts';
 
 /** Every table the apps print from, the League home's first, then the box score's: its heads, the
  * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
  * tiebreak and waiver order, the platforms' names; then the Start screen's (Lane 180): the lineup's
  * strip and verb, the positions an opponent's rank is against, the move's confirmation, the in-season
  * screens' lines, a status in words and in a rank's few characters, and the figures' heads; then the
- * Matchup's (Lane 183): the words beside its box scores. */
+ * Matchup's (Lane 183): the words beside its box scores; then the Waivers' (Lane 186): its table, strip
+ * and drop panel, the heads' basis, the Stash group, the season figures' heads and the strip's mark. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -195,6 +197,36 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/league/box/matchup.ts',
 		picks: ['MATCHUP'],
 		json: 'shared/words/league-matchup.json'
+	},
+	{
+		name: 'Waivers',
+		module: WAIVERS_MODULE,
+		picks: ['WAIVERS'],
+		json: 'shared/words/league-waivers.json'
+	},
+	{
+		name: 'WaiverHeads',
+		module: WAIVERS_MODULE,
+		picks: ['HEAD_BASIS', ['separator', 'HEAD_SEPARATOR']],
+		json: 'shared/words/league-waiver-heads.json'
+	},
+	{
+		name: 'Stash',
+		module: WAIVERS_MODULE,
+		picks: ['STASH'],
+		json: 'shared/words/league-stash.json'
+	},
+	{
+		name: 'Season',
+		module: 'web/src/lib/league/box/season.ts',
+		picks: ['SEASON', ['gainAWeek', 'GAIN_A_WEEK']],
+		json: 'shared/words/league-season.json'
+	},
+	{
+		name: 'Strip',
+		module: 'web/src/lib/league/box/strip.ts',
+		picks: ['STRIP'],
+		json: 'shared/words/league-strip.json'
 	}
 ];
 export const OUTPUT = {

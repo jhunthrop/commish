@@ -50,6 +50,8 @@ import type { Scoreboard } from '../../web/src/lib/league/inseason/api.ts';
 import { LINEUP_OUTPUT, lineupAt, moveWords, withWrites } from './lineup-parity.ts';
 import type { LineupAdvice, MatchupBox } from '../../web/src/lib/league/inseason/api.ts';
 import { gapsOf, MATCHUP_OUTPUT, matchupAt } from './matchup-parity.ts';
+import { claimWords, WAIVERS_OUTPUT, waiversAt } from './waivers-parity.ts';
+import type { HostMoveResult, WaiverAdvice } from '../../web/src/lib/league/inseason/api.ts';
 import {
 	GAME_STATE_OUTPUT,
 	lineRows,
@@ -410,6 +412,55 @@ export async function renderMatchup(): Promise<string> {
 	return `${JSON.stringify(matchup, null, '\t')}\n`;
 }
 
+/** The ESPN stand-ins whose claim is made from here, by what it comes to (shared/fixtures README). */
+export const ESPN_LEAGUES = {
+	done: '6f1d1c52-2626-4a26-9a26-000000000035',
+	refused: '6f1d1c52-2626-4a26-9a26-000000000036',
+	pending: '6f1d1c52-2626-4a26-9a26-000000000037'
+} as const;
+/** The clock the ESPN stand-ins' Waivers and claims are read at: the fixture's week. */
+const WEEK_CLOCK = '2026-10-17T17-00-00Z';
+
+/** The Waivers at every clock as the fixture's league reads it, each ESPN stand-in's at the week's
+ * clock (the claim made from here), and the claim's words (waivers-parity.ts). */
+export async function renderWaivers(host: LeagueSync['host']): Promise<string> {
+	const clocks: Record<string, unknown> = {};
+	for (const clock of CLOCKS)
+		clocks[clock] = waiversAt(
+			await answer<WaiverAdvice>(`waivers-${LEAGUE}-${clock}.json`),
+			host,
+			instantOf(clock),
+			ZONE
+		);
+	const espn: Record<string, unknown> = {};
+	const claims: HostMoveResult[] = [];
+	for (const [outcome, id] of Object.entries(ESPN_LEAGUES)) {
+		espn[outcome] = {
+			id,
+			screen: waiversAt(
+				await answer<WaiverAdvice>(`waivers-${id}-${WEEK_CLOCK}.json`),
+				'espn',
+				instantOf(WEEK_CLOCK),
+				ZONE
+			)
+		};
+		claims.push(await answer<HostMoveResult>(`claim-move-${id}.json`));
+	}
+	const waivers = {
+		about: generatedBy(
+			SCRIPT,
+			'web/src/lib/league/box/waivers.ts, basis.ts and inseason/move.ts over shared/fixtures/inseason'
+		),
+		zone: ZONE,
+		host,
+		clocks,
+		espnClock: WEEK_CLOCK,
+		espn,
+		claim: claimWords(claims, ZONE)
+	};
+	return `${JSON.stringify(waivers, null, '\t')}\n`;
+}
+
 export async function generate(): Promise<Outputs> {
 	const sync = await answer<LeagueSync>(`leagues-attached-${LEAGUE}.json`);
 	const boards = new Map<string, Scoreboard>();
@@ -425,7 +476,8 @@ export async function generate(): Promise<Outputs> {
 		[SHELL_OUTPUT, renderShell(await answer<SwitchLeague[]>('leagues-attached.json'))],
 		[GAME_STATE_OUTPUT, renderGameState(about, await gameStateRows(boards))],
 		[LINEUP_OUTPUT, await renderLineup(sync.host)],
-		[MATCHUP_OUTPUT, await renderMatchup()]
+		[MATCHUP_OUTPUT, await renderMatchup()],
+		[WAIVERS_OUTPUT, await renderWaivers(sync.host)]
 	]);
 }
 
