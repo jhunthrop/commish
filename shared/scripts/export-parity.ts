@@ -47,6 +47,8 @@ import { followedName } from '../../web/src/lib/league/names.ts';
 import { CARD, unreadBasis } from '../../web/src/lib/player/card.ts';
 import { railItemLabel } from '../../web/src/lib/run/week-names.ts';
 import type { Scoreboard } from '../../web/src/lib/league/inseason/api.ts';
+import { LINEUP_OUTPUT, lineupAt, moveWords, withWrites } from './lineup-parity.ts';
+import type { LineupAdvice } from '../../web/src/lib/league/inseason/api.ts';
 import {
 	GAME_STATE_OUTPUT,
 	lineRows,
@@ -344,6 +346,37 @@ async function gameStateRows(boards: ReadonlyMap<string, Scoreboard>): Promise<G
 	return rows;
 }
 
+/** The platform that takes lineups from here, for the parity's second set (lineup-parity.ts). */
+const WRITES_HOST = 'espn';
+
+/** The Start screen at every clock as the fixture's league reads it, the same answers with the
+ * platform's writes open, and the move's words (lineup-parity.ts). */
+export async function renderLineup(host: LeagueSync['host']): Promise<string> {
+	const answers = new Map<string, LineupAdvice>();
+	for (const clock of CLOCKS)
+		answers.set(clock, await answer<LineupAdvice>(`lineup-${LEAGUE}-${clock}.json`));
+	const at = (writes: boolean, platform: LeagueSync['host']) =>
+		Object.fromEntries(
+			[...answers].map(([clock, advice]) => [
+				clock,
+				lineupAt(writes ? withWrites(advice) : advice, platform, instantOf(clock), ZONE)
+			])
+		);
+	const lineup = {
+		about: generatedBy(
+			SCRIPT,
+			'web/src/lib/league/box/lineup.ts, basis.ts and inseason/move.ts over shared/fixtures/inseason'
+		),
+		zone: ZONE,
+		host,
+		writesHost: WRITES_HOST,
+		clocks: at(false, host),
+		writes: at(true, WRITES_HOST),
+		moves: moveWords()
+	};
+	return `${JSON.stringify(lineup, null, '\t')}\n`;
+}
+
 export async function generate(): Promise<Outputs> {
 	const sync = await answer<LeagueSync>(`leagues-attached-${LEAGUE}.json`);
 	const boards = new Map<string, Scoreboard>();
@@ -357,7 +390,8 @@ export async function generate(): Promise<Outputs> {
 		[OUTPUT, renderParity(sync, boards)],
 		[RAIL_OUTPUT, renderRail()],
 		[SHELL_OUTPUT, renderShell(await answer<SwitchLeague[]>('leagues-attached.json'))],
-		[GAME_STATE_OUTPUT, renderGameState(about, await gameStateRows(boards))]
+		[GAME_STATE_OUTPUT, renderGameState(about, await gameStateRows(boards))],
+		[LINEUP_OUTPUT, await renderLineup(sync.host)]
 	]);
 }
 

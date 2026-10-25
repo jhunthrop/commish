@@ -203,4 +203,84 @@ object Words {
         const val findOnWaivers = "Find him on Waivers"
         const val none = "--"
     }
+
+    object Lineup {
+        const val make = "Make these changes"
+        const val copy = "Copy the lineup"
+        const val set = "Your lineup is set"
+        const val sit = "Sit"
+        const val pastWeeks = "Past weeks of our order, on Our record"
+        const val copied = "Copied."
+        const val setItOn = "Set it on"
+        const val copyFailed = "This browser would not copy it."
+        const val noOneCanPlay = "no one on your roster can play this week"
+        const val noOneHere = "No one on your roster can play here this week"
+        const val heldEmpty = "has kicked off, the spot stays empty"
+        const val swapIn = "in"
+        const val swapOut = "out"
+    }
+
+    object Against {
+        const val QB = "quarterbacks"
+        const val RB = "running backs"
+        const val WR = "receivers"
+        const val TE = "tight ends"
+        const val K = "kickers"
+    }
+
+    object Move {
+        const val title = "Your lineup move"
+        const val claimTitle = "Your claim"
+        const val notNow = "Not now"
+        const val done = "Done"
+        const val notReached = "We could not reach Commish, and nothing was sent. Try again in a moment."
+    }
+
+    object InSeason {
+        const val overRepl = "over repl a week"
+        const val unranked = "Unranked"
+        const val noProjection = "No projection"
+        const val aWeek = "a week"
+        const val aGame = "a game"
+        const val all = "All"
+        const val position = "Position"
+        const val waiverAdds = "Waiver adds"
+        const val orderRecord = "How the order has done"
+        const val notFoundBar = "Page not found"
+        const val notFound = "Not found"
+        const val notFoundLine = "Nothing lives at this address."
+        const val toBoard = "Go to the board"
+        const val add = "Add"
+        const val chosen = "Up top"
+        const val sit = "Sit"
+        const val bench = "Bench"
+        const val ourCall = "Our call"
+        const val reading = "Reading your league"
+        const val noBench = "Nobody on your bench"
+        const val tradesHolding = "Trades holding"
+        const val yourPlayers = "Your players"
+        const val theirPlayers = "Their players"
+        const val signInLine = "A league lives on your account. Following one is free."
+        const val signIn = "Sign in"
+        const val missingTitle = "This league is not on your account"
+        const val missingLine = "Paste its link again to follow it."
+        const val follow = "Follow a league"
+        const val lastRead = "Your league could not be read just now. The page shows the last read."
+        const val unreadable = "Your league could not be read just now."
+        const val leaguesUnread = "Your leagues could not be read just now. We try again in a minute."
+        const val narrowingUnread = "These could not be read just now. The last read stands."
+    }
+
+    object Figure {
+        const val projected = "Projected"
+        const val points = "Points"
+        const val perGame = "A game"
+        const val avg = "Avg"
+        const val week = "Wk"
+        const val restFrom = "from week {week}"
+        const val restFromPartial = "from week {week}'s games left"
+        const val freeAgentClub = "FA"
+        const val freeAgent = "a free agent"
+        const val overReplacement = "his points less a free pickup's"
+    }
 }

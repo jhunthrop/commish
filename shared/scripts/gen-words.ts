@@ -35,10 +35,13 @@ const SCRIPT = 'shared/scripts/gen-words.ts';
 const HOME_MODULE = 'web/src/lib/league/home/home.ts';
 const BOX_MODULE = 'web/src/lib/league/box/box.ts';
 const BASIS_MODULE = 'web/src/lib/league/box/basis.ts';
+const LINEUP_MODULE = 'web/src/lib/league/box/lineup.ts';
 
 /** Every table the apps print from, the League home's first, then the box score's: its heads, the
  * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
- * tiebreak and waiver order, the platforms' names. */
+ * tiebreak and waiver order, the platforms' names; then the Start screen's (Lane 180): the lineup's
+ * strip and verb, the positions an opponent's rank is against, the move's confirmation, the in-season
+ * screens' lines and the figures' heads. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -142,6 +145,36 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/player/card.ts',
 		picks: ['CARD', ['none', 'NONE']],
 		json: 'shared/words/player-card.json'
+	},
+	{
+		name: 'Lineup',
+		module: LINEUP_MODULE,
+		picks: ['LINEUP'],
+		json: 'shared/words/league-lineup.json'
+	},
+	{
+		name: 'Against',
+		module: LINEUP_MODULE,
+		picks: ['AGAINST'],
+		json: 'shared/words/league-against.json'
+	},
+	{
+		name: 'Move',
+		module: 'web/src/lib/league/inseason/move.ts',
+		picks: ['MOVE_LINES', ['notReached', 'NOT_REACHED']],
+		json: 'shared/words/league-move.json'
+	},
+	{
+		name: 'InSeason',
+		module: 'web/src/lib/league/inseason/words.ts',
+		picks: ['LINES'],
+		json: 'shared/words/league-inseason.json'
+	},
+	{
+		name: 'Figure',
+		module: 'web/src/lib/format/figure-words.ts',
+		picks: ['FIGURE'],
+		json: 'shared/words/figure.json'
 	}
 ];
 export const OUTPUT = {
