@@ -109,12 +109,12 @@ jobs:
             apps/android/**/build/paparazzi/failures/
           retention-days: 7
 
-      # Uploads on a push to main, or a dispatch on main with upload ticked, when the four upload-key
-      # secrets are present; never from a lane branch or a pull request, whatever the input says.
+      # Uploads on a push to main, or a dispatch on main with upload ticked, when the three upload-key
+      # secrets and the alias variable are present; never from a lane branch or a pull request, whatever the input says.
       - name: Whether this run uploads to Play
         id: play
         env:
-          HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+          HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && vars.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
           REF: ${{ github.ref }}
           EVENT: ${{ github.event_name }}
           ASKED: ${{ inputs.upload == true }}
@@ -149,7 +149,7 @@ jobs:
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_ALIAS: ${{ vars.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_RUN_NUMBER: ${{ github.run_number }}
         run: |
