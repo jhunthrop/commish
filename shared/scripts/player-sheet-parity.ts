@@ -59,6 +59,21 @@ import {
 	type WeekRead
 } from '../../web/src/lib/run/schema.ts';
 import { cardBuild, restParts, restTile } from '../../web/src/lib/server/pages/player-card.ts';
+import { kickoffsFrom, seasonView } from '../../web/src/lib/server/pages/player-season.ts';
+import { unwrittenByFormat } from '../../web/src/lib/server/pages/player-unwritten.ts';
+import { withStatuses } from '../../web/src/lib/run/board-status.ts';
+import { availableTierOf } from '../../web/src/lib/run/held-places.ts';
+import {
+	boardRestFrom,
+	playerRestFrom,
+	restSpanWords,
+	tierBasisWords,
+	tierSpanOf
+} from '../../web/src/lib/run/rest-from.ts';
+import { formatTable } from '../../web/src/lib/run/player-words.ts';
+import { PLAYER_PAGE } from '../../web/src/lib/player/page-words.ts';
+import { rankWord } from '../../web/src/lib/format/designation.ts';
+import { plural, signed } from '../../web/src/lib/format/number.ts';
 import { REPOSITORY } from './generated.ts';
 import { SHEET_CLOCKS } from './export-fixtures.ts';
 import { PUBLIC_SHEET_PLAYER_IDS, SHEET_PLAYER_IDS } from './sheet-players.ts';
@@ -105,6 +120,8 @@ interface Run {
 	clubs: ReturnType<typeof clubsSchema.parse>;
 	firstKickoff: string;
 	boardSizes: Readonly<Record<string, number>>;
+	boards: Readonly<Record<string, ReturnType<typeof boardSchema.parse>>>;
+	slates: ReturnType<typeof scheduleSchema.parse>['slates'];
 	page: (id: string) => Promise<Player>;
 }
 
@@ -124,9 +141,12 @@ async function runOf(name: RunName): Promise<Run> {
 	const kickoffs = schedule.slates.flatMap((slate) => slate.games.map((game) => game.kickoff));
 	const firstKickoff = kickoffs.reduce((a, b) => (Date.parse(a) <= Date.parse(b) ? a : b));
 	const sizes: Record<string, number> = {};
+	const boards: Record<string, ReturnType<typeof boardSchema.parse>> = {};
 	for (const format of manifest.formats) {
 		try {
-			sizes[format.id] = boardSchema.parse(await json(at(`boards/${format.id}.json`))).rows.length;
+			const board = boardSchema.parse(await json(at(`boards/${format.id}.json`)));
+			boards[format.id] = board;
+			sizes[format.id] = board.rows.length;
 		} catch {
 			// A run the fixture keeps one board of: the page's value words are not held for the others.
 		}
@@ -139,6 +159,8 @@ async function runOf(name: RunName): Promise<Run> {
 		clubs: clubsSchema.parse(await json(at('clubs.json'))),
 		firstKickoff,
 		boardSizes: sizes,
+		boards,
+		slates: schedule.slates,
 		page: async (id) => playerSchema.parse(await json(at(`players/${id}.json`)))
 	};
 }
@@ -213,6 +235,11 @@ function weekReadCases(): ReadCase[] {
 		}),
 		readCase('as built for another week', READ, ppr(20, 'upcoming', 8)),
 		readCase('a read from before its figure is not judged', older, ppr(20)),
+		readCase(
+			'a read written with no projection beside a card that prints one is moved',
+			weekReadSchema.parse({ ...READ, projection: null }),
+			ppr(20)
+		),
 		...(['upcoming', null] as const).map((state) =>
 			readCase(`withheld for his status, ${String(state)}`, withheld, ppr(25.1, state))
 		),
@@ -506,7 +533,153 @@ async function pageCases(run: Run, ids: readonly string[]): Promise<unknown[]> {
 					preseason: numbers.projected,
 					rest: null
 				}),
-				heldTier: heldOut && listed ? heldTierWords(listed.status) : null
+				heldTier: heldOut && listed ? heldTierWords(listed.status) : null,
+				outcomesCaption: PLAYER_PAGE.outcomesCaption(run.manifest.season, format.label),
+				...pageSections(run, page, format, underway, listed)
+			};
+		})
+	);
+}
+
+/** The rest of the page, as server/pages/player.ts builds it and its components word it: the card as
+ * built (its week ahead and its tiles before the week is read), his season block, his tier box, the
+ * every-format table and, before the season with no read written, what the read will be built from. */
+function pageSections(
+	run: Run,
+	page: Player,
+	lead: Format,
+	underway: boolean,
+	listed: Designations['players'][string] | undefined
+): object {
+	const year = run.manifest.season;
+	const numbers = page.formats[lead.id];
+	if (!numbers) throw new Error(`${page.name} has no ${lead.id} figures.`);
+	const card = cardBuild(page.season, page.capsule);
+	const built = builtTiles(
+		{ card },
+		{ restTile: restTile(lead, numbers, page.position, year, listed) }
+	);
+	const held = listed?.seasonLong === true ? rankWord(listed.status) : null;
+	const lines = run.manifest.formats.flatMap((format) => {
+		const line = page.formats[format.id];
+		if (!line) return [];
+		const rest = restFigures(format, line, { scoring: format.label, through: '' }, year);
+		return [{ format, numbers: line, rest, boardSize: run.boardSizes[format.id] ?? 0 }];
+	});
+	const table = formatTable(lines);
+	const season = seasonView(
+		page.season,
+		page.position,
+		run.manifest.formats,
+		kickoffsFrom(run.slates, page.team),
+		page.priorSeasons ?? [],
+		page.lastGameClub ?? null
+	);
+	return {
+		built: {
+			next: card.next,
+			tiles: built.map(({ key, label, value, tone }) => ({ key, label, value, tone }))
+		},
+		season,
+		tier: tierBox(run, page, lead, listed),
+		formats: {
+			head: table.head,
+			note: table.note,
+			rows: lines.map((line, i) => ({
+				label: table.labels[i],
+				rank: held ?? String(line.numbers.ourRank),
+				points: fixed(line.numbers.projected),
+				vor: signed(line.numbers.vor),
+				tier: held ?? String(line.numbers.tier)
+			}))
+		},
+		unwritten:
+			unwrittenByFormat({
+				lines,
+				position: page.position,
+				year,
+				held,
+				underway,
+				written: page.capsule !== null
+			})[lead.id] ?? []
+	};
+}
+
+/** The tier box (player.ts mates and tierBasisOf, TierMates.svelte): his tier among the available
+ * players at his position on the leading board, its cliff and the basis at its foot; null where the
+ * fixture keeps no board of the format. */
+function tierBox(
+	run: Run,
+	page: Player,
+	format: Format,
+	listed: Designations['players'][string] | undefined
+): object | null {
+	const board = run.boards[format.id];
+	const numbers = page.formats[format.id];
+	if (!board || !numbers) return null;
+	const rows = withStatuses(board.rows, run.capture);
+	const row = rows.find((candidate) => candidate.id === page.id);
+	if (!row) return null;
+	const parts = restParts(format, numbers, page.position, listed);
+	const year = run.manifest.season;
+	const basis =
+		boardRestFrom(format) === null
+			? `Projected ${format.label} points, ${String(year)}`
+			: tierBasisWords(
+					format.label,
+					year,
+					parts?.span ?? restSpanWords(playerRestFrom(format, numbers))
+				);
+	const group = availableTierOf(rows, row);
+	if (group === null) return { tier: row.tier, mates: [], drop: null, basis };
+	const his = playerRestFrom(format, row);
+	const count = plural(group.rows.length, 'player');
+	return {
+		tier: group.tier,
+		mates: group.rows.map((mate) => ({
+			id: mate.id,
+			name: mate.name,
+			positionRank: mate.positionRank,
+			team: mate.team,
+			projected: fixed(mate.projected),
+			span: tierSpanOf(playerRestFrom(format, mate), his)
+		})),
+		// TierMates.svelte's line under the band.
+		drop: group.cliff
+			? `${count}, then ${fixed(group.cliff.drop)} ${format.unit} down to tier ${String(group.cliff.nextTier)}`
+			: `${count}, the last tier`,
+		basis
+	};
+}
+
+/** What a read not yet written will be built from (player-unwritten.ts unwrittenByFormat), for each
+ * stand-in page as if his capsule were not in the run before the season: every stand-in page has one,
+ * so the list is held over his own figures with the read taken away. */
+async function unwrittenCases(run: Run): Promise<unknown[]> {
+	return Promise.all(
+		SHEET_PLAYER_IDS.map(async (id) => {
+			const page = await run.page(id);
+			const lead = leadOf(run.manifest, page);
+			const listed = run.capture?.players[id];
+			const year = run.manifest.season;
+			const lines = run.manifest.formats.flatMap((format) => {
+				const numbers = page.formats[format.id];
+				if (!numbers) return [];
+				const rest = restFigures(format, numbers, { scoring: format.label, through: '' }, year);
+				return [{ format, numbers, rest, boardSize: run.boardSizes[format.id] ?? 0 }];
+			});
+			return {
+				player: id,
+				format: lead.id,
+				lines:
+					unwrittenByFormat({
+						lines,
+						position: page.position,
+						year,
+						held: listed?.seasonLong === true ? rankWord(listed.status) : null,
+						underway: false,
+						written: false
+					})[lead.id] ?? []
 			};
 		})
 	);
@@ -608,6 +781,7 @@ export async function renderPlayerSheet(about: string): Promise<string> {
 			...(await pageCases(standin, SHEET_PLAYER_IDS)),
 			...(await pageCases(contract, await contractIds()))
 		],
+		unwritten: await unwrittenCases(standin),
 		verbs: verbCases(),
 		heldVerbs: await heldVerbCases()
 	};

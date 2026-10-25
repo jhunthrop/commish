@@ -208,8 +208,8 @@
 <!-- His season so far as a box score: once the run is past the season's first kickoff it leads the
      draft facts, before it they lead. -->
 {#snippet thisSeason()}
-	<section class="season" id={SEASON_ANCHOR} aria-label="This season">
-		<PanelHead title="This season" aside={page.season.aside} level={2} />
+	<section class="season" id={SEASON_ANCHOR} aria-label={PLAYER_PAGE.thisSeason}>
+		<PanelHead title={PLAYER_PAGE.thisSeason} aside={page.season.aside} level={2} />
 		<GameLog
 			caption="{page.name} week by week, {page.season.season}"
 			heads={page.season.heads}
@@ -367,11 +367,11 @@
 					caption="{page.name} in every format"
 					showCaption
 					columns={[
-						{ label: 'Format' },
+						{ label: PLAYER_PAGE.format },
 						{ label: 'Our rank', align: 'end' },
 						{ label: live?.formats?.head ?? page.pointsHead, align: 'end' },
 						{ label: PLAYER_PAGE.overReplacement, align: 'end' },
-						{ label: 'Tier', align: 'end' }
+						{ label: PLAYER_PAGE.tier, align: 'end' }
 					]}
 				>
 					{#each page.lines as line (line.format.id)}

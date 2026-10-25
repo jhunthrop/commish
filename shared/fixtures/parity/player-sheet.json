@@ -512,6 +512,30 @@
 			}
 		},
 		{
+			"name": "a read written with no projection beside a card that prints one is moved",
+			"read": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": null,
+				"movedCaption": "The published projection moved since this read was written."
+			},
+			"card": {
+				"week": 7,
+				"scoring": "ppr",
+				"points": 20,
+				"state": "upcoming"
+			},
+			"shown": {
+				"withheld": true,
+				"words": "The published projection moved since this read was written."
+			}
+		},
+		{
 			"name": "withheld for his status, upcoming",
 			"read": {
 				"week": 7,
@@ -4891,7 +4915,455 @@
 			"clubName": "Chicago Bears",
 			"readStamp": "Written Oct 13, from his facts through last season",
 			"pulls": [],
-			"heldTier": null
+			"heldTier": null,
+			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"built": {
+				"next": {
+					"week": 6,
+					"opponent": "at ATL"
+				},
+				"tiles": [
+					{
+						"key": "proj",
+						"label": "Wk 6",
+						"value": "--",
+						"tone": "lead"
+					},
+					{
+						"key": "rest",
+						"label": "Projected",
+						"value": "199.2",
+						"tone": null
+					},
+					{
+						"key": "opp",
+						"label": "Opp rank",
+						"value": "--",
+						"tone": null
+					},
+					{
+						"key": "avg",
+						"label": "Avg",
+						"value": "8.5",
+						"tone": null
+					},
+					{
+						"key": "last",
+						"label": "Last",
+						"value": "5.0",
+						"tone": null
+					},
+					{
+						"key": "delta",
+						"label": "Proj change",
+						"value": "--",
+						"tone": "quiet"
+					}
+				]
+			},
+			"season": {
+				"season": 2026,
+				"aside": "2026, PPR, through week 5",
+				"heads": [
+					{
+						"short": "Tgt",
+						"full": "targets"
+					},
+					{
+						"short": "Rec",
+						"full": "catches"
+					},
+					{
+						"short": "Yds",
+						"full": "receiving yards"
+					},
+					{
+						"short": "TD",
+						"full": "receiving touchdowns"
+					},
+					{
+						"short": "Car",
+						"full": "carries"
+					},
+					{
+						"short": "Rush yds",
+						"full": "rushing yards"
+					},
+					{
+						"short": "Rush TD",
+						"full": "rushing touchdowns"
+					},
+					{
+						"short": "Snap %",
+						"full": "share of snaps"
+					}
+				],
+				"pointsHead": {
+					"short": "Pts",
+					"full": "PPR points"
+				},
+				"line": {
+					"lead": "Season",
+					"sub": "5 games, 8.5 a game",
+					"total": "42.3",
+					"points": {
+						"value": "8.5",
+						"caption": "PPR points a game"
+					},
+					"cells": [
+						{
+							"value": "29",
+							"caption": "targets"
+						},
+						{
+							"value": "17",
+							"caption": "catches"
+						},
+						{
+							"value": "273",
+							"caption": "receiving yards"
+						},
+						{
+							"value": "0",
+							"caption": "receiving touchdowns"
+						},
+						{
+							"value": "0",
+							"caption": "carries"
+						},
+						{
+							"value": "0",
+							"caption": "rushing yards"
+						},
+						{
+							"value": "0",
+							"caption": "rushing touchdowns"
+						},
+						{
+							"value": "81%",
+							"caption": "share of snaps"
+						}
+					]
+				},
+				"rows": [
+					{
+						"week": 1,
+						"opponent": "at CAR",
+						"note": "",
+						"tone": "played",
+						"points": "7.2",
+						"cells": [
+							"3",
+							"2",
+							"52",
+							"0",
+							"0",
+							"0",
+							"0",
+							"48%"
+						]
+					},
+					{
+						"week": 2,
+						"opponent": "vs MIN",
+						"note": "",
+						"tone": "played",
+						"points": "7.3",
+						"cells": [
+							"4",
+							"3",
+							"43",
+							"0",
+							"0",
+							"0",
+							"0",
+							"84%"
+						]
+					},
+					{
+						"week": 3,
+						"opponent": "vs PHI",
+						"note": "",
+						"tone": "played",
+						"points": "7.4",
+						"cells": [
+							"6",
+							"3",
+							"44",
+							"0",
+							"0",
+							"0",
+							"0",
+							"85%"
+						]
+					},
+					{
+						"week": 4,
+						"opponent": "vs NYJ",
+						"note": "",
+						"tone": "played",
+						"points": "15.4",
+						"cells": [
+							"7",
+							"6",
+							"94",
+							"0",
+							"0",
+							"0",
+							"0",
+							"89%"
+						]
+					},
+					{
+						"week": 5,
+						"opponent": "at GB",
+						"note": "",
+						"tone": "played",
+						"points": "5.0",
+						"cells": [
+							"9",
+							"3",
+							"40",
+							"0",
+							"0",
+							"0",
+							"0",
+							"99%"
+						]
+					}
+				],
+				"ahead": [
+					{
+						"week": 6,
+						"opponent": "at ATL",
+						"bye": false,
+						"day": "Final"
+					},
+					{
+						"week": 7,
+						"opponent": "vs NE",
+						"bye": false,
+						"day": "Final"
+					},
+					{
+						"week": 8,
+						"opponent": "at SEA",
+						"bye": false,
+						"day": "Mon Nov 2"
+					},
+					{
+						"week": 9,
+						"opponent": "vs TB",
+						"bye": false,
+						"day": "Sun Nov 8"
+					},
+					{
+						"week": 10,
+						"opponent": "Bye",
+						"bye": true,
+						"day": ""
+					},
+					{
+						"week": 11,
+						"opponent": "vs NO",
+						"bye": false,
+						"day": "Sun Nov 22"
+					},
+					{
+						"week": 12,
+						"opponent": "at DET",
+						"bye": false,
+						"day": "Thu Nov 26"
+					},
+					{
+						"week": 13,
+						"opponent": "vs JAX",
+						"bye": false,
+						"day": "Sun Dec 6"
+					},
+					{
+						"week": 14,
+						"opponent": "at MIA",
+						"bye": false,
+						"day": "Sun Dec 13"
+					},
+					{
+						"week": 15,
+						"opponent": "at BUF",
+						"bye": false,
+						"day": "Sat Dec 19"
+					},
+					{
+						"week": 16,
+						"opponent": "vs GB",
+						"bye": false,
+						"day": "Fri Dec 25"
+					},
+					{
+						"week": 17,
+						"opponent": "vs DET",
+						"bye": false,
+						"day": "Sun Jan 3"
+					},
+					{
+						"week": 18,
+						"opponent": "at MIN",
+						"bye": false,
+						"day": "Sun Jan 10"
+					}
+				],
+				"none": "He has no 2026 stats through week 5.",
+				"basis": null,
+				"prior": [
+					{
+						"season": 2025,
+						"sub": "12 games, 12.2 a game",
+						"total": "146.1",
+						"cells": [
+							"90",
+							"44",
+							"661",
+							"6",
+							"0",
+							"0",
+							"0",
+							"88%"
+						]
+					},
+					{
+						"season": 2024,
+						"sub": "17 games, 8.5 a game",
+						"total": "144.9",
+						"cells": [
+							"101",
+							"54",
+							"734",
+							"3",
+							"3",
+							"15",
+							"0",
+							"84%"
+						]
+					}
+				]
+			},
+			"tier": {
+				"tier": 5,
+				"mates": [
+					{
+						"id": "3128429",
+						"name": "Courtland Sutton",
+						"positionRank": 24,
+						"team": "DEN",
+						"projected": "201.1",
+						"span": null
+					},
+					{
+						"id": "4431299",
+						"name": "Rome Odunze",
+						"positionRank": 25,
+						"team": "CHI",
+						"projected": "199.2",
+						"span": null
+					},
+					{
+						"id": "3121422",
+						"name": "Terry McLaurin",
+						"positionRank": 26,
+						"team": "WSH",
+						"projected": "198.0",
+						"span": null
+					},
+					{
+						"id": "4432620",
+						"name": "Parker Washington",
+						"positionRank": 27,
+						"team": "JAX",
+						"projected": "188.9",
+						"span": null
+					},
+					{
+						"id": "4047650",
+						"name": "DK Metcalf",
+						"positionRank": 28,
+						"team": "PIT",
+						"projected": "188.1",
+						"span": null
+					},
+					{
+						"id": "4685278",
+						"name": "Luther Burden III",
+						"positionRank": 29,
+						"team": "CHI",
+						"projected": "186.9",
+						"span": null
+					},
+					{
+						"id": "16737",
+						"name": "Mike Evans",
+						"positionRank": 30,
+						"team": "SF",
+						"projected": "185.8",
+						"span": null
+					},
+					{
+						"id": "4569587",
+						"name": "Wan'Dale Robinson",
+						"positionRank": 31,
+						"team": "TEN",
+						"projected": "185.5",
+						"span": null
+					},
+					{
+						"id": "4248528",
+						"name": "Christian Watson",
+						"positionRank": 32,
+						"team": "GB",
+						"projected": "182.9",
+						"span": null
+					},
+					{
+						"id": "4360761",
+						"name": "Michael Wilson",
+						"positionRank": 33,
+						"team": "ARI",
+						"projected": "181.4",
+						"span": null
+					},
+					{
+						"id": "4871023",
+						"name": "Carnell Tate",
+						"positionRank": 34,
+						"team": "TEN",
+						"projected": "180.0",
+						"span": null
+					},
+					{
+						"id": "4432708",
+						"name": "Marvin Harrison Jr.",
+						"positionRank": 35,
+						"team": "ARI",
+						"projected": "179.1",
+						"span": null
+					}
+				],
+				"drop": "12 players, the last tier",
+				"basis": "Projected PPR points, 2026"
+			},
+			"formats": {
+				"head": "Projected",
+				"note": null,
+				"rows": [
+					{
+						"label": "PPR",
+						"rank": "50",
+						"points": "199.2",
+						"vor": "+19.1",
+						"tier": "5"
+					}
+				]
+			},
+			"unwritten": []
 		},
 		{
 			"run": "standin",
@@ -4909,7 +5381,402 @@
 			"clubName": "New Orleans Saints",
 			"readStamp": "Written Oct 13, from his facts through last season",
 			"pulls": [],
-			"heldTier": null
+			"heldTier": null,
+			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"built": {
+				"next": {
+					"week": 6,
+					"opponent": "at NYG"
+				},
+				"tiles": [
+					{
+						"key": "proj",
+						"label": "Wk 6",
+						"value": "--",
+						"tone": "lead"
+					},
+					{
+						"key": "rest",
+						"label": "Projected",
+						"value": "182.9",
+						"tone": null
+					},
+					{
+						"key": "opp",
+						"label": "Opp rank",
+						"value": "--",
+						"tone": null
+					},
+					{
+						"key": "avg",
+						"label": "Avg",
+						"value": "9.6",
+						"tone": null
+					},
+					{
+						"key": "last",
+						"label": "Last",
+						"value": "9.0",
+						"tone": null
+					},
+					{
+						"key": "delta",
+						"label": "Proj change",
+						"value": "--",
+						"tone": "quiet"
+					}
+				]
+			},
+			"season": {
+				"season": 2026,
+				"aside": "2026, PPR, through week 5",
+				"heads": [
+					{
+						"short": "Car",
+						"full": "carries"
+					},
+					{
+						"short": "Yds",
+						"full": "rushing yards"
+					},
+					{
+						"short": "TD",
+						"full": "rushing touchdowns"
+					},
+					{
+						"short": "Tgt",
+						"full": "targets"
+					},
+					{
+						"short": "Rec",
+						"full": "catches"
+					},
+					{
+						"short": "Rec yds",
+						"full": "receiving yards"
+					},
+					{
+						"short": "Rec TD",
+						"full": "receiving touchdowns"
+					},
+					{
+						"short": "Fum",
+						"full": "fumbles lost"
+					},
+					{
+						"short": "Snap %",
+						"full": "share of snaps"
+					}
+				],
+				"pointsHead": {
+					"short": "Pts",
+					"full": "PPR points"
+				},
+				"line": {
+					"lead": "Season",
+					"sub": "3 games, 9.6 a game",
+					"total": "28.9",
+					"points": {
+						"value": "9.6",
+						"caption": "PPR points a game"
+					},
+					"cells": [
+						{
+							"value": "30",
+							"caption": "carries"
+						},
+						{
+							"value": "128",
+							"caption": "rushing yards"
+						},
+						{
+							"value": "0",
+							"caption": "rushing touchdowns"
+						},
+						{
+							"value": "13",
+							"caption": "targets"
+						},
+						{
+							"value": "11",
+							"caption": "catches"
+						},
+						{
+							"value": "51",
+							"caption": "receiving yards"
+						},
+						{
+							"value": "0",
+							"caption": "receiving touchdowns"
+						},
+						{
+							"value": "0",
+							"caption": "fumbles lost"
+						},
+						{
+							"value": "51%",
+							"caption": "share of snaps"
+						}
+					]
+				},
+				"rows": [
+					{
+						"week": 1,
+						"opponent": "at DET",
+						"note": "",
+						"tone": "played",
+						"points": "14.8",
+						"cells": [
+							"9",
+							"46",
+							"0",
+							"9",
+							"7",
+							"32",
+							"0",
+							"0",
+							"59%"
+						]
+					},
+					{
+						"week": 2,
+						"opponent": "at BAL",
+						"note": "",
+						"tone": "played",
+						"points": "5.1",
+						"cells": [
+							"8",
+							"25",
+							"0",
+							"2",
+							"2",
+							"6",
+							"0",
+							"0",
+							"54%"
+						]
+					},
+					{
+						"week": 3,
+						"opponent": "vs LV",
+						"note": "",
+						"tone": "played",
+						"points": "9.0",
+						"cells": [
+							"13",
+							"57",
+							"0",
+							"2",
+							"2",
+							"13",
+							"0",
+							"0",
+							"38%"
+						]
+					},
+					{
+						"week": 4,
+						"opponent": "vs ATL",
+						"note": "Did not play",
+						"tone": "quiet",
+						"points": null,
+						"cells": null
+					},
+					{
+						"week": 5,
+						"opponent": "vs MIN",
+						"note": "Did not play",
+						"tone": "quiet",
+						"points": null,
+						"cells": null
+					}
+				],
+				"ahead": [
+					{
+						"week": 6,
+						"opponent": "at NYG",
+						"bye": false,
+						"day": "Final"
+					},
+					{
+						"week": 7,
+						"opponent": "vs PIT",
+						"bye": false,
+						"day": "Sun Oct 25"
+					},
+					{
+						"week": 8,
+						"opponent": "Bye",
+						"bye": true,
+						"day": ""
+					},
+					{
+						"week": 9,
+						"opponent": "vs CLE",
+						"bye": false,
+						"day": "Sun Nov 8"
+					},
+					{
+						"week": 10,
+						"opponent": "vs CAR",
+						"bye": false,
+						"day": "Sun Nov 15"
+					},
+					{
+						"week": 11,
+						"opponent": "at CHI",
+						"bye": false,
+						"day": "Sun Nov 22"
+					},
+					{
+						"week": 12,
+						"opponent": "at CIN",
+						"bye": false,
+						"day": "Sun Nov 29"
+					},
+					{
+						"week": 13,
+						"opponent": "vs GB",
+						"bye": false,
+						"day": "Sun Dec 6"
+					},
+					{
+						"week": 14,
+						"opponent": "at CAR",
+						"bye": false,
+						"day": "Sun Dec 13"
+					},
+					{
+						"week": 15,
+						"opponent": "at TB",
+						"bye": false,
+						"day": "Sun Dec 20"
+					},
+					{
+						"week": 16,
+						"opponent": "vs ARI",
+						"bye": false,
+						"day": "Sun Dec 27"
+					},
+					{
+						"week": 17,
+						"opponent": "at ATL",
+						"bye": false,
+						"day": "Sun Jan 3"
+					},
+					{
+						"week": 18,
+						"opponent": "vs TB",
+						"bye": false,
+						"day": "Sun Jan 10"
+					}
+				],
+				"none": "He has no 2026 stats through week 5.",
+				"basis": null,
+				"prior": [
+					{
+						"season": 2025,
+						"sub": "17 games, 14.9 a game",
+						"total": "253.9",
+						"cells": [
+							"260",
+							"1,107",
+							"7",
+							"52",
+							"36",
+							"292",
+							"6",
+							"0",
+							"60%"
+						]
+					},
+					{
+						"season": 2024,
+						"sub": "15 games, 8.7 a game",
+						"total": "130.2",
+						"cells": [
+							"150",
+							"558",
+							"2",
+							"52",
+							"39",
+							"254",
+							"0",
+							"1",
+							"54%"
+						]
+					},
+					{
+						"season": 2023,
+						"sub": "17 games, 16.4 a game",
+						"total": "278.4",
+						"cells": [
+							"267",
+							"1,008",
+							"11",
+							"73",
+							"58",
+							"476",
+							"1",
+							"0",
+							"73%"
+						]
+					}
+				]
+			},
+			"tier": {
+				"tier": 3,
+				"mates": [
+					{
+						"id": "4685382",
+						"name": "Omarion Hampton",
+						"positionRank": 11,
+						"team": "LAC",
+						"projected": "194.4",
+						"span": null
+					},
+					{
+						"id": "4427366",
+						"name": "Breece Hall",
+						"positionRank": 12,
+						"team": "NYJ",
+						"projected": "191.5",
+						"span": null
+					},
+					{
+						"id": "4870808",
+						"name": "Jeremiyah Love",
+						"positionRank": 13,
+						"team": "ARI",
+						"projected": "184.4",
+						"span": null
+					},
+					{
+						"id": "4239996",
+						"name": "Travis Etienne Jr.",
+						"positionRank": 14,
+						"team": "NO",
+						"projected": "182.9",
+						"span": null
+					}
+				],
+				"drop": "4 players, then 18.8 PPR pts down to tier 4",
+				"basis": "Projected PPR points, 2026"
+			},
+			"formats": {
+				"head": "Projected",
+				"note": null,
+				"rows": [
+					{
+						"label": "PPR",
+						"rank": "40",
+						"points": "182.9",
+						"vor": "+34.8",
+						"tier": "3"
+					}
+				]
+			},
+			"unwritten": []
 		},
 		{
 			"run": "standin",
@@ -4927,7 +5794,316 @@
 			"clubName": "New York Giants",
 			"readStamp": "Written Oct 13, from his facts through last season",
 			"pulls": [],
-			"heldTier": "On IR, not ranked"
+			"heldTier": "On IR, not ranked",
+			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"built": {
+				"next": {
+					"week": 6,
+					"opponent": "vs NO"
+				},
+				"tiles": [
+					{
+						"key": "proj",
+						"label": "Wk 6",
+						"value": "--",
+						"tone": "lead"
+					},
+					{
+						"key": "rest",
+						"label": "Projected",
+						"value": "252.2",
+						"tone": null
+					},
+					{
+						"key": "opp",
+						"label": "Opp rank",
+						"value": "--",
+						"tone": null
+					},
+					{
+						"key": "avg",
+						"label": "Avg",
+						"value": "13.7",
+						"tone": null
+					},
+					{
+						"key": "last",
+						"label": "Last",
+						"value": "0.8",
+						"tone": null
+					},
+					{
+						"key": "delta",
+						"label": "Proj change",
+						"value": "--",
+						"tone": "quiet"
+					}
+				]
+			},
+			"season": {
+				"season": 2026,
+				"aside": "2026, PPR, through week 5",
+				"heads": [
+					{
+						"short": "Comp/att",
+						"full": "completions of attempts"
+					},
+					{
+						"short": "Yds",
+						"full": "passing yards"
+					},
+					{
+						"short": "TD",
+						"full": "passing touchdowns"
+					},
+					{
+						"short": "INT",
+						"full": "interceptions"
+					},
+					{
+						"short": "Car",
+						"full": "carries"
+					},
+					{
+						"short": "Rush yds",
+						"full": "rushing yards"
+					},
+					{
+						"short": "Rush TD",
+						"full": "rushing touchdowns"
+					},
+					{
+						"short": "Fum",
+						"full": "fumbles lost"
+					}
+				],
+				"pointsHead": {
+					"short": "Pts",
+					"full": "PPR points"
+				},
+				"line": {
+					"lead": "Season",
+					"sub": "2 games, 13.7 a game",
+					"total": "27.4",
+					"points": {
+						"value": "13.7",
+						"caption": "PPR points a game"
+					},
+					"cells": [
+						{
+							"value": "26/34",
+							"caption": "completions of attempts"
+						},
+						{
+							"value": "250",
+							"caption": "passing yards"
+						},
+						{
+							"value": "3",
+							"caption": "passing touchdowns"
+						},
+						{
+							"value": "0",
+							"caption": "interceptions"
+						},
+						{
+							"value": "11",
+							"caption": "carries"
+						},
+						{
+							"value": "54",
+							"caption": "rushing yards"
+						},
+						{
+							"value": "0",
+							"caption": "rushing touchdowns"
+						},
+						{
+							"value": "0",
+							"caption": "fumbles lost"
+						}
+					]
+				},
+				"rows": [
+					{
+						"week": 1,
+						"opponent": "vs DAL",
+						"note": "",
+						"tone": "played",
+						"points": "26.6",
+						"cells": [
+							"23/29",
+							"230",
+							"3",
+							"0",
+							"11",
+							"54",
+							"0",
+							"0"
+						]
+					},
+					{
+						"week": 2,
+						"opponent": "at LAR",
+						"note": "",
+						"tone": "played",
+						"points": "0.8",
+						"cells": [
+							"3/5",
+							"20",
+							"0",
+							"0",
+							"0",
+							"0",
+							"0",
+							"0"
+						]
+					},
+					{
+						"week": 3,
+						"opponent": "vs TEN",
+						"note": "Did not play",
+						"tone": "quiet",
+						"points": null,
+						"cells": null
+					},
+					{
+						"week": 4,
+						"opponent": "vs ARI",
+						"note": "Did not play",
+						"tone": "quiet",
+						"points": null,
+						"cells": null
+					},
+					{
+						"week": 5,
+						"opponent": "at WSH",
+						"note": "Did not play",
+						"tone": "quiet",
+						"points": null,
+						"cells": null
+					}
+				],
+				"ahead": [
+					{
+						"week": 6,
+						"opponent": "vs NO",
+						"bye": false,
+						"day": "Final"
+					},
+					{
+						"week": 7,
+						"opponent": "at HOU",
+						"bye": false,
+						"day": "Sun Oct 25"
+					},
+					{
+						"week": 8,
+						"opponent": "Bye",
+						"bye": true,
+						"day": ""
+					},
+					{
+						"week": 9,
+						"opponent": "at PHI",
+						"bye": false,
+						"day": "Sun Nov 8"
+					},
+					{
+						"week": 10,
+						"opponent": "vs WSH",
+						"bye": false,
+						"day": "Thu Nov 12"
+					},
+					{
+						"week": 11,
+						"opponent": "vs JAX",
+						"bye": false,
+						"day": "Sun Nov 22"
+					},
+					{
+						"week": 12,
+						"opponent": "at IND",
+						"bye": false,
+						"day": "Sun Nov 29"
+					},
+					{
+						"week": 13,
+						"opponent": "vs SF",
+						"bye": false,
+						"day": "Sun Dec 6"
+					},
+					{
+						"week": 14,
+						"opponent": "at SEA",
+						"bye": false,
+						"day": "Sun Dec 13"
+					},
+					{
+						"week": 15,
+						"opponent": "vs CLE",
+						"bye": false,
+						"day": "Sun Dec 20"
+					},
+					{
+						"week": 16,
+						"opponent": "at DET",
+						"bye": false,
+						"day": "Mon Dec 28"
+					},
+					{
+						"week": 17,
+						"opponent": "at DAL",
+						"bye": false,
+						"day": "Sun Jan 3"
+					},
+					{
+						"week": 18,
+						"opponent": "vs PHI",
+						"bye": false,
+						"day": "Sun Jan 10"
+					}
+				],
+				"none": "He has no 2026 stats through week 5.",
+				"basis": null,
+				"prior": [
+					{
+						"season": 2025,
+						"sub": "14 games, 17.1 a game",
+						"total": "239.6",
+						"cells": [
+							"216/339",
+							"2,272",
+							"15",
+							"5",
+							"86",
+							"487",
+							"9",
+							"2"
+						]
+					}
+				]
+			},
+			"tier": {
+				"tier": 2,
+				"mates": [],
+				"drop": null,
+				"basis": "Projected PPR points, 2026"
+			},
+			"formats": {
+				"head": "Projected",
+				"note": null,
+				"rows": [
+					{
+						"label": "PPR",
+						"rank": "IR",
+						"points": "252.2",
+						"vor": "+0.0",
+						"tier": "IR"
+					}
+				]
+			},
+			"unwritten": []
 		},
 		{
 			"run": "standin",
@@ -4945,7 +6121,392 @@
 			"clubName": "Cincinnati Bengals",
 			"readStamp": "Written Oct 13, from his facts through last season",
 			"pulls": [],
-			"heldTier": null
+			"heldTier": null,
+			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"built": {
+				"next": {
+					"week": 6,
+					"opponent": "Bye"
+				},
+				"tiles": [
+					{
+						"key": "proj",
+						"label": "Wk 6",
+						"value": "--",
+						"tone": "lead"
+					},
+					{
+						"key": "rest",
+						"label": "Projected",
+						"value": "333.2",
+						"tone": null
+					},
+					{
+						"key": "opp",
+						"label": "Opp rank",
+						"value": "--",
+						"tone": null
+					},
+					{
+						"key": "avg",
+						"label": "Avg",
+						"value": "16.0",
+						"tone": null
+					},
+					{
+						"key": "last",
+						"label": "Last",
+						"value": "19.7",
+						"tone": null
+					},
+					{
+						"key": "delta",
+						"label": "Proj change",
+						"value": "--",
+						"tone": "quiet"
+					}
+				]
+			},
+			"season": {
+				"season": 2026,
+				"aside": "2026, PPR, through week 5",
+				"heads": [
+					{
+						"short": "Tgt",
+						"full": "targets"
+					},
+					{
+						"short": "Rec",
+						"full": "catches"
+					},
+					{
+						"short": "Yds",
+						"full": "receiving yards"
+					},
+					{
+						"short": "TD",
+						"full": "receiving touchdowns"
+					},
+					{
+						"short": "Car",
+						"full": "carries"
+					},
+					{
+						"short": "Rush yds",
+						"full": "rushing yards"
+					},
+					{
+						"short": "Rush TD",
+						"full": "rushing touchdowns"
+					},
+					{
+						"short": "Snap %",
+						"full": "share of snaps"
+					}
+				],
+				"pointsHead": {
+					"short": "Pts",
+					"full": "PPR points"
+				},
+				"line": {
+					"lead": "Season",
+					"sub": "5 games, 16.0 a game",
+					"total": "79.9",
+					"points": {
+						"value": "16.0",
+						"caption": "PPR points a game"
+					},
+					"cells": [
+						{
+							"value": "38",
+							"caption": "targets"
+						},
+						{
+							"value": "27",
+							"caption": "catches"
+						},
+						{
+							"value": "289",
+							"caption": "receiving yards"
+						},
+						{
+							"value": "4",
+							"caption": "receiving touchdowns"
+						},
+						{
+							"value": "0",
+							"caption": "carries"
+						},
+						{
+							"value": "0",
+							"caption": "rushing yards"
+						},
+						{
+							"value": "0",
+							"caption": "rushing touchdowns"
+						},
+						{
+							"value": "75%",
+							"caption": "share of snaps"
+						}
+					]
+				},
+				"rows": [
+					{
+						"week": 1,
+						"opponent": "vs TB",
+						"note": "",
+						"tone": "played",
+						"points": "3.2",
+						"cells": [
+							"4",
+							"2",
+							"12",
+							"0",
+							"0",
+							"0",
+							"0",
+							"94%"
+						]
+					},
+					{
+						"week": 2,
+						"opponent": "at HOU",
+						"note": "",
+						"tone": "played",
+						"points": "26.5",
+						"cells": [
+							"9",
+							"7",
+							"75",
+							"2",
+							"0",
+							"0",
+							"0",
+							"88%"
+						]
+					},
+					{
+						"week": 3,
+						"opponent": "at PIT",
+						"note": "",
+						"tone": "played",
+						"points": "24.8",
+						"cells": [
+							"12",
+							"9",
+							"98",
+							"1",
+							"0",
+							"0",
+							"0",
+							"100%"
+						]
+					},
+					{
+						"week": 4,
+						"opponent": "vs JAX",
+						"note": "",
+						"tone": "played",
+						"points": "5.7",
+						"cells": [
+							"3",
+							"3",
+							"27",
+							"0",
+							"0",
+							"0",
+							"0",
+							"20%"
+						]
+					},
+					{
+						"week": 5,
+						"opponent": "at MIA",
+						"note": "",
+						"tone": "played",
+						"points": "19.7",
+						"cells": [
+							"10",
+							"6",
+							"77",
+							"1",
+							"0",
+							"0",
+							"0",
+							"89%"
+						]
+					},
+					{
+						"week": 6,
+						"opponent": "Bye",
+						"note": "",
+						"tone": "bye",
+						"points": null,
+						"cells": null
+					}
+				],
+				"ahead": [
+					{
+						"week": 7,
+						"opponent": "at BAL",
+						"bye": false,
+						"day": "Sun Oct 25"
+					},
+					{
+						"week": 8,
+						"opponent": "vs TEN",
+						"bye": false,
+						"day": "Sun Nov 1"
+					},
+					{
+						"week": 9,
+						"opponent": "at ATL",
+						"bye": false,
+						"day": "Sun Nov 8"
+					},
+					{
+						"week": 10,
+						"opponent": "vs PIT",
+						"bye": false,
+						"day": "Sun Nov 15"
+					},
+					{
+						"week": 11,
+						"opponent": "at WSH",
+						"bye": false,
+						"day": "Mon Nov 23"
+					},
+					{
+						"week": 12,
+						"opponent": "vs NO",
+						"bye": false,
+						"day": "Sun Nov 29"
+					},
+					{
+						"week": 13,
+						"opponent": "at CLE",
+						"bye": false,
+						"day": "Sun Dec 6"
+					},
+					{
+						"week": 14,
+						"opponent": "vs KC",
+						"bye": false,
+						"day": "Sun Dec 13"
+					},
+					{
+						"week": 15,
+						"opponent": "at CAR",
+						"bye": false,
+						"day": "Sun Dec 20"
+					},
+					{
+						"week": 16,
+						"opponent": "at IND",
+						"bye": false,
+						"day": "Sun Dec 27"
+					},
+					{
+						"week": 17,
+						"opponent": "vs BAL",
+						"bye": false,
+						"day": "Thu Dec 31"
+					},
+					{
+						"week": 18,
+						"opponent": "vs CLE",
+						"bye": false,
+						"day": "Sun Jan 10"
+					}
+				],
+				"none": "He has no 2026 stats through week 5.",
+				"basis": null,
+				"prior": [
+					{
+						"season": 2025,
+						"sub": "16 games, 19.6 a game",
+						"total": "313.6",
+						"cells": [
+							"185",
+							"125",
+							"1,412",
+							"8",
+							"3",
+							"14",
+							"0",
+							"94%"
+						]
+					},
+					{
+						"season": 2024,
+						"sub": "17 games, 23.7 a game",
+						"total": "403.0",
+						"cells": [
+							"175",
+							"127",
+							"1,708",
+							"17",
+							"3",
+							"32",
+							"0",
+							"93%"
+						]
+					},
+					{
+						"season": 2023,
+						"sub": "16 games, 16.4 a game",
+						"total": "262.7",
+						"cells": [
+							"145",
+							"100",
+							"1,216",
+							"7",
+							"3",
+							"-6",
+							"0",
+							"87%"
+						]
+					}
+				]
+			},
+			"tier": {
+				"tier": 1,
+				"mates": [
+					{
+						"id": "4426515",
+						"name": "Puka Nacua",
+						"positionRank": 1,
+						"team": "LAR",
+						"projected": "344.1",
+						"span": null
+					},
+					{
+						"id": "4362628",
+						"name": "Ja'Marr Chase",
+						"positionRank": 2,
+						"team": "CIN",
+						"projected": "333.2",
+						"span": null
+					}
+				],
+				"drop": "2 players, then 23.4 PPR pts down to tier 2",
+				"basis": "Projected PPR points, 2026"
+			},
+			"formats": {
+				"head": "Projected",
+				"note": null,
+				"rows": [
+					{
+						"label": "PPR",
+						"rank": "2",
+						"points": "333.2",
+						"vor": "+153.2",
+						"tier": "1"
+					}
+				]
+			},
+			"unwritten": []
 		},
 		{
 			"run": "standin",
@@ -4963,7 +6524,437 @@
 			"clubName": "Kansas City Chiefs",
 			"readStamp": "Written Oct 13, from his facts through last season",
 			"pulls": [],
-			"heldTier": null
+			"heldTier": null,
+			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"built": {
+				"next": {
+					"week": 6,
+					"opponent": "vs LAC"
+				},
+				"tiles": [
+					{
+						"key": "proj",
+						"label": "Wk 6",
+						"value": "--",
+						"tone": "lead"
+					},
+					{
+						"key": "rest",
+						"label": "Projected",
+						"value": "248.2",
+						"tone": null
+					},
+					{
+						"key": "opp",
+						"label": "Opp rank",
+						"value": "--",
+						"tone": null
+					},
+					{
+						"key": "avg",
+						"label": "Avg",
+						"value": "20.9",
+						"tone": null
+					},
+					{
+						"key": "last",
+						"label": "Last",
+						"value": "17.0",
+						"tone": null
+					},
+					{
+						"key": "delta",
+						"label": "Proj change",
+						"value": "--",
+						"tone": "quiet"
+					}
+				]
+			},
+			"season": {
+				"season": 2026,
+				"aside": "2026, PPR, through week 5",
+				"heads": [
+					{
+						"short": "Comp/att",
+						"full": "completions of attempts"
+					},
+					{
+						"short": "Yds",
+						"full": "passing yards"
+					},
+					{
+						"short": "TD",
+						"full": "passing touchdowns"
+					},
+					{
+						"short": "INT",
+						"full": "interceptions"
+					},
+					{
+						"short": "Car",
+						"full": "carries"
+					},
+					{
+						"short": "Rush yds",
+						"full": "rushing yards"
+					},
+					{
+						"short": "Rush TD",
+						"full": "rushing touchdowns"
+					},
+					{
+						"short": "Fum",
+						"full": "fumbles lost"
+					}
+				],
+				"pointsHead": {
+					"short": "Pts",
+					"full": "PPR points"
+				},
+				"line": {
+					"lead": "Season",
+					"sub": "4 games, 20.9 a game",
+					"total": "83.6",
+					"points": {
+						"value": "20.9",
+						"caption": "PPR points a game"
+					},
+					"cells": [
+						{
+							"value": "82/128",
+							"caption": "completions of attempts"
+						},
+						{
+							"value": "1,037",
+							"caption": "passing yards"
+						},
+						{
+							"value": "9",
+							"caption": "passing touchdowns"
+						},
+						{
+							"value": "2",
+							"caption": "interceptions"
+						},
+						{
+							"value": "12",
+							"caption": "carries"
+						},
+						{
+							"value": "41",
+							"caption": "rushing yards"
+						},
+						{
+							"value": "1",
+							"caption": "rushing touchdown"
+						},
+						{
+							"value": "0",
+							"caption": "fumbles lost"
+						}
+					]
+				},
+				"rows": [
+					{
+						"week": 1,
+						"opponent": "vs DEN",
+						"note": "",
+						"tone": "played",
+						"points": "21.7",
+						"cells": [
+							"15/27",
+							"184",
+							"2",
+							"1",
+							"7",
+							"23",
+							"1",
+							"0"
+						]
+					},
+					{
+						"week": 2,
+						"opponent": "vs IND",
+						"note": "",
+						"tone": "played",
+						"points": "29.0",
+						"cells": [
+							"32/47",
+							"382",
+							"3",
+							"0",
+							"2",
+							"17",
+							"0",
+							"0"
+						]
+					},
+					{
+						"week": 3,
+						"opponent": "at MIA",
+						"note": "",
+						"tone": "played",
+						"points": "15.9",
+						"cells": [
+							"20/24",
+							"246",
+							"2",
+							"1",
+							"1",
+							"1",
+							"0",
+							"0"
+						]
+					},
+					{
+						"week": 4,
+						"opponent": "at LV",
+						"note": "",
+						"tone": "played",
+						"points": "17.0",
+						"cells": [
+							"15/30",
+							"225",
+							"2",
+							"0",
+							"2",
+							"0",
+							"0",
+							"0"
+						]
+					},
+					{
+						"week": 5,
+						"opponent": "Bye",
+						"note": "",
+						"tone": "bye",
+						"points": null,
+						"cells": null
+					}
+				],
+				"ahead": [
+					{
+						"week": 6,
+						"opponent": "vs LAC",
+						"bye": false,
+						"day": "Final"
+					},
+					{
+						"week": 7,
+						"opponent": "at SEA",
+						"bye": false,
+						"day": "Sun Oct 25"
+					},
+					{
+						"week": 8,
+						"opponent": "at DEN",
+						"bye": false,
+						"day": "Sun Nov 1"
+					},
+					{
+						"week": 9,
+						"opponent": "vs NYJ",
+						"bye": false,
+						"day": "Sun Nov 8"
+					},
+					{
+						"week": 10,
+						"opponent": "at ATL",
+						"bye": false,
+						"day": "Sun Nov 15"
+					},
+					{
+						"week": 11,
+						"opponent": "vs ARI",
+						"bye": false,
+						"day": "Sun Nov 22"
+					},
+					{
+						"week": 12,
+						"opponent": "at BUF",
+						"bye": false,
+						"day": "Thu Nov 26"
+					},
+					{
+						"week": 13,
+						"opponent": "at LAR",
+						"bye": false,
+						"day": "Thu Dec 3"
+					},
+					{
+						"week": 14,
+						"opponent": "at CIN",
+						"bye": false,
+						"day": "Sun Dec 13"
+					},
+					{
+						"week": 15,
+						"opponent": "vs NE",
+						"bye": false,
+						"day": "Mon Dec 21"
+					},
+					{
+						"week": 16,
+						"opponent": "vs SF",
+						"bye": false,
+						"day": "Sun Dec 27"
+					},
+					{
+						"week": 17,
+						"opponent": "at LAC",
+						"bye": false,
+						"day": "Sun Jan 3"
+					},
+					{
+						"week": 18,
+						"opponent": "vs LV",
+						"bye": false,
+						"day": "Sun Jan 10"
+					}
+				],
+				"none": "He has no 2026 stats through week 5.",
+				"basis": null,
+				"prior": [
+					{
+						"season": 2025,
+						"sub": "14 games, 20.1 a game",
+						"total": "281.7",
+						"cells": [
+							"315/502",
+							"3,587",
+							"22",
+							"11",
+							"64",
+							"422",
+							"5",
+							"0"
+						]
+					},
+					{
+						"season": 2024,
+						"sub": "16 games, 17.7 a game",
+						"total": "283.0",
+						"cells": [
+							"392/581",
+							"3,928",
+							"26",
+							"11",
+							"58",
+							"307",
+							"2",
+							"0"
+						]
+					},
+					{
+						"season": 2023,
+						"sub": "16 games, 17.5 a game",
+						"total": "280.2",
+						"cells": [
+							"401/597",
+							"4,183",
+							"27",
+							"14",
+							"75",
+							"389",
+							"0",
+							"3"
+						]
+					}
+				]
+			},
+			"tier": {
+				"tier": 2,
+				"mates": [
+					{
+						"id": "3915511",
+						"name": "Joe Burrow",
+						"positionRank": 4,
+						"team": "CIN",
+						"projected": "277.4",
+						"span": null
+					},
+					{
+						"id": "2577417",
+						"name": "Dak Prescott",
+						"positionRank": 5,
+						"team": "DAL",
+						"projected": "274.3",
+						"span": null
+					},
+					{
+						"id": "4040715",
+						"name": "Jalen Hurts",
+						"positionRank": 6,
+						"team": "PHI",
+						"projected": "270.4",
+						"span": null
+					},
+					{
+						"id": "4431611",
+						"name": "Caleb Williams",
+						"positionRank": 7,
+						"team": "CHI",
+						"projected": "267.0",
+						"span": null
+					},
+					{
+						"id": "4038941",
+						"name": "Justin Herbert",
+						"positionRank": 8,
+						"team": "LAC",
+						"projected": "261.0",
+						"span": null
+					},
+					{
+						"id": "3046779",
+						"name": "Jared Goff",
+						"positionRank": 9,
+						"team": "DET",
+						"projected": "257.0",
+						"span": null
+					},
+					{
+						"id": "12483",
+						"name": "Matthew Stafford",
+						"positionRank": 10,
+						"team": "LAR",
+						"projected": "256.0",
+						"span": null
+					},
+					{
+						"id": "3052587",
+						"name": "Baker Mayfield",
+						"positionRank": 11,
+						"team": "TB",
+						"projected": "252.9",
+						"span": null
+					},
+					{
+						"id": "3139477",
+						"name": "Patrick Mahomes",
+						"positionRank": 12,
+						"team": "KC",
+						"projected": "248.2",
+						"span": null
+					}
+				],
+				"drop": "9 players, the last tier",
+				"basis": "Projected PPR points, 2026"
+			},
+			"formats": {
+				"head": "Projected",
+				"note": null,
+				"rows": [
+					{
+						"label": "PPR",
+						"rank": "90",
+						"points": "248.2",
+						"vor": "−4.0",
+						"tier": "2"
+					}
+				]
+			},
+			"unwritten": []
 		},
 		{
 			"run": "contract",
@@ -4990,7 +6981,365 @@
 					"caption": "his ADP in PPR drafts"
 				}
 			],
-			"heldTier": null
+			"heldTier": null,
+			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"built": {
+				"next": {
+					"week": 6,
+					"opponent": "Bye"
+				},
+				"tiles": [
+					{
+						"key": "proj",
+						"label": "Wk 6",
+						"value": "--",
+						"tone": "lead"
+					},
+					{
+						"key": "rest",
+						"label": "Rest of season",
+						"value": "242.5",
+						"tone": null
+					},
+					{
+						"key": "opp",
+						"label": "Opp rank",
+						"value": "--",
+						"tone": null
+					},
+					{
+						"key": "avg",
+						"label": "Avg",
+						"value": "30.7",
+						"tone": null
+					},
+					{
+						"key": "last",
+						"label": "Last",
+						"value": "37.7",
+						"tone": null
+					},
+					{
+						"key": "delta",
+						"label": "Proj change",
+						"value": "--",
+						"tone": "quiet"
+					}
+				]
+			},
+			"season": {
+				"season": 2026,
+				"aside": "2026, PPR, through week 5",
+				"heads": [
+					{
+						"short": "Car",
+						"full": "carries"
+					},
+					{
+						"short": "Yds",
+						"full": "rushing yards"
+					},
+					{
+						"short": "TD",
+						"full": "rushing touchdowns"
+					},
+					{
+						"short": "Tgt",
+						"full": "targets"
+					},
+					{
+						"short": "Rec",
+						"full": "catches"
+					},
+					{
+						"short": "Rec yds",
+						"full": "receiving yards"
+					},
+					{
+						"short": "Rec TD",
+						"full": "receiving touchdowns"
+					},
+					{
+						"short": "Fum",
+						"full": "fumbles lost"
+					},
+					{
+						"short": "Snap %",
+						"full": "share of snaps"
+					}
+				],
+				"pointsHead": {
+					"short": "Pts",
+					"full": "PPR points"
+				},
+				"line": {
+					"lead": "Season",
+					"sub": "5 games, 30.7 a game",
+					"total": "153.7",
+					"points": {
+						"value": "30.7",
+						"caption": "PPR points a game"
+					},
+					"cells": [
+						{
+							"value": "105",
+							"caption": "carries"
+						},
+						{
+							"value": "504",
+							"caption": "rushing yards"
+						},
+						{
+							"value": "7",
+							"caption": "rushing touchdowns"
+						},
+						{
+							"value": "34",
+							"caption": "targets"
+						},
+						{
+							"value": "27",
+							"caption": "catches"
+						},
+						{
+							"value": "243",
+							"caption": "receiving yards"
+						},
+						{
+							"value": "2",
+							"caption": "receiving touchdowns"
+						},
+						{
+							"value": "1",
+							"caption": "fumble lost"
+						},
+						{
+							"value": "77%",
+							"caption": "share of snaps"
+						}
+					]
+				},
+				"rows": [
+					{
+						"week": 1,
+						"opponent": "vs NO",
+						"note": "",
+						"tone": "played",
+						"points": "33.6",
+						"cells": [
+							"29",
+							"156",
+							"2",
+							"5",
+							"5",
+							"30",
+							"0",
+							"1",
+							"74%"
+						]
+					},
+					{
+						"week": 2,
+						"opponent": "at BUF",
+						"note": "",
+						"tone": "played",
+						"points": "23.3",
+						"cells": [
+							"16",
+							"52",
+							"0",
+							"8",
+							"6",
+							"61",
+							"1",
+							"0",
+							"83%"
+						]
+					},
+					{
+						"week": 3,
+						"opponent": "vs NYJ",
+						"note": "",
+						"tone": "played",
+						"points": "41.4",
+						"cells": [
+							"20",
+							"99",
+							"2",
+							"8",
+							"7",
+							"65",
+							"1",
+							"0",
+							"69%"
+						]
+					},
+					{
+						"week": 4,
+						"opponent": "at CAR",
+						"note": "",
+						"tone": "played",
+						"points": "17.7",
+						"cells": [
+							"15",
+							"46",
+							"1",
+							"7",
+							"4",
+							"31",
+							"0",
+							"0",
+							"87%"
+						]
+					},
+					{
+						"week": 5,
+						"opponent": "at ARI",
+						"note": "",
+						"tone": "played",
+						"points": "37.7",
+						"cells": [
+							"25",
+							"151",
+							"2",
+							"6",
+							"5",
+							"56",
+							"0",
+							"0",
+							"70%"
+						]
+					},
+					{
+						"week": 6,
+						"opponent": "Bye",
+						"note": "",
+						"tone": "bye",
+						"points": null,
+						"cells": null
+					}
+				],
+				"ahead": [
+					{
+						"week": 7,
+						"opponent": "vs GB",
+						"bye": false,
+						"day": "Sun Oct 25"
+					},
+					{
+						"week": 8,
+						"opponent": "vs MIN",
+						"bye": false,
+						"day": "Sun Nov 1"
+					},
+					{
+						"week": 9,
+						"opponent": "at MIA",
+						"bye": false,
+						"day": "Sun Nov 8"
+					},
+					{
+						"week": 10,
+						"opponent": "vs NE",
+						"bye": false,
+						"day": "Sun Nov 15"
+					},
+					{
+						"week": 11,
+						"opponent": "vs TB",
+						"bye": false,
+						"day": "Sun Nov 22"
+					},
+					{
+						"week": 12,
+						"opponent": "vs CHI",
+						"bye": false,
+						"day": "Thu Nov 26"
+					},
+					{
+						"week": 13,
+						"opponent": "at ATL",
+						"bye": false,
+						"day": "Sun Dec 6"
+					},
+					{
+						"week": 14,
+						"opponent": "vs TEN",
+						"bye": false,
+						"day": "Sun Dec 13"
+					},
+					{
+						"week": 15,
+						"opponent": "at MIN",
+						"bye": false,
+						"day": "Sun Dec 20"
+					},
+					{
+						"week": 16,
+						"opponent": "vs NYG",
+						"bye": false,
+						"day": "Mon Dec 28"
+					},
+					{
+						"week": 17,
+						"opponent": "at CHI",
+						"bye": false,
+						"day": "Sun Jan 3"
+					},
+					{
+						"week": 18,
+						"opponent": "at GB",
+						"bye": false,
+						"day": "Sun Jan 10"
+					}
+				],
+				"none": "He has no 2026 stats through week 5.",
+				"basis": null,
+				"prior": []
+			},
+			"tier": {
+				"tier": 1,
+				"mates": [
+					{
+						"id": "4429795",
+						"name": "Jahmyr Gibbs",
+						"positionRank": 1,
+						"team": "DET",
+						"projected": "242.5",
+						"span": null
+					}
+				],
+				"drop": "1 player, the last tier",
+				"basis": "Projected PPR points for the rest of 2026, weeks 7 to 17"
+			},
+			"formats": {
+				"head": "Rest of season from week 7",
+				"note": "Each format weighs his season against his preseason pace by its own fit, so Half PPR need not sit halfway between PPR and Standard.",
+				"rows": [
+					{
+						"label": "PPR",
+						"rank": "1",
+						"points": "242.5",
+						"vor": "+153.6",
+						"tier": "1"
+					},
+					{
+						"label": "Half PPR",
+						"rank": "1",
+						"points": "223.7",
+						"vor": "+148.0",
+						"tier": "1"
+					},
+					{
+						"label": "Standard",
+						"rank": "1",
+						"points": "193.7",
+						"vor": "+131.9",
+						"tier": "1"
+					}
+				]
+			},
+			"unwritten": []
 		},
 		{
 			"run": "contract",
@@ -5021,7 +7370,350 @@
 					"caption": "his ADP in PPR drafts"
 				}
 			],
-			"heldTier": null
+			"heldTier": null,
+			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"built": {
+				"next": {
+					"week": 6,
+					"opponent": "at LV"
+				},
+				"tiles": [
+					{
+						"key": "proj",
+						"label": "Wk 6",
+						"value": "--",
+						"tone": "lead"
+					},
+					{
+						"key": "rest",
+						"label": "Rest of season",
+						"value": "195.3",
+						"tone": null
+					},
+					{
+						"key": "opp",
+						"label": "Opp rank",
+						"value": "--",
+						"tone": null
+					},
+					{
+						"key": "avg",
+						"label": "Avg",
+						"value": "28.2",
+						"tone": null
+					},
+					{
+						"key": "last",
+						"label": "Last",
+						"value": "28.5",
+						"tone": null
+					},
+					{
+						"key": "delta",
+						"label": "Proj change",
+						"value": "--",
+						"tone": "quiet"
+					}
+				]
+			},
+			"season": {
+				"season": 2026,
+				"aside": "2026, PPR, through week 5",
+				"heads": [
+					{
+						"short": "Comp/att",
+						"full": "completions of attempts"
+					},
+					{
+						"short": "Yds",
+						"full": "passing yards"
+					},
+					{
+						"short": "TD",
+						"full": "passing touchdowns"
+					},
+					{
+						"short": "INT",
+						"full": "interceptions"
+					},
+					{
+						"short": "Car",
+						"full": "carries"
+					},
+					{
+						"short": "Rush yds",
+						"full": "rushing yards"
+					},
+					{
+						"short": "Rush TD",
+						"full": "rushing touchdowns"
+					},
+					{
+						"short": "Fum",
+						"full": "fumbles lost"
+					}
+				],
+				"pointsHead": {
+					"short": "Pts",
+					"full": "PPR points"
+				},
+				"line": {
+					"lead": "Season",
+					"sub": "5 games, 28.2 a game",
+					"total": "141.0",
+					"points": {
+						"value": "28.2",
+						"caption": "PPR points a game"
+					},
+					"cells": [
+						{
+							"value": "91/138",
+							"caption": "completions of attempts"
+						},
+						{
+							"value": "1,249",
+							"caption": "passing yards"
+						},
+						{
+							"value": "7",
+							"caption": "passing touchdowns"
+						},
+						{
+							"value": "4",
+							"caption": "interceptions"
+						},
+						{
+							"value": "43",
+							"caption": "carries"
+						},
+						{
+							"value": "239",
+							"caption": "rushing yards"
+						},
+						{
+							"value": "8",
+							"caption": "rushing touchdowns"
+						},
+						{
+							"value": "1",
+							"caption": "fumble lost"
+						}
+					]
+				},
+				"rows": [
+					{
+						"week": 1,
+						"opponent": "at HOU",
+						"note": "",
+						"tone": "played",
+						"points": "35.7",
+						"cells": [
+							"20/29",
+							"334",
+							"2",
+							"0",
+							"6",
+							"23",
+							"2",
+							"0"
+						]
+					},
+					{
+						"week": 2,
+						"opponent": "vs DET",
+						"note": "",
+						"tone": "played",
+						"points": "40.8",
+						"cells": [
+							"20/31",
+							"248",
+							"3",
+							"0",
+							"14",
+							"69",
+							"2",
+							"0"
+						]
+					},
+					{
+						"week": 3,
+						"opponent": "vs LAC",
+						"note": "",
+						"tone": "played",
+						"points": "17.5",
+						"cells": [
+							"16/26",
+							"204",
+							"0",
+							"2",
+							"8",
+							"22",
+							"2",
+							"1"
+						]
+					},
+					{
+						"week": 4,
+						"opponent": "vs NE",
+						"note": "",
+						"tone": "played",
+						"points": "18.5",
+						"cells": [
+							"23/33",
+							"253",
+							"1",
+							"1",
+							"5",
+							"4",
+							"1",
+							"0"
+						]
+					},
+					{
+						"week": 5,
+						"opponent": "at LAR",
+						"note": "",
+						"tone": "played",
+						"points": "28.5",
+						"cells": [
+							"12/19",
+							"210",
+							"1",
+							"1",
+							"10",
+							"121",
+							"1",
+							"0"
+						]
+					}
+				],
+				"ahead": [
+					{
+						"week": 6,
+						"opponent": "at LV",
+						"bye": false,
+						"day": "Kicked off"
+					},
+					{
+						"week": 7,
+						"opponent": "Bye",
+						"bye": true,
+						"day": ""
+					},
+					{
+						"week": 8,
+						"opponent": "vs BAL",
+						"bye": false,
+						"day": "Sun Nov 1"
+					},
+					{
+						"week": 9,
+						"opponent": "at MIN",
+						"bye": false,
+						"day": "Mon Nov 9"
+					},
+					{
+						"week": 10,
+						"opponent": "at NYJ",
+						"bye": false,
+						"day": "Sun Nov 15"
+					},
+					{
+						"week": 11,
+						"opponent": "vs MIA",
+						"bye": false,
+						"day": "Sun Nov 22"
+					},
+					{
+						"week": 12,
+						"opponent": "vs KC",
+						"bye": false,
+						"day": "Thu Nov 26"
+					},
+					{
+						"week": 13,
+						"opponent": "at NE",
+						"bye": false,
+						"day": "Sun Dec 6"
+					},
+					{
+						"week": 14,
+						"opponent": "at GB",
+						"bye": false,
+						"day": "Sun Dec 13"
+					},
+					{
+						"week": 15,
+						"opponent": "vs CHI",
+						"bye": false,
+						"day": "Sat Dec 19"
+					},
+					{
+						"week": 16,
+						"opponent": "at DEN",
+						"bye": false,
+						"day": "Fri Dec 25"
+					},
+					{
+						"week": 17,
+						"opponent": "at MIA",
+						"bye": false,
+						"day": "Sun Jan 3"
+					},
+					{
+						"week": 18,
+						"opponent": "vs NYJ",
+						"bye": false,
+						"day": "Sun Jan 10"
+					}
+				],
+				"none": "He has no 2026 stats through week 5.",
+				"basis": null,
+				"prior": []
+			},
+			"tier": {
+				"tier": 1,
+				"mates": [
+					{
+						"id": "3918298",
+						"name": "Josh Allen",
+						"positionRank": 1,
+						"team": "BUF",
+						"projected": "195.3",
+						"span": null
+					}
+				],
+				"drop": "1 player, the last tier",
+				"basis": "Projected PPR points for the rest of 2026, weeks 7 to 17"
+			},
+			"formats": {
+				"head": "Rest of season from week 7",
+				"note": "Each format weighs his season against his preseason pace by its own fit, so Half PPR need not sit halfway between PPR and Standard.",
+				"rows": [
+					{
+						"label": "PPR",
+						"rank": "24",
+						"points": "195.3",
+						"vor": "+52.3",
+						"tier": "1"
+					},
+					{
+						"label": "Half PPR",
+						"rank": "21",
+						"points": "194.8",
+						"vor": "+51.8",
+						"tier": "1"
+					},
+					{
+						"label": "Standard",
+						"rank": "17",
+						"points": "194.2",
+						"vor": "+51.3",
+						"tier": "1"
+					}
+				]
+			},
+			"unwritten": []
 		},
 		{
 			"run": "contract",
@@ -5039,7 +7731,363 @@
 			"clubName": "Green Bay Packers",
 			"readStamp": null,
 			"pulls": [],
-			"heldTier": null
+			"heldTier": null,
+			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"built": {
+				"next": {
+					"week": 6,
+					"opponent": "vs DAL"
+				},
+				"tiles": [
+					{
+						"key": "proj",
+						"label": "Wk 6",
+						"value": "--",
+						"tone": "lead"
+					},
+					{
+						"key": "rest",
+						"label": "Rest of season",
+						"value": "67.4",
+						"tone": null
+					},
+					{
+						"key": "opp",
+						"label": "Opp rank",
+						"value": "--",
+						"tone": null
+					},
+					{
+						"key": "avg",
+						"label": "Avg",
+						"value": "8.5",
+						"tone": null
+					},
+					{
+						"key": "last",
+						"label": "Last",
+						"value": "16.7",
+						"tone": null
+					},
+					{
+						"key": "delta",
+						"label": "Proj change",
+						"value": "--",
+						"tone": "quiet"
+					}
+				]
+			},
+			"season": {
+				"season": 2026,
+				"aside": "2026, PPR, through week 5",
+				"heads": [
+					{
+						"short": "Car",
+						"full": "carries"
+					},
+					{
+						"short": "Yds",
+						"full": "rushing yards"
+					},
+					{
+						"short": "TD",
+						"full": "rushing touchdowns"
+					},
+					{
+						"short": "Tgt",
+						"full": "targets"
+					},
+					{
+						"short": "Rec",
+						"full": "catches"
+					},
+					{
+						"short": "Rec yds",
+						"full": "receiving yards"
+					},
+					{
+						"short": "Rec TD",
+						"full": "receiving touchdowns"
+					},
+					{
+						"short": "Fum",
+						"full": "fumbles lost"
+					},
+					{
+						"short": "Snap %",
+						"full": "share of snaps"
+					}
+				],
+				"pointsHead": {
+					"short": "Pts",
+					"full": "PPR points"
+				},
+				"line": {
+					"lead": "Season",
+					"sub": "5 games, 8.5 a game",
+					"total": "42.7",
+					"points": {
+						"value": "8.5",
+						"caption": "PPR points a game"
+					},
+					"cells": [
+						{
+							"value": "40",
+							"caption": "carries"
+						},
+						{
+							"value": "112",
+							"caption": "rushing yards"
+						},
+						{
+							"value": "2",
+							"caption": "rushing touchdowns"
+						},
+						{
+							"value": "13",
+							"caption": "targets"
+						},
+						{
+							"value": "10",
+							"caption": "catches"
+						},
+						{
+							"value": "55",
+							"caption": "receiving yards"
+						},
+						{
+							"value": "1",
+							"caption": "receiving touchdown"
+						},
+						{
+							"value": "1",
+							"caption": "fumble lost"
+						},
+						{
+							"value": "39%",
+							"caption": "share of snaps"
+						}
+					]
+				},
+				"rows": [
+					{
+						"week": 1,
+						"opponent": "at MIN",
+						"note": "",
+						"tone": "played",
+						"points": "3.7",
+						"cells": [
+							"13",
+							"37",
+							"0",
+							"1",
+							"0",
+							"0",
+							"0",
+							"0",
+							"44%"
+						]
+					},
+					{
+						"week": 2,
+						"opponent": "at NYJ",
+						"note": "",
+						"tone": "played",
+						"points": "8.6",
+						"cells": [
+							"6",
+							"20",
+							"0",
+							"2",
+							"2",
+							"6",
+							"1",
+							"1",
+							"27%"
+						]
+					},
+					{
+						"week": 3,
+						"opponent": "vs ATL",
+						"note": "",
+						"tone": "played",
+						"points": "3.8",
+						"cells": [
+							"4",
+							"11",
+							"0",
+							"3",
+							"2",
+							"7",
+							"0",
+							"0",
+							"23%"
+						]
+					},
+					{
+						"week": 4,
+						"opponent": "at TB",
+						"note": "",
+						"tone": "played",
+						"points": "9.9",
+						"cells": [
+							"7",
+							"13",
+							"0",
+							"5",
+							"5",
+							"36",
+							"0",
+							"0",
+							"55%"
+						]
+					},
+					{
+						"week": 5,
+						"opponent": "vs CHI",
+						"note": "",
+						"tone": "played",
+						"points": "16.7",
+						"cells": [
+							"10",
+							"31",
+							"2",
+							"2",
+							"1",
+							"6",
+							"0",
+							"0",
+							"44%"
+						]
+					}
+				],
+				"ahead": [
+					{
+						"week": 6,
+						"opponent": "vs DAL",
+						"bye": false,
+						"day": "Kicked off"
+					},
+					{
+						"week": 7,
+						"opponent": "at DET",
+						"bye": false,
+						"day": "Sun Oct 25"
+					},
+					{
+						"week": 8,
+						"opponent": "vs CAR",
+						"bye": false,
+						"day": "Thu Oct 29"
+					},
+					{
+						"week": 9,
+						"opponent": "at NE",
+						"bye": false,
+						"day": "Sun Nov 8"
+					},
+					{
+						"week": 10,
+						"opponent": "vs MIN",
+						"bye": false,
+						"day": "Sun Nov 15"
+					},
+					{
+						"week": 11,
+						"opponent": "Bye",
+						"bye": true,
+						"day": ""
+					},
+					{
+						"week": 12,
+						"opponent": "at LAR",
+						"bye": false,
+						"day": "Wed Nov 25"
+					},
+					{
+						"week": 13,
+						"opponent": "at NO",
+						"bye": false,
+						"day": "Sun Dec 6"
+					},
+					{
+						"week": 14,
+						"opponent": "vs BUF",
+						"bye": false,
+						"day": "Sun Dec 13"
+					},
+					{
+						"week": 15,
+						"opponent": "vs MIA",
+						"bye": false,
+						"day": "Sun Dec 20"
+					},
+					{
+						"week": 16,
+						"opponent": "at CHI",
+						"bye": false,
+						"day": "Fri Dec 25"
+					},
+					{
+						"week": 17,
+						"opponent": "vs HOU",
+						"bye": false,
+						"day": "Mon Jan 4"
+					},
+					{
+						"week": 18,
+						"opponent": "vs DET",
+						"bye": false,
+						"day": "Sun Jan 10"
+					}
+				],
+				"none": "He has no 2026 stats through week 5.",
+				"basis": null,
+				"prior": []
+			},
+			"tier": {
+				"tier": 7,
+				"mates": [
+					{
+						"id": "4429023",
+						"name": "MarShawn Lloyd",
+						"positionRank": 42,
+						"team": "GB",
+						"projected": "67.4",
+						"span": null
+					}
+				],
+				"drop": "1 player, the last tier",
+				"basis": "Projected PPR points for the rest of 2026, weeks 7 to 17"
+			},
+			"formats": {
+				"head": "Rest of season from week 7",
+				"note": "Each format weighs his season against his preseason pace by its own fit, so Half PPR need not sit halfway between PPR and Standard.",
+				"rows": [
+					{
+						"label": "PPR",
+						"rank": "139",
+						"points": "67.4",
+						"vor": "−21.5",
+						"tier": "7"
+					},
+					{
+						"label": "Half PPR",
+						"rank": "131",
+						"points": "60.1",
+						"vor": "−15.7",
+						"tier": "7"
+					},
+					{
+						"label": "Standard",
+						"rank": "117",
+						"points": "52.5",
+						"vor": "−9.3",
+						"tier": "9"
+					}
+				]
+			},
+			"unwritten": []
 		},
 		{
 			"run": "contract",
@@ -5066,7 +8114,394 @@
 					"caption": "his ADP in PPR drafts"
 				}
 			],
-			"heldTier": null
+			"heldTier": null,
+			"outcomesCaption": "2026 PPR points, from his low case to his high case",
+			"built": {
+				"next": {
+					"week": 6,
+					"opponent": "vs DAL"
+				},
+				"tiles": [
+					{
+						"key": "proj",
+						"label": "Wk 6",
+						"value": "--",
+						"tone": "lead"
+					},
+					{
+						"key": "rest",
+						"label": "Rest of season",
+						"value": "30.8",
+						"tone": null
+					},
+					{
+						"key": "opp",
+						"label": "Opp rank",
+						"value": "--",
+						"tone": null
+					},
+					{
+						"key": "avg",
+						"label": "Avg",
+						"value": "--",
+						"tone": null
+					},
+					{
+						"key": "last",
+						"label": "Last",
+						"value": "--",
+						"tone": null
+					},
+					{
+						"key": "delta",
+						"label": "Proj change",
+						"value": "--",
+						"tone": "quiet"
+					}
+				]
+			},
+			"season": {
+				"season": 2026,
+				"aside": "2026, PPR, through week 5",
+				"heads": [
+					{
+						"short": "Car",
+						"full": "carries"
+					},
+					{
+						"short": "Yds",
+						"full": "rushing yards"
+					},
+					{
+						"short": "TD",
+						"full": "rushing touchdowns"
+					},
+					{
+						"short": "Tgt",
+						"full": "targets"
+					},
+					{
+						"short": "Rec",
+						"full": "catches"
+					},
+					{
+						"short": "Rec yds",
+						"full": "receiving yards"
+					},
+					{
+						"short": "Rec TD",
+						"full": "receiving touchdowns"
+					},
+					{
+						"short": "Fum",
+						"full": "fumbles lost"
+					},
+					{
+						"short": "Snap %",
+						"full": "share of snaps"
+					}
+				],
+				"pointsHead": {
+					"short": "Pts",
+					"full": "PPR points"
+				},
+				"line": null,
+				"rows": [
+					{
+						"week": 1,
+						"opponent": "at MIN",
+						"note": "Did not play",
+						"tone": "quiet",
+						"points": null,
+						"cells": null
+					},
+					{
+						"week": 2,
+						"opponent": "at NYJ",
+						"note": "Did not play",
+						"tone": "quiet",
+						"points": null,
+						"cells": null
+					},
+					{
+						"week": 3,
+						"opponent": "vs ATL",
+						"note": "Did not play",
+						"tone": "quiet",
+						"points": null,
+						"cells": null
+					},
+					{
+						"week": 4,
+						"opponent": "at TB",
+						"note": "Did not play",
+						"tone": "quiet",
+						"points": null,
+						"cells": null
+					},
+					{
+						"week": 5,
+						"opponent": "vs CHI",
+						"note": "Did not play",
+						"tone": "quiet",
+						"points": null,
+						"cells": null
+					}
+				],
+				"ahead": [
+					{
+						"week": 6,
+						"opponent": "vs DAL",
+						"bye": false,
+						"day": "Kicked off"
+					},
+					{
+						"week": 7,
+						"opponent": "at DET",
+						"bye": false,
+						"day": "Sun Oct 25"
+					},
+					{
+						"week": 8,
+						"opponent": "vs CAR",
+						"bye": false,
+						"day": "Thu Oct 29"
+					},
+					{
+						"week": 9,
+						"opponent": "at NE",
+						"bye": false,
+						"day": "Sun Nov 8"
+					},
+					{
+						"week": 10,
+						"opponent": "vs MIN",
+						"bye": false,
+						"day": "Sun Nov 15"
+					},
+					{
+						"week": 11,
+						"opponent": "Bye",
+						"bye": true,
+						"day": ""
+					},
+					{
+						"week": 12,
+						"opponent": "at LAR",
+						"bye": false,
+						"day": "Wed Nov 25"
+					},
+					{
+						"week": 13,
+						"opponent": "at NO",
+						"bye": false,
+						"day": "Sun Dec 6"
+					},
+					{
+						"week": 14,
+						"opponent": "vs BUF",
+						"bye": false,
+						"day": "Sun Dec 13"
+					},
+					{
+						"week": 15,
+						"opponent": "vs MIA",
+						"bye": false,
+						"day": "Sun Dec 20"
+					},
+					{
+						"week": 16,
+						"opponent": "at CHI",
+						"bye": false,
+						"day": "Fri Dec 25"
+					},
+					{
+						"week": 17,
+						"opponent": "vs HOU",
+						"bye": false,
+						"day": "Mon Jan 4"
+					},
+					{
+						"week": 18,
+						"opponent": "vs DET",
+						"bye": false,
+						"day": "Sun Jan 10"
+					}
+				],
+				"none": "He has no 2026 stats through week 5.",
+				"basis": null,
+				"prior": []
+			},
+			"tier": {
+				"tier": 13,
+				"mates": [
+					{
+						"id": "4047365",
+						"name": "Josh Jacobs",
+						"positionRank": 67,
+						"team": "GB",
+						"projected": "30.8",
+						"span": null
+					}
+				],
+				"drop": "1 player, the last tier",
+				"basis": "Projected PPR points for the rest of 2026, weeks 7 to 17"
+			},
+			"formats": {
+				"head": "Rest of season from week 7",
+				"note": "Each format weighs his season against his preseason pace by its own fit, so Half PPR need not sit halfway between PPR and Standard.",
+				"rows": [
+					{
+						"label": "PPR",
+						"rank": "262",
+						"points": "30.8",
+						"vor": "−58.1",
+						"tier": "13"
+					},
+					{
+						"label": "Half PPR",
+						"rank": "267",
+						"points": "27.5",
+						"vor": "−48.2",
+						"tier": "11"
+					},
+					{
+						"label": "Standard",
+						"rank": "286",
+						"points": "24.2",
+						"vor": "−37.5",
+						"tier": "12"
+					}
+				]
+			},
+			"unwritten": []
+		}
+	],
+	"unwritten": [
+		{
+			"player": "4431299",
+			"format": "ppr-12",
+			"lines": [
+				{
+					"lead": "Our rank",
+					"figure": "WR25",
+					"text": "WR 25 and pick 50 overall among the 448 on our PPR board."
+				},
+				{
+					"lead": "His tier",
+					"figure": "Tier 5",
+					"text": "Tier 5 among WRs on our PPR board."
+				},
+				{
+					"lead": "His range",
+					"figure": "119.9 to 278.4",
+					"text": "Low case 119.9, middle 199.1 and high case 278.4 PPR pts for 2026."
+				},
+				{
+					"lead": "Games we expect",
+					"figure": "13.7",
+					"text": "Games we expect him to play in 2026, the base of his projected PPR points."
+				}
+			]
+		},
+		{
+			"player": "4239996",
+			"format": "ppr-12",
+			"lines": [
+				{
+					"lead": "Our rank",
+					"figure": "RB14",
+					"text": "RB 14 and pick 40 overall among the 448 on our PPR board."
+				},
+				{
+					"lead": "His tier",
+					"figure": "Tier 3",
+					"text": "Tier 3 among RBs on our PPR board."
+				},
+				{
+					"lead": "His range",
+					"figure": "123.0 to 242.7",
+					"text": "Low case 123.0, middle 182.9 and high case 242.7 PPR pts for 2026."
+				},
+				{
+					"lead": "Games we expect",
+					"figure": "14.8",
+					"text": "Games we expect him to play in 2026, the base of his projected PPR points."
+				}
+			]
+		},
+		{
+			"player": "4689114",
+			"format": "ppr-12",
+			"lines": [
+				{
+					"lead": "His place",
+					"figure": "QB IR",
+					"text": "On a season-long list, so he sits below every available QB on our PPR board, in no tier."
+				},
+				{
+					"lead": "His range",
+					"figure": "159.2 to 345.2",
+					"text": "Low case 159.2, middle 252.2 and high case 345.2 PPR pts for 2026."
+				},
+				{
+					"lead": "Games we expect",
+					"figure": "14.1",
+					"text": "Games we expect him to play in 2026, the base of his projected PPR points."
+				}
+			]
+		},
+		{
+			"player": "4362628",
+			"format": "ppr-12",
+			"lines": [
+				{
+					"lead": "Our rank",
+					"figure": "WR2",
+					"text": "WR 2 and pick 2 overall among the 448 on our PPR board."
+				},
+				{
+					"lead": "His tier",
+					"figure": "Tier 1",
+					"text": "Tier 1 among WRs on our PPR board."
+				},
+				{
+					"lead": "His range",
+					"figure": "246.0 to 420.4",
+					"text": "Low case 246.0, middle 333.2 and high case 420.4 PPR pts for 2026."
+				},
+				{
+					"lead": "Games we expect",
+					"figure": "15.4",
+					"text": "Games we expect him to play in 2026, the base of his projected PPR points."
+				}
+			]
+		},
+		{
+			"player": "3139477",
+			"format": "ppr-12",
+			"lines": [
+				{
+					"lead": "Our rank",
+					"figure": "QB12",
+					"text": "QB 12 and pick 90 overall among the 448 on our PPR board."
+				},
+				{
+					"lead": "His tier",
+					"figure": "Tier 2",
+					"text": "Tier 2 among QBs on our PPR board."
+				},
+				{
+					"lead": "His range",
+					"figure": "157.0 to 339.5",
+					"text": "Low case 157.0, middle 248.2 and high case 339.5 PPR pts for 2026."
+				},
+				{
+					"lead": "Games we expect",
+					"figure": "14.1",
+					"text": "Games we expect him to play in 2026, the base of his projected PPR points."
+				}
+			]
 		}
 	],
 	"verbs": [

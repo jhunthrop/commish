@@ -438,6 +438,10 @@ object Words {
     object PlayerPage {
         const val overReplacement = "Over replacement"
         const val outcomes = "Floor, median, ceiling"
+        const val thisSeason = "This season"
+        const val stillToPlay = "Still to play"
+        const val format = "Format"
+        const val tier = "Tier"
     }
 
     object ReadFigures {

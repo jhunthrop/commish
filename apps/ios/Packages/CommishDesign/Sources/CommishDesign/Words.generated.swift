@@ -436,6 +436,10 @@ public enum Words {
     public enum PlayerPage {
         public static let overReplacement = "Over replacement"
         public static let outcomes = "Floor, median, ceiling"
+        public static let thisSeason = "This season"
+        public static let stillToPlay = "Still to play"
+        public static let format = "Format"
+        public static let tier = "Tier"
     }
 
     public enum ReadFigures {

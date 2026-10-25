@@ -6,6 +6,12 @@ export const PLAYER_PAGE = {
 	overReplacement: 'Over replacement',
 	/** The outcome bar's fact. */
 	outcomes: 'Floor, median, ceiling',
+	/** His season block's head, and the game log's weeks still to play. */
+	thisSeason: 'This season',
+	stillToPlay: 'Still to play',
+	/** The every-format table's heads not said elsewhere. */
+	format: 'Format',
+	tier: 'Tier',
 	/** Under the outcome bar: "2026 PPR points, from his low case to his high case". */
 	outcomesCaption: (season: number, scoring: string): string =>
 		`${String(season)} ${scoring} points, from his low case to his high case`

@@ -1,6 +1,10 @@
 {
 	"overReplacement": "Over replacement",
 	"outcomes": "Floor, median, ceiling",
+	"thisSeason": "This season",
+	"stillToPlay": "Still to play",
+	"format": "Format",
+	"tier": "Tier",
 	"functions": [
 		"outcomesCaption"
 	]
