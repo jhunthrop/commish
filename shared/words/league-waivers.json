@@ -1,0 +1,21 @@
+{
+	"close": "Close",
+	"beats": "Beats",
+	"rest": "A game",
+	"starter": "Starter",
+	"bench": "Bench",
+	"onBye": "bye",
+	"find": "Find a player",
+	"noneFound": "No player free to add by that name.",
+	"gain": "Gain a week",
+	"thisWeek": "Proj this week",
+	"copied": "Copied",
+	"copyFailed": "This browser would not copy his name.",
+	"noPickup": "No pickup beats your roster",
+	"openSpot": "Open spot",
+	"dropRule": "Its drop costs least.",
+	"clears": "Clears",
+	"noGain": "No gain over your roster",
+	"irBench": "IR, on your bench",
+	"functions": []
+}

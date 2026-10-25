@@ -24,3 +24,4 @@ filter:
     - runAdp
     - runDesignations
     - runClubs
+    - leagueWaivers

@@ -12,6 +12,8 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { REPOSITORY, generatedBy, writeOutputs, type Outputs } from './generated.ts';
+import { claimMove } from '../../web/src/lib/league/inseason/move.ts';
+import type { HostMovePlan, WaiverAdvice } from '../../web/src/lib/league/inseason/api.ts';
 
 const SCRIPT = 'shared/scripts/export-fixtures.ts';
 const FIXTURES = 'shared/fixtures';
@@ -33,18 +35,36 @@ export interface FixtureClocks {
 	tuesday: string;
 }
 
-/** The fixture's league id and its clocks (web/scripts/inseason-fixture/ids.ts and clock.ts). */
+/** The ESPN stand-ins whose claim the Waivers screen makes from here, by what it comes to. */
+export interface EspnLeagues {
+	done: string;
+	refused: string;
+	pending: string;
+}
+
+/** The fixture's league id, its ESPN stand-ins and its clocks (web/scripts/inseason-fixture/ids.ts
+ * and clock.ts). */
 interface FixtureSource {
 	leagueId: string;
+	espn?: EspnLeagues;
 	clocks: FixtureClocks;
 }
 
-/** An answer's file: the route it answers, the clock it was read at, and what the file holds. */
+/** A claim's answer (Lane 186): planned for the first pickup of the Waivers answer in `waivers` with
+ * no bid, as the web's first plan is; or made with the plan's token and its bid. */
+export interface ClaimRead {
+	waivers: string;
+	plan: string | null;
+}
+
+/** An answer's file: the route it answers, the clock it was read at, and what the file holds; a
+ * claim's, the answers its body is built from. */
 export interface FixtureFile {
 	file: string;
 	route: string;
 	clock: string | null;
 	about: string;
+	claim?: ClaimRead;
 }
 
 /** An instant as a file name part, with no colons: `2026-10-17T17:00:00.000Z` as `2026-10-17T17-00-00Z`. */
@@ -61,7 +81,9 @@ export function clockPart(iso: string): string {
  * at the week's clock, with the week's games, and the scoreboard and the member's lineup at every
  * clock (the lineup's lines carry each player's game, which the game-state parity reads, Lane 176);
  * the Matchup's reads at every clock too, its box score and the league read whose matchup keeps the
- * score (Lane 183). */
+ * score (Lane 183); the Waivers answer at every clock, and on each ESPN stand-in at the week's clock
+ * its Waivers and the claim of its first pickup planned and made, done, refused and pending (Lane
+ * 186). */
 export function fixturePlan(source: FixtureSource): { clock: string; files: FixtureFile[] }[] {
 	const id = source.leagueId;
 	const { week, ...rest } = source.clocks;
@@ -89,12 +111,40 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 		clock,
 		about: `the league read with its matchup's score, ${name}`
 	});
+	const waivers = (league: string, clock: string, name: string): FixtureFile => ({
+		file: `waivers-${league}-${clockPart(clock)}.json`,
+		route: `GET /leagues/attached/${league}/waivers`,
+		clock,
+		about: `the players free to add, ${name}`
+	});
 	const atClock = (clock: string, name: string): FixtureFile[] => [
 		scoreboard(clock, name),
 		lineup(clock, name),
 		matchup(clock, name),
-		sync(clock, name)
+		sync(clock, name),
+		waivers(id, clock, name)
 	];
+	const claims = Object.entries(source.espn ?? {}).flatMap(([outcome, league]): FixtureFile[] => {
+		const pool = waivers(league, week, `the ESPN stand-in whose claim is ${outcome}`);
+		const plan = `claim-plan-${league}.json`;
+		return [
+			pool,
+			{
+				file: plan,
+				route: `POST /leagues/attached/${league}/moves/plan`,
+				clock: week,
+				about: `the claim of the first pickup planned, no bid typed, on the ESPN stand-in whose claim is ${outcome}`,
+				claim: { waivers: pool.file, plan: null }
+			},
+			{
+				file: `claim-move-${league}.json`,
+				route: `POST /leagues/attached/${league}/moves`,
+				clock: week,
+				about: `the claim made with the plan's token and bid: ${outcome}`,
+				claim: { waivers: pool.file, plan }
+			}
+		];
+	});
 	return [
 		{
 			clock: week,
@@ -123,7 +173,14 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 					clock: week,
 					about: 'the PPR draft board as a dev API answered it (record-boards.ts), the Board screen'
 				},
-				...atClock(week, 'Saturday noon Central, every Sunday game to come')
+				...atClock(week, 'Saturday noon Central, every Sunday game to come'),
+				{
+					file: `waivers-${id}-DEF-${clockPart(week)}.json`,
+					route: `GET /leagues/attached/${id}/waivers?position=DEF`,
+					clock: week,
+					about: 'the players free to add narrowed to defenses, as the D/ST chip reads them'
+				},
+				...claims
 			]
 		},
 		...Object.entries(rest).map(([name, clock]) => ({
@@ -167,6 +224,25 @@ async function waitFor(origin: string, child: ChildProcess): Promise<void> {
 	throw new Error(`${SERVE} did not answer within ${String(START_TIMEOUT_MS)} ms.`);
 }
 
+interface Envelope<T> {
+	data: T;
+}
+
+/** A claim's body, as the web's Waivers sends it (move.ts claimMove): the first pickup's add and
+ * drop with no bid when planned; made, the move planned with the plan's bid and its token. */
+export function claimBody(file: FixtureFile, answers: ReadonlyMap<string, unknown>): unknown {
+	const { claim } = file;
+	if (claim === undefined) return undefined;
+	const advice = (answers.get(claim.waivers) as Envelope<WaiverAdvice> | undefined)?.data;
+	const row = advice?.pickups[0];
+	if (advice === undefined || row === undefined)
+		throw new Error(`${claim.waivers} has no pickup to claim.`);
+	if (claim.plan === null) return claimMove(advice.week, row, null);
+	const plan = (answers.get(claim.plan) as Envelope<HostMovePlan> | undefined)?.data;
+	if (plan?.confirm == null) throw new Error(`${claim.plan} has no token to make the claim with.`);
+	return { move: claimMove(advice.week, row, plan.bid?.amount ?? null), confirm: plan.confirm };
+}
+
 /** Starts the fixture API on `clock`, stopped there, reads each file's route and stops it. */
 async function readAt(clock: string, files: readonly FixtureFile[]): Promise<[string, string][]> {
 	const port = await freePort();
@@ -181,18 +257,31 @@ async function readAt(clock: string, files: readonly FixtureFile[]): Promise<[st
 		},
 		stdio: ['ignore', 'ignore', 'inherit']
 	});
+	const read = async (file: FixtureFile, body: unknown): Promise<unknown> => {
+		const [method = 'GET', path = ''] = file.route.split(' ');
+		const response = await fetch(`${origin}${path}`, {
+			method,
+			headers: { cookie: FFPC_COOKIE, 'content-type': 'application/json' },
+			...(body === undefined ? {} : { body: JSON.stringify(body) })
+		});
+		if (!response.ok)
+			throw new Error(`${file.route} at ${clock} answered ${String(response.status)}.`);
+		return response.json();
+	};
 	try {
 		await waitFor(origin, child);
-		return await Promise.all(
-			files.map(async (file): Promise<[string, string]> => {
-				const path = file.route.replace(/^GET /, '');
-				const response = await fetch(`${origin}${path}`, { headers: { cookie: FFPC_COOKIE } });
-				if (!response.ok)
-					throw new Error(`${file.route} at ${clock} answered ${String(response.status)}.`);
-				const body: unknown = await response.json();
-				return [`${FIXTURES}/inseason/${file.file}`, `${JSON.stringify(body, null, '\t')}\n`];
-			})
+		const answers = new Map<string, unknown>();
+		const gets = files.filter((file) => file.claim === undefined);
+		await Promise.all(
+			gets.map(async (file) => answers.set(file.file, await read(file, undefined)))
 		);
+		// A claim after the answers its body is built from, one at a time, in the plan's order.
+		for (const file of files.filter((f) => f.claim !== undefined))
+			answers.set(file.file, await read(file, claimBody(file, answers)));
+		return files.map((file): [string, string] => [
+			`${FIXTURES}/inseason/${file.file}`,
+			`${JSON.stringify(answers.get(file.file), null, '\t')}\n`
+		]);
 	} finally {
 		child.kill();
 	}
@@ -239,7 +328,7 @@ ${clocks.join('\n')}
 
 async function fixtureSource(): Promise<FixtureSource> {
 	const ids = (await import(join(REPOSITORY, 'web/scripts/inseason-fixture/ids.ts'))) as {
-		FIXTURE_IDS: { league: string };
+		FIXTURE_IDS: { league: string; espnDone: string; espnRefused: string; espnPending: string };
 	};
 	const c = (await import(join(REPOSITORY, 'web/scripts/inseason-fixture/clock.ts'))) as Record<
 		string,
@@ -252,6 +341,11 @@ async function fixtureSource(): Promise<FixtureSource> {
 	};
 	return {
 		leagueId: ids.FIXTURE_IDS.league,
+		espn: {
+			done: ids.FIXTURE_IDS.espnDone,
+			refused: ids.FIXTURE_IDS.espnRefused,
+			pending: ids.FIXTURE_IDS.espnPending
+		},
 		clocks: {
 			week: clock('FIXTURE_WEEK_CLOCK'),
 			thursdayNight: clock('FIXTURE_THURSDAY_NIGHT_CLOCK'),

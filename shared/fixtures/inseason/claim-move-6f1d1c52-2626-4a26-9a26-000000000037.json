@@ -1,0 +1,12 @@
+{
+	"ok": true,
+	"data": {
+		"outcome": "pending",
+		"sentence": "Claim submitted. ESPN processes claims on Wednesday, and your lineup screen will show him once it goes through.",
+		"host_words": null,
+		"host_url": "https://fantasy.espn.com/football/league?leagueId=1081607624&seasonId=2026",
+		"move_id": "6f1d1c52-2626-4a26-9a26-0000000000f2",
+		"processes_at": "2026-10-21T07:00:00.000Z"
+	},
+	"error": null
+}
