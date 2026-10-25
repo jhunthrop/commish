@@ -322,6 +322,9 @@ export const SHOT_CASES: readonly ShotCase[] = [
 		name: 'players-kdst-shots-empty',
 		env: { STATE: 'empty' }
 	}),
+	// The in-season Rankings row as a box score on a phone (Lane 209), on the graded two records' run
+	// so /record draws its weekly record, at the Sunday clock.
+	once('rankings-row-shots', 'two-graded', FIXTURE_SUNDAY_CLOCK),
 	once('week-order-shots', 'standin', FIXTURE_WEEK_CLOCK, {
 		ownFixture: true,
 		args: (o) => [o.web, String(o.apiPort), o.out]
