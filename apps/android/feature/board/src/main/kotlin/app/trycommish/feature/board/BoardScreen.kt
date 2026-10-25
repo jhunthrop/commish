@@ -39,10 +39,12 @@ import app.trycommish.core.board.BoardSection
 import app.trycommish.core.board.BoardState
 import app.trycommish.core.board.PageVerb
 import app.trycommish.core.shell.SheetPlayer
+import app.trycommish.core.shell.SiteLinks
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
 import app.trycommish.design.Tokens
 import app.trycommish.design.Verb
+import app.trycommish.design.Words
 import app.trycommish.feature.boxscore.ScreenFailed
 
 /** What the screen's controls do: a row opens the player sheet, a chip chooses, a pull reads again,
@@ -106,13 +108,15 @@ private fun LazyListScope.board(
     actions: BoardActions,
     sections: List<BoardSection>,
 ) {
-    item("head") { BoardHead(model, stamp, Modifier.padding(top = Tokens.Space.s4.dp)) }
+    item("head") { BoardHead(model, stamp, actions.openPage, Modifier.padding(top = Tokens.Space.s4.dp)) }
     item("chips") { BoardChips(model, actions) }
     item("heads") { BoardHeadRow(model.columns) }
     sections.forEach { section ->
         section.band?.let { band -> item("band-${section.id}") { TierStrip(band) } }
         section.head?.let { head -> item("head-${section.id}") { BoardSectionHead(head) } }
-        items(section.rows, key = { "${section.id}-${it.id}" }) { BoardRowView(it, model.columns, actions.open) }
+        items(section.rows, key = { "${section.id}-${it.id}" }) {
+            BoardRowView(it, model.columns, club = { abbr -> actions.openPage(SiteLinks.club(abbr)) }, open = actions.open)
+        }
     }
     item("basis") { BoardBasis(model.basis, Modifier.padding(vertical = Tokens.Space.s4.dp)) }
 }
@@ -126,7 +130,7 @@ internal fun BoardPage(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.background(CommishTheme.colors.bg).padding(top = Tokens.Space.s4.dp)) {
-        BoardHead(model, stamp)
+        BoardHead(model, stamp, link = {})
         BoardChips(model, BoardActions(), scrolls = false)
         BoardTable(model, sections)
         BoardBasis(model.basis, Modifier.padding(vertical = Tokens.Space.s4.dp))
@@ -144,17 +148,19 @@ internal fun BoardTable(
         sections.forEach { section ->
             section.band?.let { TierStrip(it) }
             section.head?.let { BoardSectionHead(it) }
-            section.rows.forEach { BoardRowView(it, model.columns) {} }
+            section.rows.forEach { BoardRowView(it, model.columns, open = {}) }
         }
     }
 }
 
 /** The board's head (web PageHead at 390): the heading in the number face, the run's stamp, in season
- * the weeks the board ranks, and over a saved board why it shows. */
+ * the weeks the board ranks, over a saved board why it shows, and the page head's links (BoardView.svelte):
+ * ADP in the board's format and the schedule's strength, each opened through `link` by its site link. */
 @Composable
 internal fun BoardHead(
     model: BoardModel,
     stamp: String?,
+    link: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = CommishTheme.colors
@@ -175,7 +181,30 @@ internal fun BoardHead(
                 modifier = Modifier.padding(top = Tokens.Space.s1.dp),
             )
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp)) {
+            model.formats.firstOrNull { it.pressed }?.let { format ->
+                HeadLink(Words.AdpPage.heading) { link(SiteLinks.adp(format.value)) }
+            }
+            HeadLink(Words.AdpPage.scheduleLink) { link(SiteLinks.SCHEDULE) }
+        }
     }
+}
+
+/** A page head's link: the accent's words, a tap target the height of a row's line. */
+@Composable
+fun HeadLink(
+    words: String,
+    press: () -> Unit,
+) {
+    Text(
+        words,
+        style = Faces.small.copy(fontWeight = FontWeight.SemiBold),
+        color = CommishTheme.colors.accentText,
+        modifier =
+            Modifier
+                .clickable(role = Role.Button, onClick = press)
+                .padding(vertical = Tokens.Space.s2.dp),
+    )
 }
 
 /** Tokens.Type.display over Tokens.Type.head: the page title's size in the head's face. */
@@ -244,7 +273,7 @@ private fun Chip(
 
 /** The basis, said once at the foot: what the numbers are, then the capture the statuses come from. */
 @Composable
-internal fun BoardBasis(
+fun BoardBasis(
     lines: List<String>,
     modifier: Modifier = Modifier,
 ) {
@@ -255,13 +284,20 @@ internal fun BoardBasis(
 
 /** The one verb pinned above the bar, where the web's board pins it, on the page's raised shadow. */
 @Composable
-internal fun BoardPin(
+fun BoardPin(
     verb: PageVerb,
+    press: () -> Unit,
+) = BoardPin(verb.title, press)
+
+/** A screen's own verb in the board's pin (a club's Compare two of them). */
+@Composable
+fun BoardPin(
+    title: String,
     press: () -> Unit,
 ) {
     Surface(color = CommishTheme.colors.bg, shadowElevation = PIN_SHADOW, modifier = Modifier.fillMaxWidth()) {
         Box(Modifier.padding(horizontal = Tokens.Space.s3.dp, vertical = Tokens.Space.s2.dp)) {
-            Verb(verb.title, onClick = press)
+            Verb(title, onClick = press)
         }
     }
 }

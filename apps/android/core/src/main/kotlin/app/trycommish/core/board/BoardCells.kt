@@ -177,17 +177,22 @@ internal class BoardCells(
         )
     }
 
-    /** A kicker or a defense: his place is his Draft order column, so his pill is his position alone
-     * (Row.svelte pillRank) or his list's word; the site has no page of his to open. */
-    fun market(row: RunMarketRow): BoardRow {
+    /** A kicker or a defense: on the board his place is his Draft order column, so his pill is his
+     * position alone (Row.svelte pillRank) or his list's word; where no Draft order column is drawn (ADP,
+     * `placed`) the pill carries his place. The site has no page of his to open. */
+    fun market(
+        row: RunMarketRow,
+        placed: Boolean = false,
+    ): BoardRow {
         val label = BoardPosition.of(row.position.value)?.label ?: row.position.value
         val status = statuses[row.id]?.let { BoardStatus.view(it, zone) }
+        val place = status?.rank ?: row.positionRank.toString().takeIf { placed }
         return BoardRow(
             id = row.id,
             name = row.name,
             initials = initialsOf(row.name),
             headshot = headshotOf(row.headshot),
-            pill = listOfNotNull(label, status?.rank).joinToString(" "),
+            pill = listOfNotNull(label, place).joinToString(" "),
             club = row.team,
             bye = bye(row.team),
             status = status,

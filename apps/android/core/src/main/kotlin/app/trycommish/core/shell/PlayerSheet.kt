@@ -36,7 +36,16 @@ class SheetOffer(
     val line: String?,
     val lineup: Boolean,
     val act: () -> Unit,
-)
+) {
+    companion object {
+        /** shelf-state.ts compareOffer: Compare, the comparison with him on one side (the card's word),
+         * opened through `open` with its site link, which the app pushes as its own screen. */
+        fun compare(
+            player: SheetPlayer,
+            open: (String) -> Unit,
+        ): SheetOffer = SheetOffer(Words.Card.compare, null, lineup = false) { open(SiteLinks.compare(player.slug)) }
+    }
+}
 
 /** The sheet's verb (shelf.ts shelfVerb): the screen's offer, or on a lineup screen once his game has
  * kicked off the held words in its place, since no lineup move takes him then. */
@@ -161,6 +170,50 @@ object SiteLinks {
 
     /** A player's page, /players/<slug>. */
     fun player(slug: String): String = "$ORIGIN/players/$slug"
+
+    /** ADP for a format as the run names it (links.ts adp): /adp/ppr-12. */
+    fun adp(format: String): String = "$ORIGIN/adp/$format"
+
+    /** Every club (links.ts clubs). */
+    const val CLUBS = "$ORIGIN/clubs"
+
+    /** A club's page by its abbreviation, lower case (links.ts club): /clubs/ari. */
+    fun club(abbr: String): String = "$CLUBS/${abbr.lowercase()}"
+
+    /** The strength of schedule (links.ts schedule). */
+    const val SCHEDULE = "$ORIGIN/schedule"
+
+    /** Compare with the sides by their pages' slugs (links.ts compare): /compare?a=chris-olave&b=nico-collins. */
+    fun compare(
+        first: String? = null,
+        second: String? = null,
+    ): String {
+        val query = listOfNotNull(first?.let { "a=$it" }, second?.let { "b=$it" }).joinToString("&")
+        return "$ORIGIN/compare${if (query.isEmpty()) "" else "?$query"}"
+    }
+
+    /** The reference pages the app draws by their site paths (links.ts): /adp/<format>, /compare?a=&b=,
+     * /clubs, /clubs/<abbr>, /schedule; null for any other link, which the app leaves to the site. */
+    fun reference(link: String): ShellRoute? {
+        val rest = link.removePrefix("$ORIGIN/").takeIf { it != link } ?: return null
+        val path = rest.substringBefore('?').substringBefore('#').trimEnd('/')
+        val query =
+            rest
+                .substringAfter('?', "")
+                .substringBefore('#')
+                .split('&')
+                .mapNotNull { pair -> pair.split('=', limit = 2).takeIf { it.size == 2 && it[1].isNotEmpty() }?.let { it[0] to it[1] } }
+                .toMap()
+        val parts = path.split('/').filter { it.isNotEmpty() }
+        return when {
+            parts.size == 2 && parts[0] == "adp" -> ShellRoute.Adp(parts[1])
+            parts == listOf("compare") -> ShellRoute.Compare(query["a"], query["b"])
+            parts == listOf("clubs") -> ShellRoute.Clubs
+            parts.size == 2 && parts[0] == "clubs" -> ShellRoute.Club(parts[1])
+            parts == listOf("schedule") -> ShellRoute.Schedule
+            else -> null
+        }
+    }
 
     /** The slug of a link to a player's page on the site, null for any other link. */
     fun playerSlug(link: String): String? =

@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -21,6 +23,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -62,6 +65,9 @@ private object Widths {
 }
 
 private val GAP = 6.dp
+
+/** The meta line's spacing where it holds one line (ADP's), as iOS draws it on the SE. */
+private val META_GAP = 4.dp
 private val ROW_HEIGHT = 52.dp
 private val HEAD_HEIGHT = 34.dp
 private val SECTION_HEAD_HEIGHT = 32.dp
@@ -69,7 +75,7 @@ private val TINT_HEIGHT = 26.dp
 
 /** The column heads, said once over the rows: Player, then the view's figures. */
 @Composable
-internal fun BoardHeadRow(columns: BoardColumns) {
+fun BoardHeadRow(columns: BoardColumns) {
     val c = CommishTheme.colors
     Column(Modifier.fillMaxWidth().background(c.bg)) {
         Row(
@@ -109,7 +115,7 @@ private fun Head(
 
 /** A head inside the table over a run of rows: a position's players on a season-long list. */
 @Composable
-internal fun BoardSectionHead(title: String) {
+fun BoardSectionHead(title: String) {
     val c = CommishTheme.colors
     Column(Modifier.fillMaxWidth().background(c.bg).semantics { heading() }) {
         Text(
@@ -130,12 +136,14 @@ internal fun BoardSectionHead(title: String) {
  * One player's row (web Row.svelte at 390, the iOS BoardRowView's twin): his face, his name the biggest
  * thing, his position pill with his number there, his club and bye, his status chip; then Projected,
  * the row's one big figure, Over repl on its round's tint and the Gap in its tone, or a kicker's or a
- * defense's draft order and ADP. The whole row opens the player sheet where the site has a page for him.
+ * defense's draft order and ADP. The whole row opens the player sheet where the site has a page for him;
+ * the club chip in it is its own tap, the club's page, where the screen gives `club`.
  */
 @Composable
-internal fun BoardRowView(
+fun BoardRowView(
     row: BoardRow,
     columns: BoardColumns,
+    club: ((String) -> Unit)? = null,
     open: (SheetPlayer) -> Unit,
 ) {
     val c = CommishTheme.colors
@@ -147,33 +155,78 @@ internal fun BoardRowView(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Headshot(row.headshot, row.initials, Widths.face)
-            Who(row, Modifier.weight(1f))
+            RowWho(row, club, Modifier.weight(1f))
             Figures(row, columns)
         }
         HorizontalDivider(color = c.line)
     }
 }
 
+/** A row's player (Row.svelte's who): his name the biggest thing, his pill, his club chip and bye (the bye
+ * onto a line of its own where a narrow phone has no room for it beside the club), his status chip. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Who(
+fun RowWho(
     row: BoardRow,
-    modifier: Modifier,
+    club: ((String) -> Unit)?,
+    modifier: Modifier = Modifier,
+    /** The meta line may wrap: the Board's guard for a large font scale. ADP keeps it to one line, its
+     * figure columns narrowed on a small phone instead. */
+    wraps: Boolean = true,
 ) {
     val c = CommishTheme.colors
     Column(modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(row.name, style = Faces.body.copy(fontWeight = FontWeight.SemiBold), color = c.ink, maxLines = 2)
-        Row(horizontalArrangement = Arrangement.spacedBy(GAP), verticalAlignment = Alignment.CenterVertically) {
-            PositionPill(row.pill)
-            Small(row.club)
-            row.bye?.let { Small(it) }
+        if (wraps) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(GAP),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                val middle = Modifier.align(Alignment.CenterVertically)
+                PositionPill(row.pill, middle)
+                ClubChip(row.club, club, middle)
+                row.bye?.let { SmallCaps(it, middle) }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(META_GAP), verticalAlignment = Alignment.CenterVertically) {
+                PositionPill(row.pill)
+                ClubChip(row.club, club)
+                row.bye?.let { SmallCaps(it) }
+            }
         }
         row.status?.let { Pill(it.mark, if (it.sits) PillTone.Loss else PillTone.Plain) }
     }
 }
 
+/** A club chip: the club's page (links.ts club), its own tap inside a row where the screen links one; a
+ * free agent's, or one on a screen that links none, is words. */
 @Composable
-private fun Small(text: String) {
-    Text(text.uppercase(), style = Faces.label, color = CommishTheme.colors.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+fun ClubChip(
+    abbr: String,
+    open: ((String) -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val link =
+        open?.takeIf { abbr != Words.Figure.freeAgentClub }?.let { go ->
+            Modifier.clickable(role = Role.Button, onClickLabel = abbr) { go(abbr) }
+        } ?: Modifier
+    SmallCaps(abbr, modifier.then(link))
+}
+
+/** A row's small caps: its club and bye (Row.svelte .club and .phone-bye). */
+@Composable
+fun SmallCaps(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text.uppercase(),
+        style = Faces.label,
+        color = CommishTheme.colors.ink3,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -186,8 +239,8 @@ private fun Figures(
         is BoardColumns.Ranked -> {
             Figure(row.projected, Widths.projected, c.ink, Faces.figure)
             // The round's tint, reaching a gap's width past the cell's left edge (Row.svelte .heat-*).
-            val tile = tint(row.heat)
-            Figure(row.overReplacement, Widths.overReplacement, c.ink2, modifier = tile?.let { Modifier.tile(it) } ?: Modifier)
+            val tile = roundTint(row.heat)
+            Figure(row.overReplacement, Widths.overReplacement, c.ink2, modifier = tile?.let { Modifier.tintTile(it, GAP) } ?: Modifier)
             if (columns.gap) Figure(row.gap, Widths.gap, gapInk(row.gapTone))
         }
         BoardColumns.DraftOrder -> {
@@ -210,9 +263,12 @@ private fun Figure(
 }
 
 /** The tint's tile behind a figure: the row's tint height, from a gap left of the cell to its end. */
-private fun Modifier.tile(color: Color): Modifier =
+fun Modifier.tintTile(
+    color: Color,
+    reach: Dp,
+): Modifier =
     drawBehind {
-        val reach = GAP.toPx()
+        val reach = reach.toPx()
         val height = TINT_HEIGHT.toPx()
         drawRoundRect(
             color = color,
@@ -228,7 +284,7 @@ private fun Modifier.tile(color: Color): Modifier =
 
 /** The tile under Over repl (Row.svelte .heat-1 to .heat-4, .heat-neg), none past the fourth round. */
 @Composable
-private fun tint(heat: Heat): Color? {
+fun roundTint(heat: Heat): Color? {
     val dark = CommishTheme.colors.dark
     val token =
         when (heat) {
@@ -248,7 +304,7 @@ private fun tint(heat: Heat): Color? {
 
 /** The Gap's tone (gap-picks.ts): plus green, minus rose, zero neither. */
 @Composable
-private fun gapInk(tone: GapTone?): Color =
+fun gapInk(tone: GapTone?): Color =
     when (tone) {
         GapTone.Gain -> CommishTheme.colors.gainInk
         GapTone.Loss -> CommishTheme.colors.lossInk
