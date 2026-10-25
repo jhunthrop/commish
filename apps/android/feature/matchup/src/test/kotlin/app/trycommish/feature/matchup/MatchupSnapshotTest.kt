@@ -34,8 +34,9 @@ import org.junit.runners.Parameterized
  * the first kickoff (Saturday noon: each side's Proj, the first kickoff), during the games with mixed
  * states (Sunday 18:56Z: kicked off, still to come and final rows, the live score with its read), after
  * Sunday (Monday morning: Sunday's starters final, Monday night still to come) and final (Tuesday noon);
- * and a poll that failed on Sunday, the week kept with its stamp. Each as the phone's first screen, then
- * the member's box and the opponent's with the basis in full. Both themes, a Pixel 9 and a small phone
+ * and a poll that failed on Sunday, the week kept with its stamp. Each as the phone's first screen (the
+ * title, the bug and the top of the member's box), then the member's box and the opponent's with the
+ * basis in full. Both themes, a Pixel 9 and a small phone
  * (the Nexus 5's 360 by 640 dp). The persona panel reads these images.
  */
 @RunWith(Parameterized::class)
@@ -140,7 +141,13 @@ private fun Mock(
     when (part) {
         MatchupSnapshotTest.Part.Phone ->
             Box(bg.fillMaxWidth().height(phone.room).clipToBounds()) {
-                MatchupPage(week, stamp, rows, listOf(MatchupPart.Mine), Modifier.wrapContentHeight(Alignment.Top, unbounded = true))
+                MatchupPage(
+                    week,
+                    stamp,
+                    rows,
+                    listOf(MatchupPart.Head, MatchupPart.Mine),
+                    Modifier.wrapContentHeight(Alignment.Top, unbounded = true),
+                )
             }
         MatchupSnapshotTest.Part.Mine -> MatchupPage(week, stamp, rows, listOf(MatchupPart.Mine), bg)
         MatchupSnapshotTest.Part.Theirs -> MatchupPage(week, stamp, rows, listOf(MatchupPart.Theirs), bg)
