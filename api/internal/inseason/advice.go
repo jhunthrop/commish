@@ -314,6 +314,8 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 	c := Candidate{ID: id, Position: position, Rank: a.playingRanks()[boardID], Tier: facts.Tier(),
 		Locked: facts.Locked, InjuredReserve: facts.InjuredReserve()}
 	line := apitypes.PlayerLine{Player: lp, Held: boardID != "" && a.held[boardID], Facts: wireFacts(facts, thisWeek(a.Snap.Ref.Host, side, id, facts))}
+	// His game at the facts' clock as every screen says it (Lane 176).
+	line.GameState = lineGameState(line, a.now)
 	words := Line{Name: lp.Name, Position: position, Rank: c.Rank, Facts: facts}
 	// A player on a season-long list is not ranked as playing: his line
 	// draws no rank (Lane 128), while the engine still orders him by it.

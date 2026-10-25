@@ -2972,6 +2972,16 @@ export interface components {
 		 * @enum {string}
 		 */
 		GameState: 'upcoming' | 'kicked_off' | 'final';
+		/** @description a game at the request's clock as every screen says it (Lane 176), one rule for the web and the apps: a player's game by the web's lineState, a scoreboard game by its gameHead (web/src/lib/league/box/kickoff.ts), held to them by shared/fixtures/parity/game-state.json */
+		GameStateCell: {
+			/**
+			 * @description not_started before its kickoff; kicked_off from its kickoff (an upcoming read whose kickoff has passed included) until its final is in; final; bye, his club's bye week; no_game, no game held for him this week (a free agent, or a club with no game we hold). Open: a client reads a value it does not know by its word
+			 * @enum {string}
+			 */
+			state: 'not_started' | 'kicked_off' | 'final' | 'bye' | 'no_game';
+			/** @description the word the screen prints for the state: "Next kickoff" (empty for a scoreboard game with no kickoff to name), "Kicked off", "Final", "Bye", "No club" for a free agent, empty for any other line with no game */
+			word: string;
+		};
 		/**
 		 * @description the matchup's state once the member's starters have all kicked off: final when the matchup's game is final by the one game-state rule (every starter on both sides final), or with no opponent this week once the member's own starters are all final; locked while any starter on either side is still in play or has a game to play, nothing left to set
 		 * @enum {string}
@@ -3105,6 +3115,8 @@ export interface components {
 			/** @description the drafter tags him Hold on a sheet */
 			held: boolean;
 			facts: components['schemas']['WeekFacts'];
+			/** @description his game this week at the request's clock in the state and the word the screen prints (Lane 176): from facts' bye, kickoff, game_state and played by the web's lineState, so no client computes it; absent from an older answer */
+			game_state?: components['schemas']['GameStateCell'];
 		};
 		PlayerWeek: {
 			/** @description the week the line is for: the league's week, else the week of the next game still to be played */
@@ -3374,6 +3386,8 @@ export interface components {
 			 * @description the earliest kickoff still to come among both sides' starters, null when none is
 			 */
 			next_kickoff: string | null;
+			/** @description the game at the request's clock in the state and the word its score bug prints (Lane 176): from state and next_kickoff by the web's gameHead, never bye or no_game; absent from an older answer */
+			game_state?: components['schemas']['GameStateCell'];
 			/** @description while the game is playing, how many of both sides' starters with a game this week are still to play ("5 to play", or "2 playing" once none is still to come), never a zero; an out starter is done once his game has kicked off, a starter on bye or with no game held leaves the count; null otherwise, or absent from an older answer. Each side's own count is its to_play */
 			to_play?: string | null;
 			/** @description two sides, the drafter's first when the game is theirs; one for a team with no opponent */

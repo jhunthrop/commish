@@ -40,7 +40,11 @@
 						"projection_best_lineup": true,
 						"schedule_state": "final"
 					}
-				]
+				],
+				"game_state": {
+					"state": "final",
+					"word": "Final"
+				}
 			},
 			{
 				"state": "final",
@@ -71,7 +75,11 @@
 						"in_play": 0,
 						"schedule_state": "final"
 					}
-				]
+				],
+				"game_state": {
+					"state": "final",
+					"word": "Final"
+				}
 			},
 			{
 				"state": "final",
@@ -103,7 +111,11 @@
 						"in_play": 0,
 						"schedule_state": "final"
 					}
-				]
+				],
+				"game_state": {
+					"state": "final",
+					"word": "Final"
+				}
 			},
 			{
 				"state": "final",
@@ -134,7 +146,11 @@
 						"in_play": 0,
 						"schedule_state": "final"
 					}
-				]
+				],
+				"game_state": {
+					"state": "final",
+					"word": "Final"
+				}
 			},
 			{
 				"state": "final",
@@ -169,7 +185,11 @@
 						"best_lineup_skipped": true,
 						"schedule_state": "final"
 					}
-				]
+				],
+				"game_state": {
+					"state": "final",
+					"word": "Final"
+				}
 			},
 			{
 				"state": "final",
@@ -202,7 +222,11 @@
 						"projection_best_lineup": true,
 						"schedule_state": "final"
 					}
-				]
+				],
+				"game_state": {
+					"state": "final",
+					"word": "Final"
+				}
 			}
 		]
 	},

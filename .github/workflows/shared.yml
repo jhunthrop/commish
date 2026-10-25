@@ -69,3 +69,11 @@ jobs:
       - name: The web's own entry to the same check
         working-directory: web
         run: npm run check:shared
+      # The API's game-state rule held to the web's (Lane 176): the parity test reads
+      # shared/fixtures/parity/game-state.json and the fixture answers it names, so a fixture or web
+      # reader change runs it here, with no API deploy (api.yml does not watch shared/).
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with: { go-version-file: api/go.mod, cache-dependency-path: api/go.sum }
+      - name: The API's game state matches the web's reader on the shared fixtures
+        working-directory: api
+        run: go test -count=1 -run 'TestGameStateMatchesTheWebsReaderOnTheSharedFixtures' ./internal/inseason/

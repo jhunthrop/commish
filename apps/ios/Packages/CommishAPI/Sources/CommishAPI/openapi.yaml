@@ -6048,6 +6048,27 @@ components:
       anyOf:
         - $ref: "#/components/schemas/GameStateKnown"
         - type: string
+    GameStateCell:
+      type: object
+      description: "a game at the request's clock as every screen says it (Lane 176), one rule for the web and the apps: a player's game by the web's lineState, a scoreboard game by its gameHead (web/src/lib/league/box/kickoff.ts), held to them by shared/fixtures/parity/game-state.json"
+      required:
+        - state
+        - word
+      properties:
+        state:
+          description: "not_started before its kickoff; kicked_off from its kickoff (an upcoming read whose kickoff has passed included) until its final is in; final; bye, his club's bye week; no_game, no game held for him this week (a free agent, or a club with no game we hold). Open: a client reads a value it does not know by its word"
+          anyOf:
+            - type: string
+              enum:
+                - not_started
+                - kicked_off
+                - final
+                - bye
+                - no_game
+            - type: string
+        word:
+          type: string
+          description: 'the word the screen prints for the state: "Next kickoff" (empty for a scoreboard game with no kickoff to name), "Kicked off", "Final", "Bye", "No club" for a free agent, empty for any other line with no game'
     WeekDoneStateKnown:
       type: string
       enum:
@@ -6295,6 +6316,10 @@ components:
           so he is never a drop or a trade give: null
         facts:
           $ref: "#/components/schemas/WeekFacts"
+        game_state:
+          allOf:
+            - $ref: "#/components/schemas/GameStateCell"
+          description: "his game this week at the request's clock in the state and the word the screen prints (Lane 176): from facts' bye, kickoff, game_state and played by the web's lineState, so no client computes it; absent from an older answer"
     PlayerWeek:
       type: object
       required:
@@ -6816,6 +6841,10 @@ components:
           format: date-time
           nullable: true
           description: the earliest kickoff still to come among both sides' starters, null when none is
+        game_state:
+          allOf:
+            - $ref: "#/components/schemas/GameStateCell"
+          description: "the game at the request's clock in the state and the word its score bug prints (Lane 176): from state and next_kickoff by the web's gameHead, never bye or no_game; absent from an older answer"
         to_play:
           type: string
           nullable: true

@@ -6,6 +6,11 @@
  * three and a half hours after its kickoff. A kicker's or a defense's row moves to the kicked-off
  * section with its game, as the API's sectionOf does. */
 import { readFileSync } from 'node:fs';
+import {
+	lineCell,
+	scoreboardCell,
+	type StatedLine
+} from '../../src/lib/league/box/game-state-cell.ts';
 
 type State = 'upcoming' | 'kicked_off' | 'final';
 
@@ -108,5 +113,27 @@ export function stamped(
 	if (typeof out.section === 'string' && line?.facts && typeof line.facts === 'object') {
 		out.section = sectionOf(line.facts as Game, now, late);
 	}
+	// The wire's game_state (Lane 176), by the rule the API's lineGameState and scoreboardGameState
+	// follow, over the facts and the game stamped above.
+	if (isLine(out)) out.game_state = lineCell(out, now);
+	else if (isScoreboardGame(out)) out.game_state = scoreboardCell(out, now);
 	return out;
+}
+
+/** A player line: his player and his facts (PlayerLine). */
+function isLine(value: Record<string, unknown>): value is Record<string, unknown> & StatedLine {
+	const player = value.player as { team?: unknown } | undefined;
+	return (
+		typeof player === 'object' &&
+		typeof player.team === 'string' &&
+		typeof value.facts === 'object' &&
+		value.facts !== null
+	);
+}
+
+/** A scoreboard game: its state, its next kickoff and its sides (ScoreboardGame). */
+function isScoreboardGame(
+	value: Record<string, unknown>
+): value is Record<string, unknown> & Parameters<typeof scoreboardCell>[0] {
+	return typeof value.state === 'string' && 'next_kickoff' in value && Array.isArray(value.sides);
 }
