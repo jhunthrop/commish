@@ -4,6 +4,7 @@ import CommishCore
 import CommishDesign
 import LeagueHome
 import Matchup
+import Player
 import Shell
 import Start
 import SwiftUI
@@ -13,7 +14,8 @@ import SwiftUI
 /// and the account's way in. Choosing a league opens its home: the League tab where the bar has one,
 /// else the home pushed on the tab in view (B149). League, Lineup, Matchup and the board (the Board
 /// item, and Rest of season in season with no league) are live; the others say their screen's name
-/// until their lane lands. Every screen presents the player sheet through the one host.
+/// until their lane lands. Every screen presents the player sheet through the one host; its Full page
+/// and a player's site link push his page on the tab in view.
 struct RootTabs: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var selection = PhoneRail.leagueKey
@@ -21,6 +23,7 @@ struct RootTabs: View {
     @State private var switchOpen = false
     @State private var query = ""
     @State private var sheet = PlayerSheetHost()
+    @Environment(\.openURL) private var openURL
     let environment: AppEnvironment
     let session: AppSession
     /// A site link the app was opened with (a player's page), pushed on the tab in view once.
@@ -42,7 +45,22 @@ struct RootTabs: View {
         }
         .tint(Theme(colorScheme).color(Tokens.Color.accent))
         .environment(sheet)
-        .playerSheet(sheet) { player in BasisText(PlayerSheetModel(player: player).loading) }
+        // The sheet's Full page is his page in the app: the sheet closes onto it, pushed on the tab in view.
+        .environment(\.openURL, OpenURLAction { url in
+            guard case let .player(slug)? = AppLink.of(url) else {
+                return .systemAction
+            }
+            sheet.close()
+            open(.player(slug: slug))
+            return .handled
+        })
+        .playerSheet(sheet) { player in
+            PlayerSheetBody(viewModel: PlayerSheetViewModel(
+                player: player, run: environment.api, pages: environment.api, weeks: environment.api,
+                cache: environment.cache, clock: environment.clock, league: selectedLeague, onSignedOut: expired
+            ))
+            .id(player.id)
+        }
         .onChange(of: session.tabs) { _, tabs in
             // A tab the new bar does not show takes its pushed screens with it.
             paths = paths.filter { key, _ in tabs.contains { $0.key == key } }
@@ -135,9 +153,15 @@ struct RootTabs: View {
         switch route {
         case let .players(query):
             NamedScreen(AppWords.Tab.players, aside: query)
-        case .player:
-            // The player page's lane (S6) fills this from the slug.
-            NamedScreen(AppWords.Tab.players)
+        case let .player(slug):
+            PlayerPageView(
+                viewModel: PlayerPageViewModel(
+                    slug: slug, run: environment.api, pages: environment.api, weeks: environment.api,
+                    cache: environment.cache, clock: environment.clock, league: selectedLeague, onSignedOut: expired
+                ),
+                act: verbAction
+            )
+            .id(slug)
         case .account:
             NamedScreen(PhoneRail.account.label, verb: (AppWords.SignIn.signOut, signOut))
         case let .leagueHome(id):
@@ -150,6 +174,22 @@ struct RootTabs: View {
             return nil
         }
         return league
+    }
+
+    /// What the page's verb does in the app: its league screen's tab where the bar has it, the platform's
+    /// waiver page with his name on the clipboard first (so its search takes it); nil where the app has
+    /// no way to follow it, and the page then pins none.
+    private func verbAction(_ verb: CardVerb, name: String) -> (() -> Void)? {
+        if case let .platform(url) = verb.target {
+            return {
+                UIPasteboard.general.string = name
+                openURL(url)
+            }
+        }
+        guard let key = verb.target.tabKey, session.tabs.contains(where: { $0.key == key }) else {
+            return nil
+        }
+        return { selection = key }
     }
 
     private func open(_ route: ShellRoute) {
