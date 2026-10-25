@@ -21,6 +21,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/db"
+	"github.com/jhunthrop/commish/api/internal/devices"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/lobby"
 	"github.com/jhunthrop/commish/api/internal/metrics"
@@ -76,6 +77,12 @@ func run(ctx context.Context, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	// An app signs in to the room with its device token, by the same check
+	// the api's session routes make (auth.Bearer.SessionDevice).
+	bearer, err := auth.NewBearer(cfg.Session.CookiePassword, cfg.HTTP.TrustedProxyHops, &devices.Store{Pool: pool}, time.Now, log)
+	if err != nil {
+		return err
+	}
 	draftBoards, closeBoards, err := draftroom.OpenBoards(pool, cfg.Board, time.Now, log)
 	if err != nil {
 		return err
@@ -88,12 +95,12 @@ func run(ctx context.Context, log *slog.Logger) error {
 		Clock: &lobby.Clock{Store: store, Boards: draftBoards, Sheets: &sheets.Store{Pool: pool}},
 		Lease: rooms.DefaultLease, Renew: rooms.DefaultRenew, Sweep: rooms.DefaultSweep,
 	}
-	socket := &rooms.Socket{Lobby: store, Hub: hub, Adopt: owners.Adopt, OriginHosts: rooms.OriginHosts(cfg.HTTP.CORSOrigins), Now: time.Now, Log: log}
+	socket := &rooms.Socket{Lobby: store, Hub: hub, Adopt: owners.Adopt, OriginHosts: rooms.OriginHosts(cfg.HTTP.CORSOrigins), Devices: bearer, Now: time.Now, Log: log}
 	owners.Serving = socket.Serving
 
 	mux := http.NewServeMux()
 	routes := slices.Concat(server.Health(pool, version), socket.Routes())
-	if err := server.Mount(mux, routes, sessions, nil, time.Now); err != nil {
+	if err := server.Mount(mux, routes, sessions, bearer, time.Now); err != nil {
 		return err
 	}
 	// The clocks stop and give their leases up when the server stops,
