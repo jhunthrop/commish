@@ -3,6 +3,7 @@ package app.trycommish.design
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
+import android.net.NetworkCapabilities
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -80,7 +81,8 @@ object Headshots {
             shared ?: build(context.applicationContext).also { shared = it }
         }
 
-    /** How many times the device has gained a connection since the first face asked. */
+    /** How many times the device has gained a working connection (validated: an address resolves and
+     * the internet answers) since the first face asked; a network that has only appeared fails a face again. */
     fun connections(context: Context): StateFlow<Int> =
         connections ?: synchronized(this) {
             connections ?: watch(context.applicationContext).also { connections = it }
@@ -90,8 +92,20 @@ object Headshots {
         val gained = MutableStateFlow(0)
         context.getSystemService(ConnectivityManager::class.java)?.registerDefaultNetworkCallback(
             object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    gained.value += 1
+                private var working: Network? = null
+
+                override fun onCapabilitiesChanged(
+                    network: Network,
+                    capabilities: NetworkCapabilities,
+                ) {
+                    if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) && network != working) {
+                        working = network
+                        gained.value += 1
+                    }
+                }
+
+                override fun onLost(network: Network) {
+                    if (network == working) working = null
                 }
             },
         )
@@ -109,6 +123,9 @@ object Headshots {
                     .build()
             }.build()
 }
+
+/** The extra that makes a retried face a new request. */
+private const val ATTEMPT = "attempt"
 
 /**
  * A player's face (web Face.svelte, iOS Headshot): his headshot in a circle, his initials (Avatar) while
@@ -139,6 +156,8 @@ fun Headshot(
                 .Builder(context)
                 .data(Headshots.sized(address, Headshots.widthFor(pixels)))
                 .size(ceil(pixels).toInt())
+                // A retry is a request of its own: Coil restarts only for a request unlike the last.
+                .memoryCacheKeyExtra(ATTEMPT, attempt.toString())
                 .build()
         }
     val painter = rememberAsyncImagePainter(request, imageLoader = Headshots.loader(context), contentScale = ContentScale.Crop)
