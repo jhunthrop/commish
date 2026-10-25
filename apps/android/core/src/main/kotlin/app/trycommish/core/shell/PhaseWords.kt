@@ -1,6 +1,7 @@
 package app.trycommish.core.shell
 
 import app.trycommish.api.models.BoardFormat
+import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.LeaguePhase
 import app.trycommish.api.models.ScoringPreset
 import app.trycommish.core.Format
@@ -95,4 +96,10 @@ private fun scoringWords(scoring: ScoringPreset): String? =
 
 /** names.ts followedName: the league's own name, or its platform's when its read has none yet ("Your
  * Yahoo league"). */
-fun followedName(league: FollowedLeague): String = league.name.ifEmpty { "Your ${ValueWords.platform(league.host)} league" }
+fun followedName(league: FollowedLeague): String = followedName(league.name, league.host)
+
+/** names.ts followedName from a league's name and platform, as the Account's table reads it. */
+fun followedName(
+    name: String,
+    host: LeagueHost,
+): String = name.ifEmpty { "Your ${ValueWords.platform(host)} league" }

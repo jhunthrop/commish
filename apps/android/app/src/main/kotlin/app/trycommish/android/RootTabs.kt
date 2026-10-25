@@ -29,7 +29,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import app.trycommish.core.AppWords
 import app.trycommish.core.phoneBar
 import app.trycommish.core.shell.LEAGUE_PAGE
 import app.trycommish.core.shell.LINEUP_PAGE
@@ -48,7 +47,6 @@ import app.trycommish.design.CommishTheme
 import app.trycommish.design.Rail
 import app.trycommish.design.RailItem
 import app.trycommish.design.Tokens
-import app.trycommish.design.Words
 import app.trycommish.feature.shell.LeagueSwitchMenu
 import app.trycommish.feature.shell.LocalPlayerSheet
 import app.trycommish.feature.shell.NamedScreen
@@ -120,7 +118,17 @@ fun Shell(
         nav.navigate(Routes.of(route))
     }
 
-    LaunchedEffect(signedIn) { if (signedIn) shell.open() }
+    // Signed in, the account is read; signed out (Sign out, or a refused token), every tab's stack is let go
+    // and the League tab, the sign-in screen, is shown.
+    LaunchedEffect(signedIn) {
+        if (signedIn) {
+            shell.open()
+        } else {
+            switchOpen = false
+            tab = LEAGUE_PAGE
+            nav.toSignIn()
+        }
+    }
     // Back closes the open switch before it leaves the screen.
     BackHandler(enabled = switchOpen) { switchOpen = false }
     // A bar that no longer holds the tab in view (the phase moved) opens its first tab.
@@ -171,7 +179,7 @@ fun Shell(
         ) { padding ->
             // The bars' room counted as taken, so a pin's imePadding lifts it only by what the keyboard adds.
             Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
-                Pages(graph, nav, state, bar, shell::open, openLineup, ::openTab)
+                Pages(graph, nav, state, bar, PageVerbs(shell::open, openLineup, ::openTab, choose))
                 if (switchOpen) {
                     Box(
                         Modifier
@@ -190,6 +198,15 @@ fun Shell(
     }
 }
 
+/** What the pages ask of the shell: read the account again (a retry, or the Account's leagues changed), a
+ * league's lineup, a tab, and a league chosen as the switch chooses it. */
+private class PageVerbs(
+    val retry: () -> Unit,
+    val onOpenLineup: (leagueId: String) -> Unit,
+    val openTab: (String) -> Unit,
+    val choose: (String) -> Unit,
+)
+
 /** The tabs' pages and the pushed screens. */
 @Composable
 private fun Pages(
@@ -197,10 +214,11 @@ private fun Pages(
     nav: NavHostController,
     state: ShellState,
     bar: List<RailItem>,
-    retry: () -> Unit,
-    onOpenLineup: (leagueId: String) -> Unit,
-    openTab: (String) -> Unit,
+    verbs: PageVerbs,
 ) {
+    val retry = verbs.retry
+    val onOpenLineup = verbs.onOpenLineup
+    val openTab = verbs.openTab
     val selected = (state as? ShellState.Ready)?.selected
     NavHost(nav, startDestination = LEAGUE_PAGE) {
         composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup) }
@@ -223,10 +241,20 @@ private fun Pages(
         composable(Routes.PLAYER, listOf(navArgument("slug") { type = NavType.StringType })) { entry ->
             entry.arguments?.getString("slug")?.let { PlayerPage(graph, it, selected, bar, openTab) }
         }
-        composable(Routes.ACCOUNT) { NamedScreen(Words.Shell.account, verb = AppWords.signOut to graph::signOut) }
+        composable(Routes.ACCOUNT) { AccountTab(graph, leaguesChanged = retry, openLeague = verbs.choose) }
         composable(Routes.LEAGUE_HOME) { entry ->
             entry.arguments?.getString("id")?.let { LeagueHome(graph, it, onOpenLineup) }
         }
+    }
+}
+
+/** Signed out: back to the League tab with nothing above it, and no tab's saved stack kept for the next
+ * sign-in (an Account left open on another tab would come back with the last account's words). */
+private fun NavHostController.toSignIn() {
+    PAGES.forEach { clearBackStack(it.page) }
+    navigate(LEAGUE_PAGE) {
+        popUpTo(graph.findStartDestination().id) { inclusive = false }
+        launchSingleTop = true
     }
 }
 
