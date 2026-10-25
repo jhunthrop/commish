@@ -42,7 +42,8 @@ function stub(override: Answer = () => undefined): { fetch: Fetch; seen: Seen[] 
 	return { fetch, seen };
 }
 
-const request = (status: UploadRequest['status']): UploadRequest => ({ token: TOKEN, packageName: PACKAGE, track: 'internal', status, bundle: BUNDLE });
+const request = (status: UploadRequest['status'], attempt = 1): UploadRequest => ({ token: TOKEN, packageName: PACKAGE, track: 'internal', status, bundle: BUNDLE, attempt });
+const CODE_USED = 'APK specifies a version code that has already been used.';
 const quiet = (): void => {};
 const steps = (seen: Seen[]): string[] => seen.map((s) => `${s.method} ${s.url}`);
 
@@ -88,7 +89,7 @@ test('the first-review refusal is a named outcome: the track again as draft, com
 });
 
 test('any other refusal deletes the edit and fails with the step, status and message, never the token', async () => {
-	const { fetch, seen } = stub((s) => (s.url === SESSION ? refusal('APK specifies a version code that has already been used.') : undefined));
+	const { fetch, seen } = stub((s) => (s.url === SESSION ? refusal(CODE_USED) : undefined));
 	await assert.rejects(uploadToTrack(request('completed'), fetch, quiet), (error: unknown) => {
 		assert.ok(error instanceof PlayError);
 		assert.equal(error.step, 'upload bundle');
@@ -111,4 +112,31 @@ test('a draft refusal on a draft request is not retried', async () => {
 	const { fetch, seen } = stub((s) => (s.url.endsWith(':commit') ? refusal('Only releases with status draft may be created on draft app.') : undefined));
 	await assert.rejects(uploadToTrack(request('draft'), fetch, quiet), PlayError);
 	assert.equal(seen.filter((s) => s.url.endsWith('/tracks/internal')).length, 1);
+});
+
+test('a re-run whose code Play already holds is a named outcome: the edit deleted, nothing thrown', async () => {
+	const { fetch, seen } = stub((s) => (s.url === SESSION ? refusal(CODE_USED) : undefined));
+	const lines: string[] = [];
+	const result = await uploadToTrack(request('completed', 2), fetch, (line) => lines.push(line));
+	assert.deepEqual(result, { outcome: 'already-on-play', editId: 'edit-1', versionCode: null, status: null });
+	assert.equal(seen.at(-1)?.method, 'DELETE');
+	assert.equal(seen.filter((s) => s.url.endsWith(':commit')).length, 0);
+	assert.ok(lines.some((line) => line.includes('attempt 2')));
+});
+
+test('a re-run refused for another reason still fails', async () => {
+	const { fetch } = stub((s) => (s.url === SESSION ? refusal('All uploaded bundles must be signed.', 403) : undefined));
+	await assert.rejects(uploadToTrack(request('completed', 2), fetch, quiet), PlayError);
+});
+
+test('every request carries a timeout signal', async () => {
+	const { fetch, seen } = stub();
+	const signals: unknown[] = [];
+	const watching: Fetch = (url, init) => {
+		signals.push(init.signal);
+		return fetch(url, init);
+	};
+	await uploadToTrack(request('draft'), watching, quiet);
+	assert.equal(signals.length, seen.length);
+	for (const signal of signals) assert.ok(signal instanceof AbortSignal);
 });

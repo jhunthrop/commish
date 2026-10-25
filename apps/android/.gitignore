@@ -5,5 +5,3 @@ local.properties
 *.iml
 .idea/
 captures/
-fastlane/report.xml
-fastlane/README.md
