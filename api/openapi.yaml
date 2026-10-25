@@ -428,10 +428,22 @@ paths:
       summary: >-
         The week's matchup as a box score: each side's starters in the host's slots and its bench, every player with
         his line (his game's facts, his points so far once his game has kicked off, the week's published projection).
-        Reads the league as the sync route does; the sync answer's matchup keeps the score and the teams.
+        Reads the league as the sync route does; the sync answer's matchup keeps the score and the teams. Any game of
+        the week is drawn when roster names one of its sides (Lane 204).
       security: [{ session: [] }, { device: [] }]
+      parameters:
+        - name: roster
+          in: query
+          required: false
+          description: >-
+            a roster id from the scoreboard's sides (ScoreboardSide.roster_id): the box is that roster's game, its side
+            first and its opponent second when the week pairs them, by the same rules as the member's. Absent, the
+            member's own game, as before (Lane 204). Not an integer answers 400; a roster the league's last read does
+            not list answers 404, each naming the roster field
+          schema: { type: integer, minimum: 0 }
       responses:
         "200": { $ref: "#/components/responses/MatchupBoxResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
         "409": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
@@ -5986,8 +5998,16 @@ components:
           description: when the week's published projection the rows' week_projection read was captured, null with none
         sides:
           type: array
-          description: the drafter's side first, then the opponent's when the week pairs them
+          description: >-
+            the drafter's side first, then the opponent's when the week pairs them; with roster asked, that roster's
+            side first, then its opponent's
           items: { $ref: "#/components/schemas/MatchupBoxSide" }
+        viewer_side:
+          type: string
+          enum: [mine, other]
+          description: >-
+            whose game the box is (Lane 204): mine for the member's own (roster absent, or the member's), other for
+            another team's game asked by roster; absent from an older answer, which is always the member's
         standing:
           type: string
           nullable: true
@@ -5996,14 +6016,16 @@ components:
             margin and who is left ("Up 3.2, 2 of yours and 1 of theirs to play", "Down 14.1 with nobody left,
             McCaffrey and Kittle playing for them"), once final the result ("Won by 6.4", "Lost by 30.4", "Tied"); null
             before the first kickoff, without an opponent, with either score unread, where the platform shows us no
-            starters for a side, or absent from an older answer
+            starters for a side, on another team's game (viewer_side other: the words are the member's), or absent
+            from an older answer
         decided:
           type: boolean
           nullable: true
           description: >-
             while the game plays, the side behind has nobody left to score and the leader cannot fall back to it (no QB
             or D/ST of the leader's still to score, or a lead of 10 points or more): the bug says Decided in place of
-            the game's state; present whenever standing is, absent from an older answer
+            the game's state; present whenever standing is and on another team's game where the member's would be,
+            absent from an older answer
     WaiverBeats:
       type: object
       description: >-
