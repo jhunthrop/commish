@@ -2,7 +2,7 @@
  * setup's form and verb, the report's verbs and a shared draft's head, in a table the apps print from
  * (shared/scripts/gen-words.ts); the lines that carry a figure or a name are built by the functions
  * below. The rooms' shared words are words.ts ROOM and the report's report/headline.ts REPORT. */
-import { lastName, pickLabel } from '#lib/format/draft.ts';
+import { pickLabel } from '#lib/format/draft.ts';
 
 export const MOCK = {
 	undo: 'Undo',
@@ -53,9 +53,10 @@ export function autopickWords(round: number): string {
 	return `Pick for me to round ${String(round)}`;
 }
 
-/** The verb on a turn with no call: "Draft Williams". */
-export function draftNamed(name: string): string {
-	return `${MOCK.draft} ${lastName(name)}`;
+/** The verb on a turn with no call, from the player's surname (lastName): "Draft Williams". The room
+ * draws the surname marked as his name (SoloRoom); the apps build the whole verb. */
+export function draftNamed(surname: string): string {
+	return `${MOCK.draft} ${surname}`;
 }
 
 /** The call's frame while the next call is on its way: "Reading the room for 2.12". */

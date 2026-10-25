@@ -389,7 +389,7 @@ export async function renderMock(about: string): Promise<string> {
 			words: undone ? undoneWords(undone.pick, round5.teams, undonePlayer?.name ?? null) : null
 		},
 		noCall: {
-			verb: draftNamed(poolRows(board, draftedSet(first.picks), 'All', [], '')[0]?.name ?? ''),
+			verb: draftNamed(lastName(poolRows(board, draftedSet(first.picks), 'All', [], '')[0]?.name ?? '')),
 			basis: poolBasis(board, null, first.teams, true),
 			missing: chanceMissing(true, false)
 		},

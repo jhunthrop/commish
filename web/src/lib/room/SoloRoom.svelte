@@ -283,9 +283,7 @@
 	{:else if frame}
 		<RoomCall
 			view={frame}
-			reading={readingFor === null
-				? undefined
-				: readingWords(readingFor, teams)}
+			reading={readingFor === null ? undefined : readingWords(readingFor, teams)}
 			action={{
 				label: draftWords(frame.player.position),
 				key: 'Enter',

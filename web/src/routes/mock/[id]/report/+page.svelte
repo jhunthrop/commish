@@ -67,8 +67,7 @@
 				<Quiet href="/sheet?from_mock={id}">Save this draft as a sheet</Quiet>
 				{#if r.share_code}
 					{@const code = r.share_code}
-					<Quiet onclick={() => copy(code)}>{copied.on ? MOCK.copied : MOCK.copyLink}</Quiet
-					>
+					<Quiet onclick={() => copy(code)}>{copied.on ? MOCK.copied : MOCK.copyLink}</Quiet>
 				{/if}
 			{/snippet}
 		</Report>

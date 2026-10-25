@@ -104,9 +104,11 @@
 		>{/if}
 	{#if !readonly}
 		<span class="acts">
-			<span class="q"><Quiet size="sm" onclick={onqueue}>{queued ? MOCK.queued : MOCK.queue}</Quiet></span
+			<span class="q"
+				><Quiet size="sm" onclick={onqueue}>{queued ? MOCK.queued : MOCK.queue}</Quiet></span
 			>
-			{#if draftShown}<Quiet size="sm" disabled={!canDraft} onclick={ondraft}>{MOCK.draft}</Quiet>{/if}
+			{#if draftShown}<Quiet size="sm" disabled={!canDraft} onclick={ondraft}>{MOCK.draft}</Quiet
+				>{/if}
 		</span>
 	{/if}
 </div>

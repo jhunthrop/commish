@@ -101,8 +101,7 @@ function refused(error: ApiError, subject: NoticeSubject): NoticeView | null {
 }
 
 export function noticeFor(error: unknown, subject: NoticeSubject, returnTo: string): NoticeView {
-	if (!(error instanceof ApiError))
-		return { text: MOCK.unreachable };
+	if (!(error instanceof ApiError)) return { text: MOCK.unreachable };
 	switch (error.status) {
 		case HTTP.unauthorized:
 			return signedOut(subject, returnTo);
