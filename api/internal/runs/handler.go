@@ -54,10 +54,12 @@ func (h *Handler) Routes() []httpx.Route {
 }
 
 // handleManifest answers the manifest with the run's season reach beside
-// it (Lane 203), both from one run. When the reach cannot be worked out
-// (a page will not read) the manifest still answers, without the reach,
+// it (Lane 203), both from one run, once the run's reach pass has landed
+// (reach_pass.go). It never waits on the pass: until it lands, or while a
+// failed pass backs off, the manifest answers at once without the reach,
 // with no ETag and not to be kept, so no client holds the lesser answer
-// under the run's tag; the pass is tried again after failureTTL.
+// under the run's tag. A client already holding the run's answer, the
+// reach in it, is answered 304 and keeps it.
 func (h *Handler) handleManifest(w http.ResponseWriter, r *http.Request) {
 	if !h.ready(w, r) {
 		return
@@ -67,15 +69,17 @@ func (h *Handler) handleManifest(w http.ResponseWriter, r *http.Request) {
 		h.unavailable(w, r, err)
 		return
 	}
-	reached, err := h.Reader.ReadIn(r.Context(), manifest.RunID, reachedManifest)
-	if err != nil {
-		h.Log.Warn("runs: the season reach did not work out; the manifest answers without it",
-			"request_id", httpx.RequestIDFrom(r.Context()), "run_id", manifest.RunID, "err", err)
-		w.Header().Set("Cache-Control", "no-store")
-		httpx.WriteOK(w, r, http.StatusOK, manifest.Data)
+	if reached, ok := h.Reader.Reached(manifest.RunID); ok {
+		h.respond(w, r, reached)
 		return
 	}
-	h.respond(w, r, reached)
+	if matches(r.Header.Get("If-None-Match"), manifest.ETag) {
+		w.Header().Set("ETag", manifest.ETag)
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.WriteOK(w, r, http.StatusOK, manifest.Data)
 }
 
 // handleBoard answers a format the published run's manifest lists, and

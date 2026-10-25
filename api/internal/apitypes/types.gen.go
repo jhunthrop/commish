@@ -4696,7 +4696,7 @@ type RunManifestAnswer struct {
 	// Manifest the run's manifest.json, the members the site's reader names less the sources block (provenance)
 	Manifest RunManifest `json:"manifest"`
 
-	// Reach the run's season reach (Lane 203), absent on an API from before it and when the run's pages cannot be read for it
+	// Reach the run's season reach (Lane 203), absent on an API from before it, while the run's first pass runs, and while a failed pass waits to run again
 	Reach *RunReach `json:"reach,omitempty"`
 
 	// RunId the published run every /run answer is read from

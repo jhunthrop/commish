@@ -41,20 +41,53 @@ type dirObjects struct {
 	// afterGet runs after each read, with the key read (a test moves the
 	// pointer between two reads of one request with it).
 	afterGet func(key string)
+	// hold keeps a read of a key waiting until its channel closes or the
+	// read's context ends (a slow bucket, for the reach pass's tests).
+	hold map[string]chan struct{}
 }
 
 func newDirObjects(fsys fs.FS) *dirObjects {
-	return &dirObjects{fsys: fsys, reads: map[string]int{}, fail: map[string]error{}}
+	return &dirObjects{fsys: fsys, reads: map[string]int{}, fail: map[string]error{}, hold: map[string]chan struct{}{}}
 }
 
-func (d *dirObjects) Get(_ context.Context, key string) ([]byte, error) {
+// failing answers every read of key with err from now on (nil: reads it
+// again), safe beside a pass reading in the background.
+func (d *dirObjects) failing(key string, err error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if err == nil {
+		delete(d.fail, key)
+		return
+	}
+	d.fail[key] = err
+}
+
+// holding keeps every read of key waiting until the returned release is
+// called.
+func (d *dirObjects) holding(key string) (release func()) {
+	ch := make(chan struct{})
+	d.mu.Lock()
+	d.hold[key] = ch
+	d.mu.Unlock()
+	return sync.OnceFunc(func() { close(ch) })
+}
+
+func (d *dirObjects) Get(ctx context.Context, key string) ([]byte, error) {
 	d.mu.Lock()
 	d.reads[key]++
 	failure := d.fail[key]
 	after := d.afterGet
+	held := d.hold[key]
 	d.mu.Unlock()
 	if after != nil {
 		defer after(key)
+	}
+	if held != nil {
+		select {
+		case <-held:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 	if failure != nil {
 		return nil, failure
@@ -75,20 +108,37 @@ func (d *dirObjects) readsOf(key string) int {
 func quietLog() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
 type server struct {
-	mux  *http.ServeMux
-	now  *time.Time
-	objs *dirObjects
+	mux    *http.ServeMux
+	objs   *dirObjects
+	reader *Reader
+
+	// clock is the reader's now, moved by advance: the reach pass reads
+	// it from its own goroutine.
+	clockMu sync.Mutex
+	clock   time.Time
 }
 
 func newServer(t *testing.T, objs *dirObjects) *server {
 	t.Helper()
-	now := clock
-	s := &server{mux: http.NewServeMux(), now: &now, objs: objs}
-	h := &Handler{Reader: NewReader(objs, func() time.Time { return *s.now }, quietLog()), Log: quietLog()}
+	s := &server{mux: http.NewServeMux(), objs: objs, clock: clock}
+	s.reader = NewReader(objs, s.now, quietLog())
+	h := &Handler{Reader: s.reader, Log: quietLog()}
 	for _, rt := range h.Routes() {
 		s.mux.HandleFunc(rt.Pattern(), rt.Handler)
 	}
 	return s
+}
+
+func (s *server) now() time.Time {
+	s.clockMu.Lock()
+	defer s.clockMu.Unlock()
+	return s.clock
+}
+
+func (s *server) advance(d time.Duration) {
+	s.clockMu.Lock()
+	defer s.clockMu.Unlock()
+	s.clock = s.clock.Add(d)
 }
 
 func fixtureServer(t *testing.T) *server {
@@ -296,7 +346,7 @@ func TestReadsCachedPerRun(t *testing.T) {
 		t.Fatalf("reads: pointer %d board %d designations %d; want one each",
 			s.objs.readsOf(pointer), s.objs.readsOf(board), s.objs.readsOf(designations))
 	}
-	*s.now = s.now.Add(PointerTTL)
+	s.advance(PointerTTL)
 	data(t, s.get(t, "/run/boards/"+pprFormat, nil))
 	data(t, s.get(t, "/run/designations", nil))
 	if s.objs.readsOf(pointer) != 2 || s.objs.readsOf(board) != 1 || s.objs.readsOf(designations) != 2 {
@@ -371,12 +421,12 @@ func TestPublishedRun(t *testing.T) {
 			t.Fatalf("run %s", got)
 		}
 		writeRun(t, root, "2026-10-22T05", nil)
-		*s.now = s.now.Add(PointerTTL)
+		s.advance(PointerTTL)
 		if got := runOf(); got != "2026-10-22T05" {
 			t.Fatalf("after the pointer moved: run %s", got)
 		}
-		objs.fail["runs/latest.json"] = errors.New("r2 is down")
-		*s.now = s.now.Add(PointerTTL)
+		objs.failing("runs/latest.json", errors.New("r2 is down"))
+		s.advance(PointerTTL)
 		if got := runOf(); got != "2026-10-22T05" {
 			t.Fatalf("with the pointer unread: run %s; want the published run kept", got)
 		}
@@ -559,7 +609,7 @@ func mustObject(t *testing.T, raw string) map[string]any {
 // failureTTL before the bucket is asked again.
 func TestColdStartFailureKept(t *testing.T) {
 	objs := newDirObjects(os.DirFS(t.TempDir()))
-	objs.fail["runs/latest.json"] = errors.New("r2 is down")
+	objs.failing("runs/latest.json", errors.New("r2 is down"))
 	s := newServer(t, objs)
 	for range 3 {
 		if rec := s.get(t, "/run/manifest", nil); rec.Code != http.StatusServiceUnavailable {
@@ -569,7 +619,7 @@ func TestColdStartFailureKept(t *testing.T) {
 	if got := objs.readsOf("runs/latest.json"); got != 1 {
 		t.Fatalf("pointer reads %d within failureTTL; want 1", got)
 	}
-	*s.now = s.now.Add(failureTTL)
+	s.advance(failureTTL)
 	s.get(t, "/run/manifest", nil)
 	if got := objs.readsOf("runs/latest.json"); got != 2 {
 		t.Fatalf("pointer reads %d after failureTTL; want 2", got)
@@ -581,8 +631,8 @@ func TestHourlyRereadFailureKeepsCopy(t *testing.T) {
 	s := fixtureServer(t)
 	first := s.get(t, "/run/designations", nil)
 	data(t, first)
-	s.objs.fail[fileKey(fixtureRun, designationsFile.path)] = errors.New("r2 is down")
-	*s.now = s.now.Add(PointerTTL)
+	s.objs.failing(fileKey(fixtureRun, designationsFile.path), errors.New("r2 is down"))
+	s.advance(PointerTTL)
 	again := s.get(t, "/run/designations", nil)
 	data(t, again)
 	if again.Header().Get("ETag") != first.Header().Get("ETag") {

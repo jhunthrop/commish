@@ -2,7 +2,6 @@ package runs
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -44,12 +43,6 @@ type artifact struct {
 	// name is the answer's member an optional file's null is sent as.
 	name  string
 	shape func(raw []byte) ([]field, error)
-	// compose, when set, works the answer out from other files of the
-	// run instead of reading path, which then only keys it in the cache
-	// (the manifest with its reach, reach.go); tagged is the file its
-	// ETag names.
-	compose func(ctx context.Context, r *Reader, runID string) ([]field, error)
-	tagged  string
 }
 
 // Each file is held to its contract type (project.go), so the apps get

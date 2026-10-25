@@ -42,11 +42,6 @@ const (
 	statusInactive = "inactive"
 )
 
-// reachedManifest is the manifest's answer with the run's season reach
-// beside it, worked out once per run. Its ETag is the manifest's: the
-// reach is the run's own pages and schedule, written once with it.
-var reachedManifest = artifact{path: manifestPath + "#reach", tagged: manifestPath, name: "manifest", compose: composeManifest}
-
 // countedRow is what a reach reads of one week of a log.
 type countedRow struct {
 	Week        int     `json:"week"`
@@ -235,6 +230,14 @@ func runReach(pages []countedPage, slates []apitypes.RunSlate, formats []apitype
 		return apitypes.RunReach{}, fmt.Errorf("runs: the run has no page the reader took")
 	}
 	format, complete := pages[0].Season.Format, pages[0].Season.Through
+	// Every block shares them, as the web's gate refuses a run otherwise:
+	// a run that skipped the gate gets no reach rather than a wrong one.
+	for _, page := range pages {
+		if page.Season.Format != format || page.Season.Through != complete {
+			return apitypes.RunReach{}, fmt.Errorf("runs: page %s is scored in %s through week %d, not %s through week %d",
+				page.ID, page.Season.Format, page.Season.Through, format, complete)
+		}
+	}
 	i := slices.IndexFunc(formats, func(f apitypes.RunFormat) bool { return f.Id == format })
 	if i < 0 {
 		return apitypes.RunReach{}, fmt.Errorf("runs: the run has no %s format", format)
@@ -247,52 +250,63 @@ func runReach(pages []countedPage, slates []apitypes.RunSlate, formats []apitype
 	return out, nil
 }
 
-// composeManifest is the manifest's answer's fields with the reach
-// beside them, every file read in the run runID: the manifest, the held
-// pages, the index, the schedule, and each page the index gives that the
-// gate did not hold (a held page's copy is an earlier run's season).
-func composeManifest(ctx context.Context, r *Reader, runID string) ([]field, error) {
+// composeManifest is the manifest's answer with the reach beside it, and
+// how many pages it counted, every file read in the run runID: the
+// manifest, the held pages, the index, the schedule, and each page the
+// index gives that the gate did not hold (a held page's copy is an
+// earlier run's season). Each file read is bounded by its own
+// readTimeout and the pass by ctx, checked between them.
+func composeManifest(ctx context.Context, r *Reader, runID string) (Answer, int, error) {
 	manifest, err := r.ReadIn(ctx, runID, manifestFile)
 	if err != nil {
-		return nil, err
+		return Answer{}, 0, err
 	}
 	var answer struct {
 		Manifest json.RawMessage `json:"manifest"`
 	}
 	if err := json.Unmarshal(manifest.Data, &answer); err != nil {
-		return nil, fmt.Errorf("manifest: %w", err)
+		return Answer{}, 0, fmt.Errorf("manifest: %w", err)
 	}
 	var run apitypes.RunManifest
 	if err := json.Unmarshal(answer.Manifest, &run); err != nil {
-		return nil, fmt.Errorf("manifest: %w", err)
+		return Answer{}, 0, fmt.Errorf("manifest: %w", err)
 	}
 	ids, err := ownPageIDs(ctx, r, runID)
 	if err != nil {
-		return nil, err
+		return Answer{}, 0, err
 	}
 	schedule, err := r.ReadIn(ctx, runID, scheduleFile)
 	if err != nil {
-		return nil, err
+		return Answer{}, 0, err
 	}
 	var slates struct {
 		Schedule apitypes.RunSchedule `json:"schedule"`
 	}
 	if err := json.Unmarshal(schedule.Data, &slates); err != nil {
-		return nil, fmt.Errorf("schedule: %w", err)
+		return Answer{}, 0, fmt.Errorf("schedule: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return Answer{}, 0, err
 	}
 	pages, err := readPages(ctx, r, runID, ids)
 	if err != nil {
-		return nil, err
+		return Answer{}, 0, err
 	}
 	reached, err := runReach(pages, slates.Schedule.Slates, run.Formats)
 	if err != nil {
-		return nil, err
+		return Answer{}, 0, err
 	}
 	value, err := json.Marshal(reached)
 	if err != nil {
-		return nil, err
+		return Answer{}, 0, err
 	}
-	return []field{{"manifest", answer.Manifest}, {"reach", value}}, nil
+	data, err := encodeAnswer(runID, []field{{"manifest", answer.Manifest}, {"reach", value}})
+	if err != nil {
+		return Answer{}, 0, err
+	}
+	// The manifest's ETag: the reach is the run's own pages and schedule,
+	// written once with it.
+	return Answer{RunID: runID, ETag: etag(runID, manifestFile, data), Data: data}, len(pages), nil
 }
 
 // ownPageIDs is every id the index gives a page that the gate did not
@@ -320,6 +334,10 @@ func ownPageIDs(ctx context.Context, r *Reader, runID string) ([]string, error) 
 	}
 	ids := make([]string, 0, len(data.Pages))
 	for _, page := range data.Pages {
+		// An id becomes a bucket key, so it is the route's id or refused.
+		if !playerIDPattern.MatchString(page.ID) {
+			return nil, fmt.Errorf("runs: run %s index gives a page to %q, not a player id", runID, page.ID)
+		}
 		if _, isHeld := held[page.ID]; !isHeld {
 			ids = append(ids, page.ID)
 		}

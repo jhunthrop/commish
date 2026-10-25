@@ -1247,8 +1247,9 @@ paths:
         hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a
         matching If-None-Match. 503 storage_unavailable when the run cannot be read here. Beside the manifest, the
         run's season reach (Lane 203): what every basis's "through week" says, counted over every own page of the run as
-        the site counts it, worked out once per run. It is absent only when the run's pages cannot be read for it; that
-        answer carries no ETag and is not to be kept.
+        the site counts it, worked out once per run in the background. It is absent while that first pass runs (a
+        request never waits on it) and while a failed pass waits to run again; that answer carries no ETag and is not
+        to be kept, and a client holding the run's answer is answered 304.
       parameters:
         - $ref: "#/components/parameters/IfNoneMatch"
       responses:
@@ -4354,8 +4355,8 @@ components:
         reach:
           allOf: [{ $ref: "#/components/schemas/RunReach" }]
           description: >-
-            the run's season reach (Lane 203), absent on an API from before it and when the run's pages cannot be read
-            for it
+            the run's season reach (Lane 203), absent on an API from before it, while the run's first pass runs, and
+            while a failed pass waits to run again
     RunReach:
       type: object
       description: >-

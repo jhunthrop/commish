@@ -1,14 +1,17 @@
 package runs
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 )
@@ -18,25 +21,72 @@ import (
 // example to the web's count, and that example is this).
 const fixtureReach = `{"format":"ppr-12","scoring":"PPR","through":"through week 5","complete":5,"partial":null}`
 
-// reachOf is a /run/manifest answer's reach, failing when it has none.
-func reachOf(t *testing.T, s *server) apitypes.RunReach {
+// manifestReach is a /run/manifest answer's reach, nil when it has none.
+func manifestReach(t *testing.T, rec *httptest.ResponseRecorder) *apitypes.RunReach {
 	t.Helper()
 	var answer apitypes.RunManifestAnswer
-	raw, err := json.Marshal(data(t, s.get(t, "/run/manifest", nil)))
+	raw, err := json.Marshal(data(t, rec))
 	if err != nil {
 		t.Fatal(err)
 	}
 	strictly(t, "/run/manifest", raw, &answer)
-	if answer.Reach == nil {
-		t.Fatalf("the manifest answered no reach: %s", raw)
+	return answer.Reach
+}
+
+// waitFor waits for the reach pass's state to meet done; the pass runs in
+// the background.
+func waitFor(t *testing.T, s *server, what string, done func(reachMemo) bool) reachMemo {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		s.reader.mu.Lock()
+		memo := s.reader.reach
+		s.reader.mu.Unlock()
+		if done(memo) {
+			return memo
+		}
+		time.Sleep(2 * time.Millisecond)
 	}
-	return *answer.Reach
+	t.Fatalf("the reach pass never %s", what)
+	return reachMemo{}
+}
+
+// landed waits for a first pass to land, its answer kept or its retry set.
+func landed(t *testing.T, s *server) reachMemo {
+	t.Helper()
+	return waitFor(t, s, "landed", func(m reachMemo) bool { return m.answer != nil || !m.retryAt.IsZero() })
+}
+
+// reachOf asks the manifest, lets the pass it starts land with the
+// reach, and is the reach the manifest then answers.
+func reachOf(t *testing.T, s *server) apitypes.RunReach {
+	t.Helper()
+	data(t, s.get(t, "/run/manifest", nil))
+	waitFor(t, s, "kept a reach", func(m reachMemo) bool { return m.answer != nil })
+	got := manifestReach(t, s.get(t, "/run/manifest", nil))
+	if got == nil {
+		t.Fatal("the manifest answered no reach once the pass landed")
+	}
+	return *got
+}
+
+// lesser fails unless rec is the manifest without the reach: untagged,
+// not to be kept.
+func lesser(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	if got := manifestReach(t, rec); got != nil {
+		t.Fatalf("a reach was sent: %+v", got)
+	}
+	if rec.Header().Get("ETag") != "" || rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("the lesser answer is tagged %q, %q", rec.Header().Get("ETag"), rec.Header().Get("Cache-Control"))
+	}
 }
 
 // The fixture run's manifest carries its reach beside it, and its ETag is
 // the manifest's as before.
 func TestManifestCarriesTheFixtureReach(t *testing.T) {
 	s := fixtureServer(t)
+	reachOf(t, s)
 	rec := s.get(t, "/run/manifest", nil)
 	got := data(t, rec)
 	sameJSON(t, "reach", decoded(t, got["reach"]), decoded(t, []byte(fixtureReach)))
@@ -209,12 +259,15 @@ func TestReachCases(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			s := madeRun(t, c.players, slates, c.held)
-			got := reachOf(t, s)
-			gotJSON, _ := json.Marshal(got)
-			wantJSON, _ := json.Marshal(c.want)
-			if string(gotJSON) != string(wantJSON) {
-				t.Fatalf("reach\n got %s\nwant %s", gotJSON, wantJSON)
+			got, err := json.Marshal(reachOf(t, s))
+			if err != nil {
+				t.Fatal(err)
 			}
+			want, err := json.Marshal(c.want)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sameJSON(t, "reach", decoded(t, got), decoded(t, want))
 			for _, h := range c.held {
 				if n := s.objs.readsOf(fileKey(fixtureRun, "players/"+h.id+".json")); n != 0 {
 					t.Fatalf("the held page %s was read %d times", h.id, n)
@@ -230,7 +283,7 @@ func TestReachReadOncePerRun(t *testing.T) {
 	for range 3 {
 		reachOf(t, s)
 	}
-	*s.now = s.now.Add(PointerTTL)
+	s.advance(PointerTTL)
 	reachOf(t, s)
 	for _, id := range []string{"a", "b"} {
 		if n := s.objs.readsOf(fileKey(fixtureRun, "players/"+id+".json")); n != 1 {
@@ -239,31 +292,116 @@ func TestReachReadOncePerRun(t *testing.T) {
 	}
 }
 
-// A page that will not read leaves the manifest answering without the
-// reach, untagged and not to be kept; the pass is tried again after
-// failureTTL and the reach then answers.
+// A manifest asked while the pass is slow answers at once without the
+// reach, and with it, under the run's ETag, once the pass lands.
+func TestManifestDoesNotWaitOnTheReach(t *testing.T) {
+	s := madeRun(t, []madePlayer{{id: "a", team: "GB", through: 5}}, slate("GB"), nil)
+	release := s.objs.holding(fileKey(fixtureRun, "players/a.json"))
+	defer release()
+	for range 3 {
+		lesser(t, s.get(t, "/run/manifest", nil))
+	}
+	release()
+	landed(t, s)
+	rec := s.get(t, "/run/manifest", nil)
+	if got := manifestReach(t, rec); got == nil || got.Through != "through week 5" {
+		t.Fatalf("after the pass: %+v", got)
+	}
+	if tag := rec.Header().Get("ETag"); tag != `W/"`+fixtureRun+`/manifest.json"` {
+		t.Fatalf("ETag %s", tag)
+	}
+	if n := s.objs.readsOf(fileKey(fixtureRun, "players/a.json")); n != 1 {
+		t.Fatalf("the page was read %d times by one pass", n)
+	}
+}
+
+// A request that hangs up does not end the pass it started: the next
+// asker gets the reach.
+func TestACancelledRequestLeavesThePass(t *testing.T) {
+	s := madeRun(t, []madePlayer{{id: "a", team: "GB", through: 5}}, slate("GB"), nil)
+	release := s.objs.holding(fileKey(fixtureRun, "players/a.json"))
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/run/manifest", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	s.mux.ServeHTTP(rec, req)
+	cancel()
+	lesser(t, rec)
+	release()
+	if got := landed(t, s); got.answer == nil {
+		t.Fatalf("the pass was ended with its caller: %+v", got)
+	}
+	if r := manifestReach(t, s.get(t, "/run/manifest", nil)); r == nil {
+		t.Fatal("the next asker got no reach")
+	}
+}
+
+// A pass that runs out of time is never kept: the manifest answers
+// without the reach and no pass runs again until the backoff ends, which
+// doubles after each failure; then the reach lands.
+func TestATimedOutPassBacksOff(t *testing.T) {
+	s := madeRun(t, []madePlayer{{id: "a", team: "GB", through: 5}}, slate("GB"), nil)
+	s.reader.reachTimeout = 20 * time.Millisecond
+	page := fileKey(fixtureRun, "players/a.json")
+	release := s.objs.holding(page)
+	defer release()
+
+	lesser(t, s.get(t, "/run/manifest", nil))
+	if got := landed(t, s); got.answer != nil || got.backoff != firstReachBackoff {
+		t.Fatalf("after a timeout: %+v", got)
+	}
+	lesser(t, s.get(t, "/run/manifest", nil))
+	s.advance(firstReachBackoff - time.Second)
+	lesser(t, s.get(t, "/run/manifest", nil))
+	if n := s.objs.readsOf(page); n != 1 {
+		t.Fatalf("the pass ran again within its backoff: %d reads", n)
+	}
+
+	s.advance(time.Second)
+	lesser(t, s.get(t, "/run/manifest", nil))
+	got := waitFor(t, s, "doubled its backoff", func(m reachMemo) bool { return m.backoff == 2*firstReachBackoff })
+	if want := s.now().Add(2 * firstReachBackoff); !got.retryAt.Equal(want) || got.answer != nil {
+		t.Fatalf("the second backoff: %+v; want a retry at %s", got, want)
+	}
+
+	release()
+	s.advance(2 * firstReachBackoff)
+	if r := reachOf(t, s); r.Through != "through week 5" {
+		t.Fatalf("after the backoff: %+v", r)
+	}
+	if got := landed(t, s); got.backoff != 0 || !got.retryAt.IsZero() {
+		t.Fatalf("a landed pass keeps a backoff: %+v", got)
+	}
+}
+
+// A page that will not read is a failed pass: the manifest answers
+// without the reach, and a client holding the run's answer keeps it (304).
 func TestReachFailureKeepsTheManifest(t *testing.T) {
 	s := madeRun(t, []madePlayer{{id: "a", team: "GB", through: 5}}, slate("GB"), nil)
 	page := fileKey(fixtureRun, "players/a.json")
-	s.objs.fail[page] = errors.New("bucket down")
+	s.objs.failing(page, errors.New("bucket down"))
 	rec := s.get(t, "/run/manifest", nil)
-	got := data(t, rec)
-	if _, has := got["reach"]; has {
-		t.Fatalf("a reach that did not work out was sent: %s", got["reach"])
-	}
-	if _, has := got["manifest"]; !has {
+	lesser(t, rec)
+	if _, has := data(t, rec)["manifest"]; !has {
 		t.Fatal("the manifest was not sent")
 	}
-	if rec.Header().Get("ETag") != "" || rec.Header().Get("Cache-Control") != "no-store" {
-		t.Fatalf("the lesser answer is tagged %q, %q", rec.Header().Get("ETag"), rec.Header().Get("Cache-Control"))
+	landed(t, s)
+	tag := `W/"` + fixtureRun + `/manifest.json"`
+	if rec := s.get(t, "/run/manifest", http.Header{"If-None-Match": {tag}}); rec.Code != http.StatusNotModified {
+		t.Fatalf("a client holding the run's answer: %d", rec.Code)
 	}
-	delete(s.objs.fail, page)
-	data(t, s.get(t, "/run/manifest", nil))
-	if n := s.objs.readsOf(page); n != 1 {
-		t.Fatalf("the failed pass was tried again within failureTTL: %d reads", n)
-	}
-	*s.now = s.now.Add(failureTTL)
+	s.objs.failing(page, nil)
+	s.advance(firstReachBackoff)
 	if r := reachOf(t, s); r.Through != "through week 5" {
-		t.Fatalf("after failureTTL: %+v", r)
+		t.Fatalf("after the backoff: %+v", r)
+	}
+}
+
+// A page whose block is scored apart from the first page's is a run the
+// web's gate refuses: no reach rather than a wrong one.
+func TestReachRefusesBlocksThatDisagree(t *testing.T) {
+	s := madeRun(t, []madePlayer{{id: "a", team: "GB", through: 5}, {id: "b", team: "DAL", through: 4}}, slate("GB"), nil)
+	lesser(t, s.get(t, "/run/manifest", nil))
+	if got := landed(t, s); got.answer != nil {
+		t.Fatalf("a reach over blocks that disagree: %+v", got)
 	}
 }

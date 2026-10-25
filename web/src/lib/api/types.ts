@@ -1106,7 +1106,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** The published nightly run's manifest (Lane 185): its id, when it finished, its season, every format it carries (the default first) with the week its rest of season ranks from, and how many players have a page. The run is the one runs/latest.json names, the same the site is built from, and never one whose manifest is missing or names another run. Only the members the site's reader names are sent; the sources block is provenance and is never sent. Every /run route answers a weak ETag (the run id and the file; designations, rewritten beside the run every hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a matching If-None-Match. 503 storage_unavailable when the run cannot be read here. Beside the manifest, the run's season reach (Lane 203): what every basis's "through week" says, counted over every own page of the run as the site counts it, worked out once per run. It is absent only when the run's pages cannot be read for it; that answer carries no ETag and is not to be kept. */
+		/** The published nightly run's manifest (Lane 185): its id, when it finished, its season, every format it carries (the default first) with the week its rest of season ranks from, and how many players have a page. The run is the one runs/latest.json names, the same the site is built from, and never one whose manifest is missing or names another run. Only the members the site's reader names are sent; the sources block is provenance and is never sent. Every /run route answers a weak ETag (the run id and the file; designations, rewritten beside the run every hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a matching If-None-Match. 503 storage_unavailable when the run cannot be read here. Beside the manifest, the run's season reach (Lane 203): what every basis's "through week" says, counted over every own page of the run as the site counts it, worked out once per run in the background. It is absent while that first pass runs (a request never waits on it) and while a failed pass waits to run again; that answer carries no ETag and is not to be kept, and a client holding the run's answer is answered 304. */
 		get: operations['runManifest'];
 		put?: never;
 		post?: never;
@@ -3149,7 +3149,7 @@ export interface components {
 			/** @description the published run every /run answer is read from */
 			run_id: string;
 			manifest: components['schemas']['RunManifest'];
-			/** @description the run's season reach (Lane 203), absent on an API from before it and when the run's pages cannot be read for it */
+			/** @description the run's season reach (Lane 203), absent on an API from before it, while the run's first pass runs, and while a failed pass waits to run again */
 			reach?: components['schemas']['RunReach'];
 		};
 		/** @description how far the run's season figures reach, as the site's bases say it (web/src/lib/run/reach.ts runReach): counted over every own page of the run (never a held page's copy), his club's game by his log, never a game final by its status alone */

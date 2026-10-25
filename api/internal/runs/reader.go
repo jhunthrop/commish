@@ -65,11 +65,15 @@ type Reader struct {
 	// answers are the published run's alone, by file path: a new run
 	// drops the last one's.
 	answers map[string]cached
+	// reach is the season reach pass's state for one run (reach.go), and
+	// reachTimeout its own budget, apart from a file's readTimeout.
+	reach        reachMemo
+	reachTimeout time.Duration
 }
 
 // NewReader reads the published run from objects.
 func NewReader(objects Objects, now func() time.Time, log *slog.Logger) *Reader {
-	return &Reader{objects: objects, now: now, log: log, answers: map[string]cached{}}
+	return &Reader{objects: objects, now: now, log: log, answers: map[string]cached{}, reachTimeout: reachTimeout}
 }
 
 // Published is the run runs/latest.json names. A run whose manifest is
@@ -209,13 +213,6 @@ func (r *Reader) keep(runID, file string, c cached) {
 func (r *Reader) load(ctx context.Context, runID string, a artifact) (Answer, error) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), readTimeout)
 	defer cancel()
-	if a.compose != nil {
-		fields, err := a.compose(ctx, r, runID)
-		if err != nil {
-			return Answer{}, fmt.Errorf("runs: run %s %s: %w", runID, a.path, err)
-		}
-		return answerOf(runID, a, fields)
-	}
 	var fields []field
 	raw, err := r.objects.Get(ctx, fileKey(runID, a.path))
 	switch {
@@ -228,10 +225,6 @@ func (r *Reader) load(ctx context.Context, runID string, a artifact) (Answer, er
 			return Answer{}, fmt.Errorf("runs: run %s: %w", runID, err)
 		}
 	}
-	return answerOf(runID, a, fields)
-}
-
-func answerOf(runID string, a artifact, fields []field) (Answer, error) {
 	data, err := encodeAnswer(runID, fields)
 	if err != nil {
 		return Answer{}, fmt.Errorf("runs: run %s %s: %w", runID, a.path, err)
@@ -239,16 +232,11 @@ func answerOf(runID string, a artifact, fields []field) (Answer, error) {
 	return Answer{RunID: runID, ETag: etag(runID, a, data), Data: data}, nil
 }
 
-// etag names the run and the file (a composed answer's, the file it
-// names); an hourly file's adds a digest of what it holds, since the
-// run's id stays while it is written again. It is weak: the gzip and the
-// plain body of one answer share it.
+// etag names the run and the file; an hourly file's adds a digest of
+// what it holds, since the run's id stays while it is written again. It
+// is weak: the gzip and the plain body of one answer share it.
 func etag(runID string, a artifact, data []byte) string {
-	file := a.path
-	if a.tagged != "" {
-		file = a.tagged
-	}
-	tag := runID + "/" + file
+	tag := runID + "/" + a.path
 	if a.hourly {
 		sum := sha256.Sum256(data)
 		tag += "@" + hex.EncodeToString(sum[:hourlyTagBytes])
