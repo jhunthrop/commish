@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -73,17 +74,16 @@ fun Headshot(
     }
     val context = LocalContext.current
     val pixels = with(LocalDensity.current) { ceil(side.toPx()).toInt() }
-    val painter =
-        rememberAsyncImagePainter(
-            model =
-                ImageRequest
-                    .Builder(context)
-                    .data(address)
-                    .size(pixels)
-                    .build(),
-            imageLoader = Headshots.loader(context),
-            contentScale = ContentScale.Crop,
-        )
+    // Sized to the circle so it loads at once, without waiting for a draw to measure it.
+    val request =
+        remember(address, pixels) {
+            ImageRequest
+                .Builder(context)
+                .data(address)
+                .size(pixels)
+                .build()
+        }
+    val painter = rememberAsyncImagePainter(request, imageLoader = Headshots.loader(context), contentScale = ContentScale.Crop)
     val state by painter.state.collectAsState()
     if (state is AsyncImagePainter.State.Success) {
         Box(modifier.size(side).clip(CircleShape).background(CommishTheme.colors.surface2)) {
