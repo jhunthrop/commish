@@ -19,6 +19,7 @@
 		sortedFigure,
 		stripCells,
 		moveHref,
+		moveShort,
 		moveWords,
 		orderSections,
 		type OrderSection,
@@ -145,6 +146,7 @@
 									{href}
 									move={row.move}
 									said={moveWords(row, league.moves, league.host)}
+									short={moveShort(row)}
 									name={row.box.name}
 								/>
 							{:else if league !== null && row.held !== null}<span class="held">{row.held}</span>
@@ -159,6 +161,8 @@
 
 <style>
 	.order {
+		/* A phone row's face, the height of its first line (BoxPlayer's line, LINE_PHONE_FACE). */
+		--line-face: 28px;
 		width: 100%;
 		border-collapse: separate;
 		border-spacing: 0;
@@ -397,11 +401,12 @@
 		}
 	}
 
-	/* A phone's row (Lane 209): two lines and the strip, one height down the list. The row is a grid:
+	/* A phone's row (Lane 209), and below a wide screen too (review M6): two lines and the strip, one
+	   height down the list. The row is a grid:
 	   # and the player on the first line with Projected big at its end, the verb at the end of the
 	   game's line, the player's cell spanning both and its strip running under them from the # column
 	   (BoxPlayer's line, which keeps room at the line ends from the vars here). */
-	@media (max-width: 760px) {
+	@media (max-width: 1100px) {
 		.order {
 			--rank-w: 26px;
 			--col-gap: 6px;
@@ -421,7 +426,7 @@
 		.cols {
 			display: grid;
 			grid-template-columns: var(--rank-w) minmax(0, 1fr) auto;
-			grid-template-rows: 28px 22px auto;
+			grid-template-rows: var(--line-face) 22px auto;
 			column-gap: var(--col-gap);
 			row-gap: 2px;
 			height: auto;
@@ -484,9 +489,9 @@
 		td.player {
 			grid-column: 2 / 4;
 			grid-row: 1 / 4;
-			--line-end: 64px;
+			--line-end: 52px;
 			--line-end-2: 72px;
-			--strip-pull: calc(var(--rank-w) + var(--col-gap) + 28px + var(--s-2));
+			--strip-pull: calc(var(--rank-w) + var(--col-gap) + var(--line-face) + var(--s-2));
 		}
 
 		td.key,
@@ -499,8 +504,10 @@
 			position: relative;
 		}
 
+		/* The player is the biggest thing on the row (box score rule): Projected at the name's size,
+		   its weight the emphasis (review H1). */
 		td.key {
-			font-size: var(--t-lg);
+			font-size: var(--t-md);
 		}
 
 		td.act {
@@ -524,6 +531,13 @@
 
 		.ph-mark {
 			max-width: 80px;
+		}
+	}
+
+	/* Between a phone and a wide screen the face keeps its 32 px. */
+	@media (min-width: 761px) and (max-width: 1100px) {
+		.order {
+			--line-face: 32px;
 		}
 	}
 </style>

@@ -82,7 +82,7 @@ export const FIGURE_HEADS: Readonly<Record<FigureKey, string>> = {
 };
 
 /** A row's figures where the table's columns give way (Lane 209): the week's figure under its Wk
- * head (a phone's alone, where that column gives way too), the season's figures after Projected with
+ * head (a narrow cell), the season's figures after Projected with
  * the key the # sorts on in ink, the opponent's rank, then Last; Avg where the view has no Over repl.,
  * so a strip holds five cells in every view. Each under its own head, never a sentence. */
 export function stripCells(
@@ -94,7 +94,7 @@ export function stripCells(
 	const evidence = row.box.evidence;
 	const [avg, last] = formCells(evidence);
 	return [
-		figureCell(weekHead(week), row.week, { phoneOnly: true }),
+		figureCell(weekHead(week), row.week, { narrow: true }),
 		...figureColumns(rankBy)
 			.slice(1)
 			.map((f) => figureCell(FIGURE_HEADS[f], row.figures[f], { key: f === sorted })),
@@ -255,6 +255,12 @@ export function moveWords(
 ): string {
 	if (row.move === 'trade') return ORDER.tradeFor;
 	return addVerbWords(moves, row.hostId, host);
+}
+
+/** A move's short word beside its glyph on a phone's row (review M4): "Add" or "Trade". */
+export function moveShort(row: Pick<OrderView, 'move'>): string | null {
+	if (row.move === null) return null;
+	return row.move === 'trade' ? ORDER.tradeShort : ORDER.addShort;
 }
 
 /** A league screen's page for a league (tabs.ts tabHref, given by the caller). */

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { StripCell } from '#lib/league/box/figure-strip.ts';
+	import { stripTracks, type StripCell } from '#lib/league/box/figure-strip.ts';
 	import OppRank from './OppRank.svelte';
 
 	/** A row's figures as labelled cells in one strip (Lane 209): each cell its head in small caps
@@ -10,11 +10,12 @@
 	}
 
 	let { cells }: Props = $props();
+	const tracks = $derived(stripTracks(cells));
 </script>
 
-<span class="strip" style:--strip-cells={cells.length}>
+<span class="strip" style:--strip-tracks={tracks}>
 	{#each cells as cell (cell.head)}
-		<span class="cell" class:key={cell.key === true} class:phone={cell.phoneOnly === true}
+		<span class="cell" class:key={cell.key === true}
 			><span class="head">{cell.head}</span>{#if cell.ease !== undefined}<OppRank
 					text={cell.value}
 					ease={cell.ease}
@@ -24,12 +25,14 @@
 </span>
 
 <style>
-	/* Between a phone and a wide screen the strip sits under the name and wraps before it widens the
-	   table. */
+	/* A grid of fixed shares wherever the strip is drawn (below a wide screen, across the row), so
+	   every head sits over its column down the list (review M6). */
 	.strip {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 2px var(--s-2);
+		/* A step under the cell labels (--t-xs), so five heads fit a phone row. */
+		--strip-head: 0.625rem;
+		display: grid;
+		grid-template-columns: var(--strip-tracks);
+		column-gap: var(--s-2);
 	}
 
 	.cell {
@@ -40,7 +43,7 @@
 	}
 
 	.head {
-		font-size: 0.625rem;
+		font-size: var(--strip-head);
 		font-weight: 600;
 		line-height: 1.25;
 		letter-spacing: 0.02em;
@@ -82,19 +85,20 @@
 		color: var(--ink-2);
 	}
 
-	.phone {
-		display: none;
-	}
-
 	@media (max-width: 760px) {
 		.strip {
-			display: grid;
-			grid-template-columns: repeat(var(--strip-cells), minmax(0, 1fr));
-			gap: 4px;
+			column-gap: 4px;
+		}
+	}
+
+	/* The narrowest phones: the heads set tight so the longest, OVER REPL., keeps its cell. */
+	@media (max-width: 359px) {
+		.strip {
+			column-gap: 2px;
 		}
 
-		.phone {
-			display: flex;
+		.head {
+			letter-spacing: 0;
 		}
 	}
 </style>
