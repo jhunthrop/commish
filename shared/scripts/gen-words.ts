@@ -136,6 +136,7 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/context/menu-words.ts',
 		picks: [
 			['followFirst', 'FOLLOW_FIRST'],
+			['followAnother', 'FOLLOW_ANOTHER'],
 			['tePremium', 'TE_PREMIUM_WORDS']
 		],
 		json: 'shared/words/shell-league-switch.json'
@@ -346,6 +347,12 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/legal/contact.ts',
 		picks: [['email', 'SUPPORT_EMAIL']],
 		json: 'shared/words/account-support.json'
+	},
+	{
+		name: 'FreeSeason',
+		module: 'web/src/lib/pass/free-season.ts',
+		picks: [['ends', 'FREE_SEASON_ENDS']],
+		json: 'shared/words/account-free-season.json'
 	}
 ];
 export const OUTPUT = {

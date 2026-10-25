@@ -13,6 +13,7 @@
 	import { followedName } from './model.ts';
 	import { ATTACHED_WORDS, attachedCount, attachedRow } from './attached-rows.ts';
 	import { ACCOUNT_WORDS } from '#lib/account/words.ts';
+	import { FOLLOW_ANOTHER, FOLLOW_FIRST } from '#lib/context/menu-words.ts';
 
 	interface Props {
 		/** What the account may use (/me, Can): many_leagues follows more than one league. */
@@ -142,13 +143,12 @@
 		{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 		<div class="tfoot">
 			{#if many}
-				<Quiet size="sm" href={links.leagueNew()}>{ATTACHED_WORDS.followAnother}</Quiet>
+				<Quiet size="sm" href={links.leagueNew()}>{FOLLOW_ANOTHER}</Quiet>
 			{/if}
 		</div>
 	{:else if leagues}
 		<EmptyState level={3} title={ATTACHED_WORDS.none}>
-			{#snippet actions()}<Quiet href={links.leagueNew()}>{ATTACHED_WORDS.followFirst}</Quiet
-				>{/snippet}
+			{#snippet actions()}<Quiet href={links.leagueNew()}>{FOLLOW_FIRST}</Quiet>{/snippet}
 		</EmptyState>
 	{/if}
 </section>

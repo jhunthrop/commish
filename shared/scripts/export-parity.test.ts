@@ -260,7 +260,7 @@ void test("the Account's words: who, the free season's plan, each league's row, 
 		counts: { count: number; words: string }[];
 		devices: { id: string; line: string }[];
 		reads: { readAt: string | null; words: string }[];
-		freeSeason: { now: string; free: boolean }[];
+		freeSeason: { now: string; flag: boolean | null; free: boolean }[];
 	};
 	assert.equal(account.who.line, 'fixture@example.com, with us since Sep 1');
 	assert.equal(account.plan.title, 'Free this season');
@@ -274,6 +274,6 @@ void test("the Account's words: who, the free season's plan, each league's row, 
 	assert.ok(account.reads.some((r) => r.words === '4 minutes ago'));
 	assert.deepEqual(
 		account.freeSeason.map((f) => f.free),
-		[true, false]
+		[true, true, false, false, true, false]
 	);
 });

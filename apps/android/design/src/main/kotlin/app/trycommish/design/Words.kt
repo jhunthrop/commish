@@ -153,6 +153,7 @@ object Words {
 
     object LeagueSwitch {
         const val followFirst = "Follow your league"
+        const val followAnother = "Follow another league"
         const val tePremium = "extra points per catch for tight ends"
     }
 
@@ -504,8 +505,6 @@ object Words {
         const val undo = "Undo"
         const val unread = "Your leagues can't be read right now."
         const val none = "No leagues yet"
-        const val followFirst = "Follow your league"
-        const val followAnother = "Follow another league"
         const val newestFirst = "newest first"
     }
 
@@ -549,5 +548,9 @@ object Words {
 
     object Support {
         const val email = "help@trycommish.app"
+    }
+
+    object FreeSeason {
+        const val ends = "2027-03-01T00:00:00Z"
     }
 }

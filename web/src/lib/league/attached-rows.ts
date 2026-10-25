@@ -38,8 +38,6 @@ export const ATTACHED_WORDS = {
 	undo: 'Undo',
 	unread: "Your leagues can't be read right now.",
 	none: 'No leagues yet',
-	followFirst: 'Follow your league',
-	followAnother: 'Follow another league',
 	newestFirst: 'newest first'
 } as const;
 

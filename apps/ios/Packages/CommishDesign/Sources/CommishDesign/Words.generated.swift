@@ -151,6 +151,7 @@ public enum Words {
 
     public enum LeagueSwitch {
         public static let followFirst = "Follow your league"
+        public static let followAnother = "Follow another league"
         public static let tePremium = "extra points per catch for tight ends"
     }
 
@@ -502,8 +503,6 @@ public enum Words {
         public static let undo = "Undo"
         public static let unread = "Your leagues can't be read right now."
         public static let none = "No leagues yet"
-        public static let followFirst = "Follow your league"
-        public static let followAnother = "Follow another league"
         public static let newestFirst = "newest first"
     }
 
@@ -547,5 +546,9 @@ public enum Words {
 
     public enum Support {
         public static let email = "help@trycommish.app"
+    }
+
+    public enum FreeSeason {
+        public static let ends = "2027-03-01T00:00:00Z"
     }
 }

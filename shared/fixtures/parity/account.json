@@ -14,10 +14,32 @@
 	"freeSeason": [
 		{
 			"now": "2026-10-17T17:00:00.000Z",
+			"flag": null,
+			"free": true
+		},
+		{
+			"now": "2026-10-17T17:00:00.000Z",
+			"flag": true,
+			"free": true
+		},
+		{
+			"now": "2026-10-17T17:00:00.000Z",
+			"flag": false,
+			"free": false
+		},
+		{
+			"now": "2027-03-01T00:00:00Z",
+			"flag": null,
+			"free": false
+		},
+		{
+			"now": "2027-03-01T00:00:00Z",
+			"flag": true,
 			"free": true
 		},
 		{
 			"now": "2027-03-01T00:00:00Z",
+			"flag": false,
 			"free": false
 		}
 	],

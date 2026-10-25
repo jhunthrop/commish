@@ -44,10 +44,13 @@ export function renderAccount(
 		zone,
 		who: { name: displayName(answers.me), line: whoLine(answers.me) },
 		plan: planWords(answers.me, true),
-		freeSeason: [now, FREE_SEASON_ENDS].map((clock) => ({
-			now: clock,
-			free: freeSeasonAt(new Date(clock))
-		})),
+		freeSeason: [now, FREE_SEASON_ENDS].flatMap((clock) =>
+			[undefined, true, false].map((flag) => ({
+				now: clock,
+				flag: flag ?? null,
+				free: freeSeasonAt(new Date(clock), flag)
+			}))
+		),
 		leagues: answers.attached.map((league) => ({
 			...attachedRow(league, at, zone),
 			name: followedName(league)
