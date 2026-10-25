@@ -16,4 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "commish"
 
-include(":app", ":api", ":design", ":core", ":feature:boxscore", ":feature:leaguehome", ":feature:matchup",":feature:shell", ":feature:start")
+include(":app", ":api", ":design", ":core", ":feature:boxscore", ":feature:leaguehome", ":feature:matchup", ":feature:board",":feature:shell", ":feature:start")
