@@ -11,16 +11,42 @@ public enum Column {
     public static let pts: Double = 42
     public static let why: Double = 30
     public static let face: Double = 28
+    /// The Trades' last cell, his rest-of-season points a game under "A game".
+    public static let season: Double = 50
 }
 
 /// Which of the box's own parts a screen draws: the Lineup's evidence line under each player and the
-/// cell that opens a swap's evidence; the Matchup's rows have neither (BoxLine's evidence prop).
+/// cell that opens a swap's evidence; the Matchup's rows have neither (BoxLine's evidence prop); the
+/// Trades' opened rows (BoxLine with season and shortOnPhone, no facts on the phone's game line) draw
+/// the evidence line, his short name, no rank, and his points a game where the others draw Pts.
 public struct BoxStyle: Equatable, Sendable {
     public let evidence: Bool
     public let why: Bool
+    public let rank: Bool
+    /// The expected score and weather under his game while it is to come.
+    public let facts: Bool
+    /// The last cell is his rest-of-season points a game, in place of Pts.
+    public let season: Bool
+    /// His short form, "A. Rodgers", whatever the room.
+    public let shortName: Bool
+
+    public init(
+        evidence: Bool, why: Bool, rank: Bool = true, facts: Bool = true, season: Bool = false,
+        shortName: Bool = false
+    ) {
+        self.evidence = evidence
+        self.why = why
+        self.rank = rank
+        self.facts = facts
+        self.season = season
+        self.shortName = shortName
+    }
 
     public static let lineup = BoxStyle(evidence: true, why: true)
     public static let matchup = BoxStyle(evidence: false, why: false)
+    public static let trade = BoxStyle(
+        evidence: true, why: false, rank: false, facts: false, season: true, shortName: true
+    )
 }
 
 /// What a row does when tapped: his name opens the player sheet, the chevron his evidence line.
@@ -59,7 +85,8 @@ public struct TableFrame<Content: View>: View {
     }
 }
 
-/// The column heads: Slot, Player, Our rank on two lines over the rank alone, Proj, Pts.
+/// The column heads: Slot, Player, Our rank on two lines over the rank alone, Proj, Pts; on the
+/// Trades', the side, Player, Proj and A game.
 public struct HeadRow: View {
     @Environment(\.colorScheme) private var colorScheme
     private let style: BoxStyle
@@ -71,11 +98,18 @@ public struct HeadRow: View {
     public var body: some View {
         let theme = Theme(colorScheme)
         HStack(spacing: 0) {
-            head(Words.Box.slot).frame(width: Column.slot, alignment: .leading)
+            // The Trades' side cell has no head (TradeFinder's hidden "Give").
+            head(style.season ? "" : Words.Box.slot).frame(width: Column.slot, alignment: .leading)
             head(Words.Box.player).frame(maxWidth: .infinity, alignment: .leading)
-            head(Words.Box.ourRank).frame(width: Column.rank, alignment: .leading)
+            if style.rank {
+                head(Words.Box.ourRank).frame(width: Column.rank, alignment: .leading)
+            }
             head(Words.Box.proj).frame(width: Column.proj, alignment: .trailing)
-            head(Words.Box.pts).frame(width: Column.pts, alignment: .trailing)
+            if style.season {
+                head(Words.Trades.perGame).frame(width: Column.season, alignment: .trailing)
+            } else {
+                head(Words.Box.pts).frame(width: Column.pts, alignment: .trailing)
+            }
             if style.why {
                 Color.clear.frame(width: Column.why, height: 1)
             }

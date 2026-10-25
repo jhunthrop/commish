@@ -59,6 +59,18 @@ import type { HostMoveResult, WaiverAdvice } from '../../web/src/lib/league/inse
 import { BOARD_OUTPUT, renderBoard } from './board-parity.ts';
 import { BOARD_RUN_OUTPUT, renderBoardRun } from './board-run-parity.ts';
 import {
+	builderAt,
+	checkAt,
+	copiedWords,
+	holdingAt,
+	TRADES_OUTPUT,
+	tradesAt,
+	wordCases
+} from './trades-parity.ts';
+import { HOLDING_PLAYER } from './export-fixtures.ts';
+import { worthProposing } from '../../web/src/lib/league/box/trades.ts';
+import type { TradeAdvice, TradeCheck } from '../../web/src/lib/league/inseason/api.ts';
+import {
 	GAME_STATE_OUTPUT,
 	lineRows,
 	renderGameState,
@@ -504,6 +516,62 @@ export async function renderWaivers(host: LeagueSync['host']): Promise<string> {
 	return `${JSON.stringify(waivers, null, '\t')}\n`;
 }
 
+/** The clocks the fixtures post the strip's checks at (export-fixtures.ts), and how many each. */
+const CHECK_CLOCKS = ['2026-10-17T17-00-00Z', '2026-10-18T18-56-00Z'] as const;
+const CHECKS_AT_A_CLOCK = 2;
+
+/** The Trades at every clock as the fixture's league reads it, every check the fixtures post, and the
+ * line under a pressed verb (trades-parity.ts). The member's team is the switch's (leagues-attached),
+ * the platform the league read's. */
+export async function renderTrades(host: LeagueSync['host']): Promise<string> {
+	const attached = await answer<{ id: string; team_name: string }[]>('leagues-attached.json');
+	const me = attached.find((l) => l.id === LEAGUE)?.team_name ?? '';
+	const clocks: Record<string, unknown> = {};
+	for (const clock of CLOCKS) {
+		const advice = await answer<TradeAdvice>(`trades-${LEAGUE}-${clock}.json`);
+		clocks[clock] = tradesAt(advice, host, me, instantOf(clock), ZONE);
+	}
+	const checks: Record<string, unknown[]> = {};
+	for (const clock of CHECK_CLOCKS) {
+		const advice = await answer<TradeAdvice>(`trades-${LEAGUE}-${clock}.json`);
+		const read: unknown[] = [];
+		for (let n = 1; n <= CHECKS_AT_A_CLOCK; n += 1) {
+			const check = await answer<TradeCheck>(`trade-check-${LEAGUE}-${clock}-${String(n)}.json`);
+			// The fixtures post the strip's trades in its order (export-fixtures.ts checkBody).
+			const team = worthProposing(advice.teams)[n - 1]?.team.name ?? '';
+			read.push(checkAt(check, me, team, instantOf(clock)));
+		}
+		checks[clock] = read;
+	}
+	const weekAdvice = await answer<TradeAdvice>(`trades-${LEAGUE}-${CHECK_CLOCKS[0]}.json`);
+	const firstCheck = await answer<TradeCheck>(`trade-check-${LEAGUE}-${CHECK_CLOCKS[0]}-1.json`);
+	const trades = {
+		about: generatedBy(
+			SCRIPT,
+			'web/src/lib/league/box/trades.ts, basis.ts, inseason/builder.ts and words.ts over shared/fixtures/inseason'
+		),
+		zone: ZONE,
+		host,
+		me,
+		clocks,
+		checks,
+		copied: copiedWords(host),
+		words: wordCases(firstCheck),
+		holding: holdingAt(
+			weekAdvice,
+			await answer<TradeAdvice>(
+				`trades-${LEAGUE}-player-${HOLDING_PLAYER}-${CHECK_CLOCKS[0]}.json`
+			),
+			HOLDING_PLAYER,
+			me,
+			instantOf(CHECK_CLOCKS[0]),
+			ZONE
+		),
+		builder: builderAt(weekAdvice, firstCheck, me, instantOf(CHECK_CLOCKS[0]), ZONE)
+	};
+	return `${JSON.stringify(trades, null, '\t')}\n`;
+}
+
 export async function generate(): Promise<Outputs> {
 	const sync = await answer<LeagueSync>(`leagues-attached-${LEAGUE}.json`);
 	const boards = new Map<string, Scoreboard>();
@@ -538,7 +606,8 @@ export async function generate(): Promise<Outputs> {
 				)
 			)
 		],
-		[WAIVERS_OUTPUT, await renderWaivers(sync.host)]
+		[WAIVERS_OUTPUT, await renderWaivers(sync.host)],
+		[TRADES_OUTPUT, await renderTrades(sync.host)]
 	]);
 }
 

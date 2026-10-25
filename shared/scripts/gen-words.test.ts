@@ -124,7 +124,10 @@ void test("the tables: the League home's, the box score's, then the shell's and 
 			'WaiverHeads',
 			'Stash',
 			'Season',
-			'Strip'
+			'Strip',
+			'Trades',
+			'TradePicker',
+			'Builder'
 		]
 	);
 	assert.equal(new Set(TABLES.map((t) => t.json)).size, TABLES.length);
@@ -148,6 +151,9 @@ void test("the web's own words land in the JSON, the Swift and the Kotlin", asyn
 	);
 	assert.equal(json('shared/words/board-format.json').half, 'Half PPR');
 	assert.equal(json('shared/words/page-verb.json').mock, 'Start a mock draft');
+	assert.equal(json('shared/words/league-trades.json').proposeItOn, 'Propose it on');
+	assert.equal(json('shared/words/league-trade-picker.json').every, 'Every trade');
+	assert.equal(json('shared/words/league-builder.json').open, 'Build a trade');
 	assert.match(
 		String(json('shared/words/board-basis.json').gap),
 		/^Gap, drafters' ADP less our rank/

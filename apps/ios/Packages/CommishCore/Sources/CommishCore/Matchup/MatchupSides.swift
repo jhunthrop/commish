@@ -186,7 +186,7 @@ enum MatchupSides {
             slug: nil, clubMark: mark, club: player.team, position: position, rank: nil,
             status: RowStatuses.of(nil, hostIR: player.injuredReserve, zone: zone),
             reserve: player.injuredReserve, game: .none, expected: nil, weather: nil, proj: nil, pts: pts,
-            read: .noGame, oppRank: nil, oppOf: nil, avg: nil, last: nil, delta: nil
+            read: .noGame, oppRank: nil, oppOf: nil, avg: nil, last: nil, delta: nil, season: nil
         )
     }
 
