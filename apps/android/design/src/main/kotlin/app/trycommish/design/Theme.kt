@@ -36,6 +36,11 @@ data class CommishColors(
     val gainInk: Color,
     val lossBg: Color,
     val lossInk: Color,
+    /** The lit board (the Team row, a score bug): its ground, its ink, its labels, its figure. */
+    val scoreboard: Color,
+    val scoreboardInk: Color,
+    val scoreboardInk2: Color,
+    val scoreboardNum: Color,
 ) {
     companion object {
         fun of(dark: Boolean): CommishColors {
@@ -60,6 +65,10 @@ data class CommishColors(
                 gainInk = c.gainInk.resolve(dark),
                 lossBg = c.lossBg.resolve(dark),
                 lossInk = c.lossInk.resolve(dark),
+                scoreboard = c.scoreboard.resolve(dark),
+                scoreboardInk = c.scoreboardInk.resolve(dark),
+                scoreboardInk2 = c.scoreboardInk2.resolve(dark),
+                scoreboardNum = c.scoreboardNum.resolve(dark),
             )
         }
     }
