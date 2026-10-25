@@ -38,16 +38,8 @@ struct LiveRunTests {
         let all = BoardModel(read: read, position: nil, inSeason: true, following: false, now: now, zone: .current)
         print("head: \(all.words.heading) / \(all.stamp) / \(all.restLine ?? "-")")
         let counting = Counted(client)
-        print(
-            "tags",
-            read.manifest.tag ?? "-",
-            read.board.tag ?? "-",
-            read.sources.tag ?? "-",
-            read.designations.tag ?? "-"
-        )
         _ = try await RunBoardReader.read(counting, format: nil, kept: read)
-        await print("unchanged", counting.unchanged)
-        #expect(await counting.unchanged == 4)
+        #expect(await counting.unchanged == 5)
     }
 }
 
@@ -74,6 +66,10 @@ actor Counted: RunAPI {
 
     func designations(tag: String?) async throws -> RunRead<RunDesignations?> {
         try await count(client.designations(tag: tag))
+    }
+
+    func clubs(tag: String?) async throws -> RunRead<[RunClub]> {
+        try await count(client.clubs(tag: tag))
     }
 
     private func count<Value>(_ read: RunRead<Value>) -> RunRead<Value> {

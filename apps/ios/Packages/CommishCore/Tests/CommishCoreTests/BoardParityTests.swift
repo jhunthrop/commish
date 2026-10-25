@@ -7,7 +7,7 @@ import Testing
 /// The Board's words and figures held to the web's: boardWords for every rail, view, league state and
 /// cover, a row's figures and the capture's few words (shared/fixtures/parity/board.json); and over the
 /// two fixture runs (shared/fixtures/parity/board-run.json), every view's rows in the web's order with
-/// their statuses, tints, tiers and cliffs, the phone's basis, the run's stamp, the offline lead and
+/// their statuses, byes, tints, tiers and cliffs, the phone's basis, the run's stamp, the offline lead and
 /// the rest of the season's caption.
 struct BoardParityTests {
     struct Parity: Decodable {
@@ -85,6 +85,7 @@ struct BoardParityTests {
             let words: Parity.Words
             let capture: String?
             let statuses: [String: Status]
+            let byes: [String: String?]
             let heats: [String: String]
             let views: [View]
         }
@@ -204,6 +205,7 @@ struct BoardParityTests {
         #expect(model.rows.count == run.heats.count)
         for row in model.rows {
             #expect(row.heat.name == run.heats[row.id], "\(row.name)")
+            #expect(row.bye == run.byes[row.id].flatMap(\.self), "\(row.name)")
             let said = row.status.map { RunParity.Status(rank: $0.rank, mark: $0.mark, sits: $0.sits) }
             #expect(said == run.statuses[row.id], "\(row.name)")
         }
@@ -218,7 +220,8 @@ extension RunFixture {
             manifest: Kept(value: manifest(), tag: tag("manifest.json")),
             board: Kept(value: board(format: format), tag: tag("boards/\(format).json")),
             sources: Kept(value: adpSources(), tag: tag("adp.json")),
-            designations: Kept(value: designations(), tag: tag("designations.json"))
+            designations: Kept(value: designations(), tag: tag("designations.json")),
+            clubs: Kept(value: clubs(), tag: tag("clubs.json"))
         )
     }
 }

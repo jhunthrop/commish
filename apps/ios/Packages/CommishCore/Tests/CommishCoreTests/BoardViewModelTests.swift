@@ -7,7 +7,7 @@ import RunFixtures
 import Testing
 
 /// The Board's view model over the run's routes: the first open reads all four files; the next names
-/// each ETag it kept, and a run unchanged costs four 304s and refreshes only the read's stamp; with no
+/// each ETag it kept, and a run unchanged costs five 304s and refreshes only the read's stamp; with no
 /// signal the saved board shows, stale with its reason (through the generated client and a throwing
 /// transport too); the chips' choice holds across the sheet and a pull; a format chip reads its own
 /// board and never shows another's; a refused token signs out.
@@ -54,13 +54,13 @@ struct BoardViewModelTests {
         #expect(viewModel.stampWords == nil)
         #expect(board.words.heading == "Rest of 2026")
         #expect(board.rows.first?.name == "Jahmyr Gibbs")
-        #expect(await run.tags == [nil, nil, nil, nil], "nothing kept, nothing named")
+        #expect(await run.tags == [nil, nil, nil, nil, nil], "nothing kept, nothing named")
         let saved = await cache.read(RunBoardRead.self, route: BoardViewModel.route(nil))
         #expect(saved?.stamp == Self.now)
         #expect(saved?.value.board.tag == #"W/"2026-10-21T12-ros/boards/ppr-12.json""#)
     }
 
-    @Test func anUnchangedRunCostsFour304sAndRefreshesOnlyTheStamp() async throws {
+    @Test func anUnchangedRunCostsFive304sAndRefreshesOnlyTheStamp() async throws {
         let cache = FileCache(folder: folder)
         let first = model(StubRun(.contract), cache: cache)
         await first.load()
@@ -72,11 +72,11 @@ struct BoardViewModelTests {
         let (board, stamp, stale) = (shown.board, shown.stamp, shown.stale)
         #expect(stale == nil)
         #expect(stamp == later)
-        #expect(await run.unchanged == 4, "every file named by its kept ETag, every one a 304")
+        #expect(await run.unchanged == 5, "every file named by its kept ETag, every one a 304")
         let fixture = RunFixture.contract
         #expect(try await run.tags == [
             fixture.tag("manifest.json"), fixture.tag("boards/ppr-12.json"), fixture.tag("adp.json"),
-            fixture.tag("designations.json"),
+            fixture.tag("designations.json"), fixture.tag("clubs.json"),
         ])
         #expect(try board == BoardModel(
             read: fixture.read(format: "ppr-12"), position: nil, inSeason: true, following: false, now: later,
@@ -187,7 +187,7 @@ actor CountingRun: RunAPI {
 
     /// The tags named, the manifest's first, then the others in the board's, the ADP's, the capture's order.
     var tags: [String?] {
-        let order = ["manifest", "board", "adp", "designations"]
+        let order = ["manifest", "board", "adp", "designations", "clubs"]
         return asked.sorted { order.firstIndex(of: $0.file) ?? 0 < order.firstIndex(of: $1.file) ?? 0 }.map(\.tag)
     }
 
@@ -205,6 +205,10 @@ actor CountingRun: RunAPI {
 
     func designations(tag: String?) async throws -> RunRead<RunDesignations?> {
         try await count("designations", tag, run.designations(tag: tag))
+    }
+
+    func clubs(tag: String?) async throws -> RunRead<[RunClub]> {
+        try await count("clubs", tag, run.clubs(tag: tag))
     }
 
     private func count<Value>(_ file: String, _ tag: String?, _ read: RunRead<Value>) -> RunRead<Value> {

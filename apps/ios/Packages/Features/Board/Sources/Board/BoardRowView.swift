@@ -77,7 +77,7 @@ struct BoardSectionHead: View {
 }
 
 /// One player's row (web Row.svelte at 390): his face, his name the biggest thing, his position pill
-/// with his number there, his club, his status chip; then Projected, the row's one big figure, Over
+/// with his number there, his club and bye, his status chip; then Projected, the row's one big figure, Over
 /// repl. on its round's tint and the Gap in its tone, or a kicker's or a defense's draft order and ADP. The whole row
 /// opens the player sheet where the site has a page for him.
 struct BoardRowView: View {
@@ -122,6 +122,9 @@ struct BoardRowView: View {
             HStack(spacing: 6) {
                 PositionPill(row.pill)
                 Text(row.club).modifier(Small(theme: theme))
+                if let bye = row.bye {
+                    Text(bye).modifier(Small(theme: theme))
+                }
             }
             if let status = row.status {
                 Pill(status.mark, tone: status.sits ? .loss : .quiet)
@@ -191,7 +194,7 @@ struct BoardRowView: View {
     }
 }
 
-/// His club in the row's small caps (Row.svelte .club).
+/// His club and bye in the row's small caps (Row.svelte .club and .phone-bye).
 private struct Small: ViewModifier {
     let theme: Theme
 

@@ -8,13 +8,14 @@ public struct Kept<Value: Codable & Sendable & Equatable>: Codable, Sendable, Eq
 }
 
 /// Everything the Board draws, as read from the run's routes and kept on the phone: the manifest (the
-/// run's stamp and the format), the format's board, the ADP's sources and the injury capture, each with
-/// its ETag.
+/// run's stamp and the format), the format's board, the ADP's sources, the injury capture and the clubs'
+/// byes, each with its ETag.
 public struct RunBoardRead: Codable, Sendable, Equatable {
     public let manifest: Kept<RunManifest>
     public let board: Kept<RunBoardAnswer>
     public let sources: Kept<[RunAdpSource]>
     public let designations: Kept<RunDesignations?>
+    public let clubs: Kept<[RunClub]>
 
     /// The board's format as the manifest carries it: the reader keeps no board whose format it lacks.
     public var format: RunFormat {
@@ -33,7 +34,7 @@ public enum RunReadError: Error, Equatable {
 }
 
 /// The Board's read of the run's routes: the manifest first (its formats and its run), then the
-/// format's board, the ADP's sources and the capture together, each naming the ETag kept for it, so an
+/// format's board, the ADP's sources, the capture and the clubs together, each naming the ETag kept for it, so an
 /// unchanged file costs a 304 and keeps the copy. A board of another run than the manifest (the
 /// pointer moved between the reads) is read again afresh, once.
 enum RunBoardReader {
@@ -60,11 +61,13 @@ enum RunBoardReader {
         async let board = api.board(format: chosen, tag: keptBoard?.tag)
         async let sources = api.adpSources(tag: kept?.sources.tag)
         async let designations = api.designations(tag: kept?.designations.tag)
+        async let clubs = api.clubs(tag: kept?.clubs.tag)
         return try await RunBoardRead(
             manifest: manifest,
             board: resolve(board, kept: keptBoard),
             sources: resolve(sources, kept: kept?.sources),
-            designations: resolve(designations, kept: kept?.designations)
+            designations: resolve(designations, kept: kept?.designations),
+            clubs: resolve(clubs, kept: kept?.clubs)
         )
     }
 

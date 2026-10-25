@@ -4,7 +4,7 @@ import Foundation
 /// A fixture run as the API's run routes answer it (Lane 185, api/internal/runs), for the tests: a
 /// folder in the bucket's layout under shared/fixtures, its manifest, a format's board split as the API
 /// splits it (the ranked rows, then the kickers and defenses, each in the file's order), the ADP's
-/// sources and the designations, each in the API's envelope. Two runs: the contract run (in season,
+/// sources, the clubs and the designations, each in the API's envelope. Two runs: the contract run (in season,
 /// the rest of the season from week 7) and the stand-in before the draft (tiers, drops, the Gap).
 public struct RunFixture: Sendable {
     /// The contract run, shared/fixtures/run: in season, four players.
@@ -49,6 +49,10 @@ public struct RunFixture: Sendable {
         try envelope(["run_id": runID, "adp": runFile("adp.json")])
     }
 
+    public func clubsAnswer() throws -> Data {
+        try envelope(["run_id": runID, "clubs": runArray("clubs.json")])
+    }
+
     public func designationsAnswer() throws -> Data {
         try envelope(["run_id": runID, "designations": runFile("designations.json")])
     }
@@ -67,6 +71,10 @@ public struct RunFixture: Sendable {
         try APIDecoding.envelopeData(Components.Schemas.RunAdpAnswer.self, from: adpAnswer()).adp.sources
     }
 
+    public func clubs() throws -> [RunClub] {
+        try APIDecoding.envelopeData(Components.Schemas.RunClubsAnswer.self, from: clubsAnswer()).clubs
+    }
+
     public func designations() throws -> RunDesignations? {
         try APIDecoding.envelopeData(Components.Schemas.RunDesignationsAnswer.self, from: designationsAnswer())
             .designations?.value1
@@ -81,6 +89,14 @@ public struct RunFixture: Sendable {
 
     private func runFile(_ path: String) throws -> [String: Any] {
         try object(at: "runs/\(runID)/\(path)")
+    }
+
+    private func runArray(_ path: String) throws -> [Any] {
+        let url = try Self.fixtures.appendingPathComponent(folder).appendingPathComponent("runs/\(runID)/\(path)")
+        guard let array = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [Any] else {
+            throw FixtureError.unreadable(path)
+        }
+        return array
     }
 
     private func object(at path: String) throws -> [String: Any] {
@@ -127,6 +143,10 @@ public struct StubRun: RunAPI {
 
     public func designations(tag: String?) async throws -> RunRead<RunDesignations?> {
         try read("designations.json", tag: tag) { try fixture.designations() }
+    }
+
+    public func clubs(tag: String?) async throws -> RunRead<[RunClub]> {
+        try read("clubs.json", tag: tag) { try fixture.clubs() }
     }
 
     private func read<Value: Sendable>(

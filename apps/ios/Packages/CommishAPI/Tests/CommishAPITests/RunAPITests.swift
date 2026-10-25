@@ -89,6 +89,18 @@ struct RunAPITests {
         #expect(nothing == nil, "a run with no capture shows no status")
     }
 
+    @Test func theClubsReadWithTheirByes() async throws {
+        let fixture = RunFixture.contract
+        let transport = try TaggedTransport(status: .ok, tag: fixture.tag("clubs.json"), body: fixture.clubsAnswer())
+        guard case let .fresh(clubs, _) = try await Self.client(transport).clubs(tag: nil) else {
+            Issue.record("a first read is fresh")
+            return
+        }
+        #expect(clubs.count == 32)
+        #expect(clubs.first { $0.abbr == "BUF" }?.bye == 7)
+        #expect(await transport.requests.map(\.path) == ["/run/clubs"])
+    }
+
     @Test func aFormatTheRunLacksIsRefusedInTheAPIsWords() async throws {
         let refused = LineupAPITests.problem("not_found", "The run carries no such board.")
         await #expect(throws: APIError.envelope(code: "not_found", message: "The run carries no such board.")) {

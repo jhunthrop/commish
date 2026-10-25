@@ -134,7 +134,7 @@ struct BoardModelTests {
         manifest.formats[0].rosFromWeekPartial = true
         let partial = RunBoardRead(
             manifest: Kept(value: manifest, tag: nil), board: read.board, sources: read.sources,
-            designations: read.designations
+            designations: read.designations, clubs: read.clubs
         )
         let model = Self.model(partial, nil, inSeason: true)
         #expect(model.restLine == "PPR points for the rest of the 2026 season from week 7's games left, "
@@ -161,6 +161,7 @@ struct BoardModelTests {
         #expect(puka.name == "Puka Nacua")
         #expect(puka.pill == "WR 1")
         #expect(puka.club == "LAR")
+        #expect(puka.bye == "Bye 11")
         #expect(puka.projected == "344.1")
         #expect(puka.overReplacement == "+164.1")
         #expect(puka.heat == .round(1))
