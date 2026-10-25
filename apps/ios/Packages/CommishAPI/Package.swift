@@ -6,7 +6,11 @@ import PackageDescription
 let package = Package(
     name: "CommishAPI",
     platforms: [.iOS("17.4"), .macOS(.v14)],
-    products: [.library(name: "CommishAPI", targets: ["CommishAPI"])],
+    products: [
+        .library(name: "CommishAPI", targets: ["CommishAPI"]),
+        // The fixture runs as the run routes answer them, for the tests of every package (Lane 190).
+        .library(name: "RunFixtures", targets: ["RunFixtures"]),
+    ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.10.0"),
         .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.8.0"),
@@ -23,10 +27,12 @@ let package = Package(
             ],
             plugins: [.plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")]
         ),
+        .target(name: "RunFixtures", dependencies: ["CommishAPI"]),
         .testTarget(
             name: "CommishAPITests",
             dependencies: [
                 "CommishAPI",
+                "RunFixtures",
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "HTTPTypes", package: "swift-http-types"),
             ]
