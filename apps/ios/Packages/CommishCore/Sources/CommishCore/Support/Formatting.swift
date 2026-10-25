@@ -73,10 +73,31 @@ public enum Formatting {
 
     /// "Sun 1:00 pm": an instant on the member's clock, as the web's weekdayTime writes it.
     public static func weekdayTime(_ date: Date, zone: TimeZone) -> String {
+        format(date, "EEE h:mm a", zone: zone)
+    }
+
+    /// "7:00 pm": a time of day on the member's clock, as the web's timeOfDay.
+    public static func timeOfDay(_ date: Date, zone: TimeZone) -> String {
+        format(date, "h:mm a", zone: zone)
+    }
+
+    /// "Oct 21": a day on the member's clock, as the web's shortDay.
+    public static func shortDay(_ date: Date, zone: TimeZone) -> String {
+        format(date, "MMM d", zone: zone)
+    }
+
+    /// Whether two instants fall on the same calendar day on the member's clock (the web's sameDay).
+    public static func sameDay(_ lhs: Date, _ rhs: Date, zone: TimeZone) -> Bool {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        return calendar.isDate(lhs, inSameDayAs: rhs)
+    }
+
+    private static func format(_ date: Date, _ pattern: String, zone: TimeZone) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = zone
-        formatter.dateFormat = "EEE h:mm a"
+        formatter.dateFormat = pattern
         formatter.amSymbol = "am"
         formatter.pmSymbol = "pm"
         return formatter.string(from: date)

@@ -32,7 +32,7 @@ public enum PKCE {
 public enum SignInRoute {
     public static let client = "ios"
     /// The app link the API redirects to: the web serves the association file that hands it to the app.
-    public static let returnTo = URL(string: "https://trycommish.app/app/signed-in")!
+    public static let returnTo = SiteLinks.origin.appendingPathComponent("app/signed-in")
 
     public static func login(base: URL, challenge: String) -> URL {
         var parts = URLComponents(url: base.appendingPathComponent("auth/login"), resolvingAgainstBaseURL: false)!

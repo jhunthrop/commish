@@ -14,6 +14,8 @@ struct PhoneRailTests {
     private struct Rail: Decodable {
         let phases: [String: [Item]]
         let withoutLeague: [Item]
+        let withoutLeagueBySeason: [String: [Item]]
+        let account: Item
     }
 
     private static func rail() throws -> Rail {
@@ -36,6 +38,22 @@ struct PhoneRailTests {
 
     @Test func noLeagueFollowedIsTheWebsBarForNone() throws {
         #expect(try Self.items(PhoneRail.withoutLeague) == Self.rail().withoutLeague)
+    }
+
+    /// With no league followed the bar's phase is the site's (GET /season), as the web's railShown.
+    @Test(arguments: SitePhase.allCases)
+    func noLeagueFollowedFollowsTheSitesSeason(season: SitePhase) throws {
+        #expect(try Self.items(PhoneRail.withoutLeague(season: season))
+            == Self.rail().withoutLeagueBySeason[season.rawValue])
+    }
+
+    /// An API from before GET /season, or a season this build does not know: the season's bar.
+    @Test func noSeasonReadIsInSeason() {
+        #expect(PhoneRail.withoutLeague(season: nil) == PhoneRail.withoutLeague(season: .inSeason))
+    }
+
+    @Test func theAccountsWayInIsTheWebs() throws {
+        #expect(try Self.items([PhoneRail.account]) == [Self.rail().account])
     }
 
     @Test func aPhaseThisBuildDoesNotKnowReadsAsInSeason() {
