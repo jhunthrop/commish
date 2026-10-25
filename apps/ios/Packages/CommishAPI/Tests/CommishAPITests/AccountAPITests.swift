@@ -23,11 +23,12 @@ struct AccountAPITests {
     /// A ContextLeague as GET /me sends it.
     static func league(
         _ id: String, name: String, host: String = "sleeper", scoring: String = "ppr", format: String = "ppr",
-        phase: String = "in_season", draftAt: String? = nil, team: String = ""
+        phase: String = "in_season", draftAt: String? = nil, team: String = "", standing: String = "null"
     ) -> String {
         let draft = draftAt.map { "\"\($0)\"" } ?? "null"
         return """
-        {"id":"\(id)","name":"\(name)","host":"\(host)","team_name":"\(team)","standing":null,"scoring":"\(scoring)",\
+        {"id":"\(id)","name":"\(name)","host":"\(host)","team_name":"\(team)","standing":\(standing),\
+        "scoring":"\(scoring)",\
         "format":"\(format)","settings_league_id":null,"phase":"\(phase)","phase_basis":"Read.",\
         "draft_at":\(draft),"playoff_start_week":null,"waivers_open":true}
         """
@@ -46,7 +47,8 @@ struct AccountAPITests {
 
     @Test func theAccountCarriesTheLeaguesTheSelectionAndTheSeason() async throws {
         let first = Self.league(
-            "l-1", name: "Office Pool", scoring: "half_ppr", format: "superflex", team: "McConkey Kong Country"
+            "l-1", name: "Office Pool", scoring: "half_ppr", format: "superflex", team: "McConkey Kong Country",
+            standing: #"{"wins":5,"losses":1,"ties":0,"place":2,"teams":12}"#
         )
         let second = Self.league(
             "l-2", name: "", host: "ffpc", scoring: "te_premium", phase: "pre_draft", draftAt: "2026-10-21T17:00:00Z"
@@ -62,6 +64,8 @@ struct AccountAPITests {
         #expect(context.leagues[0].scoring == .halfPpr)
         #expect(context.leagues[0].format == .superflex)
         #expect(context.leagues[0].teamName == "McConkey Kong Country")
+        #expect(context.leagues[0].standing?.place == 2)
+        #expect(context.leagues[1].standing == nil)
         #expect(context.leagues[1].host.value1 == .ffpc)
         #expect(context.leagues[1].phase == .preDraft)
         #expect(context.leagues[1].draftAt == APIDecoding.parseDate("2026-10-21T17:00:00Z"))

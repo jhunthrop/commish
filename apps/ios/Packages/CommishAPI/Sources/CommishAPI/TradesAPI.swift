@@ -12,16 +12,25 @@ public typealias TradeSideTotals = Components.Schemas.TradeSideTotals
 /// check of one trade with both lineups before and after it (the builder's `/trades/check`). The seam
 /// the view model's tests replace with a stub.
 public protocol TradesAPI: Sendable {
-    func trades(id: String) async throws -> TradeAdvice
+    /// The finder, or with `player` (a board id) the trades holding him on either side (the Trades
+    /// holding picker).
+    func trades(id: String, player: String?) async throws -> TradeAdvice
     /// The check of one trade, nil where the API has no check to give: an API older than the route
-    /// answers 404, and the screen stands without the scoreboard. A refused token, a refused trade and a
-    /// failure throw.
+    /// answers its router's 404 (`not_found`), and the screen stands without the scoreboard. Any other
+    /// 404 (the member's team not in the read) throws its sentence, as do a refused token, a refused
+    /// trade and a failure.
     func checkTrade(id: String, trade: TradeCheckInput) async throws -> TradeCheck?
 }
 
 extension APIClient: TradesAPI {
-    public func trades(id: String) async throws -> TradeAdvice {
-        switch try await Self.unwrapped({ try await client.leagueTrades(path: .init(id: id)) }) {
+    /// The router's code for a route it does not have (httpx.CodeNotFound): an API older than the check.
+    static let routeNotFound = "not_found"
+
+    public func trades(id: String, player: String?) async throws -> TradeAdvice {
+        let output = try await Self.unwrapped {
+            try await client.leagueTrades(path: .init(id: id), query: .init(player: player))
+        }
+        switch output {
         case let .ok(answer):
             return try Self.payload(answer.body.json.value2.data)
         case let .badRequest(answer):
@@ -48,8 +57,12 @@ extension APIClient: TradesAPI {
         switch output {
         case let .ok(answer):
             return try Self.payload(answer.body.json.value2.data)
-        case .notFound:
-            return nil
+        case let .notFound(answer):
+            let problem = try Self.problem(answer.body.json)
+            if case .envelope(code: Self.routeNotFound, _) = problem {
+                return nil
+            }
+            throw problem
         case let .badRequest(answer):
             throw try Self.problem(answer.body.json)
         case let .conflict(answer):

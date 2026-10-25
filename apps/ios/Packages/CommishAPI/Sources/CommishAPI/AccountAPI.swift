@@ -22,6 +22,9 @@ public struct FollowedLeague: Equatable, Sendable, Codable, Identifiable {
     /// The member's team at the league's last read (ContextLeague.team_name), the Trades' own side;
     /// nil on a league saved before the app kept it.
     public let teamName: String?
+    /// Where the member's team stands (ContextLeague.standing), the builder's line beside its name; nil
+    /// before a read, or on a league saved before the app kept it.
+    public let standing: Components.Schemas.LeagueStanding?
 
     public init(
         id: String,
@@ -32,7 +35,8 @@ public struct FollowedLeague: Equatable, Sendable, Codable, Identifiable {
         phase: Components.Schemas.LeaguePhaseKnown?,
         draftAt: Date?,
         waiversOpen: Bool,
-        teamName: String? = nil
+        teamName: String? = nil,
+        standing: Components.Schemas.LeagueStanding? = nil
     ) {
         self.id = id
         self.name = name
@@ -43,6 +47,7 @@ public struct FollowedLeague: Equatable, Sendable, Codable, Identifiable {
         self.draftAt = draftAt
         self.waiversOpen = waiversOpen
         self.teamName = teamName
+        self.standing = standing
     }
 }
 
@@ -121,7 +126,8 @@ extension APIClient: AccountAPI {
         FollowedLeague(
             id: league.id, name: league.name, host: league.host, scoring: league.scoring.value1.value1,
             format: league.format.value1.value1, phase: league.phase.value1, draftAt: league.draftAt,
-            waiversOpen: league.waiversOpen, teamName: league.teamName
+            waiversOpen: league.waiversOpen, teamName: league.teamName,
+            standing: league.standing?.value1
         )
     }
 }

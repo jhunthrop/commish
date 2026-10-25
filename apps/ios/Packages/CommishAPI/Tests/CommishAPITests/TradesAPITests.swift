@@ -24,7 +24,7 @@ struct TradesAPITests {
     @Test(arguments: LineupAPITests.clocks)
     func theFinderReadsAtEveryClockWithEachLinesGameState(clock: String) async throws {
         let body = try LineupAPITests.answered("trades-\(Fixture.league)-\(clock).json")
-        let advice = try await Self.client(.ok, body).trades(id: Fixture.league)
+        let advice = try await Self.client(.ok, body).trades(id: Fixture.league, player: nil)
         #expect(advice.week == 6)
         #expect(advice.teams.count == 11)
         let lines = advice.teams.flatMap { $0.trades.flatMap { $0.give + $0.get } }
@@ -50,8 +50,28 @@ struct TradesAPITests {
         #expect(posted["get"] as? [String] == ["12481", "8116"])
     }
 
+    @Test func theTradesHoldingOnePlayerAreAskedByHisBoardID() async throws {
+        let body = try LineupAPITests.answered("trades-\(Fixture.league)-player-8439-2026-10-17T17-00-00Z.json")
+        let transport = RecordingTransport(status: .ok, body: body)
+        let advice = try await Self.client(transport).trades(id: Fixture.league, player: "8439")
+        let held = advice.teams.flatMap(\.trades).allSatisfy { row in
+            (row.give + row.get).contains { $0.player.boardId == "8439" }
+        }
+        #expect(held)
+        #expect(await transport.sent.first?.path == "/leagues/attached/\(Fixture.league)/trades?player=8439")
+    }
+
+    @Test func aTeamNotInTheReadIsTheAPIsSentenceNotAnOlderAPI() async throws {
+        let body = LineupAPITests.problem("team_not_read", "Your team is not in this league's last read.")
+        await #expect(
+            throws: APIError.envelope(code: "team_not_read", message: "Your team is not in this league's last read.")
+        ) {
+            try await Self.client(.notFound, body).checkTrade(id: Fixture.league, trade: Self.check)
+        }
+    }
+
     @Test func anAPIOlderThanTheCheckAnswersNone() async throws {
-        let body = LineupAPITests.problem("not_found", "Not found.")
+        let body = LineupAPITests.problem("not_found", "No route here")
         #expect(try await Self.client(.notFound, body).checkTrade(id: Fixture.league, trade: Self.check) == nil)
     }
 
@@ -64,7 +84,7 @@ struct TradesAPITests {
 
     @Test func aRefusedTokenThrowsItsStatus() async throws {
         await #expect(throws: APIError.status(401)) {
-            try await Self.client(.unauthorized, Data()).trades(id: Fixture.league)
+            try await Self.client(.unauthorized, Data()).trades(id: Fixture.league, player: nil)
         }
     }
 }
