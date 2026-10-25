@@ -3,41 +3,46 @@ import CommishCore
 import CommishDesign
 import SwiftUI
 
-/// The phone's columns (OrderTable.svelte and WeekTable.svelte at 390): the # cell, the week's figure
-/// and the big Projected; the week's Proj.
+/// The phone's columns (OrderTable.svelte and WeekTable.svelte at 390): the # cell, the face, the
+/// pill's slot and the club's, so the pills line up down the list, the big Projected and the week's
+/// Proj.
 enum RankingsColumn {
     static let rank: Double = 30
-    static let week: Double = 40
-    static let total: Double = 74
-    static let proj: Double = 52
     static let face: Double = 28
+    static let pill: Double = 50
+    static let club: Double = 34
+    static let total: Double = 62
+    static let proj: Double = 52
 }
 
-/// A player's cell (BoxPlayer.svelte at 390): his face or his club's mark, his name whole where it fits
-/// and else his short form (a link to his sheet where the site has his page), his club with his pill and
-/// his status chip, his game with its zone, the expected score and the kickoff weather while it is to
-/// come, and the line folded under it all.
-struct RankingsPlayerView: View {
+/// The first line of a row (BoxPlayer.svelte's line at 390): his face or his club's mark, his name the
+/// biggest thing on it, whole where it fits and else his short form (a link to his sheet where the site
+/// has his page), then his pill and club as a column of fixed width.
+struct RankingsNameLine: View {
     @Environment(\.colorScheme) private var colorScheme
     let player: RankingsPlayer
-    let folded: String
     let open: (SheetPlayer) -> Void
 
     var body: some View {
         let theme = Theme(colorScheme)
-        HStack(alignment: .center, spacing: Tokens.Space.s2) {
+        HStack(alignment: .center, spacing: 0) {
             Avatar(player.clubMark ? player.club : Initials.of(player.name), side: RankingsColumn.face)
-            VStack(alignment: .leading, spacing: 1) {
-                name
-                club(theme)
-                game(theme)
-                facts(theme)
-                Text(folded)
-                    .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
-                    .monospacedDigit()
-                    .foregroundStyle(theme.color(Tokens.Color.ink3))
-                    .fixedSize(horizontal: false, vertical: true)
+                .padding(.trailing, Tokens.Space.s2)
+            name.frame(maxWidth: .infinity, alignment: .leading)
+            Group {
+                if let pill = player.pill {
+                    PositionPill(pill, minWidth: RankingsColumn.pill)
+                } else {
+                    Color.clear.frame(height: 1)
+                }
             }
+            .frame(width: RankingsColumn.pill, alignment: .leading)
+            Text(player.club)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .medium))
+                .foregroundStyle(theme.color(Tokens.Color.ink2))
+                .lineLimit(1)
+                .frame(width: RankingsColumn.club, alignment: .leading)
+                .padding(.leading, Tokens.Space.s1)
         }
         .foregroundStyle(theme.color(Tokens.Color.ink))
     }
@@ -62,20 +67,36 @@ struct RankingsPlayerView: View {
             .font(Faces.font(.ui, size: Tokens.TypeScale.md, weight: .semibold))
             .lineLimit(1)
     }
+}
 
-    private func club(_ theme: Theme) -> some View {
-        HStack(spacing: Tokens.Space.s1) {
-            Text(player.club)
-                .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .medium))
-                .foregroundStyle(theme.color(Tokens.Color.ink2))
-            if let pill = player.pill {
-                PositionPill(pill)
+/// The second line (BoxGame.svelte with its glyph, then StatusChip): his game as one cell, the
+/// opponent strong and the kickoff or the state's word after it, the kickoff weather as its glyph alone
+/// (its words the glyph's label), then his status chip whole. Where the two do not fit one line the
+/// status takes a second, as the web's game line wraps; nothing is cut.
+struct RankingsGameLine: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let player: RankingsPlayer
+
+    var body: some View {
+        let theme = Theme(colorScheme)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Tokens.Space.s2) {
+                game(theme)
+                status
             }
-            if let status = player.status {
-                Pill(status.mark, tone: status.sits ? .loss : .quiet)
+            VStack(alignment: .leading, spacing: 2) {
+                game(theme)
+                status
             }
         }
-        .lineLimit(1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var status: some View {
+        if let status = player.status {
+            Pill(status.mark, tone: status.sits ? .loss : .quiet).fixedSize()
+        }
     }
 
     @ViewBuilder
@@ -83,41 +104,41 @@ struct RankingsPlayerView: View {
         let font = Faces.font(.ui, size: Tokens.TypeScale.sm)
         switch player.game {
         case let .game(place, when):
-            (Text(place).font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold))
-                + Text(verbatim: " ") + Text(when).foregroundStyle(theme.color(Tokens.Color.ink2)))
-                .font(font)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: Tokens.Space.s1) {
+                Text(place).font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold))
+                Text(when).font(font).foregroundStyle(theme.color(Tokens.Color.ink2))
+                if let weather = player.weather {
+                    Image(systemName: PlayerCell.glyph(weather.glyph))
+                        .font(.system(size: 10))
+                        .foregroundStyle(theme.color(Tokens.Color.ink3))
+                        .accessibilityLabel(weather.words)
+                }
+            }
+            .lineLimit(1)
+            .fixedSize()
         case .bye:
-            Text(Words.Box.bye).font(font).foregroundStyle(theme.color(Tokens.Color.ink2))
+            Text(Words.Box.bye).font(font).foregroundStyle(theme.color(Tokens.Color.ink2)).fixedSize()
         case .noClub:
-            Text(Words.Box.noClub).font(font).foregroundStyle(theme.color(Tokens.Color.ink2))
+            Text(Words.Box.noClub).font(font).foregroundStyle(theme.color(Tokens.Color.ink2)).fixedSize()
         case .none:
             EmptyView()
         }
     }
+}
 
-    @ViewBuilder
-    private func facts(_ theme: Theme) -> some View {
-        if player.expected != nil || player.weather != nil {
-            let expected = player.expected.map {
-                Text($0)
-                    .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
-                    .foregroundStyle(theme.color(Tokens.Color.ink2))
-            } ?? Text(verbatim: "")
-            let weather = player.weather.map {
-                Text(Image(systemName: PlayerCell.glyph($0.glyph))).font(.system(size: 10))
-                    + Text(verbatim: " ") + Text($0.words).font(Faces.font(.ui, size: Tokens.TypeScale.xs))
-            } ?? Text(verbatim: "")
-            let gap = player.expected != nil && player.weather != nil ? Text(verbatim: "  ") : Text(verbatim: "")
-            // One text, so it wraps between its parts and never inside a word.
-            (expected + gap + weather.foregroundStyle(theme.color(Tokens.Color.ink3)))
-                .fixedSize(horizontal: false, vertical: true)
-        }
+/// A Rankings row's frame: its lines, its padding and the hairline under it.
+private struct RankingsRowFrame: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, Tokens.Space.s2)
+            .padding(.vertical, Tokens.Space.s2)
+            .overlay(alignment: .bottom) { Hairline() }
+            .accessibilityElement(children: .contain)
     }
 }
 
-/// One row of our order (OrderTable.svelte at 390): the place, the player, the week's figure and his
-/// Projected big.
+/// One row of our order (OrderTable.svelte at 390), two lines and a strip: the place, the player and
+/// his Projected; his game under his name; his figures as labelled cells across the row.
 struct RankingsRowView: View {
     @Environment(\.colorScheme) private var colorScheme
     let row: RankingsRow
@@ -125,59 +146,69 @@ struct RankingsRowView: View {
 
     var body: some View {
         let theme = Theme(colorScheme)
-        HStack(alignment: .center, spacing: 0) {
-            Text(row.place)
-                .font(Faces.font(.num, size: Tokens.TypeScale.md, weight: .bold))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .foregroundStyle(theme.color(Tokens.Color.ink))
-                .frame(width: RankingsColumn.rank, alignment: .trailing)
-                .padding(.trailing, Tokens.Space.s2)
-            RankingsPlayerView(player: row.player, folded: row.folded, open: open)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text(row.week)
-                .font(Faces.font(.num, size: Tokens.TypeScale.sm, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(theme.color(Tokens.Color.ink2))
-                .frame(width: RankingsColumn.week, alignment: .trailing)
-            Text(row.total)
-                .font(Faces.font(.num, size: Tokens.TypeScale.md, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(theme.color(row.total == Words.Box.none ? Tokens.Color.ink3 : Tokens.Color.ink))
-                .frame(width: RankingsColumn.total, alignment: .trailing)
+        VStack(alignment: .leading, spacing: Tokens.Space.s1) {
+            HStack(alignment: .center, spacing: 0) {
+                Text(row.place)
+                    .font(Faces.font(.num, size: Tokens.TypeScale.md, weight: .bold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(width: RankingsColumn.rank, alignment: .trailing)
+                    .padding(.trailing, Tokens.Space.s2)
+                RankingsNameLine(player: row.player, open: open)
+                // The name's size, its weight for emphasis: the player stays the biggest thing.
+                Text(row.total)
+                    .font(Faces.font(.num, size: Tokens.TypeScale.md, weight: .bold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .foregroundStyle(theme.color(row.total == Words.Box.none ? Tokens.Color.ink3 : Tokens.Color.ink))
+                    .frame(width: RankingsColumn.total, alignment: .trailing)
+            }
+            RankingsGameLine(player: row.player)
+                .padding(.leading, RankingsColumn.rank + Tokens.Space.s2 + RankingsColumn.face + Tokens.Space.s2)
+            FigureStrip(cells: row.cells)
         }
-        .padding(.horizontal, Tokens.Space.s2)
-        .padding(.vertical, 7)
-        .overlay(alignment: .bottom) { Hairline() }
-        .accessibilityElement(children: .contain)
+        .foregroundStyle(theme.color(Tokens.Color.ink))
+        .modifier(RankingsRowFrame())
     }
 }
 
-/// One row of the kickers' or defenses' week (WeekTable.svelte at 390): the player and his Proj, big
-/// while his game is to come.
+/// One row of the kickers' or defenses' week (WeekTable.svelte at 390), as the order's: the player and
+/// his Proj, quiet once his game kicks off; his game; Opp rank, Avg and Last as labelled cells.
 struct WeekRankingsRowView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let row: WeekRankingsRow
     let proj: Bool
     let kicked: Bool
     let open: (SheetPlayer) -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 0) {
-            RankingsPlayerView(player: row.player, folded: row.folded, open: open)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if proj {
-                Figure(text: row.proj, width: RankingsColumn.proj, muted: kicked || row.proj == Words.Box.none)
+        let theme = Theme(colorScheme)
+        VStack(alignment: .leading, spacing: Tokens.Space.s1) {
+            HStack(alignment: .center, spacing: 0) {
+                RankingsNameLine(player: row.player, open: open)
+                if proj {
+                    Text(row.proj)
+                        .font(Faces.font(.num, size: kicked ? Tokens.TypeScale.sm : Tokens.TypeScale.md, weight: .bold))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .foregroundStyle(theme.color(
+                            kicked || row.proj == Words.Box.none ? Tokens.Color.ink3 : Tokens.Color.ink
+                        ))
+                        .frame(width: RankingsColumn.proj, alignment: .trailing)
+                }
             }
+            RankingsGameLine(player: row.player)
+                .padding(.leading, RankingsColumn.face + Tokens.Space.s2)
+            FigureStrip(cells: row.cells)
         }
-        .padding(.horizontal, Tokens.Space.s2)
-        .padding(.vertical, 7)
-        .overlay(alignment: .bottom) { Hairline() }
+        .foregroundStyle(theme.color(Tokens.Color.ink))
+        .modifier(RankingsRowFrame())
     }
 }
 
-/// The order's heads (OrderTable.svelte's cols at 390): #, Player, the week's head, Projected marked
-/// as the column the # sorts on at a position (Over repl. folds under the name across positions).
+/// The order's heads (OrderTable.svelte's cols at 390): #, Player and Projected; the week's figure and
+/// Over repl. head their own cells in each row's strip.
 struct RankingsHeadRow: View {
     @Environment(\.colorScheme) private var colorScheme
     let heads: RankingsHeads
@@ -188,7 +219,6 @@ struct RankingsHeadRow: View {
             head(heads.rank, theme).frame(width: RankingsColumn.rank, alignment: .trailing)
                 .padding(.trailing, Tokens.Space.s2)
             head(Words.Box.player, theme).frame(maxWidth: .infinity, alignment: .leading)
-            head(heads.week, theme).frame(width: RankingsColumn.week, alignment: .trailing)
             head(heads.total, theme).frame(width: RankingsColumn.total, alignment: .trailing)
         }
         .padding(.horizontal, Tokens.Space.s2)
