@@ -33,11 +33,18 @@ val CommishJson: Json =
         serializersModule = SerializersModule { contextual(UuidSerializer) }
     }
 
-/** The API's error as the envelope carries it. */
+/** The JSON a request's body is written with: a field the schema requires and the app holds as null is
+ * sent as null (a lineup change into a spot left empty sends `"out": null`), never left out. A field
+ * with a default the app did not set is still left out. */
+val CommishRequestJson: Json = Json(CommishJson) { explicitNulls = true }
+
+/** The API's error as the envelope carries it: its code, its sentence, and the sentence per field it
+ * refused, where it names one (a move's spent token says so under `confirm`). */
 @Serializable
 data class EnvelopeError(
     val code: String,
     val message: String,
+    val fields: Map<String, String>? = null,
 )
 
 /** Every answer's envelope: ok, the data, the error. The request id and page meta are not read. */
@@ -48,11 +55,13 @@ data class Envelope<T>(
     val error: EnvelopeError? = null,
 )
 
-/** The API answered with an error envelope, or with no data. */
+/** The API answered with an error envelope, or with no data: its sentence, and the sentence per field
+ * it refused. */
 class ApiFailure(
     val status: Int,
     val code: String,
     override val message: String,
+    val fields: Map<String, String> = emptyMap(),
 ) : Exception(message)
 
 /** The API refused the device's token (401): it lapsed unused or was revoked. The app signs the
@@ -68,7 +77,12 @@ inline fun <reified T> decodeEnvelope(
     val envelope = CommishJson.decodeFromString<Envelope<T>>(body)
     val error = envelope.error
     if (!envelope.ok || error != null) {
-        throw ApiFailure(status, error?.code ?: "unknown", error?.message ?: "The API answered with no data.")
+        throw ApiFailure(
+            status,
+            error?.code ?: "unknown",
+            error?.message ?: "The API answered with no data.",
+            error?.fields.orEmpty(),
+        )
     }
     return envelope.data ?: throw ApiFailure(status, "empty", "The API answered with no data.")
 }
