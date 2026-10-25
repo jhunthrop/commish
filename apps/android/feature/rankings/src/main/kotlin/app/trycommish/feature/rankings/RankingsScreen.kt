@@ -114,7 +114,7 @@ fun RankingsPage(
             is RankingsContent.Order -> {
                 OrderTable(content.model, first(content.model.sections, rows), actions.open)
                 if (ui.more && rows == null) {
-                    QuietButton(Words.Order.moreRows, Modifier.fillMaxWidth(), actions.more)
+                    QuietButton(Words.Order.moreRows, Modifier.fillMaxWidth(), onClick = actions.more)
                 }
                 if (rows == null || content.model.none != null) BasisText(content.model.basis)
             }
@@ -174,7 +174,7 @@ private fun LazyListScope.orderItems(
     }
     item(key = "foot") {
         Column(Modifier.padding(top = Tokens.Space.s4.dp), verticalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp)) {
-            if (ui.more) QuietButton(Words.Order.moreRows, Modifier.fillMaxWidth(), actions.more)
+            if (ui.more) QuietButton(Words.Order.moreRows, Modifier.fillMaxWidth(), onClick = actions.more)
             BasisText(model.basis)
         }
     }

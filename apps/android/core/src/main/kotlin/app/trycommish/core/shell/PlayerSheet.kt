@@ -149,6 +149,16 @@ object SiteLinks {
     /** The cheat sheet (verbHref sheet). */
     const val SHEET = "$ORIGIN/sheet"
 
+    /** What is free (links.pass(), the account's plan card's link in the free season). */
+    const val PASS = "$ORIGIN/pass"
+
+    /** The two legal pages (legal/legal-links.ts), named at the account's foot. */
+    const val PRIVACY = "$ORIGIN/privacy"
+    const val TERMS = "$ORIGIN/terms"
+
+    /** The one address a member writes to (legal/contact.ts SUPPORT_HREF). */
+    const val SUPPORT = "mailto:${Words.Support.email}"
+
     /** A player's page, /players/<slug>. */
     fun player(slug: String): String = "$ORIGIN/players/$slug"
 

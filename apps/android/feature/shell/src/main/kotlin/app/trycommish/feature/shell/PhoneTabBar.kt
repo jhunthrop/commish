@@ -3,13 +3,11 @@ package app.trycommish.feature.shell
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -57,20 +55,14 @@ fun PhoneTabBar(
     }
 }
 
-/** A screen named until its lane lands: its title as a section head, what it was opened for beside it
- * (the search's query), and the screen's verb when it has one already (the account's sign-out). */
+/** A screen named until its lane lands: its title as a section head, and what it was opened for beside it
+ * (the search's query). */
 @Composable
 fun NamedScreen(
     title: String,
     aside: String? = null,
-    verb: Pair<String, () -> Unit>? = null,
 ) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp)) {
         Section(title, aside) {}
-        verb?.let { (words, action) ->
-            TextButton(onClick = action, modifier = Modifier.padding(horizontal = Tokens.Space.s2.dp)) {
-                Text(words, style = Faces.body, color = CommishTheme.colors.ink2)
-            }
-        }
     }
 }

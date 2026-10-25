@@ -10,6 +10,7 @@ import app.trycommish.core.AppWords
 import app.trycommish.core.leaguehome.LeagueHomeState
 import app.trycommish.core.leaguehome.LeagueHomeViewModel
 import app.trycommish.core.shell.ShellState
+import app.trycommish.feature.account.SignInScreen
 import app.trycommish.feature.leaguehome.LeagueHomeScreen
 
 /** The League tab: sign-in when the device holds no token, else the home of the league the shell
