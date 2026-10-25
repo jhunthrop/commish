@@ -217,6 +217,9 @@ void test("the Trades at every clock: each row's offer in the web's words, the s
 		clocks: Record<string, { finder: { every: { mine: Row[] } }; basis: { closed: string } }>;
 		checks: Record<string, { yours: { figures: { projBefore: string } }; sentence: string }[]>;
 		copied: { done: string };
+		words: { checks: { sentence: string }[]; under: string };
+		holding: { rows: { key: string }[]; unheld: { decision: string } | null };
+		builder: { yours: { rows: { pick: string }[] }; pin: string };
 	};
 	assert.deepEqual(Object.keys(parity.clocks), [...CLOCKS]);
 	for (const clock of CLOCKS) {
@@ -233,4 +236,17 @@ void test("the Trades at every clock: each row's offer in the web's words, the s
 	assert.equal(sunday.length, 2);
 	assert.ok(sunday.every((c) => c.yours.figures.projBefore === '--'));
 	assert.equal(parity.copied.done, "Copied. Propose it on FFPC's trade page.");
+	// Every checkWords branch, the under 0.1 gain, a holding read and the builder (fix round 1).
+	assert.equal(
+		new Set(parity.words.checks.map((c) => c.sentence)).size,
+		parity.words.checks.length
+	);
+	assert.match(parity.words.under, /gains under 0\.1 points/);
+	assert.ok(parity.holding.rows.length > 0);
+	assert.match(parity.holding.unheld?.decision ?? '', /^No trade we found includes /);
+	assert.deepEqual(
+		['on', 'drop'].map((pick) => parity.builder.yours.rows.some((r) => r.pick === pick)),
+		[true, true]
+	);
+	assert.equal(parity.builder.pin, '+5.7 a week for your lineup, +0.7 for theirs');
 });

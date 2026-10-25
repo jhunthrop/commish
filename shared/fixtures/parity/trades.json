@@ -19029,7 +19029,8 @@
 			},
 			"basis": {
 				"closed": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Final lands the hour after a game, stats by Wednesday. How the order has done",
-				"opened": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Opp is points allowed to his position, 1st fewest. Avg and Last are our stats, which omit two-point, missed kick, fumble recovery and safety. How the order has done"
+				"opened": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Opp is points allowed to his position, 1st fewest. Avg and Last are our stats, which omit two-point, missed kick, fumble recovery and safety. How the order has done",
+				"builder": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Avg and Last are our stats, which omit two-point, missed kick, fumble recovery and safety. How the order has done"
 			}
 		},
 		"2026-10-17T17-00-00Z": {
@@ -38057,7 +38058,8 @@
 			},
 			"basis": {
 				"closed": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Final lands the hour after a game, stats by Wednesday. How the order has done",
-				"opened": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Opp is points allowed to his position, 1st fewest. Avg and Last are our stats, which omit two-point, missed kick, fumble recovery and safety. How the order has done"
+				"opened": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Opp is points allowed to his position, 1st fewest. Avg and Last are our stats, which omit two-point, missed kick, fumble recovery and safety. How the order has done",
+				"builder": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Avg and Last are our stats, which omit two-point, missed kick, fumble recovery and safety. How the order has done"
 			}
 		},
 		"2026-10-18T18-56-00Z": {
@@ -56359,7 +56361,8 @@
 			},
 			"basis": {
 				"closed": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Final lands the hour after a game, stats by Wednesday. How the order has done",
-				"opened": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Opp is points allowed to his position, 1st fewest. Avg and Last are our stats, which omit two-point, missed kick, fumble recovery and safety. How the order has done"
+				"opened": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Opp is points allowed to his position, 1st fewest. Avg and Last are our stats, which omit two-point, missed kick, fumble recovery and safety. How the order has done",
+				"builder": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Avg and Last are our stats, which omit two-point, missed kick, fumble recovery and safety. How the order has done"
 			}
 		},
 		"2026-10-19T16-00-00Z": {
@@ -74355,7 +74358,8 @@
 			},
 			"basis": {
 				"closed": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Avg and Last count FFPC's finals, our stats by Wednesday. How the order has done",
-				"opened": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Avg and Last count FFPC's finals, our stats by Wednesday. Opp is points allowed to his position, 1st fewest. Our stats omit two-point, missed kick, fumble recovery and safety. How the order has done"
+				"opened": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Avg and Last count FFPC's finals, our stats by Wednesday. Opp is points allowed to his position, 1st fewest. Our stats omit two-point, missed kick, fumble recovery and safety. How the order has done",
+				"builder": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Avg and Last count FFPC's finals, our stats by Wednesday. Our stats omit two-point, missed kick, fumble recovery and safety. How the order has done"
 			}
 		},
 		"2026-10-20T00-40-00Z": {
@@ -91247,7 +91251,8 @@
 			},
 			"basis": {
 				"closed": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. Week 7 projections expected Thursday. Avg and Last count week 6's finals from FFPC's points, our stats by Wednesday. How the order has done",
-				"opened": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Week 7 projections expected Thursday. Avg and Last count week 6's finals from FFPC's points, our stats by Wednesday. Opp is points allowed to his position, 1st fewest. Our stats omit two-point, missed kick, fumble recovery and safety. How the order has done"
+				"opened": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Week 7 projections expected Thursday. Avg and Last count week 6's finals from FFPC's points, our stats by Wednesday. Opp is points allowed to his position, 1st fewest. Our stats omit two-point, missed kick, fumble recovery and safety. How the order has done",
+				"builder": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Week 7 projections expected Thursday. Avg and Last count week 6's finals from FFPC's points, our stats by Wednesday. Our stats omit two-point, missed kick, fumble recovery and safety. How the order has done"
 			}
 		},
 		"2026-10-20T17-00-00Z": {
@@ -108139,7 +108144,8 @@
 			},
 			"basis": {
 				"closed": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. Week 7 projections expected Thursday. Avg and Last count week 6's finals from FFPC's points, our stats by Wednesday. How the order has done",
-				"opened": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Week 7 projections expected Thursday. Avg and Last count week 6's finals from FFPC's points, our stats by Wednesday. Opp is points allowed to his position, 1st fewest. Our stats omit two-point, missed kick, fumble recovery and safety. How the order has done"
+				"opened": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Week 7 projections expected Thursday. Avg and Last count week 6's finals from FFPC's points, our stats by Wednesday. Opp is points allowed to his position, 1st fewest. Our stats omit two-point, missed kick, fumble recovery and safety. How the order has done",
+				"builder": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. A game is our order's points a game. Week 7 projections expected Thursday. Avg and Last count week 6's finals from FFPC's points, our stats by Wednesday. Our stats omit two-point, missed kick, fumble recovery and safety. How the order has done"
 			}
 		}
 	},
@@ -108316,5 +108322,3873 @@
 	"copied": {
 		"done": "Copied. Propose it on FFPC's trade page.",
 		"failed": "This browser would not copy it. Propose it on FFPC's trade page."
+	},
+	"words": {
+		"checks": [
+			{
+				"name": "both gain",
+				"myGain": 1.5,
+				"theirGain": 0.6,
+				"fills": {
+					"yours": true,
+					"theirs": true,
+					"yours_open": null,
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Both lineups gain: yours 1.5 points over replacement a week, theirs 0.6. You give Aaron Rodgers (10.8 a game) for Cam Skattebo (9.3 a game) and Pierre Strong."
+			},
+			{
+				"name": "gains, loses",
+				"myGain": 2.1,
+				"theirGain": -0.8,
+				"fills": {
+					"yours": true,
+					"theirs": true,
+					"yours_open": null,
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Your lineup gains 2.1 points over replacement a week, theirs loses 0.8. You give Aaron Rodgers (10.8 a game) for Cam Skattebo (9.3 a game) and Pierre Strong."
+			},
+			{
+				"name": "loses, gains",
+				"myGain": -3,
+				"theirGain": 4.2,
+				"fills": {
+					"yours": true,
+					"theirs": true,
+					"yours_open": null,
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Your lineup loses 3.0 points over replacement a week, theirs gains 4.2. You give Aaron Rodgers (10.8 a game) for Cam Skattebo (9.3 a game) and Pierre Strong."
+			},
+			{
+				"name": "neither",
+				"myGain": 0,
+				"theirGain": 0,
+				"fills": {
+					"yours": true,
+					"theirs": true,
+					"yours_open": null,
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Neither lineup changes on our order. You give Aaron Rodgers (10.8 a game) for Cam Skattebo (9.3 a game) and Pierre Strong."
+			},
+			{
+				"name": "yours no change",
+				"myGain": 0,
+				"theirGain": 1.1,
+				"fills": {
+					"yours": true,
+					"theirs": true,
+					"yours_open": null,
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Your lineup does not change, theirs gains 1.1 points over replacement a week. You give Aaron Rodgers (10.8 a game) for Cam Skattebo (9.3 a game) and Pierre Strong."
+			},
+			{
+				"name": "theirs no change",
+				"myGain": -1.2,
+				"theirGain": 0.02,
+				"fills": {
+					"yours": true,
+					"theirs": true,
+					"yours_open": null,
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Your lineup loses 1.2 points over replacement a week, theirs does not change. You give Aaron Rodgers (10.8 a game) for Cam Skattebo (9.3 a game) and Pierre Strong."
+			},
+			{
+				"name": "under 0.1",
+				"myGain": 0.04,
+				"theirGain": 0.6,
+				"fills": {
+					"yours": true,
+					"theirs": true,
+					"yours_open": null,
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Your lineup does not change, theirs gains 0.6 points over replacement a week. You give Aaron Rodgers (10.8 a game) for Cam Skattebo (9.3 a game) and Pierre Strong."
+			},
+			{
+				"name": "drop",
+				"myGain": 2.1,
+				"theirGain": 0.8,
+				"fills": {
+					"yours": true,
+					"theirs": true,
+					"yours_open": null,
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": true,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Both lineups gain: yours 2.1 points over replacement a week, theirs 0.8. You give Aaron Rodgers (10.8 a game) for Cam Skattebo (9.3 a game) and Pierre Strong. You drop Jaxson Dart to make room."
+			},
+			{
+				"name": "drop with its sentence",
+				"myGain": 2.1,
+				"theirGain": 0.8,
+				"fills": {
+					"yours": true,
+					"theirs": true,
+					"yours_open": null,
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": true,
+				"dropReason": "Dart starts at QB for you this week, and Mahomes takes that spot after the trade.",
+				"perGame": true,
+				"sentence": "Both lineups gain: yours 2.1 points over replacement a week, theirs 0.8. You give Aaron Rodgers (10.8 a game) for Cam Skattebo (9.3 a game) and Pierre Strong. You drop Jaxson Dart to make room. Dart starts at QB for you this week, and Mahomes takes that spot after the trade."
+			},
+			{
+				"name": "no points a game",
+				"myGain": 2.1,
+				"theirGain": 0.8,
+				"fills": {
+					"yours": true,
+					"theirs": true,
+					"yours_open": null,
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": false,
+				"sentence": "Both lineups gain: yours 2.1 points over replacement a week, theirs 0.8."
+			},
+			{
+				"name": "yours would not fill RB2",
+				"myGain": 2.1,
+				"theirGain": 0.8,
+				"fills": {
+					"yours": false,
+					"theirs": true,
+					"yours_open": "RB2",
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Your roster would not fill RB2."
+			},
+			{
+				"name": "yours would not fill the flex",
+				"myGain": 2.1,
+				"theirGain": 0.8,
+				"fills": {
+					"yours": false,
+					"theirs": true,
+					"yours_open": "Flex 1",
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Your roster would not fill the flex."
+			},
+			{
+				"name": "yours would not fill every slot",
+				"myGain": 2.1,
+				"theirGain": 0.8,
+				"fills": {
+					"yours": false,
+					"theirs": true,
+					"yours_open": null,
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Your roster would not fill every slot."
+			},
+			{
+				"name": "theirs would not fill TE",
+				"myGain": 2.1,
+				"theirGain": 0.8,
+				"fills": {
+					"yours": true,
+					"theirs": false,
+					"yours_open": null,
+					"theirs_open": "TE",
+					"yours_room": true,
+					"theirs_room": true
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Their roster would not fill TE."
+			},
+			{
+				"name": "yours no one to drop",
+				"myGain": 2.1,
+				"theirGain": 0.8,
+				"fills": {
+					"yours": true,
+					"theirs": true,
+					"yours_open": null,
+					"theirs_open": null,
+					"yours_room": false,
+					"theirs_room": true
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Your roster has no one to drop to make room."
+			},
+			{
+				"name": "theirs no one to drop",
+				"myGain": 2.1,
+				"theirGain": 0.8,
+				"fills": {
+					"yours": true,
+					"theirs": true,
+					"yours_open": null,
+					"theirs_open": null,
+					"yours_room": true,
+					"theirs_room": false
+				},
+				"keepDrop": false,
+				"dropReason": null,
+				"perGame": true,
+				"sentence": "Their roster has no one to drop to make room."
+			}
+		],
+		"noTrade": "No trade we found helps both lineups.",
+		"under": "Trade Aaron Rodgers to Max_Jensen10 for Cam Skattebo and Pierre Strong. Your lineup gains under 0.1 points over replacement a week, theirs 0.6.",
+		"titles": [
+			{
+				"count": 0,
+				"title": "No trades worth proposing"
+			},
+			{
+				"count": 1,
+				"title": "One trade worth proposing"
+			},
+			{
+				"count": 2,
+				"title": "Two trades worth proposing"
+			},
+			{
+				"count": 3,
+				"title": "3 trades worth proposing"
+			}
+		],
+		"noTradeWith": "No trade we found includes Josh Downs.",
+		"prompts": [
+			{
+				"give": 0,
+				"get": 0,
+				"prompt": "Pick one or two of your players and one or two of theirs."
+			},
+			{
+				"give": 0,
+				"get": 1,
+				"prompt": "Now pick one or two of your players to give."
+			},
+			{
+				"give": 1,
+				"get": 0,
+				"prompt": "Now pick one or two of theirs to get."
+			},
+			{
+				"give": 1,
+				"get": 1,
+				"prompt": "Checking the trade"
+			}
+		]
+	},
+	"holding": {
+		"yours": [
+			{
+				"key": "8439",
+				"name": "Aaron Rodgers"
+			},
+			{
+				"key": "4689114",
+				"name": "Jaxson Dart"
+			},
+			{
+				"key": "3139477",
+				"name": "Patrick Mahomes"
+			},
+			{
+				"key": "4870808",
+				"name": "Jeremiyah Love"
+			},
+			{
+				"key": "4371733",
+				"name": "Kenny Gainwell"
+			},
+			{
+				"key": "4426386",
+				"name": "Roschon Johnson"
+			},
+			{
+				"key": "4429013",
+				"name": "Tank Bigsby"
+			},
+			{
+				"key": "4239996",
+				"name": "Travis Etienne"
+			},
+			{
+				"key": "4426385",
+				"name": "Zach Charbonnet"
+			},
+			{
+				"key": "5081432",
+				"name": "Antonio Williams"
+			},
+			{
+				"key": "3895856",
+				"name": "Christian Kirk"
+			},
+			{
+				"key": "4362628",
+				"name": "Ja'Marr Chase"
+			},
+			{
+				"key": "3916433",
+				"name": "Jakobi Meyers"
+			},
+			{
+				"key": "4429205",
+				"name": "Jordan Addison"
+			},
+			{
+				"key": "4612826",
+				"name": "Ladd McConkey"
+			},
+			{
+				"key": "4431299",
+				"name": "Rome Odunze"
+			},
+			{
+				"key": "4360635",
+				"name": "Chig Okonkwo"
+			},
+			{
+				"key": "4430027",
+				"name": "Sam LaPorta"
+			},
+			{
+				"key": "host:HOU",
+				"name": "Houston Texans"
+			},
+			{
+				"key": "host:MIN",
+				"name": "Minnesota Vikings"
+			}
+		],
+		"theirs": [
+			{
+				"key": "4572680",
+				"name": "Tucker Kraft"
+			},
+			{
+				"key": "4430539",
+				"name": "Brenton Strange"
+			},
+			{
+				"key": "4568490",
+				"name": "RJ Harvey"
+			},
+			{
+				"key": "15847",
+				"name": "Travis Kelce"
+			},
+			{
+				"key": "4361432",
+				"name": "Romeo Doubs"
+			},
+			{
+				"key": "4360939",
+				"name": "Rashod Bateman"
+			},
+			{
+				"key": "4241985",
+				"name": "J.K. Dobbins"
+			},
+			{
+				"key": "4361050",
+				"name": "Isaiah Likely"
+			},
+			{
+				"key": "4685278",
+				"name": "Luther Burden"
+			},
+			{
+				"key": "4569173",
+				"name": "Rhamondre Stevenson"
+			},
+			{
+				"key": "4432620",
+				"name": "Parker Washington"
+			},
+			{
+				"key": "4688813",
+				"name": "Josh Downs"
+			},
+			{
+				"key": "4887558",
+				"name": "Emanuel Wilson"
+			},
+			{
+				"key": "4259545",
+				"name": "D'Andre Swift"
+			},
+			{
+				"key": "4035538",
+				"name": "David Montgomery"
+			},
+			{
+				"key": "4428718",
+				"name": "Tre Tucker"
+			},
+			{
+				"key": "3121422",
+				"name": "Terry McLaurin"
+			},
+			{
+				"key": "4832800",
+				"name": "Denzel Boston"
+			},
+			{
+				"key": "4575131",
+				"name": "Jacory Croskey-Merritt"
+			},
+			{
+				"key": "4243331",
+				"name": "Cade Otton"
+			},
+			{
+				"key": "4431459",
+				"name": "Tyler Warren"
+			},
+			{
+				"key": "3054850",
+				"name": "Alvin Kamara"
+			},
+			{
+				"key": "4696981",
+				"name": "Cam Skattebo"
+			},
+			{
+				"key": "4882093",
+				"name": "Bhayshul Tuten"
+			},
+			{
+				"key": "4372016",
+				"name": "Jaylen Waddle"
+			},
+			{
+				"key": "4685382",
+				"name": "Omarion Hampton"
+			},
+			{
+				"key": "4595348",
+				"name": "Malik Nabers"
+			},
+			{
+				"key": "4695883",
+				"name": "Jalen Coker"
+			},
+			{
+				"key": "4870795",
+				"name": "Makai Lemon"
+			},
+			{
+				"key": "4242355",
+				"name": "Jake Ferguson"
+			},
+			{
+				"key": "16800",
+				"name": "Davante Adams"
+			},
+			{
+				"key": "3117256",
+				"name": "Dalton Schultz"
+			},
+			{
+				"key": "4596448",
+				"name": "Bucky Irving"
+			},
+			{
+				"key": "4683062",
+				"name": "Xavier Worthy"
+			},
+			{
+				"key": "3040151",
+				"name": "George Kittle"
+			},
+			{
+				"key": "3915511",
+				"name": "Joe Burrow"
+			},
+			{
+				"key": "4697815",
+				"name": "Rachaad White"
+			},
+			{
+				"key": "4432577",
+				"name": "C.J. Stroud"
+			},
+			{
+				"key": "4428331",
+				"name": "Rashee Rice"
+			},
+			{
+				"key": "4262921",
+				"name": "Justin Jefferson"
+			},
+			{
+				"key": "5083076",
+				"name": "Harold Fannin"
+			},
+			{
+				"key": "4569603",
+				"name": "Malik Washington"
+			},
+			{
+				"key": "3046439",
+				"name": "Hunter Henry"
+			},
+			{
+				"key": "3126486",
+				"name": "Deebo Samuel"
+			},
+			{
+				"key": "4427366",
+				"name": "Breece Hall"
+			},
+			{
+				"key": "4685247",
+				"name": "Braelon Allen"
+			}
+		],
+		"player": "8439",
+		"decision": "Trade Aaron Rodgers to Max_Jensen10 for Cam Skattebo and Pierre Strong, and drop Jaxson Dart to make room. Your lineup gains 5.7 points over replacement a week, theirs 0.7.",
+		"rows": [
+			{
+				"key": "8:96>12481+8116",
+				"team": "Max_Jensen10",
+				"rosterId": 8,
+				"give": "Rodgers",
+				"get": "Skattebo and Strong",
+				"with": "with Max_Jensen10, you drop Dart",
+				"need": null,
+				"mine": {
+					"gain": "+5.7",
+					"tone": "gain"
+				},
+				"theirs": {
+					"gain": "+0.7",
+					"tone": "gain"
+				},
+				"offer": "Trade with Max_Jensen10: Aaron Rodgers (QB PIT) for Cam Skattebo (RB NYG) and Pierre Strong (RB GB).",
+				"opened": {
+					"week": "+10.1 Proj this week for your lineup, +2.5 for theirs",
+					"dropReason": null,
+					"groups": [
+						{
+							"head": "From McConkey Kong Country, you",
+							"rows": [
+								{
+									"key": "96",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Aaron Rodgers",
+									"fit": "A. Rodgers",
+									"slug": "aaron-rodgers",
+									"boardId": "8439",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PIT",
+									"position": "QB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at TB",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "22 to 18.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.8"
+								},
+								{
+									"key": "12508",
+									"slot": "Drop",
+									"move": "out",
+									"idle": false,
+									"name": "Jaxson Dart",
+									"fit": "J. Dart",
+									"slug": "jaxson-dart",
+									"boardId": "4689114",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "NYG",
+									"position": "QB",
+									"status": {
+										"mark": "IR since Sep 24",
+										"sits": true
+									},
+									"rank": "--",
+									"game": {
+										"where": "vs NO",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "23.5 to 22",
+									"weather": {
+										"glyph": "wind",
+										"words": "54°, 7 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Avg 15.2, Last 0.8",
+									"oppRank": null,
+									"ease": "even",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "15.8"
+								}
+							]
+						},
+						{
+							"head": "From Max_Jensen10",
+							"rows": [
+								{
+									"key": "12481",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Cam Skattebo",
+									"fit": "C. Skattebo",
+									"slug": "cam-skattebo",
+									"boardId": "4696981",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "NYG",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs NO",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "23.5 to 22",
+									"weather": {
+										"glyph": "wind",
+										"words": "54°, 7 mph"
+									},
+									"proj": "13.3",
+									"pts": "--",
+									"evidence": "Opp 2nd, Avg 9.2, Last 7.1",
+									"oppRank": "2nd",
+									"ease": "hard",
+									"delta": "+0.1",
+									"state": "upcoming",
+									"why": null,
+									"season": "9.3"
+								},
+								{
+									"key": "8116",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Pierre Strong",
+									"fit": "P. Strong",
+									"slug": null,
+									"boardId": null,
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "GB",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs DAL",
+										"when": "Sun 7:20 pm"
+									},
+									"note": null,
+									"expected": "27 to 25.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "55°, 9 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Opp 22nd, Avg --, Last --",
+									"oppRank": "22nd",
+									"ease": "easy",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "--"
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"key": "7:96>12533+8111",
+				"team": "thatmattkelley",
+				"rosterId": 7,
+				"give": "Rodgers",
+				"get": "Croskey-Merritt and Otton",
+				"with": "with thatmattkelley, you drop Dart",
+				"need": null,
+				"mine": {
+					"gain": "+4.6",
+					"tone": "gain"
+				},
+				"theirs": {
+					"gain": "+0.5",
+					"tone": "gain"
+				},
+				"offer": "Trade with thatmattkelley: Aaron Rodgers (QB PIT) for Jacory Croskey-Merritt (RB WAS) and Cade Otton (TE TB).",
+				"opened": {
+					"week": "+13.6 Proj this week for your lineup, −5.6 for theirs",
+					"dropReason": null,
+					"groups": [
+						{
+							"head": "From McConkey Kong Country, you",
+							"rows": [
+								{
+									"key": "96",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Aaron Rodgers",
+									"fit": "A. Rodgers",
+									"slug": "aaron-rodgers",
+									"boardId": "8439",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PIT",
+									"position": "QB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at TB",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "22 to 18.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.8"
+								},
+								{
+									"key": "12508",
+									"slot": "Drop",
+									"move": "out",
+									"idle": false,
+									"name": "Jaxson Dart",
+									"fit": "J. Dart",
+									"slug": "jaxson-dart",
+									"boardId": "4689114",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "NYG",
+									"position": "QB",
+									"status": {
+										"mark": "IR since Sep 24",
+										"sits": true
+									},
+									"rank": "--",
+									"game": {
+										"where": "vs NO",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "23.5 to 22",
+									"weather": {
+										"glyph": "wind",
+										"words": "54°, 7 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Avg 15.2, Last 0.8",
+									"oppRank": null,
+									"ease": "even",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "15.8"
+								}
+							]
+						},
+						{
+							"head": "From thatmattkelley",
+							"rows": [
+								{
+									"key": "12533",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Jacory Croskey-Merritt",
+									"fit": "J. Croskey-Merritt",
+									"slug": "jacory-croskey-merritt",
+									"boardId": "4575131",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "WAS",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at SF",
+										"when": "Mon 7:15 pm"
+									},
+									"note": null,
+									"expected": "21.5 to 29",
+									"weather": {
+										"glyph": "wind",
+										"words": "63°, 13 mph"
+									},
+									"proj": "9.9",
+									"pts": "--",
+									"evidence": "Opp 14th, Avg 8.8, Last 14.2",
+									"oppRank": "14th",
+									"ease": "even",
+									"delta": "+0.2",
+									"state": "upcoming",
+									"why": null,
+									"season": "6.6"
+								},
+								{
+									"key": "8111",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Cade Otton",
+									"fit": "C. Otton",
+									"slug": "cade-otton",
+									"boardId": "4243331",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "TB",
+									"position": "TE",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs PIT",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "19 to 21.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "6.9",
+									"pts": "--",
+									"evidence": "Opp 19th, Avg 7.3, Last 5.5",
+									"oppRank": "19th",
+									"ease": "even",
+									"delta": "+0.3",
+									"state": "upcoming",
+									"why": null,
+									"season": "5.3"
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"key": "5:13301+96>11435",
+				"team": "Ball Snatchers",
+				"rosterId": 5,
+				"give": "Williams and Rodgers",
+				"get": "Wilson",
+				"with": "with Ball Snatchers",
+				"need": null,
+				"mine": {
+					"gain": "+1.8",
+					"tone": "gain"
+				},
+				"theirs": {
+					"gain": "+0.5",
+					"tone": "gain"
+				},
+				"offer": "Trade with Ball Snatchers: Antonio Williams (WR WAS) and Aaron Rodgers (QB PIT) for Emanuel Wilson (RB SEA).",
+				"opened": {
+					"week": null,
+					"dropReason": null,
+					"groups": [
+						{
+							"head": "From McConkey Kong Country, you",
+							"rows": [
+								{
+									"key": "13301",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Antonio Williams",
+									"fit": "A. Williams",
+									"slug": "antonio-williams",
+									"boardId": "5081432",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "WAS",
+									"position": "WR",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at SF",
+										"when": "Mon 7:15 pm"
+									},
+									"note": null,
+									"expected": "21.5 to 29",
+									"weather": {
+										"glyph": "wind",
+										"words": "63°, 13 mph"
+									},
+									"proj": "3.2",
+									"pts": "--",
+									"evidence": "Opp 25th, Avg 4.9, Last 6.1",
+									"oppRank": "25th",
+									"ease": "easy",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "4.8"
+								},
+								{
+									"key": "96",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Aaron Rodgers",
+									"fit": "A. Rodgers",
+									"slug": "aaron-rodgers",
+									"boardId": "8439",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PIT",
+									"position": "QB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at TB",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "22 to 18.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.8"
+								}
+							]
+						},
+						{
+							"head": "From Ball Snatchers",
+							"rows": [
+								{
+									"key": "11435",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Emanuel Wilson",
+									"fit": "E. Wilson",
+									"slug": "emanuel-wilson",
+									"boardId": "4887558",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "SEA",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at DEN",
+										"when": "Final"
+									},
+									"note": null,
+									"expected": null,
+									"weather": null,
+									"proj": "2.7",
+									"pts": "--",
+									"evidence": "Opp 24th, Avg 13.9, Last 13.2",
+									"oppRank": "24th",
+									"ease": "even",
+									"delta": "−0.1",
+									"state": "final",
+									"why": null,
+									"season": "2.9"
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"every": [
+			{
+				"key": "8:96>12481+8116",
+				"team": "Max_Jensen10",
+				"rosterId": 8,
+				"give": "Rodgers",
+				"get": "Skattebo and Strong",
+				"with": "with Max_Jensen10, you drop Dart",
+				"need": null,
+				"mine": {
+					"gain": "+5.7",
+					"tone": "gain"
+				},
+				"theirs": {
+					"gain": "+0.7",
+					"tone": "gain"
+				},
+				"offer": "Trade with Max_Jensen10: Aaron Rodgers (QB PIT) for Cam Skattebo (RB NYG) and Pierre Strong (RB GB).",
+				"opened": {
+					"week": "+10.1 Proj this week for your lineup, +2.5 for theirs",
+					"dropReason": null,
+					"groups": [
+						{
+							"head": "From McConkey Kong Country, you",
+							"rows": [
+								{
+									"key": "96",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Aaron Rodgers",
+									"fit": "A. Rodgers",
+									"slug": "aaron-rodgers",
+									"boardId": "8439",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PIT",
+									"position": "QB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at TB",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "22 to 18.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.8"
+								},
+								{
+									"key": "12508",
+									"slot": "Drop",
+									"move": "out",
+									"idle": false,
+									"name": "Jaxson Dart",
+									"fit": "J. Dart",
+									"slug": "jaxson-dart",
+									"boardId": "4689114",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "NYG",
+									"position": "QB",
+									"status": {
+										"mark": "IR since Sep 24",
+										"sits": true
+									},
+									"rank": "--",
+									"game": {
+										"where": "vs NO",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "23.5 to 22",
+									"weather": {
+										"glyph": "wind",
+										"words": "54°, 7 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Avg 15.2, Last 0.8",
+									"oppRank": null,
+									"ease": "even",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "15.8"
+								}
+							]
+						},
+						{
+							"head": "From Max_Jensen10",
+							"rows": [
+								{
+									"key": "12481",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Cam Skattebo",
+									"fit": "C. Skattebo",
+									"slug": "cam-skattebo",
+									"boardId": "4696981",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "NYG",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs NO",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "23.5 to 22",
+									"weather": {
+										"glyph": "wind",
+										"words": "54°, 7 mph"
+									},
+									"proj": "13.3",
+									"pts": "--",
+									"evidence": "Opp 2nd, Avg 9.2, Last 7.1",
+									"oppRank": "2nd",
+									"ease": "hard",
+									"delta": "+0.1",
+									"state": "upcoming",
+									"why": null,
+									"season": "9.3"
+								},
+								{
+									"key": "8116",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Pierre Strong",
+									"fit": "P. Strong",
+									"slug": null,
+									"boardId": null,
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "GB",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs DAL",
+										"when": "Sun 7:20 pm"
+									},
+									"note": null,
+									"expected": "27 to 25.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "55°, 9 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Opp 22nd, Avg --, Last --",
+									"oppRank": "22nd",
+									"ease": "easy",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "--"
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"key": "8:96>12490+7526",
+				"team": "Max_Jensen10",
+				"rosterId": 8,
+				"give": "Rodgers",
+				"get": "Tuten and Waddle",
+				"with": "with Max_Jensen10, you drop Dart",
+				"need": null,
+				"mine": {
+					"gain": "+5.7",
+					"tone": "gain"
+				},
+				"theirs": {
+					"gain": "+0.7",
+					"tone": "gain"
+				},
+				"offer": "Trade with Max_Jensen10: Aaron Rodgers (QB PIT) for Bhayshul Tuten (RB JAX) and Jaylen Waddle (WR DEN).",
+				"opened": {
+					"week": null,
+					"dropReason": null,
+					"groups": [
+						{
+							"head": "From McConkey Kong Country, you",
+							"rows": [
+								{
+									"key": "96",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Aaron Rodgers",
+									"fit": "A. Rodgers",
+									"slug": "aaron-rodgers",
+									"boardId": "8439",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PIT",
+									"position": "QB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at TB",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "22 to 18.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.8"
+								},
+								{
+									"key": "12508",
+									"slot": "Drop",
+									"move": "out",
+									"idle": false,
+									"name": "Jaxson Dart",
+									"fit": "J. Dart",
+									"slug": "jaxson-dart",
+									"boardId": "4689114",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "NYG",
+									"position": "QB",
+									"status": {
+										"mark": "IR since Sep 24",
+										"sits": true
+									},
+									"rank": "--",
+									"game": {
+										"where": "vs NO",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "23.5 to 22",
+									"weather": {
+										"glyph": "wind",
+										"words": "54°, 7 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Avg 15.2, Last 0.8",
+									"oppRank": null,
+									"ease": "even",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "15.8"
+								}
+							]
+						},
+						{
+							"head": "From Max_Jensen10",
+							"rows": [
+								{
+									"key": "12490",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Bhayshul Tuten",
+									"fit": "B. Tuten",
+									"slug": "bhayshul-tuten",
+									"boardId": "4882093",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "JAX",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs HOU",
+										"when": "Sun 8:30 am"
+									},
+									"note": null,
+									"expected": "23 to 19.5",
+									"weather": {
+										"glyph": "abroad",
+										"words": "Abroad, no forecast"
+									},
+									"proj": "10.7",
+									"pts": "--",
+									"evidence": "Opp 20th, Avg 13.2, Last 11.6",
+									"oppRank": "20th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "8.0"
+								},
+								{
+									"key": "7526",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Jaylen Waddle",
+									"fit": "J. Waddle",
+									"slug": "jaylen-waddle",
+									"boardId": "4372016",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "DEN",
+									"position": "WR",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs SEA",
+										"when": "Final"
+									},
+									"note": null,
+									"expected": null,
+									"weather": null,
+									"proj": "14.1",
+									"pts": "--",
+									"evidence": "Opp 9th, Avg 7.9, Last 4.8",
+									"oppRank": "9th",
+									"ease": "even",
+									"delta": "+0.2",
+									"state": "final",
+									"why": null,
+									"season": "13.6"
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"key": "8:96>12507+8116",
+				"team": "Max_Jensen10",
+				"rosterId": 8,
+				"give": "Rodgers",
+				"get": "Hampton and Strong",
+				"with": "with Max_Jensen10, you drop Dart",
+				"need": null,
+				"mine": {
+					"gain": "+5.6",
+					"tone": "gain"
+				},
+				"theirs": {
+					"gain": "+0.8",
+					"tone": "gain"
+				},
+				"offer": "Trade with Max_Jensen10: Aaron Rodgers (QB PIT) for Omarion Hampton (RB LAC) and Pierre Strong (RB GB).",
+				"opened": {
+					"week": "+12.6 Proj this week for your lineup, 0.0 for theirs",
+					"dropReason": null,
+					"groups": [
+						{
+							"head": "From McConkey Kong Country, you",
+							"rows": [
+								{
+									"key": "96",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Aaron Rodgers",
+									"fit": "A. Rodgers",
+									"slug": "aaron-rodgers",
+									"boardId": "8439",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PIT",
+									"position": "QB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at TB",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "22 to 18.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.8"
+								},
+								{
+									"key": "12508",
+									"slot": "Drop",
+									"move": "out",
+									"idle": false,
+									"name": "Jaxson Dart",
+									"fit": "J. Dart",
+									"slug": "jaxson-dart",
+									"boardId": "4689114",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "NYG",
+									"position": "QB",
+									"status": {
+										"mark": "IR since Sep 24",
+										"sits": true
+									},
+									"rank": "--",
+									"game": {
+										"where": "vs NO",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "23.5 to 22",
+									"weather": {
+										"glyph": "wind",
+										"words": "54°, 7 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Avg 15.2, Last 0.8",
+									"oppRank": null,
+									"ease": "even",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "15.8"
+								}
+							]
+						},
+						{
+							"head": "From Max_Jensen10",
+							"rows": [
+								{
+									"key": "12507",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Omarion Hampton",
+									"fit": "O. Hampton",
+									"slug": "omarion-hampton",
+									"boardId": "4685382",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "LAC",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at KC",
+										"when": "Sun 3:25 pm"
+									},
+									"note": null,
+									"expected": "17 to 25.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "66°, 10 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 7.9, Last 4.9",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "+0.4",
+									"state": "upcoming",
+									"why": null,
+									"season": "12.2"
+								},
+								{
+									"key": "8116",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Pierre Strong",
+									"fit": "P. Strong",
+									"slug": null,
+									"boardId": null,
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "GB",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs DAL",
+										"when": "Sun 7:20 pm"
+									},
+									"note": null,
+									"expected": "27 to 25.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "55°, 9 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Opp 22nd, Avg --, Last --",
+									"oppRank": "22nd",
+									"ease": "easy",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "--"
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"key": "8:96>7526+8116",
+				"team": "Max_Jensen10",
+				"rosterId": 8,
+				"give": "Rodgers",
+				"get": "Waddle and Strong",
+				"with": "with Max_Jensen10, you drop Dart",
+				"need": null,
+				"mine": {
+					"gain": "+5.3",
+					"tone": "gain"
+				},
+				"theirs": {
+					"gain": "+1.1",
+					"tone": "gain"
+				},
+				"offer": "Trade with Max_Jensen10: Aaron Rodgers (QB PIT) for Jaylen Waddle (WR DEN) and Pierre Strong (RB GB).",
+				"opened": {
+					"week": null,
+					"dropReason": null,
+					"groups": [
+						{
+							"head": "From McConkey Kong Country, you",
+							"rows": [
+								{
+									"key": "96",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Aaron Rodgers",
+									"fit": "A. Rodgers",
+									"slug": "aaron-rodgers",
+									"boardId": "8439",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PIT",
+									"position": "QB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at TB",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "22 to 18.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.8"
+								},
+								{
+									"key": "12508",
+									"slot": "Drop",
+									"move": "out",
+									"idle": false,
+									"name": "Jaxson Dart",
+									"fit": "J. Dart",
+									"slug": "jaxson-dart",
+									"boardId": "4689114",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "NYG",
+									"position": "QB",
+									"status": {
+										"mark": "IR since Sep 24",
+										"sits": true
+									},
+									"rank": "--",
+									"game": {
+										"where": "vs NO",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "23.5 to 22",
+									"weather": {
+										"glyph": "wind",
+										"words": "54°, 7 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Avg 15.2, Last 0.8",
+									"oppRank": null,
+									"ease": "even",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "15.8"
+								}
+							]
+						},
+						{
+							"head": "From Max_Jensen10",
+							"rows": [
+								{
+									"key": "7526",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Jaylen Waddle",
+									"fit": "J. Waddle",
+									"slug": "jaylen-waddle",
+									"boardId": "4372016",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "DEN",
+									"position": "WR",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs SEA",
+										"when": "Final"
+									},
+									"note": null,
+									"expected": null,
+									"weather": null,
+									"proj": "14.1",
+									"pts": "--",
+									"evidence": "Opp 9th, Avg 7.9, Last 4.8",
+									"oppRank": "9th",
+									"ease": "even",
+									"delta": "+0.2",
+									"state": "final",
+									"why": null,
+									"season": "13.6"
+								},
+								{
+									"key": "8116",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Pierre Strong",
+									"fit": "P. Strong",
+									"slug": null,
+									"boardId": null,
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "GB",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs DAL",
+										"when": "Sun 7:20 pm"
+									},
+									"note": null,
+									"expected": "27 to 25.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "55°, 9 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Opp 22nd, Avg --, Last --",
+									"oppRank": "22nd",
+									"ease": "easy",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "--"
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"key": "7:96>12533+8111",
+				"team": "thatmattkelley",
+				"rosterId": 7,
+				"give": "Rodgers",
+				"get": "Croskey-Merritt and Otton",
+				"with": "with thatmattkelley, you drop Dart",
+				"need": null,
+				"mine": {
+					"gain": "+4.6",
+					"tone": "gain"
+				},
+				"theirs": {
+					"gain": "+0.5",
+					"tone": "gain"
+				},
+				"offer": "Trade with thatmattkelley: Aaron Rodgers (QB PIT) for Jacory Croskey-Merritt (RB WAS) and Cade Otton (TE TB).",
+				"opened": {
+					"week": "+13.6 Proj this week for your lineup, −5.6 for theirs",
+					"dropReason": null,
+					"groups": [
+						{
+							"head": "From McConkey Kong Country, you",
+							"rows": [
+								{
+									"key": "96",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Aaron Rodgers",
+									"fit": "A. Rodgers",
+									"slug": "aaron-rodgers",
+									"boardId": "8439",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PIT",
+									"position": "QB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at TB",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "22 to 18.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.8"
+								},
+								{
+									"key": "12508",
+									"slot": "Drop",
+									"move": "out",
+									"idle": false,
+									"name": "Jaxson Dart",
+									"fit": "J. Dart",
+									"slug": "jaxson-dart",
+									"boardId": "4689114",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "NYG",
+									"position": "QB",
+									"status": {
+										"mark": "IR since Sep 24",
+										"sits": true
+									},
+									"rank": "--",
+									"game": {
+										"where": "vs NO",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "23.5 to 22",
+									"weather": {
+										"glyph": "wind",
+										"words": "54°, 7 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Avg 15.2, Last 0.8",
+									"oppRank": null,
+									"ease": "even",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "15.8"
+								}
+							]
+						},
+						{
+							"head": "From thatmattkelley",
+							"rows": [
+								{
+									"key": "12533",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Jacory Croskey-Merritt",
+									"fit": "J. Croskey-Merritt",
+									"slug": "jacory-croskey-merritt",
+									"boardId": "4575131",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "WAS",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at SF",
+										"when": "Mon 7:15 pm"
+									},
+									"note": null,
+									"expected": "21.5 to 29",
+									"weather": {
+										"glyph": "wind",
+										"words": "63°, 13 mph"
+									},
+									"proj": "9.9",
+									"pts": "--",
+									"evidence": "Opp 14th, Avg 8.8, Last 14.2",
+									"oppRank": "14th",
+									"ease": "even",
+									"delta": "+0.2",
+									"state": "upcoming",
+									"why": null,
+									"season": "6.6"
+								},
+								{
+									"key": "8111",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Cade Otton",
+									"fit": "C. Otton",
+									"slug": "cade-otton",
+									"boardId": "4243331",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "TB",
+									"position": "TE",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs PIT",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "19 to 21.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "6.9",
+									"pts": "--",
+									"evidence": "Opp 19th, Avg 7.3, Last 5.5",
+									"oppRank": "19th",
+									"ease": "even",
+									"delta": "+0.3",
+									"state": "upcoming",
+									"why": null,
+									"season": "5.3"
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"key": "7:96>8111+8129",
+				"team": "thatmattkelley",
+				"rosterId": 7,
+				"give": "Rodgers",
+				"get": "Otton and Pierce",
+				"with": "with thatmattkelley, you drop Dart",
+				"need": null,
+				"mine": {
+					"gain": "+4.6",
+					"tone": "gain"
+				},
+				"theirs": {
+					"gain": "+0.5",
+					"tone": "gain"
+				},
+				"offer": "Trade with thatmattkelley: Aaron Rodgers (QB PIT) for Cade Otton (TE TB) and Dameon Pierce (RB PHI).",
+				"opened": {
+					"week": "+6.9 Proj this week for your lineup, +0.8 for theirs",
+					"dropReason": null,
+					"groups": [
+						{
+							"head": "From McConkey Kong Country, you",
+							"rows": [
+								{
+									"key": "96",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Aaron Rodgers",
+									"fit": "A. Rodgers",
+									"slug": "aaron-rodgers",
+									"boardId": "8439",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PIT",
+									"position": "QB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at TB",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "22 to 18.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.8"
+								},
+								{
+									"key": "12508",
+									"slot": "Drop",
+									"move": "out",
+									"idle": false,
+									"name": "Jaxson Dart",
+									"fit": "J. Dart",
+									"slug": "jaxson-dart",
+									"boardId": "4689114",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "NYG",
+									"position": "QB",
+									"status": {
+										"mark": "IR since Sep 24",
+										"sits": true
+									},
+									"rank": "--",
+									"game": {
+										"where": "vs NO",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "23.5 to 22",
+									"weather": {
+										"glyph": "wind",
+										"words": "54°, 7 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Avg 15.2, Last 0.8",
+									"oppRank": null,
+									"ease": "even",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "15.8"
+								}
+							]
+						},
+						{
+							"head": "From thatmattkelley",
+							"rows": [
+								{
+									"key": "8111",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Cade Otton",
+									"fit": "C. Otton",
+									"slug": "cade-otton",
+									"boardId": "4243331",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "TB",
+									"position": "TE",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs PIT",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "19 to 21.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "6.9",
+									"pts": "--",
+									"evidence": "Opp 19th, Avg 7.3, Last 5.5",
+									"oppRank": "19th",
+									"ease": "even",
+									"delta": "+0.3",
+									"state": "upcoming",
+									"why": null,
+									"season": "5.3"
+								},
+								{
+									"key": "8129",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Dameon Pierce",
+									"fit": "D. Pierce",
+									"slug": null,
+									"boardId": null,
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PHI",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs CAR",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "21.5 to 20",
+									"weather": {
+										"glyph": "wind",
+										"words": "52°, 7 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Opp 7th, Avg --, Last --",
+									"oppRank": "7th",
+									"ease": "hard",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "--"
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"key": "7:96>12533+8129",
+				"team": "thatmattkelley",
+				"rosterId": 7,
+				"give": "Rodgers",
+				"get": "Croskey-Merritt and Pierce",
+				"with": "with thatmattkelley, you drop Dart",
+				"need": null,
+				"mine": {
+					"gain": "+4.5",
+					"tone": "gain"
+				},
+				"theirs": {
+					"gain": "+0.6",
+					"tone": "gain"
+				},
+				"offer": "Trade with thatmattkelley: Aaron Rodgers (QB PIT) for Jacory Croskey-Merritt (RB WAS) and Dameon Pierce (RB PHI).",
+				"opened": {
+					"week": "+6.7 Proj this week for your lineup, −2.2 for theirs",
+					"dropReason": null,
+					"groups": [
+						{
+							"head": "From McConkey Kong Country, you",
+							"rows": [
+								{
+									"key": "96",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Aaron Rodgers",
+									"fit": "A. Rodgers",
+									"slug": "aaron-rodgers",
+									"boardId": "8439",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PIT",
+									"position": "QB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at TB",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "22 to 18.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.8"
+								},
+								{
+									"key": "12508",
+									"slot": "Drop",
+									"move": "out",
+									"idle": false,
+									"name": "Jaxson Dart",
+									"fit": "J. Dart",
+									"slug": "jaxson-dart",
+									"boardId": "4689114",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "NYG",
+									"position": "QB",
+									"status": {
+										"mark": "IR since Sep 24",
+										"sits": true
+									},
+									"rank": "--",
+									"game": {
+										"where": "vs NO",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "23.5 to 22",
+									"weather": {
+										"glyph": "wind",
+										"words": "54°, 7 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Avg 15.2, Last 0.8",
+									"oppRank": null,
+									"ease": "even",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "15.8"
+								}
+							]
+						},
+						{
+							"head": "From thatmattkelley",
+							"rows": [
+								{
+									"key": "12533",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Jacory Croskey-Merritt",
+									"fit": "J. Croskey-Merritt",
+									"slug": "jacory-croskey-merritt",
+									"boardId": "4575131",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "WAS",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at SF",
+										"when": "Mon 7:15 pm"
+									},
+									"note": null,
+									"expected": "21.5 to 29",
+									"weather": {
+										"glyph": "wind",
+										"words": "63°, 13 mph"
+									},
+									"proj": "9.9",
+									"pts": "--",
+									"evidence": "Opp 14th, Avg 8.8, Last 14.2",
+									"oppRank": "14th",
+									"ease": "even",
+									"delta": "+0.2",
+									"state": "upcoming",
+									"why": null,
+									"season": "6.6"
+								},
+								{
+									"key": "8129",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Dameon Pierce",
+									"fit": "D. Pierce",
+									"slug": null,
+									"boardId": null,
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PHI",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs CAR",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "21.5 to 20",
+									"weather": {
+										"glyph": "wind",
+										"words": "52°, 7 mph"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Opp 7th, Avg --, Last --",
+									"oppRank": "7th",
+									"ease": "hard",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "--"
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"key": "5:13301+96>11435",
+				"team": "Ball Snatchers",
+				"rosterId": 5,
+				"give": "Williams and Rodgers",
+				"get": "Wilson",
+				"with": "with Ball Snatchers",
+				"need": null,
+				"mine": {
+					"gain": "+1.8",
+					"tone": "gain"
+				},
+				"theirs": {
+					"gain": "+0.5",
+					"tone": "gain"
+				},
+				"offer": "Trade with Ball Snatchers: Antonio Williams (WR WAS) and Aaron Rodgers (QB PIT) for Emanuel Wilson (RB SEA).",
+				"opened": {
+					"week": null,
+					"dropReason": null,
+					"groups": [
+						{
+							"head": "From McConkey Kong Country, you",
+							"rows": [
+								{
+									"key": "13301",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Antonio Williams",
+									"fit": "A. Williams",
+									"slug": "antonio-williams",
+									"boardId": "5081432",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "WAS",
+									"position": "WR",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at SF",
+										"when": "Mon 7:15 pm"
+									},
+									"note": null,
+									"expected": "21.5 to 29",
+									"weather": {
+										"glyph": "wind",
+										"words": "63°, 13 mph"
+									},
+									"proj": "3.2",
+									"pts": "--",
+									"evidence": "Opp 25th, Avg 4.9, Last 6.1",
+									"oppRank": "25th",
+									"ease": "easy",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "4.8"
+								},
+								{
+									"key": "96",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Aaron Rodgers",
+									"fit": "A. Rodgers",
+									"slug": "aaron-rodgers",
+									"boardId": "8439",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PIT",
+									"position": "QB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at TB",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "22 to 18.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.8"
+								}
+							]
+						},
+						{
+							"head": "From Ball Snatchers",
+							"rows": [
+								{
+									"key": "11435",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Emanuel Wilson",
+									"fit": "E. Wilson",
+									"slug": "emanuel-wilson",
+									"boardId": "4887558",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "SEA",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at DEN",
+										"when": "Final"
+									},
+									"note": null,
+									"expected": null,
+									"weather": null,
+									"proj": "2.7",
+									"pts": "--",
+									"evidence": "Opp 24th, Avg 13.9, Last 13.2",
+									"oppRank": "24th",
+									"ease": "even",
+									"delta": "−0.1",
+									"state": "final",
+									"why": null,
+									"season": "2.9"
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"key": "5:5947+96>9502",
+				"team": "Ball Snatchers",
+				"rosterId": 5,
+				"give": "Meyers and Rodgers",
+				"get": "Dell",
+				"with": "with Ball Snatchers",
+				"need": null,
+				"mine": {
+					"gain": "+1.7",
+					"tone": "gain"
+				},
+				"theirs": {
+					"gain": "+0.6",
+					"tone": "gain"
+				},
+				"offer": "Trade with Ball Snatchers: Jakobi Meyers (WR JAX) and Aaron Rodgers (QB PIT) for Tank Dell (WR HOU).",
+				"opened": {
+					"week": "−9.1 Proj this week for your lineup, +25.5 for theirs",
+					"dropReason": null,
+					"groups": [
+						{
+							"head": "From McConkey Kong Country, you",
+							"rows": [
+								{
+									"key": "5947",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Jakobi Meyers",
+									"fit": "J. Meyers",
+									"slug": "jakobi-meyers",
+									"boardId": "3916433",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "JAX",
+									"position": "WR",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "vs HOU",
+										"when": "Sun 8:30 am"
+									},
+									"note": null,
+									"expected": "23 to 19.5",
+									"weather": {
+										"glyph": "abroad",
+										"words": "Abroad, no forecast"
+									},
+									"proj": "9.7",
+									"pts": "--",
+									"evidence": "Opp 31st, Avg 10.5, Last 5.7",
+									"oppRank": "31st",
+									"ease": "easy",
+									"delta": "+0.3",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.1"
+								},
+								{
+									"key": "96",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Aaron Rodgers",
+									"fit": "A. Rodgers",
+									"slug": "aaron-rodgers",
+									"boardId": "8439",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PIT",
+									"position": "QB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at TB",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "22 to 18.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.8"
+								}
+							]
+						},
+						{
+							"head": "From Ball Snatchers",
+							"rows": [
+								{
+									"key": "9502",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "Tank Dell",
+									"fit": "T. Dell",
+									"slug": null,
+									"boardId": null,
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "HOU",
+									"position": "WR",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at JAX",
+										"when": "Sun 8:30 am"
+									},
+									"note": null,
+									"expected": "20 to 22.5",
+									"weather": {
+										"glyph": "abroad",
+										"words": "Abroad, no forecast"
+									},
+									"proj": "--",
+									"pts": "--",
+									"evidence": "Opp 2nd, Avg --, Last --",
+									"oppRank": "2nd",
+									"ease": "hard",
+									"delta": "--",
+									"state": "upcoming",
+									"why": null,
+									"season": "--"
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"key": "5:13301+96>5892",
+				"team": "Ball Snatchers",
+				"rosterId": 5,
+				"give": "Williams and Rodgers",
+				"get": "Montgomery",
+				"with": "with Ball Snatchers",
+				"need": null,
+				"mine": {
+					"gain": "+1.6",
+					"tone": "gain"
+				},
+				"theirs": {
+					"gain": "+0.7",
+					"tone": "gain"
+				},
+				"offer": "Trade with Ball Snatchers: Antonio Williams (WR WAS) and Aaron Rodgers (QB PIT) for David Montgomery (RB HOU).",
+				"opened": {
+					"week": "+9.5 Proj this week for your lineup, +6.3 for theirs",
+					"dropReason": null,
+					"groups": [
+						{
+							"head": "From McConkey Kong Country, you",
+							"rows": [
+								{
+									"key": "13301",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Antonio Williams",
+									"fit": "A. Williams",
+									"slug": "antonio-williams",
+									"boardId": "5081432",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "WAS",
+									"position": "WR",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at SF",
+										"when": "Mon 7:15 pm"
+									},
+									"note": null,
+									"expected": "21.5 to 29",
+									"weather": {
+										"glyph": "wind",
+										"words": "63°, 13 mph"
+									},
+									"proj": "3.2",
+									"pts": "--",
+									"evidence": "Opp 25th, Avg 4.9, Last 6.1",
+									"oppRank": "25th",
+									"ease": "easy",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "4.8"
+								},
+								{
+									"key": "96",
+									"slot": "Give",
+									"move": "out",
+									"idle": false,
+									"name": "Aaron Rodgers",
+									"fit": "A. Rodgers",
+									"slug": "aaron-rodgers",
+									"boardId": "8439",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "PIT",
+									"position": "QB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at TB",
+										"when": "Sun 12:00 pm"
+									},
+									"note": null,
+									"expected": "22 to 18.5",
+									"weather": {
+										"glyph": "wind",
+										"words": "74°, 15 mph"
+									},
+									"proj": "15.8",
+									"pts": "--",
+									"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+									"oppRank": "11th",
+									"ease": "even",
+									"delta": "0.0",
+									"state": "upcoming",
+									"why": null,
+									"season": "10.8"
+								}
+							]
+						},
+						{
+							"head": "From Ball Snatchers",
+							"rows": [
+								{
+									"key": "5892",
+									"slot": "Get",
+									"move": "in",
+									"idle": false,
+									"name": "David Montgomery",
+									"fit": "D. Montgomery",
+									"slug": "david-montgomery",
+									"boardId": "4035538",
+									"face": {
+										"mark": false,
+										"alt": ""
+									},
+									"club": "HOU",
+									"position": "RB",
+									"status": null,
+									"rank": "--",
+									"game": {
+										"where": "at JAX",
+										"when": "Sun 8:30 am"
+									},
+									"note": null,
+									"expected": "20 to 22.5",
+									"weather": {
+										"glyph": "abroad",
+										"words": "Abroad, no forecast"
+									},
+									"proj": "12.7",
+									"pts": "--",
+									"evidence": "Opp 23rd, Avg 4.1, Last 1.1",
+									"oppRank": "23rd",
+									"ease": "easy",
+									"delta": "+0.4",
+									"state": "upcoming",
+									"why": null,
+									"season": "9.5"
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"unheld": {
+			"key": "4689114",
+			"decision": "No trade we found includes Jaxson Dart."
+		}
+	},
+	"builder": {
+		"clock": "2026-10-17T17:00:00.000Z",
+		"picks": {
+			"team": 8,
+			"give": [
+				"96"
+			],
+			"get": [
+				"12481",
+				"8116"
+			]
+		},
+		"teams": [
+			{
+				"rosterId": 2,
+				"choice": "Carried by QJs, PeakedInHighSkool, 3-2"
+			},
+			{
+				"rosterId": 3,
+				"choice": "Keeper? I Hardly Know Her, JeffHaseleyFBG, 4-1"
+			},
+			{
+				"rosterId": 4,
+				"choice": "Dad Runners, jjzachariason, 2-3"
+			},
+			{
+				"rosterId": 5,
+				"choice": "Ball Snatchers, Quinnifer, 3-2"
+			},
+			{
+				"rosterId": 6,
+				"choice": "Bower Rangers, pricej07, 3-2"
+			},
+			{
+				"rosterId": 7,
+				"choice": "thatmattkelley, 1-4"
+			},
+			{
+				"rosterId": 8,
+				"choice": "Max_Jensen10, 1-4"
+			},
+			{
+				"rosterId": 9,
+				"choice": "Aaron Donald Dependent, Nowlan, 2-3"
+			},
+			{
+				"rosterId": 10,
+				"choice": "Muttdogs, muttdog, 5-0"
+			},
+			{
+				"rosterId": 11,
+				"choice": "OnlyFannins, jordanp2323, 2-3"
+			},
+			{
+				"rosterId": 12,
+				"choice": "Nacua Matata, Rad_Thad1, 3-2"
+			}
+		],
+		"sentence": "Both lineups gain: yours 5.7 points over replacement a week, theirs 0.7. You give Aaron Rodgers (10.8 a game) for Cam Skattebo (9.3 a game) and Pierre Strong. You drop Jaxson Dart to make room.",
+		"close": null,
+		"own": "The scoreboard is each lineup before and after the trade.",
+		"yours": {
+			"team": "McConkey Kong Country",
+			"holds": "You give 1",
+			"rows": [
+				{
+					"key": "4046",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Patrick Mahomes",
+					"fit": "P. Mahomes",
+					"slug": "patrick-mahomes",
+					"boardId": "3139477",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "KC",
+					"position": "QB",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "vs LAC",
+						"when": "Sun 3:25 pm"
+					},
+					"note": null,
+					"expected": "25.5 to 17",
+					"weather": {
+						"glyph": "wind",
+						"words": "66°, 10 mph"
+					},
+					"proj": "17.9",
+					"pts": "--",
+					"evidence": "Opp 2nd, Avg 23.3, Last 19.0",
+					"oppRank": "2nd",
+					"ease": "hard",
+					"delta": "−0.1",
+					"state": "upcoming",
+					"why": null,
+					"season": "15.5",
+					"line": "Avg 23.3, Last 19.0",
+					"pick": "off"
+				},
+				{
+					"key": "96",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Aaron Rodgers",
+					"fit": "A. Rodgers",
+					"slug": "aaron-rodgers",
+					"boardId": "8439",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "PIT",
+					"position": "QB",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "at TB",
+						"when": "Sun 12:00 pm"
+					},
+					"note": null,
+					"expected": "22 to 18.5",
+					"weather": {
+						"glyph": "wind",
+						"words": "74°, 15 mph"
+					},
+					"proj": "15.8",
+					"pts": "--",
+					"evidence": "Opp 11th, Avg 25.6, Last 25.0",
+					"oppRank": "11th",
+					"ease": "even",
+					"delta": "0.0",
+					"state": "upcoming",
+					"why": null,
+					"season": "10.8",
+					"line": "Avg 25.6, Last 25.0",
+					"pick": "on"
+				},
+				{
+					"key": "7543",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Travis Etienne",
+					"fit": "T. Etienne",
+					"slug": "travis-etienne-jr",
+					"boardId": "4239996",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "NO",
+					"position": "RB",
+					"status": {
+						"mark": "Due back Sun Oct 18",
+						"sits": false
+					},
+					"rank": "--",
+					"game": {
+						"where": "at NYG",
+						"when": "Sun 12:00 pm"
+					},
+					"note": null,
+					"expected": "22 to 23.5",
+					"weather": {
+						"glyph": "wind",
+						"words": "54°, 7 mph"
+					},
+					"proj": "14.2",
+					"pts": "--",
+					"evidence": "Opp 26th, Avg 9.6, Last 9.0",
+					"oppRank": "26th",
+					"ease": "easy",
+					"delta": "+0.2",
+					"state": "upcoming",
+					"why": null,
+					"season": "11.4",
+					"line": "Avg 9.6, Last 9.0",
+					"pick": "off"
+				},
+				{
+					"key": "13287",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Jeremiyah Love",
+					"fit": "J. Love",
+					"slug": "jeremiyah-love",
+					"boardId": "4870808",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "ARI",
+					"position": "RB",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "at LAR",
+						"when": "Sun 3:05 pm"
+					},
+					"note": null,
+					"expected": "20 to 32.5",
+					"weather": {
+						"glyph": "indoors",
+						"words": "Indoors"
+					},
+					"proj": "12.3",
+					"pts": "--",
+					"evidence": "Opp 6th, Avg 10.2, Last 2.2",
+					"oppRank": "6th",
+					"ease": "hard",
+					"delta": "−0.4",
+					"state": "upcoming",
+					"why": null,
+					"season": "11.5",
+					"line": "Avg 10.2, Last 2.2",
+					"pick": "off"
+				},
+				{
+					"key": "7567",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Kenny Gainwell",
+					"fit": "K. Gainwell",
+					"slug": "kenny-gainwell",
+					"boardId": "4371733",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "TB",
+					"position": "RB",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "vs PIT",
+						"when": "Sun 12:00 pm"
+					},
+					"note": null,
+					"expected": "19 to 21.5",
+					"weather": {
+						"glyph": "wind",
+						"words": "74°, 15 mph"
+					},
+					"proj": "9.5",
+					"pts": "--",
+					"evidence": "Opp 18th, Avg 6.5, Last 5.8",
+					"oppRank": "18th",
+					"ease": "even",
+					"delta": "0.0",
+					"state": "upcoming",
+					"why": null,
+					"season": "8.7",
+					"line": "Avg 6.5, Last 5.8",
+					"pick": "off"
+				},
+				{
+					"key": "10235",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Roschon Johnson",
+					"fit": "R. Johnson",
+					"slug": "roschon-johnson",
+					"boardId": "4426386",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "CHI",
+					"position": "RB",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "at ATL",
+						"when": "Sun 12:00 pm"
+					},
+					"note": null,
+					"expected": "26.5 to 23",
+					"weather": {
+						"glyph": "roof",
+						"words": "Roof TBD"
+					},
+					"proj": "0.6",
+					"pts": "--",
+					"evidence": "Opp 1st, Avg 4.1, Last 9.0",
+					"oppRank": "1st",
+					"ease": "hard",
+					"delta": "−0.4",
+					"state": "upcoming",
+					"why": null,
+					"season": "--",
+					"line": "Avg 4.1, Last 9.0",
+					"pick": "off"
+				},
+				{
+					"key": "9753",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Zach Charbonnet",
+					"fit": "Z. Charbonnet",
+					"slug": "zach-charbonnet",
+					"boardId": "4426385",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "SEA",
+					"position": "RB",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "at DEN",
+						"when": "Final"
+					},
+					"note": null,
+					"expected": null,
+					"weather": null,
+					"proj": "--",
+					"pts": "--",
+					"evidence": "Opp 24th, Avg --, Last --",
+					"oppRank": "24th",
+					"ease": "even",
+					"delta": "--",
+					"state": "final",
+					"why": null,
+					"season": "4.9",
+					"line": "Avg --, Last --",
+					"pick": "off"
+				},
+				{
+					"key": "11635",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Ladd McConkey",
+					"fit": "L. McConkey",
+					"slug": "ladd-mcconkey",
+					"boardId": "4612826",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "LAC",
+					"position": "WR",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "at KC",
+						"when": "Sun 3:25 pm"
+					},
+					"note": null,
+					"expected": "17 to 25.5",
+					"weather": {
+						"glyph": "wind",
+						"words": "66°, 10 mph"
+					},
+					"proj": "13.2",
+					"pts": "--",
+					"evidence": "Opp 22nd, Avg 5.7, Last 0.0",
+					"oppRank": "22nd",
+					"ease": "easy",
+					"delta": "−0.2",
+					"state": "upcoming",
+					"why": null,
+					"season": "13.9",
+					"line": "Avg 5.7, Last 0.0",
+					"pick": "off"
+				},
+				{
+					"key": "11620",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Rome Odunze",
+					"fit": "R. Odunze",
+					"slug": "rome-odunze",
+					"boardId": "4431299",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "CHI",
+					"position": "WR",
+					"status": {
+						"mark": "Questionable",
+						"sits": false
+					},
+					"rank": "--",
+					"game": {
+						"where": "at ATL",
+						"when": "Sun 12:00 pm"
+					},
+					"note": null,
+					"expected": "26.5 to 23",
+					"weather": {
+						"glyph": "roof",
+						"words": "Roof TBD"
+					},
+					"proj": "11.0",
+					"pts": "--",
+					"evidence": "Opp 12th, Avg 9.3, Last 5.0",
+					"oppRank": "12th",
+					"ease": "even",
+					"delta": "−0.1",
+					"state": "upcoming",
+					"why": null,
+					"season": "12.4",
+					"line": "Avg 9.3, Last 5.0",
+					"pick": "off"
+				},
+				{
+					"key": "5947",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Jakobi Meyers",
+					"fit": "J. Meyers",
+					"slug": "jakobi-meyers",
+					"boardId": "3916433",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "JAX",
+					"position": "WR",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "vs HOU",
+						"when": "Sun 8:30 am"
+					},
+					"note": null,
+					"expected": "23 to 19.5",
+					"weather": {
+						"glyph": "abroad",
+						"words": "Abroad, no forecast"
+					},
+					"proj": "9.7",
+					"pts": "--",
+					"evidence": "Opp 31st, Avg 10.5, Last 5.7",
+					"oppRank": "31st",
+					"ease": "easy",
+					"delta": "+0.3",
+					"state": "upcoming",
+					"why": null,
+					"season": "10.1",
+					"line": "Avg 10.5, Last 5.7",
+					"pick": "off"
+				},
+				{
+					"key": "13301",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Antonio Williams",
+					"fit": "A. Williams",
+					"slug": "antonio-williams",
+					"boardId": "5081432",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "WAS",
+					"position": "WR",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "at SF",
+						"when": "Mon 7:15 pm"
+					},
+					"note": null,
+					"expected": "21.5 to 29",
+					"weather": {
+						"glyph": "wind",
+						"words": "63°, 13 mph"
+					},
+					"proj": "3.2",
+					"pts": "--",
+					"evidence": "Opp 25th, Avg 4.9, Last 6.1",
+					"oppRank": "25th",
+					"ease": "easy",
+					"delta": "0.0",
+					"state": "upcoming",
+					"why": null,
+					"season": "4.8",
+					"line": "Avg 4.9, Last 6.1",
+					"pick": "off"
+				},
+				{
+					"key": "4950",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Christian Kirk",
+					"fit": "C. Kirk",
+					"slug": "christian-kirk",
+					"boardId": "3895856",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "SF",
+					"position": "WR",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "vs WSH",
+						"when": "Mon 7:15 pm"
+					},
+					"note": null,
+					"expected": "29 to 21.5",
+					"weather": {
+						"glyph": "wind",
+						"words": "63°, 13 mph"
+					},
+					"proj": "--",
+					"pts": "--",
+					"evidence": "Opp 5th, Avg --, Last --",
+					"oppRank": "5th",
+					"ease": "hard",
+					"delta": "--",
+					"state": "upcoming",
+					"why": null,
+					"season": "--",
+					"line": "Avg --, Last --",
+					"pick": "off"
+				},
+				{
+					"key": "7564",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Ja'Marr Chase",
+					"fit": "J. Chase",
+					"slug": "ja-marr-chase",
+					"boardId": "4362628",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "CIN",
+					"position": "WR",
+					"status": null,
+					"rank": "--",
+					"game": "bye",
+					"note": null,
+					"expected": null,
+					"weather": null,
+					"proj": "--",
+					"pts": "--",
+					"evidence": "Avg 16.7, Last 19.7",
+					"oppRank": null,
+					"ease": "even",
+					"delta": "--",
+					"state": null,
+					"why": null,
+					"season": "20.8",
+					"line": "Avg 16.7, Last 19.7",
+					"pick": "off"
+				},
+				{
+					"key": "9756",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Jordan Addison",
+					"fit": "J. Addison",
+					"slug": "jordan-addison",
+					"boardId": "4429205",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "MIN",
+					"position": "WR",
+					"status": null,
+					"rank": "--",
+					"game": "bye",
+					"note": null,
+					"expected": null,
+					"weather": null,
+					"proj": "--",
+					"pts": "--",
+					"evidence": "Avg 11.1, Last 9.1",
+					"oppRank": null,
+					"ease": "even",
+					"delta": "--",
+					"state": null,
+					"why": null,
+					"season": "10.5",
+					"line": "Avg 11.1, Last 9.1",
+					"pick": "off"
+				},
+				{
+					"key": "8210",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Chig Okonkwo",
+					"fit": "C. Okonkwo",
+					"slug": "chig-okonkwo",
+					"boardId": "4360635",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "WAS",
+					"position": "TE",
+					"status": {
+						"mark": "Out",
+						"sits": true
+					},
+					"rank": "--",
+					"game": {
+						"where": "at SF",
+						"when": "Mon 7:15 pm"
+					},
+					"note": null,
+					"expected": "21.5 to 29",
+					"weather": {
+						"glyph": "wind",
+						"words": "63°, 13 mph"
+					},
+					"proj": "7.8",
+					"pts": "--",
+					"evidence": "Opp 15th, Avg 5.4, Last 10.0",
+					"oppRank": "15th",
+					"ease": "even",
+					"delta": "−0.1",
+					"state": "upcoming",
+					"why": null,
+					"season": "5.9",
+					"line": "Avg 5.4, Last 10.0",
+					"pick": "off"
+				},
+				{
+					"key": "10859",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Sam LaPorta",
+					"fit": "S. LaPorta",
+					"slug": "sam-laporta",
+					"boardId": "4430027",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "DET",
+					"position": "TE",
+					"status": null,
+					"rank": "--",
+					"game": "bye",
+					"note": null,
+					"expected": null,
+					"weather": null,
+					"proj": "--",
+					"pts": "--",
+					"evidence": "Avg 16.5, Last 19.8",
+					"oppRank": null,
+					"ease": "even",
+					"delta": "--",
+					"state": null,
+					"why": null,
+					"season": "8.8",
+					"line": "Avg 16.5, Last 19.8",
+					"pick": "off"
+				},
+				{
+					"key": "HOU",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Houston Texans",
+					"fit": "Texans",
+					"slug": null,
+					"boardId": null,
+					"face": {
+						"mark": true,
+						"alt": "Texans defense"
+					},
+					"club": "HOU",
+					"position": "D/ST",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "at JAX",
+						"when": "Sun 8:30 am"
+					},
+					"note": null,
+					"expected": "20 to 22.5",
+					"weather": {
+						"glyph": "abroad",
+						"words": "Abroad, no forecast"
+					},
+					"proj": "7.9",
+					"pts": "--",
+					"evidence": "Avg --, Last --",
+					"oppRank": null,
+					"ease": "even",
+					"delta": "−0.3",
+					"state": "upcoming",
+					"why": null,
+					"season": "--",
+					"line": "Avg --, Last --",
+					"pick": "no"
+				},
+				{
+					"key": "MIN",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Minnesota Vikings",
+					"fit": "Vikings",
+					"slug": null,
+					"boardId": null,
+					"face": {
+						"mark": true,
+						"alt": "Vikings defense"
+					},
+					"club": "MIN",
+					"position": "D/ST",
+					"status": null,
+					"rank": "--",
+					"game": "bye",
+					"note": null,
+					"expected": null,
+					"weather": null,
+					"proj": "--",
+					"pts": "--",
+					"evidence": "Avg --, Last --",
+					"oppRank": null,
+					"ease": "even",
+					"delta": "--",
+					"state": null,
+					"why": null,
+					"season": "--",
+					"line": "Avg --, Last --",
+					"pick": "no"
+				},
+				{
+					"key": "12508",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Jaxson Dart",
+					"fit": "J. Dart",
+					"slug": "jaxson-dart",
+					"boardId": "4689114",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "NYG",
+					"position": "QB",
+					"status": {
+						"mark": "IR since Sep 24",
+						"sits": true
+					},
+					"rank": "--",
+					"game": {
+						"where": "vs NO",
+						"when": "Sun 12:00 pm"
+					},
+					"note": null,
+					"expected": "23.5 to 22",
+					"weather": {
+						"glyph": "wind",
+						"words": "54°, 7 mph"
+					},
+					"proj": "--",
+					"pts": "--",
+					"evidence": "Avg 15.2, Last 0.8",
+					"oppRank": null,
+					"ease": "even",
+					"delta": "--",
+					"state": "upcoming",
+					"why": null,
+					"season": "15.8",
+					"line": "Avg 15.2, Last 0.8",
+					"pick": "drop"
+				},
+				{
+					"key": "9225",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Tank Bigsby",
+					"fit": "T. Bigsby",
+					"slug": "tank-bigsby",
+					"boardId": "4429013",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "PHI",
+					"position": "RB",
+					"status": {
+						"mark": "IR since Oct 6",
+						"sits": true
+					},
+					"rank": "--",
+					"game": {
+						"where": "vs CAR",
+						"when": "Sun 12:00 pm"
+					},
+					"note": null,
+					"expected": "21.5 to 20",
+					"weather": {
+						"glyph": "wind",
+						"words": "52°, 7 mph"
+					},
+					"proj": "--",
+					"pts": "--",
+					"evidence": "Avg 5.6, Last 5.5",
+					"oppRank": null,
+					"ease": "even",
+					"delta": "--",
+					"state": "upcoming",
+					"why": null,
+					"season": "5.4",
+					"line": "Avg 5.6, Last 5.5",
+					"pick": "no"
+				}
+			]
+		},
+		"theirs": {
+			"team": "Max_Jensen10",
+			"aside": "1-4",
+			"holds": "Two picked, tap one to put him back",
+			"rows": [
+				{
+					"key": "12507",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Omarion Hampton",
+					"fit": "O. Hampton",
+					"slug": "omarion-hampton",
+					"boardId": "4685382",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "LAC",
+					"position": "RB",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "at KC",
+						"when": "Sun 3:25 pm"
+					},
+					"note": null,
+					"expected": "17 to 25.5",
+					"weather": {
+						"glyph": "wind",
+						"words": "66°, 10 mph"
+					},
+					"proj": "15.8",
+					"pts": "--",
+					"evidence": "Opp 11th, Avg 7.9, Last 4.9",
+					"oppRank": "11th",
+					"ease": "even",
+					"delta": "+0.4",
+					"state": "upcoming",
+					"why": null,
+					"season": "12.2",
+					"line": "Avg 7.9, Last 4.9",
+					"pick": "off-full"
+				},
+				{
+					"key": "12481",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Cam Skattebo",
+					"fit": "C. Skattebo",
+					"slug": "cam-skattebo",
+					"boardId": "4696981",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "NYG",
+					"position": "RB",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "vs NO",
+						"when": "Sun 12:00 pm"
+					},
+					"note": null,
+					"expected": "23.5 to 22",
+					"weather": {
+						"glyph": "wind",
+						"words": "54°, 7 mph"
+					},
+					"proj": "13.3",
+					"pts": "--",
+					"evidence": "Opp 2nd, Avg 9.2, Last 7.1",
+					"oppRank": "2nd",
+					"ease": "hard",
+					"delta": "+0.1",
+					"state": "upcoming",
+					"why": null,
+					"season": "9.3",
+					"line": "Avg 9.2, Last 7.1",
+					"pick": "on"
+				},
+				{
+					"key": "12490",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Bhayshul Tuten",
+					"fit": "B. Tuten",
+					"slug": "bhayshul-tuten",
+					"boardId": "4882093",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "JAX",
+					"position": "RB",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "vs HOU",
+						"when": "Sun 8:30 am"
+					},
+					"note": null,
+					"expected": "23 to 19.5",
+					"weather": {
+						"glyph": "abroad",
+						"words": "Abroad, no forecast"
+					},
+					"proj": "10.7",
+					"pts": "--",
+					"evidence": "Opp 20th, Avg 13.2, Last 11.6",
+					"oppRank": "20th",
+					"ease": "even",
+					"delta": "0.0",
+					"state": "upcoming",
+					"why": null,
+					"season": "8.0",
+					"line": "Avg 13.2, Last 11.6",
+					"pick": "off-full"
+				},
+				{
+					"key": "8116",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Pierre Strong",
+					"fit": "P. Strong",
+					"slug": null,
+					"boardId": null,
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "GB",
+					"position": "RB",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "vs DAL",
+						"when": "Sun 7:20 pm"
+					},
+					"note": null,
+					"expected": "27 to 25.5",
+					"weather": {
+						"glyph": "wind",
+						"words": "55°, 9 mph"
+					},
+					"proj": "--",
+					"pts": "--",
+					"evidence": "Opp 22nd, Avg --, Last --",
+					"oppRank": "22nd",
+					"ease": "easy",
+					"delta": "--",
+					"state": "upcoming",
+					"why": null,
+					"season": "--",
+					"line": "Avg --, Last --",
+					"pick": "on"
+				},
+				{
+					"key": "7526",
+					"slot": "",
+					"move": null,
+					"idle": false,
+					"name": "Jaylen Waddle",
+					"fit": "J. Waddle",
+					"slug": "jaylen-waddle",
+					"boardId": "4372016",
+					"face": {
+						"mark": false,
+						"alt": ""
+					},
+					"club": "DEN",
+					"position": "WR",
+					"status": null,
+					"rank": "--",
+					"game": {
+						"where": "vs SEA",
+						"when": "Final"
+					},
+					"note": null,
+					"expected": null,
+					"weather": null,
+					"proj": "14.1",
+					"pts": "--",
+					"evidence": "Opp 9th, Avg 7.9, Last 4.8",
+					"oppRank": "9th",
+					"ease": "even",
+					"delta": "+0.2",
+					"state": "final",
+					"why": null,
+					"season": "13.6",
+					"line": "Avg 7.9, Last 4.8",
+					"pick": "off-full"
+				}
+			]
+		},
+		"pin": "+5.7 a week for your lineup, +0.7 for theirs"
 	}
 }

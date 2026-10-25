@@ -455,4 +455,23 @@ public enum Words {
         public static let to = "to"
         public static let projForYou = "Proj this week for your lineup"
     }
+
+    public enum TradePicker {
+        public static let every = "Every trade"
+        public static let closeForThem = "A close call for them"
+    }
+
+    public enum Builder {
+        public static let `open` = "Build a trade"
+        public static let figures = "What the figures are"
+        public static let team = "Trade with"
+        public static let give = "You give"
+        public static let get = "You get"
+        public static let pickBoth = "Pick one or two of your players and one or two of theirs."
+        public static let pickYours = "Now pick one or two of your players to give."
+        public static let pickTheirs = "Now pick one or two of theirs to get."
+        public static let checking = "Checking the trade"
+        public static let notNow = "Not now"
+        public static let full = "Two picked, tap one to put him back"
+    }
 }

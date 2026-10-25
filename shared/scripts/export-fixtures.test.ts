@@ -4,7 +4,13 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { CHECKED_TRADES, claimBody, clockPart, fixturePlan } from './export-fixtures.ts';
+import {
+	CHECKED_TRADES,
+	claimBody,
+	clockPart,
+	fixturePlan,
+	HOLDING_PLAYER
+} from './export-fixtures.ts';
 import { REPOSITORY } from './generated.ts';
 
 const FIXTURES = join(REPOSITORY, 'shared/fixtures');
@@ -182,4 +188,11 @@ void test("the strip's trades are checked at the week's and the Sunday's clocks,
 		)
 	);
 	for (const f of checks) assert.equal(f.route, `POST /leagues/attached/${LEAGUE}/trades/check`);
+	const files = fixturePlan({ leagueId: LEAGUE, clocks: CLOCKS }).flatMap((step) => step.files);
+	assert.ok(
+		files.some(
+			(f) => f.route === `GET /leagues/attached/${LEAGUE}/trades?player=${HOLDING_PLAYER}`
+		),
+		'the picker narrowed to one player is read'
+	);
 });

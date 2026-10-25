@@ -457,4 +457,23 @@ object Words {
         const val to = "to"
         const val projForYou = "Proj this week for your lineup"
     }
+
+    object TradePicker {
+        const val every = "Every trade"
+        const val closeForThem = "A close call for them"
+    }
+
+    object Builder {
+        const val open = "Build a trade"
+        const val figures = "What the figures are"
+        const val team = "Trade with"
+        const val give = "You give"
+        const val get = "You get"
+        const val pickBoth = "Pick one or two of your players and one or two of theirs."
+        const val pickYours = "Now pick one or two of your players to give."
+        const val pickTheirs = "Now pick one or two of theirs to get."
+        const val checking = "Checking the trade"
+        const val notNow = "Not now"
+        const val full = "Two picked, tap one to put him back"
+    }
 }

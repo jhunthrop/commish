@@ -80,6 +80,10 @@ export interface FixtureFile {
 	check?: CheckRead;
 }
 
+/** The player the Trades holding picker narrows to in the fixtures, by board id: the member's Aaron
+ * Rodgers, whom the strip's best trade gives (Lane 189 fix round 1). */
+export const HOLDING_PLAYER = '8439';
+
 /** The trades a clock's checks are posted for: the strip's two (trades.ts STRIP_MOST). */
 export const CHECKED_TRADES = 2;
 
@@ -213,6 +217,13 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 					route: `GET /leagues/attached/${id}/waivers?position=DEF`,
 					clock: week,
 					about: 'the players free to add narrowed to defenses, as the D/ST chip reads them'
+				},
+				{
+					file: `trades-${id}-player-${HOLDING_PLAYER}-${clockPart(week)}.json`,
+					route: `GET /leagues/attached/${id}/trades?player=${HOLDING_PLAYER}`,
+					clock: week,
+					about:
+						"the trades holding one player, the member's Aaron Rodgers, as the Trades holding picker reads them"
 				},
 				...claims
 			]

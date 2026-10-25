@@ -58,7 +58,16 @@ import { withRuleList } from '../../web/scripts/inseason-fixture/week.ts';
 import type { HostMoveResult, WaiverAdvice } from '../../web/src/lib/league/inseason/api.ts';
 import { BOARD_OUTPUT, renderBoard } from './board-parity.ts';
 import { BOARD_RUN_OUTPUT, renderBoardRun } from './board-run-parity.ts';
-import { checkAt, copiedWords, TRADES_OUTPUT, tradesAt } from './trades-parity.ts';
+import {
+	builderAt,
+	checkAt,
+	copiedWords,
+	holdingAt,
+	TRADES_OUTPUT,
+	tradesAt,
+	wordCases
+} from './trades-parity.ts';
+import { HOLDING_PLAYER } from './export-fixtures.ts';
 import { worthProposing } from '../../web/src/lib/league/box/trades.ts';
 import type { TradeAdvice, TradeCheck } from '../../web/src/lib/league/inseason/api.ts';
 import {
@@ -534,6 +543,8 @@ export async function renderTrades(host: LeagueSync['host']): Promise<string> {
 		}
 		checks[clock] = read;
 	}
+	const weekAdvice = await answer<TradeAdvice>(`trades-${LEAGUE}-${CHECK_CLOCKS[0]}.json`);
+	const firstCheck = await answer<TradeCheck>(`trade-check-${LEAGUE}-${CHECK_CLOCKS[0]}-1.json`);
 	const trades = {
 		about: generatedBy(
 			SCRIPT,
@@ -544,7 +555,19 @@ export async function renderTrades(host: LeagueSync['host']): Promise<string> {
 		me,
 		clocks,
 		checks,
-		copied: copiedWords(host)
+		copied: copiedWords(host),
+		words: wordCases(firstCheck),
+		holding: holdingAt(
+			weekAdvice,
+			await answer<TradeAdvice>(
+				`trades-${LEAGUE}-player-${HOLDING_PLAYER}-${CHECK_CLOCKS[0]}.json`
+			),
+			HOLDING_PLAYER,
+			me,
+			instantOf(CHECK_CLOCKS[0]),
+			ZONE
+		),
+		builder: builderAt(weekAdvice, firstCheck, me, instantOf(CHECK_CLOCKS[0]), ZONE)
 	};
 	return `${JSON.stringify(trades, null, '\t')}\n`;
 }
