@@ -43,7 +43,6 @@ public enum AppWords {
         public static let lead = "Your leagues on ESPN, Sleeper, Yahoo, MyFantasyLeague and FFPC, in one place."
         public static let verb = "Sign in"
         public static let working = "Signing in"
-        public static let signOut = "Sign out"
     }
 
     /// Said in place of a screen when nothing can be shown: the API's own sentence where it sent one,

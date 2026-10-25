@@ -1,3 +1,4 @@
+import Account
 import Board
 import CommishAPI
 import CommishCore
@@ -12,7 +13,8 @@ import Waivers
 
 /// The phone's five, the web's bar for the shown league's phase or, with none, the site's season
 /// (PhoneRail, held to rail-order.ts), each under the top bar: the league switch, the player search
-/// and the account's way in. Choosing a league opens its home: the League tab where the bar has one,
+/// and the account's way in, which opens the Account. Choosing a league opens its home: the League tab where the bar
+/// has one,
 /// else the home pushed on the tab in view (B149). League, Lineup, Matchup, Waivers, Trades and the
 /// board (the Board item, and Rest of season in season with no league) are live; the others say their
 /// screen's name until their lane lands. Every screen presents the player sheet through the one host.
@@ -27,7 +29,6 @@ struct RootTabs: View {
     let session: AppSession
     /// A site link the app was opened with (a player's page), pushed on the tab in view once.
     @Binding var linked: ShellRoute?
-    let signOut: () -> Void
     /// The API refused the token on a signed-in read: the app signs out and shows sign-in.
     let expired: @MainActor () -> Void
 
@@ -148,7 +149,9 @@ struct RootTabs: View {
             // The player page's lane (S6) fills this from the slug.
             NamedScreen(AppWords.Tab.players)
         case .account:
-            NamedScreen(PhoneRail.account.label, verb: (AppWords.SignIn.signOut, signOut))
+            AccountTab(environment: environment, session: session, expired: expired) { id in
+                choose(id)
+            }
         case let .leagueHome(id):
             LeagueScreen(environment: environment, leagueID: id, expired: expired) {}
         }
@@ -180,6 +183,33 @@ struct RootTabs: View {
         case let .push(route):
             paths[selection, default: []].append(route)
         }
+    }
+}
+
+/// The Account: owns its view model; sign out is the session's (it revokes this phone and returns to
+/// sign-in), a detach or a restore reads the account again for the league switch, a league opens its
+/// home as the switch's choice does, and a site link opens in the browser.
+private struct AccountTab: View {
+    @Environment(\.openURL) private var openURL
+    @State private var viewModel: AccountViewModel
+    private let openLeague: (String) -> Void
+
+    init(
+        environment: AppEnvironment, session: AppSession, expired: @escaping @MainActor () -> Void,
+        openLeague: @escaping (String) -> Void
+    ) {
+        let store = environment.session
+        _viewModel = State(initialValue: AccountViewModel(
+            api: environment.api, cache: environment.cache, clock: environment.clock, zone: .current,
+            push: DevicePushStore(), deviceID: { await store.deviceID() },
+            signOut: { await session.signOut() }, onSignedOut: expired,
+            leaguesChanged: { Task { await session.restore() } }
+        ))
+        self.openLeague = openLeague
+    }
+
+    var body: some View {
+        AccountView(viewModel: viewModel, openLeague: openLeague, openLink: { openURL($0) })
     }
 }
 

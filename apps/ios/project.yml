@@ -45,6 +45,8 @@ packages:
     path: Packages/Features/Waivers
   Trades:
     path: Packages/Features/Trades
+  Account:
+    path: Packages/Features/Account
 targets:
   Commish:
     type: application
@@ -63,6 +65,7 @@ targets:
       - package: Board
       - package: Waivers
       - package: Trades
+      - package: Account
     entitlements:
       path: Commish/Commish.entitlements
       properties:
