@@ -622,6 +622,7 @@ public enum Words {
         public static let weeklyWhat = "Our weekly rankings against ESPN and the week's published projection"
         public static let draft = "Draft record"
         public static let draftWhat = "Our draft board against ADP, on the season's points so far"
+        public static let beforePhone = "Graded under Draft record"
         public static let notPlayed = "not played yet"
         public static let underway = "under way"
         public static let gradesLater = "grades when the stats land"

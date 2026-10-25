@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { adpFigure } from '#lib/format/draft.ts';
 	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
-	import { byeCell } from '#lib/format/bye.ts';
+	import { byeCell, byeLine } from '#lib/format/bye.ts';
 	import { gapText, gapTone } from '#lib/format/gap.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
@@ -10,7 +10,6 @@
 	import type { StatusView } from '#lib/run/status-view.ts';
 	import type { BoardPlayer, MarketPosition, RangeScale } from '#lib/types/player.ts';
 	import type { BoardColumns } from './board-columns.ts';
-	import { BOARD } from './board-words.ts';
 	import Face from './Face.svelte';
 	import NameWords from './NameWords.svelte';
 	import RangeBar from './RangeBar.svelte';
@@ -98,6 +97,8 @@
 	}
 
 	const ranked = $derived(inDraftOrder(player) ? null : player);
+	/** His bye beside his club on a phone: "Bye week 11" ahead, nothing once played (Lane 209). */
+	const phoneBye = $derived(byeLine(bye, byesFrom));
 	const drafted = $derived(inDraftOrder(player) ? player : null);
 	const cell = $derived(columns.cells);
 	const has = (key: keyof typeof columns.cells): boolean => columns.cells[key] !== undefined;
@@ -143,7 +144,7 @@
 				{status}
 			/>
 			<span class="club">{player.team}</span>
-			{#if bye !== null}<span class="phone-bye">{BOARD.bye} {byeCell(bye, byesFrom)}</span>{/if}
+			{#if phoneBye !== null}<span class="phone-bye">{phoneBye}</span>{/if}
 			{#if marks}{@render marks()}{/if}
 		</span>
 	</span>
