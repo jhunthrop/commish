@@ -17,6 +17,16 @@ class FaceWeightTest {
     }
 
     @Test
+    fun `the interface face answers every CSS weight a screen asks for, drawn heavier as iOS draws it`() {
+        assertEquals(listOf(400, 500, 600, 700), UiWeight.entries.map { it.css })
+        assertEquals(
+            listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold).map { it.weight },
+            UiWeight.entries.map { it.css },
+        )
+        UiWeight.entries.forEach { assert(it.drawn > it.css) { "${it.name} draws at ${it.drawn}, not over its CSS ${it.css}" } }
+    }
+
+    @Test
     fun `the display face's styles take their role's drawn weight`() {
         assertEquals(FontWeight(NumWeight.SemiBold.drawn), Faces.cell.fontWeight)
         assertEquals(FontWeight(NumWeight.Bold.drawn), Faces.figure.fontWeight)
