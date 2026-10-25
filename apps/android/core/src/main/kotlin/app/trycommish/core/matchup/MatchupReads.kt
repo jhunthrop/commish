@@ -22,7 +22,8 @@ class ApiMatchupReads(
     override suspend fun sync(leagueId: String): String = transport.leagueSync().leagueSync(UUID.fromString(leagueId)).bodyText()
 
     override suspend fun matchup(leagueId: String): String? {
-        val answer = transport.leagueSync().leagueMatchup(UUID.fromString(leagueId))
+        // The member's own game: another team's (roster, Lane 204) comes with B178.
+        val answer = transport.leagueSync().leagueMatchup(UUID.fromString(leagueId), roster = null)
         return if (answer.status in STANDS_WITHOUT) null else answer.bodyText()
     }
 

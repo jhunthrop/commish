@@ -1,13 +1,16 @@
 <script lang="ts">
 	import BugCard from '../box/BugCard.svelte';
+	import { bugRoster, gameHref } from '../box/game.ts';
 	import { HOME, type Bug } from './home.ts';
 
 	/** The week's scoreboard (Lane 66i): every game as a score bug (BugCard) on the lit board, three
 	 * across on a desk and swiped in a hand, the drafter's first with its orange rim. Each bug opens
-	 * the Matchup. */
+	 * its own game on the Matchup (Lane 204): the drafter's the plain address, another team's with
+	 * its roster. */
 	interface Props {
 		week: number;
 		bugs: readonly Bug[];
+		/** The Matchup's plain address, the drafter's own game. */
 		matchupHref: string;
 		/** "Last read 3:05 pm" when the latest read failed and the board shows the last good one. */
 		stamp?: string | null;
@@ -24,7 +27,7 @@
 	</div>
 	<ul class="bugs">
 		{#each bugs as bug (bug.key)}
-			<li><BugCard {bug} href={matchupHref} /></li>
+			<li><BugCard {bug} href={gameHref(matchupHref, bugRoster(bug))} /></li>
 		{/each}
 	</ul>
 </section>
