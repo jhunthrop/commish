@@ -17,6 +17,9 @@ fun ThemedColor.resolve(dark: Boolean): Color = Color(if (dark) this.dark else l
 /** The tokens the screens draw with, resolved for one theme. */
 @Immutable
 data class CommishColors(
+    /** The theme these were resolved for, so a screen resolves a token CommishColors does not carry
+     * (a tier's shade, a round's tint) in the same theme. */
+    val dark: Boolean,
     val bg: Color,
     val surface: Color,
     val surface2: Color,
@@ -49,6 +52,7 @@ data class CommishColors(
         fun of(dark: Boolean): CommishColors {
             val c = Tokens.Color
             return CommishColors(
+                dark = dark,
                 bg = c.bg.resolve(dark),
                 surface = c.surface.resolve(dark),
                 surface2 = c.surface2.resolve(dark),

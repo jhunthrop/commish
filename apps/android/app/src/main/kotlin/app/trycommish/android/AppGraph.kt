@@ -18,6 +18,9 @@ import app.trycommish.core.FileCache
 import app.trycommish.core.Session
 import app.trycommish.core.SessionEnd
 import app.trycommish.core.SystemClock
+import app.trycommish.core.board.ApiRunReads
+import app.trycommish.core.board.BoardViewModel
+import app.trycommish.core.board.RunReads
 import app.trycommish.core.leaguehome.ApiLeagueReads
 import app.trycommish.core.leaguehome.LeagueHomeViewModel
 import app.trycommish.core.leaguehome.LeagueReads
@@ -70,6 +73,7 @@ class AppGraph(
     private val lineups: LineupReads = ApiLineupReads(transport)
     private val matchups: MatchupReads = ApiMatchupReads(transport)
     private val waivers: WaiverReads = ApiWaiverReads(transport)
+    private val runs: RunReads = ApiRunReads(transport)
     private val appContext: Context = context.applicationContext
     private val clipboard: ClipboardManager? = context.getSystemService(ClipboardManager::class.java)
 
@@ -101,6 +105,13 @@ class AppGraph(
 
     /** A league's Matchup, read again once a minute while it is on screen. */
     fun matchupViewModel(): MatchupViewModel = MatchupViewModel(matchups, cache, clock, zone, sessionEnd)
+
+    /** The board from the run: the draft's Board, or in season the Rest of season, with the verb that
+     * follows whether the member follows a league. */
+    fun boardViewModel(
+        inSeason: Boolean,
+        following: Boolean,
+    ): BoardViewModel = BoardViewModel(runs, cache, clock, zone, inSeason, following, sessionEnd)
 
     /** A league's Start screen, the lineup copied to the phone's clipboard. */
     fun startViewModel(league: LeagueHost): StartViewModel = StartViewModel(lineups, cache, clock, zone, league, ::copy, sessionEnd)
