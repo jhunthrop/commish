@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.shell.initialsOf
 import app.trycommish.core.start.Ease
 import app.trycommish.core.start.Move
@@ -87,7 +88,7 @@ fun BoxRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SlotCell(cells, bench)
-                PlayerCell(cells, actions, style.evidence, Modifier.weight(1f))
+                PlayerCell(cells, actions.open, Modifier.weight(1f), evidence = if (style.evidence) cells.evidence else null)
                 Text(
                     cells.rank,
                     style = Faces.cell.copy(fontWeight = FontWeight.Medium),
@@ -193,13 +194,22 @@ private fun edge(cells: RowCells): Color =
     }
 
 /** The player cell: face, name, club line, game line, facts and evidence, folded as the phone folds
- * them. His name opens the player sheet where the site has a page for him. */
+ * them. His name opens the player sheet (by `sheetPlayer`) where the site has a page for him. The
+ * Waivers rows draw no facts, their own evidence line with A game after it, the day a claim clears
+ * after the kickoff, and a Stash row's week in place of his game. */
 @Composable
-private fun PlayerCell(
+fun PlayerCell(
     cells: RowCells,
-    actions: RowActions,
-    evidence: Boolean,
-    modifier: Modifier,
+    open: (SheetPlayer) -> Unit,
+    modifier: Modifier = Modifier,
+    sheetPlayer: SheetPlayer? = cells.sheetPlayer,
+    /** The line under the game, null for none. */
+    evidence: String? = cells.evidence,
+    /** Draws the expected score and the weather while his game is to come. */
+    facts: Boolean = true,
+    clears: String? = null,
+    /** Said in place of his game. */
+    note: String? = cells.note,
 ) {
     val c = CommishTheme.colors
     val row = cells.row
@@ -207,12 +217,12 @@ private fun PlayerCell(
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp)) {
         Avatar(if (row.clubMark) row.club else initialsOf(row.name), BoxColumn.face)
         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            NameLine(cells, ink, actions)
+            NameLine(cells, ink, sheetPlayer, open)
             ClubLine(cells)
-            GameLine(cells)
-            Facts(cells)
-            if (evidence) {
-                Text(evidence(cells), style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.sp), color = c.ink2)
+            GameLine(cells, note, clears)
+            if (facts) Facts(cells)
+            if (evidence != null) {
+                Text(evidence(cells, evidence), style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.sp), color = c.ink2)
             }
         }
     }
@@ -223,10 +233,10 @@ private fun PlayerCell(
 private fun NameLine(
     cells: RowCells,
     ink: Color,
-    actions: RowActions,
+    player: SheetPlayer?,
+    open: (SheetPlayer) -> Unit,
 ) {
     val row = cells.row
-    val player = cells.sheetPlayer
     val style = Faces.body.copy(fontWeight = FontWeight.SemiBold)
     val measurer = rememberTextMeasurer()
     BoxWithConstraints {
@@ -240,7 +250,7 @@ private fun NameLine(
             overflow = TextOverflow.Ellipsis,
             modifier =
                 Modifier.semantics { contentDescription = row.name }.then(
-                    if (player != null) Modifier.clickableLink(row.name) { actions.open(player) } else Modifier,
+                    if (player != null) Modifier.clickableLink(row.name) { open(player) } else Modifier,
                 ),
         )
     }
@@ -258,9 +268,12 @@ private fun ClubLine(cells: RowCells) {
 }
 
 @Composable
-private fun GameLine(cells: RowCells) {
+private fun GameLine(
+    cells: RowCells,
+    note: String?,
+    clears: String?,
+) {
     val c = CommishTheme.colors
-    val note = cells.note
     when {
         note != null -> Text(note, style = Faces.small, color = c.ink2, maxLines = 1, overflow = TextOverflow.Ellipsis)
         cells.game is RowGame.Game -> {
@@ -270,6 +283,10 @@ private fun GameLine(cells: RowCells) {
                     withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = c.ink)) { append(game.place) }
                     append(" ")
                     withStyle(SpanStyle(color = c.ink2)) { append(game.time) }
+                    clears?.let {
+                        append(" ")
+                        withStyle(SpanStyle(color = c.accentText, fontWeight = FontWeight.SemiBold, fontSize = Tokens.Type.xs.sp)) { append(it) }
+                    }
                 },
                 style = Faces.small,
             )
@@ -314,9 +331,11 @@ private fun Facts(cells: RowCells) {
 
 /** "Opp 2nd, Avg 23.3, Last 19.0": the opponent's rank in the ease's ink while his game is to come. */
 @Composable
-private fun evidence(cells: RowCells): AnnotatedString {
+private fun evidence(
+    cells: RowCells,
+    said: String,
+): AnnotatedString {
     val c = CommishTheme.colors
-    val said = cells.evidence
     val rank = cells.oppRank
     val at = rank?.let { said.indexOf(it) } ?: -1
     if (rank == null || at < 0 || cells.ease == Ease.Even) return AnnotatedString(said)
