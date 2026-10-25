@@ -30,23 +30,43 @@ enum class NumWeight(
 }
 
 /**
+ * The interface face's weights: the CSS numbers screens and Material ask for (FontWeight.Normal to
+ * Bold, as the web and iOS do) and the `wght` Outfit is set to for each, measured as NumWeight's are
+ * (FaceSpecimenSnapshotTest's interface ladder against iOS's renders, Lane 195 fix round 1): CoreText
+ * draws Outfit about 75 heavier at every weight, so 400, 500, 600 and 700 draw at 475, 575, 675 and
+ * 775. Screens keep naming FontWeight for this face; the cut it draws is decided here.
+ */
+enum class UiWeight(
+    val css: Int,
+    val drawn: Int,
+) {
+    Regular(css = 400, drawn = 475),
+    Medium(css = 500, drawn = 575),
+    SemiBold(css = 600, drawn = 675),
+    Bold(css = 700, drawn = 775),
+}
+
+/**
  * The three faces (Tokens.Font): Outfit for the interface, Big Shoulders Display for numbers, Newsreader
  * for prose, bundled as their variable fonts (OFL, design/fonts-licences). Numbers take tabular figures
  * so a column of them lines up.
  */
 object Faces {
+    /** The font file at `wght`, matched by a style asking for `asked` (its own `wght` unless said). */
     @OptIn(ExperimentalTextApi::class)
     private fun font(
         res: Int,
         wght: Int,
-    ): Font = Font(res, FontWeight(wght), variationSettings = FontVariation.Settings(FontVariation.weight(wght)))
+        asked: Int = wght,
+    ): Font = Font(res, FontWeight(asked), variationSettings = FontVariation.Settings(FontVariation.weight(wght)))
 
     private fun family(
         res: Int,
         vararg weights: FontWeight,
     ): FontFamily = FontFamily(weights.map { font(res, it.weight) })
 
-    val ui: FontFamily = family(R.font.outfit, FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold)
+    /** Outfit at each CSS weight, each drawn at its measured cut (UiWeight). */
+    val ui: FontFamily = FontFamily(UiWeight.entries.map { font(R.font.outfit, wght = it.drawn, asked = it.css) })
 
     /** The display face at each role's drawn weight, so a style's weight matches one of its fonts exactly. */
     private val numFamily: FontFamily = FontFamily(NumWeight.entries.map { font(R.font.big_shoulders_display, it.drawn) })
