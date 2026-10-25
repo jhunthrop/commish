@@ -89,6 +89,10 @@ public enum AccountWords {
             ?? Words.Attached.inSeason
     }
 
+    /// Under the switches while the account does not carry them: where they are kept, and that nothing
+    /// is sent yet.
+    public static let pushFoot = "\(Words.Push.savedHere). \(Words.Push.notYet)"
+
     /// Quiet hours as the switch row says them: "11:00 pm to 8:00 am".
     public static func quietHours(_ settings: PushSettings) -> String {
         "\(clockTime(settings.quietFrom)) to \(clockTime(settings.quietTo))"

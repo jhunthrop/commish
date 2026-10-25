@@ -58,7 +58,10 @@ struct AccountViewModelTests {
         #expect(model.devices.map(\.thisPhone) == [true, false])
         #expect(model.devicesAside == "2 devices")
         #expect(model.plan?.title == Words.FreePlan.title)
+        #expect(model.followMore == false)
         #expect(viewModel.stampWords == nil)
+        #expect(AccountWords
+            .pushFoot == "Saved on this phone. Nothing is sent yet. These take effect when notifications start.")
     }
 
     @Test func unpairTakesTheDeviceOffTheListAndA401AfterItSignsOut() async throws {

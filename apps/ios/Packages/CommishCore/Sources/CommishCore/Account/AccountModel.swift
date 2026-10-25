@@ -17,6 +17,11 @@ public struct AccountLeagueRow: Identifiable, Equatable, Sendable {
     public let read: String
     /// Detached a moment ago: its undo shows in place of its verbs.
     public let detached: Bool
+
+    /// The phone's line under the row (AccountLeagues.svelte .ph-only): "Last read 4 minutes ago".
+    public var readLine: String {
+        "\(Words.Attached.lastRead) \(read)"
+    }
 }
 
 /// A paired device's row: its name, "Paired Oct 12, last used Oct 17", and whether it is this phone.
@@ -94,6 +99,8 @@ public struct AccountModel: Equatable, Sendable {
     public let devices: [AccountDeviceRow]
     public let devicesAside: String
     public let plan: PlanCard?
+    /// The account may follow another league (many_leagues): the web's Follow another league.
+    public let followMore: Bool
 
     public init(
         answer: AccountScreenAnswer, detached: Set<String>, thisDevice: String?, now: Date, zone: TimeZone
@@ -111,5 +118,6 @@ public struct AccountModel: Equatable, Sendable {
         }
         devicesAside = AccountWords.deviceCount(answer.devices.count)
         plan = PlanCard.of(answer.me, now: now)
+        followMore = answer.me.features.contains { $0.value1 == .manyLeagues }
     }
 }
