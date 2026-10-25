@@ -47,6 +47,7 @@ data class RowCells(
                     row.rank?.toString() ?: row.status?.rank,
                     row.club,
                     row.headshot,
+                    boardId = row.boardId,
                 )
             }
 
@@ -150,7 +151,19 @@ data class StartModel(
     val move: HostMoveInput,
     /** The lineup as the copy verb puts it on the clipboard. */
     val copyText: String,
+    /** The advice's swaps, which the sheet's verb says under it for the row they name. */
+    val swaps: List<Swap> = emptyList(),
 ) {
+    /** lineup.ts swapOf and swapWords: the swap that names his row, as the strip says it ("QB, Dart in,
+     * Rodgers out"); null where none does. */
+    fun swapLine(row: StartRow): String? {
+        val short = LineupBoxes.shortName(row.name)
+        return swaps.firstOrNull { it.id == row.id || it.out == short }?.let(StartWords::swap)
+    }
+
+    /** The row whose player the sheet shows, by his id. */
+    fun rowOf(player: SheetPlayer): StartRow? = (starters + bench + reserve).firstOrNull { it.sheetPlayer?.id == player.id }?.row
+
     /** Every row that carries a player the sheet can open, for the sheet to keep its player by. */
     val sheetPlayers: List<SheetPlayer> get() = (starters + bench + reserve).mapNotNull { it.sheetPlayer }
 
@@ -216,6 +229,7 @@ fun startModel(
         foot = StartMoves.foot(advice, box, onPlatform, platform, page),
         move = StartMoves.lineupMove(advice),
         copyText = StartWords.lineupText(box, advice.week),
+        swaps = box.swaps,
     )
 }
 
