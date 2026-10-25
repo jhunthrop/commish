@@ -21,7 +21,7 @@ public enum AppWords {
     }
 
     /// A platform the API names with nothing readable (ValueWords.platform).
-    public static let unknownPlatform = "Your platform"
+    public static let unknownPlatform = "your platform"
 
     /// web/src/lib/league/LeaguePage.svelte stampOf: a read whose latest try failed.
     public static let lastRead = "Last read"
