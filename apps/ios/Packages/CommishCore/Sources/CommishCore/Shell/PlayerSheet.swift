@@ -79,6 +79,15 @@ public enum SiteLinks {
 
     /// Our record, past weeks of our order (the Lineup strip's link, web links.record()).
     public static let record = origin.appendingPathComponent("record")
+
+    /// The follow page, where a league is followed (nav.ts LEAGUE_START).
+    public static let leagueStart = origin.appendingPathComponent("league/new")
+
+    /// A mock draft's setup (nav.ts MOCK_SETUP).
+    public static let mockSetup = origin.appendingPathComponent("mock/new")
+
+    /// The cheat sheet (nav.ts, the sheet's rail item).
+    public static let sheet = origin.appendingPathComponent("sheet")
 }
 
 /// The sheet a screen presents from its rows: the player shown, by his id. A screen whose list reads

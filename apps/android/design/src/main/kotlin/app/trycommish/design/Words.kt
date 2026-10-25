@@ -310,4 +310,32 @@ object Words {
         const val allPlayOn = "An all-play week on"
         const val allPlaySet = "your score is set against every other team's."
     }
+
+    object Board {
+        const val all = "All"
+        const val defense = "DST"
+        const val heldHead = "On a season-long list, his figures assume he plays"
+        const val overReplShort = "Over repl"
+        const val gap = "Gap"
+        const val draftOrder = "Draft order"
+        const val adp = "ADP"
+        const val bye = "Bye"
+    }
+
+    object BoardFormat {
+        const val ppr = "PPR"
+        const val half = "Half PPR"
+        const val std = "Standard"
+    }
+
+    object BoardBasis {
+        const val gap = "Gap, drafters' ADP less our rank: green when they wait, rose when they reach."
+    }
+
+    object PageVerb {
+        const val follow = "Follow your league"
+        const val open_league = "Open your league"
+        const val mock = "Start a mock draft"
+        const val sheet = "Build your cheat sheet"
+    }
 }

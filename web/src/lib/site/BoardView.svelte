@@ -24,6 +24,7 @@
 	import TierStrip from '#lib/ui/TierStrip.svelte';
 	import Toggle from '#lib/ui/Toggle.svelte';
 	import { boardColumns } from '#lib/ui/board-columns.ts';
+	import { BOARD } from '#lib/ui/board-words.ts';
 	import { pressed, sortRows, type Sort, type SortKey } from '#lib/ui/board-sort.ts';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { heldOut } from '#lib/run/board-status.ts';
@@ -247,7 +248,9 @@
 		<div class="filters">
 			<FilterBar>
 				<ChipGroup label="Position">
-					<Chip href={links.board(page.format.id)} pressed={page.position === null}>All</Chip>
+					<Chip href={links.board(page.format.id)} pressed={page.position === null}
+						>{BOARD.all}</Chip
+					>
 					{#each page.positions as position (position)}
 						<Chip href={links.board(page.format.id, position)} pressed={page.position === position}
 							>{position}</Chip
@@ -360,7 +363,7 @@
 					{#if heldRows.length > 0}
 						<div class="tier">
 							<p class="held-head">
-								<Label>On a season-long list, his figures assume he plays</Label>
+								<Label>{BOARD.heldHead}</Label>
 							</p>
 							{#each heldRows as player (player.id)}
 								{@render row(player, page.rows.length)}

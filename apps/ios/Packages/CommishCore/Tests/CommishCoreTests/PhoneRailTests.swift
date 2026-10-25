@@ -56,6 +56,19 @@ struct PhoneRailTests {
         #expect(try Self.items([PhoneRail.account]) == [Self.rail().account])
     }
 
+    /// The board is reached as the web's rail reaches it, no tab of its own: Board before the draft, on
+    /// draft day and after the season; Rest of season in season with no league; in season with a
+    /// league the phone's five carry neither (the web's wide rail alone does).
+    @Test func theBoardIsReachedByTheWebsBoardAndRestOfSeasonItems() {
+        let boards = { (tabs: [RailTab]) in tabs.compactMap { PhoneRail.boardInSeason($0.key) } }
+        #expect(boards(PhoneRail.tabs(phase: .preDraft, waiversOpen: false)) == [false])
+        #expect(boards(PhoneRail.tabs(phase: .draftDay, waiversOpen: false)) == [false])
+        #expect(boards(PhoneRail.tabs(phase: .offseason, waiversOpen: false)) == [false])
+        #expect(boards(PhoneRail.withoutLeague) == [true])
+        #expect(boards(PhoneRail.tabs(phase: .inSeason, waiversOpen: true)).isEmpty)
+        #expect(PhoneRail.tabs(phase: .preDraft, waiversOpen: false).count == 5)
+    }
+
     @Test func aPhaseThisBuildDoesNotKnowReadsAsInSeason() {
         #expect(PhoneRail.tabs(phase: nil, waiversOpen: true) == PhoneRail.tabs(phase: .inSeason, waiversOpen: true))
     }

@@ -29,6 +29,7 @@ type OrderAdvice = components['schemas']['OrderAdvice'];
 type OrderRow = components['schemas']['OrderRow'];
 import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import { FIXTURE_IDS } from './ids.ts';
+import { RECORDED_BOARDS, boardFile } from './record-boards.ts';
 import { leagueRecordAnswer } from './record.ts';
 import { playerWeek, type Sheet } from './player-week.ts';
 import {
@@ -168,6 +169,12 @@ const [
 	load<OrderAdvice>('order'),
 	load<WeekOrderStates>('week-order')
 ]);
+/** The API's draft board for each recorded format, as record-boards.ts recorded it (Lane 182). */
+const boards = new Map<string, unknown>(
+	await Promise.all(
+		RECORDED_BOARDS.map(async (format) => [format, await load<unknown>(boardFile(format))] as const)
+	)
+);
 /** The league read with its playoffs through the horizon's last week. */
 const sync: LeagueSync =
 	recordedSync.terms.playoff_weeks === null ||
@@ -633,6 +640,8 @@ async function bodyOf(req: IncomingMessage): Promise<unknown> {
 	const text = Buffer.concat(chunks).toString('utf8');
 	return text === '' ? null : (JSON.parse(text) as unknown);
 }
+/** GET /boards/{format}: the draft board in a scoring format. */
+const BOARD = /^\/boards\/(ppr|half|std)$/;
 const SYNC = /^\/leagues\/attached\/([^/]+)\/(sync|refresh)$/;
 const LEAGUE_ORDER = /^\/leagues\/attached\/([^/]+)\/order$/;
 /** The record in a league (Lane 93, record.ts). */
@@ -818,6 +827,14 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	}
 	if (url.pathname === '/season') {
 		send(req, res, HTTP.ok, SEASON);
+		return;
+	}
+	// The draft board the apps' Board screen reads (Lane 182): a recorded format's, no other.
+	const board = BOARD.exec(url.pathname);
+	if (board) {
+		const recorded = boards.get(board[1] ?? '');
+		if (recorded === undefined) send(req, res, HTTP.notFound, 'No board recorded in that format.');
+		else send(req, res, HTTP.ok, recorded);
 		return;
 	}
 	// The open lobbies the mock setup page lists (Lane 166): none filling.

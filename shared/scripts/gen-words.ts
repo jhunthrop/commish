@@ -37,13 +37,15 @@ const BOX_MODULE = 'web/src/lib/league/box/box.ts';
 const BASIS_MODULE = 'web/src/lib/league/box/basis.ts';
 const LINEUP_MODULE = 'web/src/lib/league/box/lineup.ts';
 const DESIGNATION_MODULE = 'web/src/lib/format/designation.ts';
+const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
 
 /** Every table the apps print from, the League home's first, then the box score's: its heads, the
  * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
  * tiebreak and waiver order, the platforms' names; then the Start screen's (Lane 180): the lineup's
  * strip and verb, the positions an opponent's rank is against, the move's confirmation, the in-season
  * screens' lines, a status in words and in a rank's few characters, and the figures' heads; then the
- * Matchup's (Lane 183): the words beside its box scores. */
+ * Matchup's (Lane 183): the words beside its box scores; then the Board's (Lane 182): its chips and heads,
+ * its formats' chips, the Gap's definition, and the season pages' verbs. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -195,6 +197,30 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/league/box/matchup.ts',
 		picks: ['MATCHUP'],
 		json: 'shared/words/league-matchup.json'
+	},
+	{
+		name: 'Board',
+		module: BOARD_MODULE,
+		picks: ['BOARD'],
+		json: 'shared/words/board.json'
+	},
+	{
+		name: 'BoardFormat',
+		module: BOARD_MODULE,
+		picks: ['BOARD_FORMAT_WORDS'],
+		json: 'shared/words/board-format.json'
+	},
+	{
+		name: 'BoardBasis',
+		module: 'web/src/lib/run/board-basis.ts',
+		picks: [['gap', 'GAP_WORDS']],
+		json: 'shared/words/board-basis.json'
+	},
+	{
+		name: 'PageVerb',
+		module: 'web/src/lib/site/season-words.ts',
+		picks: ['PAGE_VERBS'],
+		json: 'shared/words/page-verb.json'
 	}
 ];
 export const OUTPUT = {

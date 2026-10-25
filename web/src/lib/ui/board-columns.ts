@@ -4,6 +4,7 @@
  * never drift. A column with no width in a band is hidden there: the table's style picks the band's
  * grid (BoardTable sets it once per table), and each cell carries the classes that hide it. */
 import { FIGURE } from '#lib/format/figure-words.ts';
+import { BOARD } from './board-words.ts';
 
 /** Every column a board row can carry, in the order a row prints them. */
 export const COLUMN_KEYS = [
@@ -40,19 +41,19 @@ export interface ColumnHead {
  * 66n). The figures' heads are the site's one word for each (format/figure-words.ts). */
 export const COLUMN_HEADS: Readonly<Record<ColumnKey, ColumnHead>> = {
 	rank: { text: 'Rk', title: 'Our rank' },
-	adpLead: { text: 'ADP' },
+	adpLead: { text: BOARD.adp },
 	face: { text: '' },
 	player: { text: 'Player' },
 	tier: { text: 'Tier', note: 'by position' },
-	bye: { text: 'Bye' },
+	bye: { text: BOARD.bye },
 	proj: { text: FIGURE.projected },
 	// Said in full where the column has the room, the basis saying what it counts (B46).
-	vor: { text: 'Over replacement', short: 'Over repl', title: 'Over replacement' },
-	order: { text: 'Draft order' },
+	vor: { text: 'Over replacement', short: BOARD.overReplShort, title: 'Over replacement' },
+	order: { text: BOARD.draftOrder },
 	range: { text: 'Floor to ceiling' },
-	adp: { text: 'ADP' },
+	adp: { text: BOARD.adp },
 	ourRank: { text: 'Rk', title: 'Our rank' },
-	gap: { text: 'Gap', title: "Gap, drafters' ADP less our rank" },
+	gap: { text: BOARD.gap, title: "Gap, drafters' ADP less our rank" },
 	gp: { text: 'GP', title: 'Games played' },
 	avg: { text: FIGURE.avg, title: 'Points a game this season' },
 	action: { text: '' }

@@ -48,7 +48,7 @@ public final class LeagueHomeViewModel {
         guard case let .loaded(_, stamp, true) = state else {
             return nil
         }
-        return "\(AppWords.lastRead) \(Formatting.weekdayTime(stamp, zone: zone))"
+        return AppWords.lastRead(stamp, zone: zone)
     }
 
     /// On the first open, the saved home at once when there is one; then the API's. When the read

@@ -50,6 +50,7 @@ import type { Scoreboard } from '../../web/src/lib/league/inseason/api.ts';
 import { LINEUP_OUTPUT, lineupAt, moveWords, withWrites } from './lineup-parity.ts';
 import type { LineupAdvice, MatchupBox } from '../../web/src/lib/league/inseason/api.ts';
 import { gapsOf, MATCHUP_OUTPUT, matchupAt } from './matchup-parity.ts';
+import { BOARD_OUTPUT, renderBoard } from './board-parity.ts';
 import {
 	GAME_STATE_OUTPUT,
 	lineRows,
@@ -425,7 +426,16 @@ export async function generate(): Promise<Outputs> {
 		[SHELL_OUTPUT, renderShell(await answer<SwitchLeague[]>('leagues-attached.json'))],
 		[GAME_STATE_OUTPUT, renderGameState(about, await gameStateRows(boards))],
 		[LINEUP_OUTPUT, await renderLineup(sync.host)],
-		[MATCHUP_OUTPUT, await renderMatchup()]
+		[MATCHUP_OUTPUT, await renderMatchup()],
+		[
+			BOARD_OUTPUT,
+			renderBoard(
+				generatedBy(
+					SCRIPT,
+					'web/src/lib/site/season-words.ts (boardWords), web/src/lib/format/number.ts and gap.ts'
+				)
+			)
+		]
 	]);
 }
 

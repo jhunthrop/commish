@@ -10,6 +10,7 @@
 	import type { StatusView } from '#lib/run/status-view.ts';
 	import type { BoardPlayer, MarketPosition, RangeScale } from '#lib/types/player.ts';
 	import type { BoardColumns } from './board-columns.ts';
+	import { BOARD } from './board-words.ts';
 	import Face from './Face.svelte';
 	import NameWords from './NameWords.svelte';
 	import RangeBar from './RangeBar.svelte';
@@ -142,7 +143,7 @@
 				{status}
 			/>
 			<span class="club">{player.team}</span>
-			{#if bye !== null}<span class="phone-bye">Bye {byeCell(bye, byesFrom)}</span>{/if}
+			{#if bye !== null}<span class="phone-bye">{BOARD.bye} {byeCell(bye, byesFrom)}</span>{/if}
 			{#if marks}{@render marks()}{/if}
 		</span>
 	</span>
