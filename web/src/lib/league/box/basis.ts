@@ -165,7 +165,7 @@ export function projFinalPhone(started: boolean, missing: boolean): string {
 
 /** Any row's game past its kickoff at the page's clock, by the one rule (kickoff.ts). */
 export function anyKicked(lines: readonly PlayerLine[], now: number): boolean {
-	return lines.some(({ facts }) => pastKickoff(facts, now));
+	return lines.some((line) => pastKickoff(line, now));
 }
 
 /** The tight end's extra a catch the league's rules add, its own sentence (Lane 94 fix round 1: said
@@ -416,8 +416,9 @@ export const KICKED_OFF_PART = `${FINAL_LANDS}, stats ${STATS_BY_WEDNESDAY}`;
  * stats not in his games yet, each by the one game-state rule at the page's clock (kickoff.ts
  * lineState), on every screen that asks; else null. */
 export function kickedOffPartAt(lines: readonly PlayerLine[], now: number): string | null {
-	const waiting = lines.some(({ facts }) => {
-		const state = lineState(facts, now);
+	const waiting = lines.some((line) => {
+		const { facts } = line;
+		const state = lineState(line, now);
 		// A final the platform's points count (Lane 111) still waits on our stats.
 		return (
 			state === 'kicked_off' ||
@@ -486,7 +487,7 @@ export function finalsPartAt(
 	const game = counted === undefined ? null : platformGame(counted);
 	if (host === null || counted === undefined || game === null) return kickedOffPartAt(lines, now);
 	const rostered = rows === 'pool' ? FOR_ROSTERED : '';
-	if (lines.some(({ facts }) => lineState(facts, now) === 'kicked_off'))
+	if (lines.some((line) => lineState(line, now) === 'kicked_off'))
 		return liveFinalsPart(host, rostered);
 	return platformFinalsPart(host, weeksWord(game.week, counted.facts.week), rostered);
 }
@@ -599,8 +600,8 @@ export function drawnText(parts: readonly BasisPart[], width: 'desk' | 'phone'):
 /** Whether any row still to be played draws the Game cell's expected score or weather. */
 function drawsFacts(lines: readonly PlayerLine[], now: number): boolean {
 	return lines.some(
-		({ facts }) =>
-			toPlay(facts, now) && (expectedWords(facts) !== null || weatherCell(facts) !== null)
+		(line) =>
+			toPlay(line, now) && (expectedWords(line.facts) !== null || weatherCell(line.facts) !== null)
 	);
 }
 

@@ -101,7 +101,7 @@ export function matchupRead(
 	now: number,
 	unlisted: readonly GameState[] = []
 ): GameRead | null {
-	const games = lines.flatMap(({ facts }) => (facts.bye || facts.kickoff === null ? [] : [facts]));
+	const games = lines.filter(({ facts }) => !facts.bye && facts.kickoff !== null);
 	if (games.length === 0) return null;
 	const read = linesRead(games, now);
 	const waiting = read.state === 'final' && unlisted.some((s) => s !== 'final');
@@ -216,7 +216,7 @@ export function sideBox(
 					box.starters.length === 0
 						? unlistedFinal(box, read)
 						: linesRead(
-								box.starters.map((s) => s.line.facts),
+								box.starters.map((s) => s.line),
 								read.now
 							).state === 'final',
 				note: totalsNote(rows, read.landed, read.week)

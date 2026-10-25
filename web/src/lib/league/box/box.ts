@@ -24,7 +24,7 @@ import { POSITIONS, type Position } from '#lib/types/player.ts';
 import { GAME_STATE_WORDS, halves, PRECIPITATION_NAMED_FROM } from '#lib/format/game-facts.ts';
 import { fixed, ordinal, signed } from '#lib/format/number.ts';
 import { clubMark } from '#lib/ui/club-mark.ts';
-import { lineState, toPlay, type GameHead } from './kickoff.ts';
+import { lineState, stateWord, toPlay, type GameHead, type GameLine } from './kickoff.ts';
 import { carriedMark } from './next-week.ts';
 import type { LeaguePlayer } from '../api.ts';
 import type { LineupSlot, PlayerLine, ProjectionScoring, WeekFacts } from '../inseason/api.ts';
@@ -402,14 +402,21 @@ export function heldGame(game: RowGame): BoxGame | null {
  * (kickoff.ts lineState, the one rule the score bug reads) the kickoff on the member's clock, "Kicked
  * off" or "Final"; "bye" on a bye week; "no-club" for a free agent, whose club cell is "FA" (he has no
  * game and no bye); null when we hold no game. */
-export function gameOf(facts: WeekFacts, club: string, zone: string, now: number): RowGame {
+export function gameOf(
+	line: GameLine & { facts: WeekFacts },
+	club: string,
+	zone: string,
+	now: number
+): RowGame {
+	const { facts } = line;
 	if (isFreeAgent(club)) return 'no-club';
 	if (facts.bye) return 'bye';
 	if (facts.opponent === null) return null;
 	const where = `${facts.home === false ? 'at' : 'vs'} ${facts.opponent}`;
-	const state = lineState(facts, now);
-	if (state === 'final') return { where, when: BOX.final };
-	if (state === 'kicked_off') return { where, when: BOX.kickedOff };
+	const state = lineState(line, now);
+	if (state === 'final') return { where, when: stateWord(line.game_state, state, BOX.final) };
+	if (state === 'kicked_off')
+		return { where, when: stateWord(line.game_state, state, BOX.kickedOff) };
 	return { where, when: facts.kickoff === null ? '' : weekdayTime(facts.kickoff, zone) };
 }
 
@@ -432,7 +439,7 @@ export function boxRow(
 	now: number
 ): BoxRow {
 	const { facts, player } = line;
-	const ahead = toPlay(facts, now);
+	const ahead = toPlay(line, now);
 	const status = rowStatus(facts.designation, player.injured_reserve, ahead, zone);
 	return {
 		key: player.host_id,
@@ -447,13 +454,13 @@ export function boxRow(
 		pill: pillOf(player.position, playingRank(line.position_rank, status), ranked),
 		status,
 		reserve: onReserve(line),
-		game: gameOf(facts, player.team, zone, now),
+		game: gameOf(line, player.team, zone, now),
 		expected: ahead ? expectedWords(facts) : null,
 		weather: ahead ? weatherCell(facts) : null,
 		proj: onList(status) ? null : line.week_projection,
 		pts: facts.points_this_week,
 		toCome: ahead,
-		state: lineState(facts, now),
+		state: lineState(line, now),
 		evidence: evidenceOf(line, onList(status))
 	};
 }
@@ -606,10 +613,10 @@ export const FORMAT_WORDS: Readonly<Record<ProjectionScoring['format'], string>>
 /** The oldest read of any game still to be played at `now`, null when no row holds one: the Waivers
  * basis says it in its short line. */
 export function factsReadAt(lines: readonly PlayerLine[], now: number): string | null {
-	const reads = lines.flatMap(({ facts }) =>
-		!toPlay(facts, now)
+	const reads = lines.flatMap((line) =>
+		!toPlay(line, now)
 			? []
-			: [facts.game_total?.read_at, facts.weather?.read_at].filter(
+			: [line.facts.game_total?.read_at, line.facts.weather?.read_at].filter(
 					(at): at is string => at !== undefined
 				)
 	);

@@ -14,7 +14,13 @@ import type {
 	WeekDoneState
 } from '../inseason/api.ts';
 import { hostWords } from '../names.ts';
-import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
+import {
+	KICKOFF,
+	scoreboardHead,
+	stateWord,
+	type GameHead,
+	type GameStateCell
+} from '../box/kickoff.ts';
 import {
 	AS_OF_KICKOFF,
 	leagueScoringWords,
@@ -244,17 +250,22 @@ function standsOf(
  * final. */
 function bugHead(
 	head: GameHead,
+	cell: GameStateCell | undefined,
 	zone: string,
 	read: BugRead | null,
 	now: number
 ): Pick<Bug, 'head' | 'words'> {
-	if (head.state === 'final') return { head: KICKOFF.final, words: '' };
+	if (head.state === 'final')
+		return { head: stateWord(cell, head.state, KICKOFF.final), words: '' };
 	if (head.state === 'kicked_off') {
-		return { head: KICKOFF.kickedOff, words: read === null ? '' : readCell(read, now) };
+		return {
+			head: stateWord(cell, head.state, KICKOFF.kickedOff),
+			words: read === null ? '' : readCell(read, now)
+		};
 	}
 	return {
 		head: head.next === null ? '' : weekdayTime(head.next, zone),
-		words: head.next === null ? '' : HOME.nextKickoff
+		words: head.next === null ? '' : stateWord(cell, head.state, HOME.nextKickoff)
 	};
 }
 
@@ -290,7 +301,7 @@ export function bugsOf(
 	const teams = new Map(sync.teams.map((t) => [t.roster_id, t] as const));
 	return board.games.map((game, i) => {
 		const mine = game.sides.some((s) => s.roster_id === sync.me);
-		const head = gameHead({ state: game.state, next: game.next_kickoff }, now);
+		const head = scoreboardHead(game, now);
 		const started = head.state !== 'upcoming';
 		const finals = game.sides.map((side) => ({ final: sideFinal(side, head.state) }));
 		const columns = bugColumns(head.state, finals);
@@ -298,7 +309,7 @@ export function bugsOf(
 			key: `${String(i)}-${game.sides.map((s) => String(s.roster_id)).join('-')}`,
 			mine,
 			state: head.state,
-			...bugHead(head, zone, read, now),
+			...bugHead(head, game.game_state, zone, read, now),
 			columns,
 			sides: game.sides.map((side, s) => {
 				const team = teams.get(side.roster_id);
@@ -332,7 +343,7 @@ export function projections(
 ): ReadonlyMap<number, number | null> {
 	return new Map(
 		(board?.games ?? []).flatMap((g) => {
-			const upcoming = gameHead({ state: g.state, next: g.next_kickoff }, now).state === 'upcoming';
+			const upcoming = scoreboardHead(g, now).state === 'upcoming';
 			return g.sides.map(
 				(s) => [s.roster_id, upcoming ? s.projection : (s.projected_final ?? null)] as const
 			);

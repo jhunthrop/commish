@@ -513,10 +513,10 @@ void test('the basis stamps no game facts read, and from his kickoff says when t
 void test('the card draws no move on a locked row: Start him becomes the way to the lineup (M-D)', () => {
 	const kickoff = Date.parse(facts().kickoff ?? '');
 	const start = { kind: 'start' as const, holder: null, host_url: null, note: null };
-	assert.equal(heldVerb(start, facts(), kickoff - 1).kind, 'start');
-	assert.equal(heldVerb(start, facts(), kickoff).kind, 'lineup');
+	assert.equal(heldVerb(start, { facts: facts() }, kickoff - 1).kind, 'start');
+	assert.equal(heldVerb(start, { facts: facts() }, kickoff).kind, 'lineup');
 	const trade = { ...start, kind: 'trade' as const };
-	assert.equal(heldVerb(trade, facts(), kickoff).kind, 'trade');
+	assert.equal(heldVerb(trade, { facts: facts() }, kickoff).kind, 'trade');
 });
 
 void test("with a league the verb is the league screens', the platform named", () => {
