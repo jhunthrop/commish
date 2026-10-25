@@ -1,150 +1,223 @@
 // The parity export: the web's League home readers over the shared fixtures, the file the apps' ports
 // are held to. Run with `node --test shared/scripts/*.test.ts`.
-import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import assert from "node:assert/strict";
+import { test } from "node:test";
 import {
-	CLOCKS,
-	generate,
-	instantOf,
-	OUTPUT,
-	RAIL_OUTPUT,
-	SHELL_OUTPUT,
-	SITE_PHASES
-} from './export-parity.ts';
-import { LINEUP_OUTPUT } from './lineup-parity.ts';
-import { BOARD_OUTPUT } from './board-parity.ts';
-import { GAP_WORDS } from '../../web/src/lib/run/board-basis.ts';
+  CLOCKS,
+  generate,
+  instantOf,
+  OUTPUT,
+  RAIL_OUTPUT,
+  SHELL_OUTPUT,
+  SITE_PHASES,
+} from "./export-parity.ts";
+import { LINEUP_OUTPUT } from "./lineup-parity.ts";
+import { BOARD_OUTPUT } from "./board-parity.ts";
+import { TRADES_OUTPUT } from "./trades-parity.ts";
+import { GAP_WORDS } from "../../web/src/lib/run/board-basis.ts";
 
-void test('a file clock reads back as its instant', () => {
-	assert.equal(instantOf('2026-10-18T18-56-00Z'), '2026-10-18T18:56:00.000Z');
+void test("a file clock reads back as its instant", () => {
+  assert.equal(instantOf("2026-10-18T18-56-00Z"), "2026-10-18T18:56:00.000Z");
 });
 
-void test('every clock carries the bugs, the twelve standings rows and a team basis', async () => {
-	const parity = JSON.parse((await generate()).get(OUTPUT) ?? '{}') as {
-		clocks: Record<string, { bugs: unknown[]; standings: { me: boolean }[]; teamBasis: string }>;
-		moves: unknown[];
-		seeding: string | null;
-	};
-	assert.deepEqual(Object.keys(parity.clocks), [...CLOCKS]);
-	for (const clock of CLOCKS) {
-		const home = parity.clocks[clock];
-		assert.equal(home?.bugs.length, 6, clock);
-		assert.equal(home?.standings.length, 12, clock);
-		assert.equal(home?.standings.filter((r) => r.me).length, 1, clock);
-		assert.match(home?.teamBasis ?? '', /^A team's Proj adds/, clock);
-	}
-	assert.equal(parity.moves.length, 15);
-	assert.match(parity.seeding ?? '', /^FFPC seeds 4 for the playoffs/);
+void test("every clock carries the bugs, the twelve standings rows and a team basis", async () => {
+  const parity = JSON.parse((await generate()).get(OUTPUT) ?? "{}") as {
+    clocks: Record<
+      string,
+      { bugs: unknown[]; standings: { me: boolean }[]; teamBasis: string }
+    >;
+    moves: unknown[];
+    seeding: string | null;
+  };
+  assert.deepEqual(Object.keys(parity.clocks), [...CLOCKS]);
+  for (const clock of CLOCKS) {
+    const home = parity.clocks[clock];
+    assert.equal(home?.bugs.length, 6, clock);
+    assert.equal(home?.standings.length, 12, clock);
+    assert.equal(home?.standings.filter((r) => r.me).length, 1, clock);
+    assert.match(home?.teamBasis ?? "", /^A team's Proj adds/, clock);
+  }
+  assert.equal(parity.moves.length, 15);
+  assert.match(parity.seeding ?? "", /^FFPC seeds 4 for the playoffs/);
 });
 
-void test('with no league the bar follows the site season: the draft bar outside it, the season bar in it', async () => {
-	const rail = JSON.parse((await generate()).get(RAIL_OUTPUT) ?? '{}') as {
-		phases: Record<string, { key: string }[]>;
-		withoutLeague: { key: string }[];
-		withoutLeagueBySeason: Record<string, { key: string }[]>;
-		account: { key: string; label: string };
-	};
-	assert.deepEqual(Object.keys(rail.withoutLeagueBySeason), [...SITE_PHASES]);
-	assert.deepEqual(rail.withoutLeagueBySeason.preseason, rail.phases.pre_draft);
-	assert.deepEqual(rail.withoutLeagueBySeason.offseason, rail.phases.offseason);
-	assert.deepEqual(rail.withoutLeagueBySeason.in_season, rail.withoutLeague);
-	assert.deepEqual(rail.withoutLeagueBySeason.playoffs, rail.withoutLeague);
-	assert.deepEqual(rail.account, { key: 'account', label: 'Account' });
+void test("with no league the bar follows the site season: the draft bar outside it, the season bar in it", async () => {
+  const rail = JSON.parse((await generate()).get(RAIL_OUTPUT) ?? "{}") as {
+    phases: Record<string, { key: string }[]>;
+    withoutLeague: { key: string }[];
+    withoutLeagueBySeason: Record<string, { key: string }[]>;
+    account: { key: string; label: string };
+  };
+  assert.deepEqual(Object.keys(rail.withoutLeagueBySeason), [...SITE_PHASES]);
+  assert.deepEqual(rail.withoutLeagueBySeason.preseason, rail.phases.pre_draft);
+  assert.deepEqual(rail.withoutLeagueBySeason.offseason, rail.phases.offseason);
+  assert.deepEqual(rail.withoutLeagueBySeason.in_season, rail.withoutLeague);
+  assert.deepEqual(rail.withoutLeagueBySeason.playoffs, rail.withoutLeague);
+  assert.deepEqual(rail.account, { key: "account", label: "Account" });
 });
 
 void test("the switch's phase words appear only where the leagues' phases differ", async () => {
-	const shell = JSON.parse((await generate()).get(SHELL_OUTPUT) ?? '{}') as {
-		cases: {
-			set: string;
-			leagues: { id: string; name: string }[];
-			names: Record<string, string>;
-			phases: Record<string, string>;
-		}[];
-		sheetLoading: string;
-		lines: { line: string }[];
-	};
-	assert.equal(shell.cases.length, 12);
-	assert.equal(shell.lines.length, 40);
-	assert.ok(shell.lines.some((l) => l.line === 'FFPC, half PPR, superflex'));
-	for (const c of shell.cases) {
-		assert.equal(Object.keys(c.names).length, c.leagues.length, c.set);
-		assert.equal(Object.keys(c.phases).length, c.set === 'oneSeason' ? 0 : c.leagues.length, c.set);
-	}
-	const unnamed = shell.cases.find((c) => c.set === 'withUnnamed');
-	assert.equal(unnamed?.names['6f1d1c52-2626-4a26-9a26-000000000099'], 'Your Yahoo league');
-	assert.match(shell.sheetLoading, /read as the page opens\.$/);
+  const shell = JSON.parse((await generate()).get(SHELL_OUTPUT) ?? "{}") as {
+    cases: {
+      set: string;
+      leagues: { id: string; name: string }[];
+      names: Record<string, string>;
+      phases: Record<string, string>;
+    }[];
+    sheetLoading: string;
+    lines: { line: string }[];
+  };
+  assert.equal(shell.cases.length, 12);
+  assert.equal(shell.lines.length, 40);
+  assert.ok(shell.lines.some((l) => l.line === "FFPC, half PPR, superflex"));
+  for (const c of shell.cases) {
+    assert.equal(Object.keys(c.names).length, c.leagues.length, c.set);
+    assert.equal(
+      Object.keys(c.phases).length,
+      c.set === "oneSeason" ? 0 : c.leagues.length,
+      c.set,
+    );
+  }
+  const unnamed = shell.cases.find((c) => c.set === "withUnnamed");
+  assert.equal(
+    unnamed?.names["6f1d1c52-2626-4a26-9a26-000000000099"],
+    "Your Yahoo league",
+  );
+  assert.match(shell.sheetLoading, /read as the page opens\.$/);
 });
 
-void test('the Lineup at every clock: changes offered before kickoff, held once their players kick off', async () => {
-	const lineup = JSON.parse((await generate()).get(LINEUP_OUTPUT) ?? '{}') as {
-		clocks: Record<
-			string,
-			{
-				title: string;
-				starters: { move: string | null; state: string | null }[];
-				pinned: { verb: string | null };
-				basis: string;
-			}
-		>;
-		writes: Record<string, { pinned: { verb: string | null } }>;
-		moves: { host: string; verb: string; results: { outcome: string }[] }[];
-	};
-	assert.deepEqual(Object.keys(lineup.clocks), [...CLOCKS]);
-	const saturday = lineup.clocks['2026-10-17T17-00-00Z'];
-	assert.equal(saturday?.title, 'Three changes');
-	assert.equal(saturday?.pinned.verb, 'Copy the lineup');
-	assert.equal(lineup.writes['2026-10-17T17-00-00Z']?.pinned.verb, 'Make these changes');
-	for (const clock of CLOCKS) {
-		const at = lineup.clocks[clock];
-		assert.ok(
-			at?.starters.every((row) => row.move === null || row.state === 'upcoming'),
-			`${clock}: a move only on a row still to come`
-		);
-		assert.match(at?.basis ?? '', /^Our pick is each slot's highest Proj/, clock);
-	}
-	assert.equal(lineup.clocks['2026-10-18T18-56-00Z']?.pinned.verb, null);
-	assert.equal(lineup.moves.find((m) => m.host === 'espn')?.verb, 'Set it on ESPN');
-	assert.deepEqual(
-		lineup.moves[0]?.results.map((r) => r.outcome),
-		['done', 'refused', 'pending']
-	);
+void test("the Lineup at every clock: changes offered before kickoff, held once their players kick off", async () => {
+  const lineup = JSON.parse((await generate()).get(LINEUP_OUTPUT) ?? "{}") as {
+    clocks: Record<
+      string,
+      {
+        title: string;
+        starters: { move: string | null; state: string | null }[];
+        pinned: { verb: string | null };
+        basis: string;
+      }
+    >;
+    writes: Record<string, { pinned: { verb: string | null } }>;
+    moves: { host: string; verb: string; results: { outcome: string }[] }[];
+  };
+  assert.deepEqual(Object.keys(lineup.clocks), [...CLOCKS]);
+  const saturday = lineup.clocks["2026-10-17T17-00-00Z"];
+  assert.equal(saturday?.title, "Three changes");
+  assert.equal(saturday?.pinned.verb, "Copy the lineup");
+  assert.equal(
+    lineup.writes["2026-10-17T17-00-00Z"]?.pinned.verb,
+    "Make these changes",
+  );
+  for (const clock of CLOCKS) {
+    const at = lineup.clocks[clock];
+    assert.ok(
+      at?.starters.every(
+        (row) => row.move === null || row.state === "upcoming",
+      ),
+      `${clock}: a move only on a row still to come`,
+    );
+    assert.match(
+      at?.basis ?? "",
+      /^Our pick is each slot's highest Proj/,
+      clock,
+    );
+  }
+  assert.equal(lineup.clocks["2026-10-18T18-56-00Z"]?.pinned.verb, null);
+  assert.equal(
+    lineup.moves.find((m) => m.host === "espn")?.verb,
+    "Set it on ESPN",
+  );
+  assert.deepEqual(
+    lineup.moves[0]?.results.map((r) => r.outcome),
+    ["done", "refused", "pending"],
+  );
 });
 
 interface BoardWordsCase {
-	rail: string;
-	position: string | null;
-	following: boolean;
-	rosFromWeek: number | null;
-	words: { bar: string; title: string; heading: string; verb: string | null };
+  rail: string;
+  position: string | null;
+  following: boolean;
+  rosFromWeek: number | null;
+  words: { bar: string; title: string; heading: string; verb: string | null };
 }
 
 void test("the board's parity: every rail's words for the board, the row's figures as the phone prints them", async () => {
-	const board = JSON.parse((await generate()).get(BOARD_OUTPUT) ?? '{}') as {
-		words: BoardWordsCase[];
-		figures: { value: number; overReplacement: string; gap: string }[];
-		noGap: string;
-		basis: { view: string; parts: string[] }[];
-	};
-	const before = board.words.find(
-		(c) => c.rail === 'pre_draft' && c.position === null && !c.following && c.rosFromWeek === null
-	);
-	assert.deepEqual(before?.words, {
-		bar: 'Board',
-		title: 'PPR Board',
-		heading: '2026 Board',
-		verb: 'mock'
-	});
-	const rest = board.words.find(
-		(c) => c.rail === 'in_season' && c.position === 'WR' && c.following && c.rosFromWeek === 7
-	);
-	assert.equal(rest?.words.heading, 'Rest of 2026');
-	assert.equal(rest?.words.verb, null);
-	assert.equal(board.figures.find((f) => f.value === -0.04)?.overReplacement, '+0.0');
-	assert.equal(board.figures.find((f) => f.value === -3.6)?.gap, '−3.6');
-	assert.equal(board.noGap, '--');
-	assert.ok(board.basis.find((c) => c.view === 'all')?.parts.includes(GAP_WORDS));
-	assert.match(
-		board.basis.find((c) => c.view === 'draftOrder')?.parts[0] ?? '',
-		/^Kickers and defenses/
-	);
+  const board = JSON.parse((await generate()).get(BOARD_OUTPUT) ?? "{}") as {
+    words: BoardWordsCase[];
+    figures: { value: number; overReplacement: string; gap: string }[];
+    noGap: string;
+    basis: { view: string; parts: string[] }[];
+  };
+  const before = board.words.find(
+    (c) =>
+      c.rail === "pre_draft" &&
+      c.position === null &&
+      !c.following &&
+      c.rosFromWeek === null,
+  );
+  assert.deepEqual(before?.words, {
+    bar: "Board",
+    title: "PPR Board",
+    heading: "2026 Board",
+    verb: "mock",
+  });
+  const rest = board.words.find(
+    (c) =>
+      c.rail === "in_season" &&
+      c.position === "WR" &&
+      c.following &&
+      c.rosFromWeek === 7,
+  );
+  assert.equal(rest?.words.heading, "Rest of 2026");
+  assert.equal(rest?.words.verb, null);
+  assert.equal(
+    board.figures.find((f) => f.value === -0.04)?.overReplacement,
+    "+0.0",
+  );
+  assert.equal(board.figures.find((f) => f.value === -3.6)?.gap, "−3.6");
+  assert.equal(board.noGap, "--");
+  assert.ok(
+    board.basis.find((c) => c.view === "all")?.parts.includes(GAP_WORDS),
+  );
+  assert.match(
+    board.basis.find((c) => c.view === "draftOrder")?.parts[0] ?? "",
+    /^Kickers and defenses/,
+  );
+});
+
+void test("the Trades at every clock: each row's offer in the web's words, the strip's checks scored", async () => {
+  interface Row {
+    offer: string;
+    opened: { groups: { rows: { slot: string }[] }[] };
+  }
+  const parity = JSON.parse((await generate()).get(TRADES_OUTPUT) ?? "{}") as {
+    clocks: Record<
+      string,
+      { finder: { every: { mine: Row[] } }; basis: { closed: string } }
+    >;
+    checks: Record<
+      string,
+      { yours: { figures: { projBefore: string } }; sentence: string }[]
+    >;
+    copied: { done: string };
+  };
+  assert.deepEqual(Object.keys(parity.clocks), [...CLOCKS]);
+  for (const clock of CLOCKS) {
+    const rows = parity.clocks[clock]?.finder.every.mine ?? [];
+    assert.ok(rows.length > 0, clock);
+    for (const row of rows) {
+      assert.match(row.offer, /^Trade with .+: .+ for .+\.$/, clock);
+      assert.deepEqual(row.opened.groups.length, 2, clock);
+    }
+    assert.match(
+      parity.clocks[clock]?.basis.closed ?? "",
+      /How the order has done$/,
+      clock,
+    );
+  }
+  // On Sunday afternoon the strip's trades move players already playing: no Proj before or after.
+  const sunday = parity.checks["2026-10-18T18-56-00Z"] ?? [];
+  assert.equal(sunday.length, 2);
+  assert.ok(sunday.every((c) => c.yours.figures.projBefore === "--"));
+  assert.equal(parity.copied.done, "Copied. Propose it on FFPC's trade page.");
 });

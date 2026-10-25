@@ -336,4 +336,47 @@ public enum Words {
         public static let mock = "Start a mock draft"
         public static let sheet = "Build your cheat sheet"
     }
+
+    public enum Trades {
+        public static let weekHead = "This week, Proj"
+        public static let weekShort = "This week"
+        public static let you = "You"
+        public static let them = "Them"
+        public static let gainHead = "Gain a week"
+        public static let yourGain = "Your gain"
+        public static let theirGain = "Their gain"
+        public static let give = "You give"
+        public static let get = "You get"
+        public static let with = "With"
+        public static let room = "Room"
+        public static let best = "Best with each team"
+        public static let every = "Every trade"
+        public static let sideGive = "Give"
+        public static let sideGet = "Get"
+        public static let sideDrop = "Drop"
+        public static let perGame = "A game"
+        public static let why = "Why this trade"
+        public static let fromThis = "Build from this"
+        public static let youHaveRoom = "You have room"
+        public static let aStarter = "a starter"
+        public static let theyHaveRoom = "They have room"
+        public static let noOneToDrop = "No one to drop"
+        public static let hasRoom = "Has room"
+        public static let copied = "Copied."
+        public static let copyFailed = "This browser would not copy it."
+        public static let proposeItOn = "Propose it on"
+        public static let aWeekForYou = "a week for your lineup"
+        public static let forTheirs = "for theirs"
+        public static let weekWord = "Week"
+        public static let yourSide = "You"
+        public static let theirSide = "With"
+        public static let propose = "Propose"
+        public static let sortBy = "Sort by"
+        public static let to = "to"
+        public static let projForYou = "Proj this week for your lineup"
+    }
+
+    public enum Strip {
+        public static let best = "Best"
+    }
 }

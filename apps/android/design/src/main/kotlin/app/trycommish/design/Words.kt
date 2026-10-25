@@ -338,4 +338,47 @@ object Words {
         const val mock = "Start a mock draft"
         const val sheet = "Build your cheat sheet"
     }
+
+    object Trades {
+        const val weekHead = "This week, Proj"
+        const val weekShort = "This week"
+        const val you = "You"
+        const val them = "Them"
+        const val gainHead = "Gain a week"
+        const val yourGain = "Your gain"
+        const val theirGain = "Their gain"
+        const val give = "You give"
+        const val get = "You get"
+        const val with = "With"
+        const val room = "Room"
+        const val best = "Best with each team"
+        const val every = "Every trade"
+        const val sideGive = "Give"
+        const val sideGet = "Get"
+        const val sideDrop = "Drop"
+        const val perGame = "A game"
+        const val why = "Why this trade"
+        const val fromThis = "Build from this"
+        const val youHaveRoom = "You have room"
+        const val aStarter = "a starter"
+        const val theyHaveRoom = "They have room"
+        const val noOneToDrop = "No one to drop"
+        const val hasRoom = "Has room"
+        const val copied = "Copied."
+        const val copyFailed = "This browser would not copy it."
+        const val proposeItOn = "Propose it on"
+        const val aWeekForYou = "a week for your lineup"
+        const val forTheirs = "for theirs"
+        const val weekWord = "Week"
+        const val yourSide = "You"
+        const val theirSide = "With"
+        const val propose = "Propose"
+        const val sortBy = "Sort by"
+        const val to = "to"
+        const val projForYou = "Proj this week for your lineup"
+    }
+
+    object Strip {
+        const val best = "Best"
+    }
 }
