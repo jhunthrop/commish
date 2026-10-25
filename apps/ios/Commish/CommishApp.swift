@@ -63,6 +63,8 @@ struct CommishApp: App {
             Task { await finish(link) }
         case let .player(slug):
             linked = .player(slug: slug)
+        case let .reference(route):
+            linked = route
         case nil:
             break
         }

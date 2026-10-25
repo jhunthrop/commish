@@ -3,16 +3,18 @@ import CommishCore
 import CommishDesign
 import SwiftUI
 
-/// What the screen's controls do: a row opens the player sheet, a chip chooses.
+/// What the screen's controls do: a row opens the player sheet, a chip chooses, a link opens its page
+/// (ADP, the schedule, a row's club), which the app pushes as its own screen.
 struct BoardActions {
     let open: (SheetPlayer) -> Void
     /// A format chip, by the run's format id ("ppr-12").
     let format: (String) -> Void
     let position: (BoardPosition?) -> Void
+    let link: (URL) -> Void
 
     /// Controls that do nothing: a snapshot's.
     static var none: BoardActions {
-        BoardActions(open: { _ in }, format: { _ in }, position: { _ in })
+        BoardActions(open: { _ in }, format: { _ in }, position: { _ in }, link: { _ in })
     }
 }
 
@@ -22,6 +24,7 @@ struct BoardHeadView: View {
     @Environment(\.colorScheme) private var colorScheme
     let model: BoardModel
     let stamp: String?
+    var link: (URL) -> Void = { _ in }
 
     var body: some View {
         let theme = Theme(colorScheme)
@@ -47,6 +50,13 @@ struct BoardHeadView: View {
                     .foregroundStyle(theme.color(Tokens.Color.accentText))
                     .padding(.top, Tokens.Space.s1)
             }
+            // The page head's links (BoardView.svelte): ADP in the board's format, the schedule.
+            HStack(spacing: Tokens.Space.s4) {
+                if let format = model.formats.first(where: \.pressed)?.value {
+                    QuietButton(Words.AdpPage.heading) { link(SiteLinks.adp(format)) }
+                }
+                QuietButton(Words.AdpPage.scheduleLink) { link(SiteLinks.schedule) }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -71,12 +81,18 @@ struct BoardChipsView: View {
 
 /// One row of chips that scrolls sideways; drawn still where nothing scrolls (a snapshot, which
 /// cannot draw a scroll view's content).
-struct ChipRow<Value: Hashable & Sendable>: View {
+public struct ChipRow<Value: Hashable & Sendable>: View {
     let chips: [BoardChip<Value>]
     let choose: (Value) -> Void
     var live = true
 
-    var body: some View {
+    public init(chips: [BoardChip<Value>], choose: @escaping (Value) -> Void, live: Bool = true) {
+        self.chips = chips
+        self.choose = choose
+        self.live = live
+    }
+
+    public var body: some View {
         if live {
             ScrollView(.horizontal, showsIndicators: false) { row }
                 .scrollClipDisabled()
@@ -103,6 +119,7 @@ struct BoardTableView: View {
     let columns: BoardColumns
     let sections: [BoardSection]
     let open: (SheetPlayer) -> Void
+    var club: ((String) -> Void)?
     var live = true
 
     var body: some View {
@@ -124,17 +141,21 @@ struct BoardTableView: View {
                 BoardSectionHead(title: head)
             }
             ForEach(section.rows) { row in
-                BoardRowView(row: row, columns: columns, open: open)
+                BoardRowView(row: row, columns: columns, open: open, club: club)
             }
         }
     }
 }
 
 /// The basis, said once at the foot: what the numbers are, then the capture the statuses come from.
-struct BoardBasisView: View {
+public struct BoardBasisView: View {
     let lines: [String]
 
-    var body: some View {
+    public init(lines: [String]) {
+        self.lines = lines
+    }
+
+    public var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s1) {
             ForEach(lines, id: \.self) { BasisText($0) }
         }
@@ -143,13 +164,24 @@ struct BoardBasisView: View {
 }
 
 /// The one verb pinned above the bar, where the web's board pins it, on the page's raised shadow.
-struct BoardPinView: View {
+public struct BoardPinView: View {
     @Environment(\.colorScheme) private var colorScheme
-    let verb: PageVerb
+    let title: String
     let press: () -> Void
 
-    var body: some View {
-        Verb(verb.title, action: press)
+    public init(verb: PageVerb, press: @escaping () -> Void) {
+        title = verb.title
+        self.press = press
+    }
+
+    /// A screen's own verb in the board's pin (a club's Compare two of them).
+    public init(title: String, press: @escaping () -> Void) {
+        self.title = title
+        self.press = press
+    }
+
+    public var body: some View {
+        Verb(title, action: press)
             .padding(.horizontal, Tokens.Space.s3)
             .padding(.vertical, Tokens.Space.s2)
             .frame(maxWidth: .infinity)
@@ -171,10 +203,11 @@ public struct BoardScreen: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s4) {
-            BoardHeadView(model: model, stamp: stamp).padding(.horizontal, Tokens.Space.s3)
+            BoardHeadView(model: model, stamp: stamp, link: actions.link).padding(.horizontal, Tokens.Space.s3)
             BoardChipsView(model: model, actions: actions, live: live)
             BoardTableView(
-                columns: model.columns, sections: sections ?? model.sections, open: actions.open, live: live
+                columns: model.columns, sections: sections ?? model.sections, open: actions.open,
+                club: { actions.link(SiteLinks.club($0)) }, live: live
             )
             BoardBasisView(lines: model.basis)
         }
@@ -236,10 +269,13 @@ public struct BoardView: View {
     }
 
     private var actions: BoardActions {
-        BoardActions(
-            open: { sheet.open($0) },
+        let openURL = openURL
+        return BoardActions(
+            // The sheet's verb here is Compare, with him on one side (shelf-state.ts compareOffer).
+            open: { player in sheet.open(player, offer: .compare(player) { openURL($0) }) },
             format: { format in Task { await viewModel.choose(format: format) } },
-            position: { viewModel.choose(position: $0) }
+            position: { viewModel.choose(position: $0) },
+            link: { openURL($0) }
         )
     }
 }

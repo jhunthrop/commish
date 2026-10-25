@@ -48,7 +48,7 @@ struct RootTabs: View {
         .tint(Theme(colorScheme).color(Tokens.Color.accent))
         .environment(sheet)
         // The sheet's Full page is his page in the app: the sheet closes onto it, pushed on the tab in view.
-        .playerSheet(sheet, openPage: { open(.player(slug: $0)) }, content: { player in
+        .playerSheet(sheet, openPage: { open(.player(slug: $0)) }, openRoute: open, content: { player in
             PlayerSheetContainer(player: player, offer: sheet.offer, close: sheet.close) { player in
                 PlayerSheetViewModel(
                     player: player, run: environment.api, pages: environment.api, weeks: environment.api,
@@ -171,6 +171,9 @@ struct RootTabs: View {
             NamedScreen(PhoneRail.account.label, verb: (AppWords.SignIn.signOut, signOut))
         case let .leagueHome(id):
             LeagueScreen(environment: environment, leagueID: id, expired: expired) {}
+        case .adp, .compare, .clubs, .club, .schedule:
+            ReferenceScreen(route: route, environment: environment, league: selectedLeague, expired: expired)
+                .id(route)
         }
     }
 
