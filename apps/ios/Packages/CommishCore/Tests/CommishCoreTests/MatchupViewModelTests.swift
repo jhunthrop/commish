@@ -180,7 +180,9 @@ struct MatchupViewModelTests {
         let week = try Self.week(viewModel).week
         #expect(week.boxes.map(\.starters.count) == [10, 10])
         #expect(week.boxes[0].teamRow.pts == "39.1")
-        #expect(week.boxes.flatMap(\.starters).allSatisfy { $0.proj == "--" && $0.game == .none })
+        let starters: [RowCells] = week.boxes.flatMap(\.starters)
+        let bare: Bool = starters.allSatisfy { $0.proj == "--" && $0.game == .none }
+        #expect(bare)
     }
 
     // MARK: the three Sunday clocks and after Sunday
@@ -252,7 +254,8 @@ struct MatchupViewModelTests {
         #expect(week.bug.words == "Mon 7:15 pm, WAS at SF")
         #expect(week.bug.mine.small == "Proj final 64.0")
         #expect(week.bug.mine.toPlay == "1 to play")
-        #expect(week.boxes[0].starters.filter { $0.row.read == .final }.count == 6)
+        let finals: Int = week.boxes[0].starters.filter { $0.row.read == .final }.count
+        #expect(finals == 6)
     }
 
     @Test func onceEveryGameIsFinalTheWeekIsDone() throws {
@@ -261,15 +264,20 @@ struct MatchupViewModelTests {
         #expect(week.bug.read == nil)
         #expect(week.bug.mine.small == "Final 63.5")
         #expect(week.bug.opponent?.small == "Final 83.7")
-        #expect(week.boxes.allSatisfy { $0.teamRow.caption == "Final" })
+        let captions: [String?] = week.boxes.map(\.teamRow.caption)
+        #expect(captions == ["Final", "Final"])
         #expect(!week.basis.contains("Proj final"))
     }
 
     @Test func everyRowWithAPageOpensThePlayerSheetByHisID() throws {
         let week = try Self.week(Self.sunday)
-        let players = week.sheetPlayers
-        #expect(players.contains { $0.id == "96" && $0.slug == "aaron-rodgers" && $0.name == "Aaron Rodgers" })
-        #expect(players.count == (week.boxes.flatMap { $0.starters + $0.bench }.filter { $0.row.slug != nil }.count))
+        let players: [SheetPlayer] = week.sheetPlayers
+        let rodgers: SheetPlayer? = players.first { $0.id == "96" }
+        #expect(rodgers?.slug == "aaron-rodgers")
+        #expect(rodgers?.name == "Aaron Rodgers")
+        let rows: [RowCells] = week.boxes.flatMap { $0.starters + $0.bench }
+        let withPages: Int = rows.filter { $0.row.slug != nil }.count
+        #expect(players.count == withPages)
     }
 }
 

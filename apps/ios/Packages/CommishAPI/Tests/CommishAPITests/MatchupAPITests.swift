@@ -25,7 +25,8 @@ struct MatchupAPITests {
         #expect(box.sides.map(\.rosterId) == [1, 7])
         let starters = box.sides.flatMap(\.starters)
         #expect(starters.count == 10)
-        #expect(starters.allSatisfy { $0.line.gameState?.value1.state.value1 != nil }, "\(clock)")
+        let stated: Bool = starters.allSatisfy { $0.line.gameState?.value1.state.value1 != nil }
+        #expect(stated, "\(clock)")
     }
 
     @Test(arguments: LineupAPITests.clocks)

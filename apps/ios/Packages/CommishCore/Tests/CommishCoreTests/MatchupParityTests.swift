@@ -110,7 +110,8 @@ struct MatchupParityTests {
     func everyStartersLineCarriesTheAPIsGameState(clock: String) throws {
         let box = try Fixtures.matchupBox(clock)
         let lines = box.sides.flatMap { $0.starters.map(\.line) + $0.bench }
-        #expect(lines.allSatisfy { $0.gameState?.value1.state.value1 != nil })
+        let stated: Bool = lines.allSatisfy { $0.gameState?.value1.state.value1 != nil }
+        #expect(stated)
     }
 }
 
