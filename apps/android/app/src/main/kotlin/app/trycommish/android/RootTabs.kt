@@ -53,7 +53,6 @@ import app.trycommish.feature.shell.LeagueSwitchMenu
 import app.trycommish.feature.shell.LocalPlayerSheet
 import app.trycommish.feature.shell.NamedScreen
 import app.trycommish.feature.shell.PhoneTabBar
-import app.trycommish.feature.shell.PlayerSheet
 import app.trycommish.feature.shell.TopBar
 import app.trycommish.feature.shell.TopBarActions
 
@@ -172,7 +171,7 @@ fun Shell(
         ) { padding ->
             // The bars' room counted as taken, so a pin's imePadding lifts it only by what the keyboard adds.
             Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
-                Pages(graph, nav, state, bar, shell::open, openLineup)
+                Pages(graph, nav, state, bar, shell::open, openLineup, ::openTab)
                 if (switchOpen) {
                     Box(
                         Modifier
@@ -187,7 +186,7 @@ fun Shell(
                 }
             }
         }
-        PlayerSheet(sheet, openPlayer = { push(it) })
+        PlayerSheetOver(graph, sheet, (state as? ShellState.Ready)?.selected, openPlayer = { push(it) })
     }
 }
 
@@ -200,11 +199,13 @@ private fun Pages(
     bar: List<RailItem>,
     retry: () -> Unit,
     onOpenLineup: (leagueId: String) -> Unit,
+    openTab: (String) -> Unit,
 ) {
+    val selected = (state as? ShellState.Ready)?.selected
     NavHost(nav, startDestination = LEAGUE_PAGE) {
         composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup) }
         composable(LINEUP_PAGE) { StartTab(graph, state, retry) }
-        composable(MATCHUP_PAGE) { MatchupTab(graph, state, retry) }
+        composable(MATCHUP_PAGE) { MatchupTab(graph, state, retry) { openTab(LINEUP_PAGE) } }
         composable(WAIVERS_PAGE) { WaiversTab(graph, state, retry) }
         composable(TRADES_PAGE) { TradesTab(graph, state, retry) }
         composable(BOARD_PAGE) {
@@ -219,8 +220,9 @@ private fun Pages(
         composable(Routes.PLAYERS, listOf(navArgument("query") { type = NavType.StringType })) { entry ->
             RankingsTab(graph, state, entry.arguments?.getString("query").orEmpty())
         }
-        // The player page's lane (S6) fills this from the slug.
-        composable(Routes.PLAYER) { NamedScreen(AppWords.players) }
+        composable(Routes.PLAYER, listOf(navArgument("slug") { type = NavType.StringType })) { entry ->
+            entry.arguments?.getString("slug")?.let { PlayerPage(graph, it, selected, bar, openTab) }
+        }
         composable(Routes.ACCOUNT) { NamedScreen(Words.Shell.account, verb = AppWords.signOut to graph::signOut) }
         composable(Routes.LEAGUE_HOME) { entry ->
             entry.arguments?.getString("id")?.let { LeagueHome(graph, it, onOpenLineup) }

@@ -131,7 +131,7 @@ class RankingsParityTest {
         val (_, model) = order("all")
         val swift = model.rows.first()
         assertEquals(
-            SheetPlayer("4259545", "d-andre-swift", "D'Andre Swift", "RB", "15", "CHI", swift.player.headshot),
+            SheetPlayer("4259545", "d-andre-swift", "D'Andre Swift", "RB", "15", "CHI", swift.player.headshot, "4259545"),
             swift.player.sheetPlayer,
         )
         val (_, defenses) = week("DEF")

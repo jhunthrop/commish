@@ -84,6 +84,7 @@ data class PoolRow(
                     row.rank?.toString() ?: row.status?.rank,
                     row.club,
                     row.headshot,
+                    boardId = row.boardId,
                 )
             }
         }

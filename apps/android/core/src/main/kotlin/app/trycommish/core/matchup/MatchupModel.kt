@@ -73,6 +73,11 @@ data class MatchupWeek(
     val boxes: List<TeamBox>,
     val basis: String,
 ) {
+    /** Whether his row is one of the member's own (MatchupPanel.svelte rowsOf(mine)): only those offer the
+     * way to his lineup. */
+    fun isMine(player: SheetPlayer): Boolean =
+        boxes.filter { it.mine }.flatMap { it.starters + it.bench }.any { it.sheetPlayer?.id == player.id }
+
     /** Every player a row opens in the sheet, both teams'. */
     val sheetPlayers: List<SheetPlayer> get() = boxes.flatMap { it.starters + it.bench }.mapNotNull { it.sheetPlayer }
 }
