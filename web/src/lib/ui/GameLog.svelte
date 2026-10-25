@@ -2,6 +2,7 @@
 	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import WeatherGlyph from '#lib/league/box/WeatherGlyph.svelte';
 	import Label from './Label.svelte';
+	import { PLAYER_PAGE } from '#lib/player/page-words.ts';
 	import {
 		projShown,
 		stillToPlay,
@@ -182,8 +183,8 @@
 {/if}
 
 {#if toPlay.length > 0}
-	<section class="ahead" aria-label="Still to play">
-		<h3><Label>Still to play</Label></h3>
+	<section class="ahead" aria-label={PLAYER_PAGE.stillToPlay}>
+		<h3><Label>{PLAYER_PAGE.stillToPlay}</Label></h3>
 		<ol>
 			{#each toPlay as week (week.week)}
 				<li class:bye={week.bye}>

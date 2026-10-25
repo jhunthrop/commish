@@ -159,6 +159,19 @@ public struct WaiverModel: Equatable, Sendable {
         WaiverWords.addVerb(shown.moves, hostID: source.add.player.hostId, platform: platform)
     }
 
+    /// The sheet's verb on his row (WaiverScreen.svelte shelfOffer): a stash an open IR slot takes with
+    /// no drop, the stash verb with his week under it; else the claim in the screen's words with the pair
+    /// and its gain (a stash's week in place of a gain) under it, the advice's drop first.
+    public func sheetOffer(_ row: PoolRow) -> (label: String, line: String) {
+        if let stash = row.stash, stash.slotTakesHim, !stash.drops {
+            return (Words.Stash.verb, stash.back)
+        }
+        let advised = drops(row).first
+        let paired = WaiverRows.with(row.source, drop: advised)
+        let tail = row.stash.map(\.back) ?? WaiverWords.cardGains(week: paired.weekGain, gain: paired.gain)
+        return (verb(paired), "\(pairWords(row.source, drop: advised)), \(tail)")
+    }
+
     /// Whether an add's claim is made from here.
     public func claimsHere(_ source: WaiverRow) -> Bool {
         WaiverWords.claimsAdd(shown.moves, hostID: source.add.player.hostId)

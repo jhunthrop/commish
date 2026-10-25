@@ -87,7 +87,7 @@ export const WEEK_TILE = {
 	underShownRead: `Moved under ${String(SHOWN_CHANGE_FROM)} since our read was written`,
 	notInRead: 'Not in our read',
 	changePart: `${CARD.delta} is its move since the earlier read, shown from ${String(SHOWN_CHANGE_FROM)}.`,
-	changePartRead: `${CARD.delta} is its move since our read was written, shown from ${String(SHOWN_CHANGE_FROM)}; the read is withheld from the same move.`
+	changePartRead: `${CARD.delta} is its move since our read was written, shown from ${String(SHOWN_CHANGE_FROM)}. The read is withheld from the same move.`
 } as const;
 
 type Schemas = components['schemas'];

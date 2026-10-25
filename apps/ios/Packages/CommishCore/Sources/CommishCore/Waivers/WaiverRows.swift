@@ -73,7 +73,7 @@ public struct PoolRow: Equatable, Sendable, Identifiable {
         return row.slug.map { slug in
             SheetPlayer(
                 id: key, slug: slug, name: row.name, position: row.position,
-                rank: row.rank.map(String.init) ?? row.status?.rank, club: row.club
+                rank: row.rank.map(String.init) ?? row.status?.rank, club: row.club, boardID: row.boardID
             )
         }
     }

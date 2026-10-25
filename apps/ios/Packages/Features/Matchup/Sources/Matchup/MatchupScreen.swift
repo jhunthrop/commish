@@ -119,10 +119,24 @@ public struct MatchupView: View {
     @State private var onScreen = false
     private let viewModel: MatchupViewModel
     private let leagueID: String
+    /// The way to the member's lineup, the sheet's verb on his own rows.
+    private let openLineup: @MainActor @Sendable () -> Void
 
-    public init(viewModel: MatchupViewModel, leagueID: String) {
+    public init(
+        viewModel: MatchupViewModel, leagueID: String, openLineup: @escaping @MainActor @Sendable () -> Void = {}
+    ) {
         self.viewModel = viewModel
         self.leagueID = leagueID
+        self.openLineup = openLineup
+    }
+
+    /// The sheet's verb on the Matchup (MatchupPanel.svelte's lineupOffer): the way to his lineup on the
+    /// member's own rows, none on the opponent's.
+    func offer(_ model: MatchupModel, _ player: SheetPlayer) -> SheetOffer? {
+        guard case let .week(week) = model, week.isMine(player) else {
+            return nil
+        }
+        return SheetOffer(label: Words.Card.openLineup, line: nil, lineup: true, act: openLineup)
     }
 
     public var body: some View {
@@ -133,7 +147,9 @@ public struct MatchupView: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             case let .loaded(model, _, _):
                 ScrollView {
-                    MatchupScreen(model: model, stamp: viewModel.stampWords, open: { sheet.open($0) })
+                    MatchupScreen(
+                        model: model, stamp: viewModel.stampWords, open: { sheet.open($0, offer: offer(model, $0)) }
+                    )
                 }
                 .refreshable { await viewModel.load(leagueID: leagueID) }
                 .onChange(of: model) { _, fresh in
