@@ -147,11 +147,16 @@ struct ScheduleGridView: View {
         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.md).strokeBorder(theme.color(Tokens.Color.line)))
     }
 
+    /// "Wk 7": a week's head.
+    static func head(_ week: Int) -> String {
+        "\(Words.SchedulePage.week) \(week)"
+    }
+
     private func weeks(_ theme: Theme) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 ForEach(grid.weeks, id: \.self) { week in
-                    Text("\(Words.SchedulePage.week) \(week)")
+                    Text(Self.head(week))
                         .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
                         .textCase(.uppercase)
                         .foregroundStyle(theme.color(week <= grid.played ? Tokens.Color.playedInk : Tokens.Color.ink3))

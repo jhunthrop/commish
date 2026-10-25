@@ -158,8 +158,8 @@ enum CompareRows {
         }
         let held = pair { $0.player.heldRank }
         let judged = held.0 == nil && held.1 == nil
-        let gapRow = gapRow(pair { $0.player.heldRank == nil ? $0.numbers.gap : nil })
-        let rangeRow = rangeRow(pair { $0.numbers.range != nil })
+        let gapRow = Self.gapRow(pair { $0.player.heldRank == nil ? $0.numbers.gap : nil })
+        let rangeRow = Self.rangeRow(pair { $0.numbers.range != nil })
         let fixed = { (value: Double) in Formatting.fixed(value) }
         let whole = { (value: Double) in String(Int(value)) }
         var rows = [
@@ -229,7 +229,7 @@ enum Verdict {
             return heldCall(lhs, rhs, formatLabel: formatLabel)
         }
         let (leader, other) = lhs.numbers.ourRank <= rhs.numbers.ourRank ? (lhs, rhs) : (rhs, lhs)
-        let names = names(leader, other)
+        let names = Self.names(leader, other)
         return called(
             leader, other, names: names,
             evidence: "\(names.leader) is \(Formatting.ordinal(leader.numbers.ourRank)) on our \(formatLabel) board "
@@ -268,7 +268,7 @@ enum Verdict {
         let rhsHeld = held(rhs)
         if lhsHeld != nil, rhsHeld != nil {
             let (leader, other) = lhs.numbers.vor >= rhs.numbers.vor ? (lhs, rhs) : (rhs, lhs)
-            let names = names(leader, other)
+            let names = Self.names(leader, other)
             return called(
                 leader, other, names: names,
                 evidence: "Both are on season-long lists, so neither sits above the available players on our "
@@ -279,7 +279,7 @@ enum Verdict {
         }
         let status = lhsHeld ?? rhsHeld
         let (leader, other) = lhsHeld != nil ? (rhs, lhs) : (lhs, rhs)
-        let names = names(leader, other)
+        let names = Self.names(leader, other)
         let word = status.map(RowStatuses.word) ?? ""
         return called(
             leader, other, names: names,

@@ -115,7 +115,7 @@ enum ScheduleViews {
     static func club(
         _ club: RunClub, schedule: RunSchedule, clubs: [RunClub], played: Reach, underway: Bool
     ) -> ClubSchedule {
-        let views = views(schedule, underway: underway)
+        let views = Self.views(schedule, underway: underway)
         let hero = views[club.abbr].map { view in
             let hardest = StrengthWords.hardestFigure(rank: view.rank, of: views.count)
             return ClubHero(
@@ -157,7 +157,7 @@ enum ScheduleViews {
         let lastWeek = schedule.slates.flatMap(\.games).map(\.week).max() ?? 0
         let weeks = Array(stride(from: 1, through: lastWeek, by: 1))
         let strong = strongFloor(Array(schedule.opponentValues.additionalProperties.values))
-        let views = views(schedule, underway: underway)
+        let views = Self.views(schedule, underway: underway)
         let slates = order(schedule, views: views)
         let first = slates.lazy.compactMap { views[$0.abbr] }.first
         let names = ClubNames(clubs)
@@ -199,7 +199,7 @@ enum ScheduleViews {
                 week: week, opponent: nil, club: nil, value: "", hard: false, played: week <= played.complete
             )
         }
-        let value = value(schedule, game.opponent)
+        let value = Self.value(schedule, game.opponent)
         return ScheduleCell(
             week: week,
             opponent: "\(game.home ? Words.ClubPage.home : Words.ClubPage.away) \(game.opponent)",

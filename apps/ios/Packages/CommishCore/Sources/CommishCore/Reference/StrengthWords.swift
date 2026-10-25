@@ -72,7 +72,7 @@ enum StrengthWords {
     /// scheduleLead: what strength is and when it was read, then how the grid is ordered, shaded and
     /// faded; with no strength to show, only what is shaded and faded.
     static func scheduleLead(_ view: StrengthView?, strong: (count: Int, atLeast: String), reach: Reach) -> String {
-        let played = played(reach)
+        let played = Self.played(reach)
         let faded = played.isEmpty ? "" : ", \(played)"
         let shaded = "the \(strong.count) highest opponents shaded (\(strong.atLeast) or more)\(faded)."
         guard let view else {
@@ -83,8 +83,8 @@ enum StrengthWords {
 
     /// clubsLead: "Every club's players on our PPR board. Rest of season strength is ...".
     static func clubsLead(_ formatLabel: String, first: StrengthView?) -> String {
-        let strength = first.map { " \(strength($0))" } ?? ""
-        return "Every club's players on our \(formatLabel) board.\(strength)"
+        let said = first.map { " \(Self.strength($0))" } ?? ""
+        return "Every club's players on our \(formatLabel) board.\(said)"
     }
 
     /// strengthFigure: the tenth the run writes.
