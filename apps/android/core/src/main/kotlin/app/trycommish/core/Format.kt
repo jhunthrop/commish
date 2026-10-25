@@ -5,6 +5,7 @@ import java.math.RoundingMode
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.floor
@@ -131,9 +132,18 @@ object Format {
         zone: ZoneId,
     ): Boolean = a.atZone(zone).toLocalDate() == b.atZone(zone).toLocalDate()
 
+    /** "Central": the zone's generic name with " Time" dropped where one word is left (basis.ts zoneWord,
+     * the iOS Formatting.zoneWord); "Central European Time" whole. */
+    fun zoneWord(zone: ZoneId): String {
+        val name = zone.getDisplayName(TextStyle.FULL, Locale.US)
+        val bare = name.removeSuffix(ZONE_SUFFIX)
+        return if (name.endsWith(ZONE_SUFFIX) && ' ' !in bare) bare else name
+    }
+
     private fun lowerPeriod(text: String): String = text.replace("AM", "am").replace("PM", "pm")
 
     private const val WHOLE_LIMIT = 1e15
+    private const val ZONE_SUFFIX = " Time"
     private const val TEN = 10
     private const val HUNDRED = 100
     private val TEENS = 11..13
