@@ -156,7 +156,7 @@ struct TradesViewModelTests {
         let viewModel = model(stub)
         await viewModel.load(leagueID: Fixtures.league)
         await viewModel.toggle(Self.best, leagueID: Fixtures.league)
-        #expect(viewModel.checks[Self.best] == .failed(AppWords.Failure.offline))
+        #expect(viewModel.checks[Self.best] == .failed(AppWords.Trades.checkUnread))
         let shown = try Self.shown(viewModel)
         #expect(shown.stale)
         #expect(shown.model.rows.first?.id == Self.best)
@@ -167,6 +167,15 @@ struct TradesViewModelTests {
         guard case .answered? = viewModel.checks[Self.best] else {
             throw Unexpected.state("\(String(describing: viewModel.checks[Self.best]))")
         }
+    }
+
+    @Test func aCheckTheAPIRefusesSaysTheAPIsSentence() async throws {
+        let stub = try Self.stub()
+        await stub.failCheck(APIError.envelope(code: "invalid", message: "Josh Allen is not on your roster."))
+        let viewModel = model(stub)
+        await viewModel.load(leagueID: Fixtures.league)
+        await viewModel.toggle(Self.best, leagueID: Fixtures.league)
+        #expect(viewModel.checks[Self.best] == .failed("Josh Allen is not on your roster."))
     }
 
     @Test func theVerbCopiesTheWebsShareTextAndSaysWhereToProposeIt() async throws {

@@ -130,7 +130,7 @@ public final class TradesViewModel {
             checks[key] = nil
             signOut()
         } catch {
-            checks[key] = .failed(LeagueHomeViewModel.sentence(for: error))
+            checks[key] = .failed(Self.checkSentence(error))
             if case let .loaded(model, stamp, _) = state {
                 state = .loaded(model, stamp: stamp, stale: true)
             }
@@ -145,6 +145,15 @@ public final class TradesViewModel {
             return
         }
         copied[key] = TradesWords.copied(copy(line.offer), platform: model.platform)
+    }
+
+    /// Why a check is missing: the API's own sentence where it refused the trade, else that it could not
+    /// be read just now (the finder shown is kept, so no word about nothing saved).
+    static func checkSentence(_ error: any Error) -> String {
+        if case let APIError.envelope(_, message) = error, !message.isEmpty {
+            return message
+        }
+        return AppWords.Trades.checkUnread
     }
 
     /// A trade not checked yet, or whose check failed: opening it reads the check.

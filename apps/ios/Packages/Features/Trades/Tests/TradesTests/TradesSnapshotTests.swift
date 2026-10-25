@@ -140,7 +140,7 @@ struct TradesSnapshotTests {
     @Test func theStaleSceneSaysItsStampAndTheCheckSaysWhyItIsMissing() async throws {
         let viewModel = try await Self.viewModel(.stale)
         #expect(viewModel.stampWords == "Last read Sat 12:00 pm")
-        #expect(viewModel.checks[Self.best] == .failed(AppWords.Failure.offline))
+        #expect(viewModel.checks[Self.best] == .failed(AppWords.Trades.checkUnread))
     }
 
     enum SceneError: Error {

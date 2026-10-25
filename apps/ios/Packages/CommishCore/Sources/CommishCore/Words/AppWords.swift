@@ -75,6 +75,13 @@ public enum AppWords {
         }
     }
 
+    /// The Trades screen's own words, where the web has no such state.
+    public enum Trades {
+        /// In place of a trade's check that could not be read (no signal, or the API not answering):
+        /// the trades shown stay, and opening the trade again reads the check again.
+        public static let checkUnread = "We could not check this trade just now. Open it again to try."
+    }
+
     /// The league the app opens until the Leagues screen lets the member pick one.
     public enum LeagueList {
         public static let none = "Follow a league on trycommish.app and it shows here."
