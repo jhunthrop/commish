@@ -1,5 +1,6 @@
 package app.trycommish.core.shell
 
+import app.trycommish.core.start.GameRead
 import app.trycommish.design.Site
 import app.trycommish.design.Words
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +23,46 @@ data class SheetPlayer(
     val club: String?,
     /** His face as the row draws it, null with none (headshotOf). */
     val headshot: String?,
+    /** His board id where the row carries it: his week is read by it when the run's index names no page
+     * for his slug. */
+    val boardId: String? = null,
 )
+
+/** What the screen under the sheet offers him (shelf-state.ts ScreenOffer): the verb in the screen's
+ * words, the line under it, what it does there, and whether the screen is one of the lineup's, whose
+ * verb gives way to his game's state once it has kicked off (shelf.ts LINEUP_SCREENS). */
+class SheetOffer(
+    val label: String,
+    val line: String?,
+    val lineup: Boolean,
+    val act: () -> Unit,
+)
+
+/** The sheet's verb (shelf.ts shelfVerb): the screen's offer, or on a lineup screen once his game has
+ * kicked off the held words in its place, since no lineup move takes him then. */
+sealed interface SheetVerb {
+    data class Act(
+        val label: String,
+        val line: String?,
+    ) : SheetVerb
+
+    data class Held(
+        val words: String,
+    ) : SheetVerb
+
+    companion object {
+        /** `game` is his game by his week's line once his card is read, null before. */
+        fun of(
+            offer: SheetOffer?,
+            game: GameRead?,
+        ): SheetVerb? {
+            if (offer == null) return null
+            if (offer.lineup && game == GameRead.Final) return Held(Words.Card.gameFinal)
+            if (offer.lineup && game == GameRead.KickedOff) return Held(Words.Card.kickedOff)
+            return Act(offer.label, offer.line)
+        }
+    }
+}
 
 /**
  * The sheet's frame (the web's player shelf, PlayerShelf.svelte): his name, position pill and club in
@@ -57,12 +97,14 @@ fun playerSheetModel(player: SheetPlayer): PlayerSheetModel =
         loading = unreadBasis(failed = false, weekTile = Words.Card.proj),
     )
 
-/** card.ts unreadBasis for a player on no list: what the week's tiles are, read as the sheet opens, or
- * why they show "--". */
+/** card.ts unreadBasis: what the week's tiles are, read as the sheet opens, or why they show "--"; a
+ * listed player's week tiles say his list, read or not (Lane 128). */
 fun unreadBasis(
     failed: Boolean,
     weekTile: String,
+    listed: String? = null,
 ): String {
+    if (listed != null) return Words.Card.listedWeek
     val tiles = "$weekTile, ${Words.Card.opp} and ${Words.Card.delta}"
     return if (failed) {
         "$tiles show \"${Words.Card.none}\" because this week's figures could not be read just now."
@@ -128,11 +170,20 @@ class PlayerSheetHost {
     /** The player the sheet shows, null while it is closed. */
     val shown: StateFlow<SheetPlayer?> = mutableShown.asStateFlow()
 
-    fun open(player: SheetPlayer) {
+    /** What the screen the sheet opened from offers him, null where it offers none. */
+    var offer: SheetOffer? = null
+        private set
+
+    fun open(
+        player: SheetPlayer,
+        offer: SheetOffer? = null,
+    ) {
+        this.offer = offer
         mutableShown.value = player
     }
 
     fun close() {
+        offer = null
         mutableShown.value = null
     }
 
