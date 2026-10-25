@@ -30,16 +30,24 @@ public struct BoxRowView: View {
         VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 0) {
                 slot(theme)
-                PlayerCell(cells: cells, evidence: style.evidence, open: actions.open)
+                PlayerCell(cells: cells, style: style, open: actions.open)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text(cells.rank)
-                    .font(Faces.font(.num, size: Tokens.TypeScale.lg, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(theme.color(cells.rank == Words.Box.none ? Tokens.Color.ink3 : Tokens.Color.ink))
-                    .frame(width: Column.rank, alignment: .leading)
-                    .padding(.leading, Tokens.Space.s1)
+                if style.rank {
+                    Text(cells.rank)
+                        .font(Faces.font(.num, size: Tokens.TypeScale.lg, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(
+                            theme.color(cells.rank == Words.Box.none ? Tokens.Color.ink3 : Tokens.Color.ink)
+                        )
+                        .frame(width: Column.rank, alignment: .leading)
+                        .padding(.leading, Tokens.Space.s1)
+                }
                 Figure(text: cells.proj, width: Column.proj, muted: cells.proj == Words.Box.none)
-                Figure(text: cells.pts, width: Column.pts, muted: cells.pts == Words.Box.none)
+                if style.season {
+                    Figure(text: cells.season, width: Column.season, muted: cells.season == Words.Box.none)
+                } else {
+                    Figure(text: cells.pts, width: Column.pts, muted: cells.pts == Words.Box.none)
+                }
                 if style.why {
                     why(theme)
                 }
@@ -124,7 +132,7 @@ public struct BoxRowView: View {
 struct PlayerCell: View {
     @Environment(\.colorScheme) private var colorScheme
     let cells: RowCells
-    let evidence: Bool
+    let style: BoxStyle
     let open: (SheetPlayer) -> Void
 
     var body: some View {
@@ -136,8 +144,10 @@ struct PlayerCell: View {
                 name(theme)
                 club(theme)
                 game(theme)
-                facts(theme)
-                if evidence {
+                if style.facts {
+                    facts(theme)
+                }
+                if style.evidence {
                     Text(evidenceLine(theme))
                         .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
                         .fixedSize(horizontal: false, vertical: true)
@@ -150,7 +160,9 @@ struct PlayerCell: View {
     @ViewBuilder
     private func name(_: Theme) -> some View {
         let label = ViewThatFits(in: .horizontal) {
-            nameText(cells.row.name)
+            if !style.shortName {
+                nameText(cells.row.name)
+            }
             nameText(cells.row.fit)
         }
         if let player = cells.sheetPlayer {
