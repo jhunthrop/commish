@@ -1,0 +1,114 @@
+/** The Play upload's request shapes against a stub of the Play Developer API (no network). */
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { API_ROOT, PlayError, type Fetch, uploadToTrack, type UploadRequest } from './play-upload.ts';
+
+interface Seen {
+	method: string;
+	url: string;
+	headers: Record<string, string>;
+	body: unknown;
+}
+
+const PACKAGE = 'app.trycommish.android';
+const BASE = `${API_ROOT}/androidpublisher/v3/applications/${PACKAGE}`;
+const UPLOAD = `${API_ROOT}/upload/androidpublisher/v3/applications/${PACKAGE}`;
+const SESSION = 'https://upload.example/session-1';
+const TOKEN = 'stub-token';
+const BUNDLE = new Uint8Array([1, 2, 3, 4]);
+const VERSION_CODE = 1219;
+
+type Answer = (seen: Seen) => Response | undefined;
+
+const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+const refusal = (message: string, status = 400): Response => json({ error: { code: status, message } }, status);
+
+/** A stub that records every request and answers like Play unless an override answers first. */
+function stub(override: Answer = () => undefined): { fetch: Fetch; seen: Seen[] } {
+	const seen: Seen[] = [];
+	const fetch: Fetch = async (url, init) => {
+		const request: Seen = { method: init.method ?? 'GET', url, headers: init.headers as Record<string, string>, body: init.body };
+		seen.push(request);
+		const answered = override(request);
+		if (answered) return answered;
+		if (url === `${BASE}/edits` && request.method === 'POST') return json({ id: 'edit-1' });
+		if (url.startsWith(`${UPLOAD}/edits/edit-1/bundles`)) return new Response('{}', { status: 200, headers: { Location: SESSION } });
+		if (url === SESSION) return json({ versionCode: VERSION_CODE, sha256: 'abc' });
+		if (url === `${BASE}/edits/edit-1/tracks/internal`) return json(JSON.parse(String(init.body)));
+		if (url === `${BASE}/edits/edit-1:commit`) return json({ id: 'edit-1' });
+		if (url === `${BASE}/edits/edit-1` && request.method === 'DELETE') return new Response(null, { status: 204 });
+		return refusal(`unexpected ${request.method} ${url}`, 404);
+	};
+	return { fetch, seen };
+}
+
+const request = (status: UploadRequest['status']): UploadRequest => ({ token: TOKEN, packageName: PACKAGE, track: 'internal', status, bundle: BUNDLE });
+const quiet = (): void => {};
+const steps = (seen: Seen[]): string[] => seen.map((s) => `${s.method} ${s.url}`);
+
+test('the edits flow: insert, resumable upload, track, commit, each with the bearer', async () => {
+	const { fetch, seen } = stub();
+	const result = await uploadToTrack(request('completed'), fetch, quiet);
+	assert.deepEqual(result, { outcome: 'committed', editId: 'edit-1', versionCode: VERSION_CODE, status: 'completed' });
+	assert.deepEqual(steps(seen), [
+		`POST ${BASE}/edits`,
+		`POST ${UPLOAD}/edits/edit-1/bundles?uploadType=resumable`,
+		`PUT ${SESSION}`,
+		`PUT ${BASE}/edits/edit-1/tracks/internal`,
+		`POST ${BASE}/edits/edit-1:commit`
+	]);
+	for (const s of seen) assert.equal(s.headers.Authorization, `Bearer ${TOKEN}`);
+	assert.equal(seen[1].headers['X-Upload-Content-Type'], 'application/octet-stream');
+	assert.equal(seen[1].headers['X-Upload-Content-Length'], String(BUNDLE.byteLength));
+	assert.equal(seen[2].body, BUNDLE);
+	assert.deepEqual(JSON.parse(String(seen[3].body)), { track: 'internal', releases: [{ versionCodes: [String(VERSION_CODE)], status: 'completed' }] });
+});
+
+test('a draft request sets the track as draft', async () => {
+	const { fetch, seen } = stub();
+	const result = await uploadToTrack(request('draft'), fetch, quiet);
+	assert.equal(result.status, 'draft');
+	assert.equal(result.outcome, 'committed');
+	assert.equal((JSON.parse(String(seen[3].body)) as { releases: { status: string }[] }).releases[0].status, 'draft');
+});
+
+test('the first-review refusal is a named outcome: the track again as draft, committed', async () => {
+	let commits = 0;
+	const { fetch, seen } = stub((s) => {
+		if (s.url.endsWith(':commit') && commits++ === 0) return refusal('Only releases with status draft may be created on draft app.');
+		return undefined;
+	});
+	const lines: string[] = [];
+	const result = await uploadToTrack(request('completed'), fetch, (line) => lines.push(line));
+	assert.equal(result.outcome, 'committed-as-draft');
+	assert.equal(result.status, 'draft');
+	const tracks = seen.filter((s) => s.url.endsWith('/tracks/internal')).map((s) => (JSON.parse(String(s.body)) as { releases: { status: string }[] }).releases[0].status);
+	assert.deepEqual(tracks, ['completed', 'draft']);
+	assert.ok(lines.some((line) => line.includes('draft app')));
+});
+
+test('any other refusal deletes the edit and fails with the step, status and message, never the token', async () => {
+	const { fetch, seen } = stub((s) => (s.url === SESSION ? refusal('APK specifies a version code that has already been used.') : undefined));
+	await assert.rejects(uploadToTrack(request('completed'), fetch, quiet), (error: unknown) => {
+		assert.ok(error instanceof PlayError);
+		assert.equal(error.step, 'upload bundle');
+		assert.equal(error.status, 400);
+		assert.match(error.message, /already been used/);
+		assert.doesNotMatch(error.message, new RegExp(TOKEN));
+		return true;
+	});
+	assert.equal(seen.at(-1)?.method, 'DELETE');
+	assert.equal(seen.at(-1)?.url, `${BASE}/edits/edit-1`);
+});
+
+test('a 403 on insert (the account not invited in Play Console) fails before any edit exists', async () => {
+	const { fetch, seen } = stub((s) => (s.url === `${BASE}/edits` ? refusal('The caller does not have permission', 403) : undefined));
+	await assert.rejects(uploadToTrack(request('draft'), fetch, quiet), (error: unknown) => error instanceof PlayError && error.status === 403 && error.step === 'insert edit');
+	assert.equal(seen.length, 1);
+});
+
+test('a draft refusal on a draft request is not retried', async () => {
+	const { fetch, seen } = stub((s) => (s.url.endsWith(':commit') ? refusal('Only releases with status draft may be created on draft app.') : undefined));
+	await assert.rejects(uploadToTrack(request('draft'), fetch, quiet), PlayError);
+	assert.equal(seen.filter((s) => s.url.endsWith('/tracks/internal')).length, 1);
+});
