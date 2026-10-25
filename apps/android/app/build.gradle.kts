@@ -76,6 +76,7 @@ dependencies {
     implementation(project(":feature:shell"))
     implementation(project(":feature:start"))
     implementation(project(":feature:waivers"))
+    implementation(project(":feature:player"))
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
