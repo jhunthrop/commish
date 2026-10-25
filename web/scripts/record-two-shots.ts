@@ -192,7 +192,16 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 	has(weekly, "Our weekly rankings against ESPN and the week's published projection", where);
 	has(weekly, 'Weeks 1 to 6', where);
 	has(weekly, 'Before that the site shipped the draft board, graded under Draft record.', where);
-	has(weekly, "Each week's are set before its first kickoff and graded as set", where);
+	has(weekly, "Each week's rankings are set before its first kickoff and graded as set", where);
+	// On a phone the weeks before the weekly record are a chip a week, never a paragraph (Lane 209).
+	if (width <= PHONE_MAX) {
+		const chips = await page.locator('section#weekly tr.before .wk-chips li:visible').count();
+		if (chips !== 6) faults.push(`${where}: ${String(chips)} week chips before the weekly record`);
+		// The set rule said once on the phone too, read as drawn (review M3), not from hidden cells.
+		const seen = await page.locator('section#weekly').innerText();
+		if (!seen.includes(RECORDS_WORDS.setRulePhone))
+			faults.push(`${where}: the phone does not say the set rule`);
+	}
 	lacks(weekly, /Yahoo|weekly experts|\bADP\b|FantasyPros|froze|freeze|rest-of-season/iu, where);
 	if (width > PHONE_MAX) has(weekly, 'Set each week before kickoff', where);
 	has(draft, 'Draft record', where);

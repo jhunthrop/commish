@@ -18,6 +18,9 @@ export const ORDER = {
 	yours: 'Yours',
 	free: 'Free',
 	tradeFor: 'Trade for him',
+	/** A move's short word on a phone's row, beside its glyph (Lane 209, review M4). */
+	addShort: 'Add',
+	tradeShort: 'Trade',
 	/** A free agent on a list with no return week, whom Waivers neither lists nor stashes: his verb
 	 * cell says why he has none (Lane 128), after the list's word ("On IR"). */
 	noReturn: 'no return date',

@@ -11,6 +11,7 @@ import type { BasisPart } from './board-basis.ts';
 import { RECORD_WORDS, publishedWords, recordSources, weekLines } from './record.ts';
 import {
 	RECORDS_WORDS,
+	beforeChips,
 	beforeLine,
 	draftBasis,
 	draftRows,
@@ -158,10 +159,18 @@ void test('the weekly record reads as a record with ESPN beside ours and no ADP 
 void test('weeks 1 to 6 are one line that says the set rule once (C14)', () => {
 	assert.deepEqual(beforeLine(7), {
 		lead: 'Weeks 1 to 6',
-		text: "Weekly rankings start week 7. Each week's are set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record."
+		text: "Weekly rankings start week 7. Each week's rankings are set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record."
 	});
 	assert.equal(beforeLine(1), null);
 	assert.equal(beforeLine(2)?.lead, 'Week 1');
+});
+
+void test('on a phone the weeks before the weekly record are a chip a week, not a paragraph (Lane 209)', () => {
+	assert.deepEqual(beforeChips(7), ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4', 'Wk 5', 'Wk 6']);
+	assert.deepEqual(beforeChips(1), []);
+	assert.equal(RECORDS_WORDS.beforePhone, 'Graded under Draft record');
+	assert.ok(RECORDS_WORDS.before(7).includes('graded as set, never as refreshed after'));
+	assert.ok(RECORDS_WORDS.setRulePhone.includes('graded as set, never as refreshed after'));
 });
 
 void test("the weekly record draws ESPN's columns from its first week, the published projection's once graded (C15)", () => {
