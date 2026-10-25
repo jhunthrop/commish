@@ -4,7 +4,8 @@
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 import { gameHead, KICKOFF, linesRead, type GameRead } from './kickoff.ts';
 import { NONE_UNLISTED, type UnlistedDrawn } from './basis.ts';
-import type { MatchupSide } from '../api.ts';
+import type { LeagueHost, MatchupSide } from '../api.ts';
+import { hostWords } from '../names.ts';
 import type { GameState, MatchupBox, MatchupBoxSide, PlayerLine } from '../inseason/api.ts';
 import {
 	BOX,
@@ -21,6 +22,29 @@ import {
 	type BoxStarter,
 	type BoxTotals
 } from './box.ts';
+
+/** Every word the Matchup prints beside its box scores (Lane 183: in a table, so the apps print the
+ * web's words). */
+export const MATCHUP = {
+	/** Between the two teams' names in the screen's title. */
+	vs: 'vs',
+	/** After the platform's name in the opponent's box where the platform shows us the member's
+	 * lineup alone (FFPC is read as one member, so the API keeps only the viewer's own starters). */
+	yoursOnly: 'shows us your lineup only.',
+	/** An all-play week's note, around the platform's name. */
+	allPlayOn: 'An all-play week on',
+	allPlaySet: "your score is set against every other team's."
+} as const;
+
+/** "FFPC shows us your lineup only.", in the opponent's box in place of his starters. */
+export function yoursOnlyWords(host: LeagueHost): string {
+	return `${hostWords(host)} ${MATCHUP.yoursOnly}`;
+}
+
+/** "An all-play week on Sleeper: your score is set against every other team's." */
+export function allPlayWords(host: LeagueHost): string {
+	return `${MATCHUP.allPlayOn} ${hostWords(host)}: ${MATCHUP.allPlaySet}`;
+}
 
 /** A side's rows and totals as its box draws them. */
 export interface SideBox {

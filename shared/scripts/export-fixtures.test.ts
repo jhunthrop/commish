@@ -32,7 +32,7 @@ void test('an instant names a file with no colons', () => {
 	assert.throws(() => clockPart('Saturday'), /Saturday/);
 });
 
-void test('the plan reads the league once, its scoreboard and lineup at every clock', () => {
+void test('the plan reads the league once, its scoreboard, lineup, matchup and league read at every clock', () => {
 	const files = fixturePlan({ leagueId: LEAGUE, clocks: CLOCKS }).flatMap((step) => step.files);
 	const names = files.map((f) => f.file);
 	assert.ok(names.includes(`leagues-attached-${LEAGUE}.json`));
@@ -40,6 +40,8 @@ void test('the plan reads the league once, its scoreboard and lineup at every cl
 	for (const clock of Object.values(CLOCKS)) {
 		assert.ok(names.includes(`scoreboard-${LEAGUE}-${clockPart(clock)}.json`), clock);
 		assert.ok(names.includes(`lineup-${LEAGUE}-${clockPart(clock)}.json`), clock);
+		assert.ok(names.includes(`matchup-${LEAGUE}-${clockPart(clock)}.json`), clock);
+		assert.ok(names.includes(`sync-${LEAGUE}-${clockPart(clock)}.json`), clock);
 	}
 	assert.equal(new Set(names).size, names.length, 'every file once');
 });

@@ -7,7 +7,9 @@
 	import { NONE_UNLISTED } from './box/basis.ts';
 	import { KICKOFF } from './box/kickoff.ts';
 	import {
+		allPlayWords,
 		decidedHead,
+		MATCHUP,
 		matchupFinal,
 		matchupNoFinal,
 		matchupStarted,
@@ -16,12 +18,13 @@
 		sideBox,
 		standingLine,
 		unlistedStates,
+		yoursOnlyWords,
 		type SideBox
 	} from './box/matchup.ts';
 	import { readCell } from './home/home.ts';
 	import type { LeagueHost, LeagueSync, MatchupSide } from './api.ts';
 	import type { MatchupBox } from './inseason/api.ts';
-	import { hostWords, matchupGap, scoreGap, scoreUnread, teamName } from './model.ts';
+	import { matchupGap, scoreGap, scoreUnread, teamName } from './model.ts';
 	import { page } from '$app/state';
 	import { askedHref } from './box/asked.ts';
 	import type { BoxRow } from './box/box.ts';
@@ -146,7 +149,7 @@
 	});
 
 	/** FFPC is read as one member, so the API keeps only the viewer's own starters. */
-	const hidden = $derived(`${hostWords(sync.host)} shows us your lineup only.`);
+	const hidden = $derived(yoursOnlyWords(sync.host));
 </script>
 
 {#if matchup && mine}
@@ -154,7 +157,7 @@
 		<h2 class="title">
 			<span class="wk">Week {matchup.week}</span>
 			{teamName(sync, matchup.mine.roster_id)}{#if matchup.opponent}
-				<i>vs</i>{teamName(sync, matchup.opponent.roster_id)}{/if}
+				<i>{MATCHUP.vs}</i>{teamName(sync, matchup.opponent.roster_id)}{/if}
 		</h2>
 		<MatchupBug
 			week={matchup.week}
@@ -182,9 +185,7 @@
 			standing={standingLine(box, started)}
 		/>
 		{#if sync.week_all_play}
-			<p class="note">
-				An all-play week on {hostWords(sync.host)}: your score is set against every other team's.
-			</p>
+			<p class="note">{allPlayWords(sync.host)}</p>
 		{/if}
 		{#if scoreUnread(matchup.mine)}<p class="note">{scoreGap(sync, now)}</p>{/if}
 		<div class="boxes">
