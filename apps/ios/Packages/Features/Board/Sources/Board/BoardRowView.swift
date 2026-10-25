@@ -100,7 +100,7 @@ struct BoardRowView: View {
     private var line: some View {
         let theme = Theme(colorScheme)
         return HStack(alignment: .center, spacing: 6) {
-            Avatar(row.initials, side: BoardColumn.face)
+            Headshot(row.headshot, initials: row.initials, side: BoardColumn.face)
             who(theme).frame(maxWidth: .infinity, alignment: .leading)
             figures(theme)
         }
@@ -144,6 +144,15 @@ struct BoardRowView: View {
                 .foregroundStyle(theme.color(row.projected == Words.Box.none ? Tokens.Color.ink3 : Tokens.Color.ink))
                 .frame(width: BoardColumn.projected, alignment: .trailing)
             figure(row.overReplacement, width: BoardColumn.overReplacement, ink: Tokens.Color.ink2, theme: theme)
+                .background(alignment: .trailing) {
+                    // Below replacement, the rose tile (ui/heat.ts heat-neg).
+                    if row.belowReplacement {
+                        RoundedRectangle(cornerRadius: Tokens.Radius.sm)
+                            .fill(theme.color(Tokens.Color.heatNeg))
+                            .frame(height: 26)
+                            .padding(.leading, -6)
+                    }
+                }
             if gap {
                 figure(row.gap, width: BoardColumn.gap, ink: gapInk, theme: theme)
             }

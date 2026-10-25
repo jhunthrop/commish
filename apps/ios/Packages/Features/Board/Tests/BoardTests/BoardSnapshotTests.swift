@@ -11,8 +11,10 @@ import Testing
 /// model at the fixture's Saturday clock, both themes, iPhone 17 Pro and iPhone SE, at 1x. The phone's
 /// first screen with the verb pinned: the PPR board at the top, a position view (WR), a kicker's view
 /// in the drafts' order, the board in season as Rest of season with its verb to follow a league, and a
-/// saved read with no signal, dated; and mid-list, a position's last available players and the
-/// season-long run under its head. With SNAPSHOT_SHOTS set each is also written at its phone's own
+/// saved read with no signal, dated; mid-list, a position's last available players and the season-long
+/// run under its head; and the foot, the last rows with the basis under them, the All view's and a
+/// kicker's. A face draws its initials here (a snapshot loads no image). With SNAPSHOT_SHOTS set each is also written
+/// at its phone's own
 /// scale for the persona panel.
 @MainActor
 struct BoardSnapshotTests {
@@ -30,11 +32,15 @@ struct BoardSnapshotTests {
         case rest
         case stale
         case held
+        /// The foot: the All view's last rows and the basis under them.
+        case foot
+        /// A kicker's view's foot with its own basis.
+        case kickerFoot = "kicker-foot"
 
         var position: BoardPosition? {
             switch self {
             case .position: .receiver
-            case .kicker: .kicker
+            case .kicker, .kickerFoot: .kicker
             case .held: .runningBack
             default: nil
             }
@@ -125,6 +131,12 @@ struct BoardMock: View {
         if scene == .held {
             BoardTableView(columns: model.columns, sections: aroundHead, open: { _ in }, live: false)
                 .padding(.vertical, Tokens.Space.s4)
+        } else if scene == .foot || scene == .kickerFoot {
+            VStack(alignment: .leading, spacing: Tokens.Space.s4) {
+                BoardTableView(columns: model.columns, sections: lastRows, open: { _ in }, live: false)
+                BoardBasisView(lines: model.basis)
+            }
+            .padding(.vertical, Tokens.Space.s4)
         } else {
             VStack(spacing: 0) {
                 BoardScreen(model: model, stamp: stamp, actions: .none, sections: firstScreen, live: false)
@@ -146,6 +158,11 @@ struct BoardMock: View {
 
     private var firstScreen: [BoardSection] {
         model.sections.prefix(1).map { $0.with(rows: Array($0.rows.prefix(Self.firstRows))) }
+    }
+
+    /// The last rows of the view, above its basis.
+    private var lastRows: [BoardSection] {
+        model.sections.suffix(1).map { $0.with(rows: Array($0.rows.suffix(Self.aroundHead))) }
     }
 
     private var aroundHead: [BoardSection] {
