@@ -38,7 +38,7 @@ import { railItemLabel } from '../../web/src/lib/run/week-names.ts';
 import type { Scoreboard } from '../../web/src/lib/league/inseason/api.ts';
 import {
 	GAME_STATE_OUTPUT,
-	lineupRows,
+	lineRows,
 	renderGameState,
 	scoreboardRows,
 	type GameStateRow
@@ -212,7 +212,7 @@ async function gameStateRows(boards: ReadonlyMap<string, Scoreboard>): Promise<G
 	const rows: GameStateRow[] = [];
 	for (const clock of CLOCKS) {
 		const lineup = sourceOf('lineup', clock);
-		rows.push(...lineupRows(lineup, await answer<unknown>(`lineup-${LEAGUE}-${clock}.json`)));
+		rows.push(...lineRows(lineup, await answer<unknown>(`lineup-${LEAGUE}-${clock}.json`)));
 		const board = boards.get(clock);
 		if (board !== undefined) rows.push(...scoreboardRows(sourceOf('scoreboard', clock), board));
 	}

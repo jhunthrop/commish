@@ -82,7 +82,11 @@
 					"projection_delta": -0.1,
 					"opp_rank": 2,
 					"season_avg": 23.3,
-					"last_points": 19
+					"last_points": 19,
+					"game_state": {
+						"state": "not_started",
+						"word": "Next kickoff"
+					}
 				},
 				"host": {
 					"player": {
@@ -155,7 +159,11 @@
 					"projection_delta": 0,
 					"opp_rank": 11,
 					"season_avg": 25.6,
-					"last_points": 25
+					"last_points": 25,
+					"game_state": {
+						"state": "kicked_off",
+						"word": "Kicked off"
+					}
 				},
 				"changed": true,
 				"no_one_can_play": false,
@@ -228,7 +236,11 @@
 					"projection_delta": -0.4,
 					"opp_rank": 6,
 					"season_avg": 10.2,
-					"last_points": 2.2
+					"last_points": 2.2,
+					"game_state": {
+						"state": "not_started",
+						"word": "Next kickoff"
+					}
 				},
 				"host": {
 					"player": {
@@ -295,7 +307,11 @@
 					"projection_delta": -0.4,
 					"opp_rank": 6,
 					"season_avg": 10.2,
-					"last_points": 2.2
+					"last_points": 2.2,
+					"game_state": {
+						"state": "not_started",
+						"word": "Next kickoff"
+					}
 				},
 				"changed": false,
 				"no_one_can_play": false,
@@ -374,7 +390,11 @@
 					"projection_delta": 0,
 					"opp_rank": 18,
 					"season_avg": 6.5,
-					"last_points": 5.8
+					"last_points": 5.8,
+					"game_state": {
+						"state": "kicked_off",
+						"word": "Kicked off"
+					}
 				},
 				"host": {
 					"player": {
@@ -447,7 +467,11 @@
 					"projection_delta": 0,
 					"opp_rank": 18,
 					"season_avg": 6.5,
-					"last_points": 5.8
+					"last_points": 5.8,
+					"game_state": {
+						"state": "kicked_off",
+						"word": "Kicked off"
+					}
 				},
 				"changed": false,
 				"no_one_can_play": false,
@@ -520,7 +544,11 @@
 					"projection_delta": 0.3,
 					"opp_rank": 31,
 					"season_avg": 10.5,
-					"last_points": 5.7
+					"last_points": 5.7,
+					"game_state": {
+						"state": "final",
+						"word": "Final"
+					}
 				},
 				"host": {
 					"player": {
@@ -587,7 +615,11 @@
 					"projection_delta": 0.3,
 					"opp_rank": 31,
 					"season_avg": 10.5,
-					"last_points": 5.7
+					"last_points": 5.7,
+					"game_state": {
+						"state": "final",
+						"word": "Final"
+					}
 				},
 				"changed": false,
 				"no_one_can_play": false,
@@ -669,7 +701,11 @@
 					"projection_delta": -0.1,
 					"opp_rank": 12,
 					"season_avg": 9.3,
-					"last_points": 5
+					"last_points": 5,
+					"game_state": {
+						"state": "kicked_off",
+						"word": "Kicked off"
+					}
 				},
 				"host": {
 					"player": {
@@ -745,7 +781,11 @@
 					"projection_delta": -0.1,
 					"opp_rank": 12,
 					"season_avg": 9.3,
-					"last_points": 5
+					"last_points": 5,
+					"game_state": {
+						"state": "kicked_off",
+						"word": "Kicked off"
+					}
 				},
 				"changed": false,
 				"no_one_can_play": false,
@@ -824,7 +864,11 @@
 					"projection_delta": 0,
 					"opp_rank": 25,
 					"season_avg": 4.9,
-					"last_points": 6.1
+					"last_points": 6.1,
+					"game_state": {
+						"state": "not_started",
+						"word": "Next kickoff"
+					}
 				},
 				"host": {
 					"player": {
@@ -897,7 +941,11 @@
 					"projection_delta": 0,
 					"opp_rank": 25,
 					"season_avg": 4.9,
-					"last_points": 6.1
+					"last_points": 6.1,
+					"game_state": {
+						"state": "not_started",
+						"word": "Next kickoff"
+					}
 				},
 				"changed": false,
 				"no_one_can_play": false,
@@ -954,7 +1002,11 @@
 					"projection_delta": null,
 					"opp_rank": null,
 					"season_avg": 16.5,
-					"last_points": 19.8
+					"last_points": 19.8,
+					"game_state": {
+						"state": "bye",
+						"word": "Bye"
+					}
 				},
 				"host": {
 					"player": {
@@ -1005,7 +1057,11 @@
 					"projection_delta": null,
 					"opp_rank": null,
 					"season_avg": 16.5,
-					"last_points": 19.8
+					"last_points": 19.8,
+					"game_state": {
+						"state": "bye",
+						"word": "Bye"
+					}
 				},
 				"changed": false,
 				"no_one_can_play": true,
@@ -1084,7 +1140,11 @@
 					"projection_delta": -0.2,
 					"opp_rank": 22,
 					"season_avg": 5.7,
-					"last_points": 0
+					"last_points": 0,
+					"game_state": {
+						"state": "not_started",
+						"word": "Next kickoff"
+					}
 				},
 				"host": {
 					"player": {
@@ -1157,7 +1217,11 @@
 					"projection_delta": -0.2,
 					"opp_rank": 22,
 					"season_avg": 5.7,
-					"last_points": 0
+					"last_points": 0,
+					"game_state": {
+						"state": "not_started",
+						"word": "Next kickoff"
+					}
 				},
 				"changed": false,
 				"no_one_can_play": false,
@@ -1240,7 +1304,11 @@
 					"projection_delta": 0.2,
 					"opp_rank": 26,
 					"season_avg": 9.6,
-					"last_points": 9
+					"last_points": 9,
+					"game_state": {
+						"state": "kicked_off",
+						"word": "Kicked off"
+					}
 				},
 				"host": {
 					"player": {
@@ -1291,7 +1359,11 @@
 					"projection_delta": null,
 					"opp_rank": null,
 					"season_avg": 16.7,
-					"last_points": 19.7
+					"last_points": 19.7,
+					"game_state": {
+						"state": "bye",
+						"word": "Bye"
+					}
 				},
 				"changed": true,
 				"no_one_can_play": false,
@@ -1346,7 +1418,11 @@
 					"projection_delta": -0.3,
 					"opp_rank": null,
 					"season_avg": null,
-					"last_points": null
+					"last_points": null,
+					"game_state": {
+						"state": "final",
+						"word": "Final"
+					}
 				},
 				"host": {
 					"player": {
@@ -1384,7 +1460,11 @@
 					"projection_delta": null,
 					"opp_rank": null,
 					"season_avg": null,
-					"last_points": null
+					"last_points": null,
+					"game_state": {
+						"state": "bye",
+						"word": "Bye"
+					}
 				},
 				"changed": true,
 				"no_one_can_play": false,
@@ -1463,7 +1543,11 @@
 				"projection_delta": 0,
 				"opp_rank": 11,
 				"season_avg": 25.6,
-				"last_points": 25
+				"last_points": 25,
+				"game_state": {
+					"state": "kicked_off",
+					"word": "Kicked off"
+				}
 			},
 			{
 				"player": {
@@ -1536,7 +1620,11 @@
 				"projection_delta": -0.4,
 				"opp_rank": 1,
 				"season_avg": 4.1,
-				"last_points": 9
+				"last_points": 9,
+				"game_state": {
+					"state": "kicked_off",
+					"word": "Kicked off"
+				}
 			},
 			{
 				"player": {
@@ -1590,7 +1678,11 @@
 				"projection_delta": null,
 				"opp_rank": 24,
 				"season_avg": null,
-				"last_points": null
+				"last_points": null,
+				"game_state": {
+					"state": "final",
+					"word": "Final"
+				}
 			},
 			{
 				"player": {
@@ -1650,7 +1742,11 @@
 				"projection_delta": null,
 				"opp_rank": 5,
 				"season_avg": null,
-				"last_points": null
+				"last_points": null,
+				"game_state": {
+					"state": "not_started",
+					"word": "Next kickoff"
+				}
 			},
 			{
 				"player": {
@@ -1724,7 +1820,11 @@
 				"projection_delta": -0.1,
 				"opp_rank": 3,
 				"season_avg": 15.2,
-				"last_points": 0.8
+				"last_points": 0.8,
+				"game_state": {
+					"state": "kicked_off",
+					"word": "Kicked off"
+				}
 			},
 			{
 				"player": {
@@ -1800,7 +1900,11 @@
 				"projection_delta": -0.1,
 				"opp_rank": 15,
 				"season_avg": 5.4,
-				"last_points": 10
+				"last_points": 10,
+				"game_state": {
+					"state": "not_started",
+					"word": "Next kickoff"
+				}
 			},
 			{
 				"player": {
@@ -1851,7 +1955,11 @@
 				"projection_delta": null,
 				"opp_rank": null,
 				"season_avg": 16.7,
-				"last_points": 19.7
+				"last_points": 19.7,
+				"game_state": {
+					"state": "bye",
+					"word": "Bye"
+				}
 			},
 			{
 				"player": {
@@ -1902,7 +2010,11 @@
 				"projection_delta": null,
 				"opp_rank": null,
 				"season_avg": 11.1,
-				"last_points": 9.1
+				"last_points": 9.1,
+				"game_state": {
+					"state": "bye",
+					"word": "Bye"
+				}
 			},
 			{
 				"player": {
@@ -1940,7 +2052,11 @@
 				"projection_delta": null,
 				"opp_rank": null,
 				"season_avg": null,
-				"last_points": null
+				"last_points": null,
+				"game_state": {
+					"state": "bye",
+					"word": "Bye"
+				}
 			}
 		],
 		"host_lineup_url": "https://sleeper.com/leagues/1382163311038038016/team",
@@ -2037,7 +2153,11 @@
 				"projection_delta": -0.1,
 				"opp_rank": 7,
 				"season_avg": 5.6,
-				"last_points": 5.5
+				"last_points": 5.5,
+				"game_state": {
+					"state": "kicked_off",
+					"word": "Kicked off"
+				}
 			}
 		],
 		"projection_previous_read_at": "2026-10-16T02:00:00.000Z",

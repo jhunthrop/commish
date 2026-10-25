@@ -41,7 +41,11 @@
 						"projected_final_paced": true,
 						"schedule_state": "kicked_off"
 					}
-				]
+				],
+				"game_state": {
+					"state": "kicked_off",
+					"word": "Kicked off"
+				}
 			},
 			{
 				"state": "playing",
@@ -72,7 +76,11 @@
 						"in_play": 0,
 						"schedule_state": "kicked_off"
 					}
-				]
+				],
+				"game_state": {
+					"state": "kicked_off",
+					"word": "Kicked off"
+				}
 			},
 			{
 				"state": "playing",
@@ -105,7 +113,11 @@
 						"in_play": 0,
 						"schedule_state": "kicked_off"
 					}
-				]
+				],
+				"game_state": {
+					"state": "kicked_off",
+					"word": "Kicked off"
+				}
 			},
 			{
 				"state": "playing",
@@ -136,7 +148,11 @@
 						"in_play": 0,
 						"schedule_state": "kicked_off"
 					}
-				]
+				],
+				"game_state": {
+					"state": "kicked_off",
+					"word": "Kicked off"
+				}
 			},
 			{
 				"state": "playing",
@@ -173,7 +189,11 @@
 						"projected_final_paced": true,
 						"schedule_state": "kicked_off"
 					}
-				]
+				],
+				"game_state": {
+					"state": "kicked_off",
+					"word": "Kicked off"
+				}
 			},
 			{
 				"state": "playing",
@@ -208,7 +228,11 @@
 						"projected_final_paced": true,
 						"schedule_state": "kicked_off"
 					}
-				]
+				],
+				"game_state": {
+					"state": "kicked_off",
+					"word": "Kicked off"
+				}
 			}
 		]
 	},
