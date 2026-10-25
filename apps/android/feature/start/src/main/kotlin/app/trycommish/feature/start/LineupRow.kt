@@ -5,12 +5,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,14 +19,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.res.painterResource
@@ -39,6 +36,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -76,11 +74,16 @@ internal fun LineupRow(
 ) {
     val c = CommishTheme.colors
     val open = cells.id in actions.opened
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(ground(cells))) {
-        Box(Modifier.width(EDGE).fillMaxHeight().background(edge(cells)))
+    val edge = edge(cells)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(ground(cells))
+            .drawBehind { drawRect(edge, size = Size(EDGE.toPx(), size.height)) },
+    ) {
         Column(Modifier.weight(1f)) {
             Row(
-                Modifier.padding(start = Tokens.Space.s2.dp - EDGE, end = Tokens.Space.s2.dp, top = 6.dp, bottom = 6.dp),
+                Modifier.padding(start = Tokens.Space.s2.dp, end = Tokens.Space.s2.dp, top = 6.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SlotCell(cells, bench)
@@ -217,19 +220,23 @@ private fun NameLine(
 ) {
     val row = cells.row
     val player = cells.sheetPlayer
-    var fits by remember(row.name) { mutableStateOf(true) }
-    Text(
-        if (fits) row.name else row.fit,
-        style = Faces.body.copy(fontWeight = FontWeight.SemiBold),
-        color = ink,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        onTextLayout = { if (fits && it.hasVisualOverflow) fits = false },
-        modifier =
-            Modifier.semantics { contentDescription = row.name }.then(
-                if (player != null) Modifier.clickableLink(row.name) { actions.open(player) } else Modifier,
-            ),
-    )
+    val style = Faces.body.copy(fontWeight = FontWeight.SemiBold)
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints {
+        val whole = measurer.measure(row.name, style, maxLines = 1, softWrap = false).size.width
+        val fits = whole <= constraints.maxWidth
+        Text(
+            if (fits) row.name else row.fit,
+            style = style,
+            color = ink,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier =
+                Modifier.semantics { contentDescription = row.name }.then(
+                    if (player != null) Modifier.clickableLink(row.name) { actions.open(player) } else Modifier,
+                ),
+        )
+    }
 }
 
 @Composable
