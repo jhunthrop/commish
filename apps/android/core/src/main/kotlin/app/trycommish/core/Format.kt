@@ -14,6 +14,7 @@ import kotlin.math.floor
 object Format {
     private val weekdayTime = DateTimeFormatter.ofPattern("EEE h:mm a", Locale.US)
     private val timeOfDay = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
+    private val weekdayName = DateTimeFormatter.ofPattern("EEEE", Locale.US)
     private val shortDay = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 
     /** "39.1": `value.toFixed(decimals)` as JavaScript gives it, the exact binary value rounded with a
@@ -61,6 +62,12 @@ object Format {
         instant: Instant,
         zone: ZoneId,
     ): String = lowerPeriod(weekdayTime.format(instant.atZone(zone)))
+
+    /** "Thursday": an instant's day on the member's clock, as the web's weekdayName writes it. */
+    fun weekdayName(
+        instant: Instant,
+        zone: ZoneId,
+    ): String = weekdayName.format(instant.atZone(zone))
 
     /** "7:00 pm": a time of day on the member's clock (clock.ts timeOfDay). */
     fun timeOfDay(
