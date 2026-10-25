@@ -65,6 +65,32 @@ struct OtherGameViewModelTests {
         #expect(viewModel.state == .failed(AppWords.Failure.offline))
     }
 
+    /// Back and forward the other way (review 206 M1): roster 2's saved week never shows under the
+    /// member's game or another team's, and going back to roster 2 brings its own save.
+    @Test func aGamesSaveComesBackOnlyUnderItsOwnRoster() async throws {
+        let cache = FileCache(folder: folder)
+        let offline = try MatchupStub(answer: Fixtures.otherGame(Self.sunday))
+        await offline.fail(URLError(.notConnectedToInternet))
+        let online = try MatchupStub(answer: Fixtures.otherGame(Self.sunday))
+        await model(online, cache: cache).load(leagueID: Fixtures.league)
+
+        let member = model(offline, roster: nil, cache: cache)
+        await member.load(leagueID: Fixtures.league)
+        #expect(member.state == .failed(AppWords.Failure.offline))
+
+        let sixth = model(offline, roster: 6, cache: cache)
+        await sixth.load(leagueID: Fixtures.league)
+        #expect(sixth.state == .failed(AppWords.Failure.offline))
+
+        let back = model(offline, cache: cache)
+        await back.load(leagueID: Fixtures.league)
+        let shown = try MatchupViewModelTests.week(back)
+        #expect(shown.stale)
+        #expect(shown.week.whose != nil)
+        #expect(shown.week.mine == "Carried by QJs")
+        #expect(shown.week.opponent == "Bower Rangers")
+    }
+
     private func model(
         _ api: any MatchupAPI, roster: Int? = 2, cache: (any AnswerCache)? = nil
     ) -> MatchupViewModel {
