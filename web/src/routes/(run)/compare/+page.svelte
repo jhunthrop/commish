@@ -24,13 +24,17 @@
 	import RangeBar from '#lib/ui/RangeBar.svelte';
 	import StatusPill from '#lib/ui/StatusPill.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
+	import { COMPARE_PAGE, filled } from '#lib/site/reference-words.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
 	const SLOTS = ['a', 'b'] as const;
 	type Slot = (typeof SLOTS)[number];
-	const SLOT_LABELS: Record<Slot, string> = { a: 'First player', b: 'Second player' };
+	const SLOT_LABELS: Record<Slot, string> = {
+		a: COMPARE_PAGE.firstPlayer,
+		b: COMPARE_PAGE.secondPlayer
+	};
 
 	let players = $state<SearchablePlayer[]>([]);
 	let chosen = $state<Record<Slot, PlayerData | null>>({ a: null, b: null });
@@ -142,17 +146,17 @@
 		{@const leader = verdict.leader.side.player}
 		<b class="call-words">{verdict.call}</b>
 		{#if lazySheet.has(leader.id)}
-			<Quiet href={links.sheet()} size="sm">{verdict.leaderName} is on your sheet</Quiet>
+			<Quiet href={links.sheet()} size="sm">{filled(COMPARE_PAGE.onSheet, verdict.leaderName)}</Quiet>
 		{:else}
-			<Verb onclick={() => lazySheet.add(leader)}>Add him to your sheet</Verb>
+			<Verb onclick={() => lazySheet.add(leader)}>{COMPARE_PAGE.addToSheet}</Verb>
 		{/if}
 	{/if}
 {/snippet}
 
-<SiteShell title="Compare" head={data.head} run={data.run}>
+<SiteShell title={COMPARE_PAGE.title} head={data.head} run={data.run}>
 	<main class="compare">
 		<PageHead
-			title="Compare"
+			title={COMPARE_PAGE.title}
 			lead={failed ? COMPARE_FAILED : (firstStep(both.length) ?? undefined)}
 		/>
 		<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
@@ -164,15 +168,15 @@
 					<div class="picked">
 						<Face src={side.player.headshot} name={side.player.name} size={32} loading="eager" />
 						<b>{side.player.name}</b>
-						<Quiet size="sm" onclick={() => clear(slot)}>Pick someone else</Quiet>
+						<Quiet size="sm" onclick={() => clear(slot)}>{COMPARE_PAGE.pickAnother}</Quiet>
 					</div>
 				{:else}
 					<div class="picker">
 						{#if missing[slot] !== null}
 							<EmptyState
 								level={3}
-								title="We couldn't find that player"
-								line="Nobody here goes by that name."
+								title={COMPARE_PAGE.missingTitle}
+								line={COMPARE_PAGE.missingLine}
 							/>
 						{/if}
 						<PlayerPicker
@@ -186,7 +190,7 @@
 		</div>
 
 		{#if verdict?.kind === 'same'}
-			<EmptyState level={2} title="Pick two different players" line={SAME_PLAYER} />
+			<EmptyState level={2} title={COMPARE_PAGE.sameTitle} line={SAME_PLAYER} />
 		{:else if verdict?.kind === 'call' && pair}
 			<div class="call-band">{@render theCall()}</div>
 			<table class="cmp">

@@ -4,6 +4,7 @@
  * never drift. A column with no width in a band is hidden there: the table's style picks the band's
  * grid (BoardTable sets it once per table), and each cell carries the classes that hide it. */
 import { FIGURE } from '#lib/format/figure-words.ts';
+import { ADP_PAGE, CLUB_PAGE } from '#lib/site/reference-words.ts';
 import { BOARD } from './board-words.ts';
 
 /** Every column a board row can carry, in the order a row prints them. */
@@ -40,7 +41,7 @@ export interface ColumnHead {
 /** Each column's head, said once over the rows (RowHead), each figure's unit never in the rows (Lane
  * 66n). The figures' heads are the site's one word for each (format/figure-words.ts). */
 export const COLUMN_HEADS: Readonly<Record<ColumnKey, ColumnHead>> = {
-	rank: { text: 'Rk', title: 'Our rank' },
+	rank: { text: ADP_PAGE.rank, title: CLUB_PAGE.ourRank },
 	adpLead: { text: BOARD.adp },
 	face: { text: '' },
 	player: { text: 'Player' },
@@ -52,7 +53,7 @@ export const COLUMN_HEADS: Readonly<Record<ColumnKey, ColumnHead>> = {
 	order: { text: BOARD.draftOrder },
 	range: { text: 'Floor to ceiling' },
 	adp: { text: BOARD.adp },
-	ourRank: { text: 'Rk', title: 'Our rank' },
+	ourRank: { text: ADP_PAGE.rank, title: CLUB_PAGE.ourRank },
 	gap: { text: BOARD.gap, title: "Gap, drafters' ADP less our rank" },
 	gp: { text: 'GP', title: 'Games played' },
 	avg: { text: FIGURE.avg, title: 'Points a game this season' },

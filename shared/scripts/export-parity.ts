@@ -59,6 +59,7 @@ import type { HostMoveResult, WaiverAdvice } from '../../web/src/lib/league/inse
 import { BOARD_OUTPUT, renderBoard } from './board-parity.ts';
 import { BOARD_RUN_OUTPUT, renderBoardRun } from './board-run-parity.ts';
 import { PLAYER_SHEET_OUTPUT, renderPlayerSheet } from './player-sheet-parity.ts';
+import { REFERENCE_OUTPUT, renderReference } from './reference-parity.ts';
 import {
 	builderAt,
 	checkAt,
@@ -622,7 +623,16 @@ export async function generate(): Promise<Outputs> {
 				)
 			)
 		],
-		[TRADES_OUTPUT, await renderTrades(sync.host)]
+		[TRADES_OUTPUT, await renderTrades(sync.host)],
+		[
+			REFERENCE_OUTPUT,
+			await renderReference(
+				generatedBy(
+					SCRIPT,
+					'web/src/lib/server/pages/adp.ts, routes/(run)/compare and web/src/lib/run/schedule-view.ts (the clubs, a club and the strength of schedule) over the two fixture runs'
+				)
+			)
+		]
 	]);
 }
 

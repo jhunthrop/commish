@@ -1,0 +1,12 @@
+{
+	"title": "Compare",
+	"firstPlayer": "First player",
+	"secondPlayer": "Second player",
+	"pickAnother": "Pick someone else",
+	"missingTitle": "We couldn't find that player",
+	"missingLine": "Nobody here goes by that name.",
+	"sameTitle": "Pick two different players",
+	"addToSheet": "Add him to your sheet",
+	"onSheet": "{name} is on your sheet",
+	"functions": []
+}

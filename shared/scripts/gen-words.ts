@@ -39,6 +39,8 @@ const LINEUP_MODULE = 'web/src/lib/league/box/lineup.ts';
 const DESIGNATION_MODULE = 'web/src/lib/format/designation.ts';
 const WAIVERS_MODULE = 'web/src/lib/league/box/waivers.ts';
 const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
+const REFERENCE_MODULE = 'web/src/lib/site/reference-words.ts';
+const STRENGTH_MODULE = 'web/src/lib/run/strength-words.ts';
 
 /** Every table the apps print from, the League home's first, then the box score's: its heads, the
  * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
@@ -52,7 +54,9 @@ const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
  * figures' heads and the strip's mark; then the Trades' (Lane 189): the trade table's words, the
  * picker's first choice and the close call's chip, and the builder's lines; then the player sheet's
  * and page's (Lane 192): a held page's words, the week tile's, the page's facts, the read's figures'
- * labels and the words in place of a read not ready. */
+ * labels and the words in place of a read not ready; then the reference screens' (Lane 199): ADP's,
+ * Compare's with its failure and its same-player sentence, the clubs' and a club's, the schedule grid's,
+ * and schedule strength's heads. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -342,6 +346,54 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/run/unwritten-words.ts',
 		picks: [['read', 'UNWRITTEN_READ']],
 		json: 'shared/words/player-unwritten.json'
+	},
+	{
+		name: 'AdpPage',
+		module: REFERENCE_MODULE,
+		picks: ['ADP_PAGE'],
+		json: 'shared/words/reference-adp.json'
+	},
+	{
+		name: 'ComparePage',
+		module: REFERENCE_MODULE,
+		picks: ['COMPARE_PAGE'],
+		json: 'shared/words/reference-compare.json'
+	},
+	{
+		name: 'Compare',
+		module: 'web/src/lib/site/compare-words.ts',
+		picks: [['failed', 'COMPARE_FAILED']],
+		json: 'shared/words/compare.json'
+	},
+	{
+		name: 'Verdict',
+		module: 'web/src/lib/site/verdict.ts',
+		picks: [['samePlayer', 'SAME_PLAYER']],
+		json: 'shared/words/verdict.json'
+	},
+	{
+		name: 'ClubPage',
+		module: REFERENCE_MODULE,
+		picks: ['CLUB_PAGE'],
+		json: 'shared/words/reference-club.json'
+	},
+	{
+		name: 'SchedulePage',
+		module: REFERENCE_MODULE,
+		picks: ['SCHEDULE_PAGE'],
+		json: 'shared/words/reference-schedule.json'
+	},
+	{
+		name: 'Strength',
+		module: STRENGTH_MODULE,
+		picks: ['STRENGTH_HEADS'],
+		json: 'shared/words/strength.json'
+	},
+	{
+		name: 'StrengthColumn',
+		module: STRENGTH_MODULE,
+		picks: ['STRENGTH_COLUMNS'],
+		json: 'shared/words/strength-column.json'
 	}
 ];
 export const OUTPUT = {

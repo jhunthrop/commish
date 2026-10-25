@@ -1,0 +1,18 @@
+{
+	"clubs": "Clubs",
+	"byeWeek": "bye week",
+	"byeNotSet": "not set",
+	"ourRank": "Our rank",
+	"player": "player",
+	"onOurBoard": "on our board",
+	"onBoard": "On our {format} board",
+	"nobody": "Nobody from {city} is on this board",
+	"kickers": "Kickers and defense, in draft order",
+	"week": "Week",
+	"opponent": "Opponent",
+	"expectedWins": "Expected wins",
+	"home": "vs",
+	"away": "at",
+	"comparePair": "Compare two of them",
+	"functions": []
+}

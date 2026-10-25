@@ -4,6 +4,7 @@
 	import ScheduleGrid from '#lib/ui/ScheduleGrid.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
+	import { SCHEDULE_PAGE } from '#lib/site/reference-words.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -12,16 +13,16 @@
 	const lead = $derived(page.lead);
 </script>
 
-<SiteShell title="Schedule strength" head={data.head} run={data.run}>
+<SiteShell title={SCHEDULE_PAGE.title} head={data.head} run={data.run}>
 	{#snippet tail()}<Verb href={sectionHref('mock')}>Start a mock draft</Verb>{/snippet}
 	<main class="schedule">
-		<PageHead title="{page.season} schedule strength" {lead} />
+		<PageHead title="{page.season} {SCHEDULE_PAGE.heading}" {lead} />
 		<ScheduleGrid
 			rows={page.rows}
 			weeks={page.weeks}
 			caption={page.strengthLabel === null
-				? "Every club's schedule"
-				: "Every club's schedule, hardest first"}
+				? SCHEDULE_PAGE.caption
+				: SCHEDULE_PAGE.captionHardest}
 			strengthLabel={page.strengthLabel}
 			played={page.played}
 		/>

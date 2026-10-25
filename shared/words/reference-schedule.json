@@ -1,0 +1,13 @@
+{
+	"heading": "schedule strength",
+	"title": "Schedule strength",
+	"caption": "Every club's schedule",
+	"captionHardest": "Every club's schedule, hardest first",
+	"club": "Club",
+	"rank": "Rank",
+	"week": "Wk",
+	"bye": "Bye",
+	"legendHard": "{value} or more",
+	"legendPlayed": "Played",
+	"functions": []
+}
