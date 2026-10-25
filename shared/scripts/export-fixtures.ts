@@ -172,6 +172,7 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 			check: { trades: trades(clock, name).file, index }
 		}));
 	const checked = new Set([source.clocks.week, source.clocks.sunday]);
+	const orders = (clock: string, name: string): FixtureFile[] => orderFiles(clock, name);
 	const atClock = (clock: string, name: string): FixtureFile[] => [
 		scoreboard(clock, name),
 		lineup(clock, name),
@@ -248,14 +249,72 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 					about:
 						"the trades holding one player, the member's Aaron Rodgers, as the Trades holding picker reads them"
 				},
-				...claims
+				...claims,
+				...orders(week, 'Saturday noon Central, every Sunday game to come')
 			]
 		},
 		...Object.entries(rest).map(([name, clock]) => ({
 			clock,
-			files: atClock(clock, CLOCK_WORDS[name as keyof typeof rest])
+			files: [
+				...atClock(clock, CLOCK_WORDS[name as keyof typeof rest]),
+				...(name === 'sunday' ? orders(clock, CLOCK_WORDS.sunday).filter(sundayOrder) : [])
+			]
 		}))
 	];
+}
+
+/** The order's reads the Rankings screen makes with no league (Lane 194, OrderScreen.svelte on the
+ * Players page): every position and each of our order's four, each in the week's rankings with the
+ * byes last and the page's first hundred rows; a search, alone and inside a position; and the
+ * kickers' and defenses' week (WeekScreen.svelte). */
+export const ORDER_READS: readonly {
+	part: string;
+	path: string;
+	about: string;
+}[] = [
+	{ part: '', path: '', about: 'every position' },
+	...(['QB', 'RB', 'WR', 'TE'] as const).map((position) => ({
+		part: `-${position}`,
+		path: `&position=${position}`,
+		about: `the ${position}s alone`
+	})),
+	{
+		part: '-q-wa',
+		path: '&q=wa',
+		about: 'the search "wa", the matches keeping their places'
+	},
+	{
+		part: '-WR-q-wa',
+		path: '&position=WR&q=wa',
+		about: 'the search "wa" among the WRs, the matches keeping their places'
+	}
+];
+
+/** The order's limit and the byes' order, as the Rankings page asks (order/path.ts). */
+const ORDER_QUERY = 'limit=100&byes=last';
+
+/** Every order read at a clock: our order's views, then the kickers' and defenses' week. */
+function orderFiles(clock: string, name: string): FixtureFile[] {
+	const at = clockPart(clock);
+	return [
+		...ORDER_READS.map((read) => ({
+			file: `order${read.part}-${at}.json`,
+			route: `GET /order?${ORDER_QUERY}${read.path}`,
+			clock,
+			about: `our rest-of-season order with no league, ${read.about}, ${name}`
+		})),
+		...(['K', 'DEF'] as const).map((position) => ({
+			file: `order-week-${position}-${at}.json`,
+			route: `GET /order/week?position=${position}`,
+			clock,
+			about: `this week's ${position === 'K' ? 'kickers' : 'defenses'} with no league, in the published projection's order, ${name}`
+		}))
+	];
+}
+
+/** On Sunday the order with every position and the kickers' week, a game kicked off among them. */
+function sundayOrder(file: FixtureFile): boolean {
+	return file.file.startsWith('order-2') || file.file.startsWith('order-week-K-');
 }
 
 const CLOCK_WORDS: Readonly<Record<Exclude<keyof FixtureClocks, 'week'>, string>> = {
@@ -308,7 +367,10 @@ export function claimBody(file: FixtureFile, answers: ReadonlyMap<string, unknow
 	if (claim.plan === null) return claimMove(advice.week, row, null);
 	const plan = (answers.get(claim.plan) as Envelope<HostMovePlan> | undefined)?.data;
 	if (plan?.confirm == null) throw new Error(`${claim.plan} has no token to make the claim with.`);
-	return { move: claimMove(advice.week, row, plan.bid?.amount ?? null), confirm: plan.confirm };
+	return {
+		move: claimMove(advice.week, row, plan.bid?.amount ?? null),
+		confirm: plan.confirm
+	};
 }
 
 /** A check's body, as the web's builder sends a finder row (builder.ts builtFrom): the strip's trade's
@@ -420,7 +482,12 @@ ${clocks.join('\n')}
 
 async function fixtureSource(): Promise<FixtureSource> {
 	const ids = (await import(join(REPOSITORY, 'web/scripts/inseason-fixture/ids.ts'))) as {
-		FIXTURE_IDS: { league: string; espnDone: string; espnRefused: string; espnPending: string };
+		FIXTURE_IDS: {
+			league: string;
+			espnDone: string;
+			espnRefused: string;
+			espnPending: string;
+		};
 	};
 	const c = (await import(join(REPOSITORY, 'web/scripts/inseason-fixture/clock.ts'))) as Record<
 		string,
