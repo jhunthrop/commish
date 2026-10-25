@@ -39,6 +39,8 @@ packages:
     path: Packages/Features/BoxScore
   Matchup:
     path: Packages/Features/Matchup
+  Board:
+    path: Packages/Features/Board
   Waivers:
     path: Packages/Features/Waivers
 targets:
@@ -56,6 +58,7 @@ targets:
       - package: Start
       - package: BoxScore
       - package: Matchup
+      - package: Board
       - package: Waivers
     entitlements:
       path: Commish/Commish.entitlements

@@ -58,6 +58,38 @@ void test('every committed fixture parses, and every answer is a successful enve
 	}
 });
 
+void test("the board file is the API's PPR board: its basis, its capture, its players in ADP order", () => {
+	assert.ok(
+		fixturePlan({ leagueId: LEAGUE, clocks: CLOCKS })
+			.flatMap((step) => step.files)
+			.some((f) => f.file === 'boards-ppr.json' && f.route === 'GET /boards/ppr')
+	);
+	const board = answer('boards-ppr.json').data as {
+		format: string;
+		basis: string;
+		status_read?: unknown;
+		players: { adp: number | null; position_rank: number; status?: { season_long: boolean } }[];
+	};
+	assert.equal(board.format, 'ppr');
+	assert.ok(board.basis.length > 0);
+	assert.ok(board.status_read, 'the capture the statuses come from');
+	assert.ok(board.players.length > 100);
+	// A player on a season-long list follows the last available player at his position.
+	const drafted = board.players
+		.filter((p) => p.status?.season_long !== true)
+		.map((p) => p.adp)
+		.filter((adp): adp is number => adp !== null);
+	assert.deepEqual(
+		drafted,
+		[...drafted].sort((a, b) => a - b),
+		'drafters take them in this order'
+	);
+	assert.ok(
+		board.players.some((p) => p.status?.season_long === true),
+		'a player on a season-long list'
+	);
+});
+
 void test('the league file carries the league: its id, its platform and its teams', () => {
 	const league = answer(`leagues-attached-${LEAGUE}.json`).data as Record<string, unknown>;
 	assert.equal(league.id, LEAGUE);

@@ -1,6 +1,6 @@
 // Package exports writes a sheet as a file to the private R2 bucket and
-// hands the drafter a short-lived signed link to it. R2 speaks the S3
-// API, so this is the AWS SDK pointed at the account's R2 endpoint.
+// hands the drafter a short-lived signed link to it, through the one R2
+// client (internal/r2).
 package exports
 
 import (
@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/jhunthrop/commish/api/internal/config"
+	"github.com/jhunthrop/commish/api/internal/r2"
 )
 
 // R2 is one bucket, ready to write, sign and delete.
@@ -25,21 +25,10 @@ type R2 struct {
 
 // NewR2 builds the client. Nothing is dialled until the first call.
 func NewR2(cfg config.R2) (*R2, error) {
-	if !cfg.Configured() {
-		return nil, fmt.Errorf("exports: r2 is not configured")
+	api, err := r2.NewClient(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("exports: %w", err)
 	}
-	endpoint := cfg.Endpoint
-	if endpoint == "" {
-		endpoint = "https://" + cfg.AccountID + ".r2.cloudflarestorage.com"
-	}
-	api := s3.NewFromConfig(aws.Config{
-		// R2 has one region and calls it auto.
-		Region:      "auto",
-		Credentials: credentials.NewStaticCredentialsProvider(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
-	}, func(o *s3.Options) {
-		o.BaseEndpoint = aws.String(endpoint)
-		o.UsePathStyle = true
-	})
 	return &R2{api: api, presign: s3.NewPresignClient(api), bucket: cfg.Bucket}, nil
 }
 

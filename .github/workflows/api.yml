@@ -37,6 +37,10 @@ env:
   # Secret Manager references, NAME=secret:version.
   API_SECRETS: >-
     DATABASE_URL=DATABASE_URL:latest,WORKOS_CLIENT_ID=WORKOS_CLIENT_ID:latest,WORKOS_API_KEY=WORKOS_API_KEY:latest,WORKOS_COOKIE_PASSWORD=WORKOS_COOKIE_PASSWORD:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,R2_ACCESS_KEY_ID=R2_ACCESS_KEY_ID:latest,R2_SECRET_ACCESS_KEY=R2_SECRET_ACCESS_KEY:latest,SHARE_LINK_KEYS=SHARE_LINK_KEYS:latest,HOST_CREDENTIALS_KEY=HOST_CREDENTIALS_KEY:1,YAHOO_CLIENT_ID=YAHOO_CLIENT_ID:latest,YAHOO_CLIENT_SECRET=YAHOO_CLIENT_SECRET:latest
+  # The service alone adds the runs' key pair the /run routes read with (Lane 185): an account R2 token with
+  # Object Read on commish-runs only. No job reads the run.
+  RUNS_SECRETS: >-
+    R2_RUNS_ACCESS_KEY_ID=R2_RUNS_ACCESS_KEY_ID:latest,R2_RUNS_SECRET_ACCESS_KEY=R2_RUNS_SECRET_ACCESS_KEY:latest
   # The jobs add the mail key the renewal reminder sends with.
   JOB_SECRETS: >-
     RESEND_API_KEY=RESEND_API_KEY:latest
@@ -157,7 +161,7 @@ jobs:
           image: ${{ env.IMAGE }}
           env_vars: ${{ env.API_ENV_VARS }}
           env_vars_update_strategy: overwrite
-          secrets: ${{ env.API_SECRETS }}
+          secrets: ${{ env.API_SECRETS }},${{ env.RUNS_SECRETS }}
           secrets_update_strategy: overwrite
           flags: >-
             --service-account=${{ env.RUNTIME_SA }} --no-invoker-iam-check --cpu=2 --memory=1Gi

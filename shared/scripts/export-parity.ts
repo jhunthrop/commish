@@ -52,6 +52,7 @@ import type { LineupAdvice, MatchupBox } from '../../web/src/lib/league/inseason
 import { gapsOf, MATCHUP_OUTPUT, matchupAt } from './matchup-parity.ts';
 import { claimWords, WAIVERS_OUTPUT, waiversAt } from './waivers-parity.ts';
 import type { HostMoveResult, WaiverAdvice } from '../../web/src/lib/league/inseason/api.ts';
+import { BOARD_OUTPUT, renderBoard } from './board-parity.ts';
 import {
 	GAME_STATE_OUTPUT,
 	lineRows,
@@ -477,6 +478,15 @@ export async function generate(): Promise<Outputs> {
 		[GAME_STATE_OUTPUT, renderGameState(about, await gameStateRows(boards))],
 		[LINEUP_OUTPUT, await renderLineup(sync.host)],
 		[MATCHUP_OUTPUT, await renderMatchup()],
+		[
+			BOARD_OUTPUT,
+			renderBoard(
+				generatedBy(
+					SCRIPT,
+					'web/src/lib/site/season-words.ts (boardWords), web/src/lib/format/number.ts and gap.ts'
+				)
+			)
+		],
 		[WAIVERS_OUTPUT, await renderWaivers(sync.host)]
 	]);
 }

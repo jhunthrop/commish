@@ -19,4 +19,5 @@ filter:
     - planHostMove
     - makeHostMove
     - leagueMatchup
+    - roomBoard
     - leagueWaivers

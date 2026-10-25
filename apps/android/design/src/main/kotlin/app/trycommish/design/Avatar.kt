@@ -16,16 +16,18 @@ import androidx.compose.ui.unit.Dp
 private const val INITIALS_SCALE = 0.38f
 
 /** A face with no headshot: the player's initials in a circle on the second surface, so someone is on
- * every row. */
+ * every row; the member's own team in the accent (web TeamAvatar.svelte). */
 @Composable
 fun Avatar(
     letters: String,
     side: Dp,
     modifier: Modifier = Modifier,
+    mine: Boolean = false,
 ) {
     val c = CommishTheme.colors
+    val (fill, ink) = if (mine) c.accent to c.accentInk else c.surface2 to c.ink2
     val size = with(LocalDensity.current) { (side * INITIALS_SCALE).toSp() }
-    Box(modifier.size(side).background(c.surface2, CircleShape), contentAlignment = Alignment.Center) {
-        Text(letters, style = Faces.body.copy(fontSize = size, fontWeight = FontWeight.SemiBold), color = c.ink2)
+    Box(modifier.size(side).background(fill, CircleShape), contentAlignment = Alignment.Center) {
+        Text(letters, style = Faces.body.copy(fontSize = size, fontWeight = FontWeight.SemiBold), color = ink)
     }
 }

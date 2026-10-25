@@ -309,6 +309,34 @@ public enum Words {
         public static let allPlaySet = "your score is set against every other team's."
     }
 
+    public enum Board {
+        public static let all = "All"
+        public static let defense = "DST"
+        public static let heldHead = "On a season-long list, his figures assume he plays"
+        public static let overReplShort = "Over repl"
+        public static let gap = "Gap"
+        public static let draftOrder = "Draft order"
+        public static let adp = "ADP"
+        public static let bye = "Bye"
+    }
+
+    public enum BoardFormat {
+        public static let ppr = "PPR"
+        public static let half = "Half PPR"
+        public static let std = "Standard"
+    }
+
+    public enum BoardBasis {
+        public static let gap = "Gap, drafters' ADP less our rank: green when they wait, rose when they reach."
+    }
+
+    public enum PageVerb {
+        public static let follow = "Follow your league"
+        public static let open_league = "Open your league"
+        public static let mock = "Start a mock draft"
+        public static let sheet = "Build your cheat sheet"
+    }
+
     public enum Waivers {
         public static let close = "Close"
         public static let beats = "Beats"

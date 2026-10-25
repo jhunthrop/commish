@@ -1,3 +1,4 @@
+import Board
 import CommishAPI
 import CommishCore
 import CommishDesign
@@ -11,8 +12,9 @@ import Waivers
 /// The phone's five, the web's bar for the shown league's phase or, with none, the site's season
 /// (PhoneRail, held to rail-order.ts), each under the top bar: the league switch, the player search
 /// and the account's way in. Choosing a league opens its home: the League tab where the bar has one,
-/// else the home pushed on the tab in view (B149). League, Lineup, Matchup and Waivers are live; the others say
-/// their screen's name until their lane lands. Every screen presents the player sheet through the one host.
+/// else the home pushed on the tab in view (B149). League, Lineup, Matchup, Waivers and the board (the
+/// Board item, and Rest of season in season with no league) are live; the others say their screen's name
+/// until their lane lands. Every screen presents the player sheet through the one host.
 struct RootTabs: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var selection = PhoneRail.leagueKey
@@ -119,7 +121,17 @@ struct RootTabs: View {
              (PhoneRail.waiversKey, nil):
             BasisText(AppWords.LeagueList.none).padding(Tokens.Space.s5)
         default:
-            NamedScreen(tab.label)
+            if let inSeason = PhoneRail.boardInSeason(tab.key) {
+                BoardTab(
+                    environment: environment,
+                    inSeason: inSeason,
+                    following: selectedLeague != nil,
+                    expired: expired
+                )
+                .id("\(tab.key)-\(selectedLeague != nil)")
+            } else {
+                NamedScreen(tab.label)
+            }
         }
     }
 
@@ -228,6 +240,22 @@ private struct MatchupTab: View {
 
     var body: some View {
         MatchupView(viewModel: viewModel, leagueID: leagueID)
+    }
+}
+
+/// The board's tab: owns its view model, which holds the chips while the player sheet is open over it.
+private struct BoardTab: View {
+    @State private var viewModel: BoardViewModel
+
+    init(environment: AppEnvironment, inSeason: Bool, following: Bool, expired: @escaping @MainActor () -> Void) {
+        _viewModel = State(initialValue: BoardViewModel(
+            api: environment.api, cache: environment.cache, clock: environment.clock, inSeason: inSeason,
+            following: following, onSignedOut: expired
+        ))
+    }
+
+    var body: some View {
+        BoardView(viewModel: viewModel)
     }
 }
 

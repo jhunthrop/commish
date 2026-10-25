@@ -1099,6 +1099,97 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/run/manifest': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The published nightly run's manifest (Lane 185): its id, when it finished, its season, every format it carries (the default first) with the week its rest of season ranks from, and how many players have a page. The run is the one runs/latest.json names, the same the site is built from, and never one whose manifest is missing or names another run. Only the members the site's reader names are sent; the sources block is provenance and is never sent. Every /run route answers a weak ETag (the run id and the file; designations, rewritten beside the run every hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a matching If-None-Match. 503 storage_unavailable when the run cannot be read here. */
+		get: operations['runManifest'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/run/boards/{format}': {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path: {
+				/** @description a format the published run carries, as its manifest names it (ppr-12) */
+				format: string;
+			};
+			cookie?: never;
+		};
+		/** The published run's board in one format (boards/<format>.json), as the site draws it: the ranked rows in the run's order, each with its tier, its tier's drop, its round and its ADP, and the kickers and defenses apart in the drafters' order. Every row is the run's as written. 404 for a format the run does not carry. */
+		get: operations['runBoard'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/run/index': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The published run's index (index.json): every player with a page and his season so far in two numbers, and the kickers and defenses the boards carry apart, with no page and no season. */
+		get: operations['runIndex'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/run/adp': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The published run's ADP (adp.json): every source, the drafts behind it and the formats whose boards blend it, with its window, and each player's ADP per source id. A board's ADP basis is its format's sources' drafts and windows. */
+		get: operations['runAdp'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/run/designations': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The newest hourly injury capture beside the published run (designations.json): each ranked player it lists, by id. designations is null when the run carries none, and the screens then show no status. It is written again every publish hour under the same run, so its ETag carries a digest of what it holds. Its source is provenance and is never sent. */
+		get: operations['runDesignations'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/order': {
 		parameters: {
 			query?: {
@@ -2884,6 +2975,253 @@ export interface components {
 		 */
 		OrderBasis: 'preseason' | 'rest_of_season';
 		/** @enum {string} */
+		RunPosition: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DST';
+		/**
+		 * @description a kicker or a defense, the positions every board carries in the drafters' order
+		 * @enum {string}
+		 */
+		RunMarketPosition: 'K' | 'DST';
+		/** @description the first and last moments a feed's numbers were captured, read from the data's own stamps */
+		RunWindow: {
+			/** Format: date-time */
+			from: string;
+			/** Format: date-time */
+			to: string;
+		};
+		RunFormat: {
+			/** @description the format id: ppr-12 */
+			id: string;
+			/** @description as a chip prints it: PPR, Half PPR */
+			label: string;
+			/** @description what the points are in, as a cell label prints it: PPR pts */
+			unit: string;
+			teams: number;
+			/** @description the basis of every number on this format's board, phrase by phrase, as the board's lead prints them */
+			basis: string[];
+			/** @description in season, the first week the board ranks the rest of the season from; absent preseason */
+			rosFromWeek?: number;
+			/** @description in season, set while a game of rosFromWeek had kicked off at the run: its clubs count from their next week. Absent preseason and on a run older than the field */
+			rosFromWeekPartial?: boolean;
+			/** @description in season, the last week whose games are in the season figures */
+			rosThroughWeek?: number;
+			/**
+			 * Format: date-time
+			 * @description in season, when the run refreshed the rest-of-season board
+			 */
+			refreshedAt?: string;
+			/** @description the ADP source id whose draft order the board's kickers and defenses take */
+			marketOrder?: string;
+		};
+		/** @description the run's manifest.json, the members the site's reader names less the sources block (provenance) */
+		RunManifest: {
+			/** @description the run's id: 2026-10-12T05 */
+			runId: string;
+			/**
+			 * Format: date-time
+			 * @description when the run finished
+			 */
+			runAt: string;
+			season: number;
+			/** @description the code that produced the run */
+			implementation: string;
+			/** @description true for the stand-in run */
+			standIn: boolean;
+			/** @description every format the run carries, the default first */
+			formats: components['schemas']['RunFormat'][];
+			/** @description every player with a page */
+			players: number;
+		};
+		RunManifestAnswer: {
+			/** @description the published run every /run answer is read from */
+			run_id: string;
+			manifest: components['schemas']['RunManifest'];
+		};
+		/** @description a ranked row of boards/<format>.json, ranked by our projection */
+		RunBoardRow: {
+			id: string;
+			slug: string;
+			name: string;
+			position: components['schemas']['RunPosition'];
+			positionRank: number;
+			team: string;
+			headshot: string;
+			/**
+			 * @description absent on a run older than the kickers' and defenses' rows
+			 * @enum {string}
+			 */
+			orderBasis?: 'projection';
+			/** @description his place on this board */
+			ourRank: number;
+			/** @description the round of this format's draft his place falls in */
+			vorRound: number;
+			/** @description the blended ADP of this format's sources, null when none has him */
+			adp: number | null;
+			/** @description the drafters' ADP less our rank, to a tenth: plus when drafters take him later than we rank him; null without an ADP, absent on a run older than the column */
+			gap?: number | null;
+			projected: number;
+			vor: number;
+			expectedGames: number;
+			/** @description null in season */
+			floor: number | null;
+			/** @description null in season */
+			median: number | null;
+			/** @description null in season */
+			ceiling: number | null;
+			/** @description his tier within his position */
+			tier: number;
+			/** @description his tier's drop to the next tier at his position, to a tenth: the tier's last player's projected points less the next tier's first; null in his position's last tier, absent on a run older than the column */
+			tierDrop?: number | null;
+			/** @description in season, where the preseason board ranked him; null when it did not */
+			preseasonRank?: number | null;
+			/** @description in season, the preseason board's points for the full season */
+			preseasonPoints?: number | null;
+			/** @description in season */
+			preseasonPerGame?: number | null;
+			/** @description in season, the share of his rate a game that pace carries, a whole percent */
+			preseasonShare?: number | null;
+			/** @description in season */
+			blendedPerGame?: number | null;
+			/** @description in season, the model's rate a game he plays */
+			ratePerGame?: number | null;
+			/** @description in season, the week his rest of season starts from, null with no game left */
+			restFromWeek?: number | null;
+			/** @description in season, his points for one more game of his club; null preseason, absent on a run older than the field */
+			gamePoints?: number | null;
+		};
+		/** @description a kicker or a defense on a board, after the ranked rows in the drafters' order, with no projected points and no tier: every figure of ours is always null */
+		RunMarketRow: {
+			id: string;
+			slug: string;
+			name: string;
+			position: components['schemas']['RunMarketPosition'];
+			/** @description his place in the drafters' order at his position */
+			positionRank: number;
+			team: string;
+			/** @description null for a defense (its face is its club's mark) */
+			headshot: string | null;
+			/** @enum {string} */
+			orderBasis: 'market';
+			/** @description his place on the whole board */
+			ourRank: number;
+			/** @description this format's ADP */
+			adp: number;
+			/** @description always null when sent */
+			gap?: number | null;
+			/** @description always null */
+			vorRound: number | null;
+			/** @description always null */
+			projected: number | null;
+			/** @description always null */
+			vor: number | null;
+			/** @description always null */
+			expectedGames: number | null;
+			/** @description always null */
+			floor: number | null;
+			/** @description always null */
+			median: number | null;
+			/** @description always null */
+			ceiling: number | null;
+			/** @description always null */
+			tier: number | null;
+			/** @description always null when sent */
+			tierDrop?: number | null;
+		};
+		RunBoardAnswer: {
+			run_id: string;
+			format: string;
+			/** @description the ranked rows, in the file's order */
+			rows: components['schemas']['RunBoardRow'][];
+			/** @description the kickers and defenses, in the file's order */
+			market: components['schemas']['RunMarketRow'][];
+		};
+		RunIndexSeason: {
+			games: number;
+			/** @description null exactly when he has no game */
+			pointsPerGame: number | null;
+		};
+		RunIndexEntry: {
+			id: string;
+			slug: string;
+			name: string;
+			team: string;
+			position: components['schemas']['RunPosition'];
+			headshot: string;
+			/**
+			 * @description absent on a run older than the kickers' and defenses' entries
+			 * @enum {string}
+			 */
+			orderBasis?: 'projection';
+			season: components['schemas']['RunIndexSeason'];
+		};
+		RunMarketEntry: {
+			id: string;
+			slug: string;
+			name: string;
+			team: string;
+			position: components['schemas']['RunMarketPosition'];
+			headshot: string | null;
+			/** @enum {string} */
+			orderBasis: 'market';
+		};
+		RunIndexAnswer: {
+			run_id: string;
+			/** @description every player with a page, in the file's order */
+			pages: components['schemas']['RunIndexEntry'][];
+			/** @description the kickers and defenses, in the file's order */
+			market: components['schemas']['RunMarketEntry'][];
+		};
+		RunAdpSource: {
+			id: string;
+			/** @description the drafts behind the numbers, in a drafter's words: PPR drafts */
+			drafts: string;
+			/** @description the formats whose boards blend this source */
+			formats: string[];
+			window: components['schemas']['RunWindow'];
+		};
+		RunAdp: {
+			sources: components['schemas']['RunAdpSource'][];
+			/** @description each player's ADP per source id; a missing key is a source that does not have him */
+			players: Record<string, Record<string, number>>;
+		};
+		RunAdpAnswer: {
+			run_id: string;
+			adp: components['schemas']['RunAdp'];
+		};
+		RunPlayerStatus: {
+			status: components['schemas']['DesignationStatus'];
+			seasonLong: boolean;
+			/**
+			 * Format: date-time
+			 * @description the first capture of his unbroken run under a season-long status; null for a week's designation
+			 */
+			since: string | null;
+			/**
+			 * Format: date
+			 * @description the day he is due back from a season-long list, absent without one
+			 */
+			returning?: string;
+		};
+		/** @description the run's designations.json, less its source (provenance) */
+		RunDesignations: {
+			/**
+			 * Format: date-time
+			 * @description the capture's stamp: when the list last changed
+			 */
+			readAt: string;
+			/**
+			 * Format: date-time
+			 * @description the capture job's last successful check of the list, null when the store records none
+			 */
+			checkedAt: string | null;
+			/** @description by player id, every ranked player the capture lists */
+			players: Record<string, components['schemas']['RunPlayerStatus']>;
+		};
+		RunDesignationsAnswer: {
+			run_id: string;
+			/** @description null when the run carries no capture */
+			designations: components['schemas']['RunDesignations'] | null;
+		};
+		/** @enum {string} */
 		DesignationStatus:
 			'questionable' | 'doubtful' | 'out' | 'injured_reserve' | 'suspended' | 'pup' | 'nfi';
 		InjuryDesignation: {
@@ -4414,6 +4752,15 @@ export interface components {
 		};
 	};
 	responses: {
+		/** @description the run and the file are the ones the If-None-Match names; no body */
+		RunNotModified: {
+			headers: {
+				ETag: components['headers']['RunETag'];
+				'Cache-Control': components['headers']['RunCacheControl'];
+				[name: string]: unknown;
+			};
+			content?: never;
+		};
 		/** @description the error envelope */
 		ErrorResponse: {
 			headers: Record<string, unknown>;
@@ -4691,6 +5038,8 @@ export interface components {
 		};
 	};
 	parameters: {
+		/** @description an ETag a /run answer gave; a match answers 304 with no body */
+		IfNoneMatch: string;
 		/** @description board ids, comma separated, at most 24, whose rest-of-season points the read gives in tier_format (the page's tier box) */
 		TierMates: string;
 		/** @description the next tier's first board id, whose points the tier's drop is measured to */
@@ -4707,7 +5056,12 @@ export interface components {
 		PerPage: number;
 	};
 	requestBodies: never;
-	headers: never;
+	headers: {
+		/** @description weak, the run id and the file, one value per run and file (the gzip and the plain body share it) */
+		RunETag: string;
+		/** @description public, with a short max-age */
+		RunCacheControl: string;
+	};
 	pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -6062,6 +6416,352 @@ export interface operations {
 				};
 			};
 			400: components['responses']['ErrorResponse'];
+		};
+	};
+	runManifest: {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the manifest */
+			200: {
+				headers: {
+					ETag: components['headers']['RunETag'];
+					'Cache-Control': components['headers']['RunCacheControl'];
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "ok": true,
+					 *       "error": null,
+					 *       "request_id": "3f0c2a9e-run-manifest",
+					 *       "data": {
+					 *         "run_id": "2026-10-21T12-ros",
+					 *         "manifest": {
+					 *           "runId": "2026-10-21T12-ros",
+					 *           "runAt": "2026-10-21T12:00:00.000Z",
+					 *           "season": 2026,
+					 *           "implementation": "python",
+					 *           "standIn": false,
+					 *           "formats": [
+					 *             {
+					 *               "id": "ppr-12",
+					 *               "label": "PPR",
+					 *               "unit": "PPR pts",
+					 *               "teams": 12,
+					 *               "basis": [
+					 *                 "PPR, rest of the 2026 season from week 7, refreshed October 21",
+					 *                 "ranked by points over replacement in a 12-team league",
+					 *                 "tiers drawn within each position"
+					 *               ],
+					 *               "rosFromWeek": 7,
+					 *               "rosFromWeekPartial": false,
+					 *               "rosThroughWeek": 5,
+					 *               "refreshedAt": "2026-10-21T12:00:00.000Z",
+					 *               "marketOrder": "ffc_adp_ppr_12"
+					 *             }
+					 *           ],
+					 *           "players": 4
+					 *         }
+					 *       }
+					 *     }
+					 */
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['RunManifestAnswer'];
+					};
+				};
+			};
+			304: components['responses']['RunNotModified'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	runBoard: {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path: {
+				/** @description a format the published run carries, as its manifest names it (ppr-12) */
+				format: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the board */
+			200: {
+				headers: {
+					ETag: components['headers']['RunETag'];
+					'Cache-Control': components['headers']['RunCacheControl'];
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "ok": true,
+					 *       "error": null,
+					 *       "request_id": "3f0c2a9e-run-board",
+					 *       "data": {
+					 *         "run_id": "2026-10-21T12-ros",
+					 *         "format": "ppr-12",
+					 *         "rows": [
+					 *           {
+					 *             "id": "4429795",
+					 *             "slug": "jahmyr-gibbs",
+					 *             "name": "Jahmyr Gibbs",
+					 *             "position": "RB",
+					 *             "positionRank": 1,
+					 *             "team": "DET",
+					 *             "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png",
+					 *             "orderBasis": "projection",
+					 *             "ourRank": 1,
+					 *             "vorRound": 1,
+					 *             "adp": 1.4,
+					 *             "gap": 0.4,
+					 *             "projected": 242.5,
+					 *             "vor": 153.6,
+					 *             "expectedGames": 10,
+					 *             "floor": null,
+					 *             "median": null,
+					 *             "ceiling": null,
+					 *             "tier": 1,
+					 *             "tierDrop": 18.2,
+					 *             "preseasonRank": 5,
+					 *             "preseasonPoints": 262.1,
+					 *             "preseasonPerGame": 17.6,
+					 *             "preseasonShare": 40,
+					 *             "blendedPerGame": 24.2,
+					 *             "ratePerGame": 24.1,
+					 *             "restFromWeek": 7,
+					 *             "gamePoints": 24.1
+					 *           }
+					 *         ],
+					 *         "market": [
+					 *           {
+					 *             "id": "DST-SEA",
+					 *             "slug": "seattle-seahawks",
+					 *             "name": "Seattle Seahawks",
+					 *             "position": "DST",
+					 *             "positionRank": 1,
+					 *             "team": "SEA",
+					 *             "headshot": null,
+					 *             "orderBasis": "market",
+					 *             "ourRank": 401,
+					 *             "adp": 81,
+					 *             "gap": null,
+					 *             "vorRound": null,
+					 *             "projected": null,
+					 *             "vor": null,
+					 *             "expectedGames": null,
+					 *             "floor": null,
+					 *             "median": null,
+					 *             "ceiling": null,
+					 *             "tier": null,
+					 *             "tierDrop": null
+					 *           }
+					 *         ]
+					 *       }
+					 *     }
+					 */
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['RunBoardAnswer'];
+					};
+				};
+			};
+			304: components['responses']['RunNotModified'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	runIndex: {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the index */
+			200: {
+				headers: {
+					ETag: components['headers']['RunETag'];
+					'Cache-Control': components['headers']['RunCacheControl'];
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "ok": true,
+					 *       "error": null,
+					 *       "request_id": "3f0c2a9e-run-index",
+					 *       "data": {
+					 *         "run_id": "2026-10-21T12-ros",
+					 *         "pages": [
+					 *           {
+					 *             "id": "4429795",
+					 *             "slug": "jahmyr-gibbs",
+					 *             "name": "Jahmyr Gibbs",
+					 *             "team": "DET",
+					 *             "position": "RB",
+					 *             "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png",
+					 *             "orderBasis": "projection",
+					 *             "season": {
+					 *               "games": 5,
+					 *               "pointsPerGame": 30.7
+					 *             }
+					 *           }
+					 *         ],
+					 *         "market": [
+					 *           {
+					 *             "id": "DST-SEA",
+					 *             "slug": "seattle-seahawks",
+					 *             "name": "Seattle Seahawks",
+					 *             "team": "SEA",
+					 *             "position": "DST",
+					 *             "headshot": null,
+					 *             "orderBasis": "market"
+					 *           }
+					 *         ]
+					 *       }
+					 *     }
+					 */
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['RunIndexAnswer'];
+					};
+				};
+			};
+			304: components['responses']['RunNotModified'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	runAdp: {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the ADP */
+			200: {
+				headers: {
+					ETag: components['headers']['RunETag'];
+					'Cache-Control': components['headers']['RunCacheControl'];
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "ok": true,
+					 *       "error": null,
+					 *       "request_id": "3f0c2a9e-run-adp",
+					 *       "data": {
+					 *         "run_id": "2026-10-21T12-ros",
+					 *         "adp": {
+					 *           "sources": [
+					 *             {
+					 *               "id": "ffc_adp_ppr_12",
+					 *               "drafts": "PPR drafts",
+					 *               "formats": [
+					 *                 "ppr-12"
+					 *               ],
+					 *               "window": {
+					 *                 "from": "2026-09-09T07:00:00.000Z",
+					 *                 "to": "2026-09-09T07:00:00.000Z"
+					 *               }
+					 *             }
+					 *           ],
+					 *           "players": {
+					 *             "4429795": {
+					 *               "ffc_adp_ppr_12": 1.4
+					 *             }
+					 *           }
+					 *         }
+					 *       }
+					 *     }
+					 */
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['RunAdpAnswer'];
+					};
+				};
+			};
+			304: components['responses']['RunNotModified'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	runDesignations: {
+		parameters: {
+			query?: never;
+			header?: {
+				/** @description an ETag a /run answer gave; a match answers 304 with no body */
+				'If-None-Match'?: components['parameters']['IfNoneMatch'];
+			};
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the designations */
+			200: {
+				headers: {
+					ETag: components['headers']['RunETag'];
+					'Cache-Control': components['headers']['RunCacheControl'];
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "ok": true,
+					 *       "error": null,
+					 *       "request_id": "3f0c2a9e-run-designations",
+					 *       "data": {
+					 *         "run_id": "2026-10-21T12-ros",
+					 *         "designations": {
+					 *           "readAt": "2026-10-14T02:03:35.613Z",
+					 *           "checkedAt": null,
+					 *           "players": {
+					 *             "2991662": {
+					 *               "status": "injured_reserve",
+					 *               "seasonLong": true,
+					 *               "since": "2026-10-10T22:00:00.000Z",
+					 *               "returning": "2026-10-25"
+					 *             },
+					 *             "4047365": {
+					 *               "status": "out",
+					 *               "seasonLong": false,
+					 *               "since": null
+					 *             }
+					 *           }
+					 *         }
+					 *       }
+					 *     }
+					 */
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['RunDesignationsAnswer'];
+					};
+				};
+			};
+			304: components['responses']['RunNotModified'];
+			503: components['responses']['ErrorResponse'];
 		};
 	};
 	order: {

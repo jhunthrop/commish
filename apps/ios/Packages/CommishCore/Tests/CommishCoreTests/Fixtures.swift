@@ -48,6 +48,11 @@ enum Fixtures {
         try APIDecoding.envelopeData(MatchupBox.self, from: data("fixtures/inseason/matchup-\(league)-\(clock).json"))
     }
 
+    /// The API's PPR board (GET /boards/ppr), as a dev API answered it.
+    static func board() throws -> RoomBoard {
+        try APIDecoding.envelopeData(RoomBoard.self, from: data("fixtures/inseason/boards-ppr.json"))
+    }
+
     /// The players free to add in a league at a clock (GET /leagues/attached/{id}/waivers).
     static func waivers(_ id: String, _ clock: String) throws -> WaiverAdvice {
         try APIDecoding.envelopeData(WaiverAdvice.self, from: data("fixtures/inseason/waivers-\(id)-\(clock).json"))

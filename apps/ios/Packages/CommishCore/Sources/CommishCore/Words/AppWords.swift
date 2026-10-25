@@ -1,3 +1,5 @@
+import Foundation
+
 /// The app's own words: what the web has no table for because the web has no such screen part (the
 /// tab bar's screens not live yet, the sign-in sheet, a read that failed with no saved answer). Every
 /// view reads its words from here or the generated web words (Words), never a literal.
@@ -25,6 +27,11 @@ public enum AppWords {
 
     /// web/src/lib/league/LeaguePage.svelte stampOf: a read whose latest try failed.
     public static let lastRead = "Last read"
+
+    /// "Last read Sun 3:05 pm": the stamp a screen shows over a saved read.
+    public static func lastRead(_ stamp: Date, zone: TimeZone) -> String {
+        "\(lastRead) \(Formatting.weekdayTime(stamp, zone: zone))"
+    }
 
     /// LineupSummary.svelte's line beside the head: "As set on FFPC".
     public static func asSetOn(_ platform: String) -> String {
