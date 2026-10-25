@@ -236,7 +236,7 @@
 </script>
 
 {#snippet sheetMark(row: OrderView)}
-	<RowSheetMark player={sheetPlayer(row)} />
+	<RowSheetMark player={sheetPlayer(row)} named />
 {/snippet}
 
 <div class="order-screen" class:players={mode === 'players'}>

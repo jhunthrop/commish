@@ -14,7 +14,6 @@ import {
 	gamePart,
 	finalsParts,
 	OPP_PART,
-	OPP_PHONE,
 	projPart,
 	said,
 	uncountedPart,
@@ -23,6 +22,7 @@ import {
 	type ProjFacts
 } from '#lib/league/box/basis.ts';
 import { BOX, boxRow, expectedScoreWords, onList, type BoxRow } from '#lib/league/box/box.ts';
+import { figureCell, formCells, oppCell, type StripCell } from '#lib/league/box/figure-strip.ts';
 import { lineState, toPlay } from '#lib/league/box/kickoff.ts';
 import { addVerbWords } from '#lib/league/box/waivers.ts';
 import { hostWords } from '#lib/league/names.ts';
@@ -80,6 +80,29 @@ export const FIGURE_HEADS: Readonly<Record<FigureKey, string>> = {
 	total: ORDER.total,
 	perGame: ORDER.perGame
 };
+
+/** A row's figures where the table's columns give way (Lane 209): the week's figure under its Wk
+ * head (a phone's alone, where that column gives way too), the season's figures after Projected with
+ * the key the # sorts on in ink, the opponent's rank, then Last; Avg where the view has no Over repl.,
+ * so a strip holds five cells in every view. Each under its own head, never a sentence. */
+export function stripCells(
+	row: Pick<OrderView, 'week' | 'figures' | 'box'>,
+	rankBy: OrderAdvice['rank_by'],
+	week: number
+): StripCell[] {
+	const sorted = sortedFigure(rankBy);
+	const evidence = row.box.evidence;
+	const [avg, last] = formCells(evidence);
+	return [
+		figureCell(weekHead(week), row.week, { phoneOnly: true }),
+		...figureColumns(rankBy)
+			.slice(1)
+			.map((f) => figureCell(FIGURE_HEADS[f], row.figures[f], { key: f === sorted })),
+		oppCell(evidence),
+		...(rankBy === 'points_over_replacement' ? [] : [avg]),
+		last
+	];
+}
 
 /** A row as the order's table draws it. */
 export interface OrderView {
@@ -285,7 +308,8 @@ export function orderBasis(
 		...(league === null
 			? said(week)
 			: deskOrPhone(week, weekProjPart(weekHead(advice.week), projFacts, clock))),
-		...deskOrPhone(OPP_PART, OPP_PHONE),
+		// The phone heads the cell Opp rank too (Lane 209), so one sentence at both widths.
+		...said(OPP_PART),
 		...(league === null ? [] : uncountedPart(advice, lines)),
 		...said(gamePart(lines, clock, now, 'read'), false),
 		// Said on the phone too: the board has the room (review finding 6); K/DST keeps it to a desk.

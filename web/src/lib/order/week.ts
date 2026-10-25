@@ -9,15 +9,14 @@ import { clubNickname } from '#lib/format/clubs.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import {
 	BOX,
-	boxNumber,
 	boxRow,
 	factsReadAt,
 	FORMAT_WORDS,
 	heldGame,
-	oppRankWord,
 	positionWord,
 	type BoxRow
 } from '#lib/league/box/box.ts';
+import { formCells, oppCell, type StripCell } from '#lib/league/box/figure-strip.ts';
 import { finalsPartAt, uncountedPart } from '#lib/league/box/basis.ts';
 import { lineState } from '#lib/league/box/kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
@@ -290,10 +289,8 @@ function part(text: string | null, phone: boolean): BasisPart | null {
 	return text === null || text === '' ? null : { text, phone };
 }
 
-/** The evidence folded under the name below a wide screen: "Opp 16th, Avg 10.6, Last 5.0", the
- * opponent's rank left out where there is none (a bye). */
-export function foldedEvidence(view: Pick<WeekView, 'box'>): string {
-	const { oppRank, avg, last } = view.box.evidence;
-	const opp = oppRank === null ? [] : [`${BOX.opp} ${oppRankWord(oppRank)}`];
-	return [...opp, `${BOX.avg} ${boxNumber(avg)}`, `${BOX.last} ${boxNumber(last)}`].join(', ');
+/** The evidence where the table's columns give way (Lane 209): Opp rank, Avg and Last, each under
+ * its own head; a bye's Opp rank is the empty mark. */
+export function weekStripCells(view: Pick<WeekView, 'box'>): StripCell[] {
+	return [oppCell(view.box.evidence), ...formCells(view.box.evidence)];
 }

@@ -7,12 +7,17 @@
  * figure and his Projected) in its section, whether Show more is offered, and the phone's basis; for
  * the kickers' and defenses' week its sections and their heads, its rows, the status line before the
  * week's projection is in, the basis line with the rules our stats lack, and a search over it.
- * Written by export-parity.ts beside the others. */
+ * Written by export-parity.ts beside the others.
+ *
+ * Since Lane 209 the web's phone row draws its figures as labelled cells (FigureStrip) and its basis
+ * says the Opp rank head's sentence; the apps' rows still fold the figures into one line under the
+ * name with the shorter "Opp" sentence, so this file keeps describing the apps' row as they draw it
+ * (appFolded, appWeekFolded, appBasis) until the apps draw the strip too. */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { hitsWords } from '../../web/src/lib/format/pool-words.ts';
 import { weekHead } from '../../web/src/lib/format/figure-words.ts';
-import { drawnText } from '../../web/src/lib/league/box/basis.ts';
+import { OPP_PART, OPP_PHONE, drawnText } from '../../web/src/lib/league/box/basis.ts';
 import {
 	BOX,
 	boxNumber,
@@ -36,7 +41,6 @@ import {
 } from '../../web/src/lib/order/order.ts';
 import { MIN_SEARCH } from '../../web/src/lib/order/path.ts';
 import {
-	foldedEvidence,
 	landed,
 	rulesLeftOut,
 	weekBasis,
@@ -139,8 +143,8 @@ function playerCell(box: BoxRow): unknown {
 	};
 }
 
-/** The line folded under his name on a phone (OrderTable.svelte folded). */
-function folded(view: OrderView, rankBy: OrderAdvice['rank_by']): string {
+/** The line the apps fold under his name on a phone, as the web's phone row did before Lane 209. */
+function appFolded(view: OrderView, rankBy: OrderAdvice['rank_by']): string {
 	const rest = figureColumns(rankBy)
 		.slice(1)
 		.map((f) => `${FIGURE_HEADS[f]} ${boxNumber(view.figures[f])}`);
@@ -162,7 +166,7 @@ function orderRow(view: OrderView, rank: number, rankBy: OrderAdvice['rank_by'])
 		bye: view.bye,
 		week: boxNumber(view.week),
 		total: boxNumber(view.figures.total),
-		folded: folded(view, rankBy)
+		folded: appFolded(view, rankBy)
 	};
 }
 
@@ -185,15 +189,29 @@ function orderCase(advice: OrderAdvice, chip: PlayersChip | null, q: string, now
 			})
 		})),
 		more: advice.total > advice.rows.length,
-		basis: drawnText(orderBasis(advice, null, ZONE, now), 'phone')
+		basis: appBasis(drawnText(orderBasis(advice, null, ZONE, now), 'phone'))
 	};
+}
+
+/** The kickers' and defenses' evidence the apps fold under the name: "Opp 16th, Avg 10.6, Last 5.0",
+ * the opponent's rank left out on a bye, as the web's phone row did before Lane 209. */
+function appWeekFolded(view: WeekView): string {
+	const { oppRank, avg, last } = view.box.evidence;
+	const opp = oppRank === null ? [] : [`${BOX.opp} ${oppRankWord(oppRank)}`];
+	return [...opp, `${BOX.avg} ${boxNumber(avg)}`, `${BOX.last} ${boxNumber(last)}`].join(', ');
+}
+
+/** The phone's basis as the apps draw it: their folded line names the opponent's rank "Opp", so its
+ * sentence is the short one where the web's strip heads it "Opp rank". */
+function appBasis(text: string): string {
+	return text.replace(OPP_PART, OPP_PHONE);
 }
 
 function weekRow(view: WeekView): unknown {
 	return {
 		...(playerCell(view.box) as object),
 		proj: boxNumber(view.box.proj),
-		folded: foldedEvidence(view)
+		folded: appWeekFolded(view)
 	};
 }
 
