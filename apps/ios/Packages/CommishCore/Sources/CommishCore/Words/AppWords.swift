@@ -59,6 +59,15 @@ public enum AppWords {
         }
     }
 
+    /// The Waivers screen's own words, where the web has no such state.
+    public enum Waivers {
+        /// Under the verb, disabled, while the waivers shown are a saved read: a player on it may have
+        /// been claimed since, so the phone reads them again first.
+        public static func stale(_ stamp: String) -> String {
+            "\(stamp). Pull down to read waivers again before you claim."
+        }
+    }
+
     /// The league the app opens until the Leagues screen lets the member pick one.
     public enum LeagueList {
         public static let none = "Follow a league on trycommish.app and it shows here."
