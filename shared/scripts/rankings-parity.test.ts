@@ -69,6 +69,18 @@ void test("the kickers' and defenses' week holds each case", () => {
 	);
 });
 
+void test("every order row's strip holds five labelled cells, and the basis beside it heads Opp rank", () => {
+	const orders = parity('rankings.json').orders as Record<
+		string,
+		{ stripBasis: string; sections: { rows: { cells: { head: string }[] }[] }[] }
+	>;
+	for (const [name, order] of Object.entries(orders)) {
+		assert.match(order.stripBasis, /Opp rank is points allowed/u, name);
+		for (const row of order.sections.flatMap((s) => s.rows))
+			assert.equal(row.cells.length, 5, `${name}: ${row.cells.map((c) => c.head).join(', ')}`);
+	}
+});
+
 void test('the record names what it grades and never a weekly model of ours', () => {
 	const cases = parity('record.json').cases as Record<string, unknown>;
 	assert.deepEqual(
