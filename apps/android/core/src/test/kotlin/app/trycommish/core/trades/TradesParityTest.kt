@@ -1,9 +1,12 @@
 package app.trycommish.core.trades
 
 import app.trycommish.api.CommishJson
+import app.trycommish.api.models.GameStateCell
 import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.TradeCheck
 import app.trycommish.core.leaguehome.Fixtures
+import app.trycommish.core.start.GameRead
+import app.trycommish.core.start.LineRead
 import app.trycommish.core.start.StartFixtures
 import app.trycommish.core.start.rowOf
 import app.trycommish.core.start.text
@@ -121,12 +124,36 @@ class TradesParityTest {
         assertEquals(copied.text("failed"), TradesWords.copied(false, "FFPC").words)
     }
 
-    @ParameterizedTest
-    @MethodSource("clocks")
-    fun `every line a trade moves carries the API's game state`(clock: String) {
-        val lines = TradeFixtures.trades(clock).teams.flatMap { team -> team.trades.flatMap { it.give + it.get + listOfNotNull(it.drop) } }
-        assertTrue(lines.isNotEmpty())
-        assertFalse(lines.any { it.gameState == null }, clock)
+    @Test
+    fun `the opened rows read each line's game state from its field`() {
+        val clock = TradeFixtures.SUNDAY
+        val now = StartFixtures.instant(clock)
+        val advice = TradeFixtures.trades(clock)
+        val row = advice.teams.flatMap { it.trades }.first { TradeFinder.key(8, it) == TradeFixtures.BEST }
+        val moved = row.give + row.get + listOfNotNull(row.drop)
+        val opened = requireNotNull(TradesParity.model(clock).row(TradeFixtures.BEST)).opened.groups.flatMap { it.rows }
+        // Each opened row's state is the port's reading of its line's field.
+        moved.forEach { line ->
+            val cells = opened.first { it.id == line.player.hostId }
+            assertEquals(LineRead.game(line, now).stateName, cells.row.read.stateName, line.player.name)
+        }
+        // A line in play by its field locks the trade's week change (heldRow), as the parity file's week is null.
+        assertTrue(moved.any { LineRead.game(it, now).locked })
+        assertEquals(
+            null,
+            TradesParity
+                .model(clock)
+                .row(TradeFixtures.BEST)
+                ?.opened
+                ?.week,
+        )
+        // The field, not the clock, decides: the same line marked final reads final at Saturday noon.
+        val line = moved.first()
+        val final = line.copy(gameState = GameStateCell(GameStateCell.State.final, "Final"))
+        assertEquals(GameRead.Final, LineRead.game(final, StartFixtures.instant(TradeFixtures.WEEK)))
+        // A line with no field is never read as still to come: the trade's week change is held.
+        val unread = row.copy(give = row.give.map { it.copy(gameState = null) })
+        assertFalse(TradeChecks.countsThisWeek(unread, StartFixtures.instant(TradeFixtures.WEEK)))
     }
 
     companion object {

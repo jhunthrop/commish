@@ -69,11 +69,15 @@ class TradesMockTest {
 
     @Test
     fun everyReferenceIsSmallEnoughToKeep() {
-        val images = File("src/test/snapshots/images").listFiles().orEmpty()
+        val folder = File("src/test/snapshots/images")
+        val images = requireNotNull(folder.listFiles()) { "no references at ${folder.absolutePath}" }
+        // Every case's reference is there, so the size check below never passes over nothing.
+        assertEquals(REFERENCES, images.count { it.name.contains("_trades-") })
         assertEquals(emptyList<String>(), images.filter { it.length() > MAX_BYTES }.map { it.name })
     }
 
     private companion object {
         const val MAX_BYTES = 300 * 1024
+        val REFERENCES = TradesSnapshotTest.cases().size
     }
 }
