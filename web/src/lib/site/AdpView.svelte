@@ -100,12 +100,18 @@
 	}
 </script>
 
-<SiteShell title="{page.format.label} {ADP_PAGE.heading}" heading={ADP_PAGE.heading} head={page.head} {run}>
+<SiteShell
+	title="{page.format.label} {ADP_PAGE.heading}"
+	heading={ADP_PAGE.heading}
+	head={page.head}
+	{run}
+>
 	{#snippet tail()}<Verb href={sectionHref('mock')}>Start a mock draft</Verb>{/snippet}
 	<main class="adp">
 		<div class="lead">
 			<PageHead title="{run.season} {ADP_PAGE.heading}">
-				{#snippet actions()}<Quiet href={links.board(page.format.id)} size="sm">{ADP_PAGE.board}</Quiet
+				{#snippet actions()}<Quiet href={links.board(page.format.id)} size="sm"
+						>{ADP_PAGE.board}</Quiet
 					>{/snippet}
 			</PageHead>
 			<BasisLine parts={page.basis} tail={words?.capture ?? null} />

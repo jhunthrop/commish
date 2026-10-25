@@ -39,7 +39,8 @@
 								headshot={club.lead.headshot}
 								href={links.player(club.lead.slug)}
 							>
-								{#snippet trailing()}<Label>{CLUB_PAGE.ourRank} {club.lead?.ourRank}</Label>{/snippet}
+								{#snippet trailing()}<Label>{CLUB_PAGE.ourRank} {club.lead?.ourRank}</Label
+									>{/snippet}
 							</PlayerLine>
 						{/if}
 						<Label>{plural(club.players, CLUB_PAGE.player)} {CLUB_PAGE.onOurBoard}</Label>

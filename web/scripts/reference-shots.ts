@@ -44,13 +44,12 @@ for (const theme of THEMES) {
 		await tab.waitForTimeout(SETTLE_MS);
 		const wide = await tab.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
 		if (wide) failures.push(`${page.path} scrolls sideways at ${String(WIDTH)} (${theme})`);
-		await tab.screenshot({ path: new URL(`${page.name}-${String(WIDTH)}-${theme}.png`, out).pathname });
+		await tab.screenshot({
+			path: new URL(`${page.name}-${String(WIDTH)}-${theme}.png`, out).pathname
+		});
 		await tab.close();
 	}
 	await ctx.close();
 }
 await browser.close();
-if (failures.length > 0) {
-	console.error(failures.join('\n'));
-	process.exit(1);
-}
+if (failures.length > 0) throw new Error(`Reference pages:\n${failures.join('\n')}`);

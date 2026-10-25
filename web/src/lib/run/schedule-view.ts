@@ -98,7 +98,10 @@ export function viewsOf(loaded: Schedule, underway: boolean): Map<string, Streng
 }
 
 /** A figure's caption: its head and its rank among the slates showing one. */
-export function strengthFigureOf(view: StrengthView | undefined, of: number): StrengthFigure | null {
+export function strengthFigureOf(
+	view: StrengthView | undefined,
+	of: number
+): StrengthFigure | null {
 	if (view === undefined) return null;
 	return {
 		value: strengthFigure(view.strength),
@@ -206,7 +209,14 @@ function cellOf(
 ): ScheduleCell {
 	const game = slate.games.find((candidate) => candidate.week === week);
 	if (!game) {
-		return { week, opponent: null, home: false, value: '', hard: false, played: week <= played.complete };
+		return {
+			week,
+			opponent: null,
+			home: false,
+			value: '',
+			hard: false,
+			played: week <= played.complete
+		};
 	}
 	const value = opponentValue(loaded, game.opponent);
 	return {

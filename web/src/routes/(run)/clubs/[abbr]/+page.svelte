@@ -78,7 +78,9 @@
 	<main class="club">
 		<Crumb trail={[{ label: CLUB_PAGE.clubs, href: links.clubs() }, { label: name }]} />
 		<HeroCard title={name}>
-			{#snippet meta()}<Label>{club.abbr} · {CLUB_PAGE.byeWeek} {club.bye ?? CLUB_PAGE.byeNotSet}</Label>{/snippet}
+			{#snippet meta()}<Label
+					>{club.abbr} · {CLUB_PAGE.byeWeek} {club.bye ?? CLUB_PAGE.byeNotSet}</Label
+				>{/snippet}
 			{#snippet aside()}
 				{#if page.hero}
 					<div class="figures">

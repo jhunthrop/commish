@@ -146,7 +146,9 @@
 		{@const leader = verdict.leader.side.player}
 		<b class="call-words">{verdict.call}</b>
 		{#if lazySheet.has(leader.id)}
-			<Quiet href={links.sheet()} size="sm">{filled(COMPARE_PAGE.onSheet, verdict.leaderName)}</Quiet>
+			<Quiet href={links.sheet()} size="sm"
+				>{filled(COMPARE_PAGE.onSheet, verdict.leaderName)}</Quiet
+			>
 		{:else}
 			<Verb onclick={() => lazySheet.add(leader)}>{COMPARE_PAGE.addToSheet}</Verb>
 		{/if}
