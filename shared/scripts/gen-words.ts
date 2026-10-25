@@ -39,6 +39,9 @@ const LINEUP_MODULE = 'web/src/lib/league/box/lineup.ts';
 const DESIGNATION_MODULE = 'web/src/lib/format/designation.ts';
 const WAIVERS_MODULE = 'web/src/lib/league/box/waivers.ts';
 const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
+const ORDER_WORDS_MODULE = 'web/src/lib/order/words.ts';
+const WEEK_MODULE = 'web/src/lib/order/week.ts';
+const RECORD_MODULE = 'web/src/lib/run/record.ts';
 
 /** Every table the apps print from, the League home's first, then the box score's: its heads, the
  * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
@@ -52,7 +55,10 @@ const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
  * figures' heads and the strip's mark; then the Trades' (Lane 189): the trade table's words, the
  * picker's first choice and the close call's chip, and the builder's lines; then the player sheet's
  * and page's (Lane 192): a held page's words, the week tile's, the page's facts, the read's figures'
- * labels and the words in place of a read not ready. */
+ * labels and the words in place of a read not ready; then the Rankings' and Our record's (Lane 194):
+ * the order's table, its week's kickers and defenses, the page's purpose and name, the pool's counts,
+ * and the record's words, its box's heads, the orders a week graded, the two records' words and a
+ * pair's. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -348,6 +354,84 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/run/unwritten-words.ts',
 		picks: [['read', 'UNWRITTEN_READ']],
 		json: 'shared/words/player-unwritten.json'
+	},
+	{
+		name: 'Order',
+		module: ORDER_WORDS_MODULE,
+		picks: ['ORDER'],
+		json: 'shared/words/order.json'
+	},
+	{
+		name: 'OrderWeek',
+		module: ORDER_WORDS_MODULE,
+		picks: ['WEEK'],
+		json: 'shared/words/order-week.json'
+	},
+	{
+		name: 'PagePurpose',
+		module: ORDER_WORDS_MODULE,
+		picks: ['PAGE_PURPOSE'],
+		json: 'shared/words/page-purpose.json'
+	},
+	{
+		name: 'WeekTab',
+		module: WEEK_MODULE,
+		picks: ['WEEK_TAB'],
+		json: 'shared/words/order-week-tab.json'
+	},
+	{
+		name: 'DefenseScoring',
+		module: WEEK_MODULE,
+		picks: ['DEFENSE_SCORING'],
+		json: 'shared/words/order-defense-scoring.json'
+	},
+	{
+		name: 'WeekMany',
+		module: 'web/src/lib/order/week-head.ts',
+		picks: ['WEEK_MANY', ['thisWeek', 'THIS_WEEK']],
+		json: 'shared/words/order-week-many.json'
+	},
+	{
+		name: 'PageName',
+		module: 'web/src/lib/run/week-names.ts',
+		picks: ['PAGE_NAME_WORDS'],
+		json: 'shared/words/page-name.json'
+	},
+	{
+		name: 'Pool',
+		module: 'web/src/lib/format/pool-words.ts',
+		picks: ['POOL'],
+		json: 'shared/words/pool.json'
+	},
+	{
+		name: 'Record',
+		module: RECORD_MODULE,
+		picks: ['RECORD_WORDS'],
+		json: 'shared/words/record.json'
+	},
+	{
+		name: 'RecordBox',
+		module: RECORD_MODULE,
+		picks: ['RECORD_BOX'],
+		json: 'shared/words/record-box.json'
+	},
+	{
+		name: 'RecordOrder',
+		module: RECORD_MODULE,
+		picks: ['ORDER_WORDS'],
+		json: 'shared/words/record-order.json'
+	},
+	{
+		name: 'Records',
+		module: 'web/src/lib/run/records.ts',
+		picks: ['RECORDS_WORDS'],
+		json: 'shared/words/records.json'
+	},
+	{
+		name: 'Pair',
+		module: 'web/src/lib/run/record-pair.ts',
+		picks: ['PAIR_WORDS'],
+		json: 'shared/words/record-pair.json'
 	}
 ];
 export const OUTPUT = {

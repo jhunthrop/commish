@@ -53,7 +53,11 @@ public enum PhoneRail {
     static let mock = RailTab(key: "mock", label: AppWords.Tab.mock)
     static let sheet = RailTab(key: "sheet", label: AppWords.Tab.sheet)
     static let advisor = RailTab(key: "advisor", label: AppWords.Tab.advisor)
-    static let week = RailTab(key: "week", label: AppWords.Tab.rankings)
+    /// The Rankings tab's key: our order with the week's game beside each player (the web's /players).
+    public static let rankingsKey = "week"
+    static let week = RailTab(key: rankingsKey, label: AppWords.Tab.rankings)
+    /// Our record's key.
+    public static let recordKey = "record"
 
     /// The five for a followed league; a phase this build does not know reads as in season, the app's
     /// hub.
@@ -94,6 +98,6 @@ public enum PhoneRail {
         RailTab(key: restKey, label: AppWords.Tab.restOfSeason),
         week,
         mock,
-        RailTab(key: "record", label: AppWords.Tab.record),
+        RailTab(key: recordKey, label: AppWords.Tab.record),
     ]
 }

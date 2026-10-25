@@ -13,13 +13,19 @@ import { generate as exportFixtures } from './export-fixtures.ts';
 import { generate as genMark } from './gen-mark.ts';
 import { generate as exportParity } from './export-parity.ts';
 import { generate as exportRun } from './export-run.ts';
+import { generate as exportRecord } from './export-record.ts';
 import { generate as genOpenapi } from '../../apps/ios/scripts/gen-openapi.ts';
 import { generate as genTokens } from './gen-tokens.ts';
 import { generate as genWords } from './gen-words.ts';
 import { REPOSITORY, writeOutputs, type Outputs } from './generated.ts';
 
 /** Folders whose every file a generator writes, so a file in them it did not write is stale. */
-const GENERATED_FOLDERS = ['shared/fixtures', 'shared/fixtures/inseason', 'shared/fixtures/parity'];
+const GENERATED_FOLDERS = [
+	'shared/fixtures',
+	'shared/fixtures/inseason',
+	'shared/fixtures/parity',
+	'shared/fixtures/record'
+];
 /** Folders whose every file, at any depth, a generator writes: the fixture run's bucket layout. */
 const GENERATED_TREES = ['shared/fixtures/run'];
 
@@ -90,6 +96,7 @@ async function main(): Promise<number> {
 		...(await genMark()),
 		...(await exportParity()),
 		...(await exportRun()),
+		...(await exportRecord()),
 		...(await genOpenapi())
 	]);
 	const fresh = await mkdtemp(join(tmpdir(), 'commish-check-gen-'));
