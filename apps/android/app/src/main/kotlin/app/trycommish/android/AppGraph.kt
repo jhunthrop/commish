@@ -1,8 +1,11 @@
 package app.trycommish.android
 
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import app.trycommish.api.Transport
@@ -15,6 +18,9 @@ import app.trycommish.core.FileCache
 import app.trycommish.core.Session
 import app.trycommish.core.SessionEnd
 import app.trycommish.core.SystemClock
+import app.trycommish.core.board.ApiRunReads
+import app.trycommish.core.board.BoardViewModel
+import app.trycommish.core.board.RunReads
 import app.trycommish.core.leaguehome.ApiLeagueReads
 import app.trycommish.core.leaguehome.LeagueHomeViewModel
 import app.trycommish.core.leaguehome.LeagueReads
@@ -30,6 +36,9 @@ import app.trycommish.core.signin.SignInResult
 import app.trycommish.core.start.ApiLineupReads
 import app.trycommish.core.start.LineupReads
 import app.trycommish.core.start.StartViewModel
+import app.trycommish.core.waivers.ApiWaiverReads
+import app.trycommish.core.waivers.WaiverReads
+import app.trycommish.core.waivers.WaiverViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +72,9 @@ class AppGraph(
     private val account: AccountReads = ApiAccountReads(transport)
     private val lineups: LineupReads = ApiLineupReads(transport)
     private val matchups: MatchupReads = ApiMatchupReads(transport)
+    private val waivers: WaiverReads = ApiWaiverReads(transport)
+    private val runs: RunReads = ApiRunReads(transport)
+    private val appContext: Context = context.applicationContext
     private val clipboard: ClipboardManager? = context.getSystemService(ClipboardManager::class.java)
 
     /** Work that must outlive a screen or a rotation: the sign-in's pairing, once its verifier is spent. */
@@ -94,17 +106,38 @@ class AppGraph(
     /** A league's Matchup, read again once a minute while it is on screen. */
     fun matchupViewModel(): MatchupViewModel = MatchupViewModel(matchups, cache, clock, zone, sessionEnd)
 
+    /** The board from the run: the draft's Board, or in season the Rest of season, with the verb that
+     * follows whether the member follows a league. */
+    fun boardViewModel(
+        inSeason: Boolean,
+        following: Boolean,
+    ): BoardViewModel = BoardViewModel(runs, cache, clock, zone, inSeason, following, sessionEnd)
+
     /** A league's Start screen, the lineup copied to the phone's clipboard. */
     fun startViewModel(league: LeagueHost): StartViewModel = StartViewModel(lineups, cache, clock, zone, league, ::copy, sessionEnd)
 
-    /** Puts the lineup on the clipboard; false where the phone would not take it. */
+    /** A league's Waivers, a name copied to the phone's clipboard and the platform's waiver page opened
+     * in the browser. */
+    fun waiverViewModel(league: LeagueHost): WaiverViewModel =
+        WaiverViewModel(waivers, cache, clock, zone, league, ::copy, ::openPage, sessionEnd)
+
+    /** Opens a page in the browser from outside an activity's composition. */
+    private fun openPage(url: String) {
+        try {
+            appContext.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: ActivityNotFoundException) {
+            Log.w(TAG, "open a page", e)
+        }
+    }
+
+    /** Puts the lineup or a player's name on the clipboard; false where the phone would not take it. */
     private fun copy(text: String): Boolean {
         val board = clipboard ?: return false
         return try {
             board.setPrimaryClip(ClipData.newPlainText(CLIP_LABEL, text))
             true
         } catch (e: SecurityException) {
-            Log.w(TAG, "copy the lineup", e)
+            Log.w(TAG, "copy to the clipboard", e)
             false
         }
     }

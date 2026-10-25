@@ -3,7 +3,57 @@ package app.trycommish.core.start
 import app.trycommish.api.ApiFailure
 import app.trycommish.api.models.HostMovePlan
 import app.trycommish.api.models.HostMoveResult
+import app.trycommish.core.waivers.WaiverWords
 import app.trycommish.design.Words
+import java.time.ZoneId
+
+/** The two moves made from our screens (move.ts MoveKind): the Start screen's lineup and the Waivers
+ * screen's claim, whose queued answer is said on the member's clock. */
+sealed interface MoveKind {
+    data object Lineup : MoveKind
+
+    data class Claim(
+        val zone: ZoneId,
+    ) : MoveKind
+
+    /** words.ts verbWords: "Set it on ESPN", "Claim on ESPN". */
+    fun verb(platform: String): String =
+        when (this) {
+            Lineup -> StartWords.setItOn(platform)
+            is Claim -> WaiverWords.claimOn(platform)
+        }
+
+    /** move.ts readingWords. */
+    fun reading(platform: String): String =
+        when (this) {
+            Lineup -> StartWords.reading(platform)
+            is Claim -> WaiverWords.reading(platform)
+        }
+
+    /** move.ts settingWords. */
+    fun setting(platform: String): String =
+        when (this) {
+            Lineup -> StartWords.setting(platform)
+            is Claim -> WaiverWords.claiming(platform)
+        }
+
+    /** move.ts lostWords. */
+    fun lost(platform: String): String =
+        when (this) {
+            Lineup -> StartWords.lost(platform)
+            is Claim -> WaiverWords.lost(platform)
+        }
+
+    /** move.ts resultWords: a claim the platform's queue holds says when it runs. */
+    fun result(
+        platform: String,
+        result: HostMoveResult,
+    ): String =
+        when (this) {
+            Lineup -> result.sentence
+            is Claim -> WaiverWords.result(platform, result, zone)
+        }
+}
 
 /** Where the move's confirmation is (move.ts MoveStep): reading the lineup on the platform, the move in
  * the API's words to confirm with its token, on its way, what it came to, unavailable here (the
@@ -65,12 +115,13 @@ sealed interface MoveStep {
             stage: Stage,
             platform: String,
             page: String?,
+            kind: MoveKind = MoveKind.Lineup,
         ): MoveStep {
             val said = (error as? ApiFailure)?.let { it.fields["confirm"] ?: it.fields["move"] ?: it.message }
             if (!said.isNullOrEmpty()) return Failed(said, null)
             return when (stage) {
                 Stage.Plan -> Failed(Words.Move.notReached, null)
-                Stage.Make -> Failed(StartWords.lost(platform), page)
+                Stage.Make -> Failed(kind.lost(platform), page)
             }
         }
     }
@@ -96,23 +147,28 @@ data class MovePanel(
 ) {
     enum class Tone { Plain, Quiet, Problem }
 
+    /** The panel with its verb held while it waits (a claim planned again for a new bid: the verb makes
+     * only the bid the sentence names). */
+    fun waiting(waits: Boolean): MovePanel = copy(verbEnabled = verbEnabled && !waits)
+
     companion object {
         fun of(
             step: MoveStep,
             platform: String,
+            kind: MoveKind = MoveKind.Lineup,
         ): MovePanel? {
             val open = { url: String? -> url?.let { FootRun(StartWords.open(platform), it) } }
             return when (step) {
                 MoveStep.Closed -> null
-                MoveStep.Planning -> MovePanel(StartWords.reading(platform), Tone.Quiet)
+                MoveStep.Planning -> MovePanel(kind.reading(platform), Tone.Quiet)
                 is MoveStep.Confirm ->
-                    MovePanel(step.sentence, verb = StartWords.setItOn(platform), verbEnabled = true, close = Words.Move.notNow)
-                is MoveStep.Sending -> MovePanel(step.sentence, verb = StartWords.setting(platform))
-                is MoveStep.Answered -> answered(step.result, platform, open)
+                    MovePanel(step.sentence, verb = kind.verb(platform), verbEnabled = true, close = Words.Move.notNow)
+                is MoveStep.Sending -> MovePanel(step.sentence, verb = kind.setting(platform))
+                is MoveStep.Answered -> answered(step.result, platform, kind, open)
                 is MoveStep.Unavailable ->
                     MovePanel(
                         step.sentence,
-                        page = step.page?.let { FootRun(StartWords.setItOn(platform), it) },
+                        page = step.page?.let { FootRun(kind.verb(platform), it) },
                         pageSolid = true,
                         close = Words.Move.notNow,
                     )
@@ -123,12 +179,13 @@ data class MovePanel(
         private fun answered(
             result: HostMoveResult,
             platform: String,
+            kind: MoveKind,
             open: (String?) -> FootRun?,
         ): MovePanel {
             val refused = result.outcome == HostMoveResult.Outcome.refused
             val done = result.outcome == HostMoveResult.Outcome.done
             return MovePanel(
-                result.sentence,
+                kind.result(platform, result),
                 said = if (refused) result.hostWords?.let { StartWords.platformSaid(platform, it) } else null,
                 page = if (done) null else open(result.hostUrl.ifEmpty { null }),
                 close = Words.Move.done,

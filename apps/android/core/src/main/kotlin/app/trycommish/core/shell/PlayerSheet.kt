@@ -90,6 +90,15 @@ object SiteLinks {
     /** Our record, past weeks of our order (the Lineup strip's link, web links.record()). */
     const val RECORD = "$ORIGIN/record"
 
+    /** Following a league (verb-links.ts verbHref follow and open_league). */
+    const val LEAGUE_START = "$ORIGIN/league/new"
+
+    /** A mock draft's setup (verbHref mock). */
+    const val MOCK_SETUP = "$ORIGIN/mock/new"
+
+    /** The cheat sheet (verbHref sheet). */
+    const val SHEET = "$ORIGIN/sheet"
+
     /** A player's page, /players/<slug>. */
     fun player(slug: String): String = "$ORIGIN/players/$slug"
 
