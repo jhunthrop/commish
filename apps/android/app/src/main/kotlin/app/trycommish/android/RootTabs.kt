@@ -38,6 +38,7 @@ import app.trycommish.core.shell.ShellDestination
 import app.trycommish.core.shell.ShellRoute
 import app.trycommish.core.shell.ShellState
 import app.trycommish.core.shell.ShellViewModel
+import app.trycommish.core.shell.WAIVERS_PAGE
 import app.trycommish.core.shell.homeOf
 import app.trycommish.core.shell.lineupOf
 import app.trycommish.core.shell.searchRoute
@@ -59,7 +60,7 @@ private val PAGES: List<RailItem> =
     (Rail.byKey.values.flatten() + Rail.withoutLeague + Rail.withoutLeagueBySeason.values.flatten()).distinctBy { it.page }
 
 /** The tabs drawn by their own screens; the rest show their name until their lane lands. */
-private val LIVE_PAGES = setOf(LEAGUE_PAGE, LINEUP_PAGE, MATCHUP_PAGE)
+private val LIVE_PAGES = setOf(LEAGUE_PAGE, LINEUP_PAGE, MATCHUP_PAGE, WAIVERS_PAGE)
 
 /** The pushed screens' routes, one per ShellRoute. */
 private object Routes {
@@ -82,7 +83,7 @@ private object Routes {
  * the account's way in) and the web's phone bar for the shown league's phase, or with none the site's
  * season (Rail.generated.kt), a back stack per tab, and the one player sheet over all of it. Choosing
  * a league shows it, writes it to the site, and opens its home: the League tab where the bar has one,
- * else the home pushed on the tab in view (B149). League, Lineup and Matchup are live; the rest show their name.
+ * else the home pushed on the tab in view (B149). League, Lineup, Matchup and Waivers are live; the rest show their name.
  * A home's Open Lineup opens the Lineup tab for the league shown, else the lineup on the site.
  */
 @Composable
@@ -193,6 +194,7 @@ private fun Pages(
         composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup) }
         composable(LINEUP_PAGE) { StartTab(graph, state, retry) }
         composable(MATCHUP_PAGE) { MatchupTab(graph, state, retry) }
+        composable(WAIVERS_PAGE) { WaiversTab(graph, state, retry) }
         PAGES.filter { it.page !in LIVE_PAGES }.forEach { item ->
             composable(item.page) { NamedScreen(item.label) }
         }
