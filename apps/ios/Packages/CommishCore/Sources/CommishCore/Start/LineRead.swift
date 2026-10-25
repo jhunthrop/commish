@@ -89,15 +89,12 @@ enum LineRead {
     }
 
     /// kickoff.ts linesRead's state over a set of lines: final once every one with a game is, playing
-    /// once any has kicked off, else upcoming.
+    /// once any has kicked off, else upcoming: MatchupSides.linesRead, the one rule.
     static func setState(_ lines: [PlayerLine], now: Date) -> GameRead {
-        let held: [GameRead] = [.upcoming, .kickedOff, .final]
-        let reads: [GameRead] = lines.filter { $0.facts.kickoff != nil }
-            .map { game($0, now: now) }
-            .filter { held.contains($0) }
-        if !reads.isEmpty, reads.allSatisfy({ $0 == GameRead.final }) {
-            return .final
+        switch MatchupSides.linesRead(lines, now: now).state {
+        case .final: .final
+        case .kickedOff: .kickedOff
+        case .upcoming: .upcoming
         }
-        return reads.contains { $0 != GameRead.upcoming } ? .kickedOff : .upcoming
     }
 }

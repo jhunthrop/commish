@@ -8,7 +8,7 @@ public enum MatchupWords {
     /// model.ts teamName: the platform's name for the team, "Team 7" where it has none.
     static func teamName(_ sync: LeagueSync, _ rosterID: Int) -> String {
         let name = sync.teams.first { $0.rosterId == rosterID }?.name ?? ""
-        return name.isEmpty ? "Team \(rosterID)" : name
+        return name.isEmpty ? LeagueNames.unnamedTeam(rosterID) : name
     }
 
     /// matchup.ts yoursOnlyWords: "FFPC shows us your lineup only."

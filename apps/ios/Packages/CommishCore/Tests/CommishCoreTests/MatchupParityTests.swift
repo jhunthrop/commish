@@ -105,6 +105,23 @@ struct MatchupParityTests {
         #expect(none == .gap(Self.parity.gaps.noWeek.gap))
     }
 
+    /// Every branch of the gap sentences (model.ts readLine and agoWords): fresh, signed out, not
+    /// answering and reading again, each just now, in minutes and in hours, on FFPC and on Sleeper.
+    @Test func everyReadLineIsTheWebs() throws {
+        let base = try Fixtures.matchupSync(StartParityTests.clocks[0])
+        #expect(Self.parity.gaps.reads.count == 24)
+        for read in Self.parity.gaps.reads {
+            var sync = base
+            sync.host = .init(value1: .init(rawValue: read.host))
+            sync.hostSignedOut = read.state == "signedOut"
+            sync.hostFailed = read.state == "failed"
+            sync.hostStaleSeconds = read.state == "stale" ? 120 : 0
+            let now = base.readAt.addingTimeInterval(read.seconds)
+            #expect(MatchupWords.gap(sync, now: now) == read.gap, "\(read.host) \(read.state) \(read.age)")
+            #expect(MatchupWords.scoreGap(sync, now: now) == read.scoreGap, "\(read.host) \(read.state) \(read.age)")
+        }
+    }
+
     /// No screen computes game state: every starter's line the fixture holds carries the API's field.
     @Test(arguments: StartParityTests.clocks)
     func everyStartersLineCarriesTheAPIsGameState(clock: String) throws {
@@ -196,9 +213,19 @@ struct MatchupParity: Decodable {
         let gap: String
     }
 
+    struct Read: Decodable {
+        let host: String
+        let state: String
+        let age: String
+        let seconds: Double
+        let gap: String
+        let scoreGap: String
+    }
+
     struct Gaps: Decodable {
         let unread: Gap
         let noWeek: Gap
+        let reads: [Read]
     }
 
     let clocks: [String: Week]

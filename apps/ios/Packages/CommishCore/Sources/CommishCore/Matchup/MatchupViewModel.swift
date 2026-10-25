@@ -54,6 +54,8 @@ public final class MatchupViewModel {
     private let onSignedOut: @MainActor () -> Void
     private var poll: Task<Void, Never>?
     private var signedOut = false
+    /// The answer shown, so a failed read redraws it at the clock it failed at.
+    private var answer: MatchupAnswer?
 
     public init(
         api: any MatchupAPI, cache: any AnswerCache, clock: any Clock, timer: any PollTimer = SystemPollTimer(),
@@ -93,8 +95,21 @@ public final class MatchupViewModel {
         guard visible else {
             return
         }
+        let timer = timer
+        // The loop holds the view model weakly: it takes it for each read alone, so a view model
+        // dropped with its screen (a league switched, a tab the bar no longer shows) stops the poll at
+        // its next pass even if nothing said hidden.
         poll = Task { [weak self] in
-            await self?.run(leagueID: leagueID)
+            while !Task.isCancelled {
+                guard await Self.pass(self, leagueID: leagueID) else {
+                    return
+                }
+                do {
+                    try await timer.sleep(for: Self.pollInterval)
+                } catch {
+                    return
+                }
+            }
         }
     }
 
@@ -103,13 +118,15 @@ public final class MatchupViewModel {
     public func load(leagueID: String) async {
         let route = Self.route(leagueID)
         if state == .loading, let saved = await cache.read(MatchupAnswer.self, route: route) {
+            answer = saved.value
             state = .loaded(model(saved.value), stamp: saved.stamp, stale: true)
         }
         do {
-            let answer = try await read(leagueID)
+            let fresh = try await read(leagueID)
             let stamp = clock.now
-            await cache.write(answer, route: route, stamp: stamp)
-            state = .loaded(model(answer), stamp: stamp, stale: false)
+            await cache.write(fresh, route: route, stamp: stamp)
+            answer = fresh
+            state = .loaded(model(fresh), stamp: stamp, stale: false)
         } catch where APIError.signsOut(error) {
             signedOut = true
             state = .failed(AppWords.Failure.signedOut)
@@ -119,27 +136,26 @@ public final class MatchupViewModel {
             return
         } catch {
             if case let .loaded(week, stamp, _) = state {
-                state = .loaded(week, stamp: stamp, stale: true)
+                // The week as read, its live read cell aged to now, dated by its stamp.
+                state = .loaded(answer.map(model) ?? week, stamp: stamp, stale: true)
             } else {
                 state = .failed(LeagueHomeViewModel.sentence(for: error))
             }
         }
     }
 
-    /// Reads, then waits the interval, until hidden (the task cancelled) or signed out.
-    private func run(leagueID: String) async {
-        while !Task.isCancelled {
-            await load(leagueID: leagueID)
-            guard !signedOut else {
-                polling = false
-                return
-            }
-            do {
-                try await timer.sleep(for: Self.pollInterval)
-            } catch {
-                return
-            }
+    /// One pass of the poll: a read, and whether to go on (not once the view model is gone or the
+    /// token was refused).
+    private static func pass(_ viewModel: MatchupViewModel?, leagueID: String) async -> Bool {
+        guard let viewModel else {
+            return false
         }
+        await viewModel.load(leagueID: leagueID)
+        guard !viewModel.signedOut else {
+            viewModel.polling = false
+            return false
+        }
+        return true
     }
 
     /// Both reads at once, as the web's Promise.all: the box where the API has one for the league.

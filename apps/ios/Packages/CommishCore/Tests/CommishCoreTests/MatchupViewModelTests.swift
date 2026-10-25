@@ -134,6 +134,43 @@ struct MatchupViewModelTests {
         viewModel.setVisible(false, leagueID: Fixtures.league)
     }
 
+    @Test func aViewModelDroppedWhilePollingReadsNoMore() async throws {
+        let stub = try MatchupStub(answer: Self.answer(Self.sunday))
+        let timer = ManualTimer()
+        var viewModel: MatchupViewModel? = model(stub, clock: Self.sunday, timer: timer)
+        viewModel?.setVisible(true, leagueID: Fixtures.league)
+        try await eventually { await (stub.reads, timer.sleepers) == (1, 1) }
+        weak let dropped = viewModel
+        viewModel = nil
+        // Nothing but the screen held it: the poll holds it only for a read.
+        #expect(dropped == nil)
+        await timer.tick()
+        try await eventually { await timer.sleepers == 0 }
+        await settle()
+        #expect(await stub.reads == 1)
+    }
+
+    @Test func aFailedPollAgesTheLiveReadCellToTheClock() async throws {
+        let stub = try MatchupStub(answer: Self.answer(Self.sunday))
+        let timer = ManualTimer()
+        let clock = MovingClock(Fixtures.instant(Self.sunday))
+        let viewModel = MatchupViewModel(
+            api: stub, cache: FileCache(folder: folder), clock: clock, timer: timer, zone: Fixtures.zone
+        )
+        viewModel.setVisible(true, leagueID: Fixtures.league)
+        try await eventually { await (stub.reads, timer.sleepers) == (1, 1) }
+        #expect(try Self.week(viewModel).week.bug.read == "FFPC 4 min ago")
+        clock.now = clock.now.addingTimeInterval(600)
+        await stub.fail(URLError(.notConnectedToInternet))
+        await timer.tick()
+        try await eventually { await (stub.reads, timer.sleepers) == (2, 1) }
+        let shown = try Self.week(viewModel)
+        #expect(shown.stale)
+        #expect(shown.week.bug.read == "FFPC 14 min ago")
+        #expect(viewModel.stampWords == "Last read Sun 1:56 pm")
+        viewModel.setVisible(false, leagueID: Fixtures.league)
+    }
+
     @Test func aRefusedTokenSignsOutAndStopsThePoll() async throws {
         let stub = try MatchupStub(answer: Self.answer(Self.sunday))
         await stub.fail(APIError.status(401))
@@ -278,102 +315,5 @@ struct MatchupViewModelTests {
         let rows: [RowCells] = week.boxes.flatMap { $0.starters + $0.bench }
         let withPages: Int = rows.filter { $0.row.slug != nil }.count
         #expect(players.count == withPages)
-    }
-}
-
-/// Waits, a little at a time, until `condition` holds; fails the test after about two seconds.
-@MainActor
-func eventually(_ condition: () async -> Bool) async throws {
-    for _ in 0 ..< 400 {
-        if await condition() {
-            return
-        }
-        try await Task.sleep(for: .milliseconds(5))
-    }
-    Issue.record("The condition never held.")
-}
-
-/// Lets every task that could run run.
-@MainActor
-func settle() async {
-    for _ in 0 ..< 20 {
-        await Task.yield()
-        try? await Task.sleep(for: .milliseconds(2))
-    }
-}
-
-/// The poll's timer by hand: each sleep is kept until the test ticks it, its interval recorded; a
-/// cancelled sleep throws at once.
-actor ManualTimer: PollTimer {
-    private(set) var intervals: [Duration] = []
-    private var waiting: [UUID: CheckedContinuation<Void, any Error>] = [:]
-    private var cancelled: Set<UUID> = []
-
-    var sleepers: Int {
-        waiting.count
-    }
-
-    func sleep(for interval: Duration) async throws {
-        intervals.append(interval)
-        let id = UUID()
-        try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-                if cancelled.remove(id) != nil {
-                    continuation.resume(throwing: CancellationError())
-                } else {
-                    waiting[id] = continuation
-                }
-            }
-        } onCancel: {
-            Task { await self.cancel(id) }
-        }
-    }
-
-    func tick() {
-        let due = waiting.values
-        waiting = [:]
-        for continuation in due {
-            continuation.resume()
-        }
-    }
-
-    private func cancel(_ id: UUID) {
-        if let continuation = waiting.removeValue(forKey: id) {
-            continuation.resume(throwing: CancellationError())
-        } else {
-            cancelled.insert(id)
-        }
-    }
-}
-
-/// The Matchup's two reads as the fixture answers them at a clock, counted; or failing as told.
-actor MatchupStub: MatchupAPI {
-    private let answer: MatchupAnswer
-    private let box: Bool
-    private var failure: (any Error)?
-    private(set) var reads = 0
-
-    init(answer: MatchupAnswer, box: Bool = true) {
-        self.answer = answer
-        self.box = box
-    }
-
-    func fail(_ error: (any Error)?) {
-        failure = error
-    }
-
-    func leagueSync(id _: String) async throws -> LeagueSync {
-        reads += 1
-        if let failure {
-            throw failure
-        }
-        return answer.sync
-    }
-
-    func matchup(id _: String) async throws -> MatchupBox? {
-        if let failure {
-            throw failure
-        }
-        return box ? answer.box : nil
     }
 }

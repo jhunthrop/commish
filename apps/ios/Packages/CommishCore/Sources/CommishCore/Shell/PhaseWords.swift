@@ -79,6 +79,12 @@ public enum LeagueNames {
         return parts.joined(separator: ", ")
     }
 
+    /// A team the platform names nothing for, by its roster: "Team 7" (home.ts and model.ts teamName,
+    /// the one wording every screen's team falls back to).
+    public static func unnamedTeam(_ rosterID: Int) -> String {
+        "Team \(rosterID)"
+    }
+
     /// The league's own name, or its platform's when its read has none yet ("Your Yahoo league").
     public static func followedName(_ league: FollowedLeague) -> String {
         league.name.isEmpty ? "Your \(ValueWords.platform(league.host)) league" : league.name

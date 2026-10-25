@@ -129,7 +129,7 @@ enum ScoreBugs {
         let state = drawn.state
         let final = drawn.final
         let (small, big) = figures(side, state: state, final: final, headFinal: drawn.headFinal)
-        let name = team?.name ?? "Team \(side.rosterId)"
+        let name = team?.name ?? LeagueNames.unnamedTeam(side.rosterId)
         return BugSide(
             rosterID: side.rosterId,
             name: name,
