@@ -161,7 +161,7 @@ internal fun BoardHead(
     Column(modifier.fillMaxWidth().padding(horizontal = Tokens.Space.s3.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
             model.words.heading.uppercase(),
-            style = Faces.head.copy(fontSize = Faces.head.fontSize * DISPLAY_SCALE, fontWeight = FontWeight.Bold),
+            style = Faces.head.copy(fontSize = Faces.head.fontSize * DISPLAY_SCALE),
             color = c.ink,
             modifier = Modifier.semantics { heading() },
         )
