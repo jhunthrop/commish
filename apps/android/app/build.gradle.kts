@@ -57,8 +57,10 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions.unitTests.isIncludeAndroidResources = true
     testOptions.unitTests.all {
         it.systemProperty("repository", rootDir.resolve("../..").canonicalPath)
+        it.systemProperty("fixtures", rootDir.resolve("../../shared/fixtures").canonicalPath)
     }
     lint {
         warningsAsErrors = false
@@ -87,4 +89,10 @@ dependencies {
 
     testImplementation(libs.junit4)
     testImplementation(libs.serialization.json)
+    testImplementation(testFixtures(project(":core")))
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.robolectric)
+    debugImplementation(platform(libs.compose.bom))
+    debugImplementation(libs.compose.ui.test.manifest)
 }
