@@ -19,4 +19,6 @@ filter:
     - planHostMove
     - makeHostMove
     - leagueMatchup
+    - leagueTrades
+    - checkLeagueTrade
     - roomBoard
