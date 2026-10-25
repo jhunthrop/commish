@@ -41,6 +41,9 @@ import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
 import app.trycommish.design.Tokens
 import app.trycommish.design.Words
+import app.trycommish.feature.boxscore.clickableLink
+import app.trycommish.feature.boxscore.edgeRule
+import app.trycommish.feature.boxscore.wrapCenter
 
 private val SUM_WIDTH = 180.dp
 private val CHIP_HEIGHT = 24.dp
