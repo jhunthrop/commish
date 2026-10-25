@@ -31,6 +31,7 @@ const (
 	defaultMetricsPort      = "9464"
 	defaultTrustedProxyHops = 1
 	defaultExportsBucket    = "commish-exports"
+	defaultRunsBucket       = "commish-runs"
 	defaultMailFrom         = "Commish <hello@trycommish.app>"
 	// DevOrigin is the SvelteKit dev server. Development allows it by
 	// default; production allows it only if CORS_ORIGINS names it.
@@ -103,7 +104,8 @@ type Stripe struct {
 // Configured reports whether billing can be offered.
 func (s Stripe) Configured() bool { return s.SecretKey != "" && s.WebhookSecret != "" }
 
-// R2 addresses the private bucket exports are written to.
+// R2 addresses one private bucket: the one exports are written to, or
+// the nightly runs' the /run routes read.
 type R2 struct {
 	AccountID       string
 	AccessKeyID     string
@@ -112,7 +114,7 @@ type R2 struct {
 	Endpoint        string
 }
 
-// Configured reports whether exports can be written.
+// Configured reports whether the bucket can be reached.
 func (r R2) Configured() bool {
 	return (r.AccountID != "" || r.Endpoint != "") && r.AccessKeyID != "" && r.SecretAccessKey != "" && r.Bucket != ""
 }
@@ -172,9 +174,14 @@ type API struct {
 	WorkOS   WorkOS
 	Stripe   Stripe
 	R2       R2
-	Mail     Mail
-	Board    Board
-	Advisor  Advisor
+	// Runs is the nightly runs' bucket (Lane 185): R2's account and
+	// endpoint with its own read-only keys, R2_RUNS_ACCESS_KEY_ID and
+	// R2_RUNS_SECRET_ACCESS_KEY, so the exports' write keys never read a
+	// run and the runs' keys never write.
+	Runs    R2
+	Mail    Mail
+	Board   Board
+	Advisor Advisor
 	// RoomBaseURL is the room service's WebSocket origin a lobby seat is
 	// handed, wss://room.trycommish.app in production.
 	RoomBaseURL string
@@ -422,6 +429,22 @@ func (l *loader) r2() R2 {
 	}
 }
 
+// runs is the nightly runs' bucket: the exports' account and endpoint,
+// its own keys and bucket. Half a key pair is refused at start.
+func (l *loader) runs(exports R2) R2 {
+	r := R2{
+		AccountID:       exports.AccountID,
+		Endpoint:        exports.Endpoint,
+		AccessKeyID:     l.optional("R2_RUNS_ACCESS_KEY_ID", ""),
+		SecretAccessKey: l.optional("R2_RUNS_SECRET_ACCESS_KEY", ""),
+		Bucket:          l.optional("R2_RUNS_BUCKET", defaultRunsBucket),
+	}
+	if (r.AccessKeyID == "") != (r.SecretAccessKey == "") {
+		l.invalid("R2_RUNS_ACCESS_KEY_ID", "is set without R2_RUNS_SECRET_ACCESS_KEY, or the other way round")
+	}
+	return r
+}
+
 // Board and advisor defaults: the 2026 board under the v9 source names,
 // checked again every five minutes (a version read, the board itself only
 // once it moved, so an hourly publish shows within five minutes); the
@@ -534,6 +557,7 @@ func LoadAPI(get Getenv) (API, error) {
 	c.WorkOS = l.workos(c.HTTP.APIBaseURL)
 	c.Stripe = l.stripe()
 	c.R2 = l.r2()
+	c.Runs = l.runs(c.R2)
 	c.Mail = Mail{ResendAPIKey: l.optional("RESEND_API_KEY", ""), From: l.optional("MAIL_FROM", defaultMailFrom)}
 	c.Board = l.board()
 	c.Advisor = l.advisor()

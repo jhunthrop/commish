@@ -24,7 +24,7 @@
 		"shots": "node --env-file-if-exists=.env scripts/shots.ts",
 		"measure:sheet": "node scripts/measure-sheet.ts",
 		"measure:page": "node scripts/measure-page-js.ts",
-		"gen:shared": "node ../shared/scripts/gen-tokens.ts && node ../shared/scripts/gen-words.ts && node ../shared/scripts/export-fixtures.ts && node ../shared/scripts/gen-mark.ts && node ../shared/scripts/export-parity.ts && node ../apps/ios/scripts/gen-openapi.ts",
+		"gen:shared": "node ../shared/scripts/gen-tokens.ts && node ../shared/scripts/gen-words.ts && node ../shared/scripts/export-fixtures.ts && node ../shared/scripts/gen-mark.ts && node ../shared/scripts/export-parity.ts && node ../shared/scripts/export-run.ts && node ../apps/ios/scripts/gen-openapi.ts",
 		"check:shared": "node ../shared/scripts/check-gen.ts"
 	},
 	"devDependencies": {

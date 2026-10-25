@@ -28,6 +28,7 @@ tags:
   - { name: companions }
   - { name: devices }
   - { name: hosts }
+  - { name: run }
 
 paths:
   /healthz:
@@ -1233,6 +1234,274 @@ paths:
                   - $ref: "#/components/schemas/Envelope"
                   - properties: { data: { $ref: "#/components/schemas/RoomBoard" } }
         "400": { $ref: "#/components/responses/ErrorResponse" }
+  /run/manifest:
+    get:
+      tags: [run]
+      operationId: runManifest
+      summary: >-
+        The published nightly run's manifest (Lane 185): its id, when it finished, its season, every format it carries
+        (the default first) with the week its rest of season ranks from, and how many players have a page. The run is
+        the one runs/latest.json names, the same the site is built from, and never one whose manifest is missing or
+        names another run. Only the members the site's reader names are sent; the sources block is provenance and is
+        never sent. Every /run route answers a weak ETag (the run id and the file; designations, rewritten beside the run every
+        hour, add a digest of what they hold) and Cache-Control public with a short max-age, and 304 with no body to a
+        matching If-None-Match. 503 storage_unavailable when the run cannot be read here.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: the manifest
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunManifestAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-manifest
+                data:
+                  run_id: 2026-10-21T12-ros
+                  manifest:
+                    runId: 2026-10-21T12-ros
+                    runAt: "2026-10-21T12:00:00.000Z"
+                    season: 2026
+                    implementation: python
+                    standIn: false
+                    formats:
+                      - id: ppr-12
+                        label: PPR
+                        unit: PPR pts
+                        teams: 12
+                        basis:
+                          - PPR, rest of the 2026 season from week 7, refreshed October 21
+                          - ranked by points over replacement in a 12-team league
+                          - tiers drawn within each position
+                        rosFromWeek: 7
+                        rosFromWeekPartial: false
+                        rosThroughWeek: 5
+                        refreshedAt: "2026-10-21T12:00:00.000Z"
+                        marketOrder: ffc_adp_ppr_12
+                    players: 4
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/boards/{format}:
+    parameters:
+      - name: format
+        in: path
+        required: true
+        description: a format the published run carries, as its manifest names it (ppr-12)
+        schema: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*-[0-9]{1,2}$" }
+      - $ref: "#/components/parameters/IfNoneMatch"
+    get:
+      tags: [run]
+      operationId: runBoard
+      summary: >-
+        The published run's board in one format (boards/<format>.json), as the site draws it: the ranked rows in the
+        run's order, each with its tier, its tier's drop, its round and its ADP, and the kickers and defenses apart in
+        the drafters' order. Every row is the run's as written. 404 for a format the run does not carry.
+      responses:
+        "200":
+          description: the board
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunBoardAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-board
+                data:
+                  run_id: 2026-10-21T12-ros
+                  format: ppr-12
+                  rows:
+                    - id: "4429795"
+                      slug: jahmyr-gibbs
+                      name: Jahmyr Gibbs
+                      position: RB
+                      positionRank: 1
+                      team: DET
+                      headshot: https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png
+                      orderBasis: projection
+                      ourRank: 1
+                      vorRound: 1
+                      adp: 1.4
+                      gap: 0.4
+                      projected: 242.5
+                      vor: 153.6
+                      expectedGames: 10
+                      floor: null
+                      median: null
+                      ceiling: null
+                      tier: 1
+                      tierDrop: 18.2
+                      preseasonRank: 5
+                      preseasonPoints: 262.1
+                      preseasonPerGame: 17.6
+                      preseasonShare: 40
+                      blendedPerGame: 24.2
+                      ratePerGame: 24.1
+                      restFromWeek: 7
+                      gamePoints: 24.1
+                  market:
+                    - id: DST-SEA
+                      slug: seattle-seahawks
+                      name: Seattle Seahawks
+                      position: DST
+                      positionRank: 1
+                      team: SEA
+                      headshot: null
+                      orderBasis: market
+                      ourRank: 401
+                      adp: 81
+                      gap: null
+                      vorRound: null
+                      projected: null
+                      vor: null
+                      expectedGames: null
+                      floor: null
+                      median: null
+                      ceiling: null
+                      tier: null
+                      tierDrop: null
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/index:
+    get:
+      tags: [run]
+      operationId: runIndex
+      summary: >-
+        The published run's index (index.json): every player with a page and his season so far in two numbers, and the
+        kickers and defenses the boards carry apart, with no page and no season.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: the index
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunIndexAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-index
+                data:
+                  run_id: 2026-10-21T12-ros
+                  pages:
+                    - id: "4429795"
+                      slug: jahmyr-gibbs
+                      name: Jahmyr Gibbs
+                      team: DET
+                      position: RB
+                      headshot: https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png
+                      orderBasis: projection
+                      season: { games: 5, pointsPerGame: 30.7 }
+                  market:
+                    - id: DST-SEA
+                      slug: seattle-seahawks
+                      name: Seattle Seahawks
+                      team: SEA
+                      position: DST
+                      headshot: null
+                      orderBasis: market
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/adp:
+    get:
+      tags: [run]
+      operationId: runAdp
+      summary: >-
+        The published run's ADP (adp.json): every source, the drafts behind it and the formats whose boards blend it,
+        with its window, and each player's ADP per source id. A board's ADP basis is its format's sources' drafts and
+        windows.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: the ADP
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunAdpAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-adp
+                data:
+                  run_id: 2026-10-21T12-ros
+                  adp:
+                    sources:
+                      - id: ffc_adp_ppr_12
+                        drafts: PPR drafts
+                        formats: [ppr-12]
+                        window: { from: "2026-09-09T07:00:00.000Z", to: "2026-09-09T07:00:00.000Z" }
+                    players:
+                      "4429795": { ffc_adp_ppr_12: 1.4 }
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /run/designations:
+    get:
+      tags: [run]
+      operationId: runDesignations
+      summary: >-
+        The newest hourly injury capture beside the published run (designations.json): each ranked player it lists,
+        by id. designations is null when the run carries none, and the screens then show no status. It is written
+        again every publish hour under the same run, so its ETag carries a digest of what it holds. Its source is
+        provenance and is never sent.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: the designations
+          headers:
+            ETag: { $ref: "#/components/headers/RunETag" }
+            Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RunDesignationsAnswer" } }
+              example:
+                ok: true
+                error: null
+                request_id: 3f0c2a9e-run-designations
+                data:
+                  run_id: 2026-10-21T12-ros
+                  designations:
+                    readAt: "2026-10-14T02:03:35.613Z"
+                    checkedAt: null
+                    players:
+                      "4047365": { status: out, seasonLong: false, since: null }
+                      "2991662":
+                        status: injured_reserve
+                        seasonLong: true
+                        since: "2026-10-10T22:00:00.000Z"
+                        returning: "2026-10-25"
+        "304": { $ref: "#/components/responses/RunNotModified" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
   /order:
     parameters:
       - name: position
@@ -1924,7 +2193,20 @@ components:
         in X-Anon-CSRF-Token, never the session's cookie or header. Sign-in moves the token's mocks to the account and
         expires both cookies. An unclaimed mock is deleted after 90 days idle, or after 24 hours with no pick.
 
+  headers:
+    RunETag:
+      description: weak, the run id and the file, one value per run and file (the gzip and the plain body share it)
+      schema: { type: string }
+    RunCacheControl:
+      description: public, with a short max-age
+      schema: { type: string }
   parameters:
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      description: an ETag a /run answer gave; a match answers 304 with no body
+      schema: { type: string }
     TierMates:
       name: tier
       in: query
@@ -1979,6 +2261,11 @@ components:
       schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
 
   responses:
+    RunNotModified:
+      description: the run and the file are the ones the If-None-Match names; no body
+      headers:
+        ETag: { $ref: "#/components/headers/RunETag" }
+        Cache-Control: { $ref: "#/components/headers/RunCacheControl" }
     ErrorResponse:
       description: the error envelope
       content:
@@ -3542,6 +3829,297 @@ components:
       description: >-
         which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API
         reads it)
+    # The published run's files (Lane 185), mirroring web/src/lib/run/schema.ts field for field: the run's own
+    # camelCase names and nullability, a field the run may leave out not required. web/src/lib/run/api-parity.test.ts
+    # holds each schema to its zod schema and parses every /run example with it.
+    RunPosition:
+      type: string
+      enum: [QB, RB, WR, TE, K, DST]
+    RunMarketPosition:
+      type: string
+      description: a kicker or a defense, the positions every board carries in the drafters' order
+      enum: [K, DST]
+    RunWindow:
+      type: object
+      description: the first and last moments a feed's numbers were captured, read from the data's own stamps
+      required: [from, to]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+    RunFormat:
+      type: object
+      required: [id, label, unit, teams, basis]
+      properties:
+        id: { type: string, description: "the format id: ppr-12" }
+        label: { type: string, description: "as a chip prints it: PPR, Half PPR" }
+        unit: { type: string, description: "what the points are in, as a cell label prints it: PPR pts" }
+        teams: { type: integer, minimum: 2 }
+        basis:
+          type: array
+          items: { type: string }
+          description: the basis of every number on this format's board, phrase by phrase, as the board's lead prints them
+        rosFromWeek:
+          type: integer
+          minimum: 1
+          description: in season, the first week the board ranks the rest of the season from; absent preseason
+        rosFromWeekPartial:
+          type: boolean
+          description: >-
+            in season, set while a game of rosFromWeek had kicked off at the run: its clubs count from their next week.
+            Absent preseason and on a run older than the field
+        rosThroughWeek:
+          type: integer
+          minimum: 0
+          description: in season, the last week whose games are in the season figures
+        refreshedAt:
+          type: string
+          format: date-time
+          description: in season, when the run refreshed the rest-of-season board
+        marketOrder:
+          type: string
+          description: the ADP source id whose draft order the board's kickers and defenses take
+    RunManifest:
+      type: object
+      description: the run's manifest.json, the members the site's reader names less the sources block (provenance)
+      required: [runId, runAt, season, implementation, standIn, formats, players]
+      properties:
+        runId: { type: string, description: "the run's id: 2026-10-12T05" }
+        runAt: { type: string, format: date-time, description: when the run finished, the date every page prints }
+        season: { type: integer }
+        implementation: { type: string, description: the code that produced the run }
+        standIn: { type: boolean, description: true for the stand-in run }
+        formats:
+          type: array
+          items: { $ref: "#/components/schemas/RunFormat" }
+          description: every format the run carries, the default first
+        players: { type: integer, minimum: 1, description: every player with a page, as the index lists them }
+    RunManifestAnswer:
+      type: object
+      required: [run_id, manifest]
+      properties:
+        run_id: { type: string, description: the published run every /run answer is read from }
+        manifest: { $ref: "#/components/schemas/RunManifest" }
+    RunBoardRow:
+      type: object
+      description: a ranked row of boards/<format>.json, ranked by our projection
+      required:
+        [id, slug, name, position, positionRank, team, headshot, ourRank, vorRound, adp, projected, vor, expectedGames, floor, median, ceiling, tier]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        position: { $ref: "#/components/schemas/RunPosition" }
+        positionRank: { type: integer, minimum: 1 }
+        team: { type: string }
+        headshot: { type: string }
+        orderBasis:
+          type: string
+          enum: [projection]
+          description: absent on a run older than the kickers' and defenses' rows
+        ourRank: { type: integer, minimum: 1, description: his place on this board, by points over replacement }
+        vorRound: { type: integer, minimum: 1, description: the round of this format's draft his place falls in }
+        adp: { type: number, nullable: true, description: "the blended ADP of this format's sources, null when none has him" }
+        gap:
+          type: number
+          nullable: true
+          description: >-
+            the drafters' ADP less our rank, to a tenth: plus when drafters take him later than we rank him; null without
+            an ADP, absent on a run older than the column
+        projected: { type: number }
+        vor: { type: number }
+        expectedGames: { type: number, minimum: 0 }
+        floor: { type: number, nullable: true, description: null in season }
+        median: { type: number, nullable: true, description: null in season }
+        ceiling: { type: number, nullable: true, description: null in season }
+        tier: { type: integer, minimum: 1, description: his tier within his position, 1 the top }
+        tierDrop:
+          type: number
+          nullable: true
+          description: >-
+            his tier's drop to the next tier at his position, to a tenth: the tier's last player's projected points less
+            the next tier's first; null in his position's last tier, absent on a run older than the column
+        preseasonRank:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: in season, where the preseason board ranked him; null when it did not
+        preseasonPoints: { type: number, nullable: true, description: "in season, the preseason board's points for the full season" }
+        preseasonPerGame: { type: number, nullable: true, description: in season, the preseason pace a game his figure starts from }
+        preseasonShare:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+          description: in season, the share of his rate a game that pace carries, a whole percent
+        blendedPerGame: { type: number, nullable: true, description: in season, his season blended with his usage a game }
+        ratePerGame: { type: number, nullable: true, description: "in season, the model's rate a game he plays" }
+        restFromWeek:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: in season, the week his rest of season starts from, null with no game left
+        gamePoints:
+          type: number
+          nullable: true
+          description: >-
+            in season, his points for one more game of his club; null preseason, absent on a run older than the
+            field
+    RunMarketRow:
+      type: object
+      description: >-
+        a kicker or a defense on a board, after the ranked rows in the drafters' order, with no projected points and no
+        tier: every figure of ours is always null
+      required:
+        [id, slug, name, position, positionRank, team, headshot, orderBasis, ourRank, adp, vorRound, projected, vor, expectedGames, floor, median, ceiling, tier]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        position: { $ref: "#/components/schemas/RunMarketPosition" }
+        positionRank: { type: integer, minimum: 1, description: his place in the drafters' order at his position }
+        team: { type: string }
+        headshot: { type: string, nullable: true, description: "null for a defense (its face is its club's mark)" }
+        orderBasis: { type: string, enum: [market] }
+        ourRank: { type: integer, minimum: 1, description: his place on the whole board, after every ranked row }
+        adp: { type: number, description: "this format's ADP" }
+        gap: { type: number, nullable: true, description: always null when sent }
+        vorRound: { type: integer, nullable: true, description: always null }
+        projected: { type: number, nullable: true, description: always null }
+        vor: { type: number, nullable: true, description: always null }
+        expectedGames: { type: number, nullable: true, description: always null }
+        floor: { type: number, nullable: true, description: always null }
+        median: { type: number, nullable: true, description: always null }
+        ceiling: { type: number, nullable: true, description: always null }
+        tier: { type: integer, nullable: true, description: always null }
+        tierDrop: { type: number, nullable: true, description: always null when sent }
+    RunBoardAnswer:
+      type: object
+      required: [run_id, format, rows, market]
+      properties:
+        run_id: { type: string }
+        format: { type: string }
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/RunBoardRow" }
+          description: the ranked rows, in the file's order
+        market:
+          type: array
+          items: { $ref: "#/components/schemas/RunMarketRow" }
+          description: the kickers and defenses, in the file's order
+    RunIndexSeason:
+      type: object
+      required: [games, pointsPerGame]
+      properties:
+        games: { type: integer, minimum: 0 }
+        pointsPerGame: { type: number, nullable: true, description: null exactly when he has no game }
+    RunIndexEntry:
+      type: object
+      required: [id, slug, name, team, position, headshot, season]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        team: { type: string }
+        position: { $ref: "#/components/schemas/RunPosition" }
+        headshot: { type: string }
+        orderBasis:
+          type: string
+          enum: [projection]
+          description: absent on a run older than the kickers' and defenses' entries
+        season: { $ref: "#/components/schemas/RunIndexSeason" }
+    RunMarketEntry:
+      type: object
+      required: [id, slug, name, team, position, headshot, orderBasis]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        team: { type: string }
+        position: { $ref: "#/components/schemas/RunMarketPosition" }
+        headshot: { type: string, nullable: true }
+        orderBasis: { type: string, enum: [market] }
+    RunIndexAnswer:
+      type: object
+      required: [run_id, pages, market]
+      properties:
+        run_id: { type: string }
+        pages:
+          type: array
+          items: { $ref: "#/components/schemas/RunIndexEntry" }
+          description: every player with a page, in the file's order
+        market:
+          type: array
+          items: { $ref: "#/components/schemas/RunMarketEntry" }
+          description: the kickers and defenses, in the file's order
+    RunAdpSource:
+      type: object
+      required: [id, drafts, formats, window]
+      properties:
+        id: { type: string }
+        drafts: { type: string, description: "the drafts behind the numbers, in a drafter's words: PPR drafts" }
+        formats:
+          type: array
+          items: { type: string }
+          description: the formats whose boards blend this source
+        window: { $ref: "#/components/schemas/RunWindow" }
+    RunAdp:
+      type: object
+      required: [sources, players]
+      properties:
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/RunAdpSource" }
+        players:
+          type: object
+          description: each player's ADP per source id; a missing key is a source that does not have him
+          additionalProperties:
+            type: object
+            additionalProperties: { type: number, format: double }
+    RunAdpAnswer:
+      type: object
+      required: [run_id, adp]
+      properties:
+        run_id: { type: string }
+        adp: { $ref: "#/components/schemas/RunAdp" }
+    RunPlayerStatus:
+      type: object
+      required: [status, seasonLong, since]
+      properties:
+        status: { $ref: "#/components/schemas/DesignationStatus" }
+        seasonLong: { type: boolean }
+        since:
+          type: string
+          format: date-time
+          nullable: true
+          description: the first capture of his unbroken run under a season-long status; null for a week's designation
+        returning:
+          type: string
+          format: date
+          description: the day he is due back from a season-long list, absent without one
+    RunDesignations:
+      type: object
+      description: the run's designations.json, less its source (provenance)
+      required: [readAt, checkedAt, players]
+      properties:
+        readAt: { type: string, format: date-time, description: "the capture's stamp: when the list last changed" }
+        checkedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: the capture job's last successful check of the list, null when the store records none
+        players:
+          type: object
+          description: by player id, every ranked player the capture lists
+          additionalProperties: { $ref: "#/components/schemas/RunPlayerStatus" }
+    RunDesignationsAnswer:
+      type: object
+      required: [run_id, designations]
+      properties:
+        run_id: { type: string }
+        designations:
+          nullable: true
+          description: null when the run carries no capture
+          allOf: [{ $ref: "#/components/schemas/RunDesignations" }]
     DesignationStatus:
       type: string
       enum: [questionable, doubtful, out, injured_reserve, suspended, pup, nfi]

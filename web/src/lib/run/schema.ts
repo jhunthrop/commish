@@ -150,7 +150,10 @@ export const boardRowSchema = z.object({
 	/** In season, the week his rest of season starts from: his club's first game still to play at the
 	 * run (Lane 86), null with none left. Absent preseason and on a run older than the field, where the
 	 * format's rosFromWeek stands. */
-	restFromWeek: z.number().int().min(1).nullable().optional()
+	restFromWeek: z.number().int().min(1).nullable().optional(),
+	/** In season, his points for one more game of his club (Lane 96, the published board's game
+	 * points): null preseason, absent on a run older than the field. */
+	gamePoints: points.nullable().optional()
 });
 
 /** A kicker or a defense on a board (the 2026-09-05 ruling): after the ranked rows, in the drafters'
