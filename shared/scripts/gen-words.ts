@@ -46,7 +46,7 @@ const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
  * screens' lines, a status in words and in a rank's few characters, and the figures' heads; then the
  * Matchup's (Lane 183): the words beside its box scores; then the Board's (Lane 182): its chips and heads,
  * its formats' chips, the Gap's definition, and the season pages' verbs; then the run's board on the Board
- * (Lane 190): a tier band's words, what its count counts, and the run's stamp. */
+ * (Lane 190): a tier band's words, what its count counts, the run's stamp and a past bye's word. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -240,6 +240,12 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/run/stamp.ts',
 		picks: ['STAMP_WORDS'],
 		json: 'shared/words/run-stamp.json'
+	},
+	{
+		name: 'Bye',
+		module: 'web/src/lib/format/bye.ts',
+		picks: ['BYE_WORDS'],
+		json: 'shared/words/bye.json'
 	}
 ];
 export const OUTPUT = {

@@ -7,210 +7,267 @@
  * words and cliffs (run/tiers.ts tierGroups, TierStrip.svelte), and the basis a phone prints
  * (run/board-basis.ts boardBasis, site/market.ts marketBasis, the capture's few words). Written by
  * export-parity.ts beside the other screens' parity. */
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { captureShort } from '../../web/src/lib/format/designation.ts';
-import { carriesGap } from '../../web/src/lib/format/gap.ts';
-import { fixed, plural } from '../../web/src/lib/format/number.ts';
-import { adpDrafts } from '../../web/src/lib/run/adp-drafts.ts';
-import { boardBasis } from '../../web/src/lib/run/board-basis.ts';
-import { heldOut, withStatuses } from '../../web/src/lib/run/board-status.ts';
-import { POSITION_NAMES, positionsIn, rowsAt } from '../../web/src/lib/run/derive.ts';
-import { isMarketPosition, marketAt, splitBoard } from '../../web/src/lib/run/market.ts';
-import { restCaption } from '../../web/src/lib/run/rest-words.ts';
-import { rowFraming } from '../../web/src/lib/run/row-framing.ts';
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { captureShort } from "../../web/src/lib/format/designation.ts";
+import { byeCell } from "../../web/src/lib/format/bye.ts";
+import { carriesGap } from "../../web/src/lib/format/gap.ts";
+import { fixed, plural } from "../../web/src/lib/format/number.ts";
+import { adpDrafts } from "../../web/src/lib/run/adp-drafts.ts";
+import { boardBasis } from "../../web/src/lib/run/board-basis.ts";
+import { heldOut, withStatuses } from "../../web/src/lib/run/board-status.ts";
 import {
-	adpSchema,
-	boardSchema,
-	designationsSchema,
-	latestPointerSchema,
-	manifestSchema,
-	type Designations,
-	type Format,
-	type Manifest
-} from '../../web/src/lib/run/schema.ts';
-import { runStampText } from '../../web/src/lib/run/stamp.ts';
-import { boardStatusWords } from '../../web/src/lib/run/status-view.ts';
-import { tierGroups } from '../../web/src/lib/run/tiers.ts';
-import { marketBasis } from '../../web/src/lib/site/market.ts';
-import { offlineLead } from '../../web/src/lib/site/offline-words.ts';
-import { boardWords } from '../../web/src/lib/site/season-words.ts';
-import { heatFor } from '../../web/src/lib/ui/heat.ts';
-import { TIER_WORDS } from '../../web/src/lib/ui/tier.ts';
-import type { MarketPosition, Position } from '../../web/src/lib/types/player.ts';
-import { REPOSITORY } from './generated.ts';
+  POSITION_NAMES,
+  positionsIn,
+  rowsAt,
+} from "../../web/src/lib/run/derive.ts";
+import {
+  isMarketPosition,
+  marketAt,
+  splitBoard,
+} from "../../web/src/lib/run/market.ts";
+import { restCaption } from "../../web/src/lib/run/rest-words.ts";
+import { rowFraming } from "../../web/src/lib/run/row-framing.ts";
+import {
+  adpSchema,
+  boardSchema,
+  clubsSchema,
+  designationsSchema,
+  latestPointerSchema,
+  manifestSchema,
+  type Designations,
+  type Format,
+  type Manifest,
+} from "../../web/src/lib/run/schema.ts";
+import { runStampText } from "../../web/src/lib/run/stamp.ts";
+import { boardStatusWords } from "../../web/src/lib/run/status-view.ts";
+import { tierGroups } from "../../web/src/lib/run/tiers.ts";
+import { marketBasis } from "../../web/src/lib/site/market.ts";
+import { offlineLead } from "../../web/src/lib/site/offline-words.ts";
+import { boardWords } from "../../web/src/lib/site/season-words.ts";
+import { heatFor } from "../../web/src/lib/ui/heat.ts";
+import { BOARD } from "../../web/src/lib/ui/board-words.ts";
+import { TIER_WORDS } from "../../web/src/lib/ui/tier.ts";
+import type {
+  MarketPosition,
+  Position,
+} from "../../web/src/lib/types/player.ts";
+import { REPOSITORY } from "./generated.ts";
 
-export const BOARD_RUN_OUTPUT = 'shared/fixtures/parity/board-run.json';
+export const BOARD_RUN_OUTPUT = "shared/fixtures/parity/board-run.json";
 
 /** The zone the statuses and the capture are said in, the fixtures' own. */
-const ZONE = 'America/Chicago';
+const ZONE = "America/Chicago";
 
 /** Each fixture run the apps read, the clock its board is shown at, and the rail at that clock. */
 export const BOARD_RUNS = [
-	{
-		fixture: 'shared/fixtures/standin-run',
-		now: '2026-09-01T17:00:00.000Z',
-		rail: 'pre_draft'
-	},
-	{
-		fixture: 'shared/fixtures/run',
-		now: '2026-10-22T17:00:00.000Z',
-		rail: 'in_season'
-	}
+  {
+    fixture: "shared/fixtures/standin-run",
+    now: "2026-09-01T17:00:00.000Z",
+    rail: "pre_draft",
+  },
+  {
+    fixture: "shared/fixtures/run",
+    now: "2026-10-22T17:00:00.000Z",
+    rail: "in_season",
+  },
 ] as const;
 
 type BoardRun = (typeof BOARD_RUNS)[number];
 
 async function json(path: string): Promise<unknown> {
-	return JSON.parse(await readFile(join(REPOSITORY, path), 'utf8'));
+  return JSON.parse(await readFile(join(REPOSITORY, path), "utf8"));
 }
 
 /** A tier band as the phone draws it: its number, its count and its drop. */
 interface TierCase {
-	tier: number;
-	ids: string[];
-	name: string;
-	count: string;
-	cliff: string;
+  tier: number;
+  ids: string[];
+  name: string;
+  count: string;
+  cliff: string;
 }
 
 interface ViewCase {
-	position: Position | null;
-	ids: string[];
-	tiers: TierCase[];
-	basis: string[];
-	/** The capture's sentence follows the basis (BoardView.svelte): always on a ranked view, on a
-	 * kicker's or a defense's only when one of its rows is listed. */
-	capture: boolean;
+  position: Position | null;
+  ids: string[];
+  tiers: TierCase[];
+  basis: string[];
+  /** The capture's sentence follows the basis (BoardView.svelte): always on a ranked view, on a
+   * kicker's or a defense's only when one of its rows is listed. */
+  capture: boolean;
 }
 
 function tiersOf(
-	rows: Parameters<typeof tierGroups>[0],
-	position: Position,
-	unit: string
+  rows: Parameters<typeof tierGroups>[0],
+  position: Position,
+  unit: string,
 ): TierCase[] {
-	const group = POSITION_NAMES[position];
-	return tierGroups(rows, position, heldOut).map((tier) => ({
-		tier: tier.tier,
-		ids: tier.rows.map((row) => row.id),
-		name: `${TIER_WORDS.tier} ${String(tier.tier)}`,
-		count: plural(tier.rows.length, group.one, group.many),
-		cliff:
-			tier.cliff === null
-				? TIER_WORDS.lastTier
-				: `${fixed(tier.cliff.drop)} ${unit} ${TIER_WORDS.toTier} ${String(tier.cliff.nextTier)}`
-	}));
+  const group = POSITION_NAMES[position];
+  return tierGroups(rows, position, heldOut).map((tier) => ({
+    tier: tier.tier,
+    ids: tier.rows.map((row) => row.id),
+    name: `${TIER_WORDS.tier} ${String(tier.tier)}`,
+    count: plural(tier.rows.length, group.one, group.many),
+    cliff:
+      tier.cliff === null
+        ? TIER_WORDS.lastTier
+        : `${fixed(tier.cliff.drop)} ${unit} ${TIER_WORDS.toTier} ${String(tier.cliff.nextTier)}`,
+  }));
 }
 
-async function viewsOf(run: BoardRun, manifest: Manifest, format: Format): Promise<ViewCase[]> {
-	const board = splitBoard(
-		boardSchema.parse(await json(`${run.fixture}/runs/${manifest.runId}/boards/${format.id}.json`))
-	);
-	const { sources } = adpSchema.parse(await json(`${run.fixture}/runs/${manifest.runId}/adp.json`));
-	const capture = await designationsOf(run, manifest);
-	const ranked = (position: Position | null): ViewCase => {
-		const rows = withStatuses(
-			position === null ? board.rows : rowsAt(board.rows, position),
-			capture
-		);
-		return {
-			position,
-			ids: rows.map((row) => row.id),
-			tiers: position === null ? [] : tiersOf(rows, position, format.unit),
-			basis: boardBasis({
-				format,
-				season: manifest.season,
-				order: 'board',
-				position,
-				adpBasis: adpDrafts(sources, format.id),
-				gap: rowFraming(format).compare && carriesGap(rows),
-				reach: null
-			})
-				.filter((part) => part.phone)
-				.map((part) => part.text),
-			capture: capture !== null
-		};
-	};
-	const marketView = (position: MarketPosition): ViewCase => {
-		const rows = withStatuses(marketAt(board.market, position), capture);
-		return {
-			position,
-			ids: rows.map((row) => row.id),
-			tiers: [],
-			basis: [marketBasis(format, sources)],
-			capture: rows.some((row) => row.status !== undefined)
-		};
-	};
-	return [null, ...positionsIn([...board.rows, ...board.market])].map((position) =>
-		position !== null && isMarketPosition(position) ? marketView(position) : ranked(position)
-	);
+async function viewsOf(
+  run: BoardRun,
+  manifest: Manifest,
+  format: Format,
+): Promise<ViewCase[]> {
+  const board = splitBoard(
+    boardSchema.parse(
+      await json(
+        `${run.fixture}/runs/${manifest.runId}/boards/${format.id}.json`,
+      ),
+    ),
+  );
+  const { sources } = adpSchema.parse(
+    await json(`${run.fixture}/runs/${manifest.runId}/adp.json`),
+  );
+  const capture = await designationsOf(run, manifest);
+  const ranked = (position: Position | null): ViewCase => {
+    const rows = withStatuses(
+      position === null ? board.rows : rowsAt(board.rows, position),
+      capture,
+    );
+    return {
+      position,
+      ids: rows.map((row) => row.id),
+      tiers: position === null ? [] : tiersOf(rows, position, format.unit),
+      basis: boardBasis({
+        format,
+        season: manifest.season,
+        order: "board",
+        position,
+        adpBasis: adpDrafts(sources, format.id),
+        gap: rowFraming(format).compare && carriesGap(rows),
+        reach: null,
+      })
+        .filter((part) => part.phone)
+        .map((part) => part.text),
+      capture: capture !== null,
+    };
+  };
+  const marketView = (position: MarketPosition): ViewCase => {
+    const rows = withStatuses(marketAt(board.market, position), capture);
+    return {
+      position,
+      ids: rows.map((row) => row.id),
+      tiers: [],
+      basis: [marketBasis(format, sources)],
+      capture: rows.some((row) => row.status !== undefined),
+    };
+  };
+  return [null, ...positionsIn([...board.rows, ...board.market])].map(
+    (position) =>
+      position !== null && isMarketPosition(position)
+        ? marketView(position)
+        : ranked(position),
+  );
 }
 
-async function designationsOf(run: BoardRun, manifest: Manifest): Promise<Designations | null> {
-	const read = await json(`${run.fixture}/runs/${manifest.runId}/designations.json`);
-	// The fixtures carry no source (the API drops it): the schema's provenance is put back to parse.
-	return read === null
-		? null
-		: designationsSchema.parse({ source: 'fixture', ...(read as object) });
+async function designationsOf(
+  run: BoardRun,
+  manifest: Manifest,
+): Promise<Designations | null> {
+  const read = await json(
+    `${run.fixture}/runs/${manifest.runId}/designations.json`,
+  );
+  // The fixtures carry no source (the API drops it): the schema's provenance is put back to parse.
+  return read === null
+    ? null
+    : designationsSchema.parse({ source: "fixture", ...(read as object) });
 }
 
 async function runCase(run: BoardRun): Promise<unknown> {
-	const { runId } = latestPointerSchema.parse(await json(`${run.fixture}/runs/latest.json`));
-	const manifest = manifestSchema.parse({
-		sources: [
-			{
-				artifact: 'boards',
-				vendor: 'fixture',
-				feed: 'fixture',
-				window: { from: run.now, to: run.now }
-			}
-		],
-		...((await json(`${run.fixture}/runs/${runId}/manifest.json`)) as object)
-	});
-	const format = manifest.formats[0];
-	if (format === undefined) throw new Error(`${run.fixture} carries no format.`);
-	const board = splitBoard(
-		boardSchema.parse(await json(`${run.fixture}/runs/${runId}/boards/${format.id}.json`))
-	);
-	const capture = await designationsOf(run, manifest);
-	const now = Date.parse(run.now);
-	const listed = withStatuses([...board.rows, ...board.market], capture);
-	const statuses =
-		capture === null
-			? null
-			: boardStatusWords(listed, {
-					capture,
-					restOfSeason: format.rosFromWeek !== undefined,
-					zone: ZONE,
-					now
-				});
-	return {
-		fixture: run.fixture,
-		runId,
-		now: run.now,
-		format: format.id,
-		stamp: runStampText({ ...manifest, search: '', formats: [] }),
-		offline: offlineLead(manifest.runAt),
-		restCaption: restCaption(format, manifest.season),
-		words: boardWords(
-			run.rail,
-			{
-				season: manifest.season,
-				label: format.label,
-				position: null,
-				...(format.rosFromWeek === undefined ? {} : { rosFromWeek: format.rosFromWeek })
-			},
-			false
-		),
-		capture: statuses?.capture ?? null,
-		statuses: statuses === null ? {} : statuses.rows,
-		heats: Object.fromEntries(board.rows.map((row) => [row.id, heatFor(row.vor, row.vorRound)])),
-		views: await viewsOf(run, manifest, format)
-	};
+  const { runId } = latestPointerSchema.parse(
+    await json(`${run.fixture}/runs/latest.json`),
+  );
+  const manifest = manifestSchema.parse({
+    sources: [
+      {
+        artifact: "boards",
+        vendor: "fixture",
+        feed: "fixture",
+        window: { from: run.now, to: run.now },
+      },
+    ],
+    ...((await json(`${run.fixture}/runs/${runId}/manifest.json`)) as object),
+  });
+  const format = manifest.formats[0];
+  if (format === undefined)
+    throw new Error(`${run.fixture} carries no format.`);
+  const board = splitBoard(
+    boardSchema.parse(
+      await json(`${run.fixture}/runs/${runId}/boards/${format.id}.json`),
+    ),
+  );
+  const capture = await designationsOf(run, manifest);
+  const now = Date.parse(run.now);
+  const listed = withStatuses([...board.rows, ...board.market], capture);
+  // The board's Bye cells, from the run's clubs (server/run.ts clubByes).
+  const clubs = clubsSchema.parse(
+    await json(`${run.fixture}/runs/${runId}/clubs.json`),
+  );
+  const byes = new Map(clubs.map((club) => [club.abbr, club.bye]));
+  const statuses =
+    capture === null
+      ? null
+      : boardStatusWords(listed, {
+          capture,
+          restOfSeason: format.rosFromWeek !== undefined,
+          zone: ZONE,
+          now,
+        });
+  return {
+    fixture: run.fixture,
+    runId,
+    now: run.now,
+    format: format.id,
+    stamp: runStampText({ ...manifest, search: "", formats: [] }),
+    offline: offlineLead(manifest.runAt),
+    restCaption: restCaption(format, manifest.season),
+    words: boardWords(
+      run.rail,
+      {
+        season: manifest.season,
+        label: format.label,
+        position: null,
+        ...(format.rosFromWeek === undefined
+          ? {}
+          : { rosFromWeek: format.rosFromWeek }),
+      },
+      false,
+    ),
+    capture: statuses?.capture ?? null,
+    statuses: statuses === null ? {} : statuses.rows,
+    byes: Object.fromEntries(
+      listed.map((row) => {
+        const bye = byes.get(row.team) ?? null;
+        return [
+          row.id,
+          bye === null
+            ? null
+            : `${BOARD.bye} ${byeCell(bye, format.rosFromWeek ?? null)}`,
+        ];
+      }),
+    ),
+    heats: Object.fromEntries(
+      board.rows.map((row) => [row.id, heatFor(row.vor, row.vorRound)]),
+    ),
+    views: await viewsOf(run, manifest, format),
+  };
 }
 
 export async function renderBoardRun(about: string): Promise<string> {
-	const runs = [];
-	for (const run of BOARD_RUNS) runs.push(await runCase(run));
-	return `${JSON.stringify({ about, zone: ZONE, runs }, null, '\t')}\n`;
+  const runs = [];
+  for (const run of BOARD_RUNS) runs.push(await runCase(run));
+  return `${JSON.stringify({ about, zone: ZONE, runs }, null, "\t")}\n`;
 }

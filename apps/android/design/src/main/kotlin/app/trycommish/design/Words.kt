@@ -364,4 +364,8 @@ object Words {
         const val updated = "Updated"
         const val standIn = "Stand-in, updated"
     }
+
+    object Bye {
+        const val done = "Done"
+    }
 }

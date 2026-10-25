@@ -1,8 +1,8 @@
 // Records the stand-in run's PPR board as the bucket would hold it, for the apps' Board before the draft
 // (Lane 190): the board the web's pre-draft board is built from (`npm run standin`), with its manifest,
-// its ADP and its designations, under shared/fixtures/standin-run in the bucket's layout
-// (`runs/latest.json` and `runs/<runId>/`), the layout of shared/fixtures/run, so one reader serves
-// both as the API's run routes answer them. Each file is held to the run's schema and to the members
+// its ADP, its clubs (their byes) and its designations, under shared/fixtures/standin-run in the
+// bucket's layout (`runs/latest.json` and `runs/<runId>/`), the layout of shared/fixtures/run, so one
+// reader serves both as the API's run routes answer them. Each file is held to the run's schema and to the members
 // the API sends (api/internal/runs project.go): the manifest's sources and the designations' source
 // are provenance and are dropped. The manifest's runAt is moved to PRE_DRAFT_RUN_AT, before the
 // season's first kickoff, the clock the pre-draft board is shown at; nothing else is changed.
@@ -16,6 +16,7 @@ import {
 	LATEST_POINTER,
 	adpSchema,
 	boardSchema,
+	clubsSchema,
 	designationsSchema,
 	latestPointerSchema,
 	manifestSchema
@@ -63,11 +64,13 @@ async function record(): Promise<void> {
 	);
 	const board = await read(boardSchema, new URL(`boards/${FORMAT}.json`, run));
 	const adp = await read(adpSchema, new URL('adp.json', run));
+	const clubs = await read(clubsSchema, new URL('clubs.json', run));
 	const out = new URL(`${runId}/`, OUT);
 	await write(new URL(LATEST_POINTER, OUT), { runId });
 	await write(new URL('manifest.json', out), { ...manifest, runAt: PRE_DRAFT_RUN_AT });
 	await write(new URL(`boards/${FORMAT}.json`, out), board);
 	await write(new URL('adp.json', out), adp);
+	await write(new URL('clubs.json', out), clubs);
 	await write(new URL('designations.json', out), designations);
 }
 

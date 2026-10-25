@@ -362,4 +362,8 @@ public enum Words {
         public static let updated = "Updated"
         public static let standIn = "Stand-in, updated"
     }
+
+    public enum Bye {
+        public static let done = "Done"
+    }
 }

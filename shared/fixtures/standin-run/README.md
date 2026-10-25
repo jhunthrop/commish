@@ -16,4 +16,5 @@ contract run predates: tiers with their drops, the Gap, and the kickers and defe
 | `runs/2026-10-12T00-standin/manifest.json` | `GET /run/manifest` | the run: its one format, PPR for 12 teams, of the full season |
 | `runs/2026-10-12T00-standin/boards/ppr-12.json` | `GET /run/boards/ppr-12` | the PPR board, 400 ranked rows and 48 kickers and defenses |
 | `runs/2026-10-12T00-standin/adp.json` | `GET /run/adp` | the ADP source and its value per player |
+| `runs/2026-10-12T00-standin/clubs.json` | `GET /run/clubs` | the 32 clubs with their byes |
 | `runs/2026-10-12T00-standin/designations.json` | `GET /run/designations` | the stand-in's injury capture |
