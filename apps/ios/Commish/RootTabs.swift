@@ -20,7 +20,8 @@ import Waivers
 /// tab where the bar has one, else the home pushed on the tab in view (B149). League, Lineup,
 /// Matchup, Waivers, Trades, the board (the Board item, and Rest of season in season with no league),
 /// Rankings and Our record are live, and the search opens Rankings with its letters; the others say
-/// their screen's name until their lane lands. Every screen presents the player sheet through the one
+/// their screen's name until their lane lands. A score bug opens its game: the member's on the Matchup
+/// tab, another team's pushed on the tab in view (Lane 206). Every screen presents the player sheet through the one
 /// host; its Full page and a player's site link push his page on the tab in view.
 struct RootTabs: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -120,17 +121,19 @@ struct RootTabs: View {
     private func screen(_ tab: RailTab) -> some View {
         switch (tab.key, selectedLeague) {
         case let (PhoneRail.leagueKey, league?):
-            LeagueScreen(environment: environment, leagueID: league.id, expired: expired) {
-                selection = PhoneRail.lineupKey
-            }
+            LeagueScreen(
+                environment: environment, leagueID: league.id, expired: expired,
+                openLineup: { selection = PhoneRail.lineupKey }, openGame: { openGame($0, league: league.id) }
+            )
             .id(league.id)
         case let (PhoneRail.lineupKey, league?):
             LineupScreen(environment: environment, league: league, expired: expired)
                 .id(league.id)
         case let (PhoneRail.matchupKey, league?):
-            MatchupTab(environment: environment, leagueID: league.id, expired: expired) {
-                selection = PhoneRail.lineupKey
-            }
+            MatchupTab(
+                environment: environment, leagueID: league.id, expired: expired,
+                openLineup: { selection = PhoneRail.lineupKey }
+            )
             .id(league.id)
         case let (PhoneRail.waiversKey, league?):
             WaiversTab(environment: environment, league: league, expired: expired)
@@ -180,7 +183,16 @@ struct RootTabs: View {
                 choose(id)
             }
         case let .leagueHome(id):
-            LeagueScreen(environment: environment, leagueID: id, expired: expired) {}
+            LeagueScreen(
+                environment: environment, leagueID: id, expired: expired, openLineup: {},
+                openGame: { openGame($0, league: id) }
+            )
+        case let .game(league, roster):
+            MatchupTab(
+                environment: environment, leagueID: league, roster: roster, expired: expired,
+                openLineup: { selection = PhoneRail.lineupKey }, yourGame: { openGame(nil, league: league) }
+            )
+            .id(route)
         case .adp, .compare, .clubs, .club, .schedule:
             ReferenceScreen(route: route, environment: environment, league: selectedLeague, expired: expired)
                 .id(route)
@@ -222,6 +234,17 @@ struct RootTabs: View {
         paths[selection, default: []].append(route)
     }
 
+    /// A score bug's game: the member's on the Matchup tab where the bar has one, else pushed.
+    private func openGame(_ roster: Int?, league: String) {
+        switch ShellRoute.game(of: roster, league: league, in: session.tabs) {
+        case let .tab(key):
+            switchOpen = false
+            selection = key
+        case let .push(route):
+            open(route)
+        }
+    }
+
     private func choose(_ id: String) {
         switchOpen = false
         session.choose(id)
@@ -236,30 +259,6 @@ struct RootTabs: View {
         case let .push(route):
             paths[selection, default: []].append(route)
         }
-    }
-}
-
-/// A league's home: owns its view model for the league it shows.
-private struct LeagueScreen: View {
-    @State private var viewModel: LeagueHomeViewModel
-    private let leagueID: String
-    private let openLineup: () -> Void
-
-    init(
-        environment: AppEnvironment,
-        leagueID: String,
-        expired: @escaping @MainActor () -> Void,
-        openLineup: @escaping () -> Void
-    ) {
-        _viewModel = State(initialValue: LeagueHomeViewModel(
-            api: environment.api, cache: environment.cache, clock: environment.clock, onSignedOut: expired
-        ))
-        self.leagueID = leagueID
-        self.openLineup = openLineup
-    }
-
-    var body: some View {
-        LeagueHomeView(viewModel: viewModel, leagueID: leagueID, openLineup: openLineup)
     }
 }
 
@@ -283,28 +282,6 @@ private struct LineupScreen: View {
 
     var body: some View {
         StartView(viewModel: viewModel, leagueID: leagueID)
-    }
-}
-
-/// A league's Matchup: owns its view model for the league it shows; the view polls while on screen.
-private struct MatchupTab: View {
-    @State private var viewModel: MatchupViewModel
-    private let leagueID: String
-    private let openLineup: @MainActor @Sendable () -> Void
-
-    init(
-        environment: AppEnvironment, leagueID: String, expired: @escaping @MainActor () -> Void,
-        openLineup: @escaping @MainActor @Sendable () -> Void
-    ) {
-        _viewModel = State(initialValue: MatchupViewModel(
-            api: environment.api, cache: environment.cache, clock: environment.clock, onSignedOut: expired
-        ))
-        self.leagueID = leagueID
-        self.openLineup = openLineup
-    }
-
-    var body: some View {
-        MatchupView(viewModel: viewModel, leagueID: leagueID, openLineup: openLineup)
     }
 }
 
