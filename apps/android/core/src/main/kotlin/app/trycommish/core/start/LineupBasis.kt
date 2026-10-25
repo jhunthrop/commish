@@ -1,0 +1,191 @@
+package app.trycommish.core.start
+
+import app.trycommish.api.models.GamePoints
+import app.trycommish.api.models.LeagueHost
+import app.trycommish.api.models.LineupAdvice
+import app.trycommish.api.models.PlayerLine
+import app.trycommish.api.models.ProjectionScoring
+import app.trycommish.core.Format
+import app.trycommish.core.instantOrNull
+import app.trycommish.core.leaguehome.ValueWords
+import app.trycommish.design.Words
+import java.time.Instant
+import java.time.ZoneId
+
+/** The basis sentences' shared parts (web basis.ts and league/names.ts). */
+internal object BasisParts {
+    /** basis.ts leagueScoringWords: " on your rules", ", PPR nearest your rules", or for a league whose
+     * rules add a tight end's extra ", PPR shown, nearest FFPC's rules". */
+    fun scoringWords(
+        scoring: ProjectionScoring,
+        league: LeagueHost,
+    ): String {
+        val format = ValueWords.format(scoring.format)
+        return when {
+            scoring.leagueOwn -> " on your rules"
+            scoring.teBonus == null -> ", $format nearest your rules"
+            else -> ", $format shown, nearest ${rulesOwner(league)}'s rules"
+        }
+    }
+
+    /** basis.ts teBonusSentence: "FFPC adds 0.5 a catch for TEs.", null without one. */
+    fun teBonusSentence(
+        bonus: Double?,
+        league: LeagueHost,
+    ): String? = bonus?.let { "${rulesOwner(league).replaceFirstChar { c -> c.uppercase() }} adds ${Format.number(it)} a catch for TEs." }
+
+    /** names.ts rulesOwner: FFPC fixes its own rules; on any other platform the league's commissioner does. */
+    private fun rulesOwner(league: LeagueHost): String = if (league == LeagueHost.ffpc) ValueWords.platform(league) else "your league"
+
+    /** basis.ts projFinalPhone: why the Proj final is "--" where it is, else what it adds; nothing before
+     * kickoff. */
+    fun projFinalPhone(
+        started: Boolean,
+        missing: Boolean,
+    ): String =
+        when {
+            !started -> ""
+            missing -> Words.Basis.noProjFinalPart
+            else -> Words.Basis.projFinalPart
+        }
+}
+
+/**
+ * The Lineup's basis as a phone says it once under the rows (basis.ts boxBasisParts on the Lineup,
+ * drawnText for the phone): the rule our pick follows with what Proj is, the Proj final, the Game cell,
+ * when Final and the stats land while a row waits on either, Our rank and Opp, Pts and the rules our
+ * stats lack. A port, held to the web's paragraph at every clock by the parity file.
+ */
+internal object LineupBasis {
+    data class Facts(
+        val advice: LineupAdvice,
+        val league: LeagueHost,
+        /** Every line on the screen: each slot's player and the starter a change sits, the bench, the
+         * injured reserve. */
+        val lines: List<PlayerLine>,
+        val totals: LineupTotals,
+        val zone: ZoneId,
+        val now: Instant,
+    )
+
+    private val pickPhone = "Our pick is each slot's highest ${Words.Box.proj},"
+    private val finalLands = "${Words.Box.final} lands the hour after a game"
+
+    fun phone(facts: Facts): String {
+        val advice = facts.advice
+        val kicked = LineRead.anyKicked(facts.lines, facts.now)
+        val projFinal = kicked && !facts.totals.allFinal
+        val noFinal = facts.totals.live && facts.totals.final == null
+        val parts =
+            listOf(
+                pickProj(facts, kicked),
+                BasisParts.projFinalPhone(projFinal, noFinal),
+                gamePart(facts),
+                if (drawsFacts(facts)) null else finalsPhone(facts),
+                Words.Basis.rankOppPhone,
+                ptsPhone(advice.playerPoints, ValueWords.platform(facts.league)),
+                uncounted(advice, facts.lines),
+            )
+        return parts.filterNotNull().filter { it.isNotEmpty() }.joinToString(" ")
+    }
+
+    /** basis.ts pickProjPart: "Our pick is each slot's highest Proj, this week's published projection,
+     * PPR shown, nearest FFPC's rules, read Fri 9:00 pm, as of kickoff once started." and the tight
+     * end's extra after it. */
+    private fun pickProj(
+        facts: Facts,
+        kicked: Boolean,
+    ): String {
+        val scoring = facts.advice.projectionScoring
+        val read = instantOrNull(facts.advice.projectionReadAt)?.let { "read ${Format.weekdayTime(it, facts.zone)}" } ?: "not in yet"
+        val asOf = if (kicked) ", ${Words.Basis.asOfKickoff}" else ""
+        val said = "$pickPhone this week's published projection${BasisParts.scoringWords(scoring, facts.league)}, $read$asOf."
+        return BasisParts.teBonusSentence(scoring.teBonus, facts.league)?.let { "$said $it" } ?: said
+    }
+
+    /** basis.ts gamePart 'full': the oldest read of any game still to be played. */
+    private fun gamePart(facts: Facts): String? =
+        facts.lines
+            .filter { LineRead.game(it, facts.now).toPlay }
+            .flatMap { listOfNotNull(it.facts.gameTotal?.readAt, it.facts.weather?.readAt) }
+            .mapNotNull(::instantOrNull)
+            .minOrNull()
+            ?.let {
+                "${Words.Box.game} is each club's expected points, his first, and weather, read ${Format.weekdayTime(
+                    it,
+                    facts.zone,
+                )}."
+            }
+
+    /** Whether a row still to be played draws its expected score or weather (basis.ts drawsFacts): the
+     * phone then keeps those cells' sentence and leaves when Final lands to the desk. */
+    private fun drawsFacts(facts: Facts): Boolean =
+        facts.lines.any { line ->
+            LineRead.game(line, facts.now).toPlay && (StartRows.expected(line.facts) != null || StartRows.weather(line.facts) != null)
+        }
+
+    /** basis.ts finalsParts as the phone draws them: when Final and the stats land while a row waits, the
+     * platform's points named where a row counts them. */
+    private fun finalsPhone(facts: Facts): String? {
+        val timing = kickedOffPart(facts)
+        val counted = facts.lines.firstOrNull { platformGame(it) != null } ?: return timing
+        val game = platformGame(counted) ?: return timing
+        val platform = ValueWords.platform(facts.league)
+        val stats = Words.Basis.statsByWednesday
+        val (avg, last) = Words.Box.avg to Words.Box.last
+        if (timing != null) return "$avg and $last count $platform's finals, our stats $stats"
+        return if (facts.lines.any { LineRead.game(it, facts.now) == GameRead.KickedOff }) {
+            "$finalLands, $avg and $last then count $platform's points, our stats $stats"
+        } else {
+            "$avg and $last count ${weeksWord(game.week, counted.facts.week)} finals from $platform's points, our stats $stats"
+        }
+    }
+
+    /** basis.ts kickedOffPartAt: when Final and the stats land, while a row is in play or final with the
+     * week's stats not in his games yet. */
+    private fun kickedOffPart(facts: Facts): String? {
+        val waiting =
+            facts.lines.any { line ->
+                val read = LineRead.game(line, facts.now)
+                val ours = line.facts.lastGames.any { it.week == line.facts.week && !fromPlatform(it) }
+                read == GameRead.KickedOff || (read == GameRead.Final && !ours)
+            }
+        return if (waiting) Words.Basis.kickedOffPart else null
+    }
+
+    private fun platformGame(line: PlayerLine): GamePoints? = line.facts.lastGames.firstOrNull(::fromPlatform)
+
+    private fun fromPlatform(game: GamePoints): Boolean = game.source == GamePoints.Source.platform
+
+    /** basis.ts weeksWord: "this week's", or "week 7's" on a page turned past the platform's week. */
+    private fun weeksWord(
+        week: Int,
+        platformWeek: Int,
+    ): String = if (week == platformWeek) "this week's" else "week $week's"
+
+    /** basis.ts ptsPhonePart. */
+    private fun ptsPhone(
+        byPlayer: Boolean,
+        platform: String,
+    ): String =
+        if (byPlayer) {
+            "${Words.Box.pts} are $platform's points so far."
+        } else {
+            "${Words.Box.pts} are $platform's team points alone."
+        }
+
+    /** basis.ts uncountedPart: the rules our stats lack, framed by whether any row counts the platform's
+     * points; an answer without the list says its note as sent. */
+    private fun uncounted(
+        advice: LineupAdvice,
+        lines: List<PlayerLine>,
+    ): String {
+        val names = advice.basisNoteList.orEmpty()
+        if (names.isEmpty()) return advice.basisNote
+        return if (lines.any { platformGame(it) != null }) {
+            "Our stats omit $names."
+        } else {
+            "${Words.Box.avg} and ${Words.Box.last} are our stats, which omit $names."
+        }
+    }
+}

@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
         handle(intent)
     }
 
-    /** The lineup on the web in a Custom Tab, until the app's own Lineup screen ships. */
+    /** The lineup on the web in a Custom Tab, for a league whose bar has no Lineup tab. */
     private fun openLineup(leagueId: String) {
         CustomTabsIntent.Builder().build().launchUrl(this, Uri.parse("${BuildConfig.SITE_URL}/league/$leagueId/start"))
     }

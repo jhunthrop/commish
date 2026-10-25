@@ -2,6 +2,7 @@ package app.trycommish.core.leaguehome
 
 import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.LeagueMove
+import app.trycommish.api.models.ProjectionScoring
 import app.trycommish.api.models.Tiebreak
 import app.trycommish.api.models.WaiverOrder
 import app.trycommish.core.AppWords
@@ -50,5 +51,15 @@ object ValueWords {
             WaiverOrder.rolling -> Words.WaiverOrder.rolling
             WaiverOrder.inverse_standings -> Words.WaiverOrder.inverse_standings
             else -> null
+        }
+
+    /** box.ts FORMAT_WORDS[format]: "PPR", "half-PPR", "standard"; a format this build does not know is
+     * the empty cell's mark. */
+    fun format(format: ProjectionScoring.Format): String =
+        when (format) {
+            ProjectionScoring.Format.ppr -> Words.BoxFormat.ppr
+            ProjectionScoring.Format.half_ppr -> Words.BoxFormat.half_ppr
+            ProjectionScoring.Format.standard -> Words.BoxFormat.standard
+            else -> Words.Box.none
         }
 }

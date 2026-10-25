@@ -93,6 +93,16 @@ class LeagueSwitchTest {
         assertEquals(ShellDestination.Tab(LEAGUE_PAGE), homeOf("l-1", phoneBar(season, null)))
     }
 
+    /** The League home's Open Lineup opens the Lineup tab for the league the tabs show; a home pushed for
+     * another league, or under a bar with no Lineup, goes to the site. */
+    @Test
+    fun `open lineup opens the Lineup tab for the league shown`() {
+        val (season, preDraft) = ShellFixtures.three().let { it[0] to it[1] }
+        assertEquals(ShellDestination.Tab(LINEUP_PAGE), lineupOf(season.id, season.id, phoneBar(season, null)))
+        assertNull(lineupOf("another", season.id, phoneBar(season, null)))
+        assertNull(lineupOf(preDraft.id, preDraft.id, phoneBar(preDraft, null)))
+    }
+
     @Test
     fun `the search opens Players with what was typed, and nothing for nothing`() {
         assertEquals(ShellRoute.Players("puka"), searchRoute("  puka "))
