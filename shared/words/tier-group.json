@@ -1,0 +1,15 @@
+{
+	"QBOne": "QB",
+	"QBMany": "QBs",
+	"RBOne": "RB",
+	"RBMany": "RBs",
+	"WROne": "WR",
+	"WRMany": "WRs",
+	"TEOne": "TE",
+	"TEMany": "TEs",
+	"KOne": "kicker",
+	"KMany": "kickers",
+	"DSTOne": "defense",
+	"DSTMany": "defenses",
+	"functions": []
+}

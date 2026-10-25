@@ -45,7 +45,8 @@ const BOARD_MODULE = 'web/src/lib/ui/board-words.ts';
  * strip and verb, the positions an opponent's rank is against, the move's confirmation, the in-season
  * screens' lines, a status in words and in a rank's few characters, and the figures' heads; then the
  * Matchup's (Lane 183): the words beside its box scores; then the Board's (Lane 182): its chips and heads,
- * its formats' chips, the Gap's definition, and the season pages' verbs. */
+ * its formats' chips, the Gap's definition, and the season pages' verbs; then the run's board on the Board
+ * (Lane 190): a tier band's words, what its count counts, and the run's stamp. */
 export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueHome',
@@ -221,6 +222,24 @@ export const TABLES: readonly TableSource[] = [
 		module: 'web/src/lib/site/season-words.ts',
 		picks: ['PAGE_VERBS'],
 		json: 'shared/words/page-verb.json'
+	},
+	{
+		name: 'Tier',
+		module: 'web/src/lib/ui/tier.ts',
+		picks: ['TIER_WORDS'],
+		json: 'shared/words/tier.json'
+	},
+	{
+		name: 'TierGroup',
+		module: 'web/src/lib/run/derive.ts',
+		picks: ['GROUP_WORDS'],
+		json: 'shared/words/tier-group.json'
+	},
+	{
+		name: 'RunStamp',
+		module: 'web/src/lib/run/stamp.ts',
+		picks: ['STAMP_WORDS'],
+		json: 'shared/words/run-stamp.json'
 	}
 ];
 export const OUTPUT = {

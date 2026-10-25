@@ -51,6 +51,7 @@ import { LINEUP_OUTPUT, lineupAt, moveWords, withWrites } from './lineup-parity.
 import type { LineupAdvice, MatchupBox } from '../../web/src/lib/league/inseason/api.ts';
 import { gapsOf, MATCHUP_OUTPUT, matchupAt } from './matchup-parity.ts';
 import { BOARD_OUTPUT, renderBoard } from './board-parity.ts';
+import { BOARD_RUN_OUTPUT, renderBoardRun } from './board-run-parity.ts';
 import {
 	GAME_STATE_OUTPUT,
 	lineRows,
@@ -433,6 +434,15 @@ export async function generate(): Promise<Outputs> {
 				generatedBy(
 					SCRIPT,
 					'web/src/lib/site/season-words.ts (boardWords), web/src/lib/format/number.ts and gap.ts'
+				)
+			)
+		],
+		[
+			BOARD_RUN_OUTPUT,
+			await renderBoardRun(
+				generatedBy(
+					SCRIPT,
+					'web/src/lib/server/pages/board.ts (its tiers, statuses, tints and basis) over the two fixture runs'
 				)
 			)
 		]

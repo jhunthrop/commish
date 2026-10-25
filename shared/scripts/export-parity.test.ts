@@ -13,6 +13,7 @@ import {
 } from './export-parity.ts';
 import { LINEUP_OUTPUT } from './lineup-parity.ts';
 import { BOARD_OUTPUT } from './board-parity.ts';
+import { BOARD_RUN_OUTPUT } from './board-run-parity.ts';
 import { GAP_WORDS } from '../../web/src/lib/run/board-basis.ts';
 
 void test('a file clock reads back as its instant', () => {
@@ -146,5 +147,38 @@ void test("the board's parity: every rail's words for the board, the row's figur
 	assert.match(
 		board.basis.find((c) => c.view === 'draftOrder')?.parts[0] ?? '',
 		/^Kickers and defenses/
+	);
+});
+
+interface BoardRunCase {
+	stamp: string;
+	restCaption: string | null;
+	words: { heading: string };
+	views: {
+		position: string | null;
+		tiers: { ids: string[]; cliff: string }[];
+		basis: string[];
+	}[];
+}
+
+void test("the board's run parity: the stand-in's tiers and cliffs, the fixture run's rest of season", async () => {
+	const parity = JSON.parse((await generate()).get(BOARD_RUN_OUTPUT) ?? '{}') as {
+		runs: BoardRunCase[];
+	};
+	const [standIn, rest] = parity.runs;
+	assert.equal(standIn?.stamp, 'Stand-in, updated Sep 1');
+	assert.equal(standIn?.restCaption, null);
+	assert.equal(standIn?.words.heading, '2026 Board');
+	const receivers = standIn?.views.find((view) => view.position === 'WR');
+	assert.equal(receivers?.tiers[0]?.cliff, '23.4 PPR pts to tier 2');
+	assert.ok(receivers?.basis.includes('Tiers are drawn within WR.'));
+	assert.ok(receivers?.basis.includes('ADP from PPR drafts, Sep 5 to Sep 9.'));
+	const tiered = receivers?.tiers.flatMap((tier) => tier.ids) ?? [];
+	assert.equal(new Set(tiered).size, tiered.length, 'every receiver in one tier at most');
+	assert.equal(rest?.words.heading, 'Rest of 2026');
+	assert.match(rest?.restCaption ?? '', /from week 7, refreshed October 21$/);
+	assert.ok(
+		rest?.views.every((view) => view.basis.every((part) => !part.startsWith('ADP from'))),
+		'the rest of the season names no drafts'
 	);
 });

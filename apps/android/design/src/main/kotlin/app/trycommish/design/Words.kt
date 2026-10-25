@@ -338,4 +338,30 @@ object Words {
         const val mock = "Start a mock draft"
         const val sheet = "Build your cheat sheet"
     }
+
+    object Tier {
+        const val tier = "Tier"
+        const val toTier = "to tier"
+        const val lastTier = "Last tier"
+    }
+
+    object TierGroup {
+        const val QBOne = "QB"
+        const val QBMany = "QBs"
+        const val RBOne = "RB"
+        const val RBMany = "RBs"
+        const val WROne = "WR"
+        const val WRMany = "WRs"
+        const val TEOne = "TE"
+        const val TEMany = "TEs"
+        const val KOne = "kicker"
+        const val KMany = "kickers"
+        const val DSTOne = "defense"
+        const val DSTMany = "defenses"
+    }
+
+    object RunStamp {
+        const val updated = "Updated"
+        const val standIn = "Stand-in, updated"
+    }
 }

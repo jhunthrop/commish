@@ -336,4 +336,30 @@ public enum Words {
         public static let mock = "Start a mock draft"
         public static let sheet = "Build your cheat sheet"
     }
+
+    public enum Tier {
+        public static let tier = "Tier"
+        public static let toTier = "to tier"
+        public static let lastTier = "Last tier"
+    }
+
+    public enum TierGroup {
+        public static let QBOne = "QB"
+        public static let QBMany = "QBs"
+        public static let RBOne = "RB"
+        public static let RBMany = "RBs"
+        public static let WROne = "WR"
+        public static let WRMany = "WRs"
+        public static let TEOne = "TE"
+        public static let TEMany = "TEs"
+        public static let KOne = "kicker"
+        public static let KMany = "kickers"
+        public static let DSTOne = "defense"
+        public static let DSTMany = "defenses"
+    }
+
+    public enum RunStamp {
+        public static let updated = "Updated"
+        public static let standIn = "Stand-in, updated"
+    }
 }
