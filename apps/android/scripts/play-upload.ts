@@ -8,11 +8,14 @@
  *   4. commit the edit.
  * An app that has not passed its first review takes only draft releases: when Play refuses a
  * completed release for that reason, the track is set again as draft in the same edit and committed,
- * and the run says so (a named outcome, exit 0). Any other refusal deletes the edit and exits 1.
+ * and the run says so (a named outcome, exit 0). On a re-run (--attempt above 1), Play's "version
+ * code already used" means this commit's bundle is already on Play: the edit is deleted and the run
+ * says so (a named outcome, exit 0). Any other refusal deletes the edit and exits 1. Every request
+ * has a timeout and none is retried.
  *
  *   PLAY_ACCESS_TOKEN=... node apps/android/scripts/play-upload.ts \
  *     --bundle app/build/outputs/bundle/release/app-release.aab \
- *     --package app.trycommish.android --track internal --status completed
+ *     --package app.trycommish.android --track internal --status completed --attempt 1
  *
  * The token is read from the environment only and never printed; the API's answers are.
  */
@@ -25,9 +28,14 @@ const UPLOAD_PATH = '/upload/androidpublisher/v3/applications';
 const BUNDLE_TYPE = 'application/octet-stream';
 /** Play's words when an app with no reviewed release is sent a release that is not a draft. */
 const DRAFT_APP_REFUSAL = /draft app/i;
+/** Play's words when a bundle's version code was already uploaded. */
+const CODE_USED_REFUSAL = /version code.*already been used/i;
+/** A JSON call's bound, and the bundle's (a large body on a slow runner). */
+const CALL_TIMEOUT_MS = 60_000;
+const BUNDLE_TIMEOUT_MS = 5 * 60_000;
 
 export type ReleaseStatus = 'completed' | 'draft';
-export type Outcome = 'committed' | 'committed-as-draft';
+export type Outcome = 'committed' | 'committed-as-draft' | 'already-on-play';
 
 export interface UploadRequest {
 	token: string;
@@ -35,13 +43,16 @@ export interface UploadRequest {
 	track: string;
 	status: ReleaseStatus;
 	bundle: Uint8Array;
+	/** The CI run's attempt (github.run_attempt); above 1 is a re-run. */
+	attempt: number;
 }
 
 export interface UploadResult {
 	outcome: Outcome;
 	editId: string;
-	versionCode: number;
-	status: ReleaseStatus;
+	/** Null when Play refused the bundle as already uploaded (the code is in its message). */
+	versionCode: number | null;
+	status: ReleaseStatus | null;
 }
 
 export type Fetch = (url: string, init: RequestInit) => Promise<Response>;
@@ -82,15 +93,15 @@ class Client {
 		this.uploadBase = `${API_ROOT}${UPLOAD_PATH}/${name}`;
 	}
 
-	async call(step: string, url: string, init: RequestInit = {}): Promise<Response> {
+	async call(step: string, url: string, init: RequestInit = {}, timeoutMs = CALL_TIMEOUT_MS): Promise<Response> {
 		const headers = { ...(init.headers as Record<string, string>), Authorization: `Bearer ${this.token}` };
-		const response = await this.fetch(url, { ...init, headers });
+		const response = await this.fetch(url, { ...init, headers, signal: AbortSignal.timeout(timeoutMs) });
 		if (!response.ok) throw new PlayError(step, response.status, await errorMessage(response));
 		return response;
 	}
 
-	async json<T>(step: string, url: string, init: RequestInit = {}): Promise<T> {
-		return (await (await this.call(step, url, init)).json()) as T;
+	async json<T>(step: string, url: string, init: RequestInit = {}, timeoutMs = CALL_TIMEOUT_MS): Promise<T> {
+		return (await (await this.call(step, url, init, timeoutMs)).json()) as T;
 	}
 }
 
@@ -113,11 +124,12 @@ async function uploadBundle(client: Client, editId: string, bundle: Uint8Array):
 	});
 	const location = session.headers.get('location');
 	if (!location) throw new PlayError('start bundle upload', session.status, 'no upload location in the answer');
-	const uploaded = await client.json<{ versionCode: number }>('upload bundle', location, {
-		method: 'PUT',
-		headers: { 'Content-Type': BUNDLE_TYPE },
-		body: bundle
-	});
+	const uploaded = await client.json<{ versionCode: number }>(
+		'upload bundle',
+		location,
+		{ method: 'PUT', headers: { 'Content-Type': BUNDLE_TYPE }, body: bundle },
+		BUNDLE_TIMEOUT_MS
+	);
 	return uploaded.versionCode;
 }
 
@@ -136,6 +148,11 @@ async function commitEdit(client: Client, editId: string): Promise<void> {
 /** True when Play refused a completed release because the app has not passed its first review. */
 export function isDraftAppRefusal(error: unknown): boolean {
 	return error instanceof PlayError && error.status === 400 && DRAFT_APP_REFUSAL.test(error.message);
+}
+
+/** True when Play refused the bundle because its version code was already uploaded. */
+export function isCodeUsedRefusal(error: unknown): boolean {
+	return error instanceof PlayError && error.step === 'upload bundle' && CODE_USED_REFUSAL.test(error.message);
 }
 
 async function releaseWithFallback(client: Client, editId: string, request: UploadRequest, versionCode: number, log: Log): Promise<Outcome> {
@@ -161,7 +178,10 @@ async function deleteEdit(client: Client, editId: string, log: Log): Promise<voi
 	}
 }
 
-/** The whole flow; the edit is deleted when any step after its insert fails. */
+/**
+ * The whole flow; the edit is deleted when any step after its insert fails. A re-run whose bundle
+ * Play already holds is a named outcome, not a failure.
+ */
 export async function uploadToTrack(request: UploadRequest, fetch: Fetch, log: Log): Promise<UploadResult> {
 	const client = new Client(fetch, request.token, request.packageName);
 	const editId = await insertEdit(client);
@@ -175,6 +195,10 @@ export async function uploadToTrack(request: UploadRequest, fetch: Fetch, log: L
 		return { outcome, editId, versionCode, status };
 	} catch (error) {
 		await deleteEdit(client, editId, log);
+		if (request.attempt > 1 && isCodeUsedRefusal(error)) {
+			log(`Play already holds this run's bundle (${(error as PlayError).message}); attempt ${request.attempt} uploads nothing.`);
+			return { outcome: 'already-on-play', editId, versionCode: null, status: null };
+		}
 		throw error;
 	}
 }
@@ -182,6 +206,12 @@ export async function uploadToTrack(request: UploadRequest, fetch: Fetch, log: L
 function parseStatus(value: string): ReleaseStatus {
 	if (value === 'completed' || value === 'draft') return value;
 	throw new Error(`--status must be completed or draft, not '${value}'`);
+}
+
+function parseAttempt(value: string): number {
+	const attempt = Number(value);
+	if (Number.isInteger(attempt) && attempt >= 1) return attempt;
+	throw new Error(`--attempt must be a whole number from 1, not '${value}'`);
 }
 
 function required(value: string | undefined, name: string): string {
@@ -195,7 +225,8 @@ async function main(): Promise<void> {
 			bundle: { type: 'string' },
 			package: { type: 'string' },
 			track: { type: 'string', default: 'internal' },
-			status: { type: 'string', default: 'completed' }
+			status: { type: 'string', default: 'completed' },
+			attempt: { type: 'string', default: '1' }
 		}
 	});
 	const request: UploadRequest = {
@@ -203,9 +234,13 @@ async function main(): Promise<void> {
 		packageName: required(values.package, '--package'),
 		track: values.track,
 		status: parseStatus(values.status),
-		bundle: new Uint8Array(await readFile(required(values.bundle, '--bundle')))
+		bundle: new Uint8Array(await readFile(required(values.bundle, '--bundle'))),
+		attempt: parseAttempt(values.attempt)
 	};
 	const result = await uploadToTrack(request, globalThis.fetch, (line) => console.log(line));
+	if (result.outcome === 'already-on-play') {
+		console.log(`::notice title=Play already has this run::Attempt ${request.attempt} found its version code already on Play, so nothing new was uploaded.`);
+	}
 	if (result.outcome === 'committed-as-draft') {
 		console.log(`::notice title=Play internal as draft::The app has not passed its first review, so version code ${result.versionCode} is a draft on ${request.track}; promote it in Play Console.`);
 	}
