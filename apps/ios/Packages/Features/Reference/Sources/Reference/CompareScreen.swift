@@ -24,6 +24,8 @@ struct ComparePicker: View {
     let label: String
     let search: (String) -> [CompareCandidate]
     let pick: (String?) -> Void
+    /// The screen's: a field to type in; a snapshot's draws the empty field still.
+    var live = true
     @State private var query = ""
 
     var body: some View {
@@ -61,11 +63,22 @@ struct ComparePicker: View {
         }
     }
 
+    @ViewBuilder
+    private var input: some View {
+        if live {
+            TextField(label, text: $query)
+                .textFieldStyle(.plain)
+                .autocorrectionDisabled()
+        } else {
+            Text(label)
+                .foregroundStyle(Theme(colorScheme).color(Tokens.Color.ink3))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     private func field(_ theme: Theme) -> some View {
-        TextField(label, text: $query)
+        input
             .font(Faces.font(.ui, size: Tokens.TypeScale.md))
-            .textFieldStyle(.plain)
-            .autocorrectionDisabled()
             .padding(.horizontal, Tokens.Space.s3)
             .frame(minHeight: 48)
             .background(theme.color(Tokens.Color.surface))
@@ -258,9 +271,10 @@ public struct CompareScreen: View {
             }
             VStack(spacing: Tokens.Space.s3) {
                 ForEach(Array(model.slots.enumerated()), id: \.offset) { index, slot in
-                    ComparePicker(slot: slot, label: model.slotLabels[index], search: model.search) { slug in
-                        actions.pick(index, slug)
-                    }
+                    ComparePicker(
+                        slot: slot, label: model.slotLabels[index], search: model.search,
+                        pick: { slug in actions.pick(index, slug) }, live: live
+                    )
                 }
             }
             .padding(.horizontal, Tokens.Space.s3)
