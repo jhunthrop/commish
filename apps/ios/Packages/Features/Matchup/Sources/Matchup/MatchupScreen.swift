@@ -3,18 +3,24 @@ import CommishCore
 import CommishDesign
 import SwiftUI
 
-/// The Matchup as its model says it, in the web's order (MatchupPanel.svelte at 390): the week and
-/// both teams, the score bug, its notes, the member's box, the opponent's, the basis once at the foot.
-/// Pure of state, so a snapshot draws it from the fixture at the fixture's clock.
+/// The Matchup as its model says it, in the web's order (MatchupPanel.svelte at 390): over another
+/// team's game the line saying whose it is with the way to the member's own, the week and both teams,
+/// the score bug, its notes, the first side's box, the second's, the basis once at the foot. Pure of
+/// state, so a snapshot draws it from the fixture at the fixture's clock.
 public struct MatchupScreen: View {
     let model: MatchupModel
     let stamp: String?
     let actions: RowActions
+    let yourGame: () -> Void
 
-    public init(model: MatchupModel, stamp: String?, open: @escaping (SheetPlayer) -> Void = { _ in }) {
+    public init(
+        model: MatchupModel, stamp: String?, open: @escaping (SheetPlayer) -> Void = { _ in },
+        yourGame: @escaping () -> Void = {}
+    ) {
         self.model = model
         self.stamp = stamp
         actions = RowActions(open: open)
+        self.yourGame = yourGame
     }
 
     public var body: some View {
@@ -22,7 +28,7 @@ public struct MatchupScreen: View {
             switch model {
             case let .week(week):
                 ForEach(MatchupPart.allCases, id: \.self) { part in
-                    MatchupPartView(part: part, week: week, stamp: stamp, actions: actions)
+                    MatchupPartView(part: part, week: week, stamp: stamp, actions: actions, yourGame: yourGame)
                 }
             case let .gap(sentence):
                 BasisText(sentence).padding(.horizontal, Tokens.Space.s3)
@@ -35,9 +41,9 @@ public struct MatchupScreen: View {
 /// The screen's two runs, top to bottom: each a snapshot of its own, so no reference grows past what a
 /// repository keeps.
 enum MatchupPart: CaseIterable {
-    /// The title, the bug, its notes and the member's box.
+    /// The title, the bug, its notes and the first side's box (the member's on the member's game).
     case mine
-    /// The opponent's box and the basis.
+    /// The second side's box and the basis.
     case theirs
 }
 
@@ -46,11 +52,15 @@ struct MatchupPartView: View {
     let week: MatchupWeek
     let stamp: String?
     let actions: RowActions
+    var yourGame: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s3) {
             switch part {
             case .mine:
+                if let whose = week.whose {
+                    WhoseLine(whose: whose, yourGame: yourGame)
+                }
                 MatchupTitle(week: week, stamp: stamp)
                 MatchupBugView(bug: week.bug)
                 ForEach(week.notes, id: \.self) { BasisText($0) }
@@ -68,6 +78,29 @@ struct MatchupPartView: View {
             }
         }
         .padding(.horizontal, Tokens.Space.s3)
+    }
+}
+
+/// Over another team's game (MatchupPanel.svelte's whose line): "Their game" in the quiet ink, and at
+/// the far end "Your game", the way to the member's own on the Matchup tab.
+struct WhoseLine: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let whose: GameWhose
+    let yourGame: () -> Void
+
+    var body: some View {
+        let theme = Theme(colorScheme)
+        HStack(alignment: .firstTextBaseline) {
+            Text(whose.head)
+                .foregroundStyle(theme.color(Tokens.Color.ink2))
+            Spacer(minLength: Tokens.Space.s3)
+            Button(whose.link, action: yourGame)
+                .buttonStyle(.plain)
+                .foregroundStyle(theme.color(Tokens.Color.accentText))
+        }
+        .font(Faces.font(.num, size: Tokens.TypeScale.md, weight: .bold))
+        .textCase(.uppercase)
+        .tracking(Tokens.TypeScale.md * 0.04)
     }
 }
 
@@ -111,7 +144,8 @@ struct MatchupTitle: View {
 /// The Matchup with its view model: the saved week at once, then the API's; while on screen with the
 /// app in the foreground it reads again on the web's cadence, and stops when hidden or backgrounded; a
 /// pull reads again; a row's name opens the player sheet by his id, and the sheet keeps its player when
-/// the week reads again under it.
+/// the week reads again under it. Another team's game (a view model with a roster) carries none of the
+/// member's verbs; its whose line's link opens the member's own.
 public struct MatchupView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
@@ -121,13 +155,17 @@ public struct MatchupView: View {
     private let leagueID: String
     /// The way to the member's lineup, the sheet's verb on his own rows.
     private let openLineup: @MainActor @Sendable () -> Void
+    /// The way from another team's game to the member's own.
+    private let yourGame: @MainActor () -> Void
 
     public init(
-        viewModel: MatchupViewModel, leagueID: String, openLineup: @escaping @MainActor @Sendable () -> Void = {}
+        viewModel: MatchupViewModel, leagueID: String, openLineup: @escaping @MainActor @Sendable () -> Void = {},
+        yourGame: @escaping @MainActor () -> Void = {}
     ) {
         self.viewModel = viewModel
         self.leagueID = leagueID
         self.openLineup = openLineup
+        self.yourGame = yourGame
     }
 
     /// The sheet's verb on the Matchup (MatchupPanel.svelte's lineupOffer): the way to his lineup on the
@@ -148,7 +186,8 @@ public struct MatchupView: View {
             case let .loaded(model, _, _):
                 ScrollView {
                     MatchupScreen(
-                        model: model, stamp: viewModel.stampWords, open: { sheet.open($0, offer: offer(model, $0)) }
+                        model: model, stamp: viewModel.stampWords, open: { sheet.open($0, offer: offer(model, $0)) },
+                        yourGame: yourGame
                     )
                 }
                 .refreshable { await viewModel.load(leagueID: leagueID) }

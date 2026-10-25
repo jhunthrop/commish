@@ -4,9 +4,9 @@ import SwiftUI
 
 /// The matchup's score bug on the lit board (MatchupBug.svelte at 390): across its top the week, the
 /// game's head and its words and the read beside a live score; under it the two teams side by side,
-/// each with You or Opponent, its name, where its starters stand, its big figure and the small one;
-/// across its foot the API's line on where the member stands. The member's figure in the board's
-/// number colour.
+/// each with You or Opponent (neither on another team's game), its name, where its starters stand,
+/// its big figure and the small one; across its foot the API's line on where the member stands. The
+/// member's figure in the board's number colour.
 struct MatchupBugView: View {
     @Environment(\.colorScheme) private var colorScheme
     let bug: MatchupBug
@@ -16,10 +16,10 @@ struct MatchupBugView: View {
         VStack(spacing: 0) {
             middle(theme)
             HStack(alignment: .top, spacing: 0) {
-                side(bug.mine, theme: theme)
+                side(bug.mine, leading: true, theme: theme)
                 if let opponent = bug.opponent {
                     Rectangle().fill(theme.color(Tokens.Color.scoreboardLine)).frame(width: 1)
-                    side(opponent, theme: theme)
+                    side(opponent, leading: false, theme: theme)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -79,19 +79,21 @@ struct MatchupBugView: View {
         }
     }
 
-    /// One team: the opponent reads from the right edge in, as the web's does.
-    private func side(_ team: BugTeam, theme: Theme) -> some View {
-        let alignment: HorizontalAlignment = team.me ? .leading : .trailing
+    /// One team: the second reads from the right edge in, as the web's does.
+    private func side(_ team: BugTeam, leading: Bool, theme: Theme) -> some View {
+        let alignment: HorizontalAlignment = leading ? .leading : .trailing
         return VStack(alignment: alignment, spacing: Tokens.Space.s1) {
-            Text(team.label)
-                .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
-                .textCase(.uppercase)
-                .tracking(Tokens.TypeScale.xs * 0.06)
-                .foregroundStyle(theme.color(Tokens.Color.scoreboardInk2))
+            if !team.label.isEmpty {
+                Text(team.label)
+                    .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
+                    .textCase(.uppercase)
+                    .tracking(Tokens.TypeScale.xs * 0.06)
+                    .foregroundStyle(theme.color(Tokens.Color.scoreboardInk2))
+            }
             Text(team.name)
                 .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .bold))
                 .lineLimit(2)
-                .multilineTextAlignment(team.me ? .leading : .trailing)
+                .multilineTextAlignment(leading ? .leading : .trailing)
                 .fixedSize(horizontal: false, vertical: true)
             if !team.toPlay.isEmpty {
                 Text(team.toPlay)
@@ -116,7 +118,7 @@ struct MatchupBugView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: team.me ? .leading : .trailing)
+        .frame(maxWidth: .infinity, alignment: leading ? .leading : .trailing)
         .padding(.horizontal, Tokens.Space.s3)
         .padding(.vertical, Tokens.Space.s2)
     }

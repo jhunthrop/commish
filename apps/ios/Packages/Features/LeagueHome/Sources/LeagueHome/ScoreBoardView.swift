@@ -3,12 +3,14 @@ import CommishDesign
 import SwiftUI
 
 /// The week's scoreboard: every game as a score bug on the lit board, swiped in a hand, the member's
-/// first with its orange rim (web ScoreBoard.svelte and BugCard.svelte).
+/// first with its orange rim (web ScoreBoard.svelte and BugCard.svelte). A tap on a bug opens its game
+/// (Lane 206): the member's (roster nil) or the one its first side's roster plays in.
 struct ScoreBoardView: View {
     let title: String
     let aside: String
     let stamp: String?
     let bugs: [ScoreBug]
+    var openGame: (Int?) -> Void = { _ in }
     /// The hand swipes; a still render draws it at rest.
     var scrolls = true
 
@@ -36,7 +38,10 @@ struct ScoreBoardView: View {
     private var hand: some View {
         HStack(spacing: Tokens.Space.s2) {
             ForEach(bugs) { bug in
-                BugCard(bug: bug).frame(width: Self.bugWidth)
+                Button { openGame(bug.roster) } label: {
+                    BugCard(bug: bug).frame(width: Self.bugWidth)
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, Tokens.Space.s4)

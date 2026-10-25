@@ -2,7 +2,8 @@ import CommishAPI
 import CommishDesign
 import Foundation
 
-/// One side of the Matchup's score bug (MatchupBug.svelte): You or Opponent, the team, its big figure
+/// One side of the Matchup's score bug (MatchupBug.svelte): You or Opponent (neither on another team's
+/// game, Lane 206), the team, its big figure
 /// with its label (Proj before the first kickoff, Pts from it), the small one under, and where its
 /// starters stand while the game is under way.
 public struct BugTeam: Equatable, Sendable {
@@ -45,6 +46,8 @@ public struct TeamBox: Equatable, Sendable, Identifiable {
 
 /// The week's matchup as the screen draws it.
 public struct MatchupWeek: Equatable, Sendable {
+    /// "Their game" with the way to the member's own, over another team's game; nil over the member's.
+    public let whose: GameWhose?
     public let week: String
     public let mine: String
     public let opponent: String?
@@ -75,14 +78,18 @@ public enum MatchupModel: Equatable, Sendable {
     case gap(String)
 
     /// The screen drawn at the league read's instant, as the web draws it (MatchupScreen passes the
-    /// read's time), the read beside a live score aged by `clock`, the screen's own clock.
-    public init(sync: LeagueSync, box: MatchupBox?, clock: Date, zone: TimeZone) {
+    /// read's time), the read beside a live score aged by `clock`, the screen's own clock. Another
+    /// team's game, by the box's own word, is drawn from the box and the scoreboard (`board`), its
+    /// score unread where the scoreboard was not read.
+    public init(sync: LeagueSync, box: MatchupBox?, board: Scoreboard? = nil, clock: Date, zone: TimeZone) {
         let now = sync.readAt
-        guard let matchup = sync.matchup?.value1 else {
+        let other = OtherGame.isOther(box)
+        guard let matchup = other ? OtherGame.matchup(box, board: board) : sync.matchup?.value1 else {
             self = .gap(MatchupWords.gap(sync, now: now))
             return
         }
-        self = .week(MatchupDraw(sync: sync, box: box, matchup: matchup, now: now, zone: zone).week(clock: clock))
+        let draw = MatchupDraw(sync: sync, box: box, matchup: matchup, other: other, now: now, zone: zone)
+        self = .week(draw.week(clock: clock))
     }
 }
 
@@ -91,6 +98,8 @@ private struct MatchupDraw {
     let sync: LeagueSync
     let box: MatchupBox?
     let matchup: Components.Schemas.LeagueMatchup
+    /// Another team's game: none of the member's words, marks or verbs.
+    let other: Bool
     let now: Date
     let zone: TimeZone
     let started: Bool
@@ -98,10 +107,14 @@ private struct MatchupDraw {
     let headFinal: Bool
     let starterLines: [PlayerLine]
 
-    init(sync: LeagueSync, box: MatchupBox?, matchup: Components.Schemas.LeagueMatchup, now: Date, zone: TimeZone) {
+    init(
+        sync: LeagueSync, box: MatchupBox?, matchup: Components.Schemas.LeagueMatchup, other: Bool, now: Date,
+        zone: TimeZone
+    ) {
         self.sync = sync
         self.box = box
         self.matchup = matchup
+        self.other = other
         self.now = now
         self.zone = zone
         starterLines = (box?.sides ?? []).flatMap { $0.starters.map(\.line) }
@@ -153,16 +166,19 @@ private struct MatchupDraw {
             finalNone: sides.contains { $0.totals.live && $0.totals.allFinal && $0.totals.pts == nil },
             unlisted: theirsUnlisted, zone: zone, now: now
         ))
-        var boxes = [teamBox(matchup.mine.rosterId, name: mineName, side: mine, mine: true, empty: nil)]
+        let hidden = sync.host.value1 == .ffpc ? MatchupWords.yoursOnly(platform) : nil
+        var boxes = [teamBox(
+            matchup.mine.rosterId, name: mineName, side: mine, mine: !other, empty: other ? hidden : nil
+        )]
         if let opponentSide, let theirs, let theirName {
-            let hidden = sync.host.value1 == .ffpc ? MatchupWords.yoursOnly(platform) : nil
             boxes.append(teamBox(opponentSide.rosterId, name: theirName, side: theirs, mine: false, empty: hidden))
         }
         return MatchupWeek(
+            whose: other ? .theirs : nil,
             week: week, mine: mineName, opponent: theirName,
             bug: MatchupBug(
                 week: week,
-                mine: bugTeam(matchup.mine.rosterId, name: mineName, side: mine, me: true),
+                mine: bugTeam(matchup.mine.rosterId, name: mineName, side: mine, me: !other),
                 opponent: opponentSide.flatMap { side in
                     theirs.map { bugTeam(side.rosterId, name: theirName ?? "", side: $0, me: false) }
                 },
@@ -177,6 +193,9 @@ private struct MatchupDraw {
     }
 
     func notes(_ platform: String) -> [String] {
+        guard !other else {
+            return []
+        }
         var notes: [String] = []
         if sync.weekAllPlay {
             notes.append(MatchupWords.allPlay(platform))
@@ -190,7 +209,8 @@ private struct MatchupDraw {
     func bugTeam(_ rosterID: Int, name: String, side: SideBox, me: Bool) -> BugTeam {
         let figures = MatchupSides.bugFigures(side.totals, started: started)
         return BugTeam(
-            label: me ? Words.Box.you : Words.Box.opponent, name: name, initials: Initials.of(name), me: me,
+            label: other ? "" : me ? Words.Box.you : Words.Box.opponent,
+            name: name, initials: Initials.of(name), me: me,
             big: figures.big, bigLabel: figures.label, small: figures.small,
             toPlay: started ? boxSide(rosterID)?.toPlay ?? "" : ""
         )

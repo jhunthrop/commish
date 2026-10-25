@@ -163,4 +163,16 @@ struct LeagueSwitchTests {
         #expect(ShellRoute.search("  Puka ") == .players(query: "Puka"))
         #expect(ShellRoute.search("   ") == nil)
     }
+
+    /// A score bug opens its game (Lane 206): the member's on the Matchup tab where the bar has one,
+    /// every other team's pushed by its roster on the tab in view.
+    @Test func aScoreBugOpensItsGame() {
+        let season = PhoneRail.tabs(phase: .inSeason, waiversOpen: true)
+        let preDraft = PhoneRail.tabs(phase: .preDraft, waiversOpen: true)
+        #expect(season.contains { $0.key == PhoneRail.matchupKey })
+        #expect(ShellRoute.game(of: nil, league: "l-1", in: season) == .tab(PhoneRail.matchupKey))
+        #expect(ShellRoute.game(of: 2, league: "l-1", in: season) == .push(.game(league: "l-1", roster: 2)))
+        #expect(!preDraft.contains { $0.key == PhoneRail.matchupKey })
+        #expect(ShellRoute.game(of: nil, league: "l-1", in: preDraft) == .push(.game(league: "l-1", roster: nil)))
+    }
 }

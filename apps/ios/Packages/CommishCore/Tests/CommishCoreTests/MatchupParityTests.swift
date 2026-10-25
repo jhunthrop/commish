@@ -8,7 +8,8 @@ import Testing
 /// title, the score bug (each side's figures, the game's head and words, the read beside a live score,
 /// the standing), the notes, each team's box (every row's cells, the Team row, the bench, the sentence
 /// for starters a platform does not send) and the phone's basis at all six fixture clocks; the same
-/// reads without the box answer; and the gap sentences with no matchup.
+/// reads without the box answer; the gap sentences with no matchup; and another team's game (Lane
+/// 206), its head saying whose it is, its bug and boxes none of the member's.
 struct MatchupParityTests {
     static let parity: MatchupParity = {
         do {
@@ -122,6 +123,43 @@ struct MatchupParityTests {
         }
     }
 
+    /// Another team's game at every clock: drawn from its own box and the scoreboard, its head the
+    /// web's whose line, no You or Opponent, no note and no box of the member's, the basis the web's.
+    @Test(arguments: StartParityTests.clocks)
+    func anotherTeamsGameIsTheWebs(clock: String) throws {
+        let web = try #require(Self.parity.otherGame[clock])
+        let answer = try Fixtures.otherGame(clock)
+        let model = MatchupModel(
+            sync: answer.sync, box: answer.box, board: answer.board, clock: Fixtures.instant(clock), zone: Fixtures.zone
+        )
+        guard case let .week(week) = model else {
+            throw MatchupParity.Missing.week(clock)
+        }
+        #expect(week.whose == web.whose.map { GameWhose(head: $0.head, link: $0.link) })
+        #expect(week.whose != nil)
+        #expect(week.week == web.week)
+        #expect(week.mine == web.title.mine)
+        #expect(week.opponent == web.title.opponent)
+        #expect(MatchupParity.Side(week.bug.mine) == web.bug.mine)
+        #expect(week.bug.opponent.map(MatchupParity.Side.init) == web.bug.opponent)
+        #expect(!week.bug.mine.me && week.bug.opponent?.me != true)
+        #expect(week.bug.head == web.bug.kickoff?.head)
+        #expect(week.bug.words == web.bug.kickoff?.words ?? "")
+        #expect(week.bug.read == web.bug.read)
+        #expect(week.bug.standing == web.bug.standing)
+        #expect(week.notes == [web.allPlay, web.scoreGap].compactMap(\.self))
+        #expect(week.boxes.map(\.team) == web.boxes.map(\.team))
+        #expect(week.boxes.map(\.mine) == web.boxes.map(\.mine))
+        for (ours, theirs) in zip(week.boxes, web.boxes) {
+            #expect(ours.empty == theirs.empty)
+            #expect(ours.starters.map(LineupParity.Row.init) == theirs.starters, "\(clock) \(ours.team)")
+            #expect(ours.teamRow.pts == theirs.teamRow.pts && ours.teamRow.proj == theirs.teamRow.proj)
+            #expect(ours.bench.map(LineupParity.Row.init) == theirs.bench, "\(clock) \(ours.team) bench")
+        }
+        #expect(week.basis == web.basis)
+        #expect(week.sheetPlayers.allSatisfy { !week.isMine($0) })
+    }
+
     /// No screen computes game state: every starter's line the fixture holds carries the API's field.
     @Test(arguments: StartParityTests.clocks)
     func everyStartersLineCarriesTheAPIsGameState(clock: String) throws {
@@ -198,7 +236,14 @@ struct MatchupParity: Decodable {
         }
     }
 
+    struct Whose: Decodable {
+        let head: String
+        let link: String
+    }
+
     struct Week: Decodable {
+        /// Another team's game only.
+        let whose: Whose?
         let week: String
         let title: Title
         let bug: Bug
@@ -231,4 +276,5 @@ struct MatchupParity: Decodable {
     let clocks: [String: Week]
     let withoutBox: [String: Week]
     let gaps: Gaps
+    let otherGame: [String: Week]
 }
