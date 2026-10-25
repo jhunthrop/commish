@@ -1,4 +1,5 @@
 import CommishAPI
+import CommishDesign
 import Foundation
 
 /// A player's status as a row's chip draws it (web/src/lib/format/designation.ts, box.ts statusOf and
@@ -24,29 +25,29 @@ enum RowStatuses {
     typealias Designation = Components.Schemas.InjuryDesignation
     typealias Status = Components.Schemas.DesignationStatusKnown
 
-    /// designation.ts DESIGNATION_WORDS.
+    /// designation.ts DESIGNATION_WORDS, generated: "Questionable", "On injured reserve".
     static func word(_ status: Status) -> String {
         switch status {
-        case .questionable: "Questionable"
-        case .doubtful: "Doubtful"
-        case .out: "Out"
-        case .injuredReserve: "On injured reserve"
-        case .suspended: "Suspended"
-        case .pup: "On the PUP list"
-        case .nfi: "On the NFI list"
+        case .questionable: Words.Designation.questionable
+        case .doubtful: Words.Designation.doubtful
+        case .out: Words.Designation.out
+        case .injuredReserve: Words.Designation.injured_reserve
+        case .suspended: Words.Designation.suspended
+        case .pup: Words.Designation.pup
+        case .nfi: Words.Designation.nfi
         }
     }
 
-    /// designation.ts RANK_WORDS.
+    /// designation.ts RANK_WORDS, generated: "IR", "PUP", a status in a rank's few characters.
     static func rankWord(_ status: Status) -> String {
         switch status {
-        case .questionable: "Q"
-        case .doubtful: "D"
-        case .out: "Out"
-        case .injuredReserve: "IR"
-        case .suspended: "Susp"
-        case .pup: "PUP"
-        case .nfi: "NFI"
+        case .questionable: Words.DesignationRank.questionable
+        case .doubtful: Words.DesignationRank.doubtful
+        case .out: Words.DesignationRank.out
+        case .injuredReserve: Words.DesignationRank.injured_reserve
+        case .suspended: Words.DesignationRank.suspended
+        case .pup: Words.DesignationRank.pup
+        case .nfi: Words.DesignationRank.nfi
         }
     }
 

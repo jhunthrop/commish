@@ -269,6 +269,26 @@ public enum Words {
         public static let narrowingUnread = "These could not be read just now. The last read stands."
     }
 
+    public enum Designation {
+        public static let questionable = "Questionable"
+        public static let doubtful = "Doubtful"
+        public static let out = "Out"
+        public static let injured_reserve = "On injured reserve"
+        public static let suspended = "Suspended"
+        public static let pup = "On the PUP list"
+        public static let nfi = "On the NFI list"
+    }
+
+    public enum DesignationRank {
+        public static let questionable = "Q"
+        public static let doubtful = "D"
+        public static let out = "Out"
+        public static let injured_reserve = "IR"
+        public static let suspended = "Susp"
+        public static let pup = "PUP"
+        public static let nfi = "NFI"
+    }
+
     public enum Figure {
         public static let projected = "Projected"
         public static let points = "Points"

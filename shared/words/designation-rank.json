@@ -1,0 +1,10 @@
+{
+	"questionable": "Q",
+	"doubtful": "D",
+	"out": "Out",
+	"injured_reserve": "IR",
+	"suspended": "Susp",
+	"pup": "PUP",
+	"nfi": "NFI",
+	"functions": []
+}

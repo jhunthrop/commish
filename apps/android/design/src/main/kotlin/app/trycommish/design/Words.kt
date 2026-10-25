@@ -271,6 +271,26 @@ object Words {
         const val narrowingUnread = "These could not be read just now. The last read stands."
     }
 
+    object Designation {
+        const val questionable = "Questionable"
+        const val doubtful = "Doubtful"
+        const val out = "Out"
+        const val injured_reserve = "On injured reserve"
+        const val suspended = "Suspended"
+        const val pup = "On the PUP list"
+        const val nfi = "On the NFI list"
+    }
+
+    object DesignationRank {
+        const val questionable = "Q"
+        const val doubtful = "D"
+        const val out = "Out"
+        const val injured_reserve = "IR"
+        const val suspended = "Susp"
+        const val pup = "PUP"
+        const val nfi = "NFI"
+    }
+
     object Figure {
         const val projected = "Projected"
         const val points = "Points"
