@@ -71,6 +71,7 @@ kotlin { jvmToolchain(17) }
 dependencies {
     implementation(project(":core"))
     implementation(project(":feature:leaguehome"))
+    implementation(project(":feature:matchup"))
     implementation(project(":feature:shell"))
     implementation(project(":feature:start"))
     implementation(libs.activity.compose)

@@ -18,6 +18,9 @@ import app.trycommish.core.SystemClock
 import app.trycommish.core.leaguehome.ApiLeagueReads
 import app.trycommish.core.leaguehome.LeagueHomeViewModel
 import app.trycommish.core.leaguehome.LeagueReads
+import app.trycommish.core.matchup.ApiMatchupReads
+import app.trycommish.core.matchup.MatchupReads
+import app.trycommish.core.matchup.MatchupViewModel
 import app.trycommish.core.shell.AccountReads
 import app.trycommish.core.shell.ApiAccountReads
 import app.trycommish.core.shell.ShellViewModel
@@ -59,6 +62,7 @@ class AppGraph(
     private val reads: LeagueReads = ApiLeagueReads(transport)
     private val account: AccountReads = ApiAccountReads(transport)
     private val lineups: LineupReads = ApiLineupReads(transport)
+    private val matchups: MatchupReads = ApiMatchupReads(transport)
     private val clipboard: ClipboardManager? = context.getSystemService(ClipboardManager::class.java)
 
     /** Work that must outlive a screen or a rotation: the sign-in's pairing, once its verifier is spent. */
@@ -86,6 +90,9 @@ class AppGraph(
         }
 
     fun leagueHomeViewModel(): LeagueHomeViewModel = LeagueHomeViewModel(reads, cache, clock, zone, sessionEnd)
+
+    /** A league's Matchup, read again once a minute while it is on screen. */
+    fun matchupViewModel(): MatchupViewModel = MatchupViewModel(matchups, cache, clock, zone, sessionEnd)
 
     /** A league's Start screen, the lineup copied to the phone's clipboard. */
     fun startViewModel(league: LeagueHost): StartViewModel = StartViewModel(lineups, cache, clock, zone, league, ::copy, sessionEnd)
