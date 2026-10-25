@@ -1243,5 +1243,247 @@
 			"phases": {}
 		}
 	],
+	"lines": [
+		{
+			"host": "sleeper",
+			"scoring": "ppr",
+			"format": "ppr",
+			"line": "Sleeper, PPR"
+		},
+		{
+			"host": "sleeper",
+			"scoring": "ppr",
+			"format": "superflex",
+			"line": "Sleeper, PPR, superflex"
+		},
+		{
+			"host": "sleeper",
+			"scoring": "half_ppr",
+			"format": "ppr",
+			"line": "Sleeper, half PPR"
+		},
+		{
+			"host": "sleeper",
+			"scoring": "half_ppr",
+			"format": "superflex",
+			"line": "Sleeper, half PPR, superflex"
+		},
+		{
+			"host": "sleeper",
+			"scoring": "standard",
+			"format": "ppr",
+			"line": "Sleeper, standard"
+		},
+		{
+			"host": "sleeper",
+			"scoring": "standard",
+			"format": "superflex",
+			"line": "Sleeper, standard, superflex"
+		},
+		{
+			"host": "sleeper",
+			"scoring": "te_premium",
+			"format": "ppr",
+			"line": "Sleeper, extra points per catch for tight ends"
+		},
+		{
+			"host": "sleeper",
+			"scoring": "te_premium",
+			"format": "superflex",
+			"line": "Sleeper, extra points per catch for tight ends, superflex"
+		},
+		{
+			"host": "mfl",
+			"scoring": "ppr",
+			"format": "ppr",
+			"line": "MyFantasyLeague, PPR"
+		},
+		{
+			"host": "mfl",
+			"scoring": "ppr",
+			"format": "superflex",
+			"line": "MyFantasyLeague, PPR, superflex"
+		},
+		{
+			"host": "mfl",
+			"scoring": "half_ppr",
+			"format": "ppr",
+			"line": "MyFantasyLeague, half PPR"
+		},
+		{
+			"host": "mfl",
+			"scoring": "half_ppr",
+			"format": "superflex",
+			"line": "MyFantasyLeague, half PPR, superflex"
+		},
+		{
+			"host": "mfl",
+			"scoring": "standard",
+			"format": "ppr",
+			"line": "MyFantasyLeague, standard"
+		},
+		{
+			"host": "mfl",
+			"scoring": "standard",
+			"format": "superflex",
+			"line": "MyFantasyLeague, standard, superflex"
+		},
+		{
+			"host": "mfl",
+			"scoring": "te_premium",
+			"format": "ppr",
+			"line": "MyFantasyLeague, extra points per catch for tight ends"
+		},
+		{
+			"host": "mfl",
+			"scoring": "te_premium",
+			"format": "superflex",
+			"line": "MyFantasyLeague, extra points per catch for tight ends, superflex"
+		},
+		{
+			"host": "ffpc",
+			"scoring": "ppr",
+			"format": "ppr",
+			"line": "FFPC, PPR"
+		},
+		{
+			"host": "ffpc",
+			"scoring": "ppr",
+			"format": "superflex",
+			"line": "FFPC, PPR, superflex"
+		},
+		{
+			"host": "ffpc",
+			"scoring": "half_ppr",
+			"format": "ppr",
+			"line": "FFPC, half PPR"
+		},
+		{
+			"host": "ffpc",
+			"scoring": "half_ppr",
+			"format": "superflex",
+			"line": "FFPC, half PPR, superflex"
+		},
+		{
+			"host": "ffpc",
+			"scoring": "standard",
+			"format": "ppr",
+			"line": "FFPC, standard"
+		},
+		{
+			"host": "ffpc",
+			"scoring": "standard",
+			"format": "superflex",
+			"line": "FFPC, standard, superflex"
+		},
+		{
+			"host": "ffpc",
+			"scoring": "te_premium",
+			"format": "ppr",
+			"line": "FFPC, extra points per catch for tight ends"
+		},
+		{
+			"host": "ffpc",
+			"scoring": "te_premium",
+			"format": "superflex",
+			"line": "FFPC, extra points per catch for tight ends, superflex"
+		},
+		{
+			"host": "yahoo",
+			"scoring": "ppr",
+			"format": "ppr",
+			"line": "Yahoo, PPR"
+		},
+		{
+			"host": "yahoo",
+			"scoring": "ppr",
+			"format": "superflex",
+			"line": "Yahoo, PPR, superflex"
+		},
+		{
+			"host": "yahoo",
+			"scoring": "half_ppr",
+			"format": "ppr",
+			"line": "Yahoo, half PPR"
+		},
+		{
+			"host": "yahoo",
+			"scoring": "half_ppr",
+			"format": "superflex",
+			"line": "Yahoo, half PPR, superflex"
+		},
+		{
+			"host": "yahoo",
+			"scoring": "standard",
+			"format": "ppr",
+			"line": "Yahoo, standard"
+		},
+		{
+			"host": "yahoo",
+			"scoring": "standard",
+			"format": "superflex",
+			"line": "Yahoo, standard, superflex"
+		},
+		{
+			"host": "yahoo",
+			"scoring": "te_premium",
+			"format": "ppr",
+			"line": "Yahoo, extra points per catch for tight ends"
+		},
+		{
+			"host": "yahoo",
+			"scoring": "te_premium",
+			"format": "superflex",
+			"line": "Yahoo, extra points per catch for tight ends, superflex"
+		},
+		{
+			"host": "espn",
+			"scoring": "ppr",
+			"format": "ppr",
+			"line": "ESPN, PPR"
+		},
+		{
+			"host": "espn",
+			"scoring": "ppr",
+			"format": "superflex",
+			"line": "ESPN, PPR, superflex"
+		},
+		{
+			"host": "espn",
+			"scoring": "half_ppr",
+			"format": "ppr",
+			"line": "ESPN, half PPR"
+		},
+		{
+			"host": "espn",
+			"scoring": "half_ppr",
+			"format": "superflex",
+			"line": "ESPN, half PPR, superflex"
+		},
+		{
+			"host": "espn",
+			"scoring": "standard",
+			"format": "ppr",
+			"line": "ESPN, standard"
+		},
+		{
+			"host": "espn",
+			"scoring": "standard",
+			"format": "superflex",
+			"line": "ESPN, standard, superflex"
+		},
+		{
+			"host": "espn",
+			"scoring": "te_premium",
+			"format": "ppr",
+			"line": "ESPN, extra points per catch for tight ends"
+		},
+		{
+			"host": "espn",
+			"scoring": "te_premium",
+			"format": "superflex",
+			"line": "ESPN, extra points per catch for tight ends, superflex"
+		}
+	],
 	"sheetLoading": "Proj, Opp rank and Proj change are this week's, read as the page opens."
 }

@@ -151,6 +151,14 @@ public enum Words {
 
     public enum LeagueSwitch {
         public static let followFirst = "Follow your league"
+        public static let tePremium = "extra points per catch for tight ends"
+    }
+
+    public enum Scoring {
+        public static let ppr = "PPR"
+        public static let half_ppr = "half PPR"
+        public static let standard = "standard"
+        public static let te_premium = "TE premium"
     }
 
     public enum Shelf {

@@ -153,6 +153,14 @@ object Words {
 
     object LeagueSwitch {
         const val followFirst = "Follow your league"
+        const val tePremium = "extra points per catch for tight ends"
+    }
+
+    object Scoring {
+        const val ppr = "PPR"
+        const val half_ppr = "half PPR"
+        const val standard = "standard"
+        const val te_premium = "TE premium"
     }
 
     object Shelf {

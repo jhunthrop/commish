@@ -40,7 +40,12 @@ const BASIS_MODULE = 'web/src/lib/league/box/basis.ts';
  * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
  * tiebreak and waiver order, the platforms' names. */
 export const TABLES: readonly TableSource[] = [
-	{ name: 'LeagueHome', module: HOME_MODULE, picks: ['HOME'], json: 'shared/words/league-home.json' },
+	{
+		name: 'LeagueHome',
+		module: HOME_MODULE,
+		picks: ['HOME'],
+		json: 'shared/words/league-home.json'
+	},
 	{ name: 'Box', module: BOX_MODULE, picks: ['BOX'], json: 'shared/words/league-box.json' },
 	{
 		name: 'BoxFormat',
@@ -114,8 +119,17 @@ export const TABLES: readonly TableSource[] = [
 	{
 		name: 'LeagueSwitch',
 		module: 'web/src/lib/context/menu-words.ts',
-		picks: [['followFirst', 'FOLLOW_FIRST']],
+		picks: [
+			['followFirst', 'FOLLOW_FIRST'],
+			['tePremium', 'TE_PREMIUM_WORDS']
+		],
 		json: 'shared/words/shell-league-switch.json'
+	},
+	{
+		name: 'Scoring',
+		module: 'web/src/lib/league/names.ts',
+		picks: ['SCORING_WORDS'],
+		json: 'shared/words/league-scoring.json'
 	},
 	{
 		name: 'Shelf',
