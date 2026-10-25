@@ -10,6 +10,7 @@ import {
 	clockPart,
 	fixturePlan,
 	HOLDING_PLAYER,
+	OTHER_GAME_ROSTER,
 	SHEET_CLOCKS
 } from './export-fixtures.ts';
 import { PUBLIC_SHEET_PLAYER_IDS, SHEET_PLAYER_IDS } from './sheet-players.ts';
@@ -54,6 +55,31 @@ void test('the plan reads the league once, its scoreboard, lineup, matchup and l
 		assert.ok(names.includes(`waivers-${LEAGUE}-${clockPart(clock)}.json`), clock);
 	}
 	assert.equal(new Set(names).size, names.length, 'every file once');
+});
+
+void test("another team's game at every clock: its box by roster, the league read and the scoreboard, read as the Sleeper league (Lane 206)", () => {
+	const files = fixturePlan({ leagueId: LEAGUE, clocks: CLOCKS }).flatMap((step) => step.files);
+	for (const clock of Object.values(CLOCKS)) {
+		const at = clockPart(clock);
+		const named = [
+			`matchup-${LEAGUE}-roster-${String(OTHER_GAME_ROSTER)}-${at}.json`,
+			`sync-${LEAGUE}-sleeper-${at}.json`,
+			`scoreboard-${LEAGUE}-sleeper-${at}.json`
+		].map((name) => files.find((f) => f.file === name));
+		for (const file of named) {
+			assert.ok(file, at);
+			assert.equal(file.cookie, clock === CLOCKS.sunday ? 'fixture_week=sunday' : null, file.file);
+		}
+		const box = answer(named[0]?.file ?? '').data as {
+			viewer_side: string;
+			standing: unknown;
+			sides: { roster_id: number }[];
+		};
+		assert.equal(box.viewer_side, 'other');
+		assert.equal(box.standing, null);
+		assert.equal(box.sides[0]?.roster_id, OTHER_GAME_ROSTER);
+	}
+	assert.ok(files.filter((f) => f.cookie === undefined).length > 0, 'the rest read as FFPC');
 });
 
 void test('every committed fixture parses, and every answer is a successful envelope', () => {
