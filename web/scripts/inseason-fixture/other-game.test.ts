@@ -10,7 +10,7 @@ import type {
 	TradeAdvice,
 	WaiverAdvice
 } from '../../src/lib/league/inseason/api.ts';
-import { askedRoster, otherGameBox } from './other-game.ts';
+import { askedRoster, otherGameBox, otherGameLines, TAPPED_ROSTER } from './other-game.ts';
 import { linesOf, recordedMatchups } from './scoreboard-at.ts';
 
 const data = (name: string): unknown =>
@@ -20,16 +20,19 @@ const matchups = await recordedMatchups();
 const week = {
 	me: box.sides[0]?.roster_id ?? 0,
 	matchups,
-	lines: linesOf({
-		lineup: data('lineup') as LineupAdvice,
-		waivers: data('waivers') as WaiverAdvice,
-		trades: data('trades') as TradeAdvice,
-		matchup: box
-	})
+	lines: linesOf(
+		{
+			lineup: data('lineup') as LineupAdvice,
+			waivers: data('waivers') as WaiverAdvice,
+			trades: data('trades') as TradeAdvice,
+			matchup: box
+		},
+		await otherGameLines()
+	)
 };
 
 void test("another roster's box is its game, its side first, in the league's slots", () => {
-	const other = matchups.find((m) => m.roster_id !== week.me && m.matchup_id !== null);
+	const other = matchups.find((m) => m.roster_id === TAPPED_ROSTER);
 	assert.ok(other);
 	const drawn = otherGameBox(other.roster_id, week, box);
 	assert.ok(drawn);
@@ -70,4 +73,18 @@ void test('the asked roster is refused as the API refuses it', () => {
 	assert.equal(askedRoster(new URLSearchParams('roster=4')), 4);
 	for (const bad of ['roster=', 'roster=x', 'roster=-1', 'roster=1.5'])
 		assert.equal(askedRoster(new URLSearchParams(bad)), 'invalid', bad);
+});
+
+void test('the game the shots tap is whole: every starter of both sides in a slot, the bench after (review 204 M2)', () => {
+	const drawn = otherGameBox(TAPPED_ROSTER, week, box);
+	assert.ok(drawn);
+	for (const side of drawn.sides) {
+		const recorded = matchups.find((m) => m.roster_id === side.roster_id);
+		assert.equal(
+			side.starters.length,
+			recorded?.starters.length,
+			`roster ${String(side.roster_id)}`
+		);
+		assert.ok(side.bench.length > 0, `roster ${String(side.roster_id)} has no bench`);
+	}
 });

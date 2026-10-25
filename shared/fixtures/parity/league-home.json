@@ -665,18 +665,18 @@
 							"record": "3-2",
 							"me": false,
 							"small": "--",
-							"big": "14.4",
+							"big": "26.7",
 							"toPlay": "",
-							"stands": "ahead"
+							"stands": "behind"
 						},
 						{
 							"name": "Bower Rangers",
 							"record": "3-2",
 							"me": false,
 							"small": "--",
-							"big": "6.5",
+							"big": "43.6",
 							"toPlay": "",
-							"stands": "behind"
+							"stands": "ahead"
 						}
 					]
 				},
@@ -974,7 +974,7 @@
 							"record": "3-2",
 							"me": false,
 							"small": "--",
-							"big": "23.8",
+							"big": "67.1",
 							"toPlay": "",
 							"stands": "ahead"
 						},
@@ -983,7 +983,7 @@
 							"record": "3-2",
 							"me": false,
 							"small": "--",
-							"big": "6.5",
+							"big": "62.2",
 							"toPlay": "",
 							"stands": "behind"
 						}
@@ -1283,7 +1283,7 @@
 							"record": "3-2",
 							"me": false,
 							"small": "--",
-							"big": "23.8",
+							"big": "79.3",
 							"toPlay": "",
 							"stands": "ahead"
 						},
@@ -1292,7 +1292,7 @@
 							"record": "3-2",
 							"me": false,
 							"small": "--",
-							"big": "17.0",
+							"big": "72.7",
 							"toPlay": "",
 							"stands": "behind"
 						}
@@ -1591,8 +1591,8 @@
 							"name": "Carried by QJs",
 							"record": "3-2",
 							"me": false,
-							"small": "23.8",
-							"big": "23.8",
+							"small": "79.3",
+							"big": "79.3",
 							"toPlay": "",
 							"stands": "ahead"
 						},
@@ -1600,8 +1600,8 @@
 							"name": "Bower Rangers",
 							"record": "3-2",
 							"me": false,
-							"small": "17.0",
-							"big": "17.0",
+							"small": "72.7",
+							"big": "72.7",
 							"toPlay": "",
 							"stands": "behind"
 						}
