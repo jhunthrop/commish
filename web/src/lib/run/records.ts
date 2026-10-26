@@ -1,5 +1,7 @@
-/** The two records (Lane 114, the founder's ruling of 2026-10-21): the weekly record, our weekly
- * rankings against ESPN and the week's published projection (from week 7), and the draft record,
+/** The two records (Lane 114, the founder's ruling of 2026-10-21): the weekly record, our
+ * rest-of-season order graded week by week against ESPN and the week's published projection (from
+ * week 7; Lane 223, B188: the order graded is the one the site ships, never a weekly model), and the
+ * draft record,
  * our draft board against ADP on the season's points so far. Each is named by what it grades; ADP appears on the draft record alone. The weekly record is in the record's
  * own shape, so the page reads it with the record's functions (record.ts). */
 import { BUILD_ZONE, dayTimeStamp } from '#lib/format/day-time.ts';
@@ -31,22 +33,22 @@ const DRAFT_RECORD = 'Draft record';
 
 /** The records' words, in one place for the copy guard. */
 export const RECORDS_WORDS = {
-	lead: `Two records, each graded against what it competes with: our weekly rankings against ${YARDSTICKS}, and our draft board against ADP.`,
+	lead: `Two records, each graded against what it competes with: our rest-of-season order, graded week by week against ${YARDSTICKS}, and our draft board against ADP.`,
 	weekly: 'Weekly record',
-	weeklyWhat: `Our weekly rankings against ${YARDSTICKS}`,
+	weeklyWhat: `Our rest-of-season order, graded week by week against ${YARDSTICKS}`,
 	draft: DRAFT_RECORD,
 	draftWhat: "Our draft board against ADP, on the season's points so far",
 	/** The weeks before the weekly record, one line (ruling 1). */
 	beforeLead: (from: number) => (from <= 2 ? 'Week 1' : `Weeks 1 to ${String(from - 1)}`),
 	/** The set rule, said once (Lane 140, C14): each week's own set time is on its row. */
 	before: (from: number) =>
-		`Weekly rankings start week ${String(from)}. Each week's rankings are set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under ${DRAFT_RECORD}.`,
+		`Our rest-of-season order is graded week by week from week ${String(from)}. Each week's order is set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under ${DRAFT_RECORD}.`,
 	/** The weeks before the weekly record on a phone (Lane 209): a chip a week, "Wk 1", then where
 	 * they are graded, in place of the set rule's paragraph, which a desk says. */
 	beforeChip: (week: number) => `Wk ${String(week)}`,
 	beforePhone: `Graded under ${DRAFT_RECORD}`,
 	/** The set rule's short form under the chips, so a phone says it once too (review M3). */
-	setRulePhone: "Each week's rankings are graded as set, never as refreshed after.",
+	setRulePhone: "Each week's order is graded as set, never as refreshed after.",
 	setBefore: (day: string) => `set before kickoff ${day}`,
 	/** A set week's row, its set time to the minute and its zone (C14). */
 	setAt: (stamp: string) => `set ${stamp}`,
@@ -111,17 +113,19 @@ export const RECORDS_WORDS = {
 	lineupEspn: "ESPN's picks",
 	/** What the league row's figures are, at both widths (Lane 131 review MEDIUM-1, Lane 138). */
 	leagueRow: "Your league's row grades its rostered players and both lineups.",
-	frontWeekly: (span: string, players: string) => `Our weekly rankings over ${span}, ${players}.`,
+	frontWeekly: (span: string, players: string) =>
+		`Our rest-of-season order, graded over ${span}, ${players}.`,
 	frontDraft: (through: number, players: string) =>
 		`Our draft board through week ${String(through)}, ${players}.`,
 	/** Before a yardstick is graded, what the weekly card will compare against (Lane 142). */
 	frontWeeklyNext: (week: number) =>
-		`Weekly rankings start week ${String(week)}, against ${YARDSTICKS}.`,
+		`Our rest-of-season order is graded week by week from week ${String(week)}, against ${YARDSTICKS}.`,
 	/** The weekly record's upcoming weeks (fix round 1, M4): the next one on its own line, the rest
 	 * said once. */
 	setEach: 'set each week before kickoff',
-	/** The order a set week of the weekly record graded (M2): never "rest-of-season". */
-	weeklyOrder: (day: string) => `Our weekly rankings, set ${day}`
+	/** The order a set week of the weekly record graded: the rest-of-season order the site shipped
+	 * (Lane 223, B188, superseding Lane 114's M2 now no weekly model has passed its check). */
+	weeklyOrder: (day: string) => `Our rest-of-season order, set ${day}`
 } as const;
 
 /** The weekly record's next week to grade and its schedule, as the page loader reads it from the
@@ -180,12 +184,24 @@ export function weeklyAsRecord(run: RunRecord): RunRecord | null {
 	};
 }
 
+/** The words the record's sentences are built from: the page's (RECORDS_WORDS), or a table of the
+ * same keys (the apps' parity, shared/scripts/apps-pending-words.ts, until their lane follows). */
+export type RecordsWords = {
+	readonly [K in keyof typeof RECORDS_WORDS]: (typeof RECORDS_WORDS)[K] extends string
+		? string
+		: (typeof RECORDS_WORDS)[K];
+};
+
 /** The weeks before the weekly record, as one line that says the set rule once (C14): "Weeks 1 to
- * 6" and "Weekly rankings start week 7. Each week's rankings are set before its first kickoff and graded as
- * set, never as refreshed after. Before that ...". Null when the record starts at week 1. */
-export function beforeLine(fromWeek: number): { lead: string; text: string } | null {
+ * 6" and "Our rest-of-season order is graded week by week from week 7. Each week's order is set
+ * before its first kickoff and graded as set, never as refreshed after. Before that ...". Null when
+ * the record starts at week 1. */
+export function beforeLine(
+	fromWeek: number,
+	words: RecordsWords = RECORDS_WORDS
+): { lead: string; text: string } | null {
 	if (fromWeek <= 1) return null;
-	return { lead: RECORDS_WORDS.beforeLead(fromWeek), text: RECORDS_WORDS.before(fromWeek) };
+	return { lead: words.beforeLead(fromWeek), text: words.before(fromWeek) };
 }
 
 /** The weeks before the weekly record as a phone draws them (Lane 209, Lane 208's F8): a chip a week,
@@ -294,17 +310,20 @@ export function weeklySpan(record: RunRecord): string {
 	return spanLead(record.weeks.filter((week) => week.status === 'graded'));
 }
 
-/** A set week's order on the weekly record (M2): "Our weekly rankings, set Oct 22". */
 /** The sentence the run wrote under a week's row, drawn on a graded week only (Lane 148): a note
  * sent on a week not yet graded says nothing beside a comparison the page does not draw. */
 export function weekNote(week: RecordWeek | null): string | undefined {
 	return week?.status === 'graded' ? week.espnNote : undefined;
 }
 
-export function weeklyOrderWords(week: RecordWeek): string | null {
+/** A set week's order on the weekly record: "Our rest-of-season order, set Oct 22". */
+export function weeklyOrderWords(
+	week: RecordWeek,
+	words: RecordsWords = RECORDS_WORDS
+): string | null {
 	return week.frozenAt === null || week.order === null
 		? null
-		: RECORDS_WORDS.weeklyOrder(dayLabel(week.frozenAt));
+		: words.weeklyOrder(dayLabel(week.frozenAt));
 }
 
 /** The draft record's orders, ours first. */
