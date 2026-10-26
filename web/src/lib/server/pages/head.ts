@@ -253,6 +253,8 @@ export const STATIC_HEADS = {
 	sheet: (): HeadMarkup => built(HEAD_WORDS.sheet, links.sheet()),
 	print: (): HeadMarkup => built(HEAD_WORDS.print, resolve('/sheet/print'), { noindex: true }),
 	account: (): HeadMarkup => built(HEAD_WORDS.account, links.account(), { noindex: true }),
+	accountDelete: (): HeadMarkup =>
+		built(HEAD_WORDS.accountDelete, links.accountDelete(), { noindex: true }),
 	compare: (): HeadMarkup => built(HEAD_WORDS.compare, links.compare(), { noindex: true }),
 	offline: (): HeadMarkup => built(HEAD_WORDS.offline, resolve('/offline'), { noindex: true }),
 	appSignedIn: (): HeadMarkup =>

@@ -174,6 +174,15 @@ void test("the API's own 503 envelope keeps its words", async () => {
 	});
 });
 
+void test('a 204 is done with nothing to say: null, not an answer we did not expect', async () => {
+	const done: typeof fetch = () => Promise.resolve(new Response(null, { status: 204 }));
+	const answer = await apiClient(ORIGIN, done, WAITS).call<null>('/me/delete', {
+		method: 'POST',
+		body: { email: 'pat@example.invalid' }
+	});
+	assert.equal(answer, null);
+});
+
 void test('a network failure reads as unreachable', async () => {
 	const down: typeof fetch = () => Promise.reject(new TypeError('Failed to fetch'));
 	await assert.rejects(apiClient(ORIGIN, down, WAITS).call('/me'), isUnreachable);

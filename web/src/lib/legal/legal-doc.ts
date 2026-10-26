@@ -2,7 +2,7 @@
  * its sections, each a head and paragraphs. A paragraph is parts: plain words, or words that link to
  * a named place (the contact address, the other page, the data licence), which the page resolves, so
  * the words stay free of the router. The words live in terms-words.ts and privacy-words.ts. */
-export type LegalTarget = 'support' | 'terms' | 'privacy' | 'licence';
+export type LegalTarget = 'support' | 'terms' | 'privacy' | 'licence' | 'deleteAccount';
 
 export interface LegalLink {
 	readonly text: string;
@@ -30,10 +30,22 @@ export interface LegalDoc {
 }
 
 /** The day both pages last changed, said at the top of each. */
-export const LEGAL_CHANGED = 'Last changed October 22, 2026.';
+export const LEGAL_CHANGED = 'Last changed October 26, 2026.';
 
 /** The note at the top of each page while counsel reviews it. */
 export const DRAFT_NOTE = 'Draft for review.';
+
+/** A section's anchor, from its head: "Deleting your account" is #deleting-your-account. The stores
+ * cite the anchors (docs/store), so a head that changes moves its address (Lane 233). */
+export function sectionId(head: string): string {
+	return head
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-|-$/g, '');
+}
+
+/** The Privacy Policy's section the stores cite for deleting an account. */
+export const DELETING_HEAD = 'Deleting your account';
 
 /** A paragraph's words as a reader hears them, a link read as its words. */
 export function paragraphText(paragraph: LegalParagraph): string {

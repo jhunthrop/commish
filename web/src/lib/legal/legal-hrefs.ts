@@ -3,6 +3,7 @@
  * licence's module ride in a browser's script, and the player page keeps the credit's chunk to
  * itself (Lane 151, the script budget). */
 import { CREDIT_LICENCE_HREF } from '#lib/site/credit.ts';
+import { links } from '#lib/site/links.ts';
 import { SUPPORT_HREF } from './contact.ts';
 import type { LegalTarget } from './legal-doc.ts';
 import { legalLinks } from './legal-links.ts';
@@ -14,6 +15,7 @@ export function legalHrefs(): LegalHrefs {
 		support: SUPPORT_HREF,
 		terms: legalLinks.terms(),
 		privacy: legalLinks.privacy(),
-		licence: CREDIT_LICENCE_HREF
+		licence: CREDIT_LICENCE_HREF,
+		deleteAccount: links.accountDelete()
 	};
 }
