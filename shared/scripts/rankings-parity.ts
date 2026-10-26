@@ -11,35 +11,19 @@
  *
  * Since Lane 209 the web's phone row draws its figures as labelled cells (FigureStrip), pinned here as
  * `cells` from the web's own builders (stripCells, weekStripCells), with `stripBasis` the phone's basis
- * the web draws beside them ("Opp rank is ..."). The iOS row draws the strip (Lane 215, B196) and is
- * held to `cells` and `stripBasis`. The Android row still folds the figures into one line under the
- * name with the shorter "Opp" sentence: `folded` and `basis` keep what it draws, their values from the
- * web's cell builders, until Lane 216 draws the strip there and both go. */
+ * the web draws beside them ("Opp rank is ..."). Both apps draw the strip (iOS Lane 215, Android Lane
+ * 216, B196) and are held to `cells` and `stripBasis`. */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { hitsWords } from '../../web/src/lib/format/pool-words.ts';
 import { weekHead } from '../../web/src/lib/format/figure-words.ts';
-import { OPP_PART, OPP_PHONE, drawnText } from '../../web/src/lib/league/box/basis.ts';
-import {
-	figureCell,
-	formCells,
-	oppCell,
-	stripShare,
-	type StripCell
-} from '../../web/src/lib/league/box/figure-strip.ts';
-import {
-	BOX,
-	boxNumber,
-	fitName,
-	positionWord,
-	type BoxRow
-} from '../../web/src/lib/league/box/box.ts';
+import { drawnText } from '../../web/src/lib/league/box/basis.ts';
+import { stripShare, type StripCell } from '../../web/src/lib/league/box/figure-strip.ts';
+import { boxNumber, fitName, positionWord, type BoxRow } from '../../web/src/lib/league/box/box.ts';
 import type { OrderAdvice, WeekOrderAdvice } from '../../web/src/lib/order/api.ts';
 import {
-	FIGURE_HEADS,
 	ORDER,
 	PLAYERS_CHIPS,
-	figureColumns,
 	orderBasis,
 	orderSections,
 	orderView,
@@ -167,23 +151,6 @@ function cellsOf(cells: readonly StripCell[]): unknown[] {
 	}));
 }
 
-/** The apps' folded line (B196 replaces it with the strip): the web's cells joined, the opponent's
- * rank under the apps' short head and left out on a bye. */
-function appFoldedOf(cells: readonly StripCell[]): string {
-	return cells
-		.filter((c) => !(c.head === BOX.oppRank && c.ease === null))
-		.map((c) => `${c.head === BOX.oppRank ? BOX.opp : c.head} ${c.value}`)
-		.join(', ');
-}
-
-/** The apps' order line: every figure after Projected, the opponent's rank, Avg and Last. */
-function appFolded(view: OrderView, rankBy: OrderAdvice['rank_by']): string {
-	const rest = figureColumns(rankBy)
-		.slice(1)
-		.map((f) => figureCell(FIGURE_HEADS[f], view.figures[f]));
-	return appFoldedOf([...rest, oppCell(view.box.evidence), ...formCells(view.box.evidence)]);
-}
-
 function orderRow(
 	view: OrderView,
 	rank: number,
@@ -197,8 +164,7 @@ function orderRow(
 		bye: view.bye,
 		week: boxNumber(view.week),
 		total: boxNumber(view.figures.total),
-		cells: cellsOf(stripCells(view, rankBy, week)),
-		folded: appFolded(view, rankBy)
+		cells: cellsOf(stripCells(view, rankBy, week))
 	};
 }
 
@@ -222,26 +188,15 @@ function orderCase(advice: OrderAdvice, chip: PlayersChip | null, q: string, now
 			})
 		})),
 		more: advice.total > advice.rows.length,
-		basis: appBasis(phoneBasis),
 		stripBasis: phoneBasis
 	};
-}
-
-/** The phone's basis as the apps draw it: their folded line names the opponent's rank "Opp", so its
- * sentence is the short one where the web's strip heads it "Opp rank". Fails loudly when the web's
- * sentence is not there to swap, so the apps' basis never drifts in silence. */
-function appBasis(text: string): string {
-	if (!text.includes(OPP_PART))
-		throw new Error(`rankings parity: the order's phone basis no longer says "${OPP_PART}"`);
-	return text.replace(OPP_PART, OPP_PHONE);
 }
 
 function weekRow(view: WeekView): unknown {
 	return {
 		...(playerCell(view.box) as object),
 		proj: boxNumber(view.box.proj),
-		cells: cellsOf(weekStripCells(view)),
-		folded: appFoldedOf(weekStripCells(view))
+		cells: cellsOf(weekStripCells(view))
 	};
 }
 
