@@ -138,7 +138,8 @@ public struct LobbyRoomScreen: View {
 
 /// The lobby full screen with its view model (web/src/routes/lobby/[id] at 390): the close (the seat
 /// stays, its queue drafting until the member comes back) and the quiet Leave at the top, which asks
-/// the web's question with Stay beside it; the room scrolling under it, redrawn four times a second on the room's clock;
+/// the web's question with Stay beside it; the room scrolling under it, redrawn four times a second on the room's
+/// clock;
 /// the report in its place once the member reads it. The socket lives as long as this screen.
 public struct LobbyRoomView: View {
     @Environment(\.colorScheme) private var colorScheme
