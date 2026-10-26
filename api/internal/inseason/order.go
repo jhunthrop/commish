@@ -3,7 +3,6 @@ package inseason
 import (
 	"context"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -101,30 +100,9 @@ func parseOrderQuery(r *http.Request, league bool) (orderQuery, map[string]strin
 // 66m).
 var orderPositions = map[draft.Position]bool{draft.QB: true, draft.RB: true, draft.WR: true, draft.TE: true}
 
-// ranked is the view's players in our order: at a position by his
-// position rank, across positions by points over replacement.
+// ranked is the view's players in our order (orderOf on the read's board).
 func (a *advisor) ranked(position draft.Position) []boards.Player {
-	var players []boards.Player
-	for _, p := range a.Board.Raw.Players {
-		if (position == "" || p.Position == position) && orderPositions[p.Position] && a.starts(p.Position) {
-			players = append(players, p)
-		}
-	}
-	if position != "" {
-		sort.SliceStable(players, func(i, j int) bool {
-			return a.Board.PositionRanks[players[i].ID] < a.Board.PositionRanks[players[j].ID]
-		})
-		return players
-	}
-	sort.SliceStable(players, func(i, j int) bool {
-		vi, hi := a.Board.Values[players[i].ID]
-		vj, hj := a.Board.Values[players[j].ID]
-		if hi != hj {
-			return hi
-		}
-		return hi && vi > vj
-	})
-	return players
+	return orderOf(a.Board, position, a.starts)
 }
 
 // playingFirst is the order with every player on a season-long list
@@ -136,25 +114,13 @@ func (a *advisor) ranked(position draft.Position) []boards.Player {
 // byesLast an available player whose club is on bye in the order's week
 // comes last of all, after the listed players (Lane 163, D06): the week's
 // rankings number the players who play it first, and his row draws no
-// number.
-func (a *advisor) playingFirst(players []boards.Player, hosts map[string]string, byesLast bool) ([]boards.Player, []int) {
-	var playing, listed, byes []boards.Player
-	for _, p := range players {
-		switch {
-		case a.seasonLong(p, hosts):
-			listed = append(listed, p)
-		case byesLast && a.season.OnBye(p.Team):
-			byes = append(byes, p)
-		default:
-			playing = append(playing, p)
-		}
+// number; each row keeps his place in the full order (Lane 227, B209).
+func (a *advisor) playingFirst(players []boards.Player, hosts map[string]string, byesLast bool) orderPlaces {
+	var onBye func(boards.Player) bool
+	if byesLast {
+		onBye = func(p boards.Player) bool { return a.season.OnBye(p.Team) }
 	}
-	ordered := append(append(playing, listed...), byes...)
-	ranks := make([]int, len(ordered))
-	for i := range ordered {
-		ranks[i] = i + 1
-	}
-	return ordered, ranks
+	return placesOf(players, func(p boards.Player) bool { return a.seasonLong(p, hosts) }, onBye)
 }
 
 // seasonLong is whether a board player is on a season-long list as his
@@ -338,9 +304,9 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 		out.ReadAt = &readAt
 		hosts = a.hostIDs()
 	}
-	players, ranks := a.playingFirst(a.ranked(q.position), hosts, q.byesLast)
+	places := a.playingFirst(a.ranked(q.position), hosts, q.byesLast)
 	onClub := 0
-	for i, p := range players {
+	for i, p := range places.players {
 		if !matches(p, q.q) || (q.roster != "" && a.rosterMark(p.ID).Kind != q.roster) {
 			continue
 		}
@@ -351,7 +317,7 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 		if len(out.Rows) == q.limit {
 			continue
 		}
-		out.Rows = append(out.Rows, a.orderRow(p, ranks[i], hosts, targets))
+		out.Rows = append(out.Rows, a.orderRow(p, places.rank[i], places.overall[i], hosts, targets))
 	}
 	out.OnClub = &onClub
 	for _, r := range out.Rows {
@@ -364,10 +330,11 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 }
 
 // orderRow is one player's row: his line as the league's screens draw it,
-// his place, the order's two keys, and in a league his roster and move.
-func (a *advisor) orderRow(p boards.Player, rank int, hosts map[string]string, targets Targets) apitypes.OrderRow {
+// his place in the answer and in the full order, the order's two keys, and
+// in a league his roster and move.
+func (a *advisor) orderRow(p boards.Player, rank, overall int, hosts map[string]string, targets Targets) apitypes.OrderRow {
 	person := a.boardPerson(p, hosts)
-	row := apitypes.OrderRow{Line: person.line, Rank: rank, RestOfSeasonPoints: a.restOfSeasonPoints(p),
+	row := apitypes.OrderRow{Line: person.line, Rank: rank, OverallRank: &overall, RestOfSeasonPoints: a.restOfSeasonPoints(p),
 		PointsOverReplacement: a.pointsOverReplacement(p)}
 	if targets != nil {
 		mark := a.rosterMark(p.ID)

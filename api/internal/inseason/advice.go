@@ -798,12 +798,7 @@ func atLeast(got, want apitypes.GameState) bool {
 
 // starts reports whether the league starts a position in any slot.
 func (a *advisor) starts(p draft.Position) bool {
-	for _, s := range a.slots {
-		if s.accepts(p) {
-			return true
-		}
-	}
-	return false
+	return startsAny(a.slots, p)
 }
 
 // pool is the board's players no roster in the league holds, at the
