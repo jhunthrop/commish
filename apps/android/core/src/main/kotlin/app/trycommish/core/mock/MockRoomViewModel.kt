@@ -94,6 +94,7 @@ class MockRoomViewModel(
     private val mutableState = MutableStateFlow<MockRoomState>(MockRoomState.Loading)
     private val mutableRefusal = MutableStateFlow<String?>(null)
     private val mutableCopied = MutableStateFlow(false)
+    private val mutableRefreshing = MutableStateFlow(false)
 
     val state: StateFlow<MockRoomState> = mutableState.asStateFlow()
 
@@ -102,6 +103,9 @@ class MockRoomViewModel(
 
     /** "Link copied" shows in place of the share verb. */
     val copied: StateFlow<Boolean> = mutableCopied.asStateFlow()
+
+    /** A pull's read is on its way: the pull-to-refresh spinner, which comes down when it lands. */
+    val refreshing: StateFlow<Boolean> = mutableRefreshing.asStateFlow()
 
     /** When the room shown was read. */
     var stamp: Instant? = null
@@ -120,6 +124,9 @@ class MockRoomViewModel(
     /** How many writes were chained, so a read begun before one can tell it was overtaken. */
     private var generation = 0
     private var boardView: Pair<RoomBoard, RoomBoardView>? = null
+
+    /** Run it again on its way. */
+    private var starting: Job? = null
 
     /** The room's line while the room shown is a saved one: the room could not be reached, and when it was
      * read. */
@@ -147,7 +154,17 @@ class MockRoomViewModel(
 
     /** A pull to read the room again: only while nothing is being written, so a read never races a write (the
      * web has no manual read; this is the way back from a stale room). */
-    fun refresh(): Job? = if (ui.busy || queueWrites > 0) null else load()
+    fun refresh(): Job? {
+        if (ui.busy || queueWrites > 0) return null
+        mutableRefreshing.value = true
+        return viewModelScope.launch {
+            try {
+                read()
+            } finally {
+                mutableRefreshing.value = false
+            }
+        }
+    }
 
     /** The pool's chip. */
     fun choose(filter: String) {
@@ -250,20 +267,24 @@ class MockRoomViewModel(
             }
         }
 
-    /** Run it again from the same slot, a new seed: the new room's id to `opened`. */
+    /** Run it again from the same slot, a new seed: the new room's id to `opened`. Once at a time: a second tap
+     * while the first is on its way starts nothing. A refusal keeps the report on screen with its sentence. */
     fun runAgain(opened: (String) -> Unit): Job? {
         val report = mutableState.value as? MockRoomState.Report ?: return null
-        return viewModelScope.launch {
-            try {
-                reads.create(MockCreate(settings = report.settings.copy(slot = report.slot))).id?.let { opened(it.toString()) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (
-                @Suppress("TooGenericExceptionCaught") e: Exception,
-            ) {
-                fail(e, reading = false)
-            }
-        }
+        if (starting?.isActive == true) return null
+        mutableRefusal.value = null
+        return viewModelScope
+            .launch {
+                try {
+                    reads.create(MockCreate(settings = report.settings.copy(slot = report.slot))).id?.let { opened(it.toString()) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") e: Exception,
+                ) {
+                    fail(e, reading = false)
+                }
+            }.also { starting = it }
     }
 
     private suspend fun read() {
@@ -347,7 +368,7 @@ class MockRoomViewModel(
         if (!samePick) ui = ui.copy(marked = null, draftedAt = null)
         if (fresh.status == MockStatus.complete) {
             keep(MockSaved(room, board))
-            report(room)
+            readReport(room)
             return
         }
         if (card == null && fresh.waiting) card = readCard(fresh.pickNumber)
@@ -371,6 +392,22 @@ class MockRoomViewModel(
         if (card?.pickNumber == pick) return card
         ui = ui.copy(callMissing = true)
         return null
+    }
+
+    /** The finished draft's report; one that cannot be read says why, with Try again (which reads the room
+     * and its report again), never a finished room with no verbs. */
+    private suspend fun readReport(room: MockRoom) {
+        try {
+            report(room)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Unauthorized) {
+            throw e
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            mutableState.value = MockRoomState.Failed(sentence(e))
+        }
     }
 
     private suspend fun report(room: MockRoom) {
@@ -443,7 +480,13 @@ class MockRoomViewModel(
         }
         if (!reading) {
             mutableRefusal.value = sentence(error)
-            show()
+            // The report stays on screen with the refusal under its verbs.
+            if (mutableState.value !is MockRoomState.Report) show()
+            return
+        }
+        if ((error as? ApiFailure)?.status in FINAL_STATUSES) {
+            // Not this account's room, or no such room: a refusal is final, not a lost connection.
+            mutableState.value = MockRoomState.Failed(sentence(error))
             return
         }
         if (saved != null) {
@@ -455,6 +498,9 @@ class MockRoomViewModel(
     }
 
     companion object {
+        /** A read refused for good: the room is not the account's (403) or is not there (404). */
+        private val FINAL_STATUSES = setOf(403, 404)
+
         /** actions.ts COPIED_MS: how long "Link copied" stays. */
         const val COPIED_MS = 3_000L
 

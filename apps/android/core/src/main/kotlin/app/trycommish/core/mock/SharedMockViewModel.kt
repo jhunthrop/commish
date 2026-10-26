@@ -3,9 +3,11 @@ package app.trycommish.core.mock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.trycommish.api.ApiFailure
+import app.trycommish.api.Unauthorized
 import app.trycommish.api.models.MockCreate
 import app.trycommish.api.models.MockRoom
 import app.trycommish.api.models.MockStatus
+import app.trycommish.core.SessionEnd
 import app.trycommish.core.companion.DraftReportModel
 import app.trycommish.core.companion.Drafter
 import app.trycommish.core.companion.RoomBoardView
@@ -43,6 +45,7 @@ sealed interface SharedMockState {
 class SharedMockViewModel(
     val code: String,
     private val reads: MockReads,
+    private val sessionEnd: SessionEnd = SessionEnd {},
 ) : ViewModel() {
     private val mutableState = MutableStateFlow<SharedMockState>(SharedMockState.Loading)
     private val mutableStarting = MutableStateFlow(false)
@@ -109,6 +112,8 @@ class SharedMockViewModel(
                     ?.let { opened(it.toString()) }
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: Unauthorized) {
+                sessionEnd.signedOut()
             } catch (
                 @Suppress("TooGenericExceptionCaught") e: Exception,
             ) {

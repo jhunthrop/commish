@@ -58,7 +58,8 @@ fun PlayerSheetOver(
     graph: AppGraph,
     host: PlayerSheetHost,
     league: FollowedLeague?,
-    openPlayer: (ShellRoute.Player) -> Unit,
+    /** His full page pushed; null where the sheet offers none (over a draft in progress). */
+    openPlayer: ((ShellRoute.Player) -> Unit)?,
 ) {
     val sheets = remember(graph, league?.id) { PlayerSheets { graph.playerSheetViewModel(it, league) } }
     PlayerSheetContainer(host, sheets, openPlayer)

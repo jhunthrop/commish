@@ -210,6 +210,19 @@ class MockSetupTest {
     }
 
     @Test
+    fun `a shared mock's run signs out on a refused token`() {
+        var ends = 0
+        val stub = StubMock(MockFixtures.Answer.SharedRound5).apply { createSignedOut = true }
+        val vm = SharedMockViewModel("code", stub) { ends++ }
+        vm.load()
+        idle()
+        vm.run {}
+        idle()
+        assertEquals(1, ends)
+        assertNull(vm.problem.value)
+    }
+
+    @Test
     fun `the site's mock links open in the app`() {
         val site = SiteLinks.ORIGIN
         assertEquals(ShellRoute.MockSetup(), SiteLinks.mock("$site/mock/new"))

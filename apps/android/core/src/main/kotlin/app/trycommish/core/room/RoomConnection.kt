@@ -1,5 +1,6 @@
 package app.trycommish.core.room
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import okhttp3.Cookie
@@ -65,7 +66,14 @@ class OkHttpRoomConnector(
         val connection = OkHttpRoomConnection()
         val socket = client.newWebSocket(request, connection.listener)
         connection.attach(socket)
-        return connection.opened()
+        return try {
+            connection.opened()
+        } catch (e: CancellationException) {
+            // The owner left while the upgrade was on its way: the socket it started is let go now, so no
+            // seat stays present with no one reading it (Lane 214 review H2).
+            socket.cancel()
+            throw e
+        }
     }
 
     private companion object {

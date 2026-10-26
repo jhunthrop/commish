@@ -59,6 +59,8 @@ class MockScenesTest {
     @Test
     fun everyReferenceIsSmallEnoughToKeep() {
         val images = File("src/test/snapshots/images").listFiles().orEmpty()
+        // A folder not found is a failure, not a pass (Lane 214 review L7).
+        assertTrue("no references found", images.isNotEmpty())
         assertEquals(emptyList<String>(), images.filter { it.length() > MAX_BYTES }.map { it.name })
     }
 

@@ -111,7 +111,8 @@ private object Routes {
             ShellRoute.Schedule -> SCHEDULE
             is ShellRoute.CompanionNew -> "companion-new?replay=${route.replay}"
             is ShellRoute.Companion -> "companion/${route.id}"
-            is ShellRoute.MockSetup -> "mock-new?league=${route.league.orEmpty()}&from=${settingsArg(route.from)}"
+            is ShellRoute.MockSetup ->
+                "mock-new?league=${android.net.Uri.encode(route.league.orEmpty())}&from=${settingsArg(route.from)}"
             is ShellRoute.SharedMock -> "mock-share/${android.net.Uri.encode(route.code)}"
         }
 }
@@ -171,6 +172,8 @@ fun Shell(
         } else {
             switchOpen = false
             tab = LEAGUE_PAGE
+            // A sign-out lets every stack go, the room over them too (Lane 214 review M2).
+            mockRoom = null
             nav.toSignIn()
         }
     }
@@ -290,10 +293,14 @@ fun Shell(
                 ),
             )
         }
-        PlayerSheetOver(graph, sheet, (state as? ShellState.Ready)?.selected, openPlayer = {
-            mockRoom = null
-            push(it)
-        })
+        // Over a draft in progress the sheet has no Full page: one verb per screen, and the room has no page
+        // stack to push it on; his page is reachable after the draft (Lane 214 review M3).
+        PlayerSheetOver(
+            graph,
+            sheet,
+            (state as? ShellState.Ready)?.selected,
+            openPlayer = if (mockRoom == null) ({ push(it) }) else null,
+        )
     }
 }
 

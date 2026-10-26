@@ -70,6 +70,7 @@ fun MockRoomView(
     val state by vm.state.collectAsStateWithLifecycle()
     val refusal by vm.refusal.collectAsStateWithLifecycle()
     val copied by vm.copied.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     var leaving by rememberSaveable { mutableStateOf(false) }
     var shown by rememberSaveable { mutableIntStateOf(PoolModel.FIRST_ROWS) }
     val clipboard = LocalClipboardManager.current
@@ -113,7 +114,7 @@ fun MockRoomView(
                             open = exits.open,
                         )
                     Column {
-                        PullToRefreshBox(isRefreshing = false, onRefresh = { vm.refresh() }, modifier = Modifier.weight(1f)) {
+                        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { vm.refresh() }, modifier = Modifier.weight(1f)) {
                             MockRoom(
                                 now.model,
                                 vm.staleWords(now),
@@ -136,6 +137,7 @@ fun MockRoomView(
                             another = { exits.anotherSlot(now.settings) },
                             copied = copied,
                             copy = share,
+                            refusal = refusal,
                         ),
                         Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                         open = exits.open,
@@ -152,12 +154,14 @@ fun MockRoomView(
     }
 }
 
-/** The room over the shell takes every touch its own controls leave, so none reaches the shell's bars under
- * it (the rehearsal's tap on the room's top bar opened the Account beneath). */
+/** The room over the shell is the hit target for every touch on it, so none reaches the shell's bars under
+ * it (the rehearsal's tap on the room's top bar opened the Account beneath); it reads the touches and
+ * consumes none, so the room's own scroll, pull and taps keep them (Lane 214 review H1: consuming them in
+ * the Main pass cancelled every drag and every tap that moved). */
 private fun Modifier.swallowTouches(): Modifier =
     pointerInput(Unit) {
         awaitPointerEventScope {
-            while (true) awaitPointerEvent().changes.forEach { it.consume() }
+            while (true) awaitPointerEvent()
         }
     }
 

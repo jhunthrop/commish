@@ -223,6 +223,53 @@ class MockRoomViewModelTest {
     }
 
     @Test
+    fun `a refused run again keeps the report and says why, and a second tap starts nothing`() {
+        val stub = StubMock(MockFixtures.Answer.Round5)
+        val vm = viewModel(stub)
+        vm.finish()
+        idle()
+        assertInstanceOf(MockRoomState.Report::class.java, vm.state.value)
+        stub.offline = true
+        vm.runAgain {}
+        idle()
+        assertInstanceOf(MockRoomState.Report::class.java, vm.state.value)
+        assertEquals(Words.Mock.unreachable, vm.refusal.value)
+        stub.offline = false
+        stub.hold("create")
+        var opened = 0
+        vm.runAgain { opened++ }
+        main.scheduler.runCurrent()
+        assertNull(vm.runAgain { opened++ })
+        stub.release("create")
+        idle()
+        assertEquals(1, stub.created.size)
+        assertEquals(1, opened)
+    }
+
+    @Test
+    fun `a report that cannot be read after finish says so, and try again reads it`() {
+        val stub = StubMock(MockFixtures.Answer.Round5).apply { reportFails = true }
+        val vm = viewModel(stub)
+        vm.finish()
+        idle()
+        assertEquals(MockRoomState.Failed(Words.Mock.unreachable), vm.state.value)
+        stub.reportFails = false
+        stub.opened = MockFixtures.Answer.Finish
+        vm.load()
+        idle()
+        assertInstanceOf(MockRoomState.Report::class.java, vm.state.value)
+    }
+
+    @Test
+    fun `a saved room the API refuses is final, not a lost connection`() {
+        val cache = MemoryCache()
+        val stub = StubMock()
+        viewModel(stub, cache)
+        stub.readRefused = 404
+        assertEquals(MockRoomState.Failed("No mock with that id."), viewModel(stub, cache).state.value)
+    }
+
+    @Test
     fun `the link copied line shows for its moment then goes`() {
         val vm = viewModel(StubMock())
         vm.linkCopied()
@@ -277,6 +324,19 @@ class MockRoomViewModelTest {
         idle()
         assertEquals(1, stub.calls.count { it == "pick" })
         assertTrue(room(vm).canWrite)
+    }
+
+    @Test
+    fun `a pull's spinner shows while its read is on its way and comes down when it lands`() {
+        val stub = StubMock()
+        val vm = viewModel(stub)
+        stub.hold("mock")
+        vm.refresh()
+        main.scheduler.runCurrent()
+        assertTrue(vm.refreshing.value)
+        stub.release("mock")
+        idle()
+        assertFalse(vm.refreshing.value)
     }
 
     @Test
