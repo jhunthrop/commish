@@ -88,7 +88,8 @@ data class RankingsRow(
     val player: RankingsPlayer,
     /** The API's rank, never numbered again here (Review Focus 4). */
     val rank: Int,
-    /** The # cell: his rank, the list's word for a player on a season-long list, or nothing for a bye. */
+    /** The # cell: his number in the full order (overall_rank), a bye's too, or the list's word for a
+     * player on a season-long list (Lane 234). */
     val place: String,
     val bye: Boolean,
     /** The week's figure: his Pts once final, his Proj before, "--" without. Pinned by the parity; drawn
@@ -206,7 +207,11 @@ internal object RankingsRows {
         return "${RankingsWords.EXPECTED_SCORE} $club ${StartRows.halves(total.teamPoints)}, $opponent ${StartRows.halves(theirs)}"
     }
 
-    /** order.ts orderView at the phone: byes sit apart (the week's rankings), the # the API's rank. */
+    /** overall.ts overallOf: his overall_rank, his rank on an answer from before the field (Lane 234). */
+    fun overall(row: OrderRow): Int = row.overallRank ?: row.rank
+
+    /** order.ts orderView at the phone: byes sit apart (the week's rankings), the # his number in the full
+     * order (overall.ts overallOf, Lane 234), a bye's too, so with the byes last the numbers skip. */
     fun row(
         row: OrderRow,
         viewing: OrderViewing,
@@ -217,12 +222,7 @@ internal object RankingsRows {
         val player = player(line, viewing.pillRank, zone, now)
         val listed = player.status?.onList == true
         val bye = line.facts.bye && !listed
-        val place =
-            when {
-                listed -> player.status?.rank.orEmpty()
-                bye -> ""
-                else -> row.rank.toString()
-            }
+        val place = if (listed) player.status?.rank.orEmpty() else overall(row).toString()
         val read = StartRows.row(line, slot = "", zone = zone, now = now, ranked = false)
         val week = if (listed) null else weekFigure(line, now)
         return RankingsRow(
