@@ -38,6 +38,15 @@ enum class ReferenceScene(
     CompareAbsent("compare-absent", true),
     Clubs("clubs", false),
     Club("club", false),
+
+    /** In season: a club whose bye is played (KC, week 5), its schedule saying week 6's games as the run read them. */
+    ClubInSeason("club-inseason", true),
+
+    /** In season, the Bye row with both byes ahead (BUF 7, GB 11 before the week 7 board). */
+    CompareByeAhead("compare-bye-ahead", true),
+
+    /** In season, the Bye row with one bye played (DET 6), its cell blank. */
+    CompareByePlayed("compare-bye-played", true),
     Schedule("schedule", true),
     Stale("stale", true),
     ;
@@ -80,13 +89,20 @@ internal class SceneReads(
     }
 
     fun compare(): RunScreenViewModel<CompareModel> {
-        val slugs = if (scene == ReferenceScene.CompareTwo) listOf("ja-marr-chase", "rome-odunze") else listOf("jahmyr-gibbs", "nobody")
+        val slugs =
+            when (scene) {
+                ReferenceScene.CompareTwo -> listOf("ja-marr-chase", "rome-odunze")
+                ReferenceScene.CompareByeAhead -> listOf("josh-allen", "josh-jacobs")
+                ReferenceScene.CompareByePlayed -> listOf("jahmyr-gibbs", "josh-jacobs")
+                else -> listOf("jahmyr-gibbs", "nobody")
+            }
         return loaded(CompareReader.viewModel(slugs, null, reads(), zone, SessionEnd {}))
     }
 
     fun clubs(): RunScreenViewModel<ClubsModel> = loaded(ClubScreens.clubs(reads(), zone, SessionEnd {}))
 
-    fun club(): RunScreenViewModel<ClubPageModel> = loaded(ClubScreens.club("cin", reads(), zone, SessionEnd {}))
+    fun club(): RunScreenViewModel<ClubPageModel> =
+        loaded(ClubScreens.club(if (scene == ReferenceScene.ClubInSeason) "kc" else "cin", reads(), zone, SessionEnd {}))
 
     fun schedule(): RunScreenViewModel<ScheduleModel> = loaded(ClubScreens.schedule(reads(), zone, SessionEnd {}))
 

@@ -87,6 +87,37 @@ class ReferenceMockTest {
     }
 
     @Test
+    fun theScheduleOpensOnTheRunsCurrentWeekWithItsStatesAndItsRead() {
+        val grid = reads(ReferenceScene.Schedule).schedule().model().grid
+        assertEquals(6, grid.current)
+        assertEquals("Week 6's games as of Wed Oct 21, 7:00 am Central.", grid.asOf)
+        val states = grid.rows.flatMap { it.cells }.filter { it.state != null }
+        assertTrue(states.isNotEmpty() && states.all { it.week == 6 })
+    }
+
+    @Test
+    fun theInSeasonClubSaysItsPlayedByeByNothingAndTheWeeksState() {
+        val model = reads(ReferenceScene.ClubInSeason).club().model()
+        assertEquals("KC", model.meta)
+        assertEquals("On our PPR board", model.boardHead)
+        assertEquals("Kicked off", model.games.single { it.week == 6 }.state)
+        assertTrue(model.asOf != null)
+    }
+
+    @Test
+    fun theByeRowSaysAheadAndPlayedAsTheBoardDoes() {
+        fun bye(scene: ReferenceScene): List<String>? =
+            (reads(scene).compare().model().outcome as? CompareOutcome.Table)
+                ?.table
+                ?.rows
+                ?.singleOrNull { it.label == "Bye" }
+                ?.cells
+                ?.map { it.text }
+        assertEquals(setOf("7", "11"), bye(ReferenceScene.CompareByeAhead)?.toSet())
+        assertEquals(setOf("", "11"), bye(ReferenceScene.CompareByePlayed)?.toSet())
+    }
+
+    @Test
     fun everyReferenceIsThereAndSmallEnoughToKeep() {
         // The record job draws the references in this same task, so it checks them on the run after.
         assumeFalse(System.getProperty("paparazzi.test.record") == "true")
@@ -97,8 +128,8 @@ class ReferenceMockTest {
     }
 
     private companion object {
-        /** Eight scenes, two themes, two phones. */
-        const val REFERENCES = 32
+        /** Eleven scenes, two themes, two phones. */
+        const val REFERENCES = 44
         const val MAX_BYTES = 300 * 1024
     }
 }

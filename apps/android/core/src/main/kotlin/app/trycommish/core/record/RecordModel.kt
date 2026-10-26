@@ -76,11 +76,11 @@ data class RecordRow(
     val lead: String,
     /** The status words, capitalized: "Set Thu Oct 22, 1:00 pm Central, graded Wed Oct 28". */
     val text: String,
-    /** The order the week graded: "Our weekly rankings, set Oct 22", "Our preseason order". */
+    /** The order the week graded: "Our rest-of-season order, set Oct 22", "Our preseason order". */
     val order: String?,
     val graded: Boolean,
     /** A graded week's line under its lead on a phone, its order and when it was graded with the set date
-     * said once: "Our weekly rankings, set Oct 22, graded Wed Oct 28"; null off a graded week. */
+     * said once: "Our rest-of-season order, set Oct 22, graded Wed Oct 28"; null off a graded week. */
     val caption: String?,
     /** The players graded at All, null off a graded week. */
     val players: String?,

@@ -211,7 +211,14 @@ data class CompareModel(
             return when (val verdict = Verdict.between(both[0], both[1], input.format.label)) {
                 Verdict.Same -> CompareOutcome.Same(Words.ComparePage.sameTitle, Words.Verdict.samePlayer)
                 is Verdict.Call -> {
-                    val rows = CompareRows.rows(verdict.leader, verdict.other, input.manifest.season, input.underway)
+                    val rows =
+                        CompareRows.rows(
+                            verdict.leader,
+                            verdict.other,
+                            input.manifest.season,
+                            input.underway,
+                            input.format.rosFromWeek,
+                        )
                     val gapRow = rows.any { it.label == CompareRows.GAP_LABEL }
                     val ranges = listOf(verdict.leader, verdict.other).mapNotNull { it.numbers.range }
                     CompareOutcome.Table(

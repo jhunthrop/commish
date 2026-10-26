@@ -36,7 +36,7 @@ class RecordMockTest {
             loaded(RecordSnapshotTest.Scene.Week)
                 .model.weekly.rows
                 .first { it.graded }
-        assertEquals("Our weekly rankings, set Oct 22, graded Wed Oct 28", week.caption)
+        assertEquals("Our rest-of-season order, set Oct 22, graded Wed Oct 28", week.caption)
         assertTrue(loaded(RecordSnapshotTest.Scene.Pending).model.weekly.bug is RecordBug.Pending)
         assertEquals(null, loaded(RecordSnapshotTest.Scene.Draft).model.draft.waiting)
         assertTrue(loaded(RecordSnapshotTest.Scene.Stale).stale)

@@ -17,6 +17,7 @@ import app.trycommish.core.board.BoardOrder
 import app.trycommish.core.board.BoardPosition
 import app.trycommish.core.board.BoardRow
 import app.trycommish.core.board.BoardWords
+import app.trycommish.core.board.Byes
 import app.trycommish.core.board.PageVerb
 import app.trycommish.core.board.RunReadFailure
 import app.trycommish.core.board.RunWords
@@ -48,7 +49,7 @@ data class ClubLead(
 data class ClubCard(
     val abbr: String,
     val name: String,
-    /** "ARI · bye week 14". */
+    /** "ARI · Bye week 14", "KC" once its bye is played. */
     val meta: String,
     val strength: StrengthFigure?,
     val lead: ClubLead?,
@@ -85,8 +86,11 @@ data class ClubPageModel(
     val stamp: String,
     val hero: ClubHero?,
     val basis: List<String>,
-    /** "On our PPR board". */
+    /** "On our PPR board": the head names what the basis beside it names, the run's board (reference-words.ts
+     * CLUB_PAGE.onBoard, Lane 223's D2); the order's head waits on this page reading the live order (B207). */
     val boardHead: String,
+    /** The section's spoken label after the head, as the web's table label: "Cincinnati Bengals, On our PPR board". */
+    val boardLabel: String,
     /** "Nobody from Arizona is on this board", null where the board has some. */
     val nobody: String?,
     val columns: BoardColumns,
@@ -96,6 +100,8 @@ data class ClubPageModel(
     val scheduleCaption: String,
     val scheduleHeads: List<String>,
     val games: List<ClubGame>,
+    /** "Week 6's games as of Wed Oct 21, 7:00 am Central.", under the schedule; null without a current week. */
+    val asOf: String?,
     /** Null with fewer than two available players. */
     val compare: ClubCompare?,
     val clubsLink: String,
@@ -142,7 +148,17 @@ class ClubFiles(
     /** A club's rows share its bye, said once in its hero, so no row carries one. */
     internal fun cells(zone: ZoneId): BoardCells = BoardCells(statuses, emptyMap(), format.rosFromWeek, zone)
 
-    fun meta(club: RunClub): String = "${club.abbr} · ${Words.ClubPage.byeWeek} ${club.bye?.toString() ?: Words.ClubPage.byeNotSet}"
+    /** reference-words.ts clubMeta: "ARI · Bye week 14" while the bye is ahead of the week the board ranks
+     * from, the code alone once it is played (Lane 223, B190), "ARI · Bye week not set" where the run names
+     * none. */
+    fun meta(club: RunClub): String {
+        val bye = club.bye ?: return "${club.abbr} · ${Words.Bye.notSet}"
+        return Byes.line(bye, format.rosFromWeek)?.let { "${club.abbr} · $it" } ?: club.abbr
+    }
+
+    /** The current week's game states as the run read them, said in `zone`. */
+    fun states(zone: ZoneId): StatedWeek =
+        StatedWeek.of(schedule.slates.flatMap { it.games }, played, underway, manifest.manifest.runAt, zone)
 
     fun captureWords(
         now: Instant,
@@ -256,8 +272,9 @@ fun clubPageModel(
                 .filter { it.team == club.abbr }
         }
     val gap = format.rosFromWeek == null && own.any { it.gap != null }
-    val scheduled = ScheduleViews.club(club, files.schedule, files.clubs, files.played, files.underway)
+    val scheduled = ScheduleViews.club(club, files.schedule, files.clubs, files.played, files.underway, files.states(zone))
     val pair = own.filter { !BoardOrder.heldOut(it.id, files.statuses) }.take(2)
+    val head = filled(Words.ClubPage.onBoard, format.label)
     return ClubPageModel(
         abbr = club.abbr,
         name = "${club.city} ${club.nickname}",
@@ -268,7 +285,8 @@ fun clubPageModel(
             listOf(StrengthWords.winsBasis(files.schedule.opponentBasis)) +
                 BoardBasis.ranked(format, files.manifest.manifest.season, null, files.sources.orEmpty(), gap) +
                 listOfNotNull(files.captureWords(now, zone)),
-        boardHead = filled(Words.ClubPage.onBoard, format.label),
+        boardHead = head,
+        boardLabel = "${club.city} ${club.nickname}, $head",
         nobody = if (own.isEmpty()) filled(Words.ClubPage.nobody, club.city) else null,
         columns = BoardColumns.Ranked(gap),
         rows = own.map(cells::ranked),
@@ -277,15 +295,19 @@ fun clubPageModel(
         scheduleCaption = scheduled.caption,
         scheduleHeads = listOf(Words.ClubPage.week, Words.ClubPage.opponent, Words.ClubPage.expectedWins),
         games = scheduled.games,
+        asOf = scheduled.asOf,
         compare = if (pair.size == 2) ClubCompare(Words.ClubPage.comparePair, pair.map { it.id }, pair.map { it.slug }) else null,
         clubsLink = Words.ClubPage.clubs,
     )
 }
 
 /** The schedule screen's model from its files. */
-fun scheduleModel(files: ClubFiles): ScheduleModel {
+fun scheduleModel(
+    files: ClubFiles,
+    zone: ZoneId,
+): ScheduleModel {
     val schedule = files.schedule
-    val grid = ScheduleViews.grid(schedule, files.clubs, files.board.rows, files.played, files.underway)
+    val grid = ScheduleViews.grid(schedule, files.clubs, files.board.rows, files.played, files.underway, files.states(zone))
     val floor = ScheduleViews.strongFloor(schedule.opponentValues.values).floor
     return ScheduleModel(
         heading = "${schedule.season} ${Words.SchedulePage.heading}",
@@ -334,6 +356,6 @@ object ClubScreens {
     ): RunScreenViewModel<ScheduleModel> =
         RunScreenViewModel(reads, zone, sessionEnd) { r ->
             val files = ClubFiles.read(r, sources = false)
-            Built(scheduleModel(files), files.manifest.manifest, files.reads)
+            Built(scheduleModel(files, zone), files.manifest.manifest, files.reads)
         }
 }

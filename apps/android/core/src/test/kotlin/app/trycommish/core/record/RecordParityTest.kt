@@ -56,10 +56,10 @@ class RecordParityTest {
         val (web, model) = model(name)
         val weekly = web.getValue("weekly").jsonObject
         assertEquals(AppWords.record, model.title)
-        assertEquals(web.text("lead"), model.lead)
+        assertEquals(pending(web)?.text("lead") ?: web.text("lead"), model.lead)
         assertEquals(normalized(weekly.getValue("bug")), bugOf(model.weekly.bug))
         val head = weekly["head"] as? JsonObject
-        assertEquals(head?.let { it.text("title") to it.text("what") }, model.weekly.head)
+        assertEquals(head?.let { it.text("title") to (pending(web)?.text("weeklyWhat") ?: it.text("what")) }, model.weekly.head)
     }
 
     @ParameterizedTest
@@ -72,8 +72,18 @@ class RecordParityTest {
         assertEquals(weekly.strings("figures"), section.figures)
         assertEquals(weekly.strings("sourceHeads"), section.sourceHeads)
         val before = weekly["before"] as? JsonObject
-        assertEquals(before?.let { it.text("lead") to it.text("text") }, section.before)
-        assertEquals(weekly.getValue("rows").jsonArray.map { rowOf(it.jsonObject) }, section.rows.map(::rowOf))
+        assertEquals(before?.let { it.text("lead") to (pending(web)?.text("before") ?: it.text("text")) }, section.before)
+        val orders =
+            pending(web)
+                ?.getValue("orders")
+                ?.jsonArray
+                ?.associate {
+                    it.jsonObject
+                        .getValue("week")
+                        .jsonPrimitive.int to
+                        it.jsonObject
+                }.orEmpty()
+        assertEquals(weekly.getValue("rows").jsonArray.map { rowOf(withOrder(it.jsonObject, orders)) }, section.rows.map(::rowOf))
         assertEquals((weekly["toDate"] as? JsonObject)?.let(::toDateOf), section.toDate?.let(::toDateOf))
         assertEquals(weekly.text("basis"), section.basis)
     }
@@ -112,6 +122,22 @@ class RecordParityTest {
         val (_, model) = model(name)
         val said = listOf(model.lead, model.weekly.basis, model.draft.basis) + model.weekly.rows.map { it.text }
         assertFalse(said.any { it.contains("model", ignoreCase = true) })
+    }
+
+    // The web's own sentences (Lane 223): the case's webPending, which Android draws since Lane 231 while
+    // the live values stay iOS's until Lane 232 moves them in.
+
+    private fun pending(web: JsonObject): JsonObject? = web["webPending"] as? JsonObject
+
+    /** A set week's row with the web's order words and caption from webPending in place of iOS's. */
+    private fun withOrder(
+        row: JsonObject,
+        orders: Map<Int, JsonObject>,
+    ): JsonObject {
+        val week = row.text("lead")?.removePrefix("Week ")?.toIntOrNull() ?: return row
+        val order = orders[week] ?: return row
+        val caption = if (row["caption"] is JsonNull) JsonNull else order.getValue("caption")
+        return JsonObject(row + mapOf("order" to order.getValue("order"), "caption" to caption))
     }
 
     // The parity file's shapes, and the port's in the same shapes.
