@@ -66,9 +66,18 @@ public enum PhoneRail {
     /// Our record's key.
     public static let recordKey = "record"
 
-    /// The five for a followed league; a phase this build does not know reads as in season, the app's
-    /// hub.
-    public static func tabs(phase: Components.Schemas.LeaguePhaseKnown?, waiversOpen: Bool) -> [RailTab] {
+    /// The bar the shell shows: the shown league's five by its phase; with no league followed, or a
+    /// league whose phase this build does not know (B154), the five for the site's season, as Android's
+    /// phoneBar and the web's railShown read it.
+    public static func bar(league: FollowedLeague?, season: SitePhase?) -> [RailTab] {
+        guard let league, let phase = league.phase else {
+            return withoutLeague(season: season)
+        }
+        return tabs(phase: phase, waiversOpen: league.waiversOpen)
+    }
+
+    /// The five for a league in a phase this build knows.
+    public static func tabs(phase: Components.Schemas.LeaguePhaseKnown, waiversOpen: Bool) -> [RailTab] {
         switch phase {
         case .preDraft, .offseason:
             [board, players, mock, sheet, advisor]
@@ -79,7 +88,7 @@ public enum PhoneRail {
             ]
         case .playoffs where !waiversOpen:
             [league, lineup, matchup, trades, week]
-        case .inSeason, .playoffs, nil:
+        case .inSeason, .playoffs:
             [league, lineup, matchup, waivers, trades]
         }
     }

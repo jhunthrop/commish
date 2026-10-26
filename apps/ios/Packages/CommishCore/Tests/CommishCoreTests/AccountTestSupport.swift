@@ -113,7 +113,9 @@ actor MutableAccount: AccountAPI {
         AccountContext(leagues: leagues, selected: nil, season: .inSeason)
     }
 
-    func selectLeague(id _: String) async throws {}
+    func selectLeague(id _: String) async throws -> Bool {
+        true
+    }
 
     func revokeDevice(id _: String) async throws {}
 }
@@ -135,4 +137,51 @@ actor Gate {
         waiting.forEach { $0.resume() }
         waiting = []
     }
+}
+
+/// GET /me and PUT /me/league with the waits a test opens: the PUT held until `put` opens (taken, the
+/// site's selection becomes the choice, unless the test says the site does not take it), and a GET
+/// /me held on a gate the test hands it, answering the selection as it stood when the read arrived.
+actor PendingAccount: AccountAPI {
+    private let leagues: [FollowedLeague]
+    private var selected: String?
+    private let takes: Bool
+    private var readGate: Gate?
+    let put = Gate()
+    /// Opens once a held read has arrived.
+    let reading = Gate()
+
+    init(leagues: [String], selected: String?, takes: Bool = true) {
+        self.leagues = leagues.map { AppSessionTests.followed($0) }
+        self.selected = selected
+        self.takes = takes
+    }
+
+    func select(_ id: String) {
+        selected = id
+    }
+
+    func hold(_ gate: Gate) {
+        readGate = gate
+    }
+
+    func account() async throws -> AccountContext {
+        let answer = AccountContext(leagues: leagues, selected: selected, season: .inSeason)
+        if let gate = readGate {
+            readGate = nil
+            await reading.open()
+            await gate.wait()
+        }
+        return answer
+    }
+
+    func selectLeague(id: String) async throws -> Bool {
+        await put.wait()
+        if takes {
+            selected = id
+        }
+        return takes
+    }
+
+    func revokeDevice(id _: String) async throws {}
 }

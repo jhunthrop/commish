@@ -8,10 +8,7 @@ import LeagueHome
 import Matchup
 import Player
 import Shell
-import Start
 import SwiftUI
-import Trades
-import Waivers
 
 /// The phone's five, the web's bar for the shown league's phase or, with none, the site's season
 /// (PhoneRail, held to rail-order.ts), each under the top bar: the league switch, the player search
@@ -22,7 +19,9 @@ import Waivers
 /// Rankings with its letters; the others say
 /// their screen's name until their lane lands. A score bug opens its game: the member's on the Matchup
 /// tab, another team's pushed on the tab in view (Lane 206). Every screen presents the player sheet through the one
-/// host; its Full page and a player's site link push his page on the tab in view.
+/// host; its Full page and a player's site link push his page on the tab in view. Signed out (B155,
+/// as Android) the bar is the web's public five with no top bar, the League tab the sign-in, and a
+/// site link waits for the sign-in; signing out lets every tab's pushed screens go and shows it.
 struct RootTabs: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var selection = PhoneRail.leagueKey
@@ -33,7 +32,9 @@ struct RootTabs: View {
     @Environment(\.openURL) private var openURL
     let environment: AppEnvironment
     let session: AppSession
-    /// A site link the app was opened with (a player's page), pushed on the tab in view once.
+    /// The League tab's screen while signed out.
+    let signIn: SignInView
+    /// A site link the app was opened with (a player's page), pushed on the tab in view once signed in.
     @Binding var linked: ShellRoute?
     /// The API refused the token on a signed-in read: the app signs out and shows sign-in.
     let expired: @MainActor () -> Void
@@ -68,41 +69,73 @@ struct RootTabs: View {
                 selection = first.key
             }
         }
-        .onChange(of: linked, initial: true) { _, route in
-            guard let route else {
-                return
+        .onChange(of: session.state) { _, state in
+            if state == .signedOut {
+                showSignIn()
+            } else {
+                openLinked()
             }
-            sheet.close()
-            open(route)
-            linked = nil
         }
+        .onChange(of: linked, initial: true) { openLinked() }
+    }
+
+    private var signedIn: Bool {
+        if case .signedIn = session.state {
+            return true
+        }
+        return false
+    }
+
+    /// The site link the app was opened with, once signed in.
+    private func openLinked() {
+        guard signedIn, let route = linked else {
+            return
+        }
+        sheet.close()
+        open(route)
+        linked = nil
+    }
+
+    /// Signed out: every tab's pushed screens let go, the League tab's sign-in shown.
+    private func showSignIn() {
+        sheet.close()
+        switchOpen = false
+        query = ""
+        paths = [:]
+        selection = PhoneRail.leagueKey
     }
 
     private func path(_ key: String) -> Binding<[ShellRoute]> {
         Binding(get: { paths[key] ?? [] }, set: { paths[key] = $0 })
     }
 
-    /// A tab's first screen under the top bar, the switch's list over it while open.
+    /// A tab's first screen under the top bar (signed in), the switch's list over it while open.
     private func root(_ tab: RailTab) -> some View {
         screen(tab)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay(alignment: .top) { switchList }
             .safeAreaInset(edge: .top, spacing: 0) {
-                TopBar(
-                    face: session.leagueSwitch.face, open: switchOpen, query: $query,
-                    actions: TopBarActions(
-                        toggleSwitch: { switchOpen.toggle() },
-                        openAccount: { open(.account) },
-                        search: { typed in
-                            if let route = ShellRoute.search(typed) {
-                                query = ""
-                                open(route)
-                            }
-                        }
-                    )
-                )
+                if signedIn {
+                    topBar
+                }
             }
             .toolbar(.hidden, for: .navigationBar)
+    }
+
+    private var topBar: some View {
+        TopBar(
+            face: session.leagueSwitch.face, open: switchOpen, query: $query,
+            actions: TopBarActions(
+                toggleSwitch: { switchOpen.toggle() },
+                openAccount: { open(.account) },
+                search: { typed in
+                    if let route = ShellRoute.search(typed) {
+                        query = ""
+                        open(route)
+                    }
+                }
+            )
+        )
     }
 
     @ViewBuilder
@@ -119,6 +152,15 @@ struct RootTabs: View {
 
     @ViewBuilder
     private func screen(_ tab: RailTab) -> some View {
+        if tab.key == PhoneRail.leagueKey, !signedIn {
+            signIn
+        } else {
+            tabScreen(tab)
+        }
+    }
+
+    @ViewBuilder
+    private func tabScreen(_ tab: RailTab) -> some View {
         switch (tab.key, selectedLeague) {
         case let (PhoneRail.leagueKey, league?):
             LeagueScreen(
@@ -280,74 +322,5 @@ struct RootTabs: View {
         case let .push(route):
             paths[selection, default: []].append(route)
         }
-    }
-}
-
-/// A league's Start screen: owns its view model for the league it shows; the lineup copied to the
-/// system clipboard.
-private struct LineupScreen: View {
-    @State private var viewModel: StartViewModel
-    private let leagueID: String
-
-    init(environment: AppEnvironment, league: FollowedLeague, expired: @escaping @MainActor () -> Void) {
-        _viewModel = State(initialValue: StartViewModel(
-            api: environment.api, cache: environment.cache, clock: environment.clock, host: league.host,
-            copy: { text in
-                UIPasteboard.general.string = text
-                return true
-            },
-            onSignedOut: expired
-        ))
-        leagueID = league.id
-    }
-
-    var body: some View {
-        StartView(viewModel: viewModel, leagueID: leagueID)
-    }
-}
-
-/// A league's Trades: owns its view model for the league it shows; the offer copied to the system
-/// clipboard, the member's team and standing as the switch names them.
-private struct TradesTab: View {
-    @State private var viewModel: TradesViewModel
-    private let leagueID: String
-
-    init(environment: AppEnvironment, league: FollowedLeague, expired: @escaping @MainActor () -> Void) {
-        _viewModel = State(initialValue: TradesViewModel(
-            api: environment.api, cache: environment.cache, clock: environment.clock, host: league.host,
-            me: TradeMe(league: league),
-            copy: { text in
-                UIPasteboard.general.string = text
-                return true
-            },
-            onSignedOut: expired
-        ))
-        leagueID = league.id
-    }
-
-    var body: some View {
-        TradesView(viewModel: viewModel, leagueID: leagueID)
-    }
-}
-
-/// A league's Waivers: owns its view model for the league it shows; a name copied to the system
-/// clipboard and the platform's waiver page opened where the claim is not made here.
-private struct WaiversTab: View {
-    @State private var viewModel: WaiverViewModel
-    private let leagueID: String
-
-    init(environment: AppEnvironment, league: FollowedLeague, expired: @escaping @MainActor () -> Void) {
-        _viewModel = State(initialValue: WaiverViewModel(
-            api: environment.api, cache: environment.cache, clock: environment.clock, host: league.host,
-            zone: .current,
-            copy: { UIPasteboard.general.string = $0 },
-            openPage: { UIApplication.shared.open($0) },
-            onSignedOut: expired
-        ))
-        leagueID = league.id
-    }
-
-    var body: some View {
-        WaiverView(viewModel: viewModel, leagueID: leagueID)
     }
 }

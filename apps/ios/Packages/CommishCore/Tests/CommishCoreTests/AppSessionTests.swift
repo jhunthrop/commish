@@ -36,6 +36,91 @@ struct AppSessionTests {
         #expect(session.state == .signedOut)
     }
 
+    /// Signed out, the bar keeps the web's public five with the League tab first, the sign-in (B155).
+    @Test func signedOutKeepsThePublicFive() async {
+        let session = AppSession(
+            account: StubAccount(), store: MemorySessionStore(), cache: NullCache(), defaults: Self.defaults()
+        )
+        #expect(session.tabs.isEmpty)
+        await session.restore()
+        #expect(session.tabs == PhoneRail.withoutLeague)
+        #expect(session.tabs.first?.key == PhoneRail.leagueKey)
+    }
+
+    /// A league whose phase this build does not know shows the site's season's bar, as Android (B154).
+    @Test(arguments: SitePhase.allCases)
+    func aLeaguePhaseThisBuildDoesNotKnowTakesTheSitesSeason(season: SitePhase) async {
+        let unknown = FollowedLeague(
+            id: "u", name: "League u", host: .init(value1: .sleeper), scoring: .ppr, format: .ppr, phase: nil,
+            draftAt: nil, waiversOpen: true
+        )
+        let session = await AppSession(
+            account: StubAccount(followed: [unknown], season: season), store: Self.signedIn(), cache: NullCache(),
+            defaults: Self.defaults()
+        )
+        await session.restore()
+        #expect(session.tabs == PhoneRail.withoutLeague(season: season))
+    }
+
+    /// The choice's PUT is held: a later GET /me naming the site's old selection never takes it back,
+    /// and once the site has taken it, the site's later selection leads again (B156).
+    @Test func aPendingChoiceHoldsAgainstALaterRead() async {
+        let account = PendingAccount(leagues: ["a", "b"], selected: "a")
+        let session = await AppSession(
+            account: account, store: Self.signedIn(), cache: NullCache(), defaults: Self.defaults()
+        )
+        await session.restore()
+        session.choose("b")
+        await session.restore()
+        #expect(session.state == .signedIn(league: Self.followed("b")))
+        await account.put.open()
+        await session.selectionWrite?.value
+        await session.restore()
+        #expect(session.state == .signedIn(league: Self.followed("b")))
+        await account.select("a")
+        await session.restore()
+        #expect(session.state == .signedIn(league: Self.followed("a")))
+    }
+
+    /// A PUT the site did not take holds the choice until a read agrees; after that the site leads.
+    @Test func aChoiceTheSiteDidNotTakeHoldsUntilAReadAgrees() async {
+        let account = PendingAccount(leagues: ["a", "b"], selected: "a", takes: false)
+        await account.put.open()
+        let session = await AppSession(
+            account: account, store: Self.signedIn(), cache: NullCache(), defaults: Self.defaults()
+        )
+        await session.restore()
+        session.choose("b")
+        await session.selectionWrite?.value
+        await session.restore()
+        #expect(session.state == .signedIn(league: Self.followed("b")))
+        await account.select("b")
+        await session.restore()
+        await account.select("a")
+        await session.restore()
+        #expect(session.state == .signedIn(league: Self.followed("a")))
+    }
+
+    /// A read already in flight when the choice is made answers from before it: it keeps the choice
+    /// shown, even once the PUT has landed.
+    @Test func aReadInFlightWhenTheChoiceIsMadeKeepsIt() async {
+        let account = PendingAccount(leagues: ["a", "b"], selected: "a")
+        await account.put.open()
+        let session = await AppSession(
+            account: account, store: Self.signedIn(), cache: NullCache(), defaults: Self.defaults()
+        )
+        await session.restore()
+        let read = Gate()
+        await account.hold(read)
+        let inFlight = Task { await session.restore() }
+        await account.reading.wait()
+        session.choose("b")
+        await session.selectionWrite?.value
+        await read.open()
+        await inFlight.value
+        #expect(session.state == .signedIn(league: Self.followed("b")))
+    }
+
     @Test func aTokenOpensTheNewestFollowedLeagueWithNoSelection() async {
         let session = await AppSession(
             account: StubAccount(leagues: [Fixtures.league, "other"]), store: Self.signedIn(), cache: NullCache(),
@@ -250,11 +335,12 @@ actor StubAccount: AccountAPI {
         return AccountContext(leagues: leagues, selected: selected, season: season)
     }
 
-    func selectLeague(id: String) async throws {
+    func selectLeague(id: String) async throws -> Bool {
         selections.append(id)
         if let selectError {
             throw selectError
         }
+        return true
     }
 
     func revokeDevice(id: String) async throws {
