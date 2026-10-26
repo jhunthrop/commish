@@ -59,7 +59,7 @@ No ads and no analytics. Commish is for people 18 and older.
 
 Notes on the copy:
 
-- The platforms are named because a member must know whether their league can be followed. The names and order are the site's (`LEAGUE_HOSTS`: Sleeper, MyFantasyLeague, FFPC, Yahoo, ESPN). All five switches default on in production (`HOST_*_ENABLED` in `api.yml`). If a switch is off on the day of submission, drop that name. The live draft names Sleeper alone because only Sleeper's live draft is read (`PLATFORMS` in `hosts.ts`).
+- The platforms are named because a member must know whether their league can be followed. The names and order are the site's (`LEAGUE_HOSTS`: Sleeper, MyFantasyLeague, FFPC, Yahoo, ESPN). Sleeper and MyFantasyLeague have no switch. The other three switches (`HOST_FFPC_ENABLED`, `HOST_YAHOO_ENABLED`, `HOST_ESPN_ENABLED` in `api.yml`) default on in production. If one is off on the day of submission, drop that name. The live draft names Sleeper alone because only Sleeper's live draft is read (`PLATFORMS` in `hosts.ts`).
 - No projection provider is named. "The week's published projection" is the site's own phrase (`freeSeasonLines`).
 - No weekly model is claimed: the order is the rest-of-season order, graded week by week (the founder's rule after rounds 2 to 4).
 - No paid tier is mentioned. The free page's "Paid tiers come later" sentence is left out on purpose (a store listing promises nothing about later).
@@ -107,7 +107,7 @@ Paste into App content, App access, "All or some functionality is restricted", o
 - Other information, drafted:
 
 ```text
-Open the app and tap Sign in. Sign in with the email and password above in the browser sheet that opens. The app returns on its own. The account follows one public Sleeper league, so the League, Lineup, Matchup, Waivers and Trades tabs show a real league with no platform sign-in. The board and the player pages work signed out too. No move is sent to the league platform unless you confirm it, and this account has no platform connection that could send one.
+Open the app and tap Sign in. Sign in with the email and password above in the browser sheet that opens. The app returns on its own. The account follows one public Sleeper league, so the League, Lineup, Matchup, Waivers and Trades tabs show a real league with no platform sign-in. The board and the player pages work signed out too. No move is sent to the league platform unless you confirm it, and this account has no platform connection that could send one. The Account tab shows notification switches, but this version registers no push token and sends no notification. The switches are saved on the phone only.
 ```
 
 Draft checked against the banned list (§7 of the report). The verb is the app's ("Sign in", `SignIn.kt`). Confirm the tab names on the submitted build before pasting.
@@ -164,7 +164,7 @@ Notes:
 
 Play requires both an in-app path (or an in-app link to the web resource) and a web resource where deletion can be requested without the app. Today:
 
-1. **In the app**: the Account screen offers sign out and unpair (`AccountViewModel.kt` `signOut`, `unpair`), no delete. A code lane must add a "Delete your account" link on Account that opens the web resource.
+1. **In the app**: the Account screen already prints the instruction, "To delete your account, write to help@trycommish.app" (`apps/android/design/src/main/kotlin/app/trycommish/design/Words.kt:722`), beside sign out and unpair (`AccountViewModel.kt`). What is missing is the in-app verb: a code lane must add "Delete your account" on Account, opening the web resource or a route that completes the deletion.
 2. **On the web**: `/privacy` says how to delete ("Write to help@trycommish.app from the email you sign in with"), but its sections carry no anchors (`web/src/lib/legal/LegalPage.svelte` prints no `id`), and Play asks for the deletion part to be "reasonably prominent (for example, through an anchor link)". A web lane should give the section an id (`#deleting-your-account`) or add a small `/account/delete` page naming Commish, the steps and the address.
 
 Both are needed before a production release, not for the internal track. The URL field takes the anchored address once it exists.

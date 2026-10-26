@@ -102,7 +102,7 @@ The spec (§5.2) plans Apple beside Google. **FOUNDER F1**: which sign-in method
 
 ### 5.2 Account deletion (guideline 5.1.1(v)): a blocker
 
-"If your app supports account creation, you must also offer account deletion within the app." A new member can create an account from the app's sign-in sheet. Today the only path is to write to `help@trycommish.app` (privacy policy, "Deleting your account"), and the Account screen offers sign out and unpair only (`AccountTab.swift`, Lane 221). Apple accepts an in-app button that starts deletion, or a direct link from the app to a web page where it is completed. An email address alone is rejected outside highly regulated industries.
+"If your app supports account creation, you must also offer account deletion within the app." A new member can create an account from the app's sign-in sheet. Today the only path is to write to `help@trycommish.app` (privacy policy, "Deleting your account"). The Account screen already prints that instruction, "To delete your account, write to help@trycommish.app" (`AccountScreen.swift:218`, words in `Words.generated.swift:720`). What is missing is the in-app verb and the route that completes the deletion. Apple accepts an in-app button that starts deletion, or a direct link from the app to a web page where it is completed. An email address alone is rejected outside highly regulated industries.
 
 Before submission a code lane must add, on both apps' Account screens, "Delete your account" leading to a deletion flow (an API route that deletes the account and its platform connections first, as the policy promises, then signs out) or to a web page that completes it. Play's requirement (Play file §4.3) is met by the same work.
 
@@ -113,7 +113,7 @@ Before submission a code lane must add, on both apps' Account screens, "Delete y
 | Sign-in required | | Yes |
 | User name, password | Must not expire | **FOUNDER F2** enters them in App Store Connect only, never in this file |
 | Contact name, email, phone | Phone with + and country code | The founder's name, `help@trycommish.app`, **FOUNDER F5** phone |
-| Notes | 4000 bytes | The text below (870 bytes) |
+| Notes | 4000 bytes | The text below (981 bytes) |
 
 ```text
 Commish shows a member's fantasy football league as box scores: the lineup to start, waivers, trades and the matchup, plus a draft board and player pages.
@@ -122,7 +122,7 @@ Sign in: tap Sign in. The sign-in page opens in the system sheet. Use the email 
 
 The review account follows one public Sleeper league, so the league screens show a real league with no platform sign-in. The board and the player pages work signed out too.
 
-No purchases: everything is free through the 2026 season and the app has no in-app purchase. No ads, no tracking. Notifications are not sent in this version.
+No purchases: everything is free through the 2026 season and the app has no in-app purchase. No ads, no tracking. The Account tab shows notification switches, but this version registers no push token and sends no notification. The switches are saved on the phone only.
 
 A move from the Lineup or Waivers screen goes to the member's own league platform only after the member confirms it. The review account has no platform connection, so no move can be sent from it.
 
