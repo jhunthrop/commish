@@ -138,7 +138,9 @@
 	);
 	const heldRows = $derived(page.position === null ? [] : page.rows.filter(heldOut).filter(shown));
 	const visible = $derived(
-		ours ? page.rows.filter(shown) : sortRows(page.rows.filter(shown), sort, page.byes)
+		ours
+			? page.rows.filter(shown)
+			: sortRows(page.rows.filter(shown), sort, page.byes, page.format.rosFromWeek ?? null)
 	);
 	const group = $derived(POSITION_NAMES[page.position ?? 'WR']);
 	const unit = $derived(page.format.unit);

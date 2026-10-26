@@ -105,6 +105,23 @@ export interface paths {
 		patch: operations['updateMe'];
 		trace?: never;
 	};
+	'/me/delete': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Deletes the signed-in account (Lane 233, B230), from the account page's browser session or an app's device token. The member types the email they sign in with. In one transaction the platform connections go first, then every row kept with the account: sign-ins, paired devices and their codes, followed leagues and their private reads, sheets and exports, solo mocks and their reports, companions, moves, passes and billing rows. A seat in a lobby draft stays in the draft under the departed member's word, its picks with no account; a group pass stays with the people who claimed it. The sign-in provider's user is deleted after the commit, and a failure there is retried by the daily sweep. Answers 204 with the session cookie cleared; every device token opens nothing from then on. POST, not DELETE with a body, because OpenAPI 3.0 leaves a DELETE's request body undefined and the app clients' generators treat it unevenly. */
+		post: operations['deleteMe'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/me/week': {
 		parameters: {
 			query?: never;
@@ -1313,7 +1330,7 @@ export interface paths {
 				q?: string;
 				/** @description at most this many rows, 100 without it */
 				limit?: number;
-				/** @description last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the answer's week (line.facts.bye) after the rest, the players on a season-long list included, numbered on from them; without it the order keeps them in their places */
+				/** @description last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the answer's week (line.facts.bye) after the rest, the players on a season-long list included; each row's rank is its place in the answer as drawn, its overall_rank its place in the order without byes=last (Lane 227, B209); without it the order keeps them in their places and the two are equal */
 				byes?: 'last';
 			};
 			header?: never;
@@ -1673,7 +1690,10 @@ export interface paths {
 		get?: never;
 		put?: never;
 		post?: never;
-		/** Unpair a browser. Its token opens nothing from the next request on. */
+		/**
+		 * Unpair a browser. Its token opens nothing from the next request on.
+		 * @description An app signing itself out (its own device token, its own id) is answered a DeviceSignOut: the WorkOS logout URL that ends the sign-in's WorkOS session, or url null for a device paired before the API kept it. Any other unpairing (the account page's cookie, or an app unpairing another device) is answered data null.
+		 */
 		delete: operations['revokeDevice'];
 		options?: never;
 		head?: never;
@@ -1970,6 +1990,10 @@ export interface components {
 		Redirect: {
 			url: string;
 		};
+		DeviceSignOut: {
+			/** @description The WorkOS logout URL the app opens to end the sign-in's WorkOS session, returning to the site; null when the device was paired before the API kept the session. */
+			url: string | null;
+		};
 		/** @enum {string} */
 		Feature:
 			| 'live_draft_advisor'
@@ -2033,6 +2057,10 @@ export interface components {
 		};
 		AccountUpdate: {
 			handle: string;
+		};
+		/** @description The member's confirmation that the account goes: the email they sign in with, typed by hand, compared without regard to case or the spaces around it. */
+		AccountDeletion: {
+			email: string;
 		};
 		/** @enum {string} */
 		ScoringPreset: 'ppr' | 'half_ppr' | 'standard' | 'te_premium';
@@ -4061,6 +4089,10 @@ export interface components {
 			 * @description those points less a free pickup's for a twelve-team league of this format, one decimal; null at a position the league starts nobody at
 			 */
 			points_over_replacement: number | null;
+			/** @description his place at his position in our order for this format at the read's clock (in PPR the public /order's overall_rank at his position, Lane 227, B206), the number the page's head says in its own format; null when he is on a season-long list as the read sees him (on a league's read the platform's IR mark included, as his head), or the order does not place him; absent from an older answer */
+			position_rank?: number | null;
+			/** @description his place across every position in our order for this format at the read's clock, by points over replacement (in PPR the public /order's overall_rank with no position, Lane 227, B206); null as position_rank is; absent from an older answer */
+			overall_rank?: number | null;
 		};
 		TierMate: {
 			board_id: string;
@@ -4540,8 +4572,10 @@ export interface components {
 		};
 		OrderRow: {
 			line: components['schemas']['PlayerLine'];
-			/** @description his place in our order for this view: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement */
+			/** @description his place in our order for this view as the answer draws it: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement; with byes=last the rows are numbered 1..n after the byes are moved last, so from the first bye row down rank and overall_rank differ */
 			rank: number;
+			/** @description his place in the full order of the view (the position asked, or every position) for the answer's scoring at the request's clock, before any byes=last move: the one number home, the club page, compare and the Rankings print for him (Lane 227, B209). Equal to rank without byes=last; with it the rows are not consecutive from the first bye down. Every row carries it; absent from an older answer */
+			overall_rank?: number;
 			/**
 			 * Format: double
 			 * @description the order's key, one decimal: his rest-of-season points over his club's games left at the read's clock (not yet kicked off) through the league's last playoff week as its platform states it (Lane 96; week 17 when it states none and with no league), byes out (Lane 86, the player read's rest_of_season figure for the order's format); null on the preseason order and without a projection
@@ -5746,6 +5780,29 @@ export interface operations {
 		responses: {
 			200: components['responses']['AccountResponse'];
 			400: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+		};
+	};
+	deleteMe: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['AccountDeletion'];
+			};
+		};
+		responses: {
+			/** @description the account is deleted and the session cookie cleared */
+			204: {
+				headers: Record<string, unknown>;
+				content?: never;
+			};
+			400: components['responses']['ErrorResponse'];
+			401: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 		};
 	};
@@ -7986,7 +8043,7 @@ export interface operations {
 				q?: string;
 				/** @description at most this many rows, 100 without it */
 				limit?: number;
-				/** @description last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the answer's week (line.facts.bye) after the rest, the players on a season-long list included, numbered on from them; without it the order keeps them in their places */
+				/** @description last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the answer's week (line.facts.bye) after the rest, the players on a season-long list included; each row's rank is its place in the answer as drawn, its overall_rank its place in the order without byes=last (Lane 227, B209); without it the order keeps them in their places and the two are equal */
 				byes?: 'last';
 			};
 			header?: never;
@@ -8370,7 +8427,15 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			200: components['responses']['EmptyResponse'];
+			/** @description unpaired */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['DeviceSignOut'] | null;
+					};
+				};
+			};
 			404: components['responses']['ErrorResponse'];
 		};
 	};

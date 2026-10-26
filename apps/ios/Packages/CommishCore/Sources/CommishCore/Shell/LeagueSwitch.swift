@@ -97,4 +97,16 @@ public enum ShellRoute: Hashable, Sendable {
         let query = typed.trimmingCharacters(in: .whitespacesAndNewlines)
         return query.isEmpty ? nil : .players(query: query)
     }
+
+    /// Whether the screen opens signed out, as the web serves it to anyone: the players, a player's
+    /// page, the reference pages, a mock's setup and a shared mock. The account, a league's screens and
+    /// the companion wait for the sign-in.
+    public var isPublic: Bool {
+        switch self {
+        case .players, .player, .adp, .compare, .clubs, .club, .schedule, .mockSetup, .sharedMock:
+            true
+        case .account, .leagueHome, .game, .companionNew, .companion:
+            false
+        }
+    }
 }

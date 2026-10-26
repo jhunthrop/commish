@@ -5,7 +5,8 @@
  * browser's keeping is ui/theme.ts and sheet/storage.ts. Sub-processors are named by role only. */
 import { ESPN_CONSENT, FFPC_CONSENT, MFL_CONSENT } from '#lib/hosts/connection-words.ts';
 import { SUPPORT_EMAIL } from './contact.ts';
-import { DRAFT_NOTE, LEGAL_CHANGED, type LegalDoc } from './legal-doc.ts';
+import { DEPARTED_NAME } from '#lib/account/delete-words.ts';
+import { DELETING_HEAD, DRAFT_NOTE, LEGAL_CHANGED, type LegalDoc } from './legal-doc.ts';
 
 const support = { text: SUPPORT_EMAIL, to: 'support' } as const;
 
@@ -91,12 +92,20 @@ export const PRIVACY: LegalDoc = {
 			]
 		},
 		{
-			head: 'Deleting your account',
+			head: DELETING_HEAD,
 			paragraphs: [
 				[
-					'Write to ',
+					'Open ',
+					{ text: 'Delete account', to: 'deleteAccount' },
+					' from your account page and type the email you sign in with. At once we delete your account and everything kept with it, your platform connections first, and sign you out on every browser and phone.'
+				],
+				[
+					`Two things stay, kept for the people they belong to as well: your seats and picks in lobby drafts, under the name ${DEPARTED_NAME}, and a group pass you bought, for the people who claimed it.`
+				],
+				[
+					'You can also write to ',
 					support,
-					' from the email you sign in with, and we delete your account and everything kept with it, your platform connections first, and write back when it is done.'
+					' from the email you sign in with, and we delete your account for you and write back when it is done.'
 				]
 			]
 		},

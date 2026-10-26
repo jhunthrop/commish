@@ -1,7 +1,7 @@
-import Account
 import CommishAPI
 import CommishCore
 import CommishDesign
+import Shell
 import SwiftUI
 import UIKit
 
@@ -34,25 +34,28 @@ struct CommishApp: App {
 
     @ViewBuilder
     private var content: some View {
-        switch session.state {
-        case .restoring:
+        if session.state == .restoring {
             ProgressView()
-        case .signedOut:
-            SignInView(working: signIn.working, problem: signIn.problem) {
-                signIn.began()
-                flow.begin(
-                    returned: { link in Task { await finish(link) } },
-                    ended: { signIn.ended() }
-                )
-            }
-        case .signedIn:
+        } else {
+            // Signed out too: the public tabs stay, the League tab is the sign-in (B155). Built anew at
+            // each sign-in and sign-out, so no tab's state passes from one account to the next.
             RootTabs(
                 environment: environment,
                 session: session,
+                signIn: SignInView(working: signIn.working, problem: signIn.problem, signIn: beginSignIn),
                 linked: $linked,
                 expired: { Task { await session.expire() } }
             )
+            .id(session.generation)
         }
+    }
+
+    private func beginSignIn() {
+        signIn.began()
+        flow.begin(
+            returned: { link in Task { await finish(link) } },
+            ended: { signIn.ended() }
+        )
     }
 
     /// A site link the app opened with: the sign-in return to the sign-in flow, a player's page to his

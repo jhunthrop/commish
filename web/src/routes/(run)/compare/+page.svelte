@@ -138,7 +138,11 @@
 	const pair = $derived(
 		verdict?.kind === 'call' ? ([verdict.leader.side, verdict.other.side] as const) : null
 	);
-	const rows = $derived(pair ? compareRows(pair[0], pair[1], data.season, data.underway) : []);
+	const rows = $derived(
+		pair
+			? compareRows(pair[0], pair[1], data.season, data.underway, format.rosFromWeek ?? null)
+			: []
+	);
 	/** Each side's range where the run carries one, and the scale the carried ranges share. */
 	const ranges = $derived(pair ? pair.map(sideRange) : []);
 	const scale = $derived.by(() => {

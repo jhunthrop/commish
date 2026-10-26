@@ -51,6 +51,8 @@ export const links = {
 	/** Your cheat sheet. Every page outside the sheet links it through here. */
 	sheet: (): string => resolve('/sheet'),
 	account: (): string => resolve('/account'),
+	/** Delete account (Lane 233): the address the app stores cite. */
+	accountDelete: (): string => resolve('/account/delete'),
 	/** The account page at Your leagues, every league the account follows, saying how many were
 	 * just followed when it is told. */
 	accountLeagues: (followed?: number): string =>
