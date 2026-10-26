@@ -10,7 +10,14 @@ import { creditSentence } from '#lib/site/credit.ts';
 import { ACCOUNT_FOOT } from '#lib/account/foot-words.ts';
 import { SUPPORT_EMAIL, SUPPORT_HREF } from './contact.ts';
 import { FOOT } from './foot-words.ts';
-import { DRAFT_NOTE, docText, paragraphText, type LegalDoc } from './legal-doc.ts';
+import {
+	DELETING_HEAD,
+	DRAFT_NOTE,
+	docText,
+	paragraphText,
+	sectionId,
+	type LegalDoc
+} from './legal-doc.ts';
 import { PRIVACY } from './privacy-words.ts';
 import { TERMS } from './terms-words.ts';
 
@@ -88,9 +95,27 @@ void test('each link names a place the page resolves', () => {
 	for (const doc of DOCS) {
 		for (const part of doc.sections.flatMap((s) => s.paragraphs.flat())) {
 			if (typeof part === 'string') continue;
-			assert.ok(['support', 'terms', 'privacy', 'licence'].includes(part.to), part.text);
+			assert.ok(
+				['support', 'terms', 'privacy', 'licence', 'deleteAccount'].includes(part.to),
+				part.text
+			);
 			if (part.to === 'support') assert.equal(part.text, SUPPORT_EMAIL);
 		}
+	}
+});
+
+void test('the stores cite the deleting section by its anchor, and it names the page', () => {
+	assert.equal(sectionId(DELETING_HEAD), 'deleting-your-account');
+	const section = PRIVACY.sections.find((s) => s.head === DELETING_HEAD);
+	assert.ok(section, 'the Privacy Policy has a Deleting your account section');
+	const parts = section.paragraphs.flat();
+	assert.ok(parts.some((part) => typeof part !== 'string' && part.to === 'deleteAccount'));
+	assert.ok(parts.some((part) => typeof part !== 'string' && part.to === 'support'));
+	// Every section's anchor is its own: no two heads make one id.
+	for (const doc of DOCS) {
+		const ids = doc.sections.map((s) => sectionId(s.head));
+		assert.equal(new Set(ids).size, ids.length, doc.title);
+		for (const id of ids) assert.match(id, /^[a-z0-9]+(-[a-z0-9]+)*$/);
 	}
 });
 

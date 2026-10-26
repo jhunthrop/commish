@@ -18,7 +18,7 @@ Limits were read from Apple's pages on 2026-10-26 (sources at the foot). Charact
 | Support URL | Required, must lead to contact information | `https://trycommish.app/terms` (the Terms end with "Write to help@trycommish.app") | `terms-words.ts`. See F5 for the address and phone Apple may require |
 | Marketing URL | Optional | `https://trycommish.app` | The site |
 | Privacy policy URL | Required | `https://trycommish.app/privacy` | `web/src/routes/privacy` |
-| Privacy choices URL | Optional | `https://trycommish.app/privacy` until the deletion anchor exists (§5.2), then the anchored address | |
+| Privacy choices URL | Optional | `https://trycommish.app/account/delete` | The delete account page (Lane 233). The policy's section is `https://trycommish.app/privacy#deleting-your-account` |
 | Primary category | One | Sports | A fantasy football tool |
 | Secondary category | Optional | Reference | Projections, rankings, player pages |
 | Copyright | `YYYY Entity`, the symbol is added | `2026 Commish LLC` | The LLC that runs Commish (privacy policy, "Who we are") |
@@ -102,9 +102,9 @@ The spec (§5.2) plans Apple beside Google. **FOUNDER F1**: which sign-in method
 
 ### 5.2 Account deletion (guideline 5.1.1(v)): a blocker
 
-"If your app supports account creation, you must also offer account deletion within the app." A new member can create an account from the app's sign-in sheet. Today the only path is to write to `help@trycommish.app` (privacy policy, "Deleting your account"). The Account screen already prints that instruction, "To delete your account, write to help@trycommish.app" (`AccountScreen.swift:218`, words in `Words.generated.swift:720`). What is missing is the in-app verb and the route that completes the deletion. Apple accepts an in-app button that starts deletion, or a direct link from the app to a web page where it is completed. An email address alone is rejected outside highly regulated industries.
+"If your app supports account creation, you must also offer account deletion within the app." A new member can create an account from the app's sign-in sheet. Apple accepts an in-app button that starts deletion, or a direct link from the app to a web page where it is completed. An email address alone is rejected outside highly regulated industries.
 
-Before submission a code lane must add, on both apps' Account screens, "Delete your account" leading to a deletion flow (an API route that deletes the account and its platform connections first, as the policy promises, then signs out) or to a web page that completes it. Play's requirement (Play file §4.3) is met by the same work.
+The route and the web page are done (Lane 233): `POST /me/delete` deletes the account and every row kept with it at once, platform connections first, then the sign-in user, and every device token opens nothing after; `https://trycommish.app/account/delete` does the same on the web, and the policy's section is `https://trycommish.app/privacy#deleting-your-account`. What is still missing is the in-app verb: the Account screen prints "To delete your account, write to help@trycommish.app" (`AccountScreen.swift:218`, words in `Words.generated.swift:720`). Before submission the follow-up lane adds "Delete account" on both apps' Account screens, calling `POST /me/delete` with the device token and the email the member types, then clearing the device as sign-out does. Linking to the web page instead would ask the member to sign in again, since an app's sign-in makes no site session (Lane 225). Play's requirement (Play file §4.3) is met by the same work.
 
 ### 5.3 Sign-in information and notes for the reviewer
 
@@ -126,7 +126,7 @@ No purchases: everything is free through the 2026 season and the app has no in-a
 
 A move from the Lineup or Waivers screen goes to the member's own league platform only after the member confirms it. The review account has no platform connection, so no move can be sent from it.
 
-Delete your account: Account, then Delete your account.
+Delete your account: Account, then Delete account, then type the account's email (the in-app verb ships before submission, §5.2; on the web at https://trycommish.app/account/delete).
 ```
 
 The last sentence is true only once §5.2 ships: remove it if the build lacks it, and do not submit without it.

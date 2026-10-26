@@ -2,7 +2,7 @@
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import type { HeadMarkup } from '#lib/site/head.ts';
 	import Shell from '#lib/ui/Shell.svelte';
-	import type { LegalDoc } from './legal-doc.ts';
+	import { sectionId, type LegalDoc } from './legal-doc.ts';
 	import type { LegalHrefs } from './legal-hrefs.ts';
 
 	/** A legal page (Lane 151): prerendered, its title, the draft note, the day it last changed, then
@@ -27,7 +27,7 @@
 		<PageHead title={doc.title} lead={doc.lead} />
 		<p class="changed">{doc.changed}</p>
 		{#each doc.sections as section (section.head)}
-			<section>
+			<section id={sectionId(section.head)}>
 				<h2>{section.head}</h2>
 				{#each section.paragraphs as paragraph, i (i)}
 					<p>

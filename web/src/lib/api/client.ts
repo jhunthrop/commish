@@ -19,6 +19,7 @@ const CSRF_PAIRS = [
 	['commish_anon_csrf', 'X-Anon-CSRF-Token']
 ] as const;
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const NO_CONTENT = 204;
 
 /** Codes the client names itself, for an answer that never arrived or was not the envelope. */
 export const CLIENT_CODES = { offline: 'offline', malformed: 'malformed' } as const;
@@ -122,6 +123,8 @@ export function apiClient(
 				throw unreachable();
 			}
 			const { status } = response;
+			// 204 is the one answer with no envelope: done, nothing to say (POST /me/delete).
+			if (status === NO_CONTENT) return null as T;
 			const parsed: unknown = await response.json().catch(() => null);
 			if (!isEnvelope(parsed)) {
 				// Past the wait while the body was read, or Google's front end answering 502 to 504 with
