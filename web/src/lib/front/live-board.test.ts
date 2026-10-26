@@ -3,6 +3,7 @@
 // API's live board has taken that game out, so its 25th back is Woody Marks at 95.7 where the run's was
 // Jacory Croskey-Merritt (WAS) at 97.8, and every back's Over repl. moves by 2.1 (api
 // oneboard_test.go and restlive.go hold the engine's side).
+import { liveBasis } from '#lib/run/live-order.ts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { components } from '#lib/api/types.ts';
@@ -10,7 +11,6 @@ import type { BoardRowView } from '#lib/run/schema.ts';
 import {
 	STRIP_ROWS,
 	answerReadAt,
-	liveBasis,
 	liveLeadPart,
 	liveStrip,
 	overReplacementPart,
