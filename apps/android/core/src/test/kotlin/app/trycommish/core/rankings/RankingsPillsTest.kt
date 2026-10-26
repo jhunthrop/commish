@@ -15,7 +15,9 @@ import java.time.Instant
  * The pill slot's candidates bound every pill the order prints (Lane 215 review H1): over every order read
  * the fixture holds, at both clocks, each pill is a candidate's position with a rank of no more digits than
  * the candidates hold (its digits no wider together than the widest digit that many times), or a candidate
- * outright. A three-digit rank is reached, so the bound is exercised.
+ * outright. A three-digit rank is reached, so the bound is exercised. This test is structural: the width
+ * bound holds by construction because the slot is measured at runtime from these same candidates
+ * (RankingsWidths). Fix the slot to a number and this test no longer guards it.
  */
 class RankingsPillsTest {
     private val parity = CommishJson.parseToJsonElement(RankingsFixtures.parity("rankings")).jsonObject
