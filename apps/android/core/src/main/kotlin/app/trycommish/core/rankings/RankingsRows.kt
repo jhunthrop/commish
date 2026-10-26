@@ -16,6 +16,8 @@ import app.trycommish.core.start.RowStatus
 import app.trycommish.core.start.StartRow
 import app.trycommish.core.start.StartRows
 import app.trycommish.core.start.StartWords
+import app.trycommish.core.start.StripCell
+import app.trycommish.core.start.StripCells
 import app.trycommish.core.start.WeatherCell
 import app.trycommish.design.Words
 import java.time.Instant
@@ -88,20 +90,22 @@ data class RankingsRow(
     /** The # cell: his rank, the list's word for a player on a season-long list, or nothing for a bye. */
     val place: String,
     val bye: Boolean,
-    /** The week's column: his Pts once final, his Proj before, "--" without. */
+    /** The week's figure: his Pts once final, his Proj before, "--" without. Pinned by the parity; drawn
+     * as the strip's Wk cell (`cells[0]`), never a column of its own. */
     val week: String,
     /** His rest-of-season Projected, the big figure. */
     val total: String,
-    /** "Over repl. 52.8, A game 10.3, Opp 1st, Avg 11.8, Last 17.3". */
-    val folded: String,
+    /** order.ts stripCells: Wk 6, Over repl. (the key across positions), A game, Opp rank, then Avg at
+     * a position and Last. */
+    val cells: List<StripCell>,
 )
 
 /** One row of the kickers' or defenses' week (WeekTable.svelte at 390). */
 data class WeekRankingsRow(
     val player: RankingsPlayer,
     val proj: String,
-    /** "Opp 16th, Avg 9.7, Last 5.0". */
-    val folded: String,
+    /** week.ts weekStripCells: Opp rank, Avg, Last. */
+    val cells: List<StripCell>,
 )
 
 /** A run of rows under one head: the players who play with none, then "Bye in week 6", or on the week's
@@ -124,11 +128,16 @@ enum class WeekSection(
 /** What the order's # sorts on: Over repl. across positions, Projected at one. */
 enum class RankBy { PointsOverReplacement, RestOfSeasonPoints }
 
+/** How the order is read: what its # sorts on, its week, and whether a pill names his rank at the
+ * position (across positions only). */
+internal data class OrderViewing(
+    val rankBy: RankBy,
+    val week: Int,
+    val pillRank: Boolean,
+)
+
 /** order.ts orderView and week.ts weekView over the API's rows, ported. */
 internal object RankingsRows {
-    /** box.ts POSITIONS: the positions a pill names; a defense has none. */
-    private val pilled = setOf("QB", "RB", "WR", "TE", "K")
-
     fun rankBy(advice: OrderAdvice): RankBy =
         if (advice.rankBy == OrderAdvice.RankBy.rest_of_season_points) RankBy.RestOfSeasonPoints else RankBy.PointsOverReplacement
 
@@ -142,7 +151,7 @@ internal object RankingsRows {
     ): RankingsPlayer {
         val row = StartRows.row(line, slot = "", zone = zone, now = now, ranked = false)
         val listed = row.status?.onList == true
-        val position = line.player.position.takeIf { it in pilled }
+        val position = line.player.position.takeIf { it in RankingsPills.positions }
         val rank = line.positionRank.takeIf { pillRank && !listed }
         val shownRank = if (position == null) null else rank?.toString() ?: row.status?.rank
         val defense = line.player.position == "DEF"
@@ -199,13 +208,12 @@ internal object RankingsRows {
     /** order.ts orderView at the phone: byes sit apart (the week's rankings), the # the API's rank. */
     fun row(
         row: OrderRow,
-        rankBy: RankBy,
-        pillRank: Boolean,
+        viewing: OrderViewing,
         zone: ZoneId,
         now: Instant,
     ): RankingsRow {
         val line = row.line
-        val player = player(line, pillRank, zone, now)
+        val player = player(line, viewing.pillRank, zone, now)
         val listed = player.status?.onList == true
         val bye = line.facts.bye && !listed
         val place =
@@ -214,35 +222,41 @@ internal object RankingsRows {
                 bye -> ""
                 else -> row.rank.toString()
             }
-        val figures =
-            if (rankBy ==
-                RankBy.PointsOverReplacement
-            ) {
-                listOf("${Words.Order.overRepl} ${StartWords.number(row.pointsOverReplacement)}")
-            } else {
-                emptyList()
-            }
         val read = StartRows.row(line, slot = "", zone = zone, now = now, ranked = false)
+        val week = if (listed) null else weekFigure(line, now)
         return RankingsRow(
             player = player,
             rank = row.rank,
             place = place,
             bye = bye,
-            week = StartWords.number(if (listed) null else weekFigure(line, now)),
+            week = StartWords.number(week),
             total = StartWords.number(row.restOfSeasonPoints),
-            folded =
-                (
-                    figures + "${Words.Order.perGame} ${StartWords.number(
-                        line.restOfSeasonPerGame,
-                    )}" + evidence(read)
-                ).joinToString(", "),
+            cells = cells(row, week, RankingsWords.weekHead(viewing.week), viewing.rankBy, read),
         )
     }
 
-    /** The Opp rank, Avg and Last folded under a name (week.ts foldedEvidence). */
-    fun evidence(row: StartRow): List<String> =
-        listOfNotNull(row.oppRank?.let { "${Words.Box.opp} ${Format.ordinal(it)}" }) +
-            listOf("${Words.Box.avg} ${StartWords.number(row.avg)}", "${Words.Box.last} ${StartWords.number(row.last)}")
+    /** order.ts stripCells: the week's figure (narrow), Over repl. as the key across positions, A game,
+     * Opp rank, then Avg at a position, where Projected on line 1 is the sort and the view has no Over
+     * repl., and Last; so a strip holds five cells in every view. */
+    fun cells(
+        row: OrderRow,
+        week: Double?,
+        weekHead: String,
+        rankBy: RankBy,
+        read: StartRow,
+    ): List<StripCell> {
+        val (avg, last) = StripCells.form(read.avg, read.last)
+        val across = rankBy == RankBy.PointsOverReplacement
+        val season = if (across) listOf(StripCells.figure(Words.Order.overRepl, row.pointsOverReplacement, key = true)) else emptyList()
+        return listOf(StripCells.figure(weekHead, week, narrow = true)) + season +
+            listOf(
+                StripCells.figure(Words.Order.perGame, row.line.restOfSeasonPerGame),
+                StripCells.opp(read.oppRank, read.oppOf),
+            ) + (if (across) emptyList() else listOf(avg)) + last
+    }
+
+    /** week.ts weekStripCells: Opp rank, Avg and Last. */
+    fun weekCells(read: StartRow): List<StripCell> = listOf(StripCells.opp(read.oppRank, read.oppOf)) + StripCells.form(read.avg, read.last)
 
     /** order.ts weekFigure: once his game is final his points, else his Proj. */
     fun weekFigure(
@@ -274,7 +288,7 @@ internal object RankingsRows {
         return WeekRankingsRow(
             player = player(row.line, pillRank = false, zone = zone, now = now),
             proj = StartWords.number(read.proj),
-            folded = evidence(read).joinToString(", "),
+            cells = weekCells(read),
         )
     }
 
