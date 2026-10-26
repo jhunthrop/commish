@@ -34,8 +34,10 @@ public enum BoardStale: Equatable, Sendable {
 /// clock injected; each format's saved read at once, dated, then the run read again naming the ETags
 /// kept, so an unchanged run costs four 304s and only refreshes the read's stamp. A failed read keeps
 /// the saved board, stale with its reason. The chips' choice is held here, so the sheet opened from a
-/// row and closed again, or a pull that reads the board again, leaves them as they were. The view
-/// decides nothing.
+/// row and closed again, or a pull that reads the board again, leaves them as they were. In season,
+/// once the run's board is shown, the order the Rankings read is read at the screen's clock (Lane 224,
+/// `orders`) and the board drawn again on it; with no answer the run's rows stand. The view decides
+/// nothing.
 @MainActor
 @Observable
 public final class BoardViewModel {
@@ -58,8 +60,12 @@ public final class BoardViewModel {
     private let inSeason: Bool
     private let following: Bool
     private let onSignedOut: @MainActor () -> Void
+    /// The in-season screens' shared read of the order; nil reads none.
+    private let orders: OrderReader?
     /// The read shown, so a position chip redraws it without a read.
     private var shown: Shown?
+    /// The order as last read at the screen's clock, so a chip redraws on it.
+    private var order: OrderAtClock?
 
     private struct Shown {
         let format: String?
@@ -69,12 +75,14 @@ public final class BoardViewModel {
     }
 
     /// `inSeason` is the bar's season (the Rest of season item); `following` whether the member follows
-    /// a league; `onSignedOut` runs when the API refuses the device token.
+    /// a league; `orders` the order's read in season; `onSignedOut` runs when the API refuses the device
+    /// token.
     public init(
         api: any RunAPI, cache: any AnswerCache, clock: any Clock, inSeason: Bool, following: Bool,
-        filter: BoardFilter = BoardFilter(), zone: TimeZone = .current,
+        filter: BoardFilter = BoardFilter(), zone: TimeZone = .current, orders: OrderReader? = nil,
         onSignedOut: @escaping @MainActor () -> Void = {}
     ) {
+        self.orders = orders
         self.api = api
         self.cache = cache
         self.clock = clock
@@ -133,6 +141,19 @@ public final class BoardViewModel {
                 state = .failed(LeagueHomeViewModel.sentence(for: error))
             }
         }
+        await readOrder(format: format)
+    }
+
+    /// In season the order at the screen's clock, the board drawn again on it; a read that fails, or
+    /// lands after another format was chosen, leaves the run's rows standing (the screen is never held
+    /// for it: the run's board is drawn first).
+    private func readOrder(format: String?) async {
+        guard inSeason, let orders, shown != nil, let read = try? await orders.read(), filter.format == format,
+              let shown else {
+            return
+        }
+        order = read
+        show(shown.read, stamp: shown.stamp, stale: shown.stale)
     }
 
     /// A format chip: that format's board, saved or read, in the same view.
@@ -160,7 +181,7 @@ public final class BoardViewModel {
         state = .loaded(
             BoardModel(
                 read: read, position: filter.position, inSeason: inSeason, following: following, now: clock.now,
-                zone: zone
+                zone: zone, order: order
             ),
             stamp: stamp, stale: stale
         )

@@ -169,7 +169,10 @@ public enum BoardColumns: Equatable, Sendable {
 /// The Board screen as the web's board says it at 390, from the run (GET /run/manifest, /run/boards,
 /// /run/adp, /run/designations): the heading, the run's stamp and, in season, the weeks it ranks; the
 /// format and position chips; the view's rows in the run's order, a position's in its tiers with their
-/// cliffs; and the basis once.
+/// cliffs; and the basis once. In season, once the order the Rankings read (GET /order) places every
+/// ranked row the view draws, the rows carry the order's figures in its order, a position's with no
+/// tiers (they are the run's), and the order's lead takes the board sentence's place; until then the
+/// run's rows stand and the basis says the run's day and time (Lane 224, LiveOrder).
 public struct BoardModel: Equatable, Sendable {
     public let words: BoardWords
     /// "Updated Oct 21": the run every number comes from.
@@ -187,9 +190,14 @@ public struct BoardModel: Equatable, Sendable {
         sections.flatMap(\.rows)
     }
 
-    /// `inSeason` is the rail's season; `following` whether the member follows a league.
+    /// Whether the rows carry the order's figures at its clock.
+    public let atClock: Bool
+
+    /// `inSeason` is the rail's season; `following` whether the member follows a league; `order` the
+    /// order as read at the screen's clock, nil while unread or when the read failed.
     public init(
-        read: RunBoardRead, position: BoardPosition?, inSeason: Bool, following: Bool, now: Date, zone: TimeZone
+        read: RunBoardRead, position: BoardPosition?, inSeason: Bool, following: Bool, now: Date, zone: TimeZone,
+        order: OrderAtClock? = nil
     ) {
         let manifest = read.manifest.value
         let format = read.format
@@ -214,8 +222,14 @@ public struct BoardModel: Equatable, Sendable {
         let cells = BoardCells(
             statuses: statuses, byes: BoardCells.byes(read.clubs.value), fromWeek: format.rosFromWeek, zone: zone
         )
-        let view = ViewRows(board: board, position: position, statuses: statuses, cells: cells, unit: format.unit)
+        let ranksRest = inSeason && format.rosFromWeek != nil
+        let places = order.flatMap { ranksRest && LiveOrder.inScoring($0.answer, format: format) ? $0.places : nil }
+        let view = ViewRows(
+            board: board, position: position, statuses: statuses, cells: cells, unit: format.unit,
+            at: places.map { (places: $0, teams: format.teams) }
+        )
         sections = view.sections
+        atClock = view.atClock
         let compare = format.rosFromWeek == nil
         columns = position?.draftOrder == true ? .draftOrder : .ranked(gap: compare && view.carriesGap)
         let said = position?.draftOrder == true
@@ -231,7 +245,20 @@ public struct BoardModel: Equatable, Sendable {
                 asOf: designations.readAt, checkedAt: designations.checkedAt, now: now, zone: zone
             ) : nil
         }
-        basis = said + (capture.map { [$0] } ?? [])
+        let run = said + (capture.map { [$0] } ?? [])
+        basis = position?.draftOrder == true || !ranksRest ? run
+            : Self.atClock(run, format: format, season: manifest.season, lead: view.atClock ? order : nil, zone: zone)
+    }
+
+    /// A ranked view's basis in season on its rows' clock: the order's lead in the board sentence's
+    /// place once its rows stand, else the run's stamp after the whole basis (LiveOrder.basis).
+    static func atClock(
+        _ run: [String], format: RunFormat, season: Int, lead order: OrderAtClock?, zone: TimeZone
+    ) -> [String] {
+        LiveOrder.basis(
+            run, board: BoardBasis.ourBoard(format, season: season),
+            lead: order?.lead(teams: format.teams, zone: zone), stamp: LiveOrderWords.runStamp(format, zone: zone)
+        )
     }
 
     /// The format chips with the chosen one pressed, alone over a format whose board could not be read,
@@ -248,19 +275,34 @@ public struct BoardModel: Equatable, Sendable {
 }
 
 /// A view's sections over the run's board: All in the run's order, a ranked position in its tiers then
-/// its season-long list, a kicker's or a defense's list in the drafts' order.
+/// its season-long list, a kicker's or a defense's list in the drafts' order. At the order's clock a
+/// ranked view's rows in the order's order with its figures, a position's as one run with no tiers, when
+/// the order places every one of them.
 private struct ViewRows {
     let sections: [BoardSection]
     /// The view's ranked rows carry a Gap (format/gap.ts carriesGap).
     let carriesGap: Bool
+    /// The rows are the order's.
+    let atClock: Bool
 
     init(
         board: RunBoardAnswer,
         position: BoardPosition?,
         statuses: BoardOrder.Statuses,
         cells: BoardCells,
-        unit: String
+        unit: String,
+        at clock: (places: [String: LivePlace], teams: Int)?
     ) {
+        let drawn = position.map { BoardOrder.at(board.rows, position: $0) } ?? board.rows
+        if position?.draftOrder != true, let clock,
+           let placed = LiveOrder.placed(drawn, id: \.id, places: clock.places) {
+            let rows = placed.map { cells.ranked($0.row, figures: $0.row.figures.at($0.place, teams: clock.teams)) }
+            sections = [BoardSection(id: position?.rawValue ?? "all", head: nil, band: nil, rows: rows)]
+            carriesGap = false
+            atClock = true
+            return
+        }
+        atClock = false
         guard let position else {
             let rows = BoardOrder.withStatuses(board.rows, statuses)
             sections = [BoardSection(id: "all", head: nil, band: nil, rows: rows.map(cells.ranked))]

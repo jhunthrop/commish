@@ -11,11 +11,24 @@ extension FileRead {
 }
 
 /// A screen built from the run's files: the screen's model, the manifest it is of (its stamp and the
-/// offline words), and every read it took.
+/// offline words), every read it took, and in season the screen again at the order's clock (Lane 224):
+/// nil where the order does not place every row it draws, so the run's model stands.
 public struct BuiltScreen<Model: Sendable>: Sendable {
+    typealias AtClock = @Sendable (OrderAtClock) -> Model?
+
     let model: Model
     let manifest: RunManifest
     let reads: [ReadMark]
+    /// The screen on the order; nil for a screen with no figures on a clock (before the season, the
+    /// schedule, ADP).
+    let atClock: AtClock?
+
+    init(model: Model, manifest: RunManifest, reads: [ReadMark], atClock: AtClock? = nil) {
+        self.model = model
+        self.manifest = manifest
+        self.reads = reads
+        self.atClock = atClock
+    }
 }
 
 /// The run's files the reference screens read (ADP, compare, the clubs, a club, the schedule), each

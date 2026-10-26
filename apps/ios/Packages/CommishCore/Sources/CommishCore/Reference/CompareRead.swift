@@ -28,16 +28,17 @@ struct CompareAsk: Equatable, Sendable {
 
 public extension RunScreenViewModel where Model == CompareModel {
     /// Compare with the sides the address sets (its ?a= and ?b=, the pages' slugs), in the followed
-    /// league's format where the run carries it.
+    /// league's format where the run carries it; `orders` reads the order in season, the pair drawn
+    /// again at its clock.
     static func compare(
         slugs: [String?], league: FollowedLeague? = nil, run: any RunAPI, pages: any RunPagesAPI,
-        cache: any AnswerCache, clock: any Clock, zone: TimeZone = .current,
+        cache: any AnswerCache, clock: any Clock, zone: TimeZone = .current, orders: OrderReader? = nil,
         onSignedOut: @escaping @MainActor () -> Void = {}
     ) -> RunScreenViewModel<CompareModel> {
         let ask = CompareAsk(slugs: slugs, format: nil, leagueFormat: CompareAsk.runFormat(league))
         return RunScreenViewModel(
-            reads: RunReads(run: run, pages: pages, cache: cache, clock: clock), zone: zone,
-            onSignedOut: onSignedOut, build: CompareReader.build(ask)
+            reads: RunReads(run: run, pages: pages, cache: cache, clock: clock), zone: zone, orders: orders,
+            onSignedOut: onSignedOut, build: CompareReader.build(ask, zone: zone)
         )
     }
 
@@ -47,7 +48,7 @@ public extension RunScreenViewModel where Model == CompareModel {
             return
         }
         let wanted = current.with(slot: slot, slug: slug)
-        await rebuild(CompareReader.build(wanted), ask: .compare(wanted))
+        await rebuild(CompareReader.build(wanted, zone: zone), ask: .compare(wanted))
     }
 
     /// A format chip: the same two in that format.
@@ -57,7 +58,7 @@ public extension RunScreenViewModel where Model == CompareModel {
         }
         let wanted = current.with(format: format)
         let label = model.formats.first { $0.value == format }?.label ?? format
-        await rebuild(CompareReader.build(wanted), ask: .compare(wanted), absent: RunWords.absent(label))
+        await rebuild(CompareReader.build(wanted, zone: zone), ask: .compare(wanted), absent: RunWords.absent(label))
     }
 
     /// The format the member last chose, pressed on the chips while its read is in flight.
@@ -80,7 +81,7 @@ public extension RunScreenViewModel where Model == CompareModel {
 /// Compare's reads: the manifest, the index, the ADP's sources, the clubs, the schedule and the capture,
 /// then each side's page as the web's reader finds it.
 enum CompareReader {
-    static func build(_ ask: CompareAsk) -> RunScreenViewModel<CompareModel>.Build {
+    static func build(_ ask: CompareAsk, zone: TimeZone) -> RunScreenViewModel<CompareModel>.Build {
         { reads in
             let manifest = try await reads.manifest()
             async let index = reads.index()
@@ -118,12 +119,18 @@ enum CompareReader {
             let scoring = scored?.label ?? format.label
             let input = CompareInput(
                 manifest: manifest.value, format: format, sources: sourcesRead.value, clubs: clubsRead.value,
-                underway: underway,
+                underway: underway, zone: zone,
                 reach: heldSide(sides) ? .none
                     : RunReach.counted(pages, slates: scheduleRead.value.slates, complete: complete),
                 scoring: scoring, index: indexRead.value, sides: players
             )
-            return BuiltScreen(model: CompareModel(input), manifest: manifest.value, reads: marks)
+            return BuiltScreen(
+                model: CompareModel(input), manifest: manifest.value, reads: marks,
+                atClock: { order in
+                    let placed = CompareModel(input.with(order: order))
+                    return placed.atClock ? placed : nil
+                }
+            )
         }
     }
 

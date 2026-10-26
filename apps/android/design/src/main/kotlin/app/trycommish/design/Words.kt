@@ -942,4 +942,13 @@ object Words {
         const val lobbyClock = "Clock in a lobby"
         const val lobbyStarts = "A lobby starts"
     }
+
+    object FormatsRank {
+        const val head = "Position rank"
+    }
+
+    object LiveStrip {
+        const val yourLeague = "your league"
+        const val leagueAvg = "Avg in your league's scoring."
+    }
 }

@@ -199,8 +199,9 @@ struct TierBoxView: View {
     }
 }
 
-/// The every-format table (Table.svelte): each format with our rank, his points, his value over a
-/// pickup's and his tier, and why the formats need not line up.
+/// The every-format table (Table.svelte): each format with his position rank, his points, his value
+/// over a pickup's and his tier, why the formats need not line up, and at the read's clock the formats
+/// that show no position rank.
 struct FormatsTableView: View {
     @Environment(\.colorScheme) private var colorScheme
     let table: FormatsTable
@@ -210,7 +211,7 @@ struct FormatsTableView: View {
         VStack(alignment: .leading, spacing: 0) {
             LogLine(
                 lead: Words.PlayerPage.format, sub: "",
-                values: [Words.Box.ourRank, table.head, Words.PlayerPage.overReplacement, Words.PlayerPage.tier],
+                values: [table.rankHead, table.head, Words.PlayerPage.overReplacement, Words.PlayerPage.tier],
                 head: true
             )
             ForEach(table.rows) { row in
@@ -218,6 +219,9 @@ struct FormatsTableView: View {
             }
             if let note = table.note {
                 BasisText(note).padding(.top, Tokens.Space.s2)
+            }
+            if let footnote = table.footnote {
+                BasisText(footnote).padding(.top, Tokens.Space.s2)
             }
         }
         .foregroundStyle(theme.color(Tokens.Color.ink))

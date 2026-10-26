@@ -9,7 +9,7 @@ struct BoardTab: View {
     init(environment: AppEnvironment, inSeason: Bool, following: Bool, expired: @escaping @MainActor () -> Void) {
         _viewModel = State(initialValue: BoardViewModel(
             api: environment.api, cache: environment.cache, clock: environment.clock, inSeason: inSeason,
-            following: following, onSignedOut: expired
+            following: following, orders: environment.orders, onSignedOut: expired
         ))
     }
 

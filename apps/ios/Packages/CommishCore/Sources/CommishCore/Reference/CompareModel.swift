@@ -66,7 +66,9 @@ public enum CompareOutcome: Equatable, Sendable {
 /// format, the leader's column first, from their pages (GET /run/players/{id}, a held page's copy or
 /// the board's row as the web's reader falls back), the Bye row from the clubs, the basis under the
 /// table with the last season's line; the format the followed league's where the run carries it, else
-/// the run's default.
+/// the run's default. In season the pair's rank, place, points and value are the order's once it places
+/// both in the board's own format (Lane 224, placedPair), the order's lead in the board sentence's place;
+/// until then both sides are the run's, the basis with the run's stamp.
 public struct CompareModel: Equatable, Sendable {
     public let title: String
     /// firstStep: what to do while a side is empty; nil once both are in.
@@ -80,6 +82,8 @@ public struct CompareModel: Equatable, Sendable {
     public let candidates: [CompareCandidate]
     /// The slugs set on each side, as the screen's address names them.
     public let slugs: [String?]
+    /// Whether the pair's figures are the order's.
+    public let atClock: Bool
 
     /// search.ts searchPlayers: names starting with the query first, then a later word starting with
     /// it, then anywhere in a word, each in the index's order (our rank); eight at most.
@@ -115,21 +119,42 @@ public struct CompareModel: Equatable, Sendable {
 }
 
 /// Everything Compare is built from.
-struct CompareInput {
+struct CompareInput: Sendable {
     let manifest: RunManifest
     let format: RunFormat
     let sources: [RunAdpSource]
     let clubs: [RunClub]
     let underway: Bool
+    /// The member's zone, the clock the basis says its stamps on.
+    let zone: TimeZone
     let reach: Reach
     /// The format the season block is scored in, as its chip prints it.
     let scoring: String
     let index: [RunIndexEntry]
     let sides: [CompareFound]
+    /// The order at the screen's clock, nil while unread.
+    var order: OrderAtClock?
+
+    func with(order: OrderAtClock) -> CompareInput {
+        var placed = self
+        placed.order = order
+        return placed
+    }
+
+    /// The order's places for the pair when the run ranks the rest of the season, the answer is in the
+    /// board's scoring and it places both in the board's own format, else none.
+    func pairPlaces(_ ids: [String]) -> [String: LivePlace]? {
+        guard let order, format.rosFromWeek != nil, let board = manifest.formats.first,
+              LiveOrder.inScoring(order.answer, format: board)
+        else {
+            return nil
+        }
+        return LiveOrder.pair(ids, places: order.places, format: format.id, boardFormat: board.id)
+    }
 }
 
 /// A side as the screen's address set it: nobody, a slug that names nobody, or a player.
-enum CompareFound {
+enum CompareFound: Sendable {
     case open
     case missing
     case player(ComparePlayer)
@@ -142,13 +167,8 @@ extension CompareModel {
         self.format = format.id
         formats = input.manifest.formats.map { BoardChip(label: $0.label, value: $0.id, pressed: $0.id == format.id) }
         slotLabels = [Words.ComparePage.firstPlayer, Words.ComparePage.secondPlayer]
-        let byes = BoardCells.byes(input.clubs)
-        let sides: [CompareSide?] = input.sides.map { found in
-            guard case let .player(player) = found, let numbers = player.formats[format.id] else {
-                return nil
-            }
-            return CompareSide(player: player, numbers: numbers, bye: byes[player.team])
-        }
+        let (sides, placed) = Self.sides(input)
+        atClock = placed
         slots = zip(input.sides, sides).map { found, side in
             if let side {
                 return .picked(
@@ -177,7 +197,32 @@ extension CompareModel {
                 key: Self.folded(entry.name)
             )
         }
-        outcome = Self.outcome(both, input: input)
+        outcome = Self.outcome(both, input: input, atClock: atClock)
+    }
+
+    /// Each side in the compared format with his club's bye, nil for one not set; at the order's clock
+    /// both with the order's figures once it places the pair (placedPair), and whether it does.
+    static func sides(_ input: CompareInput) -> (sides: [CompareSide?], atClock: Bool) {
+        let format = input.format
+        let byes = BoardCells.byes(input.clubs)
+        let run: [CompareSide?] = input.sides.map { found in
+            guard case let .player(player) = found, let numbers = player.formats[format.id] else {
+                return nil
+            }
+            return CompareSide(player: player, numbers: numbers, bye: byes[player.team])
+        }
+        let picked = run.compactMap(\.self)
+        guard picked.count == 2, let places = input.pairPlaces(picked.map(\.player.id)) else {
+            return (run, false)
+        }
+        let placed = run.map { side in
+            side.map { side in
+                places[side.player.id].map {
+                    CompareSide(player: side.player, numbers: side.numbers.at($0, teams: format.teams), bye: side.bye)
+                } ?? side
+            }
+        }
+        return (placed, true)
     }
 
     /// compare-words.ts firstStep.
@@ -188,7 +233,7 @@ extension CompareModel {
         return picked == 1 ? "Pick a second player to set beside the first." : nil
     }
 
-    private static func outcome(_ both: [CompareSide], input: CompareInput) -> CompareOutcome {
+    private static func outcome(_ both: [CompareSide], input: CompareInput, atClock: Bool) -> CompareOutcome {
         guard both.count == 2 else {
             return .none
         }
@@ -205,7 +250,7 @@ extension CompareModel {
                 heads: [leader, other].map(head),
                 rows: rows,
                 scale: ranges.isEmpty ? nil : (ranges.map(\.floor).min() ?? 0) ... (ranges.map(\.ceiling).max() ?? 0),
-                basis: basis(input).filter { gapRow || !$0.gap }.map(\.text)
+                basis: clocked(basis(input).filter { gapRow || !$0.gap }.map(\.text), input: input, atClock: atClock)
             ))
         }
     }
@@ -221,6 +266,20 @@ extension CompareModel {
                 club: player.team
             ),
             range: side.numbers.range
+        )
+    }
+
+    /// The basis on the pair's clock: the order's lead in the board sentence's place, or in season the
+    /// compared format's run stamp after the whole basis (basisAtClock).
+    static func clocked(_ run: [String], input: CompareInput, atClock: Bool) -> [String] {
+        guard input.format.rosFromWeek != nil else {
+            return run
+        }
+        let zone = input.zone
+        return LiveOrder.basis(
+            run, board: BoardBasis.ourBoard(input.format, season: input.manifest.season),
+            lead: atClock ? input.order?.lead(teams: input.format.teams, zone: zone) : nil,
+            stamp: LiveOrderWords.runStamp(input.format, zone: zone)
         )
     }
 

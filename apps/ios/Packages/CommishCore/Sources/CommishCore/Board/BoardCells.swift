@@ -27,12 +27,18 @@ struct BoardCells {
     }
 
     func ranked(_ row: RunBoardRow) -> BoardRow {
+        ranked(row, figures: row.figures)
+    }
+
+    /// His row with the figures of one clock: the run's, or the order's put on his run row
+    /// (LiveOrder), every figure and his place at his position from the same one.
+    func ranked(_ row: RunBoardRow, figures: PlacedFigures) -> BoardRow {
         let position = BoardPosition(rawValue: row.positionName)
         let label = position?.label ?? row.positionName
         let status = statuses[row.id].flatMap { BoardStatus.view($0, zone: zone) }
-        let rank = status?.rank ?? String(row.positionRank)
+        let rank = status?.rank ?? String(figures.positionRank)
         // A player on a season-long list: his rank is the word, so no gap (Row.svelte heldOut).
-        let gap = status?.onList == true ? nil : row.gap
+        let gap = status?.onList == true ? nil : figures.gap
         return BoardRow(
             id: row.id,
             name: row.name,
@@ -42,12 +48,12 @@ struct BoardCells {
             club: row.team,
             bye: bye(row.team),
             status: status,
-            projected: BoardFigures.projected(row.projected),
-            overReplacement: BoardFigures.signed(row.vor),
-            heat: Heat.of(vor: row.vor, round: row.vorRound),
+            projected: BoardFigures.projected(figures.projected),
+            overReplacement: BoardFigures.signed(figures.vor),
+            heat: Heat.of(vor: figures.vor, round: figures.vorRound),
             gap: BoardFigures.gap(gap),
             gapTone: GapTone(gap),
-            draftOrder: String(row.positionRank),
+            draftOrder: String(figures.positionRank),
             adp: row.adp.map { Formatting.fixed($0) } ?? Words.Box.none,
             sheetPlayer: SheetPlayer(
                 id: row.id, slug: row.slug, name: row.name, position: label, rank: rank, club: row.team,

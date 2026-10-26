@@ -32,7 +32,10 @@ public struct ClubCard: Equatable, Sendable, Identifiable {
 }
 
 /// The clubs index as the web's /clubs says it (server/pages/clubs.ts clubsPage, schedule-view.ts
-/// clubCards): its lead with the strength's sentence, then every club's card in the run's order.
+/// clubCards): its lead with the strength's sentence, then every club's card in the run's order. In
+/// season each card's lead is the first of its club's first three on the board at the order's clock,
+/// once the order places every club's three (Lane 224, placedLeads), and the basis under the cards says
+/// which clock they are on.
 public struct ClubsModel: Equatable, Sendable {
     public let title: String
     public let stamp: String
@@ -40,12 +43,18 @@ public struct ClubsModel: Equatable, Sendable {
     public let clubs: [ClubCard]
     /// The link to the strength of schedule, as the web's pages link it.
     public let scheduleLink: String
+    /// In season the order's lead or the run's stamp, said once under the cards; none before.
+    public let basis: [String]
+    /// Whether the leads are the order's.
+    public let atClock: Bool
 }
 
 /// A club's page as the web's /clubs/[abbr] says it at 390: the hero (its name, line, strength and
 /// rank), the basis once, its players on the default board with the round tint and the Gap where drawn,
 /// its kickers and defense in draft order, its schedule with the games played set back, and the verb
-/// that sets its two best available players side by side.
+/// that sets its two best available players side by side. In season its players carry the order's
+/// figures in the order's order once the order places every one of them, and the order's lead takes the
+/// board sentence's place in the basis; until then the run's rows stand with the run's stamp (Lane 224).
 public struct ClubPageModel: Equatable, Sendable {
     public let abbr: String
     public let name: String
@@ -67,6 +76,8 @@ public struct ClubPageModel: Equatable, Sendable {
     /// The verb that sets its two best available players side by side, nil with fewer than two.
     public let compare: ClubCompare?
     public let clubsLink: String
+    /// Whether the rows are the order's.
+    public let atClock: Bool
 }
 
 /// A club page's verb: its words and the two players it compares, by id and by slug.
@@ -102,7 +113,7 @@ public struct ScheduleModel: Equatable, Sendable {
 
 /// The run's files the club screens are built from: the manifest, the clubs, the schedule, the
 /// default board and the capture, and where the season is.
-struct ClubFiles {
+struct ClubFiles: Sendable {
     let manifest: FileRead<RunManifest>
     let clubs: FileRead<[RunClub]>
     let schedule: FileRead<RunSchedule>
@@ -175,25 +186,27 @@ func filled(_ words: String, _ name: String) -> String {
 }
 
 extension ClubsModel {
-    init(_ files: ClubFiles, zone: TimeZone) {
+    init(_ files: ClubFiles, zone: TimeZone, order: OrderAtClock? = nil) {
         let format = files.format
         let ordered = BoardOrder.withStatuses(files.board.value.rows, files.statuses)
         let views = ScheduleViews.views(files.schedule.value, underway: files.underway)
         let first = files.clubs.value.lazy.compactMap { views[$0.abbr] }.first
         let cells = BoardCells(statuses: files.statuses, byes: [:], fromWeek: format.rosFromWeek, zone: zone)
+        let leads = Self.leads(files.clubs.value, ordered: ordered, files: files, places: files.places(order))
         title = Words.ClubPage.clubs
         stamp = RunWords.stamp(files.manifest.value)
         lead = StrengthWords.clubsLead(format.label, first: first)
         scheduleLink = Words.AdpPage.scheduleLink
+        atClock = leads.atClock
+        basis = files.basis([], order: order, atClock: leads.atClock, zone: zone)
         clubs = files.clubs.value.map { club in
             let own = ordered.filter { $0.team == club.abbr }
-            // Never a player on a season-long list, whose rank assumes he plays (held-places.ts leadOf).
-            let lead = own.first { !BoardOrder.heldOut($0, files.statuses) }.map { row in
-                let drawn = cells.ranked(row)
+            let lead = leads.byClub[club.abbr].map { row, figures in
+                let drawn = cells.ranked(row, figures: figures)
                 return ClubLead(
                     name: row.name, initials: drawn.initials, headshot: drawn.headshot,
-                    pill: "\(row.positionName) \(row.positionRank)",
-                    rank: "\(Words.ClubPage.ourRank) \(row.ourRank)",
+                    pill: "\(row.positionName) \(figures.positionRank)",
+                    rank: "\(Words.ClubPage.ourRank) \(figures.ourRank)",
                     sheetPlayer: drawn.sheetPlayer ?? SheetPlayer(
                         id: row.id, slug: row.slug, name: row.name, position: row.positionName, rank: nil,
                         club: row.team
@@ -210,18 +223,22 @@ extension ClubsModel {
 }
 
 extension ClubPageModel {
-    init?(_ files: ClubFiles, abbr: String, now: Date, zone: TimeZone) {
+    init?(_ files: ClubFiles, abbr: String, now: Date, zone: TimeZone, order: OrderAtClock? = nil) {
         guard let club = files.clubs.value.first(where: { $0.abbr.lowercased() == abbr.lowercased() }) else {
             return nil
         }
         let format = files.format
         let cells = files.cells(zone: zone)
-        let own = BoardOrder.withStatuses(files.board.value.rows, files.statuses).filter { $0.team == club.abbr }
+        let run = BoardOrder.withStatuses(files.board.value.rows, files.statuses).filter { $0.team == club.abbr }
+        let placed = files.places(order).flatMap { LiveOrder.placed(run, id: \.id, places: $0) }
+        let shown = placed?.map { ($0.row, $0.row.figures.at($0.place, teams: format.teams)) }
+            ?? run.map { ($0, $0.figures) }
+        let own = shown.map(\.0)
         let market = [BoardPosition.kicker, .defense].flatMap { position in
             BoardOrder.withStatuses(BoardOrder.at(files.board.value.market, position: position), files.statuses)
                 .filter { $0.team == club.abbr }
         }
-        let gap = format.rosFromWeek == nil && own.contains { $0.gap != nil }
+        let gap = format.rosFromWeek == nil && shown.contains { $0.1.gap != nil }
         let scheduled = ScheduleViews.club(
             club, schedule: files.schedule.value, clubs: files.clubs.value, played: files.played,
             underway: files.underway
@@ -231,16 +248,20 @@ extension ClubPageModel {
         meta = files.meta(club)
         stamp = RunWords.stamp(files.manifest.value)
         hero = scheduled.hero
-        basis = [StrengthWords.winsBasis(files.schedule.value.opponentBasis)]
-            + BoardBasis.ranked(.init(
-                format: format, season: files.manifest.value.season, position: nil,
-                sources: files.sources?.value ?? [], gap: gap
-            ))
-            + (files.captureWords(now: now, zone: zone).map { [$0] } ?? [])
+        atClock = placed != nil
+        basis = files.basis(
+            [StrengthWords.winsBasis(files.schedule.value.opponentBasis)]
+                + BoardBasis.ranked(.init(
+                    format: format, season: files.manifest.value.season, position: nil,
+                    sources: files.sources?.value ?? [], gap: gap
+                ))
+                + (files.captureWords(now: now, zone: zone).map { [$0] } ?? []),
+            order: order, atClock: placed != nil, zone: zone
+        )
         boardHead = filled(Words.ClubPage.onBoard, format.label)
         nobody = own.isEmpty ? filled(Words.ClubPage.nobody, club.city) : nil
         columns = .ranked(gap: gap)
-        rows = own.map(cells.ranked)
+        rows = shown.map { cells.ranked($0.0, figures: $0.1) }
         marketHead = Words.ClubPage.kickers
         self.market = market.map { cells.market($0) }
         scheduleCaption = scheduled.caption
@@ -271,15 +292,23 @@ extension ScheduleModel {
 }
 
 public extension RunScreenViewModel where Model == ClubsModel {
+    /// `orders` reads the order in season, the leads drawn again at its clock.
     static func clubs(
         run: any RunAPI, pages: any RunPagesAPI, cache: any AnswerCache, clock: any Clock,
-        zone: TimeZone = .current, onSignedOut: @escaping @MainActor () -> Void = {}
+        zone: TimeZone = .current, orders: OrderReader? = nil, onSignedOut: @escaping @MainActor () -> Void = {}
     ) -> RunScreenViewModel<ClubsModel> {
         RunScreenViewModel(
-            reads: RunReads(run: run, pages: pages, cache: cache, clock: clock), zone: zone, onSignedOut: onSignedOut
+            reads: RunReads(run: run, pages: pages, cache: cache, clock: clock), zone: zone, orders: orders,
+            onSignedOut: onSignedOut
         ) { reads in
             let files = try await ClubFiles.read(reads, sources: false)
-            return BuiltScreen(model: ClubsModel(files, zone: zone), manifest: files.manifest.value, reads: files.marks)
+            return BuiltScreen(
+                model: ClubsModel(files, zone: zone), manifest: files.manifest.value, reads: files.marks,
+                atClock: { order in
+                    let placed = ClubsModel(files, zone: zone, order: order)
+                    return placed.atClock ? placed : nil
+                }
+            )
         }
     }
 }
@@ -290,19 +319,28 @@ public enum ClubError: Error, Equatable {
 }
 
 public extension RunScreenViewModel where Model == ClubPageModel {
-    /// A club's page by its abbreviation, in any case ("ari").
+    /// A club's page by its abbreviation, in any case ("ari"); `orders` reads the order in season, its
+    /// players drawn again at its clock.
     static func club(
         _ abbr: String, run: any RunAPI, pages: any RunPagesAPI, cache: any AnswerCache, clock: any Clock,
-        zone: TimeZone = .current, onSignedOut: @escaping @MainActor () -> Void = {}
+        zone: TimeZone = .current, orders: OrderReader? = nil, onSignedOut: @escaping @MainActor () -> Void = {}
     ) -> RunScreenViewModel<ClubPageModel> {
         RunScreenViewModel(
-            reads: RunReads(run: run, pages: pages, cache: cache, clock: clock), zone: zone, onSignedOut: onSignedOut
+            reads: RunReads(run: run, pages: pages, cache: cache, clock: clock), zone: zone, orders: orders,
+            onSignedOut: onSignedOut
         ) { reads in
             let files = try await ClubFiles.read(reads, sources: true)
-            guard let model = ClubPageModel(files, abbr: abbr, now: clock.now, zone: zone) else {
+            let now = clock.now
+            guard let model = ClubPageModel(files, abbr: abbr, now: now, zone: zone) else {
                 throw ClubError.unknown(abbr)
             }
-            return BuiltScreen(model: model, manifest: files.manifest.value, reads: files.marks)
+            return BuiltScreen(
+                model: model, manifest: files.manifest.value, reads: files.marks,
+                atClock: { order in
+                    ClubPageModel(files, abbr: abbr, now: now, zone: zone, order: order)
+                        .flatMap { $0.atClock ? $0 : nil }
+                }
+            )
         }
     }
 }

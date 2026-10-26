@@ -34,7 +34,7 @@ public final class RankingsViewModel {
 
     /// The rows one read asks for, how many more Show more adds, and the API's limit (OrderScreen's).
     public static let pageRows = 100
-    public static let maxRows = 400
+    public static let maxRows = OrderQuery.maxLimit
     /// How long a search waits after the last letter before it reads (OrderScreen's SEARCH_PAUSE_MS).
     public static let searchPause: Duration = .milliseconds(250)
 

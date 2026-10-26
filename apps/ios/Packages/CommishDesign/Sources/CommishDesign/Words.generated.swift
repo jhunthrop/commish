@@ -940,4 +940,13 @@ public enum Words {
         public static let lobbyClock = "Clock in a lobby"
         public static let lobbyStarts = "A lobby starts"
     }
+
+    public enum FormatsRank {
+        public static let head = "Position rank"
+    }
+
+    public enum LiveStrip {
+        public static let yourLeague = "your league"
+        public static let leagueAvg = "Avg in your league's scoring."
+    }
 }

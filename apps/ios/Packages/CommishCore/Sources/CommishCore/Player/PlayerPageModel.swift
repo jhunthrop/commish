@@ -138,11 +138,13 @@ public enum PlayerPages {
         let underway = underway(input)
         let season = season(input, who: who, format: format)
         let card = card(input, format: format, projected: numbers.projected, held: status?.rank)
+        let rankRead = rankRead(input, format: format)
+        let placeRank = rankRead?.positionRank ?? numbers.positionRank
         return PlayerPageModel(
             hero: .init(
                 name: who.name, initials: Initials.of(who.name), headshot: BoardCells.face(who.headshot),
                 club: PageWords.clubName(who.team, clubs: input.clubs),
-                pill: "\(who.position) \(status?.rank ?? String(numbers.positionRank))", status: status
+                pill: "\(who.position) \(status?.rank ?? String(placeRank))", status: status
             ),
             card: card.card,
             facts: underway ? nil : facts(input, format: format, numbers: numbers, heldOut: listed?.seasonLong == true),
@@ -164,12 +166,29 @@ public enum PlayerPages {
                 )
             },
             formats: input.source.player.flatMap {
-                PageSections.formats(PageSections.lines($0, formats: input.manifest.formats), held: status?.rank)
+                formats($0, input: input, facts: .init(
+                    position: who.position, held: status?.rank,
+                    live: PageSections.liveFormats(input.week, lead: format), read: rankRead
+                ))
             },
             basis: card.basis + [season.basis].compactMap(\.self),
             verb: verb(input),
             stamp: stamp(input)
         )
+    }
+
+    /// His place at his position as his week's read places him once the lead format ranks the rest of
+    /// the season: the head's and the every-format table's one rank (Lane 224, the web's head and
+    /// lineRanksAt); nil before the season or with no read.
+    static func rankRead(_ input: PageInput, format: RunFormat) -> RankRead? {
+        input.week.flatMap { week in
+            format.rosFromWeek == nil ? nil : RankRead(format: format.apiFormat, positionRank: week.line.positionRank)
+        }
+    }
+
+    /// The every-format table over his page's formats.
+    static func formats(_ player: RunPlayer, input: PageInput, facts: PageSections.FormatsFacts) -> FormatsTable? {
+        PageSections.formats(PageSections.lines(player, formats: input.manifest.formats), facts: facts)
     }
 
     /// The format the page leads with, the first of the run's that ranks him, and his numbers in it.

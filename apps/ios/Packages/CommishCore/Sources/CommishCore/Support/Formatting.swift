@@ -156,6 +156,13 @@ public enum Formatting {
         return "\(day) \(shortDay(date, zone: zone)), \(timeOfDay(date, zone: zone)) \(zoneShort(zone))"
     }
 
+    /// "Thu Oct 22, 1:00 pm Central": an instant's day and time with the zone's word (day-time.ts
+    /// dayTimeStamp).
+    public static func dayTimeStamp(_ date: Date, zone: TimeZone) -> String {
+        "\(format(date, "EEE", zone: zone)) \(shortDay(date, zone: zone)), \(timeOfDay(date, zone: zone)) "
+            + zoneWord(zone)
+    }
+
     /// The zone's short name, "Central" for Central Time, as the web's zoneWord says it.
     public static func zoneWord(_ zone: TimeZone) -> String {
         let name = zone.localizedName(for: .generic, locale: Locale(identifier: "en_US")) ?? zone.identifier

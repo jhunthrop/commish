@@ -75,7 +75,9 @@ const COMPANION_MODULE = "web/src/lib/companion/words.ts";
  * companion's (Lane 210): the followed draft's page, its start page and its signed-out words, the
  * rooms' call, pool, team and wall words it draws, the report's, and the League home's draft-day
  * entry; then the mock room's (Lane 213): its bar, the pool's row verbs, the setup's form, chips and
- * clocks, the report's verbs and a shared draft's. */
+ * clocks, the report's verbs and a shared draft's; then one value at the order's clock (Lane 224, from
+ * Lane 220): the every-format table's rank head and footnote, and the run's stamp on an in-season page
+ * that shows the run's rows. */
 export const TABLES: readonly TableSource[] = [
   {
     name: "LeagueHome",
@@ -603,6 +605,18 @@ export const TABLES: readonly TableSource[] = [
     module: "web/src/lib/room/setup/setup.ts",
     picks: ["SETUP_CELLS"],
     json: "shared/words/mock-clocks.json",
+  },
+  {
+    name: "FormatsRank",
+    module: "web/src/lib/player/formats-words.ts",
+    picks: ["FORMATS_RANK"],
+    json: "shared/words/formats-rank.json",
+  },
+  {
+    name: "LiveStrip",
+    module: "web/src/lib/front/live-board.ts",
+    picks: ["STRIP_WORDS"],
+    json: "shared/words/live-strip.json",
   },
 ];
 export const OUTPUT = {
