@@ -126,7 +126,8 @@ def _marked(ids: frozenset[str]) -> Marked:
 
 
 def _hour(dispatcher: object, dispatched: bool = False) -> Hour:
-    return Hour(dispatcher, PublishOutcome(_IN_SEASON, "publish", True, dispatched=dispatched), _NOW)  # type: ignore[arg-type]
+    published = PublishOutcome(_IN_SEASON, "publish", True, dispatched=dispatched)
+    return Hour(dispatcher, published, _NOW, sleep=lambda _seconds: None)  # type: ignore[arg-type]
 
 
 def test_the_build_is_dispatched_only_when_the_season_long_players_move(store: LocalRunStore) -> None:
@@ -138,10 +139,10 @@ def test_the_build_is_dispatched_only_when_the_season_long_players_move(store: L
     again = build_on_change(store, _marked(frozenset({_GIBBS})), _hour(dispatcher))
     assert again.line == f"designations: run {_IN_SEASON}, 1 season-long, unchanged since its last build"
     assert dispatcher.calls == [_IN_SEASON]
-    # A failed dispatch keeps the old set, so the next hour tries again.
+    # A dispatch refused three times in the hour keeps the old set, so the next hour tries again.
     failing = _Dispatcher("HTTP 500 down")
     failed = build_on_change(store, _marked(frozenset()), _hour(failing))
-    assert not failed.ok and "the dispatch FAILED (HTTP 500 down); retried next hour" in failed.line
+    assert not failed.ok and "the dispatch FAILED 3 attempts (HTTP 500 down); retried next hour" in failed.line
     retried = build_on_change(store, _marked(frozenset()), _hour(dispatcher))
     assert retried.ok and dispatcher.calls == [_IN_SEASON, _IN_SEASON]
 
