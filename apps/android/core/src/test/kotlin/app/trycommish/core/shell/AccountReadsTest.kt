@@ -12,6 +12,7 @@ import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -70,5 +71,33 @@ class AccountReadsTest {
         runTest {
             assertThrows<Unauthorized> { reads(HttpStatusCode.Unauthorized, body = error).me() }
             assertThrows<Unauthorized> { reads(HttpStatusCode.Unauthorized, body = error).selectLeague(leagues[1].id) }
+        }
+
+    @Test
+    fun `sign out answers the logout URL, url null, or data null`() =
+        runTest {
+            val url = "https://api.workos.test/user_management/sessions/logout?return_to=https%3A%2F%2Ftrycommish.app%2F&session_id=s1"
+            val device = "00000000-0000-0000-0000-0000000000d1"
+            val seen = mutableListOf<String>()
+            val shapes =
+                mapOf(
+                    """{"ok":true,"data":{"url":"$url"},"error":null}""" to url,
+                    """{"ok":true,"data":{"url":null},"error":null}""" to null,
+                    """{"ok":true,"data":null,"error":null}""" to null,
+                )
+            shapes.forEach { (body, expected) ->
+                assertEquals(expected, reads(HttpStatusCode.OK, body = body, seen = seen).revokeDevice(device), body)
+            }
+            assertEquals(List(3) { "${HttpMethod.Delete.value} /devices/$device " }, seen)
+        }
+
+    @Test
+    fun `a refused, broken or non-https answer opens nothing, and a 401 throws`() =
+        runTest {
+            val device = "00000000-0000-0000-0000-0000000000d1"
+            assertNull(reads(HttpStatusCode.NotFound, body = error).revokeDevice(device))
+            assertNull(reads(HttpStatusCode.OK, body = "<html>").revokeDevice(device))
+            assertNull(reads(HttpStatusCode.OK, body = """{"ok":true,"data":{"url":"javascript:x"}}""").revokeDevice(device))
+            assertThrows<Unauthorized> { reads(HttpStatusCode.Unauthorized, body = error).revokeDevice(device) }
         }
 }

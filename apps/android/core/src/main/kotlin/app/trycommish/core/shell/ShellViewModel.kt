@@ -52,7 +52,9 @@ object ShellKeys {
  * every answer. Read fresh, the site's selection leads (a choice made on the web shows here); from the
  * kept copy, this phone's last choice does, being newer than the copy; else the newest followed. A
  * choice in the switch shows at once and is written to the site (PUT /me/league) without waiting: any
- * answer but a 401 leaves the choice as made, a 401 signs the device out.
+ * answer but a 401 leaves the choice as made, a 401 signs the device out. A write the site did not take
+ * (no signal, an older API) is sent again on the next fresh read that still disagrees (B215), so the
+ * hold ends once the site has it and a later choice on the web shows here.
  */
 class ShellViewModel(
     private val reads: AccountReads,
@@ -66,6 +68,9 @@ class ShellViewModel(
 
     /** The phone's last choice until the site takes it (its PUT lands) or a fresh read agrees. */
     private var pending: String? = null
+
+    /** The held choice whose write the site did not take, to send again on the next fresh read. */
+    private var unsent: String? = null
 
     /** How many choices the member has made, so a read can tell one made while it was in flight. */
     private var choicesMade = 0
@@ -82,6 +87,16 @@ class ShellViewModel(
         return viewModelScope.launch { restore() }.also { job = it }
     }
 
+    /** The phone signed out: nothing of the last account is shown or held for the next one, and nothing
+     * read or written for it is still on its way. */
+    fun forget() {
+        job?.cancel()
+        selectionWrite?.cancel()
+        pending = null
+        unsent = null
+        mutableState.value = ShellState.Restoring
+    }
+
     /** The member chose a league in the switch: shown at once, kept as this phone's choice, and
      * selected on the site too. A league the account does not follow is no change. */
     fun choose(leagueId: String) {
@@ -89,6 +104,7 @@ class ShellViewModel(
         val league = ready.leagues.firstOrNull { it.id == leagueId } ?: return
         mutableState.value = ready.copy(selected = league)
         pending = leagueId
+        unsent = null
         choicesMade++
         cache.write(ShellKeys.LAST_LEAGUE, Cached(leagueId, clock.now()))
         selectionWrite = viewModelScope.launch { write(leagueId) }
@@ -128,6 +144,7 @@ class ShellViewModel(
             fresh != null -> {
                 cache.write(ShellKeys.ACCOUNT, Cached(requireNotNull(body), clock.now()))
                 show(fresh, listOf(held(fresh, chosenDuringRead = choicesMade != asked), fresh.selected, last))
+                sendAgain(fresh)
             }
             kept == null -> mutableState.value = ShellState.Unreachable
         }
@@ -145,6 +162,18 @@ class ShellViewModel(
         return pending ?: shown.takeIf { chosenDuringRead }
     }
 
+    /** A held choice the site did not take, sent again now that a read went through and still disagrees;
+     * dropped when the account no longer follows the league. */
+    private fun sendAgain(fresh: AccountContext) {
+        val again = unsent?.takeIf { it == pending } ?: return
+        unsent = null
+        if (fresh.leagues.none { it.id == again }) {
+            pending = null
+            return
+        }
+        selectionWrite = viewModelScope.launch { write(again) }
+    }
+
     /** The account shown with the first of `choices` it follows, else its newest league. */
     private fun show(
         account: AccountContext,
@@ -157,18 +186,23 @@ class ShellViewModel(
     }
 
     private suspend fun write(leagueId: String) {
-        try {
-            // Taken by the site: the choice no longer needs holding against its reads.
-            if (reads.selectLeague(leagueId) && pending == leagueId) pending = null
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Unauthorized) {
-            signOut()
-        } catch (
-            @Suppress("TooGenericExceptionCaught") e: Exception,
-        ) {
-            // Not taken by the site (no signal, an older API): the phone keeps the choice.
-        }
+        val taken =
+            try {
+                reads.selectLeague(leagueId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Unauthorized) {
+                return signOut()
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: Exception,
+            ) {
+                // No signal: not taken, like an older API's refusal.
+                false
+            }
+        if (pending != leagueId) return
+        // Taken by the site, the choice no longer needs holding against its reads; not taken, the phone
+        // keeps it and sends it again on the next read that goes through.
+        if (taken) pending = null else unsent = leagueId
     }
 
     private fun signOut() {

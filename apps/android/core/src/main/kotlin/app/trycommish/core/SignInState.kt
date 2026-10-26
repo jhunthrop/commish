@@ -16,12 +16,18 @@ class SignInState(
 ) {
     private val signedInState = MutableStateFlow(session.token != null)
     private val messageState = MutableStateFlow<String?>(null)
+    private val generationState = MutableStateFlow(0)
 
     /** Whether the device holds a token, for the tabs that need one. */
     val signedIn: StateFlow<Boolean> = signedInState.asStateFlow()
 
     /** What the sign-in screen says about the last attempt or the last sign-out, if anything. */
     val message: StateFlow<String?> = messageState.asStateFlow()
+
+    /** Which account the shell shows (iOS's AppSession.generation): it moves as the phone signs in and as
+     * it signs out, never on a read of the same account, so the shell rebuilds every tab per account and
+     * no screen's state passes from one member to the next on a shared phone. */
+    val generation: StateFlow<Int> = generationState.asStateFlow()
 
     /** Whether the phone holds a sign-in right now (the session's token, not the flow, which turns after). */
     fun holdsToken(): Boolean = session.token != null
@@ -32,7 +38,7 @@ class SignInState(
             session.signOut()
             cache.clear()
             messageState.value = AppWords.signedOut
-            signedInState.value = false
+            signedOutNow()
         }
 
     /** The member signs this phone out: the API forgets its sign-in when it can be reached, the phone forgets
@@ -42,14 +48,23 @@ class SignInState(
             signOutSession()
         } finally {
             messageState.value = null
-            signedInState.value = false
+            signedOutNow()
         }
     }
 
     /** A sign-in finished: the tabs read the account. */
     fun signedInNow() {
         messageState.value = null
+        if (!signedInState.value) generationState.value++
         signedInState.value = true
+    }
+
+    /** Signed out, then the generation moved, so the shell never reads the account again for a phone that
+     * has already let its token go. */
+    private fun signedOutNow() {
+        val was = signedInState.value
+        signedInState.value = false
+        if (was) generationState.value++
     }
 
     /** A sign-in did not finish: the screen says why. */

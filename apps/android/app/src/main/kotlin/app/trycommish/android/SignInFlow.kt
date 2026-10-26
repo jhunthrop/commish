@@ -3,7 +3,6 @@ package app.trycommish.android
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.browser.customtabs.CustomTabsIntent
 import app.trycommish.core.signin.SignIn
 import app.trycommish.core.signin.SignInResult
 
@@ -17,11 +16,8 @@ class SignInFlow(
     private val returnTo: String = BuildConfig.RETURN_TO,
 ) {
     fun launch(context: Context) {
-        CustomTabsIntent
-            .Builder()
-            .setShowTitle(true)
-            .build()
-            .launchUrl(context, Uri.parse(signIn.start()))
+        // Ephemeral, so a sign-in never reuses a WorkOS session an earlier one left in the browser (B168).
+        ephemeralTab().launchUrl(context, Uri.parse(signIn.start()))
     }
 
     /** The app's return link an intent carries, null for any other intent. */

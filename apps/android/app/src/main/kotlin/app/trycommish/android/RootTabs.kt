@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -53,6 +54,7 @@ import app.trycommish.core.shell.TRADES_PAGE
 import app.trycommish.core.shell.WAIVERS_PAGE
 import app.trycommish.core.shell.gameOf
 import app.trycommish.core.shell.homeOf
+import app.trycommish.core.shell.isPublic
 import app.trycommish.core.shell.lineupOf
 import app.trycommish.core.shell.searchRoute
 import app.trycommish.design.CommishTheme
@@ -135,6 +137,10 @@ fun Shell(
 ) {
     val shell: ShellViewModel = viewModel { graph.shellViewModel() }
     val signedIn by graph.signedIn.collectAsStateWithLifecycle()
+    val generation by graph.generation.collectAsStateWithLifecycle()
+    // The account the shell was built for: a rotation or a new process starts on the one in hand, and only a
+    // sign-in or sign-out while the shell is up moves it.
+    var builtFor by remember { mutableIntStateOf(generation) }
     val state by shell.state.collectAsStateWithLifecycle()
     val sheet = remember { PlayerSheetHost() }
     var tab by rememberSaveable { mutableStateOf(LEAGUE_PAGE) }
@@ -164,24 +170,31 @@ fun Shell(
             ?: uri.openUri(url)
     }
 
-    // Signed in, the account is read; signed out (Sign out, or a refused token), every tab's stack is let go
-    // and the League tab, the sign-in screen, is shown.
-    LaunchedEffect(signedIn) {
-        if (signedIn) {
-            shell.open()
-        } else {
+    // Each sign-in and sign-out rebuilds the shell for the account in hand (iOS's generation): every tab's
+    // stack and the view models on it, the room, the sheet, the switch and the search let go, and the shell's
+    // account forgotten, so nothing one member opened shows to the next. Signed in, the account
+    // is read; signed out, the League tab is the sign-in.
+    LaunchedEffect(generation, signedIn) {
+        if (generation != builtFor) {
             switchOpen = false
+            query = ""
             tab = LEAGUE_PAGE
-            // A sign-out lets every stack go, the room over them too (Lane 214 review M2).
+            // The room over the stacks goes too (Lane 214 review M2).
             mockRoom = null
-            nav.toSignIn()
+            sheet.close()
+            shell.forget()
+            nav.startOver()
+            builtFor = generation
         }
+        if (signedIn) shell.open()
     }
-    // An app link's screen (a /companion page), pushed on the tab in view once the device is signed in.
+    // An app link's screen: a public page (a shared mock, the mock setup) at once, signed in or out; the
+    // companion once the device is signed in (B213). Pushed once the shell is built for the account in hand.
     val asked by graph.link.collectAsStateWithLifecycle()
-    LaunchedEffect(asked, signedIn) {
+    LaunchedEffect(asked, signedIn, builtFor) {
         val route = asked ?: return@LaunchedEffect
-        if (!signedIn) return@LaunchedEffect
+        if (!signedIn && !route.isPublic) return@LaunchedEffect
+        if (builtFor != generation) return@LaunchedEffect
         graph.linkOpened()
         push(route)
     }
@@ -518,13 +531,13 @@ private fun NavGraphBuilder.reference(
     composable(Routes.SCHEDULE) { ReferenceScreen(graph, ShellRoute.Schedule, league, link) }
 }
 
-/** Signed out: back to the League tab with nothing above it, and no tab's saved stack kept for the next
- * sign-in (an Account left open on another tab would come back with the last account's words). */
-internal fun NavHostController.toSignIn(pages: List<String> = PAGES.map { it.page }) {
+/** A sign-in or a sign-out: back to a new League tab with nothing above or under it, and no tab's saved
+ * stack kept (an Account left open on another tab would come back with the last account's words). The start
+ * entry goes too, so no view model on any entry (a League home, a mock setup) passes to the next account. */
+internal fun NavHostController.startOver(pages: List<String> = PAGES.map { it.page }) {
     pages.forEach { clearBackStack(it) }
     navigate(LEAGUE_PAGE) {
-        popUpTo(graph.findStartDestination().id) { inclusive = false }
-        launchSingleTop = true
+        popUpTo(graph.findStartDestination().id) { inclusive = true }
     }
 }
 

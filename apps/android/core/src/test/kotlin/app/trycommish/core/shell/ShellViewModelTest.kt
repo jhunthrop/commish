@@ -62,7 +62,7 @@ class ShellViewModelTest {
             return taken
         }
 
-        override suspend fun revokeDevice(deviceId: String) = Unit
+        override suspend fun revokeDevice(deviceId: String): String? = null
     }
 
     private class Ends : SessionEnd {
@@ -220,6 +220,100 @@ class ShellViewModelTest {
                 advanceUntilIdle()
                 assertEquals(leagues[1].id, vm.ready().selected?.id)
             }
+        }
+
+    /** GET /me answers the site's selection as `site` says; PUT /me/league waits on `gate` the first
+     * time and then fails with no signal, and every later PUT lands. */
+    private class HeldThenFailed(
+        var site: String,
+        private val leagues: List<FollowedLeague>,
+    ) : AccountReads {
+        val gate = CompletableDeferred<Unit>()
+        val selected = mutableListOf<String>()
+
+        override suspend fun me(): String = ShellFixtures.meBody(leagues, site)
+
+        override suspend fun selectLeague(leagueId: String): Boolean {
+            selected += leagueId
+            if (selected.size == 1) {
+                gate.await()
+                throw IOException("no signal")
+            }
+            site = leagueId
+            return true
+        }
+
+        override suspend fun revokeDevice(deviceId: String): String? = null
+    }
+
+    @Test
+    fun `a PUT held then failed is sent again on the next read, and once it lands the web's choice shows`() =
+        runTest(main) {
+            val reads = HeldThenFailed(leagues[0].id, leagues)
+            val vm = viewModel(reads)
+            vm.open()
+            advanceUntilIdle()
+            vm.choose(leagues[2].id)
+            runCurrent()
+            // The PUT is held: a read in between keeps the choice and sends nothing more.
+            vm.open()
+            advanceUntilIdle()
+            assertEquals(leagues[2].id, vm.ready().selected?.id)
+            assertEquals(listOf(leagues[2].id), reads.selected)
+            // The PUT fails with no signal; the next read that goes through still disagrees, so it is sent again.
+            reads.gate.complete(Unit)
+            advanceUntilIdle()
+            vm.open()
+            advanceUntilIdle()
+            assertEquals(listOf(leagues[2].id, leagues[2].id), reads.selected)
+            assertEquals(leagues[2].id, vm.ready().selected?.id)
+            // The site has it now: the web's next choice shows, with no relaunch.
+            reads.site = leagues[1].id
+            vm.open()
+            advanceUntilIdle()
+            assertEquals(leagues[1].id, vm.ready().selected?.id)
+            assertEquals(2, reads.selected.size)
+        }
+
+    @Test
+    fun `a held choice the account no longer follows is dropped, not sent again`() =
+        runTest(main) {
+            var shown = leagues
+            val failed = FakeAccount({ "" }, write = IOException("no signal"))
+            val reads =
+                object : AccountReads by failed {
+                    override suspend fun me(): String = ShellFixtures.meBody(shown, shown[0].id)
+                }
+            val vm = viewModel(reads)
+            vm.open()
+            advanceUntilIdle()
+            vm.choose(leagues[2].id)
+            advanceUntilIdle()
+            shown = leagues.take(2)
+            vm.open()
+            advanceUntilIdle()
+            assertEquals(leagues[0].id, vm.ready().selected?.id)
+            assertEquals(listOf(leagues[2].id), failed.selected)
+        }
+
+    @Test
+    fun `signing out forgets the account, the held choice and the write on its way`() =
+        runTest(main) {
+            val reads = HeldThenFailed(leagues[0].id, leagues)
+            val vm = viewModel(reads)
+            vm.open()
+            advanceUntilIdle()
+            vm.choose(leagues[2].id)
+            runCurrent()
+            vm.forget()
+            assertEquals(ShellState.Restoring, vm.state.value)
+            reads.gate.complete(Unit)
+            advanceUntilIdle()
+            // The next account's read shows its own selection, and nothing of the last is sent.
+            vm.open()
+            advanceUntilIdle()
+            assertEquals(leagues[0].id, vm.ready().selected?.id)
+            assertEquals(listOf(leagues[2].id), reads.selected)
         }
 
     @Test

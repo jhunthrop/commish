@@ -158,10 +158,17 @@ class AppGraph(
 
     /** The one place the app's sign-in state turns (sign out, a refused token, a finished sign-in). */
     private val signInState =
-        SignInState(session, cache, SignOut(session, cache, account::revokeDevice) { Log.w(TAG, "revoke device", it) })
+        SignInState(
+            session,
+            cache,
+            SignOut(session, cache, account::revokeDevice, { openLogout(appContext, it) }) { Log.w(TAG, "revoke device", it) },
+        )
 
     /** Whether the device holds a token, for the tabs that need one. */
     val signedIn: StateFlow<Boolean> = signInState.signedIn
+
+    /** Which account the shell shows, moved at each sign-in and sign-out: the shell rebuilds its tabs on it. */
+    val generation: StateFlow<Int> = signInState.generation
 
     /** What the sign-in screen says about the last attempt or the last sign-out, if anything. */
     val signInMessage: StateFlow<String?> = signInState.message

@@ -1,10 +1,14 @@
 package app.trycommish.core.shell
 
+import app.trycommish.api.CommishJson
+import app.trycommish.api.Envelope
 import app.trycommish.api.HTTP_UNAUTHORIZED
 import app.trycommish.api.Transport
 import app.trycommish.api.Unauthorized
 import app.trycommish.api.bodyText
+import app.trycommish.api.models.DeviceSignOut
 import app.trycommish.api.models.LeagueChoice
+import kotlinx.serialization.SerializationException
 import java.util.UUID
 
 /** The shell's reads and writes on the account: GET /me's body whole (kept as the API sent it), the
@@ -17,8 +21,10 @@ interface AccountReads {
      * false and no change for the app. */
     suspend fun selectLeague(leagueId: String): Boolean
 
-    /** DELETE /devices/{id}: the API forgets this phone's sign-in. */
-    suspend fun revokeDevice(deviceId: String)
+    /** DELETE /devices/{id} with this phone's own id: the API forgets its sign-in and answers the WorkOS
+     * logout URL that ends the browser session the sign-in opened (Lane 225), null for a phone paired
+     * before the API kept that session or for any answer without one. */
+    suspend fun revokeDevice(deviceId: String): String?
 }
 
 /** The account's calls through the generated clients. */
@@ -33,7 +39,23 @@ class ApiAccountReads(
         return answer.success
     }
 
-    override suspend fun revokeDevice(deviceId: String) {
-        transport.devices().revokeDevice(UUID.fromString(deviceId))
-    }
+    override suspend fun revokeDevice(deviceId: String): String? =
+        logoutUrlOf(transport.devices().revokeDevice(UUID.fromString(deviceId)).bodyText())
 }
+
+/** The logout URL in a sign-out's answer: `data.url` when it is an https link, null for `{url: null}`,
+ * `data: null`, an error envelope or a body that is not one. */
+internal fun logoutUrlOf(body: String): String? {
+    val envelope =
+        try {
+            CommishJson.decodeFromString<Envelope<DeviceSignOut>>(body)
+        } catch (e: SerializationException) {
+            return null
+        } catch (e: IllegalArgumentException) {
+            return null
+        }
+    if (!envelope.ok || envelope.error != null) return null
+    return envelope.data?.url?.takeIf { it.startsWith(HTTPS) }
+}
+
+private const val HTTPS = "https://"

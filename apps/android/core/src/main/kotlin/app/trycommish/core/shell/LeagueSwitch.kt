@@ -123,6 +123,31 @@ sealed interface ShellRoute {
     ) : ShellRoute
 }
 
+/** Whether a link to this screen opens signed out (B213, iOS's ShellRoute.isPublic): the players, a player's
+ * page, the reference pages and the mock room's setup and shared drafts are public on the web and in the API;
+ * the account, a league's home and game and the companion wait for the sign-in. No default, so a new screen
+ * has to say which it is. */
+val ShellRoute.isPublic: Boolean
+    get() =
+        when (this) {
+            is ShellRoute.Players,
+            is ShellRoute.Player,
+            is ShellRoute.Adp,
+            is ShellRoute.Compare,
+            ShellRoute.Clubs,
+            is ShellRoute.Club,
+            ShellRoute.Schedule,
+            is ShellRoute.MockSetup,
+            is ShellRoute.SharedMock,
+            -> true
+            ShellRoute.Account,
+            is ShellRoute.LeagueHome,
+            is ShellRoute.Game,
+            is ShellRoute.CompanionNew,
+            is ShellRoute.Companion,
+            -> false
+        }
+
 /** Where a choice in the shell lands: a tab of the bar, or a screen pushed on the tab in view. */
 sealed interface ShellDestination {
     data class Tab(
