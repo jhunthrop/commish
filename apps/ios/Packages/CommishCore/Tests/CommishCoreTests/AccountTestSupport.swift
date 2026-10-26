@@ -18,6 +18,7 @@ actor StubAccountScreen: AccountScreenAPI {
     /// Each email a delete was sent with.
     private(set) var deletions: [String] = []
     private var deleteError: (any Error)?
+    private var deleteGate: Gate?
 
     init(account: AccountAnswer, leagues: [AttachedLeague], paired: [PairedDeviceRow]) {
         self.account = account
@@ -96,8 +97,14 @@ actor StubAccountScreen: AccountScreenAPI {
         deleteError = error
     }
 
+    /// Holds each delete until the test opens it, the call under way.
+    func holdDeletes(on gate: Gate) {
+        deleteGate = gate
+    }
+
     func deleteAccount(email: String) async throws {
         deletions.append(email)
+        await deleteGate?.wait()
         if let deleteError {
             throw deleteError
         }

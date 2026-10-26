@@ -121,6 +121,102 @@ struct DeleteAccountViewModelTests {
         #expect(session.notice == nil)
     }
 
+    /// How many times the league switch heard of a change.
+    final class Heard {
+        var leaguesChanged = 0
+    }
+
+    /// A phone signed in on a disk cache, its Account read, and one league detached a moment ago, its undo
+    /// window still open (the wait sleeps an hour, as long as the window can last in a test).
+    struct DetachedPhone {
+        let viewModel: AccountViewModel
+        let session: AppSession
+        let cache: FileCache
+        let heard: Heard
+    }
+
+    func detachedOnDisk(_ folder: URL) async throws -> DetachedPhone {
+        let cache = FileCache(folder: folder)
+        let store = MemorySessionStore()
+        await store.save(token: "t", deviceID: AccountViewModelTests.phone)
+        let session = AppSession(
+            account: StubAccount(leagues: [Fixtures.league]), store: store, cache: cache,
+            defaults: AppSessionTests.defaults()
+        )
+        await session.restore()
+        let heard = Heard()
+        let viewModel = try AccountViewModel(
+            api: StubAccountScreen.fixture(), cache: cache, clock: FixedClock(AccountViewModelTests.now),
+            zone: Fixtures.zone, push: MemoryPushStore(), deviceID: { await store.deviceID() },
+            signOut: { await session.signOut() }, onSignedOut: { Task { await session.expire() } },
+            deleted: { await session.deleted() }, leaguesChanged: { heard.leaguesChanged += 1 },
+            wait: { _ in try? await Task.sleep(for: .seconds(3600)) }
+        )
+        await viewModel.load()
+        await viewModel.detach(Fixtures.league)
+        #expect(try AccountViewModelTests.loaded(viewModel).leagues?.contains { $0.detached } == true)
+        return DetachedPhone(viewModel: viewModel, session: session, cache: cache, heard: heard)
+    }
+
+    /// Lets the unstructured writes a leave could start run, so a test sees any of them.
+    func settle() async {
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+    }
+
+    @Test func aDetachInItsUndoWindowWritesNothingBackAfterTheDelete() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("delete-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let phone = try await detachedOnDisk(folder)
+        let (viewModel, session, cache, heard) = (phone.viewModel, phone.session, phone.cache, phone.heard)
+        let sheet = try #require(viewModel.deletion())
+        sheet.typed = "fixture@example.com"
+        await sheet.delete()
+        #expect(session.state == .signedOut)
+        // The shell is rebuilt for no account: the Account leaves, as its view disappears.
+        viewModel.leave()
+        await settle()
+        #expect(await cache.read(AccountScreenAnswer.self, route: AccountViewModel.route) == nil)
+        #expect(viewModel.undoWindow == nil)
+        #expect(heard.leaguesChanged == 0)
+    }
+
+    @Test func aDetachInItsUndoWindowWritesNothingBackAfterSignOut() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("signout-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let phone = try await detachedOnDisk(folder)
+        let (viewModel, session, cache, heard) = (phone.viewModel, phone.session, phone.cache, phone.heard)
+        await viewModel.signOut()
+        #expect(session.state == .signedOut)
+        viewModel.leave()
+        await settle()
+        #expect(await cache.read(AccountScreenAnswer.self, route: AccountViewModel.route) == nil)
+        #expect(heard.leaguesChanged == 0)
+    }
+
+    @Test func theVerbIsHeldWhileTheDeleteRunsAndASecondTapSendsNothing() async throws {
+        let stub = try StubAccountScreen.fixture()
+        let gate = Gate()
+        await stub.holdDeletes(on: gate)
+        let calls = Calls()
+        let sheet = try await Self.sheet(stub, calls: calls)
+        sheet.typed = "fixture@example.com"
+        let first = Task { await sheet.delete() }
+        while await stub.deletions.isEmpty {
+            await Task.yield()
+        }
+        #expect(sheet.busy)
+        #expect(sheet.canDelete == false)
+        await sheet.delete()
+        #expect(await stub.deletions.count == 1)
+        await gate.open()
+        await first.value
+        #expect(await stub.deletions.count == 1)
+        #expect(sheet.busy == false)
+        #expect(calls.deleted == 1)
+    }
+
     @Test func aWrongEmailSaysTheAPIsSentenceForIt() async throws {
         let stub = try StubAccountScreen.fixture()
         await stub.refuseDelete(with: APIError.envelope(code: "invalid", message: "Type the email you sign in with"))
