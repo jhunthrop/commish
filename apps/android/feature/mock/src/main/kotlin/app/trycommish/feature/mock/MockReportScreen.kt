@@ -13,6 +13,7 @@ import app.trycommish.design.Verb
 import app.trycommish.design.Words
 import app.trycommish.feature.companion.CompanionActions
 import app.trycommish.feature.companion.DraftReportScreen
+import app.trycommish.feature.companion.NoteText
 import app.trycommish.feature.companion.ReportPart
 
 /** The report's verbs (the report page's): the solid one that runs the draft again, then the quiet ones. A
@@ -23,6 +24,8 @@ class MockReportVerbs(
     val another: (() -> Unit)? = null,
     val copied: Boolean = false,
     val copy: (() -> Unit)? = null,
+    /** A verb the API refused (Run it again), in its words, under the verbs. */
+    val refusal: String? = null,
 )
 
 /** The report as a box score (Report.svelte at 390), the companion's report with the mock's verbs: the one
@@ -42,5 +45,6 @@ fun MockReportScreen(
             verbs.another?.let { QuietButton(Words.Mock.tryAnother, onClick = it) }
             verbs.copy?.let { QuietButton(if (verbs.copied) Words.Mock.copied else Words.Mock.copyLink, onClick = it) }
         }
+        verbs.refusal?.let { NoteText(it) }
     }
 }

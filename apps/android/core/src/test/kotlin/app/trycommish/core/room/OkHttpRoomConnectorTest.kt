@@ -1,5 +1,8 @@
 package app.trycommish.core.room
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -8,10 +11,13 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
@@ -62,6 +68,49 @@ class OkHttpRoomConnectorTest {
         val upgrade = server.takeRequest(5, TimeUnit.SECONDS)
         assertEquals("Bearer device-token", upgrade?.getHeader("Authorization"))
         assertNull(upgrade?.requestUrl?.query)
+    }
+
+    @Test
+    fun `a cancel while the upgrade is on its way lets the socket go`() {
+        val serverEnded = CountDownLatch(1)
+        val serverOpened = CountDownLatch(1)
+        server.enqueue(
+            MockResponse()
+                .withWebSocketUpgrade(
+                    object : WebSocketListener() {
+                        override fun onOpen(
+                            webSocket: WebSocket,
+                            response: Response,
+                        ) {
+                            serverOpened.countDown()
+                        }
+
+                        override fun onClosing(
+                            webSocket: WebSocket,
+                            code: Int,
+                            reason: String,
+                        ) {
+                            serverEnded.countDown()
+                        }
+
+                        override fun onFailure(
+                            webSocket: WebSocket,
+                            t: Throwable,
+                            response: Response?,
+                        ) {
+                            serverEnded.countDown()
+                        }
+                    },
+                ).setHeadersDelay(1, TimeUnit.SECONDS),
+        )
+        runBlocking {
+            val opening = launch(Dispatchers.IO) { OkHttpRoomConnector().open(url(), "device-token") }
+            assertNotNull(server.takeRequest(5, TimeUnit.SECONDS))
+            opening.cancelAndJoin()
+            assertTrue(opening.isCancelled)
+        }
+        // The room never keeps a socket nobody reads: it ends on the server's side, before or after its open.
+        assertTrue(serverEnded.await(10, TimeUnit.SECONDS) || !serverOpened.await(2, TimeUnit.SECONDS))
     }
 
     @Test

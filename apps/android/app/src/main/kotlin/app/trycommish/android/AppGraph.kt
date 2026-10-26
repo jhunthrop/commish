@@ -243,7 +243,7 @@ class AppGraph(
     ): MockSetupViewModel = MockSetupViewModel(mocks, from, seed, sessionEnd)
 
     /** A shared mock by its link's code. */
-    fun sharedMockViewModel(code: String): SharedMockViewModel = SharedMockViewModel(code, mocks)
+    fun sharedMockViewModel(code: String): SharedMockViewModel = SharedMockViewModel(code, mocks, sessionEnd)
 
     /** Our record from the run, with the schedule its weeks are read by. */
     fun recordViewModel(): RecordViewModel = RecordViewModel(records, cache, clock, zone, sessionEnd)

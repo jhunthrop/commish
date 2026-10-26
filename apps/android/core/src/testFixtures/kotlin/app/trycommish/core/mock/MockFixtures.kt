@@ -106,6 +106,15 @@ class StubMock(
 
     /** Picks answered without the next turn's card, so the room reads it from the card route. */
     var pickWithoutCard = false
+
+    /** The report read fails with no connection. */
+    var reportFails = false
+
+    /** The room read is refused with this status (403, 404). */
+    var readRefused: Int? = null
+
+    /** A start (POST /mocks) answers the API's 401. */
+    var createSignedOut = false
     var saved: List<League> = emptyList()
     private var next =
         mutableListOf(MockFixtures.Answer.Pick1, MockFixtures.Answer.Pick2, MockFixtures.Answer.Pick3, MockFixtures.Answer.Pick4)
@@ -129,7 +138,9 @@ class StubMock(
     }
 
     override suspend fun create(body: MockCreate): MockRoom {
+        pass("create")
         fail()
+        if (createSignedOut) throw Unauthorized()
         created += body
         return MockFixtures.room(MockFixtures.Answer.Create)
     }
@@ -137,6 +148,7 @@ class StubMock(
     override suspend fun mock(id: String): MockRoom {
         pass("mock")
         fail()
+        readRefused?.let { throw ApiFailure(it, "not_found", "No mock with that id.") }
         return MockFixtures.room(opened)
     }
 
@@ -196,6 +208,7 @@ class StubMock(
 
     override suspend fun report(id: String): MockReport {
         fail()
+        if (reportFails) throw IOException("no signal")
         return MockFixtures.report()
     }
 
