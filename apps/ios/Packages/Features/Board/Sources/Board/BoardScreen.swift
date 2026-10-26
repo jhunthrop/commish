@@ -107,11 +107,11 @@ public struct ChipRow<Value: Hashable & Sendable>: View {
             }
         } else {
             // A drawn row that runs past the edge shows its end when the chosen chip is in its later
-            // half, as the live row scrolls to it.
-            ViewThatFits(in: .horizontal) {
-                row
-                row.frame(maxWidth: .infinity, alignment: laterHalf ? .trailing : .leading).clipped()
-            }
+            // half, as the live row scrolls to it; a row that fits is drawn as it is.
+            KeepInView(chosenLate: laterHalf) { chipViews }
+                .padding(.horizontal, Tokens.Space.s3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .clipped()
         }
     }
 
@@ -134,14 +134,39 @@ public struct ChipRow<Value: Hashable & Sendable>: View {
     }
 
     private var row: some View {
-        HStack(spacing: Tokens.Space.s2) {
-            ForEach(chips) { chip in
-                ChoiceChip(chip.label, pressed: chip.pressed) { choose(chip.value) }
-                    .id(chip.id)
-            }
+        HStack(spacing: Tokens.Space.s2) { chipViews }
+            .padding(.horizontal, Tokens.Space.s3)
+            .fixedSize()
+    }
+
+    private var chipViews: some View {
+        ForEach(chips) { chip in
+            ChoiceChip(chip.label, pressed: chip.pressed) { choose(chip.value) }
+                .id(chip.id)
         }
-        .padding(.horizontal, Tokens.Space.s3)
-        .fixedSize()
+    }
+}
+
+/// A row of chips at their own widths, the space between them the row's: placed from the leading edge,
+/// or, when they run past the trailing edge and the chosen chip is in the later half, from the trailing
+/// edge, so the chosen chip is in view.
+struct KeepInView: Layout {
+    let chosenLate: Bool
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout Void) -> CGSize {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let width = sizes.reduce(0) { $0 + $1.width } + Tokens.Space.s2 * Double(max(sizes.count - 1, 0))
+        return CGSize(width: min(width, proposal.width ?? width), height: sizes.map(\.height).max() ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout Void) {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let width = sizes.reduce(0) { $0 + $1.width } + Tokens.Space.s2 * Double(max(sizes.count - 1, 0))
+        var edge = bounds.minX + (width > bounds.width && chosenLate ? bounds.width - width : 0)
+        for (subview, size) in zip(subviews, sizes) {
+            subview.place(at: CGPoint(x: edge, y: bounds.midY), anchor: .leading, proposal: ProposedViewSize(size))
+            edge += size.width + Tokens.Space.s2
+        }
     }
 }
 
