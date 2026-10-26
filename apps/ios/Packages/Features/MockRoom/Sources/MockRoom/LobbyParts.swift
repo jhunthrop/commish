@@ -178,7 +178,7 @@ struct LobbyWaitView: View {
         let theme = Theme(colorScheme)
         RoomPanel {
             (Text(wait.count).bold().foregroundStyle(theme.color(Tokens.Color.ink))
-                + Text(" " + wait.words).foregroundStyle(theme.color(Tokens.Color.ink2)))
+                + Text(verbatim: " " + wait.words).foregroundStyle(theme.color(Tokens.Color.ink2)))
                 .font(Faces.font(.ui, size: Tokens.TypeScale.sm))
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -196,7 +196,7 @@ struct LobbyAboutView: View {
         let theme = Theme(colorScheme)
         RoomPanel {
             (Text(head).bold().foregroundStyle(theme.color(Tokens.Color.ink))
-                + Text(", " + about).foregroundStyle(theme.color(Tokens.Color.ink2)))
+                + Text(verbatim: ", " + about).foregroundStyle(theme.color(Tokens.Color.ink2)))
                 .font(Faces.font(.ui, size: Tokens.TypeScale.sm))
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
