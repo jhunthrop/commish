@@ -11,7 +11,7 @@ import { parse } from 'yaml';
 import { z } from 'zod';
 import { POSITIONS } from '#lib/types/player.ts';
 import { stampAt } from '#lib/format/clock.ts';
-import { printTenth } from '#lib/league/box/box.ts';
+import { fixed } from '#lib/format/number.ts';
 import {
 	CAPTION_ZONE,
 	movedByline,
@@ -430,8 +430,8 @@ void test("the read's byline is drawn from the API's answers alone, as the apps 
 		byline
 	);
 	assert.equal(
-		movedByline(read.writtenAt, printTenth(read.projection ?? 0), '24.2'),
-		`Written ${stampAt(read.writtenAt, CAPTION_ZONE)} at ${printTenth(read.projection ?? 0)}; the published projection has moved to 24.2 since`
+		movedByline(read.writtenAt, read.projection ?? 0, 24.2),
+		`Written ${stampAt(read.writtenAt, CAPTION_ZONE)} at ${fixed(read.projection ?? 0)}; the published projection has moved to 24.2 since`
 	);
 });
 

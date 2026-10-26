@@ -10,7 +10,6 @@
 import type { components } from '#lib/api/types.ts';
 import type { GameHead } from '#lib/league/box/kickoff.ts';
 import type { WeekRead } from '#lib/run/schema.ts';
-import { printTenth } from '#lib/league/box/box.ts';
 import { CARD, projectionMoved } from './card.ts';
 import { movedByline } from './read-byline.ts';
 
@@ -82,7 +81,7 @@ export function shownWeekRead(read: WeekRead, card: CardProjection | null): Show
 	if (read.body === null) return { withheld: true, words: withheldWords(read, card) };
 	const moved = movedUnderway(read, card);
 	if (moved !== null) {
-		const caption = movedByline(read.writtenAt, printTenth(moved.quoted), printTenth(moved.now));
+		const caption = movedByline(read.writtenAt, moved.quoted, moved.now);
 		return { withheld: false, body: read.body, caption };
 	}
 	const built = { withheld: false, body: read.body, caption: read.caption } as const;

@@ -96,7 +96,7 @@ void test('a standing read names its write, the status read its build took and t
 
 void test("a read under way whose projection moved names the figure it was written at and the card's", () => {
 	assert.equal(
-		movedByline(BIJAN.writtenAt, '21.4', '24.2'),
+		movedByline(BIJAN.writtenAt, 21.4, 24.2),
 		'Written Fri Oct 23, 12:31 am CT at 21.4; the published projection has moved to 24.2 since'
 	);
 });

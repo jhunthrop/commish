@@ -9,6 +9,7 @@
  * on a newer read (`research/nightly/game_day_reads.py`), the last whole hour more than READ_BUILD_LEAD_MS
  * before the window's first kickoff. Pure, every clock passed in. */
 import { kickoffAt, stampAt } from '#lib/format/clock.ts';
+import { fixed } from '#lib/format/number.ts';
 import type { Slate, WeekRead } from '#lib/run/schema.ts';
 
 /** The zone the read's byline is said in, as the run says its write (`capsules/week/sheet.py CENTRAL`). */
@@ -85,6 +86,6 @@ export function standingByline(
 
 /** The byline of a read under way whose projection moved past the threshold: the figure it was written
  * at, the one the card holds. */
-export function movedByline(writtenAt: string, quoted: string, now: string): string {
-	return READ_BYLINE.moved(stampAt(writtenAt, CAPTION_ZONE), quoted, now);
+export function movedByline(writtenAt: string, quoted: number, now: number): string {
+	return READ_BYLINE.moved(stampAt(writtenAt, CAPTION_ZONE), fixed(quoted), fixed(now));
 }
