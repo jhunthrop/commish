@@ -61,7 +61,7 @@ private object WallSize {
  * seat: his face, position and club, his last name; the drafter's own on the accent's wash with its edge;
  * the pick on the clock dashed in the accent with whose it is. */
 @Composable
-internal fun WallView(
+fun WallView(
     wall: RoomWall,
     open: (SheetPlayer) -> Unit,
     still: Boolean,

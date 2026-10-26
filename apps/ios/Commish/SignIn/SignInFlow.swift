@@ -7,7 +7,9 @@ import UIKit
 /// which the sheet catches as its https return (iOS 17.4, the app holding web credentials for
 /// trycommish.app). A universal link to the same address arriving through `onOpenURL` ends it the
 /// same way. Every end calls back: the return link, or `ended` when the sheet closes, fails or never
-/// opens, so the screen's verb is never left disabled.
+/// opens, so the screen's verb is never left disabled. The sheet is ephemeral (B168): it shares no
+/// cookie with Safari or an earlier sheet, so the WorkOS session a sign-in opens ends with its sheet,
+/// and after Sign out the next Sign in shows the form, never the person signed in before.
 @MainActor
 final class SignInFlow: NSObject, ASWebAuthenticationPresentationContextProviding {
     private let signIn: SignIn
@@ -36,11 +38,7 @@ final class SignInFlow: NSObject, ASWebAuthenticationPresentationContextProvidin
                 }
             }
         }
-        let session = ASWebAuthenticationSession(
-            url: started.url,
-            callback: .https(host: SignInRoute.returnTo.host() ?? "", path: SignInRoute.returnTo.path()),
-            completionHandler: completion
-        )
+        let session = Self.sheet(url: started.url, completion: completion)
         session.presentationContextProvider = self
         sheet = session
         if !session.start() {
@@ -48,6 +46,19 @@ final class SignInFlow: NSObject, ASWebAuthenticationPresentationContextProvidin
             sheet = nil
             ended()
         }
+    }
+
+    /// The sheet for a sign-in: the API's login, its https return, and no cookie kept or shared.
+    static func sheet(
+        url: URL, completion: @escaping ASWebAuthenticationSession.CompletionHandler
+    ) -> ASWebAuthenticationSession {
+        let session = ASWebAuthenticationSession(
+            url: url,
+            callback: .https(host: SignInRoute.returnTo.host() ?? "", path: SignInRoute.returnTo.path()),
+            completionHandler: completion
+        )
+        session.prefersEphemeralWebBrowserSession = true
+        return session
     }
 
     /// Whether the link is this flow's return; when it is, pairs with the verifier held since `begin`.

@@ -10,6 +10,7 @@ import android.os.Build
 import android.util.Log
 import app.trycommish.api.Transport
 import app.trycommish.api.models.LeagueHost
+import app.trycommish.api.models.LeagueSettings
 import app.trycommish.core.Cache
 import app.trycommish.core.Clock
 import app.trycommish.core.EncryptedSession
@@ -38,6 +39,12 @@ import app.trycommish.core.leaguehome.LeagueReads
 import app.trycommish.core.matchup.ApiMatchupReads
 import app.trycommish.core.matchup.MatchupReads
 import app.trycommish.core.matchup.MatchupViewModel
+import app.trycommish.core.mock.ApiMockReads
+import app.trycommish.core.mock.MockReads
+import app.trycommish.core.mock.MockRoomViewModel
+import app.trycommish.core.mock.MockSetupSeed
+import app.trycommish.core.mock.MockSetupViewModel
+import app.trycommish.core.mock.SharedMockViewModel
 import app.trycommish.core.player.ApiPlayerReads
 import app.trycommish.core.player.PlayerPageViewModel
 import app.trycommish.core.player.PlayerReadsGraph
@@ -115,6 +122,7 @@ class AppGraph(
     private val records: RecordReads = ApiRecordReads(transport)
     private val accountScreen: AccountScreenReads = ApiAccountScreenReads(transport)
     private val companions: CompanionReads = ApiCompanionReads(transport)
+    private val mocks: MockReads = ApiMockReads(transport)
 
     /** A debug build started with the CommishCompanionReplay extra follows the API's recorded draft from the
      * companion's start page (the web's /companion/new?replay=1, COMPANION_REPLAY on a development API, refused
@@ -224,6 +232,18 @@ class AppGraph(
     /** The companion's start page; `replay` where a site link asked for the development replay. */
     fun newCompanionViewModel(replay: Boolean): NewCompanionViewModel =
         NewCompanionViewModel(companions, sessionEnd, replay = replay || companionReplay)
+
+    /** A mock room by its id: every verb a write the API answers with the room. */
+    fun mockRoomViewModel(id: String): MockRoomViewModel = MockRoomViewModel(id, mocks, cache, clock, zone, sessionEnd)
+
+    /** A mock's setup: from a draft's settings (Try another slot), else in the seed's format on its saved league. */
+    fun mockSetupViewModel(
+        from: LeagueSettings?,
+        seed: MockSetupSeed,
+    ): MockSetupViewModel = MockSetupViewModel(mocks, from, seed, sessionEnd)
+
+    /** A shared mock by its link's code. */
+    fun sharedMockViewModel(code: String): SharedMockViewModel = SharedMockViewModel(code, mocks, sessionEnd)
 
     /** Our record from the run, with the schedule its weeks are read by. */
     fun recordViewModel(): RecordViewModel = RecordViewModel(records, cache, clock, zone, sessionEnd)

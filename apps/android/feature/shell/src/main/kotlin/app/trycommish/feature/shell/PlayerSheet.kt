@@ -70,7 +70,8 @@ private val FACE = 64.dp
 @Composable
 fun PlayerSheet(
     host: PlayerSheetHost,
-    openPlayer: (ShellRoute.Player) -> Unit,
+    /** His full page pushed; null draws no Full page (the sheet over a draft in progress). */
+    openPlayer: ((ShellRoute.Player) -> Unit)?,
     foot: @Composable (player: SheetPlayer, close: () -> Unit) -> Unit = { _, _ -> },
     content: @Composable (SheetPlayer) -> Unit = { SheetBasis(playerSheetModel(it).loading) },
 ) {
@@ -88,7 +89,7 @@ fun PlayerSheet(
             PlayerSheetFrame(
                 playerSheetModel(player),
                 close,
-                { link -> host.followFullPage(link)?.let(openPlayer) },
+                openPlayer?.let { open -> { link -> host.followFullPage(link)?.let(open) } },
                 Modifier.fillMaxHeight().onGloballyPositioned { frame ->
                     // The frame's bottom past the window's foot above the navigation bar.
                     val bottom = frame.positionInWindow().y + frame.size.height
@@ -113,7 +114,8 @@ fun PlayerSheet(
 fun PlayerSheetFrame(
     model: PlayerSheetModel,
     close: () -> Unit,
-    openFullPage: (String) -> Unit,
+    /** His full page by its link; null draws no Full page. */
+    openFullPage: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
     /** How far the foot is lifted above the frame's own bottom: the part of the sheet below the screen. */
     footLift: Int = 0,
@@ -145,17 +147,11 @@ fun PlayerSheetFrame(
 private fun SheetTop(
     model: PlayerSheetModel,
     close: () -> Unit,
-    openFullPage: (String) -> Unit,
+    openFullPage: ((String) -> Unit)?,
 ) {
     val c = CommishTheme.colors
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = { openFullPage(model.fullPage) }) {
-            Text(
-                model.fullPageWords,
-                style = Faces.small.copy(fontWeight = FontWeight.SemiBold, textDecoration = TextDecoration.Underline),
-                color = c.ink2,
-            )
-        }
+        if (openFullPage != null) FullPage(model, openFullPage)
         IconButton(onClick = close) {
             Icon(
                 painterResource(R.drawable.icon_close),
@@ -164,6 +160,21 @@ private fun SheetTop(
                 modifier = Modifier.size(20.dp),
             )
         }
+    }
+}
+
+/** His full page on the site, the sheet's quiet link. */
+@Composable
+private fun FullPage(
+    model: PlayerSheetModel,
+    openFullPage: (String) -> Unit,
+) {
+    TextButton(onClick = { openFullPage(model.fullPage) }) {
+        Text(
+            model.fullPageWords,
+            style = Faces.small.copy(fontWeight = FontWeight.SemiBold, textDecoration = TextDecoration.Underline),
+            color = CommishTheme.colors.ink2,
+        )
     }
 }
 

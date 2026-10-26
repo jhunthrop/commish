@@ -11,9 +11,9 @@ import Testing
 /// states over the shared fixtures (GET /me, three of the fixture's leagues, GET /devices) through a
 /// stub, at the fixture week's clock. The account: who with sign out, three leagues and the free
 /// season's plan; the switches with a starter's status turned off; the two devices with this phone
-/// marked, and the foot. A league detached, its undo in place. And the signed-out return, the sign-in
-/// screen sign out lands on. With SNAPSHOT_SHOTS set each is also written at its phone's own scale
-/// for the persona panel.
+/// marked, and the foot. A league detached, its undo in place. (The signed-out return, the League
+/// tab's sign-in, is the shell's snapshot.) With SNAPSHOT_SHOTS set each is also written at its phone's
+/// own scale for the persona panel.
 @MainActor
 struct AccountSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -32,26 +32,23 @@ struct AccountSnapshotTests {
     enum Scene: String, CaseIterable, Sendable {
         case read
         case detached
-        case signedOut
 
-        var parts: [AccountPart?] {
+        var parts: [AccountPart] {
             switch self {
             case .read: AccountPart.allCases
             case .detached: [.top]
-            case .signedOut: [nil]
             }
         }
     }
 
     struct Case: Sendable {
         let scene: Scene
-        let part: AccountPart?
+        let part: AccountPart
         let scheme: Scheme
         let device: SnapshotDevice
 
         var name: String {
-            ["account", scene.rawValue, part?.rawValue, device.name, "\(scheme)"].compactMap(\.self)
-                .joined(separator: "-")
+            ["account", scene.rawValue, part.rawValue, device.name, "\(scheme)"].joined(separator: "-")
         }
     }
 
@@ -89,12 +86,6 @@ struct AccountSnapshotTests {
     }
 
     static func view(_ item: Case) async throws -> AnyView {
-        guard let part = item.part else {
-            return AnyView(
-                SignInView(working: false, problem: nil, signIn: {})
-                    .frame(height: item.device.height - (item.device.height > 700 ? 54 + 34 : 20))
-            )
-        }
         let viewModel = try await viewModel(item.scene)
         guard case let .loaded(model, _, _) = viewModel.state else {
             throw SceneError.notLoaded(item.scene.rawValue)
@@ -102,7 +93,7 @@ struct AccountSnapshotTests {
         let state = AccountScreenState(
             stamp: viewModel.stampWords, push: viewModel.push, busy: viewModel.busy, problem: viewModel.problem
         )
-        return AnyView(AccountScreen(model: model, state: state, actions: .none, parts: [part]))
+        return AnyView(AccountScreen(model: model, state: state, actions: .none, parts: [item.part]))
     }
 
     @Test(arguments: 0 ..< cases.count)

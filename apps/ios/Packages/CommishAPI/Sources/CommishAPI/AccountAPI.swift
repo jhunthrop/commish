@@ -88,9 +88,10 @@ public struct AccountContext: Equatable, Sendable, Codable {
 public protocol AccountAPI: Sendable {
     func account() async throws -> AccountContext
     /// Selects a followed league as the site's context (PUT /me/league), so the web opens on it too.
-    /// A league the API no longer lists, or an API without the route, is no change; a refused token
-    /// throws.
-    func selectLeague(id: String) async throws
+    /// Whether the site took it: a league the API no longer lists, or an API without the route, is no
+    /// change (false); a refused token throws.
+    @discardableResult
+    func selectLeague(id: String) async throws -> Bool
     func revokeDevice(id: String) async throws
 }
 
@@ -106,15 +107,18 @@ extension APIClient: AccountAPI {
         }
     }
 
-    public func selectLeague(id: String) async throws {
+    @discardableResult
+    public func selectLeague(id: String) async throws -> Bool {
         let choice = Components.Schemas.LeagueChoice(leagueId: id)
         switch try await Self.unwrapped({ try await client.selectLeague(body: .json(choice)) }) {
-        case .ok, .notFound, .badRequest:
-            return
+        case .ok:
+            return true
+        case .notFound, .badRequest:
+            return false
         case .undocumented(401, _):
             throw APIError.status(401)
         case .undocumented:
-            return
+            return false
         }
     }
 

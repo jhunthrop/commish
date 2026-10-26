@@ -27,14 +27,31 @@ public final class AppSession {
     /// The account's features (Account.features).
     public private(set) var features: [String] = []
 
-    /// The phone's five for the league shown: by its phase as the web's bar, or with no league the
-    /// bar for the site's season (PhoneRail).
+    /// The phone's five: signed in, by the shown league's phase as the web's bar, or with no league (or
+    /// a phase this build does not know) the bar for the site's season (PhoneRail.bar); signed out, the
+    /// web's public five with the League tab as the sign-in (B155, as Android); none while restoring.
     public var tabs: [RailTab] {
-        guard case let .signedIn(league) = state else {
-            return []
+        switch state {
+        case .restoring:
+            []
+        case .signedOut:
+            PhoneRail.withoutLeague
+        case let .signedIn(league):
+            PhoneRail.bar(league: league, season: sitePhase)
         }
-        return league.map { PhoneRail.tabs(phase: $0.phase, waiversOpen: $0.waiversOpen) }
-            ?? PhoneRail.withoutLeague(season: sitePhase)
+    }
+
+    /// Which account the shell shows, bumped as the phone signs in and as it signs out (never on a read
+    /// of the same account), so the shell rebuilds every tab per account and no screen's state (a mock
+    /// setup's saved league) passes from one member to the next on a shared phone.
+    public private(set) var generation = 0
+
+    /// Whether the phone is signed in (with or without a league followed).
+    public var isSignedIn: Bool {
+        if case .signedIn = state {
+            return true
+        }
+        return false
     }
 
     /// The top bar's league switch at this moment.
@@ -51,6 +68,11 @@ public final class AppSession {
 
     /// The last choice's write to the site, kept so a test can await it; the app never waits on it.
     @ObservationIgnored private(set) var selectionWrite: Task<Void, Never>?
+    /// The phone's last choice until the site takes it (its PUT lands) or a fresh GET /me agrees, so a
+    /// read in between never takes it back (B156, Android's Lane 179 M2).
+    @ObservationIgnored private var pending: String?
+    /// How many choices the member has made, so a read can tell one was made while it was in flight.
+    @ObservationIgnored private var choicesMade = 0
 
     private let account: any AccountAPI
     private let store: any SessionStore
@@ -85,11 +107,12 @@ public final class AppSession {
         // Read fresh, the site's selection leads (a choice made on the web shows here); from the saved
         // copy, this phone's last choice does, being newer than the copy.
         let choices: [String?]
+        let asked = choicesMade
         do {
             let read = try await account.account()
             await cache.write(read, route: Self.accountRoute, stamp: clock.now)
             context = read
-            choices = [read.selected, lastLeague]
+            choices = [held(read, chosenDuringRead: choicesMade != asked), read.selected, lastLeague]
         } catch where APIError.signsOut(error) {
             await expire()
             return
@@ -102,6 +125,9 @@ public final class AppSession {
         format = context?.format
         features = context?.features ?? []
         let league = choices.compactMap { id in leagues.first { $0.id == id } }.first ?? leagues.first
+        if !isSignedIn {
+            generation += 1
+        }
         state = .signedIn(league: league)
         lastLeague = league?.id
     }
@@ -115,9 +141,14 @@ public final class AppSession {
         }
         state = .signedIn(league: league)
         lastLeague = id
+        pending = id
+        choicesMade += 1
         selectionWrite = Task { [account] in
             do {
-                try await account.selectLeague(id: id)
+                // Taken by the site: the choice no longer needs holding against its reads.
+                if try await account.selectLeague(id: id), pending == id {
+                    pending = nil
+                }
             } catch where APIError.signsOut(error) {
                 await expire()
             } catch {
@@ -141,9 +172,25 @@ public final class AppSession {
         await store.clear()
         await cache.clear()
         lastLeague = nil
+        pending = nil
         leagues = []
         sitePhase = nil
+        format = nil
+        features = []
+        if isSignedIn {
+            generation += 1
+        }
         state = .signedOut
+    }
+
+    /// The phone's choice a fresh read must not take back: one the site has not taken yet (its PUT
+    /// failed or is on its way) until the site's selection agrees, or one made while this read was in
+    /// flight, whose answer predates it. Nil when the site's selection leads.
+    private func held(_ read: AccountContext, chosenDuringRead: Bool) -> String? {
+        if read.selected != nil, read.selected == pending {
+            pending = nil
+        }
+        return pending ?? (chosenDuringRead ? selected?.id : nil)
     }
 
     /// The league last shown, so a phone with no signal (or a site with no selection) shows it again.

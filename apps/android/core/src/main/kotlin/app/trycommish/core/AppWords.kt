@@ -55,6 +55,17 @@ object AppWords {
     /** The record page's name as the bar names it (web nav.ts), the iOS AppWords.Tab.record. */
     const val record = "Our record"
 
+    /** The mock room full screen (the iOS AppWords.Mock): its close's label, and the question back asks before
+     * leaving a draft in progress. */
+    const val mockClose = "Leave the room"
+    const val mockLeaveTitle = "Leave this mock?"
+    const val mockLeaveMessage = "It stays where you left it, under Your mock drafts on your account at trycommish.app."
+    const val mockLeave = "Leave"
+    const val mockStay = "Keep drafting"
+
+    /** The bar's name for the mock room's page (web nav.ts), the iOS AppWords.Tab.mock. */
+    const val mock = "Mock draft"
+
     /** site/offline-words.ts offlineLead, before the run's day: why a saved board shows with no signal. */
     const val offlineBoard = "You're offline, so this is the last board this device saved, updated"
 }

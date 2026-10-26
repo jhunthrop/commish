@@ -36,6 +36,91 @@ struct AppSessionTests {
         #expect(session.state == .signedOut)
     }
 
+    /// Signed out, the bar keeps the web's public five with the League tab first, the sign-in (B155).
+    @Test func signedOutKeepsThePublicFive() async {
+        let session = AppSession(
+            account: StubAccount(), store: MemorySessionStore(), cache: NullCache(), defaults: Self.defaults()
+        )
+        #expect(session.tabs.isEmpty)
+        await session.restore()
+        #expect(session.tabs == PhoneRail.withoutLeague)
+        #expect(session.tabs.first?.key == PhoneRail.leagueKey)
+    }
+
+    /// A league whose phase this build does not know shows the site's season's bar, as Android (B154).
+    @Test(arguments: SitePhase.allCases)
+    func aLeaguePhaseThisBuildDoesNotKnowTakesTheSitesSeason(season: SitePhase) async {
+        let unknown = FollowedLeague(
+            id: "u", name: "League u", host: .init(value1: .sleeper), scoring: .ppr, format: .ppr, phase: nil,
+            draftAt: nil, waiversOpen: true
+        )
+        let session = await AppSession(
+            account: StubAccount(followed: [unknown], season: season), store: Self.signedIn(), cache: NullCache(),
+            defaults: Self.defaults()
+        )
+        await session.restore()
+        #expect(session.tabs == PhoneRail.withoutLeague(season: season))
+    }
+
+    /// The choice's PUT is held: a later GET /me naming the site's old selection never takes it back,
+    /// and once the site has taken it, the site's later selection leads again (B156).
+    @Test func aPendingChoiceHoldsAgainstALaterRead() async {
+        let account = PendingAccount(leagues: ["a", "b"], selected: "a")
+        let session = await AppSession(
+            account: account, store: Self.signedIn(), cache: NullCache(), defaults: Self.defaults()
+        )
+        await session.restore()
+        session.choose("b")
+        await session.restore()
+        #expect(session.state == .signedIn(league: Self.followed("b")))
+        await account.put.open()
+        await session.selectionWrite?.value
+        await session.restore()
+        #expect(session.state == .signedIn(league: Self.followed("b")))
+        await account.select("a")
+        await session.restore()
+        #expect(session.state == .signedIn(league: Self.followed("a")))
+    }
+
+    /// A PUT the site did not take holds the choice until a read agrees; after that the site leads.
+    @Test func aChoiceTheSiteDidNotTakeHoldsUntilAReadAgrees() async {
+        let account = PendingAccount(leagues: ["a", "b"], selected: "a", takes: false)
+        await account.put.open()
+        let session = await AppSession(
+            account: account, store: Self.signedIn(), cache: NullCache(), defaults: Self.defaults()
+        )
+        await session.restore()
+        session.choose("b")
+        await session.selectionWrite?.value
+        await session.restore()
+        #expect(session.state == .signedIn(league: Self.followed("b")))
+        await account.select("b")
+        await session.restore()
+        await account.select("a")
+        await session.restore()
+        #expect(session.state == .signedIn(league: Self.followed("a")))
+    }
+
+    /// A read already in flight when the choice is made answers from before it: it keeps the choice
+    /// shown, even once the PUT has landed.
+    @Test func aReadInFlightWhenTheChoiceIsMadeKeepsIt() async {
+        let account = PendingAccount(leagues: ["a", "b"], selected: "a")
+        await account.put.open()
+        let session = await AppSession(
+            account: account, store: Self.signedIn(), cache: NullCache(), defaults: Self.defaults()
+        )
+        await session.restore()
+        let read = Gate()
+        await account.hold(read)
+        let inFlight = Task { await session.restore() }
+        await account.reading.wait()
+        session.choose("b")
+        await session.selectionWrite?.value
+        await read.open()
+        await inFlight.value
+        #expect(session.state == .signedIn(league: Self.followed("b")))
+    }
+
     @Test func aTokenOpensTheNewestFollowedLeagueWithNoSelection() async {
         let session = await AppSession(
             account: StubAccount(leagues: [Fixtures.league, "other"]), store: Self.signedIn(), cache: NullCache(),
@@ -185,13 +270,46 @@ struct AppSessionTests {
     @Test func signingOutRevokesThisPhoneAndForgetsIt() async {
         let store = MemorySessionStore()
         await store.save(token: "t", deviceID: "d-9")
-        let account = StubAccount(leagues: [Fixtures.league])
+        let account = StubAccount(
+            followed: [Self.followed(Fixtures.league)], season: .preseason, format: .ppr, features: ["custom_scoring"]
+        )
         let session = AppSession(account: account, store: store, cache: NullCache(), defaults: Self.defaults())
         await session.restore()
+        #expect(session.format == .ppr)
+        #expect(session.features == ["custom_scoring"])
         await session.signOut()
         #expect(session.state == .signedOut)
         #expect(await store.token() == nil)
         #expect(await account.revoked == ["d-9"])
+        // The member's season, board and features go with them (L1).
+        #expect(session.sitePhase == nil)
+        #expect(session.format == nil)
+        #expect(session.features.isEmpty)
+    }
+
+    /// The shell is built anew per account (H1): the generation moves as the phone signs in and as it
+    /// signs out, never on a read of the same account, nor on a sign-out while already signed out.
+    @Test func theGenerationMovesAtSignInAndSignOutOnly() async {
+        let store = MemorySessionStore()
+        let session = AppSession(
+            account: StubAccount(leagues: ["a"]), store: store, cache: NullCache(), defaults: Self.defaults()
+        )
+        await session.restore()
+        let signedOut = session.generation
+        await store.save(token: "t", deviceID: "d")
+        await session.restore()
+        let signedIn = session.generation
+        #expect(signedIn != signedOut)
+        await session.restore()
+        #expect(session.generation == signedIn)
+        await session.signOut()
+        let next = session.generation
+        #expect(next != signedIn)
+        await session.expire()
+        #expect(session.generation == next)
+        await store.save(token: "t2", deviceID: "d2")
+        await session.restore()
+        #expect(session.generation != next)
     }
 
     @Test func anExpiredSignInForgetsTheSavedHome() async {
@@ -234,27 +352,34 @@ actor StubAccount: AccountAPI {
 
     init(
         followed: [FollowedLeague], selected: String? = nil, error: (any Error)? = nil,
-        season: SitePhase? = .inSeason, selectError: (any Error)? = nil
+        season: SitePhase? = .inSeason, selectError: (any Error)? = nil,
+        format: Components.Schemas.BoardFormatKnown? = nil, features: [String]? = nil
     ) {
         leagues = followed
         self.selected = selected
         self.error = error
         self.season = season
         self.selectError = selectError
+        self.format = format
+        self.features = features
     }
+
+    private let format: Components.Schemas.BoardFormatKnown?
+    private let features: [String]?
 
     func account() async throws -> AccountContext {
         if let error {
             throw error
         }
-        return AccountContext(leagues: leagues, selected: selected, season: season)
+        return AccountContext(leagues: leagues, selected: selected, season: season, format: format, features: features)
     }
 
-    func selectLeague(id: String) async throws {
+    func selectLeague(id: String) async throws -> Bool {
         selections.append(id)
         if let selectError {
             throw selectError
         }
+        return true
     }
 
     func revokeDevice(id: String) async throws {

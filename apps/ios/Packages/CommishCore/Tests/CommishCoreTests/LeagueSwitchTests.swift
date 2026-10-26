@@ -175,4 +175,27 @@ struct LeagueSwitchTests {
         #expect(!preDraft.contains { $0.key == PhoneRail.matchupKey })
         #expect(ShellRoute.game(of: nil, league: "l-1", in: preDraft) == .push(.game(league: "l-1", roster: nil)))
     }
+
+    /// Signed out, a site link to a page the web serves to anyone opens (a player, the reference pages,
+    /// a mock's setup, a shared mock); the account, a league's screens and the companion wait for the
+    /// sign-in (Lane 221 review M1).
+    @Test(arguments: [
+        (ShellRoute.players(query: "puka"), true),
+        (.player(slug: "puka-nacua"), true),
+        (.adp(format: "ppr-12"), true),
+        (.compare(first: "a", second: "b"), true),
+        (.clubs, true),
+        (.club(abbr: "LAR"), true),
+        (.schedule, true),
+        (.mockSetup(from: nil), true),
+        (.sharedMock(code: "abc"), true),
+        (.account, false),
+        (.leagueHome(id: "l-1"), false),
+        (.game(league: "l-1", roster: 2), false),
+        (.companionNew(replay: false), false),
+        (.companion(id: "d-1"), false),
+    ])
+    func aRouteOpensSignedOutOnlyWherePublic(route: ShellRoute, open: Bool) {
+        #expect(route.isPublic == open)
+    }
 }
