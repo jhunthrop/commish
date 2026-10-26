@@ -102,10 +102,14 @@ android {
     buildTypes {
         debug {
             buildConfigField("String", "API_BASE_URL", "\"${System.getenv("COMMISH_API_BASE_URL") ?: "http://10.0.2.2:8080"}\"")
+            // The host a sign-out's logout URL must name: WorkOS's API, or a rehearsal's own stub in a debug
+            // build only (Lane 236).
+            buildConfigField("String", "WORKOS_LOGOUT_HOST", "\"${System.getenv("COMMISH_WORKOS_LOGOUT_HOST") ?: "api.workos.com"}\"")
         }
         release {
             isMinifyEnabled = false
             buildConfigField("String", "API_BASE_URL", "\"https://api.trycommish.app\"")
+            buildConfigField("String", "WORKOS_LOGOUT_HOST", "\"api.workos.com\"")
             signingConfig = signingConfigs.findByName("release")
         }
     }

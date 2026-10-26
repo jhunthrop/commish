@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The API's generated client (Apple's swift-openapi-generator over api/openapi.yaml, symlinked into
 // the target) and the one transport every request goes through.
 import PackageDescription
@@ -37,5 +37,6 @@ let package = Package(
                 .product(name: "HTTPTypes", package: "swift-http-types"),
             ]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

@@ -327,3 +327,21 @@ func (s *Store) Filling(ctx context.Context) (map[apitypes.LobbyFormat]int, erro
 	}
 	return out, rows.Err()
 }
+
+// LiveRoomsOf is every filling or drafting room the account holds a
+// seat in, so a deleted account gives each seat up the way Leave does
+// (internal/deletion) before its rows go.
+func (s *Store) LiveRoomsOf(ctx context.Context, account uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := s.Pool.Query(ctx, `select st.room_id from app.room_seats st
+		join app.rooms r on r.id = st.room_id
+		where st.account_id = $1 and r.status in ($2, $3) order by st.room_id`,
+		account, StatusFilling, StatusDrafting)
+	if err != nil {
+		return nil, fmt.Errorf("lobby: live rooms of %s: %w", account, err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return nil, fmt.Errorf("lobby: live rooms of %s: %w", account, err)
+	}
+	return ids, nil
+}

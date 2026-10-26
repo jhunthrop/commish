@@ -1,4 +1,5 @@
-"""THE WEEKLY RECORD: our weekly rankings against the weekly experts (Lane 114, Amendment 5).
+"""THE WEEKLY RECORD (Lane 114, Amendment 5): our rest-of-season order, graded week by week against
+the weekly experts.
 
 From the first week a freeze kept the order the site ships (`SHIPPED_SOURCE`, week 7 of 2026), each
 week's set order graded on the week's points beside the weekly yardsticks the freeze kept on the same
@@ -54,15 +55,22 @@ YARDSTICKS: Final = (
 _STANCE: Final = "board_points"
 # The order every set week of the weekly record graded (`recordWeekSchema.order`).
 SHIPPED_ORDER: Final = "rest_of_season"
-MISSED_NOTE: Final = "Our weekly rankings were not set before kickoff that week."
+
+# THE WORD TABLE: every sentence the weekly record writes is built here, from literals, so the run's
+# words live in one place (Lane 235, B222). The order graded is our rest-of-season order, graded week
+# by week; the record never claims a weekly model (no round of one has passed). The web's records.ts
+# holds the ESPN sentences word for word for its copy guard (records.test.ts reads them from here).
+MISSED_NOTE: Final = "Our rest-of-season order was not set before kickoff that week."
 _METHOD: Final = (
-    "From week {week} we set our weekly rankings before each week's first kickoff and graded them on the "
-    "week's points{beside}."
+    "From week {week} we set our rest-of-season order before each week's first kickoff and graded it on "
+    "the week's points{beside}."
 )
+# The method's yardstick clause, naming only the yardsticks drawn (`_BESIDE_NAMES`, joined by "and").
+_BESIDE: Final = ", beside {names} on the same players"
 # Beside the ESPN comparison of a graded week (Amendment 6): the read came after the order was set, no
 # read before kickoff reached the week, or neither yardstick did (Lane 148).
 ESPN_READ_AFTER_NOTE: Final = (
-    "ESPN's projection this week was read after our weekly rankings were set, still before the first kickoff."
+    "ESPN's projection this week was read after our rest-of-season order was set, still before the first kickoff."
 )
 ESPN_UNREAD_NOTE: Final = (
     "ESPN's projection was not read before this week's first kickoff, so the week is graded against the "
@@ -72,6 +80,9 @@ NO_YARDSTICK_NOTE: Final = (
     "No yardstick was read before this week's first kickoff, so the week is graded on its own order alone."
 )
 _BESIDE_NAMES: Final = {"espn": "ESPN's projection", "published": "the week's published projection"}
+_STARTERS: Final = (
+    "{name} had more of the week's starters right in the standard lineup, {theirs} of {of} against our {ours}"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,7 +123,7 @@ class WeeklyWeek:
 
 @dataclass(frozen=True, slots=True)
 class WeeklyRecord:
-    # The first week of weekly rankings: the first freeze that kept the shipped order, else the next
+    # The first week of the weekly record: the first freeze that kept the shipped order, else the next
     # week to be set.
     from_week: int
     weeks: tuple[WeeklyWeek, ...]
@@ -199,13 +210,8 @@ def starters_basis(to_date_lines: Sequence[WeeklyLine]) -> str | None:
 def method(from_week: int, to_date_lines: Sequence[WeeklyLine]) -> str:
     """How the weekly record is kept, naming only the yardsticks drawn."""
     names = [_BESIDE_NAMES[key] for key in drawn(to_date_lines)]
-    beside = "" if not names else f", beside {' and '.join(names)} on the same players"
+    beside = "" if not names else _BESIDE.format(names=" and ".join(names))
     return _METHOD.format(week=from_week, beside=beside)
-
-
-_STARTERS: Final = (
-    "{name} had more of the week's starters right in the standard lineup, {theirs} of {of} against our {ours}"
-)
 
 
 def honest_line(to_date_lines: Sequence[WeeklyLine]) -> str | None:
@@ -292,9 +298,9 @@ def _set_week(
 def read_weekly(
     conn: Connection, season: int, as_of: datetime
 ) -> tuple[WeeklyRecord | None, dict[int, list[Mapping[str, Any]]]]:
-    """Every week from the first week of weekly rankings to the end of the regular season: set and
+    """Every week from the weekly record's first week to the end of the regular season: set and
     graded, set and waiting, missed (its first kickoff passed with no shipped order set) or upcoming.
-    None after the season with no week of weekly rankings."""
+    None after the season with no week of the record set."""
     freezes = {
         int(row.week): row.frozen_at for row in conn.execute(text(_FREEZES), {"s": season, "source": SERVED_SOURCE})
     }

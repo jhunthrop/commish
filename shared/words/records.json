@@ -11,7 +11,7 @@
 	"gradesLater": "grades when the stats land",
 	"setUnknown": "set before its first kickoff",
 	"espnBasis": "ESPN's is its own public PPR projection, read before the week's first kickoff.",
-	"espnReadAfter": "ESPN's projection this week was read after our weekly rankings were set, still before the first kickoff.",
+	"espnReadAfter": "ESPN's projection this week was read after our rest-of-season order was set, still before the first kickoff.",
 	"espnUnread": "ESPN's projection was not read before this week's first kickoff, so the week is graded against the week's published projection alone.",
 	"noYardstick": "No yardstick was read before this week's first kickoff, so the week is graded on its own order alone.",
 	"waiting": "This record is written by the next nightly run.",

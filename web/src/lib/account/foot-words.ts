@@ -1,6 +1,8 @@
 /** The account page's own foot (Lane 151): how to have the account deleted until a verb for it ships
  * (launch audit C2), the address between the two parts, then the two legal pages. Kept apart from
- * the site footer's words so the shell's chunk never carries it. */
+ * the site footer's words so the shell's chunk never carries it. The web's foot now leads with the
+ * verb (delete-words.ts, Lane 233) and keeps only the legal words here; the apps print the whole
+ * table (shared/words/account-foot.json) until their own Delete account verb lands. */
 export const ACCOUNT_FOOT = {
 	label: 'Your data',
 	before: 'To delete your account, write to ',

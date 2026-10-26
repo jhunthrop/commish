@@ -5,26 +5,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import type { Component } from 'svelte';
-import { compile } from 'svelte/compiler';
 import { render } from 'svelte/server';
+import { compiled } from '#lib/testing/svelte-ssr.ts';
 import { APP_SIGNED_IN_PATH, NO_APP, OPEN_APP } from '#lib/site/app-words.ts';
 
 const CODE = 'abc';
 const PAGE = new URL('./+page.svelte', import.meta.url);
-
-/** A .svelte file compiled for the server as a data URL, its imports pointed at the files they name
- * and every .svelte import compiled the same way. */
-function compiled(file: URL): string {
-	const { js } = compile(readFileSync(file, 'utf8'), {
-		generate: 'server',
-		filename: file.pathname
-	});
-	const code = js.code.replace(/from '([^']+)'/g, (_, spec: string) => {
-		const target = spec.startsWith('.') ? new URL(spec, file).href : import.meta.resolve(spec);
-		return `from '${target.endsWith('.svelte') ? compiled(new URL(target)) : target}'`;
-	});
-	return `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
-}
 
 async function page(): Promise<string> {
 	const mod = (await import(compiled(PAGE))) as { default: Component<{ data: { head: string } }> };

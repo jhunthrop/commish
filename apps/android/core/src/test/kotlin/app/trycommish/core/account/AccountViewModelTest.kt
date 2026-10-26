@@ -252,7 +252,15 @@ class AccountViewModelTest {
             val stub = StubAccountScreen()
             val session = MemorySession("token", AccountFixtures.PHONE)
             val cache = MemoryCache()
-            val state = SignInState(session, cache, SignOut(session, cache, stub::revokeDevice))
+            val state =
+                SignInState(
+                    session,
+                    cache,
+                    SignOut(session, cache, {
+                        stub.revokeDevice(it)
+                        null
+                    }),
+                )
             val vm = opened(account(stub, cache, signedIn = state::holdsToken) { launch { state.signOut() } })
             vm.signOut()
             advanceUntilIdle()
@@ -271,7 +279,15 @@ class AccountViewModelTest {
             val stub = StubAccountScreen()
             val session = MemorySession("token", AccountFixtures.PHONE)
             val cache = MemoryCache()
-            val state = SignInState(session, cache, SignOut(session, cache, stub::revokeDevice))
+            val state =
+                SignInState(
+                    session,
+                    cache,
+                    SignOut(session, cache, {
+                        stub.revokeDevice(it)
+                        null
+                    }),
+                )
             val heard = Heard()
             val vm =
                 opened(account(stub, cache, heard = heard, signedIn = state::holdsToken) { launch { state.signOut() } })

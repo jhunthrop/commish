@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The Rankings screen (the web's Players page in season at /players): the page named Rankings with the
 // week in the sentence under it, the search, the position chips, our rest-of-season order as a box
 // score with each player's week and every place the API's own, the kickers' and defenses' week in the
@@ -37,5 +37,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )
