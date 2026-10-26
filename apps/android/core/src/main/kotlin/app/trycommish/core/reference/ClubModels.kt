@@ -275,9 +275,10 @@ fun clubPageModel(
     val scheduled = ScheduleViews.club(club, files.schedule, files.clubs, files.played, files.underway, files.states(zone))
     val pair = own.filter { !BoardOrder.heldOut(it.id, files.statuses) }.take(2)
     val head = filled(Words.ClubPage.onBoard, format.label)
+    val name = "${club.city} ${club.nickname}"
     return ClubPageModel(
         abbr = club.abbr,
-        name = "${club.city} ${club.nickname}",
+        name = name,
         meta = files.meta(club),
         stamp = RunWords.stamp(files.manifest.manifest),
         hero = scheduled.hero,
@@ -286,7 +287,7 @@ fun clubPageModel(
                 BoardBasis.ranked(format, files.manifest.manifest.season, null, files.sources.orEmpty(), gap) +
                 listOfNotNull(files.captureWords(now, zone)),
         boardHead = head,
-        boardLabel = "${club.city} ${club.nickname}, $head",
+        boardLabel = "$name, $head",
         nobody = if (own.isEmpty()) filled(Words.ClubPage.nobody, club.city) else null,
         columns = BoardColumns.Ranked(gap),
         rows = own.map(cells::ranked),

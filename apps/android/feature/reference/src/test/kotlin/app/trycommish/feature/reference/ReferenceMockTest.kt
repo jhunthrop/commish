@@ -96,6 +96,14 @@ class ReferenceMockTest {
     }
 
     @Test
+    fun theUpcomingScheduleSaysEachKickoffWithItsDayAndZone() {
+        val grid = reads(ReferenceScene.ScheduleUpcoming).schedule().model().grid
+        val words = grid.rows.flatMap { it.cells }.mapNotNull { it.state }
+        assertTrue(words.any { Regex("^[A-Z][a-z]{2} \\d{1,2}:\\d{2} [ap]m CT$").matches(it) })
+        assertTrue(words.all { it == "Final" || it.endsWith(" CT") })
+    }
+
+    @Test
     fun theInSeasonClubSaysItsPlayedByeByNothingAndTheWeeksState() {
         val model = reads(ReferenceScene.ClubInSeason).club().model()
         assertEquals("KC", model.meta)
@@ -128,8 +136,8 @@ class ReferenceMockTest {
     }
 
     private companion object {
-        /** Eleven scenes, two themes, two phones. */
-        const val REFERENCES = 44
+        /** Twelve scenes, two themes, two phones. */
+        const val REFERENCES = 48
         const val MAX_BYTES = 300 * 1024
     }
 }

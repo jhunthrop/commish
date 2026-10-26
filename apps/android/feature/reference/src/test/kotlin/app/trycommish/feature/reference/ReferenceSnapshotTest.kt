@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
@@ -21,6 +22,7 @@ import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -66,7 +68,9 @@ class ReferenceSnapshotTest(
     @Test
     fun reference() {
         paparazzi.unsafeUpdateConfig(renderingMode = RenderingMode.V_SCROLL)
-        val screen = screenOf(scene, SceneReads(scene, scheduler))
+        // Every current-week state line, laid out: none may run past its cell (review H1).
+        val stateLines = mutableListOf<TextLayoutResult>()
+        val screen = screenOf(scene, SceneReads(scene, scheduler)) { stateLines += it }
         paparazzi.snapshot(name = "reference-${scene.id}-${phone.id}-${if (dark) "dark" else "light"}") {
             CommishTheme(dark = dark) {
                 Box(Modifier.background(CommishTheme.colors.bg).fillMaxWidth()) {
@@ -75,6 +79,11 @@ class ReferenceSnapshotTest(
                 }
             }
         }
+        // A row laid out past the first window's height gets no height on that pass (V_SCROLL then redraws the
+        // whole screen), so a line given none is not a cut one; any other line must fit its cell both ways.
+        val cut = stateLines.filter { it.didOverflowWidth || (it.didOverflowHeight && it.layoutInput.constraints.maxHeight > 0) }
+        assertTrue("state lines cut by their cell: ${cut.map { it.layoutInput.text }}", cut.isEmpty())
+        if (scene == ReferenceScene.ScheduleUpcoming) assertTrue("no state line was drawn", stateLines.isNotEmpty())
     }
 
     companion object {
@@ -100,6 +109,7 @@ internal const val GRID_ROWS = 10
 internal fun screenOf(
     scene: ReferenceScene,
     reads: SceneReads,
+    onStateLaid: (TextLayoutResult) -> Unit = {},
 ): @Composable () -> Unit =
     when (scene) {
         ReferenceScene.AdpTop, ReferenceScene.AdpInSeason, ReferenceScene.Stale -> {
@@ -120,9 +130,9 @@ internal fun screenOf(
             val model = reads.club().model()
             ({ ClubScreen(model, null, ReferenceActions(), still = true) })
         }
-        ReferenceScene.Schedule -> {
+        ReferenceScene.Schedule, ReferenceScene.ScheduleUpcoming -> {
             val model = reads.schedule().model()
-            ({ ScheduleScreen(model, null, ReferenceActions(), model.grid.rows.take(GRID_ROWS), still = true) })
+            ({ ScheduleScreen(model, null, ReferenceActions(), model.grid.rows.take(GRID_ROWS), still = true, onStateLaid = onStateLaid) })
         }
     }
 
