@@ -110,15 +110,16 @@ fun RankingsPage(
         verticalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp),
     ) {
         RankingsTop(content, ui, head, actions, still)
+        val widths = rememberRankingsWidths()
         when (content) {
             is RankingsContent.Order -> {
-                OrderTable(content.model, first(content.model.sections, rows), actions.open)
+                OrderTable(content.model, first(content.model.sections, rows), widths, actions.open)
                 if (ui.more && rows == null) {
                     QuietButton(Words.Order.moreRows, Modifier.fillMaxWidth(), onClick = actions.more)
                 }
                 if (rows == null || content.model.none != null) BasisText(content.model.basis)
             }
-            is RankingsContent.Week -> WeekTable(content.model, first(content.model.sections, rows), actions.open)
+            is RankingsContent.Week -> WeekTable(content.model, first(content.model.sections, rows), widths, actions.open)
         }
     }
 }
@@ -136,14 +137,16 @@ private fun RankingsList(
     actions: RankingsActions,
 ) {
     val gap = Tokens.Space.s4.dp
+    // Measured once for the list, never per row as rows scroll in (Lane 216 review M1).
+    val widths = rememberRankingsWidths()
     LazyColumn(
         Modifier.fillMaxSize().background(CommishTheme.colors.bg),
         contentPadding = PaddingValues(horizontal = Tokens.Space.s3.dp, vertical = gap),
     ) {
         item(key = "top") { Box(Modifier.padding(bottom = gap)) { RankingsTop(content, ui, head, actions, still = false) } }
         when (content) {
-            is RankingsContent.Order -> orderItems(content.model, ui, actions)
-            is RankingsContent.Week -> item(key = "week") { WeekTable(content.model, content.model.sections, actions.open) }
+            is RankingsContent.Order -> orderItems(content.model, ui, widths, actions)
+            is RankingsContent.Week -> item(key = "week") { WeekTable(content.model, content.model.sections, widths, actions.open) }
         }
     }
 }
@@ -152,6 +155,7 @@ private fun RankingsList(
 private fun LazyListScope.orderItems(
     model: RankingsModel,
     ui: RankingsUi,
+    widths: RankingsWidths,
     actions: RankingsActions,
 ) {
     val none = model.none
@@ -169,7 +173,7 @@ private fun LazyListScope.orderItems(
     model.sections.forEach { section ->
         section.head?.let { words -> item(key = "section-${section.key}") { Column(Modifier.tableSlice()) { SectionRow(words) } } }
         items(section.rows, key = { "row-${it.player.key}" }) { row ->
-            Column(Modifier.tableSlice(last = row === last)) { RankingsRowView(row, actions.open) }
+            Column(Modifier.tableSlice(last = row === last)) { RankingsRowView(row, widths, actions.open) }
         }
     }
     item(key = "foot") {
@@ -209,6 +213,7 @@ private val CHIPS: List<Pair<String, RankingsChip?>> = listOf(Words.Order.every 
 private fun OrderTable(
     model: RankingsModel,
     sections: List<RankingsSection<RankingsRow>>,
+    widths: RankingsWidths,
     open: (SheetPlayer) -> Unit,
 ) {
     val none = model.none
@@ -221,7 +226,7 @@ private fun OrderTable(
             RankingsHeadRow(model.heads)
             sections.forEach { section ->
                 section.head?.let { SectionRow(it) }
-                section.rows.forEach { RankingsRowView(it, open) }
+                section.rows.forEach { RankingsRowView(it, widths, open) }
             }
         }
     }
@@ -234,6 +239,7 @@ private fun OrderTable(
 private fun WeekTable(
     model: WeekRankingsModel,
     sections: List<RankingsSection<WeekRankingsRow>>,
+    widths: RankingsWidths,
     open: (SheetPlayer) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp)) {
@@ -249,7 +255,7 @@ private fun WeekTable(
                 WeekHeadRow(model.proj)
                 sections.forEach { section ->
                     section.head?.let { SectionRow(it) }
-                    section.rows.forEach { WeekRankingsRowView(it, model.proj, section.key == WeekSection.KickedOff.key, open) }
+                    section.rows.forEach { WeekRankingsRowView(it, model.proj, section.key == WeekSection.KickedOff.key, widths, open) }
                 }
             }
         }
