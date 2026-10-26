@@ -33,14 +33,16 @@ public enum LobbyWords {
         "\(teams) \(preset) lobby"
     }
 
-    /// lobby-words.ts aboutWords: who is in the room, then the clock and what happens to a seat that
-    /// steps away.
-    public static func about(people: Int, teams: Int, started: Bool, clockSeconds: Int) -> String {
+    /// lobby-words.ts aboutWords with the apps' last clause (a phone has no tab): who is in the room,
+    /// then the clock and what happens to a seat that steps away.
+    public static func about(
+        people: Int, teams: Int, started: Bool, clockSeconds: Int, standIn: String = Words.Lobby.standInApp
+    ) -> String {
         let rest = started
             ? " and \(Formatting.plural(teams - people, "bot"))"
             : ", \(Formatting.plural(teams - people, "seat")) open"
         return "\(Formatting.plural(people, "drafter"))\(rest). \(clockSeconds) seconds a pick, your queue drafts "
-            + "if you step away, a bot takes any seat that closes the tab."
+            + "if you step away, \(standIn)."
     }
 
     /// lobby-words.ts seatsWords: "3 drafters, 9 bots".

@@ -347,6 +347,14 @@ function room(
     about: {
       head: aboutHead(teams, presetWords(r.settings.scoring.preset ?? "ppr")),
       words: aboutWords(people, teams, started, r.clock_seconds),
+      /** The apps' dock line: the same, with their own last clause. */
+      app: aboutWords(
+        people,
+        teams,
+        started,
+        r.clock_seconds,
+        LOBBY.standInApp,
+      ),
     },
   };
 }

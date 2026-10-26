@@ -116,7 +116,14 @@ struct LobbyParityTests {
         }
         let about = try #require(web["about"] as? JSON)
         #expect(model.aboutHead == about["head"] as? String)
-        #expect(model.about == about["words"] as? String)
+        #expect(model.about == about["app"] as? String)
+        #expect(
+            LobbyWords.about(
+                people: LobbySeats.people(Array(drawn.lobby.seats.values.map(\.kind))), teams: 12,
+                started: drawn.lobby.drafting || drawn.lobby.complete, clockSeconds: 30,
+                standIn: Words.Lobby.standInWeb
+            ) == about["words"] as? String
+        )
     }
 
     @Test(arguments: states)

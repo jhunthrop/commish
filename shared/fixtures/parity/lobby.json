@@ -1041,7 +1041,8 @@
 				},
 				"about": {
 					"head": "12 PPR lobby",
-					"words": "3 drafters, 9 seats open. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab."
+					"words": "3 drafters, 9 seats open. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab.",
+					"app": "3 drafters, 9 seats open. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the app."
 				}
 			}
 		},
@@ -2053,7 +2054,8 @@
 				},
 				"about": {
 					"head": "12 PPR lobby",
-					"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab."
+					"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab.",
+					"app": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the app."
 				}
 			}
 		},
@@ -3232,7 +3234,8 @@
 				},
 				"about": {
 					"head": "12 PPR lobby",
-					"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab."
+					"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab.",
+					"app": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the app."
 				}
 			}
 		},
@@ -4463,7 +4466,8 @@
 				},
 				"about": {
 					"head": "12 PPR lobby",
-					"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab."
+					"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab.",
+					"app": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the app."
 				}
 			}
 		},
@@ -5730,7 +5734,8 @@
 				},
 				"about": {
 					"head": "12 PPR lobby",
-					"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab."
+					"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab.",
+					"app": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the app."
 				}
 			}
 		},
@@ -7113,7 +7118,8 @@
 				},
 				"about": {
 					"head": "12 PPR lobby",
-					"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab."
+					"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab.",
+					"app": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the app."
 				}
 			}
 		}
@@ -8807,7 +8813,8 @@
 			},
 			"about": {
 				"head": "12 PPR lobby",
-				"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab."
+				"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab.",
+				"app": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the app."
 			}
 		}
 	},

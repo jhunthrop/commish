@@ -35,6 +35,8 @@
 	"seatWaiting": "waiting",
 	"seatOpen": "open",
 	"seats": "Seats",
+	"standInWeb": "a bot takes any seat that closes the tab",
+	"standInApp": "a bot takes any seat that closes the app",
 	"justTaken": "just taken, newest first",
 	"leftTitle": "You left a lobby",
 	"leftOver": "The draft is over and your report is ready.",

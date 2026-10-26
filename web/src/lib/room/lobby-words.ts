@@ -52,6 +52,10 @@ export const LOBBY = {
 	seatWaiting: 'waiting',
 	seatOpen: 'open',
 	seats: 'Seats',
+	/** The dock line's last clause, what happens to a seat whose drafter goes: the web's words, and
+	 * the apps' (a phone has no tab to close). */
+	standInWeb: 'a bot takes any seat that closes the tab',
+	standInApp: 'a bot takes any seat that closes the app',
 	/** The strip of picks as they land, its first line. */
 	justTaken: 'just taken, newest first',
 	/** The lobby a drafter left, offered back on the setup page (LeftLobby.svelte). */
@@ -84,17 +88,18 @@ export function aboutHead(teams: number, preset: string): string {
 }
 
 /** The dock's line after its head: who is in the room, then the clock and what happens to a seat that
- * steps away. */
+ * steps away; `standIn` is the platform's last clause (LOBBY.standInWeb, LOBBY.standInApp). */
 export function aboutWords(
 	people: number,
 	teams: number,
 	started: boolean,
-	clockSeconds: number
+	clockSeconds: number,
+	standIn: string = LOBBY.standInWeb
 ): string {
 	const rest = started
 		? ` and ${plural(teams - people, 'bot')}`
 		: `, ${plural(teams - people, 'seat')} open`;
-	return `${plural(people, 'drafter')}${rest}. ${String(clockSeconds)} seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab.`;
+	return `${plural(people, 'drafter')}${rest}. ${String(clockSeconds)} seconds a pick, your queue drafts if you step away, ${standIn}.`;
 }
 
 /** The report's seats cell: "3 drafters, 9 bots". */

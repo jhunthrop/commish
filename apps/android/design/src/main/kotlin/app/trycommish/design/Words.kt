@@ -980,6 +980,8 @@ object Words {
         const val seatWaiting = "waiting"
         const val seatOpen = "open"
         const val seats = "Seats"
+        const val standInWeb = "a bot takes any seat that closes the tab"
+        const val standInApp = "a bot takes any seat that closes the app"
         const val justTaken = "just taken, newest first"
         const val leftTitle = "You left a lobby"
         const val leftOver = "The draft is over and your report is ready."

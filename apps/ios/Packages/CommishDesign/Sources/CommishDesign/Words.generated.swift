@@ -978,6 +978,8 @@ public enum Words {
         public static let seatWaiting = "waiting"
         public static let seatOpen = "open"
         public static let seats = "Seats"
+        public static let standInWeb = "a bot takes any seat that closes the tab"
+        public static let standInApp = "a bot takes any seat that closes the app"
         public static let justTaken = "just taken, newest first"
         public static let leftTitle = "You left a lobby"
         public static let leftOver = "The draft is over and your report is ready."
