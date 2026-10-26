@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// A JSON value as the room's log carries it in a row's payload (openapi.yaml `RoomAction.payload`,
 /// an object whose shape depends on the row's kind), kept whole so a reader takes what it needs.
@@ -90,8 +91,10 @@ public enum RoomFrame: Sendable, Equatable {
         let message: String?
     }
 
-    /// The frame in a text message, or a thrown error for one the client does not know.
-    public static func decode(_ text: String) throws -> RoomFrame {
+    /// The frame in a text message; nil for a type this client does not know (a newer room's), which is
+    /// skipped and logged, never a reason to drop the socket; a thrown error only for text that is not
+    /// a frame at all.
+    public static func decode(_ text: String) throws -> RoomFrame? {
         let wire = try JSONDecoder().decode(Wire.self, from: Data(text.utf8))
         switch wire.type {
         case "welcome":
@@ -107,7 +110,8 @@ public enum RoomFrame: Sendable, Equatable {
         case "error":
             return .error(code: wire.code ?? "", message: wire.message ?? "")
         default:
-            throw RoomFrameError.malformed(wire.type)
+            RoomSocket.log.notice("room socket: skipped a frame of type \(wire.type, privacy: .public)")
+            return nil
         }
     }
 }

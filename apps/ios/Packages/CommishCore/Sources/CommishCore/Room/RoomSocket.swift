@@ -1,6 +1,7 @@
 import CommishAPI
 import Foundation
 import Observation
+import os
 
 /// The room's WebSocket (docs/superpowers/specs/2026-10-24-room-protocol.md, web/src/lib/room/
 /// lobby-socket.ts): a hello with the last seq applied, the welcome with every row since and the
@@ -9,6 +10,10 @@ import Observation
 /// room's sentence (a "signed out" one signs the app out); a refusal before the upgrade (401, 403,
 /// 404) stops for good; anything else retries. The connector, the token, the clock and the waits are
 /// injected, so a recorded exchange drives it in a test.
+///
+/// `run()` is the one way in, from the owner's structured task (`.task { await socket.run() }`): when
+/// that task is cancelled, the open socket is closed with 1000 at once and no retry follows, so the
+/// socket never outlives the screen that opened it. `close()` leaves the room the same way.
 @MainActor
 @Observable
 public final class RoomSocket {
@@ -28,13 +33,17 @@ public final class RoomSocket {
     public nonisolated static let policyViolation = 1008
     /// The client's own close on leaving the room.
     public nonisolated static let normal = 1000
-    /// A socket gone without a close frame.
+    /// A socket gone without a close frame (reserved: seen, never sent).
     public nonisolated static let abnormal = 1006
+    /// The client's close for a frame it cannot read at all.
+    public nonisolated static let protocolError = 1002
     /// The 1008 reason for a revoked device token.
     public nonisolated static let signedOutReason = "signed out"
     /// The upgrade statuses no retry gets past (lobby api.ts isFinalRefusal).
     public nonisolated static let finalStatuses: Set<Int> = [401, 403, 404]
     nonisolated static let leftReason = "left the page"
+    nonisolated static let unreadableReason = "unreadable frame"
+    nonisolated static let log = Logger(subsystem: "app.trycommish.ios", category: "room-socket")
 
     public private(set) var status: Status = .connecting
     /// The server's clock less the phone's, from the latest welcome: a deadline is drawn at
@@ -57,10 +66,11 @@ public final class RoomSocket {
     private let onRows: @MainActor ([RoomRow]) -> Void
     private let onSignedOut: @MainActor () -> Void
     private var connection: (any RoomConnection)?
+    /// The open socket where a cancellation, which runs off the main actor, can close it.
+    private let live = LiveConnection()
     private var attempt = 0
     private var tries = 0
     private var leaving = false
-    private var running: Task<Void, Never>?
 
     public init(
         url: URL, connector: any RoomConnector, tokens: any TokenSource, clock: any Clock,
@@ -77,22 +87,26 @@ public final class RoomSocket {
         self.onSignedOut = onSignedOut
     }
 
-    /// Opens the socket and keeps it open until `close` or a final refusal.
-    public func start() {
-        guard running == nil else {
-            return
+    /// Runs the socket to its end: connect, read until it drops, wait a step, again; until `close`, a
+    /// final refusal, or the calling task's cancellation.
+    public func run() async {
+        await withTaskCancellationHandler {
+            await loop()
+        } onCancel: { [live] in
+            live.cancel()
         }
-        running = Task { await self.run() }
+        connection = nil
+        status = .closed
     }
 
-    /// Runs the socket to its end: connect, read until it drops, wait a step, again.
-    public func run() async {
-        while !leaving {
+    private func loop() async {
+        while !ended {
             status = tries == 0 ? .connecting : .reconnecting
             tries += 1
-            let ended = await session()
+            let session = await session()
             connection = nil
-            if leaving || stop(ended) {
+            live.clear()
+            if ended || stop(session) {
                 break
             }
             status = .reconnecting
@@ -104,7 +118,11 @@ public final class RoomSocket {
                 break
             }
         }
-        status = .closed
+    }
+
+    /// The owner left (`close`) or its task was cancelled.
+    private var ended: Bool {
+        leaving || Task.isCancelled || live.isShut
     }
 
     /// Sends a command while the socket is open; false, and nothing queued, when it is not.
@@ -125,29 +143,43 @@ public final class RoomSocket {
     /// Leaves the room: closes with 1000 and stops retrying.
     public func close() async {
         leaving = true
-        await connection?.close(code: Self.normal, reason: Self.leftReason)
-        running?.cancel()
+        connection = nil
+        await live.shut()?.close(code: Self.normal, reason: Self.leftReason)
         status = .closed
     }
 
-    /// One socket from open to its end, with whether it reached its welcome.
+    /// One socket from open to its end, with whether it reached its welcome. A socket that opens after
+    /// the owner left is closed at once, before its hello.
     private func session() async -> (closed: RoomClosed, welcomed: Bool) {
         var welcomed = false
         do {
             let opened = try await connector.open(url, token: tokens.token())
+            guard !ended, live.hold(opened) else {
+                await opened.close(code: Self.normal, reason: Self.leftReason)
+                return (RoomClosed(code: Self.normal, reason: Self.leftReason), false)
+            }
             connection = opened
             try await opened.send(RoomCommand.hello(lastSeq: lastSeq))
             while true {
-                let frame = try await RoomFrame.decode(opened.receive())
-                if case .welcome = frame {
-                    welcomed = true
+                let text = try await opened.receive()
+                do {
+                    guard let frame = try RoomFrame.decode(text) else {
+                        continue
+                    }
+                    if case .welcome = frame {
+                        welcomed = true
+                    }
+                    receive(frame)
+                } catch {
+                    // Not JSON the room writes at all: closed as a protocol error and retried.
+                    Self.log.error("room socket: unreadable frame, closing")
+                    await opened.close(code: Self.protocolError, reason: Self.unreadableReason)
+                    return (RoomClosed(code: Self.protocolError, reason: Self.unreadableReason), welcomed)
                 }
-                receive(frame)
             }
         } catch let closed as RoomClosed {
             return (closed, welcomed)
         } catch {
-            await connection?.close(code: Self.abnormal, reason: "")
             return (RoomClosed(code: Self.abnormal), welcomed)
         }
     }
@@ -179,6 +211,7 @@ public final class RoomSocket {
         case let .welcome(_, now, rows):
             attempt = 0
             status = .open
+            refusal = nil
             offset = now.timeIntervalSince(clock.now)
             apply(rows)
         case let .update(_, rows):
@@ -194,5 +227,52 @@ public final class RoomSocket {
         }
         lastSeq = last.seq
         onRows(fresh)
+    }
+}
+
+/// The open connection, where the cancellation handler (off the main actor) can reach it: `shut` closes
+/// it with 1000 and refuses any later one, so a socket that finishes opening after it is closed too.
+final class LiveConnection: Sendable {
+    private struct Held {
+        var connection: (any RoomConnection)?
+        var shut = false
+    }
+
+    private let held = OSAllocatedUnfairLock(initialState: Held())
+
+    var isShut: Bool {
+        held.withLock(\.shut)
+    }
+
+    /// Keeps the connection; false once shut, and the caller closes it.
+    func hold(_ connection: any RoomConnection) -> Bool {
+        held.withLock { state in
+            guard !state.shut else {
+                return false
+            }
+            state.connection = connection
+            return true
+        }
+    }
+
+    func clear() {
+        held.withLock { $0.connection = nil }
+    }
+
+    /// Refuses every later connection and hands back the held one for the caller to close.
+    func shut() -> (any RoomConnection)? {
+        held.withLock { state in
+            state.shut = true
+            defer { state.connection = nil }
+            return state.connection
+        }
+    }
+
+    /// From a cancellation handler, which cannot wait: shut, and the held connection closed with 1000.
+    func cancel() {
+        guard let connection = shut() else {
+            return
+        }
+        Task { await connection.close(code: RoomSocket.normal, reason: RoomSocket.leftReason) }
     }
 }

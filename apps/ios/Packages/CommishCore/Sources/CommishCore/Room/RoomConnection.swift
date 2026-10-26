@@ -62,7 +62,14 @@ struct URLSessionRoomConnection: RoomConnection {
 
     func receive() async throws -> String {
         do {
-            switch try await task.receive() {
+            // The bridged receive does not answer cancellation by itself: a cancelled reader closes the
+            // socket, which ends the receive.
+            let message = try await withTaskCancellationHandler {
+                try await task.receive()
+            } onCancel: { [task] in
+                task.cancel(with: .normalClosure, reason: Data(RoomSocket.leftReason.utf8))
+            }
+            switch message {
             case let .string(text): return text
             case let .data(data): return String(bytes: data, encoding: .utf8) ?? ""
             @unknown default: return ""

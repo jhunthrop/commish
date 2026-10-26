@@ -64,7 +64,8 @@ struct RoomSocketTests {
         #expect(applied == [1, 2, 3, 4, 5, 6])
         #expect(socket.lastSeq == 6)
         #expect(await timer.waits == [.milliseconds(250)])
-        #expect(socket.refusal == "You are not on the clock.")
+        // The refusal was the first socket's; the second welcome cleared it.
+        #expect(socket.refusal == nil)
         // The second welcome's clock: 01:02:09 less the phone's 01:02:02.
         #expect(socket.offset == 7)
         #expect(socket.status == .closed)
@@ -170,7 +171,7 @@ struct RoomSocketTests {
             .close(RoomClosed(code: 1006, status: 404)),
         ]])
         let socket = RoomSocket(
-            url: Self.url, connector: connector, tokens: FixedTokens(), clock: FixedClock(Date()),
+            url: Self.url, connector: connector, tokens: FixedTokens(), clock: FixedClock(Self.phoneNow),
             timer: RecordingTimer(), onRows: { rows in applied += rows.map(\.seq) }
         )
         await socket.run()
@@ -191,6 +192,8 @@ struct RoomSocketTests {
     }
 
     static let url = URL(string: "wss://room.example/rooms/r/ws")!
+    /// The exchange's phone clock, so no test reads the real one.
+    static let phoneNow = RoomClockReading.parse("2026-08-20T01:02:02.000Z")!
 
     static func hello(_ seq: Int64) -> String {
         RoomCommand.hello(lastSeq: seq)
@@ -200,7 +203,7 @@ struct RoomSocketTests {
         _ connector: ScriptedConnector, timer: RecordingTimer, signedOut: @escaping @MainActor () -> Void = {}
     ) -> RoomSocket {
         RoomSocket(
-            url: url, connector: connector, tokens: FixedTokens(), clock: FixedClock(Date()), timer: timer,
+            url: url, connector: connector, tokens: FixedTokens(), clock: FixedClock(phoneNow), timer: timer,
             onRows: { _ in }, onSignedOut: signedOut
         )
     }
