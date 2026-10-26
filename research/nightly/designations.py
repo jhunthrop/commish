@@ -13,7 +13,10 @@ injury capture (the hourly capture job's), the same read the API's board route m
 - dispatches the web build of the public run when the set of its ranked players on a season-long
   list differs from the set its last build was dispatched with (`designations-build.json`), so the
   static board and player pages are right within the hour. A dispatch that fails keeps the old set,
-  so the next hour tries again. No token is a skip by name, as `publish`'s own.
+  so the next hour tries again. No token is a skip by name, as `publish`'s own;
+- dispatches it too in the publish hour before each kickoff window when the status read is newer than
+  the one its last build took (Lane 222, B186, `game_day_reads.py`), so a game-day page names a read of
+  that morning or afternoon, never the night's.
 
 THE RULE. A season-long designation (injured reserve, PUP, NFI, suspended, or out with the capture's
 note saying out for the season) puts him below every available player at his position; a week's
@@ -57,6 +60,7 @@ from research.model.designations import (
 from research.model.instants import js_iso, ms_instant
 from research.nightly.config import EARLY_KEY, LATEST_KEY
 from research.nightly.designation_runs import BY_DATE_SOURCE, designation_runs
+from research.nightly.game_day_reads import season_kickoffs, window_read_due, window_words
 from research.nightly.publish import Dispatcher, PublishOutcome, encode, read_json, run_key
 from research.nightly.published_board import MANIFEST_FILE, driver_line
 from research.nightly.return_days import (
@@ -425,8 +429,21 @@ def built_set(store: RunStore, run_id: str) -> frozenset[str]:
     return frozenset(i for i in listed if isinstance(i, str)) if isinstance(listed, list) else frozenset()
 
 
-def _record(store: RunStore, run_id: str, ids: frozenset[str], build: str, now: datetime) -> None:
-    body = {"seasonLong": sorted(ids), "at": js_iso(now), "build": build}
+def built_status_read(store: RunStore, run_id: str) -> str | None:
+    """The status read the run's last dispatched build took (its check, else its stamp), None before one."""
+    record = read_json(store, run_key(run_id, BUILD_FILE))
+    found = None if record is None else record.get("statusReadAt")
+    return found if isinstance(found, str) else None
+
+
+def status_read_at(read: StatusRead) -> str:
+    """When the read was last read: the capture job's check, else the capture's stamp (the web's `lastRead`)."""
+    return js_iso(read.checked_at or read.read_at)
+
+
+def _record(store: RunStore, run_id: str, marked: Marked, build: str, now: datetime) -> None:
+    read = None if marked.read is None else status_read_at(marked.read)
+    body = {"seasonLong": sorted(marked.held[run_id]), "statusReadAt": read, "at": js_iso(now), "build": build}
     store.put(run_key(run_id, BUILD_FILE), encode(body), JSON_TYPE)
 
 
@@ -438,36 +455,53 @@ class BuildOutcome:
 
 @dataclass(frozen=True, slots=True)
 class Hour:
-    """This publish hour: its dispatcher (or why there is none), what `publish` did, its instant."""
+    """This publish hour: its dispatcher (or why there is none), what `publish` did, its instant, and the
+    first kickoff of the window it reads before on a game day (`game_day_reads.window_read_due`), else None."""
 
     dispatcher: Dispatcher | str | None
     published: PublishOutcome
     now: datetime
+    window: datetime | None = None
+
+
+def _build_reason(store: RunStore, run_id: str, marked: Marked, hour: Hour) -> str | None:
+    """Why the public run's build is dispatched this hour, None when its last build stands: its season-long
+    players moved, or this hour reads before a kickoff window and the status read is newer than its build's."""
+    if marked.held[run_id] != built_set(store, run_id):
+        return "moved"
+    if hour.window is None or marked.read is None:
+        return None
+    if status_read_at(marked.read) == built_status_read(store, run_id):
+        return None
+    return f"read again before {window_words(hour.window)}"
 
 
 def build_on_change(store: RunStore, marked: Marked, hour: Hour) -> BuildOutcome:
-    """The public run's build dispatched when its season-long players moved since its last build."""
+    """The public run's build dispatched when its season-long players moved since its last build, or before
+    a kickoff window on a newer status read."""
     run_id = _pointer(store, LATEST_KEY)
     if run_id is None or run_id not in marked.held:
         return BuildOutcome("designations: no public run to build")
     ids, dispatcher, now = marked.held[run_id], hour.dispatcher, hour.now
     count = f"{len(ids)} season-long"
     if hour.published.run_id == run_id and hour.published.dispatched:
-        _record(store, run_id, ids, "the run's own build", now)
+        _record(store, run_id, marked, "the run's own build", now)
         return BuildOutcome(f"designations: run {run_id}, {count}, in the build publish dispatched")
-    if ids == built_set(store, run_id):
+    reason = _build_reason(store, run_id, marked, hour)
+    if reason is None:
         return BuildOutcome(f"designations: run {run_id}, {count}, unchanged since its last build")
     if dispatcher is None or isinstance(dispatcher, str):
         why = "--no-dispatch" if dispatcher is None else dispatcher
-        _record(store, run_id, ids, f"skipped: {why}", now)
-        return BuildOutcome(f"designations: run {run_id}, {count}, moved; the web dispatch skipped ({why})")
+        _record(store, run_id, marked, f"skipped: {why}", now)
+        return BuildOutcome(f"designations: run {run_id}, {count}, {reason}; the web dispatch skipped ({why})")
     failure = dispatcher.dispatch(run_id)
     if failure is not None:
         return BuildOutcome(
-            f"designations: run {run_id}, {count}, moved; the dispatch FAILED ({failure}); retried next hour", ok=False
+            f"designations: run {run_id}, {count}, {reason}; the dispatch FAILED ({failure}); retried next hour",
+            ok=False,
         )
-    _record(store, run_id, ids, "dispatched", now)
-    return BuildOutcome(f"designations: run {run_id}, {count}, moved; the web build of it was dispatched")
+    _record(store, run_id, marked, "dispatched", now)
+    return BuildOutcome(f"designations: run {run_id}, {count}, {reason}; the web build of it was dispatched")
 
 
 _RETRIED: Final = "the pages keep the last file; retried at the next publish hour"
@@ -498,7 +532,9 @@ def finish_marks(engine: Engine | None, store: RunStore, marked: Marked, hour: H
         try:
             with engine.begin() as conn:
                 rows = write_table_statuses(conn, marked.seasons[run_id], marked.read)
+                window = window_read_due(season_kickoffs(conn, marked.seasons[run_id]), hour.now)
             steps.append(BuildOutcome(f"designations: run {run_id}, {rows} published rows marked"))
+            hour = replace(hour, window=window)
         except SQLAlchemyError as error:
             steps.append(BuildOutcome(f"designations: table FAILED ({driver_line(error)}); {_RETRIED}", ok=False))
     steps.append(build_on_change(store, marked, hour))
