@@ -92,12 +92,44 @@ public struct ChipRow<Value: Hashable & Sendable>: View {
         self.live = live
     }
 
+    /// The chip chosen, which the row keeps in view: a box score names its filter.
+    private var chosen: BoardChip<Value>.ID? {
+        chips.first(where: \.pressed)?.id
+    }
+
     public var body: some View {
         if live {
-            ScrollView(.horizontal, showsIndicators: false) { row }
-                .scrollClipDisabled()
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) { row }
+                    .scrollClipDisabled()
+                    .onAppear { reveal(proxy, animated: false) }
+                    .onChange(of: chosen) { reveal(proxy, animated: true) }
+            }
         } else {
-            row.frame(maxWidth: .infinity, alignment: .leading).clipped()
+            // A drawn row that runs past the edge shows its end when the chosen chip is in its later
+            // half, as the live row scrolls to it.
+            ViewThatFits(in: .horizontal) {
+                row
+                row.frame(maxWidth: .infinity, alignment: laterHalf ? .trailing : .leading).clipped()
+            }
+        }
+    }
+
+    private var laterHalf: Bool {
+        guard let index = chips.firstIndex(where: \.pressed) else {
+            return false
+        }
+        return index * 2 >= chips.count
+    }
+
+    private func reveal(_ proxy: ScrollViewProxy, animated: Bool) {
+        guard let chosen else {
+            return
+        }
+        if animated {
+            withAnimation { proxy.scrollTo(chosen, anchor: .center) }
+        } else {
+            proxy.scrollTo(chosen, anchor: .center)
         }
     }
 
@@ -105,6 +137,7 @@ public struct ChipRow<Value: Hashable & Sendable>: View {
         HStack(spacing: Tokens.Space.s2) {
             ForEach(chips) { chip in
                 ChoiceChip(chip.label, pressed: chip.pressed) { choose(chip.value) }
+                    .id(chip.id)
             }
         }
         .padding(.horizontal, Tokens.Space.s3)
