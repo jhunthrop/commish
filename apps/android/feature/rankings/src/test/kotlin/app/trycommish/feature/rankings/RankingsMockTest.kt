@@ -60,6 +60,6 @@ class RankingsMockTest {
 
     private companion object {
         const val MAX_BYTES = 300 * 1024
-        const val REFERENCES = 24
+        const val REFERENCES = 32
     }
 }
