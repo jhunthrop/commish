@@ -100,11 +100,11 @@ The app signs in through WorkOS AuthKit's hosted page in `ASWebAuthenticationSes
 
 The spec (§5.2) plans Apple beside Google. **FOUNDER F1**: which sign-in methods AuthKit offers in production. If Google is on, enable Apple in the WorkOS dashboard before submission. That needs the Apple Developer enrolment (a Services ID, a Sign in with Apple key and the team id, entered in WorkOS), so it is blocked on the enrolment like the rest. The sign-in sheet needs no app change: AuthKit draws the Apple button.
 
-### 5.2 Account deletion (guideline 5.1.1(v)): a blocker
+### 5.2 Account deletion (guideline 5.1.1(v)): done in the app and on the web
 
 "If your app supports account creation, you must also offer account deletion within the app." A new member can create an account from the app's sign-in sheet. Apple accepts an in-app button that starts deletion, or a direct link from the app to a web page where it is completed. An email address alone is rejected outside highly regulated industries.
 
-The route and the web page are done (Lane 233): `POST /me/delete` deletes the account and every row kept with it at once, platform connections first, then the sign-in user, and every device token opens nothing after; `https://trycommish.app/account/delete` does the same on the web, and the policy's section is `https://trycommish.app/privacy#deleting-your-account`. What is still missing is the in-app verb: the Account screen prints "To delete your account, write to help@trycommish.app" (`AccountScreen.swift:218`, words in `Words.generated.swift:720`). Before submission the follow-up lane adds "Delete account" on both apps' Account screens, calling `POST /me/delete` with the device token and the email the member types, then clearing the device as sign-out does. Linking to the web page instead would ask the member to sign in again, since an app's sign-in makes no site session (Lane 225). Play's requirement (Play file §4.3) is met by the same work.
+The route and the web page are done (Lane 233): `POST /me/delete` deletes the account and every row kept with it at once, platform connections first, then the sign-in user, and every device token opens nothing after; `https://trycommish.app/account/delete` does the same on the web, and the policy's section is `https://trycommish.app/privacy#deleting-your-account`. The in-app path is done too (Lane 237): the **Account** screen (the person icon in the top bar) ends with a "Delete account" verb where the old "write to help@trycommish.app" line was. It opens a sheet that lists what is deleted and what is kept, takes the account's email typed by hand, and holds its one verb, "Delete my account", until the email matches. The verb calls `POST /me/delete` with the device token; on success the phone forgets its sign-in and every saved answer, as Sign out does, and lands signed out on the public tabs with "Your account is deleted". A renewing membership is refused with the API's sentence. The app does not send the member to the web page, which would ask them to sign in again (an app's sign-in makes no site session, Lane 225). Play's requirement (Play file §4.3) is met by the same work.
 
 ### 5.3 Sign-in information and notes for the reviewer
 
@@ -126,7 +126,7 @@ No purchases: everything is free through the 2026 season and the app has no in-a
 
 A move from the Lineup or Waivers screen goes to the member's own league platform only after the member confirms it. The review account has no platform connection, so no move can be sent from it.
 
-Delete your account: Account, then Delete account, then type the account's email (the in-app verb ships before submission, §5.2; on the web at https://trycommish.app/account/delete).
+Delete your account: Account, then Delete account at the foot of the screen, then type the account's email and tap Delete my account (also on the web at https://trycommish.app/account/delete).
 ```
 
 The last sentence is true only once §5.2 ships: remove it if the build lacks it, and do not submit without it.
