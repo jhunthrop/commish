@@ -5,7 +5,8 @@ import SwiftUI
 /// The League home as its model says it, in the web's order (LeaguePage.svelte): the league's head,
 /// the week's scoreboard, the standings, the member's lineup, the moves, the basis once at the foot.
 /// Pure of state, so a snapshot draws it from the fixture at the fixture's clock. A score bug opens its
-/// game: `openGame` with nil for the member's, else the roster of the game's first side.
+/// game: `openGame` with nil for the member's, else the roster of the game's first side. On draft day
+/// the draft's word and the Advisor's verb sit under the league's head.
 public struct LeagueHomeScreen: View {
     @Environment(\.colorScheme) private var colorScheme
     let model: LeagueHomeModel
@@ -13,24 +14,30 @@ public struct LeagueHomeScreen: View {
     let openLineup: () -> Void
     let openGame: (Int?) -> Void
     let still: Bool
+    let draftDay: DraftDayEntry?
+    let openAdvisor: () -> Void
 
     /// `still` draws the scoreboard's hand at rest, for a render with no scrolling (the snapshot).
     public init(
         model: LeagueHomeModel, stamp: String?, still: Bool = false, openLineup: @escaping () -> Void,
-        openGame: @escaping (Int?) -> Void = { _ in }
+        openGame: @escaping (Int?) -> Void = { _ in }, draftDay: DraftDayEntry? = nil,
+        openAdvisor: @escaping () -> Void = {}
     ) {
         self.model = model
         self.stamp = stamp
         self.still = still
         self.openLineup = openLineup
         self.openGame = openGame
+        self.draftDay = draftDay
+        self.openAdvisor = openAdvisor
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s5) {
             ForEach(LeagueHomePart.allCases, id: \.self) { part in
                 LeagueHomePartView(
-                    part: part, model: model, stamp: stamp, still: still, openLineup: openLineup, openGame: openGame
+                    part: part, model: model, stamp: stamp, still: still, openLineup: openLineup, openGame: openGame,
+                    draftDay: draftDay, openAdvisor: openAdvisor
                 )
             }
         }
@@ -57,12 +64,17 @@ struct LeagueHomePartView: View {
     let still: Bool
     let openLineup: () -> Void
     var openGame: (Int?) -> Void = { _ in }
+    var draftDay: DraftDayEntry?
+    var openAdvisor: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s5) {
             switch part {
             case .top:
                 head
+                if let draftDay {
+                    DraftDayPanel(entry: draftDay, openAdvisor: openAdvisor)
+                }
                 if !model.bugs.isEmpty {
                     ScoreBoardView(
                         title: model.weekTitle, aside: model.scoreboardAside, stamp: stamp, bugs: model.bugs,
@@ -109,15 +121,20 @@ public struct LeagueHomeView: View {
     private let leagueID: String
     private let openLineup: () -> Void
     private let openGame: (Int?) -> Void
+    private let draftDay: DraftDayEntry?
+    private let openAdvisor: () -> Void
 
     public init(
         viewModel: LeagueHomeViewModel, leagueID: String, openLineup: @escaping () -> Void,
-        openGame: @escaping (Int?) -> Void = { _ in }
+        openGame: @escaping (Int?) -> Void = { _ in }, draftDay: DraftDayEntry? = nil,
+        openAdvisor: @escaping () -> Void = {}
     ) {
         self.viewModel = viewModel
         self.leagueID = leagueID
         self.openLineup = openLineup
         self.openGame = openGame
+        self.draftDay = draftDay
+        self.openAdvisor = openAdvisor
     }
 
     public var body: some View {
@@ -129,7 +146,8 @@ public struct LeagueHomeView: View {
             case let .loaded(model, _, _):
                 ScrollView {
                     LeagueHomeScreen(
-                        model: model, stamp: viewModel.stampWords, openLineup: openLineup, openGame: openGame
+                        model: model, stamp: viewModel.stampWords, openLineup: openLineup, openGame: openGame,
+                        draftDay: draftDay, openAdvisor: openAdvisor
                     )
                 }
                 .refreshable { await viewModel.load(leagueID: leagueID) }

@@ -802,4 +802,94 @@ object Words {
         const val rest = "Rest of season"
         const val preseason = "Preseason"
     }
+
+    object Companion {
+        const val title = "Live draft"
+        const val followAnother = "Follow another draft"
+        const val yourDraft = "Your draft"
+        const val reconnecting = "Reconnecting. The picks below are the last ones we read."
+        const val signedOutTitle = "Sign in to follow your draft"
+        const val signedOutLine = "A followed draft lives on your account."
+        const val signIn = "Sign in"
+        const val missingTitle = "This draft is not on your account"
+        const val missingLine = "Paste the draft link again to follow it."
+        const val followADraft = "Follow a draft"
+        const val unreachableTitle = "Your draft can't be read right now"
+        const val reloadLine = "Reload in a moment."
+        const val newestFirst = "newest first"
+        const val you = "you"
+        const val nextTitle = "Who we would take next"
+        const val nextAside = "Chance he lasts"
+        const val reachesHead = "Reaches"
+        const val stillThereHead = "Still there"
+        const val reshuffled = "stand-ins for your league"
+    }
+
+    object CompanionNew {
+        const val title = "Follow your draft"
+        const val lede = "At each of your picks you get our call, against the picks your league actually makes."
+        const val replay = "The recorded draft (development replay)"
+        const val draftOn = "Your draft is on"
+        const val linkLabel = "Your Sleeper draft link"
+        const val linkPlaceholder = "sleeper.com/draft/nfl/1234567890"
+        const val seatBy = "Find your seat by"
+        const val bySlot = "My draft slot"
+        const val byUsername = "My Sleeper username"
+        const val slotLabel = "Your draft slot"
+        const val usernameLabel = "Sleeper username"
+        const val verb = "Follow my draft"
+        const val failed = "That did not go through. Try again."
+        const val recentFailed = "The drafts you followed can't be read right now."
+        const val recentTitle = "Drafts you followed"
+        const val unreachableTitle = "This page can't reach Commish right now"
+        const val reloadLine = "Reload in a moment."
+    }
+
+    object CompanionSignedOut {
+        const val title = "Sign in for our call beside your real draft"
+        const val line = "Paste your Sleeper draft link and get our pick at each of your turns, against the picks your league makes."
+        const val verb = "Sign in"
+    }
+
+    object Room {
+        const val player = "Player"
+        const val overRepl = "Over repl"
+        const val overReplacement = "Over replacement"
+        const val adp = "ADP"
+        const val gap = "Gap"
+        const val waitingOnCall = "Waiting on the call"
+        const val pool = "Pool"
+        const val yourTeam = "Your team"
+        const val open = "open"
+        const val wall = "The wall"
+        const val yourPick = "Your pick"
+        const val theirPick = "Their pick"
+        const val onTheClock = "On the clock"
+    }
+
+    object Report {
+        const val field = "The field"
+        const val pickByPick = "Pick by pick"
+        const val drafters = "Drafters"
+        const val ourBoard = "Our board"
+        const val pick = "Pick"
+        const val player = "Player"
+        const val slot = "Slot"
+        const val overRepl = "Over repl"
+        const val adp = "ADP"
+        const val picksLater = "Picks later"
+        const val ours = "Ours"
+        const val rank = "Rank"
+        const val stillThere = "Still there"
+        const val by = "By"
+        const val bench = "Bench"
+        const val median = "median"
+        const val medianPoints = "median starting points"
+        const val middleRuns = "the middle 80% of runs"
+    }
+
+    object DraftDay {
+        const val advisorVerb = "Open the Advisor"
+        const val turnsAfterDraft = "The site turns to your season after your draft."
+    }
 }

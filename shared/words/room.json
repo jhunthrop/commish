@@ -1,0 +1,16 @@
+{
+	"player": "Player",
+	"overRepl": "Over repl",
+	"overReplacement": "Over replacement",
+	"adp": "ADP",
+	"gap": "Gap",
+	"waitingOnCall": "Waiting on the call",
+	"pool": "Pool",
+	"yourTeam": "Your team",
+	"open": "open",
+	"wall": "The wall",
+	"yourPick": "Your pick",
+	"theirPick": "Their pick",
+	"onTheClock": "On the clock",
+	"functions": []
+}

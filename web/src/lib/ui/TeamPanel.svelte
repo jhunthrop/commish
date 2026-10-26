@@ -4,6 +4,7 @@
 	import Face from './Face.svelte';
 	import Label from './Label.svelte';
 	import Panel from './Panel.svelte';
+	import { ROOM, teamCount } from '#lib/room/words.ts';
 
 	interface Props {
 		title?: string;
@@ -14,13 +15,13 @@
 		teams?: number;
 	}
 
-	let { title = 'Your team', slots, rosterSize, teams = DEFAULT_TEAMS }: Props = $props();
+	let { title = ROOM.yourTeam, slots, rosterSize, teams = DEFAULT_TEAMS }: Props = $props();
 
 	const drafted = $derived(slots.filter((slot) => slot.player !== null).length);
 </script>
 
 <Panel>
-	<h3>{title}<span>{drafted} of {rosterSize}</span></h3>
+	<h3>{title}<span>{teamCount(drafted, rosterSize)}</span></h3>
 	<ol>
 		{#each slots as { slot, player, pick }, i (i)}
 			{#if player}
@@ -37,7 +38,7 @@
 				<li class="open">
 					<span class="slot">{slot}</span>
 					<span class="hole"></span>
-					<Label>open</Label>
+					<Label>{ROOM.open}</Label>
 				</li>
 			{/if}
 		{/each}

@@ -7,7 +7,19 @@
 	import RoomLayout from '../RoomLayout.svelte';
 	import Exposure from './Exposure.svelte';
 	import FieldBars from './FieldBars.svelte';
-	import { points, reportBasis, settingCells, standingCells, totalCaption } from './headline.ts';
+	import {
+		REPORT,
+		fieldNote,
+		picksNote,
+		points,
+		reportBasis,
+		reportTitle,
+		runsNote,
+		runsTitle,
+		settingCells,
+		standingCells,
+		totalCaption
+	} from './headline.ts';
 	import PickReview from './PickReview.svelte';
 	import RunsSection from './RunsSection.svelte';
 
@@ -35,9 +47,7 @@
 	const board = $derived(boardOf(report.board, report.teams));
 	const head = $derived(standingCells(report.standings, report.slot, report.teams));
 	const their = $derived(shared ? 'their' : 'your');
-	const title = $derived(
-		shared ? `${shared.by ? `${shared.by}'s` : 'A shared'} draft` : 'Your draft'
-	);
+	const title = $derived(reportTitle(report.slot, shared));
 	const cells = $derived([...(head?.cells ?? []), ...settingCells(report, seats)]);
 </script>
 
@@ -50,18 +60,18 @@
 			</div>
 		{/if}
 		<div class="side">
-			<DisplayTitle size="page">{title} from slot {report.slot}</DisplayTitle>
+			<DisplayTitle size="page">{title}</DisplayTitle>
 			<FactStrip label="The finish and the draft" {cells} />
 			<div class="acts">{@render verbs()}</div>
 		</div>
 	</div>
 	<p class="basis">{reportBasis(board.basis, report.could_wait_from)}</p>
 	<section>
-		<DisplayTitle note="projected starting points, {report.teams} teams">The field</DisplayTitle>
+		<DisplayTitle note={fieldNote(report.teams)}>{REPORT.field}</DisplayTitle>
 		<FieldBars standings={report.standings} {names} you={report.slot} />
 	</section>
 	<section>
-		<DisplayTitle note="{report.picks.length} picks, starters by slot">Pick by pick</DisplayTitle>
+		<DisplayTitle note={picksNote(report.picks.length)}>{REPORT.pickByPick}</DisplayTitle>
 		<PickReview
 			picks={report.picks}
 			starters={report.starters}
@@ -72,9 +82,7 @@
 		/>
 	</section>
 	<section>
-		<DisplayTitle note="{their} picks on autopick from the board, {reshuffled} reshuffled each run">
-			The same draft, {report.runs.runs} more times
-		</DisplayTitle>
+		<DisplayTitle note={runsNote(their, reshuffled)}>{runsTitle(report.runs.runs)}</DisplayTitle>
 		<RunsSection runs={report.runs} teams={report.teams} rank={head?.rank ?? 0} />
 	</section>
 	{#snippet dock()}

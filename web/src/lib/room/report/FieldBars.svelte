@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { count } from '#lib/format/number.ts';
 	import type { MockReport } from '../api.ts';
+	import { seatName } from './headline.ts';
 
 	interface Props {
 		standings: MockReport['standings'];
@@ -18,7 +19,7 @@
 	{#each standings as team (team.seat)}
 		<div class="t" class:you={team.seat === you}>
 			<span class="n">{team.rank}</span>
-			<span class="name">{names[team.seat - 1] ?? `Seat ${team.seat}`}</span>
+			<span class="name">{seatName(names, team.seat)}</span>
 			<span class="bar"><i style:width="{(team.points / top) * 100}%"></i></span>
 			<span class="pts">{count(team.points)}</span>
 		</div>

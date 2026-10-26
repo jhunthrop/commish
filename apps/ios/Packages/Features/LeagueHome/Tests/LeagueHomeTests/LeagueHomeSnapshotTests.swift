@@ -72,6 +72,24 @@ struct LeagueHomeSnapshotTests {
         }
     }
 
+    /// Draft day's entry under the league's head (SeasonPanel.svelte, draft_day): the draft tonight on
+    /// the member's clock, the zone once, the Advisor's verb.
+    @Test(arguments: [Scheme.light, .dark].flatMap { scheme in SnapshotDevice.all.map { (scheme, $0) } })
+    func draftDayCarriesTheAdvisor(scheme: Scheme, device: SnapshotDevice) throws {
+        let now = try #require(APIDecoding.parseDate("2026-10-17T17:00:00Z"))
+        let entry = try #require(DraftDayEntry(
+            phase: .draftDay, draftAt: APIDecoding.parseDate("2026-10-18T00:30:00Z"), now: now, zone: Self.zone
+        ))
+        let view = try LeagueHomePartView(
+            part: .top, model: Self.model(at: "2026-10-17T17-00-00Z"), stamp: nil, still: true, openLineup: {},
+            draftDay: entry
+        )
+        let name = "league-home-draft-day-\(device.name)-\(scheme)"
+        Snapshot.shoot(view, named: name, device: device, scheme: scheme)
+        let result = Snapshot.verify(view, named: name, device: device, scheme: scheme, in: Self.folder)
+        #expect(result.matches, "\(result.message)")
+    }
+
     @Test func aSavedHomeCarriesItsStamp() throws {
         let view = try LeagueHomePartView(
             part: .top, model: Self.model(at: "2026-10-18T18-56-00Z"), stamp: "\(AppWords.lastRead) Sun 1:52 pm",

@@ -20,15 +20,12 @@
 	import { ApiError, companions, type CompanionCreate, type CompanionSummary } from './api.ts';
 	import { recentLine } from './model.ts';
 	import { SIGNED_OUT_WORDS } from './new-words.ts';
+	import { COMPANION, COMPANION_NEW as WORDS } from './words.ts';
 	import FFPCLeagues from '#lib/hosts/FFPCLeagues.svelte';
 	import { ffpcOpen, hostsApi, type HostLeague } from '#lib/hosts/api.ts';
 
 	/** Start following a draft: paste the Sleeper link, say which seat is yours, one verb. Signed out,
 	 * what it does and the sign-in (Lane 150: free this season, nothing says what it comes with). */
-
-	/** The words in the link field for a development replay (COMPANION_REPLAY on the API), which
-	 * always follows the recorded draft. */
-	const REPLAY_WORDS = 'The recorded draft (development replay)';
 
 	type View = 'loading' | 'signed-out' | 'form' | 'unreachable';
 
@@ -83,7 +80,7 @@
 
 	onMount(() => {
 		replay = page.url.searchParams.get('replay') === '1';
-		if (replay) link = REPLAY_WORDS;
+		if (replay) link = WORDS.replay;
 		void start();
 	});
 
@@ -116,19 +113,17 @@
 			await goto(resolve('/companion/[id]', { id: made.id }));
 		} catch (error) {
 			const fields = error instanceof ApiError ? Object.values(error.fields) : [];
-			problem =
-				fields[0] ??
-				(error instanceof ApiError ? error.message : 'That did not go through. Try again.');
+			problem = fields[0] ?? (error instanceof ApiError ? error.message : WORDS.failed);
 			busy = false;
 		}
 	}
 </script>
 
 <svelte:head>
-	<title>Follow your draft · Commish</title>
+	<title>{WORDS.title} · Commish</title>
 </svelte:head>
 
-<Shell title="Live draft" active="advisor">
+<Shell title={COMPANION.title} active="advisor">
 	<main class="new">
 		{#if view === 'loading'}
 			<div class="reserve"></div>
@@ -139,45 +134,43 @@
 				{/snippet}
 			</EmptyState>
 		{:else if view === 'unreachable'}
-			<EmptyState title="This page can't reach Commish right now" line="Reload in a moment." />
+			<EmptyState title={WORDS.unreachableTitle} line={WORDS.reloadLine} />
 		{:else}
-			<DisplayTitle size="page">Follow your draft</DisplayTitle>
-			<p class="lede">
-				At each of your picks you get our call, against the picks your league actually makes.
-			</p>
+			<DisplayTitle size="page">{WORDS.title}</DisplayTitle>
+			<p class="lede">{WORDS.lede}</p>
 			{#if ffpcOn}
-				<ChipGroup label="Your draft is on" fit>
+				<ChipGroup label={WORDS.draftOn} fit>
 					<Chip pressed={way === 'sleeper'} onclick={() => (way = 'sleeper')}>Sleeper</Chip>
 					<Chip pressed={way === 'ffpc'} onclick={() => (way = 'ffpc')}>FFPC</Chip>
 				</ChipGroup>
 			{/if}
 			{#if ffpcOn && way === 'ffpc'}
-				<FFPCLeagues verb={() => 'Follow my draft'} onpick={followFirstFFPC} typed />
+				<FFPCLeagues verb={() => WORDS.verb} onpick={followFirstFFPC} typed />
 			{:else}
 				<div class="form">
 					<Field
-						label="Your Sleeper draft link"
+						label={WORDS.linkLabel}
 						bind:value={link}
-						placeholder="sleeper.com/draft/nfl/1234567890"
+						placeholder={WORDS.linkPlaceholder}
 						maxlength={300}
 						onenter={() => void follow()}
 					/>
 					<div class="seat">
-						<ChipGroup label="Find your seat by">
-							<Chip pressed={by === 'slot'} onclick={() => (by = 'slot')}>My draft slot</Chip>
+						<ChipGroup label={WORDS.seatBy}>
+							<Chip pressed={by === 'slot'} onclick={() => (by = 'slot')}>{WORDS.bySlot}</Chip>
 							<Chip pressed={by === 'username'} onclick={() => (by = 'username')}
-								>My Sleeper username</Chip
+								>{WORDS.byUsername}</Chip
 							>
 						</ChipGroup>
 						{#if by === 'slot'}
-							<ChipGroup label="Your draft slot" variant="loose">
+							<ChipGroup label={WORDS.slotLabel} variant="loose">
 								{#each SLOTS as n (n)}
 									<Chip size="sm" pressed={slot === n} onclick={() => (slot = n)}>{n}</Chip>
 								{/each}
 							</ChipGroup>
 						{:else}
 							<Field
-								label="Sleeper username"
+								label={WORDS.usernameLabel}
 								bind:value={username}
 								maxlength={40}
 								onenter={() => void follow()}
@@ -186,15 +179,18 @@
 					</div>
 				</div>
 				<ActionBar alert={problem ? alert : undefined}>
-					<Verb disabled={!ready} onclick={() => void follow()}>Follow my draft</Verb>
+					<Verb disabled={!ready} onclick={() => void follow()}>{WORDS.verb}</Verb>
 				</ActionBar>
 			{/if}
 			{#if recentFailed}
-				<p class="lede">The drafts you followed can't be read right now.</p>
+				<p class="lede">{WORDS.recentFailed}</p>
 			{:else if recent.length > 0}
-				<section aria-label="Drafts you followed">
-					<PanelHead title="Drafts you followed" level={2} />
-					<LineList label="Drafts you followed" lines={recent.map(recentLine)} />
+				<section aria-label={WORDS.recentTitle}>
+					<PanelHead title={WORDS.recentTitle} level={2} />
+					<LineList
+						label={WORDS.recentTitle}
+						lines={recent.map((r) => recentLine(r, links.companion(r.id)))}
+					/>
 				</section>
 			{/if}
 		{/if}

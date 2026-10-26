@@ -800,4 +800,94 @@ public enum Words {
         public static let rest = "Rest of season"
         public static let preseason = "Preseason"
     }
+
+    public enum Companion {
+        public static let title = "Live draft"
+        public static let followAnother = "Follow another draft"
+        public static let yourDraft = "Your draft"
+        public static let reconnecting = "Reconnecting. The picks below are the last ones we read."
+        public static let signedOutTitle = "Sign in to follow your draft"
+        public static let signedOutLine = "A followed draft lives on your account."
+        public static let signIn = "Sign in"
+        public static let missingTitle = "This draft is not on your account"
+        public static let missingLine = "Paste the draft link again to follow it."
+        public static let followADraft = "Follow a draft"
+        public static let unreachableTitle = "Your draft can't be read right now"
+        public static let reloadLine = "Reload in a moment."
+        public static let newestFirst = "newest first"
+        public static let you = "you"
+        public static let nextTitle = "Who we would take next"
+        public static let nextAside = "Chance he lasts"
+        public static let reachesHead = "Reaches"
+        public static let stillThereHead = "Still there"
+        public static let reshuffled = "stand-ins for your league"
+    }
+
+    public enum CompanionNew {
+        public static let title = "Follow your draft"
+        public static let lede = "At each of your picks you get our call, against the picks your league actually makes."
+        public static let replay = "The recorded draft (development replay)"
+        public static let draftOn = "Your draft is on"
+        public static let linkLabel = "Your Sleeper draft link"
+        public static let linkPlaceholder = "sleeper.com/draft/nfl/1234567890"
+        public static let seatBy = "Find your seat by"
+        public static let bySlot = "My draft slot"
+        public static let byUsername = "My Sleeper username"
+        public static let slotLabel = "Your draft slot"
+        public static let usernameLabel = "Sleeper username"
+        public static let verb = "Follow my draft"
+        public static let failed = "That did not go through. Try again."
+        public static let recentFailed = "The drafts you followed can't be read right now."
+        public static let recentTitle = "Drafts you followed"
+        public static let unreachableTitle = "This page can't reach Commish right now"
+        public static let reloadLine = "Reload in a moment."
+    }
+
+    public enum CompanionSignedOut {
+        public static let title = "Sign in for our call beside your real draft"
+        public static let line = "Paste your Sleeper draft link and get our pick at each of your turns, against the picks your league makes."
+        public static let verb = "Sign in"
+    }
+
+    public enum Room {
+        public static let player = "Player"
+        public static let overRepl = "Over repl"
+        public static let overReplacement = "Over replacement"
+        public static let adp = "ADP"
+        public static let gap = "Gap"
+        public static let waitingOnCall = "Waiting on the call"
+        public static let pool = "Pool"
+        public static let yourTeam = "Your team"
+        public static let `open` = "open"
+        public static let wall = "The wall"
+        public static let yourPick = "Your pick"
+        public static let theirPick = "Their pick"
+        public static let onTheClock = "On the clock"
+    }
+
+    public enum Report {
+        public static let field = "The field"
+        public static let pickByPick = "Pick by pick"
+        public static let drafters = "Drafters"
+        public static let ourBoard = "Our board"
+        public static let pick = "Pick"
+        public static let player = "Player"
+        public static let slot = "Slot"
+        public static let overRepl = "Over repl"
+        public static let adp = "ADP"
+        public static let picksLater = "Picks later"
+        public static let ours = "Ours"
+        public static let rank = "Rank"
+        public static let stillThere = "Still there"
+        public static let by = "By"
+        public static let bench = "Bench"
+        public static let median = "median"
+        public static let medianPoints = "median starting points"
+        public static let middleRuns = "the middle 80% of runs"
+    }
+
+    public enum DraftDay {
+        public static let advisorVerb = "Open the Advisor"
+        public static let turnsAfterDraft = "The site turns to your season after your draft."
+    }
 }

@@ -4,7 +4,16 @@
 	import Panel from '#lib/ui/Panel.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import type { Companion } from './api.ts';
-	import { hostDraftUrl, hostName, turnWords } from './model.ts';
+	import {
+		draftName,
+		draftOnWords,
+		hostDraftUrl,
+		openDraftWords,
+		pickCount,
+		picksMadeWords,
+		staleWords,
+		turnWords
+	} from './model.ts';
 
 	/** The companion's head: the host's pick count where a mock room's clock would be (we never show
 	 * a clock we do not own), when you are up, and the way back to the draft on Sleeper. */
@@ -16,31 +25,25 @@
 
 	let { companion: c, league }: Props = $props();
 
-	const host = $derived(hostName(c.host));
-
-	const stale = $derived(
-		c.host_stale_seconds === null
-			? null
-			: `${host} has not answered for ${String(c.host_stale_seconds)} seconds. These are its last picks.`
-	);
+	const stale = $derived(staleWords(c));
 </script>
 
 <Panel
 	as="section"
-	label="The draft on {host}"
+	label={draftOnWords(c.host)}
 	padding="sm"
 	edge={c.your_turn ? 'accent' : undefined}
 >
 	<div class="bar">
-		<Figure value="{c.pick_count} of {c.total_picks}" size="lg" caption="picks made on {host}" />
+		<Figure value={pickCount(c)} size="lg" caption={picksMadeWords(c.host)} />
 		<div class="what">
-			<DisplayTitle size="section">{c.name || 'Your draft'}</DisplayTitle>
+			<DisplayTitle size="section">{draftName(c)}</DisplayTitle>
 			<p class="league">{league}</p>
 			<p class="turn" class:on={c.your_turn}>{turnWords(c)}</p>
 			{#if stale}<p class="stale" role="status">{stale}</p>{/if}
 		</div>
 		<div class="act">
-			<Quiet href={hostDraftUrl(c)} size="sm">Open the draft on {host}</Quiet>
+			<Quiet href={hostDraftUrl(c)} size="sm">{openDraftWords(c.host)}</Quiet>
 		</div>
 	</div>
 </Panel>

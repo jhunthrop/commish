@@ -11,6 +11,11 @@ export function fixed(value: number, decimals = 1): string {
 	return value.toFixed(decimals);
 }
 
+/** A range's two ends as RangeBar prints them under its bar: "212.3 to 407.3". */
+export function spanWords(floor: number, ceiling: number): string {
+	return `${fixed(floor)} to ${fixed(ceiling)}`;
+}
+
 const WHOLE = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
 /** A count as a reader reads it: "1,467". */

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { pickLabel, snakeSlot } from '#lib/format/draft.ts';
-	import { plural } from '#lib/format/number.ts';
 	import { callView, poolBasis } from '#lib/room/call.ts';
 	import {
 		type Board,
@@ -23,7 +22,21 @@
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
 	import type { Companion, CompanionPick, Feature } from './api.ts';
 	import CompanionBar from './CompanionBar.svelte';
-	import { has, hostDraftUrl, hostName, landingStrip, roomPicks, seatNames } from './model.ts';
+	import {
+		chanceColumn,
+		chanceLabel as chanceOf,
+		companionNotes,
+		has,
+		hostDraftUrl,
+		justTakenWords,
+		landingStrip,
+		lostWords,
+		makePickWords,
+		queueWords,
+		roomPicks,
+		seatNames
+	} from './model.ts';
+	import { COMPANION } from './words.ts';
 	import SheetSync from './SheetSync.svelte';
 	import Shortlist from './Shortlist.svelte';
 
@@ -39,8 +52,6 @@
 	}
 
 	let { companion: c, picks, board, features, search }: Props = $props();
-
-	const host = $derived(hostName(c.host));
 
 	const FILTERS: readonly PoolFilter[] = ['All', 'QB', 'RB', 'WR', 'TE', 'K', 'DST'];
 	let filter = $state<PoolFilter>('All');
@@ -59,13 +70,7 @@
 		card && (c.your_turn || card.conditional) ? callView(card, board, drafted, teams) : null
 	);
 	const onTurn = $derived(call !== null && c.your_turn);
-	const chanceLabel = $derived(
-		card?.conditional
-			? `reaches ${pickLabel(card.for_pick, teams)}`
-			: card?.next_pick
-				? `still there at ${pickLabel(card.next_pick, teams)}`
-				: 'your last pick'
-	);
+	const chanceLabel = $derived(chanceOf(card, teams));
 	const rows = $derived(poolRows(board, drafted, filter, [], search));
 	const names = $derived(seatNames(c));
 	const strip = $derived(landingStrip(picks, board, teams, c.slot, names));
@@ -77,25 +82,8 @@
 		if (!c.your_turn) namedSeen = c.placed_by_name.length;
 	});
 	const namedShown = $derived(c.your_turn ? c.placed_by_name.slice(namedSeen) : c.placed_by_name);
-	const NAMED_LINES = 2;
-	const notes = $derived(
-		[
-			c.unplaced > 0
-				? `${plural(c.unplaced, 'pick')} on ${host} ${c.unplaced === 1 ? 'is a player' : 'are players'} we do not rank. Each fills his team's roster and takes nobody from our board.`
-				: null,
-			...namedShown.slice(0, NAMED_LINES).map(
-				(p) =>
-					// A name that ends in "Jr." ends the sentence too.
-					`${p.host_name} on ${host} is our ${p.board_name}${p.board_name.endsWith('.') ? '' : '.'}`
-			),
-			namedShown.length > NAMED_LINES
-				? `And ${String(namedShown.length - NAMED_LINES)} more placed by name.`
-				: null,
-			c.traded > 0
-				? `${plural(c.traded, 'pick')} changed hands on ${host}. Our call follows the draft order by slot.`
-				: null
-		].filter((n): n is string => n !== null)
-	);
+	const notes = $derived(companionNotes(c, namedShown));
+	const lost = $derived(lostWords(c));
 
 	const SLEEPER_TAB = 'sleeper-draft';
 
@@ -126,12 +114,9 @@
 
 <RoomLayout>
 	<CompanionBar companion={c} league={leagueLine(c.settings, c.slot)} />
-	{#if c.lost_at !== null}
+	{#if lost !== null}
 		<Panel edge="loss" padding="sm">
-			<p class="note">
-				Pick {pickLabel(c.lost_at, teams)} on {host} does not fit how our draft is set up, so our call
-				stops there. The picks keep landing below.
-			</p>
+			<p class="note">{lost}</p>
 		</Panel>
 	{/if}
 	{#each notes as note (note)}
@@ -140,17 +125,17 @@
 	{#if strip.length > 0 && !onTurn}
 		<PickStrip
 			lead={pickLabel(picks.at(-1)?.pick ?? 1, teams)}
-			leadLines={[`just taken on ${host}`, 'newest first']}
+			leadLines={[justTakenWords(c.host), COMPANION.newestFirst]}
 			picks={strip}
 			width="md"
 		/>
 	{/if}
 	{#if call && card && onTurn}
 		{#if went.length > 0}<SinceStrip since={prev} {went} {teams} queue={false} />{/if}
-		<RoomCall view={call} action={{ label: `Make the pick on ${host}`, onclick: openHost }} />
+		<RoomCall view={call} action={{ label: makePickWords(c.host), onclick: openHost }} />
 		<Shortlist {card} {board} {chanceLabel} ranges={c.ranges} />
 	{:else if call}
-		<RoomCall view={call} action={{ label: `Queue him on ${host}`, onclick: openHost }} />
+		<RoomCall view={call} action={{ label: queueWords(c.host), onclick: openHost }} />
 	{/if}
 	{#if c.status !== 'complete'}
 		<Pool
@@ -158,7 +143,7 @@
 			left={board.players.length - drafted.size}
 			chance={card?.still_there ?? {}}
 			{chanceLabel}
-			chanceHead={card?.conditional ? 'Reaches' : 'Still there'}
+			chanceHead={chanceColumn(card)}
 			chanceShown={call !== null}
 			basis={call ? poolBasis(board, card, teams) : c.basis}
 			callId={call?.player.id ?? null}

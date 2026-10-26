@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { count as whole, ordinal } from '#lib/format/number.ts';
 	import type { MockReport } from '../api.ts';
+	import { REPORT, middleWords, topShareWords } from './headline.ts';
 
 	interface Props {
 		runs: MockReport['runs'];
@@ -42,17 +43,17 @@
 	{/each}
 </div>
 <div class="x">
-	<span>{round(bins.lo)}</span><span>median {round(runs.median)}</span><span>{round(bins.hi)}</span>
+	<span>{round(bins.lo)}</span><span>{REPORT.median} {round(runs.median)}</span><span
+		>{round(bins.hi)}</span
+	>
 </div>
 <div class="stats">
-	<div class="stat"><b>{round(runs.median)}</b><span>median starting points</span></div>
+	<div class="stat"><b>{round(runs.median)}</b><span>{REPORT.medianPoints}</span></div>
 	<div class="stat">
-		<b>{round(runs.middle_low)} to {round(runs.middle_high)}</b><span>the middle 80% of runs</span>
+		<b>{middleWords(runs.middle_low, runs.middle_high)}</b><span>{REPORT.middleRuns}</span>
 	</div>
 	<div class="stat">
-		<b>{Math.round(runs.top_share * 100)}%</b><span
-			>of runs finish top {runs.top_finish} of {teams}</span
-		>
+		<b>{Math.round(runs.top_share * 100)}%</b><span>{topShareWords(runs.top_finish, teams)}</span>
 	</div>
 </div>
 <!-- Every place, first to last, so the counts add up to every run. -->
