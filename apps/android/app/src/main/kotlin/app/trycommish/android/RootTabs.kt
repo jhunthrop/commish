@@ -30,6 +30,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.trycommish.core.phoneBar
@@ -156,8 +157,9 @@ fun Shell(
             nav.toSignIn()
         }
     }
-    // Back closes the open switch before it leaves the screen.
-    BackHandler(enabled = switchOpen) { switchOpen = false }
+    // The bar chooses the page back lands on: back from a tab's root opens the League tab, the start.
+    val shown by nav.currentBackStackEntryAsState()
+    LaunchedEffect(shown?.destination?.route) { tab = tabShown(shown?.destination?.route, tab) }
     // A bar that no longer holds the tab in view (the phase moved) opens its first tab.
     LaunchedEffect(bar) { if (bar.none { it.page == tab }) openTab(bar.first().page) }
 
@@ -214,7 +216,9 @@ fun Shell(
         ) { padding ->
             // The bars' room counted as taken, so a pin's imePadding lifts it only by what the keyboard adds.
             Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
-                Pages(graph, nav, state, bar, PageVerbs(shell::open, openLineup, ::openTab, choose, link, openGame))
+                PagesUnderSwitch(switchOpen, closeSwitch = { switchOpen = false }) {
+                    Pages(graph, nav, state, bar, PageVerbs(shell::open, openLineup, ::openTab, choose, link, openGame))
+                }
                 if (switchOpen) {
                     Box(
                         Modifier
@@ -244,6 +248,29 @@ private class PageVerbs(
     val link: (String) -> Unit,
     val openGame: (leagueId: String, roster: Int?) -> Unit,
 )
+
+/**
+ * The pages with the league switch's back registered after theirs: the dispatcher asks the last callback
+ * first, so back closes an open switch before the NavHost pops a page (Lane 218 device pass: registered
+ * before the pages, back popped the tab under the open switch).
+ */
+@Composable
+internal fun PagesUnderSwitch(
+    switchOpen: Boolean,
+    closeSwitch: () -> Unit,
+    pages: @Composable () -> Unit,
+) {
+    pages()
+    BackHandler(enabled = switchOpen, onBack = closeSwitch)
+}
+
+/** The tab the bar draws as chosen: the page shown when it is a tab's own page, else (a pushed screen, or
+ * nothing shown yet) the tab it sits on. */
+internal fun tabShown(
+    route: String?,
+    current: String,
+    pages: Collection<String> = PAGES.map { it.page },
+): String = route?.takeIf { it in pages } ?: current
 
 /** The tabs' pages and the pushed screens. */
 @Composable
