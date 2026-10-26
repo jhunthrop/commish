@@ -13,6 +13,18 @@ public struct LobbyScoreBug: Equatable, Sendable {
     public let yours: Bool
     /// What a screen reader hears at ten and five seconds on your own clock, else nil.
     public let spoken: String?
+    /// When the turn on the clock runs out, on the room's clock: what `at` redraws the clock from.
+    public let deadline: Date?
+
+    /// The bug at another moment on the room's clock: only the clock and what is spoken move.
+    public func at(_ now: Date) -> LobbyScoreBug {
+        let left = LobbyRoomModel.secondsLeft(deadline, now: now)
+        let mark = LobbyRoomModel.spokenMarks.last { left <= $0 }
+        return LobbyScoreBug(
+            round: round, pick: pick, onClock: onClock, clock: LobbyWords.clock(left), yourPick: yourPick,
+            yours: yours, spoken: yours ? mark.map(LobbyWords.secondsLeft) : nil, deadline: deadline
+        )
+    }
 }
 
 /// A seat in the seats strip (SeatsStrip.svelte): a person's seat names him and says how he is; a
@@ -34,6 +46,17 @@ public struct LobbySeatCell: Equatable, Sendable, Identifiable {
 public struct LobbyWait: Equatable, Sendable {
     public let count: String
     public let words: String
+    public let teams: Int
+    /// When the room starts with bots in the open seats, on the room's clock.
+    public let starts: Date?
+
+    /// The line at another moment on the room's clock: only its countdown moves.
+    public func at(_ now: Date) -> LobbyWait {
+        let left = starts.map { LobbyRoomModel.secondsLeft($0, now: now) } ?? 0
+        return LobbyWait(
+            count: count, words: LobbyWords.wait(teams: teams, secondsLeft: left), teams: teams, starts: starts
+        )
+    }
 }
 
 /// The room's call (RoomCall.svelte in the lobby): our call, its one verb, and whether the verb drafts
@@ -160,20 +183,17 @@ public struct LobbyRoomModel: Equatable, Sendable {
         guard lobby.drafting, let yourPick = facts.yourPick else {
             return nil
         }
-        let left = secondsLeft(lobby.deadline, now: now)
         let yours = yourPick == lobby.pickNumber
-        let mark = spokenMarks.last { left <= $0 }
         return LobbyScoreBug(
             round: LobbyWords.round(DraftFormat.snakeSlot(lobby.pickNumber, teams: facts.teams).round),
             pick: LobbyWords.pick(lobby.pickNumber, teams: facts.teams),
             onClock: facts.onClock.map { facts.names[$0 - 1] } ?? "",
-            clock: LobbyWords.clock(left),
+            clock: "",
             yourPick: yours
                 ? Words.Lobby.now
                 : LobbyWords.yourPickIn(yourPick, away: yourPick - lobby.pickNumber, teams: facts.teams),
-            yours: yours,
-            spoken: yours ? mark.map(LobbyWords.secondsLeft) : nil
-        )
+            yours: yours, spoken: nil, deadline: lobby.deadline
+        ).at(now)
     }
 
     /// The whole seconds left before a clock runs out, never below none (the web's Math.ceil).
@@ -210,10 +230,10 @@ public struct LobbyRoomModel: Equatable, Sendable {
     }
 
     static func wait(room: LobbyRoom, lobby _: LobbyState, now: Date, people: Int) -> LobbyWait {
-        let left = room.fillDeadline.map { secondsLeft($0, now: now) } ?? 0
-        return LobbyWait(
-            count: "\(LobbyWords.fill(people).words).", words: LobbyWords.wait(teams: room.teams, secondsLeft: left)
-        )
+        LobbyWait(
+            count: "\(LobbyWords.fill(people).words).", words: "", teams: room.teams,
+            starts: room.fillDeadline
+        ).at(now)
     }
 
     /// LandingStrip.svelte: the last round of picks, newest first, each credited to who made it.

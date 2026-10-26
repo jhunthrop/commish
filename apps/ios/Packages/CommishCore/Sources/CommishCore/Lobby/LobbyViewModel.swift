@@ -58,18 +58,39 @@ public final class LobbyViewModel {
     }
 
     public private(set) var state: State = .loading
-    public private(set) var room: LobbyRoom?
+    public private(set) var room: LobbyRoom? {
+        didSet { redraw() }
+    }
+
     public private(set) var board: RoomBoardView?
-    public private(set) var lobby: LobbyState?
-    public private(set) var card: RoomCard?
+    public private(set) var lobby: LobbyState? {
+        didSet { redraw() }
+    }
+
+    public private(set) var card: RoomCard? {
+        didSet { redraw() }
+    }
+
     /// The pool's chip and the marked row.
-    public private(set) var filter = "All"
-    public private(set) var marked: String?
+    public private(set) var filter = "All" {
+        didSet { redraw() }
+    }
+
+    public private(set) var marked: String? {
+        didSet { redraw() }
+    }
+
+    /// The room as the screen draws it, built when its state changes (a row, the card, the chip, the
+    /// mark), never on the clock's tick: the score bug and the filling line redraw their countdowns
+    /// from it (`LobbyScoreBug.at`, `LobbyWait.at`) on the room's clock.
+    public private(set) var drawn: LobbyRoomModel?
     /// The socket stopped for good: the room's sentence.
     public private(set) var stopped: String?
     public private(set) var leaving = false
     /// A leave the API refused, in its words, over the room.
     public private(set) var problem: String?
+    /// The room's refusal the member's last pick put away, so the notice stops showing it.
+    private var dismissed: String?
 
     public let id: String
     private let api: any LobbyAPI
@@ -129,10 +150,14 @@ public final class LobbyViewModel {
     }
 
     private func show(_ read: LobbyRoom) {
-        room = read
         board = RoomBoardView(read.board, teams: read.teams)
+        room = read
         lobby = LobbyState(room: read)
         state = .room
+    }
+
+    private func redraw() {
+        drawn = model(at: clock.now)
     }
 
     private func fail(_ error: any Error) {
@@ -202,7 +227,13 @@ public final class LobbyViewModel {
         if status == .reconnecting {
             return Words.Lobby.reconnecting
         }
-        return problem ?? socket?.refusal
+        if let problem {
+            return problem
+        }
+        guard let refusal = socket?.refusal, refusal != dismissed else {
+            return nil
+        }
+        return refusal
     }
 
     /// The room's clock: the phone's plus the latest welcome's offset.
@@ -237,13 +268,17 @@ public final class LobbyViewModel {
 
     /// Draft a player: the pick on the clock, as a command; it lands when its row comes back.
     public func draft(_ player: String?) async {
+        // The room's last refusal goes with the member's next pick (the page's `refused = null`).
+        dismissed = socket?.refusal
         guard let player, let lobby, let room, open,
               RoomDraft.seatAt(lobby.pickNumber, teams: room.teams) == room.you, lobby.drafting
         else {
             return
         }
         marked = nil
-        await socket?.send(.pick(playerID: player, pick: lobby.pickNumber))
+        if await socket?.send(.pick(playerID: player, pick: lobby.pickNumber)) == true {
+            dismissed = nil
+        }
     }
 
     /// Queue or unqueue a player: the whole queue as a command.

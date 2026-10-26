@@ -32,8 +32,16 @@ public struct MockSetupScreen: View {
         let theme = Theme(colorScheme)
         Group {
             if live {
-                ScrollView { form(theme) }
-                    .safeAreaInset(edge: .bottom, spacing: 0) { pin(theme) }
+                // A join asking for a handle scrolls its question into view, wherever the tap was.
+                ScrollViewReader { reader in
+                    ScrollView { form(theme) }
+                        .onChange(of: lobbies?.handleFor != nil) { _, asking in
+                            if asking {
+                                withAnimation { reader.scrollTo(Self.handleID, anchor: .top) }
+                            }
+                        }
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) { pin(theme) }
             } else {
                 VStack(spacing: 0) {
                     form(theme)
@@ -54,6 +62,7 @@ public struct MockSetupScreen: View {
                         }
                     }
                 }
+                .id(Self.handleID)
             }
             Text(Words.Mock.setupTitle)
                 .font(Faces.font(.num, size: Tokens.TypeScale.display, weight: .bold))
@@ -96,6 +105,9 @@ public struct MockSetupScreen: View {
                 .padding(.horizontal, Tokens.Space.s3)
         }
     }
+
+    /// The handle question's place in the scroll.
+    static let handleID = "lobby-handle"
 
     private func join(_ format: LobbyFormat) {
         guard let lobbies else {

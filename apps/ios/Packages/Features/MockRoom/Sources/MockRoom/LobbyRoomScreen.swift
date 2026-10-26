@@ -58,6 +58,8 @@ public struct LobbyRoomScreen: View {
     var shown = PoolModel.firstRows
     var more: () -> Void = {}
     var live = true
+    /// The room's clock from the phone's; nil draws the model's own moment (a snapshot).
+    var roomNow: ((Date) -> Date)?
 
     public init(
         model: LobbyRoomModel, notices: [String], complete: Bool, abandoned: Bool, actions: LobbyActions,
@@ -91,11 +93,23 @@ public struct LobbyRoomScreen: View {
     @ViewBuilder
     private var room: some View {
         if let bug = model.bug {
-            LobbyScoreBugView(bug: bug)
+            if let roomNow {
+                TimelineView(.periodic(from: .now, by: LobbyRoomView.tick)) { context in
+                    LobbyScoreBugView(bug: bug.at(roomNow(context.date)))
+                }
+            } else {
+                LobbyScoreBugView(bug: bug)
+            }
         }
         LobbySeatsView(seats: model.seats, live: live)
         if let wait = model.wait {
-            LobbyWaitView(wait: wait)
+            if let roomNow {
+                TimelineView(.periodic(from: .now, by: LobbyRoomView.tick)) { context in
+                    LobbyWaitView(wait: wait.at(roomNow(context.date)))
+                }
+            } else {
+                LobbyWaitView(wait: wait)
+            }
         }
         SinceView(strip: model.landing, straight: nil, live: live)
         if let call = model.call {
@@ -128,17 +142,21 @@ public struct LobbyRoomScreen: View {
         MockTeamView(title: Words.Room.yourTeam, team: model.team)
     }
 
-    func with(shown: Int, more: @escaping () -> Void) -> LobbyRoomScreen {
+    /// The live room: the pool's rows shown, its Show more, and the room's clock the score bug and the
+    /// filling line tick on (the rest of the room redraws only when its model changes).
+    func with(shown: Int, more: @escaping () -> Void, roomNow: @escaping (Date) -> Date) -> LobbyRoomScreen {
         var screen = self
         screen.shown = shown
         screen.more = more
+        screen.roomNow = roomNow
         return screen
     }
 }
 
 /// The lobby full screen with its view model (web/src/routes/lobby/[id] at 390): the close (the seat
 /// stays, its queue drafting until the member comes back) and the quiet Leave at the top, which asks
-/// the web's question with Stay beside it; the room scrolling under it, redrawn four times a second on the room's
+/// the web's question with Stay beside it; the room scrolling under it, its score bug and filling line redrawn four
+/// times a second on the room's
 /// clock;
 /// the report in its place once the member reads it. The socket lives as long as this screen.
 public struct LobbyRoomView: View {
@@ -193,15 +211,13 @@ public struct LobbyRoomView: View {
         case .loading:
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         case .room:
-            TimelineView(.periodic(from: .now, by: Self.tick)) { context in
-                ScrollView {
-                    if let model = viewModel.model(at: context.date) {
-                        LobbyRoomScreen(
-                            model: model, notices: notices, complete: viewModel.lobby?.complete == true,
-                            abandoned: viewModel.lobby?.abandoned == true, actions: actions
-                        )
-                        .with(shown: shown, more: { shown += PoolModel.moreRows })
-                    }
+            ScrollView {
+                if let model = viewModel.drawn {
+                    LobbyRoomScreen(
+                        model: model, notices: notices, complete: viewModel.lobby?.complete == true,
+                        abandoned: viewModel.lobby?.abandoned == true, actions: actions
+                    )
+                    .with(shown: shown, more: { shown += PoolModel.moreRows }, roomNow: viewModel.roomNow)
                 }
             }
         case let .failed(sentence, _):

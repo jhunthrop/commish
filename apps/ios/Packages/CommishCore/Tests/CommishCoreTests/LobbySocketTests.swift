@@ -130,6 +130,9 @@ struct LobbySocketTests {
         #expect(viewModel.lobby == end)
         #expect(viewModel.lobby?.complete == true)
         #expect(viewModel.lobby?.picks.count == 180)
+        // The drawn room follows the rows, not the clock: built when the last row landed.
+        #expect(viewModel.drawn == viewModel.model(at: Self.phone))
+        #expect(viewModel.drawn?.pool == nil)
         // Every pick of the drafter's went over the socket as the room's command, at the pick on the clock.
         let sent = await connector.sent.first ?? []
         let picks = sent.filter { $0["type"] == .string("pick") }
@@ -232,7 +235,8 @@ struct LobbySocketTests {
         #expect(hellos.last == .object(["type": .string("hello"), "last_seq": .number(0)]))
         // The skipped rows were never applied on their own: the state stopped before the gap.
         let gapStart = try #require(rows[cut].first?.seq)
-        #expect((stateBeforeGap?.seq ?? 0) < gapStart)
+        let before = try #require(stateBeforeGap)
+        #expect(before.seq < gapStart)
         #expect(try viewModel.lobby == Self.replayedEnd())
     }
 
