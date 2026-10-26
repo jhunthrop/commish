@@ -41,6 +41,14 @@ public final class AppSession {
         }
     }
 
+    /// Whether the phone is signed in (with or without a league followed).
+    public var isSignedIn: Bool {
+        if case .signedIn = state {
+            return true
+        }
+        return false
+    }
+
     /// The top bar's league switch at this moment.
     public var leagueSwitch: LeagueSwitchModel {
         LeagueSwitchModel(leagues: leagues, selected: selected?.id, now: clock.now, zone: zone)

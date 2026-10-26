@@ -94,10 +94,7 @@ struct RootTabs: View {
     }
 
     private var signedIn: Bool {
-        if case .signedIn = session.state {
-            return true
-        }
-        return false
+        session.isSignedIn
     }
 
     /// The site link the app was opened with, once signed in.
@@ -110,8 +107,9 @@ struct RootTabs: View {
         linked = nil
     }
 
-    /// Signed out: every tab's pushed screens let go, the League tab's sign-in shown.
+    /// Signed out: the mock room and every tab's pushed screens let go, the League tab's sign-in shown.
     private func showSignIn() {
+        mockRoom = nil
         sheet.close()
         switchOpen = false
         query = ""
