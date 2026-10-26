@@ -43,6 +43,8 @@ public final class RoomSocket {
     public nonisolated static let finalStatuses: Set<Int> = [401, 403, 404]
     nonisolated static let leftReason = "left the page"
     nonisolated static let unreadableReason = "unreadable frame"
+    /// The client's close when rows went missing and it resyncs from the welcome.
+    nonisolated static let resyncReason = "resync"
     nonisolated static let log = Logger(subsystem: "app.trycommish.ios", category: "room-socket")
 
     public private(set) var status: Status = .connecting
@@ -65,7 +67,10 @@ public final class RoomSocket {
     private let timer: any PollTimer
     private let onRows: @MainActor ([RoomRow]) -> Void
     private let onSignedOut: @MainActor () -> Void
+    private let onGap: (@MainActor () async -> Bool)?
     private var connection: (any RoomConnection)?
+    /// A frame skipped past the last seq applied: the socket was closed to resync from the welcome.
+    private var gapped = false
     /// The open socket where a cancellation, which runs off the main actor, can close it.
     private let live = LiveConnection()
     private var attempt = 0
@@ -75,8 +80,10 @@ public final class RoomSocket {
     public init(
         url: URL, connector: any RoomConnector, tokens: any TokenSource, clock: any Clock,
         timer: any PollTimer = SystemPollTimer(), lastSeq: Int64 = 0,
-        onRows: @escaping @MainActor ([RoomRow]) -> Void, onSignedOut: @escaping @MainActor () -> Void = {}
+        onRows: @escaping @MainActor ([RoomRow]) -> Void, onSignedOut: @escaping @MainActor () -> Void = {},
+        onGap: (@MainActor () async -> Bool)? = nil
     ) {
+        self.onGap = onGap
         self.url = url
         self.connector = connector
         self.tokens = tokens
@@ -110,6 +117,15 @@ public final class RoomSocket {
                 break
             }
             status = .reconnecting
+            if gapped {
+                // B219: rows went missing, so the owner reads the room again and the log replays whole
+                // from the welcome on the next socket, at once; a refused read ends it for good.
+                gapped = false
+                guard await resync() else {
+                    break
+                }
+                continue
+            }
             let wait = Self.retryLadder[min(attempt, Self.retryLadder.count - 1)]
             attempt += 1
             do {
@@ -169,7 +185,11 @@ public final class RoomSocket {
                     if case .welcome = frame {
                         welcomed = true
                     }
-                    receive(frame)
+                    if !receive(frame) {
+                        gapped = true
+                        await opened.close(code: Self.normal, reason: Self.resyncReason)
+                        return (RoomClosed(code: Self.normal, reason: Self.resyncReason), welcomed)
+                    }
                 } catch {
                     // Not JSON the room writes at all: closed as a protocol error and retried.
                     Self.log.error("room socket: unreadable frame, closing")
@@ -204,29 +224,49 @@ public final class RoomSocket {
         return true
     }
 
-    private func receive(_ frame: RoomFrame) {
+    /// Applies a frame; false when its rows skip past the last seq applied (a gap), which applies none.
+    private func receive(_ frame: RoomFrame) -> Bool {
         switch frame {
         case let .error(_, message):
             refusal = message
+            return true
         case let .welcome(_, now, rows):
             attempt = 0
             status = .open
             refusal = nil
             offset = now.timeIntervalSince(clock.now)
-            apply(rows)
+            return apply(rows)
         case let .update(_, rows):
-            apply(rows)
+            return apply(rows)
         }
     }
 
-    /// The rows past the last applied, in seq order; one already applied is never applied twice.
-    private func apply(_ rows: [RoomRow]) {
+    /// The rows past the last applied, in seq order; one already applied is never applied twice. With
+    /// an owner that resyncs, rows that skip past the next seq (`rows.first.seq > lastSeq + 1`) are a
+    /// gap and apply nothing (B219); without one they apply as the web's client does.
+    private func apply(_ rows: [RoomRow]) -> Bool {
         let fresh = rows.filter { $0.seq > lastSeq }.sorted { $0.seq < $1.seq }
-        guard let last = fresh.last else {
-            return
+        guard let first = fresh.first, let last = fresh.last else {
+            return true
+        }
+        if onGap != nil, first.seq > lastSeq + 1 {
+            Self.log.notice("room socket: seq gap after \(self.lastSeq), resyncing")
+            return false
         }
         lastSeq = last.seq
         onRows(fresh)
+        return true
+    }
+
+    /// The owner reads the room again (false when the read is refused for good) and the next socket
+    /// says hello from nothing, so its welcome carries the whole log.
+    private func resync() async -> Bool {
+        guard let onGap, await onGap() else {
+            stopped = stopped ?? refusal
+            return false
+        }
+        lastSeq = 0
+        return !ended
     }
 }
 
