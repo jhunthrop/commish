@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
@@ -269,7 +272,7 @@ const (
 // appCode is the code an app's sign-in hands back for kind, under the
 // test challenge.
 func (h harness) appCode(acct auth.Account, kind auth.DeviceKind) string {
-	code, err := h.svc.AppCode(context.Background(), acct.ID, kind, testChallenge)
+	code, err := h.svc.AppCode(context.Background(), acct.ID, kind, testChallenge, "")
 	if err != nil {
 		h.t.Fatalf("app code: %v", err)
 	}
@@ -366,10 +369,10 @@ func TestCodesPairOnlyTheirKind(t *testing.T) {
 	if status != http.StatusBadRequest {
 		t.Fatalf("an unknown kind: %d %s", status, body)
 	}
-	if _, err := h.svc.AppCode(context.Background(), alice.ID, auth.KindExtension, testChallenge); err == nil {
+	if _, err := h.svc.AppCode(context.Background(), alice.ID, auth.KindExtension, testChallenge, ""); err == nil {
 		t.Fatal("an app code was minted for the extension")
 	}
-	if _, err := h.svc.AppCode(context.Background(), alice.ID, auth.KindIOS, ""); err == nil {
+	if _, err := h.svc.AppCode(context.Background(), alice.ID, auth.KindIOS, "", ""); err == nil {
 		t.Fatal("an app code was minted with no challenge")
 	}
 }
@@ -452,4 +455,103 @@ func TestAppTokensLapseWhenIdle(t *testing.T) {
 	if status, _ := h.call(http.MethodGet, "/devices/me", ext.Token, nil); status != http.StatusOK {
 		t.Fatalf("an extension token lapsed: %d", status)
 	}
+}
+
+// The WorkOS session column (Lane 225, B212): an app's code carries the
+// sign-in's session to the device it pairs, and revoking the device
+// answers it and clears it from the row; the account page's revoke (a
+// cookie, no device on the request) is answered null; a code's id is
+// held to 200 characters; and the extension's device can never carry
+// one. Both refusals are the check constraint's own (23514).
+func TestDevicesKeepTheWorkOSSession(t *testing.T) {
+	h, alice, _ := newHarness(t)
+	ctx := context.Background()
+	store, ok := h.svc.Store.(*Store)
+	if !ok {
+		t.Fatal("the harness store is not the database's")
+	}
+
+	code, err := h.svc.AppCode(ctx, alice.ID, auth.KindAndroid, testChallenge, "session_store")
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, kept := h.pairAs(code, kindp(apitypes.DeviceKindAndroid), testVerifier)
+	if status != http.StatusCreated {
+		t.Fatalf("pair: %d", status)
+	}
+	h.clock.now = h.clock.now.Add(7 * time.Second) // under the pairing route's limit
+	none := h.pairApp(alice, auth.KindIOS)
+
+	if sid, err := store.Revoke(ctx, alice.ID, kept.Device.Id, h.clock.now); err != nil || sid != "session_store" {
+		t.Fatalf("revoke answered %q, %v", sid, err)
+	}
+	var left *string
+	if err := store.Pool.QueryRow(ctx, `select workos_session_id from app.devices where id = $1`, kept.Device.Id).Scan(&left); err != nil || left != nil {
+		t.Fatalf("the revoked device kept %v (%v)", left, err)
+	}
+	if _, err := store.Revoke(ctx, alice.ID, kept.Device.Id, h.clock.now); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("revoking twice: %v", err)
+	}
+	status, body := h.signedIn(h.svc.revoke, alice, http.MethodDelete, none.Device.Id.String())
+	if status != http.StatusOK || string(body) != "null" {
+		t.Fatalf("the account page's revoke: %d %s", status, body)
+	}
+
+	hash := codeHash(h.svc.CodeKey, "acorn amber anchor apple arch atlas")
+	long := strings.Repeat("s", 201)
+	if err := store.PutCode(ctx, alice.ID, Binding{Kind: auth.KindIOS, Challenge: testChallenge}, hash, h.clock.now.Add(CodeTTL), long); !isCheckViolation(err) {
+		t.Fatalf("a code with a 201-character WorkOS session: %v", err)
+	}
+	status, body = h.call(http.MethodPost, "/devices/pair", "", apitypes.PairInput{Code: h.code(alice)})
+	var ext apitypes.Paired
+	if status != http.StatusCreated || json.Unmarshal(body, &ext) != nil {
+		t.Fatalf("extension pair: %d", status)
+	}
+	_, err = store.Pool.Exec(ctx, `update app.devices set workos_session_id = 'session_ext' where id = $1`, ext.Device.Id)
+	if !isCheckViolation(err) {
+		t.Fatalf("an extension device carried a WorkOS session: %v", err)
+	}
+}
+
+// The deploy window (Lane 225 review L2): the binary before Lane 225
+// upserts the account page's code over an app code without naming the
+// WorkOS column, so the row keeps the app's id beside kind 'extension'.
+// The codes check takes it, and pairing the extension from it answers 201
+// with no id on the extension's device.
+func TestAnOldBinarysExtensionCodeOverAnAppCodePairs(t *testing.T) {
+	h, alice, _ := newHarness(t)
+	ctx := context.Background()
+	store, ok := h.svc.Store.(*Store)
+	if !ok {
+		t.Fatal("the harness store is not the database's")
+	}
+	if _, err := h.svc.AppCode(ctx, alice.ID, auth.KindIOS, testChallenge, "session_app"); err != nil {
+		t.Fatal(err)
+	}
+	const code = "acorn amber anchor apple arch atlas"
+	// main's PutCode before Lane 225, word for word.
+	if _, err := store.Pool.Exec(ctx, `insert into app.device_pair_codes (account_id, code_hash, expires_at, kind, code_challenge)
+		values ($1, $2, $3, $4, $5)
+		on conflict (account_id) do update
+		  set code_hash = excluded.code_hash, expires_at = excluded.expires_at, kind = excluded.kind,
+		      code_challenge = excluded.code_challenge, created_at = now()`,
+		alice.ID, codeHash(h.svc.CodeKey, code), h.clock.now.Add(CodeTTL), string(auth.KindExtension), nil); err != nil {
+		t.Fatalf("the old binary's extension code: %v", err)
+	}
+	status, body := h.call(http.MethodPost, "/devices/pair", "", apitypes.PairInput{Code: code})
+	var ext apitypes.Paired
+	if status != http.StatusCreated || json.Unmarshal(body, &ext) != nil {
+		t.Fatalf("extension pair from the old binary's code: %d %s", status, body)
+	}
+	var sid *string
+	if err := store.Pool.QueryRow(ctx, `select workos_session_id from app.devices where id = $1`, ext.Device.Id).Scan(&sid); err != nil || sid != nil {
+		t.Fatalf("the extension device holds %v (%v)", sid, err)
+	}
+}
+
+// isCheckViolation reports whether err is Postgres refusing a check
+// constraint (23514).
+func isCheckViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23514"
 }

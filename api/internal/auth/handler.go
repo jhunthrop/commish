@@ -32,6 +32,9 @@ const (
 	// site, with the pairing code: the universal link on iOS and the app
 	// link on Android (the web serves the association files).
 	appSignedIn = "/app/signed-in"
+	// SignedOutPath is where a sign-out lands on the site: the return of
+	// the WorkOS logout URL for a browser and for an app alike.
+	SignedOutPath = "/"
 )
 
 // Rate limits for the auth routes.
@@ -57,9 +60,11 @@ type AccountStore interface {
 
 // AppCodes mints the pairing code an app's sign-in hands back to the
 // app, good for one device of kind and only with the verifier behind
-// challenge. devices.Service implements it.
+// challenge. The WorkOS session the sign-in began rides on the code to
+// the device it pairs, so the device's sign-out can end it.
+// devices.Service implements it.
 type AppCodes interface {
-	AppCode(ctx context.Context, accountID uuid.UUID, kind DeviceKind, challenge string) (string, error)
+	AppCode(ctx context.Context, accountID uuid.UUID, kind DeviceKind, challenge, workosSID string) (string, error)
 }
 
 // Handler serves /auth and /me.
@@ -239,42 +244,55 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, problem, http.StatusFound)
 		return
 	}
-	// Signing in again replaces this browser's session: the one its
-	// cookie names, if any, ends before the new one is issued.
-	if old, ok := h.Sessions.Token(r); ok {
-		if _, err := h.Store.DeleteSession(r.Context(), hashToken(old)); err != nil {
-			h.Log.Error("auth: callback", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
-			http.Redirect(w, r, problem, http.StatusFound)
-			return
-		}
+	// An app's sign-in pairs a device and makes no site session: no
+	// client would hold its cookie (the app's sheet keeps its own), and
+	// on a phone whose browser shares the sheet's cookies the site would
+	// stay signed in after the app signs out. The WorkOS session goes to
+	// the device instead.
+	if st.Client.IsApp() {
+		h.claimAnon(w, r, acct.ID)
+		h.returnToApp(w, r, acct.ID, appSignIn{Client: st.Client, Challenge: st.Challenge}, id.SessionID)
+		return
 	}
-	token, hash := newToken()
-	if err := h.Store.CreateSession(r.Context(), acct.ID, hash, id.SessionID, r.UserAgent(), h.Now()); err != nil {
+	if err := h.startSiteSession(w, r, acct.ID, id.SessionID); err != nil {
 		h.Log.Error("auth: callback", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
 		http.Redirect(w, r, problem, http.StatusFound)
 		return
 	}
-	h.Sessions.Issue(w, token)
 	h.claimAnon(w, r, acct.ID)
-	if st.Client.IsApp() {
-		h.returnToApp(w, r, acct.ID, appSignIn{Client: st.Client, Challenge: st.Challenge})
-		return
-	}
 	http.Redirect(w, r, h.site(st.ReturnTo), http.StatusFound)
+}
+
+// startSiteSession issues a browser's session cookie for the account.
+// Signing in again replaces this browser's session: the one its cookie
+// names, if any, ends before the new one is issued.
+func (h *Handler) startSiteSession(w http.ResponseWriter, r *http.Request, accountID uuid.UUID, workosSID string) error {
+	if old, ok := h.Sessions.Token(r); ok {
+		if _, err := h.Store.DeleteSession(r.Context(), hashToken(old)); err != nil {
+			return err
+		}
+	}
+	token, hash := newToken()
+	if err := h.Store.CreateSession(r.Context(), accountID, hash, workosSID, r.UserAgent(), h.Now()); err != nil {
+		return err
+	}
+	h.Sessions.Issue(w, token)
+	return nil
 }
 
 // returnToApp hands a signed-in app its pairing code on the app link,
 // which the app trades at POST /devices/pair, with the verifier behind
 // the sealed challenge, for its device token. The link is built here
 // from the site, never read from the request, so the code goes nowhere
-// else, and without the verifier it pairs nothing.
-func (h *Handler) returnToApp(w http.ResponseWriter, r *http.Request, accountID uuid.UUID, app appSignIn) {
+// else, and without the verifier it pairs nothing. The code carries the
+// sign-in's WorkOS session to the device.
+func (h *Handler) returnToApp(w http.ResponseWriter, r *http.Request, accountID uuid.UUID, app appSignIn, workosSID string) {
 	if h.AppCodes == nil || !ValidChallenge(app.Challenge) {
 		h.Log.Error("auth: app sign-in", "request_id", httpx.RequestIDFrom(r.Context()), "err", "no app codes or no challenge")
 		http.Redirect(w, r, h.site(signInProblem), http.StatusFound)
 		return
 	}
-	code, err := h.AppCodes.AppCode(r.Context(), accountID, app.Client, app.Challenge)
+	code, err := h.AppCodes.AppCode(r.Context(), accountID, app.Client, app.Challenge, workosSID)
 	if err != nil {
 		h.Log.Error("auth: app sign-in", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
 		http.Redirect(w, r, h.site(signInProblem), http.StatusFound)
@@ -310,7 +328,7 @@ func (h *Handler) claimAnon(w http.ResponseWriter, r *http.Request, accountID uu
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
-	to := h.site("/")
+	to := h.site(SignedOutPath)
 	if token, ok := h.Sessions.Token(r); ok {
 		sid, err := h.Store.DeleteSession(r.Context(), hashToken(token))
 		if err != nil {

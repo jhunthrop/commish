@@ -1673,7 +1673,10 @@ export interface paths {
 		get?: never;
 		put?: never;
 		post?: never;
-		/** Unpair a browser. Its token opens nothing from the next request on. */
+		/**
+		 * Unpair a browser. Its token opens nothing from the next request on.
+		 * @description An app signing itself out (its own device token, its own id) is answered a DeviceSignOut: the WorkOS logout URL that ends the sign-in's WorkOS session, or url null for a device paired before the API kept it. Any other unpairing (the account page's cookie, or an app unpairing another device) is answered data null.
+		 */
 		delete: operations['revokeDevice'];
 		options?: never;
 		head?: never;
@@ -1969,6 +1972,10 @@ export interface components {
 		};
 		Redirect: {
 			url: string;
+		};
+		DeviceSignOut: {
+			/** @description The WorkOS logout URL the app opens to end the sign-in's WorkOS session, returning to the site; null when the device was paired before the API kept the session. */
+			url: string | null;
 		};
 		/** @enum {string} */
 		Feature:
@@ -8370,7 +8377,15 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			200: components['responses']['EmptyResponse'];
+			/** @description unpaired */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['DeviceSignOut'] | null;
+					};
+				};
+			};
 			404: components['responses']['ErrorResponse'];
 		};
 	};
