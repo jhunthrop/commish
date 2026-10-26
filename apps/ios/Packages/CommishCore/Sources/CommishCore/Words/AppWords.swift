@@ -86,6 +86,13 @@ public enum AppWords {
         public static let stay = "Keep drafting"
     }
 
+    /// The lobby room full screen: its close keeps the seat (the queue drafts it until the member comes
+    /// back, as a closed tab on the web), so it does not ask; Leave asks the web's question.
+    public enum Lobby {
+        public static let close = "Close the room"
+        public static let title = "Mock draft"
+    }
+
     /// The league the app opens until the Leagues screen lets the member pick one.
     public enum LeagueList {
         public static let none = "Follow a league on trycommish.app and it shows here."
