@@ -14,6 +14,8 @@ export const MOCK = {
 	wall: 'The wall',
 	queue: 'Queue',
 	queued: 'Queued',
+	/** Under a pick in the since strip that came off your queue. */
+	queuedTag: 'queued',
 	draft: 'Draft',
 	noCall: 'No call for this pick. Draft from the pool.',
 	theirTeam: 'Their team',

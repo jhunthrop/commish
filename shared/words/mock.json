@@ -7,6 +7,7 @@
 	"wall": "The wall",
 	"queue": "Queue",
 	"queued": "Queued",
+	"queuedTag": "queued",
 	"draft": "Draft",
 	"noCall": "No call for this pick. Draft from the pool.",
 	"theirTeam": "Their team",

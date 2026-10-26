@@ -889,6 +889,7 @@ object Words {
         const val wall = "The wall"
         const val queue = "Queue"
         const val queued = "Queued"
+        const val queuedTag = "queued"
         const val draft = "Draft"
         const val noCall = "No call for this pick. Draft from the pool."
         const val theirTeam = "Their team"

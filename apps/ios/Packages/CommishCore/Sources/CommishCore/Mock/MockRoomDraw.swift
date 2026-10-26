@@ -106,7 +106,7 @@ extension MockRoomModel {
                 let isQueued = queued.contains(player.id)
                 return StripFace(
                     id: pick, player: player, name: DraftFormat.lastName(player.name),
-                    lines: isQueued ? [label, "queued"] : [label], newest: false, strong: isQueued
+                    lines: isQueued ? [label, Words.Mock.queuedTag] : [label], newest: false, strong: isQueued
                 )
             }
         )

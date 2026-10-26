@@ -887,6 +887,7 @@ public enum Words {
         public static let wall = "The wall"
         public static let queue = "Queue"
         public static let queued = "Queued"
+        public static let queuedTag = "queued"
         public static let draft = "Draft"
         public static let noCall = "No call for this pick. Draft from the pool."
         public static let theirTeam = "Their team"
