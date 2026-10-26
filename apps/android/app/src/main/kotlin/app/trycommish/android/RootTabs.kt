@@ -17,10 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -44,7 +41,6 @@ import app.trycommish.core.shell.FollowedLeague
 import app.trycommish.core.shell.LEAGUE_PAGE
 import app.trycommish.core.shell.LINEUP_PAGE
 import app.trycommish.core.shell.MATCHUP_PAGE
-import app.trycommish.core.shell.PlayerSheetHost
 import app.trycommish.core.shell.ShellDestination
 import app.trycommish.core.shell.ShellRoute
 import app.trycommish.core.shell.ShellState
@@ -72,6 +68,9 @@ import app.trycommish.feature.shell.TopBarActions
 /** Every page any bar opens (Rail.generated.kt), each its own route. */
 private val PAGES: List<RailItem> =
     (Rail.byKey.values.flatten() + Rail.withoutLeague + Rail.withoutLeagueBySeason.values.flatten()).distinctBy { it.page }
+
+/** Every page a tab opens, whose saved stacks a sign-in or sign-out lets go. */
+internal val SHELL_PAGES: List<String> = PAGES.map { it.page }
 
 /** The tabs drawn by their own screens; the rest show their name until their lane lands. */
 private val LIVE_PAGES =
@@ -138,16 +137,13 @@ fun Shell(
     val shell: ShellViewModel = viewModel { graph.shellViewModel() }
     val signedIn by graph.signedIn.collectAsStateWithLifecycle()
     val generation by graph.generation.collectAsStateWithLifecycle()
-    // The account the shell was built for: a rotation or a new process starts on the one in hand, and only a
-    // sign-in or sign-out while the shell is up moves it.
-    var builtFor by remember { mutableIntStateOf(generation) }
     val state by shell.state.collectAsStateWithLifecycle()
-    val sheet = remember { PlayerSheetHost() }
-    var tab by rememberSaveable { mutableStateOf(LEAGUE_PAGE) }
-    var switchOpen by rememberSaveable { mutableStateOf(false) }
-    var query by rememberSaveable { mutableStateOf("") }
-    // The mock room open full screen over the shell, its bars hidden while drafting.
-    var mockRoom by rememberSaveable { mutableStateOf<String?>(null) }
+    val chrome = rememberShellChrome()
+    val sheet = chrome.sheet
+    var tab by chrome::tab
+    var switchOpen by chrome::switchOpen
+    var query by chrome::query
+    var mockRoom by chrome::mockRoom
     // Read from the collected state, so the bar follows every answer and choice.
     val bar = if (signedIn && state != ShellState.SignedOut) shell.bar() else phoneBar(null, null)
 
@@ -162,41 +158,31 @@ fun Shell(
     }
 
     // A site link a screen follows: a reference page (ADP, Compare, the clubs, a club, the schedule) or a
-    // player's page is pushed on the tab in view, as the web links them; any other opens on the site.
+    // player's page is pushed on the tab in view, as the web links them; any other opens on the site. Signed
+    // out, a page that waits for the sign-in (the companion) is held as an app link is (B213).
     val uri = LocalUriHandler.current
     val link: (String) -> Unit = { url ->
-        (SiteLinks.reference(url) ?: SiteLinks.companion(url) ?: SiteLinks.mock(url))?.let(::push)
-            ?: SiteLinks.playerSlug(url)?.let { push(ShellRoute.Player(it)) }
-            ?: uri.openUri(url)
+        val route = SiteLinks.reference(url) ?: SiteLinks.companion(url) ?: SiteLinks.mock(url)
+        when {
+            route != null && (signedIn || route.isPublic) -> push(route)
+            route != null -> graph.openLink(route)
+            else -> SiteLinks.playerSlug(url)?.let { push(ShellRoute.Player(it)) } ?: uri.openUri(url)
+        }
     }
 
-    // Each sign-in and sign-out rebuilds the shell for the account in hand (iOS's generation): every tab's
-    // stack and the view models on it, the room, the sheet, the switch and the search let go, and the shell's
-    // account forgotten, so nothing one member opened shows to the next. Signed in, the account
-    // is read; signed out, the League tab is the sign-in.
-    LaunchedEffect(generation, signedIn) {
-        if (generation != builtFor) {
-            switchOpen = false
-            query = ""
-            tab = LEAGUE_PAGE
-            // The room over the stacks goes too (Lane 214 review M2).
-            mockRoom = null
-            sheet.close()
-            shell.forget()
-            nav.startOver()
-            builtFor = generation
-        }
-        if (signedIn) shell.open()
-    }
-    // An app link's screen: a public page (a shared mock, the mock setup) at once, signed in or out; the
-    // companion once the device is signed in (B213). Pushed once the shell is built for the account in hand.
+    // Signed in, the account is read; signed out, the League tab is the sign-in.
+    LaunchedEffect(generation, signedIn) { if (signedIn) shell.open() }
+    // Each sign-in and sign-out rebuilds the shell for the account in hand (iOS's generation, kept by the
+    // shell's view model so a rotation still finds it owed): every tab's stack and the view models on it, the
+    // room, the sheet, the switch and the search let go, so nothing one member opened shows to the next. Then
+    // a held app link: a public page (a shared mock, the mock setup) at once, signed in or out; the companion
+    // once the device is signed in (B213).
     val asked by graph.link.collectAsStateWithLifecycle()
-    LaunchedEffect(asked, signedIn, builtFor) {
-        val route = asked ?: return@LaunchedEffect
-        if (!signedIn && !route.isPublic) return@LaunchedEffect
-        if (builtFor != generation) return@LaunchedEffect
-        graph.linkOpened()
-        push(route)
+    LaunchedEffect(generation, signedIn, asked) {
+        chrome.follow(shell, nav, signedIn, asked)?.let { route ->
+            graph.linkOpened()
+            push(route)
+        }
     }
     // The bar chooses the page shown: drawn from the back stack on the frame back lands, kept for a rotation.
     val shown by nav.currentBackStackEntryAsState()
@@ -534,7 +520,7 @@ private fun NavGraphBuilder.reference(
 /** A sign-in or a sign-out: back to a new League tab with nothing above or under it, and no tab's saved
  * stack kept (an Account left open on another tab would come back with the last account's words). The start
  * entry goes too, so no view model on any entry (a League home, a mock setup) passes to the next account. */
-internal fun NavHostController.startOver(pages: List<String> = PAGES.map { it.page }) {
+internal fun NavHostController.startOver(pages: List<String> = SHELL_PAGES) {
     pages.forEach { clearBackStack(it) }
     navigate(LEAGUE_PAGE) {
         popUpTo(graph.findStartDestination().id) { inclusive = true }

@@ -112,7 +112,7 @@ class AppGraph(
     private val cache: Cache = FileCache(context.cacheDir.resolve("answers")) { what, e -> Log.w(TAG, what, e) }
     private val transport = Transport(apiBaseUrl, token = { session.token })
     private val reads: LeagueReads = ApiLeagueReads(transport)
-    private val account: AccountReads = ApiAccountReads(transport)
+    private val account: AccountReads = ApiAccountReads(transport, BuildConfig.WORKOS_LOGOUT_HOST)
     private val lineups: LineupReads = ApiLineupReads(transport)
     private val matchups: MatchupReads = ApiMatchupReads(transport)
     private val waivers: WaiverReads = ApiWaiverReads(transport)
@@ -161,7 +161,8 @@ class AppGraph(
         SignInState(
             session,
             cache,
-            SignOut(session, cache, account::revokeDevice, { openLogout(appContext, it) }) { Log.w(TAG, "revoke device", it) },
+            SignOut(session, cache, account::revokeDevice) { Log.w(TAG, "revoke device", it) },
+            openLogout = { url -> openEphemeral(appContext, url, newTask = true) { Log.w(TAG, "open the logout", it) } },
         )
 
     /** Whether the device holds a token, for the tabs that need one. */
@@ -174,7 +175,7 @@ class AppGraph(
     val signInMessage: StateFlow<String?> = signInState.message
 
     private val signIn = SignIn(apiBaseUrl, returnTo, Build.MODEL, ApiPairing(transport), session, SecureRandom())
-    val signInFlow = SignInFlow(signIn, returnTo)
+    val signInFlow = SignInFlow(signIn, returnTo) { Log.w(TAG, "open the sign-in", it) }
 
     /** The API refused the token: forget it and every kept answer, and ask for a sign-in. */
     val sessionEnd: SessionEnd = signInState.sessionEnd
@@ -316,7 +317,7 @@ class AppGraph(
             AccountHooks(::signOut, sessionEnd, leaguesChanged, signInState::holdsToken),
         )
 
-    fun shellViewModel(): ShellViewModel = ShellViewModel(account, cache, clock, zone, sessionEnd)
+    fun shellViewModel(): ShellViewModel = ShellViewModel(account, cache, clock, zone, sessionEnd, signInState)
 
     /** The member signs this phone out (the Account's Sign out, or its own row's): the API forgets its
      * sign-in when it can be reached, the phone forgets its token and every kept answer whatever the API

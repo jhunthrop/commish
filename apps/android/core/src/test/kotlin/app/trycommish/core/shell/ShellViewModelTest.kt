@@ -2,14 +2,19 @@ package app.trycommish.core.shell
 
 import app.trycommish.api.Unauthorized
 import app.trycommish.api.models.SiteSeason
+import app.trycommish.core.AccountGeneration
 import app.trycommish.core.Cached
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
+import app.trycommish.core.MemorySession
 import app.trycommish.core.SessionEnd
+import app.trycommish.core.SignInState
+import app.trycommish.core.SignOut
 import app.trycommish.core.leaguehome.Fixtures
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -75,11 +80,32 @@ class ShellViewModelTest {
 
     private fun offline(): String = throw IOException("Unable to resolve host")
 
+    /** The phone's account generation, moved by hand. */
+    private class Accounts : AccountGeneration {
+        override val generation = MutableStateFlow(1)
+        private val hooks = mutableListOf<() -> Unit>()
+
+        override fun onSignOut(hook: () -> Unit): AutoCloseable {
+            hooks += hook
+            return AutoCloseable { hooks -= hook }
+        }
+
+        fun signedOut() {
+            generation.value++
+            hooks.toList().forEach { it() }
+        }
+
+        fun signedIn() {
+            generation.value++
+        }
+    }
+
     private fun viewModel(
         reads: AccountReads,
         cache: MemoryCache = MemoryCache(),
         ends: Ends = Ends(),
-    ) = ShellViewModel(reads, cache, clock, Fixtures.zone, ends)
+        accounts: AccountGeneration = Accounts(),
+    ) = ShellViewModel(reads, cache, clock, Fixtures.zone, ends, accounts)
 
     private fun ShellViewModel.ready(): ShellState.Ready = assertInstanceOf(ShellState.Ready::class.java, state.value)
 
@@ -314,6 +340,75 @@ class ShellViewModelTest {
             advanceUntilIdle()
             assertEquals(leagues[0].id, vm.ready().selected?.id)
             assertEquals(listOf(leagues[2].id), reads.selected)
+        }
+
+    @Test
+    fun `a read in flight at sign-out keeps nothing of the last account`() =
+        runTest(main) {
+            val gate = CompletableDeferred<Unit>()
+            val session = MemorySession("token", "device-1")
+            val cache = MemoryCache()
+            val state = SignInState(session, cache, SignOut(session, cache, { null }))
+            val vm = viewModel(FakeAccount({ ShellFixtures.meBody(leagues, leagues[1].id) }, gate = gate), cache, accounts = state)
+            vm.open()
+            runCurrent()
+            state.signOut()
+            assertEquals(ShellState.Restoring, vm.state.value)
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertNull(cache.read(ShellKeys.ACCOUNT))
+            assertNull(cache.read(ShellKeys.LAST_LEAGUE))
+            assertEquals(ShellState.Restoring, vm.state.value)
+        }
+
+    @Test
+    fun `a 401 for an account already let go signs nothing out`() =
+        runTest(main) {
+            val gate = CompletableDeferred<Unit>()
+            val ends = Ends()
+            val accounts = Accounts()
+            val reads =
+                object : AccountReads by FakeAccount({ "" }) {
+                    override suspend fun me(): String {
+                        gate.await()
+                        throw Unauthorized()
+                    }
+                }
+            val vm = viewModel(reads, ends = ends, accounts = accounts)
+            vm.open()
+            runCurrent()
+            // The generation moves with no hook (another account's sign-in); the read in flight answers 401.
+            accounts.signedIn()
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(0, ends.count)
+            assertEquals(ShellState.Restoring, vm.state.value)
+        }
+
+    @Test
+    fun `the shell rebuilds once per account, and a held link waits for the rebuild and its sign-in`() =
+        runTest(main) {
+            val accounts = Accounts()
+            val vm = viewModel(FakeAccount({ ShellFixtures.meBody(leagues, leagues[0].id) }), accounts = accounts)
+            val companion = ShellRoute.Companion("draft")
+            val shared = ShellRoute.SharedMock("abc123")
+            // Built for the account in hand at start: no rebuild, a public link opens signed out, the
+            // companion waits.
+            assertEquals(ShellStep(rebuild = false, push = shared), vm.step(signedIn = false, asked = shared))
+            assertEquals(ShellStep(rebuild = false, push = null), vm.step(signedIn = false, asked = companion))
+            // Signed in: the screens are owed a rebuild and nothing is pushed until it is done.
+            accounts.signedIn()
+            assertEquals(ShellStep(rebuild = true, push = null), vm.step(signedIn = true, asked = companion))
+            vm.rebuilt()
+            assertEquals(ShellStep(rebuild = false, push = companion), vm.step(signedIn = true, asked = companion))
+            vm.open()
+            advanceUntilIdle()
+            // Signed out: the account is forgotten at once and the rebuild is owed again.
+            accounts.signedOut()
+            assertEquals(ShellState.Restoring, vm.state.value)
+            assertEquals(ShellStep(rebuild = true, push = null), vm.step(signedIn = false, asked = shared))
+            vm.rebuilt()
+            assertEquals(ShellStep(rebuild = false, push = null), vm.step(signedIn = false, asked = null))
         }
 
     @Test

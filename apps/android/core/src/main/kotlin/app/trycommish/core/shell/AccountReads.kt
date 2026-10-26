@@ -9,6 +9,7 @@ import app.trycommish.api.bodyText
 import app.trycommish.api.models.DeviceSignOut
 import app.trycommish.api.models.LeagueChoice
 import kotlinx.serialization.SerializationException
+import java.net.URI
 import java.util.UUID
 
 /** The shell's reads and writes on the account: GET /me's body whole (kept as the API sent it), the
@@ -27,9 +28,11 @@ interface AccountReads {
     suspend fun revokeDevice(deviceId: String): String?
 }
 
-/** The account's calls through the generated clients. */
+/** The account's calls through the generated clients; a sign-out's logout URL is taken only when it names
+ * `logoutHost` (WorkOS's API; a rehearsal's stub in a debug build). */
 class ApiAccountReads(
     private val transport: Transport,
+    private val logoutHost: String = WORKOS_LOGOUT_HOST,
 ) : AccountReads {
     override suspend fun me(): String = transport.auth().getMe().bodyText()
 
@@ -40,12 +43,18 @@ class ApiAccountReads(
     }
 
     override suspend fun revokeDevice(deviceId: String): String? =
-        logoutUrlOf(transport.devices().revokeDevice(UUID.fromString(deviceId)).bodyText())
+        logoutUrlOf(transport.devices().revokeDevice(UUID.fromString(deviceId)).bodyText(), logoutHost)
 }
 
-/** The logout URL in a sign-out's answer: `data.url` when it is an https link, null for `{url: null}`,
- * `data: null`, an error envelope or a body that is not one. */
-internal fun logoutUrlOf(body: String): String? {
+/** The host WorkOS's logout URLs name (usermanagement GetLogoutURL). */
+const val WORKOS_LOGOUT_HOST = "api.workos.com"
+
+/** The logout URL in a sign-out's answer: `data.url` when it is an https link on `host`, null for
+ * `{url: null}`, `data: null`, an error envelope, a body that is not one, or a link anywhere else. */
+internal fun logoutUrlOf(
+    body: String,
+    host: String = WORKOS_LOGOUT_HOST,
+): String? {
     val envelope =
         try {
             CommishJson.decodeFromString<Envelope<DeviceSignOut>>(body)
@@ -55,7 +64,13 @@ internal fun logoutUrlOf(body: String): String? {
             return null
         }
     if (!envelope.ok || envelope.error != null) return null
-    return envelope.data?.url?.takeIf { it.startsWith(HTTPS) }
+    val url = envelope.data?.url ?: return null
+    val parsed = runCatching { URI(url) }.getOrNull() ?: return null
+    val named = parsed.host == host.substringBefore(':') && parsed.port == portOf(host)
+    return url.takeIf { parsed.scheme == HTTPS && parsed.rawUserInfo == null && named }
 }
 
-private const val HTTPS = "https://"
+/** The port a host override names ("localhost:18443"), -1 for none, as java.net.URI reads an absent one. */
+private fun portOf(host: String): Int = host.substringAfter(':', "").toIntOrNull() ?: -1
+
+private const val HTTPS = "https"
