@@ -19,16 +19,53 @@ public struct LobbyCard: Equatable, Sendable, Identifiable {
     public let seat: String?
 }
 
+/// Where the landing keeps the rooms the member holds a seat in, by format, across a relaunch: the
+/// phone's defaults in the app, memory in a test.
+@MainActor
+public protocol LobbySeatMemory: AnyObject {
+    var seats: [String: String] { get set }
+}
+
+/// The phone's defaults, one dictionary of format to room id.
+@MainActor
+public final class DefaultsLobbySeats: LobbySeatMemory {
+    static let key = "lobby.seats"
+    private let defaults: UserDefaults
+
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    public var seats: [String: String] {
+        get { defaults.dictionary(forKey: Self.key) as? [String: String] ?? [:] }
+        set { defaults.set(newValue, forKey: Self.key) }
+    }
+}
+
+/// Seats kept for the test's life only.
+@MainActor
+public final class MemoryLobbySeats: LobbySeatMemory {
+    public var seats: [String: String]
+
+    public init(_ seats: [String: String] = [:]) {
+        self.seats = seats
+    }
+}
+
 /// The open house drafts (the lobby list on the web's /mock/new, where /lobby goes): every format with
 /// how full its filling room is, a card each, one verb, Join. A join answers the room's id, which the
 /// app opens; a join without a handle asks for one first (HandlePrompt.svelte). The rooms the member
-/// joined this session are remembered so their card reads "Your seat" until the seat is gone.
+/// joined are remembered across a relaunch so their card reads "Your seat" while the seat is still
+/// the member's in a room still drafting or filling; every read checks it (B243 is the API's flag).
 @MainActor
 @Observable
 public final class LobbyLandingViewModel {
     public private(set) var lobbies: [LobbyFilling] = []
     /// The rooms joined, by format, while the API still seats the member in them.
-    public private(set) var seated: [String: String] = [:]
+    public var seated: [String: String] {
+        memory.seats
+    }
+
     public private(set) var busy = false
     public private(set) var problem: String?
     /// The format a join waits on a handle for, and the API's word on the last handle tried.
@@ -37,10 +74,15 @@ public final class LobbyLandingViewModel {
     public private(set) var read = false
 
     private let api: any LobbyAPI
+    private let memory: any LobbySeatMemory
     private let onSignedOut: @MainActor () -> Void
 
-    public init(api: any LobbyAPI, onSignedOut: @escaping @MainActor () -> Void = {}) {
+    public init(
+        api: any LobbyAPI, memory: any LobbySeatMemory = MemoryLobbySeats(),
+        onSignedOut: @escaping @MainActor () -> Void = {}
+    ) {
         self.api = api
+        self.memory = memory
         self.onSignedOut = onSignedOut
     }
 
@@ -79,8 +121,9 @@ public final class LobbyLandingViewModel {
         format.value1?.rawValue ?? format.value2 ?? ""
     }
 
-    /// The list read again (on appear and on pull), and each remembered seat checked: a seat the API
-    /// no longer holds for the member (403, 404) or a room that closed unattended is forgotten.
+    /// The list read again (on appear and on pull), and each remembered seat checked: one the API no
+    /// longer holds for the member (403, 404), a room drafted to its end or closed unattended, or a seat
+    /// the member left is forgotten, so the card offers Join again.
     public func load() async {
         do {
             lobbies = try await api.lobbies()
@@ -91,16 +134,22 @@ public final class LobbyLandingViewModel {
         read = true
         for (format, room) in seated {
             do {
-                let lobby = try await api.lobby(id: room)
-                if lobby.status.value1 == .abandoned {
-                    seated[format] = nil
+                if try await Self.over(api.lobby(id: room)) {
+                    memory.seats[format] = nil
                 }
             } catch where LobbyRefusal.isFinal(error) {
-                seated[format] = nil
+                memory.seats[format] = nil
             } catch {
                 // Offline: the seat stays until a read says otherwise.
             }
         }
+    }
+
+    /// A room the member's seat is no longer in play in: drafted to its end, closed unattended, or left.
+    static func over(_ room: LobbyRoom) -> Bool {
+        let status = room.status.value1
+        let mine = room.seats.first { $0.seat == room.you }.map(LobbySeats.kind)
+        return status == .complete || status == .abandoned || mine == .left
     }
 
     /// A card's verb: the room the member is seated in, or a seat in the format's filling room. Nil
@@ -117,7 +166,7 @@ public final class LobbyLandingViewModel {
         problem = nil
         do {
             let seat = try await api.join(format)
-            seated[Self.key(format)] = seat.roomId
+            memory.seats[Self.key(format)] = seat.roomId
             handleFor = nil
             return seat.roomId
         } catch is LobbyHandleNeeded {
@@ -150,13 +199,14 @@ public final class LobbyLandingViewModel {
         return nil
     }
 
-    /// The seat given up (Leave) or the room closed: its card offers Join again.
+    /// The seat given up (Leave), the room drafted to its end, or its report's Join another lobby: its
+    /// card offers Join again.
     public func forget(room: String) {
-        seated = seated.filter { $0.value != room }
+        memory.seats = seated.filter { $0.value != room }
     }
 
-    /// A room opened from elsewhere (Join another lobby): its card reads "Your seat".
+    /// A room opened from elsewhere (a closed lobby's Join another lobby): its card reads "Your seat".
     public func seat(_ room: String, format: LobbyFormat) {
-        seated[Self.key(format)] = room
+        memory.seats[Self.key(format)] = room
     }
 }

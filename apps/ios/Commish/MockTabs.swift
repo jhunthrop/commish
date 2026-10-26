@@ -37,7 +37,9 @@ struct MockSetupTab: View {
         _viewModel = State(initialValue: MockSetupViewModel(
             api: environment.api, from: from, seed: seed, onSignedOut: expired
         ))
-        _lobbies = State(initialValue: LobbyLandingViewModel(api: environment.api, onSignedOut: expired))
+        _lobbies = State(initialValue: LobbyLandingViewModel(
+            api: environment.api, memory: DefaultsLobbySeats(), onSignedOut: expired
+        ))
         self.environment = environment
         self.expired = expired
         self.start = start
@@ -59,6 +61,8 @@ struct MockSetupTab: View {
                     lobby = nil
                 },
                 show: { lobby = $0 },
+                forget: { lobbies.forget(room: $0) },
+                seat: { lobbies.seat($0, format: $1) },
                 solo: { id in
                     startAfter = id
                     lobby = nil
@@ -86,16 +90,32 @@ struct LobbyCover: View {
     let close: () -> Void
     let left: () -> Void
     let show: (OpenLobby) -> Void
+    /// A seat no longer in play (its room drafted to its end, or its report's Join another lobby), and a
+    /// seat taken from a closed lobby's Join another lobby: the landing's "Your seat" follows them.
+    let forget: (String) -> Void
+    let seat: (String, LobbyFormat) -> Void
     let solo: (String) -> Void
 
     var body: some View {
         if open.report {
-            LobbyReportCover(environment: environment, id: open.id, expired: expired, lobbies: close, solo: solo)
+            LobbyReportCover(
+                environment: environment, id: open.id, expired: expired,
+                lobbies: {
+                    forget(open.id)
+                    close()
+                },
+                solo: solo
+            )
         } else {
             LobbyRoomCover(
                 environment: environment, id: open.id, expired: expired, close: close, left: left,
                 report: { show(OpenLobby(id: open.id, report: true)) },
-                opened: { show(OpenLobby(id: $0)) }
+                completed: { forget(open.id) },
+                opened: { id, format in
+                    forget(open.id)
+                    seat(id, format)
+                    show(OpenLobby(id: id))
+                }
             )
             .id(open.id)
         }
@@ -107,12 +127,13 @@ struct LobbyRoomCover: View {
     private let close: () -> Void
     private let left: () -> Void
     private let report: () -> Void
-    private let opened: (String) -> Void
+    private let completed: () -> Void
+    private let opened: (String, LobbyFormat) -> Void
 
     init(
         environment: AppEnvironment, id: String, expired: @escaping @MainActor () -> Void,
         close: @escaping () -> Void, left: @escaping () -> Void, report: @escaping () -> Void,
-        opened: @escaping (String) -> Void
+        completed: @escaping () -> Void, opened: @escaping (String, LobbyFormat) -> Void
     ) {
         _viewModel = State(initialValue: LobbyViewModel(
             id: id, api: environment.api, connector: URLSessionRoomConnector(), tokens: environment.session,
@@ -121,11 +142,21 @@ struct LobbyRoomCover: View {
         self.close = close
         self.left = left
         self.report = report
+        self.completed = completed
         self.opened = opened
     }
 
     var body: some View {
-        LobbyRoomView(viewModel: viewModel, close: close, left: left, report: report, opened: opened)
+        LobbyRoomView(viewModel: viewModel, close: close, left: left, report: report) { id in
+            if let format = viewModel.room?.format {
+                opened(id, format)
+            }
+        }
+        .onChange(of: viewModel.lobby?.complete == true) { _, done in
+            if done {
+                completed()
+            }
+        }
     }
 }
 
