@@ -147,13 +147,15 @@ struct RankingsParity: Decodable, Sendable {
         let words: String
     }
 
-    /// figure-strip.ts StripCell as the parity pins it.
+    /// figure-strip.ts StripCell as the parity pins it, with its share of the strip's width as the
+    /// web's stripShare gives it, so the app's share is compared, never copied in silence.
     struct Cell: Decodable, Equatable, Sendable {
         let head: String
         let value: String
         let key: Bool
         let ease: String?
         let narrow: Bool
+        let share: Double
 
         init(_ cell: StripCell) {
             head = cell.head
@@ -161,6 +163,7 @@ struct RankingsParity: Decodable, Sendable {
             key = cell.key
             ease = cell.ease?.rawValue
             narrow = cell.narrow
+            share = cell.share
         }
     }
 

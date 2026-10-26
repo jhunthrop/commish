@@ -43,7 +43,8 @@ public struct RankingsModel: Equatable, Sendable {
     }
 }
 
-/// The order's heads: the # head, the week's ("Wk 6") and the big figure's (Projected).
+/// The order's heads: the # head, the week's ("Wk 6", pinned by the parity; drawn as the strip's Wk
+/// cell's head, not in the head row) and the big figure's (Projected).
 public struct RankingsHeads: Equatable, Sendable {
     public let rank: String
     public let week: String

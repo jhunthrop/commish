@@ -79,7 +79,10 @@ struct StripLayout: Layout {
     let gap: Double
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
-        let width = proposal.width ?? subviews.reduce(0) { $0 + $1.sizeThatFits(.unspecified).width }
+        // An unbounded proposal (a horizontal scroll, a fixed-size parent) takes the cells' ideal widths.
+        let ideal = subviews.reduce(0) { $0 + $1.sizeThatFits(.unspecified).width }
+            + gap * Double(max(0, subviews.count - 1))
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? ideal
         let tracks = tracks(width)
         let height = zip(subviews, tracks).map { view, track in
             view.sizeThatFits(ProposedViewSize(width: track, height: nil)).height

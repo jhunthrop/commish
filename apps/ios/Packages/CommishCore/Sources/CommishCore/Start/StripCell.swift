@@ -26,7 +26,7 @@ public struct StripCell: Equatable, Sendable, Identifiable {
         narrow ? Self.narrowShare : 1
     }
 
-    /// figure-strip.ts NARROW_SHARE.
+    /// figure-strip.ts stripShare's narrow share, held to the web's by the parity file's `share`.
     static let narrowShare = 0.6
 }
 
@@ -37,16 +37,17 @@ enum StripCells {
         StripCell(head: head, value: StartWords.number(value), key: key, opp: false, ease: nil, narrow: narrow)
     }
 
-    /// oppCell: the opponent's rank against his position, tinted, "--" without one (a bye, a list).
-    static func opp(_ row: StartRow) -> StripCell {
+    /// oppCell: the opponent's rank against his position (of the clubs ranked), tinted, "--" without
+    /// one (a bye, a list).
+    static func opp(rank: Int?, of clubs: Int?) -> StripCell {
         StripCell(
-            head: Words.Box.oppRank, value: row.oppRank.map { Formatting.ordinal($0) } ?? Words.Box.none,
-            key: false, opp: true, ease: row.oppRank.map { StartRows.ease($0, outOf: row.oppOf) }, narrow: false
+            head: Words.Box.oppRank, value: rank.map { Formatting.ordinal($0) } ?? Words.Box.none,
+            key: false, opp: true, ease: rank.map { StartRows.ease($0, outOf: clubs) }, narrow: false
         )
     }
 
     /// formCells: Avg and Last, the evidence every box score ends on.
-    static func form(_ row: StartRow) -> (avg: StripCell, last: StripCell) {
-        (figure(Words.Box.avg, row.avg), figure(Words.Box.last, row.last))
+    static func form(avg: Double?, last: Double?) -> (avg: StripCell, last: StripCell) {
+        (figure(Words.Box.avg, avg), figure(Words.Box.last, last))
     }
 }

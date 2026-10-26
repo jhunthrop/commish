@@ -12,10 +12,10 @@ import Testing
 /// (Saturday noon Central), both themes, iPhone 17 Pro and iPhone SE, at 1x: the top in season (every
 /// position), a position's view (WR), the kickers' week (K), a search ("wa", the matches at their places
 /// in the order), a row whose game line wraps (the RB view: Travis Etienne's kickoff, weather glyph and
-/// "Due back" chip take two lines), and the order saved and read again with no signal, stale with its
-/// stamp. A face draws
-/// its initials here (a snapshot loads no image). With SNAPSHOT_SHOTS set each is also written at its
-/// phone's own scale for the persona panel.
+/// "Due back" chip take two lines), every position scrolled to its three-digit ranks ("WR 125" to
+/// "WR 138", each pill whole), and the order saved and read again with no signal, stale with its stamp.
+/// A face draws its initials here (a snapshot loads no image). With SNAPSHOT_SHOTS set each is also
+/// written at its phone's own scale for the persona panel.
 @MainActor
 struct RankingsSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -29,6 +29,7 @@ struct RankingsSnapshotTests {
         case kicker
         case search
         case wrapped
+        case deep
         case stale
 
         var chip: RankingsChip? {
@@ -45,9 +46,19 @@ struct RankingsSnapshotTests {
         }
 
         /// The rows drawn: on the wrapped scene the list as far as the RB view's fifth row, its end in
-        /// view, as the phone shows it scrolled to Travis Etienne's row (the fourth).
+        /// view, as the phone shows it scrolled to Travis Etienne's row (the fourth); on the deep scene
+        /// every position's as far as its eightieth, scrolled to the three-digit receivers (review H1).
         var rows: Int {
-            self == .wrapped ? 5 : RankingsMock.firstRows
+            switch self {
+            case .wrapped: 5
+            case .deep: 80
+            default: RankingsMock.firstRows
+            }
+        }
+
+        /// The room shows the end of the rows drawn, as a list scrolled down to them.
+        var scrolled: Bool {
+            self == .wrapped || self == .deep
         }
     }
 
@@ -89,7 +100,7 @@ struct RankingsSnapshotTests {
         }
         return RankingsMock(
             viewModel: viewModel, content: content, device: item.device, rows: item.scene.rows,
-            scrolled: item.scene == .wrapped
+            scrolled: item.scene.scrolled
         )
     }
 

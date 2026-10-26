@@ -58,7 +58,8 @@ public struct RankingsPlayer: Equatable, Sendable {
     public let rank: String?
     public let status: RowStatus?
     public let game: RowGame
-    /// "Expected score CHI 26.5, ATL 23", while his game is to come.
+    /// "Expected score CHI 26.5, ATL 23", while his game is to come: pinned by the parity as the web
+    /// builds it; the phone's row does not draw it (the web's line drops it too).
     public let expected: String?
     public let weather: WeatherCell?
 
@@ -80,7 +81,8 @@ public struct RankingsRow: Equatable, Sendable, Identifiable {
     /// The # cell: his rank, the list's word for a player on a season-long list, or nothing for a bye.
     public let place: String
     public let bye: Bool
-    /// The week's column: his Pts once final, his Proj before, "--" without.
+    /// The week's figure: his Pts once final, his Proj before, "--" without. Pinned by the parity;
+    /// drawn as the strip's Wk cell (`cells[0]`), never a column of its own.
     public let week: String
     /// His rest-of-season Projected, the big figure.
     public let total: String
@@ -188,19 +190,19 @@ enum RankingsRows {
     /// after Projected with the key the # sorts on in ink, the opponent's rank, then Last; Avg where the
     /// view has no Over repl., so a strip holds five cells in every view.
     static func cells(_ row: OrderRow, week: Double?, weekHead: String, rankBy: RankBy, read: StartRow) -> [StripCell] {
-        let form = StripCells.form(read)
+        let form = StripCells.form(avg: read.avg, last: read.last)
         let season = rankBy == .pointsOverReplacement
             ? [StripCells.figure(Words.Order.overRepl, row.pointsOverReplacement, key: true)] : []
         return [StripCells.figure(weekHead, week, narrow: true)] + season + [
             StripCells.figure(Words.Order.perGame, row.line.restOfSeasonPerGame),
-            StripCells.opp(read),
+            StripCells.opp(rank: read.oppRank, of: read.oppOf),
         ] + (rankBy == .pointsOverReplacement ? [] : [form.avg]) + [form.last]
     }
 
     /// week.ts weekStripCells: Opp rank, Avg and Last.
     static func weekCells(_ read: StartRow) -> [StripCell] {
-        let form = StripCells.form(read)
-        return [StripCells.opp(read), form.avg, form.last]
+        let form = StripCells.form(avg: read.avg, last: read.last)
+        return [StripCells.opp(rank: read.oppRank, of: read.oppOf), form.avg, form.last]
     }
 
     /// order.ts weekFigure: once his game is final his points, else his Proj.

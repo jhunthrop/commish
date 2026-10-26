@@ -9,7 +9,11 @@ import SwiftUI
 enum RankingsColumn {
     static let rank: Double = 30
     static let face: Double = 28
-    static let pill: Double = 50
+    /// The pill's slot: as wide as the widest pill the order prints ("WR 149"), so a three-digit rank
+    /// is never cut and the club column starts at one x on every row (review H1).
+    static let pill: Double = 56
+    /// The pill's least width (the web's --line-pill), so short pills ("K", "RB") are one size.
+    static let pillLeast: Double = 50
     static let club: Double = 34
     static let total: Double = 62
     static let proj: Double = 52
@@ -31,7 +35,8 @@ struct RankingsNameLine: View {
             name.frame(maxWidth: .infinity, alignment: .leading)
             Group {
                 if let pill = player.pill {
-                    PositionPill(pill, minWidth: RankingsColumn.pill)
+                    // Its ideal width, never squeezed: the words are a fact (review H1).
+                    PositionPill(pill, minWidth: RankingsColumn.pillLeast).fixedSize()
                 } else {
                     Color.clear.frame(height: 1)
                 }
