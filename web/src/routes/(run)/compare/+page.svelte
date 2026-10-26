@@ -25,6 +25,10 @@
 	import StatusPill from '#lib/ui/StatusPill.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { COMPARE_PAGE, filled } from '#lib/site/reference-words.ts';
+	import { basisAtClock, placedAt, placedPair, type LivePlace } from '#lib/run/live-order.ts';
+	import { BUILD_ZONE, inSeasonStamp } from '#lib/front/live-board.ts';
+	import type { BasisPart } from '#lib/run/board-basis.ts';
+	import { memberZone } from '#lib/format/clock.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -50,13 +54,67 @@
 		return lead;
 	});
 	const figures = $derived(apiFormatOf(format));
-	const basis = $derived(data.basis[format.id] ?? []);
+	/** In season the pair at the order's clock, the one the Rankings read (Lane 220, B184): read for the
+	 * board's own format, the public order's, once both players are in. */
+	let atClock = $state<{ ids: string; places: Map<string, LivePlace>; lead: BasisPart } | null>(
+		null
+	);
+	const board = $derived(data.formats[0]);
+	$effect(() => {
+		const picked = [chosen.a, chosen.b].filter((player) => player !== null);
+		if (board?.rosFromWeek === undefined || picked.length < 2) return;
+		const ids = picked.map((player) => player.id).join(',');
+		if (atClock?.ids === ids) return;
+		let stale = false;
+		const ordered = { teams: board.teams, scoring: apiFormatOf(board) };
+		void import('#lib/run/live-order-read.ts')
+			.then(({ readOrder }) =>
+				Promise.all(picked.map((player) => readOrder(player.name, ordered, memberZone(), Date.now)))
+			)
+			.then((reads) => {
+				const last = reads.at(-1);
+				if (stale || last === undefined) return;
+				const places = new Map(reads.flatMap((read) => [...read.places]));
+				atClock = { ids, places, lead: last.lead };
+			})
+			.catch(() => {
+				if (!stale) atClock = null;
+			});
+		return () => {
+			stale = true;
+		};
+	});
+	/** The order's places for the pair when it places both in the compared format, else none: the
+	 * table is the run's or the order's, never one side of each. */
+	const placesShown = $derived(
+		placedPair(
+			[chosen.a?.id, chosen.b?.id].filter((id) => id !== undefined),
+			atClock?.places ?? null,
+			format.id,
+			board?.id ?? null
+		)
+	);
+	/** The member's zone once the page is live, the build's before (as the front door's stamp). */
+	let zone = $state(BUILD_ZONE);
+	onMount(() => {
+		zone = memberZone();
+	});
+	/** The order's lead once the pair is the order's, else the run's basis with its stamp (review M1). */
+	const basis = $derived(
+		basisAtClock(
+			data.basis[format.id] ?? [],
+			placesShown === null ? null : (atClock?.lead ?? null),
+			inSeasonStamp(format, zone)
+		)
+	);
 	const note = $derived(siteContext.notes?.lineFor(figures, 'These figures are') ?? null);
 
 	function sideOf(slot: Slot): Side | null {
 		const player = chosen[slot];
-		const numbers = player?.formats[format.id];
-		if (!player || !numbers) return null;
+		const run = player?.formats[format.id];
+		if (!player || !run) return null;
+		const place = placesShown?.get(player.id);
+		const numbers = place === undefined ? run : placedAt(run, place, format.teams);
 		return { player, numbers, bye: data.byes[player.team] ?? null };
 	}
 

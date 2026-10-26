@@ -10,6 +10,7 @@ import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { overReplacementWords } from '#lib/format/figure-words.ts';
 import { COLUMN_HEADS } from '#lib/ui/board-columns.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
+import { placedAt } from '#lib/run/live-order.ts';
 import type { BoardRowView } from '#lib/run/schema.ts';
 import type { components } from '#lib/api/types.ts';
 
@@ -48,6 +49,18 @@ export const STRIP_WORDS = {
  * its one stamp (C24): the front door's basis dates the run here alone. */
 export function runStampPart(refreshedAt: string, zone: string): BasisPart {
 	return { text: STRIP_WORDS.updated(dayTimeStamp(refreshedAt, zone)), phone: true };
+}
+
+/** The run's stamp on an in-season page while it shows the run's rows (Lane 220 review M1), null
+ * before the season or on a run that says no refresh: on game day the run and the order share a date,
+ * so its time says which clock the rows are on. */
+export function inSeasonStamp(
+	format: { rosFromWeek?: number; refreshedAt?: string },
+	zone: string
+): BasisPart | null {
+	return format.rosFromWeek === undefined || format.refreshedAt === undefined
+		? null
+		: runStampPart(format.refreshedAt, zone);
 }
 
 /** What Over replacement counts, said once under the heads (B46): the site's one definition
@@ -185,7 +198,7 @@ function builtRow(row: OrderRow, projected: number, vor: number, teams: number):
 }
 
 /** The strip at the API's clock: the answer's first `size` rows in its order, each the run's row for
- * him with the answer's Projected, Over repl., place, the round of a `teams`-team draft it falls in
+ * him with the answer's Projected, Over repl., place, his place at his position, the round of a `teams`-team draft it falls in
  * and his Avg, or a row built from the answer's line where the run's rows do not hold him. Null when
  * a row carries no figure or no board id, or the answer is short: the page then keeps the run's
  * strip and its stamp, never a strip half one board and half the other. */
@@ -209,24 +222,16 @@ export function liveStrip(
 			run === undefined
 				? builtRow(row, projected, vor, teams)
 				: {
-						...run,
-						projected,
-						vor,
-						ourRank: row.rank,
-						// The round his place falls in, as the run words it from its own rank (row-framing.ts).
-						vorRound: Math.ceil(row.rank / teams),
-						// The run's Gap is its ADP less its own rank: the live place leaves it unsaid.
-						gap: null,
+						// The order's rank, place at his position, figures and round (live-order.ts, Lane 220).
+						...placedAt(
+							run,
+							{ rank: row.rank, positionRank: row.line.position_rank, projected, vor },
+							teams
+						),
 						season: liveSeason(run, row.line)
 					};
 		if (shownRow === null) return null;
 		out.push(shownRow);
 	}
 	return out;
-}
-
-/** The run's basis led by the live lead (the run stamp is the run's strip's alone). The front
- * door's run basis names no board of its own, its heading says it (Lane 140, C24). */
-export function liveBasis(runBasis: readonly BasisPart[], lead: BasisPart): BasisPart[] {
-	return [lead, ...runBasis];
 }
