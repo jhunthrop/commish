@@ -1,0 +1,36 @@
+{
+	"title": "Delete account",
+	"heading": "Delete your account",
+	"lead": "Your account and everything kept with it go for good. This cannot be undone.",
+	"deletedHead": "Deleted",
+	"deleted": [
+		"Your sign-in, email, name and handle",
+		"Your cheat sheets and their exports",
+		"Your mock drafts and their reports",
+		"The leagues you follow and your platform connections",
+		"Every browser and phone paired with your account",
+		"Your passes and your membership"
+	],
+	"keptHead": "Kept",
+	"kept": [
+		"Your seats and picks in lobby drafts, under the name Former member",
+		"A group pass you bought, for the people who claimed it"
+	],
+	"signedInAs": "Signed in as",
+	"confirm": "Type your email to confirm",
+	"verb": "Delete account",
+	"sheetVerb": "Delete my account",
+	"failed": "Your account was not deleted. Try again.",
+	"doneTitle": "Your account is deleted",
+	"doneLine": "Everything kept with it is gone, and you are signed out on every device.",
+	"home": "Back to Commish",
+	"signedOutTitle": "Sign in to delete your account",
+	"signedOutLine": "Sign in with the account to delete, and you come back to this page.",
+	"signIn": "Sign in",
+	"offlineTitle": "You're offline",
+	"offlineLine": "This page loads your account as soon as you are back online.",
+	"unreachableTitle": "Your account can't be reached right now",
+	"unreachableLine": "Nothing was deleted.",
+	"tryAgain": "Try again",
+	"functions": []
+}

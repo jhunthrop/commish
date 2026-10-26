@@ -717,8 +717,6 @@ public enum Words {
 
     public enum AccountFoot {
         public static let label = "Your data"
-        public static let before = "To delete your account, write to "
-        public static let after = " from the email you sign in with. What we keep is in the "
         public static let privacy = "Privacy Policy"
         public static let joint = " and the "
         public static let terms = "Terms of Service"
@@ -939,5 +937,36 @@ public enum Words {
         public static let none = "None"
         public static let lobbyClock = "Clock in a lobby"
         public static let lobbyStarts = "A lobby starts"
+    }
+
+    public enum DeleteAccount {
+        public static let title = "Delete account"
+        public static let heading = "Delete your account"
+        public static let lead = "Your account and everything kept with it go for good. This cannot be undone."
+        public static let deletedHead = "Deleted"
+        public static let keptHead = "Kept"
+        public static let signedInAs = "Signed in as"
+        public static let confirm = "Type your email to confirm"
+        public static let verb = "Delete account"
+        public static let sheetVerb = "Delete my account"
+        public static let failed = "Your account was not deleted. Try again."
+        public static let doneTitle = "Your account is deleted"
+        public static let doneLine = "Everything kept with it is gone, and you are signed out on every device."
+        public static let home = "Back to Commish"
+        public static let signedOutTitle = "Sign in to delete your account"
+        public static let signedOutLine = "Sign in with the account to delete, and you come back to this page."
+        public static let signIn = "Sign in"
+        public static let offlineTitle = "You're offline"
+        public static let offlineLine = "This page loads your account as soon as you are back online."
+        public static let unreachableTitle = "Your account can't be reached right now"
+        public static let unreachableLine = "Nothing was deleted."
+        public static let tryAgain = "Try again"
+        public static let deleted: [String] = ["Your sign-in, email, name and handle", "Your cheat sheets and their exports", "Your mock drafts and their reports", "The leagues you follow and your platform connections", "Every browser and phone paired with your account", "Your passes and your membership"]
+        public static let kept: [String] = ["Your seats and picks in lobby drafts, under the name Former member", "A group pass you bought, for the people who claimed it"]
+    }
+
+    public enum AccountDeleteFoot {
+        public static let verb = "Delete account"
+        public static let keep = "What we keep is in the "
     }
 }

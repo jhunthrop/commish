@@ -61,8 +61,31 @@ void test("a key that is the language's keyword is quoted the language's way", (
   assert.match(swift, /public static let `default` = "Default"/);
 });
 
-void test("a member that is neither a string nor a function fails with its key named", () => {
+void test("a member that is neither a string, a list of strings nor a function fails with its key named", () => {
   assert.throws(() => renderTable({ n: 3 }, "Bad"), /Bad\.n/);
+  assert.throws(() => renderTable({ mixed: ["a", 3] }, "Bad"), /Bad\.mixed/);
+});
+
+void test("a list of strings is copied as a list, in order, in the JSON, the Swift and the Kotlin", () => {
+  const table = { head: "Deleted", lines: ["Your sheets", 'Your "mocks"'] };
+  assert.deepEqual(JSON.parse(renderTable(table, "Gone").json), {
+    head: "Deleted",
+    lines: ["Your sheets", 'Your "mocks"'],
+    functions: [],
+  });
+  const { swift, kotlin } = renderWords([{ name: "Gone", table }]);
+  assert.ok(
+    swift.includes(
+      'public static let lines: [String] = ["Your sheets", "Your \\"mocks\\""]',
+    ),
+    swift,
+  );
+  assert.ok(
+    kotlin.includes(
+      'val lines: List<String> = listOf("Your sheets", "Your \\"mocks\\"")',
+    ),
+    kotlin,
+  );
 });
 
 void test("a table gathered from a module: an object export spread, a string export under its key", () => {
@@ -196,6 +219,8 @@ void test("the tables: the League home's, the box score's, then the shell's and 
       "Mock",
       "MockSetup",
       "MockClocks",
+      "DeleteAccount",
+      "AccountDeleteFoot",
     ],
   );
   assert.equal(new Set(TABLES.map((t) => t.json)).size, TABLES.length);
