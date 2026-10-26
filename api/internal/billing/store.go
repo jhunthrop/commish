@@ -105,8 +105,10 @@ func (s *Store) WithLock(ctx context.Context, key string, fn func(context.Contex
 
 // GroupPass is one row of app.group_passes with its claim count.
 type GroupPass struct {
-	ID          uuid.UUID
-	PurchaserID uuid.UUID
+	ID uuid.UUID
+	// PurchaserID is the buyer, nil once the buyer deleted their account
+	// (the pass stays with the people who claimed it, migration 00033).
+	PurchaserID *uuid.UUID
 	LeagueName  string
 	Season      int
 	Seats       int

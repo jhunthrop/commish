@@ -21,6 +21,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/billing"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/db"
+	"github.com/jhunthrop/commish/api/internal/deletion"
 	"github.com/jhunthrop/commish/api/internal/devices"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
@@ -213,9 +214,17 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	// minute old (Lane 92): the schedule's one live window.
 	leagueSync.Poller.Live = facts.Live
 
+	// A member deletes their own account (Lane 233): their live lobby seats
+	// given up, every row in one transaction, then the sign-in user.
+	deleter := &deletion.Service{
+		Accounts: &deletion.Store{Pool: pool}, Rooms: lobbies.Store, Users: idp, Objects: exportHandler.Objects,
+		Cookies: sessions, Now: now, Log: log,
+	}
+
 	routes := slices.Concat(
 		server.Health(pool, version),
 		authHandler.Routes(),
+		deleter.Routes(),
 		(&account.SeasonHandler{Season: site}).Routes(),
 		(&leagues.Handler{Store: leagueStore, Gate: gate, Log: log}).Routes(),
 		(&sheets.Handler{Store: sheetStore, Log: log}).Routes(),
