@@ -154,7 +154,7 @@ public struct MockRoomView: View {
                 )
                 .with(shown: shown, more: { shown += PoolModel.moreRows }, run: {}, starting: false)
             }
-            .refreshable { await viewModel.load() }
+            .refreshable { await viewModel.refresh() }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if let bar = model.bar {
                     MockBarView(bar: bar, enabled: viewModel.canWrite, copied: viewModel.copied, actions: actions)

@@ -51,9 +51,11 @@ public final class MockRoomViewModel {
     private var saved: MockSaved?
     private var ui = MockRoomUI()
     private var stale = false
-    /// The queue as last set, shown at once until its write lands, and a later one waiting on it.
+    /// The queue as last set, shown at once until its writes land.
     private var queued: [String]?
-    private var queueWriting = false
+    private var queueWrites = 0
+    /// Every write runs after the one before it (the web's `write` chain).
+    private let chain = WriteChain()
 
     public init(
         id: String, api: any MockAPI, cache: any AnswerCache, clock: any Clock,
@@ -67,16 +69,6 @@ public final class MockRoomViewModel {
         self.timer = timer
         self.zone = zone
         self.onSignedOut = onSignedOut
-    }
-
-    /// The cache key of a mock.
-    public static func route(_ id: String) -> String {
-        "/mocks/\(id)"
-    }
-
-    /// The share link of a draft by its code (actions.ts copyShareLink).
-    public nonisolated static func shareLink(_ code: String) -> URL {
-        SiteLinks.origin.appendingPathComponent("mock/share").appendingPathComponent(code)
     }
 
     /// The room's line while the room shown is a saved one: the room could not be reached, and when it
@@ -114,16 +106,29 @@ public final class MockRoomViewModel {
             stale = true
             show()
         }
+        let generation = chain.generation
         do {
             let fresh = try await api.mock(id: id)
             guard let board = fresh.board?.value1 ?? saved?.board else {
                 throw APIError.emptyEnvelope
+            }
+            guard generation == chain.generation else {
+                return
             }
             stale = false
             try await settle(fresh, board: board)
         } catch {
             fail(error, reading: true)
         }
+    }
+
+    /// A pull to read the room again: only while nothing is being written, so a read never races a
+    /// write (the web has no manual read; this is the way back from a stale room).
+    public func refresh() async {
+        guard !ui.busy, queueWrites == 0 else {
+            return
+        }
+        await load()
     }
 
     /// The pool's chip.
@@ -182,32 +187,33 @@ public final class MockRoomViewModel {
         await write { [api, id] in try await api.finish(id: id) }
     }
 
-    /// Queue or let go of a player: shown at once, sent as the whole queue; a toggle while one write is
-    /// on its way goes with the next one, so none is lost or raced.
+    /// Queue or let go of a player: shown at once, sent as the whole queue in the write chain, so each
+    /// lands in order; a queue write never holds the room busy, so Draft him right after still acts,
+    /// after it.
     public func toggleQueue(_ player: String) async {
         guard let saved, case .room(_, false) = state else {
             return
         }
         let drafted = Set(saved.room.picks.map(\.playerId))
         let current = (queued ?? saved.room.queue).filter { !drafted.contains($0) }
-        queued = current.contains(player) ? current.filter { $0 != player } : current + [player]
+        let sending = current.contains(player) ? current.filter { $0 != player } : current + [player]
+        queued = sending
+        queueWrites += 1
         show()
-        guard !queueWriting else {
-            return
-        }
-        queueWriting = true
-        defer { queueWriting = false }
-        while let sending = queued {
+        await chain.run { [weak self] in
+            guard let self else {
+                return
+            }
             do {
                 let answer = try await api.queue(id: id, players: sending)
-                if queued == sending {
-                    queued = nil
-                }
                 try await settle(answer, board: saved.board)
             } catch {
-                queued = nil
                 fail(error, reading: false)
-                return
+            }
+            queueWrites -= 1
+            if queueWrites == 0 {
+                queued = nil
+                repaint()
             }
         }
     }
@@ -249,23 +255,31 @@ public final class MockRoomViewModel {
         }
     }
 
-    /// One write: the room busy until its answer lands and the turn's call is read.
+    /// One write: the room busy until its answer lands and the turn's call is read (the web's `act`),
+    /// so a second tap can never send a pick for a turn already made.
     private func write(after notice: String? = nil, _ run: @escaping @Sendable () async throws -> MockRoom) async {
-        guard let saved else {
+        guard let saved, !ui.busy else {
             return
         }
         ui.busy = true
         refusal = nil
         show()
-        do {
-            let answer = try await run()
-            ui.busy = false
-            ui.notice = notice
-            try await settle(answer, board: saved.board)
-        } catch {
-            ui.busy = false
-            ui.draftedAt = nil
-            fail(error, reading: false)
+        await chain.run { [weak self] in
+            guard let self else {
+                return
+            }
+            defer {
+                ui.busy = false
+                repaint()
+            }
+            do {
+                let answer = try await run()
+                ui.notice = notice
+                try await settle(answer, board: saved.board)
+            } catch {
+                ui.draftedAt = nil
+                fail(error, reading: false)
+            }
         }
     }
 
@@ -324,6 +338,13 @@ public final class MockRoomViewModel {
         await cache.write(next, route: Self.route(id), stamp: now)
     }
 
+    /// The room drawn again, while the room is what shows (never over the report or a sign-out).
+    private func repaint() {
+        if case .room = state {
+            show()
+        }
+    }
+
     private func show() {
         guard let saved else {
             return
@@ -361,14 +382,6 @@ public final class MockRoomViewModel {
             show()
         } else {
             state = .failed(Self.sentence(for: error))
-        }
-    }
-
-    /// The API's own sentence where it sent one, else the app's for no connection or anything else.
-    static func sentence(for error: any Error) -> String {
-        switch error {
-        case let APIError.envelope(_, message) where !message.isEmpty: message
-        default: Words.Mock.unreachable
         }
     }
 }

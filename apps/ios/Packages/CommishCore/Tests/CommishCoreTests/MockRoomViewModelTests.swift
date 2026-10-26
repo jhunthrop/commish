@@ -53,6 +53,7 @@ struct MockRoomViewModelTests {
         }
         viewModel.mark(row.id)
         guard case let .room(marked, _) = viewModel.state else {
+            Issue.record("no room after the mark")
             return
         }
         #expect(marked.pool?.rows.first { $0.marked }?.id == row.id)
@@ -135,6 +136,7 @@ struct MockRoomViewModelTests {
         await viewModel.toggleQueue(player)
         #expect(await api.queues == [[player]])
         guard case let .room(model, _) = viewModel.state else {
+            Issue.record("no room after the queue")
             return
         }
         #expect(try model.room.queue == (MockFixture.room(.queue)).queue)
@@ -173,12 +175,16 @@ struct MockRoomViewModelTests {
         #expect(await api.created.first?.settings?.value1.slot == slot)
     }
 
-    @Test func theLinkCopiedLineGoesAfterItsMoment() async {
+    @Test func theLinkCopiedLineShowsForItsMomentThenGoes() async {
+        let seen = CopiedProbe()
+        let timer = ProbeTimer { await seen.look() }
         let viewModel = MockRoomViewModel(
             id: MockFixture.id, api: StubMock(), cache: MockParityTests.cache(), clock: MockParityTests.clock,
-            timer: InstantTimer()
+            timer: timer
         )
+        seen.viewModel = viewModel
         await viewModel.linkCopied()
+        #expect(seen.during == [true])
         #expect(!viewModel.copied)
     }
 
