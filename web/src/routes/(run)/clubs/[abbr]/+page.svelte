@@ -164,10 +164,10 @@
 		</HeroCard>
 		<BasisLine parts={basis} tail={words?.capture ?? null} />
 
-		<section aria-label="On our board">
+		<section aria-label={head.title}>
 			<PanelHead title={head.title} />
 			{#if rows.length > 0}
-				<BoardTable {columns} label="{name} on our {page.format.label} board">
+				<BoardTable {columns} label="{name}, {head.title}">
 					{#each rows as player (player.id)}
 						<Row
 							{player}

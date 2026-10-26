@@ -131,14 +131,55 @@ async function checkGrid(page: Page, tag: string, phone: boolean): Promise<void>
 	if (phone) {
 		const seen = await page.evaluate((week) => {
 			const frame = document.querySelector('.frame');
-			const head = document.querySelectorAll('.frame thead th.week')[week - 1];
-			if (!frame || !head) return false;
+			const heads = document.querySelectorAll('.frame thead th.week');
+			const head = heads[week - 1];
+			const before = heads[week - 2];
+			const pinned = document.querySelector('.frame thead th.strength');
+			if (!frame || !head || !before || !pinned) return { current: false, previous: true };
 			const f = frame.getBoundingClientRect();
 			const h = head.getBoundingClientRect();
-			return h.left >= f.left && h.right <= f.right + 1;
+			// The week before sits wholly under the pinned columns, no sliver of it beside them.
+			const edge = pinned.getBoundingClientRect().right;
+			return {
+				current: h.left >= edge - 1 && h.right <= f.right + 1,
+				previous: before.getBoundingClientRect().right > edge + 1
+			};
 		}, CURRENT_WEEK);
-		if (!seen) fail(tag, `opens with week ${String(CURRENT_WEEK)} out of view`);
+		if (!seen.current) fail(tag, `opens with week ${String(CURRENT_WEEK)} out of view`);
+		if (seen.previous) fail(tag, `opens with a sliver of week ${String(CURRENT_WEEK - 1)} in view`);
 	}
+}
+
+/** The desk Board's views that draw a sortable Bye head (in season the kickers' and defenses' draft
+ * order): sorted by Bye, the first row's Bye cell names a week, never a blank played bye. */
+const BYE_SORT_VIEWS = ['/board/ppr-12', '/board/ppr-12/k', '/board/ppr-12/dst'];
+
+async function checkByeSort(ctx: BrowserContext): Promise<number> {
+	let sorted = 0;
+	for (const path of BYE_SORT_VIEWS) {
+		const page = await ctx.newPage();
+		await page.goto(new URL(path, web).href);
+		await settle(page);
+		const button = page.locator('main .h button', { hasText: /^Bye$/u }).first();
+		if ((await button.count()) > 0) {
+			await button.click();
+			await page.waitForTimeout(SETTLE_MS);
+			const first = await page.evaluate(() => {
+				const head = [...document.querySelectorAll('main .h')].find(
+					(h) => h.querySelector('button')?.textContent.trim() === 'Bye'
+				);
+				const area = [...(head?.classList ?? [])].find((c) => c !== 'h' && c !== 'left');
+				return area === undefined
+					? null
+					: (document.querySelector(`main .row .${area}`)?.textContent.trim() ?? null);
+			});
+			sorted += 1;
+			if (first === null || !/^\d+$/u.test(first))
+				fail(`bye-sort ${path}`, `the first row's Bye reads "${first ?? ''}"`);
+		}
+		await page.close();
+	}
+	return sorted;
 }
 
 /** The club's week row says its state, its head names what its basis names, and its bye is ahead. */
@@ -225,6 +266,8 @@ if (mode === 'schedule') {
 	await settle(page);
 	if ((await lines(page)).some((line) => /\bbye\b/iu.test(line) && /\b5\b/u.test(line)))
 		fail(`club-${PLAYED_BYE_CLUB}`, 'says its played bye');
+	const sorted = await checkByeSort(ctx);
+	process.stdout.write(`Bye sort checked on ${String(sorted)} Board views.\n`);
 	await ctx.close();
 }
 await browser.close();

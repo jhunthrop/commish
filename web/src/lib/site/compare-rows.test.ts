@@ -169,9 +169,27 @@ void test('Floor to ceiling is drawn only where a side carries a range, the empt
 	);
 });
 
-void test('a played bye on both sides draws no Bye row, one side ahead keeps it (Lane 223)', () => {
-	const played = (side: Side): Side => ({ ...side, bye: null });
-	assert.ok(!compareRows(played(NACUA), played(CHASE), 2026, true).some((r) => r.label === 'Bye'));
-	const one = byLabel(compareRows(NACUA, played(CHASE), 2026, true), 'Bye');
-	assert.equal(one.cells[1].text, EMPTY_FIGURE);
+void test('the Bye row draws a bye as the Board does: ahead its week, played blank, unnamed the empty figure (Lane 223)', () => {
+	const at = (side: Side, bye: number | null): Side => ({ ...side, bye });
+	const byeRow = (a: Side, b: Side) =>
+		compareRows(a, b, 2026, true, 7).find((row) => row.label === 'Bye');
+	assert.equal(byeRow(at(NACUA, 5), at(CHASE, 6)), undefined);
+	assert.deepEqual(
+		byeRow(at(NACUA, 11), at(CHASE, 5))?.cells.map((cell) => cell.text),
+		['11', '']
+	);
+	assert.deepEqual(
+		byeRow(at(NACUA, null), at(CHASE, 5))?.cells.map((cell) => cell.text),
+		[EMPTY_FIGURE, '']
+	);
+	assert.deepEqual(
+		byeRow(at(NACUA, null), at(CHASE, null))?.cells.map((cell) => cell.text),
+		[EMPTY_FIGURE, EMPTY_FIGURE]
+	);
+	assert.deepEqual(
+		compareRows(at(NACUA, 5), at(CHASE, 6), 2026, true)
+			.find((row) => row.label === 'Bye')
+			?.cells.map((cell) => cell.text),
+		['5', '6']
+	);
 });

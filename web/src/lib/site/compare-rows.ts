@@ -2,6 +2,7 @@
  * the leader first, and which of the two is better where a row has a better (a rank lower, points
  * higher). A player on a season-long list shows his rank as the word and wins no rank row, since his
  * figures assume he plays. Pure, so the tests read the table the page prints. */
+import { byeAhead, byeCell } from '#lib/format/bye.ts';
 import { carriesGap, gapText, gapTone, type GapTone } from '#lib/format/gap.ts';
 import { rankWord } from '#lib/format/designation.ts';
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
@@ -84,7 +85,9 @@ export function compareRows(
 	first: Side,
 	second: Side,
 	season: number,
-	underway: boolean
+	underway: boolean,
+	/** The week a rest-of-season board ranks from, null on a board of the full season. */
+	byesFrom: number | null = null
 ): CompareRow[] {
 	const pairOf = <T>(read: (side: Side) => T): readonly [T, T] => [read(first), read(second)];
 	const held = pairOf(heldRank);
@@ -119,10 +122,22 @@ export function compareRows(
 					}
 				]
 			: [];
-	/** The Bye row, only when a side has a bye to show: in season a played bye is none (Lane 223). */
+	/** The Bye row as the Board's Bye cell draws it (byeCell): the week while ahead, blank once played,
+	 * the empty figure where the run names none; dropped only when both byes are played (Lane 223). */
 	const byes = pairOf((side) => side.bye);
+	const played = (bye: number | null): boolean => bye !== null && byeAhead(bye, byesFrom) === null;
 	const byeRow: CompareRow[] =
-		byes[0] === null && byes[1] === null ? [] : [figures('Bye', byes, String, null)];
+		played(byes[0]) && played(byes[1])
+			? []
+			: [
+					{
+						label: 'Bye',
+						cells: [
+							{ text: byeCell(byes[0], byesFrom), wins: null },
+							{ text: byeCell(byes[1], byesFrom), wins: null }
+						]
+					}
+				];
 	const rows: CompareRow[] = [
 		rankRow(
 			'Our rank',
