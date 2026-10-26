@@ -23,7 +23,7 @@ Limits were read from Google's help pages on 2026-10-26 (sources at the foot). C
 | Tags | At most 5, from the console's list | Proposed: Fantasy sports, Football, Sports stats, Sports news, Sports. Pick the closest five the console offers | The console holds the list. This lane could not read it signed out |
 | Contact email | Required | `help@trycommish.app` | `web/src/lib/legal/contact.ts` `SUPPORT_EMAIL`, the footer address |
 | Website | Optional, recommended | `https://trycommish.app` | `PUBLIC_BASE_URL` in `.github/workflows/api.yml` |
-| Phone | Optional | Leave empty | The site prints no phone |
+| Phone | Optional | `(479) 227-2208` | The public number (F5, resolved 2026-10-26). The founder's private number goes to Apple's App Review contact only |
 | Privacy policy URL | Required | `https://trycommish.app/privacy` | `web/src/routes/privacy`, words in `web/src/lib/legal/privacy-words.ts` |
 
 ### 1.1 Full description
@@ -103,7 +103,7 @@ Captions sit above the screen on a plain tokens background (`shared/design/token
 Paste into App content, App access, "All or some functionality is restricted", one instruction set:
 
 - Name: `Review account`
-- Username and password: **FOUNDER** enters them in the console only, never in this file. See F2 for what the account needs.
+- Username and password: `help+review@trycommish.app` with password sign-in, created 2026-10-26 (F2, resolved). The password is in the local env file, pasted into the console only, never in this file. The account follows one public Sleeper league after its first sign-in.
 - Other information, drafted:
 
 ```text
@@ -126,7 +126,7 @@ Draft checked against the banned list (§7 of the report). The verb is the app's
 | Unrestricted internet access | No | Sign-in and the follow page open in the system browser (Custom Tabs, `androidx.browser`), not an in-app browser |
 | Contains a web browser or search engine | No | As above |
 
-Expected outcome: the lowest rating in each region, with the "Users Interact" notice. Target audience (§2) stays 18 and over whatever the rating says.
+Expected outcome: the lowest rating in each region, with the "Users Interact" notice. The age rating is 18+ on both stores (F4, resolved 2026-10-26): Play computes its rating from these answers, so on Play the 18+ is the target audience (§2), which stays 18 and over whatever the rating says.
 
 ## 4. Data safety
 
@@ -171,6 +171,8 @@ Play requires both an in-app path (or an in-app link to the web resource) and a 
 
 - Internal track: live (first CI upload 2026-10-26, run 40254247245). The organization account is exempt from the 20-tester closed-test rule.
 - Production: needs §1 to §4 complete and the feature graphic and screenshots (§6); §4.3 is closed (Lane 237).
+- Countries: the United States only (F7, resolved 2026-10-26). No EU trader declaration.
+- The organization address on the listing stays as the payments profile shows it (F6, resolved 2026-10-26).
 - The founder checks the listing and the app on the Mac's emulator (a Play Store AVD signed into his Google account for the internal track), never on a phone.
 
 ## 6. Graphics checklist
@@ -192,7 +194,10 @@ Play requires both an in-app path (or an in-app link to the web resource) and a 
 - Provide information for Google Play's Data safety section: https://support.google.com/googleplay/android-developer/answer/10787469
 - Understanding Google Play's app account deletion requirements: https://support.google.com/googleplay/android-developer/answer/13327111
 
-## FOUNDER questions for Play
+## FOUNDER questions for Play (resolved 2026-10-26)
 
-- **F2** (shared with the App Store): the review account. See the App Store file, F2.
-- **F6**: Play shows an organization's address on the listing from the payments profile. The business address is your own (the LLC's filing). Confirm that is acceptable or set a different public address in the payments profile before production.
+- **F2** (shared with the App Store): the review account is `help+review@trycommish.app` with password sign-in; the credentials are in the local env file, pasted into the console only. §2.1.
+- **F4** (shared): age rating 18+ on both stores; Play's target audience stays 18 and over. §2, §3.
+- **F5** (shared): the listing's phone is the public number, (479) 227-2208. §1.
+- **F6**: Play keeps the organization address as the payments profile shows it.
+- **F7** (shared): the United States only, no EU trader declaration.
