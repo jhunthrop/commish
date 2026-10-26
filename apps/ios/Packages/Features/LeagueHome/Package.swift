@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The League home: the week's scoreboard, the standings, the member's lineup and the moves, drawn from
 // the Core's model; its snapshots, both themes at two phone sizes, are the screen's mock.
 import PackageDescription
@@ -29,5 +29,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

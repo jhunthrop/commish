@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The live-draft companion (the web's /companion/new and /companion/[id] at 390): the second screen for
 // a draft running on another platform. The start page follows a draft from a seat; the followed draft
 // shows the platform's pick count, the picks as they land, at the drafter's turn our call with each
@@ -37,5 +37,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

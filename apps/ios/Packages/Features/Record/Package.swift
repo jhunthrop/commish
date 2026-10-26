@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The Our record screen (the web's record page at /record, drawn from the run): what each record
 // grades and against what, the summary, the weeks with their status words and, graded, their figures
 // beside each yardstick, the season to date, the draft record, the basis once. Its snapshots, both
@@ -35,5 +35,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

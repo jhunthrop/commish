@@ -2121,6 +2121,11 @@ type Account struct {
 	Season SiteSeason `json:"season"`
 }
 
+// AccountDeletion The member's confirmation that the account goes: the email they sign in with, typed by hand, compared without regard to case or the spaces around it.
+type AccountDeletion struct {
+	Email string `json:"email"`
+}
+
 // AccountUpdate defines model for AccountUpdate.
 type AccountUpdate struct {
 	Handle string `json:"handle"`
@@ -6705,6 +6710,9 @@ type JoinLobbyJSONRequestBody = LobbyJoin
 
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = AccountUpdate
+
+// DeleteMeJSONRequestBody defines body for DeleteMe for application/json ContentType.
+type DeleteMeJSONRequestBody = AccountDeletion
 
 // SelectLeagueJSONRequestBody defines body for SelectLeague for application/json ContentType.
 type SelectLeagueJSONRequestBody = LeagueChoice

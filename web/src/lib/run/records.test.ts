@@ -123,7 +123,7 @@ const weekly = (weeks: RecordWeek[], toDate = gradedSeven.lines) => ({
 	statistic: { agreement: 'order matched', placesOff: 'places off', starters: 'starters right' },
 	scale: 'Order matched is how closely an order ranked the players.',
 	startersBasis: null,
-	method: 'From week 7 we set our weekly rankings.',
+	method: 'From week 7 we set our rest-of-season order.',
 	honest: null,
 	weeks,
 	toDate

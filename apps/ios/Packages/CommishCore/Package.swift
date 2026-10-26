@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The app's core: plain models mapped from the generated types, view models, the clock, the session
 // in the Keychain, the cache of the last answer per screen, and sign-in. No UIKit, no SwiftUI, so
 // `swift test` runs every rule on a Mac.
@@ -32,5 +32,6 @@ let package = Package(
                 .product(name: "HTTPTypes", package: "swift-http-types"),
             ]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

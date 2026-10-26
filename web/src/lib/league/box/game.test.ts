@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import type { Component } from 'svelte';
-import { compile } from 'svelte/compiler';
 import { render } from 'svelte/server';
+import { compiled } from '#lib/testing/svelte-ssr.ts';
 import type { LeagueSync } from '../api.ts';
 import type { MatchupBox, Scoreboard } from '../inseason/api.ts';
 import { bugsOf, type Bug } from '../home/home.ts';
@@ -117,20 +117,6 @@ void test("the Matchup decides another team's game by the box alone, and the sco
 		/async function readBoard\(\)[\s\S]*?catch \{\s*return null;/
 	);
 });
-
-/** A .svelte file compiled for the server as a data URL, its imports pointed at the files they name
- * and every .svelte import compiled the same way (routes/app/signed-in/page.test.ts). */
-function compiled(file: URL): string {
-	const { js } = compile(readFileSync(file, 'utf8'), {
-		generate: 'server',
-		filename: file.pathname
-	});
-	const code = js.code.replace(/from '([^']+)'/g, (_, spec: string) => {
-		const target = spec.startsWith('.') ? new URL(spec, file).href : import.meta.resolve(spec);
-		return `from '${target.endsWith('.svelte') ? compiled(new URL(target)) : target}'`;
-	});
-	return `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
-}
 
 void test("the League home's scoreboard links each bug to its own game", async () => {
 	const mod = (await import(compiled(new URL('../home/ScoreBoard.svelte', import.meta.url)))) as {

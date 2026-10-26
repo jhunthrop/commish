@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The player sheet's body and the player page (the web's player shelf and /players/[slug] at 390): his
 // week's game and its figures as cells, our read as the web's shelf prints it, the basis once; his page
 // with the one big number and its basis, where drafters take him, his range, our read in the reading
@@ -35,5 +35,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The Matchup screen (the web's Sunday matchup at /league/[id]/matchup): the score bug with both
 // teams, each team's box with its starters' live points and projections, the basis once; read again
 // on the web's cadence while it is on screen. Its snapshots, both themes at two phone sizes at the
@@ -33,5 +33,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

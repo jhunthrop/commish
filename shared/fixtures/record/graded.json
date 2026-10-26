@@ -3290,7 +3290,7 @@
 		},
 		"scale": "Order matched is how closely an order ranked the players to the week's finish: 1.00 is the same order, 0.00 no closer than chance, below 0.00 the order runs backwards.",
 		"startersBasis": "Starters right counts a standard 12-team lineup, the week's top 12 QBs, 24 RBs, 36 WRs and 12 TEs, and how many of them the order also put there.",
-		"method": "From week 7 we set our weekly rankings before each week's first kickoff and graded them on the week's points, beside ESPN's projection on the same players.",
+		"method": "From week 7 we set our rest-of-season order before each week's first kickoff and graded it on the week's points, beside ESPN's projection on the same players.",
 		"honest": null,
 		"weeks": [
 			{
@@ -4915,7 +4915,7 @@
 						"espn": 42
 					}
 				],
-				"espnNote": "ESPN's projection this week was read after our weekly rankings were set, still before the first kickoff."
+				"espnNote": "ESPN's projection this week was read after our rest-of-season order was set, still before the first kickoff."
 			},
 			{
 				"week": 8,

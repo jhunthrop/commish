@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The Waivers screen (the web's Waivers at /league/[id]/waivers): the strip with a card for each pickup
 // worth making, the players free to add as a box score with the pickup rule's Beats cell, each row's
 // drop panel, the basis once, and the one verb pinned above the bar that claims on the platform or
@@ -35,5 +35,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

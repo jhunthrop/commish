@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The mock room (the web's /mock/new, /mock/[id], /mock/[id]/report and /mock/share/[code] at 390): the
 // setup against bots, the solo room full screen with the web's bar at the bottom (the pick on the clock,
 // Undo, Pick for me, Finish, Save and share), our call with its one verb, the strip since your pick,
@@ -39,5 +39,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )
