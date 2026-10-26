@@ -10,7 +10,7 @@ import type { Reach } from './reach.ts';
 import type { Game } from './schema.ts';
 
 /** A game of the current week as the run read it: its state and its kickoff. */
-export interface StatedGame {
+export interface RunStatedGame {
 	state: NonNullable<Game['state']>;
 	kickoff: string;
 }
@@ -47,13 +47,13 @@ export function currentWeek(
 export function statedGame(
 	game: Pick<Game, 'week' | 'state' | 'kickoff'>,
 	current: CurrentWeek | null
-): StatedGame | null {
+): RunStatedGame | null {
 	if (game.state === undefined || current?.week !== game.week) return null;
 	return { state: game.state, kickoff: game.kickoff };
 }
 
 /** The game's word: Final, Kicked off, or its kickoff with its day and zone ("Sun 12:00 pm CT"). */
-export function stateWord(game: StatedGame, zone: string): string {
+export function stateWord(game: RunStatedGame, zone: string): string {
 	return game.state === 'upcoming' ? kickoffAt(game.kickoff, zone) : GAME_STATE_WORDS[game.state];
 }
 

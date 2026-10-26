@@ -467,7 +467,8 @@ void test('the records say no banned word and no em-dash', () => {
 			typeof value === 'string' ? [value] : []
 		),
 		PAIR_WORDS.by('ADP', '4'),
-		BYE_WORDS.done,
+		BYE_WORDS.week(11),
+		BYE_WORDS.notSet,
 		RANKINGS_NAME,
 		RAIL_ITEMS.find((item) => item.key === WEEK_RANKINGS_KEY)?.label ?? '',
 		RECORDS_WORDS.draftSet('Tue Sep 8', 5),

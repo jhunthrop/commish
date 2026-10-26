@@ -1,7 +1,7 @@
 /** The reference pages' own words (Lane 199): ADP, Compare, the clubs, a club and the strength of
  * schedule, each said once here so the pages and the apps (through shared/scripts/gen-words.ts) print
  * the same words. A word with "{name}" in it is filled where it is printed. */
-import { byeLine } from '#lib/format/bye.ts';
+import { BYE_WORDS, byeLine } from '#lib/format/bye.ts';
 
 /** ADP for one format, and the links to it and from it. */
 export const ADP_PAGE = {
@@ -61,10 +61,10 @@ export const CLUB_ORDER = {
 } as const;
 
 /** A club's meta line, "ARI · Bye week 14" while the bye is ahead of the week the board ranks from,
- * the code alone once it is played (Lane 223, B190), "ARI · bye week not set" where the run names
+ * the code alone once it is played (Lane 223, B190), "ARI · Bye week not set" where the run names
  * none. */
 export function clubMeta(abbr: string, bye: number | null, fromWeek: number | null): string {
-	if (bye === null) return `${abbr} · ${CLUB_PAGE.byeWeek} ${CLUB_PAGE.byeNotSet}`;
+	if (bye === null) return `${abbr} · ${BYE_WORDS.notSet}`;
 	const ahead = byeLine(bye, fromWeek);
 	return ahead === null ? abbr : `${abbr} · ${ahead}`;
 }

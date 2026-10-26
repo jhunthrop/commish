@@ -36,7 +36,9 @@ import { oursAccented, type FigurePair } from '../../web/src/lib/run/record-pair
 import {
 	DRAFT_FIGURES,
 	DRAFT_SOURCES,
+	RECORDS_WORDS as WEB_RECORDS_WORDS,
 	beforeLine,
+	frontRecord,
 	draftBasis,
 	draftCell,
 	draftHeads,
@@ -391,7 +393,27 @@ async function recordCase(file: string, now: string): Promise<unknown> {
 						weeklyStates.underway,
 						nextGrade(weekly, schedule)
 					),
-		draft: draftSection(run)
+		draft: draftSection(run),
+		webPending: webPending(run)
+	};
+}
+
+/** The web's own record sentences, which the apps do not check yet (Lane 223 review M4): B224 holds
+ * the apps to them when it drops apps-pending-words.ts. Null on a run with no weekly record. */
+function webPending(run: RunRecord): unknown {
+	const weekly = weeklyAsRecord(run);
+	if (weekly === null || run.weekly === undefined) return null;
+	const front = frontRecord(run);
+	return {
+		lead: WEB_RECORDS_WORDS.lead,
+		weeklyWhat: WEB_RECORDS_WORDS.weeklyWhat,
+		before: beforeLine(run.weekly.fromWeek)?.text ?? null,
+		setRulePhone: WEB_RECORDS_WORDS.setRulePhone,
+		orders: weekly.weeks.flatMap((week) => {
+			const words = weeklyOrderWords(week);
+			return words === null ? [] : [{ week: week.week, order: words }];
+		}),
+		front: front === null ? null : { caption: front.caption, note: front.note }
 	};
 }
 

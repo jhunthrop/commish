@@ -10,7 +10,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { captureShort } from "../../web/src/lib/format/designation.ts";
-import { BYE_WORDS, byeAhead } from "../../web/src/lib/format/bye.ts";
+import { appByeCell } from "./apps-pending-words.ts";
 import { carriesGap } from "../../web/src/lib/format/gap.ts";
 import { fixed, plural } from "../../web/src/lib/format/number.ts";
 import { adpDrafts } from "../../web/src/lib/run/adp-drafts.ts";
@@ -55,14 +55,6 @@ import type {
 import { REPOSITORY } from "./generated.ts";
 
 export const BOARD_RUN_OUTPUT = "shared/fixtures/parity/board-run.json";
-
-/** The apps' bye cell (BoardCells.bye): its week while ahead, "Done" once played. The web's row draws
- * nothing for a played bye since Lane 223 (B190); the apps keep this until their lane follows, so
- * their parity stays what they draw. */
-function appByeCell(bye: number, fromWeek: number | null): string {
-  const ahead = byeAhead(bye, fromWeek);
-  return ahead === null ? BYE_WORDS.done : String(ahead);
-}
 
 /** The zone the statuses and the capture are said in, the fixtures' own. */
 const ZONE = "America/Chicago";

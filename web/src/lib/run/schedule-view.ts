@@ -6,7 +6,7 @@ import { fixed } from '#lib/format/number.ts';
 import type { ScheduleCell } from '#lib/ui/schedule-grid.ts';
 import { leadOf } from './held-places.ts';
 import type { Reach } from './reach.ts';
-import { statedGame, type CurrentWeek, type StatedGame } from './schedule-state.ts';
+import { statedGame, type CurrentWeek, type RunStatedGame } from './schedule-state.ts';
 import type { BoardRow, Club, Game, PlayerStatus, Schedule, Slate } from './schema.ts';
 import {
 	STRENGTH_COLUMNS,
@@ -48,7 +48,7 @@ export interface ScheduleGame extends Game {
 	/** The game is in at the run (its state, or its week complete on a run from before): set back. */
 	played: boolean;
 	/** The current week's game as the run read it (Lane 223, B187): absent on every other week. */
-	stated?: StatedGame;
+	stated?: RunStatedGame;
 }
 
 /** A club's hero figures: its strength, headed, its read, and its rank as a figure. */
@@ -204,8 +204,8 @@ export function clubSchedule(
 /** A game or a cell with the run's state of its game when it carries one, else as it is. */
 function withStated<T extends object>(
 	value: T,
-	stated: StatedGame | null
-): T & { stated?: StatedGame } {
+	stated: RunStatedGame | null
+): T & { stated?: RunStatedGame } {
 	return stated === null ? value : { ...value, stated };
 }
 
