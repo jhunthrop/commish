@@ -10,7 +10,7 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
-import { HEADSHOT_ROUTE } from '../src/lib/ui/headshot.ts';
+import { IMAGES_ORIGIN } from '../src/lib/ui/headshot.ts';
 
 const web = process.argv[2] ?? 'http://localhost:4173';
 const out = new URL(process.argv[3] ?? '../screenshots/weight/', import.meta.url);
@@ -101,7 +101,7 @@ try {
 							drawn: Math.round(img.getBoundingClientRect().width * window.devicePixelRatio),
 							fetched: img.naturalWidth
 						})),
-				HEADSHOT_ROUTE
+				IMAGES_ORIGIN
 			);
 			const total = [...bytes.values()].reduce((sum, n) => sum + n, 0);
 			const kb = (n: number): string => (n / KB).toFixed(0);
