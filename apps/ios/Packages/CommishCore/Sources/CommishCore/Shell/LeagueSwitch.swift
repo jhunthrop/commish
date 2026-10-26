@@ -68,6 +68,11 @@ public enum ShellRoute: Hashable, Sendable {
     case companionNew(replay: Bool)
     /// A followed draft (/companion/<id>).
     case companion(id: String)
+    /// The mock room's setup (/mock/new), from a draft's settings when the report's Try another slot
+    /// opened it, or on a saved league a link names (`?league=`, the League home's mock your league).
+    case mockSetup(from: RoomSettings?, league: String? = nil)
+    /// A shared mock draft by its link's code (/mock/share/<code>).
+    case sharedMock(code: String)
 
     public enum Destination: Equatable, Sendable {
         case tab(String)

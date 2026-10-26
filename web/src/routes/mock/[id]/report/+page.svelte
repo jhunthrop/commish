@@ -12,6 +12,7 @@
 	import { COPIED_MS, copyShareLink, runAgain } from '#lib/room/actions.ts';
 	import { botNames } from '#lib/room/words.ts';
 	import { Flash } from '#lib/room/flash.svelte.ts';
+	import { MOCK, runAgainWords } from '#lib/room/mock-words.ts';
 
 	const id = $derived(page.params.id ?? '');
 	let report = $state<MockReport | null>(null);
@@ -50,7 +51,7 @@
 
 <Shell title="Mock draft" active="mock">
 	{#snippet tail()}
-		<Quiet href={resolve('/mock/new')}>New mock</Quiet>
+		<Quiet href={resolve('/mock/new')}>{MOCK.newMock}</Quiet>
 	{/snippet}
 	{#if error}
 		<div class="notice">
@@ -59,20 +60,19 @@
 	{/if}
 	{#if report}
 		{@const r = report}
-		<Report report={r} names={botNames(r.teams, r.slot)} seats="Bots by ADP">
+		<Report report={r} names={botNames(r.teams, r.slot)} seats={MOCK.botsByAdp}>
 			{#snippet verbs()}
-				<Verb onclick={again} disabled={starting}>Run it again from slot {r.slot}</Verb>
-				<Quiet href="{resolve('/mock/new')}?from={id}">Try another slot</Quiet>
+				<Verb onclick={again} disabled={starting}>{runAgainWords(r.slot)}</Verb>
+				<Quiet href="{resolve('/mock/new')}?from={id}">{MOCK.tryAnother}</Quiet>
 				<Quiet href="/sheet?from_mock={id}">Save this draft as a sheet</Quiet>
 				{#if r.share_code}
 					{@const code = r.share_code}
-					<Quiet onclick={() => copy(code)}>{copied.on ? 'Link copied' : 'Copy a share link'}</Quiet
-					>
+					<Quiet onclick={() => copy(code)}>{copied.on ? MOCK.copied : MOCK.copyLink}</Quiet>
 				{/if}
 			{/snippet}
 		</Report>
 	{/if}
-	<LiveRegion words={copied.on ? 'Link copied' : ''} />
+	<LiveRegion words={copied.on ? MOCK.copied : ''} />
 </Shell>
 
 <style>

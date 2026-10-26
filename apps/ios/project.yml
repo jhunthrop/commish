@@ -57,6 +57,8 @@ packages:
     path: Packages/Features/Reference
   Companion:
     path: Packages/Features/Companion
+  MockRoom:
+    path: Packages/Features/MockRoom
 targets:
   Commish:
     type: application
@@ -81,6 +83,7 @@ targets:
       - package: Account
       - package: Reference
       - package: Companion
+      - package: MockRoom
     entitlements:
       path: Commish/Commish.entitlements
       properties:

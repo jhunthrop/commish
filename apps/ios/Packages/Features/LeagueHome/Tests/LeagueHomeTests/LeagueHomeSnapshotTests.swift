@@ -90,6 +90,26 @@ struct LeagueHomeSnapshotTests {
         #expect(result.matches, "\(result.message)")
     }
 
+    /// Before the draft the same entry carries the mock draft (SeasonPanel.svelte, pre_draft): the draft
+    /// tonight on the member's clock, the zone once, Start a mock draft (Lane 213).
+    @Test(arguments: [Scheme.light, .dark].flatMap { scheme in SnapshotDevice.all.map { (scheme, $0) } })
+    func beforeTheDraftCarriesTheMock(scheme: Scheme, device: SnapshotDevice) throws {
+        let now = try #require(APIDecoding.parseDate("2026-10-17T17:00:00Z"))
+        let entry = try #require(DraftDayEntry(
+            phase: .preDraft, draftAt: APIDecoding.parseDate("2026-10-18T00:30:00Z"), now: now, zone: Self.zone
+        ))
+        #expect(entry.opens == .mock)
+        #expect(entry.verb == Words.PageVerb.mock)
+        let view = try LeagueHomePartView(
+            part: .top, model: Self.model(at: "2026-10-17T17-00-00Z"), stamp: nil, still: true, openLineup: {},
+            draftDay: entry
+        )
+        let name = "league-home-pre-draft-\(device.name)-\(scheme)"
+        Snapshot.shoot(view, named: name, device: device, scheme: scheme)
+        let result = Snapshot.verify(view, named: name, device: device, scheme: scheme, in: Self.folder)
+        #expect(result.matches, "\(result.message)")
+    }
+
     @Test func aSavedHomeCarriesItsStamp() throws {
         let view = try LeagueHomePartView(
             part: .top, model: Self.model(at: "2026-10-18T18-56-00Z"), stamp: "\(AppWords.lastRead) Sun 1:52 pm",

@@ -22,6 +22,10 @@ public final class AppSession {
     public private(set) var leagues: [FollowedLeague] = []
     /// The site's season; nil unread or a phase this build does not know.
     public private(set) var sitePhase: SitePhase?
+    /// The context's format with no league selected (Account.format), the board a mock starts in.
+    public private(set) var format: Components.Schemas.BoardFormatKnown?
+    /// The account's features (Account.features).
+    public private(set) var features: [String] = []
 
     /// The phone's five: signed in, by the shown league's phase as the web's bar, or with no league (or
     /// a phase this build does not know) the bar for the site's season (PhoneRail.bar); signed out, the
@@ -105,6 +109,8 @@ public final class AppSession {
         }
         leagues = context?.leagues ?? []
         sitePhase = context?.season
+        format = context?.format
+        features = context?.features ?? []
         let league = choices.compactMap { id in leagues.first { $0.id == id } }.first ?? leagues.first
         state = .signedIn(league: league)
         lastLeague = league?.id

@@ -28,7 +28,6 @@
 		BUILD_ZONE,
 		STRIP_ROWS,
 		answerReadAt,
-		liveBasis,
 		liveLeadPart,
 		liveStrip,
 		overReplacementPart,
@@ -39,6 +38,7 @@
 		type StripRow
 	} from '#lib/front/live-board.ts';
 	import type { BasisPart } from '#lib/run/board-basis.ts';
+	import { liveBasis } from '#lib/run/live-order.ts';
 	import { RAIL_OF_WORD_SET, railInSeason, type WordSet } from '#lib/ui/nav.ts';
 	import type { Component } from 'svelte';
 	import type { PageProps } from './$types';

@@ -6,6 +6,7 @@ import CommishDesign
 import Companion
 import LeagueHome
 import Matchup
+import MockRoom
 import Player
 import Shell
 import SwiftUI
@@ -29,6 +30,8 @@ struct RootTabs: View {
     @State private var switchOpen = false
     @State private var query = ""
     @State private var sheet = PlayerSheetHost()
+    /// The mock room open full screen over the shell, its bar hidden while drafting.
+    @State private var mockRoom: OpenMock?
     @Environment(\.openURL) private var openURL
     let environment: AppEnvironment
     let session: AppSession
@@ -52,6 +55,17 @@ struct RootTabs: View {
         }
         .tint(Theme(colorScheme).color(Tokens.Color.accent))
         .environment(sheet)
+        .fullScreenCover(item: $mockRoom) { open in
+            MockRoomCover(
+                environment: environment, id: open.id, expired: expired, close: { mockRoom = nil },
+                opened: { mockRoom = OpenMock(id: $0) },
+                anotherSlot: { settings in
+                    mockRoom = nil
+                    self.open(.mockSetup(from: settings))
+                }
+            )
+            .id(open.id)
+        }
         // The sheet's Full page is his page in the app: the sheet closes onto it, pushed on the tab in view.
         .playerSheet(sheet, openPage: { open(.player(slug: $0)) }, openRoute: open, content: { player in
             PlayerSheetContainer(player: player, offer: sheet.offer, close: sheet.close) { player in
@@ -166,7 +180,8 @@ struct RootTabs: View {
             LeagueScreen(
                 environment: environment, leagueID: league.id, league: league, expired: expired,
                 openLineup: { selection = PhoneRail.lineupKey }, openGame: { openGame($0, league: league.id) },
-                openAdvisor: { open(.companionNew(replay: false)) }
+                openAdvisor: { open(.companionNew(replay: false)) },
+                openMock: { open(.mockSetup(from: nil, league: league.settingsLeagueID)) }
             )
             .id(league.id)
         case let (PhoneRail.lineupKey, league?):
@@ -211,6 +226,10 @@ struct RootTabs: View {
                 expired: expired
             )
             .id("\(tab.key)-\(selectedLeague != nil)")
+        } else if PhoneRail.isMock(tab.key) {
+            MockSetupTab(environment: environment, from: nil, seed: mockSeed(league: nil), expired: expired) {
+                mockRoom = OpenMock(id: $0)
+            }
         } else {
             NamedScreen(tab.label)
         }
@@ -236,11 +255,7 @@ struct RootTabs: View {
                 choose(id)
             }
         case let .leagueHome(id):
-            LeagueScreen(
-                environment: environment, leagueID: id, league: selectedLeague.flatMap { $0.id == id ? $0 : nil },
-                expired: expired, openLineup: {}, openGame: { openGame($0, league: id) },
-                openAdvisor: { open(.companionNew(replay: false)) }
-            )
+            leagueHome(id)
         case let .game(league, roster):
             MatchupTab(
                 environment: environment, leagueID: league, roster: roster, expired: expired,
@@ -256,6 +271,13 @@ struct RootTabs: View {
                 open(.companionNew(replay: false))
             }
             .id(id)
+        case let .mockSetup(from, league):
+            MockSetupTab(environment: environment, from: from, seed: mockSeed(league: league), expired: expired) {
+                mockRoom = OpenMock(id: $0)
+            }
+        case let .sharedMock(code):
+            SharedMockTab(environment: environment, code: code) { mockRoom = OpenMock(id: $0) }
+                .id(code)
         case .adp, .compare, .clubs, .club, .schedule:
             ReferenceScreen(route: route, environment: environment, league: selectedLeague, expired: expired)
                 .id(route)
@@ -267,6 +289,28 @@ struct RootTabs: View {
     /// unread season reads as in season, as the bar does.
     private var inSeason: Bool {
         session.sitePhase == nil || session.sitePhase == .inSeason
+    }
+
+    /// A league's home pushed by its id: its draft entry opens the Advisor or the setup on its saved
+    /// league.
+    private func leagueHome(_ id: String) -> some View {
+        let league = selectedLeague.flatMap { $0.id == id ? $0 : nil }
+        return LeagueScreen(
+            environment: environment, leagueID: id, league: league,
+            expired: expired, openLineup: {}, openGame: { openGame($0, league: id) },
+            openAdvisor: { open(.companionNew(replay: false)) },
+            openMock: { open(.mockSetup(from: nil, league: league?.settingsLeagueID)) }
+        )
+    }
+
+    /// Where a mock's setup starts (the web's site context): the selected league's board and saved
+    /// league, else the format chosen with no league; a link's `?league=` names the saved league first.
+    private func mockSeed(league: String?) -> MockSetupSeed {
+        MockSetupSeed(
+            format: selectedLeague?.format ?? session.format,
+            league: league ?? selectedLeague?.settingsLeagueID,
+            exactRules: session.features.contains(Components.Schemas.FeatureKnown.customScoring.rawValue)
+        )
     }
 
     private var selectedLeague: FollowedLeague? {

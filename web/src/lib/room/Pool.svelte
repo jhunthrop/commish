@@ -7,6 +7,7 @@
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import { MOCK } from './mock-words.ts';
 	import PoolRow from './PoolRow.svelte';
 	import type { PoolFilter, RoomPlayer } from './model.ts';
 	import { ROOM, chanceMissing as missingWords, poolEmpty, poolLine, showMore } from './words.ts';
@@ -52,7 +53,7 @@
 		chanceGone = false,
 		chance,
 		chanceLabel,
-		chanceHead = 'Still there',
+		chanceHead = MOCK.stillThere,
 		chanceShown,
 		basis,
 		callId,

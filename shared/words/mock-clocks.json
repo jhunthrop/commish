@@ -1,0 +1,8 @@
+{
+	"label": "The clocks",
+	"botClock": "Clock against bots",
+	"none": "None",
+	"lobbyClock": "Clock in a lobby",
+	"lobbyStarts": "A lobby starts",
+	"functions": []
+}

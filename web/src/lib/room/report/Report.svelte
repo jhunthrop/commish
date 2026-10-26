@@ -22,6 +22,7 @@
 	} from './headline.ts';
 	import PickReview from './PickReview.svelte';
 	import RunsSection from './RunsSection.svelte';
+	import { MOCK } from '../mock-words.ts';
 
 	/** The report as a box score (Lane 66o): the one big number with a one-line caption, the finish
 	 * and settings as cells, the basis said once, then the field, pick by pick and the runs reading
@@ -42,7 +43,7 @@
 		reshuffled?: string;
 	}
 
-	let { report, names, seats, shared, verbs, reshuffled = 'the bots' }: Props = $props();
+	let { report, names, seats, shared, verbs, reshuffled = MOCK.reshuffled }: Props = $props();
 
 	const board = $derived(boardOf(report.board, report.teams));
 	const head = $derived(standingCells(report.standings, report.slot, report.teams));

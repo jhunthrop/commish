@@ -1,0 +1,35 @@
+{
+  "socket_url": "wss://room.example/rooms/0b8d3f0e-6f43-4a4e-9f0f-3c1d2a7e5b10/ws",
+  "phone_now": "2026-08-20T01:02:02.000Z",
+  "connections": [
+    [
+      { "client": { "type": "hello", "last_seq": 0 } },
+      { "server": { "type": "welcome", "room_id": "0b8d3f0e-6f43-4a4e-9f0f-3c1d2a7e5b10", "seq": 3, "now": "2026-08-20T01:02:03.456Z", "actions": [
+        { "seq": 1, "kind": "SEAT_JOINED", "seat": 1, "payload": { "handle": "jpk88" }, "at": "2026-08-20T00:58:00Z" },
+        { "seq": 2, "kind": "SEAT_JOINED", "seat": 4, "payload": { "handle": "you" }, "at": "2026-08-20T00:59:10Z" },
+        { "seq": 3, "kind": "ROOM_STARTED", "seat": null, "payload": { "bots": [2, 3, 5, 6, 7, 8, 9, 10, 11, 12], "solo_pace": false }, "at": "2026-08-20T01:00:00Z" }
+      ] } },
+      { "client": { "type": "queue", "player_ids": ["9509", "8150"] } },
+      { "server": { "type": "update", "seq": 4, "actions": [
+        { "seq": 4, "kind": "SET_QUEUE", "seat": 4, "payload": { "action": { "type": "SET_QUEUE", "timestamp": "2026-08-20T01:02:04Z", "teamId": "4", "playerIds": ["9509", "8150"] } }, "at": "2026-08-20T01:02:04Z" }
+      ] } },
+      { "client": { "type": "pick", "player_id": "9509", "pick": 3 } },
+      { "server": { "type": "error", "code": "conflict", "message": "You are not on the clock." } },
+      { "close": { "code": 1006, "reason": "" } }
+    ],
+    [
+      { "client": { "type": "hello", "last_seq": 4 } },
+      { "server": { "type": "welcome", "room_id": "0b8d3f0e-6f43-4a4e-9f0f-3c1d2a7e5b10", "seq": 6, "now": "2026-08-20T01:02:09.000Z", "actions": [
+        { "seq": 5, "kind": "MAKE_PICK", "seat": 1, "payload": {
+          "action": { "type": "MAKE_PICK", "timestamp": "2026-08-20T01:02:05Z", "teamId": "1", "playerId": "9509" },
+          "pick": { "pick": 1, "round": 1, "seat": 1, "player_id": "9509", "auto": false, "by": "drafter" },
+          "deadline": "2026-08-20T01:02:35Z" }, "at": "2026-08-20T01:02:05Z" },
+        { "seq": 6, "kind": "MAKE_PICK", "seat": 2, "payload": {
+          "action": { "type": "MAKE_PICK", "timestamp": "2026-08-20T01:02:06Z", "teamId": "2", "playerId": "8150" },
+          "pick": { "pick": 2, "round": 1, "seat": 2, "player_id": "8150", "auto": true, "by": "bot" },
+          "deadline": "2026-08-20T01:02:36Z" }, "at": "2026-08-20T01:02:06Z" }
+      ] } },
+      { "end": true }
+    ]
+  ]
+}

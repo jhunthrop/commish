@@ -9,6 +9,7 @@ import type {
 	Club,
 	Format,
 	MarketRowView,
+	PlayerStatus,
 	Schedule
 } from '#lib/run/schema.ts';
 import { MARKET_POSITIONS, marketAt } from '#lib/run/market.ts';
@@ -48,10 +49,61 @@ export type { ClubHero, ScheduleGame, StrengthFigure } from '#lib/run/schedule-v
 
 const NOT_FOUND = 404;
 
-export type ClubCard = ClubCardView<BoardRow>;
+/** How many of a club's first players on the board a card carries for its lead at the order's clock
+ * (Lane 220): a club's players all lose the same games as its games kick off, so its lead at the clock
+ * is among its first few on the run. The index reads the order's first 400 rows (ORDER_MAX_ROWS), every
+ * available player before any listed one (api order.go playingFirst): on a board of more than 400
+ * ranked players a listed player in a club's first three could fall outside the read, and the index
+ * then keeps the run's leads, every one (review L5). */
+export const CLUB_LEAD_POOL = 3;
+
+/** A club card's player as the card draws him and the order places him (review L4): no more of the
+ * board row than that. */
+export type LeadRow = Pick<
+	BoardRow,
+	| 'id'
+	| 'slug'
+	| 'name'
+	| 'position'
+	| 'positionRank'
+	| 'team'
+	| 'headshot'
+	| 'ourRank'
+	| 'projected'
+	| 'vor'
+	| 'vorRound'
+	| 'gap'
+> & { status?: PlayerStatus };
+
+export type ClubCard = Omit<ClubCardView<BoardRow>, 'lead'> & {
+	lead: LeadRow | null;
+	/** In season, the club's first players on the board, the lead's pool at the order's clock; none
+	 * before the season, when the leads are the run's alone. */
+	pool: LeadRow[];
+};
+
+function leadRow(row: BoardRow & { status?: PlayerStatus }): LeadRow {
+	return {
+		id: row.id,
+		slug: row.slug,
+		name: row.name,
+		position: row.position,
+		positionRank: row.positionRank,
+		team: row.team,
+		headshot: row.headshot,
+		ourRank: row.ourRank,
+		projected: row.projected,
+		vor: row.vor,
+		vorRound: row.vorRound,
+		gap: row.gap ?? null,
+		...(row.status === undefined ? {} : { status: row.status })
+	};
+}
 
 export interface ClubsPage {
 	format: Format;
+	/** The run ranks the rest of the season: the cards' leads are read again at the order's clock. */
+	restOfSeason: boolean;
 	/** The page's lead, the strength's sentence in it when there is a strength to show. */
 	lead: string;
 	clubs: ClubCard[];
@@ -91,9 +143,23 @@ export async function clubsPage(): Promise<ClubsPage> {
 		designations(),
 		seasonUnderway()
 	]);
+	const ordered = withStatuses(rows.rows, capture);
+	const cards = clubCards(list, loaded, ordered, format.label, underway);
+	const restOfSeason = format.rosFromWeek !== undefined;
 	return {
 		format,
-		...clubCards(list, loaded, withStatuses(rows.rows, capture), format.label, underway)
+		restOfSeason,
+		lead: cards.lead,
+		clubs: cards.clubs.map((card) => ({
+			...card,
+			lead: card.lead === null ? null : leadRow(card.lead),
+			pool: restOfSeason
+				? ordered
+						.filter((row) => row.team === card.abbr)
+						.slice(0, CLUB_LEAD_POOL)
+						.map(leadRow)
+				: []
+		}))
 	};
 }
 
