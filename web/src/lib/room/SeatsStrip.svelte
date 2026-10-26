@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { type LobbySeatState, seatName } from './lobby.ts';
+	import { LOBBY, seatLabel } from './lobby-words.ts';
 
 	interface Props {
 		seats: ReadonlyMap<number, LobbySeatState>;
@@ -24,14 +25,14 @@
 	}
 
 	function status(seat: number): string {
-		if (seat === onClock) return 'on the clock';
+		if (seat === onClock) return LOBBY.seatOnClock;
 		switch (kindOf(seat)) {
 			case 'left':
-				return 'left, queue drafts';
+				return LOBBY.seatLeft;
 			case 'drafter':
-				return 'drafter';
+				return LOBBY.seatDrafter;
 			default:
-				return 'waiting';
+				return LOBBY.seatWaiting;
 		}
 	}
 
@@ -64,7 +65,7 @@
 	});
 </script>
 
-<ol class="seats" aria-label="Seats" bind:this={list}>
+<ol class="seats" aria-label={LOBBY.seats} bind:this={list}>
 	{#each Array.from({ length: teams }, (_, i) => i + 1) as seat (seat)}
 		{@const s = seats.get(seat)}
 		{@const name = seatName({ seat, handle: s?.handle ?? null, kind: kindOf(seat) }, you)}
@@ -78,7 +79,7 @@
 			class:left={s?.kind === 'left'}
 			data-seat={seat}
 			aria-label={small
-				? `${name}${kindOf(seat) === 'open' ? ', open' : ''}${seat === onClock ? ', on the clock' : ''}`
+				? seatLabel(name, kindOf(seat) === 'open', seat === onClock)
 				: undefined}
 		>
 			{#if small}

@@ -15,6 +15,7 @@
 	import { type Board, boardOf } from '#lib/room/model.ts';
 	import RoomNotice from '#lib/room/RoomNotice.svelte';
 	import { rememberLeft } from '#lib/room/setup/left.ts';
+	import { LOBBY } from '#lib/room/lobby-words.ts';
 
 	/** The clock's redraw: a second clock read four times a second never shows a stale second. */
 	const TICK_MS = 250;
@@ -127,11 +128,11 @@
 </svelte:head>
 
 {#snippet poolSearch()}
-	{#if open}<Search placeholder="Search the pool" label="Search the pool" bind:value={query} />{/if}
+	{#if open}<Search placeholder={LOBBY.searchPool} label={LOBBY.searchPool} bind:value={query} />{/if}
 {/snippet}
 
 {#snippet leaveAction()}
-	{#if open && !leaving}<Quiet onclick={() => (leaving = true)}>Leave</Quiet>{/if}
+	{#if open && !leaving}<Quiet onclick={() => (leaving = true)}>{LOBBY.leave}</Quiet>{/if}
 {/snippet}
 
 <!-- A closed lobby has no pool to search and no seat to leave, so it passes neither and its bar is
@@ -161,12 +162,10 @@
 			<Panel padding="sm" edge="quiet">
 				<div class="done">
 					<p class="line" id="leave-question">
-						{lobby.drafting
-							? 'Leave? Your queue drafts your seat, then the board, and the report is yours when the draft ends.'
-							: 'Leave? Your seat opens for someone else.'}
+						{lobby.drafting ? LOBBY.leaveDrafting : LOBBY.leaveFilling}
 					</p>
-					<Quiet onclick={leave}>Leave the lobby</Quiet>
-					<Quiet onclick={() => (leaving = false)}>Stay</Quiet>
+					<Quiet onclick={leave}>{LOBBY.leaveVerb}</Quiet>
+					<Quiet onclick={() => (leaving = false)}>{LOBBY.stay}</Quiet>
 				</div>
 			</Panel>
 		</div>
@@ -175,7 +174,7 @@
 		<div class="notice">
 			<Panel padding="sm">
 				<p class="line">
-					{status === 'reconnecting' ? 'Reconnecting to the room.' : refused}
+					{status === 'reconnecting' ? LOBBY.reconnecting : refused}
 				</p>
 			</Panel>
 		</div>
@@ -184,8 +183,8 @@
 		<div class="notice">
 			<Panel padding="sm">
 				<div class="done">
-					<p class="line">The draft is over.</p>
-					<Verb href={resolve('/lobby/[id]/report', { id })}>Read the report</Verb>
+					<p class="line">{LOBBY.over}</p>
+					<Verb href={resolve('/lobby/[id]/report', { id })}>{LOBBY.readReport}</Verb>
 				</div>
 			</Panel>
 		</div>
@@ -195,8 +194,8 @@
 		<div class="notice">
 			<Panel padding="sm">
 				<div class="done">
-					<p class="line">This lobby closed because nobody was here when it filled.</p>
-					<Verb onclick={() => joinAnother(format)}>Join another lobby</Verb>
+					<p class="line">{LOBBY.abandoned}</p>
+					<Verb onclick={() => joinAnother(format)}>{LOBBY.joinAnother}</Verb>
 				</div>
 			</Panel>
 		</div>

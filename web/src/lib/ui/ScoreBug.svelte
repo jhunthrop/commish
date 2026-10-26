@@ -1,5 +1,12 @@
 <script lang="ts">
-	import { DEFAULT_TEAMS, clockLabel, pickLabel, snakeSlot } from '#lib/format/draft.ts';
+	import { DEFAULT_TEAMS, clockLabel, snakeSlot } from '#lib/format/draft.ts';
+	import {
+		LOBBY,
+		pickWords,
+		roundWords,
+		secondsLeftWords,
+		yourPickIn
+	} from '#lib/room/lobby-words.ts';
 
 	interface Props {
 		/** The overall pick on the clock. */
@@ -23,7 +30,7 @@
 	const yours = $derived(away === 0);
 	const spokenMark = $derived(SPOKEN_MARKS.findLast((mark) => secondsLeft <= mark));
 	const clockWords = $derived(
-		!yours || spokenMark === undefined ? '' : `${spokenMark} seconds left`
+		!yours || spokenMark === undefined ? '' : secondsLeftWords(spokenMark)
 	);
 </script>
 
@@ -33,21 +40,21 @@
      from screen readers, and a separate line speaks it at ten and five seconds only on your clock. -->
 <div class="bug">
 	<div role="status" aria-live="polite" class="spoken">
-		<div class="seg"><small>Round {round}</small><b>Pick {pickLabel(now, teams)}</b></div>
-		<div class="seg grow"><small>On the clock</small><b>{onClock}</b></div>
-		<span class="visually-hidden">{yours ? 'Your pick is now' : ''}</span>
+		<div class="seg"><small>{roundWords(round)}</small><b>{pickWords(now, teams)}</b></div>
+		<div class="seg grow"><small>{LOBBY.onTheClock}</small><b>{onClock}</b></div>
+		<span class="visually-hidden">{yours ? LOBBY.yourPickIsNow : ''}</span>
 	</div>
 	<div class="seg clock" aria-hidden="true">
-		<small>Clock</small><b>{clockLabel(secondsLeft)}</b>
+		<small>{LOBBY.clock}</small><b>{clockLabel(secondsLeft)}</b>
 	</div>
 	<!-- Read when a reader moves to it, never announced: "Your pick is now" above is the one line
 	     this segment speaks. -->
 	<div class="seg you">
-		<small>Your pick</small>
+		<small>{LOBBY.yourPick}</small>
 		{#if yours}
-			<b aria-hidden="true">Now</b>
+			<b aria-hidden="true">{LOBBY.now}</b>
 		{:else}
-			<b>{pickLabel(yourPick, teams)}, in {away}</b>
+			<b>{yourPickIn(yourPick, away, teams)}</b>
 		{/if}
 	</div>
 	<span class="visually-hidden" aria-live="polite">{clockWords}</span>

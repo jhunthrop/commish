@@ -1,0 +1,6029 @@
+{
+	"recorded_by": "you",
+	"steps": [
+		{
+			"client": {
+				"last_seq": 0,
+				"type": "hello"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:15:02.671-05:00",
+						"kind": "SEAT_JOINED",
+						"payload": {
+							"handle": "you"
+						},
+						"seat": 12,
+						"seq": 1
+					},
+					{
+						"at": "2026-10-26T03:15:02.678-05:00",
+						"kind": "SEAT_JOINED",
+						"payload": {
+							"handle": "jpk88"
+						},
+						"seat": 5,
+						"seq": 2
+					},
+					{
+						"at": "2026-10-26T03:15:02.682-05:00",
+						"kind": "SEAT_JOINED",
+						"payload": {
+							"handle": "mara"
+						},
+						"seat": 8,
+						"seq": 3
+					}
+				],
+				"now": "2026-10-26T08:15:02.712978Z",
+				"room_id": "8c0ab888-70a9-466c-965b-b42e49c19279",
+				"seq": 3,
+				"type": "welcome"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:32.672-05:00",
+						"kind": "ROOM_STARTED",
+						"payload": {
+							"bots": [
+								1,
+								2,
+								3,
+								4,
+								6,
+								7,
+								9,
+								10,
+								11
+							],
+							"solo_pace": false
+						},
+						"seat": null,
+						"seq": 4
+					},
+					{
+						"at": "2026-10-26T03:16:32.672-05:00",
+						"kind": "START_DRAFT",
+						"payload": {
+							"action": {
+								"autopick": {
+									"lateRoundOnlyRoundsFromEnd": 2,
+									"needPerOpenStartingSlot": 0.4,
+									"rampFullAtRosterFraction": 0.5,
+									"rosterCeilings": {
+										"backupsAtSingleStarterPosition": 1
+									},
+									"startersFilledDamp": 0.6,
+									"surplusDamp": 0.25,
+									"temperature": 3
+								},
+								"draftOrder": [
+									"seat01",
+									"seat02",
+									"seat03",
+									"seat04",
+									"seat05",
+									"seat06",
+									"seat07",
+									"seat08",
+									"seat09",
+									"seat10",
+									"seat11",
+									"seat12"
+								],
+								"minBid": 1,
+								"skipPolicy": {
+									"appliesAtOrAbovePickSeconds": 3600,
+									"maxOwedPerTeam": 1
+								},
+								"timestamp": "2026-10-26T08:16:32.672Z",
+								"type": "START_DRAFT",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:02.672Z"
+						},
+						"seat": null,
+						"seq": 5
+					}
+				],
+				"seq": 5,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"player_ids": [
+					"4362628",
+					"4430878",
+					"4374302"
+				],
+				"type": "queue"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:32.746-05:00",
+						"kind": "SET_QUEUE",
+						"payload": {
+							"action": {
+								"playerIds": [
+									"4362628",
+									"4430878",
+									"4374302"
+								],
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:16:32.746Z",
+								"type": "SET_QUEUE",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:02.672Z"
+						},
+						"seat": 12,
+						"seq": 6
+					}
+				],
+				"seq": 6,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:33.157-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4374302",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:16:33.157Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:03.157Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 1,
+								"player_id": "4374302",
+								"round": 1,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 7
+					}
+				],
+				"seq": 7,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:33.872-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3117251",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:16:33.872Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:03.872Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 2,
+								"player_id": "3117251",
+								"round": 1,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 8
+					}
+				],
+				"seq": 8,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:34.679-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4430807",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:16:34.679Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:04.679Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 3,
+								"player_id": "4430807",
+								"round": 1,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 9
+					}
+				],
+				"seq": 9,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:35.554-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4429795",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:16:35.554Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:05.554Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 4,
+								"player_id": "4429795",
+								"round": 1,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 10
+					}
+				],
+				"seq": 10,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:35.568-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4362628",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:16:35.568Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:05.568Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 5,
+								"player_id": "4362628",
+								"round": 1,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 11
+					}
+				],
+				"seq": 11,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:36.433-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4426515",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:16:36.433Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:06.433Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 6,
+								"player_id": "4426515",
+								"round": 1,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 12
+					}
+				],
+				"seq": 12,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:37.226-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4379399",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:16:37.226Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:07.226Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 7,
+								"player_id": "4379399",
+								"round": 1,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 13
+					}
+				],
+				"seq": 13,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:37.238-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4241389",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:16:37.238Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:07.238Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 8,
+								"player_id": "4241389",
+								"round": 1,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 14
+					}
+				],
+				"seq": 14,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:37.878-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4429160",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:16:37.878Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:07.878Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 9,
+								"player_id": "4429160",
+								"round": 1,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 15
+					}
+				],
+				"seq": 15,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:38.632-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4262921",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:16:38.632Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:08.632Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 10,
+								"player_id": "4262921",
+								"round": 1,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 16
+					}
+				],
+				"seq": 16,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:39.182-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3043078",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:16:39.182Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:09.182Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 11,
+								"player_id": "3043078",
+								"round": 1,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 17
+					}
+				],
+				"seq": 17,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 12,
+				"player_id": "4430878",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:39.194-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4430878",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:16:39.194Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:09.194Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 12,
+								"player_id": "4430878",
+								"round": 1,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 18
+					}
+				],
+				"seq": 18,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 13,
+				"player_id": "4361370",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:39.208-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4361370",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:16:39.208Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:09.208Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 13,
+								"player_id": "4361370",
+								"round": 2,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 19
+					}
+				],
+				"seq": 19,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:40.017-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4362238",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:16:40.017Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:10.017Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 14,
+								"player_id": "4362238",
+								"round": 2,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 20
+					}
+				],
+				"seq": 20,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:40.857-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4426502",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:16:40.857Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:10.857Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 15,
+								"player_id": "4426502",
+								"round": 2,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 21
+					}
+				],
+				"seq": 21,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:41.525-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4242335",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:16:41.525Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:11.525Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 16,
+								"player_id": "4242335",
+								"round": 2,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 22
+					}
+				],
+				"seq": 22,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:41.538-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4426354",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:16:41.538Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:11.538Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 17,
+								"player_id": "4426354",
+								"round": 2,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 23
+					}
+				],
+				"seq": 23,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:42.02-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4047646",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:16:42.020Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:12.020Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 18,
+								"player_id": "4047646",
+								"round": 2,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 24
+					}
+				],
+				"seq": 24,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:42.949-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4428331",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:16:42.949Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:12.949Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 19,
+								"player_id": "4428331",
+								"round": 2,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 25
+					}
+				],
+				"seq": 25,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:42.966-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4258173",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:16:42.966Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:12.966Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 20,
+								"player_id": "4258173",
+								"round": 2,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 26
+					}
+				],
+				"seq": 26,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:43.718-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4567048",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:16:43.718Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:13.718Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 21,
+								"player_id": "4567048",
+								"round": 2,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 27
+					}
+				],
+				"seq": 27,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:44.47-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4595348",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:16:44.470Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:14.470Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 22,
+								"player_id": "4595348",
+								"round": 2,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 28
+					}
+				],
+				"seq": 28,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:45.167-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3929630",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:16:45.167Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:15.167Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 23,
+								"player_id": "3929630",
+								"round": 2,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 29
+					}
+				],
+				"seq": 29,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:45.795-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4429615",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:16:45.795Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:15.795Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 24,
+								"player_id": "4429615",
+								"round": 2,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 30
+					}
+				],
+				"seq": 30,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:46.403-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4427366",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:16:46.403Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:16.403Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 25,
+								"player_id": "4427366",
+								"round": 3,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 31
+					}
+				],
+				"seq": 31,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:47.335-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4569618",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:16:47.335Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:17.335Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 26,
+								"player_id": "4569618",
+								"round": 3,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 32
+					}
+				],
+				"seq": 32,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:47.818-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4870808",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:16:47.818Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:17.818Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 27,
+								"player_id": "4870808",
+								"round": 3,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 33
+					}
+				],
+				"seq": 33,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:48.594-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4685472",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:16:48.594Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:18.594Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 28,
+								"player_id": "4685472",
+								"round": 3,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 34
+					}
+				],
+				"seq": 34,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:48.609-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4432665",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:16:48.609Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:18.609Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 29,
+								"player_id": "4432665",
+								"round": 3,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 35
+					}
+				],
+				"seq": 35,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:49.283-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3918298",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:16:49.283Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:19.283Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 30,
+								"player_id": "3918298",
+								"round": 3,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 36
+					}
+				],
+				"seq": 36,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:49.9-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4685382",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:16:49.900Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:19.900Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 31,
+								"player_id": "4685382",
+								"round": 3,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 37
+					}
+				],
+				"seq": 37,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:49.914-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4361307",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:16:49.914Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:19.914Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 32,
+								"player_id": "4361307",
+								"round": 3,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 38
+					}
+				],
+				"seq": 38,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:50.834-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4567750",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:16:50.834Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:20.834Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 33,
+								"player_id": "4567750",
+								"round": 3,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 39
+					}
+				],
+				"seq": 39,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:51.531-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4241478",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:16:51.531Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:21.531Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 34,
+								"player_id": "4241478",
+								"round": 3,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 40
+					}
+				],
+				"seq": 40,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:52.125-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4361579",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:16:52.125Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:22.125Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 35,
+								"player_id": "4361579",
+								"round": 3,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 41
+					}
+				],
+				"seq": 41,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 36,
+				"player_id": "4890973",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:52.138-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4890973",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:16:52.138Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:22.138Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 36,
+								"player_id": "4890973",
+								"round": 3,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 42
+					}
+				],
+				"seq": 42,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 37,
+				"player_id": "3916387",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:52.154-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3916387",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:16:52.154Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:22.154Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 37,
+								"player_id": "3916387",
+								"round": 4,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 43
+					}
+				],
+				"seq": 43,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:52.755-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4239993",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:16:52.755Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:22.755Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 38,
+								"player_id": "4239993",
+								"round": 4,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 44
+					}
+				],
+				"seq": 44,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:53.502-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4430737",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:16:53.502Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:23.502Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 39,
+								"player_id": "4430737",
+								"round": 4,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 45
+					}
+				],
+				"seq": 45,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:54.191-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4239996",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:16:54.191Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:24.191Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 40,
+								"player_id": "4239996",
+								"round": 4,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 46
+					}
+				],
+				"seq": 46,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:54.206-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4426388",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:16:54.206Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:24.206Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 41,
+								"player_id": "4426388",
+								"round": 4,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 47
+					}
+				],
+				"seq": 47,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:54.76-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4259545",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:16:54.760Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:24.760Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 42,
+								"player_id": "4259545",
+								"round": 4,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 48
+					}
+				],
+				"seq": 48,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:55.683-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4696981",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:16:55.683Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:25.683Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 43,
+								"player_id": "4696981",
+								"round": 4,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 49
+					}
+				],
+				"seq": 49,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:55.698-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4612826",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:16:55.698Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:25.698Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 44,
+								"player_id": "4612826",
+								"round": 4,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 50
+					}
+				],
+				"seq": 50,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:56.619-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4372016",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:16:56.619Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:26.619Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 45,
+								"player_id": "4372016",
+								"round": 4,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 51
+					}
+				],
+				"seq": 51,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:57.32-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "16800",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:16:57.320Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:27.320Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 46,
+								"player_id": "16800",
+								"round": 4,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 52
+					}
+				],
+				"seq": 52,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:57.836-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4035538",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:16:57.836Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:27.836Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 47,
+								"player_id": "4035538",
+								"round": 4,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 53
+					}
+				],
+				"seq": 53,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:58.5-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3121422",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:16:58.500Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:28.500Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 48,
+								"player_id": "3121422",
+								"round": 4,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 54
+					}
+				],
+				"seq": 54,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:59.09-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4431452",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:16:59.090Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:29.090Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 49,
+								"player_id": "4431452",
+								"round": 5,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 55
+					}
+				],
+				"seq": 55,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:16:59.844-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4685278",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:16:59.844Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:29.844Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 50,
+								"player_id": "4685278",
+								"round": 5,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 56
+					}
+				],
+				"seq": 56,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:00.752-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3915416",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:17:00.752Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:30.752Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 51,
+								"player_id": "3915416",
+								"round": 5,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 57
+					}
+				],
+				"seq": 57,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:01.403-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4596448",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:17:01.403Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:31.403Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 52,
+								"player_id": "4596448",
+								"round": 5,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 58
+					}
+				],
+				"seq": 58,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:01.418-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4723086",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:17:01.418Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:31.418Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 53,
+								"player_id": "4723086",
+								"round": 5,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 59
+					}
+				],
+				"seq": 59,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:02.135-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4248528",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:17:02.135Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:32.135Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 54,
+								"player_id": "4248528",
+								"round": 5,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 60
+					}
+				],
+				"seq": 60,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:02.942-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "16737",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:17:02.942Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:32.942Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 55,
+								"player_id": "16737",
+								"round": 5,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 61
+					}
+				],
+				"seq": 61,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:02.955-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4431459",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:17:02.955Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:32.955Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 56,
+								"player_id": "4431459",
+								"round": 5,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 62
+					}
+				],
+				"seq": 62,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:03.839-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4432620",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:17:03.839Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:33.839Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 57,
+								"player_id": "4432620",
+								"round": 5,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 63
+					}
+				],
+				"seq": 63,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:04.567-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4685702",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:17:04.567Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:34.567Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 58,
+								"player_id": "4685702",
+								"round": 5,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 64
+					}
+				],
+				"seq": 64,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:05.441-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3128429",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:17:05.441Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:35.441Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 59,
+								"player_id": "3128429",
+								"round": 5,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 65
+					}
+				],
+				"seq": 65,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 60,
+				"player_id": "3915511",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:05.457-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3915511",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:17:05.457Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:35.457Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 60,
+								"player_id": "3915511",
+								"round": 5,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 66
+					}
+				],
+				"seq": 66,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 61,
+				"player_id": "2577417",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:05.474-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "2577417",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:17:05.474Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:35.474Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 61,
+								"player_id": "2577417",
+								"round": 6,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 67
+					}
+				],
+				"seq": 67,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:06.396-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4431299",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:17:06.396Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:36.396Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 62,
+								"player_id": "4431299",
+								"round": 6,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 68
+					}
+				],
+				"seq": 68,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:07.228-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4569173",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:17:07.228Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:37.228Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 63,
+								"player_id": "4569173",
+								"round": 6,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 69
+					}
+				],
+				"seq": 69,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:07.784-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4882093",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:17:07.784Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:37.784Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 64,
+								"player_id": "4882093",
+								"round": 6,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 70
+					}
+				],
+				"seq": 70,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:07.803-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4040715",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:17:07.803Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:37.803Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 65,
+								"player_id": "4040715",
+								"round": 6,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 71
+					}
+				],
+				"seq": 71,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:08.516-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4569987",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:17:08.516Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:38.516Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 66,
+								"player_id": "4569987",
+								"round": 6,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 72
+					}
+				],
+				"seq": 72,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:09.201-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4685512",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:17:09.201Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:39.201Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 67,
+								"player_id": "4685512",
+								"round": 6,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 73
+					}
+				],
+				"seq": 73,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:09.222-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "5083076",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:17:09.222Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:39.222Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 68,
+								"player_id": "5083076",
+								"round": 6,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 74
+					}
+				],
+				"seq": 74,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:09.988-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4426348",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:17:09.988Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:39.988Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 69,
+								"player_id": "4426348",
+								"round": 6,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 75
+					}
+				],
+				"seq": 75,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:10.689-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "12483",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:17:10.689Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:40.689Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 70,
+								"player_id": "12483",
+								"round": 6,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 76
+					}
+				],
+				"seq": 76,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:11.246-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4047650",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:17:11.246Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:41.246Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 71,
+								"player_id": "4047650",
+								"round": 6,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 77
+					}
+				],
+				"seq": 77,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:11.82-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3916148",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:17:11.820Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:41.820Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 72,
+								"player_id": "3916148",
+								"round": 6,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 78
+					}
+				],
+				"seq": 78,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:12.298-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4432708",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:17:12.298Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:42.298Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 73,
+								"player_id": "4432708",
+								"round": 7,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 79
+					}
+				],
+				"seq": 79,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:13.205-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4432773",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:17:13.205Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:43.205Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 74,
+								"player_id": "4432773",
+								"round": 7,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 80
+					}
+				],
+				"seq": 80,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:13.93-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4038815",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:17:13.930Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:43.930Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 75,
+								"player_id": "4038815",
+								"round": 7,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 81
+					}
+				],
+				"seq": 81,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:14.617-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "DST-SEA",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:17:14.617Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:44.617Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 76,
+								"player_id": "DST-SEA",
+								"round": 7,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 82
+					}
+				],
+				"seq": 82,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:14.64-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4431611",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:17:14.640Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:44.640Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 77,
+								"player_id": "4431611",
+								"round": 7,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 83
+					}
+				],
+				"seq": 83,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:15.48-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4360248",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:17:15.480Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:45.480Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 78,
+								"player_id": "4360248",
+								"round": 7,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 84
+					}
+				],
+				"seq": 84,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:16.138-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4361741",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:17:16.138Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:46.138Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 79,
+								"player_id": "4361741",
+								"round": 7,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 85
+					}
+				],
+				"seq": 85,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:16.163-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4360078",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:17:16.163Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:46.163Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 80,
+								"player_id": "4360078",
+								"round": 7,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 86
+					}
+				],
+				"seq": 86,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:16.885-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "DST-DEN",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:17:16.885Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:46.885Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 81,
+								"player_id": "DST-DEN",
+								"round": 7,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 87
+					}
+				],
+				"seq": 87,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:17.602-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4360761",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:17:17.602Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:47.602Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 82,
+								"player_id": "4360761",
+								"round": 7,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 88
+					}
+				],
+				"seq": 88,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:18.09-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4432710",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:17:18.090Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:48.090Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 83,
+								"player_id": "4432710",
+								"round": 7,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 89
+					}
+				],
+				"seq": 89,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 84,
+				"player_id": "4038941",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:18.109-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4038941",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:17:18.109Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:48.109Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 84,
+								"player_id": "4038941",
+								"round": 7,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 90
+					}
+				],
+				"seq": 90,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 85,
+				"player_id": "4569587",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:18.127-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4569587",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:17:18.127Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:48.127Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 85,
+								"player_id": "4569587",
+								"round": 8,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 91
+					}
+				],
+				"seq": 91,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:18.688-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4871023",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:17:18.688Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:48.688Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 86,
+								"player_id": "4871023",
+								"round": 8,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 92
+					}
+				],
+				"seq": 92,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:19.202-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3040151",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:17:19.202Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:49.202Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 87,
+								"player_id": "3040151",
+								"round": 8,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 93
+					}
+				],
+				"seq": 93,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:19.931-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4360310",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:17:19.931Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:49.931Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 88,
+								"player_id": "4360310",
+								"round": 8,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 94
+					}
+				],
+				"seq": 94,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:19.953-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4572680",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:17:19.953Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:49.953Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 89,
+								"player_id": "4572680",
+								"round": 8,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 95
+					}
+				],
+				"seq": 95,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:20.421-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4362249",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:17:20.421Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:50.421Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 90,
+								"player_id": "4362249",
+								"round": 8,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 96
+					}
+				],
+				"seq": 96,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:21.005-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4678008",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:17:21.005Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:51.005Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 91,
+								"player_id": "4678008",
+								"round": 8,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 97
+					}
+				],
+				"seq": 97,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:21.026-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4430027",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:17:21.026Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:51.026Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 92,
+								"player_id": "4430027",
+								"round": 8,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 98
+					}
+				],
+				"seq": 98,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:21.722-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3116165",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:17:21.722Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:51.722Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 93,
+								"player_id": "3116165",
+								"round": 8,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 99
+					}
+				],
+				"seq": 99,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:22.363-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4047365",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:17:22.363Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:52.363Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 94,
+								"player_id": "4047365",
+								"round": 8,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 100
+					}
+				],
+				"seq": 100,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:23.118-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4241416",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:17:23.118Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:53.118Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 95,
+								"player_id": "4241416",
+								"round": 8,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 101
+					}
+				],
+				"seq": 101,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:23.608-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4688813",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:17:23.608Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:53.608Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 96,
+								"player_id": "4688813",
+								"round": 8,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 102
+					}
+				],
+				"seq": 102,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:24.52-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "DST-LAR",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:17:24.520Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:54.520Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 97,
+								"player_id": "DST-LAR",
+								"round": 9,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 103
+					}
+				],
+				"seq": 103,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:25.351-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4568490",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:17:25.351Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:55.351Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 98,
+								"player_id": "4568490",
+								"round": 9,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 104
+					}
+				],
+				"seq": 104,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:25.973-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "DST-HOU",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:17:25.973Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:55.973Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 99,
+								"player_id": "DST-HOU",
+								"round": 9,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 105
+					}
+				],
+				"seq": 105,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:26.699-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4241985",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:17:26.699Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:56.699Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 100,
+								"player_id": "4241985",
+								"round": 9,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 106
+					}
+				],
+				"seq": 106,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:26.72-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "15847",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:17:26.720Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:56.720Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 101,
+								"player_id": "15847",
+								"round": 9,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 107
+					}
+				],
+				"seq": 107,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:27.38-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4429205",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:17:27.380Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:57.380Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 102,
+								"player_id": "4429205",
+								"round": 9,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 108
+					}
+				],
+				"seq": 108,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:27.964-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4429025",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:17:27.964Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:57.964Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 103,
+								"player_id": "4429025",
+								"round": 9,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 109
+					}
+				],
+				"seq": 109,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:27.98-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3046779",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:17:27.980Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:57.980Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 104,
+								"player_id": "3046779",
+								"round": 9,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 110
+					}
+				],
+				"seq": 110,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:28.656-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4371733",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:17:28.656Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:58.656Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 105,
+								"player_id": "4371733",
+								"round": 9,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 111
+					}
+				],
+				"seq": 111,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:29.528-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3139477",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:17:29.528Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:17:59.528Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 106,
+								"player_id": "3139477",
+								"round": 9,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 112
+					}
+				],
+				"seq": 112,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:30.372-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3916433",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:17:30.372Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:00.372Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 107,
+								"player_id": "3916433",
+								"round": 9,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 113
+					}
+				],
+				"seq": 113,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 108,
+				"player_id": "4361050",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:30.388-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4361050",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:17:30.388Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:00.388Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 108,
+								"player_id": "4361050",
+								"round": 9,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 114
+					}
+				],
+				"seq": 114,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 109,
+				"player_id": "3116365",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:30.407-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3116365",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:17:30.407Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:00.407Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 109,
+								"player_id": "3116365",
+								"round": 10,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 115
+					}
+				],
+				"seq": 115,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:31.329-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4689114",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:17:31.329Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:01.329Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 110,
+								"player_id": "4689114",
+								"round": 10,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 116
+					}
+				],
+				"seq": 116,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:32.113-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "2976212",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:17:32.113Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:02.113Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 111,
+								"player_id": "2976212",
+								"round": 10,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 117
+					}
+				],
+				"seq": 117,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:32.715-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4373678",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:17:32.715Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:02.715Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 112,
+								"player_id": "4373678",
+								"round": 10,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 118
+					}
+				],
+				"seq": 118,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:32.738-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3052587",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:17:32.738Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:02.738Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 113,
+								"player_id": "3052587",
+								"round": 10,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 119
+					}
+				],
+				"seq": 119,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:33.613-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3042519",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:17:33.613Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:03.613Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 114,
+								"player_id": "3042519",
+								"round": 10,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 120
+					}
+				],
+				"seq": 120,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:34.184-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4426338",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:17:34.184Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:04.184Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 115,
+								"player_id": "4426338",
+								"round": 10,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 121
+					}
+				],
+				"seq": 121,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:34.208-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3929645",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:17:34.208Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:04.208Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 116,
+								"player_id": "3929645",
+								"round": 10,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 122
+					}
+				],
+				"seq": 122,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:34.795-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4701936",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:17:34.795Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:04.795Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 117,
+								"player_id": "4701936",
+								"round": 10,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 123
+					}
+				],
+				"seq": 123,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:35.266-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4035687",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:17:35.266Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:05.266Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 118,
+								"player_id": "4035687",
+								"round": 10,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 124
+					}
+				],
+				"seq": 124,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:35.751-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "DST-MIN",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:17:35.751Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:05.751Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 119,
+								"player_id": "DST-MIN",
+								"round": 10,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 125
+					}
+				],
+				"seq": 125,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:36.609-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3121023",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:17:36.609Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:06.609Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 120,
+								"player_id": "3121023",
+								"round": 10,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 126
+					}
+				],
+				"seq": 126,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:37.524-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4429023",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:17:37.524Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:07.524Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 121,
+								"player_id": "4429023",
+								"round": 11,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 127
+					}
+				],
+				"seq": 127,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:38.342-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3953687",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:17:38.342Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:08.342Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 122,
+								"player_id": "3953687",
+								"round": 11,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 128
+					}
+				],
+				"seq": 128,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:38.825-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4361432",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:17:38.825Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:08.825Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 123,
+								"player_id": "4361432",
+								"round": 11,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 129
+					}
+				],
+				"seq": 129,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:39.633-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4608686",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:17:39.633Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:09.633Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 124,
+								"player_id": "4608686",
+								"round": 11,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 130
+					}
+				],
+				"seq": 130,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:39.653-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4576297",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:17:39.653Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:09.653Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 125,
+								"player_id": "4576297",
+								"round": 11,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 131
+					}
+				],
+				"seq": 131,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:40.35-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3126486",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:17:40.350Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:10.350Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 126,
+								"player_id": "3126486",
+								"round": 11,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 132
+					}
+				],
+				"seq": 132,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:40.842-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "DST-PHI",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:17:40.842Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:10.842Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 127,
+								"player_id": "DST-PHI",
+								"round": 11,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 133
+					}
+				],
+				"seq": 133,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:40.862-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4385690",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:17:40.862Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:10.862Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 128,
+								"player_id": "4385690",
+								"round": 11,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 134
+					}
+				],
+				"seq": 134,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:41.598-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4032473",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:17:41.598Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:11.598Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 129,
+								"player_id": "4032473",
+								"round": 11,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 135
+					}
+				],
+				"seq": 135,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:42.322-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "DST-NE",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:17:42.322Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:12.322Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 130,
+								"player_id": "DST-NE",
+								"round": 11,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 136
+					}
+				],
+				"seq": 136,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:42.963-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "DST-DET",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:17:42.963Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:12.963Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 131,
+								"player_id": "DST-DET",
+								"round": 11,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 137
+					}
+				],
+				"seq": 137,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 132,
+				"player_id": "4242355",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:42.987-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4242355",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:17:42.987Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:12.987Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 132,
+								"player_id": "4242355",
+								"round": 11,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 138
+					}
+				],
+				"seq": 138,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 133,
+				"player_id": "3123076",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:43.013-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3123076",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:17:43.013Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:13.013Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 133,
+								"player_id": "3123076",
+								"round": 12,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 139
+					}
+				],
+				"seq": 139,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:43.823-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "2971573",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:17:43.823Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:13.823Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 134,
+								"player_id": "2971573",
+								"round": 12,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 140
+					}
+				],
+				"seq": 140,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:44.456-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3917315",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:17:44.456Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:14.456Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 135,
+								"player_id": "3917315",
+								"round": 12,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 141
+					}
+				],
+				"seq": 141,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:45.161-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4683062",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:17:45.161Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:15.161Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 136,
+								"player_id": "4683062",
+								"round": 12,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 142
+					}
+				],
+				"seq": 142,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:45.189-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3116389",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:17:45.189Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:15.189Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 137,
+								"player_id": "3116389",
+								"round": 12,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 143
+					}
+				],
+				"seq": 143,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:45.85-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4870653",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:17:45.850Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:15.850Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 138,
+								"player_id": "4870653",
+								"round": 12,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 144
+					}
+				],
+				"seq": 144,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:46.64-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "2473037",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:17:46.640Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:16.640Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 139,
+								"player_id": "2473037",
+								"round": 12,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 145
+					}
+				],
+				"seq": 145,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:46.663-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4360516",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:17:46.663Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:16.663Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 140,
+								"player_id": "4360516",
+								"round": 12,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 146
+					}
+				],
+				"seq": 146,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:47.407-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4695883",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:17:47.407Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:17.407Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 141,
+								"player_id": "4695883",
+								"round": 12,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 147
+					}
+				],
+				"seq": 147,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:47.909-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4429096",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:17:47.909Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:17.909Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 142,
+								"player_id": "4429096",
+								"round": 12,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 148
+					}
+				],
+				"seq": 148,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:48.725-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4036378",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:17:48.725Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:18.725Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 143,
+								"player_id": "4036378",
+								"round": 12,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 149
+					}
+				],
+				"seq": 149,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:49.515-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4360689",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:17:49.515Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:19.515Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 144,
+								"player_id": "4360689",
+								"round": 12,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 150
+					}
+				],
+				"seq": 150,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:50.143-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4575131",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:17:50.143Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:20.143Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 145,
+								"player_id": "4575131",
+								"round": 13,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 151
+					}
+				],
+				"seq": 151,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:51.066-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4870795",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:17:51.066Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:21.066Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 146,
+								"player_id": "4870795",
+								"round": 13,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 152
+					}
+				],
+				"seq": 152,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:52.001-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4574716",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:17:52.001Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:22.001Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 147,
+								"player_id": "4574716",
+								"round": 13,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 153
+					}
+				],
+				"seq": 153,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:52.76-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "17372",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:17:52.760Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:22.760Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 148,
+								"player_id": "17372",
+								"round": 13,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 154
+					}
+				],
+				"seq": 154,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:52.784-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4362478",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:17:52.784Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:22.784Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 149,
+								"player_id": "4362478",
+								"round": 13,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 155
+					}
+				],
+				"seq": 155,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:53.48-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "DST-PIT",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:17:53.480Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:23.480Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 150,
+								"player_id": "DST-PIT",
+								"round": 13,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 156
+					}
+				],
+				"seq": 156,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:54.339-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3055899",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:17:54.339Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:24.339Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 151,
+								"player_id": "3055899",
+								"round": 13,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 157
+					}
+				],
+				"seq": 157,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:54.364-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "5081397",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:17:54.364Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:24.364Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 152,
+								"player_id": "5081397",
+								"round": 13,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 158
+					}
+				],
+				"seq": 158,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:55.193-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4689936",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:17:55.193Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:25.193Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 153,
+								"player_id": "4689936",
+								"round": 13,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 159
+					}
+				],
+				"seq": 159,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:56.124-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4428557",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:17:56.124Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:26.124Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 154,
+								"player_id": "4428557",
+								"round": 13,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 160
+					}
+				],
+				"seq": 160,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:56.65-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4697815",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:17:56.650Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:26.650Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 155,
+								"player_id": "4697815",
+								"round": 13,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 161
+					}
+				],
+				"seq": 161,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 156,
+				"player_id": "4360569",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:56.674-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4360569",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:17:56.674Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:26.674Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 156,
+								"player_id": "4360569",
+								"round": 13,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 162
+					}
+				],
+				"seq": 162,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 157,
+				"player_id": "DST-LAC",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:56.701-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "DST-LAC",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:17:56.701Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:26.701Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 157,
+								"player_id": "DST-LAC",
+								"round": 14,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 163
+					}
+				],
+				"seq": 163,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:57.553-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3046439",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:17:57.553Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:27.553Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 158,
+								"player_id": "3046439",
+								"round": 14,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 164
+					}
+				],
+				"seq": 164,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:58.31-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4362081",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:17:58.310Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:28.310Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 159,
+								"player_id": "4362081",
+								"round": 14,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 165
+					}
+				],
+				"seq": 165,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:58.799-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4430539",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:17:58.799Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:28.799Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 160,
+								"player_id": "4430539",
+								"round": 14,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 166
+					}
+				],
+				"seq": 166,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:58.824-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "DST-JAX",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:17:58.824Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:28.824Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 161,
+								"player_id": "DST-JAX",
+								"round": 14,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 167
+					}
+				],
+				"seq": 167,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:59.334-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4036133",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:17:59.334Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:29.334Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 162,
+								"player_id": "4036133",
+								"round": 14,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 168
+					}
+				],
+				"seq": 168,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:59.858-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4429059",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:17:59.858Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:29.858Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 163,
+								"player_id": "4429059",
+								"round": 14,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 169
+					}
+				],
+				"seq": 169,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:17:59.89-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4686361",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:17:59.890Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:29.890Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 164,
+								"player_id": "4686361",
+								"round": 14,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 170
+					}
+				],
+				"seq": 170,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:00.445-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "5083315",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:18:00.445Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:30.445Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 165,
+								"player_id": "5083315",
+								"round": 14,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 171
+					}
+				],
+				"seq": 171,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:00.971-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4367209",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:18:00.971Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:30.971Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 166,
+								"player_id": "4367209",
+								"round": 14,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 172
+					}
+				],
+				"seq": 172,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:01.722-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4570037",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:18:01.722Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:31.722Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 167,
+								"player_id": "4570037",
+								"round": 14,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 173
+					}
+				],
+				"seq": 173,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:02.389-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4567104",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:18:02.389Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:32.389Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 168,
+								"player_id": "4567104",
+								"round": 14,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 174
+					}
+				],
+				"seq": 174,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:03.109-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4373626",
+								"teamId": "seat01",
+								"timestamp": "2026-10-26T08:18:03.109Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:33.109Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 169,
+								"player_id": "4373626",
+								"round": 15,
+								"seat": 1
+							}
+						},
+						"seat": 1,
+						"seq": 175
+					}
+				],
+				"seq": 175,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:04.027-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4837248",
+								"teamId": "seat02",
+								"timestamp": "2026-10-26T08:18:04.027Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:34.027Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 170,
+								"player_id": "4837248",
+								"round": 15,
+								"seat": 2
+							}
+						},
+						"seat": 2,
+						"seq": 176
+					}
+				],
+				"seq": 176,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:04.726-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4432577",
+								"teamId": "seat03",
+								"timestamp": "2026-10-26T08:18:04.726Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:34.726Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 171,
+								"player_id": "4432577",
+								"round": 15,
+								"seat": 3
+							}
+						},
+						"seat": 3,
+						"seq": 177
+					}
+				],
+				"seq": 177,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:05.613-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3917792",
+								"teamId": "seat04",
+								"timestamp": "2026-10-26T08:18:05.613Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:35.613Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 172,
+								"player_id": "3917792",
+								"round": 15,
+								"seat": 4
+							}
+						},
+						"seat": 4,
+						"seq": 178
+					}
+				],
+				"seq": 178,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:05.632-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "DST-GB",
+								"teamId": "seat05",
+								"timestamp": "2026-10-26T08:18:05.632Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:35.632Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 173,
+								"player_id": "DST-GB",
+								"round": 15,
+								"seat": 5
+							}
+						},
+						"seat": 5,
+						"seq": 179
+					}
+				],
+				"seq": 179,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:06.114-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4426385",
+								"teamId": "seat06",
+								"timestamp": "2026-10-26T08:18:06.114Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:36.114Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 174,
+								"player_id": "4426385",
+								"round": 15,
+								"seat": 6
+							}
+						},
+						"seat": 6,
+						"seq": 180
+					}
+				],
+				"seq": 180,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:06.947-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4688380",
+								"teamId": "seat07",
+								"timestamp": "2026-10-26T08:18:06.947Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:36.947Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 175,
+								"player_id": "4688380",
+								"round": 15,
+								"seat": 7
+							}
+						},
+						"seat": 7,
+						"seq": 181
+					}
+				],
+				"seq": 181,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:06.962-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "3150744",
+								"teamId": "seat08",
+								"timestamp": "2026-10-26T08:18:06.962Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:36.962Z",
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 176,
+								"player_id": "3150744",
+								"round": 15,
+								"seat": 8
+							}
+						},
+						"seat": 8,
+						"seq": 182
+					}
+				],
+				"seq": 182,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:07.531-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4595342",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:18:07.531Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:37.531Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 177,
+								"player_id": "4595342",
+								"round": 15,
+								"seat": 9
+							}
+						},
+						"seat": 9,
+						"seq": 183
+					}
+				],
+				"seq": 183,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:08.378-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4832955",
+								"teamId": "seat10",
+								"timestamp": "2026-10-26T08:18:08.378Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:38.378Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 178,
+								"player_id": "4832955",
+								"round": 15,
+								"seat": 10
+							}
+						},
+						"seat": 10,
+						"seq": 184
+					}
+				],
+				"seq": 184,
+				"type": "update"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:09.301-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "2578570",
+								"teamId": "seat11",
+								"timestamp": "2026-10-26T08:18:09.301Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"deadline": "2026-10-26T08:18:39.301Z",
+							"pick": {
+								"auto": false,
+								"by": "bot",
+								"pick": 179,
+								"player_id": "2578570",
+								"round": 15,
+								"seat": 11
+							}
+						},
+						"seat": 11,
+						"seq": 185
+					}
+				],
+				"seq": 185,
+				"type": "update"
+			}
+		},
+		{
+			"client": {
+				"pick": 180,
+				"player_id": "4034949",
+				"type": "pick"
+			}
+		},
+		{
+			"server": {
+				"actions": [
+					{
+						"at": "2026-10-26T03:18:09.316-05:00",
+						"kind": "MAKE_PICK",
+						"payload": {
+							"action": {
+								"playerId": "4034949",
+								"teamId": "seat12",
+								"timestamp": "2026-10-26T08:18:09.316Z",
+								"type": "MAKE_PICK",
+								"v": 1
+							},
+							"pick": {
+								"auto": false,
+								"by": "drafter",
+								"pick": 180,
+								"player_id": "4034949",
+								"round": 15,
+								"seat": 12
+							}
+						},
+						"seat": 12,
+						"seq": 186
+					},
+					{
+						"at": "2026-10-26T03:18:09.316-05:00",
+						"kind": "ROOM_COMPLETE",
+						"payload": {},
+						"seat": null,
+						"seq": 187
+					}
+				],
+				"seq": 187,
+				"type": "update"
+			}
+		}
+	]
+}

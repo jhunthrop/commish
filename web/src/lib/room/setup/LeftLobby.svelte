@@ -5,6 +5,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import { type LobbyRoom, isGone, rooms } from '../api.ts';
 	import { lobbyTitle } from './setup.ts';
+	import { LOBBY } from '../lobby-words.ts';
 
 	interface Props {
 		/** The lobby the drafter left. */
@@ -49,18 +50,18 @@
 		room.settings.lineup
 	)}
 	<Panel edge="quiet">
-		<h3>You left a lobby</h3>
+		<h3>{LOBBY.leftTitle}</h3>
 		<p>
 			{title}.
 			{room.status === 'complete'
-				? 'The draft is over and your report is ready.'
-				: 'Your queue drafts your seat, then the board. Return and the seat is yours again.'}
+				? LOBBY.leftOver
+				: LOBBY.leftDrafting}
 		</p>
 		<div class="acts">
 			{#if room.status === 'complete'}
-				<Quiet href={resolve('/lobby/[id]/report', { id })} onclick={ondone}>Read the report</Quiet>
+				<Quiet href={resolve('/lobby/[id]/report', { id })} onclick={ondone}>{LOBBY.readReport}</Quiet>
 			{:else}
-				<Quiet href={resolve('/lobby/[id]', { id })}>Return to the lobby</Quiet>
+				<Quiet href={resolve('/lobby/[id]', { id })}>{LOBBY.returnVerb}</Quiet>
 			{/if}
 		</div>
 	</Panel>

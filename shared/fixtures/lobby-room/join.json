@@ -1,0 +1,10 @@
+{
+	"data": {
+		"room_id": "8c0ab888-70a9-466c-965b-b42e49c19279",
+		"seat": 12,
+		"socket_url": "ws://localhost:19229/rooms/8c0ab888-70a9-466c-965b-b42e49c19279/ws"
+	},
+	"error": null,
+	"ok": true,
+	"request_id": "535e5f3a2b0282e7"
+}
