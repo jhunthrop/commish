@@ -5,15 +5,20 @@
  * a status read stamp baked into it was thirteen hours old at the Sunday 1 pm games. The page names the
  * status read its own build took (`designations.json`, its check, else its stamp: a read that found no change
  * still moves the check), and the next one: the publish hour before each kickoff window dispatches a build
- * on a newer read (`research/nightly/game_day_reads.py`), the last whole hour more than READ_BUILD_LEAD_MS
- * before the window's first kickoff. Pure, every clock passed in. */
-import { kickoffAt, stampAt } from '#lib/format/clock.ts';
+ * on this hour's newer read (`research/nightly/game_day_reads.py`), the last whole hour more than
+ * READ_BUILD_LEAD_MS before the window's first kickoff. The next read is named only on a game day before its
+ * windows (the coordinator's ruling, fix round 1): on any other day the run's own morning build and the hourly
+ * capture read again before any window, so a "next" days off would undersell the cadence. Pure, every clock
+ * passed in. */
+import { kickoffAt, sameDay, stampAt } from '#lib/format/clock.ts';
 import type { Slate, WeekRead } from '#lib/run/schema.ts';
 
 /** The zone the read's byline is said in, as the run says its write (`capsules/week/sheet.py CENTRAL`). */
 export const CAPTION_ZONE = 'America/Chicago';
-/** The web build's time from the dispatch to the deploy (`game_day_reads.py BUILD_LEAD`, 25 minutes). */
-export const READ_BUILD_LEAD_MS = 25 * 60_000;
+/** The wait for the hour's capture, the publish step and the web build (`game_day_reads.py BUILD_LEAD`). */
+export const READ_BUILD_LEAD_MS = 40 * 60_000;
+/** The zone a game day is the provider's day in (`game_day_reads.py _EASTERN`). */
+const GAME_DAY_ZONE = 'America/New_York';
 const HOUR_MS = 3_600_000;
 
 const gamesWord = (games: number): string => (games === 1 ? 'game' : 'games');
@@ -21,7 +26,7 @@ const gamesWord = (games: number): string => (games === 1 ? 'game' : 'games');
 export const READ_BYLINE = {
 	/** The run's own words for the write (`caption.py written_caption`). */
 	written: (stamp: string, week: number): string => `Written ${stamp}, for week ${String(week)}`,
-	statusRead: (stamp: string): string => `Status read again ${stamp}, no change`,
+	statusRead: (stamp: string): string => `Status read ${stamp}, no change`,
 	next: (kickoff: string, games: number): string =>
 		`next before the ${kickoff} ${gamesWord(games)}`,
 	nextAlone: (kickoff: string, games: number): string =>
@@ -41,13 +46,16 @@ export function scheduleKickoffs(slates: readonly Slate[]): number[] {
 	);
 }
 
-/** The window the next game-day read is before, at `now`: its first kickoff and its games; null with no
- * game left in the schedule. */
+/** The window the next game-day read is before, at `now`: its first kickoff and its games; null when no
+ * window of `now`'s game day (Eastern) is still to be read. */
 export function nextReadWindow(
 	kickoffs: readonly number[],
 	now: number
 ): { kickoff: number; games: number } | null {
-	const ahead = kickoffs.filter((kickoff) => readHour(kickoff) > now);
+	const today = new Date(now);
+	const ahead = kickoffs.filter(
+		(kickoff) => readHour(kickoff) > now && sameDay(new Date(kickoff), today, GAME_DAY_ZONE)
+	);
 	if (ahead.length === 0) return null;
 	const hour = Math.min(...ahead.map(readHour));
 	const window = ahead.filter((kickoff) => readHour(kickoff) === hour);
