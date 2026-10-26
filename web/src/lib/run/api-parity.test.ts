@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import { parse } from 'yaml';
 import { z } from 'zod';
 import { POSITIONS } from '#lib/types/player.ts';
+import { scheduleKickoffs, standingByline } from '#lib/player/read-byline.ts';
 import { MARKET_POSITIONS, splitIndex } from './market.ts';
 import { runReach } from './reach.ts';
 import {
@@ -49,6 +50,7 @@ import {
 	slateSchema,
 	weekReadSchema,
 	weeklyRecordSchema,
+	type WeekRead,
 	windowSchema
 } from './schema.ts';
 import { gameLogRowSchema, priorSeasonSchema, seasonSchema, statLineSchema } from './season.ts';
@@ -395,6 +397,25 @@ void test("the player's and the record's examples carry every optional block the
 	for (const key of ['weekly', 'draft']) assert.ok(record[key], key);
 	const statuses = new Set(list(record.weeks).map((week) => (week as { status: string }).status));
 	for (const status of ['graded', 'frozen', 'missed']) assert.ok(statuses.has(status), status);
+});
+
+void test("the read's byline is drawn from the API's answers alone, as the apps draw it (Lane 222)", () => {
+	// The write's stamp rides on /run/players; the status read the byline names is /run/designations' check,
+	// newer than the write; the next read is from /run/schedule's kickoffs, on the morning of its home game
+	// (the examples' dates are each their own: the case holds the composition, not one day's run).
+	const { player } = exampleData('/run/players/{id}') as { player: { weekRead: WeekRead } };
+	const read = weekReadSchema.parse(player.weekRead);
+	const { designations } = exampleData('/run/designations') as { designations: unknown };
+	const capture = designationsSchema.omit({ source: true }).parse(designations);
+	const { schedule } = exampleData('/run/schedule') as { schedule: { slates: unknown } };
+	const slates = list(schedule.slates).map((slate) => slateSchema.parse(slate));
+	const statusRead = Date.parse(capture.checkedAt ?? capture.readAt);
+	assert.ok(statusRead > Date.parse(read.writtenAt), 'the example read is newer than the write');
+	const gameMorning = Date.parse('2026-09-13T12:20:00.000Z');
+	assert.equal(
+		standingByline(read, statusRead, scheduleKickoffs(slates), gameMorning),
+		'Written Fri Oct 23, 9:00 pm CT, for week 8. Status read Sun Oct 25, 11:04 am CT, no change; next before the Sun 12:00 pm CT game'
+	);
 });
 
 void test('the walker refuses a member the API does not name, at any depth', () => {

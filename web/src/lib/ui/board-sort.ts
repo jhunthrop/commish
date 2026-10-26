@@ -1,6 +1,7 @@
 /** Sorting a board's rows by a column (Lane 66n): each sortable column's natural direction (a rank
  * or an ADP up, a figure down), the second press turning it, players without the figure last. Pure,
  * so the tests read the order a page prints. */
+import { byeAhead } from '#lib/format/bye.ts';
 import type { ColumnKey } from './board-columns.ts';
 
 /** The columns a head sorts by. The face, the player, the range and the action do not sort. */
@@ -60,7 +61,8 @@ export function pressed(current: Sort, key: SortKey): Sort {
 function figure(
 	row: Sortable,
 	key: SortKey,
-	byes: Readonly<Record<string, number | null>>
+	byes: Readonly<Record<string, number | null>>,
+	byesFrom: number | null
 ): number | null {
 	switch (key) {
 		case 'rank':
@@ -72,7 +74,8 @@ function figure(
 		case 'tier':
 			return row.tier;
 		case 'bye':
-			return byes[row.team] ?? null;
+			// The bye as its cell draws it: a played bye is no figure, so it sorts last (Lane 223).
+			return byeAhead(byes[row.team] ?? null, byesFrom);
 		case 'proj':
 			return row.projected;
 		case 'vor':
@@ -87,15 +90,17 @@ function figure(
 }
 
 /** The rows in the sort's order, a new array. Ties keep the page's order, and a row without the
- * figure (no ADP, no game yet) sits last either way. */
+ * figure (no ADP, no game yet, a bye already played before `byesFrom`) sits last either way.
+ * `byesFrom` is the week a rest-of-season board ranks from, null on a board of the full season. */
 export function sortRows<R extends Sortable>(
 	rows: readonly R[],
 	sort: Sort,
-	byes: Readonly<Record<string, number | null>>
+	byes: Readonly<Record<string, number | null>>,
+	byesFrom: number | null = null
 ): R[] {
 	const up = ASCENDING.has(sort.key) !== sort.turned;
 	return rows
-		.map((row, i) => ({ row, i, value: figure(row, sort.key, byes) }))
+		.map((row, i) => ({ row, i, value: figure(row, sort.key, byes, byesFrom) }))
 		.sort((a, b) => {
 			if (a.value === null || b.value === null) {
 				return a.value === b.value ? a.i - b.i : a.value === null ? 1 : -1;

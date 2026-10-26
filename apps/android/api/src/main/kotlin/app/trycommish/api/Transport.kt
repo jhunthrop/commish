@@ -5,6 +5,8 @@ import app.trycommish.api.apis.BillingApi
 import app.trycommish.api.apis.CompanionsApi
 import app.trycommish.api.apis.DevicesApi
 import app.trycommish.api.apis.LeagueSyncApi
+import app.trycommish.api.apis.LeaguesApi
+import app.trycommish.api.apis.MocksApi
 import app.trycommish.api.apis.RunApi
 import app.trycommish.api.infrastructure.HttpResponse
 import io.ktor.client.HttpClientConfig
@@ -58,6 +60,8 @@ class Transport(
     private val runApi by lazy { RunApi(baseUrl, engine, config) }
     private val billingApi by lazy { BillingApi(baseUrl, engine, config) }
     private val companionsApi by lazy { CompanionsApi(baseUrl, engine, config) }
+    private val mocksApi by lazy { MocksApi(baseUrl, engine, config) }
+    private val leaguesApi by lazy { LeaguesApi(baseUrl, engine, config) }
 
     fun leagueSync(): LeagueSyncApi = leagueSyncApi
 
@@ -74,6 +78,13 @@ class Transport(
 
     /** The live-draft companion: the followed drafts, following one, a draft since a pick, its report. */
     fun companions(): CompanionsApi = companionsApi
+
+    /** The solo mock room: start, read, draft, undo, Pick for me, Finish, the queue, the call, the report and a
+     * shared draft by its code. */
+    fun mocks(): MocksApi = mocksApi
+
+    /** The account's saved leagues, which a mock reruns from. */
+    fun leagues(): LeaguesApi = leaguesApi
 }
 
 /** An answer's body whole, or Unauthorized when the API no longer takes the device's token. */

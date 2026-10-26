@@ -2,8 +2,9 @@ import CommishCore
 import CommishDesign
 import SwiftUI
 
-/// Signed out: the mark, what Commish is, and the one verb. Where sign out returns the phone (Lane
-/// 198 moved it beside the Account screen so its snapshot is the signed-out return's mock).
+/// Signed out: the mark, what Commish is, and the one verb. The League tab's screen while the phone is
+/// signed out, the public tabs beside it (B155), and where sign out returns the phone; the shell's
+/// signed-out snapshot is its mock.
 public struct SignInView: View {
     @Environment(\.colorScheme) private var colorScheme
     let working: Bool

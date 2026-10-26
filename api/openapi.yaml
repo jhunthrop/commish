@@ -1512,7 +1512,7 @@ paths:
                   run_id: 2026-10-21T12-ros
                   designations:
                     readAt: "2026-10-14T02:03:35.613Z"
-                    checkedAt: null
+                    checkedAt: "2026-10-25T16:04:10.000Z"
                     players:
                       "4047365": { status: out, seasonLong: false, since: null }
                       "2991662":
@@ -1989,8 +1989,9 @@ paths:
         required: false
         description: >-
           last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the
-          answer's week (line.facts.bye) after the rest, the players on a season-long list included, numbered on from
-          them; without it the order keeps them in their places
+          answer's week (line.facts.bye) after the rest, the players on a season-long list included; each row's rank is
+          its place in the answer as drawn, its overall_rank its place in the order without byes=last (Lane 227, B209);
+          without it the order keeps them in their places and the two are equal
         schema: { type: string, enum: [last] }
     get:
       tags: [league-sync]
@@ -2305,9 +2306,20 @@ paths:
       tags: [devices]
       operationId: revokeDevice
       summary: Unpair a browser. Its token opens nothing from the next request on.
+      description: >-
+        An app signing itself out (its own device token, its own id) is answered a DeviceSignOut: the WorkOS logout URL
+        that ends the sign-in's WorkOS session, or url null for a device paired before the API kept it. Any other unpairing
+        (the account page's cookie, or an app unpairing another device) is answered data null.
       security: [{ session: [] }, { device: [] }]
       responses:
-        "200": { $ref: "#/components/responses/EmptyResponse" }
+        "200":
+          description: unpaired
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { nullable: true, allOf: [{ $ref: "#/components/schemas/DeviceSignOut" }] } }
         "404": { $ref: "#/components/responses/ErrorResponse" }
 
   /hosts:
@@ -3024,6 +3036,16 @@ components:
       required: [url]
       properties:
         url: { type: string }
+    DeviceSignOut:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          nullable: true
+          description: >-
+            The WorkOS logout URL the app opens to end the sign-in's WorkOS session, returning to the site; null when the
+            device was paired before the API kept the session.
 
     Feature:
       type: string
@@ -5473,6 +5495,21 @@ components:
           format: double
           nullable: true
           description: those points less a free pickup's for a twelve-team league of this format, one decimal; null at a position the league starts nobody at
+        position_rank:
+          type: integer
+          nullable: true
+          description: >-
+            his place at his position in our order for this format at the read's clock (in PPR the public /order's
+            overall_rank at his position, Lane 227, B206), the number the page's head says in its own format; null
+            when he is on a season-long list as the read sees him (on a league's read the platform's IR mark
+            included, as his head), or the order does not place him; absent from an older answer
+        overall_rank:
+          type: integer
+          nullable: true
+          description: >-
+            his place across every position in our order for this format at the read's clock, by points over
+            replacement (in PPR the public /order's overall_rank with no position, Lane 227, B206); null as
+            position_rank is; absent from an older answer
     TierMate:
       type: object
       required: [board_id, points]
@@ -6254,9 +6291,17 @@ components:
         rank:
           type: integer
           description: >-
-            his place in our order for this view: at a position his position rank (by his rest-of-season total, which
-            orders the same as points over replacement there), across every position his place by points over
-            replacement
+            his place in our order for this view as the answer draws it: at a position his position rank (by his
+            rest-of-season total, which orders the same as points over replacement there), across every position his
+            place by points over replacement; with byes=last the rows are numbered 1..n after the byes are moved last,
+            so from the first bye row down rank and overall_rank differ
+        overall_rank:
+          type: integer
+          description: >-
+            his place in the full order of the view (the position asked, or every position) for the answer's scoring at
+            the request's clock, before any byes=last move: the one number home, the club page, compare and the
+            Rankings print for him (Lane 227, B209). Equal to rank without byes=last; with it the rows are not
+            consecutive from the first bye down. Every row carries it; absent from an older answer
         rest_of_season_points:
           type: number
           format: double

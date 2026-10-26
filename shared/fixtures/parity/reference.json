@@ -15487,6 +15487,147 @@
 					}
 				],
 				"legendHard": "10.5 or more"
+			},
+			"webPending": {
+				"current": null,
+				"asOf": null,
+				"states": [],
+				"clubMeta": [
+					{
+						"abbr": "ARI",
+						"meta": "ARI · Bye week 14"
+					},
+					{
+						"abbr": "ATL",
+						"meta": "ATL · Bye week 11"
+					},
+					{
+						"abbr": "BAL",
+						"meta": "BAL · Bye week 13"
+					},
+					{
+						"abbr": "BUF",
+						"meta": "BUF · Bye week 7"
+					},
+					{
+						"abbr": "CAR",
+						"meta": "CAR · Bye week 5"
+					},
+					{
+						"abbr": "CHI",
+						"meta": "CHI · Bye week 10"
+					},
+					{
+						"abbr": "CIN",
+						"meta": "CIN · Bye week 6"
+					},
+					{
+						"abbr": "CLE",
+						"meta": "CLE · Bye week 11"
+					},
+					{
+						"abbr": "DAL",
+						"meta": "DAL · Bye week 14"
+					},
+					{
+						"abbr": "DEN",
+						"meta": "DEN · Bye week 10"
+					},
+					{
+						"abbr": "DET",
+						"meta": "DET · Bye week 6"
+					},
+					{
+						"abbr": "GB",
+						"meta": "GB · Bye week 11"
+					},
+					{
+						"abbr": "HOU",
+						"meta": "HOU · Bye week 8"
+					},
+					{
+						"abbr": "IND",
+						"meta": "IND · Bye week 13"
+					},
+					{
+						"abbr": "JAX",
+						"meta": "JAX · Bye week 7"
+					},
+					{
+						"abbr": "KC",
+						"meta": "KC · Bye week 5"
+					},
+					{
+						"abbr": "LAC",
+						"meta": "LAC · Bye week 7"
+					},
+					{
+						"abbr": "LAR",
+						"meta": "LAR · Bye week 11"
+					},
+					{
+						"abbr": "LV",
+						"meta": "LV · Bye week 13"
+					},
+					{
+						"abbr": "MIA",
+						"meta": "MIA · Bye week 6"
+					},
+					{
+						"abbr": "MIN",
+						"meta": "MIN · Bye week 6"
+					},
+					{
+						"abbr": "NE",
+						"meta": "NE · Bye week 11"
+					},
+					{
+						"abbr": "NO",
+						"meta": "NO · Bye week 8"
+					},
+					{
+						"abbr": "NYG",
+						"meta": "NYG · Bye week 8"
+					},
+					{
+						"abbr": "NYJ",
+						"meta": "NYJ · Bye week 13"
+					},
+					{
+						"abbr": "PHI",
+						"meta": "PHI · Bye week 10"
+					},
+					{
+						"abbr": "PIT",
+						"meta": "PIT · Bye week 9"
+					},
+					{
+						"abbr": "SEA",
+						"meta": "SEA · Bye week 11"
+					},
+					{
+						"abbr": "SF",
+						"meta": "SF · Bye week 8"
+					},
+					{
+						"abbr": "TB",
+						"meta": "TB · Bye week 10"
+					},
+					{
+						"abbr": "TEN",
+						"meta": "TEN · Bye week 9"
+					},
+					{
+						"abbr": "WSH",
+						"meta": "WSH · Bye week 7"
+					}
+				],
+				"clubHead": {
+					"board": "On our PPR board",
+					"order": "On our rest-of-season order",
+					"nobodyBoard": "Nobody from {city} is on this board",
+					"nobodyOrder": "Nobody from {city} is in this order"
+				}
 			}
 		},
 		{
@@ -31391,6 +31532,291 @@
 					}
 				],
 				"legendHard": "10.5 or more"
+			},
+			"webPending": {
+				"current": {
+					"week": 6,
+					"readAt": "2026-10-21T12:00:00.000Z"
+				},
+				"asOf": "Week 6's games as of Wed Oct 21, 7:00 am Central.",
+				"states": [
+					{
+						"abbr": "ARI",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "ATL",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "BAL",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "BUF",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "CAR",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "CHI",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "CLE",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "DAL",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "DEN",
+						"week": 6,
+						"word": "Final"
+					},
+					{
+						"abbr": "GB",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "HOU",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "IND",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "JAX",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "KC",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "LAC",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "LAR",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "LV",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "NE",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "NO",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "NYG",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "NYJ",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "PHI",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "PIT",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "SEA",
+						"week": 6,
+						"word": "Final"
+					},
+					{
+						"abbr": "SF",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "TB",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "TEN",
+						"week": 6,
+						"word": "Kicked off"
+					},
+					{
+						"abbr": "WSH",
+						"week": 6,
+						"word": "Kicked off"
+					}
+				],
+				"clubMeta": [
+					{
+						"abbr": "ARI",
+						"meta": "ARI · Bye week 14"
+					},
+					{
+						"abbr": "ATL",
+						"meta": "ATL · Bye week 11"
+					},
+					{
+						"abbr": "BAL",
+						"meta": "BAL · Bye week 13"
+					},
+					{
+						"abbr": "BUF",
+						"meta": "BUF · Bye week 7"
+					},
+					{
+						"abbr": "CAR",
+						"meta": "CAR"
+					},
+					{
+						"abbr": "CHI",
+						"meta": "CHI · Bye week 10"
+					},
+					{
+						"abbr": "CIN",
+						"meta": "CIN"
+					},
+					{
+						"abbr": "CLE",
+						"meta": "CLE · Bye week 11"
+					},
+					{
+						"abbr": "DAL",
+						"meta": "DAL · Bye week 14"
+					},
+					{
+						"abbr": "DEN",
+						"meta": "DEN · Bye week 10"
+					},
+					{
+						"abbr": "DET",
+						"meta": "DET"
+					},
+					{
+						"abbr": "GB",
+						"meta": "GB · Bye week 11"
+					},
+					{
+						"abbr": "HOU",
+						"meta": "HOU · Bye week 8"
+					},
+					{
+						"abbr": "IND",
+						"meta": "IND · Bye week 13"
+					},
+					{
+						"abbr": "JAX",
+						"meta": "JAX · Bye week 7"
+					},
+					{
+						"abbr": "KC",
+						"meta": "KC"
+					},
+					{
+						"abbr": "LAC",
+						"meta": "LAC · Bye week 7"
+					},
+					{
+						"abbr": "LAR",
+						"meta": "LAR · Bye week 11"
+					},
+					{
+						"abbr": "LV",
+						"meta": "LV · Bye week 13"
+					},
+					{
+						"abbr": "MIA",
+						"meta": "MIA"
+					},
+					{
+						"abbr": "MIN",
+						"meta": "MIN"
+					},
+					{
+						"abbr": "NE",
+						"meta": "NE · Bye week 11"
+					},
+					{
+						"abbr": "NO",
+						"meta": "NO · Bye week 8"
+					},
+					{
+						"abbr": "NYG",
+						"meta": "NYG · Bye week 8"
+					},
+					{
+						"abbr": "NYJ",
+						"meta": "NYJ · Bye week 13"
+					},
+					{
+						"abbr": "PHI",
+						"meta": "PHI · Bye week 10"
+					},
+					{
+						"abbr": "PIT",
+						"meta": "PIT · Bye week 9"
+					},
+					{
+						"abbr": "SEA",
+						"meta": "SEA · Bye week 11"
+					},
+					{
+						"abbr": "SF",
+						"meta": "SF · Bye week 8"
+					},
+					{
+						"abbr": "TB",
+						"meta": "TB · Bye week 10"
+					},
+					{
+						"abbr": "TEN",
+						"meta": "TEN · Bye week 9"
+					},
+					{
+						"abbr": "WSH",
+						"meta": "WSH · Bye week 7"
+					}
+				],
+				"clubHead": {
+					"board": "On our PPR board",
+					"order": "On our rest-of-season order",
+					"nobodyBoard": "Nobody from {city} is on this board",
+					"nobodyOrder": "Nobody from {city} is in this order"
+				}
 			}
 		}
 	]

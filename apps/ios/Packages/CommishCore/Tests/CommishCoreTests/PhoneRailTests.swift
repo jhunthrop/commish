@@ -69,7 +69,36 @@ struct PhoneRailTests {
         #expect(PhoneRail.tabs(phase: .preDraft, waiversOpen: false).count == 5)
     }
 
-    @Test func aPhaseThisBuildDoesNotKnowReadsAsInSeason() {
-        #expect(PhoneRail.tabs(phase: nil, waiversOpen: true) == PhoneRail.tabs(phase: .inSeason, waiversOpen: true))
+    private static func league(_ phase: Components.Schemas.LeaguePhaseKnown?) -> FollowedLeague {
+        FollowedLeague(
+            id: "l-1", name: "League", host: .init(value1: .sleeper), scoring: .ppr, format: .ppr, phase: phase,
+            draftAt: nil, waiversOpen: true
+        )
+    }
+
+    /// A league whose phase this build does not know reads as no league: the site's season's five, as
+    /// Android's phoneBar (B154); a known phase is its own five.
+    @Test(arguments: SitePhase.allCases)
+    func aPhaseThisBuildDoesNotKnowReadsAsTheSitesSeason(season: SitePhase) {
+        #expect(PhoneRail.bar(league: Self.league(nil), season: season) == PhoneRail.withoutLeague(season: season))
+        #expect(PhoneRail.bar(league: nil, season: season) == PhoneRail.withoutLeague(season: season))
+        #expect(PhoneRail.bar(league: Self.league(.preDraft), season: season)
+            == PhoneRail.tabs(phase: .preDraft, waiversOpen: true))
+    }
+
+    /// Every phase reaches the League home (B149): the League tab where the bar has one (in season and
+    /// the playoffs), else the home pushed from the switch on the tab in view (before the draft, on draft
+    /// day, after the season), as the web's railFor draws the five.
+    @Test(arguments: Components.Schemas.LeaguePhaseKnown.allCases)
+    func everyPhaseReachesTheLeagueHome(phase: Components.Schemas.LeaguePhaseKnown) {
+        let tabs = PhoneRail.bar(league: Self.league(phase), season: .inSeason)
+        let home = ShellRoute.home(of: "l-1", in: tabs)
+        switch phase {
+        case .inSeason, .playoffs:
+            #expect(home == .tab(PhoneRail.leagueKey))
+        case .preDraft, .draftDay, .offseason:
+            #expect(!tabs.contains { $0.key == PhoneRail.leagueKey })
+            #expect(home == .push(.leagueHome(id: "l-1")))
+        }
     }
 }

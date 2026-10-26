@@ -23,7 +23,8 @@
 	import Table from '#lib/ui/Table.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { boardColumns } from '#lib/ui/board-columns.ts';
-	import { CLUB_PAGE, filled } from '#lib/site/reference-words.ts';
+	import { CLUB_ORDER, CLUB_PAGE, clubMeta, filled } from '#lib/site/reference-words.ts';
+	import { asOfLine, stateWord } from '#lib/run/schedule-state.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -115,6 +116,16 @@
 		);
 	});
 	const words = $derived(sayBoard(page, live));
+	/** The section's head names what the basis beside it names (Lane 223, Lane 220's D2): the order
+	 * once its rows stand, the run's board before. */
+	const head = $derived(
+		atClock === null
+			? {
+					title: filled(CLUB_PAGE.onBoard, page.format.label),
+					nobody: filled(CLUB_PAGE.nobody, club.city)
+				}
+			: { title: CLUB_ORDER.onOrder, nobody: filled(CLUB_ORDER.nobody, club.city) }
+	);
 </script>
 
 <SiteShell title={name} head={data.head} run={data.run}>
@@ -127,7 +138,7 @@
 		<Crumb trail={[{ label: CLUB_PAGE.clubs, href: links.clubs() }, { label: name }]} />
 		<HeroCard title={name}>
 			{#snippet meta()}<Label
-					>{club.abbr} · {CLUB_PAGE.byeWeek} {club.bye ?? CLUB_PAGE.byeNotSet}</Label
+					>{clubMeta(club.abbr, club.bye, page.format.rosFromWeek ?? null)}</Label
 				>{/snippet}
 			{#snippet aside()}
 				{#if page.hero}
@@ -153,10 +164,10 @@
 		</HeroCard>
 		<BasisLine parts={basis} tail={words?.capture ?? null} />
 
-		<section aria-label="On our board">
-			<PanelHead title={filled(CLUB_PAGE.onBoard, page.format.label)} />
+		<section aria-label={head.title}>
+			<PanelHead title={head.title} />
 			{#if rows.length > 0}
-				<BoardTable {columns} label="{name} on our {page.format.label} board">
+				<BoardTable {columns} label="{name}, {head.title}">
 					{#each rows as player (player.id)}
 						<Row
 							{player}
@@ -171,7 +182,7 @@
 					{/each}
 				</BoardTable>
 			{:else}
-				<Label>{filled(CLUB_PAGE.nobody, club.city)}</Label>
+				<Label>{head.nobody}</Label>
 			{/if}
 		</section>
 
@@ -211,12 +222,13 @@
 							{game.home ? CLUB_PAGE.home : CLUB_PAGE.away}
 							<a href={links.club(game.opponent)}
 								>{opponent ? `${opponent.city} ${opponent.nickname}` : game.opponent}</a
-							>
+							>{#if game.stated}<span class="state">{stateWord(game.stated, zone)}</span>{/if}
 						</td>
 						<td class="num">{fixed(game.value, 1)}</td>
 					</tr>
 				{/each}
 			</Table>
+			{#if page.current}<p class="as-of">{asOfLine(page.current, zone)}</p>{/if}
 		</section>
 	</main>
 </SiteShell>
@@ -226,6 +238,24 @@
 	.played,
 	.played :global(a) {
 		color: var(--played-ink);
+	}
+
+	/* The run's state of the current week's game, after its opponent. */
+	.state {
+		margin-left: var(--s-2);
+		font-size: var(--t-xs);
+		color: var(--ink-2);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.played .state {
+		color: var(--played-ink);
+	}
+
+	.as-of {
+		margin: var(--s-2) 0 0;
+		font-size: var(--t-xs);
+		color: var(--ink-3);
 	}
 
 	.club {

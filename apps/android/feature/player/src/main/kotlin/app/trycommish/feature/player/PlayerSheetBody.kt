@@ -46,7 +46,7 @@ private const val HELD_HEIGHT = 48
 fun PlayerSheetContainer(
     host: PlayerSheetHost,
     sheets: PlayerSheets,
-    openPlayer: (ShellRoute.Player) -> Unit,
+    openPlayer: ((ShellRoute.Player) -> Unit)?,
 ) {
     PlayerSheet(
         host,

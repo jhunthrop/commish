@@ -28,6 +28,8 @@ data class FollowedLeague(
     val phase: LeaguePhase,
     val draftAt: Instant?,
     val waiversOpen: Boolean,
+    /** The saved league this one's settings live in (a mock of it reruns from it), null with none. */
+    val settingsLeagueId: String? = null,
     /** The member's team at the last read, empty when unread (the Trades' own side). */
     val teamName: String = "",
     /** Where the member's team stands, null when unread. */
@@ -45,6 +47,10 @@ data class AccountContext(
     val selected: String?,
     /** The site's season phase; null when absent or a phase this build does not know (read as in season). */
     val season: SiteSeason.Phase?,
+    /** The board format the account chose with no league (the site context's format), null with none. */
+    val format: BoardFormat? = null,
+    /** The paid features the account holds, by their API names (custom_scoring drafts a league's own rules). */
+    val features: Set<String> = emptySet(),
 )
 
 /** The part of GET /me the shell reads. Every field may be absent, so an older API's answer still
@@ -54,6 +60,8 @@ private data class ShellAccount(
     val league: ContextLeague? = null,
     val leagues: List<ContextLeague> = emptyList(),
     val season: SiteSeason? = null,
+    val format: BoardFormat? = null,
+    val features: List<String> = emptyList(),
 )
 
 /** The account's context from GET /me's body; throws on an error envelope or a body that is not one. */
@@ -63,6 +71,8 @@ fun accountContext(body: String): AccountContext {
         leagues = account.leagues.map(::followed),
         selected = account.league?.id?.toString(),
         season = account.season?.phase?.takeUnless { it == SiteSeason.Phase.unknown_default_open_api },
+        format = account.format?.takeUnless { it == BoardFormat.unknown_default_open_api },
+        features = account.features.toSet(),
     )
 }
 
@@ -76,6 +86,7 @@ private fun followed(league: ContextLeague): FollowedLeague =
         phase = league.phase,
         draftAt = league.draftAt?.let(::instantOrNull),
         waiversOpen = league.waiversOpen,
+        settingsLeagueId = league.settingsLeagueId?.toString(),
         teamName = league.teamName,
         standing = league.standing,
     )
