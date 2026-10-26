@@ -10,7 +10,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { captureShort } from "../../web/src/lib/format/designation.ts";
-import { byeCell } from "../../web/src/lib/format/bye.ts";
+import { appByeCell } from "./apps-pending-words.ts";
 import { carriesGap } from "../../web/src/lib/format/gap.ts";
 import { fixed, plural } from "../../web/src/lib/format/number.ts";
 import { adpDrafts } from "../../web/src/lib/run/adp-drafts.ts";
@@ -255,7 +255,7 @@ async function runCase(run: BoardRun): Promise<unknown> {
           row.id,
           bye === null
             ? null
-            : `${BOARD.bye} ${byeCell(bye, format.rosFromWeek ?? null)}`,
+            : `${BOARD.bye} ${appByeCell(bye, format.rosFromWeek ?? null)}`,
         ];
       }),
     ),

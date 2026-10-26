@@ -2,6 +2,7 @@
 // held player's rank as its word and no rank row judged. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import type { PlayerFormat } from '#lib/run/schema.ts';
 import { compareRows, type Side } from './compare-rows.ts';
 
@@ -165,5 +166,30 @@ void test('Floor to ceiling is drawn only where a side carries a range, the empt
 	assert.deepEqual(
 		both.cells.map((cell) => cell.text),
 		['', '']
+	);
+});
+
+void test('the Bye row draws a bye as the Board does: ahead its week, played blank, unnamed the empty figure (Lane 223)', () => {
+	const at = (side: Side, bye: number | null): Side => ({ ...side, bye });
+	const byeRow = (a: Side, b: Side) =>
+		compareRows(a, b, 2026, true, 7).find((row) => row.label === 'Bye');
+	assert.equal(byeRow(at(NACUA, 5), at(CHASE, 6)), undefined);
+	assert.deepEqual(
+		byeRow(at(NACUA, 11), at(CHASE, 5))?.cells.map((cell) => cell.text),
+		['11', '']
+	);
+	assert.deepEqual(
+		byeRow(at(NACUA, null), at(CHASE, 5))?.cells.map((cell) => cell.text),
+		[EMPTY_FIGURE, '']
+	);
+	assert.deepEqual(
+		byeRow(at(NACUA, null), at(CHASE, null))?.cells.map((cell) => cell.text),
+		[EMPTY_FIGURE, EMPTY_FIGURE]
+	);
+	assert.deepEqual(
+		compareRows(at(NACUA, 5), at(CHASE, 6), 2026, true)
+			.find((row) => row.label === 'Bye')
+			?.cells.map((cell) => cell.text),
+		['5', '6']
 	);
 });
