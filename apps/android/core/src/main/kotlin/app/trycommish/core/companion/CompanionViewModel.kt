@@ -87,7 +87,9 @@ sealed interface CompanionState {
  * tried again, as the web's. A failed draft read keeps the last picks on screen with their stamp and the
  * poll goes on; a refused token signs out; a draft the account does not hold says so and stops. Every read,
  * the poll's or a pull's, is the one in flight: a pull while one runs waits on it, a pull within the
- * interval of the last read finds it fresh enough, and a visible screen of a finished draft reads nothing.
+ * interval of the last read finds it fresh enough, a screen shown again (a rotation, back from another tab)
+ * waits out what is left of the interval before it reads, and a visible screen of a finished draft reads
+ * nothing.
  */
 class CompanionViewModel(
     val id: String,
@@ -158,12 +160,21 @@ class CompanionViewModel(
         if (!visible || done) return
         poll =
             viewModelScope.launch {
+                // Shown again (a rotation, back from another tab): what is left of the interval first.
+                delay(untilDue())
                 while (isActive) {
                     load()
                     if (done) return@launch
                     delay(POLL_MS)
                 }
             }
+    }
+
+    /** What is left of the interval since the last read on the injected clock, 0 with none or once it is
+     * spent: a poll restarted never reads faster than the web's cadence. */
+    private fun untilDue(): Long {
+        val last = lastRead ?: return 0
+        return (POLL_MS - Duration.between(last, clock.now()).toMillis()).coerceIn(0, POLL_MS)
     }
 
     /** A fresh poll after a failure the member asks to try again: it reads at once. */

@@ -136,6 +136,46 @@ class CompanionViewModelTest {
         }
 
     @Test
+    fun `shown again within the interval waits out what is left of it before reading`() =
+        runTest(main) {
+            val clock = MovingClock(CompanionFixtures.readAt)
+            val stub = StubCompanion()
+            val vm = viewModel(stub, clock)
+            vm.setVisible(true)
+            runCurrent()
+            assertEquals(1, stub.reads.size)
+            // A rotation or a trip to another tab one second after the read.
+            vm.setVisible(false)
+            clock.now = clock.now.plusSeconds(1)
+            vm.setVisible(true)
+            runCurrent()
+            assertEquals(1, stub.reads.size)
+            advanceTimeBy(LEFT_MS - 1)
+            runCurrent()
+            assertEquals(1, stub.reads.size)
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(2, stub.reads.size)
+            vm.setVisible(false)
+        }
+
+    @Test
+    fun `shown again after the interval reads at once`() =
+        runTest(main) {
+            val clock = MovingClock(CompanionFixtures.readAt)
+            val stub = StubCompanion()
+            val vm = viewModel(stub, clock)
+            vm.setVisible(true)
+            runCurrent()
+            vm.setVisible(false)
+            clock.now = clock.now.plusSeconds(POLL_SECONDS.toLong())
+            vm.setVisible(true)
+            runCurrent()
+            assertEquals(2, stub.reads.size)
+            vm.setVisible(false)
+        }
+
+    @Test
     fun `hidden stops the poll`() =
         runTest(main) {
             val stub = StubCompanion()
@@ -295,5 +335,8 @@ class CompanionViewModelTest {
     private companion object {
         const val POLL_SECONDS = 3
         const val HOUR = 3600L
+
+        /** What is left of the interval one second after a read. */
+        const val LEFT_MS = 2_000L
     }
 }
