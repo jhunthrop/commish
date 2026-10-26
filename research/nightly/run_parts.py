@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Final
 
-import httpx
 from sqlalchemy import Engine
 
 from research.capsules.sweep import FactsPassMemo
@@ -36,7 +35,6 @@ from research.nightly.capsule_step import (
     run_capsule_step,
 )
 from research.nightly.config import HELD_OUT_BASELINE_KEY, IMPLEMENTATION
-from research.nightly.headshots import Face, mirror_headshots
 from research.nightly.page_findings import page_findings
 from research.nightly.publish import read_json
 from research.nightly.reads.schedule import slates_by_club, weeks_left_at
@@ -191,15 +189,6 @@ def ros_setup(engine: Engine, instant: datetime, log: Log) -> RosSetup:
         log(f"rest of season: the model's inputs could not be read ({why})")
         return RosSetup(None, None, unread=why)
     return RosSetup(priors, raw, players)
-
-
-def mirror_faces(http: httpx.Client, store: RunStore, assembled: Assembled, skip: bool) -> tuple[Json, str]:
-    if skip:
-        return {}, "skipped by --skip"
-    faces = [Face(p.id, p.headshot) for p in (*assembled.people, *assembled.market) if p.headshot]
-    result = mirror_headshots(http, store, faces)
-    counts = ", ".join(f"{count} {outcome}" for outcome, count in sorted(result.counts.items()))
-    return result.by_player, f"{len(faces)} faces: {counts}"
 
 
 def manifest_of(  # noqa: PLR0913, PLR0917 - every field the manifest names

@@ -1,6 +1,6 @@
 """`python -m research.nightly`: the nightly run and its publication (the Cloud Run Job `nightly`).
 
-    uv run python -m research.nightly run [--out DIR] [--skip ingest,fit,capsules,week-reads,headshots]
+    uv run python -m research.nightly run [--out DIR] [--skip ingest,fit,capsules,week-reads]
                                           [--capsule-budget N] [--regenerate-all] [--mend-only]
     uv run python -m research.nightly publish [--out DIR] [--at ISO] [--no-dispatch]
     uv run python -m research.nightly mark --out DIR
@@ -78,7 +78,7 @@ def _run(args: argparse.Namespace) -> int:
     fetcher = LiveFetcher()
     try:
         with httpx.Client(timeout=60.0) as http:
-            deps = RunDeps(engine, _store(args, http), http, fetcher, os.environ, now_ms, _line)
+            deps = RunDeps(engine, _store(args, http), fetcher, os.environ, now_ms, _line)
             outcome = run_nightly(
                 deps, RunOptions(skip, CapsuleStepPlan(args.capsule_budget, args.regenerate_all, args.mend_only))
             )
