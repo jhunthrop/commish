@@ -9,8 +9,16 @@ plugins {
 
 android {
     namespace = "app.trycommish.core"
-    compileSdk = 35
-    defaultConfig { minSdk = 26 }
+    compileSdk =
+        libs.versions.android.compile.sdk
+            .get()
+            .toInt()
+    defaultConfig {
+        minSdk =
+            libs.versions.android.min.sdk
+                .get()
+                .toInt()
+    }
     testFixtures { enable = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

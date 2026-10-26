@@ -1,5 +1,8 @@
 package app.trycommish.android
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,6 +34,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.trycommish.core.phoneBar
@@ -156,8 +161,11 @@ fun Shell(
             nav.toSignIn()
         }
     }
-    // Back closes the open switch before it leaves the screen.
-    BackHandler(enabled = switchOpen) { switchOpen = false }
+    // The bar chooses the page shown: drawn from the back stack on the frame back lands, kept for a rotation.
+    val shown by nav.currentBackStackEntryAsState()
+    val chosen = tabShown(shown?.destination?.route, tab)
+    LaunchedEffect(chosen) { tab = chosen }
+    val activity = LocalContext.current.activity()
     // A bar that no longer holds the tab in view (the phase moved) opens its first tab.
     LaunchedEffect(bar) { if (bar.none { it.page == tab }) openTab(bar.first().page) }
 
@@ -210,11 +218,19 @@ fun Shell(
                     )
                 }
             },
-            bottomBar = { PhoneTabBar(bar, tab) { openTab(it.page) } },
+            bottomBar = { PhoneTabBar(bar, chosen) { openTab(it.page) } },
         ) { padding ->
             // The bars' room counted as taken, so a pin's imePadding lifts it only by what the keyboard adds.
             Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
-                Pages(graph, nav, state, bar, PageVerbs(shell::open, openLineup, ::openTab, choose, link, openGame))
+                PagesWithBack(
+                    nav,
+                    bar.map { it.page },
+                    BackVerbs(::openTab, leave = { activity?.moveTaskToBack(false) }),
+                    switchOpen,
+                    closeSwitch = { switchOpen = false },
+                ) {
+                    Pages(graph, nav, state, bar, PageVerbs(shell::open, openLineup, ::openTab, choose, link, openGame))
+                }
                 if (switchOpen) {
                     Box(
                         Modifier
@@ -244,6 +260,62 @@ private class PageVerbs(
     val link: (String) -> Unit,
     val openGame: (leagueId: String, roster: Int?) -> Unit,
 )
+
+/** What back asks of the shell: a tab opened, or the app left (sent behind, as the system's back does). */
+internal class BackVerbs(
+    val openTab: (String) -> Unit,
+    val leave: () -> Unit,
+)
+
+/**
+ * The pages and the shell's two backs (Lane 218). The dispatcher asks the newest callback first.
+ * - The tabs' back, added after the NavHost's: the bar's first tab is the start, whatever the NavHost starts
+ *   at. Back from another tab's root opens it; back from its root leaves the app. A draft bar has no League
+ *   tab, and the NavHost's start (League) sits under its first, so the NavHost alone would pop to a page no
+ *   tab holds. At the first tab's root with nothing under it the handler stands aside for the system's back.
+ *   A page's own back, drawn later, answers ahead of it.
+ * - The open switch's back, added only while it is open, so it is newer than any page's: back closes the
+ *   switch first.
+ */
+@Composable
+internal fun PagesWithBack(
+    nav: NavHostController,
+    bar: List<String>,
+    verbs: BackVerbs,
+    switchOpen: Boolean,
+    closeSwitch: () -> Unit,
+    pages: @Composable () -> Unit,
+) {
+    pages()
+    val shown by nav.currentBackStackEntryAsState()
+    val route = shown?.destination?.route
+    val first = bar.firstOrNull()
+    val atTabRoot = route != null && route in bar
+    val underFirst = route == first && nav.previousBackStackEntry != null
+    BackHandler(enabled = atTabRoot && (route != first || underFirst)) {
+        if (route == first) verbs.leave() else first?.let(verbs.openTab)
+    }
+    if (switchOpen) BackHandler(onBack = closeSwitch)
+}
+
+/** The activity a context belongs to, for sending the app behind. */
+private tailrec fun Context.activity(): Activity? =
+    when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.activity()
+        else -> null
+    }
+
+/** Every tab's page, the routes the bar can choose. */
+private val TAB_PAGES: Set<String> = PAGES.map { it.page }.toSet()
+
+/** The tab the bar draws as chosen: the page shown when it is a tab's own page, else (a pushed screen, or
+ * nothing shown yet) the tab it sits on. */
+internal fun tabShown(
+    route: String?,
+    current: String,
+    pages: Collection<String> = TAB_PAGES,
+): String = route?.takeIf { it in pages } ?: current
 
 /** The tabs' pages and the pushed screens. */
 @Composable
