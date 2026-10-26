@@ -2511,6 +2511,12 @@ type DeviceMe struct {
 // DeviceScope what a paired device may do; session (an app's alone) opens every signed-in route
 type DeviceScope string
 
+// DeviceSignOut defines model for DeviceSignOut.
+type DeviceSignOut struct {
+	// Url The WorkOS logout URL the app opens to end the sign-in's WorkOS session, returning to the site; null when the device was paired before the API kept the session.
+	Url *string `json:"url"`
+}
+
 // DraftPassState defines model for DraftPassState.
 type DraftPassState struct {
 	EndsAt time.Time            `json:"ends_at"`

@@ -3019,12 +3019,23 @@ paths:
         - devices
       operationId: revokeDevice
       summary: Unpair a browser. Its token opens nothing from the next request on.
+      description: "An app signing itself out (its own device token, its own id) is answered a DeviceSignOut: the WorkOS logout URL that ends the sign-in's WorkOS session, or url null for a device paired before the API kept it. Any other unpairing (the account page's cookie, or an app unpairing another device) is answered data null."
       security:
         - session: []
         - device: []
       responses:
         "200":
-          $ref: "#/components/responses/EmptyResponse"
+          description: unpaired
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties:
+                      data:
+                        nullable: true
+                        allOf:
+                          - $ref: "#/components/schemas/DeviceSignOut"
         "404":
           $ref: "#/components/responses/ErrorResponse"
   /hosts:
@@ -3924,6 +3935,15 @@ components:
       properties:
         url:
           type: string
+    DeviceSignOut:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          nullable: true
+          description: The WorkOS logout URL the app opens to end the sign-in's WorkOS session, returning to the site; null when the device was paired before the API kept the session.
     FeatureKnown:
       type: string
       enum:
