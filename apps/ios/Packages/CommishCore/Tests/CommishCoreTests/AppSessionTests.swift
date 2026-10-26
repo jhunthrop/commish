@@ -270,13 +270,46 @@ struct AppSessionTests {
     @Test func signingOutRevokesThisPhoneAndForgetsIt() async {
         let store = MemorySessionStore()
         await store.save(token: "t", deviceID: "d-9")
-        let account = StubAccount(leagues: [Fixtures.league])
+        let account = StubAccount(
+            followed: [Self.followed(Fixtures.league)], season: .preseason, format: .ppr, features: ["custom_scoring"]
+        )
         let session = AppSession(account: account, store: store, cache: NullCache(), defaults: Self.defaults())
         await session.restore()
+        #expect(session.format == .ppr)
+        #expect(session.features == ["custom_scoring"])
         await session.signOut()
         #expect(session.state == .signedOut)
         #expect(await store.token() == nil)
         #expect(await account.revoked == ["d-9"])
+        // The member's season, board and features go with them (L1).
+        #expect(session.sitePhase == nil)
+        #expect(session.format == nil)
+        #expect(session.features.isEmpty)
+    }
+
+    /// The shell is built anew per account (H1): the generation moves as the phone signs in and as it
+    /// signs out, never on a read of the same account, nor on a sign-out while already signed out.
+    @Test func theGenerationMovesAtSignInAndSignOutOnly() async {
+        let store = MemorySessionStore()
+        let session = AppSession(
+            account: StubAccount(leagues: ["a"]), store: store, cache: NullCache(), defaults: Self.defaults()
+        )
+        await session.restore()
+        let signedOut = session.generation
+        await store.save(token: "t", deviceID: "d")
+        await session.restore()
+        let signedIn = session.generation
+        #expect(signedIn != signedOut)
+        await session.restore()
+        #expect(session.generation == signedIn)
+        await session.signOut()
+        let next = session.generation
+        #expect(next != signedIn)
+        await session.expire()
+        #expect(session.generation == next)
+        await store.save(token: "t2", deviceID: "d2")
+        await session.restore()
+        #expect(session.generation != next)
     }
 
     @Test func anExpiredSignInForgetsTheSavedHome() async {
@@ -319,20 +352,26 @@ actor StubAccount: AccountAPI {
 
     init(
         followed: [FollowedLeague], selected: String? = nil, error: (any Error)? = nil,
-        season: SitePhase? = .inSeason, selectError: (any Error)? = nil
+        season: SitePhase? = .inSeason, selectError: (any Error)? = nil,
+        format: Components.Schemas.BoardFormatKnown? = nil, features: [String]? = nil
     ) {
         leagues = followed
         self.selected = selected
         self.error = error
         self.season = season
         self.selectError = selectError
+        self.format = format
+        self.features = features
     }
+
+    private let format: Components.Schemas.BoardFormatKnown?
+    private let features: [String]?
 
     func account() async throws -> AccountContext {
         if let error {
             throw error
         }
-        return AccountContext(leagues: leagues, selected: selected, season: season)
+        return AccountContext(leagues: leagues, selected: selected, season: season, format: format, features: features)
     }
 
     func selectLeague(id: String) async throws -> Bool {

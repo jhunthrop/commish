@@ -21,8 +21,9 @@ import SwiftUI
 /// their screen's name until their lane lands. A score bug opens its game: the member's on the Matchup
 /// tab, another team's pushed on the tab in view (Lane 206). Every screen presents the player sheet through the one
 /// host; its Full page and a player's site link push his page on the tab in view. Signed out (B155,
-/// as Android) the bar is the web's public five with no top bar, the League tab the sign-in, and a
-/// site link waits for the sign-in; signing out lets every tab's pushed screens go and shows it.
+/// as Android) the bar is the web's public five with no top bar, the League tab the sign-in; a public
+/// page's site link opens, the rest wait for the sign-in. The app builds the shell anew for each
+/// account (AppSession.generation), so nothing one member left on a tab shows to the next.
 struct RootTabs: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var selection = PhoneRail.leagueKey
@@ -76,18 +77,11 @@ struct RootTabs: View {
             }
             .id(player.id)
         })
-        .onChange(of: session.tabs) { _, tabs in
+        .onChange(of: session.tabs, initial: true) { _, tabs in
             // A tab the new bar does not show takes its pushed screens with it.
             paths = paths.filter { key, _ in tabs.contains { $0.key == key } }
             if !tabs.contains(where: { $0.key == selection }), let first = tabs.first {
                 selection = first.key
-            }
-        }
-        .onChange(of: session.state) { _, state in
-            if state == .signedOut {
-                showSignIn()
-            } else {
-                openLinked()
             }
         }
         .onChange(of: linked, initial: true) { openLinked() }
@@ -97,24 +91,15 @@ struct RootTabs: View {
         session.isSignedIn
     }
 
-    /// The site link the app was opened with, once signed in.
+    /// The site link the app was opened with: a public page at once, the rest once signed in (the
+    /// shell is rebuilt at the sign-in, which reads it again).
     private func openLinked() {
-        guard signedIn, let route = linked else {
+        guard let route = linked, signedIn || route.isPublic else {
             return
         }
         sheet.close()
         open(route)
         linked = nil
-    }
-
-    /// Signed out: the mock room and every tab's pushed screens let go, the League tab's sign-in shown.
-    private func showSignIn() {
-        mockRoom = nil
-        sheet.close()
-        switchOpen = false
-        query = ""
-        paths = [:]
-        selection = PhoneRail.leagueKey
     }
 
     private func path(_ key: String) -> Binding<[ShellRoute]> {

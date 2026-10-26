@@ -41,6 +41,11 @@ public final class AppSession {
         }
     }
 
+    /// Which account the shell shows, bumped as the phone signs in and as it signs out (never on a read
+    /// of the same account), so the shell rebuilds every tab per account and no screen's state (a mock
+    /// setup's saved league) passes from one member to the next on a shared phone.
+    public private(set) var generation = 0
+
     /// Whether the phone is signed in (with or without a league followed).
     public var isSignedIn: Bool {
         if case .signedIn = state {
@@ -120,6 +125,9 @@ public final class AppSession {
         format = context?.format
         features = context?.features ?? []
         let league = choices.compactMap { id in leagues.first { $0.id == id } }.first ?? leagues.first
+        if !isSignedIn {
+            generation += 1
+        }
         state = .signedIn(league: league)
         lastLeague = league?.id
     }
@@ -167,6 +175,11 @@ public final class AppSession {
         pending = nil
         leagues = []
         sitePhase = nil
+        format = nil
+        features = []
+        if isSignedIn {
+            generation += 1
+        }
         state = .signedOut
     }
 

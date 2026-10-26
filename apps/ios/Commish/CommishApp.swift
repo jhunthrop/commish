@@ -37,7 +37,8 @@ struct CommishApp: App {
         if session.state == .restoring {
             ProgressView()
         } else {
-            // Signed out too: the public tabs stay, the League tab is the sign-in (B155).
+            // Signed out too: the public tabs stay, the League tab is the sign-in (B155). Built anew at
+            // each sign-in and sign-out, so no tab's state passes from one account to the next.
             RootTabs(
                 environment: environment,
                 session: session,
@@ -45,6 +46,7 @@ struct CommishApp: App {
                 linked: $linked,
                 expired: { Task { await session.expire() } }
             )
+            .id(session.generation)
         }
     }
 
