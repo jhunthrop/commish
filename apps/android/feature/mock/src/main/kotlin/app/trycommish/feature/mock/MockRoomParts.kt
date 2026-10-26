@@ -145,7 +145,14 @@ internal fun MockPoolView(
     Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp)) {
         SectionHead(Words.Room.pool, pool.model.line, Modifier.padding(horizontal = Tokens.Space.s3.dp))
         Box(Modifier.padding(horizontal = Tokens.Space.s3.dp)) {
-            ChipRow(pool.chips.map(BoardChip<String>::pair), pool.model.filter, actions.filter, still = still, label = Words.Room.pool)
+            ChipRow(
+                pool.chips.map(BoardChip<String>::pair),
+                pool.model.filter,
+                actions.filter,
+                still = still,
+                label = Words.Room.pool,
+                keepChosen = true,
+            )
         }
         Box(Modifier.padding(horizontal = Tokens.Space.s3.dp)) { BasisText(pool.model.basis) }
         Column {

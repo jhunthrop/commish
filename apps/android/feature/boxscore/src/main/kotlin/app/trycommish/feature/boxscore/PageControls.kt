@@ -108,8 +108,9 @@ fun ChoiceChip(
 
 /** One row of choice chips that scrolls sideways, the chosen chip always in view (scrolled to the middle
  * when it is chosen, Lane 213's M3: a box score names its filter); or (a snapshot's) lies still running past
- * the edge as the scrolling one does, showing its end when the chosen chip is in its later half, never
- * squeezing a chip. */
+ * the edge as the scrolling one does, never squeezing a chip, and with `keepChosen` showing its end when the
+ * chosen chip is in its later half (the mock room's; a screen whose references predate it opts in when it
+ * re-records them). */
 @Composable
 fun <Value> ChipRow(
     chips: List<Pair<String, Value>>,
@@ -117,6 +118,7 @@ fun <Value> ChipRow(
     choose: (Value) -> Unit,
     still: Boolean = false,
     label: String? = null,
+    keepChosen: Boolean = false,
 ) {
     val chosen = chips.indexOfFirst { it.second == pressed }
     val scroll = rememberScrollState()
@@ -124,7 +126,7 @@ fun <Value> ChipRow(
     var view by remember { mutableIntStateOf(0) }
     val row =
         if (still) {
-            Modifier.fillMaxWidth().keepInView(laterHalf = chosen >= 0 && chosen * 2 >= chips.size)
+            Modifier.fillMaxWidth().keepInView(laterHalf = keepChosen && chosen >= 0 && chosen * 2 >= chips.size)
         } else {
             Modifier.fillMaxWidth().onSizeChanged { view = it.width }.horizontalScroll(scroll)
         }
