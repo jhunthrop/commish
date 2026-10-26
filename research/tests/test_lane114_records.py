@@ -4,6 +4,7 @@ draft record grading the preseason board against ADP on the season's points so f
 
 import json
 import os
+import re
 from collections.abc import Iterator, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -12,6 +13,7 @@ from typing import Any, Final
 import pytest
 from sqlalchemy import Connection, Engine, insert
 
+from research.capsules.site_words import list_file, site_list
 from research.db.engine import make_engine
 from research.db.schema import (
     ESPN_PROJECTION_ROWS,
@@ -218,6 +220,9 @@ def test_the_weekly_record_starts_at_the_first_shipped_week_and_grades_espn_besi
     assert out["toDate"][0]["oursOnEspn"]["agreement"] == 1.0
     assert out["method"].endswith("beside ESPN's projection on the same players.")
     assert out["weeks"][1]["note"] == weekly_record.MISSED_NOTE
+    # Lane 235: the run's own sentences, scanned as written, never a weekly claim.
+    written = [out["method"], out["weeks"][1]["note"], out["startersBasis"], out["honest"]]
+    assert all("weekly" not in sentence.lower() for sentence in written if sentence is not None)
 
 
 def test_before_any_shipped_week_the_weekly_record_starts_at_the_next_week_to_set(engine: Engine) -> None:
@@ -279,12 +284,97 @@ def test_the_weekly_honest_line_says_where_espn_called_the_weeks_better() -> Non
         "ESPN had more of the week's starters right in the standard lineup, 52 of 84 against our 50."
     )
     assert weekly_record.method(_FIRST_SHIPPED, [line]) == (
-        "From week 7 we set our weekly rankings before each week's first kickoff and graded them on the week's "
+        "From week 7 we set our rest-of-season order before each week's first kickoff and graded it on the week's "
         "points, beside ESPN's projection on the same players."
     )
     assert weekly_record.method(_FIRST_SHIPPED, []) == (
-        "From week 7 we set our weekly rankings before each week's first kickoff and graded them on the week's points."
+        "From week 7 we set our rest-of-season order before each week's first kickoff and graded it on the week's "
+        "points."
     )
+
+
+_LEADS: Final = Score(100, 0.4, 30.0, 50, 84)
+_BETTER: Final = Score(100, 0.5, 28.0, 52, 84)
+_ESPN_CALLED_BETTER: Final = (
+    "ESPN's order matched the finish better, 0.50 against our 0.40. "
+    "ESPN put a typical player closer to his finish, 28.0 places off against our 30.0. "
+    "ESPN had more of the week's starters right in the standard lineup, 52 of 84 against our 50."
+)
+_PUBLISHED_CALLED_BETTER: Final = (
+    "The published projection's order matched the finish better, 0.50 against our 0.40. "
+    "The published projection put a typical player closer to his finish, 28.0 places off against our 30.0. "
+    "The published projection had more of the week's starters right in the standard lineup, 52 of 84 against "
+    "our 50."
+)
+_METHOD_STEM: Final = (
+    "From week 7 we set our rest-of-season order before each week's first kickoff and graded it on the week's points"
+)
+# The names the run never prints: the projection provider and the rival products (ESPN is the yardstick
+# the record names by the site's own rule).
+_UNNAMED: Final = re.compile(r"\b(?:tank01|tank|rapidapi|fantasypros|sleeper|yahoo|underdog|flock)\b", re.IGNORECASE)
+
+
+def _line(position: str, espn: Score | None, published: Score | None) -> weekly_record.WeeklyLine:
+    ours_on = {"espn": _LEADS if espn else None, "published": _LEADS if published else None}
+    return weekly_record.WeeklyLine(position, _LEADS, {"espn": espn, "published": published}, ours_on)
+
+
+def _every_sentence() -> dict[str, str | None]:
+    """Every sentence the weekly record writes, each in each of its forms."""
+    espn = [_line(position, _BETTER, None) for position in ("All", "QB", "RB", "WR", "TE")]
+    both = [_line(position, _BETTER, _BETTER) for position in ("All", "QB", "RB", "WR", "TE")]
+    behind = [_line("All", _LEADS, _LEADS)]
+    return {
+        "missed": weekly_record.MISSED_NOTE,
+        "espn read after": weekly_record.ESPN_READ_AFTER_NOTE,
+        "espn unread": weekly_record.ESPN_UNREAD_NOTE,
+        "no yardstick": weekly_record.NO_YARDSTICK_NOTE,
+        "method alone": weekly_record.method(_FIRST_SHIPPED, []),
+        "method espn": weekly_record.method(_FIRST_SHIPPED, espn),
+        "method both": weekly_record.method(_FIRST_SHIPPED, both),
+        "honest espn": weekly_record.honest_line(espn),
+        "honest both": weekly_record.honest_line(both),
+        "honest none": weekly_record.honest_line(behind),
+        "starters basis": weekly_record.starters_basis(both),
+    }
+
+
+def test_the_weekly_record_names_its_order_as_the_rest_of_season_order_never_weekly_rankings() -> None:
+    """Lane 235, B222: the run's sentences are printed as written, so the writer never claims a weekly
+    model; the order graded is our rest-of-season order, graded week by week. Every sentence the writer
+    can produce, word for word, then each scanned for a weekly claim, the site's banned words and marks
+    (shared/words/banned-words.json) and a name the run never prints."""
+    assert _every_sentence() == {
+        "missed": "Our rest-of-season order was not set before kickoff that week.",
+        "espn read after": (
+            "ESPN's projection this week was read after our rest-of-season order was set, still before the first "
+            "kickoff."
+        ),
+        "espn unread": (
+            "ESPN's projection was not read before this week's first kickoff, so the week is graded against the "
+            "week's published projection alone."
+        ),
+        "no yardstick": (
+            "No yardstick was read before this week's first kickoff, so the week is graded on its own order alone."
+        ),
+        "method alone": f"{_METHOD_STEM}.",
+        "method espn": f"{_METHOD_STEM}, beside ESPN's projection on the same players.",
+        "method both": (
+            f"{_METHOD_STEM}, beside ESPN's projection and the week's published projection on the same players."
+        ),
+        "honest espn": _ESPN_CALLED_BETTER,
+        "honest both": f"{_ESPN_CALLED_BETTER} {_PUBLISHED_CALLED_BETTER}",
+        "honest none": None,
+        "starters basis": (
+            "Starters right counts a standard 12-team lineup, the week's top 12 QBs, 24 RBs, 36 WRs and 12 TEs, "
+            "and how many of them the order also put there."
+        ),
+    }
+    banned, _ = site_list(list_file())
+    for sentence in (text for text in _every_sentence().values() if text is not None):
+        assert re.search(r"\bweekly\b", sentence, re.IGNORECASE) is None, sentence
+        assert banned.search(sentence) is None, sentence  # betting, trading, host, the em dash and its kin
+        assert _UNNAMED.search(sentence) is None, sentence
 
 
 def test_the_draft_all_line_combines_the_positions_and_never_pools_raw_points() -> None:
