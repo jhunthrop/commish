@@ -7,11 +7,13 @@ import Foundation
 import SwiftUI
 import Testing
 
-/// The shell's mock: the top bar over a league in season and over one before its draft (the bar's
-/// five under each, as the system tab bar lists them), the switch open with three leagues in three
-/// phases, and the player sheet at its two heights, both themes, iPhone 17 Pro and iPhone SE, at 1x,
-/// from the shared fixture's leagues at its Saturday clock. With SNAPSHOT_SHOTS set each is also
-/// written at its phone's own scale, which is what the persona panel reads.
+/// The shell's mock: the top bar over a league in season, over one before its draft and over none
+/// (the bar's five under each, as the system tab bar lists them), the switch open with three leagues
+/// in three phases over the season's bar and over the draft's, the signed-out League tab's sign-in
+/// over the public five (no top bar, as Android), and the player sheet at its two heights, both
+/// themes, iPhone 17 Pro and iPhone SE, at 1x, from the shared fixture's leagues at its Saturday
+/// clock. With SNAPSHOT_SHOTS set each is also written at its phone's own scale, which is what the
+/// persona panel reads.
 @MainActor
 struct ShellSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -26,6 +28,12 @@ struct ShellSnapshotTests {
         case barInSeason = "bar-in-season"
         case barPreDraft = "bar-pre-draft"
         case switchOpen = "switch-open"
+        /// B149: a bar with no League tab, the switch open as the way to any league's home.
+        case preDraftSwitchOpen = "pre-draft-switch-open"
+        /// No league followed: the bar for the site's season.
+        case barNoLeague = "bar-no-league"
+        /// B155: signed out, the public tabs with the League tab as the sign-in.
+        case signedOut = "signed-out"
         case sheetMedium = "sheet-medium"
         case sheetLarge = "sheet-large"
     }
@@ -66,13 +74,20 @@ struct ShellSnapshotTests {
         case .barInSeason, .switchOpen:
             ShellMock(
                 model: LeagueSwitchModel(leagues: leagues, selected: leagues[0].id, now: now, zone: zone),
-                tabs: PhoneRail.tabs(phase: leagues[0].phase, waiversOpen: true), open: scene == .switchOpen
+                tabs: PhoneRail.bar(league: leagues[0], season: .inSeason), open: scene == .switchOpen
             )
-        case .barPreDraft:
+        case .barPreDraft, .preDraftSwitchOpen:
             ShellMock(
                 model: LeagueSwitchModel(leagues: leagues, selected: leagues[1].id, now: now, zone: zone),
-                tabs: PhoneRail.tabs(phase: leagues[1].phase, waiversOpen: true), open: false
+                tabs: PhoneRail.bar(league: leagues[1], season: .inSeason), open: scene == .preDraftSwitchOpen
             )
+        case .barNoLeague:
+            ShellMock(
+                model: LeagueSwitchModel(leagues: [], selected: nil, now: now, zone: zone),
+                tabs: PhoneRail.bar(league: nil, season: .inSeason), open: false
+            )
+        case .signedOut:
+            SignedOutMock(device: device)
         case .sheetMedium, .sheetLarge:
             SheetMock(player: player, device: device, large: scene == .sheetLarge)
         }
@@ -141,6 +156,20 @@ struct TabStrip: View {
         .frame(height: 50)
         .background(theme.color(Tokens.Color.shell))
         .overlay(alignment: .top) { Rectangle().fill(theme.color(Tokens.Color.shellLine)).frame(height: 1) }
+    }
+}
+
+/// Signed out: the League tab's sign-in filling the screen between the status bar and the five, the
+/// web's public bar with the League tab first and selected.
+struct SignedOutMock: View {
+    let device: SnapshotDevice
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SignInView(working: false, problem: nil, signIn: {})
+                .frame(height: device.height - (device.height > 700 ? 54 + 34 : 20) - 50)
+            TabStrip(tabs: PhoneRail.withoutLeague)
+        }
     }
 }
 
