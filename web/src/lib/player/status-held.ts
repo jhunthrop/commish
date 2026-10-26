@@ -15,9 +15,7 @@
  * of it. */
 import { stampAt } from '#lib/format/clock.ts';
 import type { Designations, PlayerStatus, WeekRead } from '#lib/run/schema.ts';
-
-/** The zone the read's captions are said in, as the run says them (`capsules/week/sheet.py CENTRAL`). */
-const CAPTION_ZONE = 'America/Chicago';
+import { CAPTION_ZONE } from './read-byline.ts';
 /** The writer's hourly passes, Eastern hours (`capsules/week/caption.py HOURLY_PASS_HOURS_ET`, the
  * capture's schedule in `infra/research-schedule.sh`): midnight, 2 am, then 6 am through 11 pm. */
 const HOURLY_PASS_HOURS_ET: ReadonlySet<number> = new Set([
@@ -50,7 +48,7 @@ export function nextHourlyPass(after: number): number {
 }
 
 /** When the capture was last read: its check, else its stamp (the page's "read" instant). */
-function lastRead(capture: Pick<Designations, 'readAt' | 'checkedAt'>): number {
+export function lastRead(capture: Pick<Designations, 'readAt' | 'checkedAt'>): number {
 	return Date.parse(capture.checkedAt ?? capture.readAt);
 }
 

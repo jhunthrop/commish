@@ -22,7 +22,8 @@ import type {
 	IndexEntry,
 	Player,
 	PlayerFormat,
-	PlayerStatus
+	PlayerStatus,
+	Slate
 } from '#lib/run/schema.ts';
 import { lastGameClubWords } from '#lib/player/club-words.ts';
 import type { Position } from '#lib/types/player.ts';
@@ -51,7 +52,8 @@ import {
 import { unwrittenByFormat } from './player-unwritten.ts';
 import { playerHead } from './head.ts';
 import type { HeadMarkup } from '#lib/site/head.ts';
-import { readAtStatus } from '#lib/player/status-held.ts';
+import { lastRead, readAtStatus } from '#lib/player/status-held.ts';
+import { scheduleKickoffs, standingByline } from '#lib/player/read-byline.ts';
 import type { BasisTile, CardTile, RestParts } from '#lib/player/card.ts';
 import {
 	adp,
@@ -337,6 +339,20 @@ function clubNoteOf(
 	return lastGameClubWords(club, last.week, clubOf(list, last.club), kind);
 }
 
+/** His read as the build serves it (Lane 222, B186): a standing read's byline names the status read
+ * this build took and the next game-day read, never the night's baked into the run; a read withheld
+ * keeps its own words. */
+function servedRead(
+	read: WeekRead,
+	capture: Designations | null,
+	slates: readonly Slate[],
+	now: number
+): WeekRead {
+	if (read.body === null) return read;
+	const statusRead = capture === null ? null : lastRead(capture);
+	return { ...read, caption: standingByline(read, statusRead, scheduleKickoffs(slates), now) };
+}
+
 /** Each week's last kickoff across the run's schedule. */
 async function lastKickoffsOf(): Promise<Record<number, string>> {
 	const last: Record<number, string> = {};
@@ -453,7 +469,14 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		// A read his designation moved past since it was written is withheld on the page and the shelf
 		// alike (Lane 162, D01).
 		weekRead:
-			loaded.weekRead === null ? null : readAtStatus(loaded.weekRead, capture, entry.id, now),
+			loaded.weekRead === null
+				? null
+				: servedRead(
+						readAtStatus(loaded.weekRead, capture, entry.id, now),
+						capture,
+						slate.slates,
+						now
+					),
 		lastKickoffs,
 		copyOf: loaded.copyOf,
 		unwritten: unwrittenByFormat({

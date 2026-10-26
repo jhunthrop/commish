@@ -13,7 +13,12 @@ injury capture (the hourly capture job's), the same read the API's board route m
 - dispatches the web build of the public run when the set of its ranked players on a season-long
   list differs from the set its last build was dispatched with (`designations-build.json`), so the
   static board and player pages are right within the hour. A dispatch that fails keeps the old set,
-  so the next hour tries again. No token is a skip by name, as `publish`'s own.
+  so the next hour tries again. No token is a skip by name, as `publish`'s own;
+- dispatches it too in the publish hour before each kickoff window when the status read is newer than
+  the one its last build took (Lane 222, B186, `game_day_reads.py`), so a game-day page names a read of
+  that hour, never the night's. A refused dispatch is tried three times in the hour; a window build still
+  refused is recorded as not sent and said in the following hours' lines, as no later hour reads before
+  those kickoffs.
 
 THE RULE. A season-long designation (injured reserve, PUP, NFI, suspended, or out with the capture's
 note saying out for the season) puts him below every available player at his position; a week's
@@ -32,8 +37,9 @@ when no by-date capture exists, carries the note and no history.
 """
 
 import logging
+import time
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from typing import Any, Final
 
@@ -57,6 +63,7 @@ from research.model.designations import (
 from research.model.instants import js_iso, ms_instant
 from research.nightly.config import EARLY_KEY, LATEST_KEY
 from research.nightly.designation_runs import BY_DATE_SOURCE, designation_runs
+from research.nightly.game_day_reads import Sleep, newer, not_sent_note, not_sent_words, window_words
 from research.nightly.publish import Dispatcher, PublishOutcome, encode, read_json, run_key
 from research.nightly.published_board import MANIFEST_FILE, driver_line
 from research.nightly.return_days import (
@@ -425,9 +432,44 @@ def built_set(store: RunStore, run_id: str) -> frozenset[str]:
     return frozenset(i for i in listed if isinstance(i, str)) if isinstance(listed, list) else frozenset()
 
 
-def _record(store: RunStore, run_id: str, ids: frozenset[str], build: str, now: datetime) -> None:
-    body = {"seasonLong": sorted(ids), "at": js_iso(now), "build": build}
+def built_status_read(store: RunStore, run_id: str) -> str | None:
+    """The status read the run's last dispatched build took (its check, else its stamp), None before one."""
+    record = read_json(store, run_key(run_id, BUILD_FILE))
+    found = None if record is None else record.get("statusReadAt")
+    return found if isinstance(found, str) else None
+
+
+def status_read_at(read: StatusRead) -> str:
+    """When the read was last read: the capture job's check, else the capture's stamp (the web's `lastRead`)."""
+    return js_iso(read.checked_at or read.read_at)
+
+
+@dataclass(frozen=True, slots=True)
+class BuildRecord:
+    """What `designations-build.json` holds after this hour: the season-long players and the status read the
+    last sent build took, how this hour went, and a window build that was not sent (review H1)."""
+
+    season_long: frozenset[str]
+    status_read_at: str | None
+    build: str
+    not_sent: dict[str, str] | None = None
+
+
+def _record(store: RunStore, run_id: str, record: BuildRecord, now: datetime) -> None:
+    body = {
+        "seasonLong": sorted(record.season_long),
+        "statusReadAt": record.status_read_at,
+        "at": js_iso(now),
+        "build": record.build,
+        **({} if record.not_sent is None else {"notSent": record.not_sent}),
+    }
     store.put(run_key(run_id, BUILD_FILE), encode(body), JSON_TYPE)
+
+
+def _sent(marked: Marked, run_id: str, build: str) -> BuildRecord:
+    """A build sent this hour: it takes this hour's set and read."""
+    read = None if marked.read is None else status_read_at(marked.read)
+    return BuildRecord(marked.held[run_id], read, build)
 
 
 @dataclass(frozen=True, slots=True)
@@ -436,38 +478,97 @@ class BuildOutcome:
     ok: bool = True
 
 
+# A dispatch GitHub refused is tried again in the hour this many times in all, after these pauses (review H1:
+# a window hour has no later hour before its kickoffs).
+DISPATCH_ATTEMPTS: Final = 3
+DISPATCH_BACKOFF_SECONDS: Final = (10.0, 30.0)
+
+
 @dataclass(frozen=True, slots=True)
 class Hour:
-    """This publish hour: its dispatcher (or why there is none), what `publish` did, its instant."""
+    """This publish hour: its dispatcher (or why there is none), what `publish` did, its instant, the first
+    kickoff of the window it reads before on a game day (`game_day_reads.game_day_hour`), else None, and how
+    it pauses between dispatch attempts."""
 
     dispatcher: Dispatcher | str | None
     published: PublishOutcome
     now: datetime
+    window: datetime | None = None
+    sleep: Sleep = field(default=time.sleep, compare=False)
+
+
+def _build_reason(store: RunStore, run_id: str, marked: Marked, hour: Hour) -> str | None:
+    """Why the public run's build is dispatched this hour, None when its last build stands: its season-long
+    players moved, or this hour reads before a kickoff window and the status read is newer than its build's."""
+    if marked.held[run_id] != built_set(store, run_id):
+        return "moved"
+    if hour.window is None or marked.read is None:
+        return None
+    if not newer(status_read_at(marked.read), built_status_read(store, run_id)):
+        return None
+    return f"read again before {window_words(hour.window)}"
+
+
+def _dispatch(dispatcher: Dispatcher, run_id: str, sleep: Sleep) -> str | None:
+    """The dispatch, tried `DISPATCH_ATTEMPTS` times; the last refusal, None once one is sent."""
+    failure: str | None = None
+    for attempt in range(DISPATCH_ATTEMPTS):
+        if attempt:
+            sleep(DISPATCH_BACKOFF_SECONDS[attempt - 1])
+        failure = dispatcher.dispatch(run_id)
+        if failure is None:
+            return None
+    return failure
+
+
+def _unchanged(store: RunStore, run_id: str, count: str) -> BuildOutcome:
+    """No build this hour; a window build not sent earlier is said, never "unchanged" alone (review H1)."""
+    record = read_json(store, run_key(run_id, BUILD_FILE))
+    missed = None if record is None else not_sent_words(record.get("notSent"))
+    tail = "" if missed is None else f"; {missed}, the pages keep the read of the build before it"
+    return BuildOutcome(f"designations: run {run_id}, {count}, unchanged since its last build{tail}")
+
+
+def _failed(store: RunStore, run_id: str, reason: str, failure: str, hour: Hour) -> BuildOutcome:
+    """A dispatch refused every attempt. A moved set keeps the old one, so the next hour tries again; a window
+    build is recorded as not sent, as no later hour reads before those kickoffs."""
+    tries = f"{DISPATCH_ATTEMPTS} attempts"
+    if hour.window is None:
+        return BuildOutcome(f"{reason}; the dispatch FAILED {tries} ({failure}); retried next hour", ok=False)
+    kept = BuildRecord(built_set(store, run_id), built_status_read(store, run_id), f"not sent: {failure}")
+    _record(store, run_id, replace(kept, not_sent=not_sent_note(hour.window, failure, hour.now)), hour.now)
+    return BuildOutcome(
+        f"{reason}; the dispatch FAILED {tries} ({failure}); build not sent, the pages keep the earlier read",
+        ok=False,
+    )
 
 
 def build_on_change(store: RunStore, marked: Marked, hour: Hour) -> BuildOutcome:
-    """The public run's build dispatched when its season-long players moved since its last build."""
+    """The public run's build dispatched when its season-long players moved since its last build, or before
+    a kickoff window on a newer status read."""
     run_id = _pointer(store, LATEST_KEY)
     if run_id is None or run_id not in marked.held:
         return BuildOutcome("designations: no public run to build")
     ids, dispatcher, now = marked.held[run_id], hour.dispatcher, hour.now
     count = f"{len(ids)} season-long"
+    head = f"designations: run {run_id}, {count}"
     if hour.published.run_id == run_id and hour.published.dispatched:
-        _record(store, run_id, ids, "the run's own build", now)
-        return BuildOutcome(f"designations: run {run_id}, {count}, in the build publish dispatched")
-    if ids == built_set(store, run_id):
-        return BuildOutcome(f"designations: run {run_id}, {count}, unchanged since its last build")
+        _record(store, run_id, _sent(marked, run_id, "the run's own build"), now)
+        return BuildOutcome(f"{head}, in the build publish dispatched")
+    reason = _build_reason(store, run_id, marked, hour)
+    if reason is None:
+        return _unchanged(store, run_id, count)
     if dispatcher is None or isinstance(dispatcher, str):
         why = "--no-dispatch" if dispatcher is None else dispatcher
-        _record(store, run_id, ids, f"skipped: {why}", now)
-        return BuildOutcome(f"designations: run {run_id}, {count}, moved; the web dispatch skipped ({why})")
-    failure = dispatcher.dispatch(run_id)
+        # No build took the read, so the record keeps the last built one (review L2).
+        _record(store, run_id, BuildRecord(ids, built_status_read(store, run_id), f"skipped: {why}"), now)
+        return BuildOutcome(f"{head}, {reason}; the web dispatch skipped ({why})")
+    failure = _dispatch(dispatcher, run_id, hour.sleep)
     if failure is not None:
-        return BuildOutcome(
-            f"designations: run {run_id}, {count}, moved; the dispatch FAILED ({failure}); retried next hour", ok=False
-        )
-    _record(store, run_id, ids, "dispatched", now)
-    return BuildOutcome(f"designations: run {run_id}, {count}, moved; the web build of it was dispatched")
+        failed = _failed(store, run_id, reason, failure, hour)
+        return BuildOutcome(f"{head}, {failed.line}", ok=False)
+    _record(store, run_id, _sent(marked, run_id, "dispatched"), now)
+    return BuildOutcome(f"{head}, {reason}; the web build of it was dispatched")
 
 
 _RETRIED: Final = "the pages keep the last file; retried at the next publish hour"
