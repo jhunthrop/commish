@@ -6,7 +6,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
+import app.trycommish.api.models.LeaguePhase
 import app.trycommish.core.AppWords
+import app.trycommish.core.leaguehome.DraftDayEntry
 import app.trycommish.core.leaguehome.Fixtures
 import app.trycommish.core.leaguehome.LeagueHomeModel
 import app.trycommish.core.leaguehome.LeagueHomeState
@@ -86,6 +88,25 @@ class LeagueHomeSnapshotTest {
     @Test fun offlineSmallLight() =
         screen("offline-small", dark = false, state = fresh.copy(stamp = Instant.parse("2026-10-18T17:00:00Z"), stale = true))
 
+    /** The followed league's draft day (Lane 212, the iOS league-home-draft-day): the entry under the head,
+     * its draft tonight on the member's clock, the zone said once, and the Advisor's verb. */
+    private fun draftDay(
+        dark: Boolean,
+        device: DeviceConfig,
+        name: String,
+    ) = snap(name, dark, device, RenderingMode.NORMAL) {
+        val entry = requireNotNull(DraftDayEntry.of(LeaguePhase.draft_day, DRAFT_AT, clock, Fixtures.zone))
+        LeagueHomeScreen(fresh, Fixtures.zone, refreshing = false, onRefresh = {}, onOpenLineup = {}, draftDay = DraftDay(entry) {})
+    }
+
+    @Test fun draftDayPixel8Light() = draftDay(dark = false, device = PIXEL_8, name = "draft-day-pixel8")
+
+    @Test fun draftDayPixel8Dark() = draftDay(dark = true, device = PIXEL_8, name = "draft-day-pixel8")
+
+    @Test fun draftDaySmallLight() = draftDay(dark = false, device = SMALL, name = "draft-day-small")
+
+    @Test fun draftDaySmallDark() = draftDay(dark = true, device = SMALL, name = "draft-day-small")
+
     @Test fun failedSmallLight() = screen("failed-small", dark = false, state = LeagueHomeState.Failed(AppWords.cannotLoad))
 
     @Test fun failedSmallDark() = screen("failed-small", dark = true, state = LeagueHomeState.Failed(AppWords.cannotLoad))
@@ -99,6 +120,9 @@ class LeagueHomeSnapshotTest {
 
     private companion object {
         const val MOVES_SHOWN = 8
+
+        /** 7:30 pm Central on the fixture's Sunday. */
+        val DRAFT_AT: Instant = Instant.parse("2026-10-19T00:30:00Z")
 
         /** A Pixel 8: 1080 by 2400 at 420 dpi, the Pixel 6's screen. */
         val PIXEL_8 = DeviceConfig.PIXEL_6

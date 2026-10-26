@@ -28,6 +28,10 @@ import app.trycommish.core.account.PushStore
 import app.trycommish.core.board.ApiRunReads
 import app.trycommish.core.board.BoardViewModel
 import app.trycommish.core.board.RunReads
+import app.trycommish.core.companion.ApiCompanionReads
+import app.trycommish.core.companion.CompanionReads
+import app.trycommish.core.companion.CompanionViewModel
+import app.trycommish.core.companion.NewCompanionViewModel
 import app.trycommish.core.leaguehome.ApiLeagueReads
 import app.trycommish.core.leaguehome.LeagueHomeViewModel
 import app.trycommish.core.leaguehome.LeagueReads
@@ -57,6 +61,7 @@ import app.trycommish.core.shell.AccountReads
 import app.trycommish.core.shell.ApiAccountReads
 import app.trycommish.core.shell.FollowedLeague
 import app.trycommish.core.shell.SheetPlayer
+import app.trycommish.core.shell.ShellRoute
 import app.trycommish.core.shell.ShellViewModel
 import app.trycommish.core.signin.ApiPairing
 import app.trycommish.core.signin.SignIn
@@ -74,7 +79,9 @@ import app.trycommish.core.waivers.WaiverViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.security.SecureRandom
 import java.time.ZoneId
@@ -107,6 +114,33 @@ class AppGraph(
     private val rankings: RankingsReads = ApiRankingsReads(transport)
     private val records: RecordReads = ApiRecordReads(transport)
     private val accountScreen: AccountScreenReads = ApiAccountScreenReads(transport)
+    private val companions: CompanionReads = ApiCompanionReads(transport)
+
+    /** A debug build started with the CommishCompanionReplay extra follows the API's recorded draft from the
+     * companion's start page (the web's /companion/new?replay=1, COMPANION_REPLAY on a development API, refused
+     * by any other); a release build never sets it. */
+    var companionReplay: Boolean = false
+        private set
+
+    private val mutableLink = MutableStateFlow<ShellRoute?>(null)
+
+    /** A screen an app link asked for (a /companion page), pushed by the shell once it is signed in. */
+    val link: StateFlow<ShellRoute?> = mutableLink.asStateFlow()
+
+    fun openLink(route: ShellRoute) {
+        mutableLink.value = route
+    }
+
+    /** The shell pushed the screen the link asked for. */
+    fun linkOpened() {
+        mutableLink.value = null
+    }
+
+    /** The launch's development replay, honoured in a debug build only. */
+    fun askReplay(asked: Boolean) {
+        if (BuildConfig.DEBUG && asked) companionReplay = true
+    }
+
     private val push: PushStore = DevicePushStore(context)
     private val appContext: Context = context.applicationContext
     private val clipboard: ClipboardManager? = context.getSystemService(ClipboardManager::class.java)
@@ -183,6 +217,13 @@ class AppGraph(
         inSeason: Boolean,
         query: String,
     ): RankingsViewModel = RankingsViewModel(rankings, cache, clock, zone, inSeason, query, sessionEnd)
+
+    /** A followed draft, read every three seconds while it is on screen. */
+    fun companionViewModel(id: String): CompanionViewModel = CompanionViewModel(id, companions, cache, clock, zone, sessionEnd)
+
+    /** The companion's start page; `replay` where a site link asked for the development replay. */
+    fun newCompanionViewModel(replay: Boolean): NewCompanionViewModel =
+        NewCompanionViewModel(companions, sessionEnd, replay = replay || companionReplay)
 
     /** Our record from the run, with the schedule its weeks are read by. */
     fun recordViewModel(): RecordViewModel = RecordViewModel(records, cache, clock, zone, sessionEnd)

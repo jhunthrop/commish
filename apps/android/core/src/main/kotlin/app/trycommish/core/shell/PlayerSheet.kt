@@ -215,6 +215,25 @@ object SiteLinks {
         }
     }
 
+    /** The live-draft companion's pages the app draws by their site paths (links.ts companionNew and
+     * companion): /companion/new (`?replay=1` for the development replay) and /companion/<id>; null for any
+     * other link. */
+    fun companion(link: String): ShellRoute? {
+        val rest = link.removePrefix("$ORIGIN/companion/").takeIf { it != link } ?: return null
+        val path = rest.substringBefore('?').substringBefore('#').trimEnd('/')
+        if (path.isEmpty() || '/' in path) return null
+        val replay =
+            rest
+                .substringAfter('?', "")
+                .substringBefore('#')
+                .split('&')
+                .contains("replay=1")
+        return if (path == COMPANION_START) ShellRoute.CompanionNew(replay) else ShellRoute.Companion(path)
+    }
+
+    /** The companion's start page's last segment (nav.ts COMPANION_START). */
+    private const val COMPANION_START = "new"
+
     /** The slug of a link to a player's page on the site, null for any other link. */
     fun playerSlug(link: String): String? =
         link

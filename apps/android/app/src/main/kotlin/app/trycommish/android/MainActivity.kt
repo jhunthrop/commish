@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.browser.customtabs.CustomTabsIntent
+import app.trycommish.core.shell.SiteLinks
 import app.trycommish.design.CommishTheme
 
 /** The one activity: the shell, and the sign-in's return link (an app link) handed to the graph. */
@@ -36,6 +37,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handle(intent: Intent?) {
+        graph.askReplay(intent?.getBooleanExtra(REPLAY_EXTRA, false) == true)
         graph.signInFlow.returnLink(intent)?.let(graph::completeSignIn)
+        intent?.dataString?.let(SiteLinks::companion)?.let(graph::openLink)
+    }
+
+    private companion object {
+        /** The launch extra a development build reads for the companion's replay (the iOS app's launch
+         * argument CommishCompanionReplay). */
+        const val REPLAY_EXTRA = "CommishCompanionReplay"
     }
 }

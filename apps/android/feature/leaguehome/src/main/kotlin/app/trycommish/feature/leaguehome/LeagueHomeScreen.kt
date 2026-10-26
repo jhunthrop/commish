@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.trycommish.core.AppWords
 import app.trycommish.core.Format
+import app.trycommish.core.leaguehome.DraftDayEntry
 import app.trycommish.core.leaguehome.LeagueHomeModel
 import app.trycommish.core.leaguehome.LeagueHomeState
 import app.trycommish.design.CommishTheme
@@ -50,6 +51,7 @@ fun LeagueHomeScreen(
     onOpenLineup: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenGame: (Int?) -> Unit = {},
+    draftDay: DraftDay? = null,
 ) {
     PullToRefreshBox(
         isRefreshing = refreshing,
@@ -59,7 +61,7 @@ fun LeagueHomeScreen(
         when (state) {
             LeagueHomeState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             is LeagueHomeState.Failed -> Failed(state.message)
-            is LeagueHomeState.Loaded -> Loaded(state.model, stampText(state.stamp, state.stale, zone), onOpenLineup, onOpenGame)
+            is LeagueHomeState.Loaded -> Loaded(state.model, stampText(state.stamp, state.stale, zone), onOpenLineup, onOpenGame, draftDay)
             LeagueHomeState.SignedOut -> Failed(AppWords.signedOut)
         }
     }
@@ -91,9 +93,16 @@ private fun Loaded(
     stamp: String,
     onOpenLineup: () -> Unit,
     onOpenGame: (Int?) -> Unit,
+    draftDay: DraftDay?,
 ) {
-    LeagueHomePage(model, stamp, onOpenLineup, Modifier.fillMaxSize().verticalScroll(rememberScrollState()), onOpenGame)
+    LeagueHomePage(model, stamp, onOpenLineup, Modifier.fillMaxSize().verticalScroll(rememberScrollState()), onOpenGame, draftDay)
 }
+
+/** The followed league's draft day on its home: the entry the web's SeasonPanel draws, and its verb. */
+class DraftDay(
+    val entry: DraftDayEntry,
+    val openAdvisor: () -> Unit,
+)
 
 /** The page itself, every section at its full height: the screen scrolls it, a snapshot draws it whole.
  * A page of six games, twelve teams, ten starters and two weeks of moves needs no lazy list. */
@@ -104,9 +113,11 @@ fun LeagueHomePage(
     onOpenLineup: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenGame: (Int?) -> Unit = {},
+    draftDay: DraftDay? = null,
 ) {
     Column(modifier.background(CommishTheme.colors.bg)) {
         Head(model, stamp)
+        draftDay?.let { DraftDayPanel(it.entry, it.openAdvisor) }
         if (model.games.isNotEmpty()) ScoreBoard(model.week, model.games, onOpenGame)
         Standings(model.standings)
         LineupSummary(model.lineup, onOpenLineup)
