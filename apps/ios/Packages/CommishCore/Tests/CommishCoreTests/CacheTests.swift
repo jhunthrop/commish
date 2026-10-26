@@ -60,5 +60,3 @@ struct FormattingTests {
         #expect(Formatting.plural(10, "player") == "10 players")
     }
 }
-
-// Lane 238 CI check: a Swift-touching commit runs the simulator job; reverted in the next commit.
