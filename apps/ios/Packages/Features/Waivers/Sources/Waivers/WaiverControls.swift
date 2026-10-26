@@ -62,7 +62,7 @@ struct FiltersView: View {
     let chosen: WaiverPosition?
     let choose: (WaiverPosition?) -> Void
     let query: String
-    let find: @MainActor (String) -> Void
+    let find: (String) -> Void
     let problem: String?
     /// Draws the chips and the field at rest (a snapshot draws no scroll view or text field contents).
     var still = false
