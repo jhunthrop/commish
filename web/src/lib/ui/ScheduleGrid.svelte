@@ -1,4 +1,8 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { memberZone } from '#lib/format/clock.ts';
+	import { BUILD_ZONE } from '#lib/format/day-time.ts';
+	import { asOfLine, stateWord, type CurrentWeek } from '#lib/run/schedule-state.ts';
 	import { CLUB_PAGE, SCHEDULE_PAGE } from '#lib/site/reference-words.ts';
 	import Face from './Face.svelte';
 	import type { ScheduleRow } from './schedule-grid.ts';
@@ -19,14 +23,35 @@
 		/** The last complete week, 0 before the first kickoff: its week heads are set back, as each
 		 * game in is (its cell's played), so what is left reads at a glance. The lead says so. */
 		played?: number;
+		/** The week whose cells say their game's state as the run read it, named once under the
+		 * grid with the run's read (Lane 223, B187); the grid opens on it where the weeks scroll. */
+		current?: CurrentWeek;
 	}
 
-	let { rows, weeks, caption, strengthLabel, played = 0 }: Props = $props();
+	let { rows, weeks, caption, strengthLabel, played = 0, current }: Props = $props();
+
+	/** The member's zone once the page is live, the build's before. */
+	let zone = $state(BUILD_ZONE);
+	let frame = $state<HTMLDivElement>();
+	onMount(() => {
+		zone = memberZone();
+		openOnCurrent();
+	});
+
+	/** Scrolls the weeks so the current week sits first after the pinned columns. */
+	function openOnCurrent(): void {
+		if (!frame || current === undefined) return;
+		const heads = frame.querySelectorAll<HTMLElement>('thead th');
+		const week = frame.querySelector<HTMLElement>(`thead th[data-week="${String(current.week)}"]`);
+		const pinned = [...heads].filter((head) => getComputedStyle(head).position === 'sticky');
+		const pinnedRight = Math.max(0, ...pinned.map((head) => head.offsetLeft + head.offsetWidth));
+		if (week) frame.scrollLeft = Math.max(0, week.offsetLeft - pinnedRight);
+	}
 </script>
 
 <!-- The frame scrolls, so it takes focus: a keyboard reaches week 18 with the arrow keys. -->
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="frame" role="region" aria-label={caption} tabindex="0">
+<div class="frame" role="region" aria-label={caption} tabindex="0" bind:this={frame}>
 	<table>
 		<caption>{caption}</caption>
 		<thead>
@@ -37,7 +62,8 @@
 					<th scope="col" class="strength">{strengthLabel}</th>
 				{/if}
 				{#each weeks as week (week)}
-					<th scope="col" class="week" class:played={week <= played}>{SCHEDULE_PAGE.week} {week}</th
+					<th scope="col" class="week" class:played={week <= played} data-week={week}
+						>{SCHEDULE_PAGE.week} {week}</th
 					>
 				{/each}
 			</tr>
@@ -69,6 +95,7 @@
 									>{cell.home ? CLUB_PAGE.home : CLUB_PAGE.away} {cell.opponent}</span
 								>
 								<span class="value">{cell.value}</span>
+								{#if cell.game}<span class="state">{stateWord(cell.game, zone)}</span>{/if}
 							</td>
 						{/if}
 					{/each}
@@ -77,6 +104,7 @@
 		</tbody>
 	</table>
 </div>
+{#if current}<p class="as-of">{asOfLine(current, zone)}</p>{/if}
 
 <style>
 	/* The sticky columns' widths, which the next column's offset is built from. */
@@ -208,8 +236,22 @@
 	}
 
 	.opp,
-	.value {
+	.value,
+	.state {
 		display: block;
+	}
+
+	/* The run's state of the current week's game, small under its opponent's number. */
+	.state {
+		font-size: var(--t-xs);
+		color: var(--ink-2);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.as-of {
+		margin: 0;
+		font-size: var(--t-xs);
+		color: var(--ink-3);
 	}
 
 	.value {
@@ -232,7 +274,8 @@
 
 	/* A played week steps back behind the weeks still to come in muted ink, which holds 4.5:1. */
 	.played,
-	.played .value {
+	.played .value,
+	.played .state {
 		color: var(--played-ink);
 		font-weight: 400;
 	}
@@ -246,8 +289,10 @@
 	   strength pins right after it, so its head is never cut. */
 	@media (max-width: 760px) {
 		.frame {
-			--club-w: 196px;
-			--strength-w: 80px;
+			/* Narrow enough that one whole week, the current one's kickoff with its zone, shows
+			   beside the pinned columns at 390 (Lane 223). */
+			--club-w: 160px;
+			--strength-w: 72px;
 		}
 
 		.club,
@@ -281,6 +326,11 @@
 		.strength {
 			left: var(--club-w);
 			min-width: var(--strength-w);
+		}
+
+		/* Its head wraps to two lines in the narrower pinned column, never cut. */
+		thead .strength {
+			white-space: normal;
 		}
 	}
 </style>

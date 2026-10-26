@@ -7,7 +7,7 @@
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import PlayerLine from '#lib/ui/PlayerLine.svelte';
 	import Tile from '#lib/ui/Tile.svelte';
-	import { CLUB_PAGE } from '#lib/site/reference-words.ts';
+	import { CLUB_PAGE, clubMeta } from '#lib/site/reference-words.ts';
 	import { basisAtClock, placedLeads } from '#lib/run/live-order.ts';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import type { BasisPart } from '#lib/run/board-basis.ts';
@@ -73,7 +73,7 @@
 					<Tile
 						title="{club.city} {club.nickname}"
 						href={links.club(club.abbr)}
-						meta="{club.abbr} · {CLUB_PAGE.byeWeek} {club.bye ?? CLUB_PAGE.byeNotSet}"
+						meta={clubMeta(club.abbr, club.bye, page.format.rosFromWeek ?? null)}
 					>
 						{#if club.strength}
 							<Figure value={club.strength.value} size="md" caption={club.strength.caption} />

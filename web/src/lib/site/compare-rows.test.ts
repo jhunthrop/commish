@@ -2,6 +2,7 @@
 // held player's rank as its word and no rank row judged. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import type { PlayerFormat } from '#lib/run/schema.ts';
 import { compareRows, type Side } from './compare-rows.ts';
 
@@ -166,4 +167,11 @@ void test('Floor to ceiling is drawn only where a side carries a range, the empt
 		both.cells.map((cell) => cell.text),
 		['', '']
 	);
+});
+
+void test('a played bye on both sides draws no Bye row, one side ahead keeps it (Lane 223)', () => {
+	const played = (side: Side): Side => ({ ...side, bye: null });
+	assert.ok(!compareRows(played(NACUA), played(CHASE), 2026, true).some((r) => r.label === 'Bye'));
+	const one = byLabel(compareRows(NACUA, played(CHASE), 2026, true), 'Bye');
+	assert.equal(one.cells[1].text, EMPTY_FIGURE);
 });

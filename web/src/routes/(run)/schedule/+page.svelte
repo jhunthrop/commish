@@ -23,6 +23,7 @@
 			caption={page.strengthLabel === null ? SCHEDULE_PAGE.caption : SCHEDULE_PAGE.captionHardest}
 			strengthLabel={page.strengthLabel}
 			played={page.played}
+			current={page.current}
 		/>
 	</main>
 </SiteShell>

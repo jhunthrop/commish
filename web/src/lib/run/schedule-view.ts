@@ -6,6 +6,7 @@ import { fixed } from '#lib/format/number.ts';
 import type { ScheduleCell } from '#lib/ui/schedule-grid.ts';
 import { leadOf } from './held-places.ts';
 import type { Reach } from './reach.ts';
+import { statedGame, type CurrentWeek, type StatedGame } from './schedule-state.ts';
 import type { BoardRow, Club, Game, PlayerStatus, Schedule, Slate } from './schema.ts';
 import {
 	STRENGTH_COLUMNS,
@@ -46,6 +47,8 @@ export interface ScheduleGame extends Game {
 	value: number;
 	/** The game is in at the run (its state, or its week complete on a run from before): set back. */
 	played: boolean;
+	/** The current week's game as the run read it (Lane 223, B187): absent on every other week. */
+	stated?: StatedGame;
 }
 
 /** A club's hero figures: its strength, headed, its read, and its rank as a figure. */
@@ -63,6 +66,8 @@ export interface ClubSchedule {
 	games: ScheduleGame[];
 	/** "2026 schedule, weeks 1 to 5 and week 6's Thursday game are played, so faded". */
 	scheduleCaption: string;
+	/** The week whose games say their state and the run's read (Lane 223): absent with none. */
+	current?: CurrentWeek;
 }
 
 /** One club's row of the grid with no link: the page adds its club's address. */
@@ -86,6 +91,8 @@ export interface ScheduleGrid {
 	strengthLabel: string | null;
 	/** The last complete week, 0 before the first kickoff: the grid's week heads set back. */
 	played: number;
+	/** The week whose cells say their game's state and the run's read (Lane 223): absent with none. */
+	current?: CurrentWeek;
 }
 
 /** The strength each slate shows, keyed by club (Lane 80). */
@@ -166,7 +173,8 @@ export function clubSchedule(
 	club: Club,
 	loaded: Schedule,
 	played: Reach,
-	underway: boolean
+	underway: boolean,
+	current: CurrentWeek | null = null
 ): ClubSchedule {
 	const slate = slateOf(loaded, club.abbr);
 	const views = viewsOf(loaded, underway);
@@ -182,13 +190,23 @@ export function clubSchedule(
 						note: readWords(view),
 						hardest: hardestFigure(view.rank, views.size)
 					},
-		games: slate.games.map((game) => ({
-			...game,
-			value: opponentValue(loaded, game.opponent),
-			played: isPlayed(game, played)
-		})),
-		scheduleCaption: `${String(loaded.season)} schedule${fadedWords === '' ? '' : `, ${fadedWords}`}`
+		games: slate.games.map((game) =>
+			withStated(
+				{ ...game, value: opponentValue(loaded, game.opponent), played: isPlayed(game, played) },
+				statedGame(game, current)
+			)
+		),
+		scheduleCaption: `${String(loaded.season)} schedule${fadedWords === '' ? '' : `, ${fadedWords}`}`,
+		...(current === null ? {} : { current })
 	};
+}
+
+/** A game or a cell with the run's state of its game when it carries one, else as it is. */
+function withStated<T extends object>(
+	value: T,
+	stated: StatedGame | null
+): T & { stated?: StatedGame } {
+	return stated === null ? value : { ...value, stated };
 }
 
 /** The slates in the grid's order: hardest first by the strength shown, else in the clubs' order. */
@@ -205,7 +223,8 @@ function cellOf(
 	slate: Slate,
 	week: number,
 	strong: number,
-	played: Reach
+	played: Reach,
+	current: CurrentWeek | null
 ): ScheduleCell {
 	const game = slate.games.find((candidate) => candidate.week === week);
 	if (!game) {
@@ -219,13 +238,15 @@ function cellOf(
 		};
 	}
 	const value = opponentValue(loaded, game.opponent);
+	const stated = statedGame(game, current);
 	return {
 		week,
 		opponent: game.opponent,
 		home: game.home,
 		value: fixed(value, 1),
 		hard: value >= strong,
-		played: isPlayed(game, played)
+		played: isPlayed(game, played),
+		...(stated === null ? {} : { game: stated })
 	};
 }
 
@@ -236,7 +257,8 @@ export function scheduleGrid(
 	list: readonly Club[],
 	rows: readonly BoardRow[],
 	played: Reach,
-	underway: boolean
+	underway: boolean,
+	current: CurrentWeek | null = null
 ): ScheduleGrid {
 	const lastWeek = Math.max(
 		...loaded.slates.flatMap((slate) => slate.games.map((game) => game.week))
@@ -256,6 +278,7 @@ export function scheduleGrid(
 		),
 		strengthLabel: first === undefined ? null : STRENGTH_COLUMNS[first.kind],
 		played: played.complete,
+		...(current === null ? {} : { current }),
 		rows: slates.map((slate) => {
 			const club = list.find((candidate) => candidate.abbr === slate.abbr);
 			const lead = rows.find((row) => row.team === slate.abbr);
@@ -266,7 +289,7 @@ export function scheduleGrid(
 				face: lead ? { src: lead.headshot, name: lead.name } : null,
 				rank: view?.rank ?? null,
 				strength: view === undefined ? null : strengthFigure(view.strength),
-				cells: weeks.map((week) => cellOf(loaded, slate, week, strong.floor, played))
+				cells: weeks.map((week) => cellOf(loaded, slate, week, strong.floor, played, current))
 			};
 		})
 	};

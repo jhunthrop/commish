@@ -30,7 +30,9 @@ import {
 	type ClubSchedule,
 	type ScheduleGrid
 } from '#lib/run/schedule-view.ts';
+import { currentWeek, type CurrentWeek } from '#lib/run/schedule-state.ts';
 import { winsBasis } from '#lib/run/strength-words.ts';
+import type { Reach } from '#lib/run/reach.ts';
 import { boardSeason } from '../board-season.ts';
 import {
 	adp,
@@ -134,6 +136,17 @@ export interface SchedulePage extends Omit<ScheduleGrid, 'rows'> {
 	rows: ScheduleRow[];
 }
 
+/** The week whose games the schedule says the state of, as the run read them (Lane 223, B187). */
+function currentOf(
+	loaded: Schedule,
+	played: Reach,
+	underway: boolean,
+	readAt: string
+): CurrentWeek | null {
+	const games = loaded.slates.flatMap((slate) => slate.games);
+	return currentWeek(games, played, underway, readAt);
+}
+
 export async function clubsPage(): Promise<ClubsPage> {
 	const format = await defaultFormat();
 	const [list, loaded, rows, capture, underway] = await Promise.all([
@@ -194,7 +207,7 @@ export async function clubPage(abbr: string, now: number): Promise<ClubPage> {
 	return {
 		club,
 		format,
-		...clubSchedule(club, loaded, played, underway),
+		...clubSchedule(club, loaded, played, underway, currentOf(loaded, played, underway, run.runAt)),
 		schedule: { opponentBasis: loaded.opponentBasis, season: loaded.season },
 		rows: seasoned,
 		market,
@@ -219,13 +232,15 @@ export async function clubPage(abbr: string, now: number): Promise<ClubPage> {
 
 export async function schedulePage(): Promise<SchedulePage> {
 	const format = await defaultFormat();
-	const [loaded, list, rows, played, underway] = await Promise.all([
+	const [loaded, list, rows, played, underway, run] = await Promise.all([
 		schedule(),
 		clubs(),
 		board(format.id),
 		playedReach(),
-		seasonUnderway()
+		seasonUnderway(),
+		manifest()
 	]);
-	const grid = scheduleGrid(loaded, list, rows.rows, played, underway);
+	const current = currentOf(loaded, played, underway, run.runAt);
+	const grid = scheduleGrid(loaded, list, rows.rows, played, underway, current);
 	return { ...grid, rows: grid.rows.map((row) => ({ ...row, href: links.club(row.abbr) })) };
 }

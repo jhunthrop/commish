@@ -2,11 +2,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dayTimeStamp } from './day-time.ts';
-import { BYE_WORDS, byeCell, byeLine } from './bye.ts';
+import { byeAhead, byeCell, byeLine } from './bye.ts';
 import { EMPTY_FIGURE } from './empty.ts';
 
-void test('a bye before the week the board ranks from reads Done, one ahead its week', () => {
-	assert.equal(byeCell(6, 7), BYE_WORDS.done);
+void test('a bye before the week the board ranks from draws nothing (Lane 223), one ahead its week', () => {
+	assert.equal(byeCell(6, 7), '');
 	assert.equal(byeCell(7, 7), '7');
 	assert.equal(byeCell(11, 7), '11');
 });
@@ -22,6 +22,13 @@ void test('a phone row says its bye ahead as Bye week N and nothing once it is p
 	assert.equal(byeLine(6, 7), null);
 	assert.equal(byeLine(6, null), 'Bye week 6');
 	assert.equal(byeLine(null, 7), null);
+});
+
+void test('a bye is ahead from the week the board ranks from, and never once played', () => {
+	assert.equal(byeAhead(7, 7), 7);
+	assert.equal(byeAhead(6, 7), null);
+	assert.equal(byeAhead(6, null), 6);
+	assert.equal(byeAhead(null, null), null);
 });
 
 void test('a stamp says its day, its time and its zone (C14, C24)', () => {
