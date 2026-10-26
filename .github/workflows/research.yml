@@ -326,7 +326,9 @@ jobs:
           # A store whose capsules predate the change is restamped once first (`python -m
           # research.capsules restamp-injury-day`, idempotent), or its first night rewrites the board.
           deploy nightly "research.nightly,run" "$nightly" 2 2Gi 8h
-          deploy nightly-publish "research.nightly,publish" "$publish" 1 512Mi 10m
+          # A window hour waits up to 10 minutes for this hour's status capture before it marks the run
+          # (Lane 222, research/nightly/game_day_reads.py), and may try a refused dispatch three times.
+          deploy nightly-publish "research.nightly,publish" "$publish" 1 512Mi 20m
           # The Thursday pass reads the Tank01 player list before its freeze (step player-list, Lane 160).
           weekly="$db,ODDS_API_KEY=ODDS_API_KEY:latest,CLOUDFLARE_API_TOKEN=CLOUDFLARE_API_TOKEN:latest,TANK01_API_KEY=TANK01_API_KEY:latest"
           deploy inseason "research.inseason,--task,season-week" "$weekly" 2 2Gi 1h

@@ -34,6 +34,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
@@ -49,6 +50,7 @@ from research.db.url import database_url_from_env
 from research.logging_setup import configure_logging
 from research.nightly.capsule_step import CapsuleStepPlan, night_facts
 from research.nightly.designations import Hour, finish_marks, mark_public_runs
+from research.nightly.game_day_reads import GameDayHour, game_day_hour
 from research.nightly.publish import Dispatcher, publish
 from research.nightly.published_board import SyncOutcome, failed, sync_published_board
 from research.nightly.r2 import run_store
@@ -93,6 +95,11 @@ def _publish(args: argparse.Namespace) -> int:
         with httpx.Client(timeout=60.0) as http:
             store = _store(args, http)
             dispatcher = None if args.no_dispatch else Dispatcher.from_environ(http, os.environ)
+            # Before a kickoff window, this hour's status capture first (Lane 222 fix round 1), so the
+            # window's build takes it.
+            day = GameDayHour(None) if engine is None else game_day_hour(engine, now, time.sleep, now_ms)
+            if day.line is not None:
+                _line(day.line)
             # The injury capture is written beside the public and the early run first (Lane 63), so a
             # build the pointer step dispatches already reads it.
             marked = mark_public_runs(engine, store, now)
@@ -103,7 +110,9 @@ def _publish(args: argparse.Namespace) -> int:
             # an earlier hour is made good now, and an unmoved pointer costs one row read.
             synced = _sync_table(args, engine, store, now)
             _line(synced.line)
-            finished = finish_marks(engine if synced.ok else None, store, marked, Hour(dispatcher, outcome, now))
+            finished = finish_marks(
+                engine if synced.ok else None, store, marked, Hour(dispatcher, outcome, now, day.window)
+            )
             for step in finished:
                 _line(step.line)
     finally:

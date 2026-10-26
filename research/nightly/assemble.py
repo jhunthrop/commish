@@ -275,8 +275,7 @@ def _served_week(
     statuses = {board_id: status_word(read, board_id) for board_id, _ in ids}
     reads = served_week_reads(conn, PRODUCT_SEASON, week, sorted({uid for _, uid in ids}))
     projections = served_projections(published_projections(conn, PRODUCT_SEASON, [week], as_of), week)
-    checked = None if read is None else (read.checked_at or read.read_at)
-    return pages.ServedWeek(reads, statuses, as_of, projections, checked)
+    return pages.ServedWeek(reads, statuses, as_of, projections)
 
 
 def served_projections(read: Mapping[tuple[str, int], PublishedProjection], week: int) -> Mapping[str, float] | None:

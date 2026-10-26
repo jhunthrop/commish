@@ -7305,7 +7305,7 @@ export interface operations {
 					 *         "run_id": "2026-10-21T12-ros",
 					 *         "designations": {
 					 *           "readAt": "2026-10-14T02:03:35.613Z",
-					 *           "checkedAt": null,
+					 *           "checkedAt": "2026-10-25T16:04:10.000Z",
 					 *           "players": {
 					 *             "2991662": {
 					 *               "status": "injured_reserve",

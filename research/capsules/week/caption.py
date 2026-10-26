@@ -1,8 +1,10 @@
 """THE READ'S CAPTIONS ON THE PAGE (Lane 66h): when it was written, in Central time, and the week it is for;
 and, for a read his status has moved past, when the new one is due.
 
-"Written Fri Oct 16, 9:00 pm CT, for week 6", the page's one stamp format (Lane 139, C12), with the status
-read the run serves it against when that is newer ("Status read again ..., no change", C13). A read written
+"Written Fri Oct 16, 9:00 pm CT, for week 6", the page's one stamp format (Lane 139, C12). The status read
+it stands on is not named here: the run is built once a night, so a stamp baked into it was thirteen hours old at
+the Sunday 1 pm games (Lane 222, B186); the web names the status read its own build took, and the next one
+(`web/src/lib/player/read-byline.ts`), from `designations.json` and the run's schedule. A read written
 against another status than his current one is withheld behind "His status changed since this read was
 written. A new read is due by Sun Oct 18, 1:00 am CT." (the re-review's F5): the hourly pass after the
 status capture writes it (`HOURLY_PASS_HOURS_ET`, the capture's schedule in `infra/research-schedule.sh`).
@@ -20,14 +22,10 @@ EASTERN: Final = ZoneInfo("America/New_York")
 HOURLY_PASS_HOURS_ET: Final = (0, 2, *range(6, 24))
 
 
-def written_caption(written_at: datetime, week: int, status_read: datetime | None = None) -> str:
+def written_caption(written_at: datetime, week: int) -> str:
     """The caption for a read written at `written_at` for `week`, in the page's one stamp format (Lane 139,
-    C12). With the status read the run serves it against (`status_read`) newer than the write, it says so
-    (C13): a read whose status moved is withheld (`status_changed_caption`), so the newer read found none."""
-    written = f"Written {central_stamp(written_at)}, for week {week}"
-    if status_read is None or status_read <= written_at:
-        return written
-    return f"{written}. Status read again {central_stamp(status_read)}, no change"
+    C12)."""
+    return f"Written {central_stamp(written_at)}, for week {week}"
 
 
 def next_hourly_pass(after: datetime) -> datetime:
