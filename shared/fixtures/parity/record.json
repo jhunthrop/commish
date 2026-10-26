@@ -2793,7 +2793,8 @@
 				"orders": [
 					{
 						"week": 7,
-						"order": "Our rest-of-season order, set Oct 22"
+						"order": "Our rest-of-season order, set Oct 22",
+						"caption": "Our rest-of-season order, set Oct 22, graded Wed Oct 28"
 					}
 				],
 				"front": {
@@ -3783,7 +3784,8 @@
 				"orders": [
 					{
 						"week": 7,
-						"order": "Our rest-of-season order, set Oct 22"
+						"order": "Our rest-of-season order, set Oct 22",
+						"caption": "Our rest-of-season order, set Oct 22, graded Wed Oct 28"
 					}
 				],
 				"front": {

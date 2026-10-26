@@ -11,6 +11,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { captureShort } from "../../web/src/lib/format/designation.ts";
 import { appByeCell } from "./apps-pending-words.ts";
+import { byeLine } from "../../web/src/lib/format/bye.ts";
 import { carriesGap } from "../../web/src/lib/format/gap.ts";
 import { fixed, plural } from "../../web/src/lib/format/number.ts";
 import { adpDrafts } from "../../web/src/lib/run/adp-drafts.ts";
@@ -263,6 +264,16 @@ async function runCase(run: BoardRun): Promise<unknown> {
       board.rows.map((row) => [row.id, heatFor(row.vor, row.vorRound)]),
     ),
     views: await viewsOf(run, manifest, format),
+    // The web's phone bye beside the club (Row.svelte byeLine: "Bye week 11", nothing once played),
+    // which Android's parity holds it to since Lane 231 while `byes` stays iOS's until Lane 232.
+    webPending: {
+      byes: Object.fromEntries(
+        listed.map((row) => [
+          row.id,
+          byeLine(byes.get(row.team) ?? null, format.rosFromWeek ?? null),
+        ]),
+      ),
+    },
   };
 }
 

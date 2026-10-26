@@ -279,6 +279,19 @@ function pairCase(
 	const call = verdict(contender(first), contender(second), format.label);
 	if (call.kind === 'same') return { a: a.id, b: b.id, format: format.id, kind: 'same' };
 	const rows = compareRows(call.leader.side, call.other.side, files.manifest.season, underway);
+	// The Bye row as the page draws it, from the format's rest-of-season week (Lane 223): a played bye
+	// blank, the row gone when both are played. Android's parity holds it since Lane 231; the live
+	// rows stay the full season's, as iOS draws them, until Lane 232.
+	const pageBye =
+		compareRows(
+			call.leader.side,
+			call.other.side,
+			files.manifest.season,
+			underway,
+			format.rosFromWeek ?? null
+		)
+			.find((row) => row.label === 'Bye')
+			?.cells.map((cell) => cell.text) ?? null;
 	const basis = compareBasis(files, format, underway);
 	const showsGap = rows.some((row) => row.label === 'Gap');
 	return {
@@ -298,7 +311,8 @@ function pairCase(
 				tone: cell.tone ?? null
 			}))
 		})),
-		basis: basis.filter((part) => showsGap || !part.gap).map((part) => part.text)
+		basis: basis.filter((part) => showsGap || !part.gap).map((part) => part.text),
+		webPending: { bye: pageBye }
 	};
 }
 
@@ -423,7 +437,7 @@ const PENDING_ZONE = 'America/Chicago';
 
 /** The web's own reference sentences from Lane 223, which the apps do not check yet (review M4): the
  * current week's game states and the run's read on the schedule and a club, each club's meta line and
- * the club section's two heads. B224 holds the apps to them when it ports the screens. */
+ * the club section's two heads. Android's parity holds it to them since Lane 231; iOS follows in Lane 232. */
 function webPending(files: RunFiles, underway: boolean, played: Reach) {
 	const [format] = files.manifest.formats;
 	const games = files.schedule.slates.flatMap((slate) => slate.games);
