@@ -27,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
@@ -85,6 +86,7 @@ fun MockRoomView(
     Column(
         Modifier
             .fillMaxSize()
+            .swallowTouches()
             .background(CommishTheme.colors.bg)
             .statusBarsPadding()
             .navigationBarsPadding(),
@@ -149,6 +151,15 @@ fun MockRoomView(
         })
     }
 }
+
+/** The room over the shell takes every touch its own controls leave, so none reaches the shell's bars under
+ * it (the rehearsal's tap on the room's top bar opened the Account beneath). */
+private fun Modifier.swallowTouches(): Modifier =
+    pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) awaitPointerEvent().changes.forEach { it.consume() }
+        }
+    }
 
 /** Back while drafting asks first: the draft stays on the account, and the way back to it. */
 @Composable

@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -215,6 +216,9 @@ fun Shell(
 
     CompositionLocalProvider(LocalPlayerSheet provides sheet) {
         Scaffold(
+            // Under the room full screen the shell is out of reach, to touch (the room takes it) and to a
+            // screen reader.
+            modifier = if (mockRoom != null) Modifier.clearAndSetSemantics {} else Modifier,
             containerColor = CommishTheme.colors.bg,
             topBar = {
                 if (signedIn) {
