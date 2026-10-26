@@ -10,6 +10,14 @@ import { test } from 'node:test';
 import { parse } from 'yaml';
 import { z } from 'zod';
 import { POSITIONS } from '#lib/types/player.ts';
+import { stampAt } from '#lib/format/clock.ts';
+import { printTenth } from '#lib/league/box/box.ts';
+import {
+	CAPTION_ZONE,
+	movedByline,
+	scheduleKickoffs,
+	standingByline
+} from '#lib/player/read-byline.ts';
 import { MARKET_POSITIONS, splitIndex } from './market.ts';
 import { runReach } from './reach.ts';
 import {
@@ -49,6 +57,7 @@ import {
 	slateSchema,
 	weekReadSchema,
 	weeklyRecordSchema,
+	type WeekRead,
 	windowSchema
 } from './schema.ts';
 import { gameLogRowSchema, priorSeasonSchema, seasonSchema, statLineSchema } from './season.ts';
@@ -395,6 +404,35 @@ void test("the player's and the record's examples carry every optional block the
 	for (const key of ['weekly', 'draft']) assert.ok(record[key], key);
 	const statuses = new Set(list(record.weeks).map((week) => (week as { status: string }).status));
 	for (const status of ['graded', 'frozen', 'missed']) assert.ok(statuses.has(status), status);
+});
+
+void test("the read's byline is drawn from the API's answers alone, as the apps draw it (Lane 222)", () => {
+	// The figure the read was written at and its stamp ride on /run/players; the status read the byline
+	// names is /run/designations' check; the next read is from /run/schedule's kickoffs.
+	const { player } = exampleData('/run/players/{id}') as { player: { weekRead: WeekRead } };
+	const read = weekReadSchema.parse(player.weekRead);
+	assert.equal(typeof read.projection, 'number');
+	const { designations } = exampleData('/run/designations') as { designations: unknown };
+	const capture = designationsSchema.omit({ source: true }).parse(designations);
+	const { schedule } = exampleData('/run/schedule') as { schedule: { slates: unknown } };
+	const slates = list(schedule.slates).map((slate) => slateSchema.parse(slate));
+	const written = Date.parse(read.writtenAt);
+	const byline = standingByline(
+		read,
+		Date.parse(capture.checkedAt ?? capture.readAt),
+		scheduleKickoffs(slates),
+		written
+	);
+	assert.ok(
+		byline.startsWith(
+			`Written ${stampAt(read.writtenAt, CAPTION_ZONE)}, for week ${String(read.week)}`
+		),
+		byline
+	);
+	assert.equal(
+		movedByline(read.writtenAt, printTenth(read.projection ?? 0), '24.2'),
+		`Written ${stampAt(read.writtenAt, CAPTION_ZONE)} at ${printTenth(read.projection ?? 0)}; the published projection has moved to 24.2 since`
+	);
 });
 
 void test('the walker refuses a member the API does not name, at any depth', () => {

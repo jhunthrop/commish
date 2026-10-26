@@ -1,15 +1,18 @@
 /** The week-ahead read beside the card (Lane 66v). The read quotes the published projection it was
  * written with, in PPR, as the card prints it (the run's `projection`); while his game is still to come
  * and the week's published projection has moved from it by the Proj change tile's threshold (card.ts
- * projectionMoved, Lane 162), the read is withheld behind the run's words for it (`movedCaption`). From kickoff through final the read written for the week stands whatever the
- * card prints (Lane 158), and a read the run withheld says it was not written for this game (Lane 160).
+ * projectionMoved, Lane 162), the read is withheld behind the run's words for it (`movedCaption`). From kickoff through final the read written for the week stands
+ * (Lane 158), its byline marked with the figure it was written at and the card's when that moved past the
+ * threshold (Lane 222, B185), and a read the run withheld says it was not written for this game (Lane 160).
  * A withheld read is its caption alone, never under the not-written line, which
  * is said only when the run holds no read for him (Lane 158). The figures are the run's and the API's,
  * each rounded once there: this only compares them. */
 import type { components } from '#lib/api/types.ts';
 import type { GameHead } from '#lib/league/box/kickoff.ts';
 import type { WeekRead } from '#lib/run/schema.ts';
+import { printTenth } from '#lib/league/box/box.ts';
 import { CARD, projectionMoved } from './card.ts';
+import { movedByline } from './read-byline.ts';
 
 /** His game's state at the screen's clock, by the screen's one rule (kickoff.ts lineState), null for
  * a bye or a week with no game held. */
@@ -58,12 +61,30 @@ export function movedPastRead(
 	return projectionMoved(card.points, read.projection);
 }
 
+/** The figures a read under way is marked with (Lane 222, B185): the one it quotes and the one the card
+ * holds as of his kickoff, when they are a move past the tile's threshold apart; null otherwise. From
+ * kickoff the read stands, so a move is said in its byline, never silent. */
+function movedUnderway(
+	read: Pick<WeekRead, 'projection' | 'week'>,
+	card: CardProjection | null
+): { quoted: number; now: number } | null {
+	if (card?.scoring !== 'ppr' || card.week !== read.week || !underway(card.state)) return null;
+	const quoted = read.projection;
+	if (quoted === null || quoted === undefined || card.points === null) return null;
+	return projectionMoved(card.points, quoted) ? { quoted, now: card.points } : null;
+}
+
 /** The read as the page shows it beside the card's live projection (null until the card has read). */
 export function shownWeekRead(read: WeekRead, card: CardProjection | null): ShownRead {
 	// A read the run already withheld keeps the run's caption (a status change says when the new one is
 	// due) while his game is to come; from kickoff through final that due time has passed, so the place
 	// says no read was written for this game (Lane 160, B140).
 	if (read.body === null) return { withheld: true, words: withheldWords(read, card) };
+	const moved = movedUnderway(read, card);
+	if (moved !== null) {
+		const caption = movedByline(read.writtenAt, printTenth(moved.quoted), printTenth(moved.now));
+		return { withheld: false, body: read.body, caption };
+	}
 	const built = { withheld: false, body: read.body, caption: read.caption } as const;
 	// One threshold with the Proj change tile (Lane 162, D04): a move under it shows the read.
 	return movedPastRead(read, card) && read.movedCaption !== undefined
