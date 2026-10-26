@@ -631,7 +631,7 @@ public enum Words {
         public static let gradesLater = "grades when the stats land"
         public static let setUnknown = "set before its first kickoff"
         public static let espnBasis = "ESPN's is its own public PPR projection, read before the week's first kickoff."
-        public static let espnReadAfter = "ESPN's projection this week was read after our weekly rankings were set, still before the first kickoff."
+        public static let espnReadAfter = "ESPN's projection this week was read after our rest-of-season order was set, still before the first kickoff."
         public static let espnUnread = "ESPN's projection was not read before this week's first kickoff, so the week is graded against the week's published projection alone."
         public static let noYardstick = "No yardstick was read before this week's first kickoff, so the week is graded on its own order alone."
         public static let waiting = "This record is written by the next nightly run."

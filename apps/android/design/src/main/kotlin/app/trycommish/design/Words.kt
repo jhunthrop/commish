@@ -633,7 +633,7 @@ object Words {
         const val gradesLater = "grades when the stats land"
         const val setUnknown = "set before its first kickoff"
         const val espnBasis = "ESPN's is its own public PPR projection, read before the week's first kickoff."
-        const val espnReadAfter = "ESPN's projection this week was read after our weekly rankings were set, still before the first kickoff."
+        const val espnReadAfter = "ESPN's projection this week was read after our rest-of-season order was set, still before the first kickoff."
         const val espnUnread = "ESPN's projection was not read before this week's first kickoff, so the week is graded against the week's published projection alone."
         const val noYardstick = "No yardstick was read before this week's first kickoff, so the week is graded on its own order alone."
         const val waiting = "This record is written by the next nightly run."

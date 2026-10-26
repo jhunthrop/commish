@@ -76,7 +76,7 @@ export const RECORDS_WORDS = {
 	 * for the copy guard and the stand-in run only: the page prints a week's espnNote as the run wrote
 	 * it, never these. */
 	espnReadAfter:
-		"ESPN's projection this week was read after our weekly rankings were set, still before the first kickoff.",
+		"ESPN's projection this week was read after our rest-of-season order was set, still before the first kickoff.",
 	espnUnread:
 		"ESPN's projection was not read before this week's first kickoff, so the week is graded against the week's published projection alone.",
 	noYardstick:
