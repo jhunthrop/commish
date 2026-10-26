@@ -36,7 +36,9 @@ fi
 if [[ "$(xcode-select -p)" == *CommandLineTools* ]]; then
   local_xcode="Command Line Tools"
 else
-  local_xcode="$(xcodebuild -version | head -n 1)"
+  # Read whole, then cut: xcodebuild aborts on a pipe a reader such as head closes early.
+  local_xcode="$(xcodebuild -version)"
+  local_xcode="${local_xcode%%$'\n'*}"
 fi
 swift_version="$(swift --version 2>&1 | grep -o 'Swift version [0-9.]*')"
 echo "== Toolchain: $local_xcode, $swift_version, rendering on macOS $(sw_vers -productVersion); CI pins Xcode $pinned"
