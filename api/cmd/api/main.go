@@ -143,10 +143,14 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	leagueStore := &leagues.Store{Pool: pool}
 	sheetStore := &sheets.Store{Pool: pool}
 
-	deviceService := &devices.Service{Store: deviceStore, Tokens: bearer, CodeKey: codeKey, Now: now, Log: log}
+	idp := auth.NewWorkOS(cfg.WorkOS.APIKey, cfg.WorkOS.ClientID, cfg.WorkOS.RedirectURI)
+	deviceService := &devices.Service{
+		Store: deviceStore, Tokens: bearer, CodeKey: codeKey, Now: now, Log: log,
+		IdP: idp, SignedOutURL: cfg.HTTP.PublicBaseURL + auth.SignedOutPath,
+	}
 	authHandler := &auth.Handler{
 		Store: authStore, Sessions: sessions, Viewer: viewer, Names: nameFilter, StateSealer: stateSealer,
-		IdP:           auth.NewWorkOS(cfg.WorkOS.APIKey, cfg.WorkOS.ClientID, cfg.WorkOS.RedirectURI),
+		IdP:           idp,
 		PublicBaseURL: cfg.HTTP.PublicBaseURL, TrustedHops: cfg.HTTP.TrustedProxyHops, Now: now, Log: log,
 		Anon: anon, Claimer: mockStore, AppCodes: deviceService,
 	}

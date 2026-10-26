@@ -57,16 +57,22 @@ var (
 
 // Repository is the part of Store the handlers use.
 type Repository interface {
-	PutCode(ctx context.Context, accountID uuid.UUID, b Binding, hash []byte, expires time.Time) error
+	PutCode(ctx context.Context, accountID uuid.UUID, b Binding, hash []byte, expires time.Time, workosSID string) error
 	Pair(ctx context.Context, code []byte, b Binding, name string, tokenHash []byte, scopes []auth.Scope, now time.Time) (uuid.UUID, Device, error)
 	List(ctx context.Context, accountID uuid.UUID) ([]Device, error)
 	Get(ctx context.Context, accountID, id uuid.UUID) (Device, error)
-	Revoke(ctx context.Context, accountID, id uuid.UUID, now time.Time) error
+	Revoke(ctx context.Context, accountID, id uuid.UUID, now time.Time) (string, error)
 }
 
 // Minter mints device tokens. *auth.Bearer implements it.
 type Minter interface {
 	Mint() (token string, hash []byte)
+}
+
+// LogoutURLs builds the URL that ends a WorkOS session. auth's
+// IdentityProvider (WorkOS) implements it.
+type LogoutURLs interface {
+	LogoutURL(sessionID, returnTo string) (string, error)
 }
 
 // Service serves the device routes.
@@ -75,8 +81,12 @@ type Service struct {
 	Tokens Minter
 	// CodeKey keys the pairing codes' stored hashes (PurposeCodes).
 	CodeKey []byte
-	Now     func() time.Time
-	Log     *slog.Logger
+	// IdP and SignedOutURL answer an app's own sign-out with the WorkOS
+	// logout URL, returning to SignedOutURL; a nil IdP answers url null.
+	IdP          LogoutURLs
+	SignedOutURL string
+	Now          func() time.Time
+	Log          *slog.Logger
 }
 
 // Routes is every route this package serves.
@@ -92,14 +102,15 @@ func (s *Service) Routes() []httpx.Route {
 }
 
 // issue stores a fresh code under its binding on the account, replacing
-// its earlier code, and answers it with when it ends.
-func (s *Service) issue(ctx context.Context, accountID uuid.UUID, b Binding) (string, time.Time, error) {
+// its earlier code, and answers it with when it ends. workosSID rides on
+// an app's code to its device.
+func (s *Service) issue(ctx context.Context, accountID uuid.UUID, b Binding, workosSID string) (string, time.Time, error) {
 	code, err := NewCode()
 	if err != nil {
 		return "", time.Time{}, err
 	}
 	expires := s.Now().Add(CodeTTL)
-	if err := s.Store.PutCode(ctx, accountID, b, codeHash(s.CodeKey, code), expires); err != nil {
+	if err := s.Store.PutCode(ctx, accountID, b, codeHash(s.CodeKey, code), expires, workosSID); err != nil {
 		return "", time.Time{}, err
 	}
 	return code, expires, nil
@@ -107,21 +118,22 @@ func (s *Service) issue(ctx context.Context, accountID uuid.UUID, b Binding) (st
 
 // AppCode is the code an app's sign-in hands back to the app (auth's
 // callback): good for one device of that app's kind, for ten minutes,
-// and only with the verifier behind challenge.
-func (s *Service) AppCode(ctx context.Context, accountID uuid.UUID, kind auth.DeviceKind, challenge string) (string, error) {
+// and only with the verifier behind challenge. The device it pairs keeps
+// workosSID, the WorkOS session the sign-in began.
+func (s *Service) AppCode(ctx context.Context, accountID uuid.UUID, kind auth.DeviceKind, challenge, workosSID string) (string, error) {
 	if !kind.IsApp() {
 		return "", errNotAnApp
 	}
 	if !auth.ValidChallenge(challenge) {
 		return "", errNoChallenge
 	}
-	code, _, err := s.issue(ctx, accountID, Binding{Kind: kind, Challenge: challenge})
+	code, _, err := s.issue(ctx, accountID, Binding{Kind: kind, Challenge: challenge}, workosSID)
 	return code, err
 }
 
 // code is the account page's code, for the extension.
 func (s *Service) code(w http.ResponseWriter, r *http.Request) {
-	code, expires, err := s.issue(r.Context(), auth.AccountID(r), Binding{Kind: auth.KindExtension})
+	code, expires, err := s.issue(r.Context(), auth.AccountID(r), Binding{Kind: auth.KindExtension}, "")
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "devices: code", err)
 		return
@@ -210,7 +222,7 @@ func (s *Service) revoke(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	err := s.Store.Revoke(r.Context(), auth.AccountID(r), id, s.Now())
+	workosSID, err := s.Store.Revoke(r.Context(), auth.AccountID(r), id, s.Now())
 	if errors.Is(err, ErrNotFound) {
 		httpx.WriteNotFound(w, r)
 		return
@@ -219,7 +231,27 @@ func (s *Service) revoke(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, s.Log, "devices: revoke", err)
 		return
 	}
+	if dev, ok := auth.DeviceFrom(r.Context()); ok && dev.ID == id {
+		httpx.WriteOK(w, r, http.StatusOK, apitypes.DeviceSignOut{Url: s.logoutURL(r, workosSID)})
+		return
+	}
 	httpx.WriteOK(w, r, http.StatusOK, nil)
+}
+
+// logoutURL is the WorkOS logout URL for an app's own sign-out, nil when
+// the device kept no WorkOS session or the URL cannot be built (logged:
+// the device is unpaired either way, and the app's sheet keeps no
+// cookies).
+func (s *Service) logoutURL(r *http.Request, workosSID string) *string {
+	if workosSID == "" || s.IdP == nil {
+		return nil
+	}
+	u, err := s.IdP.LogoutURL(workosSID, s.SignedOutURL)
+	if err != nil {
+		s.Log.Warn("devices: logout url", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+		return nil
+	}
+	return &u
 }
 
 func (s *Service) me(w http.ResponseWriter, r *http.Request) {
