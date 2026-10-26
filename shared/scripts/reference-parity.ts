@@ -54,7 +54,19 @@ import { compareRows, type Side } from '../../web/src/lib/site/compare-rows.ts';
 import { firstStep } from '../../web/src/lib/site/compare-words.ts';
 import type { PlayerData } from '../../web/src/lib/site/player-data.ts';
 import { absentWords } from '../../web/src/lib/site/absent.ts';
-import { CLUB_PAGE, SCHEDULE_PAGE, filled } from '../../web/src/lib/site/reference-words.ts';
+import {
+	CLUB_ORDER,
+	CLUB_PAGE,
+	SCHEDULE_PAGE,
+	clubMeta,
+	filled
+} from '../../web/src/lib/site/reference-words.ts';
+import {
+	asOfLine,
+	currentWeek,
+	stateWord,
+	statedGame
+} from '../../web/src/lib/run/schedule-state.ts';
 import { verdict } from '../../web/src/lib/site/verdict.ts';
 import { heatFor } from '../../web/src/lib/ui/heat.ts';
 import { REPOSITORY } from './generated.ts';
@@ -406,6 +418,41 @@ async function clubCases(
 	};
 }
 
+/** The zone the pending sentences are said in, the fixtures' own (board-run-parity.ts ZONE). */
+const PENDING_ZONE = 'America/Chicago';
+
+/** The web's own reference sentences from Lane 223, which the apps do not check yet (review M4): the
+ * current week's game states and the run's read on the schedule and a club, each club's meta line and
+ * the club section's two heads. B224 holds the apps to them when it ports the screens. */
+function webPending(files: RunFiles, underway: boolean, played: Reach) {
+	const [format] = files.manifest.formats;
+	const games = files.schedule.slates.flatMap((slate) => slate.games);
+	const current = currentWeek(games, played, underway, files.manifest.runAt);
+	const fromWeek = format?.rosFromWeek ?? null;
+	return {
+		current,
+		asOf: current === null ? null : asOfLine(current, PENDING_ZONE),
+		states: files.schedule.slates.flatMap((slate) =>
+			slate.games.flatMap((game) => {
+				const stated = statedGame(game, current);
+				return stated === null
+					? []
+					: [{ abbr: slate.abbr, week: game.week, word: stateWord(stated, PENDING_ZONE) }];
+			})
+		),
+		clubMeta: files.clubs.map((club) => ({
+			abbr: club.abbr,
+			meta: clubMeta(club.abbr, club.bye, fromWeek)
+		})),
+		clubHead: {
+			board: filled(CLUB_PAGE.onBoard, format?.label ?? ''),
+			order: CLUB_ORDER.onOrder,
+			nobodyBoard: CLUB_PAGE.nobody,
+			nobodyOrder: CLUB_ORDER.nobody
+		}
+	};
+}
+
 async function runCase(run: ReferenceRun) {
 	const files = await filesOf(run);
 	const underway = underwayOf(files);
@@ -418,7 +465,8 @@ async function runCase(run: ReferenceRun) {
 		played,
 		adp: await adpCases(run, files, underway),
 		compare: compareCases(files, underway),
-		...(await clubCases(run, files, underway, played))
+		...(await clubCases(run, files, underway, played)),
+		webPending: webPending(files, underway, played)
 	};
 }
 

@@ -1,4 +1,4 @@
-import type { StatedGame } from '#lib/run/schedule-state.ts';
+import type { RunStatedGame } from '#lib/run/schedule-state.ts';
 
 /** One club's row of the schedule grid, every value already in the words and digits it prints. */
 export interface ScheduleCell {
@@ -13,7 +13,7 @@ export interface ScheduleCell {
 	/** The game is in at the run (Lane 80): set back, so what is left reads first. */
 	played: boolean;
 	/** The current week's game as the run read it (Lane 223, B187): absent on every other week. */
-	game?: StatedGame;
+	game?: RunStatedGame;
 }
 
 export interface ScheduleRow {

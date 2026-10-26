@@ -4,11 +4,10 @@
 import { EMPTY_FIGURE } from './empty.ts';
 
 export const BYE_WORDS = {
-	/** The apps' word for a played bye (shared/words/bye.json, BoardCells), until their lane follows
-	 * the web's empty cell (Lane 223); the web draws nothing there. */
-	done: 'Done',
 	/** A phone row's bye beside his club, where the Bye column gives way (Lane 209): "Bye week 11". */
-	week: (week: number) => `Bye week ${String(week)}`
+	week: (week: number) => `Bye week ${String(week)}`,
+	/** A club's bye where the run names none, in the same form (Lane 223 review L3). */
+	notSet: 'Bye week not set'
 } as const;
 
 /** The bye still ahead of the week the board ranks from, null once played or when the run names none.
