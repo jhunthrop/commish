@@ -86,7 +86,7 @@ object LineRead {
         val held =
             (read == GameRead.Final && cell?.state == GameStateCell.State.final) ||
                 (read == GameRead.KickedOff && cell?.state == GameStateCell.State.kicked_off)
-        return if (held && cell != null) cell.word else own
+        return if (held) cell.word else own
     }
 
     /** Kicked off or final by its field. */

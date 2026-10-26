@@ -8,7 +8,8 @@ import java.io.File
 /** One place decides the display face's cut (NumWeight): the roles keep iOS's CSS numbers, and no
  * screen's source sets a weight on a display-face style or reaches for a variation of its own. */
 class FaceWeightTest {
-    private val android = File(System.getProperty("repository")).resolve("apps/android")
+    private val repository = requireNotNull(System.getProperty("repository")) { "the build sets the repository property" }
+    private val android = File(repository).resolve("apps/android")
 
     @Test
     fun `the roles are iOS's CSS numbers and each draws heavier than it asks`() {
