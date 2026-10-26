@@ -1,10 +1,9 @@
-// The week read's byline (Lane 222, B185 and B186), at fixed clocks on the 2026 week 7 Sunday (Eastern
+// The week read's byline (Lane 222, B186), at fixed clocks on the 2026 week 7 Sunday (Eastern
 // daylight time, Central five hours behind UTC). Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Slate } from '#lib/run/schema.ts';
 import {
-	movedByline,
 	nextReadWindow,
 	readHour,
 	READ_BUILD_LEAD_MS,
@@ -91,13 +90,6 @@ void test('a standing read names its write, the status read its build took and t
 	assert.equal(
 		standingByline({ writtenAt: '2026-10-17T02:00:00.000Z', week: 6 }, null, [], 0),
 		'Written Fri Oct 16, 9:00 pm CT, for week 6'
-	);
-});
-
-void test("a read under way whose projection moved names the figure it was written at and the card's", () => {
-	assert.equal(
-		movedByline(BIJAN.writtenAt, 21.4, 24.2),
-		'Written Fri Oct 23, 12:31 am CT at 21.4; the published projection has moved to 24.2 since'
 	);
 });
 

@@ -1,6 +1,5 @@
-/** The week read's byline (Lane 222): when it was written, the status read it stands on and the next one
- * (B186), and, once his game is under way, the figure it was written at beside the one the card holds when
- * the published projection moved past the Proj change tile's threshold since (B185).
+/** The week read's byline (Lane 222, B186): when it was written, the status read it stands on and the
+ * next one.
  *
  * The run is built once a night, so it names the write alone (`capsules/week/caption.py written_caption`):
  * a status read stamp baked into it was thirteen hours old at the Sunday 1 pm games. The page names the
@@ -9,7 +8,6 @@
  * on a newer read (`research/nightly/game_day_reads.py`), the last whole hour more than READ_BUILD_LEAD_MS
  * before the window's first kickoff. Pure, every clock passed in. */
 import { kickoffAt, stampAt } from '#lib/format/clock.ts';
-import { fixed } from '#lib/format/number.ts';
 import type { Slate, WeekRead } from '#lib/run/schema.ts';
 
 /** The zone the read's byline is said in, as the run says its write (`capsules/week/sheet.py CENTRAL`). */
@@ -27,10 +25,7 @@ export const READ_BYLINE = {
 	next: (kickoff: string, games: number): string =>
 		`next before the ${kickoff} ${gamesWord(games)}`,
 	nextAlone: (kickoff: string, games: number): string =>
-		`Next status read before the ${kickoff} ${gamesWord(games)}`,
-	/** A read under way whose published projection moved past the tile's threshold since it was written. */
-	moved: (stamp: string, quoted: string, now: string): string =>
-		`Written ${stamp} at ${quoted}; the published projection has moved to ${now} since`
+		`Next status read before the ${kickoff} ${gamesWord(games)}`
 } as const;
 
 /** The publish hour that reads before a kickoff: the last whole hour more than the build's lead before it
@@ -82,10 +77,4 @@ export function standingByline(
 	return next === null
 		? `${written}. ${status}`
 		: `${written}. ${status}; ${READ_BYLINE.next(...next)}`;
-}
-
-/** The byline of a read under way whose projection moved past the threshold: the figure it was written
- * at, the one the card holds. */
-export function movedByline(writtenAt: string, quoted: number, now: number): string {
-	return READ_BYLINE.moved(stampAt(writtenAt, CAPTION_ZONE), fixed(quoted), fixed(now));
 }

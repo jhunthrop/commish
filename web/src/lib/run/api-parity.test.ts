@@ -11,13 +11,7 @@ import { parse } from 'yaml';
 import { z } from 'zod';
 import { POSITIONS } from '#lib/types/player.ts';
 import { stampAt } from '#lib/format/clock.ts';
-import { fixed } from '#lib/format/number.ts';
-import {
-	CAPTION_ZONE,
-	movedByline,
-	scheduleKickoffs,
-	standingByline
-} from '#lib/player/read-byline.ts';
+import { CAPTION_ZONE, scheduleKickoffs, standingByline } from '#lib/player/read-byline.ts';
 import { MARKET_POSITIONS, splitIndex } from './market.ts';
 import { runReach } from './reach.ts';
 import {
@@ -407,7 +401,7 @@ void test("the player's and the record's examples carry every optional block the
 });
 
 void test("the read's byline is drawn from the API's answers alone, as the apps draw it (Lane 222)", () => {
-	// The figure the read was written at and its stamp ride on /run/players; the status read the byline
+	// The write's stamp and the figure it was written at ride on /run/players; the status read the byline
 	// names is /run/designations' check; the next read is from /run/schedule's kickoffs.
 	const { player } = exampleData('/run/players/{id}') as { player: { weekRead: WeekRead } };
 	const read = weekReadSchema.parse(player.weekRead);
@@ -428,10 +422,6 @@ void test("the read's byline is drawn from the API's answers alone, as the apps 
 			`Written ${stampAt(read.writtenAt, CAPTION_ZONE)}, for week ${String(read.week)}`
 		),
 		byline
-	);
-	assert.equal(
-		movedByline(read.writtenAt, read.projection ?? 0, 24.2),
-		`Written ${stampAt(read.writtenAt, CAPTION_ZONE)} at ${fixed(read.projection ?? 0)}; the published projection has moved to 24.2 since`
 	);
 });
 

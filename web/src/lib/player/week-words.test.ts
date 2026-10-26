@@ -1022,26 +1022,13 @@ void test('the change tile and the withhold read the move since the read was wri
 	);
 });
 
-// Lane 222 (B185): from kickoff the read stands, and a move past the tile's threshold since it was
-// written is said in its byline, the figure it was written at beside the card's as of kickoff.
-const MOVED_SHOWN = {
-	...SHOWN,
-	caption:
-		'Written Fri Oct 16, 9:00 pm CT at 21.8; the published projection has moved to 23.4 since'
-};
-
-void test('once his game has kicked off the read stands, its byline marked with the move', () => {
+void test('once his game has kicked off the read stands whatever the card now prints', () => {
 	const live = week({}, { week_projection: 23.4, facts: facts({ points_this_week: 4.6 }) });
 	assert.equal(card(live, null, KICKED_OFF).projection.state, 'kicked_off');
-	assert.deepEqual(shownAt(live, KICKED_OFF), MOVED_SHOWN);
-	// The figure it quotes, as of kickoff: the byline as built.
-	assert.deepEqual(
-		shownAt(week({}, { facts: facts({ points_this_week: 4.6 }) }), KICKED_OFF),
-		SHOWN
-	);
+	assert.deepEqual(shownAt(live, KICKED_OFF), SHOWN);
 });
 
-void test('once his game is final the read stands, its byline marked with the move', () => {
+void test('once his game is final the read stands', () => {
 	const final = week(
 		{},
 		{
@@ -1050,7 +1037,7 @@ void test('once his game is final the read stands, its byline marked with the mo
 		}
 	);
 	assert.equal(card(final, null, FINAL).projection.state, 'final');
-	assert.deepEqual(shownAt(final, FINAL), MOVED_SHOWN);
+	assert.deepEqual(shownAt(final, FINAL), SHOWN);
 });
 
 void test('with no read at all the place says it is not written, "next" only for a game to come', () => {

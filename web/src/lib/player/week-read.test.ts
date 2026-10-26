@@ -51,27 +51,10 @@ void test("before kickoff the read is withheld once the projection moves by the 
 	assert.deepEqual(shownWeekRead(READ, ppr(20, null)), { withheld: true, words: MOVED });
 });
 
-void test('from kickoff through final the read stands, its byline marked when the projection moved (Lane 158, Lane 222)', () => {
+void test('from kickoff through final the read stands whatever the card prints (Lane 158)', () => {
 	for (const state of ['kicked_off', 'final'] as const) {
-		// B185: a move past the tile's threshold is said in the byline, never silent, and never withholds.
-		assert.deepEqual(
-			shownWeekRead(READ, ppr(29.2, state)),
-			{
-				withheld: false,
-				body: READ.body,
-				caption:
-					'Written Fri Oct 16, 9:00 pm CT at 26.4; the published projection has moved to 29.2 since'
-			},
-			state
-		);
-		// Under the threshold, with no figure held, or in another scoring or week: the byline as built.
-		for (const card of [ppr(26.8, state), ppr(null, state), { ...ppr(29.2, state), week: 8 }])
-			assert.deepEqual(shownWeekRead(READ, card), BUILT, state);
-		assert.deepEqual(
-			shownWeekRead(READ, { week: 7, scoring: 'half_ppr', points: 20.1, state }),
-			BUILT,
-			state
-		);
+		assert.deepEqual(shownWeekRead(READ, ppr(4.6, state)), BUILT, state);
+		assert.deepEqual(shownWeekRead(READ, ppr(null, state)), BUILT, state);
 	}
 });
 
