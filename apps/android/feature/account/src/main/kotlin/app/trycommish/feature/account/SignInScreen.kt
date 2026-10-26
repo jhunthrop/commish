@@ -23,12 +23,15 @@ import app.trycommish.design.Mark
 import app.trycommish.design.Tokens
 
 /** The League tab signed out, where sign out returns the phone: what signing in does, and the one verb.
- * Beside the Account (as the iOS SignInView, Lane 198) so its snapshot is the signed-out return's mock. */
+ * Beside the Account (as the iOS SignInView, Lane 198) so its snapshot is the signed-out return's mock.
+ * `message` is a refusal, in the refusal red; `notice` is quiet news ("Your account is deleted"), in the
+ * basis ink as iOS draws it. */
 @Composable
 fun SignInScreen(
     message: String?,
     onSignIn: () -> Unit,
     modifier: Modifier = Modifier,
+    notice: String? = null,
 ) {
     val c = CommishTheme.colors
     Column(
@@ -42,6 +45,10 @@ fun SignInScreen(
         if (message != null) {
             Spacer(Modifier.height(Tokens.Space.s3.dp))
             Text(message, style = Faces.small, color = c.lossInk, textAlign = TextAlign.Center)
+        }
+        if (notice != null) {
+            Spacer(Modifier.height(Tokens.Space.s3.dp))
+            Text(notice, style = Faces.small, color = c.ink3, textAlign = TextAlign.Center)
         }
         Spacer(Modifier.height(Tokens.Space.s5.dp))
         Button(onClick = onSignIn, shape = RoundedCornerShape(Tokens.Radius.md.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) {

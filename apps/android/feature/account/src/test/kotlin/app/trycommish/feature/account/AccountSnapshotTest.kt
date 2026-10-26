@@ -124,10 +124,10 @@ class AccountSnapshotTest(
             return
         }
         if (part == null) {
-            val message = if (scene == Scene.Deleted) Words.DeleteAccount.doneTitle else null
+            val notice = if (scene == Scene.Deleted) Words.DeleteAccount.doneTitle else null
             paparazzi.snapshot(name = name) {
                 CommishTheme(dark = dark) {
-                    Box(Modifier.fillMaxWidth().height(phone.room)) { SignInScreen(message = message, onSignIn = {}) }
+                    Box(Modifier.fillMaxWidth().height(phone.room)) { SignInScreen(message = null, onSignIn = {}, notice = notice) }
                 }
             }
             return

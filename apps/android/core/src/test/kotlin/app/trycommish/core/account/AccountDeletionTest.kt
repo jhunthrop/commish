@@ -180,7 +180,9 @@ class AccountDeletionTest {
             assertNull(cache.read("/me"))
             assertNull(cache.read(AccountViewModel.ROUTE))
             assertFalse(state.signedIn.value)
-            assertEquals(Words.DeleteAccount.doneTitle, state.message.value)
+            // A quiet notice, never the refusal slot the sign-in screen draws in red (review M1).
+            assertEquals(Words.DeleteAccount.doneTitle, state.notice.value)
+            assertNull(state.message.value)
             // The shell rebuilds for no account (the generation and the sign-out hooks), and no logout opens.
             assertEquals(before + 1, state.generation.value)
             assertEquals(1, forgotten)
@@ -191,6 +193,7 @@ class AccountDeletionTest {
             // The next sign-in says nothing of it.
             state.signedInNow()
             assertNull(state.message.value)
+            assertNull(state.notice.value)
         }
 
     @Test
