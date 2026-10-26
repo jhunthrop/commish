@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The shell every tab shares: the top bar with the league switch, the search and the account's way
 // in, the switch's list, the player sheet frame every screen presents from a row, and the screens
 // named until their lanes land. Its snapshots, both themes at two phone sizes, are the shell's mock.
@@ -30,5 +30,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

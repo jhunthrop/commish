@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The reference screens (the web's /adp/[format], /compare, /clubs, /clubs/[abbr] and /schedule at
 // 390), built from the Board's pattern and pushed on its stack: ADP in the drafters' order beside our
 // board, two players side by side with our call, every club with its strength and lead player, a club's
@@ -38,5 +38,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

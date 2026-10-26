@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The design: tokens and words generated from shared/, the three faces, the theme, the mark and the
 // box score primitives every screen draws with. CommishSnapshotSupport renders a view to PNG and
 // compares it with the committed one: each screen's mock is its snapshot.
@@ -23,5 +23,6 @@ let package = Package(
         ),
         .target(name: "CommishSnapshotSupport", dependencies: ["CommishDesign"]),
         .testTarget(name: "CommishDesignTests", dependencies: ["CommishDesign", "CommishSnapshotSupport"]),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

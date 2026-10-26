@@ -8,7 +8,7 @@ struct WaiverPinActions {
     let press: () -> Void
     let confirm: () -> Void
     let close: () -> Void
-    let bid: (String) -> Void
+    let bid: @MainActor (String) -> Void
 
     static var none: WaiverPinActions {
         WaiverPinActions(press: {}, confirm: {}, close: {}, bid: { _ in })
@@ -65,7 +65,7 @@ struct WaiverPinView: View {
 struct BidFieldView: View {
     @Environment(\.colorScheme) private var colorScheme
     let field: BidField
-    let change: (String) -> Void
+    let change: @MainActor (String) -> Void
     let still: Bool
     @FocusState private var typing: Bool
 
