@@ -110,7 +110,7 @@ function tenths(line: PlayerLine): PlayerLine {
 	};
 }
 
-function rowOf(line: PlayerLine): Omit<OrderRow, 'rank'> {
+function rowOf(line: PlayerLine): Omit<OrderRow, 'rank' | 'overall_rank'> {
 	const id = line.player.board_id ?? '';
 	const holder = heldBy[id];
 	const roster: OrderRow['roster'] =
@@ -159,7 +159,8 @@ const out: OrderAdvice = {
 	projection_read_at: lineup.projection_read_at,
 	projection_scoring: lineup.projection_scoring,
 	total: ranked.length,
-	rows: ranked.map((line, i) => ({ rank: i + 1, ...rowOf(line) }))
+	// No byes=last here: each row's place as drawn is its place in the full order (Lane 227, B209).
+	rows: ranked.map((line, i) => ({ rank: i + 1, overall_rank: i + 1, ...rowOf(line) }))
 };
 const file = new URL('order.json', DATA);
 const text = await prettierFormat(JSON.stringify(out), {

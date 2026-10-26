@@ -19,6 +19,7 @@
 		"rows": [
 			{
 				"rank": 7,
+				"overall_rank": 8,
 				"line": {
 					"player": {
 						"host_id": "12518",
@@ -103,6 +104,7 @@
 			},
 			{
 				"rank": 9,
+				"overall_rank": 10,
 				"line": {
 					"player": {
 						"host_id": "9487",
@@ -181,6 +183,7 @@
 			},
 			{
 				"rank": 15,
+				"overall_rank": 20,
 				"line": {
 					"player": {
 						"host_id": "7526",
@@ -259,6 +262,7 @@
 			},
 			{
 				"rank": 29,
+				"overall_rank": 34,
 				"line": {
 					"player": {
 						"host_id": "12533",
@@ -343,6 +347,7 @@
 			},
 			{
 				"rank": 35,
+				"overall_rank": 40,
 				"line": {
 					"player": {
 						"host_id": "5927",
@@ -427,6 +432,7 @@
 			},
 			{
 				"rank": 42,
+				"overall_rank": 47,
 				"line": {
 					"player": {
 						"host_id": "8136",
@@ -511,6 +517,7 @@
 			},
 			{
 				"rank": 44,
+				"overall_rank": 49,
 				"line": {
 					"player": {
 						"host_id": "",
@@ -595,6 +602,7 @@
 			},
 			{
 				"rank": 55,
+				"overall_rank": 60,
 				"line": {
 					"player": {
 						"host_id": "8210",
@@ -682,6 +690,7 @@
 			},
 			{
 				"rank": 58,
+				"overall_rank": 63,
 				"line": {
 					"player": {
 						"host_id": "13301",
@@ -766,6 +775,7 @@
 			},
 			{
 				"rank": 61,
+				"overall_rank": 66,
 				"line": {
 					"player": {
 						"host_id": "",
@@ -850,6 +860,7 @@
 			},
 			{
 				"rank": 78,
+				"overall_rank": 86,
 				"line": {
 					"player": {
 						"host_id": "",
@@ -937,6 +948,7 @@
 			},
 			{
 				"rank": 117,
+				"overall_rank": 15,
 				"line": {
 					"player": {
 						"host_id": "11610",

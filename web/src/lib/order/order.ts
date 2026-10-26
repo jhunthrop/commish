@@ -30,6 +30,7 @@ import { askedHref } from '#lib/league/box/asked.ts';
 import type { OrderAdvice, OrderPosition, OrderRow, RosterMark } from './api.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
 import type { WeekPosition } from './week-head.ts';
+import { overallOf } from './overall.ts';
 import { ORDER, byeHead } from './words.ts';
 
 export { ORDER };
@@ -113,9 +114,9 @@ export interface OrderView {
 	box: BoxRow;
 	/** The week column (Lane 92, B36): his Pts once his game is final, his Proj before (weekFigure). */
 	week: number | null;
-	rank: number;
-	/** The # cell: his place, the list's short form ("IR") for a player on a season-long list, or
-	 * nothing on the week's rankings for a player on bye (Lane 163, D06). */
+	/** The # cell: his number in our full order (overallOf, Lane 234: the one number home, a club page,
+	 * compare and his page say), a bye on the week's rankings included; the list's short form ("IR")
+	 * for a player on a season-long list. */
 	place: string;
 	/** On the week's rankings, an available player whose club is on bye this week: his row sits in
 	 * the byes' section after the players who play (orderSections). */
@@ -153,7 +154,8 @@ export function rosterWords(mark: RosterMark): string {
 /** One row's view. Its key is his board id, which every row carries (the order only ranks players
  * our board places). In a position's view the # is his place there, so his pill names his position
  * alone; across positions it names his place at his position too. On the week's rankings
- * (byesApart, the Players page, Lane 163 D06) a player on bye draws no place. */
+ * (byesApart, the Players page, Lane 163 D06) a player on bye sits in the byes' section with his
+ * full-order number (Lane 234). */
 export function orderView(
 	row: OrderRow,
 	zone: string,
@@ -171,10 +173,11 @@ export function orderView(
 		hostId: row.line.player.host_id,
 		box: { ...box, key, ...gameCell(box, row.line, zone, now) },
 		week: listed ? null : weekFigure(row.line, now),
-		rank: row.rank,
 		// A player on a season-long list sits after every available one with no number (Lane 128 fix
-		// round 1): his # cell reads the list's short form. A bye on the week's rankings has none.
-		place: listed ? (box.status?.rank ?? '') : bye ? '' : String(row.rank),
+		// round 1): his # cell reads the list's short form. Every other row, a bye on the week's
+		// rankings too, draws his full-order number, so with the byes last the numbers skip where the
+		// byes moved (Lane 220 D1, Lane 234).
+		place: listed ? (box.status?.rank ?? '') : String(overallOf(row)),
 		bye,
 		figures: {
 			por: row.points_over_replacement,

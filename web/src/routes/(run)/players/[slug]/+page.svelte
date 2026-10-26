@@ -154,7 +154,16 @@
 	);
 	/** His status words as built, said again on the member's clock once the page is live. */
 	let liveStatus = $state<LiveStatus | null>(null);
+	/** The run's stamp in the member's zone (as the club page says it), loaded after first paint and
+	 * only in season on a page with an every-format table: the player page's script budget. */
+	let inSeasonRunStamp = $state<string | null>(null);
 	onMount(() => {
+		if (page.lines.length > 1 && page.format.rosFromWeek !== undefined)
+			void Promise.all([import('#lib/front/live-board.ts'), import('#lib/format/clock.ts')]).then(
+				([board, clock]) => {
+					inSeasonRunStamp = board.inSeasonStamp(page.format, clock.memberZone())?.text ?? null;
+				}
+			);
 		liveStatusClock(
 			page.status !== null,
 			() => import('#lib/run/status-view.ts'),
@@ -195,8 +204,8 @@
 			apiFormatOf(line.format),
 			live?.formats ?? null
 		);
-	/** The every-format table's ranks on the figures' own clock (review H1): the read's only when
-	 * its figures stand, the formats it does not place said once under the table. */
+	/** The every-format table's ranks on the figures' own clock (review H1): the read's in each format
+	 * only when its figures stand (Lane 234), the formats it does not place said once under the table. */
 	const lineRanks = $derived(
 		lineRanksAt(
 			page.lines.map((line) => ({
@@ -205,7 +214,8 @@
 				label: line.format.label
 			})),
 			live?.formats ?? null,
-			live === null ? null : { format: figures, positionRank: live.positionRank }
+			live === null ? null : { format: figures, positionRank: live.positionRank },
+			listed !== null
 		)
 	);
 	const rankText = (i: number): string => {
@@ -214,11 +224,15 @@
 	};
 	/** The week tile's head as drawn ("Wk 6"), which the unread basis names. */
 	const weekTileHead = $derived(tiles.find((tile) => tile.key === 'proj')?.label ?? CARD.proj);
+	/** The run's stamp while the every-format table shows the run's ranks and figures in season
+	 * (Lane 234, ruling 2): on game day the run and the read share a date, so its time says the clock. */
+	const runStamp = $derived(live?.formats == null ? inSeasonRunStamp : null);
 	/** Every number's basis, once: the week's, the rest of season's, the season's. */
 	const basis = $derived([
 		...(live === null
 			? [unreadBasis(failed, weekTileHead, page.status?.words.view.rank ?? null)]
 			: live.basis),
+		...(runStamp === null ? [] : [runStamp]),
 		...(page.season.basis === null ? [] : [page.season.basis])
 	]);
 </script>
@@ -405,7 +419,7 @@
 				</Table>
 				{#if page.formatsNote}<Footnote>{page.formatsNote}</Footnote>{/if}
 				{#if lineRanks.unranked.length > 0}<Footnote
-						>{FORMATS_RANK.unranked(lineRanks.unranked)}</Footnote
+						>{FORMATS_RANK.unranked(lineRanks.unranked, lineRanks.reason)}</Footnote
 					>{/if}
 			</section>
 		{/if}

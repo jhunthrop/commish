@@ -309,6 +309,35 @@ void test('review H3: the tile, the read, the every-format table and the tier bo
 	});
 	assert.equal(alone.tier?.basis, 'Projected PPR points for the rest of 2026, weeks 7 to 17');
 	assert.equal(card(week()).formats, null);
+	// An answer older than the per-format ranks carries none: the table keeps the older rule.
+	assert.equal(live.formats.ranks, null);
+	// With them (Lane 227, B206), each format's rank from the same answer; a null one is left out of
+	// the API's answer and reads as none.
+	const ranked = liveCard({
+		week: week({
+			rest_of_season: RUN_FORMATS_LIVE.map((f, i) =>
+				i === 0 ? { ...f, position_rank: 3, overall_rank: 9 } : f
+			),
+			rest_from_week: 7
+		}),
+		player: PLAYER,
+		league: null,
+		tiles: BUILT,
+		opponents: {},
+		games: 3,
+		rest: REST,
+		tier: null,
+		screenHref: href,
+		zone: ZONE,
+		now: NOW
+	});
+	assert.ok(ranked.formats?.ranks);
+	assert.deepEqual(ranked.formats.ranks, {
+		ppr: 3,
+		half_ppr: null,
+		standard: null,
+		superflex: null
+	});
 	assert.equal(card(week()).tier, null);
 });
 

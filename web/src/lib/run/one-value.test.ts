@@ -27,8 +27,9 @@ type OrderRow = OrderAdvice['rows'][number];
 const RUN_AT = Date.parse('2026-10-15T13:50:00.000Z');
 const SUNDAY = Date.parse(FIXTURE_SUNDAY_CLOCK);
 const TEAMS = 12;
-/** A read whose rest-of-season figures stand on the table (its figures are not what these tests read). */
-const FIGURES: LiveFormats = { head: 'Rest of season', figures: {} };
+/** A read whose rest-of-season figures stand on the table (its figures are not what these tests
+ * read), from an answer older than the per-format ranks (Lane 227): `ranks` null. */
+const FIGURES: LiveFormats = { head: 'Rest of season', figures: {}, ranks: null };
 const PLAYERS = ["D'Andre Swift", 'Parker Washington', 'Joe Burrow'] as const;
 
 const ORDER = JSON.parse(
@@ -154,9 +155,10 @@ void test('every view prints the order rank, place, points and Over repl. for ea
 			{ run: run.positionRank, format: 'half_ppr' as const, label: 'Half PPR' }
 		];
 		const read = { format: 'ppr' as const, positionRank: head };
-		assert.deepEqual(lineRanksAt(lines, FIGURES, read), {
+		assert.deepEqual(lineRanksAt(lines, FIGURES, read, false), {
 			ranks: [head, null],
-			unranked: ['Half PPR']
+			unranked: ['Half PPR'],
+			reason: 'unread'
 		});
 	}
 });
@@ -173,21 +175,31 @@ void test("the formats table's ranks stay the run's while its figures do (review
 		points: 183.2,
 		vor: 95.3
 	});
-	assert.deepEqual(lineRanksAt(lines, null, read), { ranks: [3, 4, 2], unranked: [] });
+	assert.deepEqual(lineRanksAt(lines, null, read, false), {
+		ranks: [3, 4, 2],
+		unranked: [],
+		reason: 'unread'
+	});
 	// No read at all: the run's.
-	assert.deepEqual(lineRanksAt(lines, FIGURES, null), { ranks: [3, 4, 2], unranked: [] });
-	// The read's figures stand: its format takes the head's rank, the others none, named for the note.
-	assert.deepEqual(lineRanksAt(lines, FIGURES, read), {
+	assert.deepEqual(lineRanksAt(lines, FIGURES, null, false), {
+		ranks: [3, 4, 2],
+		unranked: [],
+		reason: 'unread'
+	});
+	// An answer older than the per-format ranks (the deploy window): its format takes the head's
+	// rank, the others none, named for the note.
+	assert.deepEqual(lineRanksAt(lines, FIGURES, read, false), {
 		ranks: [5, null, null],
-		unranked: ['Half PPR', 'Standard']
+		unranked: ['Half PPR', 'Standard'],
+		reason: 'unread'
 	});
 	assert.equal(
-		FORMATS_RANK.unranked(['Half PPR', 'Standard']),
-		'Half PPR and Standard show no position rank at this read; their points are.'
+		FORMATS_RANK.unranked(['Half PPR', 'Standard'], 'unread'),
+		'Half PPR and Standard show points at this read with no position rank.'
 	);
 	assert.equal(
-		FORMATS_RANK.unranked(['Standard']),
-		'Standard shows no position rank at this read; its points are.'
+		FORMATS_RANK.unranked(['Standard'], 'unread'),
+		'Standard shows points at this read with no position rank.'
 	);
 });
 

@@ -9,6 +9,8 @@ export const SATURDAY_RUN_ID = '2026-10-17T17-ros';
 export const ONE_BOARD_RUN_ID = '2026-10-15T13-oneboard';
 /** The one-board run with its board cut to the fixture order's players (one-value-run.ts, Lane 220). */
 export const ONE_VALUE_RUN_ID = '2026-10-15T13-onevalue';
+/** The one-value run in three scorings, PPR, half PPR and standard (formats-run.ts, Lane 234). */
+export const FORMATS_RUN_ID = '2026-10-15T13-formats';
 /** The contract run with Jahmyr Gibbs as a club mover, a free agent, or a mover whose newest line was
  * on special teams alone (mover-run.ts). */
 export type ClubRun = 'mover' | 'free-agent' | 'special-teams';

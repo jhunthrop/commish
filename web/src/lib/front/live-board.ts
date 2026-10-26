@@ -10,7 +10,8 @@ import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { overReplacementWords } from '#lib/format/figure-words.ts';
 import { COLUMN_HEADS } from '#lib/ui/board-columns.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
-import { placedAt } from '#lib/run/live-order.ts';
+import { overallOf } from '#lib/order/overall.ts';
+import { livePlace, placedAt } from '#lib/run/live-order.ts';
 import type { BoardRowView } from '#lib/run/schema.ts';
 import type { components } from '#lib/api/types.ts';
 
@@ -175,12 +176,12 @@ function builtRow(row: OrderRow, projected: number, vor: number, teams: number):
 		slug,
 		name: player.name,
 		position: player.position as BoardRowView['position'],
-		positionRank: positionRank ?? row.rank,
+		positionRank: positionRank ?? overallOf(row),
 		team: player.team,
 		headshot: headshot ?? '',
 		orderBasis: 'projection',
-		ourRank: row.rank,
-		vorRound: Math.ceil(row.rank / teams),
+		ourRank: overallOf(row),
+		vorRound: Math.ceil(overallOf(row) / teams),
 		adp: null,
 		gap: null,
 		projected,
@@ -213,21 +214,17 @@ export function liveStrip(
 	if (shown.length < Math.min(size, pool.length)) return null;
 	const out: StripRow[] = [];
 	for (const row of shown) {
-		const projected = row.rest_of_season_points;
-		const vor = row.points_over_replacement;
-		if (projected === null || vor === null) return null;
+		const place = livePlace(row);
+		if (place === null) return null;
 		const id = row.line.player.board_id;
 		const run = id === null ? undefined : byId.get(id);
 		const shownRow =
 			run === undefined
-				? builtRow(row, projected, vor, teams)
+				? builtRow(row, place.projected, place.vor, teams)
 				: {
-						// The order's rank, place at his position, figures and round (live-order.ts, Lane 220).
-						...placedAt(
-							run,
-							{ rank: row.rank, positionRank: row.line.position_rank, projected, vor },
-							teams
-						),
+						// The order's number, place at his position, figures and round (live-order.ts, Lane 220
+						// and 234).
+						...placedAt(run, place, teams),
 						season: liveSeason(run, row.line)
 					};
 		if (shownRow === null) return null;

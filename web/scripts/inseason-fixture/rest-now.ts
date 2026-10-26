@@ -131,7 +131,16 @@ export const runIndex = await (async (): Promise<
 /** One run format's in-season rows: each player's club, points and points over replacement. */
 interface FormatRows {
 	format: BoardFormat;
-	rows: Map<string, { team: string; projected: number; vor: number; positionRank: number }>;
+	rows: Map<string, RunRow>;
+}
+
+/** One run board row the fixture reads. */
+interface RunRow {
+	team: string;
+	position: string;
+	projected: number;
+	vor: number;
+	positionRank: number;
 }
 
 /** Every format the run carries, its rows and its schedule (Lane 86): null on a preseason run. */
@@ -153,6 +162,7 @@ const runRead = await (async (): Promise<{
 				rows: {
 					id: string;
 					team: string;
+					position: string;
 					projected: number | null;
 					vor: number | null;
 					positionRank: number;
@@ -165,7 +175,13 @@ const runRead = await (async (): Promise<{
 						: [
 								[
 									r.id,
-									{ team: r.team, projected: r.projected, vor: r.vor, positionRank: r.positionRank }
+									{
+										team: r.team,
+										position: r.position,
+										projected: r.projected,
+										vor: r.vor,
+										positionRank: r.positionRank
+									}
 								] as const
 							]
 				)
@@ -221,6 +237,33 @@ function rowAtClock(
 	return { points, vor: roundTenth(row.vor + points - row.projected) };
 }
 
+/** His places in one format at `now`, as the API's formatPlaces counts them (Lane 227, B206): at his
+ * position by his points, across positions by his Over repl., each among the format's rows the clock
+ * values. STAND-IN, named so: the run's boards carry no season-long list, so no figure's ranks are
+ * null here; players level on the figure share the higher place. */
+function placesAtClock(
+	format: FormatRows,
+	id: string,
+	position: string,
+	now: number
+): { position_rank: number; overall_rank: number } {
+	const valued = [...format.rows].flatMap(([other, row]) => {
+		const live = rowAtClock(row, now);
+		return live === null ? [] : [{ other, position: row.position, ...live }];
+	});
+	const his = valued.find((v) => v.other === id);
+	const ahead = (by: (v: (typeof valued)[number]) => number, among: typeof valued): number =>
+		his === undefined ? 0 : among.filter((v) => by(v) > by(his)).length;
+	return {
+		position_rank:
+			ahead(
+				(v) => v.points,
+				valued.filter((v) => v.position === position)
+			) + 1,
+		overall_rank: ahead((v) => v.vor, valued) + 1
+	};
+}
+
 /** The tier box the read is asked for (?tier=, ?tier_next=, ?tier_format=). */
 export interface TierAsk {
 	ids: string[];
@@ -250,9 +293,16 @@ export function restAtClock(
 	const figures = formats.flatMap((f) => {
 		const row = f.rows.get(id);
 		const live = row === undefined ? null : rowAtClock(row, now);
-		return live === null
+		return live === null || row === undefined
 			? []
-			: [{ format: f.format, points: live.points, points_over_replacement: live.vor }];
+			: [
+					{
+						format: f.format,
+						points: live.points,
+						points_over_replacement: live.vor,
+						...placesAtClock(f, id, row.position, now)
+					}
+				];
 	});
 	const team = formats[0]?.rows.get(id)?.team;
 	if (figures.length === 0 || team === undefined) return {};
