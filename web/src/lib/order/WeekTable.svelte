@@ -8,15 +8,17 @@
 	import OppRank from '#lib/ui/OppRank.svelte';
 	import RosterChip from '#lib/ui/RosterChip.svelte';
 	import type { WeekOrderAdvice } from './api.ts';
-	import { ORDER, moveHref, moveWords } from './order.ts';
+	import { ORDER, moveHref, moveShort, moveWords } from './order.ts';
 	import SectionHead from './SectionHead.svelte';
-	import { foldedEvidence, WEEK_TAB, type WeekSection, type WeekView } from './week.ts';
+	import FigureStrip from '#lib/ui/FigureStrip.svelte';
+	import { weekStripCells, WEEK_TAB, type WeekSection, type WeekView } from './week.ts';
 
 	/** The kickers' or defenses' week as a box score (Lane 66w): the player (his face or the club's
 	 * mark), his game, Proj big when the week's projection is in, then Opp rank, Avg and Last ruled off,
 	 * and in a league his roster and the add the API sets. Games kicked off sit under their own head
-	 * with a muted Proj, the byes last. Below 1100 px the evidence folds under the name; below 900 the
-	 * roster mark moves onto his club line and the add keeps its glyph; on a phone the game folds too. */
+	 * with a muted Proj, the byes last. Below 1100 px the evidence folds under the name as labelled
+	 * cells (Lane 209); below 900 the roster mark moves onto his club line and the add keeps its glyph;
+	 * on a phone the row is two lines and its strip, as the order's. */
 	interface Props {
 		label: string;
 		sections: readonly WeekSection[];
@@ -35,7 +37,7 @@
 <table class="week" class:marked aria-label={label}>
 	<thead>
 		<tr>
-			<th scope="col">{BOX.player}</th>
+			<th class="pl" scope="col">{BOX.player}</th>
 			<th class="game" scope="col">{BOX.game}</th>
 			{#if proj}<th class="n proj" scope="col">{BOX.proj}</th>{/if}
 			<th class="n ev first opp" scope="col">{BOX.oppRank}</th>
@@ -64,11 +66,11 @@
 	{@const href = moveHref(row, league?.id ?? null, tabHref)}
 	<tr class:mine={row.roster?.kind === 'yours'}>
 		<td class="player">
-			<BoxPlayer row={row.box}>
+			<BoxPlayer row={row.box} line fitOnPhone>
 				{#snippet after()}{#if row.roster}<span class="ph-mark"
 							><RosterChip kind={row.roster.kind} words={row.roster.words} size="fold" /></span
 						>{/if}{/snippet}
-				<span class="ph-ev">{foldedEvidence(row)}</span>
+				<span class="ph-ev"><FigureStrip cells={weekStripCells(row)} /></span>
 			</BoxPlayer>
 		</td>
 		<td class="game"><BoxGame row={row.box} /></td>
@@ -91,6 +93,7 @@
 						{href}
 						move={row.move}
 						said={moveWords(row, league.moves, league.host)}
+						short={moveShort(row)}
 						name={row.box.name}
 					/>
 				{/if}
@@ -101,6 +104,8 @@
 
 <style>
 	.week {
+		/* A phone row's face, the height of its first line (BoxPlayer's line, LINE_PHONE_FACE). */
+		--line-face: 28px;
 		width: 100%;
 		border-collapse: separate;
 		border-spacing: 0;
@@ -249,9 +254,7 @@
 
 		.ph-ev {
 			display: block;
-			font-size: var(--t-xs);
-			color: var(--ink-3);
-			font-variant-numeric: tabular-nums;
+			margin-top: 2px;
 		}
 	}
 
@@ -272,29 +275,115 @@
 		}
 	}
 
-	@media (max-width: 760px) {
-		td {
-			padding: 7px 6px;
+	/* A phone's row (Lane 209), as the order's: the player and Proj big on the first line, the add at
+	   the end of the game's line, the strip under both from the face. */
+	@media (max-width: 1100px) {
+		.week {
+			display: block;
+		}
+
+		thead,
+		tbody {
+			display: block;
 		}
 
 		tr {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) auto;
+			grid-template-rows: var(--line-face) 22px auto;
+			column-gap: 6px;
+			row-gap: 2px;
 			height: auto;
+			padding: 7px var(--s-2);
+			border-bottom: 1px solid var(--line);
 		}
 
-		.game {
-			display: none;
+		thead tr {
+			grid-template-rows: 30px;
+			padding-top: 0;
+			padding-bottom: 0;
+			align-items: center;
+			background: var(--bg);
 		}
 
+		thead th {
+			height: auto;
+			border-bottom: 0;
+			padding: 0;
+		}
+
+		tbody:last-child tr:last-child {
+			border-bottom: 0;
+		}
+
+		td {
+			padding: 0;
+			border-bottom: 0;
+		}
+
+		tbody tr:hover td,
+		.mine td {
+			background: none;
+		}
+
+		tbody tr:hover {
+			background: var(--surface-2);
+		}
+
+		.mine {
+			background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+			box-shadow: inset 3px 0 0 var(--accent);
+		}
+
+		.mine td:first-child {
+			box-shadow: none;
+		}
+
+		td.player {
+			grid-column: 1 / 3;
+			grid-row: 1 / 4;
+			--line-end: 52px;
+			--line-end-2: 72px;
+			--strip-pull: calc(var(--line-face) + var(--s-2));
+		}
+
+		.proj,
 		thead .proj {
-			width: 52px;
+			grid-column: 2;
+			grid-row: 1;
+			align-self: center;
+			width: auto;
+			position: relative;
 		}
 
+		/* The player is the biggest thing on the row: Proj at the name's size, a kicked-off game's a
+		   step quieter (review H1). */
 		td.proj {
-			font-size: var(--t-lg);
+			font-size: var(--t-md);
 		}
 
 		.kicked_off td.proj {
-			font-size: var(--t-md);
+			font-size: var(--t-sm);
+		}
+
+		td.act {
+			grid-column: 2;
+			grid-row: 2;
+			align-self: center;
+			position: relative;
+		}
+
+		thead th:not(.pl):not(.proj),
+		.game,
+		td.roster {
+			display: none;
+		}
+	}
+
+	/* Between a phone and a wide screen the face keeps its 32 px. */
+	@media (min-width: 761px) and (max-width: 1100px) {
+		.week {
+			--line-face: 32px;
 		}
 	}
 </style>
