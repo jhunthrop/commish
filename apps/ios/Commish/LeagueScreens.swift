@@ -13,6 +13,7 @@ struct LeagueScreen: View {
     private let openGame: (Int?) -> Void
     private let draftDay: DraftDayEntry?
     private let openAdvisor: () -> Void
+    private let openMock: () -> Void
 
     init(
         environment: AppEnvironment,
@@ -21,7 +22,8 @@ struct LeagueScreen: View {
         expired: @escaping @MainActor () -> Void,
         openLineup: @escaping () -> Void,
         openGame: @escaping (Int?) -> Void,
-        openAdvisor: @escaping () -> Void
+        openAdvisor: @escaping () -> Void,
+        openMock: @escaping () -> Void
     ) {
         _viewModel = State(initialValue: LeagueHomeViewModel(
             api: environment.api, cache: environment.cache, clock: environment.clock, onSignedOut: expired
@@ -33,12 +35,13 @@ struct LeagueScreen: View {
             DraftDayEntry(phase: $0.phase, draftAt: $0.draftAt, now: environment.clock.now, zone: .current)
         }
         self.openAdvisor = openAdvisor
+        self.openMock = openMock
     }
 
     var body: some View {
         LeagueHomeView(
             viewModel: viewModel, leagueID: leagueID, openLineup: openLineup, openGame: openGame,
-            draftDay: draftDay, openAdvisor: openAdvisor
+            draftDay: draftDay, openAdvisor: openAdvisor, openMock: openMock
         )
     }
 }

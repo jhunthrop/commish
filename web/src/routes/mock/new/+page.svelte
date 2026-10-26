@@ -11,6 +11,7 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { startMock } from '#lib/room/actions.ts';
+	import { MOCK } from '#lib/room/mock-words.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import {
 		ApiError,
@@ -39,6 +40,7 @@
 	import { hasFeature } from '#lib/account/features.ts';
 	import {
 		LINEUP_CHOICES,
+		SETUP_CELLS,
 		MAX_ROUNDS,
 		MIN_ROUNDS,
 		TEAM_CHOICES,
@@ -234,9 +236,9 @@
 
 <Shell title="Mock draft" active="mock">
 	<RoomLayout>
-		<DisplayTitle size="page">New mock</DisplayTitle>
+		<DisplayTitle size="page">{MOCK.setupTitle}</DisplayTitle>
 		<FactStrip
-			label="The clocks"
+			label={SETUP_CELLS.label}
 			cells={setupCells(lobbies.find((l) => l.format === nearestLobby(settings)))}
 		/>
 		{#if handleFor}
@@ -249,21 +251,21 @@
 				signInTo={signedOut ? signInHref(page.url.pathname) : null}
 				onchange={(scoring: LeagueSettings['scoring']) => set({ scoring })}
 			/>
-			<SetupRow label="Teams">
-				<ChipGroup label="Teams">
+			<SetupRow label={MOCK.teams}>
+				<ChipGroup label={MOCK.teams}>
 					{#each TEAM_CHOICES as n (n)}
 						<Chip pressed={settings.teams === n} onclick={() => setTeams(n)}>{n}</Chip>
 					{/each}
 				</ChipGroup>
 			</SetupRow>
-			<SetupRow label="Your slot">
-				<ChipGroup label="Your slot" variant="loose">
+			<SetupRow label={MOCK.slot}>
+				<ChipGroup label={MOCK.slot} variant="loose">
 					{#each Array.from({ length: settings.teams }, (_, i) => i + 1) as n (n)}
 						<Chip size="sm" pressed={settings.slot === n} onclick={() => set({ slot: n })}>{n}</Chip
 						>
 					{/each}
 					<Chip size="sm" pressed={settings.slot === null} onclick={() => set({ slot: null })}
-						>Random</Chip
+						>{MOCK.random}</Chip
 					>
 				</ChipGroup>
 			</SetupRow>
@@ -273,8 +275,8 @@
 				{rounds}
 				onchange={(patch: Partial<LeagueSettings>) => set(patch)}
 			/>
-			<SetupRow label="Lineup">
-				<ChipGroup label="Lineup">
+			<SetupRow label={MOCK.lineup}>
+				<ChipGroup label={MOCK.lineup}>
 					{#each LINEUP_CHOICES as c (c.lineup)}
 						<Chip pressed={settings.lineup === c.lineup} onclick={() => set({ lineup: c.lineup })}
 							>{c.label}</Chip
@@ -318,7 +320,7 @@
 				disabled={busy || !roundsOk}
 				onclick={() =>
 					opened ? mockLeague(opened, settings.slot) : run(() => startMock(settings))}
-				>Start against bots</Verb
+				>{MOCK.start}</Verb
 			>
 			<Quiet disabled={busy} onclick={() => join(nearestLobby(settings))}
 				>Join a lobby with people</Quiet

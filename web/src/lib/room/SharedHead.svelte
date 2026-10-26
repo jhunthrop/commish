@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { pickLabel } from '#lib/format/draft.ts';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import type { MockRoom } from './api.ts';
+	import { MOCK, runSharedWords, sharedAt, sharedTitle } from './mock-words.ts';
 	import { formatLine } from './words.ts';
 
 	interface Props {
@@ -14,25 +14,19 @@
 
 	let { room, starting, onrun }: Props = $props();
 
-	const whose = $derived(room.shared_by ? `${room.shared_by}'s mock` : 'A shared mock');
-	const at = $derived(
-		room.status === 'complete' ? 'finished' : `at pick ${pickLabel(room.pick_number, room.teams)}`
-	);
+	const at = $derived(sharedAt(room.status === 'complete', room.pick_number, room.teams));
 </script>
 
 <!-- A shared draft is a reader's page: whose it is in the third person, where it stands, and one verb
      that runs it as the reader's own. -->
 <header class="head">
 	<div>
-		<DisplayTitle size="page">{whose} from slot {room.slot}</DisplayTitle>
+		<DisplayTitle size="page">{sharedTitle(room.shared_by, room.slot)}</DisplayTitle>
 		<p>{formatLine(room.settings)} · {at}</p>
 	</div>
 	<div class="act">
-		<Verb onclick={onrun} disabled={starting}>Run this draft from slot {room.slot}</Verb>
-		<p class="note">
-			It starts from the first pick with the same settings and bots, so they draft the same way
-			until a pick of yours changes the board.
-		</p>
+		<Verb onclick={onrun} disabled={starting}>{runSharedWords(room.slot)}</Verb>
+		<p class="note">{MOCK.sharedNote}</p>
 	</div>
 </header>
 

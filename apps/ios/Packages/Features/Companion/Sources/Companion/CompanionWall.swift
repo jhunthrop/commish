@@ -6,11 +6,17 @@ import SwiftUI
 /// sideways, each seat's name across the top (the drafter's in the accent) and each round's picks seat
 /// by seat: his face, position and club, his last name; the drafter's own on the accent's wash with its
 /// edge; the pick on the clock dashed in the accent with whose it is.
-struct WallView: View {
+public struct WallView: View {
     @Environment(\.colorScheme) private var colorScheme
     let wall: RoomWall
     let open: (SheetPlayer) -> Void
     var live = true
+
+    public init(wall: RoomWall, open: @escaping (SheetPlayer) -> Void, live: Bool = true) {
+        self.wall = wall
+        self.open = open
+        self.live = live
+    }
 
     /// Wall.svelte's widths: the round's column, a team's (a cell's min-width), a cell's least height,
     /// the face, the drafter's edge.
@@ -22,7 +28,7 @@ struct WallView: View {
         static let edge: Double = 3
     }
 
-    var body: some View {
+    public var body: some View {
         let theme = Theme(colorScheme)
         VStack(alignment: .leading, spacing: Tokens.Space.s3) {
             HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s3) {

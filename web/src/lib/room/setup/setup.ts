@@ -8,11 +8,22 @@ import { presetWords } from '../words.ts';
 type Roster = LeagueSettings['roster'];
 type Preset = NonNullable<LeagueSettings['scoring']['preset']>;
 
+/** The setup's chips' words (Lane 213: a table the apps print from, shared/scripts/gen-words.ts). */
+export const SETUP_CHOICES = {
+	ppr: 'PPR',
+	half_ppr: 'Half PPR',
+	standard: 'Standard',
+	te_premium: 'TE premium',
+	lineupStandard: 'Standard',
+	superflex: 'Superflex',
+	twoFlex: '2 flex'
+} as const;
+
 export const SCORING_CHOICES: readonly { preset: Preset; label: string }[] = [
-	{ preset: 'ppr', label: 'PPR' },
-	{ preset: 'half_ppr', label: 'Half PPR' },
-	{ preset: 'standard', label: 'Standard' },
-	{ preset: 'te_premium', label: 'TE premium' }
+	{ preset: 'ppr', label: SETUP_CHOICES.ppr },
+	{ preset: 'half_ppr', label: SETUP_CHOICES.half_ppr },
+	{ preset: 'standard', label: SETUP_CHOICES.standard },
+	{ preset: 'te_premium', label: SETUP_CHOICES.te_premium }
 ];
 
 export const TEAM_CHOICES: readonly number[] = [8, 10, 12, 14];
@@ -20,9 +31,9 @@ export const TEAM_CHOICES: readonly number[] = [8, 10, 12, 14];
 export const MAX_TEAMS = 14;
 
 export const LINEUP_CHOICES: readonly { lineup: LeagueSettings['lineup']; label: string }[] = [
-	{ lineup: 'standard', label: 'Standard' },
-	{ lineup: 'superflex', label: 'Superflex' },
-	{ lineup: 'two_flex', label: '2 flex' }
+	{ lineup: 'standard', label: SETUP_CHOICES.lineupStandard },
+	{ lineup: 'superflex', label: SETUP_CHOICES.superflex },
+	{ lineup: 'two_flex', label: SETUP_CHOICES.twoFlex }
 ];
 
 /** Each roster count's label and its bounds, matching openapi.yaml's RosterCounts. */
@@ -119,15 +130,30 @@ export function nearestLobby(s: LeagueSettings): LobbyFormat {
 /** The setup's settings table (Lane 66o): only what the form below does not show (review M4), the
  * clock against bots, the nearest lobby's clock as the API gives it (left out until the lobbies are
  * read), and when a lobby starts. The format, teams, seat and rounds are the form's own fields. */
+/** The settings table's words (Lane 213: a table the apps print from). */
+export const SETUP_CELLS = {
+	label: 'The clocks',
+	botClock: 'Clock against bots',
+	none: 'None',
+	lobbyClock: 'Clock in a lobby',
+	lobbyStarts: 'A lobby starts'
+} as const;
+
 export function setupCells(lobby: Pick<LobbyFilling, 'clock_seconds'> | undefined): FactCell[] {
 	const lobbyClock: FactCell[] = lobby
-		? [{ label: 'Clock in a lobby', value: `${String(lobby.clock_seconds)} s a pick`, word: true }]
+		? [
+				{
+					label: SETUP_CELLS.lobbyClock,
+					value: `${String(lobby.clock_seconds)} s a pick`,
+					word: true
+				}
+			]
 		: [];
 	return [
-		{ label: 'Clock against bots', value: 'None', word: true },
+		{ label: SETUP_CELLS.botClock, value: SETUP_CELLS.none, word: true },
 		...lobbyClock,
 		{
-			label: 'A lobby starts',
+			label: SETUP_CELLS.lobbyStarts,
 			value: `Full, or ${String(LOBBY_FILL_SECONDS)} s after the first join`,
 			word: true
 		}

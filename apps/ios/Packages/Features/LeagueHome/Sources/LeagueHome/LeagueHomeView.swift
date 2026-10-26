@@ -16,12 +16,13 @@ public struct LeagueHomeScreen: View {
     let still: Bool
     let draftDay: DraftDayEntry?
     let openAdvisor: () -> Void
+    let openMock: () -> Void
 
     /// `still` draws the scoreboard's hand at rest, for a render with no scrolling (the snapshot).
     public init(
         model: LeagueHomeModel, stamp: String?, still: Bool = false, openLineup: @escaping () -> Void,
         openGame: @escaping (Int?) -> Void = { _ in }, draftDay: DraftDayEntry? = nil,
-        openAdvisor: @escaping () -> Void = {}
+        openAdvisor: @escaping () -> Void = {}, openMock: @escaping () -> Void = {}
     ) {
         self.model = model
         self.stamp = stamp
@@ -30,6 +31,7 @@ public struct LeagueHomeScreen: View {
         self.openGame = openGame
         self.draftDay = draftDay
         self.openAdvisor = openAdvisor
+        self.openMock = openMock
     }
 
     public var body: some View {
@@ -37,7 +39,7 @@ public struct LeagueHomeScreen: View {
             ForEach(LeagueHomePart.allCases, id: \.self) { part in
                 LeagueHomePartView(
                     part: part, model: model, stamp: stamp, still: still, openLineup: openLineup, openGame: openGame,
-                    draftDay: draftDay, openAdvisor: openAdvisor
+                    draftDay: draftDay, openAdvisor: openAdvisor, openMock: openMock
                 )
             }
         }
@@ -66,6 +68,7 @@ struct LeagueHomePartView: View {
     var openGame: (Int?) -> Void = { _ in }
     var draftDay: DraftDayEntry?
     var openAdvisor: () -> Void = {}
+    var openMock: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s5) {
@@ -73,7 +76,7 @@ struct LeagueHomePartView: View {
             case .top:
                 head
                 if let draftDay {
-                    DraftDayPanel(entry: draftDay, openAdvisor: openAdvisor)
+                    DraftDayPanel(entry: draftDay, openAdvisor: openAdvisor, openMock: openMock)
                 }
                 if !model.bugs.isEmpty {
                     ScoreBoardView(
@@ -123,11 +126,12 @@ public struct LeagueHomeView: View {
     private let openGame: (Int?) -> Void
     private let draftDay: DraftDayEntry?
     private let openAdvisor: () -> Void
+    private let openMock: () -> Void
 
     public init(
         viewModel: LeagueHomeViewModel, leagueID: String, openLineup: @escaping () -> Void,
         openGame: @escaping (Int?) -> Void = { _ in }, draftDay: DraftDayEntry? = nil,
-        openAdvisor: @escaping () -> Void = {}
+        openAdvisor: @escaping () -> Void = {}, openMock: @escaping () -> Void = {}
     ) {
         self.viewModel = viewModel
         self.leagueID = leagueID
@@ -135,6 +139,7 @@ public struct LeagueHomeView: View {
         self.openGame = openGame
         self.draftDay = draftDay
         self.openAdvisor = openAdvisor
+        self.openMock = openMock
     }
 
     public var body: some View {
@@ -147,7 +152,7 @@ public struct LeagueHomeView: View {
                 ScrollView {
                     LeagueHomeScreen(
                         model: model, stamp: viewModel.stampWords, openLineup: openLineup, openGame: openGame,
-                        draftDay: draftDay, openAdvisor: openAdvisor
+                        draftDay: draftDay, openAdvisor: openAdvisor, openMock: openMock
                     )
                 }
                 .refreshable { await viewModel.load(leagueID: leagueID) }

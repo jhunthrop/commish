@@ -890,4 +890,54 @@ public enum Words {
         public static let advisorVerb = "Open the Advisor"
         public static let turnsAfterDraft = "The site turns to your season after your draft."
     }
+
+    public enum Mock {
+        public static let undo = "Undo"
+        public static let more = "More"
+        public static let finish = "Finish the draft"
+        public static let share = "Save and share"
+        public static let copied = "Link copied"
+        public static let queue = "Queue"
+        public static let queued = "Queued"
+        public static let queuedTag = "queued"
+        public static let draft = "Draft"
+        public static let noCall = "No call for this pick. Draft from the pool."
+        public static let theirTeam = "Their team"
+        public static let drafter = "Drafter"
+        public static let lastPick = "your last pick"
+        public static let newMock = "New mock"
+        public static let setupTitle = "New mock"
+        public static let scoring = "Scoring"
+        public static let teams = "Teams"
+        public static let slot = "Your slot"
+        public static let random = "Random"
+        public static let lineup = "Lineup"
+        public static let start = "Start against bots"
+        public static let tryAnother = "Try another slot"
+        public static let copyLink = "Copy a share link"
+        public static let botsByAdp = "Bots by ADP"
+        public static let setUpOwn = "Set up your own"
+        public static let stillThere = "Still there"
+        public static let reshuffled = "the bots"
+        public static let unreachable = "The room could not be reached. Check the connection and reload."
+        public static let sharedNote = "It starts from the first pick with the same settings and bots, so they draft the same way until a pick of yours changes the board."
+    }
+
+    public enum MockSetup {
+        public static let ppr = "PPR"
+        public static let half_ppr = "Half PPR"
+        public static let standard = "Standard"
+        public static let te_premium = "TE premium"
+        public static let lineupStandard = "Standard"
+        public static let superflex = "Superflex"
+        public static let twoFlex = "2 flex"
+    }
+
+    public enum MockClocks {
+        public static let label = "The clocks"
+        public static let botClock = "Clock against bots"
+        public static let none = "None"
+        public static let lobbyClock = "Clock in a lobby"
+        public static let lobbyStarts = "A lobby starts"
+    }
 }

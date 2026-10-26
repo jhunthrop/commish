@@ -75,6 +75,17 @@ public enum AppWords {
         }
     }
 
+    /// The mock room's own words, where the web has no such state: the phone's room is full screen,
+    /// so leaving it asks first (the web's page is left by its own back).
+    public enum Mock {
+        public static let close = "Leave the room"
+        public static let leaveTitle = "Leave this mock?"
+        public static let leaveMessage =
+            "It stays where you left it, under Your mock drafts on your account at trycommish.app."
+        public static let leave = "Leave"
+        public static let stay = "Keep drafting"
+    }
+
     /// The league the app opens until the Leagues screen lets the member pick one.
     public enum LeagueList {
         public static let none = "Follow a league on trycommish.app and it shows here."

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { pickLabel } from '#lib/format/draft.ts';
 	import type { FactCell } from '#lib/ui/facts.ts';
 	import Menu from '#lib/ui/Menu.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import { MOCK, autopickWords, pickHead } from './mock-words.ts';
 
 	interface Props {
 		/** The pick on the clock. */
@@ -38,7 +38,7 @@
 </script>
 
 <div class="bar">
-	<b class="pick">Pick {pickLabel(now, teams)}</b>
+	<b class="pick">{pickHead(now, teams)}</b>
 	<dl class="cells" aria-label="This pick">
 		{#each cells as cell (cell.label)}
 			<div>
@@ -50,16 +50,16 @@
 	<!-- On the phone Undo stays out and the rest fold into More, so the strip and our call come
 		 first. -->
 	<div class="acts">
-		<Quiet key="U" disabled={!canUndo || busy} onclick={onundo}>Undo</Quiet>
+		<Quiet key="U" disabled={!canUndo || busy} onclick={onundo}>{MOCK.undo}</Quiet>
 		<span class="spread">{@render more()}</span>
-		<span class="folded"><Menu label="More" id="room-more">{@render more()}</Menu></span>
+		<span class="folded"><Menu label={MOCK.more} id="room-more">{@render more()}</Menu></span>
 	</div>
 </div>
 
 {#snippet more()}
-	<Quiet disabled={busy} onclick={onautopick}>Pick for me to round {autopickTo}</Quiet>
-	<Quiet disabled={busy} onclick={onfinish}>Finish the draft</Quiet>
-	<Quiet onclick={onshare}>{copied ? 'Link copied' : 'Save and share'}</Quiet>
+	<Quiet disabled={busy} onclick={onautopick}>{autopickWords(autopickTo)}</Quiet>
+	<Quiet disabled={busy} onclick={onfinish}>{MOCK.finish}</Quiet>
+	<Quiet onclick={onshare}>{copied ? MOCK.copied : MOCK.share}</Quiet>
 {/snippet}
 
 <style>

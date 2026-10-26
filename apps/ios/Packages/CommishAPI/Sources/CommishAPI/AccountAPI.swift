@@ -25,6 +25,9 @@ public struct FollowedLeague: Equatable, Sendable, Codable, Identifiable {
     /// Where the member's team stands (ContextLeague.standing), the builder's line beside its name; nil
     /// before a read, or on a league saved before the app kept it.
     public let standing: Components.Schemas.LeagueStanding?
+    /// The saved league a mock reruns from (ContextLeague.settings_league_id); nil when a mock room cannot
+    /// draft this league, or on a league saved before the app kept it.
+    public let settingsLeagueID: String?
 
     public init(
         id: String,
@@ -36,7 +39,8 @@ public struct FollowedLeague: Equatable, Sendable, Codable, Identifiable {
         draftAt: Date?,
         waiversOpen: Bool,
         teamName: String? = nil,
-        standing: Components.Schemas.LeagueStanding? = nil
+        standing: Components.Schemas.LeagueStanding? = nil,
+        settingsLeagueID: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -48,6 +52,7 @@ public struct FollowedLeague: Equatable, Sendable, Codable, Identifiable {
         self.waiversOpen = waiversOpen
         self.teamName = teamName
         self.standing = standing
+        self.settingsLeagueID = settingsLeagueID
     }
 }
 
@@ -60,11 +65,21 @@ public struct AccountContext: Equatable, Sendable, Codable {
     public let selected: String?
     /// The site's season phase; nil for a phase this build does not know.
     public let season: SitePhase?
+    /// The context's format (Account.format): the selected league's, else the one chosen with no league;
+    /// nil with neither, or one this build does not know.
+    public let format: Components.Schemas.BoardFormatKnown?
+    /// The account's features (Account.features): custom_scoring drafts a saved league's own rules.
+    public let features: [String]?
 
-    public init(leagues: [FollowedLeague], selected: String?, season: SitePhase?) {
+    public init(
+        leagues: [FollowedLeague], selected: String?, season: SitePhase?,
+        format: Components.Schemas.BoardFormatKnown? = nil, features: [String]? = nil
+    ) {
         self.leagues = leagues
         self.selected = selected
         self.season = season
+        self.format = format
+        self.features = features
     }
 }
 
@@ -118,7 +133,9 @@ extension APIClient: AccountAPI {
         AccountContext(
             leagues: account.leagues.map(followed),
             selected: account.league?.value1.id,
-            season: account.season.phase.value1
+            season: account.season.phase.value1,
+            format: account.format?.value1.value1,
+            features: account.features.compactMap { $0.value1?.rawValue ?? $0.value2 }
         )
     }
 
@@ -127,7 +144,7 @@ extension APIClient: AccountAPI {
             id: league.id, name: league.name, host: league.host, scoring: league.scoring.value1.value1,
             format: league.format.value1.value1, phase: league.phase.value1, draftAt: league.draftAt,
             waiversOpen: league.waiversOpen, teamName: league.teamName,
-            standing: league.standing?.value1
+            standing: league.standing?.value1, settingsLeagueID: league.settingsLeagueId
         )
     }
 }

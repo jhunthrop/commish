@@ -74,7 +74,8 @@ const COMPANION_MODULE = "web/src/lib/companion/words.ts";
  * sentence, the clubs' and a club's, the schedule grid's, and schedule strength's heads; then the
  * companion's (Lane 210): the followed draft's page, its start page and its signed-out words, the
  * rooms' call, pool, team and wall words it draws, the report's, and the League home's draft-day
- * entry. */
+ * entry; then the mock room's (Lane 213): its bar, the pool's row verbs, the setup's form, chips and
+ * clocks, the report's verbs and a shared draft's. */
 export const TABLES: readonly TableSource[] = [
   {
     name: "LeagueHome",
@@ -584,6 +585,24 @@ export const TABLES: readonly TableSource[] = [
       ["turnsAfterDraft", "TURNS_AFTER_DRAFT"],
     ],
     json: "shared/words/draft-day.json",
+  },
+  {
+    name: "Mock",
+    module: "web/src/lib/room/mock-words.ts",
+    picks: ["MOCK"],
+    json: "shared/words/mock.json",
+  },
+  {
+    name: "MockSetup",
+    module: "web/src/lib/room/setup/setup.ts",
+    picks: ["SETUP_CHOICES"],
+    json: "shared/words/mock-setup.json",
+  },
+  {
+    name: "MockClocks",
+    module: "web/src/lib/room/setup/setup.ts",
+    picks: ["SETUP_CELLS"],
+    json: "shared/words/mock-clocks.json",
   },
 ];
 export const OUTPUT = {

@@ -45,6 +45,14 @@ public enum PhoneRail {
     }
 
     static let advisorFirstKey = "advisor_first"
+
+    /// The Mock draft tab (before the draft, after the season, and with no league in season) and draft
+    /// day's late one: the mock room's setup.
+    public static func isMock(_ key: String) -> Bool {
+        key == mock.key || key == mockLateKey
+    }
+
+    static let mockLateKey = "mock_late"
     static let lineup = RailTab(key: lineupKey, label: AppWords.Tab.lineup)
     /// The Matchup tab's key: the selected league's week as a box score.
     public static let matchupKey = "matchup"
@@ -75,7 +83,7 @@ public enum PhoneRail {
         case .draftDay:
             [
                 RailTab(key: advisorFirstKey, label: AppWords.Tab.advisor), board, players, sheet,
-                RailTab(key: "mock_late", label: AppWords.Tab.mock),
+                RailTab(key: mockLateKey, label: AppWords.Tab.mock),
             ]
         case .playoffs where !waiversOpen:
             [league, lineup, matchup, trades, week]
