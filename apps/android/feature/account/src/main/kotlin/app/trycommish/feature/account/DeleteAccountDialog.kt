@@ -1,5 +1,6 @@
 package app.trycommish.feature.account
 
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -14,21 +15,27 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogWindowProvider
 import app.trycommish.core.account.DeletionUi
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
@@ -40,7 +47,8 @@ private val FIELD_HEIGHT = 48.dp
 private val DOT = 4.dp
 
 /** The Account's Delete account dialog: the panel over the screen, put away by Back or a tap outside unless
- * the delete is under way. */
+ * the delete is under way. The panel scrolls above the keyboard, and the keyboard's Done puts it away, so
+ * the verb is in reach once the email is typed. */
 @Composable
 fun DeleteAccountDialog(
     ui: DeletionUi,
@@ -49,6 +57,12 @@ fun DeleteAccountDialog(
     close: () -> Unit,
 ) {
     Dialog(onDismissRequest = close) {
+        // The dialog's window gives way to the keyboard, so the panel's scroll reaches the verb under it.
+        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+        SideEffect {
+            @Suppress("DEPRECATION") // adjustResize is still how a dialog's window gives way to the keyboard.
+            window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
         DeleteAccountPanel(ui, type, delete, Modifier.verticalScroll(rememberScrollState()))
     }
 }
@@ -137,6 +151,7 @@ private fun EmailField(
             Box(frame, contentAlignment = Alignment.CenterStart) { Text(ui.typed, style = Faces.body, color = c.ink) }
             return@Column
         }
+        val focus = LocalFocusManager.current
         BasicTextField(
             value = ui.typed,
             onValueChange = type,
@@ -149,7 +164,9 @@ private fun EmailField(
                     capitalization = KeyboardCapitalization.None,
                     autoCorrectEnabled = false,
                     keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Done,
                 ),
+            keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
             modifier = frame.semantics { contentDescription = Words.DeleteAccount.confirm },
             decorationBox = { field ->
                 Box(Modifier.fillMaxWidth().heightIn(min = FIELD_HEIGHT), contentAlignment = Alignment.CenterStart) { field() }
