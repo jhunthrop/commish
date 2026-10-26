@@ -126,11 +126,27 @@ enum CompareReader {
             )
             return BuiltScreen(
                 model: CompareModel(input), manifest: manifest.value, reads: marks,
-                atClock: { order in
-                    let placed = CompareModel(input.with(order: order))
-                    return placed.atClock ? placed : nil
-                }
+                atClock: atClock(input)
             )
+        }
+    }
+
+    /// The pair at the order's clock: each side read by his name, as the web's Compare reads the pair;
+    /// nil where a read fails or the order does not place both.
+    static func atClock(_ input: CompareInput) -> BuiltScreen<CompareModel>.AtClock {
+        { orders in
+            var reads: [OrderAtClock] = []
+            for name in input.names {
+                guard let read = try? await orders.read(search: name) else {
+                    return nil
+                }
+                reads.append(read)
+            }
+            guard let order = OrderAtClock.merged(reads) else {
+                return nil
+            }
+            let placed = CompareModel(input.with(order: order))
+            return placed.atClock ? placed : nil
         }
     }
 

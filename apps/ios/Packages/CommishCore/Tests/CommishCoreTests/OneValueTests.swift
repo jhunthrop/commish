@@ -74,6 +74,48 @@ struct OneValueTests {
         }
     }
 
+    /// The order ranks more players than one read gives: the Board at its clock draws the rows the read
+    /// reaches, never a run row among them.
+    @Test func theBoardDrawsTheRowsTheOrderReaches() throws {
+        let swift = try #require(Reads.parity.players.first)
+        let full = try Reads.order()
+        var answer = full.answer
+        answer.rows = answer.rows.filter { $0.line.player.boardId != swift.id }
+        let model = try Reads.board(order: OrderAtClock(answer: answer, landed: Reads.now))
+        #expect(model.atClock)
+        #expect(model.rows.map(\.id) == Reads.parity.board.ids.filter { $0 != swift.id })
+    }
+
+    @Test func eachReadIsAskedOncePerClockAndSharedByItsScreens() async throws {
+        let counted = CountedOrder()
+        let orders = OrderReader(api: counted, clock: FixedClock(Reads.now), memo: OrderMemo())
+        async let first = orders.read()
+        async let second = orders.read()
+        _ = try await (first, second)
+        _ = try await orders.read(search: "chi")
+        _ = try await orders.read()
+        #expect(await counted.routes == [OrderReader.query(search: nil).route, OrderReader.query(search: "chi").route])
+        let later = OrderReader(
+            api: counted, clock: FixedClock(Reads.now + OrderReader.window), memo: orders.memo
+        )
+        _ = try await later.read()
+        #expect(await counted.routes.count == 3, "an answer stands for its window alone")
+    }
+
+    /// The order's route over the fixture, counting the reads it is asked.
+    actor CountedOrder: RankingsAPI {
+        private(set) var routes: [String] = []
+
+        func order(_ query: OrderQuery) async throws -> OrderAdvice {
+            routes.append(query.route)
+            return try await StubOrderSearch().order(query)
+        }
+
+        func weekOrder(position: WeekOrderPosition) async throws -> WeekOrderAdvice {
+            try await StubOrderSearch().weekOrder(position: position)
+        }
+    }
+
     @Test func aPositionViewAtTheOrdersClockDrawsNoTiers() throws {
         let model = try BoardModel(
             read: RunFixture.oneValue.read(format: Reads.ppr), position: .runningBack, inSeason: true,

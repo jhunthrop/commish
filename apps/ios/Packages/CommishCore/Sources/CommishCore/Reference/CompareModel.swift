@@ -135,6 +135,16 @@ struct CompareInput: Sendable {
     /// The order at the screen's clock, nil while unread.
     var order: OrderAtClock?
 
+    /// The players set on the sides, by name, whose order a pair reads.
+    var names: [String] {
+        sides.compactMap { found in
+            if case let .player(player) = found {
+                return player.name
+            }
+            return nil
+        }
+    }
+
     func with(order: OrderAtClock) -> CompareInput {
         var placed = self
         placed.order = order

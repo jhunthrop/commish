@@ -131,9 +131,11 @@ extension RunScreenViewModel {
     /// The screen at the order's clock once the order answers and places every row it draws; a failed
     /// read, a newer build, or an answer that does not place them leaves the run's screen standing.
     private func place(_ built: BuiltScreen<Model>, freshness: Freshness, generation mine: Int) async {
-        guard let orders, let atClock = built.atClock, let read = try? await orders.read(), mine == generation,
-              let model = atClock(read)
-        else {
+        guard let orders, let atClock = built.atClock else {
+            return
+        }
+        let model = await atClock(orders)
+        guard mine == generation, let model else {
             return
         }
         state = .loaded(model, freshness)

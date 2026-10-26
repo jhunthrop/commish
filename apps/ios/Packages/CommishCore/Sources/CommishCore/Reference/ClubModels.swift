@@ -304,7 +304,11 @@ public extension RunScreenViewModel where Model == ClubsModel {
             let files = try await ClubFiles.read(reads, sources: false)
             return BuiltScreen(
                 model: ClubsModel(files, zone: zone), manifest: files.manifest.value, reads: files.marks,
-                atClock: { order in
+                atClock: { orders in
+                    // Every club's first three: the order's first rows, which a club's leads are among.
+                    guard let order = try? await orders.read() else {
+                        return nil
+                    }
                     let placed = ClubsModel(files, zone: zone, order: order)
                     return placed.atClock ? placed : nil
                 }
@@ -336,8 +340,12 @@ public extension RunScreenViewModel where Model == ClubPageModel {
             }
             return BuiltScreen(
                 model: model, manifest: files.manifest.value, reads: files.marks,
-                atClock: { order in
-                    ClubPageModel(files, abbr: abbr, now: now, zone: zone, order: order)
+                atClock: { orders in
+                    // Every player of the club, read by its name as the web's club page reads him.
+                    guard let order = try? await orders.read(search: abbr) else {
+                        return nil
+                    }
+                    return ClubPageModel(files, abbr: abbr, now: now, zone: zone, order: order)
                         .flatMap { $0.atClock ? $0 : nil }
                 }
             )

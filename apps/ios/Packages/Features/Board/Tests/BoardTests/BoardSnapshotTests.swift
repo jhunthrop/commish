@@ -75,7 +75,7 @@ struct BoardSnapshotTests {
                 return nil
             }
             return OrderReader(
-                api: StubRankings(clock: OneValueFixture.clock, offline: self == .clockUnread),
+                api: StubOrderSearch(offline: self == .clockUnread),
                 clock: FixedClock(now), memo: OrderMemo()
             )
         }

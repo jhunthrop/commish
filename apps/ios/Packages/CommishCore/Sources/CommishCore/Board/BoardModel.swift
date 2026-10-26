@@ -169,10 +169,11 @@ public enum BoardColumns: Equatable, Sendable {
 /// The Board screen as the web's board says it at 390, from the run (GET /run/manifest, /run/boards,
 /// /run/adp, /run/designations): the heading, the run's stamp and, in season, the weeks it ranks; the
 /// format and position chips; the view's rows in the run's order, a position's in its tiers with their
-/// cliffs; and the basis once. In season, once the order the Rankings read (GET /order) places every
-/// ranked row the view draws, the rows carry the order's figures in its order, a position's with no
-/// tiers (they are the run's), and the order's lead takes the board sentence's place; until then the
-/// run's rows stand and the basis says the run's day and time (Lane 224, LiveOrder).
+/// cliffs; and the basis once. In season, once the order the Rankings read (GET /order) answers, the
+/// view is the order's: the run's rows it places, in its order with its figures (as far as its read
+/// reaches, as the web's Rest of season, which is the order, reaches), a position's with no tiers (they
+/// are the run's), and the order's lead in the board sentence's place; until then the run's rows stand
+/// and the basis says the run's day and time (Lane 224, LiveOrder).
 public struct BoardModel: Equatable, Sendable {
     public let words: BoardWords
     /// "Updated Oct 21": the run every number comes from.
@@ -276,8 +277,9 @@ public struct BoardModel: Equatable, Sendable {
 
 /// A view's sections over the run's board: All in the run's order, a ranked position in its tiers then
 /// its season-long list, a kicker's or a defense's list in the drafts' order. At the order's clock a
-/// ranked view's rows in the order's order with its figures, a position's as one run with no tiers, when
-/// the order places every one of them.
+/// ranked view is the rows the order places, in its order with its figures, a position's as one run with
+/// no tiers; the rows its read does not reach are not drawn, so no row of the run's clock stands among
+/// them.
 private struct ViewRows {
     let sections: [BoardSection]
     /// The view's ranked rows carry a Gap (format/gap.ts carriesGap).
@@ -294,8 +296,9 @@ private struct ViewRows {
         at clock: (places: [String: LivePlace], teams: Int)?
     ) {
         let drawn = position.map { BoardOrder.at(board.rows, position: $0) } ?? board.rows
-        if position?.draftOrder != true, let clock,
-           let placed = LiveOrder.placed(drawn, id: \.id, places: clock.places) {
+        let reached = clock.map { clock in drawn.filter { clock.places[$0.id] != nil } } ?? []
+        if position?.draftOrder != true, let clock, !reached.isEmpty,
+           let placed = LiveOrder.placed(reached, id: \.id, places: clock.places) {
             let rows = placed.map { cells.ranked($0.row, figures: $0.row.figures.at($0.place, teams: clock.teams)) }
             sections = [BoardSection(id: position?.rawValue ?? "all", head: nil, band: nil, rows: rows)]
             carriesGap = false

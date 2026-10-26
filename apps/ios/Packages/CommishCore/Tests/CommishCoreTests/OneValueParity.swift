@@ -152,7 +152,7 @@ struct OneValueReads {
 
     static func orders(offline: Bool = false) -> OrderReader {
         OrderReader(
-            api: StubRankings(clock: OneValueFixture.clock, offline: offline), clock: FixedClock(now), memo: OrderMemo()
+            api: StubOrderSearch(offline: offline), clock: FixedClock(now), memo: OrderMemo()
         )
     }
 

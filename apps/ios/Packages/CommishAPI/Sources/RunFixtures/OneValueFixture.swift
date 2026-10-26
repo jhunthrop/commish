@@ -50,3 +50,39 @@ public struct StubOneValueWeeks: PlayerWeekAPI {
         return try OneValueFixture.week(player)
     }
 }
+
+/// The order's route over the fixture's every-position answer at a clock, as the API answers a search
+/// (api inseason/order.go matches): the rows whose name or club holds the letters, any case, accents
+/// aside, each keeping his place; every read failing with no signal while `offline`.
+public struct StubOrderSearch: RankingsAPI {
+    public let clock: String
+    public let offline: Bool
+
+    public init(clock: String = OneValueFixture.clock, offline: Bool = false) {
+        self.clock = clock
+        self.offline = offline
+    }
+
+    public func order(_ query: OrderQuery) async throws -> OrderAdvice {
+        guard !offline else {
+            throw URLError(.notConnectedToInternet)
+        }
+        var answer = try RankingsFixture.order("", at: clock)
+        guard let search = query.search.map(Self.folded) else {
+            return answer
+        }
+        answer.rows = answer.rows.filter { row in
+            Self.folded(row.line.player.name).contains(search) || Self.folded(row.line.player.team).contains(search)
+        }
+        answer.total = answer.rows.count
+        return answer
+    }
+
+    public func weekOrder(position: WeekOrderPosition) async throws -> WeekOrderAdvice {
+        try await StubRankings(clock: clock, offline: offline).weekOrder(position: position)
+    }
+
+    static func folded(_ text: String) -> String {
+        text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US"))
+    }
+}
