@@ -10,10 +10,11 @@
  * Written by export-parity.ts beside the others.
  *
  * Since Lane 209 the web's phone row draws its figures as labelled cells (FigureStrip), pinned here as
- * `cells` from the web's own builders (stripCells, weekStripCells). The apps' rows still fold the
- * figures into one line under the name with the shorter "Opp" sentence: `folded` and the basis's Opp
- * sentence keep what the apps draw, their values from the web's cell builders, until B196 draws the
- * strip in the apps and both go. */
+ * `cells` from the web's own builders (stripCells, weekStripCells), with `stripBasis` the phone's basis
+ * the web draws beside them ("Opp rank is ..."). The iOS row draws the strip (Lane 215, B196) and is
+ * held to `cells` and `stripBasis`. The Android row still folds the figures into one line under the
+ * name with the shorter "Opp" sentence: `folded` and `basis` keep what it draws, their values from the
+ * web's cell builders, until Lane 216 draws the strip there and both go. */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { hitsWords } from '../../web/src/lib/format/pool-words.ts';
@@ -23,6 +24,7 @@ import {
 	figureCell,
 	formCells,
 	oppCell,
+	stripShare,
 	type StripCell
 } from '../../web/src/lib/league/box/figure-strip.ts';
 import {
@@ -151,12 +153,17 @@ function playerCell(box: BoxRow): unknown {
 	};
 }
 
-/** The web's strip as the parity pins it: each cell's head and value, and whether it is the key. */
+/** The web's strip as the parity pins it: each cell's head and value, whether it is the key, the
+ * opponent's tint (null on every other cell and on an opponent's cell without a rank), whether it is
+ * the narrow cell, and its share of the strip's width (stripShare, as stripTracks lays it out). */
 function cellsOf(cells: readonly StripCell[]): unknown[] {
 	return cells.map((c) => ({
 		head: c.head,
 		value: c.value,
-		key: c.key === true
+		key: c.key === true,
+		ease: c.ease ?? null,
+		narrow: c.narrow === true,
+		share: stripShare(c)
 	}));
 }
 
@@ -198,6 +205,7 @@ function orderRow(
 function orderCase(advice: OrderAdvice, chip: PlayersChip | null, q: string, now: number): unknown {
 	const views = advice.rows.map((row) => orderView(row, ZONE, chip === null, now, true));
 	const filtered = q.trim().length >= MIN_SEARCH || chip !== null;
+	const phoneBasis = drawnText(orderBasis(advice, null, ZONE, now), 'phone');
 	return {
 		lead: playersLead(true, false, advice.week) ?? null,
 		hits: hitsWords(advice.total, filtered, advice.on_club),
@@ -214,7 +222,8 @@ function orderCase(advice: OrderAdvice, chip: PlayersChip | null, q: string, now
 			})
 		})),
 		more: advice.total > advice.rows.length,
-		basis: appBasis(drawnText(orderBasis(advice, null, ZONE, now), 'phone'))
+		basis: appBasis(phoneBasis),
+		stripBasis: phoneBasis
 	};
 }
 

@@ -5,8 +5,8 @@ import Foundation
 /// The Rankings' bases as a phone says them with no league (order.ts orderBasis and week.ts weekBasis,
 /// drawnText for the phone), ported and held to the web's paragraphs by the parity file.
 enum RankingsBasis {
-    /// orderBasis with no league: the API's basis, the week column and what its Proj is, Opp, and when
-    /// Final and the stats land while a row waits on either.
+    /// orderBasis with no league: the API's basis, the week cell and what its Proj is, Opp rank under
+    /// the strip's own head, and when Final and the stats land while a row waits on either.
     static func order(_ advice: OrderAdvice, zone: TimeZone, now: Date) -> String {
         let lines = advice.rows.map(\.line)
         let week = "\(RankingsWords.weekHead(advice.week)) is \(Words.Box.pts) once final, "
@@ -17,7 +17,7 @@ enum RankingsBasis {
         let parts: [String?] = [
             advice.basis,
             "\(week) \(projected)",
-            Words.Basis.oppPhone,
+            Words.Basis.oppPart,
             LineupBasis.kickedOffPart(lines: lines, now: now),
         ]
         return parts.compactMap(\.self).filter { !$0.isEmpty }.joined(separator: " ")

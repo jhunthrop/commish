@@ -2,6 +2,7 @@
  * Pure, so every page reads an error the same way. */
 import { resolve } from '$app/paths';
 import { ApiError, signInHref } from './api.ts';
+import { MOCK } from './mock-words.ts';
 
 /** The page that hit the error: the reader's own mock or its report, a shared link, a lobby, setup. */
 export type NoticeSubject = 'mock' | 'share' | 'lobby' | 'setup';
@@ -100,8 +101,7 @@ function refused(error: ApiError, subject: NoticeSubject): NoticeView | null {
 }
 
 export function noticeFor(error: unknown, subject: NoticeSubject, returnTo: string): NoticeView {
-	if (!(error instanceof ApiError))
-		return { text: 'The room could not be reached. Check the connection and reload.' };
+	if (!(error instanceof ApiError)) return { text: MOCK.unreachable };
 	switch (error.status) {
 		case HTTP.unauthorized:
 			return signedOut(subject, returnTo);

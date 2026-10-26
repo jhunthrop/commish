@@ -77,7 +77,8 @@ extension CompanionParityTests {
             let turns = try #require(web["turns"] as? String)
             #expect(entry.line == ([turns] + [lines["zone"] as? String].compactMap(\.self)).joined(separator: " "))
         }
-        #expect(DraftDayEntry(phase: .preDraft, draftAt: nil, now: now, zone: .current) == nil)
+        // Before the draft the entry carries the mock draft instead (Lane 213).
+        #expect(DraftDayEntry(phase: .preDraft, draftAt: nil, now: now, zone: .current)?.opens == .mock)
         #expect(DraftDayEntry(phase: .inSeason, draftAt: nil, now: now, zone: .current) == nil)
     }
 }

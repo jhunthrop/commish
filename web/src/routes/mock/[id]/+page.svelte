@@ -3,7 +3,6 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { pickLabel } from '#lib/format/draft.ts';
 	import LiveRegion from '#lib/ui/LiveRegion.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Search from '#lib/ui/Search.svelte';
@@ -12,6 +11,7 @@
 	import { COPIED_MS, copyShareLink } from '#lib/room/actions.ts';
 	import { Flash } from '#lib/room/flash.svelte.ts';
 	import { type Board, boardOf } from '#lib/room/model.ts';
+	import { MOCK, undoneWords } from '#lib/room/mock-words.ts';
 	import RoomNotice from '#lib/room/RoomNotice.svelte';
 	import SoloRoom from '#lib/room/SoloRoom.svelte';
 
@@ -109,13 +109,11 @@
 	}
 
 	/** The undo's line: the pick it went back to, who is back in the pool, and that the room branched. */
-	function undoneWords(pick: number): string | null {
+	function undone(pick: number): string | null {
 		if (!room || !board) return null;
 		const made = room.picks.find((p) => p.pick === pick);
 		const player = made ? board.byId.get(made.player_id) : undefined;
-		const at = pickLabel(pick, room.teams);
-		const back = player ? ` ${player.name} is in the pool again.` : '';
-		return `Back to ${at}.${back} Same bots, same seed, so the room drafts the same until your pick goes another way.`;
+		return undoneWords(pick, room.teams, player?.name ?? null);
 	}
 
 	async function share(): Promise<void> {
@@ -156,7 +154,7 @@
 	{/snippet}
 	{#snippet tail()}
 		<!-- A room that never loaded shows its notice with New mock, so the bar leaves it out. -->
-		{#if room !== null || !error}<Quiet href={resolve('/mock/new')}>New mock</Quiet>{/if}
+		{#if room !== null || !error}<Quiet href={resolve('/mock/new')}>{MOCK.newMock}</Quiet>{/if}
 	{/snippet}
 	{#if error}
 		<div class="notice">
@@ -174,7 +172,7 @@
 			callMissing={cardMissing}
 			copied={copied.on}
 			onpick={(player: string) => act(() => rooms.pick(id, player, room?.pick_number ?? 0))}
-			onundo={(pick: number) => act(() => rooms.undo(id, pick), undoneWords(pick))}
+			onundo={(pick: number) => act(() => rooms.undo(id, pick), undone(pick))}
 			onautopick={(round: number) => act(() => rooms.autopick(id, round))}
 			onfinish={() => act(() => rooms.finish(id))}
 			onqueue={setQueue}

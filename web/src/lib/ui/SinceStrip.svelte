@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { DEFAULT_TEAMS, pickLabel } from '#lib/format/draft.ts';
+	import { MOCK } from '#lib/room/mock-words.ts';
 	import { sinceLead, sinceQueued, straightBack } from '#lib/room/words.ts';
 	import type { WentPick } from '#lib/types/room.ts';
 	import Panel from './Panel.svelte';
@@ -37,7 +38,7 @@
 		picks={went.map(({ player, pick, queued }) => ({
 			key: pick,
 			player,
-			lines: queued ? [pickLabel(pick, teams), 'queued'] : [pickLabel(pick, teams)],
+			lines: queued ? [pickLabel(pick, teams), MOCK.queuedTag] : [pickLabel(pick, teams)],
 			ring: queued ? 'accent' : undefined
 		}))}
 	/>

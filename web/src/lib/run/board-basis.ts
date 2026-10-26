@@ -17,8 +17,9 @@ export interface BasisPart {
 	/** False for a part drawn on a phone alone: the short form of a sentence another part says at a
 	 * desk (Lane 111, the box scores' eight phone lines). Absent, the part is drawn at a desk. */
 	desk?: false;
-	/** The Gap's sentence, which a screen whose rows carry no gap leaves out (Compare's pair). */
-	topic?: 'gap';
+	/** The Gap's sentence, which a screen whose rows carry no gap leaves out (Compare's pair); the
+	 * board's sentence, which a page at the order's clock says in the order's words (live-order.ts). */
+	topic?: 'gap' | 'board';
 	/** A part drawn as a link: the page its words open (the league's rules, our record). */
 	href?: string;
 	/** A clause of the sentence the part before opens, drawn with no space before it, so a sentence
@@ -78,7 +79,9 @@ export function boardBasis(facts: BasisFacts): BasisPart[] {
 					{ text: ourBoard(facts), phone: true }
 				]
 			: [
-					...(facts.headSaysBoard ? [] : [{ text: ourBoard(facts), phone: true }]),
+					...(facts.headSaysBoard
+						? []
+						: [{ text: ourBoard(facts), phone: true, topic: 'board' as const }]),
 					...(facts.position
 						? [{ text: `Tiers are drawn within ${facts.position}.`, phone: true }]
 						: []),

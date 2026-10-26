@@ -35,10 +35,11 @@ public struct RoomWall: Equatable, Sendable {
     public let rows: [[WallCell]]
 
     /// model.ts wallRows through `shown` rounds of `rounds`; `now` is the pick on the clock, nil once
-    /// the draft is over.
+    /// the draft is over; `shared` for a reader of someone else's draft (Wall.svelte's whose), whose
+    /// drafter's turn reads "Their pick".
     public init(
         picks: [PlacedPick], board: RoomBoardView, names: [String], you: Int, teams: Int, rounds: Int, shown: Int,
-        now: Int?
+        now: Int?, shared: Bool = false
     ) {
         let byPick = Dictionary(picks.map { ($0.pick, $0.playerID) }, uniquingKeysWith: { first, _ in first })
         title = Words.Room.wall
@@ -53,7 +54,8 @@ public struct RoomWall: Equatable, Sendable {
                     id: pick, seat: seat, player: player, name: player.map { DraftFormat.lastName($0.name) },
                     line: player.map { "\($0.position) · \($0.team)" }, mine: player != nil && seat == you,
                     now: onClock ? WallClock(
-                        words: seat == you ? Words.Room.yourPick : Words.Room.onTheClock,
+                        words: seat == you ? (shared ? Words.Room.theirPick : Words.Room.yourPick) : Words.Room
+                            .onTheClock,
                         pick: DraftFormat.pickLabel(pick, teams: teams)
                     ) : nil
                 )

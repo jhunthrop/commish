@@ -3,6 +3,7 @@
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import type { LeagueSettings } from '../api.ts';
+	import { MOCK } from '../mock-words.ts';
 	import CustomRules from './CustomRules.svelte';
 	import { rulesFrom, type ScoringRules } from './rules.ts';
 	import { SCORING_CHOICES } from './setup.ts';
@@ -42,9 +43,9 @@
 	}
 </script>
 
-<SetupRow label="Scoring" note={own ? "your league's own rules" : undefined}>
+<SetupRow label={MOCK.scoring} note={own ? "your league's own rules" : undefined}>
 	<!-- Loose, so the five chips wrap inside a phone's width. -->
-	<ChipGroup label="Scoring" variant="loose">
+	<ChipGroup label={MOCK.scoring} variant="loose">
 		{#each SCORING_CHOICES as c (c.preset)}
 			<Chip
 				pressed={!own && !asked && scoring.preset === c.preset}

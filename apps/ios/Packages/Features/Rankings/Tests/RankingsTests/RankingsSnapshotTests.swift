@@ -11,9 +11,11 @@ import Testing
 /// The Rankings' mock: the fixture's order with no league through the view model at the week's clock
 /// (Saturday noon Central), both themes, iPhone 17 Pro and iPhone SE, at 1x: the top in season (every
 /// position), a position's view (WR), the kickers' week (K), a search ("wa", the matches at their places
-/// in the order), and the order saved and read again with no signal, stale with its stamp. A face draws
-/// its initials here (a snapshot loads no image). With SNAPSHOT_SHOTS set each is also written at its
-/// phone's own scale for the persona panel.
+/// in the order), a row whose game line wraps (the RB view: Travis Etienne's kickoff, weather glyph and
+/// "Due back" chip take two lines), every position scrolled to its three-digit ranks ("WR 125" to
+/// "WR 138", each pill whole), and the order saved and read again with no signal, stale with its stamp.
+/// A face draws its initials here (a snapshot loads no image). With SNAPSHOT_SHOTS set each is also
+/// written at its phone's own scale for the persona panel.
 @MainActor
 struct RankingsSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -26,18 +28,37 @@ struct RankingsSnapshotTests {
         case position
         case kicker
         case search
+        case wrapped
+        case deep
         case stale
 
         var chip: RankingsChip? {
             switch self {
             case .position: .receiver
             case .kicker: .kicker
+            case .wrapped: .runningBack
             default: nil
             }
         }
 
         var query: String {
             self == .search ? "wa" : ""
+        }
+
+        /// The rows drawn: on the wrapped scene the list as far as the RB view's fifth row, its end in
+        /// view, as the phone shows it scrolled to Travis Etienne's row (the fourth); on the deep scene
+        /// every position's as far as its eightieth, scrolled to the three-digit receivers (review H1).
+        var rows: Int {
+            switch self {
+            case .wrapped: 5
+            case .deep: 80
+            default: RankingsMock.firstRows
+            }
+        }
+
+        /// The room shows the end of the rows drawn, as a list scrolled down to them.
+        var scrolled: Bool {
+            self == .wrapped || self == .deep
         }
     }
 
@@ -77,7 +98,10 @@ struct RankingsSnapshotTests {
         guard case let .loaded(content, _, _) = viewModel.state else {
             throw SceneError.notLoaded(item.scene.rawValue)
         }
-        return RankingsMock(viewModel: viewModel, content: content, device: item.device)
+        return RankingsMock(
+            viewModel: viewModel, content: content, device: item.device, rows: item.scene.rows,
+            scrolled: item.scene.scrolled
+        )
     }
 
     @Test(arguments: 0 ..< cases.count)
@@ -110,6 +134,9 @@ struct RankingsMock: View {
     let viewModel: RankingsViewModel
     let content: RankingsContent
     let device: SnapshotDevice
+    var rows = firstRows
+    /// The room shows the end of the rows drawn, as a list scrolled down to them.
+    var scrolled = false
 
     /// Rows enough to fill the first screen of the tallest phone.
     static let firstRows = 8
@@ -123,10 +150,10 @@ struct RankingsMock: View {
         RankingsScreen(
             name: viewModel.name, lead: viewModel.lead, stamp: viewModel.stampWords, chip: viewModel.chip,
             query: viewModel.query, content: content, more: viewModel.more, actions: .none, still: true,
-            rows: Self.firstRows
+            rows: rows
         )
         .fixedSize(horizontal: false, vertical: true)
-        .frame(height: room, alignment: .top)
+        .frame(height: room, alignment: scrolled ? .bottom : .top)
         .clipped()
     }
 }

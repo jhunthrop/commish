@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../Packages"
 packages=("$@")
 if [ ${#packages[@]} -eq 0 ]; then
-  packages=(CommishAPI CommishDesign CommishCore Features/LeagueHome Features/Shell Features/Start Features/Matchup Features/Board Features/Waivers Features/Player Features/Trades Features/Rankings Features/Record Features/Account Features/Reference Features/Companion)
+  packages=(CommishAPI CommishDesign CommishCore Features/LeagueHome Features/Shell Features/Start Features/Matchup Features/Board Features/Waivers Features/Player Features/Trades Features/Rankings Features/Record Features/Account Features/Reference Features/Companion Features/MockRoom)
 fi
 flags=()
 developer_dir="$(xcode-select -p)"

@@ -20,9 +20,8 @@ public struct RankingsModel: Equatable, Sendable {
 
     public init(advice: OrderAdvice, chip: RankingsChip?, query: String, inSeason: Bool, zone: TimeZone, now: Date) {
         let rankBy = RankBy(advice.rankBy)
-        let rows = advice.rows.map {
-            RankingsRows.row($0, rankBy: rankBy, pillRank: chip == nil, zone: zone, now: now)
-        }
+        let viewing = OrderViewing(rankBy: rankBy, week: advice.week, pillRank: chip == nil)
+        let rows = advice.rows.map { RankingsRows.row($0, view: viewing, zone: zone, now: now) }
         let searched = query.trimmingCharacters(in: .whitespaces).count >= OrderQuery.minSearch
         lead = RankingsWords.lead(inSeason: inSeason, onWeekChip: false, week: advice.week)
         hits = RankingsWords.hits(total: advice.total, filtered: searched || chip != nil, onClub: advice.onClub)
@@ -44,7 +43,8 @@ public struct RankingsModel: Equatable, Sendable {
     }
 }
 
-/// The order's heads: the # head, the week's ("Wk 6") and the big figure's (Projected).
+/// The order's heads: the # head, the week's ("Wk 6", pinned by the parity; drawn as the strip's Wk
+/// cell's head, not in the head row) and the big figure's (Projected).
 public struct RankingsHeads: Equatable, Sendable {
     public let rank: String
     public let week: String
