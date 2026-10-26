@@ -951,4 +951,8 @@ object Words {
         const val yourLeague = "your league"
         const val leagueAvg = "Avg in your league's scoring."
     }
+
+    object LiveOrder {
+
+    }
 }

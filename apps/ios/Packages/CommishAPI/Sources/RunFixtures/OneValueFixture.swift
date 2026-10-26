@@ -51,9 +51,11 @@ public struct StubOneValueWeeks: PlayerWeekAPI {
     }
 }
 
-/// The order's route over the fixture's every-position answer at a clock, as the API answers a search
-/// (api inseason/order.go matches): the rows whose name or club holds the letters, any case, accents
-/// aside, each keeping his place; every read failing with no signal while `offline`.
+/// The order's route over the fixture's every-position answers at a clock, as the API answers them
+/// (api inseason/order.go): with the byes last the Rankings' read (order-<clock>.json, its first hundred
+/// rows), else the whole read with the byes in their places (order-all-<clock>.json); a search keeps the
+/// rows whose name or club holds the letters, any case, accents aside, each keeping his place; then the
+/// read's limit, `total` counting the rows before it; every read failing with no signal while `offline`.
 public struct StubOrderSearch: RankingsAPI {
     public let clock: String
     public let offline: Bool
@@ -67,14 +69,14 @@ public struct StubOrderSearch: RankingsAPI {
         guard !offline else {
             throw URLError(.notConnectedToInternet)
         }
-        var answer = try RankingsFixture.order("", at: clock)
-        guard let search = query.search.map(Self.folded) else {
-            return answer
+        var answer = try RankingsFixture.order(query.byesLast ? "" : "-all", at: clock)
+        if let search = query.search.map(Self.folded) {
+            answer.rows = answer.rows.filter { row in
+                Self.folded(row.line.player.name).contains(search) || Self.folded(row.line.player.team).contains(search)
+            }
+            answer.total = answer.rows.count
         }
-        answer.rows = answer.rows.filter { row in
-            Self.folded(row.line.player.name).contains(search) || Self.folded(row.line.player.team).contains(search)
-        }
-        answer.total = answer.rows.count
+        answer.rows = Array(answer.rows.prefix(query.limit))
         return answer
     }
 

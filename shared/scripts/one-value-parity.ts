@@ -1,21 +1,23 @@
 /** One value and one order for a player on the apps' in-season screens (Lane 224, B207, the apps'
  * follow of Lane 220's web rule, web/src/lib/run/live-order.ts and player/live-figures.ts): what the
- * web prints for three players (an RB whose game has kicked off, a WR whose game is final, a QB still
- * to play) on every view that ranks or scores them, once the order the Rankings read has answered and
+ * web prints for three players (an RB whose game has kicked off, a WR whose game is final, a QB on
+ * bye) on every view that ranks or scores them, once the order the in-season pages read has answered and
  * while it has not, as JSON the apps' ports are held to; and the stand-in run those views are built
  * from, in the run routes' layout, for the apps' tests and snapshots.
  *
  * STAND-IN, named so: no fixture run holds the order's players (the contract run has four others),
  * so `shared/fixtures/one-value-run` is made here from the fixture order. Its PPR board is the
- * Saturday order's rows (2026-10-17T17-00-00Z, every week 6 game still to come) placed one lower
+ * Saturday order's whole read (order-all-2026-10-17T17-00-00Z, every week 6 game still to come, the
+ * byes in their places) placed one lower
  * than the order, as a run made before a kickoff ranks a player the read has since moved past
  * (Lane 220's one-value.test.ts did the same); its manifest, clubs, schedule and ADP are the contract
  * run's, made Thursday Oct 15 before week 6 (the order's from_week). The three players' pages carry
  * that row in PPR and its figures scaled by the contract run's own Half PPR and Standard ratios in the
  * other two formats (`FORMAT_SCALE`), and their weeks (GET /players/{id}/week) are the Sunday order's
  * line with the rest-of-season figures the same scaling gives at the read's clock. Every rank and
- * figure the views print at the read's clock is the Sunday order's (2026-10-18T18-56-00Z, the
- * Rankings' own read, byes last).
+ * figure the views print at the read's clock is the Sunday order's whole read (order-all-
+ * 2026-10-18T18-56-00Z): the web's live-order-read.ts and the apps' OrderReader keep the byes in their
+ * places, so a bye club's players are within the API's 400 rows (Lane 224 review H1).
  *
  * Written by export-parity.ts beside the others. */
 import { readFile } from 'node:fs/promises';
@@ -32,6 +34,7 @@ import { lineFiguresAt, lineRanksAt } from '../../web/src/lib/player/live-figure
 import type { BasisPart } from '../../web/src/lib/run/board-basis.ts';
 import { leadOf } from '../../web/src/lib/run/held-places.ts';
 import {
+	LIVE_ORDER_WORDS,
 	basisAtClock,
 	inScoring,
 	livePlaces,
@@ -75,7 +78,7 @@ const TEAMS = 12;
 /** The stand-in's places: one below the order's, its Over repl. one higher. */
 const RUN_OFFSET = 1;
 /** The players the parity names: the brief's three positions, each a game state of week 6. */
-export const PLAYERS = ["D'Andre Swift", 'Parker Washington', 'Patrick Mahomes'] as const;
+export const PLAYERS = ["D'Andre Swift", 'Parker Washington', 'Joe Burrow'] as const;
 /** The contract run's page the stand-in pages are shaped from (its season block and its keys). */
 const PAGE_TEMPLATE = '4429795';
 /** The run's formats in the manifest's order: the PPR board, then the two the pages scale to. */
@@ -94,6 +97,8 @@ const FORMAT_SCALE: Readonly<Record<FormatId, number>> = {
 };
 /** The game states his own rest of season starts after: a game kicked off counts from the next week. */
 const STARTED = new Set(['kicked_off', 'final']);
+/** The live run's board against one read (Lane 224 report): 400 of 627. */
+const REACH_SAMPLE = { shown: 400, total: 627 } as const;
 /** A club card's pool, its first players on the board (server/pages/clubs.ts CLUB_LEAD_POOL). */
 const CLUB_LEAD_POOL = 3;
 
@@ -126,7 +131,7 @@ async function readJson<T>(path: string): Promise<T> {
 }
 
 async function order(clock: string): Promise<OrderAdvice> {
-	return (await readJson<{ data: OrderAdvice }>(`${INSEASON}/order-${clock}.json`)).data;
+	return (await readJson<{ data: OrderAdvice }>(`${INSEASON}/order-all-${clock}.json`)).data;
 }
 
 /** A tenth as the run's figures round, so the apps read the same number the web does. */
@@ -362,6 +367,8 @@ function bases(sunday: OrderAdvice): Json {
 	return {
 		lead: lead.text,
 		stamp: stamp?.text ?? null,
+		// The Board's count when one read reaches fewer players than it ranks (the live run's 627).
+		reach: { shown: REACH_SAMPLE.shown, total: REACH_SAMPLE.total, text: LIVE_ORDER_WORDS.reach(REACH_SAMPLE.shown, REACH_SAMPLE.total) },
 		sample: texts(runBasis),
 		unread: texts(basisAtClock(runBasis, null, stamp)),
 		read: texts(basisAtClock(runBasis, lead, stamp)),
@@ -396,7 +403,7 @@ function renderParity(
 		runAt: RUN_AT,
 		zone: ZONE,
 		teams: TEAMS,
-		order: `${INSEASON}/order-${SUNDAY}.json`,
+		order: `${INSEASON}/order-all-${SUNDAY}.json`,
 		run: `${ONE_VALUE_RUN}/runs/${ONE_VALUE_RUN_ID}/boards/${FORMATS[0].id}.json`,
 		players: PLAYERS.map((name) => playerViews(name, rows, sunday, places)),
 		board: { ids: placedRows(rows, places, TEAMS)?.map((row) => row.id) ?? null },

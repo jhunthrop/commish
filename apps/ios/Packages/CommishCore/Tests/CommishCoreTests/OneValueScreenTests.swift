@@ -80,46 +80,62 @@ struct OneValueScreenTests {
     }
 
     /// The three players' rank at their position and rest-of-season points on every screen at the
-    /// order's clock are the Rankings' (the web's one-value.test.ts over the apps' screens).
+    /// order's clock are the Rankings' (the web's one-value.test.ts over the apps' screens), each cell
+    /// drawn and read; the overall number is the API's whole read's, the one the web prints, until the
+    /// Rankings' byes-last number and it are one (Lane 234's overall_rank).
     @Test func everyScreenAgreesWithTheRankings() async throws {
-        let rankings = try RankingsModel(
-            advice: Reads.order().answer, chip: nil, query: "", inSeason: true, zone: Reads.zone, now: Reads.now
+        let order = try Reads.order()
+        // The Rankings over every row the order gives (their pills and figures do not move with the byes).
+        let rankings = RankingsModel(
+            advice: order.answer, chip: nil, query: "", inSeason: true, zone: Reads.zone, now: Reads.now
         )
-        let board = try Reads.board(order: Reads.order())
+        let board = try Reads.board(order: order)
         let compared = try await reads.table(reads.loaded(reads.compare(orders: Reads.orders())))
+        let clubs = try await reads.clubs(orders: Reads.orders())
+        let leaders = clubs.clubs.compactMap(\.lead).filter { lead in
+            Reads.parity.players.contains { $0.id == lead.sheetPlayer.id }
+        }
+        #expect(!leaders.isEmpty, "a parity player leads his club's card")
+        let pair = Set(Reads.parity.players.prefix(2).map(\.id))
+        #expect(compared.heads.count == 2)
+        #expect(Set(compared.heads.map(\.id)) == pair, "Compare draws the parity's pair")
         for player in Reads.parity.players {
-            let ranked = try #require(rankings.rows.first { $0.player.key == player.id })
+            let ranked = try #require(rankings.rows.first { $0.player.key == player.id }, "\(player.name)")
+            let points = try #require(Double(ranked.total), "\(player.name)")
             #expect(ranked.rank == player.order.rank)
             let club = try await reads.club(player.team, orders: Reads.orders())
             let page = try await reads.page(player, offline: false)
-            let row = { (rows: [BoardRow]) in rows.first { $0.id == player.id } }
-            let shown = [
-                Shown(
-                    screen: "board",
-                    pill: row(board.rows)?.pill,
-                    points: row(board.rows).flatMap { Double($0.projected) }
-                ),
-                Shown(
-                    screen: "club",
-                    pill: row(club.rows)?.pill,
-                    points: row(club.rows).flatMap { Double($0.projected) }
-                ),
-                Shown(
-                    screen: "player", pill: page.hero.pill,
-                    points: page.formats?.rows.first.flatMap { Double($0.points) }
-                ),
-                Shown(screen: "formats", pill: page.formats?.rows.first?.rank, points: nil),
-            ]
-            for screen in shown {
+            for screen in try shown(player, board: board, club: club, page: page) {
                 #expect(screen.pill == ranked.player.pill, "\(screen.screen): \(player.name)")
-                #expect(screen.points.map { $0 == Double(ranked.total) } != false, "\(screen.screen): \(player.name)")
+                if let drawn = screen.points {
+                    #expect(drawn == points, "\(screen.screen): \(player.name)")
+                }
             }
-            // Compare draws the first two players.
+            if let lead = leaders.first(where: { $0.sheetPlayer.id == player.id }) {
+                #expect(lead.pill == ranked.player.pill, "clubs: \(player.name)")
+                #expect(lead.rank == "\(Words.ClubPage.ourRank) \(player.order.rank)", "clubs: \(player.name)")
+            }
             if let column = compared.heads.firstIndex(where: { $0.id == player.id }) {
                 #expect(compared.heads[column].pill == ranked.player.pill, "compare: \(player.name)")
                 let ourRank = compared.rows.first { $0.label == "Our rank" }?.cells[column].text
-                #expect(ourRank == String(ranked.rank), "compare: \(player.name)")
+                #expect(ourRank == String(player.order.rank), "compare: \(player.name)")
             }
         }
+    }
+
+    /// His pill and points on the Board, his club and his page, each cell required to be drawn and to
+    /// read as a number; the formats table's rank has no points of its own.
+    private func shown(
+        _ player: OneValueParity.Player, board: BoardModel, club: ClubPageModel, page: PlayerPageModel
+    ) throws -> [Shown] {
+        let onBoard = try #require(board.rows.first { $0.id == player.id }, "board: \(player.name)")
+        let inClub = try #require(club.rows.first { $0.id == player.id }, "club: \(player.name)")
+        let line = try #require(page.formats?.rows.first, "formats: \(player.name)")
+        return try [
+            Shown(screen: "board", pill: onBoard.pill, points: #require(Double(onBoard.projected))),
+            Shown(screen: "club", pill: inClub.pill, points: #require(Double(inClub.projected))),
+            Shown(screen: "player", pill: page.hero.pill, points: #require(Double(line.points))),
+            Shown(screen: "formats", pill: line.rank, points: nil),
+        ]
     }
 }

@@ -62,6 +62,18 @@ struct BoardCells {
         )
     }
 
+    /// A player on a season-long list at the order's clock: the list's word in his pill and no figure,
+    /// as the Rankings draw him (the order values none for him, and the run's are another clock's).
+    func listed(_ row: RunBoardRow) -> BoardRow {
+        let drawn = ranked(row)
+        return BoardRow(
+            id: drawn.id, name: drawn.name, initials: drawn.initials, headshot: drawn.headshot, pill: drawn.pill,
+            club: drawn.club, bye: drawn.bye, status: drawn.status, projected: Words.Box.none,
+            overReplacement: Words.Box.none, heat: .none, gap: Words.Box.none, gapTone: nil,
+            draftOrder: drawn.draftOrder, adp: drawn.adp, sheetPlayer: drawn.sheetPlayer
+        )
+    }
+
     /// A kicker or a defense: on the board his place is his Draft order column, so his pill is his
     /// position alone (Row.svelte pillRank) or his list's word; where no Draft order column is drawn
     /// (ADP, `placed`) the pill carries his place. The site has no page of his to open.

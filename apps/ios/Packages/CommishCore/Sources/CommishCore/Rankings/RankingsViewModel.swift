@@ -49,6 +49,8 @@ public final class RankingsViewModel {
     public private(set) var problem: String?
 
     private let api: any RankingsAPI
+    /// The order's reads, through the share every in-season screen reads it by (Lane 224 review M3).
+    private let orders: OrderReader
     private let cache: any AnswerCache
     private let clock: any Clock
     private let zone: TimeZone
@@ -85,12 +87,13 @@ public final class RankingsViewModel {
     }
 
     /// `inSeason` names the page "Rankings" and says the week's game beside each player; `query` is the
-    /// search the shell opened the screen with.
+    /// search the shell opened the screen with; `memo` the order's reads the app's screens share.
     public init(
         api: any RankingsAPI, cache: any AnswerCache, clock: any Clock, inSeason: Bool, query: String = "",
-        zone: TimeZone = .current, onSignedOut: @escaping @MainActor () -> Void = {}
+        zone: TimeZone = .current, memo: OrderMemo = OrderMemo(), onSignedOut: @escaping @MainActor () -> Void = {}
     ) {
         self.api = api
+        orders = OrderReader(api: api, clock: clock, memo: memo)
         self.cache = cache
         self.clock = clock
         self.inSeason = inSeason
@@ -159,7 +162,7 @@ public final class RankingsViewModel {
             let answer: Answer = if let position = asked.chip?.weekPosition {
                 try await .week(api.weekOrder(position: position))
             } else {
-                try await .order(api.order(asked.order))
+                try await .order(orders.read(asked.order).answer)
             }
             let stamp = clock.now
             await cache.write(answer, route: asked.route, stamp: stamp)

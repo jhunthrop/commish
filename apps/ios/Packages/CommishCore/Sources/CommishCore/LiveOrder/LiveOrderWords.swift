@@ -31,6 +31,12 @@ public enum LiveOrderWords {
         return "Projected updated \(Formatting.dayTimeStamp(refreshed, zone: zone))."
     }
 
+    /// live-order.ts LIVE_ORDER_WORDS.reach: the Board's count when one read of the order reaches fewer
+    /// of its players than it ranks, "The first 400 of the 627 players on our board, in our order."
+    public static func reach(shown: Int, total: Int) -> String {
+        "The first \(shown) of the \(total) players on our board, in our order."
+    }
+
     /// formats-words.ts FORMATS_RANK.unranked: under the table when a format's rank cell reads "--".
     public static func unranked(_ labels: [String]) -> String {
         let one = labels.count == 1

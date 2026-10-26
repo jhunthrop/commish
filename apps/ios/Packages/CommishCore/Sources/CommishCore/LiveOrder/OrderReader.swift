@@ -42,40 +42,51 @@ public struct OrderAtClock: Equatable, Sendable {
 }
 
 /// The orders the app's screens share, by read: each one's answer last read and its read in flight, so
-/// the Board, the clubs index and a club or a pair opened together ask the API once for each.
+/// the Rankings, the Board, the clubs index and a club or a pair opened together ask the API once for
+/// each. A read is keyed by its route in any case ("CHI" and "chi" are one read), and an answer past its
+/// window is dropped when the next answer is kept.
 public actor OrderMemo {
     private var last: [String: OrderAtClock] = [:]
     private var flights: [String: Task<OrderAtClock, any Error>] = [:]
 
     public init() {}
 
+    /// The answers kept, for the tests of the window.
+    var kept: Int {
+        last.count
+    }
+
     /// The read `route`'s answer read within `window` of `now`, else its read in flight, else `read`
     /// made now.
     func shared(
         _ route: String, now: Date, window: TimeInterval, read: @escaping @Sendable () async throws -> OrderAtClock
     ) async throws -> OrderAtClock {
-        if let kept = last[route], now.timeIntervalSince(kept.landed) < window {
+        let key = route.lowercased()
+        if let kept = last[key], now.timeIntervalSince(kept.landed) < window {
             return kept
         }
-        if let flight = flights[route] {
+        if let flight = flights[key] {
             return try await flight.value
         }
         let task = Task { try await read() }
-        flights[route] = task
-        defer { flights[route] = nil }
+        flights[key] = task
+        defer { flights[key] = nil }
         let answer = try await task.value
-        last[route] = answer
+        last = last.filter { now.timeIntervalSince($0.value.landed) < window }
+        last[key] = answer
         return answer
     }
 }
 
-/// The in-season screens' read of our order at their clock (Lane 224): the Rankings' own read with no
-/// league (GET /order, byes last, the API's numbers as the Rankings print them), the API's most rows,
-/// shared through the memo. The order ranks more players than one read gives, so a screen that draws a
-/// club's or a pair's players reads them by their club or name (`search`), as the web's club page and
-/// Compare do; the API numbers every row before the search, so a match keeps his place. The route
-/// answers with no ETag, so an answer is reused for `window` and never kept past it: a saved order
-/// would be a third clock, so a screen with no answer keeps the run's figures with the run's stamp.
+/// Our order read at a screen's clock (Lane 224), shared through the memo: the in-season pages' read with
+/// no league (GET /order, the API's most rows, the byes in their places as the web's
+/// live-order-read.ts reads it, so a bye club's players are within the rows and the number is the
+/// web's), and the Rankings' own reads (`read(_:)`, the byes last as their page asks). The order ranks
+/// more players than one read gives, so a screen that draws a club's or a pair's players reads them by
+/// their club or name (`search`), as the web's club page and Compare do; the API numbers every row
+/// before the search, so a match keeps his place. The route answers with no ETag, so an answer is
+/// reused for `window` and never kept past it: a saved order would be a third clock, so a screen with
+/// no answer keeps the run's figures with the run's stamp.
 public struct OrderReader: Sendable {
     /// How long an answer stands for another screen opened after it.
     public static let window: TimeInterval = 60
@@ -90,15 +101,19 @@ public struct OrderReader: Sendable {
         self.memo = memo
     }
 
-    /// The read for `search` (letters of a name or a club), every player with none: every position,
-    /// the API's most rows, byes last as the Rankings ask.
+    /// The in-season pages' read for `search` (letters of a name or a club), every player with none:
+    /// every position, the API's most rows, the byes in their places.
     public static func query(search: String?) -> OrderQuery {
-        OrderQuery(position: nil, search: search, limit: OrderQuery.maxLimit)
+        OrderQuery(position: nil, search: search, limit: OrderQuery.maxLimit, byesLast: false)
     }
 
     public func read(search: String? = nil) async throws -> OrderAtClock {
+        try await read(Self.query(search: search))
+    }
+
+    /// Any read of the order through the share: the Rankings' chips, searches and Show more.
+    public func read(_ query: OrderQuery) async throws -> OrderAtClock {
         let (api, clock) = (api, clock)
-        let query = Self.query(search: search)
         return try await memo.shared(query.route, now: clock.now, window: Self.window) {
             let answer = try await api.order(query)
             return OrderAtClock(answer: answer, landed: clock.now)

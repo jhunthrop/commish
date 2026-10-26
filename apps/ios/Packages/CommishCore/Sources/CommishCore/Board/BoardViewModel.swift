@@ -127,6 +127,8 @@ public final class BoardViewModel {
             guard filter.format == format else {
                 return
             }
+            // A fresh run is drawn on its own clock; the order is read for it below (review H2).
+            order = nil
             show(fresh, stamp: stamp, stale: nil)
         } catch where APIError.signsOut(error) {
             state = .failed(AppWords.Failure.signedOut)
@@ -144,12 +146,16 @@ public final class BoardViewModel {
         await readOrder(format: format)
     }
 
-    /// In season the order at the screen's clock, the board drawn again on it; a read that fails, or
-    /// lands after another format was chosen, leaves the run's rows standing (the screen is never held
-    /// for it: the run's board is drawn first).
+    /// In season the order at the screen's clock, the board drawn again on it; a read that fails drops
+    /// any order held, so the run's rows stand with the run's stamp (review H2), and one that lands after
+    /// another format was chosen is not drawn (the screen is never held for it: the run's board is drawn
+    /// first).
     private func readOrder(format: String?) async {
-        guard inSeason, let orders, shown != nil, let read = try? await orders.read(), filter.format == format,
-              let shown else {
+        guard inSeason, let orders, shown != nil else {
+            return
+        }
+        let read = try? await orders.read()
+        guard filter.format == format, let shown else {
             return
         }
         order = read

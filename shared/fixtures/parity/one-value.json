@@ -4,7 +4,7 @@
 	"runAt": "2026-10-15T13:50:00.000Z",
 	"zone": "America/Chicago",
 	"teams": 12,
-	"order": "shared/fixtures/inseason/order-2026-10-18T18-56-00Z.json",
+	"order": "shared/fixtures/inseason/order-all-2026-10-18T18-56-00Z.json",
 	"run": "shared/fixtures/one-value-run/runs/2026-10-15T13-onevalue/boards/ppr-12.json",
 	"players": [
 		{
@@ -14,21 +14,21 @@
 			"team": "CHI",
 			"position": "RB",
 			"order": {
-				"rank": 1,
+				"rank": 2,
 				"positionRank": 15,
 				"projected": 103,
 				"vor": 52.8
 			},
 			"run": {
-				"rank": 2,
+				"rank": 3,
 				"positionRank": 16,
 				"projected": 113.3,
 				"vor": 53.8,
 				"round": 1
 			},
 			"board": {
-				"row": 0,
-				"rank": 1,
+				"row": 1,
+				"rank": 2,
 				"positionRank": 15,
 				"projected": 103,
 				"vor": 52.8,
@@ -41,14 +41,14 @@
 					"4431299"
 				],
 				"row": 0,
-				"rank": 1,
+				"rank": 2,
 				"positionRank": 15,
 				"projected": 103,
 				"vor": 52.8,
 				"round": 1
 			},
 			"compare": {
-				"rank": 1,
+				"rank": 2,
 				"positionRank": 15,
 				"projected": 103,
 				"vor": 52.8,
@@ -111,21 +111,21 @@
 			"team": "JAX",
 			"position": "WR",
 			"order": {
-				"rank": 9,
+				"rank": 10,
 				"positionRank": 27,
 				"projected": 118,
 				"vor": 27.6
 			},
 			"run": {
-				"rank": 10,
+				"rank": 11,
 				"positionRank": 28,
 				"projected": 129.8,
 				"vor": 28.6,
 				"round": 1
 			},
 			"board": {
-				"row": 8,
-				"rank": 9,
+				"row": 9,
+				"rank": 10,
 				"positionRank": 27,
 				"projected": 118,
 				"vor": 27.6,
@@ -139,14 +139,14 @@
 					"3916433"
 				],
 				"row": 0,
-				"rank": 9,
+				"rank": 10,
 				"positionRank": 27,
 				"projected": 118,
 				"vor": 27.6,
 				"round": 1
 			},
 			"compare": {
-				"rank": 9,
+				"rank": 10,
 				"positionRank": 27,
 				"projected": 118,
 				"vor": 27.6,
@@ -203,73 +203,72 @@
 			"restFromWeek": 7
 		},
 		{
-			"name": "Patrick Mahomes",
-			"id": "3139477",
-			"slug": "patrick-mahomes",
-			"team": "KC",
+			"name": "Joe Burrow",
+			"id": "3915511",
+			"slug": "joe-burrow",
+			"team": "CIN",
 			"position": "QB",
 			"order": {
-				"rank": 6,
-				"positionRank": 12,
-				"projected": 186,
-				"vor": 32.4
+				"rank": 13,
+				"positionRank": 4,
+				"projected": 190.3,
+				"vor": 18
 			},
 			"run": {
-				"rank": 7,
-				"positionRank": 13,
-				"projected": 186,
-				"vor": 33.4,
-				"round": 1
+				"rank": 14,
+				"positionRank": 5,
+				"projected": 190.3,
+				"vor": 19,
+				"round": 2
 			},
 			"board": {
-				"row": 5,
-				"rank": 6,
-				"positionRank": 12,
-				"projected": 186,
-				"vor": 32.4,
-				"round": 1
+				"row": 12,
+				"rank": 13,
+				"positionRank": 4,
+				"projected": 190.3,
+				"vor": 18,
+				"round": 2
 			},
 			"club": {
 				"ids": [
-					"3139477",
-					"15847",
-					"4428331",
-					"4683062"
+					"4362628",
+					"3915511",
+					"5092508"
 				],
-				"row": 0,
-				"rank": 6,
-				"positionRank": 12,
-				"projected": 186,
-				"vor": 32.4,
-				"round": 1
+				"row": 1,
+				"rank": 13,
+				"positionRank": 4,
+				"projected": 190.3,
+				"vor": 18,
+				"round": 2
 			},
 			"compare": {
-				"rank": 6,
-				"positionRank": 12,
-				"projected": 186,
-				"vor": 32.4,
-				"round": 1
+				"rank": 13,
+				"positionRank": 4,
+				"projected": 190.3,
+				"vor": 18,
+				"round": 2
 			},
 			"formats": {
 				"run": {
 					"rows": [
 						{
 							"format": "ppr-12",
-							"rank": 13,
-							"points": 186,
-							"vor": 33.4
+							"rank": 5,
+							"points": 190.3,
+							"vor": 19
 						},
 						{
 							"format": "half-ppr-12",
-							"rank": 13,
-							"points": 171.6,
-							"vor": 30.8
+							"rank": 5,
+							"points": 175.6,
+							"vor": 17.5
 						},
 						{
 							"format": "standard-12",
-							"rank": 13,
-							"points": 148.5,
-							"vor": 26.7
+							"rank": 5,
+							"points": 152,
+							"vor": 15.2
 						}
 					],
 					"footnote": null
@@ -278,21 +277,21 @@
 					"rows": [
 						{
 							"format": "ppr-12",
-							"rank": 12,
-							"points": 186,
-							"vor": 32.4
+							"rank": 4,
+							"points": 190.3,
+							"vor": 18
 						},
 						{
 							"format": "half-ppr-12",
 							"rank": null,
-							"points": 171.6,
-							"vor": 29.9
+							"points": 175.6,
+							"vor": 16.6
 						},
 						{
 							"format": "standard-12",
 							"rank": null,
-							"points": 148.5,
-							"vor": 25.9
+							"points": 152,
+							"vor": 14.4
 						}
 					],
 					"footnote": "Half PPR and Standard show no position rank at this read, only their points."
@@ -303,6 +302,7 @@
 	],
 	"board": {
 		"ids": [
+			"4362628",
 			"4259545",
 			"16800",
 			"4596448",
@@ -312,7 +312,11 @@
 			"4431459",
 			"4569173",
 			"4432620",
+			"4430027",
+			"4262921",
+			"3915511",
 			"4428718",
+			"4569603",
 			"4696981",
 			"4685382",
 			"4432577",
@@ -368,8 +372,10 @@
 			"4808766",
 			"4382466",
 			"4612826",
+			"4429205",
 			"4429148",
 			"3916945",
+			"4912052",
 			"4565859",
 			"4426385",
 			"4696700",
@@ -377,6 +383,7 @@
 			"4242433",
 			"4685553",
 			"4241476",
+			"5092508",
 			"4573697",
 			"4241424",
 			"4061956",
@@ -391,7 +398,7 @@
 				"abbr": "ARI",
 				"lead": {
 					"id": "4870808",
-					"rank": 17,
+					"rank": 22,
 					"positionRank": 14,
 					"projected": 126.5,
 					"vor": 8.2,
@@ -402,7 +409,7 @@
 				"abbr": "ATL",
 				"lead": {
 					"id": "4361409",
-					"rank": 63,
+					"rank": 68,
 					"positionRank": 82,
 					"projected": 59.4,
 					"vor": -35,
@@ -413,18 +420,18 @@
 				"abbr": "BAL",
 				"lead": {
 					"id": "4360939",
-					"rank": 48,
+					"rank": 53,
 					"positionRank": 59,
 					"projected": 83.6,
 					"vor": -14.6,
-					"round": 4
+					"round": 5
 				}
 			},
 			{
 				"abbr": "BUF",
 				"lead": {
 					"id": "4242433",
-					"rank": 75,
+					"rank": 82,
 					"positionRank": 95,
 					"projected": 45.1,
 					"vor": -79.4,
@@ -435,7 +442,7 @@
 				"abbr": "CAR",
 				"lead": {
 					"id": "4695883",
-					"rank": 39,
+					"rank": 44,
 					"positionRank": 56,
 					"projected": 97.2,
 					"vor": -6.2,
@@ -446,7 +453,7 @@
 				"abbr": "CHI",
 				"lead": {
 					"id": "4259545",
-					"rank": 2,
+					"rank": 3,
 					"positionRank": 16,
 					"projected": 113.3,
 					"vor": 53.8,
@@ -455,13 +462,20 @@
 			},
 			{
 				"abbr": "CIN",
-				"lead": null
+				"lead": {
+					"id": "4362628",
+					"rank": 2,
+					"positionRank": 3,
+					"projected": 228.8,
+					"vor": 53.8,
+					"round": 1
+				}
 			},
 			{
 				"abbr": "CLE",
 				"lead": {
 					"id": "4832800",
-					"rank": 19,
+					"rank": 24,
 					"positionRank": 61,
 					"projected": 81.4,
 					"vor": 7,
@@ -472,18 +486,18 @@
 				"abbr": "DAL",
 				"lead": {
 					"id": "4242355",
-					"rank": 47,
+					"rank": 52,
 					"positionRank": 16,
 					"projected": 90.2,
 					"vor": -13.4,
-					"round": 4
+					"round": 5
 				}
 			},
 			{
 				"abbr": "DEN",
 				"lead": {
 					"id": "4372016",
-					"rank": 16,
+					"rank": 21,
 					"positionRank": 21,
 					"projected": 136,
 					"vor": 10.6,
@@ -492,24 +506,31 @@
 			},
 			{
 				"abbr": "DET",
-				"lead": null
+				"lead": {
+					"id": "4430027",
+					"rank": 12,
+					"positionRank": 12,
+					"projected": 96.8,
+					"vor": 26.2,
+					"round": 1
+				}
 			},
 			{
 				"abbr": "GB",
 				"lead": {
 					"id": "4572680",
-					"rank": 22,
+					"rank": 27,
 					"positionRank": 11,
 					"projected": 97.9,
 					"vor": 4.6,
-					"round": 2
+					"round": 3
 				}
 			},
 			{
 				"abbr": "HOU",
 				"lead": {
 					"id": "4432577",
-					"rank": 14,
+					"rank": 19,
 					"positionRank": 20,
 					"projected": 140.8,
 					"vor": 14.2,
@@ -520,7 +541,7 @@
 				"abbr": "IND",
 				"lead": {
 					"id": "4431459",
-					"rank": 8,
+					"rank": 9,
 					"positionRank": 5,
 					"projected": 112.2,
 					"vor": 31,
@@ -531,7 +552,7 @@
 				"abbr": "JAX",
 				"lead": {
 					"id": "4432620",
-					"rank": 10,
+					"rank": 11,
 					"positionRank": 28,
 					"projected": 129.8,
 					"vor": 28.6,
@@ -542,7 +563,7 @@
 				"abbr": "KC",
 				"lead": {
 					"id": "3139477",
-					"rank": 7,
+					"rank": 8,
 					"positionRank": 13,
 					"projected": 186,
 					"vor": 33.4,
@@ -553,7 +574,7 @@
 				"abbr": "LAC",
 				"lead": {
 					"id": "4685382",
-					"rank": 13,
+					"rank": 18,
 					"positionRank": 12,
 					"projected": 134.2,
 					"vor": 14.2,
@@ -564,7 +585,7 @@
 				"abbr": "LAR",
 				"lead": {
 					"id": "16800",
-					"rank": 3,
+					"rank": 4,
 					"positionRank": 22,
 					"projected": 145.2,
 					"vor": 51.4,
@@ -575,26 +596,40 @@
 				"abbr": "LV",
 				"lead": {
 					"id": "4428718",
-					"rank": 11,
+					"rank": 15,
 					"positionRank": 45,
 					"projected": 108.9,
 					"vor": 17.8,
-					"round": 1
+					"round": 2
 				}
 			},
 			{
 				"abbr": "MIA",
-				"lead": null
+				"lead": {
+					"id": "4569603",
+					"rank": 16,
+					"positionRank": 58,
+					"projected": 86.9,
+					"vor": 16.6,
+					"round": 2
+				}
 			},
 			{
 				"abbr": "MIN",
-				"lead": null
+				"lead": {
+					"id": "4262921",
+					"rank": 13,
+					"positionRank": 8,
+					"projected": 187,
+					"vor": 26.2,
+					"round": 2
+				}
 			},
 			{
 				"abbr": "NE",
 				"lead": {
 					"id": "4569173",
-					"rank": 9,
+					"rank": 10,
 					"positionRank": 21,
 					"projected": 106.7,
 					"vor": 28.6,
@@ -605,18 +640,18 @@
 				"abbr": "NO",
 				"lead": {
 					"id": "4569559",
-					"rank": 20,
+					"rank": 25,
 					"positionRank": 67,
 					"projected": 71.5,
 					"vor": 7,
-					"round": 2
+					"round": 3
 				}
 			},
 			{
 				"abbr": "NYG",
 				"lead": {
 					"id": "4361050",
-					"rank": 5,
+					"rank": 6,
 					"positionRank": 9,
 					"projected": 101.2,
 					"vor": 37,
@@ -627,18 +662,18 @@
 				"abbr": "NYJ",
 				"lead": {
 					"id": "15864",
-					"rank": 44,
+					"rank": 49,
 					"positionRank": 26,
 					"projected": 123.2,
 					"vor": -9.8,
-					"round": 4
+					"round": 5
 				}
 			},
 			{
 				"abbr": "PHI",
 				"lead": {
 					"id": "4870795",
-					"rank": 51,
+					"rank": 56,
 					"positionRank": 52,
 					"projected": 93.5,
 					"vor": -18.2,
@@ -649,7 +684,7 @@
 				"abbr": "PIT",
 				"lead": {
 					"id": "8439",
-					"rank": 27,
+					"rank": 32,
 					"positionRank": 27,
 					"projected": 118.8,
 					"vor": 1,
@@ -660,7 +695,7 @@
 				"abbr": "SEA",
 				"lead": {
 					"id": "4887558",
-					"rank": 42,
+					"rank": 47,
 					"positionRank": 62,
 					"projected": 29,
 					"vor": -7.4,
@@ -671,18 +706,18 @@
 				"abbr": "SF",
 				"lead": {
 					"id": "3040151",
-					"rank": 24,
+					"rank": 29,
 					"positionRank": 13,
 					"projected": 96.8,
 					"vor": 3.4,
-					"round": 2
+					"round": 3
 				}
 			},
 			{
 				"abbr": "TB",
 				"lead": {
 					"id": "4596448",
-					"rank": 4,
+					"rank": 5,
 					"positionRank": 18,
 					"projected": 111.1,
 					"vor": 46.6,
@@ -693,22 +728,22 @@
 				"abbr": "TEN",
 				"lead": {
 					"id": "4688380",
-					"rank": 45,
+					"rank": 50,
 					"positionRank": 23,
 					"projected": 128.7,
 					"vor": -9.8,
-					"round": 4
+					"round": 5
 				}
 			},
 			{
 				"abbr": "WSH",
 				"lead": {
 					"id": "2576980",
-					"rank": 83,
+					"rank": 91,
 					"positionRank": 45,
 					"projected": 30.8,
 					"vor": -145.4,
-					"round": 7
+					"round": 8
 				}
 			}
 		],
@@ -717,7 +752,7 @@
 				"abbr": "ARI",
 				"lead": {
 					"id": "4870808",
-					"rank": 16,
+					"rank": 21,
 					"positionRank": 13,
 					"projected": 126.5,
 					"vor": 7.2,
@@ -728,7 +763,7 @@
 				"abbr": "ATL",
 				"lead": {
 					"id": "4361409",
-					"rank": 62,
+					"rank": 67,
 					"positionRank": 81,
 					"projected": 54,
 					"vor": -36,
@@ -739,18 +774,18 @@
 				"abbr": "BAL",
 				"lead": {
 					"id": "4360939",
-					"rank": 47,
+					"rank": 52,
 					"positionRank": 58,
 					"projected": 76,
 					"vor": -15.6,
-					"round": 4
+					"round": 5
 				}
 			},
 			{
 				"abbr": "BUF",
 				"lead": {
 					"id": "4242433",
-					"rank": 74,
+					"rank": 81,
 					"positionRank": 94,
 					"projected": 45.1,
 					"vor": -80.4,
@@ -761,7 +796,7 @@
 				"abbr": "CAR",
 				"lead": {
 					"id": "4695883",
-					"rank": 38,
+					"rank": 43,
 					"positionRank": 55,
 					"projected": 89.1,
 					"vor": -7.2,
@@ -772,7 +807,7 @@
 				"abbr": "CHI",
 				"lead": {
 					"id": "4259545",
-					"rank": 1,
+					"rank": 2,
 					"positionRank": 15,
 					"projected": 103,
 					"vor": 52.8,
@@ -781,13 +816,20 @@
 			},
 			{
 				"abbr": "CIN",
-				"lead": null
+				"lead": {
+					"id": "4362628",
+					"rank": 1,
+					"positionRank": 2,
+					"projected": 228.8,
+					"vor": 52.8,
+					"round": 1
+				}
 			},
 			{
 				"abbr": "CLE",
 				"lead": {
 					"id": "4832800",
-					"rank": 18,
+					"rank": 23,
 					"positionRank": 60,
 					"projected": 74,
 					"vor": 6,
@@ -798,18 +840,18 @@
 				"abbr": "DAL",
 				"lead": {
 					"id": "4242355",
-					"rank": 46,
+					"rank": 51,
 					"positionRank": 15,
 					"projected": 90.2,
 					"vor": -14.4,
-					"round": 4
+					"round": 5
 				}
 			},
 			{
 				"abbr": "DEN",
 				"lead": {
 					"id": "4372016",
-					"rank": 15,
+					"rank": 20,
 					"positionRank": 20,
 					"projected": 136,
 					"vor": 9.6,
@@ -818,24 +860,31 @@
 			},
 			{
 				"abbr": "DET",
-				"lead": null
+				"lead": {
+					"id": "4430027",
+					"rank": 11,
+					"positionRank": 11,
+					"projected": 96.8,
+					"vor": 25.2,
+					"round": 1
+				}
 			},
 			{
 				"abbr": "GB",
 				"lead": {
 					"id": "4572680",
-					"rank": 21,
+					"rank": 26,
 					"positionRank": 10,
 					"projected": 97.9,
 					"vor": 3.6,
-					"round": 2
+					"round": 3
 				}
 			},
 			{
 				"abbr": "HOU",
 				"lead": {
 					"id": "4432577",
-					"rank": 13,
+					"rank": 18,
 					"positionRank": 19,
 					"projected": 128,
 					"vor": 13.2,
@@ -846,7 +895,7 @@
 				"abbr": "IND",
 				"lead": {
 					"id": "4431459",
-					"rank": 7,
+					"rank": 8,
 					"positionRank": 4,
 					"projected": 102,
 					"vor": 30,
@@ -857,7 +906,7 @@
 				"abbr": "JAX",
 				"lead": {
 					"id": "4432620",
-					"rank": 9,
+					"rank": 10,
 					"positionRank": 27,
 					"projected": 118,
 					"vor": 27.6,
@@ -868,7 +917,7 @@
 				"abbr": "KC",
 				"lead": {
 					"id": "3139477",
-					"rank": 6,
+					"rank": 7,
 					"positionRank": 12,
 					"projected": 186,
 					"vor": 32.4,
@@ -879,18 +928,18 @@
 				"abbr": "LAC",
 				"lead": {
 					"id": "4685382",
-					"rank": 12,
+					"rank": 17,
 					"positionRank": 11,
 					"projected": 134.2,
 					"vor": 13.2,
-					"round": 1
+					"round": 2
 				}
 			},
 			{
 				"abbr": "LAR",
 				"lead": {
 					"id": "16800",
-					"rank": 2,
+					"rank": 3,
 					"positionRank": 21,
 					"projected": 145.2,
 					"vor": 50.4,
@@ -901,26 +950,40 @@
 				"abbr": "LV",
 				"lead": {
 					"id": "4428718",
-					"rank": 10,
+					"rank": 14,
 					"positionRank": 44,
 					"projected": 108.9,
 					"vor": 16.8,
-					"round": 1
+					"round": 2
 				}
 			},
 			{
 				"abbr": "MIA",
-				"lead": null
+				"lead": {
+					"id": "4569603",
+					"rank": 15,
+					"positionRank": 57,
+					"projected": 86.9,
+					"vor": 15.6,
+					"round": 2
+				}
 			},
 			{
 				"abbr": "MIN",
-				"lead": null
+				"lead": {
+					"id": "4262921",
+					"rank": 12,
+					"positionRank": 7,
+					"projected": 187,
+					"vor": 25.2,
+					"round": 1
+				}
 			},
 			{
 				"abbr": "NE",
 				"lead": {
 					"id": "4569173",
-					"rank": 8,
+					"rank": 9,
 					"positionRank": 20,
 					"projected": 97,
 					"vor": 27.6,
@@ -931,7 +994,7 @@
 				"abbr": "NO",
 				"lead": {
 					"id": "4569559",
-					"rank": 19,
+					"rank": 24,
 					"positionRank": 66,
 					"projected": 65,
 					"vor": 6,
@@ -942,7 +1005,7 @@
 				"abbr": "NYG",
 				"lead": {
 					"id": "4361050",
-					"rank": 4,
+					"rank": 5,
 					"positionRank": 8,
 					"projected": 92,
 					"vor": 36,
@@ -953,7 +1016,7 @@
 				"abbr": "NYJ",
 				"lead": {
 					"id": "15864",
-					"rank": 43,
+					"rank": 48,
 					"positionRank": 25,
 					"projected": 112,
 					"vor": -10.8,
@@ -964,7 +1027,7 @@
 				"abbr": "PHI",
 				"lead": {
 					"id": "4870795",
-					"rank": 50,
+					"rank": 55,
 					"positionRank": 51,
 					"projected": 85,
 					"vor": -19.2,
@@ -975,7 +1038,7 @@
 				"abbr": "PIT",
 				"lead": {
 					"id": "8439",
-					"rank": 26,
+					"rank": 31,
 					"positionRank": 26,
 					"projected": 108,
 					"vor": 0,
@@ -986,7 +1049,7 @@
 				"abbr": "SEA",
 				"lead": {
 					"id": "4887558",
-					"rank": 41,
+					"rank": 46,
 					"positionRank": 61,
 					"projected": 29,
 					"vor": -8.4,
@@ -997,18 +1060,18 @@
 				"abbr": "SF",
 				"lead": {
 					"id": "3040151",
-					"rank": 23,
+					"rank": 28,
 					"positionRank": 12,
 					"projected": 96.8,
 					"vor": 2.4,
-					"round": 2
+					"round": 3
 				}
 			},
 			{
 				"abbr": "TB",
 				"lead": {
 					"id": "4596448",
-					"rank": 3,
+					"rank": 4,
 					"positionRank": 17,
 					"projected": 101,
 					"vor": 45.6,
@@ -1019,22 +1082,22 @@
 				"abbr": "TEN",
 				"lead": {
 					"id": "4688380",
-					"rank": 44,
+					"rank": 49,
 					"positionRank": 22,
 					"projected": 117,
 					"vor": -10.8,
-					"round": 4
+					"round": 5
 				}
 			},
 			{
 				"abbr": "WSH",
 				"lead": {
 					"id": "2576980",
-					"rank": 82,
+					"rank": 90,
 					"positionRank": 44,
 					"projected": 30.8,
 					"vor": -146.4,
-					"round": 7
+					"round": 8
 				}
 			}
 		]
@@ -1046,7 +1109,7 @@
 			"sides": [
 				{
 					"id": "4259545",
-					"rank": 2,
+					"rank": 3,
 					"positionRank": 16,
 					"projected": 113.3,
 					"vor": 53.8,
@@ -1055,7 +1118,7 @@
 				},
 				{
 					"id": "4432620",
-					"rank": 10,
+					"rank": 11,
 					"positionRank": 28,
 					"projected": 129.8,
 					"vor": 28.6,
@@ -1063,7 +1126,7 @@
 					"gap": null
 				}
 			],
-			"evidence": "Swift is 2nd on our PPR board and Washington 10th, with +53.8 over replacement against +28.6."
+			"evidence": "Swift is 3rd on our PPR board and Washington 11th, with +53.8 over replacement against +28.6."
 		},
 		"read": {
 			"format": "ppr-12",
@@ -1071,7 +1134,7 @@
 			"sides": [
 				{
 					"id": "4259545",
-					"rank": 1,
+					"rank": 2,
 					"positionRank": 15,
 					"projected": 103,
 					"vor": 52.8,
@@ -1080,7 +1143,7 @@
 				},
 				{
 					"id": "4432620",
-					"rank": 9,
+					"rank": 10,
 					"positionRank": 27,
 					"projected": 118,
 					"vor": 27.6,
@@ -1088,7 +1151,7 @@
 					"gap": null
 				}
 			],
-			"evidence": "Swift is 1st on our PPR board and Washington 9th, with +52.8 over replacement against +27.6."
+			"evidence": "Swift is 2nd on our PPR board and Washington 10th, with +52.8 over replacement against +27.6."
 		},
 		"otherFormat": {
 			"format": "half-ppr-12",
@@ -1096,7 +1159,7 @@
 			"sides": [
 				{
 					"id": "4259545",
-					"rank": 2,
+					"rank": 3,
 					"positionRank": 16,
 					"projected": 104.5,
 					"vor": 49.6,
@@ -1105,7 +1168,7 @@
 				},
 				{
 					"id": "4432620",
-					"rank": 10,
+					"rank": 11,
 					"positionRank": 28,
 					"projected": 119.8,
 					"vor": 26.4,
@@ -1113,7 +1176,7 @@
 					"gap": null
 				}
 			],
-			"evidence": "Swift is 2nd on our Half PPR board and Washington 10th, with +49.6 over replacement against +26.4."
+			"evidence": "Swift is 3rd on our Half PPR board and Washington 11th, with +49.6 over replacement against +26.4."
 		}
 	},
 	"refused": {
@@ -1128,6 +1191,11 @@
 	"basis": {
 		"lead": "Our rest-of-season order from week 6's games left, by points over replacement for 12 teams, read 1:56 pm Central.",
 		"stamp": "Projected updated Thu Oct 15, 8:50 am Central.",
+		"reach": {
+			"shown": 400,
+			"total": 627,
+			"text": "The first 400 of the 627 players on our board, in our order."
+		},
 		"sample": [
 			"Wins basis.",
 			"Our board sentence.",

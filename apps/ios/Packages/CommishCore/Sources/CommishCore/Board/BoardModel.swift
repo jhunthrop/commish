@@ -169,11 +169,12 @@ public enum BoardColumns: Equatable, Sendable {
 /// The Board screen as the web's board says it at 390, from the run (GET /run/manifest, /run/boards,
 /// /run/adp, /run/designations): the heading, the run's stamp and, in season, the weeks it ranks; the
 /// format and position chips; the view's rows in the run's order, a position's in its tiers with their
-/// cliffs; and the basis once. In season, once the order the Rankings read (GET /order) answers, the
-/// view is the order's: the run's rows it places, in its order with its figures (as far as its read
-/// reaches, as the web's Rest of season, which is the order, reaches), a position's with no tiers (they
-/// are the run's), and the order's lead in the board sentence's place; until then the run's rows stand
-/// and the basis says the run's day and time (Lane 224, LiveOrder).
+/// cliffs; and the basis once. In season, once the order the in-season pages read (GET /order)
+/// answers, the view is the order's: the run's rows it places, in its order with its figures (as far as
+/// its read reaches, as the web's Rest of season, which is the order, reaches, the count said once), a
+/// position's with no tiers (they are the run's), the players on a season-long list after them with the
+/// list's word, and the order's lead under the heading and in the board sentence's place; until then the
+/// run's rows stand and the basis says the run's day and time (Lane 224, LiveOrder).
 public struct BoardModel: Equatable, Sendable {
     public let words: BoardWords
     /// "Updated Oct 21": the run every number comes from.
@@ -213,7 +214,6 @@ public struct BoardModel: Equatable, Sendable {
             following: following
         )
         stamp = RunWords.stamp(manifest)
-        restLine = RunWords.restCaption(format, season: manifest.season)
         formats = manifest.formats.map { BoardChip(label: $0.label, value: $0.id, pressed: $0.id == format.id) }
         let present = Set(board.rows.map(\.positionName) + board.market.map(\.positionName))
         positions = [BoardChip(label: Words.Board.all, value: nil, pressed: position == nil)]
@@ -231,6 +231,9 @@ public struct BoardModel: Equatable, Sendable {
         )
         sections = view.sections
         atClock = view.atClock
+        // The head follows the basis's clock: the order's lead once its rows stand (review M2).
+        restLine = (view.atClock ? order?.lead(teams: format.teams, zone: zone) : nil)
+            ?? RunWords.restCaption(format, season: manifest.season)
         let compare = format.rosFromWeek == nil
         columns = position?.draftOrder == true ? .draftOrder : .ranked(gap: compare && view.carriesGap)
         let said = position?.draftOrder == true
@@ -249,6 +252,7 @@ public struct BoardModel: Equatable, Sendable {
         let run = said + (capture.map { [$0] } ?? [])
         basis = position?.draftOrder == true || !ranksRest ? run
             : Self.atClock(run, format: format, season: manifest.season, lead: view.atClock ? order : nil, zone: zone)
+            + (view.reach.map { [LiveOrderWords.reach(shown: $0.shown, total: $0.total)] } ?? [])
     }
 
     /// A ranked view's basis in season on its rows' clock: the order's lead in the board sentence's
@@ -278,14 +282,17 @@ public struct BoardModel: Equatable, Sendable {
 /// A view's sections over the run's board: All in the run's order, a ranked position in its tiers then
 /// its season-long list, a kicker's or a defense's list in the drafts' order. At the order's clock a
 /// ranked view is the rows the order places, in its order with its figures, a position's as one run with
-/// no tiers; the rows its read does not reach are not drawn, so no row of the run's clock stands among
-/// them.
+/// no tiers, then the view's players on a season-long list with the list's word and no figure (review
+/// M1); the rows its read does not reach are not drawn, so no row of the run's clock stands among them,
+/// and `reach` says how many of the view's rows are drawn when it is fewer than all.
 private struct ViewRows {
     let sections: [BoardSection]
     /// The view's ranked rows carry a Gap (format/gap.ts carriesGap).
     let carriesGap: Bool
     /// The rows are the order's.
     let atClock: Bool
+    /// At the order's clock, the view's rows drawn and its rows on the run, when fewer are drawn.
+    let reach: (shown: Int, total: Int)?
 
     init(
         board: RunBoardAnswer,
@@ -300,12 +307,17 @@ private struct ViewRows {
         if position?.draftOrder != true, let clock, !reached.isEmpty,
            let placed = LiveOrder.placed(reached, id: \.id, places: clock.places) {
             let rows = placed.map { cells.ranked($0.row, figures: $0.row.figures.at($0.place, teams: clock.teams)) }
-            sections = [BoardSection(id: position?.rawValue ?? "all", head: nil, band: nil, rows: rows)]
+            let listed = BoardOrder.withStatuses(drawn, statuses)
+                .filter { BoardOrder.heldOut($0, statuses) && clock.places[$0.id] == nil }
+            sections = Self.atClock(rows, listed: listed.map(cells.listed), position: position)
             carriesGap = false
             atClock = true
+            let shown = rows.count + listed.count
+            reach = shown < drawn.count ? (shown, drawn.count) : nil
             return
         }
         atClock = false
+        reach = nil
         guard let position else {
             let rows = BoardOrder.withStatuses(board.rows, statuses)
             sections = [BoardSection(id: "all", head: nil, band: nil, rows: rows.map(cells.ranked))]
@@ -330,6 +342,18 @@ private struct ViewRows {
             id: "\(position.rawValue)-held", head: Words.Board.heldHead, band: nil, rows: held.map(cells.ranked)
         )])
         carriesGap = rows.contains { $0.gap != nil }
+    }
+
+    /// A view at the order's clock: the order's rows, then its players on a season-long list, after
+    /// them in All and under the list's head in a position's view, as the run's view draws them.
+    static func atClock(_ rows: [BoardRow], listed: [BoardRow], position: BoardPosition?) -> [BoardSection] {
+        guard let position else {
+            return [BoardSection(id: "all", head: nil, band: nil, rows: rows + listed)]
+        }
+        return [BoardSection(id: position.rawValue, head: nil, band: nil, rows: rows)]
+            + (listed.isEmpty ? [] : [BoardSection(
+                id: "\(position.rawValue)-held", head: Words.Board.heldHead, band: nil, rows: listed
+            )])
     }
 
     /// TierStrip.svelte's words for a tier.

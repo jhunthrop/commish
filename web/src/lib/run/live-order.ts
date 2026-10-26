@@ -17,6 +17,13 @@ type OrderAdvice = components['schemas']['OrderAdvice'];
 /** The largest view of the order the API answers (api inseason MaxOrderRows). */
 export const ORDER_MAX_ROWS = 400;
 
+/** A page's words about the order it draws (Lane 224 review M2): when one read of the order reaches
+ * fewer players than the board ranks, how many of them the page draws. */
+export const LIVE_ORDER_WORDS = {
+	reach: (shown: number, total: number): string =>
+		`The first ${String(shown)} of the ${String(total)} players on our board, in our order.`
+} as const;
+
 /** A player's place in the order at the read's clock. */
 export interface LivePlace {
 	rank: number;

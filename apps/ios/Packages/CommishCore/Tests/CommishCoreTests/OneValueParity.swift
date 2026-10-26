@@ -99,8 +99,15 @@ struct OneValueParity: Decodable {
             let read: [String]
         }
 
+        struct Reach: Decodable {
+            let shown: Int
+            let total: Int
+            let text: String
+        }
+
         let lead: String
         let stamp: String
+        let reach: Reach
         let sample: [String]
         let unread: [String]
         let read: [String]
@@ -147,7 +154,8 @@ struct OneValueReads {
     }
 
     static func order() throws -> OrderAtClock {
-        try OrderAtClock(answer: RankingsFixture.order("", at: OneValueFixture.clock), landed: now)
+        // The in-season pages' whole read, the byes in their places (Lane 224 review H1).
+        try OrderAtClock(answer: RankingsFixture.order("-all", at: OneValueFixture.clock), landed: now)
     }
 
     static func orders(offline: Bool = false) -> OrderReader {
@@ -178,6 +186,15 @@ struct OneValueReads {
         let viewModel = RunScreenViewModel.club(
             abbr, run: StubRun(.oneValue), pages: StubPages(.oneValue), cache: cache(),
             clock: FixedClock(Self.now), zone: Self.zone, orders: orders
+        )
+        await viewModel.load()
+        return try loaded(viewModel)
+    }
+
+    func clubs(orders: OrderReader) async throws -> ClubsModel {
+        let viewModel = RunScreenViewModel.clubs(
+            run: StubRun(.oneValue), pages: StubPages(.oneValue), cache: cache(), clock: FixedClock(Self.now),
+            zone: Self.zone, orders: orders
         )
         await viewModel.load()
         return try loaded(viewModel)

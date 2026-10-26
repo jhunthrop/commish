@@ -949,4 +949,8 @@ public enum Words {
         public static let yourLeague = "your league"
         public static let leagueAvg = "Avg in your league's scoring."
     }
+
+    public enum LiveOrder {
+
+    }
 }

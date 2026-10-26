@@ -198,6 +198,7 @@ void test("the tables: the League home's, the box score's, then the shell's and 
       "MockClocks",
       "FormatsRank",
       "LiveStrip",
+      "LiveOrder",
     ],
   );
   assert.equal(new Set(TABLES.map((t) => t.json)).size, TABLES.length);

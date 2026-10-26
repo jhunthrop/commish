@@ -8,7 +8,7 @@
 	"formats": {
 		"ppr-12": {
 			"positionRank": 28,
-			"ourRank": 10,
+			"ourRank": 11,
 			"vorRound": 1,
 			"adp": null,
 			"projected": 129.8,
@@ -21,7 +21,7 @@
 		},
 		"half-ppr-12": {
 			"positionRank": 28,
-			"ourRank": 10,
+			"ourRank": 11,
 			"vorRound": 1,
 			"adp": null,
 			"projected": 119.8,
@@ -34,7 +34,7 @@
 		},
 		"standard-12": {
 			"positionRank": 28,
-			"ourRank": 10,
+			"ourRank": 11,
 			"vorRound": 1,
 			"adp": null,
 			"projected": 103.7,
