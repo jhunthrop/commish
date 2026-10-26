@@ -13,7 +13,9 @@ import { FIXTURE_SUNDAY_CLOCK } from '../../../scripts/inseason-fixture/clock.ts
 import { orderAtClock } from '../../../scripts/inseason-fixture/rest-now.ts';
 import type { components } from '#lib/api/types.ts';
 import { STRIP_ROWS, liveStrip } from '#lib/front/live-board.ts';
-import { lineRankAt } from '#lib/player/live-figures.ts';
+import { FORMATS_RANK } from '#lib/player/formats-words.ts';
+import { lineFiguresAt, lineRanksAt } from '#lib/player/live-figures.ts';
+import type { LiveFormats } from '#lib/player/week-words.ts';
 import { livePlaces, placedAt, placedLeads, placedRows } from './live-order.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { BoardRowView } from './schema.ts';
@@ -25,6 +27,8 @@ type OrderRow = OrderAdvice['rows'][number];
 const RUN_AT = Date.parse('2026-10-15T13:50:00.000Z');
 const SUNDAY = Date.parse(FIXTURE_SUNDAY_CLOCK);
 const TEAMS = 12;
+/** A read whose rest-of-season figures stand on the table (its figures are not what these tests read). */
+const FIGURES: LiveFormats = { head: 'Rest of season', figures: {} };
 const PLAYERS = ["D'Andre Swift", 'Parker Washington', 'Joe Burrow'] as const;
 
 const ORDER = JSON.parse(
@@ -110,7 +114,13 @@ function runOf(name: string): BoardRowView {
 void test('the run and the order disagree for the three players, the case the views must settle', () => {
 	// Swift's week 6 game has kicked off at the clock: the order counts one game fewer.
 	assert.notEqual(runOf(PLAYERS[0]).projected, orderOf(PLAYERS[0]).projected);
-	for (const name of PLAYERS) assert.notEqual(runOf(name).ourRank, orderOf(name).rank);
+	// A guard on the stand-in, not evidence: its run rows sit one place lower by construction.
+	for (const name of PLAYERS)
+		assert.notEqual(
+			runOf(name).ourRank,
+			orderOf(name).rank,
+			`the stand-in run places ${name} one lower than the order`
+		);
 });
 
 void test('every view prints the order rank, place, points and Over repl. for each of the three', () => {
@@ -139,13 +149,46 @@ void test('every view prints the order rank, place, points and Over repl. for ea
 		}
 		// The player page: the head's place and the formats table's in the read's format agree.
 		const head = want.positionRank;
-		assert.equal(lineRankAt(run.positionRank, 'ppr', { format: 'ppr', positionRank: head }), head);
-		assert.equal(
-			lineRankAt(run.positionRank, 'half_ppr', { format: 'ppr', positionRank: head }),
-			null
-		);
-		assert.equal(lineRankAt(run.positionRank, 'ppr', null), run.positionRank);
+		const lines = [
+			{ run: run.positionRank, format: 'ppr' as const, label: 'PPR' },
+			{ run: run.positionRank, format: 'half_ppr' as const, label: 'Half PPR' }
+		];
+		const read = { format: 'ppr' as const, positionRank: head };
+		assert.deepEqual(lineRanksAt(lines, FIGURES, read), {
+			ranks: [head, null],
+			unranked: ['Half PPR']
+		});
 	}
+});
+
+void test("the formats table's ranks stay the run's while its figures do (review H1)", () => {
+	const lines = [
+		{ run: 3, format: 'ppr' as const, label: 'PPR' },
+		{ run: 4, format: 'half_ppr' as const, label: 'Half PPR' },
+		{ run: 2, format: 'standard' as const, label: 'Standard' }
+	];
+	const read = { format: 'ppr' as const, positionRank: 5 };
+	// Preseason, or a read that carries no rest-of-season figures: the run's figures and ranks stand.
+	assert.deepEqual(lineFiguresAt({ points: 183.2, vor: 95.3 }, 'half_ppr', null), {
+		points: 183.2,
+		vor: 95.3
+	});
+	assert.deepEqual(lineRanksAt(lines, null, read), { ranks: [3, 4, 2], unranked: [] });
+	// No read at all: the run's.
+	assert.deepEqual(lineRanksAt(lines, FIGURES, null), { ranks: [3, 4, 2], unranked: [] });
+	// The read's figures stand: its format takes the head's rank, the others none, named for the note.
+	assert.deepEqual(lineRanksAt(lines, FIGURES, read), {
+		ranks: [5, null, null],
+		unranked: ['Half PPR', 'Standard']
+	});
+	assert.equal(
+		FORMATS_RANK.unranked(['Half PPR', 'Standard']),
+		'Half PPR and Standard show no position rank at this read; their points are.'
+	);
+	assert.equal(
+		FORMATS_RANK.unranked(['Standard']),
+		'Standard shows no position rank at this read; its points are.'
+	);
 });
 
 void test('a club page or a pair the order does not place keeps the run, every row of it', () => {

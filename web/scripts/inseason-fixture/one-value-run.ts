@@ -5,8 +5,8 @@
 // web/.runs/runs/2026-10-15T13-onevalue (never committed); the stand-in's latest.json is left as is.
 // STAND-INS, named here and in the report: the board holds the order's 112 players only (the stand-in's
 // other ranked players are dropped with their pages, index entries and designations), renumbered in the
-// one-board run's order; each kept player's page carries his board row's PPR figures, as a real run's
-// pages carry the board's.
+// one-board run's order; each kept player's page carries his board row's PPR figures and no range, as
+// a real in-season run's pages carry the board's (floor, median and ceiling null in season, review L3).
 //
 //   node scripts/inseason-fixture/one-board-run.ts && node scripts/inseason-fixture/one-value-run.ts
 // then build with PUBLIC_RUN_ID=2026-10-15T13-onevalue PUBLIC_RUN_BASE_URL=.runs and start the fixture
@@ -30,6 +30,8 @@ interface OrderRow {
 }
 
 const readJson = async (url: URL): Promise<Json> => JSON.parse(await readFile(url, 'utf8')) as Json;
+// A run left from an earlier write is removed first, so no file of it outlives this one.
+await rm(OUT, { recursive: true, force: true });
 await cp(new URL(`${ONE_BOARD_RUN_ID}/`, RUNS), OUT, { recursive: true });
 
 const order = (await readJson(new URL('./data/order.json', import.meta.url))) as unknown as {
@@ -78,7 +80,10 @@ for (const file of await readdir(new URL('players/', OUT))) {
 	formats[FORMAT] = {
 		...numbers,
 		...Object.fromEntries(PAGE_FIELDS.map((field) => [field, row[field]])),
-		gap: null
+		gap: null,
+		floor: null,
+		median: null,
+		ceiling: null
 	};
 	await writeFile(url, JSON.stringify(page));
 }

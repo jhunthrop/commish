@@ -2,7 +2,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { BasisPart } from './board-basis.ts';
-import { liveBasis, livePlaces, placedAt } from './live-order.ts';
+import { inSeasonStamp } from '#lib/front/live-board.ts';
+import {
+	basisAtClock,
+	inScoring,
+	liveBasis,
+	livePlaces,
+	placedAt,
+	placedPair
+} from './live-order.ts';
 
 const lead: BasisPart = {
 	text: 'Our rest-of-season order from week 7, read 1:41 pm Central.',
@@ -51,4 +59,51 @@ void test('the places skip a row with no board id or no figure', () => {
 		>[0]['rows']
 	});
 	assert.deepEqual([...places.keys()], ['a']);
+});
+
+void test("compare draws the order's pair only in the board's format and only with both placed", () => {
+	const place = { rank: 2, positionRank: 15, projected: 103, vor: 52.8 };
+	const places = new Map([
+		['swift', place],
+		['burrow', { ...place, rank: 13, positionRank: 4 }]
+	]);
+	// Both placed, in the board's own format: the order's.
+	assert.equal(placedPair(['swift', 'burrow'], places, 'ppr-12', 'ppr-12'), places);
+	// One missing: neither side takes the order's.
+	assert.equal(placedPair(['swift', 'nacua'], places, 'ppr-12', 'ppr-12'), null);
+	// Another format compared: the run's, as the order is read in the board's scoring alone.
+	assert.equal(placedPair(['swift', 'burrow'], places, 'half-ppr-12', 'ppr-12'), null);
+	// Not read yet.
+	assert.equal(placedPair(['swift', 'burrow'], null, 'ppr-12', 'ppr-12'), null);
+});
+
+void test("an order answered in another scoring than the board's is refused", () => {
+	const scoring = (format: 'ppr' | 'half_ppr' | 'standard') => ({
+		projection_scoring: { format, league_own: false }
+	});
+	assert.equal(inScoring(scoring('ppr'), 'ppr'), true);
+	assert.equal(inScoring(scoring('half_ppr'), 'ppr'), false);
+	assert.equal(inScoring(scoring('ppr'), null), false);
+});
+
+void test("a page says the run's time on the run's rows and the order's lead on the order's", () => {
+	const board: BasisPart = {
+		text: 'Our PPR board, refreshed October 25.',
+		phone: true,
+		topic: 'board'
+	};
+	const stamp = inSeasonStamp(
+		{ rosFromWeek: 7, refreshedAt: '2026-10-25T05:51:19.530Z' },
+		'America/Chicago'
+	);
+	assert.deepEqual(stamp, { text: 'Projected updated Sun Oct 25, 12:51 am Central.', phone: true });
+	// Unread or failed: the run's basis and its stamp.
+	assert.deepEqual(basisAtClock([board], null, stamp), [board, stamp]);
+	// Read: the order's lead in the board sentence's place, no run stamp.
+	assert.deepEqual(basisAtClock([board], lead, stamp), [lead]);
+	// The clubs index has no basis of its own: its one part is the lead or the stamp.
+	assert.deepEqual(basisAtClock([], null, stamp), [stamp]);
+	assert.deepEqual(basisAtClock([], lead, stamp), [lead]);
+	// Before the season no stamp is said.
+	assert.equal(inSeasonStamp({ refreshedAt: '2026-09-01T05:00:00.000Z' }, 'America/Chicago'), null);
 });

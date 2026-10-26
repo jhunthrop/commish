@@ -51,6 +51,18 @@ export function runStampPart(refreshedAt: string, zone: string): BasisPart {
 	return { text: STRIP_WORDS.updated(dayTimeStamp(refreshedAt, zone)), phone: true };
 }
 
+/** The run's stamp on an in-season page while it shows the run's rows (Lane 220 review M1), null
+ * before the season or on a run that says no refresh: on game day the run and the order share a date,
+ * so its time says which clock the rows are on. */
+export function inSeasonStamp(
+	format: { rosFromWeek?: number; refreshedAt?: string },
+	zone: string
+): BasisPart | null {
+	return format.rosFromWeek === undefined || format.refreshedAt === undefined
+		? null
+		: runStampPart(format.refreshedAt, zone);
+}
+
 /** What Over replacement counts, said once under the heads (B46): the site's one definition
  * (figure-words.ts, Lane 163 D05), for the followed league or the board's shape. */
 export function overReplacementPart(teams: number, scoring: string, league: boolean): BasisPart {

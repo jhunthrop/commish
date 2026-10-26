@@ -7,6 +7,7 @@
  * the run's, every row of them, so no table mixes the run's clock with the read's. Pure, so the tests
  * read every figure a page prints. */
 import type { components } from '#lib/api/types.ts';
+import type { BoardFormat } from '#lib/sheet/model.ts';
 import type { BasisPart } from './board-basis.ts';
 import { leadOf } from './held-places.ts';
 import type { PlayerFormat, PlayerStatus } from './schema.ts';
@@ -93,6 +94,41 @@ export function placedLeads<
 		out.push({ ...card, lead: leadOf(pool) });
 	}
 	return out;
+}
+
+/** Whether the order's answer is in the board format's scoring (review M3): the public order is
+ * PPR, so a page whose board is in another scoring, or a format with no API id, never draws it. */
+export function inScoring(
+	answer: Pick<OrderAdvice, 'projection_scoring'>,
+	scoring: BoardFormat | null
+): boolean {
+	return scoring !== null && answer.projection_scoring.format === scoring;
+}
+
+/** The places Compare draws its pair from (review M3): the order's, only in the board's own format
+ * (the one the order is read in) and only when it places both players; else none, and both sides
+ * keep the run's, never one side of each. */
+export function placedPair(
+	ids: readonly string[],
+	places: ReadonlyMap<string, LivePlace> | null,
+	format: string,
+	boardFormat: string | null
+): ReadonlyMap<string, LivePlace> | null {
+	if (places === null || format !== boardFormat) return null;
+	return ids.every((id) => places.has(id)) ? places : null;
+}
+
+/** A page's basis on the clock its rows are on (Lane 220 review M1): the order's lead in place of the
+ * run's board sentence once the order's rows stand; before it answers, or when it fails, the run's
+ * basis with the run's stamp after it, the day and time it was made (live-board.ts runStampPart), as
+ * the front door says it, since on game day the run and the order share a date. */
+export function basisAtClock(
+	runBasis: readonly BasisPart[],
+	lead: BasisPart | null,
+	runStamp: BasisPart | null
+): BasisPart[] {
+	if (lead !== null) return liveBasis(runBasis, lead);
+	return runStamp === null ? [...runBasis] : [...runBasis, runStamp];
 }
 
 /** The run's basis with the order's lead in place of the run's board sentence (the run's time goes

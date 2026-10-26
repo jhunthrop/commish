@@ -58,14 +58,29 @@ export function lineFiguresAt(
 	return read ?? { points: null, vor: null };
 }
 
-/** One every-format line's place at his position on the table's one clock (Lane 220, B184): the run's
- * until the read answers, then the read's in the format the read is in, the head's own rank, and none
- * in another format, which the read does not place. */
-export function lineRankAt(
-	run: number,
-	format: BoardFormat | null,
-	read: { format: BoardFormat | null; positionRank: number | null } | null
-): number | null {
-	if (read === null) return run;
-	return format !== null && format === read.format ? read.positionRank : null;
+/** The read's rank for the every-format table: his place at his position in the format the read is
+ * in. The table takes it only on the read that switched its figures (`LiveFormats`), never on a read
+ * that left the run's figures in place (Lane 220 review H1). */
+export interface RankRead {
+	format: BoardFormat | null;
+	positionRank: number | null;
+}
+
+/** The every-format table's rank column on the table's one clock (Lane 220, B184; review H1): while
+ * the figures are the run's (no read, or a read with no figures for the table), every rank is the
+ * run's; once the read's figures stand, the read's format takes the head's rank and every other format
+ * shows none, as the read places him in its own format alone (the per-format rank is an API field
+ * still to come, B206). `unranked` is the labels of the lines that show none, for the table's one
+ * footnote. */
+export function lineRanksAt(
+	lines: readonly { run: number; format: BoardFormat | null; label: string }[],
+	figures: LiveFormats | null,
+	read: RankRead | null
+): { ranks: (number | null)[]; unranked: string[] } {
+	if (figures === null || read === null)
+		return { ranks: lines.map((line) => line.run), unranked: [] };
+	const ranks = lines.map((line) =>
+		line.format !== null && line.format === read.format ? read.positionRank : null
+	);
+	return { ranks, unranked: lines.filter((_, i) => ranks[i] === null).map((line) => line.label) };
 }

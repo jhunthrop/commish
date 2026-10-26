@@ -3,10 +3,12 @@
 	import { fixed } from '#lib/format/number.ts';
 	import { heldOut } from '#lib/run/board-status.ts';
 	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
-	import { liveBasis, placedRows } from '#lib/run/live-order.ts';
+	import { basisAtClock, placedRows } from '#lib/run/live-order.ts';
+	import { BUILD_ZONE, inSeasonStamp } from '#lib/front/live-board.ts';
 	import type { BasisPart } from '#lib/run/board-basis.ts';
 	import type { BoardRowView } from '#lib/run/schema.ts';
 	import { memberZone } from '#lib/format/clock.ts';
+	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { rowFraming } from '#lib/run/row-framing.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
@@ -60,20 +62,32 @@
 	/** In season the club's players at the order's clock, the one the Rankings read (Lane 220, B184):
 	 * their ranks, places, points and values the order's, or the run's rows while it is unread or
 	 * when it does not place every one of them. */
-	let atClock = $state<{ rows: BoardRowView[]; basis: BasisPart[] } | null>(null);
+	let atClock = $state<{ rows: BoardRowView[]; lead: BasisPart } | null>(null);
+	/** The member's zone once the page is live, the build's before (as the front door's stamp). */
+	let zone = $state(BUILD_ZONE);
+	onMount(() => {
+		zone = memberZone();
+	});
 	$effect(() => {
-		const { format, rows, basis } = page;
+		const { format, rows } = page;
 		if (format.rosFromWeek === undefined) {
 			atClock = null;
 			return;
 		}
 		let stale = false;
 		void import('#lib/run/live-order-read.ts')
-			.then(({ readOrder }) => readOrder(club.abbr, format.teams, memberZone(), Date.now))
+			.then(({ readOrder }) =>
+				readOrder(
+					club.abbr,
+					{ teams: format.teams, scoring: apiFormatOf(format) },
+					memberZone(),
+					Date.now
+				)
+			)
 			.then((read) => {
 				if (stale) return;
 				const placed = placedRows(rows, read.places, format.teams);
-				atClock = placed === null ? null : { rows: placed, basis: liveBasis(basis, read.lead) };
+				atClock = placed === null ? null : { rows: placed, lead: read.lead };
 			})
 			.catch(() => {
 				if (!stale) atClock = null;
@@ -83,7 +97,10 @@
 		};
 	});
 	const rows = $derived(atClock?.rows ?? page.rows);
-	const basis = $derived(atClock?.basis ?? page.basis);
+	/** The order's lead once its rows stand, else the run's basis with its stamp (review M1). */
+	const basis = $derived(
+		basisAtClock(page.basis, atClock?.lead ?? null, inSeasonStamp(page.format, zone))
+	);
 	/** The page's one verb: his two best available players side by side. */
 	const pair = $derived(rows.filter((row) => !heldOut(row)).slice(0, 2));
 	/** The rows' status words as built, said again on the member's clock once the page is live. */

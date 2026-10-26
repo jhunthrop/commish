@@ -25,7 +25,8 @@
 	import StatusPill from '#lib/ui/StatusPill.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { COMPARE_PAGE, filled } from '#lib/site/reference-words.ts';
-	import { liveBasis, placedAt, type LivePlace } from '#lib/run/live-order.ts';
+	import { basisAtClock, placedAt, placedPair, type LivePlace } from '#lib/run/live-order.ts';
+	import { BUILD_ZONE, inSeasonStamp } from '#lib/front/live-board.ts';
 	import type { BasisPart } from '#lib/run/board-basis.ts';
 	import { memberZone } from '#lib/format/clock.ts';
 	import type { PageProps } from './$types';
@@ -65,10 +66,10 @@
 		const ids = picked.map((player) => player.id).join(',');
 		if (atClock?.ids === ids) return;
 		let stale = false;
-		const teams = board.teams;
+		const ordered = { teams: board.teams, scoring: apiFormatOf(board) };
 		void import('#lib/run/live-order-read.ts')
 			.then(({ readOrder }) =>
-				Promise.all(picked.map((player) => readOrder(player.name, teams, memberZone(), Date.now)))
+				Promise.all(picked.map((player) => readOrder(player.name, ordered, memberZone(), Date.now)))
 			)
 			.then((reads) => {
 				const last = reads.at(-1);
@@ -85,16 +86,26 @@
 	});
 	/** The order's places for the pair when it places both in the compared format, else none: the
 	 * table is the run's or the order's, never one side of each. */
-	const placesShown = $derived.by(() => {
-		if (atClock === null || format.id !== board?.id) return null;
-		const { places } = atClock;
-		const both = [chosen.a, chosen.b].every((player) => player !== null && places.has(player.id));
-		return both ? places : null;
+	const placesShown = $derived(
+		placedPair(
+			[chosen.a?.id, chosen.b?.id].filter((id) => id !== undefined),
+			atClock?.places ?? null,
+			format.id,
+			board?.id ?? null
+		)
+	);
+	/** The member's zone once the page is live, the build's before (as the front door's stamp). */
+	let zone = $state(BUILD_ZONE);
+	onMount(() => {
+		zone = memberZone();
 	});
+	/** The order's lead once the pair is the order's, else the run's basis with its stamp (review M1). */
 	const basis = $derived(
-		placesShown === null || atClock === null
-			? (data.basis[format.id] ?? [])
-			: liveBasis(data.basis[format.id] ?? [], atClock.lead)
+		basisAtClock(
+			data.basis[format.id] ?? [],
+			placesShown === null ? null : (atClock?.lead ?? null),
+			inSeasonStamp(format, zone)
+		)
 	);
 	const note = $derived(siteContext.notes?.lineFor(figures, 'These figures are') ?? null);
 

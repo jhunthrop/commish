@@ -33,7 +33,8 @@ const PHONE_HEIGHT = 844;
 const DESK_HEIGHT = 900;
 /** A beat for a table to draw an answer that has arrived. */
 const SETTLE_MS = 600;
-/** How many text lines after a player's name his figures sit within, on any of the views. */
+/** How many text lines after a player's name his figures sit within, on any of the views; the window
+ * also ends at the next player the order names, so a neighbour's cells are never his. */
 const WINDOW_LINES = 16;
 /** The order's rows the script reads the three players from. */
 const ORDER_LIMIT = 100;
@@ -45,6 +46,12 @@ const PLAYERS = [
 	{ name: 'Joe Burrow', slug: 'joe-burrow' }
 ] as const;
 const CLUB = 'chi';
+/** Each of the three players' clubs, read (not shot) so every one of them is held on a club page. */
+const CLUBS: Readonly<Record<string, string>> = {
+	"D'Andre Swift": 'chi',
+	'Parker Washington': 'jax',
+	'Joe Burrow': 'cin'
+};
 const COMPARE = `/compare?a=${PLAYERS[0].slug}&b=${PLAYERS[2].slug}`;
 
 interface Expected {
@@ -63,7 +70,7 @@ const tenth = (value: number): string => value.toFixed(1);
 const signedTenth = (value: number): string => `${value >= 0 ? '+' : ''}${tenth(value)}`;
 
 /** The order the Rankings read, signed out: each player's chip, figure and Over repl. */
-async function expected(): Promise<Expected[]> {
+async function expected(): Promise<{ want: Expected[]; names: Set<string> }> {
 	const response = await fetch(`${API_ORIGIN}/order?limit=${String(ORDER_LIMIT)}`);
 	if (!response.ok) throw new Error(`The fixture's /order answered ${String(response.status)}.`);
 	const { data } = await response.json<{
@@ -75,7 +82,8 @@ async function expected(): Promise<Expected[]> {
 			}[];
 		};
 	}>();
-	return PLAYERS.map(({ name }) => {
+	const names = new Set(data.rows.map((row) => row.line.player.name));
+	const want = PLAYERS.map(({ name }) => {
 		const row = data.rows.find((candidate) => candidate.line.player.name === name);
 		if (row?.rest_of_season_points == null || row.points_over_replacement == null)
 			throw new Error(`The fixture's order has no figures for ${name}.`);
@@ -86,6 +94,7 @@ async function expected(): Promise<Expected[]> {
 			vor: signedTenth(row.points_over_replacement)
 		};
 	});
+	return { want, names };
 }
 
 const browser = await chromium.launch();
@@ -121,46 +130,63 @@ async function lines(page: Page): Promise<string[]> {
 		.filter((line) => line !== '');
 }
 
-/** What a view reads for a player: the lines after his name, where his chip and figures sit. */
-function windowOf(all: readonly string[], name: string): string[] | null {
-	const at = all.findIndex((line) => line === name || line.startsWith(`${name} `));
-	return at < 0 ? null : all.slice(at, at + WINDOW_LINES);
+/** A position chip, whole: "RB 15". */
+const CHIP = /^[A-Z]{1,3} \d+$/u;
+
+/** A line's cells as chips and figures, whole: "RB 15" is one chip (never "RB 1"), "103.0" one figure. */
+function cellsOf(line: string): string[] {
+	return line.match(/[A-Z]{1,3} \d+|[+-]?\d+(?:\.\d+)?/gu) ?? [];
+}
+
+/** What a view draws for a player: the cells after his name, up to the next player the order names. */
+function windowOf(
+	all: readonly string[],
+	name: string,
+	names: ReadonlySet<string>
+): string[] | null {
+	const at = all.findIndex((line) => line === name);
+	if (at < 0) return null;
+	const after = all.slice(at + 1, at + WINDOW_LINES);
+	const next = after.findIndex((line) => line !== name && names.has(line));
+	const cells = (next < 0 ? after : after.slice(0, next)).flatMap(cellsOf);
+	// A row draws one chip, his: a second chip is the next row's player, whom the order may not name.
+	const first = cells.findIndex((cell) => CHIP.test(cell));
+	const second = cells.findIndex((cell, i) => i > first && CHIP.test(cell));
+	return second < 0 ? cells : cells.slice(0, second);
 }
 
 type Reading = Record<string, Record<string, string[] | null>>;
 const readings: Reading = {};
 
-/** Each of the three players this view draws prints the order's chip and figure (and Over repl.
- * where `vor` is set); a player the view does not draw is said in the readings, never a miss. */
+/** Every player the view must draw is drawn, and his cells hold the order's chip and figure (and Over
+ * repl. where the view draws it), each a whole cell. */
 function checkView(
 	view: string,
 	all: readonly string[],
-	want: readonly Expected[],
+	players: readonly Expected[],
+	names: ReadonlySet<string>,
 	drawn: { projected: boolean; vor: boolean }
 ): void {
 	readings[view] = {};
-	for (const player of want) {
-		const seen = windowOf(all, player.name);
-		readings[view][player.name] = seen;
-		if (seen === null) continue;
-		const text = seen.join(' | ');
-		if (!seen.includes(player.chip) && !text.includes(player.chip))
-			fail(view, `${player.name} reads no ${player.chip} (${text})`);
-		if (drawn.projected && !text.includes(player.projected))
-			fail(view, `${player.name} reads no ${player.projected} (${text})`);
-		if (drawn.vor && !text.includes(player.vor.replace('+', '')))
-			fail(view, `${player.name} reads no Over repl. ${player.vor} (${text})`);
+	for (const player of players) {
+		const cells = windowOf(all, player.name, names);
+		readings[view][player.name] = cells;
+		if (cells === null) {
+			fail(view, `draws no ${player.name}`);
+			continue;
+		}
+		const said = cells.join(' | ');
+		if (!cells.includes(player.chip))
+			fail(view, `${player.name} reads no ${player.chip} (${said})`);
+		if (drawn.projected && !cells.includes(player.projected))
+			fail(view, `${player.name} reads no ${player.projected} (${said})`);
+		if (drawn.vor && !cells.includes(player.vor) && !cells.includes(player.vor.replace('+', '')))
+			fail(view, `${player.name} reads no Over repl. ${player.vor} (${said})`);
 	}
 }
 
-/** A row's cells as figures and chips: "RB 15 QB 4" is two chips, "103.0 190.3" two figures. */
-function cellsOf(rest: string): string[] {
-	return rest.match(/[A-Z]{1,3} \d+|[+-]?\d+(?:\.\d+)?/gu) ?? [];
-}
-
 /** Compare's table: each row's two cells, the leader first, held to the two players' figures. */
-function checkCompare(all: readonly string[], want: readonly Expected[]): void {
-	const pair = [want[0], want[2]].filter((p): p is Expected => p !== undefined);
+function checkCompare(all: readonly string[], pair: readonly Expected[]): void {
 	/** A table row's line, "Projected 103.0 190.3", as its cells. */
 	const row = (label: string): string[] => {
 		const line = all.find((candidate) => candidate.startsWith(`${label} `));
@@ -172,7 +198,7 @@ function checkCompare(all: readonly string[], want: readonly Expected[]): void {
 		vor: row('Over replacement')
 	};
 	readings.compare = {
-		[`${pair[0]?.name ?? ''} and ${pair[1]?.name ?? ''}`]: Object.values(shown).flat()
+		[pair.map((player) => player.name).join(' and ')]: Object.values(shown).flat()
 	};
 	for (const player of pair) {
 		const chip = player.chip;
@@ -183,6 +209,8 @@ function checkCompare(all: readonly string[], want: readonly Expected[]): void {
 		if (!shown.vor.includes(player.vor))
 			fail('compare', `Over replacement reads ${shown.vor.join(', ')}, not ${player.vor}`);
 	}
+	if (all.some((line) => line.startsWith('Floor to ceiling')))
+		fail('compare', 'draws a Floor to ceiling row in season');
 }
 
 async function overflow(page: Page, tag: string): Promise<void> {
@@ -190,17 +218,33 @@ async function overflow(page: Page, tag: string): Promise<void> {
 	if (over > 0) fail(tag, `scrolls sideways by ${String(over)} px`);
 }
 
+/** The players each view must draw: the front door's top ten holds the order's first ten (Swift 2nd,
+ * Washington 10th, Burrow 13th); Rankings' first page holds the playing players, Burrow's bye in its
+ * own section past it; the club page its own club's; compare its pair. */
+const SWIFT_WASHINGTON = [PLAYERS[0].name, PLAYERS[1].name];
 const VIEWS = [
 	// The Rankings row draws the week's Proj and Over repl., never the rest-of-season total. A player
 	// page's head is read in the loop after the views (its figures under the name's other lines).
-	{ key: 'home', path: '/', drawn: { projected: true, vor: true } },
-	{ key: 'players', path: '/players', drawn: { projected: false, vor: true } },
-	{ key: 'p-swift', path: `/players/${PLAYERS[0].slug}`, drawn: null },
-	{ key: `club-${CLUB}`, path: `/clubs/${CLUB}`, drawn: { projected: true, vor: true } },
-	{ key: 'compare', path: COMPARE, drawn: null }
+	{ key: 'home', path: '/', draws: SWIFT_WASHINGTON, drawn: { projected: true, vor: true } },
+	{
+		key: 'players',
+		path: '/players',
+		draws: SWIFT_WASHINGTON,
+		drawn: { projected: false, vor: true }
+	},
+	{ key: 'p-swift', path: `/players/${PLAYERS[0].slug}`, draws: [], drawn: null },
+	{
+		key: `club-${CLUB}`,
+		path: `/clubs/${CLUB}`,
+		draws: [PLAYERS[0].name],
+		drawn: { projected: true, vor: true }
+	},
+	{ key: 'compare', path: COMPARE, draws: [PLAYERS[0].name, PLAYERS[2].name], drawn: null }
 ] as const;
 
-const want = await expected();
+const { want, names } = await expected();
+const wanted = (draws: readonly string[]): Expected[] =>
+	want.filter((player) => draws.includes(player.name));
 await mkdir(out, { recursive: true });
 for (const theme of THEMES) {
 	for (const width of WIDTHS) {
@@ -216,8 +260,9 @@ for (const theme of THEMES) {
 			// The figures are read once, at a desk in the light theme: the phone draws the same answer.
 			if (theme === 'light' && width === WIDTHS[1]) {
 				const all = await lines(page);
-				if (view.key === 'compare') checkCompare(all, want);
-				else if (view.drawn !== null) checkView(view.key, all, want, view.drawn);
+				if (view.key === 'compare') checkCompare(all, wanted(view.draws));
+				else if (view.drawn !== null)
+					checkView(view.key, all, wanted(view.draws), names, view.drawn);
 			}
 			await page.screenshot({ path: new URL(`${tag}.png`, out).pathname, fullPage: true });
 			await page.close();
@@ -241,6 +286,18 @@ for (const theme of THEMES) {
 		if (!head.includes(player.projected))
 			fail(`player-${slug}`, `the head reads no ${player.projected}`);
 		await page.close();
+		// His club's page, read at a desk: every one of the three is held on his club page.
+		const club = CLUBS[player.name] ?? '';
+		if (club !== CLUB) {
+			const clubPage = await ctx.newPage();
+			await clubPage.goto(new URL(`/clubs/${club}`, web).href);
+			await settle(clubPage);
+			checkView(`club-${club}`, await lines(clubPage), [player], names, {
+				projected: true,
+				vor: true
+			});
+			await clubPage.close();
+		}
 	}
 	await ctx.close();
 }
