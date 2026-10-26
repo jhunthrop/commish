@@ -66,12 +66,21 @@ tasks.matching { it.name == "testDebugUnitTest" }.configureEach { dependsOn(veri
 
 android {
     namespace = "app.trycommish.android"
-    compileSdk = 35
+    compileSdk =
+        libs.versions.android.compile.sdk
+            .get()
+            .toInt()
 
     defaultConfig {
         applicationId = "app.trycommish.android"
-        minSdk = 26
-        targetSdk = 35
+        minSdk =
+            libs.versions.android.min.sdk
+                .get()
+                .toInt()
+        targetSdk =
+            libs.versions.android.target.sdk
+                .get()
+                .toInt()
         versionCode = appVersionCode
         versionName = marketingVersion
         buildConfigField("String", "SITE_URL", "\"$siteUrl\"")
