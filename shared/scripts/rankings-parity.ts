@@ -24,6 +24,7 @@ import {
 	figureCell,
 	formCells,
 	oppCell,
+	stripShare,
 	type StripCell
 } from '../../web/src/lib/league/box/figure-strip.ts';
 import {
@@ -153,15 +154,16 @@ function playerCell(box: BoxRow): unknown {
 }
 
 /** The web's strip as the parity pins it: each cell's head and value, whether it is the key, the
- * opponent's tint (null on every other cell and on an opponent's cell without a rank) and whether it
- * takes the narrow share (stripTracks). */
+ * opponent's tint (null on every other cell and on an opponent's cell without a rank), whether it is
+ * the narrow cell, and its share of the strip's width (stripShare, as stripTracks lays it out). */
 function cellsOf(cells: readonly StripCell[]): unknown[] {
 	return cells.map((c) => ({
 		head: c.head,
 		value: c.value,
 		key: c.key === true,
 		ease: c.ease ?? null,
-		narrow: c.narrow === true
+		narrow: c.narrow === true,
+		share: stripShare(c)
 	}));
 }
 
