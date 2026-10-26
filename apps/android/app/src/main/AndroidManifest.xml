@@ -44,6 +44,18 @@
                     android:host="trycommish.app"
                     android:pathPrefix="/companion/" />
             </intent-filter>
+            <!-- The mock room's pages (links.ts mockSetup and sharedMock, the web's APP_LINK_PATHS /mock/share/*):
+                 the setup and a shared draft open in the app, as the iOS app's universal links open them. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="trycommish.app"
+                    android:path="/mock/new" />
+                <data android:pathPrefix="/mock/share/" />
+            </intent-filter>
         </activity>
     </application>
 

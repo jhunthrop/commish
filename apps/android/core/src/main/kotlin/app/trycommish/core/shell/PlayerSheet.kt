@@ -231,6 +231,33 @@ object SiteLinks {
         return if (path == COMPANION_START) ShellRoute.CompanionNew(replay) else ShellRoute.Companion(path)
     }
 
+    /** The mock room's pages the app draws by their site paths (links.ts mockSetup, mockLeague and
+     * sharedMock, nav.ts MOCK_SETUP): /mock and /mock/new the setup, on the saved league `?league=` names,
+     * and /mock/share/<code> a shared draft; null for any other link (a room by its id stays on the site). */
+    fun mock(link: String): ShellRoute? {
+        val rest = link.removePrefix("$ORIGIN/").takeIf { it != link } ?: return null
+        val parts =
+            rest
+                .substringBefore('?')
+                .substringBefore('#')
+                .split('/')
+                .filter { it.isNotEmpty() }
+        val league =
+            rest
+                .substringAfter('?', "")
+                .substringBefore('#')
+                .split('&')
+                .firstNotNullOfOrNull { pair -> pair.removePrefix("league=").takeIf { it != pair && it.isNotEmpty() } }
+        return when {
+            parts == listOf("mock") || parts == listOf("mock", "new") -> ShellRoute.MockSetup(league)
+            parts.size == MOCK_SHARE_PARTS && parts[0] == "mock" && parts[1] == "share" -> ShellRoute.SharedMock(parts[2])
+            else -> null
+        }
+    }
+
+    /** /mock/share/<code>: three parts. */
+    private const val MOCK_SHARE_PARTS = 3
+
     /** The companion's start page's last segment (nav.ts COMPANION_START). */
     private const val COMPANION_START = "new"
 

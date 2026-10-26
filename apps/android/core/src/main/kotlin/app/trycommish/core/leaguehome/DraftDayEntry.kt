@@ -10,32 +10,39 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 /**
- * The League home's word on draft day (SeasonPanel.svelte, phase draft_day), the iOS DraftDayEntry's: when
- * the draft is on the member's clock, that the site turns to the season after it with the zone once, and
- * the one verb, the Advisor, which opens the live-draft companion. Held to the web by the companion's parity
- * (shared/fixtures/parity/companion.json draftDay). Every instant on the member's own clock.
+ * The League home's word before and on draft day (SeasonPanel.svelte, phases pre_draft and draft_day), the iOS
+ * DraftDayEntry's: when the draft is on the member's clock, that the site turns to the season after it with the
+ * zone once, and the one verb: on draft day the Advisor, which opens the live-draft companion; before it Start
+ * a mock draft, which opens the mock room's setup on the league (Lane 214). Held to the web by the companion's
+ * parity (shared/fixtures/parity/companion.json draftDay). Every instant on the member's own clock.
  */
 data class DraftDayEntry(
     val lead: String,
     val line: String,
     val verb: String,
+    val opens: Opens = Opens.Advisor,
 ) {
+    /** What the verb opens. */
+    enum class Opens { Advisor, Mock }
+
     companion object {
         private const val EASTERN = "Eastern Time"
 
-        /** The entry for a league on draft day; null in every other phase, where the web draws another panel
-         * or none. */
+        /** The entry for a league before or on draft day; null in every other phase, where the web draws
+         * another panel or none. */
         fun of(
             phase: LeaguePhase?,
             draftAt: Instant?,
             now: Instant,
             zone: ZoneId,
         ): DraftDayEntry? {
-            if (phase != LeaguePhase.draft_day) return null
+            if (phase != LeaguePhase.draft_day && phase != LeaguePhase.pre_draft) return null
+            val opens = if (phase == LeaguePhase.draft_day) Opens.Advisor else Opens.Mock
             return DraftDayEntry(
                 lead = draftLine(draftAt, now, zone),
                 line = listOfNotNull(Words.DraftDay.turnsAfterDraft, zoneLine(zone)).joinToString(" "),
-                verb = Words.DraftDay.advisorVerb,
+                verb = if (opens == Opens.Advisor) Words.DraftDay.advisorVerb else Words.PageVerb.mock,
+                opens = opens,
             )
         }
 

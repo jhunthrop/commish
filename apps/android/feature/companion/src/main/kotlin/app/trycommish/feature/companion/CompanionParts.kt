@@ -51,7 +51,7 @@ import app.trycommish.feature.boxscore.FitText
 
 /** The companion's widths at 390 (the room's phone grid, Pool.svelte --pool-cols), the iOS CompanionColumn:
  * his face, the player taking the rest, Over repl, the chance, a team's slot and its pick. */
-internal object Widths {
+object Widths {
     val face = 32.dp
     val value = 64.dp
     val chance = 78.dp
@@ -78,11 +78,11 @@ class CompanionActions(
 )
 
 /** A panel's line (Panel.svelte): the hairline, the accent's edge at your turn, the loss's edge. */
-internal enum class Edge { Plain, Accent, Quiet, Loss }
+enum class Edge { Plain, Accent, Quiet, Loss }
 
 /** A panel as the web draws one (Panel.svelte): the surface, its line, the accent or the loss edge. */
 @Composable
-internal fun Panel(
+fun Panel(
     edge: Edge = Edge.Plain,
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
@@ -108,7 +108,7 @@ internal fun Panel(
 
 /** A line of the small words under a head: ink 2, the small face. */
 @Composable
-internal fun NoteText(
+fun NoteText(
     text: String,
     modifier: Modifier = Modifier,
     ink: Color = CommishTheme.colors.ink2,
@@ -118,7 +118,7 @@ internal fun NoteText(
 
 /** A column head in the room's small caps (Label.svelte), shrunk rather than broken. */
 @Composable
-internal fun HeadText(
+fun HeadText(
     text: String,
     modifier: Modifier = Modifier,
     end: Boolean = true,
@@ -136,7 +136,7 @@ internal fun HeadText(
 
 /** A figure cell in the number face, right aligned, shrunk to fit its width. */
 @Composable
-internal fun FigureText(
+fun FigureText(
     text: String,
     width: Dp,
     ink: Color = CommishTheme.colors.ink,
@@ -147,7 +147,7 @@ internal fun FigureText(
 
 /** A player's face: his headshot, his initials while it loads or where he has none. */
 @Composable
-internal fun PlayerFace(
+fun PlayerFace(
     player: RoomPlayer,
     side: Dp = Widths.face,
 ) {
@@ -156,7 +156,7 @@ internal fun PlayerFace(
 
 /** His name the biggest thing in the row, his pill and club under it, and an extra word after them. */
 @Composable
-internal fun WhoCell(
+fun WhoCell(
     player: RoomPlayer,
     modifier: Modifier = Modifier,
     extra: String? = null,
@@ -181,18 +181,20 @@ internal fun WhoCell(
 }
 
 /** A row a tap opens his sheet from: the button's role, the hairline over it. */
-internal fun Modifier.opens(
+fun Modifier.opens(
     player: RoomPlayer?,
     open: (SheetPlayer) -> Unit,
 ): Modifier = player?.let { clickable(role = Role.Button, onClickLabel = it.name) { open(it.sheetPlayer) } } ?: this
 
 /** A strip of picks (PickStrip.svelte): the lead figure and its lines, then each face with his last name
- * and its lines, the newest ringed in ink; sideways where it runs past the phone, still in a snapshot. */
+ * and its lines, the newest ringed in ink (with `ringStrong`, the mock's SinceStrip, a strong face ringed in
+ * the accent: a pick that was in your queue); sideways where it runs past the phone, still in a snapshot. */
 @Composable
-internal fun PickStripView(
+fun PickStripView(
     strip: PickStripModel,
     open: (SheetPlayer) -> Unit,
     still: Boolean,
+    ringStrong: Boolean = false,
 ) {
     val c = CommishTheme.colors
     Panel {
@@ -223,7 +225,12 @@ internal fun PickStripView(
                             Modifier.width(Widths.stripFace).opens(face.player, open),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            val ring = if (face.newest) Modifier.border(EDGE, c.ink, CircleShape) else Modifier
+                            val ring =
+                                when {
+                                    face.newest -> Modifier.border(EDGE, c.ink, CircleShape)
+                                    ringStrong && face.strong -> Modifier.border(EDGE, c.accent, CircleShape)
+                                    else -> Modifier
+                                }
                             Box(ring) { PlayerFace(face.player, Widths.stripHead) }
                             Text(
                                 face.name,
@@ -257,7 +264,7 @@ internal fun PickStripView(
 /** A chance as the room's cell prints it (StillThereCell.svelte): the figure, its meter, what it is of; or
  * the words for none. */
 @Composable
-internal fun ChanceCell(
+fun ChanceCell(
     chance: String?,
     label: String,
     missing: String,
@@ -285,7 +292,7 @@ internal fun ChanceCell(
 }
 
 /** The meter's share from the printed chance: "<1%" is 0, ">99%" is 1. */
-internal fun share(chance: String): Float =
+fun share(chance: String): Float =
     when {
         chance.startsWith("<") -> 0f
         chance.startsWith(">") -> 1f
@@ -296,7 +303,7 @@ private const val PERCENT = 100f
 
 /** Over repl on its round's tint (Row.svelte .heat-1 to .heat-4, .heat-neg), the Board's tile. */
 @Composable
-internal fun ValueCell(
+fun ValueCell(
     text: String,
     heat: Heat?,
 ) {
@@ -320,13 +327,13 @@ internal fun ValueCell(
 
 /** A hairline across a list's row. */
 @Composable
-internal fun RowRule() {
+fun RowRule() {
     Box(Modifier.fillMaxWidth().height(HAIRLINE).background(CommishTheme.colors.line))
 }
 
 /** A section's head in the display face, its aside under it (SectionHead.svelte at 390). */
 @Composable
-internal fun SectionHead(
+fun SectionHead(
     title: String,
     aside: String? = null,
     modifier: Modifier = Modifier,
