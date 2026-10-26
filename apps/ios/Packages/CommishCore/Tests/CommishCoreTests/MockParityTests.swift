@@ -169,7 +169,7 @@ struct MockParityTests {
         let wall = try #require(web["wall"] as? JSON)
         #expect(model.wall.names == wall["names"] as? [String])
         let rows = try #require(wall["rows"] as? [[Any]])
-        #expect(model.wall.rows.map { $0.map { $0?.id } } == rows.map { $0.map { $0 as? String } })
+        #expect(model.wall.rows.map { $0.map { $0.player?.id } } == rows.map { $0.map { $0 as? String } })
         let team = try #require(web["team"] as? JSON)
         let slots = try #require(team["slots"] as? [JSON])
         #expect(model.team.count == team["count"] as? String)

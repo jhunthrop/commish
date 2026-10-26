@@ -54,7 +54,8 @@ public struct RoomWall: Equatable, Sendable {
                     id: pick, seat: seat, player: player, name: player.map { DraftFormat.lastName($0.name) },
                     line: player.map { "\($0.position) · \($0.team)" }, mine: player != nil && seat == you,
                     now: onClock ? WallClock(
-                        words: seat == you ? (shared ? Words.Room.theirPick : Words.Room.yourPick) : Words.Room.onTheClock,
+                        words: seat == you ? (shared ? Words.Room.theirPick : Words.Room.yourPick) : Words.Room
+                            .onTheClock,
                         pick: DraftFormat.pickLabel(pick, teams: teams)
                     ) : nil
                 )

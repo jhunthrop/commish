@@ -138,7 +138,8 @@ struct RootTabs: View {
             LeagueScreen(
                 environment: environment, leagueID: league.id, league: league, expired: expired,
                 openLineup: { selection = PhoneRail.lineupKey }, openGame: { openGame($0, league: league.id) },
-                openAdvisor: { open(.companionNew(replay: false)) }
+                openAdvisor: { open(.companionNew(replay: false)) },
+                openMock: { open(.mockSetup(from: nil, league: league.settingsLeagueID)) }
             )
             .id(league.id)
         case let (PhoneRail.lineupKey, league?):
@@ -212,11 +213,7 @@ struct RootTabs: View {
                 choose(id)
             }
         case let .leagueHome(id):
-            LeagueScreen(
-                environment: environment, leagueID: id, league: selectedLeague.flatMap { $0.id == id ? $0 : nil },
-                expired: expired, openLineup: {}, openGame: { openGame($0, league: id) },
-                openAdvisor: { open(.companionNew(replay: false)) }
-            )
+            leagueHome(id)
         case let .game(league, roster):
             MatchupTab(
                 environment: environment, leagueID: league, roster: roster, expired: expired,
@@ -250,6 +247,18 @@ struct RootTabs: View {
     /// unread season reads as in season, as the bar does.
     private var inSeason: Bool {
         session.sitePhase == nil || session.sitePhase == .inSeason
+    }
+
+    /// A league's home pushed by its id: its draft entry opens the Advisor or the setup on its saved
+    /// league.
+    private func leagueHome(_ id: String) -> some View {
+        let league = selectedLeague.flatMap { $0.id == id ? $0 : nil }
+        return LeagueScreen(
+            environment: environment, leagueID: id, league: league,
+            expired: expired, openLineup: {}, openGame: { openGame($0, league: id) },
+            openAdvisor: { open(.companionNew(replay: false)) },
+            openMock: { open(.mockSetup(from: nil, league: league?.settingsLeagueID)) }
+        )
     }
 
     /// Where a mock's setup starts (the web's site context): the selected league's board and saved
