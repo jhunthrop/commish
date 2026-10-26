@@ -216,6 +216,44 @@ func TestWebSignInUnchanged(t *testing.T) {
 	}
 }
 
+// queuedUsers is the deleted accounts' WorkOS users still queued; err
+// fails every read.
+type queuedUsers struct {
+	users map[string]bool
+	err   error
+}
+
+func (q queuedUsers) Queued(_ context.Context, id string) (bool, error) { return q.users[id], q.err }
+
+// A sign-in as a WorkOS user whose account was deleted here, still queued
+// for the provider's delete (Lane 233), is refused for the web and the
+// apps alike: no account made, no session, no pairing code, the problem
+// page. A failed read refuses too. Another user signs in as before.
+func TestSignInRefusedWhileTheAccountIsBeingDeleted(t *testing.T) {
+	for name, queue := range map[string]queuedUsers{
+		"queued":      {users: map[string]bool{userID: true}},
+		"read failed": {err: errors.New("db down")},
+	} {
+		for _, query := range []string{"return_to=%2Faccount", appLogin("ios")} {
+			codes, accounts := &memCodes{}, &memAccounts{}
+			h := newAuthHandler(t, accounts, codes)
+			h.Deleting = queue
+			w := signIn(t, h, query)
+			if w.Code != http.StatusFound || w.Header().Get("Location") != siteURL+"/sign-in/problem" {
+				t.Fatalf("%s %q: %d to %q", name, query, w.Code, w.Header().Get("Location"))
+			}
+			if accounts.acct.WorkOSUserID != "" || len(accounts.created) != 0 || hasSessionCookie(w) || len(codes.kinds) != 0 {
+				t.Fatalf("%s %q: an account, session or code was made", name, query)
+			}
+		}
+	}
+	h := newAuthHandler(t, &memAccounts{}, &memCodes{})
+	h.Deleting = queuedUsers{users: map[string]bool{"user_someone_else": true}}
+	if w := signIn(t, h, "return_to=%2Faccount"); w.Code != http.StatusFound || !hasSessionCookie(w) {
+		t.Fatalf("another user's sign-in: %d, cookie %v", w.Code, hasSessionCookie(w))
+	}
+}
+
 // An app's sign-in makes no site session (B212): no session row, no
 // session cookie, and the WorkOS session goes on the pairing code to the
 // device instead.

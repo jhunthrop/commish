@@ -96,7 +96,7 @@ Captions sit above the screen on a plain tokens background (`shared/design/token
 | Financial features | "My app doesn't provide any financial features" | No billing in the app (spec §2, the 2026 season is free). Stripe stays in test mode (`STRIPE_ENVIRONMENT` default `test`) |
 | COVID-19 contact tracing and status | Not applicable | |
 | Data safety | Answers in §4 | |
-| Account deletion URL | `https://trycommish.app/privacy`, section "Deleting your account" | **Gap**, see §4.3 |
+| Account deletion URL | `https://trycommish.app/account/delete` | The web page (Lane 233): what is deleted and kept, the email typed to confirm, one verb. The policy's section is `https://trycommish.app/privacy#deleting-your-account`. In-app verb still to come, see §4.3 |
 
 ### 2.1 App access instructions for review
 
@@ -138,7 +138,7 @@ Google's rule: "collect" is data the app sends off the device. Data sent to a se
 | --- | --- | --- |
 | Does the app collect or share any of the required user data types? | Yes, it collects. It shares none | §4.2 |
 | Is all user data collected by the app encrypted in transit? | Yes | Release builds call `https://api.trycommish.app`. `network_security_config.xml` sets `cleartextTrafficPermitted="false"`. The room socket is `wss://room.trycommish.app` |
-| Do you provide a way for users to request that their data is deleted? | Yes: write to `help@trycommish.app` from the sign-in email | `privacy-words.ts`, "Deleting your account". See §4.3 for what Play also requires |
+| Do you provide a way for users to request that their data is deleted? | Yes: on the web at `https://trycommish.app/account/delete`, and in the app under Account once the app's verb ships (§4.3); writing to `help@trycommish.app` still works | `POST /me/delete` (`api/internal/deletion`, Lane 233) deletes the account and every row kept with it at once. Kept: lobby draft seats and picks under "Former member", a group pass for its claimants. Policy: `privacy-words.ts`, `#deleting-your-account` |
 
 ### 4.2 Data types
 
@@ -160,14 +160,14 @@ Notes:
 - Platform connections (ESPN cookies, Yahoo tokens, FFPC sign-in) are made on the web, not in the app (the app opens `/league/new` in the browser, `PlayerSheet.kt` `LEAGUE_START`), so the app does not collect them. If the app ever connects a platform itself, revisit this form.
 - Sign-in runs in Custom Tabs on AuthKit's pages, which we control, so the email and name it collects are declared above.
 
-### 4.3 Account deletion: two gaps before production
+### 4.3 Account deletion: one gap before production
 
-Play requires both an in-app path (or an in-app link to the web resource) and a web resource where deletion can be requested without the app. Today:
+Play requires both an in-app path (or an in-app link to the web resource) and a web resource where deletion can be requested without the app.
 
-1. **In the app**: the Account screen already prints the instruction, "To delete your account, write to help@trycommish.app" (`apps/android/design/src/main/kotlin/app/trycommish/design/Words.kt:722`), beside sign out and unpair (`AccountViewModel.kt`). What is missing is the in-app verb: a code lane must add "Delete your account" on Account, opening the web resource or a route that completes the deletion.
-2. **On the web**: `/privacy` says how to delete ("Write to help@trycommish.app from the email you sign in with"), but its sections carry no anchors (`web/src/lib/legal/LegalPage.svelte` prints no `id`), and Play asks for the deletion part to be "reasonably prominent (for example, through an anchor link)". A web lane should give the section an id (`#deleting-your-account`) or add a small `/account/delete` page naming Commish, the steps and the address.
+1. **On the web: done (Lane 233).** `https://trycommish.app/account/delete` names Commish, lists what is deleted and what is kept, takes the email typed to confirm and deletes at once through `POST /me/delete`; the page after says "Your account is deleted" at the same address. The account page opens it with "Delete account". The policy's section has its anchor, `https://trycommish.app/privacy#deleting-your-account`, and names the page.
+2. **In the app: still to do.** The Account screen prints "To delete your account, write to help@trycommish.app" (`Words.kt:722`, from `shared/words/account-foot.json`). The follow-up lane adds the "Delete account" verb on Account calling `POST /me/delete` with the device token and the typed email, then clearing the device as sign-out does. The web page cannot stand in for it: an app's sign-in makes no site session (Lane 225), so the page would ask the member to sign in again.
 
-Both are needed before a production release, not for the internal track. The URL field takes the anchored address once it exists.
+The in-app verb is needed before a production release, not for the internal track.
 
 ## 5. Release tracks and the founder's device
 

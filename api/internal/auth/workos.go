@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/workos/workos-go/v4/pkg/usermanagement"
+	"github.com/workos/workos-go/v4/pkg/workos_errors"
 )
 
 // Identity is who WorkOS says signed in.
@@ -89,6 +92,21 @@ func (w *WorkOS) LogoutURL(sessionID, returnTo string) (string, error) {
 		return "", fmt.Errorf("auth: workos logout url: %w", err)
 	}
 	return u.String(), nil
+}
+
+// DeleteUser deletes the member's WorkOS user, which ends every WorkOS
+// session it holds. A user WorkOS no longer has is already deleted, so
+// its 404 is success: a retry after a lost answer is not a failure.
+func (w *WorkOS) DeleteUser(ctx context.Context, userID string) error {
+	err := w.client.DeleteUser(ctx, usermanagement.DeleteUserOpts{User: userID})
+	var httpErr workos_errors.HTTPError
+	if errors.As(err, &httpErr) && httpErr.Code == http.StatusNotFound {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("auth: workos delete user: %w", err)
+	}
+	return nil
 }
 
 // sessionIDFromAccessToken reads the sid claim. The token came straight

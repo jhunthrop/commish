@@ -84,8 +84,17 @@ type Handler struct {
 	// at sign-in; nil leaves them where they are.
 	Anon    *Anon
 	Claimer AnonClaimer
-	Now     func() time.Time
-	Log     *slog.Logger
+	// Deleting names the WorkOS users whose accounts were deleted here and
+	// are still queued for the provider; a sign-in as one is refused. nil
+	// checks nothing. deletion.Store implements it.
+	Deleting DeletionQueue
+	Now      func() time.Time
+	Log      *slog.Logger
+}
+
+// DeletionQueue is the queue of deleted accounts' WorkOS users.
+type DeletionQueue interface {
+	Queued(ctx context.Context, workosUserID string) (bool, error)
 }
 
 // NewStateSealer is the sealer for the sign-in state cookie.
@@ -238,6 +247,10 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, problem, http.StatusFound)
 		return
 	}
+	if h.refuseDeleted(r, id.UserID) {
+		http.Redirect(w, r, problem, http.StatusFound)
+		return
+	}
 	acct, err := h.Store.UpsertAccount(r.Context(), id)
 	if err != nil {
 		h.Log.Error("auth: callback", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
@@ -261,6 +274,26 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	h.claimAnon(w, r, acct.ID)
 	http.Redirect(w, r, h.site(st.ReturnTo), http.StatusFound)
+}
+
+// refuseDeleted reports whether the WorkOS user's account was deleted here
+// and the provider has not yet confirmed its own delete (Lane 233): a
+// sign-in now would make a fresh account on a user the sweep is about to
+// delete, an account nobody could sign in to again. A failed read refuses
+// too, logged: the sign-in can be tried again in a moment.
+func (h *Handler) refuseDeleted(r *http.Request, workosUserID string) bool {
+	if h.Deleting == nil {
+		return false
+	}
+	queued, err := h.Deleting.Queued(r.Context(), workosUserID)
+	if err != nil {
+		h.Log.Error("auth: callback deletion check", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+		return true
+	}
+	if queued {
+		h.Log.Warn("auth: sign-in refused, the account is being deleted", "request_id", httpx.RequestIDFrom(r.Context()))
+	}
+	return queued
 }
 
 // startSiteSession issues a browser's session cookie for the account.

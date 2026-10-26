@@ -18,6 +18,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/billing"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/db"
+	"github.com/jhunthrop/commish/api/internal/deletion"
 	"github.com/jhunthrop/commish/api/internal/devices"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
@@ -41,7 +42,8 @@ func jobTable() map[string]job {
 		"billing-reconcile": runReconcile,
 		// renewal-reminders runs daily: the mail seven days before a renewal.
 		"renewal-reminders": runReminders,
-		// sweep runs daily: expired sessions, pairing codes and exports.
+		// sweep runs daily: expired sessions, pairing codes and exports, and
+		// the sign-in users of deleted accounts the provider refused.
 		"sweep": runSweep,
 		// stripe-setup runs by hand once per Stripe mode.
 		"stripe-setup": runStripeSetup,
@@ -148,6 +150,9 @@ func runSweep(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpo
 		return err
 	}
 	log.Info("swept device pairing codes", "deleted", codes)
+	if err := retryUserDeletions(ctx, log, cfg, pool, now); err != nil {
+		return err
+	}
 	if !cfg.R2.Configured() {
 		log.Warn("r2 not configured", "effect", "exports not swept")
 		return nil
@@ -159,6 +164,26 @@ func runSweep(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpo
 	m, err := exports.Sweep(ctx, &exports.Store{Pool: pool}, r2, now, sweepBatch)
 	log.Info("swept exports", "deleted", m)
 	return err
+}
+
+// userDeletionBatch bounds how many sign-in users one sweep deletes.
+const userDeletionBatch = 100
+
+// retryUserDeletions deletes, at the sign-in provider, every user whose
+// account was deleted here while the provider failed (Lane 233). A user
+// still failing stays queued and is logged with its former account id.
+func retryUserDeletions(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpool.Pool, now time.Time) error {
+	svc := &deletion.Service{
+		Accounts: &deletion.Store{Pool: pool},
+		Users:    auth.NewWorkOS(cfg.WorkOS.APIKey, cfg.WorkOS.ClientID, cfg.WorkOS.RedirectURI),
+		Now:      func() time.Time { return now }, Log: log,
+	}
+	n, err := svc.Retry(ctx, userDeletionBatch)
+	if err != nil {
+		return err
+	}
+	log.Info("retried sign-in user deletions", "deleted", n.Deleted, "failed", n.Failed)
+	return nil
 }
 
 // runStripeSetup makes sure every launch price exists (billing.

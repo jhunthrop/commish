@@ -105,6 +105,23 @@ export interface paths {
 		patch: operations['updateMe'];
 		trace?: never;
 	};
+	'/me/delete': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Deletes the signed-in account (Lane 233, B230), from the account page's browser session or an app's device token. The member types the email they sign in with. In one transaction the platform connections go first, then every row kept with the account: sign-ins, paired devices and their codes, followed leagues and their private reads, sheets and exports, solo mocks and their reports, companions, moves, passes and billing rows. A seat in a lobby draft stays in the draft under the departed member's word, its picks with no account; a group pass stays with the people who claimed it. The sign-in provider's user is deleted after the commit, and a failure there is retried by the daily sweep. Answers 204 with the session cookie cleared; every device token opens nothing from then on. POST, not DELETE with a body, because OpenAPI 3.0 leaves a DELETE's request body undefined and the app clients' generators treat it unevenly. */
+		post: operations['deleteMe'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/me/week': {
 		parameters: {
 			query?: never;
@@ -2040,6 +2057,10 @@ export interface components {
 		};
 		AccountUpdate: {
 			handle: string;
+		};
+		/** @description The member's confirmation that the account goes: the email they sign in with, typed by hand, compared without regard to case or the spaces around it. */
+		AccountDeletion: {
+			email: string;
 		};
 		/** @enum {string} */
 		ScoringPreset: 'ppr' | 'half_ppr' | 'standard' | 'te_premium';
@@ -5759,6 +5780,29 @@ export interface operations {
 		responses: {
 			200: components['responses']['AccountResponse'];
 			400: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+		};
+	};
+	deleteMe: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['AccountDeletion'];
+			};
+		};
+		responses: {
+			/** @description the account is deleted and the session cookie cleared */
+			204: {
+				headers: Record<string, unknown>;
+				content?: never;
+			};
+			400: components['responses']['ErrorResponse'];
+			401: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 		};
 	};
