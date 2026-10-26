@@ -30,7 +30,7 @@ internal object RankingsBasis {
             "${RankingsWords.weekHead(advice.week)} is ${Words.Box.pts} once final, " +
                 "${Words.Box.none} until his stats land, ${Words.Box.proj} before."
         val projected = proj(instantOrNull(advice.projectionReadAt), advice.projectionScoring, lines, zone, now)
-        return said(advice.basis, "$week $projected", Words.Basis.oppPhone, LineupBasis.kickedOffPart(lines, now))
+        return said(advice.basis, "$week $projected", Words.Basis.oppPart, LineupBasis.kickedOffPart(lines, now))
     }
 
     /** basis.ts projPart for a reader with no league: "Proj is this week's published projection in PPR,
