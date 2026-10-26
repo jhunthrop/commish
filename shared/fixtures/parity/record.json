@@ -856,7 +856,8 @@
 					"what": "Our draft board against ADP, on the season's points so far"
 				},
 				"waiting": "This record is written by the next nightly run."
-			}
+			},
+			"webPending": null
 		},
 		"own": {
 			"now": "2026-10-22T17:00:00.000Z",
@@ -1710,7 +1711,8 @@
 					"what": "Our draft board against ADP, on the season's points so far"
 				},
 				"waiting": "This record is written by the next nightly run."
-			}
+			},
+			"webPending": null
 		},
 		"upcoming": {
 			"now": "2026-10-22T17:00:00.000Z",
@@ -1972,6 +1974,17 @@
 					}
 				},
 				"basis": "Each position is graded on its own, All by players graded. Top named counts how many of the season's top 12 QBs, 24 RBs, 36 WRs and 12 TEs so far the order also ranked that high."
+			},
+			"webPending": {
+				"lead": "Two records, each graded against what it competes with: our rest-of-season order, graded week by week against ESPN and the week's published projection, and our draft board against ADP.",
+				"weeklyWhat": "Our rest-of-season order, graded week by week against ESPN and the week's published projection",
+				"before": "Our rest-of-season order is graded week by week from week 7. Each week's order is set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record.",
+				"setRulePhone": "Each week's order is graded as set, never as refreshed after.",
+				"orders": [],
+				"front": {
+					"caption": "Our draft board through week 5, 208 players.",
+					"note": "Our rest-of-season order is graded week by week from week 7, against ESPN and the week's published projection."
+				}
 			}
 		},
 		"graded": {
@@ -2771,6 +2784,22 @@
 					}
 				},
 				"basis": "Each position is graded on its own, All by players graded. Top named counts how many of the season's top 12 QBs, 24 RBs, 36 WRs and 12 TEs so far the order also ranked that high."
+			},
+			"webPending": {
+				"lead": "Two records, each graded against what it competes with: our rest-of-season order, graded week by week against ESPN and the week's published projection, and our draft board against ADP.",
+				"weeklyWhat": "Our rest-of-season order, graded week by week against ESPN and the week's published projection",
+				"before": "Our rest-of-season order is graded week by week from week 7. Each week's order is set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record.",
+				"setRulePhone": "Each week's order is graded as set, never as refreshed after.",
+				"orders": [
+					{
+						"week": 7,
+						"order": "Our rest-of-season order, set Oct 22"
+					}
+				],
+				"front": {
+					"caption": "Our rest-of-season order, graded over week 7, 188 players.",
+					"note": null
+				}
 			}
 		},
 		"published": {
@@ -3745,6 +3774,22 @@
 					}
 				},
 				"basis": "Each position is graded on its own, All by players graded. Top named counts how many of the season's top 12 QBs, 24 RBs, 36 WRs and 12 TEs so far the order also ranked that high."
+			},
+			"webPending": {
+				"lead": "Two records, each graded against what it competes with: our rest-of-season order, graded week by week against ESPN and the week's published projection, and our draft board against ADP.",
+				"weeklyWhat": "Our rest-of-season order, graded week by week against ESPN and the week's published projection",
+				"before": "Our rest-of-season order is graded week by week from week 7. Each week's order is set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record.",
+				"setRulePhone": "Each week's order is graded as set, never as refreshed after.",
+				"orders": [
+					{
+						"week": 7,
+						"order": "Our rest-of-season order, set Oct 22"
+					}
+				],
+				"front": {
+					"caption": "Our rest-of-season order, graded over week 7, 188 players.",
+					"note": null
+				}
 			}
 		}
 	}

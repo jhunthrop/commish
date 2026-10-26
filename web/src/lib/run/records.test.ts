@@ -159,7 +159,7 @@ void test('the weekly record reads as a record with ESPN beside ours and no ADP 
 void test('weeks 1 to 6 are one line that says the set rule once (C14)', () => {
 	assert.deepEqual(beforeLine(7), {
 		lead: 'Weeks 1 to 6',
-		text: "Weekly rankings start week 7. Each week's rankings are set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record."
+		text: "Our rest-of-season order is graded week by week from week 7. Each week's order is set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record."
 	});
 	assert.equal(beforeLine(1), null);
 	assert.equal(beforeLine(2)?.lead, 'Week 1');
@@ -191,11 +191,11 @@ void test("the weekly record draws ESPN's columns from its first week, the publi
 	assert.deepEqual(weeklySources(published), ['ours', 'espn', 'published']);
 	assert.match(
 		RECORDS_WORDS.lead,
-		/our weekly rankings against ESPN and the week's published projection,/u
+		/our rest-of-season order, graded week by week against ESPN and the week's published projection,/u
 	);
 	assert.equal(
 		RECORDS_WORDS.weeklyWhat,
-		"Our weekly rankings against ESPN and the week's published projection"
+		"Our rest-of-season order, graded week by week against ESPN and the week's published projection"
 	);
 });
 
@@ -267,7 +267,7 @@ void test('the front card shows the draft record until a weekly week is graded, 
 		scale: RECORDS_WORDS.draftScale,
 		caption: 'Our draft board through week 5, 214 players.',
 		second: null,
-		note: "Weekly rankings start week 7, against ESPN and the week's published projection."
+		note: "Our rest-of-season order is graded week by week from week 7, against ESPN and the week's published projection."
 	});
 	assert.match(RECORDS_WORDS.draftScale, /below 0\.00 the order runs backwards\.$/u);
 	const after = frontRecord(run({ draft, weekly: weekly([gradedSeven]) }));
@@ -292,7 +292,7 @@ void test('the front card shows the draft record until a weekly week is graded, 
 			}
 		],
 		scale: 'Order matched is how closely an order ranked the players.',
-		caption: 'Our weekly rankings over week 7, 214 players.',
+		caption: 'Our rest-of-season order, graded over week 7, 214 players.',
 		second: null,
 		note: null
 	});
@@ -375,7 +375,7 @@ void test('before either yardstick is graded the front card says what the weekly
 	assert.equal(card.name, 'Draft record');
 	assert.equal(
 		card.note,
-		"Weekly rankings start week 7, against ESPN and the week's published projection."
+		"Our rest-of-season order is graded week by week from week 7, against ESPN and the week's published projection."
 	);
 });
 
@@ -467,7 +467,8 @@ void test('the records say no banned word and no em-dash', () => {
 			typeof value === 'string' ? [value] : []
 		),
 		PAIR_WORDS.by('ADP', '4'),
-		BYE_WORDS.done,
+		BYE_WORDS.week(11),
+		BYE_WORDS.notSet,
 		RANKINGS_NAME,
 		RAIL_ITEMS.find((item) => item.key === WEEK_RANKINGS_KEY)?.label ?? '',
 		RECORDS_WORDS.draftSet('Tue Sep 8', 5),
@@ -559,11 +560,11 @@ void test('the weeks to come read one line per state: the next with its day, the
 	);
 });
 
-void test('the weekly record names its weeks and its order as weekly rankings, never rest of season (M2)', () => {
+void test('the weekly record names the order it graded as the rest-of-season order, never a weekly model (Lane 223, B188)', () => {
 	const shown = weeklyAsRecord(run({ weekly: weekly([gradedSeven]) }));
 	assert.ok(shown);
 	assert.equal(weeklySpan(shown), 'Week 7');
-	assert.equal(weeklyOrderWords(gradedSeven), 'Our weekly rankings, set Oct 22');
+	assert.equal(weeklyOrderWords(gradedSeven), 'Our rest-of-season order, set Oct 22');
 	assert.equal(weeklyOrderWords(upcoming(8, '2026-10-30T00:15:00.000Z')), null);
 });
 
