@@ -48,7 +48,8 @@ public final class MockRoomViewModel {
     private let timer: any PollTimer
     private let zone: TimeZone
     private let onSignedOut: @MainActor () -> Void
-    private var saved: MockSaved?
+    /// The room as last answered, with its board and the turn's card.
+    private(set) var saved: MockSaved?
     private var ui = MockRoomUI()
     private var stale = false
     /// The queue as last set, shown at once until its writes land.
@@ -87,15 +88,6 @@ public final class MockRoomViewModel {
             return false
         }
         return !ui.busy
-    }
-
-    /// The link the bar's Save and share and the report's Copy a share link copy.
-    public var shareURL: URL? {
-        switch state {
-        case let .report(_, code?, _, _): Self.shareLink(code)
-        case .room: saved.map { Self.shareLink($0.room.shareCode) }
-        default: nil
-        }
     }
 
     /// The saved room at once on the first open, then the API's.

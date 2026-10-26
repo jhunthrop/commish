@@ -2,8 +2,17 @@ import CommishAPI
 import CommishDesign
 import Foundation
 
-/// The mock room's cache key, share link and sentences, which need nothing of a room.
+/// The mock room's cache key, share links and sentences.
 public extension MockRoomViewModel {
+    /// The link the bar's Save and share and the report's Copy a share link copy.
+    var shareURL: URL? {
+        switch state {
+        case let .report(_, code?, _, _): Self.shareLink(code)
+        case .room: saved.map { Self.shareLink($0.room.shareCode) }
+        default: nil
+        }
+    }
+
     /// The cache key of a mock.
     static func route(_ id: String) -> String {
         "/mocks/\(id)"

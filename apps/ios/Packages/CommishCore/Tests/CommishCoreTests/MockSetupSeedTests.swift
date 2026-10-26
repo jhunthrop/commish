@@ -18,14 +18,14 @@ struct MockSetupSeedTests {
         if let reception {
             settings.scoring = .init(preset: nil, custom: .init(value1: rules(reception: reception)))
         }
-        let at = MockParityTests.clock.now
+        let made = MockParityTests.clock.now
         return SavedLeague(
             id: savedID,
             name: "Home league",
             settings: settings,
             rounds: 15,
-            createdAt: at,
-            updatedAt: at
+            createdAt: made,
+            updatedAt: made
         )
     }
 
