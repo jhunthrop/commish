@@ -37,8 +37,9 @@ data class RoomWall(
 ) {
     companion object {
         /** model.ts wallRows through `shown` rounds of `rounds`; `now` is the pick on the clock, null once
-         * the draft is over. */
-        @Suppress("LongParameterList") // The web's wallRows takes the same seven.
+         * the draft is over; `shared` for a reader of someone else's draft (Wall.svelte's whose), whose drafter's
+         * turn reads "Their pick". */
+        @Suppress("LongParameterList") // The web's wallRows takes the same seven, and whose.
         fun of(
             picks: List<PlacedPick>,
             board: RoomBoardView,
@@ -48,6 +49,7 @@ data class RoomWall(
             rounds: Int,
             shown: Int,
             now: Int?,
+            shared: Boolean = false,
         ): RoomWall {
             val byPick = picks.groupBy { it.pick }.mapValues { it.value.first().playerId }
             val rows =
@@ -63,18 +65,28 @@ data class RoomWall(
                             name = player?.let { DraftFormat.lastName(it.name) },
                             line = player?.let { "${it.position} · ${it.team}" },
                             mine = player != null && seat == you,
-                            now = if (onClock) clock(seat == you, pick, teams) else null,
+                            now = if (onClock) clock(seat == you, shared, pick, teams) else null,
                         )
                     }
                 }
             return RoomWall(Words.Room.wall, RoomWords.wallRounds(rows.size, rounds), names, you, rows)
         }
 
-        /** The cell on the clock: "Your pick" at the drafter's seat, else "On the clock", with the pick. */
+        /** The cell on the clock: "Your pick" at the drafter's seat ("Their pick" on a shared draft), else "On
+         * the clock", with the pick. */
         private fun clock(
             yours: Boolean,
+            shared: Boolean,
             pick: Int,
             teams: Int,
-        ): WallClock = WallClock(if (yours) Words.Room.yourPick else Words.Room.onTheClock, DraftFormat.pickLabel(pick, teams))
+        ): WallClock {
+            val words =
+                when {
+                    !yours -> Words.Room.onTheClock
+                    shared -> Words.Room.theirPick
+                    else -> Words.Room.yourPick
+                }
+            return WallClock(words, DraftFormat.pickLabel(pick, teams))
+        }
     }
 }

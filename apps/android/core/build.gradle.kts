@@ -37,10 +37,12 @@ dependencies {
     api(libs.lifecycle.viewmodel)
     api(libs.coroutines.core)
     implementation(libs.security.crypto)
+    implementation(libs.okhttp)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.okhttp.mockwebserver)
 }

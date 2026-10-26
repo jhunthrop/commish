@@ -9,6 +9,12 @@ import app.trycommish.core.start.StartRows
 import app.trycommish.design.Words
 import kotlin.math.floor
 
+/** Someone else's draft read through its link (a shared mock): its drafter's handle, null when he has none.
+ * A report or a room told for it speaks of "their" picks. */
+data class Drafter(
+    val handle: String?,
+)
+
 /** A cell of the report's head (ui/facts.ts FactCell): its label and value, the seat's own in the accent. */
 data class ReportCell(
     val label: String,
@@ -123,20 +129,23 @@ data class DraftReportModel(
         private const val PERCENT = 100
 
         /** `names` are the seats' names, slot 1 first; `seats` who the other seats are ("Your league on
-         * Sleeper"); `reshuffled` who stands in for them in the runs. */
+         * Sleeper"); `reshuffled` who stands in for them in the runs; `drafter`, set for someone else's draft
+         * read through its link, tells it of them. */
         fun of(
             report: MockReport,
             names: List<String>,
             seats: String,
             reshuffled: String,
+            drafter: Drafter? = null,
         ): DraftReportModel {
+            val whose = if (drafter == null) "your" else "their"
             val board = RoomBoardView.of(report.board, report.teams)
             val head = standing(report)
             val top = maxOf(report.standings.maxOfOrNull { it.points } ?: 1.0, 1.0)
             return DraftReportModel(
-                title = "Your draft from slot ${report.slot}",
+                title = "${whoseDraft(drafter)} from slot ${report.slot}",
                 points = head?.let { Format.whole(it.points) },
-                caption = "points from your QB, RB, WR and TE starters",
+                caption = "points from $whose QB, RB, WR and TE starters",
                 cells = head?.cells.orEmpty() + settings(report, seats),
                 basis = basis(board.basis, report.couldWaitFrom),
                 fieldNote = "projected starting points, ${report.teams} teams",
@@ -151,9 +160,9 @@ data class DraftReportModel(
                         )
                     },
                 picksNote = "${report.picks.size} picks, starters by slot",
-                picks = picks(report, board),
-                runs = runs(report.runs, report.teams, head?.rank ?: 0, reshuffled),
-                exposureTitle = "Who you end up with",
+                picks = picks(report, board, shared = drafter != null),
+                runs = runs(report.runs, report.teams, head?.rank ?: 0, reshuffled, whose),
+                exposureTitle = "Who ${if (drafter == null) "you" else "they"} end up with",
                 exposureAside = "share of ${report.runs.runs} runs",
                 exposure =
                     report.runs.exposure.take(EXPOSURE_ROWS).mapNotNull { entry ->
@@ -206,9 +215,18 @@ data class DraftReportModel(
                 "defenses there), plus is later. Still there: the room's read at that pick, tinted from $from%."
         }
 
+        /** headline.ts reportTitle's whose: "Your draft", "jh's draft", "A shared draft". */
+        private fun whoseDraft(drafter: Drafter?): String =
+            when {
+                drafter == null -> "Your draft"
+                drafter.handle != null -> "${drafter.handle}'s draft"
+                else -> "A shared draft"
+            }
+
         private fun picks(
             report: MockReport,
             board: RoomBoardView,
+            shared: Boolean,
         ): List<ReportPickLine> {
             val slotOf =
                 report.starters
@@ -228,7 +246,7 @@ data class DraftReportModel(
                     adp = if (kept) null else pick.adpGap?.let { later(it, decimals = 1) },
                     ours = if (kept) null else pick.boardGap?.let { later(it.toDouble(), decimals = 0) },
                     still = still(pick, last, report.couldWaitFrom),
-                    madeBy = madeBy(pick),
+                    madeBy = madeBy(pick, shared),
                     mine = pick.madeBy == ReportPick.MadeBy.you,
                 )
             }
@@ -280,14 +298,17 @@ data class DraftReportModel(
             return StillThere(DraftFormat.chanceShort(chance), wait = chance >= couldWaitFrom, muted = false)
         }
 
-        /** headline.ts byWords, for your own draft: who made the pick, or Kept for a keeper. */
-        private fun madeBy(pick: ReportPick): String {
+        /** headline.ts byWords: who made the pick, of your draft or a shared one, or Kept for a keeper. */
+        private fun madeBy(
+            pick: ReportPick,
+            shared: Boolean,
+        ): String {
             if (pick.chip == ReportPick.Chip.kept) return "Kept"
             return when (pick.madeBy) {
-                ReportPick.MadeBy.you -> "You"
+                ReportPick.MadeBy.you -> if (shared) "Them" else "You"
                 ReportPick.MadeBy.for_you -> "Pick for me"
-                ReportPick.MadeBy.queue -> "Your queue"
-                ReportPick.MadeBy.clock -> "Your clock"
+                ReportPick.MadeBy.queue -> if (shared) "Their queue" else "Your queue"
+                ReportPick.MadeBy.clock -> if (shared) "Their clock" else "Your clock"
                 ReportPick.MadeBy.unknown_default_open_api -> pick.madeBy.value
             }
         }
@@ -299,6 +320,7 @@ data class DraftReportModel(
             teams: Int,
             rank: Int,
             reshuffled: String,
+            whose: String,
         ): ReportRunsModel {
             val low = runs.points.firstOrNull() ?: 0.0
             val high = runs.points.lastOrNull() ?: 0.0
@@ -307,7 +329,7 @@ data class DraftReportModel(
             val counts = runs.points.groupingBy(bin).eachCount()
             return ReportRunsModel(
                 title = "The same draft, ${runs.runs} more times",
-                note = "your picks on autopick from the board, $reshuffled reshuffled each run",
+                note = "$whose picks on autopick from the board, $reshuffled reshuffled each run",
                 bins = (0 until BINS).map { counts[it] ?: 0 },
                 medianBin = bin(runs.median),
                 low = Format.whole(low),
