@@ -1,5 +1,6 @@
 package app.trycommish.core
 
+import app.trycommish.design.Words
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,6 +45,17 @@ class SignInState(
             messageState.value = null
             signedInState.value = false
         }
+    }
+
+    /** The account was deleted (POST /me/delete answered 204): the phone forgets its token and every kept
+     * answer as a sign-out does, with nothing to revoke (the API deleted every device) and no sign-in
+     * provider's logout (the API deleted the user), and the sign-in screen says so until the next sign-in.
+     * The line is held in memory only, so it does not outlast this launch. */
+    fun deleted() {
+        session.signOut()
+        cache.clear()
+        messageState.value = Words.DeleteAccount.doneTitle
+        signedInState.value = false
     }
 
     /** A sign-in finished: the tabs read the account. */

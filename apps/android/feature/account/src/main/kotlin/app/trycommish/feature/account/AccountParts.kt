@@ -124,17 +124,23 @@ internal fun ProblemText(text: String) {
     )
 }
 
-/** How to have the account deleted and the two legal pages (AccountFoot.svelte), each link the site's
- * and each its own TalkBack stop. */
+/** The page's foot (AccountFoot.svelte): the quiet Delete account verb, which opens the confirmation
+ * dialog, then the two legal pages, each link the site's and each its own TalkBack stop. */
 @Composable
-internal fun AccountFoot(openLink: (String) -> Unit) {
+internal fun AccountFoot(
+    deleteAccount: () -> Unit,
+    openLink: (String) -> Unit,
+) {
     val c = CommishTheme.colors
-    Text(
-        foot(c.accentText, openLink),
-        style = Faces.small,
-        color = c.ink3,
-        modifier = Modifier.fillMaxWidth(),
-    )
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp)) {
+        QuietButton(Words.AccountDeleteFoot.verb, onClick = deleteAccount)
+        Text(
+            foot(c.accentText, openLink),
+            style = Faces.small,
+            color = c.ink3,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 private fun foot(
@@ -148,9 +154,7 @@ private fun foot(
             text: String,
             url: String,
         ) = withLink(LinkAnnotation.Clickable(url, styles) { openLink(url) }) { append(text) }
-        append(words.before)
-        link(Words.Support.email, SiteLinks.SUPPORT)
-        append(words.after)
+        append(Words.AccountDeleteFoot.keep)
         link(words.privacy, SiteLinks.PRIVACY)
         append(words.joint)
         link(words.terms, SiteLinks.TERMS)

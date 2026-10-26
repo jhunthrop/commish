@@ -306,7 +306,7 @@ class AppGraph(
             zone,
             push,
             { session.deviceId },
-            AccountHooks(::signOut, sessionEnd, leaguesChanged, signInState::holdsToken),
+            AccountHooks(::signOut, sessionEnd, leaguesChanged, signInState::holdsToken, signInState::deleted),
         )
 
     fun shellViewModel(): ShellViewModel = ShellViewModel(account, cache, clock, zone, sessionEnd)

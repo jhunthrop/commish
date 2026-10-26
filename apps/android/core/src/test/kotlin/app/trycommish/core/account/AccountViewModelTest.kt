@@ -45,6 +45,7 @@ class AccountViewModelTest {
         var signOuts = 0
         var sessionEnds = 0
         var leaguesChanged = 0
+        var deleted = 0
     }
 
     private fun account(
@@ -63,7 +64,7 @@ class AccountViewModelTest {
         Fixtures.zone,
         store,
         { AccountFixtures.PHONE },
-        AccountHooks(signOut, { sessionEnd() }, { heard.leaguesChanged++ }, signedIn),
+        AccountHooks(signOut, { sessionEnd() }, { heard.leaguesChanged++ }, signedIn) { heard.deleted++ },
     )
 
     private fun AccountViewModel.loaded(): AccountState.Loaded = ui.value.state as AccountState.Loaded
@@ -430,7 +431,7 @@ class AccountViewModelTest {
                     Fixtures.zone,
                     MemoryPushStore(),
                     { AccountFixtures.PHONE },
-                    AccountHooks({}, {}, {}, { true }),
+                    AccountHooks({}, {}, {}, { true }, {}),
                 )
             assertNull(opened(vm).loaded().model.leagues)
         }

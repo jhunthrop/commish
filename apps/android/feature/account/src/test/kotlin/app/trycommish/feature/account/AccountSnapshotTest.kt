@@ -11,18 +11,21 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
+import app.trycommish.api.ApiFailure
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
 import app.trycommish.core.account.AccountFixtures
 import app.trycommish.core.account.AccountHooks
 import app.trycommish.core.account.AccountState
 import app.trycommish.core.account.AccountViewModel
+import app.trycommish.core.account.DeletionUi
 import app.trycommish.core.account.MemoryPushStore
 import app.trycommish.core.account.PushKind
 import app.trycommish.core.account.PushSettings
 import app.trycommish.core.account.StubAccountScreen
 import app.trycommish.core.leaguehome.Fixtures
 import app.trycommish.design.CommishTheme
+import app.trycommish.design.Words
 import com.android.ide.common.rendering.api.SessionParams.RenderingMode
 import com.android.resources.Density
 import kotlinx.coroutines.Dispatchers
@@ -66,6 +69,14 @@ class AccountSnapshotTest(
         Switches("switches", AccountPart.Switches),
         Devices("devices", AccountPart.Devices),
         SignedOut("signedout", null),
+        Deleted("deleted", null),
+        DeleteEmpty("delete-empty", null),
+        DeleteMatched("delete-matched", null),
+        DeleteRefused("delete-refused", null),
+        ;
+
+        /** The delete dialog's scenes: as it opens, the email typed, and a renewing membership's refusal. */
+        val isDeletion: Boolean get() = id.startsWith("delete-")
     }
 
     enum class Phone(
@@ -93,10 +104,30 @@ class AccountSnapshotTest(
         paparazzi.unsafeUpdateConfig(renderingMode = RenderingMode.SHRINK)
         val name = "account-${scene.id}-${phone.id}-${if (dark) "dark" else "light"}"
         val part = scene.part
-        if (part == null) {
+        if (scene.isDeletion) {
+            // The panel is taller than the small phone: it is drawn whole, as the scroll in its dialog would show it.
+            paparazzi.unsafeUpdateConfig(renderingMode = RenderingMode.V_SCROLL)
+            val shown = deletionAt(scene, scheduler)
             paparazzi.snapshot(name = name) {
                 CommishTheme(dark = dark) {
-                    Box(Modifier.fillMaxWidth().height(phone.room)) { SignInScreen(message = null, onSignIn = {}) }
+                    Box(Modifier.background(CommishTheme.colors.bg).fillMaxWidth()) {
+                        DeleteAccountPanel(
+                            shown,
+                            type = {},
+                            delete = {},
+                            modifier = Modifier.wrapContentHeight(Alignment.Top, unbounded = true),
+                            still = true,
+                        )
+                    }
+                }
+            }
+            return
+        }
+        if (part == null) {
+            val message = if (scene == Scene.Deleted) Words.DeleteAccount.doneTitle else null
+            paparazzi.snapshot(name = name) {
+                CommishTheme(dark = dark) {
+                    Box(Modifier.fillMaxWidth().height(phone.room)) { SignInScreen(message = message, onSignIn = {}) }
                 }
             }
             return
@@ -124,7 +155,14 @@ class AccountSnapshotTest(
     /** The scenes show the states they name. */
     @Test
     fun mockShowsTheStatesItNames() {
-        if (dark || phone != Phone.Pixel9 || scene.part == null) return
+        if (dark || phone != Phone.Pixel9) return
+        if (scene.isDeletion) {
+            val shown = deletionAt(scene, scheduler)
+            assertEquals(scene != Scene.DeleteEmpty, shown.canDelete)
+            assertEquals(if (scene == Scene.DeleteRefused) RENEWING else null, shown.problem)
+            return
+        }
+        if (scene.part == null) return
         val vm = viewModelAt(scene, scheduler)
         val loaded = vm.ui.value.state as AccountState.Loaded
         val model = loaded.model
@@ -154,6 +192,38 @@ class AccountSnapshotTest(
 }
 
 private const val HALF_HOUR = 1800L
+private const val CONFLICT = 409
+private const val RENEWING = "Cancel your membership first, so your card is not charged again"
+
+/** The delete dialog at the scene's state through the stub: opened, the account's email typed, or typed and
+ * refused for a membership that still renews. */
+@OptIn(ExperimentalCoroutinesApi::class)
+private fun deletionAt(
+    scene: AccountSnapshotTest.Scene,
+    scheduler: TestCoroutineScheduler,
+): DeletionUi {
+    val stub = StubAccountScreen()
+    if (scene == AccountSnapshotTest.Scene.DeleteRefused) stub.deleteRefusal = ApiFailure(CONFLICT, "conflict", RENEWING)
+    val vm =
+        AccountViewModel(
+            stub,
+            MemoryCache(),
+            FixedClock(Fixtures.week),
+            Fixtures.zone,
+            MemoryPushStore(),
+            { AccountFixtures.PHONE },
+            AccountHooks({}, {}, {}, { true }, {}),
+        )
+    vm.load()
+    scheduler.advanceUntilIdle()
+    vm.openDeletion()
+    if (scene != AccountSnapshotTest.Scene.DeleteEmpty) vm.deletion.type(AccountFixtures.me().email)
+    if (scene == AccountSnapshotTest.Scene.DeleteRefused) {
+        vm.deletion.delete()
+        scheduler.advanceUntilIdle()
+    }
+    return checkNotNull(vm.deletion.ui.value)
+}
 
 private fun twoX(
     base: DeviceConfig,
@@ -179,7 +249,7 @@ private fun viewModelAt(
     val cache = MemoryCache()
     val stub = StubAccountScreen(flag = if (scene == AccountSnapshotTest.Scene.NotFree) false else null)
     val push = MemoryPushStore(PushSettings.standard.with(PushKind.Status, isOn = false))
-    val hooks = AccountHooks({}, {}, {}, { true })
+    val hooks = AccountHooks({}, {}, {}, { true }, {})
 
     fun at(seconds: Long) =
         AccountViewModel(

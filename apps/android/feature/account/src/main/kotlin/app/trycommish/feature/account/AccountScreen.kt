@@ -35,6 +35,7 @@ class AccountActions(
     val toggle: (PushKind, Boolean) -> Unit = { _, _ -> },
     val editQuiet: (QuietEnd) -> Unit = {},
     val signOut: () -> Unit = {},
+    val deleteAccount: () -> Unit = {},
     val openLink: (String) -> Unit = {},
     val refresh: () -> Unit = {},
 )
@@ -108,7 +109,7 @@ fun AccountPage(
                 AccountPart.Switches -> PushSwitches(ui.push, actions.toggle, actions.editQuiet)
                 AccountPart.Devices -> {
                     AccountDevices(model, ui, actions.unpair)
-                    AccountFoot(actions.openLink)
+                    AccountFoot(actions.deleteAccount, actions.openLink)
                 }
             }
         }
