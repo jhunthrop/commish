@@ -46,8 +46,14 @@ export function formCells(
 /** A narrow cell's share of the strip beside each other cell's one. */
 const NARROW_SHARE = 0.6;
 
+/** A cell's share of the strip's width beside each other cell's one: the narrow cell's smaller, every
+ * other cell's one. The apps take the same share from the parity file (Lane 215). */
+export function stripShare(cell: Pick<StripCell, 'narrow'>): number {
+	return cell.narrow === true ? NARROW_SHARE : 1;
+}
+
 /** The strip's grid tracks, one fixed share per cell, so the heads line up row to row at every
  * width (review M6). */
 export function stripTracks(cells: readonly StripCell[]): string {
-	return cells.map((c) => `minmax(0, ${String(c.narrow === true ? NARROW_SHARE : 1)}fr)`).join(' ');
+	return cells.map((c) => `minmax(0, ${String(stripShare(c))}fr)`).join(' ');
 }

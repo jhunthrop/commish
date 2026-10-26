@@ -7,10 +7,11 @@ import Testing
 
 /// The Rankings port held to the web's Players page in season at 390 (shared/fixtures/parity/
 /// rankings.json): the sentence under the page's name, the hits, the heads, every row of our order in
-/// its section with its place, pill, game, folded line, week and Projected, Show more and the phone's
-/// basis, at every chip, a search alone and inside a position, and on Sunday; then the kickers' and
-/// defenses' week, its sections and heads, a search over it, the line when none matches, and its basis
-/// with the rules our stats lack. Review Focus 4: every place is the API's rank under every filter.
+/// its section with its place, pill, game, week, Projected and strip of labelled cells (each head,
+/// figure, key, tint and share), Show more and the phone's basis beside the strip, at every chip, a
+/// search alone and inside a position, and on Sunday; then the kickers' and defenses' week, its
+/// sections and heads, a search over it, the line when none matches, and its basis with the rules our
+/// stats lack. Review Focus 4: every place is the API's rank under every filter.
 struct RankingsParityTests {
     static let parity: RankingsParity = {
         do {
@@ -70,7 +71,7 @@ struct RankingsParityTests {
         #expect(model.hits == web.hits)
         #expect(model.heads == RankingsHeads(rank: web.heads.rank, week: web.heads.week, total: web.heads.total))
         #expect(model.more == web.more)
-        #expect(model.basis == web.basis)
+        #expect(model.basis == web.stripBasis)
     }
 
     @Test(arguments: orderCases)
@@ -144,6 +145,26 @@ struct RankingsParity: Decodable, Sendable {
     struct Weather: Decodable, Equatable, Sendable {
         let glyph: String
         let words: String
+    }
+
+    /// figure-strip.ts StripCell as the parity pins it, with its share of the strip's width as the
+    /// web's stripShare gives it, so the app's share is compared, never copied in silence.
+    struct Cell: Decodable, Equatable, Sendable {
+        let head: String
+        let value: String
+        let key: Bool
+        let ease: String?
+        let narrow: Bool
+        let share: Double
+
+        init(_ cell: StripCell) {
+            head = cell.head
+            value = cell.value
+            key = cell.key
+            ease = cell.ease?.rawValue
+            narrow = cell.narrow
+            share = cell.share
+        }
     }
 
     /// box.ts RowGame: the opponent and the kickoff or state, "bye", "no-club", or none.
@@ -228,7 +249,7 @@ struct RankingsParity: Decodable, Sendable {
         let bye: Bool
         let week: String
         let total: String
-        let folded: String
+        let cells: [Cell]
 
         init(_ row: RankingsRow) {
             player = Player(row.player)
@@ -237,11 +258,11 @@ struct RankingsParity: Decodable, Sendable {
             bye = row.bye
             week = row.week
             total = row.total
-            folded = row.folded
+            cells = row.cells.map(Cell.init)
         }
 
         enum CodingKeys: String, CodingKey {
-            case rank, place, bye, week, total, folded
+            case rank, place, bye, week, total, cells
         }
 
         init(from decoder: any Decoder) throws {
@@ -252,30 +273,30 @@ struct RankingsParity: Decodable, Sendable {
             bye = try container.decode(Bool.self, forKey: .bye)
             week = try container.decode(String.self, forKey: .week)
             total = try container.decode(String.self, forKey: .total)
-            folded = try container.decode(String.self, forKey: .folded)
+            cells = try container.decode([Cell].self, forKey: .cells)
         }
     }
 
     struct WeekRow: Decodable, Equatable, Sendable {
         let player: Player
         let proj: String
-        let folded: String
+        let cells: [Cell]
 
         init(_ row: WeekRankingsRow) {
             player = Player(row.player)
             proj = row.proj
-            folded = row.folded
+            cells = row.cells.map(Cell.init)
         }
 
         enum CodingKeys: String, CodingKey {
-            case proj, folded
+            case proj, cells
         }
 
         init(from decoder: any Decoder) throws {
             player = try Player(from: decoder)
             let container = try decoder.container(keyedBy: CodingKeys.self)
             proj = try container.decode(String.self, forKey: .proj)
-            folded = try container.decode(String.self, forKey: .folded)
+            cells = try container.decode([Cell].self, forKey: .cells)
         }
     }
 
@@ -294,10 +315,11 @@ struct RankingsParity: Decodable, Sendable {
         let heads: Heads
         let sections: [Section<OrderRow>]
         let more: Bool
-        let basis: String
+        /// The phone's basis beside the strip ("Opp rank is ..."); `basis` is the Android row's.
+        let stripBasis: String
 
         enum CodingKeys: String, CodingKey {
-            case clock, file, chip, lead, hits, heads, sections, more, basis
+            case clock, file, chip, lead, hits, heads, sections, more, stripBasis
             case query = "q"
         }
     }

@@ -30,6 +30,7 @@ let package = Package(
             name: "RankingsTests",
             dependencies: [
                 "Rankings",
+                .product(name: "BoxScore", package: "BoxScore"),
                 .product(name: "CommishAPI", package: "CommishAPI"),
                 .product(name: "RunFixtures", package: "CommishAPI"),
                 .product(name: "CommishSnapshotSupport", package: "CommishDesign"),
