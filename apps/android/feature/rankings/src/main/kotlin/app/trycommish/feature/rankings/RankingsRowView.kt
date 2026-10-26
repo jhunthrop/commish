@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,24 +46,23 @@ import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
 import app.trycommish.design.NumWeight
 import app.trycommish.design.PILL_PADDING
-import app.trycommish.design.PILL_STYLE
 import app.trycommish.design.Pill
 import app.trycommish.design.PillTone
 import app.trycommish.design.PositionPill
 import app.trycommish.design.StrokeGlyph
 import app.trycommish.design.Tokens
 import app.trycommish.design.Words
+import app.trycommish.design.pillStyle
 import app.trycommish.feature.boxscore.FigureStrip
 import app.trycommish.feature.boxscore.FigureStripSize
 import app.trycommish.feature.boxscore.HEAD_TRACKING
 import app.trycommish.feature.boxscore.Hairline
 import app.trycommish.feature.boxscore.WeatherGlyphs
 import app.trycommish.feature.boxscore.clickableLink
-import app.trycommish.feature.boxscore.rememberFigureWidth
 
 /** The phone's columns (OrderTable.svelte and WeekTable.svelte at 390, iOS's RankingsColumn): the # cell,
  * the face, the pill's least width and the club's column, and the week's Proj. The pill's slot and the big
- * Projected are measured, not fixed (rememberPillSlot, rememberTotalColumn). */
+ * Projected are measured, not fixed (RankingsWidths). */
 internal object RankingsColumn {
     val rank = 30.dp
     val face = 28.dp
@@ -76,31 +76,55 @@ internal object RankingsColumn {
     const val WIDEST_TOTAL = 999.9
 }
 
-/** The pill's slot: as wide as the widest pill the order can print (RankingsPills.widestCandidates), at
- * least the pill's least width, so a three-digit rank is never cut and the club column starts at one x on
- * every row (Lane 215 review H1). */
+/** The row's measured columns, the same for every row of a table: the pill's slot and the big Projected's
+ * column. Measured once where the table is drawn (rememberRankingsWidths) and handed to each row, never in
+ * a row: a lazy list composes rows as they scroll in, and the slot lays out every pill candidate. */
+@Immutable
+internal data class RankingsWidths(
+    /** The pill's slot: as wide as the widest pill the order can print, at least the pill's least width, so
+     * a three-digit rank or a list word is never cut and the club column starts at one x on every row (Lane
+     * 215 review H1). */
+    val pill: Dp,
+    /** The big figure's column: the widest Projected the order prints at the name's size, bold (the number
+     * face's tabular figures make every such figure one width), plus the strip's gap before it, so the rest of
+     * the line is the name's (Lane 215 re-review M-A). */
+    val total: Dp,
+)
+
+/** The widest of the candidates by a measure, with its width: the candidate the pill slot is sized to. */
+internal fun widestPill(
+    candidates: List<String>,
+    measure: (String) -> Int,
+): Pair<String, Int> = candidates.map { it to measure(it) }.maxBy { it.second }
+
+/** The table's measured columns, laid out once per table with one measurer, keyed on the density (which
+ * carries the font scale). Composed once by RankingsPage and once by the screen's lazy list, so scrolling
+ * a row in measures nothing. The widest pill candidate at the default scale is "WR Susp"
+ * (RankingsWidthsTest), 62 dp with the pill's padding. */
 @Composable
-private fun rememberPillSlot(): Dp {
-    val measurer = rememberTextMeasurer()
+internal fun rememberRankingsWidths(): RankingsWidths {
+    val measurer = rememberTextMeasurer(cacheSize = 0)
     val density = LocalDensity.current
-    val style = PILL_STYLE
-    return remember(density, style) {
-        val widest =
-            RankingsPills.widestCandidates.maxOf { measurer.measure(it, style, maxLines = 1, softWrap = false).size.width }
-        maxOf(with(density) { widest.toDp() } + PILL_PADDING * 2, RankingsColumn.pillLeast)
+    return remember(density) {
+        val pillStyle = pillStyle
+        val (_, widest) =
+            widestPill(RankingsPills.widestCandidates) { measurer.measure(it, pillStyle, maxLines = 1, softWrap = false).size.width }
+        val totalStyle = Faces.number(NumWeight.Bold, Tokens.Type.md.sp)
+        val total = measurer.measure(StartWords.number(RankingsColumn.WIDEST_TOTAL), totalStyle, maxLines = 1, softWrap = false).size.width
+        with(density) {
+            RankingsWidths(
+                pill = maxOf(widest.toDp() + PILL_PADDING * 2, RankingsColumn.pillLeast),
+                total = total.toDp() + FigureStripSize.gap,
+            )
+        }
     }
 }
 
-/** The big figure's column: the widest Projected the order prints at the name's size, bold (the number
- * face's tabular figures make every such figure one width), plus the strip's gap before it, so the rest of
- * the line is the name's (Lane 215 re-review M-A). */
-@Composable
-private fun rememberTotalColumn(): Dp =
-    rememberFigureWidth(StartWords.number(RankingsColumn.WIDEST_TOTAL), NumWeight.Bold, Tokens.Type.md.sp) + FigureStripSize.gap
-
 /** The game line's indent under the name: past the # cell (on the order) and the face. */
 private val FACE_INDENT = RankingsColumn.face + Tokens.Space.s2.dp
-private val RANK_INDENT = RankingsColumn.rank + Tokens.Space.s2.dp
+
+/** The order's: the # cell's whole width (its padding before the face is inside it), then the face's. */
+private val ORDER_INDENT = RankingsColumn.rank + FACE_INDENT
 
 /** The first line of a row (BoxPlayer.svelte's line at 390): his face or his club's mark, his name the
  * biggest thing on it, whole where it fits and else his short form (a link to his sheet where the site has
@@ -108,11 +132,11 @@ private val RANK_INDENT = RankingsColumn.rank + Tokens.Space.s2.dp
 @Composable
 private fun RankingsNameLine(
     player: RankingsPlayer,
+    pillSlot: Dp,
     open: (SheetPlayer) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = CommishTheme.colors
-    val pillSlot = rememberPillSlot()
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Avatar(if (player.clubMark) player.club else initialsOf(player.name), RankingsColumn.face)
         NameText(player, open, Modifier.padding(start = Tokens.Space.s2.dp).weight(1f))
@@ -142,7 +166,11 @@ private fun NameText(
     val measurer = rememberTextMeasurer()
     val sheet = player.sheetPlayer
     BoxWithConstraints(modifier) {
-        val fits = measurer.measure(player.name, style, maxLines = 1, softWrap = false).size.width <= constraints.maxWidth
+        val room = constraints.maxWidth
+        val fits =
+            remember(player.name, room, style) {
+                measurer.measure(player.name, style, maxLines = 1, softWrap = false).size.width <= room
+            }
         Text(
             if (fits) player.name else player.fit,
             style = style,
@@ -218,6 +246,7 @@ private fun RankingsRowFrame(content: @Composable () -> Unit) {
 @Composable
 internal fun RankingsRowView(
     row: RankingsRow,
+    widths: RankingsWidths,
     open: (SheetPlayer) -> Unit,
 ) {
     val c = CommishTheme.colors
@@ -232,7 +261,7 @@ internal fun RankingsRowView(
                 softWrap = false,
                 modifier = Modifier.width(RankingsColumn.rank).padding(end = Tokens.Space.s2.dp),
             )
-            RankingsNameLine(row.player, open, Modifier.weight(1f))
+            RankingsNameLine(row.player, widths.pill, open, Modifier.weight(1f))
             // The name's size, its weight for emphasis: the player stays the biggest thing.
             Text(
                 row.total,
@@ -241,10 +270,10 @@ internal fun RankingsRowView(
                 textAlign = TextAlign.End,
                 maxLines = 1,
                 softWrap = false,
-                modifier = Modifier.width(rememberTotalColumn()),
+                modifier = Modifier.width(widths.total),
             )
         }
-        RankingsGameLine(row.player, RANK_INDENT + FACE_INDENT)
+        RankingsGameLine(row.player, ORDER_INDENT)
         FigureStrip(row.cells)
     }
 }
@@ -256,12 +285,13 @@ internal fun WeekRankingsRowView(
     row: WeekRankingsRow,
     proj: Boolean,
     kicked: Boolean,
+    widths: RankingsWidths,
     open: (SheetPlayer) -> Unit,
 ) {
     val c = CommishTheme.colors
     RankingsRowFrame {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            RankingsNameLine(row.player, open, Modifier.weight(1f))
+            RankingsNameLine(row.player, widths.pill, open, Modifier.weight(1f))
             if (proj) {
                 Text(
                     row.proj,

@@ -68,7 +68,8 @@ data class RankingsPlayer(
     val rank: String?,
     val status: RowStatus?,
     val game: RowGame,
-    /** "Expected score CHI 26.5, ATL 23", while his game is to come. */
+    /** "Expected score CHI 26.5, ATL 23", while his game is to come. Pinned by the parity; not drawn on the
+     * row (the web's phone row dropped it with the strip, BoxGame facts off). */
     val expected: String?,
     val weather: WeatherCell?,
     /** His face for the sheet's head (the row draws his initials, as the web's box rows at 390 do). */

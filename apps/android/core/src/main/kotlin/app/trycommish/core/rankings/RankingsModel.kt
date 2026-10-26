@@ -9,6 +9,7 @@ import java.time.ZoneId
 /** The order's heads: the # head, the week's ("Wk 6") and the big figure's (Projected). */
 data class RankingsHeads(
     val rank: String,
+    /** Pinned by the parity; drawn as the strip's Wk cell's head on each row, never in the head row. */
     val week: String,
     val total: String,
 )

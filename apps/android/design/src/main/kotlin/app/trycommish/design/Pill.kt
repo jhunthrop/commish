@@ -52,13 +52,13 @@ fun PositionPill(
         c.surface2,
         c.ink,
         modifier.widthIn(min = minWidth),
-        PILL_STYLE,
+        pillStyle,
         if (minWidth == Dp.Unspecified) null else TextAlign.Center,
     )
 }
 
 /** The position pill's face: the label's, bold. */
-val PILL_STYLE: TextStyle get() = Faces.label.copy(fontWeight = FontWeight.Bold)
+val pillStyle: TextStyle = Faces.label.copy(fontWeight = FontWeight.Bold)
 
 /** The room a pill's words take beside them, each side. */
 val PILL_PADDING: Dp = Tokens.Space.s1.dp + 2.dp

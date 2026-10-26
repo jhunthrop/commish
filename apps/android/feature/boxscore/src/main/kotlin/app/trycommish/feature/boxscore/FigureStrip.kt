@@ -8,18 +8,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -63,10 +57,17 @@ fun FigureStrip(
         modifier = modifier.fillMaxWidth(),
     ) { measurables, constraints ->
         val gap = FigureStripSize.gap.roundToPx()
-        val tracks = stripTracks(shares, constraints.maxWidth, gap)
+        // An unbounded width (a horizontal scroll, an unbounded wrap) takes the cells' own widths and the gaps.
+        val width =
+            if (constraints.hasBoundedWidth) {
+                constraints.maxWidth
+            } else {
+                measurables.sumOf { it.maxIntrinsicWidth(Constraints.Infinity) } + gap * (measurables.size - 1).coerceAtLeast(0)
+            }
+        val tracks = stripTracks(shares, width, gap)
         val placeables = measurables.zip(tracks).map { (m, w) -> m.measure(Constraints.fixedWidth(w)) }
         val height = placeables.maxOfOrNull { it.height } ?: 0
-        layout(constraints.maxWidth, height) {
+        layout(width, height) {
             var x = 0
             placeables.zip(tracks).forEach { (p, w) ->
                 p.place(x, 0)
@@ -76,7 +77,9 @@ fun FigureStrip(
     }
 }
 
-/** stripTracks: each track's width in pixels, the room after the gaps shared out by each cell's share. */
+/** stripTracks: each track's width in pixels, the room after the gaps shared out by each cell's share; the
+ * pixels the shares round away go to the last track, so the tracks and gaps fill the width exactly and the
+ * last figure ends at the row's edge. */
 internal fun stripTracks(
     shares: List<Double>,
     width: Int,
@@ -85,7 +88,9 @@ internal fun stripTracks(
     val total = shares.sum()
     if (total <= 0) return shares.map { 0 }
     val room = (width - gap * (shares.size - 1).coerceAtLeast(0)).coerceAtLeast(0)
-    return shares.map { (room * it / total).toInt() }
+    val tracks = shares.map { (room * it / total).toInt() }
+    val left = room - tracks.sum()
+    return tracks.mapIndexed { i, w -> if (i == tracks.lastIndex) w + left else w }
 }
 
 /** One cell: the head over the figure, both to the cell's trailing edge as a figure column is. */
@@ -131,30 +136,3 @@ private fun StripFigure(cell: StripCell) {
         else -> Text(cell.value, style = style, color = if (cell.key) c.ink else c.ink2, maxLines = 1)
     }
 }
-
-/** A text's drawn width in a face, as the platform sets it (the number face in tabular figures, so every
- * figure of as many digits is one width): what a figure column needs to hold it whole. */
-@Composable
-fun rememberTextWidth(
-    text: String,
-    style: TextStyle,
-): Dp {
-    val measurer = rememberTextMeasurer()
-    val density = LocalDensity.current
-    return remember(text, style, density) {
-        with(density) {
-            measurer
-                .measure(text, style, maxLines = 1, softWrap = false)
-                .size.width
-                .toDp()
-        }
-    }
-}
-
-/** A figure's width at a weight of the number face. */
-@Composable
-fun rememberFigureWidth(
-    text: String,
-    weight: NumWeight,
-    size: TextUnit,
-): Dp = rememberTextWidth(text, Faces.number(weight, size))
