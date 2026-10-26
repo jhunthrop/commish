@@ -441,7 +441,8 @@ export const TABLES: readonly TableSource[] = [
   },
   {
     name: "Records",
-    module: "web/src/lib/run/records.ts",
+    // The apps' record words until their lane follows the web's (Lane 223, apps-pending-words.ts).
+    module: "shared/scripts/apps-pending-words.ts",
     picks: ["RECORDS_WORDS"],
     json: "shared/words/records.json",
   },
