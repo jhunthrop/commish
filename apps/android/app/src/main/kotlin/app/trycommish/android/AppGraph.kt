@@ -61,6 +61,7 @@ import app.trycommish.core.shell.AccountReads
 import app.trycommish.core.shell.ApiAccountReads
 import app.trycommish.core.shell.FollowedLeague
 import app.trycommish.core.shell.SheetPlayer
+import app.trycommish.core.shell.ShellRoute
 import app.trycommish.core.shell.ShellViewModel
 import app.trycommish.core.signin.ApiPairing
 import app.trycommish.core.signin.SignIn
@@ -78,7 +79,9 @@ import app.trycommish.core.waivers.WaiverViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.security.SecureRandom
 import java.time.ZoneId
@@ -118,6 +121,20 @@ class AppGraph(
      * by any other); a release build never sets it. */
     var companionReplay: Boolean = false
         private set
+
+    private val mutableLink = MutableStateFlow<ShellRoute?>(null)
+
+    /** A screen an app link asked for (a /companion page), pushed by the shell once it is signed in. */
+    val link: StateFlow<ShellRoute?> = mutableLink.asStateFlow()
+
+    fun openLink(route: ShellRoute) {
+        mutableLink.value = route
+    }
+
+    /** The shell pushed the screen the link asked for. */
+    fun linkOpened() {
+        mutableLink.value = null
+    }
 
     /** The launch's development replay, honoured in a debug build only. */
     fun askReplay(asked: Boolean) {

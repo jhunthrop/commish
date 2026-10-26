@@ -33,6 +33,17 @@
                     android:host="trycommish.app"
                     android:path="/app/signed-in" />
             </intent-filter>
+            <!-- The live-draft companion's pages (links.ts companionNew and companion), opened in the app
+                 as the iOS app's universal links open them. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="trycommish.app"
+                    android:pathPrefix="/companion/" />
+            </intent-filter>
         </activity>
     </application>
 

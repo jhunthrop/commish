@@ -166,6 +166,14 @@ fun Shell(
             nav.toSignIn()
         }
     }
+    // An app link's screen (a /companion page), pushed on the tab in view once the device is signed in.
+    val asked by graph.link.collectAsStateWithLifecycle()
+    LaunchedEffect(asked, signedIn) {
+        val route = asked ?: return@LaunchedEffect
+        if (!signedIn) return@LaunchedEffect
+        graph.linkOpened()
+        push(route)
+    }
     // The bar chooses the page shown: drawn from the back stack on the frame back lands, kept for a rotation.
     val shown by nav.currentBackStackEntryAsState()
     val chosen = tabShown(shown?.destination?.route, tab)
