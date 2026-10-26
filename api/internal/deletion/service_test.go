@@ -1,6 +1,7 @@
 package deletion_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -44,10 +45,12 @@ func quietLog() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, n
 // to delete and fails every call while fail is set.
 type fakeUsers struct {
 	deleted []string
+	tries   int
 	fail    error
 }
 
 func (f *fakeUsers) DeleteUser(_ context.Context, id string) error {
+	f.tries++
 	if f.fail != nil {
 		return f.fail
 	}
@@ -420,10 +423,13 @@ func TestWrongConfirmationDeletesNothing(t *testing.T) {
 }
 
 // A membership that still renews refuses the delete with 409 and its
-// sentence, and keeps the account.
+// sentence, and the refusal costs nothing: the account stays, and the
+// member's seat in a drafting lobby is not given up (review M1).
 func TestRenewingMembershipRefuses(t *testing.T) {
 	f := newFixture(t)
 	member := f.account(t, memberUser, memberEmail, "pat_drafts")
+	other := f.account(t, otherUser, "other@example.invalid", "sam_drafts")
+	f.seedRooms(t, member, other)
 	f.exec(t, `insert into app.entitlements (account_id, product, source, status, stripe_subscription_id, granted_by, billing_interval)
 		values ($1, 'membership', 'subscription', 'active', 'sub_test_1', 'stripe', 'year')`, member.ID)
 	w := serve(t, f.svc, deleteRequest(member, `{"email": "member@example.invalid"}`))
@@ -432,6 +438,102 @@ func TestRenewingMembershipRefuses(t *testing.T) {
 	}
 	if n := f.count(t, `select count(*) from app.accounts where id = $1`, member.ID); n != 1 {
 		t.Fatal("the account was deleted with a renewing membership")
+	}
+	if len(f.rooms.left) != 0 {
+		t.Fatalf("a refused delete gave up the live seats %v", f.rooms.left)
+	}
+	if n := f.count(t, `select count(*) from app.room_seats where room_id = $1 and account_id = $2 and handle = 'pat_drafts'`, liveRoom, member.ID); n != 1 {
+		t.Fatal("the drafting seat changed on a refused delete")
+	}
+	if len(f.users.deleted) != 0 || f.cookies.cleared != 0 {
+		t.Fatal("a refused delete reached the provider or the cookie")
+	}
+}
+
+// failedDelete deletes the member while the provider fails, leaving its
+// user queued with one failed try.
+func failedDelete(t *testing.T, f fixture) auth.Account {
+	t.Helper()
+	member := f.account(t, memberUser, memberEmail, "pat_drafts")
+	f.users.fail = errors.New("workos: 422 refused")
+	if w := serve(t, f.svc, deleteRequest(member, `{"email": "member@example.invalid"}`)); w.Code != http.StatusNoContent {
+		t.Fatalf("answer %d %s", w.Code, w.Body)
+	}
+	return member
+}
+
+// A user the provider refuses MaxAttempts times is marked dead with one
+// error line naming the former account and asking for a hand, and no
+// sweep tries it again (review M2). It stays queued, so sign-in as it is
+// still refused.
+func TestRetryStopsAtTheBound(t *testing.T) {
+	f := newFixture(t)
+	var logged bytes.Buffer
+	f.svc.Log = slog.New(slog.NewTextHandler(&logged, nil))
+	member := failedDelete(t, f)
+	f.exec(t, `update app.workos_user_deletions set attempts = $1`, deletion.MaxAttempts-2)
+
+	if got, err := f.svc.Retry(context.Background(), 10); err != nil || got != (deletion.Retried{Failed: 1}) {
+		t.Fatalf("the try before the bound: %+v, %v", got, err)
+	}
+	if strings.Contains(logged.String(), "needs a hand") {
+		t.Fatal("marked dead before the bound")
+	}
+	if got, err := f.svc.Retry(context.Background(), 10); err != nil || got != (deletion.Retried{Failed: 1}) {
+		t.Fatalf("the try at the bound: %+v, %v", got, err)
+	}
+	var attempts int
+	var dead bool
+	if err := f.pool.QueryRow(context.Background(), `select attempts, dead_at is not null from app.workos_user_deletions
+		where workos_user_id = $1`, memberUser).Scan(&attempts, &dead); err != nil || attempts != deletion.MaxAttempts || !dead {
+		t.Fatalf("at the bound: attempts %d, dead %v, %v", attempts, dead, err)
+	}
+	line := ""
+	for l := range strings.Lines(logged.String()) {
+		if strings.Contains(l, "needs a hand") {
+			line = l
+		}
+	}
+	if line == "" || !strings.Contains(line, "former_account_id="+member.ID.String()) || !strings.Contains(line, "level=ERROR") {
+		t.Fatalf("no error line for a hand naming the former account: %q", logged.String())
+	}
+	tries := f.users.tries
+	f.users.fail = nil
+	if got, err := f.svc.Retry(context.Background(), 10); err != nil || got != (deletion.Retried{}) || f.users.tries != tries {
+		t.Fatalf("a dead user was tried again: %+v, %v", got, err)
+	}
+	if queued, err := (&deletion.Store{Pool: f.pool}).Queued(context.Background(), memberUser); err != nil || !queued {
+		t.Fatalf("a dead user left the queue: %v, %v", queued, err)
+	}
+}
+
+// The queue tries never-tried users first, then the longest untried, so
+// a failing user moves behind a fresh one; Queued follows the row.
+func TestQueueOrderAndQueued(t *testing.T) {
+	f := newFixture(t)
+	f.exec(t, `insert into app.workos_user_deletions (workos_user_id, former_account_id, attempts, created_at, last_tried_at) values
+		('user_old_failing', $1, 3, $2, $3), ('user_new', $1, 0, $3, null), ('user_older_failing', $1, 4, $2, $4)`,
+		uuid.New(), fixedNow.Add(-72*time.Hour), fixedNow.Add(-time.Hour), fixedNow.Add(-2*time.Hour))
+	store := &deletion.Store{Pool: f.pool}
+	pending, err := store.Pending(context.Background(), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var order []string
+	for _, p := range pending {
+		order = append(order, p.WorkOSUserID)
+	}
+	if !slices.Equal(order, []string{"user_new", "user_older_failing", "user_old_failing"}) {
+		t.Fatalf("queue order %v", order)
+	}
+	if queued, err := store.Queued(context.Background(), "user_new"); err != nil || !queued {
+		t.Fatalf("queued user: %v, %v", queued, err)
+	}
+	if err := store.Done(context.Background(), "user_new"); err != nil {
+		t.Fatal(err)
+	}
+	if queued, err := store.Queued(context.Background(), "user_new"); err != nil || queued {
+		t.Fatalf("a done user is still queued: %v, %v", queued, err)
 	}
 }
 

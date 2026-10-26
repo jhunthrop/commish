@@ -35,10 +35,11 @@ const (
 
 // Accounts is the part of Store the route and the sweep use.
 type Accounts interface {
+	Renewing(ctx context.Context, accountID uuid.UUID) (bool, error)
 	Delete(ctx context.Context, accountID uuid.UUID, now time.Time) (Deleted, error)
 	Pending(ctx context.Context, limit int) ([]Pending, error)
 	Done(ctx context.Context, workosUserID string) error
-	Failed(ctx context.Context, workosUserID string, cause error, now time.Time) error
+	Failed(ctx context.Context, workosUserID string, cause error, now time.Time) (dead bool, err error)
 }
 
 // Rooms gives up a member's seats in live lobby drafts, the way a
@@ -103,6 +104,17 @@ func (s *Service) delete(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, map[string]string{"email": WrongEmail})
 		return
 	}
+	// A refusal must cost nothing: the renewal is read before any live
+	// seat is given up. The transaction checks it again, as the authority.
+	renews, err := s.Accounts.Renewing(r.Context(), a.ID)
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "deletion: renewing", err)
+		return
+	}
+	if renews {
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, Renewing, nil)
+		return
+	}
 	if err := s.leaveRooms(r.Context(), a.ID); err != nil {
 		httpx.WriteInternal(w, r, s.Log, "deletion: leave rooms", err)
 		return
@@ -146,13 +158,19 @@ func (s *Service) leaveRooms(ctx context.Context, accountID uuid.UUID) error {
 
 // retire deletes one provider user and drops its pending row, or keeps
 // the row with the failure for the sweep. A failure is logged with the
-// deleted account's former id, never silent.
+// deleted account's former id, never silent; the MaxAttempts-th marks the
+// row dead and logs once that it needs a hand.
 func (s *Service) retire(ctx context.Context, p Pending) bool {
 	if err := s.Users.DeleteUser(ctx, p.WorkOSUserID); err != nil {
 		s.Log.Error("deletion: sign-in user not deleted, the sweep retries it",
 			"former_account_id", p.FormerAccountID, "attempts", p.Attempts+1, "err", err)
-		if ferr := s.Accounts.Failed(ctx, p.WorkOSUserID, err, s.Now()); ferr != nil {
+		dead, ferr := s.Accounts.Failed(ctx, p.WorkOSUserID, err, s.Now())
+		if ferr != nil {
 			s.Log.Error("deletion: keep the failure", "former_account_id", p.FormerAccountID, "err", ferr)
+		}
+		if dead {
+			s.Log.Error("deletion: sign-in user refused too often, no more tries; it needs a hand",
+				"former_account_id", p.FormerAccountID, "attempts", MaxAttempts)
 		}
 		return false
 	}

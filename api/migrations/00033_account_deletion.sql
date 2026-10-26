@@ -18,16 +18,22 @@ alter table app.group_passes add constraint group_passes_purchaser_id_fkey
 -- writes the row in its own transaction, so a provider that fails, or a
 -- process that stops before the call, leaves the row for the daily sweep
 -- (cmd/api jobs.go) to try again. former_account_id is the deleted
--- account's id, kept for the log; it references nothing.
+-- account's id, kept for the log; it references nothing. A row the
+-- provider refused deletion.MaxAttempts times is dead (dead_at): the sweep
+-- stops trying it and logs it once for a hand, so a permanent refusal
+-- never loops nor holds the queue. While a row is pending, a sign-in as
+-- its user is refused (auth: the account is being deleted).
 create table app.workos_user_deletions (
   workos_user_id    text primary key check (char_length(workos_user_id) between 1 and 200),
   former_account_id uuid not null,
   attempts          integer not null default 0 check (attempts >= 0),
   last_error        text check (last_error is null or char_length(last_error) <= 500),
   created_at        timestamptz not null default now(),
-  last_tried_at     timestamptz
+  last_tried_at     timestamptz,
+  dead_at           timestamptz
 );
-create index workos_user_deletions_created_idx on app.workos_user_deletions (created_at);
+create index workos_user_deletions_queue_idx on app.workos_user_deletions (last_tried_at nulls first, created_at)
+  where dead_at is null;
 
 -- +goose Down
 -- A cleared buyer cannot be restored; the not-null fails while one exists.
