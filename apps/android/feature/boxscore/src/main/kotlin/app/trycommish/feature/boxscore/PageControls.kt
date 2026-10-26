@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -20,9 +19,19 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -33,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
@@ -96,8 +106,10 @@ fun ChoiceChip(
     )
 }
 
-/** One row of choice chips that scrolls sideways, or (a snapshot's) lies still running past the edge as
- * the scrolling one does, never squeezing a chip. */
+/** One row of choice chips that scrolls sideways, the chosen chip always in view (scrolled to the middle
+ * when it is chosen, Lane 213's M3: a box score names its filter); or (a snapshot's) lies still running past
+ * the edge as the scrolling one does, showing its end when the chosen chip is in its later half, never
+ * squeezing a chip. */
 @Composable
 fun <Value> ChipRow(
     chips: List<Pair<String, Value>>,
@@ -106,19 +118,44 @@ fun <Value> ChipRow(
     still: Boolean = false,
     label: String? = null,
 ) {
-    val scroll =
+    val chosen = chips.indexOfFirst { it.second == pressed }
+    val scroll = rememberScrollState()
+    val centres = remember { mutableStateMapOf<Int, Int>() }
+    var view by remember { mutableIntStateOf(0) }
+    val row =
         if (still) {
-            Modifier.fillMaxWidth().wrapContentWidth(Alignment.Start, unbounded = true)
+            Modifier.fillMaxWidth().keepInView(laterHalf = chosen >= 0 && chosen * 2 >= chips.size)
         } else {
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+            Modifier.fillMaxWidth().onSizeChanged { view = it.width }.horizontalScroll(scroll)
         }
+    if (!still) {
+        LaunchedEffect(chosen, view, centres[chosen]) {
+            centres[chosen]?.let { centre -> scroll.animateScrollTo((centre - view / 2).coerceIn(0, scroll.maxValue)) }
+        }
+    }
     Row(
-        scroll.semantics { label?.let { contentDescription = it } },
+        row.semantics { label?.let { contentDescription = it } },
         horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp),
     ) {
-        chips.forEach { (words, value) -> ChoiceChip(words, value == pressed) { choose(value) } }
+        chips.forEachIndexed { index, (words, value) ->
+            Box(Modifier.onGloballyPositioned { centres[index] = (it.positionInParent().x + it.size.width / 2f).toInt() }) {
+                ChoiceChip(words, value == pressed) { choose(value) }
+            }
+        }
     }
 }
+
+/** A still row as wide as it needs: at its start, or at its end when the chosen chip is in its later half and
+ * the row runs past the edge, as the scrolled row would show it. */
+private fun Modifier.keepInView(laterHalf: Boolean): Modifier =
+    layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity))
+        val width = constraints.maxWidth
+        layout(width, placeable.height) {
+            val x = if (laterHalf && placeable.width > width) width - placeable.width else 0
+            placeable.placeRelative(x, 0)
+        }
+    }
 
 /** The search, big, with the hits beside it (OrderScreen.svelte's players mode at 390): what is typed, or
  * what the field is for. `still` draws it at rest, its words as text (a snapshot's renderer draws a text

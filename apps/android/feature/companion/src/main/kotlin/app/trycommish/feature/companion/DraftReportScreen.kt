@@ -76,9 +76,10 @@ fun DraftReportScreen(
     actions: CompanionActions,
     modifier: Modifier = Modifier,
     parts: Set<ReportPart> = ReportPart.entries.toSet(),
+    verbs: @Composable () -> Unit = { Verb(Words.Companion.followAnother, onClick = actions.followAnother) },
 ) {
     Column(modifier.padding(vertical = Tokens.Space.s4.dp), verticalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp)) {
-        if (ReportPart.Head in parts) Head(report, actions)
+        if (ReportPart.Head in parts) Head(report, verbs)
         if (ReportPart.Picks in parts) PickByPick(report.picksNote, report.picks, actions.open)
         if (ReportPart.Runs in parts) {
             Runs(report.runs)
@@ -87,10 +88,12 @@ fun DraftReportScreen(
     }
 }
 
+/** The head: the one big number, the title, the cells, the report's verbs (the companion's Follow another
+ * draft, the mock's run again), the basis once and the field. */
 @Composable
 private fun Head(
     report: DraftReportModel,
-    actions: CompanionActions,
+    verbs: @Composable () -> Unit,
 ) {
     val c = CommishTheme.colors
     Column(Modifier.padding(horizontal = Tokens.Space.s3.dp), verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp)) {
@@ -105,7 +108,7 @@ private fun Head(
             modifier = Modifier.semantics { heading() },
         )
         CellGrid(report.cells)
-        Verb(Words.Companion.followAnother, onClick = actions.followAnother)
+        verbs()
     }
     Box(Modifier.padding(horizontal = Tokens.Space.s3.dp)) { BasisText(report.basis) }
     Field(report.fieldNote, report.field)

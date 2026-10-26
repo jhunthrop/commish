@@ -50,7 +50,7 @@ private val OPEN_ROW = 30.dp
  * clock would be, the draft and the league, when you are up (in the accent at your turn), the platform gone
  * quiet, and the way back to its draft room. */
 @Composable
-internal fun CompanionBarView(
+fun CompanionBarView(
     bar: CompanionBar,
     openDraft: () -> Unit,
 ) {
@@ -77,7 +77,7 @@ internal fun CompanionBarView(
 
 /** The heads over a call's or the pool's rows: Player, Over repl, and the chance's head where one is drawn. */
 @Composable
-private fun ColumnHeads(chanceHead: String?) {
+fun ColumnHeads(chanceHead: String?) {
     Row(
         Modifier.fillMaxWidth().heightIn(min = HEAD_ROW).padding(start = Widths.face + Widths.gap),
         horizontalArrangement = Arrangement.spacedBy(Widths.gap),
@@ -92,7 +92,7 @@ private fun ColumnHeads(chanceHead: String?) {
 /** Our call (CallPanel.svelte at 390): its tag, the heads, the call first then the next two, and the one
  * verb: solid at your turn, quiet while the call waits on the board. */
 @Composable
-internal fun CallPanelView(
+fun CallPanelView(
     call: CallModel,
     open: (SheetPlayer) -> Unit,
     press: () -> Unit,
@@ -137,7 +137,7 @@ internal fun CallPanelView(
 /** Who we would take next (Shortlist.svelte): each player after the call with his chance of lasting, our
  * why's first sentence under his name, and his outcome range on the list's shared scale. */
 @Composable
-internal fun ShortlistView(
+fun ShortlistView(
     lines: List<ShortlistLine>,
     open: (SheetPlayer) -> Unit,
 ) {
@@ -165,7 +165,7 @@ internal fun ShortlistView(
 /** The pool (Pool.svelte at 390): its title and count, the chips, the basis over it, the heads, the rows
  * (our call washed), more on a tap. */
 @Composable
-internal fun PoolView(
+fun PoolView(
     pool: PoolModel,
     shown: Int,
     actions: CompanionActions,
@@ -211,13 +211,14 @@ private fun <Value> BoardChip<Value>.pair(): Pair<String, Value> = label to valu
 /** Your team (TeamPanel.svelte): the count, then each slot with who fills it and the pick that took him, or
  * open. */
 @Composable
-internal fun TeamView(
+fun TeamView(
     team: TeamModel,
     open: (SheetPlayer) -> Unit,
+    title: String = Words.Room.yourTeam,
 ) {
     val c = CommishTheme.colors
     Panel {
-        SectionHead(Words.Room.yourTeam, team.count, Modifier.padding(bottom = Tokens.Space.s2.dp))
+        SectionHead(title, team.count, Modifier.padding(bottom = Tokens.Space.s2.dp))
         team.slots.forEach { line ->
             RowRule()
             Row(
