@@ -90,7 +90,6 @@ public enum AppWords {
     /// back, as a closed tab on the web), so it does not ask; Leave asks the web's question.
     public enum Lobby {
         public static let close = "Close the room"
-        public static let title = "Mock draft"
     }
 
     /// The league the app opens until the Leagues screen lets the member pick one.

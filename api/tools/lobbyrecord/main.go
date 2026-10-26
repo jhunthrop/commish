@@ -5,6 +5,11 @@
 // so it refuses any database not on localhost.
 //
 //	go run ./tools/lobbyrecord -out ../shared/fixtures/lobby-room
+//	go run ./tools/lobbyrecord -play jpk88,mara
+//
+// With -play it records nothing: the named drafters take seats in the
+// 12_ppr room filling now and draft our call on their clocks to the end,
+// the people a rehearsal on a phone drafts against.
 //
 // Environment: DATABASE_URL (the api's), WORKOS_COOKIE_PASSWORD (the
 // api's), API (default http://localhost:8080).
@@ -51,9 +56,10 @@ var handles = []string{recordedBy, "jpk88", "mara"}
 
 func main() {
 	out := flag.String("out", "", "the fixture folder to write")
+	play := flag.String("play", "", "drafters to seat and draft, recording nothing (comma separated)")
 	flag.Parse()
-	if *out == "" {
-		fail(errors.New("-out is required"))
+	if *out == "" && *play == "" {
+		fail(errors.New("-out or -play is required"))
 	}
 	api := os.Getenv("API")
 	if api == "" {
@@ -69,9 +75,49 @@ func main() {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Minute)
 	defer cancel()
+	if *play != "" {
+		if err := playAlong(ctx, api, dsn, password, strings.Split(*play, ",")); err != nil {
+			fail(err)
+		}
+		return
+	}
 	if err := record(ctx, api, dsn, password, *out); err != nil {
 		fail(err)
 	}
+}
+
+// playAlong seats each handle in the format's filling room and drafts our
+// call on its clock until the room ends.
+func playAlong(ctx context.Context, api, dsn, password string, handles []string) error {
+	rec := &recorder{names: map[string]bool{}}
+	done := make(chan error, len(handles))
+	for _, h := range handles {
+		d, err := mint(ctx, dsn, password, h, api)
+		if err != nil {
+			return err
+		}
+		envelope, _, err := d.call(ctx, http.MethodPost, "/lobbies/join", map[string]string{"format": format})
+		if err != nil {
+			return err
+		}
+		var seat struct {
+			RoomID    string `json:"room_id"`
+			Seat      int    `json:"seat"`
+			SocketURL string `json:"socket_url"`
+		}
+		if err := data(envelope, &seat); err != nil {
+			return err
+		}
+		d.seat, d.room, d.socket = seat.Seat, seat.RoomID, seat.SocketURL
+		fmt.Printf("%s: seat %d in %s\n", h, d.seat, d.room)
+		go func(d *drafter) { done <- rec.draft(ctx, d, false) }(d)
+	}
+	for range handles {
+		if err := <-done; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func fail(err error) {
