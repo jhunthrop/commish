@@ -41,8 +41,8 @@ fun rankingsModel(
     zone: ZoneId,
     now: Instant,
 ): RankingsModel {
-    val rankBy = RankingsRows.rankBy(advice)
-    val rows = advice.rows.map { RankingsRows.row(it, rankBy, pillRank = chip == null, zone = zone, now = now) }
+    val viewing = OrderViewing(RankingsRows.rankBy(advice), advice.week, pillRank = chip == null)
+    val rows = advice.rows.map { RankingsRows.row(it, viewing, zone, now) }
     val searched = query.trim().length >= OrderQuery.MIN_SEARCH
     return RankingsModel(
         lead = RankingsWords.lead(inSeason, onWeekChip = false, week = advice.week),
