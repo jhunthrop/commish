@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { PUBLIC_API_URL } from '$app/env/public';
 	import { ApiError, apiClient } from '#lib/api/client.ts';
@@ -61,7 +60,8 @@
 			// Nothing of the account's leagues stays in this browser.
 			forgetContext();
 			view = { kind: 'deleted' };
-			void goto(`${here}?${DELETED_PARAM}`, { state: {}, shallow: true, replace: true });
+			// The page after, at the same address: a reload still says the account is deleted.
+			window.location.replace(`${here}?${DELETED_PARAM}`);
 		} catch (error) {
 			problem = error instanceof ApiError ? error.message : DELETE_WORDS.failed;
 		} finally {
