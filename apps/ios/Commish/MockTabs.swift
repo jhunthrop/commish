@@ -16,15 +16,19 @@ struct MockSetupTab: View {
     init(
         environment: AppEnvironment,
         from: RoomSettings?,
+        seed: MockSetupSeed,
         expired: @escaping @MainActor () -> Void,
         start: @escaping (String) -> Void
     ) {
-        _viewModel = State(initialValue: MockSetupViewModel(api: environment.api, from: from, onSignedOut: expired))
+        _viewModel = State(initialValue: MockSetupViewModel(
+            api: environment.api, from: from, seed: seed, onSignedOut: expired
+        ))
         self.start = start
     }
 
     var body: some View {
         MockSetupScreen(viewModel: viewModel, started: start)
+            .task { await viewModel.load() }
     }
 }
 

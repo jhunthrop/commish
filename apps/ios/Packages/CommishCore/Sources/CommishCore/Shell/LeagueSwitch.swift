@@ -69,8 +69,8 @@ public enum ShellRoute: Hashable, Sendable {
     /// A followed draft (/companion/<id>).
     case companion(id: String)
     /// The mock room's setup (/mock/new), from a draft's settings when the report's Try another slot
-    /// opened it.
-    case mockSetup(from: RoomSettings?)
+    /// opened it, or on a saved league a link names (`?league=`, the League home's mock your league).
+    case mockSetup(from: RoomSettings?, league: String? = nil)
     /// A shared mock draft by its link's code (/mock/share/<code>).
     case sharedMock(code: String)
 

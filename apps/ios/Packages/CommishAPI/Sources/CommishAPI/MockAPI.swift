@@ -4,6 +4,7 @@ import OpenAPIRuntime
 public typealias MockRoom = Components.Schemas.MockRoom
 public typealias MockCreate = Components.Schemas.MockCreate
 public typealias RoomPick = Components.Schemas.RoomPick
+public typealias SavedLeague = Components.Schemas.League
 
 /// The solo mock's calls (web/src/lib/room/api.ts `rooms`): start a mock, read it, draft, take a pick
 /// back, Pick for me, Finish, the queue, the turn's call, the report, and a shared draft by its link's
@@ -32,6 +33,8 @@ public protocol MockAPI: Sendable {
     func sharedMock(code: String) async throws -> MockRoom
     /// GET /shared/mocks/{code}/report: a shared, finished draft's report.
     func sharedReport(code: String) async throws -> MockReport
+    /// GET /leagues: the account's saved leagues, newest first, which a mock reruns from.
+    func leagues() async throws -> [SavedLeague]
 }
 
 extension APIClient: MockAPI {
@@ -151,6 +154,13 @@ extension APIClient: MockAPI {
     }
 
     /// A room answer's payload.
+    public func leagues() async throws -> [SavedLeague] {
+        switch try await Self.unwrapped({ try await client.listLeagues() }) {
+        case let .ok(answer): return try Self.payload(answer.body.json.value2.data)
+        case let .undocumented(status, _): throw APIError.status(status)
+        }
+    }
+
     static func room(_ answer: Components.Responses.MockRoomResponse) throws -> MockRoom {
         try payload(answer.body.json.value2.data)
     }

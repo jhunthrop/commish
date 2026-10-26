@@ -75,6 +75,7 @@ public actor StubMock: MockAPI {
     private var offline = false
     private var refusal: String?
     private var cardMissing = false
+    private var saved: [SavedLeague] = []
     private let signedOut: Bool
 
     public init(opened: MockFixture.Answer = .create, signedOut: Bool = false) {
@@ -93,6 +94,16 @@ public actor StubMock: MockAPI {
     /// From now on the card route fails: the turn's call cannot be made.
     public func setCardMissing(_ missing: Bool) {
         cardMissing = missing
+    }
+
+    /// The account's saved leagues, as GET /leagues answers them.
+    public func setSaved(_ leagues: [SavedLeague]) {
+        saved = leagues
+    }
+
+    public func leagues() async throws -> [SavedLeague] {
+        try fail()
+        return saved
     }
 
     public func setOpened(_ answer: MockFixture.Answer) {

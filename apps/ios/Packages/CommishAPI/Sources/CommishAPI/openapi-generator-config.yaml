@@ -56,3 +56,4 @@ filter:
     - mockReport
     - sharedMock
     - sharedMockReport
+    - listLeagues

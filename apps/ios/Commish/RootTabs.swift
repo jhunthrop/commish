@@ -183,7 +183,9 @@ struct RootTabs: View {
             )
             .id("\(tab.key)-\(selectedLeague != nil)")
         } else if PhoneRail.isMock(tab.key) {
-            MockSetupTab(environment: environment, from: nil, expired: expired) { mockRoom = OpenMock(id: $0) }
+            MockSetupTab(environment: environment, from: nil, seed: mockSeed(league: nil), expired: expired) {
+                mockRoom = OpenMock(id: $0)
+            }
         } else {
             NamedScreen(tab.label)
         }
@@ -228,8 +230,10 @@ struct RootTabs: View {
                 open(.companionNew(replay: false))
             }
             .id(id)
-        case let .mockSetup(from):
-            MockSetupTab(environment: environment, from: from, expired: expired) { mockRoom = OpenMock(id: $0) }
+        case let .mockSetup(from, league):
+            MockSetupTab(environment: environment, from: from, seed: mockSeed(league: league), expired: expired) {
+                mockRoom = OpenMock(id: $0)
+            }
         case let .sharedMock(code):
             SharedMockTab(environment: environment, code: code) { mockRoom = OpenMock(id: $0) }
                 .id(code)
@@ -244,6 +248,16 @@ struct RootTabs: View {
     /// unread season reads as in season, as the bar does.
     private var inSeason: Bool {
         session.sitePhase == nil || session.sitePhase == .inSeason
+    }
+
+    /// Where a mock's setup starts (the web's site context): the selected league's board and saved
+    /// league, else the format chosen with no league; a link's `?league=` names the saved league first.
+    private func mockSeed(league: String?) -> MockSetupSeed {
+        MockSetupSeed(
+            format: selectedLeague?.format ?? session.format,
+            league: league ?? selectedLeague?.settingsLeagueID,
+            exactRules: session.features.contains(Components.Schemas.FeatureKnown.customScoring.rawValue)
+        )
     }
 
     private var selectedLeague: FollowedLeague? {

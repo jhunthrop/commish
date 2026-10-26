@@ -14,6 +14,13 @@ struct MockLinkTests {
         #expect(AppLink.of(site.appendingPathComponent("mock/some-id")) == nil)
     }
 
+    @Test func aLinksSavedLeagueOpensTheSetupOnIt() throws {
+        let link = try #require(URL(string: "https://trycommish.app/mock/new?league=saved-1"))
+        #expect(AppLink.of(link) == .mock(.mockSetup(from: nil, league: "saved-1")))
+        let empty = try #require(URL(string: "https://trycommish.app/mock/new?league="))
+        #expect(AppLink.of(empty) == .mock(.mockSetup(from: nil)))
+    }
+
     @Test func theBarsMockDraftTabsAreTheSetup() {
         #expect(PhoneRail.isMock("mock"))
         #expect(PhoneRail.isMock("mock_late"))

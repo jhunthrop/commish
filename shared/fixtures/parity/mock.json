@@ -30,7 +30,61 @@
 			14
 		],
 		"line": "12 teams · PPR",
-		"start": "Start against bots"
+		"start": "Start against bots",
+		"formats": [
+			{
+				"format": "ppr",
+				"line": "12 teams · PPR"
+			},
+			{
+				"format": "half_ppr",
+				"line": "12 teams · half PPR"
+			},
+			{
+				"format": "standard",
+				"line": "12 teams · standard"
+			},
+			{
+				"format": "superflex",
+				"line": "12 teams · PPR · superflex"
+			},
+			{
+				"format": "te_premium",
+				"line": "12 teams · PPR"
+			}
+		],
+		"nearest": [
+			{
+				"reception": 1,
+				"bonus": 0,
+				"preset": "ppr"
+			},
+			{
+				"reception": 1,
+				"bonus": 0.5,
+				"preset": "te_premium"
+			},
+			{
+				"reception": 0.5,
+				"bonus": 0,
+				"preset": "half_ppr"
+			},
+			{
+				"reception": 0.25,
+				"bonus": 0,
+				"preset": "half_ppr"
+			},
+			{
+				"reception": 0.2,
+				"bonus": 0,
+				"preset": "standard"
+			},
+			{
+				"reception": 0,
+				"bonus": 0,
+				"preset": "standard"
+			}
+		]
 	},
 	"states": {
 		"create": {

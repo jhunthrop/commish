@@ -32,17 +32,19 @@ public enum AppLink: Equatable, Sendable {
             return .companion(parts[1] == "new" ? .companionNew(replay: replay) : .companion(id: parts[1]))
         }
         if parts.first == "mock" {
-            return mock(parts).map(AppLink.mock)
+            let league = query.first { $0.name == "league" }?.value.flatMap { $0.isEmpty ? nil : $0 }
+            return mock(parts, league: league).map(AppLink.mock)
         }
         return reference(parts, query: query).map(AppLink.reference)
     }
 
     /// The mock room's pages by their site paths (web links.ts, nav.ts MOCK_SETUP): /mock and /mock/new
-    /// the setup, /mock/share/<code> a shared draft. A room by its id is the account's on the site.
-    private static func mock(_ parts: [String]) -> ShellRoute? {
+    /// the setup (on the saved league `?league=` names), /mock/share/<code> a shared draft. A room by its
+    /// id is the account's on the site.
+    private static func mock(_ parts: [String], league: String?) -> ShellRoute? {
         switch parts.count {
-        case 1: .mockSetup(from: nil)
-        case 2 where parts[1] == "new": .mockSetup(from: nil)
+        case 1: .mockSetup(from: nil, league: league)
+        case 2 where parts[1] == "new": .mockSetup(from: nil, league: league)
         case 3 where parts[1] == "share" && !parts[2].isEmpty: .sharedMock(code: parts[2])
         default: nil
         }
