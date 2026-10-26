@@ -6,12 +6,14 @@ import app.trycommish.api.models.OrderAdvice
 import app.trycommish.core.leaguehome.Fixtures
 import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.start.RowGame
+import app.trycommish.core.start.StripCell
 import app.trycommish.core.start.gameOf
 import app.trycommish.core.start.strings
 import app.trycommish.core.start.text
 import app.trycommish.design.Words
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -27,8 +29,8 @@ import java.time.Instant
 /**
  * The Rankings port held to the web's Players page in season at 390 (shared/fixtures/parity/rankings.json,
  * Lane 194's file), as the iOS port is: the sentence under the page's name, the hits, the heads, every row
- * of our order in its section with its place, pill, game, folded line, week and Projected, Show more and
- * the phone's basis, at every chip, a search alone and inside a position, and on Sunday; then the kickers'
+ * of our order in its section with its place, pill, game, week, Projected and strip of labelled cells (each
+ * head, figure, key, tint and share), Show more and the phone's basis beside the strip, at every chip, a search alone and inside a position, and on Sunday; then the kickers'
  * and defenses' week, its sections and heads, a search over it, the line when none matches, and its basis
  * with the rules our stats lack. Review Focus 4: every place is the API's rank under every filter.
  */
@@ -81,7 +83,7 @@ class RankingsParityTest {
         val heads = web.getValue("heads").jsonObject
         assertEquals(RankingsHeads(heads.text("rank").orEmpty(), heads.text("week").orEmpty(), heads.text("total").orEmpty()), model.heads)
         assertEquals(web.getValue("more").jsonPrimitive.boolean, model.more)
-        assertEquals(web.text("basis"), model.basis)
+        assertEquals(web.text("stripBasis"), model.basis)
     }
 
     @ParameterizedTest
@@ -186,13 +188,30 @@ class RankingsParityTest {
                 row.getValue("bye").jsonPrimitive.boolean,
                 row.text("week"),
                 row.text("total"),
-                row.text("folded"),
+                cellsOf(row),
             )
 
     private fun orderRowOf(row: RankingsRow): List<Any?> =
-        playerOf(row.player) + listOf(row.rank, row.place, row.bye, row.week, row.total, row.folded)
+        playerOf(row.player) + listOf(row.rank, row.place, row.bye, row.week, row.total, row.cells.map(::cellOf))
 
-    private fun weekRowOf(row: JsonObject): List<Any?> = playerOf(row) + listOf(row.text("proj"), row.text("folded"))
+    private fun weekRowOf(row: JsonObject): List<Any?> = playerOf(row) + listOf(row.text("proj"), cellsOf(row))
 
-    private fun weekRowOf(row: WeekRankingsRow): List<Any?> = playerOf(row.player) + listOf(row.proj, row.folded)
+    private fun weekRowOf(row: WeekRankingsRow): List<Any?> = playerOf(row.player) + listOf(row.proj, row.cells.map(::cellOf))
+
+    /** figure-strip.ts StripCell as the parity pins it: head, figure, key, the opponent's tint, narrow, and
+     * its share of the strip's width as the web's stripShare gives it, so the share is compared, never
+     * copied in silence. */
+    private fun cellsOf(row: JsonObject): List<List<Any?>> =
+        row.getValue("cells").jsonArray.map { it.jsonObject }.map { cell ->
+            listOf(
+                cell.text("head"),
+                cell.text("value"),
+                cell.getValue("key").jsonPrimitive.boolean,
+                cell.text("ease"),
+                cell.getValue("narrow").jsonPrimitive.boolean,
+                cell.getValue("share").jsonPrimitive.double,
+            )
+        }
+
+    private fun cellOf(cell: StripCell): List<Any?> = listOf(cell.head, cell.value, cell.key, cell.ease?.word, cell.narrow, cell.share)
 }
