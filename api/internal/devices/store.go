@@ -56,22 +56,26 @@ type Binding struct {
 }
 
 // challengeOrNull is the binding's challenge as the column holds it.
-func (b Binding) challengeOrNull() *string {
-	if b.Challenge == "" {
+func (b Binding) challengeOrNull() *string { return orNull(b.Challenge) }
+
+// orNull is s as a nullable column holds it.
+func orNull(s string) *string {
+	if s == "" {
 		return nil
 	}
-	return &b.Challenge
+	return &s
 }
 
 // PutCode stores the account's pairing code under its binding, replacing
-// any earlier code.
-func (s *Store) PutCode(ctx context.Context, accountID uuid.UUID, b Binding, hash []byte, expires time.Time) error {
-	_, err := s.Pool.Exec(ctx, `insert into app.device_pair_codes (account_id, code_hash, expires_at, kind, code_challenge)
-		values ($1, $2, $3, $4, $5)
+// any earlier code. workosSID is the WorkOS session an app's sign-in
+// began, carried to the device the code pairs; empty for the extension.
+func (s *Store) PutCode(ctx context.Context, accountID uuid.UUID, b Binding, hash []byte, expires time.Time, workosSID string) error {
+	_, err := s.Pool.Exec(ctx, `insert into app.device_pair_codes (account_id, code_hash, expires_at, kind, code_challenge, workos_session_id)
+		values ($1, $2, $3, $4, $5, $6)
 		on conflict (account_id) do update
 		  set code_hash = excluded.code_hash, expires_at = excluded.expires_at, kind = excluded.kind,
-		      code_challenge = excluded.code_challenge, created_at = now()`,
-		accountID, hash, expires, string(b.Kind), b.challengeOrNull())
+		      code_challenge = excluded.code_challenge, workos_session_id = excluded.workos_session_id, created_at = now()`,
+		accountID, hash, expires, string(b.Kind), b.challengeOrNull(), orNull(workosSID))
 	if err != nil {
 		return fmt.Errorf("devices: put code: %w", err)
 	}
@@ -82,16 +86,18 @@ func (s *Store) PutCode(ctx context.Context, accountID uuid.UUID, b Binding, has
 // challenge or the lack of one) and makes a device of that kind for its
 // account under the token's hash, in one transaction: a code pairs
 // exactly one device, only of its own kind, and an app's only with its
-// verifier. A code that does not match is left as it was.
+// verifier. The code's WorkOS session, if it carries one, moves to the
+// device. A code that does not match is left as it was.
 func (s *Store) Pair(ctx context.Context, code []byte, b Binding, name string, tokenHash []byte, scopes []auth.Scope, now time.Time) (uuid.UUID, Device, error) {
 	kind := b.Kind
 	var accountID uuid.UUID
+	var workosSID *string
 	var dev Device
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		err := tx.QueryRow(ctx, `delete from app.device_pair_codes
 			where code_hash = $1 and expires_at > $2 and kind = $3 and code_challenge is not distinct from $4
-			returning account_id`,
-			code, now, string(kind), b.challengeOrNull()).Scan(&accountID)
+			returning account_id, workos_session_id`,
+			code, now, string(kind), b.challengeOrNull()).Scan(&accountID, &workosSID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrBadCode
 		}
@@ -106,9 +112,9 @@ func (s *Store) Pair(ctx context.Context, code []byte, b Binding, name string, t
 			return ErrTooMany
 		}
 		dev = Device{Name: name, Kind: kind, Scopes: scopes}
-		return tx.QueryRow(ctx, `insert into app.devices (account_id, name, token_hash, scopes, kind, created_at)
-			values ($1, $2, $3, $4, $5, $6) returning id, created_at`,
-			accountID, name, tokenHash, scopeStrings(scopes), string(kind), now).Scan(&dev.ID, &dev.CreatedAt)
+		return tx.QueryRow(ctx, `insert into app.devices (account_id, name, token_hash, scopes, kind, created_at, workos_session_id)
+			values ($1, $2, $3, $4, $5, $6, $7) returning id, created_at`,
+			accountID, name, tokenHash, scopeStrings(scopes), string(kind), now, workosSID).Scan(&dev.ID, &dev.CreatedAt)
 	})
 	if errors.Is(err, ErrBadCode) || errors.Is(err, ErrTooMany) {
 		return uuid.Nil, Device{}, err
@@ -161,17 +167,24 @@ func (s *Store) List(ctx context.Context, accountID uuid.UUID) ([]Device, error)
 }
 
 // Revoke ends one of the account's devices; its token opens nothing from
-// the next request on.
-func (s *Store) Revoke(ctx context.Context, accountID, id uuid.UUID, now time.Time) error {
-	tag, err := s.Pool.Exec(ctx, `update app.devices set revoked_at = $3 where id = $1 and account_id = $2 and revoked_at is null`,
-		id, accountID, now)
+// the next request on. It answers the WorkOS session the device's
+// sign-in began, empty when it has none (the extension, or an app paired
+// before Lane 225).
+func (s *Store) Revoke(ctx context.Context, accountID, id uuid.UUID, now time.Time) (string, error) {
+	var workosSID *string
+	err := s.Pool.QueryRow(ctx, `update app.devices set revoked_at = $3
+		where id = $1 and account_id = $2 and revoked_at is null returning workos_session_id`,
+		id, accountID, now).Scan(&workosSID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
 	if err != nil {
-		return fmt.Errorf("devices: revoke %s: %w", id, err)
+		return "", fmt.Errorf("devices: revoke %s: %w", id, err)
 	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotFound
+	if workosSID == nil {
+		return "", nil
 	}
-	return nil
+	return *workosSID, nil
 }
 
 // Get is one of the account's live devices.

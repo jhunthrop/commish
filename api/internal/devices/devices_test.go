@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -269,7 +270,7 @@ const (
 // appCode is the code an app's sign-in hands back for kind, under the
 // test challenge.
 func (h harness) appCode(acct auth.Account, kind auth.DeviceKind) string {
-	code, err := h.svc.AppCode(context.Background(), acct.ID, kind, testChallenge)
+	code, err := h.svc.AppCode(context.Background(), acct.ID, kind, testChallenge, "")
 	if err != nil {
 		h.t.Fatalf("app code: %v", err)
 	}
@@ -366,10 +367,10 @@ func TestCodesPairOnlyTheirKind(t *testing.T) {
 	if status != http.StatusBadRequest {
 		t.Fatalf("an unknown kind: %d %s", status, body)
 	}
-	if _, err := h.svc.AppCode(context.Background(), alice.ID, auth.KindExtension, testChallenge); err == nil {
+	if _, err := h.svc.AppCode(context.Background(), alice.ID, auth.KindExtension, testChallenge, ""); err == nil {
 		t.Fatal("an app code was minted for the extension")
 	}
-	if _, err := h.svc.AppCode(context.Background(), alice.ID, auth.KindIOS, ""); err == nil {
+	if _, err := h.svc.AppCode(context.Background(), alice.ID, auth.KindIOS, "", ""); err == nil {
 		t.Fatal("an app code was minted with no challenge")
 	}
 }
@@ -451,5 +452,54 @@ func TestAppTokensLapseWhenIdle(t *testing.T) {
 	}
 	if status, _ := h.call(http.MethodGet, "/devices/me", ext.Token, nil); status != http.StatusOK {
 		t.Fatalf("an extension token lapsed: %d", status)
+	}
+}
+
+// The WorkOS session column (Lane 225, B212): an app's code carries the
+// sign-in's session to the device it pairs, and revoking the device
+// answers it; an app code without one pairs a device without one; the
+// extension's code and device can never carry one; and the account
+// page's revoke (a cookie, no device on the request) is answered null.
+func TestDevicesKeepTheWorkOSSession(t *testing.T) {
+	h, alice, _ := newHarness(t)
+	ctx := context.Background()
+	store, ok := h.svc.Store.(*Store)
+	if !ok {
+		t.Fatal("the harness store is not the database's")
+	}
+
+	code, err := h.svc.AppCode(ctx, alice.ID, auth.KindAndroid, testChallenge, "session_store")
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, kept := h.pairAs(code, kindp(apitypes.DeviceKindAndroid), testVerifier)
+	if status != http.StatusCreated {
+		t.Fatalf("pair: %d", status)
+	}
+	h.clock.now = h.clock.now.Add(7 * time.Second) // under the pairing route's limit
+	none := h.pairApp(alice, auth.KindIOS)
+
+	if sid, err := store.Revoke(ctx, alice.ID, kept.Device.Id, h.clock.now); err != nil || sid != "session_store" {
+		t.Fatalf("revoke answered %q, %v", sid, err)
+	}
+	if _, err := store.Revoke(ctx, alice.ID, kept.Device.Id, h.clock.now); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("revoking twice: %v", err)
+	}
+	status, body := h.signedIn(h.svc.revoke, alice, http.MethodDelete, none.Device.Id.String())
+	if status != http.StatusOK || string(body) != "null" {
+		t.Fatalf("the account page's revoke: %d %s", status, body)
+	}
+
+	hash := codeHash(h.svc.CodeKey, "acorn amber anchor apple arch atlas")
+	if err := store.PutCode(ctx, alice.ID, Binding{Kind: auth.KindExtension}, hash, h.clock.now.Add(CodeTTL), "session_ext"); err == nil {
+		t.Fatal("an extension code carried a WorkOS session")
+	}
+	status, body = h.call(http.MethodPost, "/devices/pair", "", apitypes.PairInput{Code: h.code(alice)})
+	var ext apitypes.Paired
+	if status != http.StatusCreated || json.Unmarshal(body, &ext) != nil {
+		t.Fatalf("extension pair: %d", status)
+	}
+	if _, err := store.Pool.Exec(ctx, `update app.devices set workos_session_id = 'session_ext' where id = $1`, ext.Device.Id); err == nil {
+		t.Fatal("an extension device carried a WorkOS session")
 	}
 }
