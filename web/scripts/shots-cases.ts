@@ -369,6 +369,11 @@ export const SHOT_CASES: readonly ShotCase[] = [
 		fixture: { FIXTURE_TWO_QB: '1' },
 		env: { TWO_QB: '1' }
 	}),
+	// Lane 223: the run's game state on the schedule and a club, a club's head, the bye cells.
+	once('game-day-polish-shots', 'saturday', FIXTURE_SUNDAY_CLOCK, {
+		name: 'game-day-polish-shots-schedule',
+		args: (o) => ['schedule', o.web, o.api, o.out]
+	}),
 	// The record runs.
 	once('record-shots', 'record-live', FIXTURE_MONDAY_NIGHT_CLOCK, {
 		args: (o) => [o.web, o.api, o.out]
@@ -384,6 +389,12 @@ export const SHOT_CASES: readonly ShotCase[] = [
 		name: 'record-two-shots-graded',
 		fixture: BOARD_WEEK_7,
 		args: (o) => ['graded', o.web, o.api, o.out]
+	}),
+	// Lane 223: the record and its front card name the rest-of-season order.
+	once('game-day-polish-shots', 'two-graded', FIXTURE_SUNDAY_CLOCK, {
+		name: 'game-day-polish-shots-record',
+		fixture: BOARD_WEEK_7,
+		args: (o) => ['record', o.web, o.api, o.out]
 	}),
 	once('record-two-shots', 'two-published', FIXTURE_WEEK_CLOCK, {
 		name: 'record-two-shots-published',

@@ -189,10 +189,14 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 	const weekly = (await page.locator('section#weekly').textContent()) ?? '';
 	const draft = (await page.locator('section#draft').textContent()) ?? '';
 	has(weekly, 'Weekly record', where);
-	has(weekly, "Our weekly rankings against ESPN and the week's published projection", where);
+	has(
+		weekly,
+		"Our rest-of-season order, graded week by week against ESPN and the week's published projection",
+		where
+	);
 	has(weekly, 'Weeks 1 to 6', where);
 	has(weekly, 'Before that the site shipped the draft board, graded under Draft record.', where);
-	has(weekly, "Each week's rankings are set before its first kickoff and graded as set", where);
+	has(weekly, "Each week's order is set before its first kickoff and graded as set", where);
 	// On a phone the weeks before the weekly record are a chip a week, never a paragraph (Lane 209).
 	if (width <= PHONE_MAX) {
 		const chips = await page.locator('section#weekly tr.before .wk-chips li:visible').count();
@@ -202,7 +206,7 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 		if (!seen.includes(RECORDS_WORDS.setRulePhone))
 			faults.push(`${where}: the phone does not say the set rule`);
 	}
-	lacks(weekly, /Yahoo|weekly experts|\bADP\b|FantasyPros|froze|freeze|rest-of-season/iu, where);
+	lacks(weekly, /Yahoo|weekly experts|\bADP\b|FantasyPros|froze|freeze/iu, where);
 	if (width > PHONE_MAX) has(weekly, 'Set each week before kickoff', where);
 	has(draft, 'Draft record', where);
 	has(draft, "Our draft board against ADP, on the season's points so far", where);
@@ -228,7 +232,7 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 		lacks(weekly, /ESPN 0\.|Order matched by week/u, where);
 	} else {
 		has(weekly, 'Set Thu Oct 22, ', where);
-		has(weekly, 'Our weekly rankings, set Oct 22', where);
+		has(weekly, 'Our rest-of-season order, set Oct 22', where);
 		has(weekly, 'Order matched by week, 1 week graded', where);
 		has(weekly, RECORDS_WORDS.espnBasis, where);
 		// The weekly pairs name the leader, ESPN's where it leads (fix round 1, HIGH-1).
@@ -284,7 +288,7 @@ async function front(width: number): Promise<void> {
 		has(card, 'Our draft board through week 5', where);
 		has(
 			card,
-			"Weekly rankings start week 7, against ESPN and the week's published projection.",
+			"Our rest-of-season order is graded week by week from week 7, against ESPN and the week's published projection.",
 			where
 		);
 		has(card, 'ADP by 4', where);
@@ -292,7 +296,7 @@ async function front(width: number): Promise<void> {
 	} else {
 		has(card, 'Weekly record', where);
 		has(card, 'Order matched is how closely an order ranked the players', where);
-		has(card, 'Our weekly rankings over week 7', where);
+		has(card, 'Our rest-of-season order, graded over week 7', where);
 		has(card, 'ESPN by 2', where);
 		lacks(card, /\bADP\b/u, where);
 		// The front card says nothing of a week's ESPN read (Lane 147).
