@@ -38,13 +38,22 @@
 		openOnCurrent();
 	});
 
-	/** Scrolls the weeks so the current week sits first after the pinned columns. */
+	/** Scrolls the weeks so the current week sits first after the pinned columns, measured where they
+	 * stick (their sticky `left` plus their width), not where they sit in the flow, which a wider
+	 * laid-out club column pushes right (Lane 223 review M1): no sliver of the week before shows. */
 	function openOnCurrent(): void {
 		if (!frame || current === undefined) return;
 		const heads = frame.querySelectorAll<HTMLElement>('thead th');
 		const week = frame.querySelector<HTMLElement>(`thead th[data-week="${String(current.week)}"]`);
-		const pinned = [...heads].filter((head) => getComputedStyle(head).position === 'sticky');
-		const pinnedRight = Math.max(0, ...pinned.map((head) => head.offsetLeft + head.offsetWidth));
+		const pinnedRight = Math.max(
+			0,
+			...[...heads].flatMap((head) => {
+				const style = getComputedStyle(head);
+				return style.position === 'sticky' && style.display !== 'none'
+					? [parseFloat(style.left) + head.getBoundingClientRect().width]
+					: [];
+			})
+		);
 		if (week) frame.scrollLeft = Math.max(0, week.offsetLeft - pinnedRight);
 	}
 </script>
@@ -295,8 +304,11 @@
 			--strength-w: 72px;
 		}
 
+		/* Each pinned column is exactly its width, padding inside it, so the next one sticks flush
+		   against it and the weeks scroll in from that edge (Lane 223 review M1). */
 		.club,
 		.strength {
+			box-sizing: border-box;
 			padding-inline: var(--s-2);
 		}
 

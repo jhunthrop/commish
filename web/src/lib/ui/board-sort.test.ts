@@ -73,3 +73,25 @@ void test('sorting returns a new array and leaves the rows alone', () => {
 	sortRows(ROWS, { key: 'vor', turned: true }, BYES);
 	assert.deepEqual(names(ROWS), before);
 });
+
+void test('in season a played bye sorts with the missing ones, last either way (Lane 223)', () => {
+	const rows = [
+		row('Played', { team: 'KC' }),
+		row('Week 11', { team: 'LAR' }),
+		row('None', { team: 'FA' }),
+		row('Week 7', { team: 'BUF' })
+	];
+	const byes = { KC: 5, LAR: 11, FA: null, BUF: 7 };
+	assert.deepEqual(names(sortRows(rows, { key: 'bye', turned: false }, byes, 7)), [
+		'Week 7',
+		'Week 11',
+		'Played',
+		'None'
+	]);
+	assert.deepEqual(names(sortRows(rows, { key: 'bye', turned: true }, byes, 7)), [
+		'Week 11',
+		'Week 7',
+		'Played',
+		'None'
+	]);
+});

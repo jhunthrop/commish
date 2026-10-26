@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { byeAhead } from '#lib/format/bye.ts';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { siteContext } from '#lib/context/context.svelte.ts';
@@ -116,9 +115,7 @@
 		if (!player || !run) return null;
 		const place = placesShown?.get(player.id);
 		const numbers = place === undefined ? run : placedAt(run, place, format.teams);
-		// A bye already played is no bye to weigh (Lane 223, B190): the Bye row shows one ahead alone.
-		const bye = byeAhead(data.byes[player.team] ?? null, format.rosFromWeek ?? null);
-		return { player, numbers, bye };
+		return { player, numbers, bye: data.byes[player.team] ?? null };
 	}
 
 	const sides = $derived(SLOTS.map(sideOf));
@@ -141,7 +138,11 @@
 	const pair = $derived(
 		verdict?.kind === 'call' ? ([verdict.leader.side, verdict.other.side] as const) : null
 	);
-	const rows = $derived(pair ? compareRows(pair[0], pair[1], data.season, data.underway) : []);
+	const rows = $derived(
+		pair
+			? compareRows(pair[0], pair[1], data.season, data.underway, format.rosFromWeek ?? null)
+			: []
+	);
 	/** Each side's range where the run carries one, and the scale the carried ranges share. */
 	const ranges = $derived(pair ? pair.map(sideRange) : []);
 	const scale = $derived.by(() => {
