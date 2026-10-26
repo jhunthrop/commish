@@ -9,8 +9,9 @@ import Testing
 /// the view model over the recorded replay read in order as the page reads it: per moment the bar, the
 /// notes, the strip of picks as they land, at the turn the picks since and the call with the shortlist,
 /// between turns the call that waits on the board, the pool under every chip with its basis and
-/// chances, and the team; the report; the followed drafts' lines; and the sentences the replay never
-/// reaches over edited copies of a recorded answer.
+/// chances, the wall, and the team; at the turn the shortlist's why and outcome range; the report; the
+/// followed drafts' lines; the sentences the replay never reaches over edited copies of a recorded
+/// answer; and the League home's draft-day entry.
 @MainActor
 struct CompanionParityTests {
     typealias JSON = [String: Any]
@@ -127,13 +128,24 @@ struct CompanionParityTests {
             #expect(model.call == nil)
         }
         if let shortlist = web["shortlist"] as? [JSON] {
-            let ours = try #require(model.shortlist)
-            #expect(ours.map(\.player.id) == shortlist.map { $0["id"] as? String ?? "" })
-            #expect(ours.map(\.chance) == shortlist.map { $0["chance"] as? String })
-            #expect(ours.map(\.label) == shortlist.map { $0["label"] as? String ?? "" })
+            try Self.expectShortlist(#require(model.shortlist), shortlist)
         } else {
             #expect(model.shortlist == nil)
         }
+    }
+
+    /// A shortlist row by row: who, his chance and what it is of, our why, his range's words and where
+    /// its span and median fall (the web's percents to a tenth).
+    static func expectShortlist(_ ours: [ShortlistLine], _ web: [JSON]) {
+        #expect(ours.map(\.player.id) == web.map { $0["id"] as? String ?? "" })
+        #expect(ours.map(\.chance) == web.map { $0["chance"] as? String })
+        #expect(ours.map(\.label) == web.map { $0["label"] as? String ?? "" })
+        #expect(ours.map(\.why) == web.map { $0["why"] as? String })
+        let ranges = web.map { $0["range"] as? JSON }
+        #expect(ours.map { $0.range?.text } == ranges.map { $0?["text"] as? String })
+        #expect(ours.map { $0.range.map { Formatting.fixed($0.left) } } == ranges.map { $0?["left"] as? String })
+        #expect(ours.map { $0.range.map { Formatting.fixed($0.width) } } == ranges.map { $0?["width"] as? String })
+        #expect(ours.map { $0.range.map { Formatting.fixed($0.mid) } } == ranges.map { $0?["mid"] as? String })
     }
 
     @Test(arguments: roomMoments)

@@ -17,6 +17,7 @@ import {
 	moveWords,
 	orderBasis,
 	orderView,
+	stripCells,
 	rosterBasis,
 	rosterFilter,
 	rosterWords
@@ -236,6 +237,33 @@ void test('the big figure is his projected points, the sort key beside it (Lane 
 	assert.equal(sortedFigure('rest_of_season_points'), 'total');
 	assert.equal(FIGURE_HEADS.por, 'Over repl.');
 	assert.equal(FIGURE_HEADS.total, 'Projected');
+});
+
+void test('below a wide screen the figures are labelled cells, never a sentence (Lane 209)', () => {
+	const view = orderView(row('Swift'), ZONE, true, NOW);
+	const heads = (rankBy: OrderAdvice['rank_by']): string[] =>
+		stripCells(view, rankBy, 6).map((c) => c.head);
+	// Across positions: the week, Over repl. (the key # sorts on), A game, Opp rank, Last.
+	assert.deepEqual(heads('points_over_replacement'), [
+		'Wk 6',
+		'Over repl.',
+		'A game',
+		'Opp rank',
+		'Last'
+	]);
+	// At one position Projected is the key, drawn big; Avg takes Over repl.'s place.
+	assert.deepEqual(heads('rest_of_season_points'), ['Wk 6', 'A game', 'Opp rank', 'Avg', 'Last']);
+	const cells = stripCells(view, 'points_over_replacement', 6);
+	assert.deepEqual(
+		cells.filter((c) => c.key === true).map((c) => c.head),
+		['Over repl.']
+	);
+	// The week's short figure takes a narrower share, so the longer heads keep their room.
+	assert.deepEqual(
+		cells.filter((c) => c.narrow === true).map((c) => c.head),
+		['Wk 6']
+	);
+	for (const cell of cells) assert.doesNotMatch(cell.value, /,/u, cell.value);
 });
 
 void test('a roster mark reads Yours, Free or the holding team, never the platform word', () => {

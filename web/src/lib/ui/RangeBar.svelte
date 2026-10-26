@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { fixed } from '#lib/format/number.ts';
+	import { fixed, spanWords } from '#lib/format/number.ts';
 	import type { RangeScale } from '#lib/types/player.ts';
 	import Label from './Label.svelte';
+	import { rangePercent } from './range.ts';
 
 	interface Props {
 		floor: number;
@@ -16,16 +17,9 @@
 
 	let { floor, median, ceiling, scale, form = 'stacked' }: Props = $props();
 
-	function percent(points: number): number {
-		const span = scale.hi - scale.lo;
-		if (span <= 0)
-			throw new RangeError(`A range scale needs hi above lo, got ${scale.lo} to ${scale.hi}.`);
-		return Math.min(100, Math.max(0, ((points - scale.lo) / span) * 100));
-	}
-
-	const left = $derived(percent(floor));
-	const width = $derived(percent(ceiling) - left);
-	const mid = $derived(percent(median));
+	const left = $derived(rangePercent(floor, scale));
+	const width = $derived(rangePercent(ceiling, scale) - left);
+	const mid = $derived(rangePercent(median, scale));
 </script>
 
 {#snippet bar()}
@@ -44,7 +38,7 @@
 {:else}
 	<span class="range">
 		{@render bar()}
-		<Label size="cell">{fixed(floor)} to {fixed(ceiling)}</Label>
+		<Label size="cell">{spanWords(floor, ceiling)}</Label>
 	</span>
 {/if}
 

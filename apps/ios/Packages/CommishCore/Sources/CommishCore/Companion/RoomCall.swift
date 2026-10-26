@@ -128,6 +128,11 @@ public enum RoomWords {
         "Show \(rows) more"
     }
 
+    /// words.ts wallRounds: "rounds 1 to 3 of 20".
+    public static func wallRounds(_ shown: Int, of rounds: Int) -> String {
+        "rounds 1 to \(shown) of \(rounds)"
+    }
+
     /// words.ts teamCount: "3 of 20".
     public static func teamCount(_ drafted: Int, of rosterSize: Int) -> String {
         "\(drafted) of \(rosterSize)"

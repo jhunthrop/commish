@@ -148,17 +148,6 @@ extension MockRoomModel {
         )
     }
 
-    /// model.ts wallRows: the rounds through `rounds`, seat by seat.
-    static func wall(_ picks: [PlacedPick], board: RoomBoardView, teams: Int, rounds: Int) -> [[RoomPlayer?]] {
-        let byPick = Dictionary(picks.map { ($0.pick, $0.playerID) }, uniquingKeysWith: { first, _ in first })
-        return (0 ..< max(rounds, 0)).map { index in
-            (1 ... teams).map { seat in
-                let pick = index % 2 == 0 ? index * teams + seat : index * teams + (teams - seat + 1)
-                return byPick[pick].flatMap { board.byID[$0] }
-            }
-        }
-    }
-
     /// TeamPanel.svelte: your team by slot with the count and the pick that took each.
     static func team(_ room: MockRoom, mine: [PlacedPick], board: RoomBoardView) -> TeamModel {
         let slots = RoomDraft.team(room.settings, mine: mine, board: board)

@@ -125,6 +125,9 @@ public struct NewCompanionScreen: View {
 /// draft and opens it.
 public struct NewCompanionView: View {
     @Environment(\.colorScheme) private var colorScheme
+    /// The follow in flight, cancelled when the page leaves the screen so its answer never pushes a
+    /// draft onto whichever tab is up by then.
+    @State private var following: Task<Void, Never>?
     private let viewModel: NewCompanionViewModel
     private let opened: (String) -> Void
 
@@ -138,8 +141,9 @@ public struct NewCompanionView: View {
             NewCompanionScreen(
                 viewModel: viewModel,
                 follow: {
-                    Task {
-                        if let id = await viewModel.follow() {
+                    following?.cancel()
+                    following = Task {
+                        if let id = await viewModel.follow(), !Task.isCancelled {
                             opened(id)
                         }
                     }
@@ -150,6 +154,10 @@ public struct NewCompanionView: View {
         .scrollDismissesKeyboard(.interactively)
         .background(Theme(colorScheme).color(Tokens.Color.bg))
         .task { await viewModel.load() }
+        .onDisappear {
+            following?.cancel()
+            following = nil
+        }
     }
 }
 

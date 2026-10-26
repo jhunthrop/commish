@@ -4,8 +4,8 @@
 	import Face from '#lib/ui/Face.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import NameWords from '#lib/ui/NameWords.svelte';
-	import { MOCK } from './mock-words.ts';
 	import type { WallCell } from './model.ts';
+	import { ROOM, wallRounds } from './words.ts';
 
 	interface Props {
 		rows: readonly (readonly WallCell[])[];
@@ -24,10 +24,10 @@
 	let { rows, names, you, now, teams, rounds, whose = 'your' }: Props = $props();
 </script>
 
-<section aria-label={MOCK.wall}>
+<section aria-label={ROOM.wall}>
 	<div class="head">
-		<DisplayTitle size="panel">{MOCK.wall}</DisplayTitle>
-		<Label>rounds 1 to {rows.length} of {rounds}</Label>
+		<DisplayTitle size="panel">{ROOM.wall}</DisplayTitle>
+		<Label>{wallRounds(rows.length, rounds)}</Label>
 	</div>
 	<div class="wrap">
 		<div class="wall" style:--teams={teams}>
@@ -46,7 +46,11 @@
 						</span>
 					{:else if cell.pick === now}
 						<span class="cell now">
-							{cell.seat === you ? (whose === 'your' ? 'Your pick' : 'Their pick') : 'On the clock'}
+							{cell.seat === you
+								? whose === 'your'
+									? ROOM.yourPick
+									: ROOM.theirPick
+								: ROOM.onTheClock}
 							<span>{pickLabel(cell.pick, teams)}</span>
 						</span>
 					{:else}

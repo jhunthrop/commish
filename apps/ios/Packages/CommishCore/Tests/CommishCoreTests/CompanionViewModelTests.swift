@@ -12,8 +12,10 @@ func companionCache() -> FileCache {
 
 /// The companion's state through its view model over the recorded replay (plan Task D4's test): the
 /// first read asks from pick 0 and takes the board, each later one the count held; the picks merge
-/// across reads; the poll keeps the web's three seconds and stops with the report; a lost connection
-/// keeps the last picks with their stamp; a refused token signs out; a draft not on the account says so.
+/// across reads; the poll keeps the web's three seconds and stops with the report, with a finish the
+/// engine lost and with a report read that fails; a pull never reads beside the poll nor within its
+/// interval; a lost connection keeps the last picks with their stamp; a refused token signs out; a
+/// draft not on the account says so and stops.
 @MainActor
 struct CompanionViewModelTests {
     static let zone = TimeZone(identifier: "America/Chicago")!
@@ -129,11 +131,9 @@ struct CompanionViewModelTests {
 
     @Test func aSavedDraftOpensWithNoSignalDated() async {
         let cache = companionCache()
-        let first = Self.viewModel(StubCompanion(moments: [.turn]), cache: cache)
         // The turn's answer alone carries no board: the first read is the waiting one.
         let saved = Self.viewModel(StubCompanion(moments: [.waiting]), cache: cache)
         await saved.load()
-        _ = first
         let later = Self.viewModel(
             StubCompanion(offline: true),
             cache: cache,
@@ -163,6 +163,106 @@ struct CompanionViewModelTests {
         #expect(viewModel.done)
     }
 
+    /// The waiting read, then the finish with the edit applied: the board comes with the first.
+    static func finish(
+        notFound: Bool = false, reportFails: Bool = false, lost: Bool = false
+    ) -> StubCompanion {
+        StubCompanion(moments: [.waiting, .complete], notFound: notFound, reportFails: reportFails) { answer in
+            if lost, CompanionWords.status(answer.status) == "complete" {
+                answer.lostAt = 37
+            }
+        }
+    }
+
+    /// The poll from visible to its end: every read, each sleep ticked, until it stops.
+    static func pollToTheEnd(_ viewModel: CompanionViewModel, timer: ManualTimer) async throws {
+        viewModel.setVisible(true)
+        try await eventually {
+            if !viewModel.polling {
+                return true
+            }
+            if await timer.sleepers == 1 {
+                await timer.tick()
+            }
+            return false
+        }
+    }
+
+    @Test func aFinishTheEngineLostStopsThePollWithNoReport() async throws {
+        let timer = ManualTimer()
+        let api = Self.finish(lost: true)
+        let viewModel = Self.viewModel(api, timer: timer)
+        try await Self.pollToTheEnd(viewModel, timer: timer)
+        #expect(await api.reads == [0, 2])
+        #expect(await api.reportReads == 0)
+        #expect(viewModel.done)
+        guard case let .room(model, stale) = viewModel.state else {
+            Issue.record("the lost finish drew no room: \(viewModel.state)")
+            return
+        }
+        #expect(!stale)
+        #expect(model.isComplete)
+        #expect(model.lost != nil)
+        // Ticking again reads nothing more.
+        await timer.tick()
+        await settle()
+        #expect(await api.reads.count == 2)
+    }
+
+    @Test func aReportReadThatFailsIsNotTriedAgain() async throws {
+        let timer = ManualTimer()
+        let api = Self.finish(reportFails: true)
+        let viewModel = Self.viewModel(api, timer: timer)
+        try await Self.pollToTheEnd(viewModel, timer: timer)
+        #expect(await api.reads == [0, 2])
+        #expect(await api.reportReads == 1)
+        #expect(viewModel.done)
+        guard case let .room(model, true) = viewModel.state else {
+            Issue.record("the failed report did not keep the room with the reconnecting line: \(viewModel.state)")
+            return
+        }
+        #expect(model.isComplete)
+    }
+
+    @Test func aDraftNotOnTheAccountSaysSoAndStops() async throws {
+        let timer = ManualTimer()
+        var signedOut = false
+        let api = StubCompanion(notFound: true)
+        let viewModel = Self.viewModel(api, timer: timer) { signedOut = true }
+        try await Self.pollToTheEnd(viewModel, timer: timer)
+        #expect(viewModel.state == .failed(.missing))
+        #expect(viewModel.done)
+        #expect(!signedOut)
+        #expect(await api.reads.count == 1)
+        #expect(await timer.sleepers == 0)
+    }
+
+    @Test func aPullWithinTheIntervalReadsNothingAndBesideAReadWaitsOnIt() async {
+        let api = StubCompanion(moments: [.waiting, .between])
+        let viewModel = Self.viewModel(api)
+        // Beside a read in flight: the pull waits on it, one read between them.
+        async let poll: Void = viewModel.load()
+        async let pull: Void = viewModel.refresh()
+        _ = await (poll, pull)
+        #expect(await api.reads == [0])
+        // Within three seconds of that read (the clock has not moved): nothing.
+        await viewModel.refresh()
+        #expect(await api.reads == [0])
+    }
+
+    @Test func aPullAfterTheIntervalReadsOnce() async {
+        let api = StubCompanion(moments: [.waiting, .between])
+        let clock = SteppedClock(Self.readAt)
+        let viewModel = CompanionViewModel(
+            id: CompanionFixture.id, api: api, cache: companionCache(), clock: clock, timer: ManualTimer(),
+            zone: Self.zone
+        )
+        await viewModel.load()
+        clock.advance(by: TimeInterval(CompanionViewModel.pollSeconds))
+        await viewModel.refresh()
+        #expect(await api.reads == [0, 2])
+    }
+
     @Test func theChipFiltersThePoolWithNoRead() async {
         let api = StubCompanion(moments: [.waiting])
         let viewModel = Self.viewModel(api)
@@ -177,6 +277,24 @@ struct CompanionViewModelTests {
         #expect(await api.reads.count == 1)
         viewModel.choose(filter: "Nobody")
         #expect(viewModel.filter == "TE")
+    }
+}
+
+/// A clock a test moves on by hand.
+final class SteppedClock: Clock, @unchecked Sendable {
+    private let lock = NSLock()
+    private var current: Date
+
+    init(_ start: Date) {
+        current = start
+    }
+
+    var now: Date {
+        lock.withLock { current }
+    }
+
+    func advance(by seconds: TimeInterval) {
+        lock.withLock { current = current.addingTimeInterval(seconds) }
     }
 }
 

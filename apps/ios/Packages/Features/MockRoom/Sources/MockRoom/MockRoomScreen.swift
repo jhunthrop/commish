@@ -59,7 +59,8 @@ public struct MockRoomScreen: View {
                 MockPoolView(pool: pool, shown: shown, enabled: enabled, actions: actions, more: more, live: live)
             }
             if parts.contains(.wall) {
-                MockWallView(wall: model.wall, live: live)
+                // The companion's wall, one for both rooms; the mock room opens no player sheet yet.
+                WallView(wall: model.wall, open: { _ in }, live: live)
             }
             if parts.contains(.team) {
                 MockTeamView(title: model.teamTitle, team: model.team)

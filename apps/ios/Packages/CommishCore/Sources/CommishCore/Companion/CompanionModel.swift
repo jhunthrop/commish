@@ -61,11 +61,15 @@ public struct CallModel: Equatable, Sendable {
     public let rows: [CallLine]
 }
 
-/// Who we would take next (Shortlist.svelte): each with his chance of lasting and what it is of.
+/// Who we would take next (Shortlist.svelte): each with his chance of lasting and what it is of, our
+/// why's first sentence with full_reasoning, and his outcome range on the list's shared scale with
+/// range_of_outcomes.
 public struct ShortlistLine: Equatable, Sendable, Identifiable {
     public let player: RoomPlayer
     public let chance: String?
     public let label: String
+    public let why: String?
+    public let range: RangeLine?
 
     public var id: String {
         player.id
@@ -143,6 +147,8 @@ public struct CompanionModel: Equatable, Sendable {
     public let call: CallModel?
     public let shortlist: [ShortlistLine]?
     public let pool: PoolModel?
+    /// The draft board, every round through the one on the clock.
+    public let wall: RoomWall
     public let team: TeamModel
 
     /// The picks the landing strip shows (model.ts STRIP_PICKS): a round of a 12-team draft.
@@ -183,9 +189,17 @@ public struct CompanionModel: Equatable, Sendable {
         let went = RoomDraft.wentSince(placed, since: previous ?? 0, board: board)
         since = onTurn && !went.isEmpty ? Self.since(went, previous: previous, teams: teams) : nil
         self.call = call.map { Self.call($0, onTurn: onTurn, host: draft.host) }
-        shortlist = onTurn ? card.map { Self.shortlist($0, board: board, teams: teams) } : nil
+        shortlist = onTurn ? card.map {
+            Self.shortlist($0, board: board, teams: teams, ranges: draft.ranges?.additionalProperties ?? [:])
+        } : nil
         pool = status == "complete" ? nil : Self.pool(
             draft, board: board, drafted: drafted, call: call, filter: filter
+        )
+        let complete = status == "complete"
+        wall = RoomWall(
+            picks: placed, board: board, names: names, you: draft.slot, teams: teams, rounds: draft.rounds,
+            shown: min(draft.rounds, DraftFormat.snakeSlot(min(now, draft.totalPicks), teams: teams).round),
+            now: complete ? nil : now
         )
         team = Self.team(draft, placed: placed, board: board)
     }
@@ -266,17 +280,26 @@ public struct CompanionModel: Equatable, Sendable {
         )
     }
 
-    /// Shortlist.svelte: the shortlist after the call, each with his chance and what it is of.
-    static func shortlist(_ card: RoomCard, board: RoomBoardView, teams: Int) -> [ShortlistLine] {
+    /// Shortlist.svelte: the shortlist after the call, each with his chance and what it is of, our
+    /// why's first sentence, and his range on the scale the list's ranges share.
+    static func shortlist(
+        _ card: RoomCard, board: RoomBoardView, teams: Int, ranges: [String: Components.Schemas.OutcomeRange]
+    ) -> [ShortlistLine] {
         let label = CompanionWords.chanceLabel(card, teams: teams)
-        return card.shortlist.filter { $0.playerId != card.call }.compactMap { entry in
-            board.byID[entry.playerId].map { player in
-                ShortlistLine(
-                    player: player,
-                    chance: card.stillThere.additionalProperties[entry.playerId].map(DraftFormat.chanceShort),
-                    label: label
-                )
-            }
+        let rows = card.shortlist.filter { $0.playerId != card.call }.compactMap { entry in
+            board.byID[entry.playerId].map { (entry, $0, ranges[entry.playerId]) }
+        }
+        let scale = RangeScale.shared(rows.compactMap { $0.2.map { (floor: $0.floor, ceiling: $0.ceiling) } })
+        return rows.map { entry, player, range in
+            ShortlistLine(
+                player: player,
+                chance: card.stillThere.additionalProperties[entry.playerId].map(DraftFormat.chanceShort),
+                label: label,
+                why: entry.why.flatMap { $0.isEmpty ? nil : Sentence.first($0) },
+                range: zip(range, scale).map {
+                    RangeLine(floor: $0.0.floor, median: $0.0.median, ceiling: $0.0.ceiling, scale: $0.1)
+                }
+            )
         }
     }
 

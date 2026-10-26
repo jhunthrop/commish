@@ -137,34 +137,6 @@ struct CompareHeadCell: View {
     }
 }
 
-/// A range bar on the pair's shared scale: floor to ceiling, the median marked.
-struct RangeBar: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let range: CompareRange
-    let scale: ClosedRange<Double>
-
-    var body: some View {
-        let theme = Theme(colorScheme)
-        GeometryReader { proxy in
-            let span = max(scale.upperBound - scale.lowerBound, 1)
-            let place = { (value: Double) in (value - scale.lowerBound) / span * proxy.size.width }
-            ZStack(alignment: .leading) {
-                Capsule().fill(theme.color(Tokens.Color.surface2)).frame(height: 6)
-                Capsule().fill(theme.color(Tokens.Color.ink3))
-                    .frame(width: max(place(range.ceiling) - place(range.floor), 2), height: 6)
-                    .offset(x: place(range.floor))
-                Circle().fill(theme.color(Tokens.Color.ink))
-                    .frame(width: 10, height: 10)
-                    .offset(x: place(range.median) - 5)
-            }
-            .frame(maxHeight: .infinity)
-        }
-        .frame(height: 20)
-        .accessibilityLabel(Text(verbatim: [range.floor, range.median, range.ceiling].map { Formatting.fixed($0) }
-                .joined(separator: ", ")))
-    }
-}
-
 /// One row of the table: its label, then each side's figure, the better one bold on the gain's wash,
 /// the Gap in its tone, the range as bars.
 struct CompareRowView: View {
@@ -196,7 +168,14 @@ struct CompareRowView: View {
     @ViewBuilder
     private func cellView(_ cell: CompareCell, index: Int, theme: Theme) -> some View {
         if row.range, let range = table.heads[index].range, let scale = table.scale {
-            RangeBar(range: range, scale: scale)
+            let line = RangeLine(
+                floor: range.floor, median: range.median, ceiling: range.ceiling,
+                scale: RangeScale(low: scale.lowerBound, high: scale.upperBound)
+            )
+            RangeBar(
+                left: line.left, width: line.width, mid: line.mid,
+                spoken: [range.floor, range.median, range.ceiling].map { Formatting.fixed($0) }.joined(separator: ", ")
+            )
         } else {
             Text(cell.text)
                 .font(Faces.font(.num, size: Tokens.TypeScale.lg, weight: cell.wins == true ? .bold : .semibold))

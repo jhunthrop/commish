@@ -43,17 +43,6 @@ public struct MockPool: Equatable, Sendable {
     }
 }
 
-/// The wall (Wall.svelte): each seat's name across the top, then each round's picks seat by seat.
-public struct MockWall: Equatable, Sendable {
-    public let names: [String]
-    public let you: Int
-    /// Rounds through the one on the clock, each cell the player taken there or nil.
-    public let rows: [[RoomPlayer?]]
-    /// The pick on the clock, marked on the wall; nil once the draft is over.
-    public let now: Int?
-    public let teams: Int
-}
-
 /// A shared draft's head (SharedHead.svelte): whose it is, where it stands, its one verb.
 public struct MockSharedHead: Equatable, Sendable {
     public let title: String

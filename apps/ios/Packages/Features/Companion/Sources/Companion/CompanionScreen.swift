@@ -33,13 +33,14 @@ public enum CompanionPart: CaseIterable, Sendable {
     case strips
     case call
     case pool
+    case wall
     case team
 }
 
 /// The followed draft as its model says it, in the web's order at 390 (CompanionRoom.svelte): the
 /// reconnecting line over picks that are not the latest, the bar, the notes, the picks as they land
-/// (or at your turn the picks since your last), our call and who we would take next, the pool, your
-/// team. Pure of state, so a snapshot draws it from the fixture.
+/// (or at your turn the picks since your last), our call and who we would take next, the pool, the
+/// wall, your team. Pure of state, so a snapshot draws it from the fixture.
 public struct CompanionScreen: View {
     let model: CompanionModel
     let stale: String?
@@ -77,6 +78,9 @@ public struct CompanionScreen: View {
             }
             if parts.contains(.pool), let pool = model.pool {
                 PoolView(pool: pool, shown: shown, choose: actions.filter, more: more, open: actions.open, live: live)
+            }
+            if parts.contains(.wall) {
+                WallView(wall: model.wall, open: actions.open, live: live)
             }
             if parts.contains(.team) {
                 TeamView(team: model.team, open: actions.open)
@@ -161,7 +165,7 @@ public struct CompanionView: View {
                         more: { shown += PoolModel.moreRows }
                     )
                 }
-                .refreshable { await viewModel.load() }
+                .refreshable { await viewModel.refresh() }
                 .onChange(of: model.pool?.filter) { shown = PoolModel.firstRows }
             case let .report(report, _):
                 ScrollView {

@@ -136,8 +136,9 @@ struct RootTabs: View {
         switch (tab.key, selectedLeague) {
         case let (PhoneRail.leagueKey, league?):
             LeagueScreen(
-                environment: environment, leagueID: league.id, expired: expired,
-                openLineup: { selection = PhoneRail.lineupKey }, openGame: { openGame($0, league: league.id) }
+                environment: environment, leagueID: league.id, league: league, expired: expired,
+                openLineup: { selection = PhoneRail.lineupKey }, openGame: { openGame($0, league: league.id) },
+                openAdvisor: { open(.companionNew(replay: false)) }
             )
             .id(league.id)
         case let (PhoneRail.lineupKey, league?):
@@ -212,8 +213,9 @@ struct RootTabs: View {
             }
         case let .leagueHome(id):
             LeagueScreen(
-                environment: environment, leagueID: id, expired: expired, openLineup: {},
-                openGame: { openGame($0, league: id) }
+                environment: environment, leagueID: id, league: selectedLeague.flatMap { $0.id == id ? $0 : nil },
+                expired: expired, openLineup: {}, openGame: { openGame($0, league: id) },
+                openAdvisor: { open(.companionNew(replay: false)) }
             )
         case let .game(league, roster):
             MatchupTab(

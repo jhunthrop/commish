@@ -537,6 +537,8 @@ object Words {
         const val yours = "Yours"
         const val free = "Free"
         const val tradeFor = "Trade for him"
+        const val addShort = "Add"
+        const val tradeShort = "Trade"
         const val noReturn = "no return date"
         const val backLate = "back after the regular season"
         const val every = "All"
@@ -624,6 +626,8 @@ object Words {
         const val weeklyWhat = "Our weekly rankings against ESPN and the week's published projection"
         const val draft = "Draft record"
         const val draftWhat = "Our draft board against ADP, on the season's points so far"
+        const val beforePhone = "Graded under Draft record"
+        const val setRulePhone = "Each week's rankings are graded as set, never as refreshed after."
         const val notPlayed = "not played yet"
         const val underway = "under way"
         const val gradesLater = "grades when the stats land"
@@ -857,6 +861,10 @@ object Words {
         const val pool = "Pool"
         const val yourTeam = "Your team"
         const val open = "open"
+        const val wall = "The wall"
+        const val yourPick = "Your pick"
+        const val theirPick = "Their pick"
+        const val onTheClock = "On the clock"
     }
 
     object Report {
@@ -880,13 +888,17 @@ object Words {
         const val middleRuns = "the middle 80% of runs"
     }
 
+    object DraftDay {
+        const val advisorVerb = "Open the Advisor"
+        const val turnsAfterDraft = "The site turns to your season after your draft."
+    }
+
     object Mock {
         const val undo = "Undo"
         const val more = "More"
         const val finish = "Finish the draft"
         const val share = "Save and share"
         const val copied = "Link copied"
-        const val wall = "The wall"
         const val queue = "Queue"
         const val queued = "Queued"
         const val queuedTag = "queued"

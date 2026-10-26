@@ -423,3 +423,34 @@
 		display: none;
 	}
 }
+/* The weeks before the weekly record where the set rule's paragraph gives way (Lane 209): a chip a
+   week, then where they are graded, never a paragraph in a narrow cell. */
+.record .wk-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin: var(--s-1) 0 2px;
+	padding: 0;
+	list-style: none;
+}
+.record .wk-chips li {
+	padding: 1px 6px;
+	border-radius: var(--r-sm);
+	background: var(--surface-2);
+	color: var(--ink-2);
+	font-size: var(--t-xs);
+	font-weight: 600;
+	white-space: nowrap;
+}
+.record .graded-under {
+	display: inline-block;
+	font-size: var(--t-xs);
+	color: var(--ink-2);
+}
+.record .set-rule {
+	display: block;
+	margin-bottom: var(--s-1);
+	font-size: var(--t-xs);
+	line-height: 1.4;
+	color: var(--ink-3);
+}

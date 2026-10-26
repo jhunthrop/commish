@@ -7,11 +7,11 @@ import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
 import { KICKED_OFF_PART, UNCOUNTED } from '#lib/league/box/basis.ts';
 import { BOX, heldGame, positionWord } from '#lib/league/box/box.ts';
+import type { StripCell } from '#lib/league/box/figure-strip.ts';
 import type { WeekOrderAdvice } from './api.ts';
 import { stamped } from '../../../scripts/inseason-fixture/game-state.ts';
 import { weekOrderPath } from './path.ts';
 import {
-	foldedEvidence,
 	landed,
 	rulesLeftOut,
 	weekBasis,
@@ -20,6 +20,7 @@ import {
 	weekSearch,
 	weekSections,
 	weekStatus,
+	weekStripCells,
 	weekView,
 	WEEK_NOUNS,
 	WEEK_TAB,
@@ -283,13 +284,22 @@ void test('the roster chips filter the rows the API sent, the adds where the API
 	assert.equal(all.filter((r) => r.move === 'add').length, 5);
 });
 
-void test('the evidence folds under the name in one short line, no rank on a bye', () => {
+void test('the evidence folds into labelled cells, never a sentence, the empty mark on a bye', () => {
 	const all = views(fixture.read.K, SATURDAY);
 	const playing = all.find((r) => r.section === 'to_play');
 	const bye = all.find((r) => r.section === 'bye');
 	assert.ok(playing && bye);
-	assert.match(foldedEvidence(playing), /^Opp \d+(st|nd|rd|th), Avg \d+\.\d, Last \d+\.\d$/);
-	assert.match(foldedEvidence(bye), /^Avg \d+\.\d, Last \d+\.\d$/);
+	const heads = (cells: readonly StripCell[]): string[] => cells.map((c) => c.head);
+	assert.deepEqual(heads(weekStripCells(playing)), [BOX.oppRank, BOX.avg, BOX.last]);
+	assert.deepEqual(heads(weekStripCells(bye)), [BOX.oppRank, BOX.avg, BOX.last]);
+	const [opp, avg, last] = weekStripCells(playing);
+	assert.match(opp?.value ?? '', /^\d+(st|nd|rd|th)$/);
+	assert.ok(opp?.ease !== undefined && opp.ease !== null);
+	assert.match(`${avg?.value ?? ''} ${last?.value ?? ''}`, /^\d+\.\d \d+\.\d$/);
+	const byeOpp = weekStripCells(bye)[0];
+	assert.ok(byeOpp);
+	assert.equal(byeOpp.value, BOX.none);
+	assert.equal(byeOpp.ease, null);
 });
 
 void test('every word the tab prints passes the copy guard', () => {

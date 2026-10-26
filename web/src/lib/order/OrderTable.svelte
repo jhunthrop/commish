@@ -3,6 +3,8 @@
 	import type { LeagueHost } from '#lib/league/api.ts';
 	import { weekHead } from '#lib/format/figure-words.ts';
 	import { BOX, boxNumber, easeOf, oppRankWord } from '#lib/league/box/box.ts';
+	import FigureStrip from '#lib/ui/FigureStrip.svelte';
+	import { SHEET_MARK } from '#lib/ui/sheet-mark.ts';
 	import BoxGame from '#lib/league/box/BoxGame.svelte';
 	import BoxPlayer from '#lib/league/box/BoxPlayer.svelte';
 	import { tabHref } from '#lib/league/inseason/tabs.ts';
@@ -15,7 +17,9 @@
 		ORDER,
 		figureColumns,
 		sortedFigure,
+		stripCells,
 		moveHref,
+		moveShort,
 		moveWords,
 		orderSections,
 		type OrderSection,
@@ -26,8 +30,9 @@
 	/** Our order as a box score (Lane 66j): #, the player, in a league his roster, his game, Proj, then
 	 * Rest of season with his projected points first and big (Lane 139, C20), Over repl. beside it across
 	 * positions (the key the # sorts on), Avg, Last and Opp rank, and the one move his row admits. Your players are tinted. Below
-	 * 1100 px the figures after the key fold under the name in one short line; on a phone the game folds
-	 * too, the roster mark onto his club line. */
+	 * 1100 px the figures after the key fold under the name as labelled cells (Lane 209, never a
+	 * sentence); on a phone the row is two lines and its strip: #, face, name, pill, club and Projected
+	 * big; his game, status and the verb with its word; then the strip with the week's figure. */
 	interface Props {
 		label: string;
 		rows: readonly OrderView[];
@@ -62,27 +67,12 @@
 	const figures = $derived(figureColumns(rankBy));
 	/** The column # sorts on, its head marked where it is not the big first column (MEDIUM-3). */
 	const sortedBy = $derived(sortedFigure(rankBy));
-	const SEPARATOR = ', ';
 	/** The rows in their sections: one with no head, unless the byes sit apart. */
 	const sections = $derived<OrderSection[]>(
 		byesApart ? orderSections(rows, week) : [{ key: 'playing', head: null, rows: [...rows] }]
 	);
 	/** Every column, for a section head across the row. */
 	const span = $derived((marked ? 3 : 2) + 2 + figures.length + (marked || end ? 4 : 3));
-
-	/** The folded line under the name below 1100 px: every figure after the key, the opponent's rank,
-	 * then Avg and Last. */
-	function folded(row: OrderView): string {
-		const rest = figures.slice(1).map((f) => `${FIGURE_HEADS[f]} ${boxNumber(row.figures[f])}`);
-		const rank = row.box.evidence.oppRank;
-		const opp = rank === null ? [] : [`${BOX.opp} ${oppRankWord(rank)}`];
-		return [
-			...rest,
-			...opp,
-			`${BOX.avg} ${boxNumber(row.box.evidence.avg)}`,
-			`${BOX.last} ${boxNumber(row.box.evidence.last)}`
-		].join(SEPARATOR);
-	}
 </script>
 
 {#snippet mark(row: OrderView, size: 'md' | 'fold')}
@@ -101,7 +91,7 @@
 			<th class="n rank" scope="col" aria-label="{ORDER.rank}, {ORDER.rankGroup.toLowerCase()}"
 				>{ORDER.rank}</th
 			>
-			<th scope="col">{BOX.player}</th>
+			<th class="pl" scope="col">{BOX.player}</th>
 			{#if marked}<th class="roster" scope="col">{ORDER.roster}</th>{/if}
 			<th class="game" scope="col">{BOX.game}</th>
 			<th class="n proj" scope="col">{weekHead(week)}</th>
@@ -116,7 +106,8 @@
 			<th class="n ev first" scope="col">{BOX.avg}</th>
 			<th class="n ev" scope="col">{BOX.last}</th>
 			<th class="n ev opp" scope="col">{BOX.oppRank}</th>
-			{#if marked || end}<th class="act" scope="col"><span class="vh">{ORDER.tradeFor}</span></th
+			{#if marked || end}<th class="act" scope="col"
+					><span class="vh">{league === null ? SHEET_MARK.add : ORDER.tradeFor}</span></th
 				>{/if}
 		</tr>
 	</thead>
@@ -129,9 +120,9 @@
 				<tr class:mine={row.roster?.kind === 'yours'}>
 					<td class="n rank">{row.place}</td>
 					<td class="player">
-						<BoxPlayer row={row.box} tags={tagsOf(row.box.boardId)}>
+						<BoxPlayer row={row.box} tags={tagsOf(row.box.boardId)} line fitOnPhone>
 							{#snippet after()}<span class="ph-mark">{@render mark(row, 'fold')}</span>{/snippet}
-							<span class="ph-ev">{folded(row)}</span>
+							<span class="ph-ev"><FigureStrip cells={stripCells(row, rankBy, week)} /></span>
 						</BoxPlayer>
 					</td>
 					{#if marked}<td class="roster">{@render mark(row, 'md')}</td>{/if}
@@ -155,6 +146,7 @@
 									{href}
 									move={row.move}
 									said={moveWords(row, league.moves, league.host)}
+									short={moveShort(row)}
 									name={row.box.name}
 								/>
 							{:else if league !== null && row.held !== null}<span class="held">{row.held}</span>
@@ -169,6 +161,8 @@
 
 <style>
 	.order {
+		/* A phone row's face, the height of its first line (BoxPlayer's line, LINE_PHONE_FACE). */
+		--line-face: 28px;
 		width: 100%;
 		border-collapse: separate;
 		border-spacing: 0;
@@ -379,9 +373,7 @@
 
 		.ph-ev {
 			display: block;
-			font-size: var(--t-xs);
-			color: var(--ink-3);
-			font-variant-numeric: tabular-nums;
+			margin-top: 2px;
 		}
 	}
 
@@ -409,51 +401,143 @@
 		}
 	}
 
-	@media (max-width: 760px) {
+	/* A phone's row (Lane 209), and below a wide screen too (review M6): two lines and the strip, one
+	   height down the list. The row is a grid:
+	   # and the player on the first line with Projected big at its end, the verb at the end of the
+	   game's line, the player's cell spanning both and its strip running under them from the # column
+	   (BoxPlayer's line, which keeps room at the line ends from the vars here). */
+	@media (max-width: 1100px) {
+		.order {
+			--rank-w: 26px;
+			--col-gap: 6px;
+			display: block;
+		}
+
+		thead,
+		tbody {
+			display: block;
+		}
+
 		.grp {
 			display: none;
 		}
 
-		td {
-			padding: 7px 4px;
-		}
-
-		tr {
+		tr,
+		.cols {
+			display: grid;
+			grid-template-columns: var(--rank-w) minmax(0, 1fr) auto;
+			grid-template-rows: var(--line-face) 22px auto;
+			column-gap: var(--col-gap);
+			row-gap: 2px;
 			height: auto;
+			padding: 7px var(--s-2) 7px 2px;
+			border-bottom: 1px solid var(--line);
 		}
 
+		.cols {
+			grid-template-rows: 30px;
+			padding-top: 0;
+			padding-bottom: 0;
+			align-items: center;
+			background: var(--bg);
+		}
+
+		.cols th {
+			height: auto;
+			border-bottom: 0;
+			padding: 0;
+		}
+
+		tbody:last-child tr:last-child {
+			border-bottom: 0;
+		}
+
+		td {
+			padding: 0;
+			border-bottom: 0;
+		}
+
+		tbody tr:hover td,
+		.mine td {
+			background: none;
+		}
+
+		tbody tr:hover {
+			background: var(--surface-2);
+		}
+
+		.mine {
+			background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+			box-shadow: inset 3px 0 0 var(--accent);
+		}
+
+		.mine td:first-child {
+			box-shadow: none;
+		}
+
+		.rank,
 		.cols .rank,
 		td.rank {
-			width: 30px;
+			grid-column: 1;
+			grid-row: 1;
+			width: auto;
+			padding: 0;
 			font-size: var(--t-md);
-			padding-right: 2px;
+			align-self: center;
 		}
 
-		.cols .proj {
-			width: 44px;
+		td.player {
+			grid-column: 2 / 4;
+			grid-row: 1 / 4;
+			--line-end: 52px;
+			--line-end-2: 72px;
+			--strip-pull: calc(var(--rank-w) + var(--col-gap) + var(--line-face) + var(--s-2));
 		}
 
+		td.key,
 		.cols .key {
-			width: 52px;
+			grid-column: 3;
+			grid-row: 1;
+			align-self: center;
+			width: auto;
+			border-left: 0;
+			position: relative;
 		}
 
-		.cols .act {
-			width: 40px;
+		/* The player is the biggest thing on the row (box score rule): Projected at the name's size,
+		   its weight the emphasis (review H1). */
+		td.key {
+			font-size: var(--t-md);
 		}
 
-		.roster,
-		.cols .roster,
-		.game,
-		.cols .game {
+		td.act {
+			grid-column: 3;
+			grid-row: 2;
+			align-self: center;
+			position: relative;
+		}
+
+		.cols th:not(.rank):not(.key):not(.pl),
+		td.proj,
+		td.fig,
+		td.roster,
+		td.game {
 			display: none;
 		}
 
-		td.proj {
-			font-size: var(--t-sm);
+		.cols .pl {
+			grid-column: 2;
 		}
 
-		td.key {
-			font-size: var(--t-md);
+		.ph-mark {
+			max-width: 80px;
+		}
+	}
+
+	/* Between a phone and a wide screen the face keeps its 32 px. */
+	@media (min-width: 761px) and (max-width: 1100px) {
+		.order {
+			--line-face: 32px;
 		}
 	}
 </style>

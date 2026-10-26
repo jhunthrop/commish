@@ -13,7 +13,7 @@ public struct MockRoomModel: Equatable, Sendable {
     public let straight: String?
     public let call: MockCallState?
     public let pool: MockPool?
-    public let wall: MockWall
+    public let wall: RoomWall
     public let team: TeamModel
     public let teamTitle: String
 
@@ -51,10 +51,11 @@ public struct MockRoomModel: Equatable, Sendable {
             ? Self
             .pool(room, board: board, draft: draft, turn: Turn(card: card, view: view, noCall: noCall), ui: ui) :
             nil
-        wall = MockWall(
+        wall = RoomWall(
+            picks: draft.placed, board: board,
             names: MockWords.seatNames(teams: draft.teams, slot: room.slot, sharedBy: sharedBy), you: room.slot,
-            rows: Self.wall(draft.placed, board: board, teams: draft.teams, rounds: min(room.rounds, draft.round)),
-            now: draft.active ? room.pickNumber : nil, teams: draft.teams
+            teams: draft.teams, rounds: room.rounds, shown: min(room.rounds, draft.round),
+            now: draft.active ? room.pickNumber : nil, shared: draft.readOnly
         )
         team = Self.team(room, mine: draft.mine, board: board)
         teamTitle = draft.readOnly ? Words.Mock.theirTeam : Words.Room.yourTeam

@@ -535,6 +535,8 @@ public enum Words {
         public static let yours = "Yours"
         public static let free = "Free"
         public static let tradeFor = "Trade for him"
+        public static let addShort = "Add"
+        public static let tradeShort = "Trade"
         public static let noReturn = "no return date"
         public static let backLate = "back after the regular season"
         public static let every = "All"
@@ -622,6 +624,8 @@ public enum Words {
         public static let weeklyWhat = "Our weekly rankings against ESPN and the week's published projection"
         public static let draft = "Draft record"
         public static let draftWhat = "Our draft board against ADP, on the season's points so far"
+        public static let beforePhone = "Graded under Draft record"
+        public static let setRulePhone = "Each week's rankings are graded as set, never as refreshed after."
         public static let notPlayed = "not played yet"
         public static let underway = "under way"
         public static let gradesLater = "grades when the stats land"
@@ -855,6 +859,10 @@ public enum Words {
         public static let pool = "Pool"
         public static let yourTeam = "Your team"
         public static let `open` = "open"
+        public static let wall = "The wall"
+        public static let yourPick = "Your pick"
+        public static let theirPick = "Their pick"
+        public static let onTheClock = "On the clock"
     }
 
     public enum Report {
@@ -878,13 +886,17 @@ public enum Words {
         public static let middleRuns = "the middle 80% of runs"
     }
 
+    public enum DraftDay {
+        public static let advisorVerb = "Open the Advisor"
+        public static let turnsAfterDraft = "The site turns to your season after your draft."
+    }
+
     public enum Mock {
         public static let undo = "Undo"
         public static let more = "More"
         public static let finish = "Finish the draft"
         public static let share = "Save and share"
         public static let copied = "Link copied"
-        public static let wall = "The wall"
         public static let queue = "Queue"
         public static let queued = "Queued"
         public static let queuedTag = "queued"

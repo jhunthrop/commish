@@ -1441,6 +1441,128 @@
 					}
 				]
 			},
+			"wall": {
+				"title": "The wall",
+				"label": "rounds 1 to 1 of 20",
+				"names": [
+					"Nowlan",
+					"pricej07",
+					"GMenJay",
+					"Rad_Thad1",
+					"You",
+					"jjzachariason",
+					"Max_Jensen10",
+					"jordanp2323",
+					"thatmattkelley",
+					"Quinnifer",
+					"muttdog",
+					"PeakedInHighSkool"
+				],
+				"you": 5,
+				"rows": [
+					[
+						{
+							"pick": 1,
+							"id": "4430807",
+							"name": "Robinson",
+							"line": "RB · ATL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 2,
+							"id": "4429795",
+							"name": "Gibbs",
+							"line": "RB · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 3,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": {
+								"words": "On the clock",
+								"pick": "1.03"
+							}
+						},
+						{
+							"pick": 4,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 5,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 6,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 7,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 8,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 9,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 10,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 11,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 12,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						}
+					]
+				]
+			},
 			"team": {
 				"count": "0 of 20",
 				"slots": [
@@ -3027,6 +3149,128 @@
 					}
 				]
 			},
+			"wall": {
+				"title": "The wall",
+				"label": "rounds 1 to 1 of 20",
+				"names": [
+					"Nowlan",
+					"pricej07",
+					"GMenJay",
+					"Rad_Thad1",
+					"You",
+					"jjzachariason",
+					"Max_Jensen10",
+					"jordanp2323",
+					"thatmattkelley",
+					"Quinnifer",
+					"muttdog",
+					"PeakedInHighSkool"
+				],
+				"you": 5,
+				"rows": [
+					[
+						{
+							"pick": 1,
+							"id": "4430807",
+							"name": "Robinson",
+							"line": "RB · ATL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 2,
+							"id": "4429795",
+							"name": "Gibbs",
+							"line": "RB · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 3,
+							"id": "4362628",
+							"name": "Chase",
+							"line": "WR · CIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 4,
+							"id": "4426515",
+							"name": "Nacua",
+							"line": "WR · LAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 5,
+							"id": "4430878",
+							"name": "Smith-Njigba",
+							"line": "WR · SEA",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 6,
+							"id": "3117251",
+							"name": "McCaffrey",
+							"line": "RB · SF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 7,
+							"id": "4374302",
+							"name": "Brown",
+							"line": "WR · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 8,
+							"id": "4242335",
+							"name": "Taylor",
+							"line": "RB · IND",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 9,
+							"id": "4379399",
+							"name": "Cook",
+							"line": "RB · BUF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 10,
+							"id": "4429160",
+							"name": "Achane",
+							"line": "RB · MIA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 11,
+							"id": "4890973",
+							"name": "Jeanty",
+							"line": "RB · LV",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 12,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": {
+								"words": "On the clock",
+								"pick": "1.12"
+							}
+						}
+					]
+				]
+			},
 			"team": {
 				"count": "1 of 20",
 				"slots": [
@@ -3267,7 +3511,14 @@
 					"pill": "WR 6",
 					"team": "NO",
 					"chance": "25%",
-					"label": "still there at 3.05"
+					"label": "still there at 3.05",
+					"why": null,
+					"range": {
+						"text": "185.2 to 362.3",
+						"left": "13.2",
+						"width": "86.8",
+						"mid": "56.6"
+					}
 				},
 				{
 					"id": "4241478",
@@ -3275,7 +3526,14 @@
 					"pill": "WR 14",
 					"team": "PHI",
 					"chance": "23%",
-					"label": "still there at 3.05"
+					"label": "still there at 3.05",
+					"why": null,
+					"range": {
+						"text": "174.7 to 321.7",
+						"left": "8.1",
+						"width": "72.0",
+						"mid": "44.1"
+					}
 				},
 				{
 					"id": "4428331",
@@ -3283,7 +3541,14 @@
 					"pill": "WR 12",
 					"team": "KC",
 					"chance": "33%",
-					"label": "still there at 3.05"
+					"label": "still there at 3.05",
+					"why": null,
+					"range": {
+						"text": "158.2 to 347.0",
+						"left": "0.0",
+						"width": "92.5",
+						"mid": "46.3"
+					}
 				},
 				{
 					"id": "4258173",
@@ -3291,7 +3556,14 @@
 					"pill": "WR 11",
 					"team": "HOU",
 					"chance": "34%",
-					"label": "still there at 3.05"
+					"label": "still there at 3.05",
+					"why": null,
+					"range": {
+						"text": "169.3 to 336.9",
+						"left": "5.4",
+						"width": "82.1",
+						"mid": "46.5"
+					}
 				}
 			],
 			"pool": {
@@ -4631,6 +4903,226 @@
 							}
 						]
 					}
+				]
+			},
+			"wall": {
+				"title": "The wall",
+				"label": "rounds 1 to 2 of 20",
+				"names": [
+					"Nowlan",
+					"pricej07",
+					"GMenJay",
+					"Rad_Thad1",
+					"You",
+					"jjzachariason",
+					"Max_Jensen10",
+					"jordanp2323",
+					"thatmattkelley",
+					"Quinnifer",
+					"muttdog",
+					"PeakedInHighSkool"
+				],
+				"you": 5,
+				"rows": [
+					[
+						{
+							"pick": 1,
+							"id": "4430807",
+							"name": "Robinson",
+							"line": "RB · ATL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 2,
+							"id": "4429795",
+							"name": "Gibbs",
+							"line": "RB · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 3,
+							"id": "4362628",
+							"name": "Chase",
+							"line": "WR · CIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 4,
+							"id": "4426515",
+							"name": "Nacua",
+							"line": "WR · LAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 5,
+							"id": "4430878",
+							"name": "Smith-Njigba",
+							"line": "WR · SEA",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 6,
+							"id": "3117251",
+							"name": "McCaffrey",
+							"line": "RB · SF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 7,
+							"id": "4374302",
+							"name": "Brown",
+							"line": "WR · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 8,
+							"id": "4242335",
+							"name": "Taylor",
+							"line": "RB · IND",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 9,
+							"id": "4379399",
+							"name": "Cook",
+							"line": "RB · BUF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 10,
+							"id": "4429160",
+							"name": "Achane",
+							"line": "RB · MIA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 11,
+							"id": "4890973",
+							"name": "Jeanty",
+							"line": "RB · LV",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 12,
+							"id": "4241389",
+							"name": "Lamb",
+							"line": "WR · DAL",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 24,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 23,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 22,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 21,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 20,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": {
+								"words": "Your pick",
+								"pick": "2.08"
+							}
+						},
+						{
+							"pick": 19,
+							"id": "4426502",
+							"name": "London",
+							"line": "WR · ATL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 18,
+							"id": "4685382",
+							"name": "Hampton",
+							"line": "RB · LAC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 17,
+							"id": "4262921",
+							"name": "Jefferson",
+							"line": "WR · MIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 16,
+							"id": "4047646",
+							"name": "Brown",
+							"line": "WR · NE",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 15,
+							"id": "4361307",
+							"name": "McBride",
+							"line": "TE · ARI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 14,
+							"id": "4567048",
+							"name": "Walker",
+							"line": "RB · KC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 13,
+							"id": "3929630",
+							"name": "Barkley",
+							"line": "RB · PHI",
+							"mine": false,
+							"now": null
+						}
+					]
 				]
 			},
 			"team": {
@@ -6229,6 +6721,226 @@
 					}
 				]
 			},
+			"wall": {
+				"title": "The wall",
+				"label": "rounds 1 to 2 of 20",
+				"names": [
+					"Nowlan",
+					"pricej07",
+					"GMenJay",
+					"Rad_Thad1",
+					"You",
+					"jjzachariason",
+					"Max_Jensen10",
+					"jordanp2323",
+					"thatmattkelley",
+					"Quinnifer",
+					"muttdog",
+					"PeakedInHighSkool"
+				],
+				"you": 5,
+				"rows": [
+					[
+						{
+							"pick": 1,
+							"id": "4430807",
+							"name": "Robinson",
+							"line": "RB · ATL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 2,
+							"id": "4429795",
+							"name": "Gibbs",
+							"line": "RB · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 3,
+							"id": "4362628",
+							"name": "Chase",
+							"line": "WR · CIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 4,
+							"id": "4426515",
+							"name": "Nacua",
+							"line": "WR · LAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 5,
+							"id": "4430878",
+							"name": "Smith-Njigba",
+							"line": "WR · SEA",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 6,
+							"id": "3117251",
+							"name": "McCaffrey",
+							"line": "RB · SF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 7,
+							"id": "4374302",
+							"name": "Brown",
+							"line": "WR · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 8,
+							"id": "4242335",
+							"name": "Taylor",
+							"line": "RB · IND",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 9,
+							"id": "4379399",
+							"name": "Cook",
+							"line": "RB · BUF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 10,
+							"id": "4429160",
+							"name": "Achane",
+							"line": "RB · MIA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 11,
+							"id": "4890973",
+							"name": "Jeanty",
+							"line": "RB · LV",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 12,
+							"id": "4241389",
+							"name": "Lamb",
+							"line": "WR · DAL",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 24,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 23,
+							"id": null,
+							"name": null,
+							"line": null,
+							"mine": false,
+							"now": {
+								"words": "On the clock",
+								"pick": "2.11"
+							}
+						},
+						{
+							"pick": 22,
+							"id": "4870808",
+							"name": "Love",
+							"line": "RB · ARI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 21,
+							"id": "4427366",
+							"name": "Hall",
+							"line": "RB · NYJ",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 20,
+							"id": "3043078",
+							"name": "Henry",
+							"line": "RB · BAL",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 19,
+							"id": "4426502",
+							"name": "London",
+							"line": "WR · ATL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 18,
+							"id": "4685382",
+							"name": "Hampton",
+							"line": "RB · LAC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 17,
+							"id": "4262921",
+							"name": "Jefferson",
+							"line": "WR · MIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 16,
+							"id": "4047646",
+							"name": "Brown",
+							"line": "WR · NE",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 15,
+							"id": "4361307",
+							"name": "McBride",
+							"line": "TE · ARI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 14,
+							"id": "4567048",
+							"name": "Walker",
+							"line": "RB · KC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 13,
+							"id": "3929630",
+							"name": "Barkley",
+							"line": "RB · PHI",
+							"mine": false,
+							"now": null
+						}
+					]
+				]
+			},
 			"team": {
 				"count": "2 of 20",
 				"slots": [
@@ -6453,6 +7165,1987 @@
 			"call": null,
 			"shortlist": null,
 			"pool": null,
+			"wall": {
+				"title": "The wall",
+				"label": "rounds 1 to 20 of 20",
+				"names": [
+					"Nowlan",
+					"pricej07",
+					"GMenJay",
+					"Rad_Thad1",
+					"You",
+					"jjzachariason",
+					"Max_Jensen10",
+					"jordanp2323",
+					"thatmattkelley",
+					"Quinnifer",
+					"muttdog",
+					"PeakedInHighSkool"
+				],
+				"you": 5,
+				"rows": [
+					[
+						{
+							"pick": 1,
+							"id": "4430807",
+							"name": "Robinson",
+							"line": "RB · ATL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 2,
+							"id": "4429795",
+							"name": "Gibbs",
+							"line": "RB · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 3,
+							"id": "4362628",
+							"name": "Chase",
+							"line": "WR · CIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 4,
+							"id": "4426515",
+							"name": "Nacua",
+							"line": "WR · LAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 5,
+							"id": "4430878",
+							"name": "Smith-Njigba",
+							"line": "WR · SEA",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 6,
+							"id": "3117251",
+							"name": "McCaffrey",
+							"line": "RB · SF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 7,
+							"id": "4374302",
+							"name": "Brown",
+							"line": "WR · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 8,
+							"id": "4242335",
+							"name": "Taylor",
+							"line": "RB · IND",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 9,
+							"id": "4379399",
+							"name": "Cook",
+							"line": "RB · BUF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 10,
+							"id": "4429160",
+							"name": "Achane",
+							"line": "RB · MIA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 11,
+							"id": "4890973",
+							"name": "Jeanty",
+							"line": "RB · LV",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 12,
+							"id": "4241389",
+							"name": "Lamb",
+							"line": "WR · DAL",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 24,
+							"id": "4685472",
+							"name": "McMillan",
+							"line": "WR · CAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 23,
+							"id": "4258173",
+							"name": "Collins",
+							"line": "WR · HOU",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 22,
+							"id": "4870808",
+							"name": "Love",
+							"line": "RB · ARI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 21,
+							"id": "4427366",
+							"name": "Hall",
+							"line": "RB · NYJ",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 20,
+							"id": "3043078",
+							"name": "Henry",
+							"line": "RB · BAL",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 19,
+							"id": "4426502",
+							"name": "London",
+							"line": "WR · ATL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 18,
+							"id": "4685382",
+							"name": "Hampton",
+							"line": "RB · LAC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 17,
+							"id": "4262921",
+							"name": "Jefferson",
+							"line": "WR · MIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 16,
+							"id": "4047646",
+							"name": "Brown",
+							"line": "WR · NE",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 15,
+							"id": "4361307",
+							"name": "McBride",
+							"line": "TE · ARI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 14,
+							"id": "4567048",
+							"name": "Walker",
+							"line": "RB · KC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 13,
+							"id": "3929630",
+							"name": "Barkley",
+							"line": "RB · PHI",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 25,
+							"id": "4595348",
+							"name": "Nabers",
+							"line": "WR · NYG",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 26,
+							"id": "4047365",
+							"name": "Jacobs",
+							"line": "RB · GB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 27,
+							"id": "4612826",
+							"name": "McConkey",
+							"line": "WR · LAC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 28,
+							"id": "4430737",
+							"name": "Williams",
+							"line": "RB · LAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 29,
+							"id": "4429615",
+							"name": "Flowers",
+							"line": "WR · BAL",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 30,
+							"id": "4241478",
+							"name": "Smith",
+							"line": "WR · PHI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 31,
+							"id": "4567750",
+							"name": "Egbuka",
+							"line": "WR · TB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 32,
+							"id": "4428331",
+							"name": "Rice",
+							"line": "WR · KC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 33,
+							"id": "4569618",
+							"name": "Wilson",
+							"line": "WR · NYJ",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 34,
+							"id": "4259545",
+							"name": "Swift",
+							"line": "RB · CHI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 35,
+							"id": "4596448",
+							"name": "Irving",
+							"line": "RB · TB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 36,
+							"id": "4239996",
+							"name": "Etienne",
+							"line": "RB · NO",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 48,
+							"id": "16800",
+							"name": "Adams",
+							"line": "WR · LAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 47,
+							"id": "4432665",
+							"name": "Bowers",
+							"line": "TE · LV",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 46,
+							"id": "4431299",
+							"name": "Odunze",
+							"line": "WR · CHI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 45,
+							"id": "3918298",
+							"name": "Allen",
+							"line": "QB · BUF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 44,
+							"id": "3915416",
+							"name": "Moore",
+							"line": "WR · BUF",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 43,
+							"id": "4685702",
+							"name": "Judkins",
+							"line": "RB · CLE",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 42,
+							"id": "4372016",
+							"name": "Waddle",
+							"line": "WR · DEN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 41,
+							"id": "4426354",
+							"name": "Pickens",
+							"line": "WR · DAL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 40,
+							"id": "4432710",
+							"name": "Henderson",
+							"line": "RB · NE",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 39,
+							"id": "4035538",
+							"name": "Montgomery",
+							"line": "RB · HOU",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 38,
+							"id": "4361370",
+							"name": "Olave",
+							"line": "WR · NO",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 37,
+							"id": "4239993",
+							"name": "Higgins",
+							"line": "WR · CIN",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 49,
+							"id": "4685512",
+							"name": "Price",
+							"line": "RB · SEA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 50,
+							"id": "3121422",
+							"name": "McLaurin",
+							"line": "WR · WSH",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 51,
+							"id": "4430027",
+							"name": "LaPorta",
+							"line": "TE · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 52,
+							"id": "4569987",
+							"name": "Warren",
+							"line": "RB · PIT",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 53,
+							"id": "4360248",
+							"name": "Pitts",
+							"line": "TE · ATL",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 54,
+							"id": "4432620",
+							"name": "Washington",
+							"line": "WR · JAX",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 55,
+							"id": "16737",
+							"name": "Evans",
+							"line": "WR · SF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 56,
+							"id": "3916387",
+							"name": "Jackson",
+							"line": "QB · BAL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 57,
+							"id": "4431459",
+							"name": "Warren",
+							"line": "TE · IND",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 58,
+							"id": "4426388",
+							"name": "Williams",
+							"line": "WR · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 59,
+							"id": "4248528",
+							"name": "Watson",
+							"line": "WR · GB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 60,
+							"id": "4572680",
+							"name": "Kraft",
+							"line": "TE · GB",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 72,
+							"id": "4385690",
+							"name": "Kincaid",
+							"line": "TE · BUF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 71,
+							"id": "4880281",
+							"name": "Tyson",
+							"line": "WR · NO",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 70,
+							"id": "4371733",
+							"name": "Gainwell",
+							"line": "RB · TB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 69,
+							"id": "4038815",
+							"name": "Dowdle",
+							"line": "RB · PIT",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 68,
+							"id": "4432773",
+							"name": "Thomas",
+							"line": "WR · JAX",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 67,
+							"id": "4569173",
+							"name": "Stevenson",
+							"line": "RB · NE",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 66,
+							"id": "4696981",
+							"name": "Skattebo",
+							"line": "RB · NYG",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 65,
+							"id": "3916148",
+							"name": "Pollard",
+							"line": "RB · TEN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 64,
+							"id": "4360761",
+							"name": "Wilson",
+							"line": "WR · ARI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 63,
+							"id": "4432708",
+							"name": "Harrison",
+							"line": "WR · ARI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 62,
+							"id": "3040151",
+							"name": "Kittle",
+							"line": "TE · SF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 61,
+							"id": "4871023",
+							"name": "Tate",
+							"line": "WR · TEN",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 73,
+							"id": "4870795",
+							"name": "Lemon",
+							"line": "WR · PHI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 74,
+							"id": "4723086",
+							"name": "Loveland",
+							"line": "TE · CHI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 75,
+							"id": "4429205",
+							"name": "Addison",
+							"line": "WR · MIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 76,
+							"id": "3128429",
+							"name": "Sutton",
+							"line": "WR · DEN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 77,
+							"id": "4241985",
+							"name": "Dobbins",
+							"line": "RB · DEN",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 78,
+							"id": "4688813",
+							"name": "Downs",
+							"line": "WR · IND",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 79,
+							"id": "4360569",
+							"name": "Mason",
+							"line": "RB · MIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 80,
+							"id": "4678008",
+							"name": "Brooks",
+							"line": "RB · CAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 81,
+							"id": "3116165",
+							"name": "Godwin",
+							"line": "WR · TB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 82,
+							"id": "4569587",
+							"name": "Robinson",
+							"line": "WR · TEN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 83,
+							"id": "4429025",
+							"name": "Johnston",
+							"line": "WR · LAC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 84,
+							"id": "4568490",
+							"name": "Harvey",
+							"line": "RB · DEN",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 96,
+							"id": "4242355",
+							"name": "Ferguson",
+							"line": "TE · DAL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 95,
+							"id": "4701936",
+							"name": "Golden",
+							"line": "WR · GB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 94,
+							"id": "4362249",
+							"name": "Reed",
+							"line": "WR · GB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 93,
+							"id": "3126486",
+							"name": "Samuel",
+							"line": "WR · SF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 92,
+							"id": "15847",
+							"name": "Kelce",
+							"line": "TE · KC",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 91,
+							"id": "4047650",
+							"name": "Metcalf",
+							"line": "WR · PIT",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 90,
+							"id": "2976212",
+							"name": "Diggs",
+							"line": "WR · WSH",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 89,
+							"id": "4697815",
+							"name": "White",
+							"line": "RB · WSH",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 88,
+							"id": "4870653",
+							"name": "Concepcion",
+							"line": "WR · CLE",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 87,
+							"id": "4710714",
+							"name": "Stribling",
+							"line": "WR · SF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 86,
+							"id": "3915511",
+							"name": "Burrow",
+							"line": "QB · CIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 85,
+							"id": "4361579",
+							"name": "Williams",
+							"line": "RB · DAL",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 97,
+							"id": "4040715",
+							"name": "Hurts",
+							"line": "QB · PHI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 98,
+							"id": "4608686",
+							"name": "Monangai",
+							"line": "RB · CHI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 99,
+							"id": "3916433",
+							"name": "Meyers",
+							"line": "WR · JAX",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 100,
+							"id": "4241416",
+							"name": "Hubbard",
+							"line": "RB · CAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 101,
+							"id": "4431452",
+							"name": "Maye",
+							"line": "QB · NE",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 102,
+							"id": "3121023",
+							"name": "Goedert",
+							"line": "TE · PHI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 103,
+							"id": "4882093",
+							"name": "Tuten",
+							"line": "RB · JAX",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 104,
+							"id": "4035687",
+							"name": "Pittman",
+							"line": "WR · PIT",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 105,
+							"id": "4575131",
+							"name": "Croskey-Merritt",
+							"line": "RB · WSH",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 106,
+							"id": "4431611",
+							"name": "Williams",
+							"line": "QB · CHI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 107,
+							"id": "3116365",
+							"name": "Andrews",
+							"line": "TE · BAL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 108,
+							"id": "4426348",
+							"name": "Daniels",
+							"line": "QB · WSH",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 120,
+							"id": "4595342",
+							"name": "Gadsden",
+							"line": "TE · LAC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 119,
+							"id": "4832800",
+							"name": "Boston",
+							"line": "WR · CLE",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 118,
+							"id": "4426385",
+							"name": "Charbonnet",
+							"line": "RB · SEA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 117,
+							"id": "2577417",
+							"name": "Prescott",
+							"line": "QB · DAL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 116,
+							"id": "4361432",
+							"name": "Doubs",
+							"line": "WR · NE",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 115,
+							"id": "4685278",
+							"name": "Burden",
+							"line": "WR · CHI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 114,
+							"id": "4362619",
+							"name": "Rodriguez",
+							"line": "RB · JAX",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 113,
+							"id": "4877706",
+							"name": "Higgins",
+							"line": "WR · HOU",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 112,
+							"id": "4702555",
+							"name": "Coleman",
+							"line": "RB · DEN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 111,
+							"id": "4360310",
+							"name": "Lawrence",
+							"line": "QB · JAX",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 110,
+							"id": "4373678",
+							"name": "Shakir",
+							"line": "WR · BUF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 109,
+							"id": "3042519",
+							"name": "Jones",
+							"line": "RB · MIN",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 121,
+							"id": "4032473",
+							"name": "Shaheed",
+							"line": "WR · SEA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 122,
+							"id": "4429023",
+							"name": "Lloyd",
+							"line": "RB · GB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 123,
+							"id": "4360635",
+							"name": "Okonkwo",
+							"line": "TE · WSH",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 124,
+							"id": "3046439",
+							"name": "Henry",
+							"line": "TE · NE",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 125,
+							"id": "4685246",
+							"name": "Allen",
+							"line": "RB · WSH",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 126,
+							"id": "4596334",
+							"name": "Mitchell",
+							"line": "RB · LAC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 127,
+							"id": "3929645",
+							"name": "Johnson",
+							"line": "TE · NO",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 128,
+							"id": "4360516",
+							"name": "Tracy",
+							"line": "RB · NYG",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 129,
+							"id": "3054850",
+							"name": "Kamara",
+							"line": "RB · NO",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 130,
+							"id": "4373626",
+							"name": "Allgeier",
+							"line": "RB · ARI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 131,
+							"id": "4683062",
+							"name": "Worthy",
+							"line": "WR · KC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 132,
+							"id": "4430539",
+							"name": "Strange",
+							"line": "TE · JAX",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 144,
+							"id": "DST-LAR",
+							"name": "Rams",
+							"line": "DST · LAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 143,
+							"id": "4832955",
+							"name": "Johnson",
+							"line": "RB · KC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 142,
+							"id": "4429013",
+							"name": "Bigsby",
+							"line": "RB · PHI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 141,
+							"id": "4382466",
+							"name": "Nailor",
+							"line": "WR · LV",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 140,
+							"id": "5081397",
+							"name": "Sampson",
+							"line": "RB · CLE",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 139,
+							"id": "4362238",
+							"name": "Brown",
+							"line": "RB · CIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 138,
+							"id": "4428850",
+							"name": "Wicks",
+							"line": "WR · PHI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 137,
+							"id": "5083315",
+							"name": "Sadiq",
+							"line": "TE · NYJ",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 136,
+							"id": "4429059",
+							"name": "Marks",
+							"line": "RB · HOU",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 135,
+							"id": "4366031",
+							"name": "Dell",
+							"line": "WR · HOU",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 134,
+							"id": "4870847",
+							"name": "Lane",
+							"line": "WR · BAL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 133,
+							"id": "4428557",
+							"name": "Spears",
+							"line": "RB · TEN",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 145,
+							"id": "4912218",
+							"name": "Allen",
+							"line": "WR · KC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 146,
+							"id": "4428718",
+							"name": "Tucker",
+							"line": "WR · LV",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 147,
+							"id": "4685555",
+							"name": "Singleton",
+							"line": "RB · TEN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 148,
+							"id": "4685247",
+							"name": "Allen",
+							"line": "RB · NYJ",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 149,
+							"id": "4361050",
+							"name": "Likely",
+							"line": "TE · NYG",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 150,
+							"id": "4570037",
+							"name": "Ferguson",
+							"line": "TE · LAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 151,
+							"id": "4686612",
+							"name": "Harris",
+							"line": "WR · LAC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 152,
+							"id": "4723820",
+							"name": "Cooper",
+							"line": "WR · NYJ",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 153,
+							"id": "4685415",
+							"name": "Hunter",
+							"line": "WR · JAX",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 154,
+							"id": "4430968",
+							"name": "Vidal",
+							"line": "RB · LAC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 155,
+							"id": "4686658",
+							"name": "Washington",
+							"line": "RB · LV",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 156,
+							"id": "4430834",
+							"name": "McMillan",
+							"line": "WR · TB",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 168,
+							"id": "4635008",
+							"name": "Coleman",
+							"line": "WR · BUF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 167,
+							"id": "4597500",
+							"name": "Mitchell",
+							"line": "WR · NYJ",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 166,
+							"id": "3139477",
+							"name": "Mahomes",
+							"line": "QB · KC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 165,
+							"id": "4569603",
+							"name": "Washington",
+							"line": "WR · MIA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 164,
+							"id": "4832846",
+							"name": "Claiborne",
+							"line": "RB · MIN",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 163,
+							"id": "4367209",
+							"name": "Dulcich",
+							"line": "TE · MIA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 162,
+							"id": "4429501",
+							"name": "Davis",
+							"line": "RB · BUF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 161,
+							"id": "4361529",
+							"name": "Pacheco",
+							"line": "RB · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 160,
+							"id": "4869645",
+							"name": "Douglas",
+							"line": "WR · MIA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 159,
+							"id": "4600981",
+							"name": "Bryant",
+							"line": "WR · DEN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 158,
+							"id": "4429096",
+							"name": "Corum",
+							"line": "RB · LAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 157,
+							"id": "4361741",
+							"name": "Purdy",
+							"line": "QB · SF",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 169,
+							"id": "4870612",
+							"name": "Branch",
+							"line": "WR · ATL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 170,
+							"id": "4426338",
+							"name": "Nix",
+							"line": "QB · DEN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 171,
+							"id": "DST-HOU",
+							"name": "Texans",
+							"line": "DST · HOU",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 172,
+							"id": "12483",
+							"name": "Stafford",
+							"line": "QB · LAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 173,
+							"id": "3046779",
+							"name": "Goff",
+							"line": "QB · DET",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 174,
+							"id": "4360689",
+							"name": "Shough",
+							"line": "QB · NO",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 175,
+							"id": "4241474",
+							"name": "Robinson",
+							"line": "RB · ATL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 176,
+							"id": "4036378",
+							"name": "Love",
+							"line": "QB · GB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 177,
+							"id": "4038941",
+							"name": "Herbert",
+							"line": "QB · LAC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 178,
+							"id": "4241463",
+							"name": "Jeudy",
+							"line": "WR · CLE",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 179,
+							"id": "4596602",
+							"name": "Smith",
+							"line": "RB · KC",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 180,
+							"id": "4036133",
+							"name": "Hockenson",
+							"line": "TE · MIN",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 192,
+							"id": "4695883",
+							"name": "Coker",
+							"line": "WR · CAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 191,
+							"id": "4685279",
+							"name": "Blue",
+							"line": "RB · DAL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 190,
+							"id": "5081432",
+							"name": "Williams",
+							"line": "WR · WSH",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 189,
+							"id": "DST-SEA",
+							"name": "Seahawks",
+							"line": "DST · SEA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 188,
+							"id": "5220680",
+							"name": "Hurst",
+							"line": "WR · TB",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 187,
+							"id": "4429022",
+							"name": "Boutte",
+							"line": "WR · HOU",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 186,
+							"id": "3917315",
+							"name": "Murray",
+							"line": "QB · MIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 185,
+							"id": "5083076",
+							"name": "Fannin",
+							"line": "TE · CLE",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 184,
+							"id": "4242512",
+							"name": "Willis",
+							"line": "QB · MIA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 183,
+							"id": "4429086",
+							"name": "Mayer",
+							"line": "TE · LV",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 182,
+							"id": "3052587",
+							"name": "Mayfield",
+							"line": "QB · TB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 181,
+							"id": "3116406",
+							"name": "Hill",
+							"line": "WR · MIA",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 193,
+							"id": "4576297",
+							"name": "Barner",
+							"line": "TE · SEA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 194,
+							"id": "4682648",
+							"name": "Fields",
+							"line": "WR · NYG",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 195,
+							"id": "4689114",
+							"name": "Dart",
+							"line": "QB · NYG",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 196,
+							"id": "4819231",
+							"name": "Johnson",
+							"line": "RB · GB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 197,
+							"id": "4869961",
+							"name": "Bell",
+							"line": "WR · MIA",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 198,
+							"id": "3917792",
+							"name": "Jones",
+							"line": "QB · IND",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 199,
+							"id": "15818",
+							"name": "Allen",
+							"line": "WR · IND",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 200,
+							"id": "4685261",
+							"name": "Bernard",
+							"line": "WR · PIT",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 201,
+							"id": "5123663",
+							"name": "TeSlaa",
+							"line": "WR · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 202,
+							"id": "DST-DEN",
+							"name": "Broncos",
+							"line": "DST · DEN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 203,
+							"id": "3117256",
+							"name": "Schultz",
+							"line": "TE · HOU",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 204,
+							"id": "DST-LAC",
+							"name": "Chargers",
+							"line": "DST · LAC",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 216,
+							"id": "2576925",
+							"name": "Waller",
+							"line": "TE · CAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 215,
+							"id": "4685720",
+							"name": "Young",
+							"line": "QB · CAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 214,
+							"id": "4429835",
+							"name": "Holani",
+							"line": "RB · SEA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 213,
+							"id": "3886598",
+							"name": "Jennings",
+							"line": "WR · MIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 212,
+							"id": "4431574",
+							"name": "Stowers",
+							"line": "TE · PHI",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 211,
+							"id": "4360939",
+							"name": "Bateman",
+							"line": "WR · BAL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 210,
+							"id": "4686728",
+							"name": "Helm",
+							"line": "TE · TEN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 209,
+							"id": "4833029",
+							"name": "Klare",
+							"line": "TE · LAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 208,
+							"id": "4603186",
+							"name": "Bech",
+							"line": "WR · LV",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 207,
+							"id": "4360078",
+							"name": "Pierce",
+							"line": "WR · IND",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 206,
+							"id": "4428209",
+							"name": "Pearsall",
+							"line": "WR · SF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 205,
+							"id": "4597703",
+							"name": "Horton",
+							"line": "WR · SEA",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 217,
+							"id": "4837248",
+							"name": "Mendoza",
+							"line": "QB · LV",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 218,
+							"id": "DST-JAX",
+							"name": "Jaguars",
+							"line": "DST · JAX",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 219,
+							"id": "DST-MIN",
+							"name": "Vikings",
+							"line": "DST · MIN",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 220,
+							"id": "5083754",
+							"name": "Flournoy",
+							"line": "WR · DAL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 221,
+							"id": "DST-NE",
+							"name": "Patriots",
+							"line": "DST · NE",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 222,
+							"id": "DST-PHI",
+							"name": "Eagles",
+							"line": "DST · PHI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 223,
+							"id": "3045147",
+							"name": "Conner",
+							"line": "RB · ARI",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 224,
+							"id": "DST-PIT",
+							"name": "Steelers",
+							"line": "DST · PIT",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 225,
+							"id": "4243331",
+							"name": "Otton",
+							"line": "TE · TB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 226,
+							"id": "DST-DET",
+							"name": "Lions",
+							"line": "DST · DET",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 227,
+							"id": "DST-GB",
+							"name": "Packers",
+							"line": "DST · GB",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 228,
+							"id": "4430871",
+							"name": "Tucker",
+							"line": "RB · TB",
+							"mine": false,
+							"now": null
+						}
+					],
+					[
+						{
+							"pick": 240,
+							"id": "4432577",
+							"name": "Stroud",
+							"line": "QB · HOU",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 239,
+							"id": "5088338",
+							"name": "Sarratt",
+							"line": "WR · BAL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 238,
+							"id": "3895856",
+							"name": "Kirk",
+							"line": "WR · SF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 237,
+							"id": "4586312",
+							"name": "Noel",
+							"line": "WR · HOU",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 236,
+							"id": "4831959",
+							"name": "Raridon",
+							"line": "TE · NE",
+							"mine": true,
+							"now": null
+						},
+						{
+							"pick": 235,
+							"id": "4696044",
+							"name": "Black",
+							"line": "RB · SF",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 234,
+							"id": "3912547",
+							"name": "Darnold",
+							"line": "QB · SEA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 233,
+							"id": "4569559",
+							"name": "Vele",
+							"line": "WR · NO",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 232,
+							"id": "DST-BAL",
+							"name": "Ravens",
+							"line": "DST · BAL",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 231,
+							"id": "4685350",
+							"name": "Etienne",
+							"line": "RB · CAR",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 230,
+							"id": "4682745",
+							"name": "Wright",
+							"line": "RB · MIA",
+							"mine": false,
+							"now": null
+						},
+						{
+							"pick": 229,
+							"id": "4431268",
+							"name": "Dike",
+							"line": "WR · TEN",
+							"mine": false,
+							"now": null
+						}
+					]
+				]
+			},
 			"team": {
 				"count": "20 of 20",
 				"slots": [
@@ -7310,6 +10003,111 @@
 		"empty": {
 			"searched": "Nobody named zz at WR in the pool.",
 			"left": "Nobody left at K."
+		},
+		"whys": [
+			{
+				"text": "The No. 3 receiver on our board, gone by your next pick in most runs. He lasts in 12% of them.",
+				"first": "The No. 3 receiver on our board, gone by your next pick in most runs."
+			},
+			{
+				"text": "Amon-Ra St. Brown is the last of his tier. The next one is a round later.",
+				"first": "Amon-Ra St. Brown is the last of his tier."
+			},
+			{
+				"text": "D.J. Moore fills your flex! The runs agree.",
+				"first": "D.J. Moore fills your flex!"
+			},
+			{
+				"text": "Why wait? He is gone by 4.05.",
+				"first": "Why wait?"
+			},
+			{
+				"text": "A lone sentence with no stop",
+				"first": "A lone sentence with no stop"
+			}
+		]
+	},
+	"shortlistWhy": [
+		{
+			"id": "4361370",
+			"name": "Chris Olave",
+			"pill": "WR 6",
+			"team": "NO",
+			"chance": "25%",
+			"label": "still there at 3.05",
+			"why": "Amon-Ra St. Brown is the last of his tier.",
+			"range": {
+				"text": "185.2 to 362.3",
+				"left": "13.2",
+				"width": "86.8",
+				"mid": "56.6"
+			}
+		},
+		{
+			"id": "4241478",
+			"name": "DeVonta Smith",
+			"pill": "WR 14",
+			"team": "PHI",
+			"chance": "23%",
+			"label": "still there at 3.05",
+			"why": "D.J. Moore fills your flex!",
+			"range": {
+				"text": "174.7 to 321.7",
+				"left": "8.1",
+				"width": "72.0",
+				"mid": "44.1"
+			}
+		},
+		{
+			"id": "4428331",
+			"name": "Rashee Rice",
+			"pill": "WR 12",
+			"team": "KC",
+			"chance": "33%",
+			"label": "still there at 3.05",
+			"why": "Why wait?",
+			"range": {
+				"text": "158.2 to 347.0",
+				"left": "0.0",
+				"width": "92.5",
+				"mid": "46.3"
+			}
+		},
+		{
+			"id": "4258173",
+			"name": "Nico Collins",
+			"pill": "WR 11",
+			"team": "HOU",
+			"chance": "34%",
+			"label": "still there at 3.05",
+			"why": "A lone sentence with no stop",
+			"range": {
+				"text": "169.3 to 336.9",
+				"left": "5.4",
+				"width": "82.1",
+				"mid": "46.5"
+			}
+		}
+	],
+	"draftDay": {
+		"now": "2026-09-06T15:00:00.000Z",
+		"verb": "Open the Advisor",
+		"turns": "The site turns to your season after your draft.",
+		"chicago": {
+			"unset": "Your league has not set its draft time.",
+			"onNow": "Your draft is on now.",
+			"today": "Your draft is today at 6:00 pm.",
+			"tomorrow": "Your draft is tomorrow at 6:30 pm.",
+			"later": "Your draft is Wednesday, September 9 at 7:00 pm.",
+			"zone": "Times are in Central Time."
+		},
+		"newYork": {
+			"unset": "Your league has not set its draft time.",
+			"onNow": "Your draft is on now.",
+			"today": "Your draft is today at 7:00 pm.",
+			"tomorrow": "Your draft is tomorrow at 7:30 pm.",
+			"later": "Your draft is Wednesday, September 9 at 8:00 pm.",
+			"zone": null
 		}
 	}
 }
