@@ -156,17 +156,21 @@ class AccountDeletionTest {
             val cache = MemoryCache()
             cache.write("/me", Cached("{}", Instant.EPOCH))
             var revoked = 0
+            var logouts = 0
             val state =
                 SignInState(
                     session,
                     cache,
                     SignOut(session, cache, {
                         revoked++
-                        // Lane 236's revoke answers the logout URL; there is none here.
-                        null
+                        "https://auth.example/logout"
                     }),
+                    openLogout = { logouts++ },
                 )
+            var forgotten = 0
+            state.onSignOut { forgotten++ }
             val vm = opened(stub, cache, sessionEnd = { state.sessionEnd.signedOut() }, deleted = state::deleted)
+            val before = state.generation.value
             assertTrue(state.signedIn.value)
             vm.deletion.type(" FIXTURE@example.com ")
             vm.deletion.delete()
@@ -177,6 +181,10 @@ class AccountDeletionTest {
             assertNull(cache.read(AccountViewModel.ROUTE))
             assertFalse(state.signedIn.value)
             assertEquals(Words.DeleteAccount.doneTitle, state.message.value)
+            // The shell rebuilds for no account (the generation and the sign-out hooks), and no logout opens.
+            assertEquals(before + 1, state.generation.value)
+            assertEquals(1, forgotten)
+            assertEquals(0, logouts)
             // The API deleted every device: nothing is revoked.
             assertEquals(0, revoked)
             assertNull(vm.deletion.ui.value)
