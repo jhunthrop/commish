@@ -143,10 +143,9 @@ func liveFormatIndex(f apitypes.BoardFormat) (int, bool) {
 // tier box and the card's head say one number (Lane 162, D02). Nothing
 // off the rest-of-season order. Each format's figure carries his place in
 // that format's full order, at his position and across positions (Lane
-// 227, B206), a player on a season-long list as listed says none (nil:
-// nobody is).
-func fillRest(out *apitypes.PlayerWeek, lives []liveFormat, bp boards.Player, q tierQuery, ranks map[string]int, listed func(boards.Player) bool) {
-	listed = onceEach(listed)
+// 227, B206), counted under lists.
+func fillRest(out *apitypes.PlayerWeek, lives []liveFormat, bp boards.Player, q tierQuery, ranks map[string]int, lists formatLists) {
+	listed := lists.of(bp.ID)
 	figures := []apitypes.RestOfSeasonFigure{}
 	for _, live := range lives {
 		p, ok := live.board.Player(bp.ID)
@@ -180,6 +179,28 @@ func fillRest(out *apitypes.PlayerWeek, lives []liveFormat, bp boards.Player, q 
 func formatPlaces(live liveFormat, p boards.Player, listed func(boards.Player) bool) (position, overall *int) {
 	starts := func(pos draft.Position) bool { return startsAny(live.slots, pos) }
 	return playingPlace(live.board, p.Position, starts, p, listed), playingPlace(live.board, "", starts, p, listed)
+}
+
+// formatLists is who the per-format ranks count as on a season-long list
+// (Lane 227 fix round 1, M1 and M2): the read's own subject by the read's
+// own rule (subject: on a league read the platform's IR mark counts, so the
+// formats table never numbers a player its head does not), every other
+// player by the public order's rule at the public order's week (others,
+// nil for nobody), so a player who plays has the public order's number.
+type formatLists struct {
+	others  func(boards.Player) bool
+	subject bool
+}
+
+// of is the list rule for the read of player id, each player read once.
+func (l formatLists) of(id string) func(boards.Player) bool {
+	others := onceEach(l.others)
+	return func(p boards.Player) bool {
+		if p.ID == id {
+			return l.subject
+		}
+		return others(p)
+	}
 }
 
 // onceEach is listed read once a player: the run formats share their

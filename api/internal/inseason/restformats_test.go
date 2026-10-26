@@ -50,7 +50,7 @@ func TestThePlayerReadCarriesEveryRunFormatAtTheReadsClock(t *testing.T) {
 	q := tierQuery{format: apitypes.BoardFormatPpr, ids: []string{"tb", "mia"}, next: "det"}
 	out := apitypes.PlayerWeek{}
 	mia, _ := lives[0].board.Player("mia")
-	fillRest(&out, lives, mia, q, nil, nil)
+	fillRest(&out, lives, mia, q, nil, formatLists{})
 	if out.RestOfSeason == nil || len(*out.RestOfSeason) != len(RunFormats()) {
 		t.Fatalf("figures %v", out.RestOfSeason)
 	}
@@ -88,12 +88,12 @@ func TestTheTierIsInTheFormatAsked(t *testing.T) {
 	}
 	mia, _ := lives[0].board.Player("mia")
 	out := apitypes.PlayerWeek{}
-	fillRest(&out, lives, mia, tierQuery{format: apitypes.BoardFormatStandard, ids: []string{"mia"}}, nil, nil)
+	fillRest(&out, lives, mia, tierQuery{format: apitypes.BoardFormatStandard, ids: []string{"mia"}}, nil, formatLists{})
 	if out.Tier == nil || *out.Tier.Mates[0].Points != roundTenth(96*11.0/12) || out.Tier.Drop != nil || out.Tier.Partial {
 		t.Fatalf("standard tier %+v", out.Tier)
 	}
 	none := apitypes.PlayerWeek{}
-	fillRest(&none, lives, mia, tierQuery{}, nil, nil)
+	fillRest(&none, lives, mia, tierQuery{}, nil, formatLists{})
 	if none.Tier != nil {
 		t.Fatalf("an unasked tier %+v", none.Tier)
 	}

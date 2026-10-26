@@ -5478,17 +5478,17 @@ components:
           type: integer
           nullable: true
           description: >-
-            his place at his position in this format's full order at the read's clock (what /order's overall_rank says
-            for him at his position in that format, Lane 227, B206), the number the page's head says in its own
-            format; null when that order numbers him among no players who play (on a season-long list, whose row draws
-            the list's word) or does not place him; absent from an older answer
+            his place at his position in our order for this format at the read's clock (in PPR the public /order's
+            overall_rank at his position, Lane 227, B206), the number the page's head says in its own format; null
+            when he is on a season-long list as the read sees him (on a league's read the platform's IR mark
+            included, as his head), or the order does not place him; absent from an older answer
         overall_rank:
           type: integer
           nullable: true
           description: >-
-            his place across every position in this format's full order at the read's clock, by points over
-            replacement (what /order's overall_rank says for him with no position in that format, Lane 227, B206);
-            null as position_rank is; absent from an older answer
+            his place across every position in our order for this format at the read's clock, by points over
+            replacement (in PPR the public /order's overall_rank with no position, Lane 227, B206); null as
+            position_rank is; absent from an older answer
     TierMate:
       type: object
       required: [board_id, points]
@@ -6280,8 +6280,7 @@ components:
             his place in the full order of the view (the position asked, or every position) for the answer's scoring at
             the request's clock, before any byes=last move: the one number home, the club page, compare and the
             Rankings print for him (Lane 227, B209). Equal to rank without byes=last; with it the rows are not
-            consecutive from the first bye down. Every row of this API's answers carries it (not listed as required so
-            the clients' typed fixtures of an older answer still hold); absent from an older answer
+            consecutive from the first bye down. Every row carries it; absent from an older answer
         rest_of_season_points:
           type: number
           format: double

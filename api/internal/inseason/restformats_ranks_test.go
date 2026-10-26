@@ -64,7 +64,7 @@ func placesIn(t *testing.T, lives []liveFormat, id string, listed func(boards.Pl
 		t.Fatalf("%s is not on the board", id)
 	}
 	out := apitypes.PlayerWeek{}
-	fillRest(&out, lives, bp, tierQuery{}, nil, listed)
+	fillRest(&out, lives, bp, tierQuery{}, nil, formatLists{others: listed, subject: listed != nil && listed(bp)})
 	if out.RestOfSeason == nil {
 		t.Fatalf("%s: no rest-of-season figures", id)
 	}
@@ -176,10 +176,18 @@ func TestThePPRFigureRanksAreTheOrdersOverallRank(t *testing.T) {
 	got := placesIn(t, lives, "mia", nil)[apitypes.BoardFormatPpr]
 	for i, position := range []draft.Position{draft.RB, ""} {
 		places := placesOf(orderOf(lives[0].board, position, starts), none, nil)
+		found := false
 		for j, p := range places.players {
-			if p.ID == "mia" && places.overall[j] != got[i] {
+			if p.ID != "mia" {
+				continue
+			}
+			found = true
+			if places.overall[j] != got[i] {
 				t.Fatalf("%q: the order says %d, the figure %d", position, places.overall[j], got[i])
 			}
+		}
+		if !found {
+			t.Fatalf("%q: the order has no row for Miami", position)
 		}
 	}
 }

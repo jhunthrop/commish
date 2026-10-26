@@ -4061,9 +4061,9 @@ export interface components {
 			 * @description those points less a free pickup's for a twelve-team league of this format, one decimal; null at a position the league starts nobody at
 			 */
 			points_over_replacement: number | null;
-			/** @description his place at his position in this format's full order at the read's clock (what /order's overall_rank says for him at his position in that format, Lane 227, B206), the number the page's head says in its own format; null when that order numbers him among no players who play (on a season-long list, whose row draws the list's word) or does not place him; absent from an older answer */
+			/** @description his place at his position in our order for this format at the read's clock (in PPR the public /order's overall_rank at his position, Lane 227, B206), the number the page's head says in its own format; null when he is on a season-long list as the read sees him (on a league's read the platform's IR mark included, as his head), or the order does not place him; absent from an older answer */
 			position_rank?: number | null;
-			/** @description his place across every position in this format's full order at the read's clock, by points over replacement (what /order's overall_rank says for him with no position in that format, Lane 227, B206); null as position_rank is; absent from an older answer */
+			/** @description his place across every position in our order for this format at the read's clock, by points over replacement (in PPR the public /order's overall_rank with no position, Lane 227, B206); null as position_rank is; absent from an older answer */
 			overall_rank?: number | null;
 		};
 		TierMate: {
@@ -4546,7 +4546,7 @@ export interface components {
 			line: components['schemas']['PlayerLine'];
 			/** @description his place in our order for this view as the answer draws it: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement; with byes=last the rows are numbered 1..n after the byes are moved last, so from the first bye row down rank and overall_rank differ */
 			rank: number;
-			/** @description his place in the full order of the view (the position asked, or every position) for the answer's scoring at the request's clock, before any byes=last move: the one number home, the club page, compare and the Rankings print for him (Lane 227, B209). Equal to rank without byes=last; with it the rows are not consecutive from the first bye down. Every row of this API's answers carries it (not listed as required so the clients' typed fixtures of an older answer still hold); absent from an older answer */
+			/** @description his place in the full order of the view (the position asked, or every position) for the answer's scoring at the request's clock, before any byes=last move: the one number home, the club page, compare and the Rankings print for him (Lane 227, B209). Equal to rank without byes=last; with it the rows are not consecutive from the first bye down. Every row carries it; absent from an older answer */
 			overall_rank?: number;
 			/**
 			 * Format: double
