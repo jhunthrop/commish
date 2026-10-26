@@ -20,7 +20,7 @@ export const DELETE_WORDS = {
 		'Your mock drafts and their reports',
 		'The leagues you follow and your platform connections',
 		'Every browser and phone paired with your account',
-		'Your passes and your plan'
+		'Your passes and your membership'
 	],
 	keptHead: 'Kept',
 	kept: [
