@@ -20,35 +20,57 @@ public struct LobbyCard: Equatable, Sendable, Identifiable {
 }
 
 /// Where the landing keeps the rooms the member holds a seat in, by format, across a relaunch: the
-/// phone's defaults in the app, memory in a test.
+/// phone's defaults in the app, memory in a test. The seats are one signed-in device's (its owner, the
+/// paired device's id, new at every sign-in): another owner reads none, and keeping an owner's seats
+/// drops any other's, so a sign-out leaves no seat for the next member.
 @MainActor
 public protocol LobbySeatMemory: AnyObject {
-    var seats: [String: String] { get set }
+    func seats(owner: String) -> [String: String]
+    func keep(_ seats: [String: String], owner: String)
 }
 
-/// The phone's defaults, one dictionary of format to room id.
+/// The phone's defaults: one record, its owner and its seats by format.
 @MainActor
 public final class DefaultsLobbySeats: LobbySeatMemory {
     static let key = "lobby.seats"
+    static let ownerKey = "owner"
+    static let seatsKey = "seats"
     private let defaults: UserDefaults
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
 
-    public var seats: [String: String] {
-        get { defaults.dictionary(forKey: Self.key) as? [String: String] ?? [:] }
-        set { defaults.set(newValue, forKey: Self.key) }
+    public func seats(owner: String) -> [String: String] {
+        guard let record = defaults.dictionary(forKey: Self.key), record[Self.ownerKey] as? String == owner else {
+            return [:]
+        }
+        return record[Self.seatsKey] as? [String: String] ?? [:]
+    }
+
+    public func keep(_ seats: [String: String], owner: String) {
+        defaults.set([Self.ownerKey: owner, Self.seatsKey: seats], forKey: Self.key)
     }
 }
 
-/// Seats kept for the test's life only.
+/// Seats kept for the test's life only, with the same one-owner rule.
 @MainActor
 public final class MemoryLobbySeats: LobbySeatMemory {
-    public var seats: [String: String]
+    public private(set) var owner: String?
+    public private(set) var kept: [String: String]
 
-    public init(_ seats: [String: String] = [:]) {
-        self.seats = seats
+    public init(owner: String? = nil, _ seats: [String: String] = [:]) {
+        self.owner = owner
+        kept = seats
+    }
+
+    public func seats(owner: String) -> [String: String] {
+        owner == self.owner ? kept : [:]
+    }
+
+    public func keep(_ seats: [String: String], owner: String) {
+        self.owner = owner
+        kept = seats
     }
 }
 
@@ -61,10 +83,9 @@ public final class MemoryLobbySeats: LobbySeatMemory {
 @Observable
 public final class LobbyLandingViewModel {
     public private(set) var lobbies: [LobbyFilling] = []
-    /// The rooms joined, by format, while the API still seats the member in them.
-    public var seated: [String: String] {
-        memory.seats
-    }
+    /// The rooms joined, by format, while the API still seats the member in them: observed, and written
+    /// through to the memory under the signed-in device.
+    public private(set) var seated: [String: String] = [:]
 
     public private(set) var busy = false
     public private(set) var problem: String?
@@ -75,15 +96,29 @@ public final class LobbyLandingViewModel {
 
     private let api: any LobbyAPI
     private let memory: any LobbySeatMemory
+    private let owner: @Sendable () async -> String?
+    /// Whose seats `seated` holds: the signed-in device, read at each load; nil keeps nothing.
+    private var signedIn: String?
     private let onSignedOut: @MainActor () -> Void
 
+    /// `owner` answers the signed-in device's id (nil signed out), whose seats the memory keeps.
     public init(
         api: any LobbyAPI, memory: any LobbySeatMemory = MemoryLobbySeats(),
+        owner: @escaping @Sendable () async -> String? = { nil },
         onSignedOut: @escaping @MainActor () -> Void = {}
     ) {
         self.api = api
         self.memory = memory
+        self.owner = owner
         self.onSignedOut = onSignedOut
+    }
+
+    /// The seats changed: drawn at once and kept for the signed-in device.
+    private func store(_ seats: [String: String]) {
+        seated = seats
+        if let signedIn {
+            memory.keep(seats, owner: signedIn)
+        }
     }
 
     /// The list's head: "Lobbies filling now" from the first seat taken, else "Open lobbies".
@@ -123,8 +158,14 @@ public final class LobbyLandingViewModel {
 
     /// The list read again (on appear and on pull), and each remembered seat checked: one the API no
     /// longer holds for the member (403, 404), a room drafted to its end or closed unattended, or a seat
-    /// the member left is forgotten, so the card offers Join again.
+    /// the member left is forgotten, so the card offers Join again. A 401 keeps the seat and signs out:
+    /// the seat is still the member's once they sign in again.
     public func load() async {
+        let device = await owner()
+        if device != signedIn {
+            signedIn = device
+            seated = device.map { memory.seats(owner: $0) } ?? [:]
+        }
         do {
             lobbies = try await api.lobbies()
             problem = nil
@@ -135,14 +176,20 @@ public final class LobbyLandingViewModel {
         for (format, room) in seated {
             do {
                 if try await Self.over(api.lobby(id: room)) {
-                    memory.seats[format] = nil
+                    forget(format: format)
                 }
-            } catch where LobbyRefusal.isFinal(error) {
-                memory.seats[format] = nil
             } catch {
-                // Offline: the seat stays until a read says otherwise.
+                switch LobbyRefusal.status(error) {
+                case 403, 404: forget(format: format)
+                case 401: onSignedOut()
+                default: break // Offline: the seat stays until a read says otherwise.
+                }
             }
         }
+    }
+
+    private func forget(format: String) {
+        store(seated.filter { $0.key != format })
     }
 
     /// A room the member's seat is no longer in play in: drafted to its end, closed unattended, or left.
@@ -166,7 +213,7 @@ public final class LobbyLandingViewModel {
         problem = nil
         do {
             let seat = try await api.join(format)
-            memory.seats[Self.key(format)] = seat.roomId
+            store(seated.merging([Self.key(format): seat.roomId]) { $1 })
             handleFor = nil
             return seat.roomId
         } catch is LobbyHandleNeeded {
@@ -202,11 +249,11 @@ public final class LobbyLandingViewModel {
     /// The seat given up (Leave), the room drafted to its end, or its report's Join another lobby: its
     /// card offers Join again.
     public func forget(room: String) {
-        memory.seats = seated.filter { $0.value != room }
+        store(seated.filter { $0.value != room })
     }
 
     /// A room opened from elsewhere (a closed lobby's Join another lobby): its card reads "Your seat".
     public func seat(_ room: String, format: LobbyFormat) {
-        memory.seats[Self.key(format)] = room
+        store(seated.merging([Self.key(format): room]) { $1 })
     }
 }

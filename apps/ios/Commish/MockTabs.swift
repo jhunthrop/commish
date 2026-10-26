@@ -38,7 +38,8 @@ struct MockSetupTab: View {
             api: environment.api, from: from, seed: seed, onSignedOut: expired
         ))
         _lobbies = State(initialValue: LobbyLandingViewModel(
-            api: environment.api, memory: DefaultsLobbySeats(), onSignedOut: expired
+            api: environment.api, memory: DefaultsLobbySeats(),
+            owner: { [session = environment.session] in await session.deviceID() }, onSignedOut: expired
         ))
         self.environment = environment
         self.expired = expired
