@@ -86,8 +86,10 @@ func (s *Store) PutCode(ctx context.Context, accountID uuid.UUID, b Binding, has
 // challenge or the lack of one) and makes a device of that kind for its
 // account under the token's hash, in one transaction: a code pairs
 // exactly one device, only of its own kind, and an app's only with its
-// verifier. The code's WorkOS session, if it carries one, moves to the
-// device. A code that does not match is left as it was.
+// verifier. An app code's WorkOS session, if it carries one, moves to
+// the device; an extension code's never does (a binary before Lane 225
+// could leave an app's id on a code it turned into the extension's). A
+// code that does not match is left as it was.
 func (s *Store) Pair(ctx context.Context, code []byte, b Binding, name string, tokenHash []byte, scopes []auth.Scope, now time.Time) (uuid.UUID, Device, error) {
 	kind := b.Kind
 	var accountID uuid.UUID
@@ -103,6 +105,9 @@ func (s *Store) Pair(ctx context.Context, code []byte, b Binding, name string, t
 		}
 		if err != nil {
 			return err
+		}
+		if !kind.IsApp() {
+			workosSID = nil
 		}
 		var n int
 		if err := tx.QueryRow(ctx, `select count(*) from app.devices where account_id = $1 and revoked_at is null`, accountID).Scan(&n); err != nil {
@@ -169,11 +174,16 @@ func (s *Store) List(ctx context.Context, accountID uuid.UUID) ([]Device, error)
 // Revoke ends one of the account's devices; its token opens nothing from
 // the next request on. It answers the WorkOS session the device's
 // sign-in began, empty when it has none (the extension, or an app paired
-// before Lane 225).
+// before Lane 225), and clears it from the row in the same statement: a
+// revoked device keeps no WorkOS session id.
 func (s *Store) Revoke(ctx context.Context, accountID, id uuid.UUID, now time.Time) (string, error) {
 	var workosSID *string
-	err := s.Pool.QueryRow(ctx, `update app.devices set revoked_at = $3
-		where id = $1 and account_id = $2 and revoked_at is null returning workos_session_id`,
+	err := s.Pool.QueryRow(ctx, `with live as (
+			select id, workos_session_id from app.devices
+			where id = $1 and account_id = $2 and revoked_at is null for update)
+		update app.devices d set revoked_at = $3, workos_session_id = null
+		from live where d.id = live.id
+		returning live.workos_session_id`,
 		id, accountID, now).Scan(&workosSID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", ErrNotFound

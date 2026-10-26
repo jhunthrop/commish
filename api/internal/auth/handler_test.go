@@ -42,10 +42,12 @@ const (
 
 // fakeIdP is AuthKit: it hands the state back in its URL, signs in one
 // member for any code, and records each WorkOS session it was asked to
-// end, with the return it was given.
+// end, with the return it was given. With logoutErr set, building the
+// logout URL fails.
 type fakeIdP struct {
-	logouts []string
-	returns []string
+	logouts   []string
+	returns   []string
+	logoutErr error
 }
 
 func (*fakeIdP) AuthorizationURL(state string, _ auth.Screen) (string, error) {
@@ -62,6 +64,9 @@ func (*fakeIdP) Authenticate(_ context.Context, code, _, _ string) (auth.Identit
 func (f *fakeIdP) LogoutURL(sessionID, returnTo string) (string, error) {
 	f.logouts = append(f.logouts, sessionID)
 	f.returns = append(f.returns, returnTo)
+	if f.logoutErr != nil {
+		return "", f.logoutErr
+	}
 	return logoutURL + "?" + url.Values{"session_id": {sessionID}, "return_to": {returnTo}}.Encode(), nil
 }
 
@@ -479,6 +484,30 @@ func TestAppSignOutAnswersTheWorkOSLogout(t *testing.T) {
 	}
 	if status, _ := p.call(http.MethodGet, "/leagues/attached", paired.Token, nil); status != http.StatusUnauthorized {
 		t.Fatalf("a signed-out app token: %d", status)
+	}
+	if n := p.count(`select count(*) from app.devices where workos_session_id is not null`); n != 0 {
+		t.Fatalf("%d revoked devices kept their WorkOS session", n)
+	}
+}
+
+// When WorkOS cannot build the logout URL, the sign-out still unpairs:
+// 200 with url null (the failure is logged), and the token is dead from
+// the next request. The device is revoked before the URL is asked for.
+func TestAppSignOutWhenTheLogoutURLFails(t *testing.T) {
+	p := newAppPairing(t)
+	p.idp.logoutErr = errors.New("workos: incomplete arguments")
+	status, paired := p.pair(p.signInCode("ios"), appVerifier)
+	if status != http.StatusCreated {
+		t.Fatalf("pair: %d", status)
+	}
+	if out := p.signOut(paired); out.Url != nil {
+		t.Fatalf("a failed logout URL answered %q", *out.Url)
+	}
+	if !slices.Equal(p.idp.logouts, []string{workosSID}) {
+		t.Fatalf("WorkOS asked to end %v", p.idp.logouts)
+	}
+	if status, _ := p.call(http.MethodGet, "/leagues/attached", paired.Token, nil); status != http.StatusUnauthorized {
+		t.Fatalf("the token after a sign-out whose URL failed: %d", status)
 	}
 }
 
