@@ -15,7 +15,14 @@ enum RankingsColumn {
     /// The pill's least width (the web's --line-pill), so short pills ("K", "RB") are one size.
     static let pillLeast: Double = 50
     static let club: Double = 34
-    static let total: Double = 62
+    /// The big figure's column: the widest Projected the order prints (three digits and a tenth; the
+    /// number face's tabular figures make every such figure one width) at the name's size, plus the
+    /// strip's gap before it, so the rest of the line is the name's (re-review M-A).
+    static let total: Double = FigureWidth.of(
+        StartWords.number(widestTotal), face: .num, size: Tokens.TypeScale.md, weight: .bold
+    ) + FigureStrip.gap
+    /// A rest-of-season Projected under a thousand points, the most a season holds.
+    static let widestTotal = 999.9
     static let proj: Double = 52
 }
 

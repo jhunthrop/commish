@@ -1,6 +1,23 @@
 import CommishCore
 import CommishDesign
+import CoreText
 import SwiftUI
+
+/// A figure's drawn width in a face, as CoreText sets it (the number face in tabular figures, so every
+/// figure of as many digits is one width): what a figure column needs to hold it whole.
+public enum FigureWidth {
+    public static func of(_ text: String, face: Face, size: Double, weight: FaceWeight) -> Double {
+        let font = Faces.ctFont(face, size: size, weight: weight)
+            ?? CTFontCreateUIFontForLanguage(.system, size, nil)
+        guard let font else {
+            return 0
+        }
+        let line = CTLineCreateWithAttributedString(
+            NSAttributedString(string: text, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font])
+        )
+        return Double(CTLineGetTypographicBounds(line, nil, nil, nil)).rounded(.up)
+    }
+}
 
 /// A row's figures as labelled cells in one strip (the web's FigureStrip.svelte, Lane 209): each cell
 /// its head in small caps over its figure, never a sentence. The cells take fixed shares of the row, so
@@ -11,7 +28,7 @@ public struct FigureStrip: View {
     /// as the web's strip sets its heads (--strip-head).
     static let headSize: Double = 10
     /// The room between two cells, as the web's phone strip.
-    static let gap: Double = 4
+    public nonisolated static let gap: Double = 4
 
     private let cells: [StripCell]
 
