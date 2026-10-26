@@ -70,7 +70,8 @@ private val PAGES: List<RailItem> =
     (Rail.byKey.values.flatten() + Rail.withoutLeague + Rail.withoutLeagueBySeason.values.flatten()).distinctBy { it.page }
 
 /** The tabs drawn by their own screens; the rest show their name until their lane lands. */
-private val LIVE_PAGES = setOf(LEAGUE_PAGE, LINEUP_PAGE, MATCHUP_PAGE, WAIVERS_PAGE, TRADES_PAGE, BOARD_PAGE, PLAYERS_PAGE, RECORD_PAGE)
+private val LIVE_PAGES =
+    setOf(LEAGUE_PAGE, LINEUP_PAGE, MATCHUP_PAGE, WAIVERS_PAGE, TRADES_PAGE, BOARD_PAGE, PLAYERS_PAGE, RECORD_PAGE, ADVISOR_PAGE)
 
 /** The run pages the bar opens: the order's (Rankings in season, Players before and after it) and Our
  * record. */
@@ -89,6 +90,8 @@ private object Routes {
     const val CLUBS = "clubs"
     const val CLUB = "club/{abbr}"
     const val SCHEDULE = "schedule"
+    const val COMPANION_NEW = "companion-new?replay={replay}"
+    const val COMPANION = "companion/{id}"
 
     fun of(route: ShellRoute): String =
         when (route) {
@@ -102,6 +105,8 @@ private object Routes {
             ShellRoute.Clubs -> CLUBS
             is ShellRoute.Club -> "club/${route.abbr}"
             ShellRoute.Schedule -> SCHEDULE
+            is ShellRoute.CompanionNew -> "companion-new?replay=${route.replay}"
+            is ShellRoute.Companion -> "companion/${route.id}"
         }
 }
 
@@ -145,7 +150,7 @@ fun Shell(
     // player's page is pushed on the tab in view, as the web links them; any other opens on the site.
     val uri = LocalUriHandler.current
     val link: (String) -> Unit = { url ->
-        SiteLinks.reference(url)?.let(::push)
+        (SiteLinks.reference(url) ?: SiteLinks.companion(url))?.let(::push)
             ?: SiteLinks.playerSlug(url)?.let { push(ShellRoute.Player(it)) }
             ?: uri.openUri(url)
     }
@@ -229,7 +234,7 @@ fun Shell(
                     switchOpen,
                     closeSwitch = { switchOpen = false },
                 ) {
-                    Pages(graph, nav, state, bar, PageVerbs(shell::open, openLineup, ::openTab, choose, link, openGame))
+                    Pages(graph, nav, state, bar, PageVerbs(shell::open, openLineup, ::openTab, choose, link, openGame, ::push))
                 }
                 if (switchOpen) {
                     Box(
@@ -259,6 +264,8 @@ private class PageVerbs(
     /** A site link: a reference page or a player's page pushed, any other on the site. */
     val link: (String) -> Unit,
     val openGame: (leagueId: String, roster: Int?) -> Unit,
+    /** A screen pushed on the tab in view. */
+    val push: (ShellRoute) -> Unit,
 )
 
 /** What back asks of the shell: a tab opened, or the app left (sent behind, as the system's back does). */
@@ -331,7 +338,8 @@ private fun Pages(
     val openTab = verbs.openTab
     val selected = (state as? ShellState.Ready)?.selected
     NavHost(nav, startDestination = LEAGUE_PAGE) {
-        composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup, verbs.openGame) }
+        val openAdvisor = { verbs.push(ShellRoute.CompanionNew(replay = false)) }
+        composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup, verbs.openGame, openAdvisor) }
         composable(LINEUP_PAGE) { StartTab(graph, state, retry) }
         composable(MATCHUP_PAGE) { MatchupTab(graph, state, retry) { openTab(LINEUP_PAGE) } }
         composable(WAIVERS_PAGE) { WaiversTab(graph, state, retry) }
@@ -342,6 +350,7 @@ private fun Pages(
         }
         composable(PLAYERS_PAGE) { RankingsTab(graph, state, query = "") }
         composable(RECORD_PAGE) { RecordTab(graph) }
+        companion(graph, verbs.push)
         PAGES.filter { it.page !in LIVE_PAGES }.forEach { item ->
             composable(item.page) { NamedScreen(item.label) }
         }
@@ -354,7 +363,10 @@ private fun Pages(
         reference(graph, selected, verbs.link)
         composable(Routes.ACCOUNT) { AccountTab(graph, leaguesChanged = retry, openLeague = verbs.choose) }
         composable(Routes.LEAGUE_HOME) { entry ->
-            entry.arguments?.getString("id")?.let { LeagueHome(graph, it, onOpenLineup, verbs.openGame) }
+            entry.arguments?.getString("id")?.let { id ->
+                val league = (state as? ShellState.Ready)?.leagues?.firstOrNull { it.id == id }
+                LeagueHome(graph, id, onOpenLineup, verbs.openGame, draftDayOf(graph, league, openAdvisor))
+            }
         }
         composable(
             Routes.GAME,
@@ -371,6 +383,31 @@ private fun Pages(
             // Open Lineup as a home's: the Lineup tab for the league shown where the bar has one, else the site.
             GameScreen(graph, GameOf(id, roster), openLineup = { onOpenLineup(id) }, yourGame = { verbs.openGame(id, null) })
         }
+    }
+}
+
+/** The live-draft companion's routes: the Advisor's start page on the bar, the start page pushed (a site
+ * link, a League home's draft day, a report's Follow another draft) and a followed draft. */
+private fun NavGraphBuilder.companion(
+    graph: AppGraph,
+    push: (ShellRoute) -> Unit,
+) {
+    val open = { id: String -> push(ShellRoute.Companion(id)) }
+    val start = { push(ShellRoute.CompanionNew(replay = false)) }
+    composable(ADVISOR_PAGE) { CompanionStartTab(graph, replay = false, open = open) }
+    composable(
+        Routes.COMPANION_NEW,
+        listOf(
+            navArgument("replay") {
+                type = NavType.BoolType
+                defaultValue = false
+            },
+        ),
+    ) { entry ->
+        CompanionStartTab(graph, replay = entry.arguments?.getBoolean("replay") == true, open = open)
+    }
+    composable(Routes.COMPANION, listOf(navArgument("id") { type = NavType.StringType })) { entry ->
+        entry.arguments?.getString("id")?.let { CompanionDraftTab(graph, it, followAnother = start) }
     }
 }
 
