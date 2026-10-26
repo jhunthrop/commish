@@ -61,11 +61,7 @@
 	{/if}
 	{#if report}
 		{@const r = report}
-		<Report
-			report={r}
-			{names}
-			seats={seatsWords(people, r.teams)}
-		>
+		<Report report={r} {names} seats={seatsWords(people, r.teams)}>
 			{#snippet verbs()}
 				<Verb href={resolve('/mock/new')}>{LOBBY.joinAnother}</Verb>
 				<Quiet onclick={solo} disabled={starting}>{soloAgainWords(r.slot)}</Quiet>

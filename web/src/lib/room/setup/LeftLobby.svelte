@@ -53,13 +53,13 @@
 		<h3>{LOBBY.leftTitle}</h3>
 		<p>
 			{title}.
-			{room.status === 'complete'
-				? LOBBY.leftOver
-				: LOBBY.leftDrafting}
+			{room.status === 'complete' ? LOBBY.leftOver : LOBBY.leftDrafting}
 		</p>
 		<div class="acts">
 			{#if room.status === 'complete'}
-				<Quiet href={resolve('/lobby/[id]/report', { id })} onclick={ondone}>{LOBBY.readReport}</Quiet>
+				<Quiet href={resolve('/lobby/[id]/report', { id })} onclick={ondone}
+					>{LOBBY.readReport}</Quiet
+				>
 			{:else}
 				<Quiet href={resolve('/lobby/[id]', { id })}>{LOBBY.returnVerb}</Quiet>
 			{/if}

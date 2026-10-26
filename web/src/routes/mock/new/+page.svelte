@@ -135,8 +135,7 @@
 			handleProblem = null;
 			await join(format);
 		} catch (e) {
-			handleProblem =
-				e instanceof ApiError ? (e.fields.handle ?? e.message) : LOBBY.handleFailed;
+			handleProblem = e instanceof ApiError ? (e.fields.handle ?? e.message) : LOBBY.handleFailed;
 		}
 	}
 

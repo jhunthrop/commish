@@ -128,7 +128,11 @@
 </svelte:head>
 
 {#snippet poolSearch()}
-	{#if open}<Search placeholder={LOBBY.searchPool} label={LOBBY.searchPool} bind:value={query} />{/if}
+	{#if open}<Search
+			placeholder={LOBBY.searchPool}
+			label={LOBBY.searchPool}
+			bind:value={query}
+		/>{/if}
 {/snippet}
 
 {#snippet leaveAction()}

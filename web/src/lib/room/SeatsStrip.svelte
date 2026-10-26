@@ -78,9 +78,7 @@
 			class:on={seat === onClock}
 			class:left={s?.kind === 'left'}
 			data-seat={seat}
-			aria-label={small
-				? seatLabel(name, kindOf(seat) === 'open', seat === onClock)
-				: undefined}
+			aria-label={small ? seatLabel(name, kindOf(seat) === 'open', seat === onClock) : undefined}
 		>
 			{#if small}
 				<i aria-hidden="true"></i><b aria-hidden="true">{seat}</b>

@@ -96,8 +96,7 @@ function refused(error: ApiError, subject: NoticeSubject): NoticeView | null {
 			...(setup ? { verb: { label: `Open ${setup.host}`, href: setup.href } } : {})
 		};
 	}
-	if (subject === 'lobby')
-		return { text: LOBBY.noSeat, verb: joinLobby() };
+	if (subject === 'lobby') return { text: LOBBY.noSeat, verb: joinLobby() };
 	return null;
 }
 
