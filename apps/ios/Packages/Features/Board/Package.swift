@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The Board screen (the web's board at /board/[format]/[position], drawn from the run): the chips,
 // the rows as a box score in our order, each player's number the run's own, a position's tiers with
 // their cliffs, the season-long players under their head, the basis once, and the one verb pinned
@@ -33,5 +33,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The Trades screen (the web's trade finder at /league/[id]/trades): the strip of the trades worth
 // proposing, each team's best or every trade by either side's gain, a trade opened into both sides'
 // players as box-score rows with the check of both lineups before and after, the verb that copies the
@@ -35,5 +35,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

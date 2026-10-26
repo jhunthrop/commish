@@ -139,7 +139,7 @@ struct RankingsMock: View {
     var scrolled = false
 
     /// Rows enough to fill the first screen of the tallest phone.
-    static let firstRows = 8
+    nonisolated static let firstRows = 8
 
     /// The status bar, the top bar and the tab bar the screen sits between, by phone.
     private var room: Double {

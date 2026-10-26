@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The Account screen (the web's /account): who, the leagues followed with detach and its undo, the
 // plan in the free season, the push switches kept on this phone, the paired devices with this phone
 // marked and unpair, and sign out. Its snapshots, both themes at two phone
@@ -32,5 +32,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )
