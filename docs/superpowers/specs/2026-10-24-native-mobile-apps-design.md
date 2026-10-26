@@ -133,7 +133,7 @@ The last answer per screen is cached on device with its stamp and shown at once 
 
 ## 10. Build and ship
 
-Two workflows: `.github/workflows/ios.yml` (macOS runner, Xcode pinned, SwiftPM cache, build, test, Fastlane `pilot` upload to TestFlight on main) and `android.yml` (Ubuntu, Gradle cache, build, test, Fastlane `supply` to the internal track on main). Secrets: an App Store Connect API key, the signing certificate and profile (Fastlane match against a private repo, or manual signing with the key), a Play service account JSON, the APNs `.p8`, the FCM service account. The store release is a lane: listings, screenshots from the snapshot suite, privacy labels and data-safety form, review notes with a test account, submit, watch review.
+Two workflows: `.github/workflows/ios.yml` (macOS runner, Xcode pinned, SwiftPM cache, build, test, Fastlane `pilot` upload to TestFlight on main) and `android.yml` (Ubuntu, Gradle cache, build, test, the signed bundle to the internal track on main through the Play Developer API, `apps/android/scripts/play-upload.ts`). Secrets: an App Store Connect API key, the signing certificate and profile (Fastlane match against a private repo, or manual signing with the key), the Play service account `commish-play` reached by GitHub federation (`vars.PLAY_SA`; the organization forbids service-account keys, so there is no JSON key), the APNs `.p8`, the FCM service account. The store release is a lane: listings, screenshots from the snapshot suite, privacy labels and data-safety form, review notes with a test account, submit, watch review.
 
 ## 11. Founder items and spend
 

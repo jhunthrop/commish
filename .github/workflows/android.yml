@@ -3,9 +3,11 @@
 # colours, the phone bar and its glyphs) against the web, ktlint,
 # Android lint, the unit tests (the League home against shared/fixtures with a fixed clock, the
 # client against the fixtures, the copy guard), the Paparazzi snapshots against the committed images,
-# and a debug build. On main, with the Play service account and the upload key in the repository's
-# secrets, Fastlane sends the signed bundle to Play's internal track; without them that step is
-# skipped by name and the run stays green.
+# and a debug build. On main, with the upload key in the repository's secrets, the build job signs the
+# release bundle once and the upload job sends it to Play's internal track through the Play Developer
+# API, authenticated by GitHub federation as the Play service account (vars.PLAY_SA, a short-lived
+# token; the organization forbids service-account keys, so none exists). Off main, or without the
+# key, the upload is skipped by name with its reason and the run stays green.
 #
 # The snapshot references are this runner's images, and CI is the reference: a Mac draws edges one
 # colour level off, so the local verifyPaparazziDebug compares nothing (see apps/android/build.gradle.kts).
@@ -53,6 +55,10 @@ on:
         description: Record the Paparazzi references on this image, upload them and commit them to this branch
         type: boolean
         default: false
+      upload:
+        description: Upload the signed bundle to Play internal (honoured on main only)
+        type: boolean
+        default: false
 
 concurrency:
   group: android-${{ github.ref }}
@@ -71,8 +77,10 @@ jobs:
     defaults:
       run:
         working-directory: apps/android
-    # The Play key and the upload keystore are never in the job's environment: one step says whether
-    # they exist, Fastlane installs with neither, and only the upload step reads them.
+    # The upload keystore is never in the job's environment: one step says whether this run uploads,
+    # and only the signing step reads the keystore.
+    outputs:
+      upload: ${{ steps.play.outputs.upload }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -84,6 +92,9 @@ jobs:
 
       - name: The files generated from the web match it
         run: node scripts/web-shell.ts --check
+
+      - name: The Play upload script against a stub of the API
+        run: node --test scripts/*.test.ts
 
       - name: Lint, unit tests, snapshots, debug build
         run: ./gradlew ktlintCheck lint testDebugUnitTest verifyPaparazziDebug assembleDebug --continue
@@ -98,37 +109,109 @@ jobs:
             apps/android/**/build/paparazzi/failures/
           retention-days: 7
 
-      - name: Whether the Play key and the upload keystore are present
+      # Uploads on a push to main, or a dispatch on main with upload ticked, when the three upload-key
+      # secrets and the alias variable are present; never from a lane branch or a pull request, whatever the input says.
+      - name: Whether this run uploads to Play
         id: play
-        run: echo "has_key=${{ secrets.PLAY_JSON_KEY != '' && secrets.ANDROID_KEYSTORE_BASE64 != '' }}" >> "$GITHUB_OUTPUT"
-
-      - name: Upload to Play internal (skipped, no PLAY_JSON_KEY or upload key secret)
-        if: github.ref == 'refs/heads/main' && steps.play.outputs.has_key != 'true'
-        run: echo "The Play service account or the upload key is not in the repository's secrets yet, so nothing is uploaded."
-
-      - uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1.335.0
-        if: github.ref == 'refs/heads/main' && steps.play.outputs.has_key == 'true'
-        with: { ruby-version: "3.3" }
-
-      # Fastlane installed in a step of its own, with no secret in its environment (B150): a gem's
-      # install hooks never see the Play key or the keystore.
-      - name: Install Fastlane
-        if: github.ref == 'refs/heads/main' && steps.play.outputs.has_key == 'true'
-        run: gem install fastlane --no-document
-
-      - name: Upload to Play internal
-        if: github.ref == 'refs/heads/main' && steps.play.outputs.has_key == 'true'
         env:
-          PLAY_JSON_KEY: ${{ secrets.PLAY_JSON_KEY }}
+          HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && vars.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+          REF: ${{ github.ref }}
+          EVENT: ${{ github.event_name }}
+          ASKED: ${{ inputs.upload == true }}
+        run: |
+          if [ "$REF" != "refs/heads/main" ]; then
+            reason="This run is on $REF, not main, so nothing is uploaded to Play (the upload input is honoured on main only)."
+          elif [ "$EVENT" != "push" ] && [ "$EVENT" != "workflow_dispatch" ]; then
+            reason="A $EVENT run never uploads to Play."
+          elif [ "$EVENT" = "workflow_dispatch" ] && [ "$ASKED" != "true" ]; then
+            reason="This dispatch did not tick upload, so nothing is uploaded to Play."
+          elif [ "$HAS_KEYSTORE" != "true" ]; then
+            reason="The upload key is not in the repository's secrets yet, so nothing is uploaded to Play."
+          else
+            reason=""
+          fi
+          if [ -n "$reason" ]; then
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+            echo "reason=$reason" >> "$GITHUB_OUTPUT"
+          else
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload to Play internal (skipped, off main or no upload key)
+        if: steps.play.outputs.upload != 'true'
+        env:
+          REASON: ${{ steps.play.outputs.reason }}
+        run: echo "$REASON"
+
+      # Built and signed once, here; the upload job sends this file and never builds.
+      - name: Sign the release bundle
+        if: steps.play.outputs.upload == 'true'
+        env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_ALIAS: ${{ vars.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          ANDROID_VERSION_CODE: ${{ github.run_number }}
+          # A re-run keeps the run number; the attempt gives it a code Play has not used (app/build.gradle.kts).
+          ANDROID_RUN_NUMBER: ${{ github.run_number }}
+          ANDROID_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
+          umask 077
+          trap 'rm -f "$RUNNER_TEMP/upload.jks"' EXIT
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
           export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/upload.jks"
-          fastlane internal
+          ./gradlew bundleRelease
+
+      - name: Keep the signed bundle for the upload job
+        if: steps.play.outputs.upload == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: play-bundle
+          path: apps/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 3
+
+  upload:
+    name: Upload to Play internal
+    needs: build
+    if: needs.build.outputs.upload == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Three locks, not one: the gate above (editable on any branch, so not a boundary by itself); the
+    # play environment, whose deployment branch policy is main only and which alone holds PLAY_SA, so
+    # this job cannot start from another branch; and GCP, where commish-play's federation binding is
+    # the principal set attribute.ref/refs/heads/main (the provider pins the repository), so a token
+    # for it cannot be minted off main even by an edited workflow.
+    environment: play
+    # The federated token is this job's alone; the build job never holds id-token.
+    permissions: { contents: read, id-token: write }
+    env:
+      PLAY_PACKAGE: app.trycommish.android
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with: { sparse-checkout: apps/android/scripts, persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 24 }
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: play-bundle
+          path: ${{ runner.temp }}/play-bundle
+      - id: auth
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.PLAY_SA }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+          create_credentials_file: false
+      # completed on internal; an app that has not passed its first review takes it only as a draft,
+      # and a re-run whose code Play already holds uploads nothing: the script names both in a notice
+      # and still exits 0.
+      - name: Send the bundle to the internal track
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          BUNDLE: ${{ runner.temp }}/play-bundle/app-release.aab
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: node apps/android/scripts/play-upload.ts --bundle "$BUNDLE" --package "$PLAY_PACKAGE" --track internal --status completed --attempt "$RUN_ATTEMPT"
 
   record:
     name: Record the Paparazzi references
