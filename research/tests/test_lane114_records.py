@@ -218,6 +218,7 @@ def test_the_weekly_record_starts_at_the_first_shipped_week_and_grades_espn_besi
     assert out["toDate"][0]["oursOnEspn"]["agreement"] == 1.0
     assert out["method"].endswith("beside ESPN's projection on the same players.")
     assert out["weeks"][1]["note"] == weekly_record.MISSED_NOTE
+    assert "weekly rankings" not in json.dumps(out).lower()  # Lane 235: the run never claims a weekly model
 
 
 def test_before_any_shipped_week_the_weekly_record_starts_at_the_next_week_to_set(engine: Engine) -> None:
@@ -279,12 +280,35 @@ def test_the_weekly_honest_line_says_where_espn_called_the_weeks_better() -> Non
         "ESPN had more of the week's starters right in the standard lineup, 52 of 84 against our 50."
     )
     assert weekly_record.method(_FIRST_SHIPPED, [line]) == (
-        "From week 7 we set our weekly rankings before each week's first kickoff and graded them on the week's "
+        "From week 7 we set our rest-of-season order before each week's first kickoff and graded it on the week's "
         "points, beside ESPN's projection on the same players."
     )
     assert weekly_record.method(_FIRST_SHIPPED, []) == (
-        "From week 7 we set our weekly rankings before each week's first kickoff and graded them on the week's points."
+        "From week 7 we set our rest-of-season order before each week's first kickoff and graded it on the week's "
+        "points."
     )
+
+
+def test_the_weekly_record_names_its_order_as_the_rest_of_season_order_never_weekly_rankings() -> None:
+    """Lane 235, B222: the run's sentences are printed as written, so the writer never claims a weekly
+    model; the order graded is our rest-of-season order, graded week by week."""
+    assert weekly_record.MISSED_NOTE == "Our rest-of-season order was not set before kickoff that week."
+    assert weekly_record.ESPN_READ_AFTER_NOTE == (
+        "ESPN's projection this week was read after our rest-of-season order was set, still before the first kickoff."
+    )
+    ours = Score(100, 0.4, 30.0, 50, 84)
+    both = weekly_record.WeeklyLine("All", ours, {"espn": ours, "published": ours}, {"espn": ours, "published": ours})
+    written = [
+        weekly_record.MISSED_NOTE,
+        weekly_record.ESPN_READ_AFTER_NOTE,
+        weekly_record.ESPN_UNREAD_NOTE,
+        weekly_record.NO_YARDSTICK_NOTE,
+        weekly_record.method(_FIRST_SHIPPED, []),
+        weekly_record.method(_FIRST_SHIPPED, [both]),
+    ]
+    for sentence in written:
+        assert "weekly rankings" not in sentence.lower(), sentence
+        assert "—" not in sentence, sentence
 
 
 def test_the_draft_all_line_combines_the_positions_and_never_pools_raw_points() -> None:
