@@ -8,19 +8,45 @@
 	import PlayerLine from '#lib/ui/PlayerLine.svelte';
 	import Tile from '#lib/ui/Tile.svelte';
 	import { CLUB_PAGE } from '#lib/site/reference-words.ts';
+	import { placedLeads } from '#lib/run/live-order.ts';
+	import { memberZone } from '#lib/format/clock.ts';
+	import type { ClubCard } from '#lib/server/pages/clubs.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
 	const page = $derived(data.page);
 	const lead = $derived(page.lead);
+	/** In season each club's lead at the order's clock, the one the Rankings read (Lane 220, B184): his
+	 * rank and place the order's, or the run's leads while it is unread or when it does not place them. */
+	let atClock = $state<ClubCard[] | null>(null);
+	$effect(() => {
+		const { format, clubs, restOfSeason } = page;
+		if (!restOfSeason) {
+			atClock = null;
+			return;
+		}
+		let stale = false;
+		void import('#lib/run/live-order-read.ts')
+			.then(({ readOrder }) => readOrder(null, format.teams, memberZone(), Date.now))
+			.then((read) => {
+				if (!stale) atClock = placedLeads(clubs, read.places, format.teams);
+			})
+			.catch(() => {
+				if (!stale) atClock = null;
+			});
+		return () => {
+			stale = true;
+		};
+	});
+	const cards = $derived(atClock ?? page.clubs);
 </script>
 
 <SiteShell title={CLUB_PAGE.clubs} head={data.head} run={data.run}>
 	<main class="clubs">
 		<PageHead title={CLUB_PAGE.clubs} {lead} />
 		<ul>
-			{#each page.clubs as club (club.abbr)}
+			{#each cards as club (club.abbr)}
 				<li>
 					<Tile
 						title="{club.city} {club.nickname}"

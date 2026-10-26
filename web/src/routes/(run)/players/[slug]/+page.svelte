@@ -14,7 +14,8 @@
 	import { CARD, compareLeadsWithoutVerb, unreadBasis, type CardTile } from '#lib/player/card.ts';
 	import type { CardLeague, LiveCard } from '#lib/player/week-words.ts';
 	import { noReadWords, shownWeekRead, weekReadLabel } from '#lib/player/week-read.ts';
-	import { cliffAt, lineFiguresAt, matesAt } from '#lib/player/live-figures.ts';
+	import { cliffAt, lineFiguresAt, lineRankAt, matesAt } from '#lib/player/live-figures.ts';
+	import { FORMATS_RANK } from '#lib/player/formats-words.ts';
 	import { builtTiles, cardSource } from '#lib/player/card-source.ts';
 	import { PLAYER_PAGE } from '#lib/player/page-words.ts';
 	import PlayerCard from '#lib/player/PlayerCard.svelte';
@@ -194,6 +195,15 @@
 			apiFormatOf(line.format),
 			live?.formats ?? null
 		);
+	/** One every-format line's place at his position, the head's rank in the read's format. */
+	const lineRank = (line: (typeof page.lines)[number]): string => {
+		const rank = lineRankAt(
+			line.numbers.positionRank,
+			apiFormatOf(line.format),
+			live === null ? null : { format: figures, positionRank: live.positionRank ?? n.positionRank }
+		);
+		return rank === null ? EMPTY_FIGURE : `${page.position} ${String(rank)}`;
+	};
 	/** The week tile's head as drawn ("Wk 6"), which the unread basis names. */
 	const weekTileHead = $derived(tiles.find((tile) => tile.key === 'proj')?.label ?? CARD.proj);
 	/** Every number's basis, once: the week's, the rest of season's, the season's. */
@@ -368,7 +378,7 @@
 					showCaption
 					columns={[
 						{ label: PLAYER_PAGE.format },
-						{ label: 'Our rank', align: 'end' },
+						{ label: FORMATS_RANK.head, align: 'end' },
 						{ label: live?.formats?.head ?? page.pointsHead, align: 'end' },
 						{ label: PLAYER_PAGE.overReplacement, align: 'end' },
 						{ label: PLAYER_PAGE.tier, align: 'end' }
@@ -378,7 +388,7 @@
 						{@const figures = lineFigures(line)}
 						<tr>
 							<td><a href={links.board(line.format.id, page.position)}>{line.tableLabel}</a></td>
-							<td class="num">{listed?.rank ?? line.numbers.ourRank}</td>
+							<td class="num">{listed?.rank ?? lineRank(line)}</td>
 							<td class="num">{figures.points === null ? EMPTY_FIGURE : fixed(figures.points)}</td>
 							<td class="num">{figures.vor === null ? EMPTY_FIGURE : signed(figures.vor)}</td>
 							<td class="num">{listed?.rank ?? line.numbers.tier}</td>
@@ -386,6 +396,7 @@
 					{/each}
 				</Table>
 				{#if page.formatsNote}<Footnote>{page.formatsNote}</Footnote>{/if}
+				{#if live !== null}<Footnote>{FORMATS_RANK.readOnly(scoring)}</Footnote>{/if}
 			</section>
 		{/if}
 

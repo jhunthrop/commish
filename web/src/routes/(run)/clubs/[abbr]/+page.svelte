@@ -3,6 +3,10 @@
 	import { fixed } from '#lib/format/number.ts';
 	import { heldOut } from '#lib/run/board-status.ts';
 	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
+	import { liveBasis, placedRows } from '#lib/run/live-order.ts';
+	import type { BasisPart } from '#lib/run/board-basis.ts';
+	import type { BoardRowView } from '#lib/run/schema.ts';
+	import { memberZone } from '#lib/format/clock.ts';
 	import { rowFraming } from '#lib/run/row-framing.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
@@ -53,8 +57,35 @@
 			draftOrder: true
 		})
 	);
+	/** In season the club's players at the order's clock, the one the Rankings read (Lane 220, B184):
+	 * their ranks, places, points and values the order's, or the run's rows while it is unread or
+	 * when it does not place every one of them. */
+	let atClock = $state<{ rows: BoardRowView[]; basis: BasisPart[] } | null>(null);
+	$effect(() => {
+		const { format, rows, basis } = page;
+		if (format.rosFromWeek === undefined) {
+			atClock = null;
+			return;
+		}
+		let stale = false;
+		void import('#lib/run/live-order-read.ts')
+			.then(({ readOrder }) => readOrder(club.abbr, format.teams, memberZone(), Date.now))
+			.then((read) => {
+				if (stale) return;
+				const placed = placedRows(rows, read.places, format.teams);
+				atClock = placed === null ? null : { rows: placed, basis: liveBasis(basis, read.lead) };
+			})
+			.catch(() => {
+				if (!stale) atClock = null;
+			});
+		return () => {
+			stale = true;
+		};
+	});
+	const rows = $derived(atClock?.rows ?? page.rows);
+	const basis = $derived(atClock?.basis ?? page.basis);
 	/** The page's one verb: his two best available players side by side. */
-	const pair = $derived(page.rows.filter((row) => !heldOut(row)).slice(0, 2));
+	const pair = $derived(rows.filter((row) => !heldOut(row)).slice(0, 2));
 	/** The rows' status words as built, said again on the member's clock once the page is live. */
 	let live = $state<LiveStatus | null>(null);
 	onMount(() => {
@@ -103,13 +134,13 @@
 				{/if}
 			{/snippet}
 		</HeroCard>
-		<BasisLine parts={page.basis} tail={words?.capture ?? null} />
+		<BasisLine parts={basis} tail={words?.capture ?? null} />
 
 		<section aria-label="On our board">
 			<PanelHead title={filled(CLUB_PAGE.onBoard, page.format.label)} />
-			{#if page.rows.length > 0}
+			{#if rows.length > 0}
 				<BoardTable {columns} label="{name} on our {page.format.label} board">
-					{#each page.rows as player (player.id)}
+					{#each rows as player (player.id)}
 						<Row
 							{player}
 							href={links.player(player.slug)}

@@ -57,3 +57,15 @@ export function lineFiguresAt(
 	const read = format === null ? undefined : live.figures[format];
 	return read ?? { points: null, vor: null };
 }
+
+/** One every-format line's place at his position on the table's one clock (Lane 220, B184): the run's
+ * until the read answers, then the read's in the format the read is in, the head's own rank, and none
+ * in another format, which the read does not place. */
+export function lineRankAt(
+	run: number,
+	format: BoardFormat | null,
+	read: { format: BoardFormat | null; positionRank: number | null } | null
+): number | null {
+	if (read === null) return run;
+	return format !== null && format === read.format ? read.positionRank : null;
+}

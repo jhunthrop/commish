@@ -48,10 +48,20 @@ export type { ClubHero, ScheduleGame, StrengthFigure } from '#lib/run/schedule-v
 
 const NOT_FOUND = 404;
 
-export type ClubCard = ClubCardView<BoardRow>;
+/** How many of a club's first players on the board a card carries for its lead at the order's clock
+ * (Lane 220): a club's players all lose the same games as its games kick off, so its lead at the clock
+ * is among its first few on the run. */
+export const CLUB_LEAD_POOL = 3;
+
+export type ClubCard = ClubCardView<BoardRow> & {
+	/** The club's first players on the board, the lead's pool at the order's clock. */
+	pool: BoardRow[];
+};
 
 export interface ClubsPage {
 	format: Format;
+	/** The run ranks the rest of the season: the cards' leads are read again at the order's clock. */
+	restOfSeason: boolean;
 	/** The page's lead, the strength's sentence in it when there is a strength to show. */
 	lead: string;
 	clubs: ClubCard[];
@@ -91,9 +101,16 @@ export async function clubsPage(): Promise<ClubsPage> {
 		designations(),
 		seasonUnderway()
 	]);
+	const ordered = withStatuses(rows.rows, capture);
+	const cards = clubCards(list, loaded, ordered, format.label, underway);
 	return {
 		format,
-		...clubCards(list, loaded, withStatuses(rows.rows, capture), format.label, underway)
+		restOfSeason: format.rosFromWeek !== undefined,
+		lead: cards.lead,
+		clubs: cards.clubs.map((card) => ({
+			...card,
+			pool: ordered.filter((row) => row.team === card.abbr).slice(0, CLUB_LEAD_POOL)
+		}))
 	};
 }
 
