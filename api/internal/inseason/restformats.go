@@ -9,6 +9,8 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
+	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/mock"
 )
 
 // The player page's rest of season in every format the run carries
@@ -45,6 +47,9 @@ type liveFormat struct {
 	format apitypes.BoardFormat
 	board  boards.Board
 	rest   RestNow
+	// slots is the format's league's starting spots: the positions its
+	// order ranks (orderOf).
+	slots []Slot
 }
 
 // liveRunBoards is every run format's board at now, the first PPR's (the
@@ -62,7 +67,11 @@ func liveRunBoards(ctx context.Context, src BoardSource, games []boards.TeamWeek
 		if err != nil {
 			return nil, fmt.Errorf("inseason: the %s board at the read's clock: %w", f.Format, err)
 		}
-		out = append(out, liveFormat{format: f.Format, board: live, rest: rest})
+		config, err := mock.SlotConfig(f.Settings)
+		if err != nil {
+			return nil, fmt.Errorf("inseason: the %s league's roster: %w", f.Format, err)
+		}
+		out = append(out, liveFormat{format: f.Format, board: live, rest: rest, slots: Slots(config)})
 	}
 	return out, nil
 }
@@ -132,8 +141,12 @@ func liveFormatIndex(f apitypes.BoardFormat) (int, bool) {
 // tier asked, each of its players ranked by ranks, the read's own
 // position ranks (the map its line.position_rank is read from), so the
 // tier box and the card's head say one number (Lane 162, D02). Nothing
-// off the rest-of-season order.
-func fillRest(out *apitypes.PlayerWeek, lives []liveFormat, bp boards.Player, q tierQuery, ranks map[string]int) {
+// off the rest-of-season order. Each format's figure carries his place in
+// that format's full order, at his position and across positions (Lane
+// 227, B206), a player on a season-long list as listed says none (nil:
+// nobody is).
+func fillRest(out *apitypes.PlayerWeek, lives []liveFormat, bp boards.Player, q tierQuery, ranks map[string]int, listed func(boards.Player) bool) {
+	listed = onceEach(listed)
 	figures := []apitypes.RestOfSeasonFigure{}
 	for _, live := range lives {
 		p, ok := live.board.Player(bp.ID)
@@ -145,6 +158,7 @@ func fillRest(out *apitypes.PlayerWeek, lives []liveFormat, bp boards.Player, q 
 			r := roundTenth(v)
 			fig.PointsOverReplacement = &r
 		}
+		fig.PositionRank, fig.OverallRank = formatPlaces(live, p, listed)
 		figures = append(figures, fig)
 	}
 	if len(figures) == 0 {
@@ -156,6 +170,32 @@ func fillRest(out *apitypes.PlayerWeek, lives []liveFormat, bp boards.Player, q 
 	}
 	if i, ok := liveFormatIndex(q.format); ok && len(q.ids) > 0 && i < len(lives) {
 		out.Tier = tierOf(lives[i], q, ranks)
+	}
+}
+
+// formatPlaces is his place in a run format's full order at the read's
+// clock, at his position and across positions: the overall_rank the
+// public order in that format gives him (orderOf, placesOf), nil where it
+// numbers him among no players who play.
+func formatPlaces(live liveFormat, p boards.Player, listed func(boards.Player) bool) (position, overall *int) {
+	starts := func(pos draft.Position) bool { return startsAny(live.slots, pos) }
+	return playingPlace(live.board, p.Position, starts, p, listed), playingPlace(live.board, "", starts, p, listed)
+}
+
+// onceEach is listed read once a player: the run formats share their
+// players, and his list does not change with the scoring. nil lists nobody.
+func onceEach(listed func(boards.Player) bool) func(boards.Player) bool {
+	if listed == nil {
+		return func(boards.Player) bool { return false }
+	}
+	seen := map[string]bool{}
+	return func(p boards.Player) bool {
+		v, ok := seen[p.ID]
+		if !ok {
+			v = listed(p)
+			seen[p.ID] = v
+		}
+		return v
 	}
 }
 

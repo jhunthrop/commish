@@ -67,10 +67,16 @@ func publicSeason(d Data, week int, now time.Time) *Season {
 // season-long list holds him. The read's line and its tier box both read
 // it (Lane 162).
 func publicRanks(season *Season, b boards.Board) map[string]int {
-	return PlayingRanks(b, func(p boards.Player) bool {
+	return PlayingRanks(b, publicListed(season))
+}
+
+// publicListed is whether a board player is on a season-long list with no
+// league: the capture's designation alone, as the public order reads it.
+func publicListed(season *Season) func(boards.Player) bool {
+	return func(p boards.Player) bool {
 		d := season.designation(Player{BoardID: p.ID, Team: p.Team, Position: p.Position})
 		return d != nil && d.SeasonLong
-	})
+	}
 }
 
 // publicLineIn is publicLine on a season and its ranks already read.
@@ -157,7 +163,7 @@ func (s *Service) playerWeek(w http.ResponseWriter, r *http.Request) {
 		Line:              publicLineIn(season, ranks, projection, board, rest, bp),
 		ProjectionScoring: apitypes.ProjectionScoring{Format: apitypes.ProjectionScoringFormatPpr, LeagueOwn: false},
 		ProjectionReadAt:  read, ProjectionPreviousReadAt: previous}
-	fillRest(&out, lives, bp, tier, ranks)
+	fillRest(&out, lives, bp, tier, ranks, publicListed(season))
 	out.AfterBye = s.publicAfterBye(ctx, out, data, board, rest, bp, now)
 	httpx.WriteOK(w, r, http.StatusOK, out)
 }
@@ -165,8 +171,11 @@ func (s *Service) playerWeek(w http.ResponseWriter, r *http.Request) {
 // withRest puts his rest of season in every run format on a league's read
 // (fillRest): the run's formats, not the league's own, as his page's
 // every-format table and tier box are; the tier's players ranked by ranks,
-// the league read's own.
-func (s *Service) withRest(ctx context.Context, out *apitypes.PlayerWeek, bp boards.Player, tier tierQuery, ranks map[string]int) error {
+// the league read's own. Each format's ranks are the public order's in that
+// format (formatPlaces), whatever league the read is for: season is the
+// league read's, its designations read as the public order reads them
+// (publicListed: no platform IR mark).
+func (s *Service) withRest(ctx context.Context, out *apitypes.PlayerWeek, bp boards.Player, tier tierQuery, ranks map[string]int, season *Season) error {
 	data, err := s.Facts.Data(ctx, s.Season)
 	if err != nil {
 		return err
@@ -175,7 +184,7 @@ func (s *Service) withRest(ctx context.Context, out *apitypes.PlayerWeek, bp boa
 	if err != nil {
 		return err
 	}
-	fillRest(out, lives, bp, tier, ranks)
+	fillRest(out, lives, bp, tier, ranks, publicListed(season))
 	return nil
 }
 
@@ -206,7 +215,7 @@ func (s *Service) leaguePlayerWeek(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// The tier box ranks its players as the league's line ranks him (Lane 162).
-	if err := s.withRest(r.Context(), &out, bp, tier, a.playingRanks()); err != nil {
+	if err := s.withRest(r.Context(), &out, bp, tier, a.playingRanks(), a.season); err != nil {
 		httpx.WriteInternal(w, r, s.Log, "inseason: league player week rest of season", err)
 		return
 	}

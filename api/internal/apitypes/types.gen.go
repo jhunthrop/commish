@@ -3812,10 +3812,13 @@ type OrderRow struct {
 	// Move the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players, and for a free agent Waivers neither lists nor stashes, one on injured reserve with no return week among them)
 	Move *OrderRowMove `json:"move"`
 
+	// OverallRank his place in the full order of the view (the position asked, or every position) for the answer's scoring at the request's clock, before any byes=last move: the one number home, the club page, compare and the Rankings print for him (Lane 227, B209). Equal to rank without byes=last; with it the rows are not consecutive from the first bye down. Every row of this API's answers carries it (not listed as required so the clients' typed fixtures of an older answer still hold); absent from an older answer
+	OverallRank *int `json:"overall_rank,omitempty"`
+
 	// PointsOverReplacement the key across positions, one decimal: his points over replacement for the league over the weeks the order covers; null at a position the league starts nobody at
 	PointsOverReplacement *float64 `json:"points_over_replacement"`
 
-	// Rank his place in our order for this view: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement
+	// Rank his place in our order for this view as the answer draws it: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement; with byes=last the rows are numbered 1..n after the byes are moved last, so from the first bye row down rank and overall_rank differ
 	Rank int `json:"rank"`
 
 	// RestOfSeasonPoints the order's key, one decimal: his rest-of-season points over his club's games left at the read's clock (not yet kicked off) through the league's last playoff week as its platform states it (Lane 96; week 17 when it states none and with no league), byes out (Lane 86, the player read's rest_of_season figure for the order's format); null on the preseason order and without a projection
@@ -4154,11 +4157,17 @@ type ReportTeam struct {
 type RestOfSeasonFigure struct {
 	Format BoardFormat `json:"format"`
 
+	// OverallRank his place across every position in this format's full order at the read's clock, by points over replacement (what /order's overall_rank says for him with no position in that format, Lane 227, B206); null as position_rank is; absent from an older answer
+	OverallRank *int `json:"overall_rank,omitempty"`
+
 	// Points his rest-of-season points in this format at the read's clock, one decimal
 	Points float64 `json:"points"`
 
 	// PointsOverReplacement those points less a free pickup's for a twelve-team league of this format, one decimal; null at a position the league starts nobody at
 	PointsOverReplacement *float64 `json:"points_over_replacement"`
+
+	// PositionRank his place at his position in this format's full order at the read's clock (what /order's overall_rank says for him at his position in that format, Lane 227, B206), the number the page's head says in its own format; null when that order numbers him among no players who play (on a season-long list, whose row draws the list's word) or does not place him; absent from an older answer
+	PositionRank *int `json:"position_rank,omitempty"`
 }
 
 // RestOfSeasonTier defines model for RestOfSeasonTier.
@@ -6543,7 +6552,7 @@ type OrderParams struct {
 	// Limit at most this many rows, 100 without it
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 
-	// Byes last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the answer's week (line.facts.bye) after the rest, the players on a season-long list included, numbered on from them; without it the order keeps them in their places
+	// Byes last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the answer's week (line.facts.bye) after the rest, the players on a season-long list included; each row's rank is its place in the answer as drawn, its overall_rank its place in the order without byes=last (Lane 227, B209); without it the order keeps them in their places and the two are equal
 	Byes *string `form:"byes,omitempty" json:"byes,omitempty"`
 }
 
