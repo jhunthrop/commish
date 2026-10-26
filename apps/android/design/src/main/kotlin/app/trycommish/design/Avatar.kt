@@ -1,6 +1,7 @@
 package app.trycommish.design
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -12,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 /** The letters' size as a share of the circle (web/src/lib/ui/initials.ts INITIALS_SCALE). */
 private const val INITIALS_SCALE = 0.38f
@@ -43,7 +45,9 @@ fun Avatar(
             else -> c.surface2 to c.ink2
         }
     val size = with(LocalDensity.current) { (side * INITIALS_SCALE).toSp() }
-    Box(modifier.size(side).background(fill, CircleShape), contentAlignment = Alignment.Center) {
+    // A club's dark fill keeps its edge on the dark surface: a hairline inside the circle.
+    val edge = if (chip != null) Modifier.border(1.dp, c.lineStrong, CircleShape) else Modifier
+    Box(modifier.size(side).background(fill, CircleShape).then(edge), contentAlignment = Alignment.Center) {
         Text(club ?: letters, style = Faces.body.copy(fontSize = size, fontWeight = FontWeight.SemiBold), color = ink)
     }
 }

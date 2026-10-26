@@ -33,6 +33,8 @@ public struct Avatar: View {
             .foregroundStyle(theme.color(ink))
             .frame(width: side, height: side)
             .background(Circle().fill(theme.color(fill)))
+            // A club's dark fill keeps its edge on the dark surface: a hairline inside the circle.
+            .overlay(Circle().strokeBorder(theme.color(Tokens.Color.lineStrong), lineWidth: chip == nil ? 0 : 1))
             .accessibilityHidden(true)
     }
 
