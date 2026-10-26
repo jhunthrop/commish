@@ -18,13 +18,13 @@ import app.trycommish.design.Faces
 import app.trycommish.design.Tokens
 import app.trycommish.design.Verb
 
-/** The League home's draft-day word (SeasonPanel.svelte, draft_day), the iOS DraftDayPanel's: on the
- * accent's edge, when the draft is, that the site turns to the season after it, and the one verb that opens
- * the Advisor. */
+/** The League home's word before and on draft day (SeasonPanel.svelte, pre_draft and draft_day), the iOS
+ * DraftDayPanel's: on the accent's edge, when the draft is, that the site turns to the season after it, and
+ * the one verb, which opens the Advisor on draft day and the mock's setup before it. */
 @Composable
 fun DraftDayPanel(
     entry: DraftDayEntry,
-    openAdvisor: () -> Unit,
+    open: () -> Unit,
 ) {
     val c = CommishTheme.colors
     val shape = RoundedCornerShape(Tokens.Radius.md.dp)
@@ -41,6 +41,6 @@ fun DraftDayPanel(
             Text(entry.lead, style = Faces.body.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
             Text(entry.line, style = Faces.small, color = c.ink2)
         }
-        Verb(entry.verb, onClick = openAdvisor)
+        Verb(entry.verb, onClick = open)
     }
 }

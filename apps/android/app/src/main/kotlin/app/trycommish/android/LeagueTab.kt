@@ -26,6 +26,7 @@ fun LeagueTab(
     onOpenLineup: (leagueId: String) -> Unit,
     onOpenGame: (leagueId: String, roster: Int?) -> Unit,
     openAdvisor: () -> Unit,
+    openMock: (savedLeague: String?) -> Unit,
 ) {
     val signedIn by graph.signedIn.collectAsStateWithLifecycle()
     if (!signedIn) {
@@ -36,7 +37,7 @@ fun LeagueTab(
     }
     val league = (shell as? ShellState.Ready)?.selected
     if (league != null) {
-        LeagueHome(graph, league.id, onOpenLineup, onOpenGame, draftDayOf(graph, league, openAdvisor))
+        LeagueHome(graph, league.id, onOpenLineup, onOpenGame, draftDayOf(graph, league, openAdvisor, openMock))
         return
     }
     val waiting =
@@ -48,16 +49,25 @@ fun LeagueTab(
     LeagueHomeScreen(waiting, graph.zone, refreshing = false, onRefresh = onRetry, onOpenLineup = {})
 }
 
-/** A followed league's draft day on its home (SeasonPanel.svelte): the entry on the member's clock and the
- * Advisor's verb; null in every other phase. */
+/** A followed league's draft on its home (SeasonPanel.svelte): the entry on the member's clock and its verb,
+ * the Advisor on draft day and before it the mock's setup on the league's saved league; null in every other
+ * phase. */
 fun draftDayOf(
     graph: AppGraph,
     league: FollowedLeague?,
     openAdvisor: () -> Unit,
+    openMock: (savedLeague: String?) -> Unit,
 ): DraftDay? =
     league
         ?.let { DraftDayEntry.of(it.phase, it.draftAt, graph.clock.now(), graph.zone) }
-        ?.let { DraftDay(it, openAdvisor) }
+        ?.let { entry ->
+            DraftDay(entry) {
+                when (entry.opens) {
+                    DraftDayEntry.Opens.Advisor -> openAdvisor()
+                    DraftDayEntry.Opens.Mock -> openMock(league.settingsLeagueId)
+                }
+            }
+        }
 
 /** One league's home, its own view model per screen it is on (the League tab's, or one pushed from the
  * league switch): the kept page at once, the API's after; a pull reads it again; a score bug opens its

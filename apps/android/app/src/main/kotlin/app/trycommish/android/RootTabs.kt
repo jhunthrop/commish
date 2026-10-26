@@ -58,6 +58,7 @@ import app.trycommish.design.CommishTheme
 import app.trycommish.design.Rail
 import app.trycommish.design.RailItem
 import app.trycommish.design.Tokens
+import app.trycommish.feature.mock.MockRoomExits
 import app.trycommish.feature.shell.LeagueSwitchMenu
 import app.trycommish.feature.shell.LocalPlayerSheet
 import app.trycommish.feature.shell.NamedScreen
@@ -71,7 +72,7 @@ private val PAGES: List<RailItem> =
 
 /** The tabs drawn by their own screens; the rest show their name until their lane lands. */
 private val LIVE_PAGES =
-    setOf(LEAGUE_PAGE, LINEUP_PAGE, MATCHUP_PAGE, WAIVERS_PAGE, TRADES_PAGE, BOARD_PAGE, PLAYERS_PAGE, RECORD_PAGE, ADVISOR_PAGE)
+    setOf(LEAGUE_PAGE, LINEUP_PAGE, MATCHUP_PAGE, WAIVERS_PAGE, TRADES_PAGE, BOARD_PAGE, PLAYERS_PAGE, RECORD_PAGE, ADVISOR_PAGE, MOCK_PAGE)
 
 /** The run pages the bar opens: the order's (Rankings in season, Players before and after it) and Our
  * record. */
@@ -92,6 +93,8 @@ private object Routes {
     const val SCHEDULE = "schedule"
     const val COMPANION_NEW = "companion-new?replay={replay}"
     const val COMPANION = "companion/{id}"
+    const val MOCK_SETUP = "mock-new?league={league}&from={from}"
+    const val SHARED_MOCK = "mock-share/{code}"
 
     fun of(route: ShellRoute): String =
         when (route) {
@@ -107,6 +110,8 @@ private object Routes {
             ShellRoute.Schedule -> SCHEDULE
             is ShellRoute.CompanionNew -> "companion-new?replay=${route.replay}"
             is ShellRoute.Companion -> "companion/${route.id}"
+            is ShellRoute.MockSetup -> "mock-new?league=${route.league.orEmpty()}&from=${settingsArg(route.from)}"
+            is ShellRoute.SharedMock -> "mock-share/${android.net.Uri.encode(route.code)}"
         }
 }
 
@@ -133,6 +138,8 @@ fun Shell(
     var tab by rememberSaveable { mutableStateOf(LEAGUE_PAGE) }
     var switchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
+    // The mock room open full screen over the shell, its bars hidden while drafting.
+    var mockRoom by rememberSaveable { mutableStateOf<String?>(null) }
     // Read from the collected state, so the bar follows every answer and choice.
     val bar = if (signedIn && state != ShellState.SignedOut) shell.bar() else phoneBar(null, null)
 
@@ -150,7 +157,7 @@ fun Shell(
     // player's page is pushed on the tab in view, as the web links them; any other opens on the site.
     val uri = LocalUriHandler.current
     val link: (String) -> Unit = { url ->
-        (SiteLinks.reference(url) ?: SiteLinks.companion(url))?.let(::push)
+        (SiteLinks.reference(url) ?: SiteLinks.companion(url) ?: SiteLinks.mock(url))?.let(::push)
             ?: SiteLinks.playerSlug(url)?.let { push(ShellRoute.Player(it)) }
             ?: uri.openUri(url)
     }
@@ -242,7 +249,13 @@ fun Shell(
                     switchOpen,
                     closeSwitch = { switchOpen = false },
                 ) {
-                    Pages(graph, nav, state, bar, PageVerbs(shell::open, openLineup, ::openTab, choose, link, openGame, ::push))
+                    Pages(
+                        graph,
+                        nav,
+                        state,
+                        bar,
+                        PageVerbs(shell::open, openLineup, ::openTab, choose, link, openGame, ::push) { mockRoom = it },
+                    )
                 }
                 if (switchOpen) {
                     Box(
@@ -258,7 +271,25 @@ fun Shell(
                 }
             }
         }
-        PlayerSheetOver(graph, sheet, (state as? ShellState.Ready)?.selected, openPlayer = { push(it) })
+        mockRoom?.let { id ->
+            MockRoomCover(
+                graph,
+                id,
+                MockRoomExits(
+                    close = { mockRoom = null },
+                    opened = { mockRoom = it },
+                    anotherSlot = { settings ->
+                        mockRoom = null
+                        push(ShellRoute.MockSetup(from = settings))
+                    },
+                    open = { sheet.open(it) },
+                ),
+            )
+        }
+        PlayerSheetOver(graph, sheet, (state as? ShellState.Ready)?.selected, openPlayer = {
+            mockRoom = null
+            push(it)
+        })
     }
 }
 
@@ -274,6 +305,8 @@ private class PageVerbs(
     val openGame: (leagueId: String, roster: Int?) -> Unit,
     /** A screen pushed on the tab in view. */
     val push: (ShellRoute) -> Unit,
+    /** A mock room opened full screen by its id. */
+    val openRoom: (String) -> Unit,
 )
 
 /** What back asks of the shell: a tab opened, or the app left (sent behind, as the system's back does). */
@@ -347,7 +380,8 @@ private fun Pages(
     val selected = (state as? ShellState.Ready)?.selected
     NavHost(nav, startDestination = LEAGUE_PAGE) {
         val openAdvisor = { verbs.push(ShellRoute.CompanionNew(replay = false)) }
-        composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup, verbs.openGame, openAdvisor) }
+        val openMock = { league: String? -> verbs.push(ShellRoute.MockSetup(league)) }
+        composable(LEAGUE_PAGE) { LeagueTab(graph, state, retry, onOpenLineup, verbs.openGame, openAdvisor, openMock) }
         composable(LINEUP_PAGE) { StartTab(graph, state, retry) }
         composable(MATCHUP_PAGE) { MatchupTab(graph, state, retry) { openTab(LINEUP_PAGE) } }
         composable(WAIVERS_PAGE) { WaiversTab(graph, state, retry) }
@@ -359,6 +393,7 @@ private fun Pages(
         composable(PLAYERS_PAGE) { RankingsTab(graph, state, query = "") }
         composable(RECORD_PAGE) { RecordTab(graph) }
         companion(graph, verbs.push)
+        mock(graph, state, verbs.openRoom)
         PAGES.filter { it.page !in LIVE_PAGES }.forEach { item ->
             composable(item.page) { NamedScreen(item.label) }
         }
@@ -373,7 +408,7 @@ private fun Pages(
         composable(Routes.LEAGUE_HOME) { entry ->
             entry.arguments?.getString("id")?.let { id ->
                 val league = (state as? ShellState.Ready)?.leagues?.firstOrNull { it.id == id }
-                LeagueHome(graph, id, onOpenLineup, verbs.openGame, draftDayOf(graph, league, openAdvisor))
+                LeagueHome(graph, id, onOpenLineup, verbs.openGame, draftDayOf(graph, league, openAdvisor, openMock))
             }
         }
         composable(
@@ -416,6 +451,34 @@ private fun NavGraphBuilder.companion(
     }
     composable(Routes.COMPANION, listOf(navArgument("id") { type = NavType.StringType })) { entry ->
         entry.arguments?.getString("id")?.let { CompanionDraftTab(graph, it, followAnother = start) }
+    }
+}
+
+/** The mock room's routes: the setup on the bar's Mock draft, the setup pushed (a site link, a League home's
+ * Start a mock draft, a report's Try another slot) and a shared draft by its code. Starting opens the room
+ * full screen. */
+private fun NavGraphBuilder.mock(
+    graph: AppGraph,
+    state: ShellState,
+    openRoom: (String) -> Unit,
+) {
+    composable(MOCK_PAGE) { MockSetupTab(graph, ShellRoute.MockSetup(), state, openRoom) }
+    val optional = { name: String ->
+        navArgument(name) {
+            type = NavType.StringType
+            defaultValue = ""
+        }
+    }
+    composable(Routes.MOCK_SETUP, listOf(optional("league"), optional("from"))) { entry ->
+        val route =
+            ShellRoute.MockSetup(
+                entry.arguments?.getString("league")?.takeIf { it.isNotEmpty() },
+                settingsOf(entry.arguments?.getString("from")),
+            )
+        MockSetupTab(graph, route, state, openRoom)
+    }
+    composable(Routes.SHARED_MOCK, listOf(navArgument("code") { type = NavType.StringType })) { entry ->
+        entry.arguments?.getString("code")?.let { SharedMockTab(graph, it, openRoom) }
     }
 }
 
