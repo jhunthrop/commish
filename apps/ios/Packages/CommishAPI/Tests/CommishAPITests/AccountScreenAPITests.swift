@@ -82,6 +82,44 @@ struct AccountScreenAPITests {
         #expect(sent.first?.path == "/devices/\(Self.phone)")
     }
 
+    @Test func deleteAccountPostsTheTypedEmailAndA204IsDone() async throws {
+        let transport = RecordingTransport(status: .noContent, body: Data())
+        try await Self.client(transport).deleteAccount(email: " Fixture@Example.com ")
+        let sent = await transport.sent
+        #expect(sent.first?.method == .post)
+        #expect(sent.first?.path == "/me/delete")
+        let body = try #require(sent.first?.body)
+        let json = try JSONSerialization.jsonObject(with: body) as? [String: String]
+        #expect(json == ["email": " Fixture@Example.com "])
+    }
+
+    @Test func aDeleteWithTheWrongEmailThrowsTheAPIsSentenceForTheField() async {
+        let error = #"{"code":"invalid","message":"Some of that did not check out","#
+            + #""fields":{"email":"Type the email you sign in with"}}"#
+        let body = Data(#"{"ok":false,"data":null,"error":\#(error),"request_id":"r"}"#.utf8)
+        await #expect(throws: APIError.envelope(code: "invalid", message: "Type the email you sign in with")) {
+            try await Self.client(.badRequest, body).deleteAccount(email: "other@example.com")
+        }
+    }
+
+    @Test func aDeleteARenewingMembershipRefusesThrowsItsSentence() async {
+        let sentence = "Cancel your membership first, so your card is not charged again"
+        await #expect(throws: APIError.envelope(code: "conflict", message: sentence)) {
+            try await Self.client(.conflict, Self.refused("conflict", sentence)).deleteAccount(email: "a@b.c")
+        }
+    }
+
+    @Test func aDeleteWithARefusedTokenSignsOut() async {
+        do {
+            try await Self.client(.unauthorized, Self.refused("unauthorized", "Sign in again")).deleteAccount(
+                email: "a@b.c"
+            )
+            Issue.record("a 401 went through")
+        } catch {
+            #expect(APIError.signsOut(error))
+        }
+    }
+
     @Test func aRefusedTokenThrowsOnEveryRead() async {
         await #expect(throws: APIError.status(401)) {
             _ = try await Self.client(.unauthorized, Data()).devices()

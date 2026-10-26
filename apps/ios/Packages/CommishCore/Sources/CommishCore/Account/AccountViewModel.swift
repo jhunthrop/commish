@@ -61,17 +61,21 @@ public final class AccountViewModel {
     private let deviceID: @Sendable () async -> String?
     private let signOutSession: @MainActor () async -> Void
     private let onSignedOut: @MainActor () -> Void
+    private let accountDeleted: @MainActor () async -> Void
     private let leaguesChanged: @MainActor () -> Void
     private let wait: @Sendable (Double) async -> Void
 
     /// `signOut` is the session's (it revokes this phone and forgets it); `onSignedOut` runs when the API
-    /// refuses the token or this phone was unpaired here; `leaguesChanged` after a detach or a restore,
-    /// so the league switch reads the account again; `wait` sleeps for seconds, the undo's window.
+    /// refuses the token or this phone was unpaired here; `deleted` is the session's once the account is
+    /// deleted (it forgets this phone as a sign-out does, with nothing left to revoke); `leaguesChanged`
+    /// after a detach or a restore, so the league switch reads the account again; `wait` sleeps for
+    /// seconds, the undo's window.
     public init(
         api: any AccountScreenAPI, cache: any AnswerCache, clock: any Clock, zone: TimeZone, push: any PushStore,
         deviceID: @escaping @Sendable () async -> String?,
         signOut: @escaping @MainActor () async -> Void,
         onSignedOut: @escaping @MainActor () -> Void,
+        deleted: @escaping @MainActor () async -> Void,
         leaguesChanged: @escaping @MainActor () -> Void = {},
         wait: @escaping @Sendable (Double) async -> Void = { try? await Task.sleep(for: .seconds($0)) }
     ) {
@@ -84,8 +88,20 @@ public final class AccountViewModel {
         self.deviceID = deviceID
         signOutSession = signOut
         self.onSignedOut = onSignedOut
+        accountDeleted = deleted
         self.leaguesChanged = leaguesChanged
         self.wait = wait
+    }
+
+    /// The confirmation sheet for the account shown: its email to type, the delete through this screen's
+    /// API, and the session's hooks. Nil until an account has been read.
+    public func deletion() -> DeleteAccountViewModel? {
+        guard let email = answer?.me.email else {
+            return nil
+        }
+        return DeleteAccountViewModel(
+            email: email, api: api, deleted: accountDeleted, onSignedOut: onSignedOut
+        )
     }
 
     /// "Last read Sat 12:00 pm" while the account shown is a saved one.

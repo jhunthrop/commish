@@ -75,7 +75,7 @@ struct AccountSnapshotTests {
         let viewModel = AccountViewModel(
             api: stub, cache: NullCache(), clock: FixedClock(now), zone: zone,
             push: MemoryPushStore(PushSettings.standard.with(.status, isOn: false)),
-            deviceID: { phone }, signOut: {}, onSignedOut: {},
+            deviceID: { phone }, signOut: {}, onSignedOut: {}, deleted: {},
             wait: { _ in try? await Task.sleep(for: .seconds(3600)) }
         )
         await viewModel.load()
@@ -103,6 +103,74 @@ struct AccountSnapshotTests {
         Snapshot.shoot(view, named: item.name, device: item.device, scheme: item.scheme)
         let result = Snapshot.verify(view, named: item.name, device: item.device, scheme: item.scheme, in: Self.folder)
         #expect(result.matches, "\(result.message)")
+    }
+
+    /// The delete sheet's states: as it opens (nothing typed, the verb held), the email typed and the verb
+    /// ready, and a renewing membership's refusal in the API's sentence.
+    enum DeleteScene: String, CaseIterable, Sendable {
+        case empty
+        case matched
+        case refused
+    }
+
+    struct DeleteCase: Sendable {
+        let scene: DeleteScene
+        let scheme: Scheme
+        let device: SnapshotDevice
+
+        var name: String {
+            ["account", "delete", scene.rawValue, device.name, "\(scheme)"].joined(separator: "-")
+        }
+    }
+
+    nonisolated static let deleteCases: [DeleteCase] = DeleteScene.allCases.flatMap { scene in
+        [Scheme.light, .dark].flatMap { scheme in
+            SnapshotDevice.screens.map { DeleteCase(scene: scene, scheme: scheme, device: $0) }
+        }
+    }
+
+    nonisolated static let renewing = "Cancel your membership first, so your card is not charged again"
+
+    static func deletion(_ scene: DeleteScene) async throws -> DeleteAccountViewModel {
+        let stub = try StubAccountScreen(
+            account: answer(AccountAnswer.self, "me.json"), leagues: [],
+            paired: answer([PairedDeviceRow].self, "devices.json"),
+            refusal: scene == .refused ? APIError.envelope(code: "conflict", message: renewing) : nil
+        )
+        let account = AccountViewModel(
+            api: stub, cache: NullCache(), clock: FixedClock(now), zone: zone, push: MemoryPushStore(),
+            deviceID: { phone }, signOut: {}, onSignedOut: {}, deleted: {}
+        )
+        await account.load()
+        guard let sheet = account.deletion() else {
+            throw SceneError.notLoaded("delete")
+        }
+        if scene != .empty {
+            sheet.typed = sheet.email
+        }
+        if scene == .refused {
+            await sheet.delete()
+        }
+        return sheet
+    }
+
+    @Test(arguments: 0 ..< deleteCases.count)
+    func deleteSheet(index: Int) async throws {
+        let item = Self.deleteCases[index]
+        let view = try await AnyView(DeleteAccountSheet(viewModel: Self.deletion(item.scene), live: false))
+        Snapshot.shoot(view, named: item.name, device: item.device, scheme: item.scheme)
+        let result = Snapshot.verify(view, named: item.name, device: item.device, scheme: item.scheme, in: Self.folder)
+        #expect(result.matches, "\(result.message)")
+    }
+
+    @Test func theDeleteSheetShowsTheStatesItNames() async throws {
+        let empty = try await Self.deletion(.empty)
+        #expect(empty.canDelete == false)
+        let matched = try await Self.deletion(.matched)
+        #expect(matched.canDelete)
+        #expect(matched.problem == nil)
+        let refused = try await Self.deletion(.refused)
+        #expect(refused.problem == Self.renewing)
     }
 
     @Test func everyReferenceIsSmallEnoughToKeep() {
@@ -134,6 +202,14 @@ struct StubAccountScreen: AccountScreenAPI {
     let account: AccountAnswer
     let leagues: [AttachedLeague]
     let paired: [PairedDeviceRow]
+    /// What a delete answers: nothing (a 204), or the API's refusal.
+    var refusal: APIError?
+
+    func deleteAccount(email _: String) async throws {
+        if let refusal {
+            throw refusal
+        }
+    }
 
     func me() async throws -> AccountAnswer {
         account

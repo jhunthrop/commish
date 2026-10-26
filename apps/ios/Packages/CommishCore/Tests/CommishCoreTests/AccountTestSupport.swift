@@ -15,6 +15,9 @@ actor StubAccountScreen: AccountScreenAPI {
     private(set) var revoked: [String] = []
     private(set) var detached: [String] = []
     private(set) var restored: [String] = []
+    /// Each email a delete was sent with.
+    private(set) var deletions: [String] = []
+    private var deleteError: (any Error)?
 
     init(account: AccountAnswer, leagues: [AttachedLeague], paired: [PairedDeviceRow]) {
         self.account = account
@@ -87,6 +90,17 @@ actor StubAccountScreen: AccountScreenAPI {
             throw writeError
         }
         restored.append(id)
+    }
+
+    func refuseDelete(with error: any Error) {
+        deleteError = error
+    }
+
+    func deleteAccount(email: String) async throws {
+        deletions.append(email)
+        if let deleteError {
+            throw deleteError
+        }
     }
 
     func revokeDevice(id: String) async throws {
