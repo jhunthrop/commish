@@ -2,6 +2,7 @@ package app.trycommish.api
 
 import app.trycommish.api.apis.AuthApi
 import app.trycommish.api.apis.BillingApi
+import app.trycommish.api.apis.CompanionsApi
 import app.trycommish.api.apis.DevicesApi
 import app.trycommish.api.apis.LeagueSyncApi
 import app.trycommish.api.apis.RunApi
@@ -56,6 +57,7 @@ class Transport(
     private val authApi by lazy { AuthApi(baseUrl, engine, config) }
     private val runApi by lazy { RunApi(baseUrl, engine, config) }
     private val billingApi by lazy { BillingApi(baseUrl, engine, config) }
+    private val companionsApi by lazy { CompanionsApi(baseUrl, engine, config) }
 
     fun leagueSync(): LeagueSyncApi = leagueSyncApi
 
@@ -69,6 +71,9 @@ class Transport(
     /** The published run's files (the GET /run routes): each takes the ETag kept for it and answers 304 when it
      * still stands. No HTTP cache is installed on this client, so a 304 always reaches the caller. */
     fun run(): RunApi = runApi
+
+    /** The live-draft companion: the followed drafts, following one, a draft since a pick, its report. */
+    fun companions(): CompanionsApi = companionsApi
 }
 
 /** An answer's body whole, or Unauthorized when the API no longer takes the device's token. */

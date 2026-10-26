@@ -97,6 +97,17 @@ sealed interface ShellRoute {
 
     /** The strength of schedule. */
     data object Schedule : ShellRoute
+
+    /** The live-draft companion's start page (/companion/new), with the development replay when asked
+     * (`?replay=1`, as the web reads it). */
+    data class CompanionNew(
+        val replay: Boolean,
+    ) : ShellRoute
+
+    /** A followed draft (/companion/<id>). */
+    data class Companion(
+        val id: String,
+    ) : ShellRoute
 }
 
 /** Where a choice in the shell lands: a tab of the bar, or a screen pushed on the tab in view. */
