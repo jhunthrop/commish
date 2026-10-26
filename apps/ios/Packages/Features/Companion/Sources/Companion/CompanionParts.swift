@@ -19,7 +19,7 @@ struct PlayerFace: View {
     var side: Double = CompanionColumn.face
 
     var body: some View {
-        Headshot(URL(string: player.headshot), initials: Initials.of(player.name), side: side)
+        Headshot(URL(string: player.headshot), initials: Initials.of(player.name), side: side, club: player.clubMark)
     }
 }
 

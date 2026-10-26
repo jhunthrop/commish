@@ -132,6 +132,8 @@ data class BoardRow(
     val adp: String,
     /** The player his row opens in the sheet; null where the site has no page for him. */
     val sheetPlayer: SheetPlayer?,
+    /** A defense: its face is its club's chip (B245), never a logo. */
+    val clubMark: Boolean = false,
 )
 
 /** A run row's cells as the phone prints them. */
@@ -204,6 +206,7 @@ internal class BoardCells(
             draftOrder = row.positionRank.toString(),
             adp = Format.fixed(row.adp.toDouble()),
             sheetPlayer = null,
+            clubMark = BoardPosition.of(row.position.value) == BoardPosition.Defense && row.team.isNotEmpty(),
         )
     }
 

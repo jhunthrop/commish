@@ -11,11 +11,12 @@ import Testing
 /// The Board's mock: the run through the view model at each run's clock, both themes, iPhone 17 Pro and
 /// iPhone SE, at 1x. Before the draft, the stand-in's PPR board (shared/fixtures/standin-run): the top of
 /// the All view, a position's view (WR) at its first tier and its cliff, a tier's cliff mid-list, a
-/// kicker's view in the drafts' order, and the WR view's foot with the complete basis under its last
-/// rows. In season, the contract run (shared/fixtures/run): the rest of the season's head with its
-/// weeks and the verb to follow a league, and the same board saved and read with no signal, stale with
-/// its reason. A face draws its initials here (a snapshot loads no image). With SNAPSHOT_SHOTS set each
-/// is also written at its phone's own scale for the persona panel.
+/// kicker's view in the drafts' order, the defenses' (each face its club's chip, B245), and the WR
+/// view's foot with the complete basis under its last rows. In season, the contract run
+/// (shared/fixtures/run): the rest of the season's head with its weeks and the verb to follow a league,
+/// and the same board saved and read with no signal, stale with its reason. A face draws its initials
+/// here (a snapshot loads no image). With SNAPSHOT_SHOTS set each is also written at its phone's own
+/// scale for the persona panel.
 @MainActor
 struct BoardSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -30,6 +31,8 @@ struct BoardSnapshotTests {
         /// A tier's cliff mid-list: the last rows of one tier, the next tier's band and its first rows.
         case cliff
         case kicker
+        /// The defenses in the drafts' order, each face its club's chip (B245).
+        case defense
         /// The foot: the WR view's last rows and the basis under them.
         case foot
         /// In season: the rest of the season's head.
@@ -41,6 +44,7 @@ struct BoardSnapshotTests {
             switch self {
             case .position, .cliff, .foot: .receiver
             case .kicker: .kicker
+            case .defense: .defense
             default: nil
             }
         }

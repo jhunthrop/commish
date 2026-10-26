@@ -64,7 +64,12 @@ struct Who: View {
     var body: some View {
         let theme = Theme(colorScheme)
         HStack(spacing: 6) {
-            Headshot(URL(string: player.headshot), initials: Initials.of(player.name), side: face)
+            Headshot(
+                URL(string: player.headshot),
+                initials: Initials.of(player.name),
+                side: face,
+                club: player.clubMark
+            )
             VStack(alignment: .leading, spacing: 3) {
                 Text(player.name)
                     .font(Faces.font(.ui, size: Tokens.TypeScale.md, weight: .semibold))

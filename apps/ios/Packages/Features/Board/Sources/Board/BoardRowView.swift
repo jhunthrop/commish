@@ -135,7 +135,7 @@ public struct BoardRowView: View {
     private var line: some View {
         let theme = Theme(colorScheme)
         return HStack(alignment: .center, spacing: 6) {
-            Headshot(row.headshot, initials: row.initials, side: BoardColumn.face)
+            Headshot(row.headshot, initials: row.initials, side: BoardColumn.face, club: row.clubMark ? row.club : nil)
             who(theme).frame(maxWidth: .infinity, alignment: .leading)
             figures(theme)
         }

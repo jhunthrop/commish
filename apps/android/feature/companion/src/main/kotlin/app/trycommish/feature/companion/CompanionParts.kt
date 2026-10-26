@@ -151,7 +151,7 @@ fun PlayerFace(
     player: RoomPlayer,
     side: Dp = Widths.face,
 ) {
-    Headshot(player.headshot.takeIf { it.isNotEmpty() }, player.initials, side)
+    Headshot(player.headshot.takeIf { it.isNotEmpty() }, player.initials, side, club = player.clubMark)
 }
 
 /** His name the biggest thing in the row, his pill and club under it, and an extra word after them. */

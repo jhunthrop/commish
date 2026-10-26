@@ -52,7 +52,8 @@ struct BoardCells {
             sheetPlayer: SheetPlayer(
                 id: row.id, slug: row.slug, name: row.name, position: label, rank: rank, club: row.team,
                 boardID: row.id
-            )
+            ),
+            clubMark: false
         )
     }
 
@@ -79,7 +80,8 @@ struct BoardCells {
             gapTone: nil,
             draftOrder: String(row.positionRank),
             adp: Formatting.fixed(row.adp),
-            sheetPlayer: nil
+            sheetPlayer: nil,
+            clubMark: BoardPosition(rawValue: row.positionName) == .defense && !row.team.isEmpty
         )
     }
 

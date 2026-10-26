@@ -35,7 +35,8 @@ import org.junit.runners.Parameterized
  * The Board's mock, the same scenes as the iOS screen's (Lane 190), from the same fixture runs at the
  * same clocks. Before the draft, the stand-in's PPR board (shared/fixtures/standin-run): the top of the
  * All view, a position's view (WR) at its first tier and its cliff, a tier's cliff mid-list, a kicker's
- * view in the drafts' order, and the WR view's foot with the complete basis under its last rows. In
+ * view in the drafts' order, the defenses' (each face its club's chip, B245), and the WR view's foot
+ * with the complete basis under its last rows. In
  * season, the contract run (shared/fixtures/run): the rest of the season's head with its weeks and the
  * verb to follow a league, and the same board saved and read with no signal, stale with its reason.
  * Both themes, a Pixel 9 and a small phone (the Nexus 5's 360 by 640 dp). A face draws its initials.
@@ -57,6 +58,9 @@ class BoardSnapshotTest(
         /** A tier's cliff mid-list: the last rows of one tier, the next tier's band and its first rows. */
         Cliff("cliff", BoardPosition.Receiver, false),
         Kicker("kicker", BoardPosition.Kicker, false),
+
+        /** The defenses in the drafts' order, each face its club's chip (B245). */
+        Defense("defense", BoardPosition.Defense, false),
 
         /** The foot: the WR view's last rows and the basis under them. */
         Foot("foot", BoardPosition.Receiver, false),
