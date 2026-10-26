@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { byeAhead } from '#lib/format/bye.ts';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { siteContext } from '#lib/context/context.svelte.ts';
@@ -115,7 +116,9 @@
 		if (!player || !run) return null;
 		const place = placesShown?.get(player.id);
 		const numbers = place === undefined ? run : placedAt(run, place, format.teams);
-		return { player, numbers, bye: data.byes[player.team] ?? null };
+		// A bye already played is no bye to weigh (Lane 223, B190): the Bye row shows one ahead alone.
+		const bye = byeAhead(data.byes[player.team] ?? null, format.rosFromWeek ?? null);
+		return { player, numbers, bye };
 	}
 
 	const sides = $derived(SLOTS.map(sideOf));

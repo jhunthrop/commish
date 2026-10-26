@@ -119,6 +119,10 @@ export function compareRows(
 					}
 				]
 			: [];
+	/** The Bye row, only when a side has a bye to show: in season a played bye is none (Lane 223). */
+	const byes = pairOf((side) => side.bye);
+	const byeRow: CompareRow[] =
+		byes[0] === null && byes[1] === null ? [] : [figures('Bye', byes, String, null)];
 	const rows: CompareRow[] = [
 		rankRow(
 			'Our rank',
@@ -154,12 +158,7 @@ export function compareRows(
 			null
 		),
 		...gapRow,
-		figures(
-			'Bye',
-			pairOf((side) => side.bye),
-			String,
-			null
-		)
+		...byeRow
 	];
 	if (underway) {
 		rows.push(
