@@ -27,23 +27,23 @@ on:
         type: boolean
         default: false
 
-# One run per commit, keyed on the branch name (head_ref on a pull request, ref_name on a push or a
-# dispatch, so both spell the branch the same way). On a branch a newer run cancels the older one.
-# Main is never cancelled: each main run has a group of its own (main-<run id>), so a later push to
-# main can neither cancel it nor replace it while it waits. A shared main group would not do: with
-# cancel-in-progress off a newer run still cancels the pending one (run 40311055577 on b98d92a77 was
-# cancelled that way on 2026-10-26), and the queue key that would hold them in order (queue: max) is
-# not yet known to actionlint (1.7.12). Main runs therefore run side by side, each one whole. The
-# pull request runs sit in their own group, so
-# a lane's skipped duplicate (the changes job's if) never cancels the push run it duplicates, and a
-# record run (the record_snapshots dispatch) sits in its own group, so a verify push and a record run
-# on one branch never cancel each other.
+# One run per commit. A push or a dispatch on a branch is keyed on the branch (ref_name), a pull
+# request on its number; on either a newer run cancels the older one. Main is never cancelled: each
+# main run has a group of its own (main-<run id>), so a later push to main can neither cancel it nor
+# replace it while it waits. A shared main group would not do: with cancel-in-progress off a newer
+# run still cancels the pending one (run 40311055577 on b98d92a77 was cancelled that way on
+# 2026-10-26), and the queue key that would hold them in order (queue: max) is not yet known to
+# actionlint (1.7.12). Main runs therefore run side by side, each one whole; iOS uploads nothing that
+# could overlap until the TestFlight key exists. Pull request runs sit in their own groups, so a
+# skipped duplicate (the changes job's if) never cancels the push run it duplicates. A record run
+# (the record_snapshots dispatch) sits in its own group, so a verify push and a record run on one
+# branch never cancel each other. A dispatched verify run shares the branch's verify group with the
+# pushes: the newer of the two cancels the older, so the newest head of the branch wins.
 concurrency:
   group: >-
-    ios-${{ github.ref == 'refs/heads/main' && format('main-{0}', github.run_id) || format('{0}-{1}-{2}',
-    github.event_name == 'pull_request' && 'pr' || 'branch',
-    inputs.record_snapshots && 'record' || 'verify',
-    github.head_ref || github.ref_name) }}
+    ios-${{ github.ref == 'refs/heads/main' && format('main-{0}', github.run_id)
+    || github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number)
+    || format('branch-{0}-{1}', inputs.record_snapshots && 'record' || 'verify', github.ref_name) }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
@@ -74,16 +74,18 @@ jobs:
   # workflow did; a spec-only change (an API lane's regeneration) or a shared-only change is checked
   # by the packages job, which builds CommishAPI against the spec and runs the package tests on the
   # shared fixtures. Main and a run by hand always run the simulator job; so does any change the diff
-  # cannot be read for (fail closed). The decision is printed as a notice either way.
-  # A pull request from a lane branch (worktree-*, lane-*) in this repository is skipped here, with
-  # every job after it: the push run on the same branch already tests it. A pull request from a fork
-  # (no push run here) runs.
+  # cannot be read for (fail closed). The decision is printed as a notice either way. A branch is
+  # judged whole, from its merge base with main to its head, never by one push: a spec-only push
+  # after a Swift commit still runs the simulator job, so a branch head is never green over Swift the
+  # simulator has not built. Known risk, accepted: the app target (Commish/, CommishTests/) uses
+  # generated types directly and only the simulator job compiles it, so a spec-only change that
+  # renames or drops a case those files use passes the branch and fails main's app job after the merge.
+  # A pull request from a branch of this repository is skipped here, with every job after it: push
+  # runs on every branch, so the push run already tests it. A pull request from a fork (no push run
+  # here) runs.
   changes:
     name: What changed
-    if: >-
-      ${{ github.event_name != 'pull_request'
-      || github.event.pull_request.head.repo.full_name != github.repository
-      || !(startsWith(github.head_ref, 'worktree-') || startsWith(github.head_ref, 'lane-')) }}
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -97,7 +99,6 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref }}
-          BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
           SPEC_COPY: apps/ios/Packages/CommishAPI/Sources/CommishAPI/openapi.yaml
@@ -111,10 +112,7 @@ jobs:
           [ "$REF" = refs/heads/main ] && runs "main is the merge gate"
           if [ "$EVENT" = pull_request ]; then
             range="$PR_BASE...HEAD"
-          elif [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            range="$BEFORE..$AFTER"
           else
-            # A new branch (before is all zeros) or a force push whose old head is gone.
             base="$(git merge-base origin/main "$AFTER")" || runs "no base to diff $AFTER against"
             range="$base..$AFTER"
           fi

@@ -60,19 +60,20 @@ on:
         type: boolean
         default: false
 
-# One run per commit, as in ios.yml: keyed on the branch name (head_ref on a pull request, ref_name on
-# a push or a dispatch); on a branch a newer run cancels the older one. Main is never cancelled: each
-# main run has a group of its own (main-<run id>), so a later merge cannot cancel a build or a Play
-# upload half way, nor replace a waiting run (a shared group with cancel-in-progress off still
-# cancels the pending run). The pull request runs sit in their own group, so a lane's skipped
+# One run per commit, as in ios.yml: a push or a dispatch on a branch is keyed on the branch
+# (ref_name), a pull request on its number; on either a newer run cancels the older one. Main runs
+# share one group, android-main, with cancel-in-progress off: a build or a Play upload is never
+# cancelled half way and two uploads never overlap. A waiting main run is still replaced by a newer
+# one (GitHub keeps one pending run per group); that is accepted, since the newest main commit's run
+# builds and uploads everything before it. Pull request runs sit in their own groups, so a skipped
 # duplicate (the build job's if) never cancels the push run, and a record run (the dispatch input or
-# the [record-android] token) sits in its own group, so the lane's next push does not cancel it.
+# the [record-android] token) sits in its own group, so the lane's next push does not cancel it. A
+# dispatched verify run shares the branch's verify group with the pushes: the newer cancels the older.
 concurrency:
   group: >-
-    android-${{ github.ref == 'refs/heads/main' && format('main-{0}', github.run_id) || format('{0}-{1}-{2}',
-    github.event_name == 'pull_request' && 'pr' || 'branch',
-    (inputs.record_snapshots || (github.event_name == 'push' && contains(github.event.head_commit.message, '[record-android]'))) && 'record' || 'verify',
-    github.head_ref || github.ref_name) }}
+    android-${{ github.ref == 'refs/heads/main' && 'main'
+    || github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number)
+    || format('branch-{0}-{1}', (inputs.record_snapshots || (github.event_name == 'push' && contains(github.event.head_commit.message, '[record-android]'))) && 'record' || 'verify', github.ref_name) }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
@@ -82,13 +83,11 @@ jobs:
   build:
     # The record job takes the run when it is asked for, by the dispatch input or the commit token,
     # except on main, where the build and the Play step always run and record never does. A pull
-    # request from a lane branch (worktree-*, lane-*) in this repository is skipped: the push run on
-    # the same branch already builds it. A pull request from a fork runs.
+    # request from a branch of this repository is skipped: push runs on every branch, so the push run
+    # already builds it. A pull request from a fork runs.
     if: >-
       ${{ !((inputs.record_snapshots || (github.event_name == 'push' && contains(github.event.head_commit.message, '[record-android]'))) && github.ref != 'refs/heads/main')
-      && (github.event_name != 'pull_request'
-      || github.event.pull_request.head.repo.full_name != github.repository
-      || !(startsWith(github.head_ref, 'worktree-') || startsWith(github.head_ref, 'lane-'))) }}
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository) }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     defaults:
