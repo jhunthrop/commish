@@ -1,5 +1,5 @@
-"""THE WEEKLY RECORD: our rest-of-season order, graded week by week against the weekly experts (Lane
-114, Amendment 5).
+"""THE WEEKLY RECORD (Lane 114, Amendment 5): our rest-of-season order, graded week by week against
+the weekly experts.
 
 From the first week a freeze kept the order the site ships (`SHIPPED_SOURCE`, week 7 of 2026), each
 week's set order graded on the week's points beside the weekly yardsticks the freeze kept on the same
@@ -65,6 +65,8 @@ _METHOD: Final = (
     "From week {week} we set our rest-of-season order before each week's first kickoff and graded it on "
     "the week's points{beside}."
 )
+# The method's yardstick clause, naming only the yardsticks drawn (`_BESIDE_NAMES`, joined by "and").
+_BESIDE: Final = ", beside {names} on the same players"
 # Beside the ESPN comparison of a graded week (Amendment 6): the read came after the order was set, no
 # read before kickoff reached the week, or neither yardstick did (Lane 148).
 ESPN_READ_AFTER_NOTE: Final = (
@@ -208,7 +210,7 @@ def starters_basis(to_date_lines: Sequence[WeeklyLine]) -> str | None:
 def method(from_week: int, to_date_lines: Sequence[WeeklyLine]) -> str:
     """How the weekly record is kept, naming only the yardsticks drawn."""
     names = [_BESIDE_NAMES[key] for key in drawn(to_date_lines)]
-    beside = "" if not names else f", beside {' and '.join(names)} on the same players"
+    beside = "" if not names else _BESIDE.format(names=" and ".join(names))
     return _METHOD.format(week=from_week, beside=beside)
 
 
