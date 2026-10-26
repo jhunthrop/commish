@@ -6,7 +6,7 @@ import Foundation
 /// every frame the recorded drafter's socket sent and received.
 public enum LobbyFixture {
     /// The recorded room's id, as every answer names it.
-    public static let id = "8c0ab888-70a9-466c-965b-b42e49c19279"
+    public static let id = "02294fd3-7304-4129-9071-1e7d95b4a4d5"
 
     static let folder = RunFixture.fixtures.appendingPathComponent("lobby-room")
 
@@ -27,13 +27,13 @@ public enum LobbyFixture {
         try APIDecoding.envelopeData(LobbySeat.self, from: data("join"))
     }
 
-    /// Our call on the recorded drafter's turn at that overall pick (12, 13, 36, 37), nil off them.
+    /// Our call on the recorded drafter's turn at that overall pick (9, 16, 33, 40), nil off them.
     public static func card(_ pick: Int) -> RoomCard? {
         try? APIDecoding.envelopeData(RoomCard.self, from: data("card-\(pick)"))
     }
 
-    /// A seat's report: you (1st of 12), jpk88, mara (6th of 12).
-    public static func report(_ handle: String = "you") throws -> MockReport {
+    /// A seat's report: hunt (the recorded drafter, 7th of 12), jpk88 (1st), mara (9th).
+    public static func report(_ handle: String = "hunt") throws -> MockReport {
         try APIDecoding.envelopeData(MockReport.self, from: data("report-\(handle)"))
     }
 
@@ -77,7 +77,7 @@ public actor StubLobby: LobbyAPI {
     private var refusalFrom = 1
     private var needsHandle: Bool
     private var complete = false
-    private var cardPick = 12
+    private var cardPick = 9
 
     public init(needsHandle: Bool = false) {
         self.needsHandle = needsHandle

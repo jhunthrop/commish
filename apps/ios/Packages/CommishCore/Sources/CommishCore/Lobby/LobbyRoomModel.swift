@@ -132,7 +132,8 @@ public struct LobbyRoomModel: Equatable, Sendable {
         init(room: LobbyRoom, lobby: LobbyState, card: RoomCard?, board: RoomBoardView) {
             teams = room.teams
             total = room.teams * room.rounds
-            onClock = lobby.drafting && lobby.pickNumber <= total ? RoomDraft.seatAt(lobby.pickNumber, teams: teams) : nil
+            onClock = lobby.drafting && lobby.pickNumber <= total ? RoomDraft
+                .seatAt(lobby.pickNumber, teams: teams) : nil
             yourTurn = onClock == room.you
             // model.ts turnFrom: this pick when it is yours, else your next.
             yourPick = !lobby.drafting ? nil
@@ -155,7 +156,7 @@ public struct LobbyRoomModel: Equatable, Sendable {
         return preset?.value1?.rawValue ?? preset?.value2 ?? "ppr"
     }
 
-    static func bug(_ facts: Facts, room: LobbyRoom, lobby: LobbyState, now: Date) -> LobbyScoreBug? {
+    static func bug(_ facts: Facts, room _: LobbyRoom, lobby: LobbyState, now: Date) -> LobbyScoreBug? {
         guard lobby.drafting, let yourPick = facts.yourPick else {
             return nil
         }
@@ -221,14 +222,14 @@ public struct LobbyRoomModel: Equatable, Sendable {
         guard let newest = picks.first else {
             return nil
         }
-        let people = picks.count { $0.by == .drafter }
+        let people = picks.count { $0.madeBy == .drafter }
         let faces = picks.enumerated().compactMap { index, pick -> StripFace? in
             board.byID[pick.playerID].map { player in
                 StripFace(
                     id: pick.pick, player: player, name: DraftFormat.lastName(player.name),
                     lines: LobbySeats.credit(pick, seats: lobby.seats, you: room.you)
                         + [DraftFormat.pickLabel(pick.pick, teams: room.teams)],
-                    newest: index == 0, strong: pick.by == .drafter
+                    newest: index == 0, strong: pick.madeBy == .drafter
                 )
             }
         }
@@ -238,7 +239,13 @@ public struct LobbyRoomModel: Equatable, Sendable {
         )
     }
 
-    static func pool(_ facts: Facts, board: RoomBoardView, card: RoomCard?, filter: String, marked: String?) -> MockPool {
+    static func pool(
+        _ facts: Facts,
+        board: RoomBoardView,
+        card: RoomCard?,
+        filter: String,
+        marked: String?
+    ) -> MockPool {
         let chances = card?.stillThere.additionalProperties ?? [:]
         let chosen = filters.contains(filter) ? filter : "All"
         let players = chosen == Words.Mock.queue

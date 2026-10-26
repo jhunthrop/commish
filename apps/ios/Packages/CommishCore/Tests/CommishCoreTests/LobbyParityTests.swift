@@ -23,7 +23,7 @@ struct LobbyParityTests {
         return object
     }()
 
-    nonisolated static let states = ["filling", "started", "yourTurn", "backToBack", "between", "round3"]
+    nonisolated static let states = ["filling", "started", "yourTurn", "between", "round2", "round3"]
 
     /// The recorded frames' rows, each frame's index in the exchange with the rows it carried.
     static func frames() throws -> [(index: Int, rows: [RoomRow])] {
@@ -49,22 +49,29 @@ struct LobbyParityTests {
         try #require((parity["states"] as? JSON)?[name] as? JSON)
     }
 
-    static func model(_ name: String) throws -> (LobbyRoomModel, LobbyState, JSON) {
+    /// A state drawn as the web draws it: the room's model under a chip, the replayed state, the web's room.
+    struct Drawn {
+        let model: LobbyRoomModel
+        let lobby: LobbyState
+        let room: JSON
+    }
+
+    static func drawn(_ name: String, filter: String = "All") throws -> Drawn {
         let web = try web(name)
-        let frame = try #require(web["frame"] as? Int)
-        let now = try #require((web["now"] as? String).flatMap(RoomClockReading.parse))
-        let lobby = try replayed(through: frame)
+        let lobby = try replayed(through: #require(web["frame"] as? Int))
         let room = try LobbyFixture.room()
-        let card = (web["card"] as? Int).flatMap(LobbyFixture.card)
-        let model = LobbyRoomModel(
-            room: room, board: RoomBoardView(room.board, teams: room.teams), lobby: lobby, card: card, now: now
+        let model = try LobbyRoomModel(
+            room: room, board: RoomBoardView(room.board, teams: room.teams), lobby: lobby,
+            card: (web["card"] as? Int).flatMap(LobbyFixture.card),
+            now: #require((web["now"] as? String).flatMap(RoomClockReading.parse)), filter: filter
         )
-        return try (model, lobby, #require(web["room"] as? JSON))
+        return try Drawn(model: model, lobby: lobby, room: #require(web["room"] as? JSON))
     }
 
     @Test(arguments: states)
     func theReplayedStateIsTheWebs(name: String) throws {
-        let (_, lobby, web) = try Self.model(name)
+        let drawn = try Self.drawn(name)
+        let (lobby, web) = (drawn.lobby, drawn.room)
         let state = try #require(web["state"] as? JSON)
         #expect(Int(lobby.seq) == state["seq"] as? Int)
         #expect(lobby.pickNumber == state["pickNumber"] as? Int)
@@ -74,7 +81,7 @@ struct LobbyParityTests {
         #expect(lobby.queue == state["queue"] as? [String])
         #expect(lobby.deadline.map(Self.iso) == state["deadline"] as? String)
         let picks = try #require(state["picks"] as? [[Any]])
-        #expect(lobby.picks.map { "\($0.pick) \($0.seat) \($0.playerID) \($0.by.rawValue)" }
+        #expect(lobby.picks.map { "\($0.pick) \($0.seat) \($0.playerID) \($0.madeBy.rawValue)" }
             == picks.map { $0.map { "\($0)" }.joined(separator: " ") })
         let seats = try #require(state["seats"] as? [[Any]])
         #expect((1 ... 12).map { "\(lobby.seats[$0]?.handle ?? "-") \(lobby.seats[$0]?.kind.rawValue ?? "-")" }
@@ -83,7 +90,8 @@ struct LobbyParityTests {
 
     @Test(arguments: states)
     func theScoreBugTheSeatsAndTheWaitAreTheWebs(name: String) throws {
-        let (model, _, web) = try Self.model(name)
+        let drawn = try Self.drawn(name)
+        let (model, web) = (drawn.model, drawn.room)
         if let bug = web["bug"] as? JSON {
             let mine = try #require(model.bug)
             #expect(mine.round == bug["round"] as? String)
@@ -113,7 +121,8 @@ struct LobbyParityTests {
 
     @Test(arguments: states)
     func theStripAndTheCallAreTheWebs(name: String) throws {
-        let (model, _, web) = try Self.model(name)
+        let drawn = try Self.drawn(name)
+        let (model, web) = (drawn.model, drawn.room)
         if let landing = web["landing"] as? JSON {
             let strip = try #require(model.landing)
             #expect(strip.lead == landing["lead"] as? String)
@@ -141,12 +150,12 @@ struct LobbyParityTests {
 
     @Test(arguments: states)
     func thePoolUnderEveryChipIsTheWebs(name: String) throws {
-        let web = try Self.model(name).2
+        let web = try Self.drawn(name).room
         let pool = try #require(web["pool"] as? JSON)
         let filters = try #require(pool["filters"] as? [JSON])
         for chip in filters {
             let filter = try #require(chip["filter"] as? String)
-            let (model, _, _) = try Self.modelAt(name, filter: filter)
+            let model = try Self.drawn(name, filter: filter).model
             let mine = try #require(model.pool)
             #expect(mine.model.line == pool["line"] as? String)
             #expect(mine.model.basis == pool["basis"] as? String)
@@ -165,21 +174,10 @@ struct LobbyParityTests {
         }
     }
 
-    static func modelAt(_ name: String, filter: String) throws -> (LobbyRoomModel, LobbyState, JSON) {
-        let web = try web(name)
-        let lobby = try replayed(through: #require(web["frame"] as? Int))
-        let room = try LobbyFixture.room()
-        let model = try LobbyRoomModel(
-            room: room, board: RoomBoardView(room.board, teams: room.teams), lobby: lobby,
-            card: (web["card"] as? Int).flatMap(LobbyFixture.card),
-            now: #require((web["now"] as? String).flatMap(RoomClockReading.parse)), filter: filter
-        )
-        return (model, lobby, web)
-    }
-
     @Test(arguments: states)
     func theWallAndTheTeamAreTheWebs(name: String) throws {
-        let (model, _, web) = try Self.model(name)
+        let drawn = try Self.drawn(name)
+        let (model, web) = (drawn.model, drawn.room)
         try Self.checkWallAndTeam(model, web)
     }
 
@@ -237,7 +235,7 @@ struct LobbyParityTests {
         #expect(Words.Lobby.leaveDrafting == leave["drafting"] as? String)
     }
 
-    @Test(arguments: [("you", "you"), ("down", "mara")])
+    @Test(arguments: [("first", "jpk88"), ("down", "mara")])
     func theReportIsTheWebs(key: String, handle: String) throws {
         let web = try #require((Self.parity["reports"] as? JSON)?[key] as? JSON)
         let report = try LobbyFixture.report(handle)
@@ -256,7 +254,7 @@ struct LobbyParityTests {
         #expect([Words.Lobby.joinAnother, LobbyWords.soloAgain(report.slot)] == web["verbs"] as? [String])
     }
 
-    @Test func theReportViewModelDrawsTheRoomsNames() async throws {
+    @Test func theReportViewModelDrawsTheRoomsNames() async {
         let api = StubLobby()
         await api.setComplete(true)
         let viewModel = LobbyReportViewModel(id: LobbyFixture.id, api: api, mocks: StubMock())
@@ -265,9 +263,10 @@ struct LobbyParityTests {
             Issue.record("no report: \(viewModel.state)")
             return
         }
-        let web = try #require((Self.parity["reports"] as? JSON)?["you"] as? JSON)
-        try MockParityTests.checkReport(model, web)
-        #expect(viewModel.soloVerb == LobbyWords.soloAgain(12))
+        // The recorded drafter's own report: You at seat 9, the others by handle or bot.
+        #expect(model.field.first { $0.you }?.name == "You")
+        #expect(model.field.contains { $0.name == "jpk88" })
+        #expect(viewModel.soloVerb == LobbyWords.soloAgain(9))
     }
 
     static func iso(_ date: Date) -> String {

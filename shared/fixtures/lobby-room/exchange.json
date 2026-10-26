@@ -1,5 +1,5 @@
 {
-	"recorded_by": "you",
+	"recorded_by": "hunt",
 	"steps": [
 		{
 			"client": {
@@ -11,35 +11,35 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:15:02.671-05:00",
+						"at": "2026-10-26T03:28:55.497-05:00",
 						"kind": "SEAT_JOINED",
 						"payload": {
-							"handle": "you"
+							"handle": "hunt"
 						},
-						"seat": 12,
+						"seat": 9,
 						"seq": 1
 					},
 					{
-						"at": "2026-10-26T03:15:02.678-05:00",
+						"at": "2026-10-26T03:28:55.504-05:00",
 						"kind": "SEAT_JOINED",
 						"payload": {
 							"handle": "jpk88"
 						},
-						"seat": 5,
+						"seat": 2,
 						"seq": 2
 					},
 					{
-						"at": "2026-10-26T03:15:02.682-05:00",
+						"at": "2026-10-26T03:28:55.51-05:00",
 						"kind": "SEAT_JOINED",
 						"payload": {
 							"handle": "mara"
 						},
-						"seat": 8,
+						"seat": 7,
 						"seq": 3
 					}
 				],
-				"now": "2026-10-26T08:15:02.712978Z",
-				"room_id": "8c0ab888-70a9-466c-965b-b42e49c19279",
+				"now": "2026-10-26T08:28:55.55769Z",
+				"room_id": "02294fd3-7304-4129-9071-1e7d95b4a4d5",
 				"seq": 3,
 				"type": "welcome"
 			}
@@ -48,19 +48,19 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:32.672-05:00",
+						"at": "2026-10-26T03:30:25.497-05:00",
 						"kind": "ROOM_STARTED",
 						"payload": {
 							"bots": [
 								1,
-								2,
 								3,
 								4,
+								5,
 								6,
-								7,
-								9,
+								8,
 								10,
-								11
+								11,
+								12
 							],
 							"solo_pace": false
 						},
@@ -68,7 +68,7 @@
 						"seq": 4
 					},
 					{
-						"at": "2026-10-26T03:16:32.672-05:00",
+						"at": "2026-10-26T03:30:25.497-05:00",
 						"kind": "START_DRAFT",
 						"payload": {
 							"action": {
@@ -102,11 +102,11 @@
 									"appliesAtOrAbovePickSeconds": 3600,
 									"maxOwedPerTeam": 1
 								},
-								"timestamp": "2026-10-26T08:16:32.672Z",
+								"timestamp": "2026-10-26T08:30:25.497Z",
 								"type": "START_DRAFT",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:02.672Z"
+							"deadline": "2026-10-26T08:30:55.497Z"
 						},
 						"seat": null,
 						"seq": 5
@@ -120,8 +120,8 @@
 			"client": {
 				"player_ids": [
 					"4362628",
-					"4430878",
-					"4374302"
+					"4374302",
+					"4430878"
 				],
 				"type": "queue"
 			}
@@ -130,23 +130,23 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:32.746-05:00",
+						"at": "2026-10-26T03:30:25.547-05:00",
 						"kind": "SET_QUEUE",
 						"payload": {
 							"action": {
 								"playerIds": [
 									"4362628",
-									"4430878",
-									"4374302"
+									"4374302",
+									"4430878"
 								],
-								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:16:32.746Z",
+								"teamId": "seat09",
+								"timestamp": "2026-10-26T08:30:25.547Z",
 								"type": "SET_QUEUE",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:02.672Z"
+							"deadline": "2026-10-26T08:30:55.497Z"
 						},
-						"seat": 12,
+						"seat": 9,
 						"seq": 6
 					}
 				],
@@ -158,22 +158,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:33.157-05:00",
+						"at": "2026-10-26T03:30:26.339-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4374302",
+								"playerId": "4430807",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:16:33.157Z",
+								"timestamp": "2026-10-26T08:30:26.339Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:03.157Z",
+							"deadline": "2026-10-26T08:30:56.339Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 1,
-								"player_id": "4374302",
+								"player_id": "4430807",
 								"round": 1,
 								"seat": 1
 							}
@@ -190,22 +190,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:33.872-05:00",
+						"at": "2026-10-26T03:30:26.364-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3117251",
+								"playerId": "4426515",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:16:33.872Z",
+								"timestamp": "2026-10-26T08:30:26.364Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:03.872Z",
+							"deadline": "2026-10-26T08:30:56.364Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 2,
-								"player_id": "3117251",
+								"player_id": "4426515",
 								"round": 1,
 								"seat": 2
 							}
@@ -222,22 +222,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:34.679-05:00",
+						"at": "2026-10-26T03:30:27.036-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4430807",
+								"playerId": "4429160",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:16:34.679Z",
+								"timestamp": "2026-10-26T08:30:27.036Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:04.679Z",
+							"deadline": "2026-10-26T08:30:57.036Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 3,
-								"player_id": "4430807",
+								"player_id": "4429160",
 								"round": 1,
 								"seat": 3
 							}
@@ -254,22 +254,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:35.554-05:00",
+						"at": "2026-10-26T03:30:27.6-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4429795",
+								"playerId": "3117251",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:16:35.554Z",
+								"timestamp": "2026-10-26T08:30:27.600Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:05.554Z",
+							"deadline": "2026-10-26T08:30:57.600Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 4,
-								"player_id": "4429795",
+								"player_id": "3117251",
 								"round": 1,
 								"seat": 4
 							}
@@ -286,22 +286,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:35.568-05:00",
+						"at": "2026-10-26T03:30:28.397-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4362628",
+								"playerId": "4242335",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:16:35.568Z",
+								"timestamp": "2026-10-26T08:30:28.397Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:05.568Z",
+							"deadline": "2026-10-26T08:30:58.397Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 5,
-								"player_id": "4362628",
+								"player_id": "4242335",
 								"round": 1,
 								"seat": 5
 							}
@@ -318,22 +318,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:36.433-05:00",
+						"at": "2026-10-26T03:30:29.191-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4426515",
+								"playerId": "4362628",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:16:36.433Z",
+								"timestamp": "2026-10-26T08:30:29.191Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:06.433Z",
+							"deadline": "2026-10-26T08:30:59.191Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 6,
-								"player_id": "4426515",
+								"player_id": "4362628",
 								"round": 1,
 								"seat": 6
 							}
@@ -350,22 +350,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:37.226-05:00",
+						"at": "2026-10-26T03:30:29.206-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4379399",
+								"playerId": "4430878",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:16:37.226Z",
+								"timestamp": "2026-10-26T08:30:29.206Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:07.226Z",
+							"deadline": "2026-10-26T08:30:59.206Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 7,
-								"player_id": "4379399",
+								"player_id": "4430878",
 								"round": 1,
 								"seat": 7
 							}
@@ -382,20 +382,20 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:37.238-05:00",
+						"at": "2026-10-26T03:30:30.106-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
 								"playerId": "4241389",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:16:37.238Z",
+								"timestamp": "2026-10-26T08:30:30.106Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:07.238Z",
+							"deadline": "2026-10-26T08:31:00.106Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 8,
 								"player_id": "4241389",
 								"round": 1,
@@ -411,25 +411,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 9,
+				"player_id": "4429795",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:37.878-05:00",
+						"at": "2026-10-26T03:30:30.121-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4429160",
+								"playerId": "4429795",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:16:37.878Z",
+								"timestamp": "2026-10-26T08:30:30.121Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:07.878Z",
+							"deadline": "2026-10-26T08:31:00.121Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 9,
-								"player_id": "4429160",
+								"player_id": "4429795",
 								"round": 1,
 								"seat": 9
 							}
@@ -446,22 +453,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:38.632-05:00",
+						"at": "2026-10-26T03:30:30.594-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4262921",
+								"playerId": "4374302",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:16:38.632Z",
+								"timestamp": "2026-10-26T08:30:30.594Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:08.632Z",
+							"deadline": "2026-10-26T08:31:00.594Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 10,
-								"player_id": "4262921",
+								"player_id": "4374302",
 								"round": 1,
 								"seat": 10
 							}
@@ -478,22 +485,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:39.182-05:00",
+						"at": "2026-10-26T03:30:31.18-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3043078",
+								"playerId": "4426502",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:16:39.182Z",
+								"timestamp": "2026-10-26T08:30:31.180Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:09.182Z",
+							"deadline": "2026-10-26T08:31:01.180Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 11,
-								"player_id": "3043078",
+								"player_id": "4426502",
 								"round": 1,
 								"seat": 11
 							}
@@ -507,32 +514,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 12,
-				"player_id": "4430878",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:39.194-05:00",
+						"at": "2026-10-26T03:30:31.712-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4430878",
+								"playerId": "4262921",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:16:39.194Z",
+								"timestamp": "2026-10-26T08:30:31.712Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:09.194Z",
+							"deadline": "2026-10-26T08:31:01.712Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 12,
-								"player_id": "4430878",
+								"player_id": "4262921",
 								"round": 1,
 								"seat": 12
 							}
@@ -546,32 +546,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 13,
-				"player_id": "4361370",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:39.208-05:00",
+						"at": "2026-10-26T03:30:32.419-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4361370",
+								"playerId": "4362238",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:16:39.208Z",
+								"timestamp": "2026-10-26T08:30:32.419Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:09.208Z",
+							"deadline": "2026-10-26T08:31:02.419Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 13,
-								"player_id": "4361370",
+								"player_id": "4362238",
 								"round": 2,
 								"seat": 12
 							}
@@ -588,22 +581,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:40.017-05:00",
+						"at": "2026-10-26T03:30:32.924-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4362238",
+								"playerId": "4426354",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:16:40.017Z",
+								"timestamp": "2026-10-26T08:30:32.924Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:10.017Z",
+							"deadline": "2026-10-26T08:31:02.924Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 14,
-								"player_id": "4362238",
+								"player_id": "4426354",
 								"round": 2,
 								"seat": 11
 							}
@@ -620,22 +613,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:40.857-05:00",
+						"at": "2026-10-26T03:30:33.517-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4426502",
+								"playerId": "4361370",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:16:40.857Z",
+								"timestamp": "2026-10-26T08:30:33.517Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:10.857Z",
+							"deadline": "2026-10-26T08:31:03.517Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 15,
-								"player_id": "4426502",
+								"player_id": "4361370",
 								"round": 2,
 								"seat": 10
 							}
@@ -649,25 +642,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 16,
+				"player_id": "3929630",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:41.525-05:00",
+						"at": "2026-10-26T03:30:33.531-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4242335",
+								"playerId": "3929630",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:16:41.525Z",
+								"timestamp": "2026-10-26T08:30:33.531Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:11.525Z",
+							"deadline": "2026-10-26T08:31:03.531Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 16,
-								"player_id": "4242335",
+								"player_id": "3929630",
 								"round": 2,
 								"seat": 9
 							}
@@ -684,22 +684,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:41.538-05:00",
+						"at": "2026-10-26T03:30:34.442-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4426354",
+								"playerId": "4258173",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:16:41.538Z",
+								"timestamp": "2026-10-26T08:30:34.442Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:11.538Z",
+							"deadline": "2026-10-26T08:31:04.442Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 17,
-								"player_id": "4426354",
+								"player_id": "4258173",
 								"round": 2,
 								"seat": 8
 							}
@@ -716,22 +716,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:42.02-05:00",
+						"at": "2026-10-26T03:30:34.463-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4047646",
+								"playerId": "4429615",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:16:42.020Z",
+								"timestamp": "2026-10-26T08:30:34.463Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:12.020Z",
+							"deadline": "2026-10-26T08:31:04.463Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 18,
-								"player_id": "4047646",
+								"player_id": "4429615",
 								"round": 2,
 								"seat": 7
 							}
@@ -748,22 +748,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:42.949-05:00",
+						"at": "2026-10-26T03:30:34.967-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4428331",
+								"playerId": "4047646",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:16:42.949Z",
+								"timestamp": "2026-10-26T08:30:34.967Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:12.949Z",
+							"deadline": "2026-10-26T08:31:04.967Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 19,
-								"player_id": "4428331",
+								"player_id": "4047646",
 								"round": 2,
 								"seat": 6
 							}
@@ -780,22 +780,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:42.966-05:00",
+						"at": "2026-10-26T03:30:35.626-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4258173",
+								"playerId": "4379399",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:16:42.966Z",
+								"timestamp": "2026-10-26T08:30:35.626Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:12.966Z",
+							"deadline": "2026-10-26T08:31:05.626Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 20,
-								"player_id": "4258173",
+								"player_id": "4379399",
 								"round": 2,
 								"seat": 5
 							}
@@ -812,22 +812,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:43.718-05:00",
+						"at": "2026-10-26T03:30:36.482-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4567048",
+								"playerId": "4595348",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:16:43.718Z",
+								"timestamp": "2026-10-26T08:30:36.482Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:13.718Z",
+							"deadline": "2026-10-26T08:31:06.482Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 21,
-								"player_id": "4567048",
+								"player_id": "4595348",
 								"round": 2,
 								"seat": 4
 							}
@@ -844,22 +844,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:44.47-05:00",
+						"at": "2026-10-26T03:30:37.215-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4595348",
+								"playerId": "3043078",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:16:44.470Z",
+								"timestamp": "2026-10-26T08:30:37.215Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:14.470Z",
+							"deadline": "2026-10-26T08:31:07.215Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 22,
-								"player_id": "4595348",
+								"player_id": "3043078",
 								"round": 2,
 								"seat": 3
 							}
@@ -876,22 +876,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:45.167-05:00",
+						"at": "2026-10-26T03:30:37.228-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3929630",
+								"playerId": "4428331",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:16:45.167Z",
+								"timestamp": "2026-10-26T08:30:37.228Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:15.167Z",
+							"deadline": "2026-10-26T08:31:07.228Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 23,
-								"player_id": "3929630",
+								"player_id": "4428331",
 								"round": 2,
 								"seat": 2
 							}
@@ -908,22 +908,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:45.795-05:00",
+						"at": "2026-10-26T03:30:37.687-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4429615",
+								"playerId": "4685382",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:16:45.795Z",
+								"timestamp": "2026-10-26T08:30:37.687Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:15.795Z",
+							"deadline": "2026-10-26T08:31:07.687Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 24,
-								"player_id": "4429615",
+								"player_id": "4685382",
 								"round": 2,
 								"seat": 1
 							}
@@ -940,22 +940,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:46.403-05:00",
+						"at": "2026-10-26T03:30:38.381-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4427366",
+								"playerId": "4569618",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:16:46.403Z",
+								"timestamp": "2026-10-26T08:30:38.381Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:16.403Z",
+							"deadline": "2026-10-26T08:31:08.381Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 25,
-								"player_id": "4427366",
+								"player_id": "4569618",
 								"round": 3,
 								"seat": 1
 							}
@@ -972,22 +972,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:47.335-05:00",
+						"at": "2026-10-26T03:30:38.396-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4569618",
+								"playerId": "4432665",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:16:47.335Z",
+								"timestamp": "2026-10-26T08:30:38.396Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:17.335Z",
+							"deadline": "2026-10-26T08:31:08.396Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 26,
-								"player_id": "4569618",
+								"player_id": "4432665",
 								"round": 3,
 								"seat": 2
 							}
@@ -1004,22 +1004,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:47.818-05:00",
+						"at": "2026-10-26T03:30:38.855-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4870808",
+								"playerId": "4567048",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:16:47.818Z",
+								"timestamp": "2026-10-26T08:30:38.855Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:17.818Z",
+							"deadline": "2026-10-26T08:31:08.855Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 27,
-								"player_id": "4870808",
+								"player_id": "4567048",
 								"round": 3,
 								"seat": 3
 							}
@@ -1036,22 +1036,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:48.594-05:00",
+						"at": "2026-10-26T03:30:39.548-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4685472",
+								"playerId": "4361307",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:16:48.594Z",
+								"timestamp": "2026-10-26T08:30:39.548Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:18.594Z",
+							"deadline": "2026-10-26T08:31:09.548Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 28,
-								"player_id": "4685472",
+								"player_id": "4361307",
 								"round": 3,
 								"seat": 4
 							}
@@ -1068,22 +1068,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:48.609-05:00",
+						"at": "2026-10-26T03:30:40.444-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4432665",
+								"playerId": "4890973",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:16:48.609Z",
+								"timestamp": "2026-10-26T08:30:40.444Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:18.609Z",
+							"deadline": "2026-10-26T08:31:10.444Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 29,
-								"player_id": "4432665",
+								"player_id": "4890973",
 								"round": 3,
 								"seat": 5
 							}
@@ -1100,22 +1100,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:49.283-05:00",
+						"at": "2026-10-26T03:30:41.344-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3918298",
+								"playerId": "4430737",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:16:49.283Z",
+								"timestamp": "2026-10-26T08:30:41.344Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:19.283Z",
+							"deadline": "2026-10-26T08:31:11.344Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 30,
-								"player_id": "3918298",
+								"player_id": "4430737",
 								"round": 3,
 								"seat": 6
 							}
@@ -1132,22 +1132,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:49.9-05:00",
+						"at": "2026-10-26T03:30:41.367-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4685382",
+								"playerId": "4241478",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:16:49.900Z",
+								"timestamp": "2026-10-26T08:30:41.367Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:19.900Z",
+							"deadline": "2026-10-26T08:31:11.367Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 31,
-								"player_id": "4685382",
+								"player_id": "4241478",
 								"round": 3,
 								"seat": 7
 							}
@@ -1164,22 +1164,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:49.914-05:00",
+						"at": "2026-10-26T03:30:41.829-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4361307",
+								"playerId": "4685472",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:16:49.914Z",
+								"timestamp": "2026-10-26T08:30:41.829Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:19.914Z",
+							"deadline": "2026-10-26T08:31:11.829Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 32,
-								"player_id": "4361307",
+								"player_id": "4685472",
 								"round": 3,
 								"seat": 8
 							}
@@ -1193,25 +1193,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 33,
+				"player_id": "3918298",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:50.834-05:00",
+						"at": "2026-10-26T03:30:41.843-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4567750",
+								"playerId": "3918298",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:16:50.834Z",
+								"timestamp": "2026-10-26T08:30:41.843Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:20.834Z",
+							"deadline": "2026-10-26T08:31:11.843Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 33,
-								"player_id": "4567750",
+								"player_id": "3918298",
 								"round": 3,
 								"seat": 9
 							}
@@ -1228,22 +1235,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:51.531-05:00",
+						"at": "2026-10-26T03:30:42.637-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4241478",
+								"playerId": "4239996",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:16:51.531Z",
+								"timestamp": "2026-10-26T08:30:42.637Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:21.531Z",
+							"deadline": "2026-10-26T08:31:12.637Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 34,
-								"player_id": "4241478",
+								"player_id": "4239996",
 								"round": 3,
 								"seat": 10
 							}
@@ -1260,22 +1267,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:52.125-05:00",
+						"at": "2026-10-26T03:30:43.243-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4361579",
+								"playerId": "4696981",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:16:52.125Z",
+								"timestamp": "2026-10-26T08:30:43.243Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:22.125Z",
+							"deadline": "2026-10-26T08:31:13.243Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 35,
-								"player_id": "4361579",
+								"player_id": "4696981",
 								"round": 3,
 								"seat": 11
 							}
@@ -1289,32 +1296,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 36,
-				"player_id": "4890973",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:52.138-05:00",
+						"at": "2026-10-26T03:30:43.842-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4890973",
+								"playerId": "4567750",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:16:52.138Z",
+								"timestamp": "2026-10-26T08:30:43.842Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:22.138Z",
+							"deadline": "2026-10-26T08:31:13.842Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 36,
-								"player_id": "4890973",
+								"player_id": "4567750",
 								"round": 3,
 								"seat": 12
 							}
@@ -1328,32 +1328,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 37,
-				"player_id": "3916387",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:52.154-05:00",
+						"at": "2026-10-26T03:30:44.777-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3916387",
+								"playerId": "4870808",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:16:52.154Z",
+								"timestamp": "2026-10-26T08:30:44.777Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:22.154Z",
+							"deadline": "2026-10-26T08:31:14.777Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 37,
-								"player_id": "3916387",
+								"player_id": "4870808",
 								"round": 4,
 								"seat": 12
 							}
@@ -1370,22 +1363,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:52.755-05:00",
+						"at": "2026-10-26T03:30:45.359-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4239993",
+								"playerId": "4427366",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:16:52.755Z",
+								"timestamp": "2026-10-26T08:30:45.359Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:22.755Z",
+							"deadline": "2026-10-26T08:31:15.359Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 38,
-								"player_id": "4239993",
+								"player_id": "4427366",
 								"round": 4,
 								"seat": 11
 							}
@@ -1402,22 +1395,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:53.502-05:00",
+						"at": "2026-10-26T03:30:46.144-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4430737",
+								"playerId": "4361579",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:16:53.502Z",
+								"timestamp": "2026-10-26T08:30:46.144Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:23.502Z",
+							"deadline": "2026-10-26T08:31:16.144Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 39,
-								"player_id": "4430737",
+								"player_id": "4361579",
 								"round": 4,
 								"seat": 10
 							}
@@ -1431,25 +1424,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 40,
+				"player_id": "3916387",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:54.191-05:00",
+						"at": "2026-10-26T03:30:46.162-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4239996",
+								"playerId": "3916387",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:16:54.191Z",
+								"timestamp": "2026-10-26T08:30:46.162Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:24.191Z",
+							"deadline": "2026-10-26T08:31:16.162Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 40,
-								"player_id": "4239996",
+								"player_id": "3916387",
 								"round": 4,
 								"seat": 9
 							}
@@ -1466,22 +1466,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:54.206-05:00",
+						"at": "2026-10-26T03:30:46.685-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4426388",
+								"playerId": "4259545",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:16:54.206Z",
+								"timestamp": "2026-10-26T08:30:46.685Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:24.206Z",
+							"deadline": "2026-10-26T08:31:16.685Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 41,
-								"player_id": "4426388",
+								"player_id": "4259545",
 								"round": 4,
 								"seat": 8
 							}
@@ -1498,22 +1498,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:54.76-05:00",
+						"at": "2026-10-26T03:30:46.699-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4259545",
+								"playerId": "4239993",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:16:54.760Z",
+								"timestamp": "2026-10-26T08:30:46.699Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:24.760Z",
+							"deadline": "2026-10-26T08:31:16.699Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 42,
-								"player_id": "4259545",
+								"player_id": "4239993",
 								"round": 4,
 								"seat": 7
 							}
@@ -1530,22 +1530,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:55.683-05:00",
+						"at": "2026-10-26T03:30:47.48-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4696981",
+								"playerId": "4372016",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:16:55.683Z",
+								"timestamp": "2026-10-26T08:30:47.480Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:25.683Z",
+							"deadline": "2026-10-26T08:31:17.480Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 43,
-								"player_id": "4696981",
+								"player_id": "4372016",
 								"round": 4,
 								"seat": 6
 							}
@@ -1562,22 +1562,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:55.698-05:00",
+						"at": "2026-10-26T03:30:48.357-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4612826",
+								"playerId": "16800",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:16:55.698Z",
+								"timestamp": "2026-10-26T08:30:48.357Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:25.698Z",
+							"deadline": "2026-10-26T08:31:18.357Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 44,
-								"player_id": "4612826",
+								"player_id": "16800",
 								"round": 4,
 								"seat": 5
 							}
@@ -1594,22 +1594,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:56.619-05:00",
+						"at": "2026-10-26T03:30:48.968-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4372016",
+								"playerId": "4612826",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:16:56.619Z",
+								"timestamp": "2026-10-26T08:30:48.968Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:26.619Z",
+							"deadline": "2026-10-26T08:31:18.968Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 45,
-								"player_id": "4372016",
+								"player_id": "4612826",
 								"round": 4,
 								"seat": 4
 							}
@@ -1626,22 +1626,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:57.32-05:00",
+						"at": "2026-10-26T03:30:49.498-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "16800",
+								"playerId": "3915416",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:16:57.320Z",
+								"timestamp": "2026-10-26T08:30:49.498Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:27.320Z",
+							"deadline": "2026-10-26T08:31:19.498Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 46,
-								"player_id": "16800",
+								"player_id": "3915416",
 								"round": 4,
 								"seat": 3
 							}
@@ -1658,22 +1658,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:57.836-05:00",
+						"at": "2026-10-26T03:30:49.521-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4035538",
+								"playerId": "4426388",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:16:57.836Z",
+								"timestamp": "2026-10-26T08:30:49.521Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:27.836Z",
+							"deadline": "2026-10-26T08:31:19.521Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 47,
-								"player_id": "4035538",
+								"player_id": "4426388",
 								"round": 4,
 								"seat": 2
 							}
@@ -1690,17 +1690,17 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:58.5-05:00",
+						"at": "2026-10-26T03:30:50.141-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
 								"playerId": "3121422",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:16:58.500Z",
+								"timestamp": "2026-10-26T08:30:50.141Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:28.500Z",
+							"deadline": "2026-10-26T08:31:20.141Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
@@ -1722,17 +1722,17 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:59.09-05:00",
+						"at": "2026-10-26T03:30:50.908-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
 								"playerId": "4431452",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:16:59.090Z",
+								"timestamp": "2026-10-26T08:30:50.908Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:29.090Z",
+							"deadline": "2026-10-26T08:31:20.908Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
@@ -1754,22 +1754,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:16:59.844-05:00",
+						"at": "2026-10-26T03:30:50.931-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4685278",
+								"playerId": "4723086",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:16:59.844Z",
+								"timestamp": "2026-10-26T08:30:50.931Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:29.844Z",
+							"deadline": "2026-10-26T08:31:20.931Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 50,
-								"player_id": "4685278",
+								"player_id": "4723086",
 								"round": 5,
 								"seat": 2
 							}
@@ -1786,22 +1786,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:00.752-05:00",
+						"at": "2026-10-26T03:30:51.768-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3915416",
+								"playerId": "3915511",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:17:00.752Z",
+								"timestamp": "2026-10-26T08:30:51.768Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:30.752Z",
+							"deadline": "2026-10-26T08:31:21.768Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 51,
-								"player_id": "3915416",
+								"player_id": "3915511",
 								"round": 5,
 								"seat": 3
 							}
@@ -1818,17 +1818,17 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:01.403-05:00",
+						"at": "2026-10-26T03:30:52.699-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
 								"playerId": "4596448",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:17:01.403Z",
+								"timestamp": "2026-10-26T08:30:52.699Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:31.403Z",
+							"deadline": "2026-10-26T08:31:22.699Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
@@ -1850,22 +1850,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:01.418-05:00",
+						"at": "2026-10-26T03:30:53.459-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4723086",
+								"playerId": "16737",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:17:01.418Z",
+								"timestamp": "2026-10-26T08:30:53.459Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:31.418Z",
+							"deadline": "2026-10-26T08:31:23.459Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 53,
-								"player_id": "4723086",
+								"player_id": "16737",
 								"round": 5,
 								"seat": 5
 							}
@@ -1882,22 +1882,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:02.135-05:00",
+						"at": "2026-10-26T03:30:53.988-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4248528",
+								"playerId": "4035538",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:17:02.135Z",
+								"timestamp": "2026-10-26T08:30:53.988Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:32.135Z",
+							"deadline": "2026-10-26T08:31:23.988Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 54,
-								"player_id": "4248528",
+								"player_id": "4035538",
 								"round": 5,
 								"seat": 6
 							}
@@ -1914,22 +1914,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:02.942-05:00",
+						"at": "2026-10-26T03:30:54.001-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "16737",
+								"playerId": "4431459",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:17:02.942Z",
+								"timestamp": "2026-10-26T08:30:54.001Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:32.942Z",
+							"deadline": "2026-10-26T08:31:24.001Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 55,
-								"player_id": "16737",
+								"player_id": "4431459",
 								"round": 5,
 								"seat": 7
 							}
@@ -1946,22 +1946,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:02.955-05:00",
+						"at": "2026-10-26T03:30:54.932-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4431459",
+								"playerId": "4685702",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:17:02.955Z",
+								"timestamp": "2026-10-26T08:30:54.932Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:32.955Z",
+							"deadline": "2026-10-26T08:31:24.932Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 56,
-								"player_id": "4431459",
+								"player_id": "4685702",
 								"round": 5,
 								"seat": 8
 							}
@@ -1975,25 +1975,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 57,
+				"player_id": "2577417",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:03.839-05:00",
+						"at": "2026-10-26T03:30:54.946-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4432620",
+								"playerId": "2577417",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:17:03.839Z",
+								"timestamp": "2026-10-26T08:30:54.946Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:33.839Z",
+							"deadline": "2026-10-26T08:31:24.946Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 57,
-								"player_id": "4432620",
+								"player_id": "2577417",
 								"round": 5,
 								"seat": 9
 							}
@@ -2010,22 +2017,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:04.567-05:00",
+						"at": "2026-10-26T03:30:55.629-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4685702",
+								"playerId": "4685278",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:17:04.567Z",
+								"timestamp": "2026-10-26T08:30:55.629Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:34.567Z",
+							"deadline": "2026-10-26T08:31:25.629Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 58,
-								"player_id": "4685702",
+								"player_id": "4685278",
 								"round": 5,
 								"seat": 10
 							}
@@ -2042,17 +2049,17 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:05.441-05:00",
+						"at": "2026-10-26T03:30:56.271-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
 								"playerId": "3128429",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:17:05.441Z",
+								"timestamp": "2026-10-26T08:30:56.271Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:35.441Z",
+							"deadline": "2026-10-26T08:31:26.271Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
@@ -2071,32 +2078,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 60,
-				"player_id": "3915511",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:05.457-05:00",
+						"at": "2026-10-26T03:30:56.921-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3915511",
+								"playerId": "4569173",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:17:05.457Z",
+								"timestamp": "2026-10-26T08:30:56.921Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:35.457Z",
+							"deadline": "2026-10-26T08:31:26.921Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 60,
-								"player_id": "3915511",
+								"player_id": "4569173",
 								"round": 5,
 								"seat": 12
 							}
@@ -2110,32 +2110,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 61,
-				"player_id": "2577417",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:05.474-05:00",
+						"at": "2026-10-26T03:30:57.457-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "2577417",
+								"playerId": "4431299",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:17:05.474Z",
+								"timestamp": "2026-10-26T08:30:57.457Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:35.474Z",
+							"deadline": "2026-10-26T08:31:27.457Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 61,
-								"player_id": "2577417",
+								"player_id": "4431299",
 								"round": 6,
 								"seat": 12
 							}
@@ -2152,22 +2145,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:06.396-05:00",
+						"at": "2026-10-26T03:30:58.035-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4431299",
+								"playerId": "4248528",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:17:06.396Z",
+								"timestamp": "2026-10-26T08:30:58.035Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:36.396Z",
+							"deadline": "2026-10-26T08:31:28.035Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 62,
-								"player_id": "4431299",
+								"player_id": "4248528",
 								"round": 6,
 								"seat": 11
 							}
@@ -2184,22 +2177,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:07.228-05:00",
+						"at": "2026-10-26T03:30:58.565-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4569173",
+								"playerId": "4432708",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:17:07.228Z",
+								"timestamp": "2026-10-26T08:30:58.565Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:37.228Z",
+							"deadline": "2026-10-26T08:31:28.565Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 63,
-								"player_id": "4569173",
+								"player_id": "4432708",
 								"round": 6,
 								"seat": 10
 							}
@@ -2213,25 +2206,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 64,
+				"player_id": "4040715",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:07.784-05:00",
+						"at": "2026-10-26T03:30:58.588-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4882093",
+								"playerId": "4040715",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:17:07.784Z",
+								"timestamp": "2026-10-26T08:30:58.588Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:37.784Z",
+							"deadline": "2026-10-26T08:31:28.588Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 64,
-								"player_id": "4882093",
+								"player_id": "4040715",
 								"round": 6,
 								"seat": 9
 							}
@@ -2248,22 +2248,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:07.803-05:00",
+						"at": "2026-10-26T03:30:59.477-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4040715",
+								"playerId": "4432620",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:17:07.803Z",
+								"timestamp": "2026-10-26T08:30:59.477Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:37.803Z",
+							"deadline": "2026-10-26T08:31:29.477Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 65,
-								"player_id": "4040715",
+								"player_id": "4432620",
 								"round": 6,
 								"seat": 8
 							}
@@ -2280,22 +2280,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:08.516-05:00",
+						"at": "2026-10-26T03:30:59.503-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4569987",
+								"playerId": "4360248",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:17:08.516Z",
+								"timestamp": "2026-10-26T08:30:59.503Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:38.516Z",
+							"deadline": "2026-10-26T08:31:29.503Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 66,
-								"player_id": "4569987",
+								"player_id": "4360248",
 								"round": 6,
 								"seat": 7
 							}
@@ -2312,22 +2312,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:09.201-05:00",
+						"at": "2026-10-26T03:31:00.242-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4685512",
+								"playerId": "4569987",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:17:09.201Z",
+								"timestamp": "2026-10-26T08:31:00.242Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:39.201Z",
+							"deadline": "2026-10-26T08:31:30.242Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 67,
-								"player_id": "4685512",
+								"player_id": "4569987",
 								"round": 6,
 								"seat": 6
 							}
@@ -2344,20 +2344,20 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:09.222-05:00",
+						"at": "2026-10-26T03:31:01.061-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
 								"playerId": "5083076",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:17:09.222Z",
+								"timestamp": "2026-10-26T08:31:01.061Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:39.222Z",
+							"deadline": "2026-10-26T08:31:31.061Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 68,
 								"player_id": "5083076",
 								"round": 6,
@@ -2376,22 +2376,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:09.988-05:00",
+						"at": "2026-10-26T03:31:01.575-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4426348",
+								"playerId": "4047650",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:17:09.988Z",
+								"timestamp": "2026-10-26T08:31:01.575Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:39.988Z",
+							"deadline": "2026-10-26T08:31:31.575Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 69,
-								"player_id": "4426348",
+								"player_id": "4047650",
 								"round": 6,
 								"seat": 4
 							}
@@ -2408,22 +2408,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:10.689-05:00",
+						"at": "2026-10-26T03:31:02.526-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "12483",
+								"playerId": "4360078",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:17:10.689Z",
+								"timestamp": "2026-10-26T08:31:02.526Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:40.689Z",
+							"deadline": "2026-10-26T08:31:32.526Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 70,
-								"player_id": "12483",
+								"player_id": "4360078",
 								"round": 6,
 								"seat": 3
 							}
@@ -2440,22 +2440,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:11.246-05:00",
+						"at": "2026-10-26T03:31:02.541-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4047650",
+								"playerId": "12483",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:17:11.246Z",
+								"timestamp": "2026-10-26T08:31:02.541Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:41.246Z",
+							"deadline": "2026-10-26T08:31:32.541Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 71,
-								"player_id": "4047650",
+								"player_id": "12483",
 								"round": 6,
 								"seat": 2
 							}
@@ -2472,22 +2472,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:11.82-05:00",
+						"at": "2026-10-26T03:31:03.421-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3916148",
+								"playerId": "4685512",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:17:11.820Z",
+								"timestamp": "2026-10-26T08:31:03.421Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:41.820Z",
+							"deadline": "2026-10-26T08:31:33.421Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 72,
-								"player_id": "3916148",
+								"player_id": "4685512",
 								"round": 6,
 								"seat": 1
 							}
@@ -2504,22 +2504,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:12.298-05:00",
+						"at": "2026-10-26T03:31:03.947-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4432708",
+								"playerId": "4432773",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:17:12.298Z",
+								"timestamp": "2026-10-26T08:31:03.947Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:42.298Z",
+							"deadline": "2026-10-26T08:31:33.947Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 73,
-								"player_id": "4432708",
+								"player_id": "4432773",
 								"round": 7,
 								"seat": 1
 							}
@@ -2536,22 +2536,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:13.205-05:00",
+						"at": "2026-10-26T03:31:03.963-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4432773",
+								"playerId": "4431611",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:17:13.205Z",
+								"timestamp": "2026-10-26T08:31:03.963Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:43.205Z",
+							"deadline": "2026-10-26T08:31:33.963Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 74,
-								"player_id": "4432773",
+								"player_id": "4431611",
 								"round": 7,
 								"seat": 2
 							}
@@ -2568,22 +2568,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:13.93-05:00",
+						"at": "2026-10-26T03:31:04.786-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4038815",
+								"playerId": "4432710",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:17:13.930Z",
+								"timestamp": "2026-10-26T08:31:04.786Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:43.930Z",
+							"deadline": "2026-10-26T08:31:34.786Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 75,
-								"player_id": "4038815",
+								"player_id": "4432710",
 								"round": 7,
 								"seat": 3
 							}
@@ -2600,22 +2600,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:14.617-05:00",
+						"at": "2026-10-26T03:31:05.249-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "DST-SEA",
+								"playerId": "4426348",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:17:14.617Z",
+								"timestamp": "2026-10-26T08:31:05.249Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:44.617Z",
+							"deadline": "2026-10-26T08:31:35.249Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 76,
-								"player_id": "DST-SEA",
+								"player_id": "4426348",
 								"round": 7,
 								"seat": 4
 							}
@@ -2632,22 +2632,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:14.64-05:00",
+						"at": "2026-10-26T03:31:05.874-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4431611",
+								"playerId": "3116165",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:17:14.640Z",
+								"timestamp": "2026-10-26T08:31:05.874Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:44.640Z",
+							"deadline": "2026-10-26T08:31:35.874Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 77,
-								"player_id": "4431611",
+								"player_id": "3116165",
 								"round": 7,
 								"seat": 5
 							}
@@ -2664,22 +2664,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:15.48-05:00",
+						"at": "2026-10-26T03:31:06.569-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4360248",
+								"playerId": "DST-SEA",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:17:15.480Z",
+								"timestamp": "2026-10-26T08:31:06.569Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:45.480Z",
+							"deadline": "2026-10-26T08:31:36.569Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 78,
-								"player_id": "4360248",
+								"player_id": "DST-SEA",
 								"round": 7,
 								"seat": 6
 							}
@@ -2696,22 +2696,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:16.138-05:00",
+						"at": "2026-10-26T03:31:06.585-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4361741",
+								"playerId": "4569587",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:17:16.138Z",
+								"timestamp": "2026-10-26T08:31:06.585Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:46.138Z",
+							"deadline": "2026-10-26T08:31:36.585Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 79,
-								"player_id": "4361741",
+								"player_id": "4569587",
 								"round": 7,
 								"seat": 7
 							}
@@ -2728,22 +2728,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:16.163-05:00",
+						"at": "2026-10-26T03:31:07.224-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4360078",
+								"playerId": "4361741",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:17:16.163Z",
+								"timestamp": "2026-10-26T08:31:07.224Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:46.163Z",
+							"deadline": "2026-10-26T08:31:37.224Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 80,
-								"player_id": "4360078",
+								"player_id": "4361741",
 								"round": 7,
 								"seat": 8
 							}
@@ -2757,25 +2757,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 81,
+				"player_id": "4360761",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:16.885-05:00",
+						"at": "2026-10-26T03:31:07.242-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "DST-DEN",
+								"playerId": "4360761",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:17:16.885Z",
+								"timestamp": "2026-10-26T08:31:07.242Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:46.885Z",
+							"deadline": "2026-10-26T08:31:37.242Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 81,
-								"player_id": "DST-DEN",
+								"player_id": "4360761",
 								"round": 7,
 								"seat": 9
 							}
@@ -2792,22 +2799,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:17.602-05:00",
+						"at": "2026-10-26T03:31:07.98-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4360761",
+								"playerId": "DST-DEN",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:17:17.602Z",
+								"timestamp": "2026-10-26T08:31:07.980Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:47.602Z",
+							"deadline": "2026-10-26T08:31:37.980Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 82,
-								"player_id": "4360761",
+								"player_id": "DST-DEN",
 								"round": 7,
 								"seat": 10
 							}
@@ -2824,22 +2831,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:18.09-05:00",
+						"at": "2026-10-26T03:31:08.454-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4432710",
+								"playerId": "4882093",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:17:18.090Z",
+								"timestamp": "2026-10-26T08:31:08.454Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:48.090Z",
+							"deadline": "2026-10-26T08:31:38.454Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 83,
-								"player_id": "4432710",
+								"player_id": "4882093",
 								"round": 7,
 								"seat": 11
 							}
@@ -2853,32 +2860,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 84,
-				"player_id": "4038941",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:18.109-05:00",
+						"at": "2026-10-26T03:31:08.965-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4038941",
+								"playerId": "3916148",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:17:18.109Z",
+								"timestamp": "2026-10-26T08:31:08.965Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:48.109Z",
+							"deadline": "2026-10-26T08:31:38.965Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 84,
-								"player_id": "4038941",
+								"player_id": "3916148",
 								"round": 7,
 								"seat": 12
 							}
@@ -2892,32 +2892,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 85,
-				"player_id": "4569587",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:18.127-05:00",
+						"at": "2026-10-26T03:31:09.729-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4569587",
+								"playerId": "4362249",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:17:18.127Z",
+								"timestamp": "2026-10-26T08:31:09.729Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:48.127Z",
+							"deadline": "2026-10-26T08:31:39.729Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 85,
-								"player_id": "4569587",
+								"player_id": "4362249",
 								"round": 8,
 								"seat": 12
 							}
@@ -2934,22 +2927,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:18.688-05:00",
+						"at": "2026-10-26T03:31:10.382-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4871023",
+								"playerId": "3040151",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:17:18.688Z",
+								"timestamp": "2026-10-26T08:31:10.382Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:48.688Z",
+							"deadline": "2026-10-26T08:31:40.382Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 86,
-								"player_id": "4871023",
+								"player_id": "3040151",
 								"round": 8,
 								"seat": 11
 							}
@@ -2966,22 +2959,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:19.202-05:00",
+						"at": "2026-10-26T03:31:11.092-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3040151",
+								"playerId": "4360310",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:17:19.202Z",
+								"timestamp": "2026-10-26T08:31:11.092Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:49.202Z",
+							"deadline": "2026-10-26T08:31:41.092Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 87,
-								"player_id": "3040151",
+								"player_id": "4360310",
 								"round": 8,
 								"seat": 10
 							}
@@ -2995,25 +2988,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 88,
+				"player_id": "4038941",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:19.931-05:00",
+						"at": "2026-10-26T03:31:11.121-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4360310",
+								"playerId": "4038941",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:17:19.931Z",
+								"timestamp": "2026-10-26T08:31:11.121Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:49.931Z",
+							"deadline": "2026-10-26T08:31:41.121Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 88,
-								"player_id": "4360310",
+								"player_id": "4038941",
 								"round": 8,
 								"seat": 9
 							}
@@ -3030,22 +3030,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:19.953-05:00",
+						"at": "2026-10-26T03:31:11.903-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4572680",
+								"playerId": "4038815",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:17:19.953Z",
+								"timestamp": "2026-10-26T08:31:11.903Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:49.953Z",
+							"deadline": "2026-10-26T08:31:41.903Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 89,
-								"player_id": "4572680",
+								"player_id": "4038815",
 								"round": 8,
 								"seat": 8
 							}
@@ -3062,22 +3062,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:20.421-05:00",
+						"at": "2026-10-26T03:31:11.922-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4362249",
+								"playerId": "3046779",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:17:20.421Z",
+								"timestamp": "2026-10-26T08:31:11.922Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:50.421Z",
+							"deadline": "2026-10-26T08:31:41.922Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 90,
-								"player_id": "4362249",
+								"player_id": "3046779",
 								"round": 8,
 								"seat": 7
 							}
@@ -3094,22 +3094,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:21.005-05:00",
+						"at": "2026-10-26T03:31:12.802-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4678008",
+								"playerId": "4035687",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:17:21.005Z",
+								"timestamp": "2026-10-26T08:31:12.802Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:51.005Z",
+							"deadline": "2026-10-26T08:31:42.802Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 91,
-								"player_id": "4678008",
+								"player_id": "4035687",
 								"round": 8,
 								"seat": 6
 							}
@@ -3126,22 +3126,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:21.026-05:00",
+						"at": "2026-10-26T03:31:13.47-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4430027",
+								"playerId": "4241416",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:17:21.026Z",
+								"timestamp": "2026-10-26T08:31:13.470Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:51.026Z",
+							"deadline": "2026-10-26T08:31:43.470Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 92,
-								"player_id": "4430027",
+								"player_id": "4241416",
 								"round": 8,
 								"seat": 5
 							}
@@ -3158,22 +3158,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:21.722-05:00",
+						"at": "2026-10-26T03:31:13.942-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3116165",
+								"playerId": "4678008",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:17:21.722Z",
+								"timestamp": "2026-10-26T08:31:13.942Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:51.722Z",
+							"deadline": "2026-10-26T08:31:43.942Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 93,
-								"player_id": "3116165",
+								"player_id": "4678008",
 								"round": 8,
 								"seat": 4
 							}
@@ -3190,22 +3190,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:22.363-05:00",
+						"at": "2026-10-26T03:31:14.625-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4047365",
+								"playerId": "4871023",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:17:22.363Z",
+								"timestamp": "2026-10-26T08:31:14.625Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:52.363Z",
+							"deadline": "2026-10-26T08:31:44.625Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 94,
-								"player_id": "4047365",
+								"player_id": "4871023",
 								"round": 8,
 								"seat": 3
 							}
@@ -3222,22 +3222,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:23.118-05:00",
+						"at": "2026-10-26T03:31:14.64-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4241416",
+								"playerId": "15847",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:17:23.118Z",
+								"timestamp": "2026-10-26T08:31:14.640Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:53.118Z",
+							"deadline": "2026-10-26T08:31:44.640Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 95,
-								"player_id": "4241416",
+								"player_id": "15847",
 								"round": 8,
 								"seat": 2
 							}
@@ -3254,22 +3254,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:23.608-05:00",
+						"at": "2026-10-26T03:31:15.104-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4688813",
+								"playerId": "4241985",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:17:23.608Z",
+								"timestamp": "2026-10-26T08:31:15.104Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:53.608Z",
+							"deadline": "2026-10-26T08:31:45.104Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 96,
-								"player_id": "4688813",
+								"player_id": "4241985",
 								"round": 8,
 								"seat": 1
 							}
@@ -3286,22 +3286,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:24.52-05:00",
+						"at": "2026-10-26T03:31:15.995-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "DST-LAR",
+								"playerId": "3916433",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:17:24.520Z",
+								"timestamp": "2026-10-26T08:31:15.995Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:54.520Z",
+							"deadline": "2026-10-26T08:31:45.995Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 97,
-								"player_id": "DST-LAR",
+								"player_id": "3916433",
 								"round": 9,
 								"seat": 1
 							}
@@ -3318,22 +3318,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:25.351-05:00",
+						"at": "2026-10-26T03:31:16.013-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4568490",
+								"playerId": "4572680",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:17:25.351Z",
+								"timestamp": "2026-10-26T08:31:16.013Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:55.351Z",
+							"deadline": "2026-10-26T08:31:46.013Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 98,
-								"player_id": "4568490",
+								"player_id": "4572680",
 								"round": 9,
 								"seat": 2
 							}
@@ -3350,17 +3350,17 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:25.973-05:00",
+						"at": "2026-10-26T03:31:16.774-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
 								"playerId": "DST-HOU",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:17:25.973Z",
+								"timestamp": "2026-10-26T08:31:16.774Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:55.973Z",
+							"deadline": "2026-10-26T08:31:46.774Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
@@ -3382,22 +3382,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:26.699-05:00",
+						"at": "2026-10-26T03:31:17.403-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4241985",
+								"playerId": "4429025",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:17:26.699Z",
+								"timestamp": "2026-10-26T08:31:17.403Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:56.699Z",
+							"deadline": "2026-10-26T08:31:47.403Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 100,
-								"player_id": "4241985",
+								"player_id": "4429025",
 								"round": 9,
 								"seat": 4
 							}
@@ -3414,22 +3414,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:26.72-05:00",
+						"at": "2026-10-26T03:31:17.955-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "15847",
+								"playerId": "DST-LAR",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:17:26.720Z",
+								"timestamp": "2026-10-26T08:31:17.955Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:56.720Z",
+							"deadline": "2026-10-26T08:31:47.955Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 101,
-								"player_id": "15847",
+								"player_id": "DST-LAR",
 								"round": 9,
 								"seat": 5
 							}
@@ -3446,22 +3446,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:27.38-05:00",
+						"at": "2026-10-26T03:31:18.669-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4429205",
+								"playerId": "4430027",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:17:27.380Z",
+								"timestamp": "2026-10-26T08:31:18.669Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:57.380Z",
+							"deadline": "2026-10-26T08:31:48.669Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 102,
-								"player_id": "4429205",
+								"player_id": "4430027",
 								"round": 9,
 								"seat": 6
 							}
@@ -3478,22 +3478,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:27.964-05:00",
+						"at": "2026-10-26T03:31:18.687-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4429025",
+								"playerId": "4361050",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:17:27.964Z",
+								"timestamp": "2026-10-26T08:31:18.687Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:57.964Z",
+							"deadline": "2026-10-26T08:31:48.687Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 103,
-								"player_id": "4429025",
+								"player_id": "4361050",
 								"round": 9,
 								"seat": 7
 							}
@@ -3510,22 +3510,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:27.98-05:00",
+						"at": "2026-10-26T03:31:19.297-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3046779",
+								"playerId": "4371733",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:17:27.980Z",
+								"timestamp": "2026-10-26T08:31:19.297Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:57.980Z",
+							"deadline": "2026-10-26T08:31:49.297Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 104,
-								"player_id": "3046779",
+								"player_id": "4371733",
 								"round": 9,
 								"seat": 8
 							}
@@ -3539,25 +3539,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 105,
+				"player_id": "3116365",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:28.656-05:00",
+						"at": "2026-10-26T03:31:19.324-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4371733",
+								"playerId": "3116365",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:17:28.656Z",
+								"timestamp": "2026-10-26T08:31:19.324Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:58.656Z",
+							"deadline": "2026-10-26T08:31:49.324Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 105,
-								"player_id": "4371733",
+								"player_id": "3116365",
 								"round": 9,
 								"seat": 9
 							}
@@ -3574,22 +3581,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:29.528-05:00",
+						"at": "2026-10-26T03:31:20.275-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3139477",
+								"playerId": "4047365",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:17:29.528Z",
+								"timestamp": "2026-10-26T08:31:20.275Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:17:59.528Z",
+							"deadline": "2026-10-26T08:31:50.275Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 106,
-								"player_id": "3139477",
+								"player_id": "4047365",
 								"round": 9,
 								"seat": 10
 							}
@@ -3606,22 +3613,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:30.372-05:00",
+						"at": "2026-10-26T03:31:20.852-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3916433",
+								"playerId": "3139477",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:17:30.372Z",
+								"timestamp": "2026-10-26T08:31:20.852Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:00.372Z",
+							"deadline": "2026-10-26T08:31:50.852Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 107,
-								"player_id": "3916433",
+								"player_id": "3139477",
 								"round": 9,
 								"seat": 11
 							}
@@ -3635,32 +3642,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 108,
-				"player_id": "4361050",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:30.388-05:00",
+						"at": "2026-10-26T03:31:21.779-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4361050",
+								"playerId": "2976212",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:17:30.388Z",
+								"timestamp": "2026-10-26T08:31:21.779Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:00.388Z",
+							"deadline": "2026-10-26T08:31:51.779Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 108,
-								"player_id": "4361050",
+								"player_id": "2976212",
 								"round": 9,
 								"seat": 12
 							}
@@ -3674,32 +3674,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 109,
-				"player_id": "3116365",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:30.407-05:00",
+						"at": "2026-10-26T03:31:22.569-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3116365",
+								"playerId": "DST-MIN",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:17:30.407Z",
+								"timestamp": "2026-10-26T08:31:22.569Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:00.407Z",
+							"deadline": "2026-10-26T08:31:52.569Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 109,
-								"player_id": "3116365",
+								"player_id": "DST-MIN",
 								"round": 10,
 								"seat": 12
 							}
@@ -3716,22 +3709,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:31.329-05:00",
+						"at": "2026-10-26T03:31:23.307-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4689114",
+								"playerId": "4429205",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:17:31.329Z",
+								"timestamp": "2026-10-26T08:31:23.307Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:01.329Z",
+							"deadline": "2026-10-26T08:31:53.307Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 110,
-								"player_id": "4689114",
+								"player_id": "4429205",
 								"round": 10,
 								"seat": 11
 							}
@@ -3748,22 +3741,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:32.113-05:00",
+						"at": "2026-10-26T03:31:24.194-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "2976212",
+								"playerId": "4688813",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:17:32.113Z",
+								"timestamp": "2026-10-26T08:31:24.194Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:02.113Z",
+							"deadline": "2026-10-26T08:31:54.194Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 111,
-								"player_id": "2976212",
+								"player_id": "4688813",
 								"round": 10,
 								"seat": 10
 							}
@@ -3777,25 +3770,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 112,
+				"player_id": "3052587",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:32.715-05:00",
+						"at": "2026-10-26T03:31:24.217-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4373678",
+								"playerId": "3052587",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:17:32.715Z",
+								"timestamp": "2026-10-26T08:31:24.217Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:02.715Z",
+							"deadline": "2026-10-26T08:31:54.217Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 112,
-								"player_id": "4373678",
+								"player_id": "3052587",
 								"round": 10,
 								"seat": 9
 							}
@@ -3812,22 +3812,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:32.738-05:00",
+						"at": "2026-10-26T03:31:25.088-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3052587",
+								"playerId": "4568490",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:17:32.738Z",
+								"timestamp": "2026-10-26T08:31:25.088Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:02.738Z",
+							"deadline": "2026-10-26T08:31:55.088Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 113,
-								"player_id": "3052587",
+								"player_id": "4568490",
 								"round": 10,
 								"seat": 8
 							}
@@ -3844,22 +3844,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:33.613-05:00",
+						"at": "2026-10-26T03:31:25.117-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3042519",
+								"playerId": "4689114",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:17:33.613Z",
+								"timestamp": "2026-10-26T08:31:25.117Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:03.613Z",
+							"deadline": "2026-10-26T08:31:55.117Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 114,
-								"player_id": "3042519",
+								"player_id": "4689114",
 								"round": 10,
 								"seat": 7
 							}
@@ -3876,17 +3876,17 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:34.184-05:00",
+						"at": "2026-10-26T03:31:25.823-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
 								"playerId": "4426338",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:17:34.184Z",
+								"timestamp": "2026-10-26T08:31:25.823Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:04.184Z",
+							"deadline": "2026-10-26T08:31:55.823Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
@@ -3908,22 +3908,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:34.208-05:00",
+						"at": "2026-10-26T03:31:26.767-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3929645",
+								"playerId": "4361432",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:17:34.208Z",
+								"timestamp": "2026-10-26T08:31:26.767Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:04.208Z",
+							"deadline": "2026-10-26T08:31:56.767Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 116,
-								"player_id": "3929645",
+								"player_id": "4361432",
 								"round": 10,
 								"seat": 5
 							}
@@ -3940,22 +3940,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:34.795-05:00",
+						"at": "2026-10-26T03:31:27.667-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4701936",
+								"playerId": "3042519",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:17:34.795Z",
+								"timestamp": "2026-10-26T08:31:27.667Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:04.795Z",
+							"deadline": "2026-10-26T08:31:57.667Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 117,
-								"player_id": "4701936",
+								"player_id": "3042519",
 								"round": 10,
 								"seat": 4
 							}
@@ -3972,22 +3972,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:35.266-05:00",
+						"at": "2026-10-26T03:31:28.456-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4035687",
+								"playerId": "4373678",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:17:35.266Z",
+								"timestamp": "2026-10-26T08:31:28.456Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:05.266Z",
+							"deadline": "2026-10-26T08:31:58.456Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 118,
-								"player_id": "4035687",
+								"player_id": "4373678",
 								"round": 10,
 								"seat": 3
 							}
@@ -4004,22 +4004,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:35.751-05:00",
+						"at": "2026-10-26T03:31:28.484-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "DST-MIN",
+								"playerId": "3929645",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:17:35.751Z",
+								"timestamp": "2026-10-26T08:31:28.484Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:05.751Z",
+							"deadline": "2026-10-26T08:31:58.484Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 119,
-								"player_id": "DST-MIN",
+								"player_id": "3929645",
 								"round": 10,
 								"seat": 2
 							}
@@ -4036,22 +4036,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:36.609-05:00",
+						"at": "2026-10-26T03:31:29.193-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3121023",
+								"playerId": "4360569",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:17:36.609Z",
+								"timestamp": "2026-10-26T08:31:29.193Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:06.609Z",
+							"deadline": "2026-10-26T08:31:59.193Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 120,
-								"player_id": "3121023",
+								"player_id": "4360569",
 								"round": 10,
 								"seat": 1
 							}
@@ -4068,22 +4068,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:37.524-05:00",
+						"at": "2026-10-26T03:31:29.833-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4429023",
+								"playerId": "3121023",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:17:37.524Z",
+								"timestamp": "2026-10-26T08:31:29.833Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:07.524Z",
+							"deadline": "2026-10-26T08:31:59.833Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 121,
-								"player_id": "4429023",
+								"player_id": "3121023",
 								"round": 11,
 								"seat": 1
 							}
@@ -4100,22 +4100,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:38.342-05:00",
+						"at": "2026-10-26T03:31:29.853-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3953687",
+								"playerId": "4576297",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:17:38.342Z",
+								"timestamp": "2026-10-26T08:31:29.853Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:08.342Z",
+							"deadline": "2026-10-26T08:31:59.853Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 122,
-								"player_id": "3953687",
+								"player_id": "4576297",
 								"round": 11,
 								"seat": 2
 							}
@@ -4132,22 +4132,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:38.825-05:00",
+						"at": "2026-10-26T03:31:30.703-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4361432",
+								"playerId": "4683062",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:17:38.825Z",
+								"timestamp": "2026-10-26T08:31:30.703Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:08.825Z",
+							"deadline": "2026-10-26T08:32:00.703Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 123,
-								"player_id": "4361432",
+								"player_id": "4683062",
 								"round": 11,
 								"seat": 3
 							}
@@ -4164,22 +4164,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:39.633-05:00",
+						"at": "2026-10-26T03:31:31.58-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4608686",
+								"playerId": "4701936",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:17:39.633Z",
+								"timestamp": "2026-10-26T08:31:31.580Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:09.633Z",
+							"deadline": "2026-10-26T08:32:01.580Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 124,
-								"player_id": "4608686",
+								"player_id": "4701936",
 								"round": 11,
 								"seat": 4
 							}
@@ -4196,22 +4196,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:39.653-05:00",
+						"at": "2026-10-26T03:31:32.398-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4576297",
+								"playerId": "4608686",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:17:39.653Z",
+								"timestamp": "2026-10-26T08:31:32.398Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:09.653Z",
+							"deadline": "2026-10-26T08:32:02.398Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 125,
-								"player_id": "4576297",
+								"player_id": "4608686",
 								"round": 11,
 								"seat": 5
 							}
@@ -4228,22 +4228,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:40.35-05:00",
+						"at": "2026-10-26T03:31:33.154-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3126486",
+								"playerId": "3953687",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:17:40.350Z",
+								"timestamp": "2026-10-26T08:31:33.154Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:10.350Z",
+							"deadline": "2026-10-26T08:32:03.154Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 126,
-								"player_id": "3126486",
+								"player_id": "3953687",
 								"round": 11,
 								"seat": 6
 							}
@@ -4260,22 +4260,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:40.842-05:00",
+						"at": "2026-10-26T03:31:33.18-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "DST-PHI",
+								"playerId": "4385690",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:17:40.842Z",
+								"timestamp": "2026-10-26T08:31:33.180Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:10.842Z",
+							"deadline": "2026-10-26T08:32:03.180Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 127,
-								"player_id": "DST-PHI",
+								"player_id": "4385690",
 								"round": 11,
 								"seat": 7
 							}
@@ -4292,22 +4292,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:40.862-05:00",
+						"at": "2026-10-26T03:31:33.669-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4385690",
+								"playerId": "DST-NE",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:17:40.862Z",
+								"timestamp": "2026-10-26T08:31:33.669Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:10.862Z",
+							"deadline": "2026-10-26T08:32:03.669Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 128,
-								"player_id": "4385690",
+								"player_id": "DST-NE",
 								"round": 11,
 								"seat": 8
 							}
@@ -4321,25 +4321,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 129,
+				"player_id": "4428718",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:41.598-05:00",
+						"at": "2026-10-26T03:31:33.686-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4032473",
+								"playerId": "4428718",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:17:41.598Z",
+								"timestamp": "2026-10-26T08:31:33.686Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:11.598Z",
+							"deadline": "2026-10-26T08:32:03.686Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 129,
-								"player_id": "4032473",
+								"player_id": "4428718",
 								"round": 11,
 								"seat": 9
 							}
@@ -4356,22 +4363,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:42.322-05:00",
+						"at": "2026-10-26T03:31:34.409-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "DST-NE",
+								"playerId": "4242355",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:17:42.322Z",
+								"timestamp": "2026-10-26T08:31:34.409Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:12.322Z",
+							"deadline": "2026-10-26T08:32:04.409Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 130,
-								"player_id": "DST-NE",
+								"player_id": "4242355",
 								"round": 11,
 								"seat": 10
 							}
@@ -4388,22 +4395,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:42.963-05:00",
+						"at": "2026-10-26T03:31:35.243-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "DST-DET",
+								"playerId": "DST-PHI",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:17:42.963Z",
+								"timestamp": "2026-10-26T08:31:35.243Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:12.963Z",
+							"deadline": "2026-10-26T08:32:05.243Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 131,
-								"player_id": "DST-DET",
+								"player_id": "DST-PHI",
 								"round": 11,
 								"seat": 11
 							}
@@ -4417,32 +4424,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 132,
-				"player_id": "4242355",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:42.987-05:00",
+						"at": "2026-10-26T03:31:35.884-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4242355",
+								"playerId": "3917315",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:17:42.987Z",
+								"timestamp": "2026-10-26T08:31:35.884Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:12.987Z",
+							"deadline": "2026-10-26T08:32:05.884Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 132,
-								"player_id": "4242355",
+								"player_id": "3917315",
 								"round": 11,
 								"seat": 12
 							}
@@ -4456,32 +4456,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 133,
-				"player_id": "3123076",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:43.013-05:00",
+						"at": "2026-10-26T03:31:36.534-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3123076",
+								"playerId": "2971573",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:17:43.013Z",
+								"timestamp": "2026-10-26T08:31:36.534Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:13.013Z",
+							"deadline": "2026-10-26T08:32:06.534Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 133,
-								"player_id": "3123076",
+								"player_id": "2971573",
 								"round": 12,
 								"seat": 12
 							}
@@ -4498,22 +4491,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:43.823-05:00",
+						"at": "2026-10-26T03:31:37.094-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "2971573",
+								"playerId": "2473037",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:17:43.823Z",
+								"timestamp": "2026-10-26T08:31:37.094Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:13.823Z",
+							"deadline": "2026-10-26T08:32:07.094Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 134,
-								"player_id": "2971573",
+								"player_id": "2473037",
 								"round": 12,
 								"seat": 11
 							}
@@ -4530,22 +4523,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:44.456-05:00",
+						"at": "2026-10-26T03:31:38.028-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3917315",
+								"playerId": "4360689",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:17:44.456Z",
+								"timestamp": "2026-10-26T08:31:38.028Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:14.456Z",
+							"deadline": "2026-10-26T08:32:08.028Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 135,
-								"player_id": "3917315",
+								"player_id": "4360689",
 								"round": 12,
 								"seat": 10
 							}
@@ -4559,25 +4552,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 136,
+				"player_id": "3123076",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:45.161-05:00",
+						"at": "2026-10-26T03:31:38.047-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4683062",
+								"playerId": "3123076",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:17:45.161Z",
+								"timestamp": "2026-10-26T08:31:38.047Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:15.161Z",
+							"deadline": "2026-10-26T08:32:08.047Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 136,
-								"player_id": "4683062",
+								"player_id": "3123076",
 								"round": 12,
 								"seat": 9
 							}
@@ -4594,22 +4594,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:45.189-05:00",
+						"at": "2026-10-26T03:31:38.58-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3116389",
+								"playerId": "3126486",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:17:45.189Z",
+								"timestamp": "2026-10-26T08:31:38.580Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:15.189Z",
+							"deadline": "2026-10-26T08:32:08.580Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 137,
-								"player_id": "3116389",
+								"player_id": "3126486",
 								"round": 12,
 								"seat": 8
 							}
@@ -4626,22 +4626,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:45.85-05:00",
+						"at": "2026-10-26T03:31:38.659-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4870653",
+								"playerId": "3116389",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:17:45.850Z",
+								"timestamp": "2026-10-26T08:31:38.659Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:15.850Z",
+							"deadline": "2026-10-26T08:32:08.659Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 138,
-								"player_id": "4870653",
+								"player_id": "3116389",
 								"round": 12,
 								"seat": 7
 							}
@@ -4658,22 +4658,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:46.64-05:00",
+						"at": "2026-10-26T03:31:39.244-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "2473037",
+								"playerId": "4695883",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:17:46.640Z",
+								"timestamp": "2026-10-26T08:31:39.244Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:16.640Z",
+							"deadline": "2026-10-26T08:32:09.244Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 139,
-								"player_id": "2473037",
+								"player_id": "4695883",
 								"round": 12,
 								"seat": 6
 							}
@@ -4690,22 +4690,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:46.663-05:00",
+						"at": "2026-10-26T03:31:39.814-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4360516",
+								"playerId": "4036378",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:17:46.663Z",
+								"timestamp": "2026-10-26T08:31:39.814Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:16.663Z",
+							"deadline": "2026-10-26T08:32:09.814Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 140,
-								"player_id": "4360516",
+								"player_id": "4036378",
 								"round": 12,
 								"seat": 5
 							}
@@ -4722,22 +4722,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:47.407-05:00",
+						"at": "2026-10-26T03:31:40.338-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4695883",
+								"playerId": "DST-DET",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:17:47.407Z",
+								"timestamp": "2026-10-26T08:31:40.338Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:17.407Z",
+							"deadline": "2026-10-26T08:32:10.338Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 141,
-								"player_id": "4695883",
+								"player_id": "DST-DET",
 								"round": 12,
 								"seat": 4
 							}
@@ -4754,22 +4754,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:47.909-05:00",
+						"at": "2026-10-26T03:31:40.878-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4429096",
+								"playerId": "3912547",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:17:47.909Z",
+								"timestamp": "2026-10-26T08:31:40.878Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:17.909Z",
+							"deadline": "2026-10-26T08:32:10.878Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 142,
-								"player_id": "4429096",
+								"player_id": "3912547",
 								"round": 12,
 								"seat": 3
 							}
@@ -4786,22 +4786,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:48.725-05:00",
+						"at": "2026-10-26T03:31:40.907-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4036378",
+								"playerId": "4697815",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:17:48.725Z",
+								"timestamp": "2026-10-26T08:31:40.907Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:18.725Z",
+							"deadline": "2026-10-26T08:32:10.907Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 143,
-								"player_id": "4036378",
+								"player_id": "4697815",
 								"round": 12,
 								"seat": 2
 							}
@@ -4818,22 +4818,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:49.515-05:00",
+						"at": "2026-10-26T03:31:41.402-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4360689",
+								"playerId": "4032473",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:17:49.515Z",
+								"timestamp": "2026-10-26T08:31:41.402Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:19.515Z",
+							"deadline": "2026-10-26T08:32:11.402Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 144,
-								"player_id": "4360689",
+								"player_id": "4032473",
 								"round": 12,
 								"seat": 1
 							}
@@ -4850,22 +4850,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:50.143-05:00",
+						"at": "2026-10-26T03:31:41.871-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4575131",
+								"playerId": "DST-LAC",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:17:50.143Z",
+								"timestamp": "2026-10-26T08:31:41.871Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:20.143Z",
+							"deadline": "2026-10-26T08:32:11.871Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 145,
-								"player_id": "4575131",
+								"player_id": "DST-LAC",
 								"round": 13,
 								"seat": 1
 							}
@@ -4882,22 +4882,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:51.066-05:00",
+						"at": "2026-10-26T03:31:41.896-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4870795",
+								"playerId": "4360516",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:17:51.066Z",
+								"timestamp": "2026-10-26T08:31:41.896Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:21.066Z",
+							"deadline": "2026-10-26T08:32:11.896Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 146,
-								"player_id": "4870795",
+								"player_id": "4360516",
 								"round": 13,
 								"seat": 2
 							}
@@ -4914,22 +4914,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:52.001-05:00",
+						"at": "2026-10-26T03:31:42.695-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4574716",
+								"playerId": "4362081",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:17:52.001Z",
+								"timestamp": "2026-10-26T08:31:42.695Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:22.001Z",
+							"deadline": "2026-10-26T08:32:12.695Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 147,
-								"player_id": "4574716",
+								"player_id": "4362081",
 								"round": 13,
 								"seat": 3
 							}
@@ -4946,22 +4946,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:52.76-05:00",
+						"at": "2026-10-26T03:31:43.53-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "17372",
+								"playerId": "4575131",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:17:52.760Z",
+								"timestamp": "2026-10-26T08:31:43.530Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:22.760Z",
+							"deadline": "2026-10-26T08:32:13.530Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 148,
-								"player_id": "17372",
+								"player_id": "4575131",
 								"round": 13,
 								"seat": 4
 							}
@@ -4978,22 +4978,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:52.784-05:00",
+						"at": "2026-10-26T03:31:44.035-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4362478",
+								"playerId": "4870653",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:17:52.784Z",
+								"timestamp": "2026-10-26T08:31:44.035Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:22.784Z",
+							"deadline": "2026-10-26T08:32:14.035Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 149,
-								"player_id": "4362478",
+								"player_id": "4870653",
 								"round": 13,
 								"seat": 5
 							}
@@ -5010,22 +5010,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:53.48-05:00",
+						"at": "2026-10-26T03:31:44.742-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "DST-PIT",
+								"playerId": "4429096",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:17:53.480Z",
+								"timestamp": "2026-10-26T08:31:44.742Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:23.480Z",
+							"deadline": "2026-10-26T08:32:14.742Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 150,
-								"player_id": "DST-PIT",
+								"player_id": "4429096",
 								"round": 13,
 								"seat": 6
 							}
@@ -5042,22 +5042,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:54.339-05:00",
+						"at": "2026-10-26T03:31:44.762-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3055899",
+								"playerId": "4362478",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:17:54.339Z",
+								"timestamp": "2026-10-26T08:31:44.762Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:24.339Z",
+							"deadline": "2026-10-26T08:32:14.762Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 151,
-								"player_id": "3055899",
+								"player_id": "4362478",
 								"round": 13,
 								"seat": 7
 							}
@@ -5074,22 +5074,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:54.364-05:00",
+						"at": "2026-10-26T03:31:45.438-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "5081397",
+								"playerId": "17372",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:17:54.364Z",
+								"timestamp": "2026-10-26T08:31:45.438Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:24.364Z",
+							"deadline": "2026-10-26T08:32:15.438Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 152,
-								"player_id": "5081397",
+								"player_id": "17372",
 								"round": 13,
 								"seat": 8
 							}
@@ -5103,25 +5103,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 153,
+				"player_id": "4241463",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:55.193-05:00",
+						"at": "2026-10-26T03:31:45.467-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4689936",
+								"playerId": "4241463",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:17:55.193Z",
+								"timestamp": "2026-10-26T08:31:45.467Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:25.193Z",
+							"deadline": "2026-10-26T08:32:15.467Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 153,
-								"player_id": "4689936",
+								"player_id": "4241463",
 								"round": 13,
 								"seat": 9
 							}
@@ -5138,22 +5145,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:56.124-05:00",
+						"at": "2026-10-26T03:31:46.115-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4428557",
+								"playerId": "4426385",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:17:56.124Z",
+								"timestamp": "2026-10-26T08:31:46.115Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:26.124Z",
+							"deadline": "2026-10-26T08:32:16.115Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 154,
-								"player_id": "4428557",
+								"player_id": "4426385",
 								"round": 13,
 								"seat": 10
 							}
@@ -5170,22 +5177,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:56.65-05:00",
+						"at": "2026-10-26T03:31:46.59-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4697815",
+								"playerId": "4832955",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:17:56.650Z",
+								"timestamp": "2026-10-26T08:31:46.590Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:26.650Z",
+							"deadline": "2026-10-26T08:32:16.590Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 155,
-								"player_id": "4697815",
+								"player_id": "4832955",
 								"round": 13,
 								"seat": 11
 							}
@@ -5199,32 +5206,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 156,
-				"player_id": "4360569",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:56.674-05:00",
+						"at": "2026-10-26T03:31:47.058-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4360569",
+								"playerId": "4429023",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:17:56.674Z",
+								"timestamp": "2026-10-26T08:31:47.058Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:26.674Z",
+							"deadline": "2026-10-26T08:32:17.058Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 156,
-								"player_id": "4360569",
+								"player_id": "4429023",
 								"round": 13,
 								"seat": 12
 							}
@@ -5238,32 +5238,25 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 157,
-				"player_id": "DST-LAC",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:56.701-05:00",
+						"at": "2026-10-26T03:31:47.836-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "DST-LAC",
+								"playerId": "3046439",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:17:56.701Z",
+								"timestamp": "2026-10-26T08:31:47.836Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:26.701Z",
+							"deadline": "2026-10-26T08:32:17.836Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 157,
-								"player_id": "DST-LAC",
+								"player_id": "3046439",
 								"round": 14,
 								"seat": 12
 							}
@@ -5280,22 +5273,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:57.553-05:00",
+						"at": "2026-10-26T03:31:48.339-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3046439",
+								"playerId": "4837248",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:17:57.553Z",
+								"timestamp": "2026-10-26T08:31:48.339Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:27.553Z",
+							"deadline": "2026-10-26T08:32:18.339Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 158,
-								"player_id": "3046439",
+								"player_id": "4837248",
 								"round": 14,
 								"seat": 11
 							}
@@ -5312,22 +5305,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:58.31-05:00",
+						"at": "2026-10-26T03:31:49.016-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4362081",
+								"playerId": "4574716",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:17:58.310Z",
+								"timestamp": "2026-10-26T08:31:49.016Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:28.310Z",
+							"deadline": "2026-10-26T08:32:19.016Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 159,
-								"player_id": "4362081",
+								"player_id": "4574716",
 								"round": 14,
 								"seat": 10
 							}
@@ -5341,25 +5334,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 160,
+				"player_id": "DST-PIT",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:58.799-05:00",
+						"at": "2026-10-26T03:31:49.043-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4430539",
+								"playerId": "DST-PIT",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:17:58.799Z",
+								"timestamp": "2026-10-26T08:31:49.043Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:28.799Z",
+							"deadline": "2026-10-26T08:32:19.043Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 160,
-								"player_id": "4430539",
+								"player_id": "DST-PIT",
 								"round": 14,
 								"seat": 9
 							}
@@ -5376,22 +5376,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:58.824-05:00",
+						"at": "2026-10-26T03:31:49.661-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "DST-JAX",
+								"playerId": "5083315",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:17:58.824Z",
+								"timestamp": "2026-10-26T08:31:49.661Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:28.824Z",
+							"deadline": "2026-10-26T08:32:19.661Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 161,
-								"player_id": "DST-JAX",
+								"player_id": "5083315",
 								"round": 14,
 								"seat": 8
 							}
@@ -5408,22 +5408,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:59.334-05:00",
+						"at": "2026-10-26T03:31:49.699-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4036133",
+								"playerId": "4689936",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:17:59.334Z",
+								"timestamp": "2026-10-26T08:31:49.699Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:29.334Z",
+							"deadline": "2026-10-26T08:32:19.699Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 162,
-								"player_id": "4036133",
+								"player_id": "4689936",
 								"round": 14,
 								"seat": 7
 							}
@@ -5440,17 +5440,17 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:59.858-05:00",
+						"at": "2026-10-26T03:31:50.163-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
 								"playerId": "4429059",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:17:59.858Z",
+								"timestamp": "2026-10-26T08:31:50.163Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:29.858Z",
+							"deadline": "2026-10-26T08:32:20.163Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
@@ -5472,22 +5472,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:17:59.89-05:00",
+						"at": "2026-10-26T03:31:50.826-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4686361",
+								"playerId": "4567104",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:17:59.890Z",
+								"timestamp": "2026-10-26T08:31:50.826Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:29.890Z",
+							"deadline": "2026-10-26T08:32:20.826Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 164,
-								"player_id": "4686361",
+								"player_id": "4567104",
 								"round": 14,
 								"seat": 5
 							}
@@ -5504,22 +5504,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:00.445-05:00",
+						"at": "2026-10-26T03:31:51.531-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "5083315",
+								"playerId": "3150744",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:18:00.445Z",
+								"timestamp": "2026-10-26T08:31:51.531Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:30.445Z",
+							"deadline": "2026-10-26T08:32:21.531Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 165,
-								"player_id": "5083315",
+								"player_id": "3150744",
 								"round": 14,
 								"seat": 4
 							}
@@ -5536,22 +5536,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:00.971-05:00",
+						"at": "2026-10-26T03:31:52.031-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4367209",
+								"playerId": "4428557",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:18:00.971Z",
+								"timestamp": "2026-10-26T08:31:52.031Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:30.971Z",
+							"deadline": "2026-10-26T08:32:22.031Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 166,
-								"player_id": "4367209",
+								"player_id": "4428557",
 								"round": 14,
 								"seat": 3
 							}
@@ -5568,22 +5568,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:01.722-05:00",
+						"at": "2026-10-26T03:31:52.051-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4570037",
+								"playerId": "3055899",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:18:01.722Z",
+								"timestamp": "2026-10-26T08:31:52.051Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:31.722Z",
+							"deadline": "2026-10-26T08:32:22.051Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 167,
-								"player_id": "4570037",
+								"player_id": "3055899",
 								"round": 14,
 								"seat": 2
 							}
@@ -5600,22 +5600,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:02.389-05:00",
+						"at": "2026-10-26T03:31:52.72-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4567104",
+								"playerId": "4686361",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:18:02.389Z",
+								"timestamp": "2026-10-26T08:31:52.720Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:32.389Z",
+							"deadline": "2026-10-26T08:32:22.720Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 168,
-								"player_id": "4567104",
+								"player_id": "4686361",
 								"round": 14,
 								"seat": 1
 							}
@@ -5632,22 +5632,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:03.109-05:00",
+						"at": "2026-10-26T03:31:53.388-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4373626",
+								"playerId": "4570037",
 								"teamId": "seat01",
-								"timestamp": "2026-10-26T08:18:03.109Z",
+								"timestamp": "2026-10-26T08:31:53.388Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:33.109Z",
+							"deadline": "2026-10-26T08:32:23.388Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 169,
-								"player_id": "4373626",
+								"player_id": "4570037",
 								"round": 15,
 								"seat": 1
 							}
@@ -5664,22 +5664,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:04.027-05:00",
+						"at": "2026-10-26T03:31:53.405-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4837248",
+								"playerId": "DST-JAX",
 								"teamId": "seat02",
-								"timestamp": "2026-10-26T08:18:04.027Z",
+								"timestamp": "2026-10-26T08:31:53.405Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:34.027Z",
+							"deadline": "2026-10-26T08:32:23.405Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 170,
-								"player_id": "4837248",
+								"player_id": "DST-JAX",
 								"round": 15,
 								"seat": 2
 							}
@@ -5696,22 +5696,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:04.726-05:00",
+						"at": "2026-10-26T03:31:54.332-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4432577",
+								"playerId": "4036133",
 								"teamId": "seat03",
-								"timestamp": "2026-10-26T08:18:04.726Z",
+								"timestamp": "2026-10-26T08:31:54.332Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:34.726Z",
+							"deadline": "2026-10-26T08:32:24.332Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 171,
-								"player_id": "4432577",
+								"player_id": "4036133",
 								"round": 15,
 								"seat": 3
 							}
@@ -5728,22 +5728,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:05.613-05:00",
+						"at": "2026-10-26T03:31:55.068-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3917792",
+								"playerId": "4367209",
 								"teamId": "seat04",
-								"timestamp": "2026-10-26T08:18:05.613Z",
+								"timestamp": "2026-10-26T08:31:55.068Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:35.613Z",
+							"deadline": "2026-10-26T08:32:25.068Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 172,
-								"player_id": "3917792",
+								"player_id": "4367209",
 								"round": 15,
 								"seat": 4
 							}
@@ -5760,22 +5760,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:05.632-05:00",
+						"at": "2026-10-26T03:31:55.639-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "DST-GB",
+								"playerId": "3917792",
 								"teamId": "seat05",
-								"timestamp": "2026-10-26T08:18:05.632Z",
+								"timestamp": "2026-10-26T08:31:55.639Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:35.632Z",
+							"deadline": "2026-10-26T08:32:25.639Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 173,
-								"player_id": "DST-GB",
+								"player_id": "3917792",
 								"round": 15,
 								"seat": 5
 							}
@@ -5792,22 +5792,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:06.114-05:00",
+						"at": "2026-10-26T03:31:56.175-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4426385",
+								"playerId": "4688380",
 								"teamId": "seat06",
-								"timestamp": "2026-10-26T08:18:06.114Z",
+								"timestamp": "2026-10-26T08:31:56.175Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:36.114Z",
+							"deadline": "2026-10-26T08:32:26.175Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 174,
-								"player_id": "4426385",
+								"player_id": "4688380",
 								"round": 15,
 								"seat": 6
 							}
@@ -5824,22 +5824,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:06.947-05:00",
+						"at": "2026-10-26T03:31:56.227-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4688380",
+								"playerId": "DST-GB",
 								"teamId": "seat07",
-								"timestamp": "2026-10-26T08:18:06.947Z",
+								"timestamp": "2026-10-26T08:31:56.227Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:36.947Z",
+							"deadline": "2026-10-26T08:32:26.227Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 175,
-								"player_id": "4688380",
+								"player_id": "DST-GB",
 								"round": 15,
 								"seat": 7
 							}
@@ -5856,22 +5856,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:06.962-05:00",
+						"at": "2026-10-26T03:31:56.924-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "3150744",
+								"playerId": "4432577",
 								"teamId": "seat08",
-								"timestamp": "2026-10-26T08:18:06.962Z",
+								"timestamp": "2026-10-26T08:31:56.924Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:36.962Z",
+							"deadline": "2026-10-26T08:32:26.924Z",
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 176,
-								"player_id": "3150744",
+								"player_id": "4432577",
 								"round": 15,
 								"seat": 8
 							}
@@ -5885,25 +5885,32 @@
 			}
 		},
 		{
+			"client": {
+				"pick": 177,
+				"player_id": "4034949",
+				"type": "pick"
+			}
+		},
+		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:07.531-05:00",
+						"at": "2026-10-26T03:31:56.94-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4595342",
+								"playerId": "4034949",
 								"teamId": "seat09",
-								"timestamp": "2026-10-26T08:18:07.531Z",
+								"timestamp": "2026-10-26T08:31:56.940Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:37.531Z",
+							"deadline": "2026-10-26T08:32:26.940Z",
 							"pick": {
 								"auto": false,
-								"by": "bot",
+								"by": "drafter",
 								"pick": 177,
-								"player_id": "4595342",
+								"player_id": "4034949",
 								"round": 15,
 								"seat": 9
 							}
@@ -5920,22 +5927,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:08.378-05:00",
+						"at": "2026-10-26T03:31:57.829-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4832955",
+								"playerId": "4373626",
 								"teamId": "seat10",
-								"timestamp": "2026-10-26T08:18:08.378Z",
+								"timestamp": "2026-10-26T08:31:57.829Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:38.378Z",
+							"deadline": "2026-10-26T08:32:27.829Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 178,
-								"player_id": "4832955",
+								"player_id": "4373626",
 								"round": 15,
 								"seat": 10
 							}
@@ -5952,22 +5959,22 @@
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:09.301-05:00",
+						"at": "2026-10-26T03:31:58.523-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "2578570",
+								"playerId": "4685397",
 								"teamId": "seat11",
-								"timestamp": "2026-10-26T08:18:09.301Z",
+								"timestamp": "2026-10-26T08:31:58.523Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
-							"deadline": "2026-10-26T08:18:39.301Z",
+							"deadline": "2026-10-26T08:32:28.523Z",
 							"pick": {
 								"auto": false,
 								"by": "bot",
 								"pick": 179,
-								"player_id": "2578570",
+								"player_id": "4685397",
 								"round": 15,
 								"seat": 11
 							}
@@ -5981,31 +5988,24 @@
 			}
 		},
 		{
-			"client": {
-				"pick": 180,
-				"player_id": "4034949",
-				"type": "pick"
-			}
-		},
-		{
 			"server": {
 				"actions": [
 					{
-						"at": "2026-10-26T03:18:09.316-05:00",
+						"at": "2026-10-26T03:31:59.043-05:00",
 						"kind": "MAKE_PICK",
 						"payload": {
 							"action": {
-								"playerId": "4034949",
+								"playerId": "4430539",
 								"teamId": "seat12",
-								"timestamp": "2026-10-26T08:18:09.316Z",
+								"timestamp": "2026-10-26T08:31:59.043Z",
 								"type": "MAKE_PICK",
 								"v": 1
 							},
 							"pick": {
 								"auto": false,
-								"by": "drafter",
+								"by": "bot",
 								"pick": 180,
-								"player_id": "4034949",
+								"player_id": "4430539",
 								"round": 15,
 								"seat": 12
 							}
@@ -6014,7 +6014,7 @@
 						"seq": 186
 					},
 					{
-						"at": "2026-10-26T03:18:09.316-05:00",
+						"at": "2026-10-26T03:31:59.043-05:00",
 						"kind": "ROOM_COMPLETE",
 						"payload": {},
 						"seat": null,

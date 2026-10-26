@@ -250,7 +250,8 @@ public final class RoomSocket {
             return true
         }
         if onGap != nil, first.seq > lastSeq + 1 {
-            Self.log.notice("room socket: seq gap after \(self.lastSeq), resyncing")
+            let applied = lastSeq
+            Self.log.notice("room socket: seq gap after \(applied), resyncing")
             return false
         }
         lastSeq = last.seq

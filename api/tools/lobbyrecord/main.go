@@ -9,12 +9,12 @@
 // Environment: DATABASE_URL (the api's), WORKOS_COOKIE_PASSWORD (the
 // api's), API (default http://localhost:8080).
 //
-// Three drafters take seats in a 12_ppr lobby: "you" (whose answers and
+// Three drafters take seats in a 12_ppr lobby: "hunt" (whose answers and
 // socket frames are kept), jpk88 and mara. Each drafts our call on its own
 // clock, by hand, as the frames bring its turn. Every answer is kept whole
 // as the API sent it (the envelope), the room's board trimmed to its first
 // 300 players and every player the recording names; the socket's frames
-// are kept in the order "you" received them, with the commands it sent.
+// are kept in the order "hunt" received them, with the commands it sent.
 package main
 
 import (
@@ -44,7 +44,7 @@ const (
 	format     = "12_ppr"
 	boardKeep  = 300
 	teams      = 12
-	recordedBy = "you"
+	recordedBy = "hunt"
 )
 
 var handles = []string{recordedBy, "jpk88", "mara"}

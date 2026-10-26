@@ -77,7 +77,8 @@ public final class LobbyReportViewModel {
         var settings = report.settings
         settings.slot = report.slot
         do {
-            return try await mocks.createMock(MockCreate(leagueId: nil, settings: .init(value1: settings), seed: nil)).id
+            return try await mocks.createMock(MockCreate(leagueId: nil, settings: .init(value1: settings), seed: nil))
+                .id
         } catch {
             problem = LobbyRefusal.sentence(error)
             return nil

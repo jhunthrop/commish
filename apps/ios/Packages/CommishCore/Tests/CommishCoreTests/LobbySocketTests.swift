@@ -62,7 +62,8 @@ struct LobbySocketTests {
         encoder.outputFormatting = .sortedKeys
         let actions = rows.compactMap { try? String(bytes: encoder.encode($0), encoding: .utf8) }
         let clock = now.map { #","now":"\#($0)""# } ?? ""
-        return #"{"type":"\#(type)","room_id":"r","seq":\#(seq)\#(clock),"actions":[\#(actions.joined(separator: ","))]}"#
+        let list = actions.joined(separator: ",")
+        return #"{"type":"\#(type)","room_id":"r","seq":\#(seq)\#(clock),"actions":[\#(list)]}"#
     }
 
     /// The whole recorded log, replayed as the page applies it.
@@ -132,7 +133,7 @@ struct LobbySocketTests {
         // Every pick of the drafter's went over the socket as the room's command, at the pick on the clock.
         let sent = await connector.sent.first ?? []
         let picks = sent.filter { $0["type"] == .string("pick") }
-        let mine = end.picks.filter { $0.seat == 12 }
+        let mine = end.picks.filter { $0.seat == 9 }
         #expect(picks.count == mine.count)
         #expect(picks.map { $0["pick"] } == mine.map { .number(Double($0.pick)) })
         #expect(picks.map { $0["player_id"] } == mine.map { .string($0.playerID) })
@@ -143,10 +144,10 @@ struct LobbySocketTests {
     @Test func aPickOnYourTurnLandsAsItsRowAndNotBefore() async throws {
         let rows = try Self.rows()
         let room = try LobbyFixture.room()
-        // The frames up to your first turn, 1.12.
+        // The frames up to your first turn, 1.09.
         var state = LobbyState(room: room)
         var upTo = 0
-        for (index, batch) in rows.enumerated() where state.pickNumber < 12 || !state.drafting {
+        for (index, batch) in rows.enumerated() where state.pickNumber < 9 || !state.drafting {
             state = state.applying(batch, you: room.you)
             upTo = index
         }
@@ -154,11 +155,11 @@ struct LobbySocketTests {
         let landing = rows[upTo + 1]
         let connector = ScriptedConnector([
             [Self.welcome(opening.flatMap(\.self))]
-                + [.client(RoomCommand.pick(playerID: "x", pick: 12).text), Self.update(landing), .end],
+                + [.client(RoomCommand.pick(playerID: "x", pick: 9).text), Self.update(landing), .end],
         ])
         let api = StubLobby()
         let viewModel = Self.viewModel(api, connector, timer: RecordingTimer())
-        let card = try #require(LobbyFixture.card(12))
+        let card = try #require(LobbyFixture.card(9))
         var before: Int?
         await connector.drive { command in
             if case .pick = command {
@@ -171,13 +172,13 @@ struct LobbySocketTests {
             }
         }
         await viewModel.run()
-        #expect(before == 11)
-        let mine = viewModel.lobby?.picks.first { $0.pick == 12 }
-        #expect(mine?.seat == 12)
-        #expect(mine?.by == .drafter)
+        #expect(before == 8)
+        let mine = viewModel.lobby?.picks.first { $0.pick == 9 }
+        #expect(mine?.seat == 9)
+        #expect(mine?.madeBy == .drafter)
         let sent = await connector.sent.first ?? []
         #expect(sent.contains(.object([
-            "type": .string("pick"), "player_id": .string(card.call), "pick": .number(12),
+            "type": .string("pick"), "player_id": .string(card.call), "pick": .number(9),
         ])))
     }
 

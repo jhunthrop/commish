@@ -103,15 +103,15 @@ export const CLOCK_LEFT_MS = 27_400;
 export const FILL_LEFT_MS = 65_000;
 
 /** The replayed states the parity draws, each the first frame after which the room is at its pick:
- * the room filling, the draft started, your first turn, your turn straight back, between your turns in
- * round 3 and your turn in round 3; then the room at its end. */
+ * the room filling, the draft started, your first turn, between your turns, your turn in round 2 and
+ * your turn in round 3; then the room at its end. */
 export const STATES = [
   { name: "filling", pick: null },
   { name: "started", pick: 1 },
-  { name: "yourTurn", pick: 12 },
-  { name: "backToBack", pick: 13 },
-  { name: "between", pick: 30 },
-  { name: "round3", pick: 36 },
+  { name: "yourTurn", pick: 9 },
+  { name: "between", pick: 13 },
+  { name: "round2", pick: 16 },
+  { name: "round3", pick: 33 },
 ] as const;
 
 async function answer<T>(file: string): Promise<T> {
@@ -326,12 +326,9 @@ function room(
         },
     wall: {
       names,
-      rows: wallRows(
-        lobby.picks,
-        board,
-        teams,
-        Math.min(r.rounds, round),
-      ).map((row) => row.map((cell) => cell.player?.id ?? null)),
+      rows: wallRows(lobby.picks, board, teams, Math.min(r.rounds, round)).map(
+        (row) => row.map((cell) => cell.player?.id ?? null),
+      ),
     },
     team: (() => {
       const slots = teamSlots(r.settings, mine, board);
@@ -405,12 +402,10 @@ export async function renderLobby(about: string): Promise<string> {
       return seat ? seatName(seat, r.you) : botName(i + 1);
     });
   const people = seatedPeople(complete.seats);
-  const youReport = await answer<MockReport>("report-you");
+  const firstReport = await answer<MockReport>("report-jpk88");
   const maraReport = await answer<MockReport>("report-mara");
-  const maraNames = names({
-    ...complete,
-    you: maraReport.slot,
-  });
+  const maraNames = names({ ...complete, you: maraReport.slot });
+  const firstNames = names({ ...complete, you: firstReport.slot });
   const parity = {
     about,
     landing: {
@@ -437,14 +432,24 @@ export async function renderLobby(about: string): Promise<string> {
     },
     leave: { filling: LOBBY.leaveFilling, drafting: LOBBY.leaveDrafting },
     reports: {
-      you: {
-        names: names(complete),
-        ...report(youReport, names(complete), undefined, seatsWords(people, complete.teams)),
-        verbs: [LOBBY.joinAnother, soloAgainWords(youReport.slot)],
+      first: {
+        names: firstNames,
+        ...report(
+          firstReport,
+          firstNames,
+          undefined,
+          seatsWords(people, complete.teams),
+        ),
+        verbs: [LOBBY.joinAnother, soloAgainWords(firstReport.slot)],
       },
       down: {
         names: maraNames,
-        ...report(maraReport, maraNames, undefined, seatsWords(people, complete.teams)),
+        ...report(
+          maraReport,
+          maraNames,
+          undefined,
+          seatsWords(people, complete.teams),
+        ),
         verbs: [LOBBY.joinAnother, soloAgainWords(maraReport.slot)],
       },
     },

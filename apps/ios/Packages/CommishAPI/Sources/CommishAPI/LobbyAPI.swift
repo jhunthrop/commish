@@ -104,8 +104,8 @@ extension APIClient: LobbyAPI {
         let body = Components.Schemas.AccountUpdate(handle: handle)
         switch try await Self.unwrapped({ try await client.updateMe(body: .json(body)) }) {
         case .ok: return
-        case let .badRequest(answer): throw Self.fieldProblem(try answer.body.json, field: "handle")
-        case let .conflict(answer): throw Self.fieldProblem(try answer.body.json, field: "handle")
+        case let .badRequest(answer): throw try Self.fieldProblem(answer.body.json, field: "handle")
+        case let .conflict(answer): throw try Self.fieldProblem(answer.body.json, field: "handle")
         case let .undocumented(status, _): throw APIError.status(status)
         }
     }

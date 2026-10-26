@@ -6879,14 +6879,50 @@
 					"position_rank": 74,
 					"team": "IND",
 					"vor": -90.4
+				},
+				{
+					"adp": null,
+					"bye": 9,
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3039707.png",
+					"id": "3039707",
+					"name": "Mitchell Trubisky",
+					"points": 24.4,
+					"position": "QB",
+					"position_rank": 58,
+					"team": "TEN",
+					"vor": -227.8
+				},
+				{
+					"adp": null,
+					"bye": 8,
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3040569.png",
+					"id": "3040569",
+					"name": "Trent Taylor",
+					"points": null,
+					"position": "WR",
+					"position_rank": 248,
+					"team": "SF",
+					"vor": null
+				},
+				{
+					"adp": null,
+					"bye": 14,
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3042749.png",
+					"id": "3042749",
+					"name": "Logan Woodside",
+					"points": null,
+					"position": "QB",
+					"position_rank": 96,
+					"team": "ARI",
+					"vor": null
 				}
 			],
 			"season": 2026
 		},
 		"clock_seconds": 30,
-		"fill_deadline": "2026-10-26T03:16:32.667-05:00",
+		"fill_deadline": "2026-10-26T03:30:25.493-05:00",
 		"format": "12_ppr",
-		"id": "8c0ab888-70a9-466c-965b-b42e49c19279",
+		"id": "02294fd3-7304-4129-9071-1e7d95b4a4d5",
 		"rounds": 15,
 		"seats": [
 			{
@@ -6895,8 +6931,8 @@
 				"seat": 1
 			},
 			{
-				"handle": null,
-				"kind": "bot",
+				"handle": "jpk88",
+				"kind": "drafter",
 				"seat": 2
 			},
 			{
@@ -6910,8 +6946,8 @@
 				"seat": 4
 			},
 			{
-				"handle": "jpk88",
-				"kind": "drafter",
+				"handle": null,
+				"kind": "bot",
 				"seat": 5
 			},
 			{
@@ -6920,18 +6956,18 @@
 				"seat": 6
 			},
 			{
-				"handle": null,
-				"kind": "bot",
+				"handle": "mara",
+				"kind": "drafter",
 				"seat": 7
 			},
 			{
-				"handle": "mara",
-				"kind": "drafter",
+				"handle": null,
+				"kind": "bot",
 				"seat": 8
 			},
 			{
-				"handle": null,
-				"kind": "bot",
+				"handle": "hunt",
+				"kind": "drafter",
 				"seat": 9
 			},
 			{
@@ -6945,8 +6981,8 @@
 				"seat": 11
 			},
 			{
-				"handle": "you",
-				"kind": "drafter",
+				"handle": null,
+				"kind": "bot",
 				"seat": 12
 			}
 		],
@@ -6969,14 +7005,14 @@
 			"slot": null,
 			"teams": 12
 		},
-		"socket_url": "ws://localhost:19229/rooms/8c0ab888-70a9-466c-965b-b42e49c19279/ws",
+		"socket_url": "ws://localhost:19229/rooms/02294fd3-7304-4129-9071-1e7d95b4a4d5/ws",
 		"solo_pace": false,
-		"started_at": "2026-10-26T03:16:32.672-05:00",
+		"started_at": "2026-10-26T03:30:25.497-05:00",
 		"status": "complete",
 		"teams": 12,
-		"you": 12
+		"you": 9
 	},
 	"error": null,
 	"ok": true,
-	"request_id": "31c84cfa7c0b29b1"
+	"request_id": "a15f45afec70a193"
 }

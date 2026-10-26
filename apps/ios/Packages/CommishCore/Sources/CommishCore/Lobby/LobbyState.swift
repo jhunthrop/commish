@@ -31,7 +31,7 @@ public struct LobbyPick: Equatable, Sendable {
     public let round: Int
     public let seat: Int
     public let playerID: String
-    public let by: LobbyPickBy
+    public let madeBy: LobbyPickBy
 
     public var placed: PlacedPick {
         PlacedPick(pick: pick, round: round, seat: seat, playerID: playerID)
@@ -117,7 +117,8 @@ extension LobbyState {
         return with(seats: next)
     }
 
-    private func applyingOne(_ row: RoomRow, you: Int) -> LobbyState {
+    /// A seat's row: joined, left (freed while the room fills), returned; nil for any other row.
+    private func seated(_ row: RoomRow) -> LobbyState? {
         let payload = row.payload
         switch row.kind {
         case "SEAT_JOINED":
@@ -126,6 +127,17 @@ extension LobbyState {
             return row.seat.map { withSeat($0, kind: payload["freed"]?.flag == true ? .open : .left) } ?? self
         case "SEAT_RETURNED":
             return row.seat.map { withSeat($0, kind: .drafter) } ?? self
+        default:
+            return nil
+        }
+    }
+
+    private func applyingOne(_ row: RoomRow, you: Int) -> LobbyState {
+        if let seated = seated(row) {
+            return seated
+        }
+        let payload = row.payload
+        switch row.kind {
         case "ROOM_STARTED":
             let bots = payload["bots"]?.numbers ?? []
             return bots.reduce(with(soloPace: payload["solo_pace"]?.flag ?? false)) { state, bot in
@@ -165,8 +177,8 @@ extension LobbyState {
         else {
             return nil
         }
-        let by = value["by"]?.text.flatMap(LobbyPickBy.init(rawValue:)) ?? .bot
-        return LobbyPick(pick: pick, round: round, seat: seat, playerID: player, by: by)
+        let madeBy = value["by"]?.text.flatMap(LobbyPickBy.init(rawValue:)) ?? .bot
+        return LobbyPick(pick: pick, round: round, seat: seat, playerID: player, madeBy: madeBy)
     }
 }
 
@@ -230,7 +242,7 @@ public enum LobbySeats {
         name(view.seat, state: LobbySeatState(handle: view.handle, kind: kind(view)), you: you)
     }
 
-    static func kind(_ view: LobbySeatView) -> LobbySeatKind {
+    public static func kind(_ view: LobbySeatView) -> LobbySeatKind {
         (view.kind.value1?.rawValue ?? view.kind.value2).flatMap(LobbySeatKind.init(rawValue:)) ?? .open
     }
 
@@ -242,7 +254,7 @@ public enum LobbySeats {
     /// lobby.ts pickCredit: who made a pick in the strip's words, a stand-in's credit on two lines.
     public static func credit(_ pick: LobbyPick, seats: [Int: LobbySeatState], you: Int) -> [String] {
         let owner = pick.seat == you ? "you" : (seats[pick.seat]?.handle ?? "Bot \(pick.seat)")
-        switch pick.by {
+        switch pick.madeBy {
         case .drafter: return [owner]
         case .queue: return ["bot for", owner]
         case .clock: return ["clock for", owner]

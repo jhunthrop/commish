@@ -66,6 +66,15 @@ public final class LobbyLandingViewModel {
         }
     }
 
+    /// setup.ts nearestLobby: superflex drafts in the superflex room, ten teams or fewer in the ten-team
+    /// one, the rest in the twelve-team PPR room.
+    public static func nearest(_ settings: RoomSettings) -> LobbyFormat {
+        if (settings.lineup.value1?.rawValue ?? settings.lineup.value2) == "superflex" {
+            return LobbyFormat(value1: ._12HalfSuperflex)
+        }
+        return LobbyFormat(value1: settings.teams <= 10 ? ._10Ppr : ._12Ppr)
+    }
+
     static func key(_ format: LobbyFormat) -> String {
         format.value1?.rawValue ?? format.value2 ?? ""
     }

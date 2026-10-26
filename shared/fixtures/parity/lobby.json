@@ -39,7 +39,7 @@
 	"states": {
 		"filling": {
 			"frame": 1,
-			"now": "2026-10-26T08:15:27.667Z",
+			"now": "2026-10-26T08:29:20.493Z",
 			"card": null,
 			"room": {
 				"state": {
@@ -59,8 +59,8 @@
 						],
 						[
 							2,
-							null,
-							null
+							"jpk88",
+							"drafter"
 						],
 						[
 							3,
@@ -74,8 +74,8 @@
 						],
 						[
 							5,
-							"jpk88",
-							"drafter"
+							null,
+							null
 						],
 						[
 							6,
@@ -84,18 +84,18 @@
 						],
 						[
 							7,
-							null,
-							null
-						],
-						[
-							8,
 							"mara",
 							"drafter"
 						],
 						[
-							9,
+							8,
 							null,
 							null
+						],
+						[
+							9,
+							"hunt",
+							"drafter"
 						],
 						[
 							10,
@@ -109,8 +109,8 @@
 						],
 						[
 							12,
-							"you",
-							"drafter"
+							null,
+							null
 						]
 					]
 				},
@@ -125,10 +125,10 @@
 					},
 					{
 						"seat": 2,
-						"name": "Seat 2",
-						"line": "waiting",
-						"compact": true,
-						"label": "Seat 2, open"
+						"name": "jpk88",
+						"line": "drafter",
+						"compact": false,
+						"label": "jpk88"
 					},
 					{
 						"seat": 3,
@@ -146,10 +146,10 @@
 					},
 					{
 						"seat": 5,
-						"name": "jpk88",
-						"line": "drafter",
-						"compact": false,
-						"label": "jpk88"
+						"name": "Seat 5",
+						"line": "waiting",
+						"compact": true,
+						"label": "Seat 5, open"
 					},
 					{
 						"seat": 6,
@@ -160,24 +160,24 @@
 					},
 					{
 						"seat": 7,
-						"name": "Seat 7",
-						"line": "waiting",
-						"compact": true,
-						"label": "Seat 7, open"
-					},
-					{
-						"seat": 8,
 						"name": "mara",
 						"line": "drafter",
 						"compact": false,
 						"label": "mara"
 					},
 					{
-						"seat": 9,
-						"name": "Seat 9",
+						"seat": 8,
+						"name": "Seat 8",
 						"line": "waiting",
 						"compact": true,
-						"label": "Seat 9, open"
+						"label": "Seat 8, open"
+					},
+					{
+						"seat": 9,
+						"name": "You",
+						"line": "drafter",
+						"compact": false,
+						"label": "You"
 					},
 					{
 						"seat": 10,
@@ -195,10 +195,10 @@
 					},
 					{
 						"seat": 12,
-						"name": "You",
-						"line": "drafter",
-						"compact": false,
-						"label": "You"
+						"name": "Seat 12",
+						"line": "waiting",
+						"compact": true,
+						"label": "Seat 12, open"
 					}
 				],
 				"wait": {
@@ -208,7 +208,7 @@
 				"landing": null,
 				"call": null,
 				"pool": {
-					"line": "556 left to draft, ranked by points over replacement",
+					"line": "559 left to draft, ranked by points over replacement",
 					"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Still there lands with our call.",
 					"chanceLabel": "",
 					"missing": "with our call",
@@ -216,7 +216,7 @@
 					"filters": [
 						{
 							"filter": "All",
-							"count": 556,
+							"count": 559,
 							"empty": null,
 							"rows": [
 								{
@@ -321,7 +321,7 @@
 						},
 						{
 							"filter": "QB",
-							"count": 70,
+							"count": 72,
 							"empty": null,
 							"rows": [
 								{
@@ -531,7 +531,7 @@
 						},
 						{
 							"filter": "WR",
-							"count": 197,
+							"count": 198,
 							"empty": null,
 							"rows": [
 								{
@@ -960,17 +960,17 @@
 				"wall": {
 					"names": [
 						"Seat 1",
-						"Seat 2",
+						"jpk88",
 						"Seat 3",
 						"Seat 4",
-						"jpk88",
+						"Seat 5",
 						"Seat 6",
-						"Seat 7",
 						"mara",
-						"Seat 9",
+						"Seat 8",
+						"You",
 						"Seat 10",
 						"Seat 11",
-						"You"
+						"Seat 12"
 					],
 					"rows": [
 						[
@@ -1047,13 +1047,13 @@
 		},
 		"started": {
 			"frame": 2,
-			"now": "2026-10-26T08:16:35.272Z",
+			"now": "2026-10-26T08:30:28.097Z",
 			"card": null,
 			"room": {
 				"state": {
 					"seq": 5,
 					"pickNumber": 1,
-					"deadline": "2026-10-26T08:17:02.672Z",
+					"deadline": "2026-10-26T08:30:55.497Z",
 					"drafting": true,
 					"complete": false,
 					"soloPace": false,
@@ -1067,8 +1067,8 @@
 						],
 						[
 							2,
-							null,
-							"bot"
+							"jpk88",
+							"drafter"
 						],
 						[
 							3,
@@ -1082,8 +1082,8 @@
 						],
 						[
 							5,
-							"jpk88",
-							"drafter"
+							null,
+							"bot"
 						],
 						[
 							6,
@@ -1092,18 +1092,18 @@
 						],
 						[
 							7,
-							null,
-							"bot"
-						],
-						[
-							8,
 							"mara",
 							"drafter"
 						],
 						[
-							9,
+							8,
 							null,
 							"bot"
+						],
+						[
+							9,
+							"hunt",
+							"drafter"
 						],
 						[
 							10,
@@ -1117,8 +1117,8 @@
 						],
 						[
 							12,
-							"you",
-							"drafter"
+							null,
+							"bot"
 						]
 					]
 				},
@@ -1127,7 +1127,7 @@
 					"pick": "Pick 1.01",
 					"onClock": "Bot 1",
 					"clock": "0:28",
-					"yourPick": "1.12, in 11",
+					"yourPick": "1.09, in 8",
 					"spoken": null
 				},
 				"seats": [
@@ -1140,10 +1140,10 @@
 					},
 					{
 						"seat": 2,
-						"name": "Bot 2",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 2"
+						"name": "jpk88",
+						"line": "drafter",
+						"compact": false,
+						"label": "jpk88"
 					},
 					{
 						"seat": 3,
@@ -1161,10 +1161,10 @@
 					},
 					{
 						"seat": 5,
-						"name": "jpk88",
-						"line": "drafter",
-						"compact": false,
-						"label": "jpk88"
+						"name": "Bot 5",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 5"
 					},
 					{
 						"seat": 6,
@@ -1175,24 +1175,24 @@
 					},
 					{
 						"seat": 7,
-						"name": "Bot 7",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 7"
-					},
-					{
-						"seat": 8,
 						"name": "mara",
 						"line": "drafter",
 						"compact": false,
 						"label": "mara"
 					},
 					{
-						"seat": 9,
-						"name": "Bot 9",
+						"seat": 8,
+						"name": "Bot 8",
 						"line": "waiting",
 						"compact": true,
-						"label": "Bot 9"
+						"label": "Bot 8"
+					},
+					{
+						"seat": 9,
+						"name": "You",
+						"line": "drafter",
+						"compact": false,
+						"label": "You"
 					},
 					{
 						"seat": 10,
@@ -1210,17 +1210,17 @@
 					},
 					{
 						"seat": 12,
-						"name": "You",
-						"line": "drafter",
-						"compact": false,
-						"label": "You"
+						"name": "Bot 12",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 12"
 					}
 				],
 				"wait": null,
 				"landing": null,
 				"call": null,
 				"pool": {
-					"line": "556 left to draft, ranked by points over replacement",
+					"line": "559 left to draft, ranked by points over replacement",
 					"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Still there lands with our call.",
 					"chanceLabel": "",
 					"missing": "with our call",
@@ -1228,7 +1228,7 @@
 					"filters": [
 						{
 							"filter": "All",
-							"count": 556,
+							"count": 559,
 							"empty": null,
 							"rows": [
 								{
@@ -1333,7 +1333,7 @@
 						},
 						{
 							"filter": "QB",
-							"count": 70,
+							"count": 72,
 							"empty": null,
 							"rows": [
 								{
@@ -1543,7 +1543,7 @@
 						},
 						{
 							"filter": "WR",
-							"count": 197,
+							"count": 198,
 							"empty": null,
 							"rows": [
 								{
@@ -1972,17 +1972,17 @@
 				"wall": {
 					"names": [
 						"Bot 1",
-						"Bot 2",
+						"jpk88",
 						"Bot 3",
 						"Bot 4",
-						"jpk88",
+						"Bot 5",
 						"Bot 6",
-						"Bot 7",
 						"mara",
-						"Bot 9",
+						"Bot 8",
+						"You",
 						"Bot 10",
 						"Bot 11",
-						"You"
+						"Bot 12"
 					],
 					"rows": [
 						[
@@ -2058,87 +2058,69 @@
 			}
 		},
 		"yourTurn": {
-			"frame": 15,
-			"now": "2026-10-26T08:16:41.782Z",
-			"card": 12,
+			"frame": 12,
+			"now": "2026-10-26T08:30:32.706Z",
+			"card": 9,
 			"room": {
 				"state": {
-					"seq": 17,
-					"pickNumber": 12,
-					"deadline": "2026-10-26T08:17:09.182Z",
+					"seq": 14,
+					"pickNumber": 9,
+					"deadline": "2026-10-26T08:31:00.106Z",
 					"drafting": true,
 					"complete": false,
 					"soloPace": false,
 					"queue": [
 						"4362628",
-						"4430878",
-						"4374302"
+						"4374302",
+						"4430878"
 					],
 					"picks": [
 						[
 							1,
 							1,
-							"4374302",
-							"bot"
-						],
-						[
-							2,
-							2,
-							"3117251",
-							"bot"
-						],
-						[
-							3,
-							3,
 							"4430807",
 							"bot"
 						],
 						[
-							4,
-							4,
-							"4429795",
-							"bot"
-						],
-						[
-							5,
-							5,
-							"4362628",
+							2,
+							2,
+							"4426515",
 							"drafter"
 						],
 						[
+							3,
+							3,
+							"4429160",
+							"bot"
+						],
+						[
+							4,
+							4,
+							"3117251",
+							"bot"
+						],
+						[
+							5,
+							5,
+							"4242335",
+							"bot"
+						],
+						[
 							6,
 							6,
-							"4426515",
+							"4362628",
 							"bot"
 						],
 						[
 							7,
 							7,
-							"4379399",
-							"bot"
+							"4430878",
+							"drafter"
 						],
 						[
 							8,
 							8,
 							"4241389",
-							"drafter"
-						],
-						[
-							9,
-							9,
-							"4429160",
-							"bot"
-						],
-						[
-							10,
-							10,
-							"4262921",
-							"bot"
-						],
-						[
-							11,
-							11,
-							"3043078",
 							"bot"
 						]
 					],
@@ -2150,8 +2132,8 @@
 						],
 						[
 							2,
-							null,
-							"bot"
+							"jpk88",
+							"drafter"
 						],
 						[
 							3,
@@ -2165,8 +2147,8 @@
 						],
 						[
 							5,
-							"jpk88",
-							"drafter"
+							null,
+							"bot"
 						],
 						[
 							6,
@@ -2175,18 +2157,18 @@
 						],
 						[
 							7,
-							null,
-							"bot"
-						],
-						[
-							8,
 							"mara",
 							"drafter"
 						],
 						[
-							9,
+							8,
 							null,
 							"bot"
+						],
+						[
+							9,
+							"hunt",
+							"drafter"
 						],
 						[
 							10,
@@ -2200,14 +2182,14 @@
 						],
 						[
 							12,
-							"you",
-							"drafter"
+							null,
+							"bot"
 						]
 					]
 				},
 				"bug": {
 					"round": "Round 1",
-					"pick": "Pick 1.12",
+					"pick": "Pick 1.09",
 					"onClock": "You",
 					"clock": "0:28",
 					"yourPick": "Now",
@@ -2223,10 +2205,10 @@
 					},
 					{
 						"seat": 2,
-						"name": "Bot 2",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 2"
+						"name": "jpk88",
+						"line": "drafter",
+						"compact": false,
+						"label": "jpk88"
 					},
 					{
 						"seat": 3,
@@ -2244,10 +2226,10 @@
 					},
 					{
 						"seat": 5,
-						"name": "jpk88",
-						"line": "drafter",
-						"compact": false,
-						"label": "jpk88"
+						"name": "Bot 5",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 5"
 					},
 					{
 						"seat": 6,
@@ -2258,24 +2240,24 @@
 					},
 					{
 						"seat": 7,
-						"name": "Bot 7",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 7"
-					},
-					{
-						"seat": 8,
 						"name": "mara",
 						"line": "drafter",
 						"compact": false,
 						"label": "mara"
 					},
 					{
-						"seat": 9,
-						"name": "Bot 9",
+						"seat": 8,
+						"name": "Bot 8",
 						"line": "waiting",
 						"compact": true,
-						"label": "Bot 9"
+						"label": "Bot 8"
+					},
+					{
+						"seat": 9,
+						"name": "You",
+						"line": "on the clock",
+						"compact": false,
+						"label": "You, on the clock"
 					},
 					{
 						"seat": 10,
@@ -2293,74 +2275,44 @@
 					},
 					{
 						"seat": 12,
-						"name": "You",
-						"line": "on the clock",
-						"compact": false,
-						"label": "You, on the clock"
+						"name": "Bot 12",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 12"
 					}
 				],
 				"wait": null,
 				"landing": {
-					"lead": "1.11",
+					"lead": "1.08",
 					"lines": [
 						"just taken, newest first",
-						"2 of the last 11 by people"
+						"2 of the last 8 by people"
 					],
 					"faces": [
-						{
-							"pick": 11,
-							"id": "3043078",
-							"name": "Henry",
-							"lines": [
-								"Bot 11",
-								"1.11"
-							],
-							"strong": false
-						},
-						{
-							"pick": 10,
-							"id": "4262921",
-							"name": "Jefferson",
-							"lines": [
-								"Bot 10",
-								"1.10"
-							],
-							"strong": false
-						},
-						{
-							"pick": 9,
-							"id": "4429160",
-							"name": "Achane",
-							"lines": [
-								"Bot 9",
-								"1.09"
-							],
-							"strong": false
-						},
 						{
 							"pick": 8,
 							"id": "4241389",
 							"name": "Lamb",
 							"lines": [
-								"mara",
+								"Bot 8",
 								"1.08"
-							],
-							"strong": true
-						},
-						{
-							"pick": 7,
-							"id": "4379399",
-							"name": "Cook",
-							"lines": [
-								"Bot 7",
-								"1.07"
 							],
 							"strong": false
 						},
 						{
+							"pick": 7,
+							"id": "4430878",
+							"name": "Smith-Njigba",
+							"lines": [
+								"mara",
+								"1.07"
+							],
+							"strong": true
+						},
+						{
 							"pick": 6,
-							"id": "4426515",
-							"name": "Nacua",
+							"id": "4362628",
+							"name": "Chase",
 							"lines": [
 								"Bot 6",
 								"1.06"
@@ -2369,18 +2321,18 @@
 						},
 						{
 							"pick": 5,
-							"id": "4362628",
-							"name": "Chase",
+							"id": "4242335",
+							"name": "Taylor",
 							"lines": [
-								"jpk88",
+								"Bot 5",
 								"1.05"
 							],
-							"strong": true
+							"strong": false
 						},
 						{
 							"pick": 4,
-							"id": "4429795",
-							"name": "Gibbs",
+							"id": "3117251",
+							"name": "McCaffrey",
 							"lines": [
 								"Bot 4",
 								"1.04"
@@ -2389,8 +2341,8 @@
 						},
 						{
 							"pick": 3,
-							"id": "4430807",
-							"name": "Robinson",
+							"id": "4429160",
+							"name": "Achane",
 							"lines": [
 								"Bot 3",
 								"1.03"
@@ -2399,18 +2351,18 @@
 						},
 						{
 							"pick": 2,
-							"id": "3117251",
-							"name": "McCaffrey",
+							"id": "4426515",
+							"name": "Nacua",
 							"lines": [
-								"Bot 2",
+								"jpk88",
 								"1.02"
 							],
-							"strong": false
+							"strong": true
 						},
 						{
 							"pick": 1,
-							"id": "4374302",
-							"name": "Brown",
+							"id": "4430807",
+							"name": "Robinson",
 							"lines": [
 								"Bot 1",
 								"1.01"
@@ -2420,89 +2372,96 @@
 					]
 				},
 				"call": {
-					"tag": "Our call at 1.12",
-					"chanceHead": "Still there 2.01",
+					"tag": "Our call at 1.09",
+					"chanceHead": "Still there 2.04",
 					"verb": "Draft him",
 					"rows": [
 						{
-							"id": "4430878",
-							"chance": ">99%"
+							"id": "4429795",
+							"chance": "11%"
 						},
 						{
-							"id": "4361370",
-							"chance": ">99%"
+							"id": "4262921",
+							"chance": "20%"
 						},
 						{
-							"id": "4426354",
-							"chance": ">99%"
+							"id": "4362238",
+							"chance": "30%"
 						}
 					]
 				},
 				"pool": {
-					"line": "545 left to draft, ranked by points over replacement",
-					"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Still there at 2.01: 200 runs of this room, each seat drafting as it has so far.",
-					"chanceLabel": "still there at 2.01",
+					"line": "551 left to draft, ranked by points over replacement",
+					"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Still there at 2.04: 200 runs of this room, each seat drafting as it has so far.",
+					"chanceLabel": "still there at 2.04",
 					"missing": "not read",
 					"draftShown": true,
 					"filters": [
 						{
 							"filter": "All",
-							"count": 545,
+							"count": 551,
 							"empty": null,
 							"rows": [
 								{
-									"id": "4430878",
-									"value": "+129.8",
+									"id": "4374302",
+									"value": "+115.2",
 									"chance": ">99%",
-									"call": true,
+									"call": false,
 									"queued": true
+								},
+								{
+									"id": "4429795",
+									"value": "+113.9",
+									"chance": "11%",
+									"call": true,
+									"queued": false
 								},
 								{
 									"id": "4361370",
 									"value": "+93.7",
-									"chance": ">99%",
+									"chance": "86%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4262921",
+									"value": "+91.4",
+									"chance": "20%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4426354",
 									"value": "+91.4",
-									"chance": ">99%",
+									"chance": "82%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4426502",
 									"value": "+88.2",
-									"chance": ">99%",
+									"chance": "33%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4362238",
 									"value": "+88.1",
-									"chance": ">99%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4242335",
-									"value": "+87.9",
-									"chance": ">99%",
+									"chance": "30%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "3929630",
 									"value": "+82.8",
-									"chance": ">99%",
+									"chance": "74%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4047646",
 									"value": "+76.2",
-									"chance": ">99%",
+									"chance": "50%",
 									"call": false,
 									"queued": false
 								},
@@ -2523,28 +2482,21 @@
 								{
 									"id": "4258173",
 									"value": "+73.1",
-									"chance": ">99%",
+									"chance": "95%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4379399",
+									"value": "+72.9",
+									"chance": "14%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4428331",
 									"value": "+72.6",
-									"chance": ">99%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4429615",
-									"value": "+71.7",
-									"chance": ">99%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4241478",
-									"value": "+68.1",
-									"chance": ">99%",
+									"chance": "64%",
 									"call": false,
 									"queued": false
 								}
@@ -2552,7 +2504,7 @@
 						},
 						{
 							"filter": "QB",
-							"count": 70,
+							"count": 72,
 							"empty": null,
 							"rows": [
 								{
@@ -2657,34 +2609,41 @@
 						},
 						{
 							"filter": "RB",
-							"count": 139,
+							"count": 141,
 							"empty": null,
 							"rows": [
 								{
-									"id": "4362238",
-									"value": "+88.1",
-									"chance": ">99%",
-									"call": false,
+									"id": "4429795",
+									"value": "+113.9",
+									"chance": "11%",
+									"call": true,
 									"queued": false
 								},
 								{
-									"id": "4242335",
-									"value": "+87.9",
-									"chance": ">99%",
+									"id": "4362238",
+									"value": "+88.1",
+									"chance": "30%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "3929630",
 									"value": "+82.8",
-									"chance": ">99%",
+									"chance": "74%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4379399",
+									"value": "+72.9",
+									"chance": "14%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4567048",
 									"value": "+67.4",
-									"chance": ">99%",
+									"chance": "96%",
 									"call": false,
 									"queued": false
 								},
@@ -2692,6 +2651,13 @@
 									"id": "4890973",
 									"value": "+66.2",
 									"chance": ">99%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3043078",
+									"value": "+63.3",
+									"chance": "49%",
 									"call": false,
 									"queued": false
 								},
@@ -2743,74 +2709,67 @@
 									"chance": ">99%",
 									"call": false,
 									"queued": false
-								},
-								{
-									"id": "4361579",
-									"value": "+13.2",
-									"chance": ">99%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4569987",
-									"value": "+9.2",
-									"chance": ">99%",
-									"call": false,
-									"queued": false
 								}
 							]
 						},
 						{
 							"filter": "WR",
-							"count": 192,
+							"count": 194,
 							"empty": null,
 							"rows": [
 								{
-									"id": "4430878",
-									"value": "+129.8",
+									"id": "4374302",
+									"value": "+115.2",
 									"chance": ">99%",
-									"call": true,
+									"call": false,
 									"queued": true
 								},
 								{
 									"id": "4361370",
 									"value": "+93.7",
-									"chance": ">99%",
+									"chance": "86%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4262921",
+									"value": "+91.4",
+									"chance": "20%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4426354",
 									"value": "+91.4",
-									"chance": ">99%",
+									"chance": "82%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4426502",
 									"value": "+88.2",
-									"chance": ">99%",
+									"chance": "33%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4047646",
 									"value": "+76.2",
-									"chance": ">99%",
+									"chance": "50%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4258173",
 									"value": "+73.1",
-									"chance": ">99%",
+									"chance": "95%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4428331",
 									"value": "+72.6",
-									"chance": ">99%",
+									"chance": "64%",
 									"call": false,
 									"queued": false
 								},
@@ -2852,13 +2811,6 @@
 								{
 									"id": "4426388",
 									"value": "+42.9",
-									"chance": ">99%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4612826",
-									"value": "+42.7",
 									"chance": ">99%",
 									"call": false,
 									"queued": false
@@ -3186,10 +3138,10 @@
 							"empty": null,
 							"rows": [
 								{
-									"id": "4430878",
-									"value": "+129.8",
+									"id": "4374302",
+									"value": "+115.2",
 									"chance": ">99%",
-									"call": true,
+									"call": false,
 									"queued": true
 								}
 							]
@@ -3199,31 +3151,31 @@
 				"wall": {
 					"names": [
 						"Bot 1",
-						"Bot 2",
+						"jpk88",
 						"Bot 3",
 						"Bot 4",
-						"jpk88",
+						"Bot 5",
 						"Bot 6",
-						"Bot 7",
 						"mara",
-						"Bot 9",
+						"Bot 8",
+						"You",
 						"Bot 10",
 						"Bot 11",
-						"You"
+						"Bot 12"
 					],
 					"rows": [
 						[
-							"4374302",
-							"3117251",
 							"4430807",
-							"4429795",
-							"4362628",
 							"4426515",
-							"4379399",
-							"4241389",
 							"4429160",
-							"4262921",
-							"3043078",
+							"3117251",
+							"4242335",
+							"4362628",
+							"4430878",
+							"4241389",
+							null,
+							null,
+							null,
 							null
 						]
 					]
@@ -3284,95 +3236,95 @@
 				}
 			}
 		},
-		"backToBack": {
+		"between": {
 			"frame": 17,
-			"now": "2026-10-26T08:16:41.794Z",
-			"card": 13,
+			"now": "2026-10-26T08:30:34.312Z",
+			"card": null,
 			"room": {
 				"state": {
 					"seq": 18,
 					"pickNumber": 13,
-					"deadline": "2026-10-26T08:17:09.194Z",
+					"deadline": "2026-10-26T08:31:01.712Z",
 					"drafting": true,
 					"complete": false,
 					"soloPace": false,
 					"queue": [
 						"4362628",
-						"4430878",
-						"4374302"
+						"4374302",
+						"4430878"
 					],
 					"picks": [
 						[
 							1,
 							1,
-							"4374302",
-							"bot"
-						],
-						[
-							2,
-							2,
-							"3117251",
-							"bot"
-						],
-						[
-							3,
-							3,
 							"4430807",
 							"bot"
 						],
 						[
-							4,
-							4,
-							"4429795",
-							"bot"
-						],
-						[
-							5,
-							5,
-							"4362628",
+							2,
+							2,
+							"4426515",
 							"drafter"
 						],
 						[
+							3,
+							3,
+							"4429160",
+							"bot"
+						],
+						[
+							4,
+							4,
+							"3117251",
+							"bot"
+						],
+						[
+							5,
+							5,
+							"4242335",
+							"bot"
+						],
+						[
 							6,
 							6,
-							"4426515",
+							"4362628",
 							"bot"
 						],
 						[
 							7,
 							7,
-							"4379399",
-							"bot"
+							"4430878",
+							"drafter"
 						],
 						[
 							8,
 							8,
 							"4241389",
-							"drafter"
-						],
-						[
-							9,
-							9,
-							"4429160",
 							"bot"
 						],
 						[
+							9,
+							9,
+							"4429795",
+							"drafter"
+						],
+						[
 							10,
 							10,
+							"4374302",
+							"bot"
+						],
+						[
+							11,
+							11,
+							"4426502",
+							"bot"
+						],
+						[
+							12,
+							12,
 							"4262921",
 							"bot"
-						],
-						[
-							11,
-							11,
-							"3043078",
-							"bot"
-						],
-						[
-							12,
-							12,
-							"4430878",
-							"drafter"
 						]
 					],
 					"seats": [
@@ -3383,8 +3335,8 @@
 						],
 						[
 							2,
-							null,
-							"bot"
+							"jpk88",
+							"drafter"
 						],
 						[
 							3,
@@ -3398,8 +3350,8 @@
 						],
 						[
 							5,
-							"jpk88",
-							"drafter"
+							null,
+							"bot"
 						],
 						[
 							6,
@@ -3408,18 +3360,18 @@
 						],
 						[
 							7,
-							null,
-							"bot"
-						],
-						[
-							8,
 							"mara",
 							"drafter"
 						],
 						[
-							9,
+							8,
 							null,
 							"bot"
+						],
+						[
+							9,
+							"hunt",
+							"drafter"
 						],
 						[
 							10,
@@ -3433,17 +3385,17 @@
 						],
 						[
 							12,
-							"you",
-							"drafter"
+							null,
+							"bot"
 						]
 					]
 				},
 				"bug": {
 					"round": "Round 2",
 					"pick": "Pick 2.01",
-					"onClock": "You",
+					"onClock": "Bot 12",
 					"clock": "0:28",
-					"yourPick": "Now",
+					"yourPick": "2.04, in 3",
 					"spoken": null
 				},
 				"seats": [
@@ -3456,10 +3408,10 @@
 					},
 					{
 						"seat": 2,
-						"name": "Bot 2",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 2"
+						"name": "jpk88",
+						"line": "drafter",
+						"compact": false,
+						"label": "jpk88"
 					},
 					{
 						"seat": 3,
@@ -3477,10 +3429,10 @@
 					},
 					{
 						"seat": 5,
-						"name": "jpk88",
-						"line": "drafter",
-						"compact": false,
-						"label": "jpk88"
+						"name": "Bot 5",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 5"
 					},
 					{
 						"seat": 6,
@@ -3491,24 +3443,24 @@
 					},
 					{
 						"seat": 7,
-						"name": "Bot 7",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 7"
-					},
-					{
-						"seat": 8,
 						"name": "mara",
 						"line": "drafter",
 						"compact": false,
 						"label": "mara"
 					},
 					{
-						"seat": 9,
-						"name": "Bot 9",
+						"seat": 8,
+						"name": "Bot 8",
 						"line": "waiting",
 						"compact": true,
-						"label": "Bot 9"
+						"label": "Bot 8"
+					},
+					{
+						"seat": 9,
+						"name": "You",
+						"line": "drafter",
+						"compact": false,
+						"label": "You"
 					},
 					{
 						"seat": 10,
@@ -3526,10 +3478,10 @@
 					},
 					{
 						"seat": 12,
-						"name": "You",
+						"name": "Bot 12",
 						"line": "on the clock",
-						"compact": false,
-						"label": "You, on the clock"
+						"compact": true,
+						"label": "Bot 12, on the clock"
 					}
 				],
 				"wait": null,
@@ -3542,18 +3494,18 @@
 					"faces": [
 						{
 							"pick": 12,
-							"id": "4430878",
-							"name": "Smith-Njigba",
+							"id": "4262921",
+							"name": "Jefferson",
 							"lines": [
-								"you",
+								"Bot 12",
 								"1.12"
 							],
-							"strong": true
+							"strong": false
 						},
 						{
 							"pick": 11,
-							"id": "3043078",
-							"name": "Henry",
+							"id": "4426502",
+							"name": "London",
 							"lines": [
 								"Bot 11",
 								"1.11"
@@ -3562,8 +3514,8 @@
 						},
 						{
 							"pick": 10,
-							"id": "4262921",
-							"name": "Jefferson",
+							"id": "4374302",
+							"name": "Brown",
 							"lines": [
 								"Bot 10",
 								"1.10"
@@ -3572,38 +3524,38 @@
 						},
 						{
 							"pick": 9,
-							"id": "4429160",
-							"name": "Achane",
+							"id": "4429795",
+							"name": "Gibbs",
 							"lines": [
-								"Bot 9",
+								"you",
 								"1.09"
 							],
-							"strong": false
+							"strong": true
 						},
 						{
 							"pick": 8,
 							"id": "4241389",
 							"name": "Lamb",
 							"lines": [
-								"mara",
+								"Bot 8",
 								"1.08"
-							],
-							"strong": true
-						},
-						{
-							"pick": 7,
-							"id": "4379399",
-							"name": "Cook",
-							"lines": [
-								"Bot 7",
-								"1.07"
 							],
 							"strong": false
 						},
 						{
+							"pick": 7,
+							"id": "4430878",
+							"name": "Smith-Njigba",
+							"lines": [
+								"mara",
+								"1.07"
+							],
+							"strong": true
+						},
+						{
 							"pick": 6,
-							"id": "4426515",
-							"name": "Nacua",
+							"id": "4362628",
+							"name": "Chase",
 							"lines": [
 								"Bot 6",
 								"1.06"
@@ -3612,18 +3564,18 @@
 						},
 						{
 							"pick": 5,
-							"id": "4362628",
-							"name": "Chase",
+							"id": "4242335",
+							"name": "Taylor",
 							"lines": [
-								"jpk88",
+								"Bot 5",
 								"1.05"
 							],
-							"strong": true
+							"strong": false
 						},
 						{
 							"pick": 4,
-							"id": "4429795",
-							"name": "Gibbs",
+							"id": "3117251",
+							"name": "McCaffrey",
 							"lines": [
 								"Bot 4",
 								"1.04"
@@ -3632,8 +3584,8 @@
 						},
 						{
 							"pick": 3,
-							"id": "4430807",
-							"name": "Robinson",
+							"id": "4429160",
+							"name": "Achane",
 							"lines": [
 								"Bot 3",
 								"1.03"
@@ -3642,18 +3594,18 @@
 						},
 						{
 							"pick": 2,
-							"id": "3117251",
-							"name": "McCaffrey",
+							"id": "4426515",
+							"name": "Nacua",
 							"lines": [
-								"Bot 2",
+								"jpk88",
 								"1.02"
 							],
-							"strong": false
+							"strong": true
 						},
 						{
 							"pick": 1,
-							"id": "4374302",
-							"name": "Brown",
+							"id": "4430807",
+							"name": "Robinson",
 							"lines": [
 								"Bot 1",
 								"1.01"
@@ -3662,29 +3614,1278 @@
 						}
 					]
 				},
+				"call": null,
+				"pool": {
+					"line": "547 left to draft, ranked by points over replacement",
+					"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Still there lands with our call.",
+					"chanceLabel": "",
+					"missing": "with our call",
+					"draftShown": false,
+					"filters": [
+						{
+							"filter": "All",
+							"count": 547,
+							"empty": null,
+							"rows": [
+								{
+									"id": "4361370",
+									"value": "+93.7",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4426354",
+									"value": "+91.4",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4362238",
+									"value": "+88.1",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3929630",
+									"value": "+82.8",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4047646",
+									"value": "+76.2",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4361307",
+									"value": "+75.2",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4432665",
+									"value": "+73.7",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4258173",
+									"value": "+73.1",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4379399",
+									"value": "+72.9",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4428331",
+									"value": "+72.6",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4429615",
+									"value": "+71.7",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4241478",
+									"value": "+68.1",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4567048",
+									"value": "+67.4",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4890973",
+									"value": "+66.2",
+									"chance": null,
+									"call": false,
+									"queued": false
+								}
+							]
+						},
+						{
+							"filter": "QB",
+							"count": 72,
+							"empty": null,
+							"rows": [
+								{
+									"id": "3918298",
+									"value": "+55.1",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3916387",
+									"value": "+48.1",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4431452",
+									"value": "+34.8",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3915511",
+									"value": "+25.3",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "2577417",
+									"value": "+22.2",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4040715",
+									"value": "+18.2",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4431611",
+									"value": "+14.8",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4038941",
+									"value": "+8.8",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3046779",
+									"value": "+4.8",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "12483",
+									"value": "+3.8",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3052587",
+									"value": "+0.8",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4689114",
+									"value": "+0.0",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3139477",
+									"value": "−4.0",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4426338",
+									"value": "−16.4",
+									"chance": null,
+									"call": false,
+									"queued": false
+								}
+							]
+						},
+						{
+							"filter": "RB",
+							"count": 140,
+							"empty": null,
+							"rows": [
+								{
+									"id": "4362238",
+									"value": "+88.1",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3929630",
+									"value": "+82.8",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4379399",
+									"value": "+72.9",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4567048",
+									"value": "+67.4",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4890973",
+									"value": "+66.2",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3043078",
+									"value": "+63.3",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4685382",
+									"value": "+46.3",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4427366",
+									"value": "+43.4",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4870808",
+									"value": "+36.3",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4239996",
+									"value": "+34.8",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4259545",
+									"value": "+15.9",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4430737",
+									"value": "+15.7",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4596448",
+									"value": "+13.9",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4361579",
+									"value": "+13.2",
+									"chance": null,
+									"call": false,
+									"queued": false
+								}
+							]
+						},
+						{
+							"filter": "WR",
+							"count": 191,
+							"empty": null,
+							"rows": [
+								{
+									"id": "4361370",
+									"value": "+93.7",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4426354",
+									"value": "+91.4",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4047646",
+									"value": "+76.2",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4258173",
+									"value": "+73.1",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4428331",
+									"value": "+72.6",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4429615",
+									"value": "+71.7",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4241478",
+									"value": "+68.1",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4685472",
+									"value": "+51.3",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4239993",
+									"value": "+48.8",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4569618",
+									"value": "+45.6",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4426388",
+									"value": "+42.9",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4612826",
+									"value": "+42.7",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4567750",
+									"value": "+41.2",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4372016",
+									"value": "+38.3",
+									"chance": null,
+									"call": false,
+									"queued": false
+								}
+							]
+						},
+						{
+							"filter": "TE",
+							"count": 91,
+							"empty": null,
+							"rows": [
+								{
+									"id": "4361307",
+									"value": "+75.2",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4432665",
+									"value": "+73.7",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4723086",
+									"value": "+25.3",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4431459",
+									"value": "+22.5",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4360248",
+									"value": "+10.1",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "5083076",
+									"value": "+8.6",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "15847",
+									"value": "+6.7",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4361050",
+									"value": "+6.6",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3116365",
+									"value": "+3.1",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4572680",
+									"value": "+1.9",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4430027",
+									"value": "+0.9",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3040151",
+									"value": "+0.0",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3929645",
+									"value": "−2.5",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3121023",
+									"value": "−2.8",
+									"chance": null,
+									"call": false,
+									"queued": false
+								}
+							]
+						},
+						{
+							"filter": "K",
+							"count": 27,
+							"empty": null,
+							"rows": [
+								{
+									"id": "3953687",
+									"value": "Draft order 1",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "2971573",
+									"value": "Draft order 2",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "2473037",
+									"value": "Draft order 3",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4362081",
+									"value": "Draft order 4",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4574716",
+									"value": "Draft order 5",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "17372",
+									"value": "Draft order 6",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4689936",
+									"value": "Draft order 7",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3055899",
+									"value": "Draft order 8",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4686361",
+									"value": "Draft order 9",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4567104",
+									"value": "Draft order 10",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3150744",
+									"value": "Draft order 11",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4034949",
+									"value": "Draft order 12",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3917232",
+									"value": "Draft order 13",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "2985659",
+									"value": "Draft order 14",
+									"chance": null,
+									"call": false,
+									"queued": false
+								}
+							]
+						},
+						{
+							"filter": "DST",
+							"count": 26,
+							"empty": null,
+							"rows": [
+								{
+									"id": "DST-SEA",
+									"value": "Draft order 1",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "DST-DEN",
+									"value": "Draft order 2",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "DST-HOU",
+									"value": "Draft order 3",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "DST-LAR",
+									"value": "Draft order 4",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "DST-MIN",
+									"value": "Draft order 5",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "DST-NE",
+									"value": "Draft order 6",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "DST-PHI",
+									"value": "Draft order 7",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "DST-DET",
+									"value": "Draft order 8",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "DST-PIT",
+									"value": "Draft order 9",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "DST-LAC",
+									"value": "Draft order 10",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "DST-JAX",
+									"value": "Draft order 11",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "DST-GB",
+									"value": "Draft order 12",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "DST-DAL",
+									"value": "Draft order 13",
+									"chance": null,
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "DST-ATL",
+									"value": "Draft order 14",
+									"chance": null,
+									"call": false,
+									"queued": false
+								}
+							]
+						},
+						{
+							"filter": "Queue",
+							"count": 0,
+							"empty": "Nobody in your queue. Mark a player and press Q to add him.",
+							"rows": []
+						}
+					]
+				},
+				"wall": {
+					"names": [
+						"Bot 1",
+						"jpk88",
+						"Bot 3",
+						"Bot 4",
+						"Bot 5",
+						"Bot 6",
+						"mara",
+						"Bot 8",
+						"You",
+						"Bot 10",
+						"Bot 11",
+						"Bot 12"
+					],
+					"rows": [
+						[
+							"4430807",
+							"4426515",
+							"4429160",
+							"3117251",
+							"4242335",
+							"4362628",
+							"4430878",
+							"4241389",
+							"4429795",
+							"4374302",
+							"4426502",
+							"4262921"
+						],
+						[
+							null,
+							null,
+							null,
+							null,
+							null,
+							null,
+							null,
+							null,
+							null,
+							null,
+							null,
+							null
+						]
+					]
+				},
+				"team": {
+					"count": "1 of 15",
+					"slots": [
+						{
+							"slot": "QB",
+							"id": null,
+							"pick": null
+						},
+						{
+							"slot": "RB",
+							"id": "4429795",
+							"pick": "1.09"
+						},
+						{
+							"slot": "RB",
+							"id": null,
+							"pick": null
+						},
+						{
+							"slot": "WR",
+							"id": null,
+							"pick": null
+						},
+						{
+							"slot": "WR",
+							"id": null,
+							"pick": null
+						},
+						{
+							"slot": "TE",
+							"id": null,
+							"pick": null
+						},
+						{
+							"slot": "FLEX",
+							"id": null,
+							"pick": null
+						},
+						{
+							"slot": "K",
+							"id": null,
+							"pick": null
+						},
+						{
+							"slot": "DST",
+							"id": null,
+							"pick": null
+						}
+					]
+				},
+				"about": {
+					"head": "12 PPR lobby",
+					"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab."
+				}
+			}
+		},
+		"round2": {
+			"frame": 20,
+			"now": "2026-10-26T08:30:36.117Z",
+			"card": 16,
+			"room": {
+				"state": {
+					"seq": 21,
+					"pickNumber": 16,
+					"deadline": "2026-10-26T08:31:03.517Z",
+					"drafting": true,
+					"complete": false,
+					"soloPace": false,
+					"queue": [
+						"4362628",
+						"4374302",
+						"4430878"
+					],
+					"picks": [
+						[
+							1,
+							1,
+							"4430807",
+							"bot"
+						],
+						[
+							2,
+							2,
+							"4426515",
+							"drafter"
+						],
+						[
+							3,
+							3,
+							"4429160",
+							"bot"
+						],
+						[
+							4,
+							4,
+							"3117251",
+							"bot"
+						],
+						[
+							5,
+							5,
+							"4242335",
+							"bot"
+						],
+						[
+							6,
+							6,
+							"4362628",
+							"bot"
+						],
+						[
+							7,
+							7,
+							"4430878",
+							"drafter"
+						],
+						[
+							8,
+							8,
+							"4241389",
+							"bot"
+						],
+						[
+							9,
+							9,
+							"4429795",
+							"drafter"
+						],
+						[
+							10,
+							10,
+							"4374302",
+							"bot"
+						],
+						[
+							11,
+							11,
+							"4426502",
+							"bot"
+						],
+						[
+							12,
+							12,
+							"4262921",
+							"bot"
+						],
+						[
+							13,
+							12,
+							"4362238",
+							"bot"
+						],
+						[
+							14,
+							11,
+							"4426354",
+							"bot"
+						],
+						[
+							15,
+							10,
+							"4361370",
+							"bot"
+						]
+					],
+					"seats": [
+						[
+							1,
+							null,
+							"bot"
+						],
+						[
+							2,
+							"jpk88",
+							"drafter"
+						],
+						[
+							3,
+							null,
+							"bot"
+						],
+						[
+							4,
+							null,
+							"bot"
+						],
+						[
+							5,
+							null,
+							"bot"
+						],
+						[
+							6,
+							null,
+							"bot"
+						],
+						[
+							7,
+							"mara",
+							"drafter"
+						],
+						[
+							8,
+							null,
+							"bot"
+						],
+						[
+							9,
+							"hunt",
+							"drafter"
+						],
+						[
+							10,
+							null,
+							"bot"
+						],
+						[
+							11,
+							null,
+							"bot"
+						],
+						[
+							12,
+							null,
+							"bot"
+						]
+					]
+				},
+				"bug": {
+					"round": "Round 2",
+					"pick": "Pick 2.04",
+					"onClock": "You",
+					"clock": "0:28",
+					"yourPick": "Now",
+					"spoken": null
+				},
+				"seats": [
+					{
+						"seat": 1,
+						"name": "Bot 1",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 1"
+					},
+					{
+						"seat": 2,
+						"name": "jpk88",
+						"line": "drafter",
+						"compact": false,
+						"label": "jpk88"
+					},
+					{
+						"seat": 3,
+						"name": "Bot 3",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 3"
+					},
+					{
+						"seat": 4,
+						"name": "Bot 4",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 4"
+					},
+					{
+						"seat": 5,
+						"name": "Bot 5",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 5"
+					},
+					{
+						"seat": 6,
+						"name": "Bot 6",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 6"
+					},
+					{
+						"seat": 7,
+						"name": "mara",
+						"line": "drafter",
+						"compact": false,
+						"label": "mara"
+					},
+					{
+						"seat": 8,
+						"name": "Bot 8",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 8"
+					},
+					{
+						"seat": 9,
+						"name": "You",
+						"line": "on the clock",
+						"compact": false,
+						"label": "You, on the clock"
+					},
+					{
+						"seat": 10,
+						"name": "Bot 10",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 10"
+					},
+					{
+						"seat": 11,
+						"name": "Bot 11",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 11"
+					},
+					{
+						"seat": 12,
+						"name": "Bot 12",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 12"
+					}
+				],
+				"wait": null,
+				"landing": {
+					"lead": "2.03",
+					"lines": [
+						"just taken, newest first",
+						"2 of the last 12 by people"
+					],
+					"faces": [
+						{
+							"pick": 15,
+							"id": "4361370",
+							"name": "Olave",
+							"lines": [
+								"Bot 10",
+								"2.03"
+							],
+							"strong": false
+						},
+						{
+							"pick": 14,
+							"id": "4426354",
+							"name": "Pickens",
+							"lines": [
+								"Bot 11",
+								"2.02"
+							],
+							"strong": false
+						},
+						{
+							"pick": 13,
+							"id": "4362238",
+							"name": "Brown",
+							"lines": [
+								"Bot 12",
+								"2.01"
+							],
+							"strong": false
+						},
+						{
+							"pick": 12,
+							"id": "4262921",
+							"name": "Jefferson",
+							"lines": [
+								"Bot 12",
+								"1.12"
+							],
+							"strong": false
+						},
+						{
+							"pick": 11,
+							"id": "4426502",
+							"name": "London",
+							"lines": [
+								"Bot 11",
+								"1.11"
+							],
+							"strong": false
+						},
+						{
+							"pick": 10,
+							"id": "4374302",
+							"name": "Brown",
+							"lines": [
+								"Bot 10",
+								"1.10"
+							],
+							"strong": false
+						},
+						{
+							"pick": 9,
+							"id": "4429795",
+							"name": "Gibbs",
+							"lines": [
+								"you",
+								"1.09"
+							],
+							"strong": true
+						},
+						{
+							"pick": 8,
+							"id": "4241389",
+							"name": "Lamb",
+							"lines": [
+								"Bot 8",
+								"1.08"
+							],
+							"strong": false
+						},
+						{
+							"pick": 7,
+							"id": "4430878",
+							"name": "Smith-Njigba",
+							"lines": [
+								"mara",
+								"1.07"
+							],
+							"strong": true
+						},
+						{
+							"pick": 6,
+							"id": "4362628",
+							"name": "Chase",
+							"lines": [
+								"Bot 6",
+								"1.06"
+							],
+							"strong": false
+						},
+						{
+							"pick": 5,
+							"id": "4242335",
+							"name": "Taylor",
+							"lines": [
+								"Bot 5",
+								"1.05"
+							],
+							"strong": false
+						},
+						{
+							"pick": 4,
+							"id": "3117251",
+							"name": "McCaffrey",
+							"lines": [
+								"Bot 4",
+								"1.04"
+							],
+							"strong": false
+						}
+					]
+				},
 				"call": {
-					"tag": "Our call at 2.01",
-					"chanceHead": "Still there 3.12",
+					"tag": "Our call at 2.04",
+					"chanceHead": "Still there 3.09",
 					"verb": "Draft him",
 					"rows": [
 						{
-							"id": "4361370",
-							"chance": "2%"
-						},
-						{
-							"id": "4426354",
-							"chance": "6%"
-						},
-						{
 							"id": "3929630",
-							"chance": "5%"
+							"chance": "7%"
+						},
+						{
+							"id": "4429615",
+							"chance": "4%"
+						},
+						{
+							"id": "4258173",
+							"chance": "8%"
 						}
 					]
 				},
 				"pool": {
 					"line": "544 left to draft, ranked by points over replacement",
-					"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Still there at 3.12: 200 runs of this room, each seat drafting as it has so far.",
-					"chanceLabel": "still there at 3.12",
+					"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Still there at 3.09: 200 runs of this room, each seat drafting as it has so far.",
+					"chanceLabel": "still there at 3.09",
 					"missing": "not read",
 					"draftShown": true,
 					"filters": [
@@ -3694,100 +4895,100 @@
 							"empty": null,
 							"rows": [
 								{
-									"id": "4361370",
-									"value": "+93.7",
-									"chance": "2%",
-									"call": true,
-									"queued": false
-								},
-								{
-									"id": "4426354",
-									"value": "+91.4",
-									"chance": "6%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4426502",
-									"value": "+88.2",
-									"chance": "12%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4362238",
-									"value": "+88.1",
-									"chance": "24%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4242335",
-									"value": "+87.9",
-									"chance": "37%",
-									"call": false,
-									"queued": false
-								},
-								{
 									"id": "3929630",
 									"value": "+82.8",
-									"chance": "5%",
-									"call": false,
+									"chance": "7%",
+									"call": true,
 									"queued": false
 								},
 								{
 									"id": "4047646",
 									"value": "+76.2",
-									"chance": "12%",
+									"chance": "24%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4361307",
 									"value": "+75.2",
-									"chance": "13%",
+									"chance": "34%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4432665",
 									"value": "+73.7",
-									"chance": "52%",
+									"chance": "82%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4258173",
 									"value": "+73.1",
-									"chance": "<1%",
+									"chance": "8%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4379399",
+									"value": "+72.9",
+									"chance": "26%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4428331",
 									"value": "+72.6",
-									"chance": "5%",
+									"chance": "14%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4429615",
 									"value": "+71.7",
-									"chance": "1%",
+									"chance": "4%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4241478",
 									"value": "+68.1",
-									"chance": "6%",
+									"chance": "14%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4567048",
 									"value": "+67.4",
-									"chance": "1%",
+									"chance": "5%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4890973",
+									"value": "+66.2",
+									"chance": "5%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3043078",
+									"value": "+63.3",
+									"chance": "18%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3918298",
+									"value": "+55.1",
+									"chance": "80%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4685472",
+									"value": "+51.3",
+									"chance": "41%",
 									"call": false,
 									"queued": false
 								}
@@ -3795,13 +4996,13 @@
 						},
 						{
 							"filter": "QB",
-							"count": 70,
+							"count": 72,
 							"empty": null,
 							"rows": [
 								{
 									"id": "3918298",
 									"value": "+55.1",
-									"chance": "54%",
+									"chance": "80%",
 									"call": false,
 									"queued": false
 								},
@@ -3904,65 +5105,65 @@
 							"empty": null,
 							"rows": [
 								{
-									"id": "4362238",
-									"value": "+88.1",
-									"chance": "24%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4242335",
-									"value": "+87.9",
-									"chance": "37%",
-									"call": false,
-									"queued": false
-								},
-								{
 									"id": "3929630",
 									"value": "+82.8",
-									"chance": "5%",
+									"chance": "7%",
+									"call": true,
+									"queued": false
+								},
+								{
+									"id": "4379399",
+									"value": "+72.9",
+									"chance": "26%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4567048",
 									"value": "+67.4",
-									"chance": "1%",
+									"chance": "5%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4890973",
 									"value": "+66.2",
-									"chance": "1%",
+									"chance": "5%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3043078",
+									"value": "+63.3",
+									"chance": "18%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4685382",
 									"value": "+46.3",
-									"chance": "<1%",
+									"chance": "2%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4427366",
 									"value": "+43.4",
-									"chance": "8%",
+									"chance": "24%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4870808",
 									"value": "+36.3",
-									"chance": "4%",
+									"chance": "10%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4239996",
 									"value": "+34.8",
-									"chance": "73%",
+									"chance": "92%",
 									"call": false,
 									"queued": false
 								},
@@ -3976,7 +5177,7 @@
 								{
 									"id": "4430737",
 									"value": "+15.7",
-									"chance": "34%",
+									"chance": "59%",
 									"call": false,
 									"queued": false
 								},
@@ -3990,7 +5191,7 @@
 								{
 									"id": "4361579",
 									"value": "+13.2",
-									"chance": "23%",
+									"chance": "49%",
 									"call": false,
 									"queued": false
 								},
@@ -4005,83 +5206,62 @@
 						},
 						{
 							"filter": "WR",
-							"count": 191,
+							"count": 189,
 							"empty": null,
 							"rows": [
 								{
-									"id": "4361370",
-									"value": "+93.7",
-									"chance": "2%",
-									"call": true,
-									"queued": false
-								},
-								{
-									"id": "4426354",
-									"value": "+91.4",
-									"chance": "6%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4426502",
-									"value": "+88.2",
-									"chance": "12%",
-									"call": false,
-									"queued": false
-								},
-								{
 									"id": "4047646",
 									"value": "+76.2",
-									"chance": "12%",
+									"chance": "24%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4258173",
 									"value": "+73.1",
-									"chance": "<1%",
+									"chance": "8%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4428331",
 									"value": "+72.6",
-									"chance": "5%",
+									"chance": "14%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4429615",
 									"value": "+71.7",
-									"chance": "1%",
+									"chance": "4%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4241478",
 									"value": "+68.1",
-									"chance": "6%",
+									"chance": "14%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4685472",
 									"value": "+51.3",
-									"chance": "19%",
+									"chance": "41%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4239993",
 									"value": "+48.8",
-									"chance": "77%",
+									"chance": "100%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4569618",
 									"value": "+45.6",
-									"chance": "4%",
+									"chance": "8%",
 									"call": false,
 									"queued": false
 								},
@@ -4095,14 +5275,35 @@
 								{
 									"id": "4612826",
 									"value": "+42.7",
-									"chance": "90%",
+									"chance": ">99%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4567750",
 									"value": "+41.2",
-									"chance": "56%",
+									"chance": "93%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4372016",
+									"value": "+38.3",
+									"chance": ">99%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "16800",
+									"value": "+30.6",
+									"chance": ">99%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "3915416",
+									"value": "+26.8",
+									"chance": ">99%",
 									"call": false,
 									"queued": false
 								}
@@ -4116,14 +5317,14 @@
 								{
 									"id": "4361307",
 									"value": "+75.2",
-									"chance": "13%",
+									"chance": "34%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4432665",
 									"value": "+73.7",
-									"chance": "52%",
+									"chance": "82%",
 									"call": false,
 									"queued": false
 								},
@@ -4434,32 +5635,32 @@
 				"wall": {
 					"names": [
 						"Bot 1",
-						"Bot 2",
+						"jpk88",
 						"Bot 3",
 						"Bot 4",
-						"jpk88",
+						"Bot 5",
 						"Bot 6",
-						"Bot 7",
 						"mara",
-						"Bot 9",
+						"Bot 8",
+						"You",
 						"Bot 10",
 						"Bot 11",
-						"You"
+						"Bot 12"
 					],
 					"rows": [
 						[
-							"4374302",
-							"3117251",
 							"4430807",
-							"4429795",
-							"4362628",
 							"4426515",
-							"4379399",
-							"4241389",
 							"4429160",
-							"4262921",
-							"3043078",
-							"4430878"
+							"3117251",
+							"4242335",
+							"4362628",
+							"4430878",
+							"4241389",
+							"4429795",
+							"4374302",
+							"4426502",
+							"4262921"
 						],
 						[
 							null,
@@ -4471,9 +5672,9 @@
 							null,
 							null,
 							null,
-							null,
-							null,
-							null
+							"4361370",
+							"4426354",
+							"4362238"
 						]
 					]
 				},
@@ -4487,8 +5688,8 @@
 						},
 						{
 							"slot": "RB",
-							"id": null,
-							"pick": null
+							"id": "4429795",
+							"pick": "1.09"
 						},
 						{
 							"slot": "RB",
@@ -4497,1360 +5698,13 @@
 						},
 						{
 							"slot": "WR",
-							"id": "4430878",
-							"pick": "1.12"
-						},
-						{
-							"slot": "WR",
-							"id": null,
-							"pick": null
-						},
-						{
-							"slot": "TE",
-							"id": null,
-							"pick": null
-						},
-						{
-							"slot": "FLEX",
-							"id": null,
-							"pick": null
-						},
-						{
-							"slot": "K",
-							"id": null,
-							"pick": null
-						},
-						{
-							"slot": "DST",
-							"id": null,
-							"pick": null
-						}
-					]
-				},
-				"about": {
-					"head": "12 PPR lobby",
-					"words": "3 drafters and 9 bots. 30 seconds a pick, your queue drafts if you step away, a bot takes any seat that closes the tab."
-				}
-			}
-		},
-		"between": {
-			"frame": 35,
-			"now": "2026-10-26T08:16:51.209Z",
-			"card": null,
-			"room": {
-				"state": {
-					"seq": 35,
-					"pickNumber": 30,
-					"deadline": "2026-10-26T08:17:18.609Z",
-					"drafting": true,
-					"complete": false,
-					"soloPace": false,
-					"queue": [
-						"4362628",
-						"4430878",
-						"4374302"
-					],
-					"picks": [
-						[
-							1,
-							1,
-							"4374302",
-							"bot"
-						],
-						[
-							2,
-							2,
-							"3117251",
-							"bot"
-						],
-						[
-							3,
-							3,
-							"4430807",
-							"bot"
-						],
-						[
-							4,
-							4,
-							"4429795",
-							"bot"
-						],
-						[
-							5,
-							5,
-							"4362628",
-							"drafter"
-						],
-						[
-							6,
-							6,
-							"4426515",
-							"bot"
-						],
-						[
-							7,
-							7,
-							"4379399",
-							"bot"
-						],
-						[
-							8,
-							8,
-							"4241389",
-							"drafter"
-						],
-						[
-							9,
-							9,
-							"4429160",
-							"bot"
-						],
-						[
-							10,
-							10,
-							"4262921",
-							"bot"
-						],
-						[
-							11,
-							11,
-							"3043078",
-							"bot"
-						],
-						[
-							12,
-							12,
-							"4430878",
-							"drafter"
-						],
-						[
-							13,
-							12,
-							"4361370",
-							"drafter"
-						],
-						[
-							14,
-							11,
-							"4362238",
-							"bot"
-						],
-						[
-							15,
-							10,
-							"4426502",
-							"bot"
-						],
-						[
-							16,
-							9,
-							"4242335",
-							"bot"
-						],
-						[
-							17,
-							8,
-							"4426354",
-							"drafter"
-						],
-						[
-							18,
-							7,
-							"4047646",
-							"bot"
-						],
-						[
-							19,
-							6,
-							"4428331",
-							"bot"
-						],
-						[
-							20,
-							5,
-							"4258173",
-							"drafter"
-						],
-						[
-							21,
-							4,
-							"4567048",
-							"bot"
-						],
-						[
-							22,
-							3,
-							"4595348",
-							"bot"
-						],
-						[
-							23,
-							2,
-							"3929630",
-							"bot"
-						],
-						[
-							24,
-							1,
-							"4429615",
-							"bot"
-						],
-						[
-							25,
-							1,
-							"4427366",
-							"bot"
-						],
-						[
-							26,
-							2,
-							"4569618",
-							"bot"
-						],
-						[
-							27,
-							3,
-							"4870808",
-							"bot"
-						],
-						[
-							28,
-							4,
-							"4685472",
-							"bot"
-						],
-						[
-							29,
-							5,
-							"4432665",
-							"drafter"
-						]
-					],
-					"seats": [
-						[
-							1,
-							null,
-							"bot"
-						],
-						[
-							2,
-							null,
-							"bot"
-						],
-						[
-							3,
-							null,
-							"bot"
-						],
-						[
-							4,
-							null,
-							"bot"
-						],
-						[
-							5,
-							"jpk88",
-							"drafter"
-						],
-						[
-							6,
-							null,
-							"bot"
-						],
-						[
-							7,
-							null,
-							"bot"
-						],
-						[
-							8,
-							"mara",
-							"drafter"
-						],
-						[
-							9,
-							null,
-							"bot"
-						],
-						[
-							10,
-							null,
-							"bot"
-						],
-						[
-							11,
-							null,
-							"bot"
-						],
-						[
-							12,
-							"you",
-							"drafter"
-						]
-					]
-				},
-				"bug": {
-					"round": "Round 3",
-					"pick": "Pick 3.06",
-					"onClock": "Bot 6",
-					"clock": "0:28",
-					"yourPick": "3.12, in 6",
-					"spoken": null
-				},
-				"seats": [
-					{
-						"seat": 1,
-						"name": "Bot 1",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 1"
-					},
-					{
-						"seat": 2,
-						"name": "Bot 2",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 2"
-					},
-					{
-						"seat": 3,
-						"name": "Bot 3",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 3"
-					},
-					{
-						"seat": 4,
-						"name": "Bot 4",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 4"
-					},
-					{
-						"seat": 5,
-						"name": "jpk88",
-						"line": "drafter",
-						"compact": false,
-						"label": "jpk88"
-					},
-					{
-						"seat": 6,
-						"name": "Bot 6",
-						"line": "on the clock",
-						"compact": true,
-						"label": "Bot 6, on the clock"
-					},
-					{
-						"seat": 7,
-						"name": "Bot 7",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 7"
-					},
-					{
-						"seat": 8,
-						"name": "mara",
-						"line": "drafter",
-						"compact": false,
-						"label": "mara"
-					},
-					{
-						"seat": 9,
-						"name": "Bot 9",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 9"
-					},
-					{
-						"seat": 10,
-						"name": "Bot 10",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 10"
-					},
-					{
-						"seat": 11,
-						"name": "Bot 11",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 11"
-					},
-					{
-						"seat": 12,
-						"name": "You",
-						"line": "drafter",
-						"compact": false,
-						"label": "You"
-					}
-				],
-				"wait": null,
-				"landing": {
-					"lead": "3.05",
-					"lines": [
-						"just taken, newest first",
-						"2 of the last 12 by people"
-					],
-					"faces": [
-						{
-							"pick": 29,
-							"id": "4432665",
-							"name": "Bowers",
-							"lines": [
-								"jpk88",
-								"3.05"
-							],
-							"strong": true
-						},
-						{
-							"pick": 28,
-							"id": "4685472",
-							"name": "McMillan",
-							"lines": [
-								"Bot 4",
-								"3.04"
-							],
-							"strong": false
-						},
-						{
-							"pick": 27,
-							"id": "4870808",
-							"name": "Love",
-							"lines": [
-								"Bot 3",
-								"3.03"
-							],
-							"strong": false
-						},
-						{
-							"pick": 26,
-							"id": "4569618",
-							"name": "Wilson",
-							"lines": [
-								"Bot 2",
-								"3.02"
-							],
-							"strong": false
-						},
-						{
-							"pick": 25,
-							"id": "4427366",
-							"name": "Hall",
-							"lines": [
-								"Bot 1",
-								"3.01"
-							],
-							"strong": false
-						},
-						{
-							"pick": 24,
-							"id": "4429615",
-							"name": "Flowers",
-							"lines": [
-								"Bot 1",
-								"2.12"
-							],
-							"strong": false
-						},
-						{
-							"pick": 23,
-							"id": "3929630",
-							"name": "Barkley",
-							"lines": [
-								"Bot 2",
-								"2.11"
-							],
-							"strong": false
-						},
-						{
-							"pick": 22,
-							"id": "4595348",
-							"name": "Nabers",
-							"lines": [
-								"Bot 3",
-								"2.10"
-							],
-							"strong": false
-						},
-						{
-							"pick": 21,
-							"id": "4567048",
-							"name": "Walker",
-							"lines": [
-								"Bot 4",
-								"2.09"
-							],
-							"strong": false
-						},
-						{
-							"pick": 20,
-							"id": "4258173",
-							"name": "Collins",
-							"lines": [
-								"jpk88",
-								"2.08"
-							],
-							"strong": true
-						},
-						{
-							"pick": 19,
-							"id": "4428331",
-							"name": "Rice",
-							"lines": [
-								"Bot 6",
-								"2.07"
-							],
-							"strong": false
-						},
-						{
-							"pick": 18,
-							"id": "4047646",
-							"name": "Brown",
-							"lines": [
-								"Bot 7",
-								"2.06"
-							],
-							"strong": false
-						}
-					]
-				},
-				"call": null,
-				"pool": {
-					"line": "527 left to draft, ranked by points over replacement",
-					"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Still there lands with our call.",
-					"chanceLabel": "",
-					"missing": "with our call",
-					"draftShown": false,
-					"filters": [
-						{
-							"filter": "All",
-							"count": 527,
-							"empty": null,
-							"rows": [
-								{
-									"id": "4361307",
-									"value": "+75.2",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4241478",
-									"value": "+68.1",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4890973",
-									"value": "+66.2",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3918298",
-									"value": "+55.1",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4239993",
-									"value": "+48.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3916387",
-									"value": "+48.1",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4685382",
-									"value": "+46.3",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4426388",
-									"value": "+42.9",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4612826",
-									"value": "+42.7",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4567750",
-									"value": "+41.2",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4372016",
-									"value": "+38.3",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4239996",
-									"value": "+34.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4431452",
-									"value": "+34.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "16800",
-									"value": "+30.6",
-									"chance": null,
-									"call": false,
-									"queued": false
-								}
-							]
-						},
-						{
-							"filter": "QB",
-							"count": 70,
-							"empty": null,
-							"rows": [
-								{
-									"id": "3918298",
-									"value": "+55.1",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3916387",
-									"value": "+48.1",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4431452",
-									"value": "+34.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3915511",
-									"value": "+25.3",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "2577417",
-									"value": "+22.2",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4040715",
-									"value": "+18.2",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4431611",
-									"value": "+14.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4038941",
-									"value": "+8.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3046779",
-									"value": "+4.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "12483",
-									"value": "+3.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3052587",
-									"value": "+0.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4689114",
-									"value": "+0.0",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3139477",
-									"value": "−4.0",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4426338",
-									"value": "−16.4",
-									"chance": null,
-									"call": false,
-									"queued": false
-								}
-							]
-						},
-						{
-							"filter": "RB",
-							"count": 133,
-							"empty": null,
-							"rows": [
-								{
-									"id": "4890973",
-									"value": "+66.2",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4685382",
-									"value": "+46.3",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4239996",
-									"value": "+34.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4259545",
-									"value": "+15.9",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4430737",
-									"value": "+15.7",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4596448",
-									"value": "+13.9",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4361579",
-									"value": "+13.2",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4569987",
-									"value": "+9.2",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4569173",
-									"value": "+7.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4685702",
-									"value": "+4.6",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4035538",
-									"value": "+3.6",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4696981",
-									"value": "+0.0",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4038815",
-									"value": "−1.0",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4241416",
-									"value": "−5.6",
-									"chance": null,
-									"call": false,
-									"queued": false
-								}
-							]
-						},
-						{
-							"filter": "WR",
-							"count": 181,
-							"empty": null,
-							"rows": [
-								{
-									"id": "4241478",
-									"value": "+68.1",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4239993",
-									"value": "+48.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4426388",
-									"value": "+42.9",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4612826",
-									"value": "+42.7",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4567750",
-									"value": "+41.2",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4372016",
-									"value": "+38.3",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "16800",
-									"value": "+30.6",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3915416",
-									"value": "+26.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3128429",
-									"value": "+21.1",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4431299",
-									"value": "+19.1",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3121422",
-									"value": "+17.9",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4432620",
-									"value": "+8.9",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4047650",
-									"value": "+8.1",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4685278",
-									"value": "+6.9",
-									"chance": null,
-									"call": false,
-									"queued": false
-								}
-							]
-						},
-						{
-							"filter": "TE",
-							"count": 90,
-							"empty": null,
-							"rows": [
-								{
-									"id": "4361307",
-									"value": "+75.2",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4723086",
-									"value": "+25.3",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4431459",
-									"value": "+22.5",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4360248",
-									"value": "+10.1",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "5083076",
-									"value": "+8.6",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "15847",
-									"value": "+6.7",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4361050",
-									"value": "+6.6",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3116365",
-									"value": "+3.1",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4572680",
-									"value": "+1.9",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4430027",
-									"value": "+0.9",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3040151",
-									"value": "+0.0",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3929645",
-									"value": "−2.5",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3121023",
-									"value": "−2.8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4242355",
-									"value": "−8.6",
-									"chance": null,
-									"call": false,
-									"queued": false
-								}
-							]
-						},
-						{
-							"filter": "K",
-							"count": 27,
-							"empty": null,
-							"rows": [
-								{
-									"id": "3953687",
-									"value": "Draft order 1",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "2971573",
-									"value": "Draft order 2",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "2473037",
-									"value": "Draft order 3",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4362081",
-									"value": "Draft order 4",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4574716",
-									"value": "Draft order 5",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "17372",
-									"value": "Draft order 6",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4689936",
-									"value": "Draft order 7",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3055899",
-									"value": "Draft order 8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4686361",
-									"value": "Draft order 9",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4567104",
-									"value": "Draft order 10",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3150744",
-									"value": "Draft order 11",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4034949",
-									"value": "Draft order 12",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "3917232",
-									"value": "Draft order 13",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "2985659",
-									"value": "Draft order 14",
-									"chance": null,
-									"call": false,
-									"queued": false
-								}
-							]
-						},
-						{
-							"filter": "DST",
-							"count": 26,
-							"empty": null,
-							"rows": [
-								{
-									"id": "DST-SEA",
-									"value": "Draft order 1",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "DST-DEN",
-									"value": "Draft order 2",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "DST-HOU",
-									"value": "Draft order 3",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "DST-LAR",
-									"value": "Draft order 4",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "DST-MIN",
-									"value": "Draft order 5",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "DST-NE",
-									"value": "Draft order 6",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "DST-PHI",
-									"value": "Draft order 7",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "DST-DET",
-									"value": "Draft order 8",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "DST-PIT",
-									"value": "Draft order 9",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "DST-LAC",
-									"value": "Draft order 10",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "DST-JAX",
-									"value": "Draft order 11",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "DST-GB",
-									"value": "Draft order 12",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "DST-DAL",
-									"value": "Draft order 13",
-									"chance": null,
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "DST-ATL",
-									"value": "Draft order 14",
-									"chance": null,
-									"call": false,
-									"queued": false
-								}
-							]
-						},
-						{
-							"filter": "Queue",
-							"count": 0,
-							"empty": "Nobody in your queue. Mark a player and press Q to add him.",
-							"rows": []
-						}
-					]
-				},
-				"wall": {
-					"names": [
-						"Bot 1",
-						"Bot 2",
-						"Bot 3",
-						"Bot 4",
-						"jpk88",
-						"Bot 6",
-						"Bot 7",
-						"mara",
-						"Bot 9",
-						"Bot 10",
-						"Bot 11",
-						"You"
-					],
-					"rows": [
-						[
-							"4374302",
-							"3117251",
-							"4430807",
-							"4429795",
-							"4362628",
-							"4426515",
-							"4379399",
-							"4241389",
-							"4429160",
-							"4262921",
-							"3043078",
-							"4430878"
-						],
-						[
-							"4429615",
-							"3929630",
-							"4595348",
-							"4567048",
-							"4258173",
-							"4428331",
-							"4047646",
-							"4426354",
-							"4242335",
-							"4426502",
-							"4362238",
-							"4361370"
-						],
-						[
-							"4427366",
-							"4569618",
-							"4870808",
-							"4685472",
-							"4432665",
-							null,
-							null,
-							null,
-							null,
-							null,
-							null,
-							null
-						]
-					]
-				},
-				"team": {
-					"count": "2 of 15",
-					"slots": [
-						{
-							"slot": "QB",
-							"id": null,
-							"pick": null
-						},
-						{
-							"slot": "RB",
-							"id": null,
-							"pick": null
-						},
-						{
-							"slot": "RB",
 							"id": null,
 							"pick": null
 						},
 						{
 							"slot": "WR",
-							"id": "4430878",
-							"pick": "1.12"
-						},
-						{
-							"slot": "WR",
-							"id": "4361370",
-							"pick": "2.01"
+							"id": null,
+							"pick": null
 						},
 						{
 							"slot": "TE",
@@ -5881,231 +5735,213 @@
 			}
 		},
 		"round3": {
-			"frame": 41,
-			"now": "2026-10-26T08:16:54.725Z",
-			"card": 36,
+			"frame": 38,
+			"now": "2026-10-26T08:30:44.429Z",
+			"card": 33,
 			"room": {
 				"state": {
-					"seq": 41,
-					"pickNumber": 36,
-					"deadline": "2026-10-26T08:17:22.125Z",
+					"seq": 38,
+					"pickNumber": 33,
+					"deadline": "2026-10-26T08:31:11.829Z",
 					"drafting": true,
 					"complete": false,
 					"soloPace": false,
 					"queue": [
 						"4362628",
-						"4430878",
-						"4374302"
+						"4374302",
+						"4430878"
 					],
 					"picks": [
 						[
 							1,
 							1,
-							"4374302",
-							"bot"
-						],
-						[
-							2,
-							2,
-							"3117251",
-							"bot"
-						],
-						[
-							3,
-							3,
 							"4430807",
 							"bot"
 						],
 						[
-							4,
-							4,
-							"4429795",
-							"bot"
-						],
-						[
-							5,
-							5,
-							"4362628",
+							2,
+							2,
+							"4426515",
 							"drafter"
 						],
 						[
+							3,
+							3,
+							"4429160",
+							"bot"
+						],
+						[
+							4,
+							4,
+							"3117251",
+							"bot"
+						],
+						[
+							5,
+							5,
+							"4242335",
+							"bot"
+						],
+						[
 							6,
 							6,
-							"4426515",
+							"4362628",
 							"bot"
 						],
 						[
 							7,
 							7,
-							"4379399",
-							"bot"
+							"4430878",
+							"drafter"
 						],
 						[
 							8,
 							8,
 							"4241389",
-							"drafter"
-						],
-						[
-							9,
-							9,
-							"4429160",
 							"bot"
 						],
 						[
+							9,
+							9,
+							"4429795",
+							"drafter"
+						],
+						[
 							10,
 							10,
+							"4374302",
+							"bot"
+						],
+						[
+							11,
+							11,
+							"4426502",
+							"bot"
+						],
+						[
+							12,
+							12,
 							"4262921",
 							"bot"
 						],
 						[
-							11,
-							11,
-							"3043078",
-							"bot"
-						],
-						[
-							12,
-							12,
-							"4430878",
-							"drafter"
-						],
-						[
 							13,
 							12,
-							"4361370",
-							"drafter"
+							"4362238",
+							"bot"
 						],
 						[
 							14,
 							11,
-							"4362238",
+							"4426354",
 							"bot"
 						],
 						[
 							15,
 							10,
-							"4426502",
+							"4361370",
 							"bot"
 						],
 						[
 							16,
 							9,
-							"4242335",
-							"bot"
+							"3929630",
+							"drafter"
 						],
 						[
 							17,
 							8,
-							"4426354",
-							"drafter"
+							"4258173",
+							"bot"
 						],
 						[
 							18,
 							7,
-							"4047646",
-							"bot"
+							"4429615",
+							"drafter"
 						],
 						[
 							19,
 							6,
-							"4428331",
+							"4047646",
 							"bot"
 						],
 						[
 							20,
 							5,
-							"4258173",
-							"drafter"
+							"4379399",
+							"bot"
 						],
 						[
 							21,
 							4,
-							"4567048",
+							"4595348",
 							"bot"
 						],
 						[
 							22,
 							3,
-							"4595348",
+							"3043078",
 							"bot"
 						],
 						[
 							23,
 							2,
-							"3929630",
-							"bot"
+							"4428331",
+							"drafter"
 						],
 						[
 							24,
 							1,
-							"4429615",
+							"4685382",
 							"bot"
 						],
 						[
 							25,
 							1,
-							"4427366",
+							"4569618",
 							"bot"
 						],
 						[
 							26,
 							2,
-							"4569618",
-							"bot"
+							"4432665",
+							"drafter"
 						],
 						[
 							27,
 							3,
-							"4870808",
+							"4567048",
 							"bot"
 						],
 						[
 							28,
 							4,
-							"4685472",
+							"4361307",
 							"bot"
 						],
 						[
 							29,
 							5,
-							"4432665",
-							"drafter"
+							"4890973",
+							"bot"
 						],
 						[
 							30,
 							6,
-							"3918298",
+							"4430737",
 							"bot"
 						],
 						[
 							31,
 							7,
-							"4685382",
-							"bot"
+							"4241478",
+							"drafter"
 						],
 						[
 							32,
 							8,
-							"4361307",
-							"drafter"
-						],
-						[
-							33,
-							9,
-							"4567750",
-							"bot"
-						],
-						[
-							34,
-							10,
-							"4241478",
-							"bot"
-						],
-						[
-							35,
-							11,
-							"4361579",
+							"4685472",
 							"bot"
 						]
 					],
@@ -6117,8 +5953,8 @@
 						],
 						[
 							2,
-							null,
-							"bot"
+							"jpk88",
+							"drafter"
 						],
 						[
 							3,
@@ -6132,8 +5968,8 @@
 						],
 						[
 							5,
-							"jpk88",
-							"drafter"
+							null,
+							"bot"
 						],
 						[
 							6,
@@ -6142,18 +5978,18 @@
 						],
 						[
 							7,
-							null,
-							"bot"
-						],
-						[
-							8,
 							"mara",
 							"drafter"
 						],
 						[
-							9,
+							8,
 							null,
 							"bot"
+						],
+						[
+							9,
+							"hunt",
+							"drafter"
 						],
 						[
 							10,
@@ -6167,14 +6003,14 @@
 						],
 						[
 							12,
-							"you",
-							"drafter"
+							null,
+							"bot"
 						]
 					]
 				},
 				"bug": {
 					"round": "Round 3",
-					"pick": "Pick 3.12",
+					"pick": "Pick 3.09",
 					"onClock": "You",
 					"clock": "0:28",
 					"yourPick": "Now",
@@ -6190,10 +6026,10 @@
 					},
 					{
 						"seat": 2,
-						"name": "Bot 2",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 2"
+						"name": "jpk88",
+						"line": "drafter",
+						"compact": false,
+						"label": "jpk88"
 					},
 					{
 						"seat": 3,
@@ -6211,10 +6047,10 @@
 					},
 					{
 						"seat": 5,
-						"name": "jpk88",
-						"line": "drafter",
-						"compact": false,
-						"label": "jpk88"
+						"name": "Bot 5",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 5"
 					},
 					{
 						"seat": 6,
@@ -6225,24 +6061,24 @@
 					},
 					{
 						"seat": 7,
-						"name": "Bot 7",
-						"line": "waiting",
-						"compact": true,
-						"label": "Bot 7"
-					},
-					{
-						"seat": 8,
 						"name": "mara",
 						"line": "drafter",
 						"compact": false,
 						"label": "mara"
 					},
 					{
-						"seat": 9,
-						"name": "Bot 9",
+						"seat": 8,
+						"name": "Bot 8",
 						"line": "waiting",
 						"compact": true,
-						"label": "Bot 9"
+						"label": "Bot 8"
+					},
+					{
+						"seat": 9,
+						"name": "You",
+						"line": "on the clock",
+						"compact": false,
+						"label": "You, on the clock"
 					},
 					{
 						"seat": 10,
@@ -6260,74 +6096,44 @@
 					},
 					{
 						"seat": 12,
-						"name": "You",
-						"line": "on the clock",
-						"compact": false,
-						"label": "You, on the clock"
+						"name": "Bot 12",
+						"line": "waiting",
+						"compact": true,
+						"label": "Bot 12"
 					}
 				],
 				"wait": null,
 				"landing": {
-					"lead": "3.11",
+					"lead": "3.08",
 					"lines": [
 						"just taken, newest first",
-						"2 of the last 12 by people"
+						"3 of the last 12 by people"
 					],
 					"faces": [
 						{
-							"pick": 35,
-							"id": "4361579",
-							"name": "Williams",
+							"pick": 32,
+							"id": "4685472",
+							"name": "McMillan",
 							"lines": [
-								"Bot 11",
-								"3.11"
+								"Bot 8",
+								"3.08"
 							],
 							"strong": false
 						},
 						{
-							"pick": 34,
+							"pick": 31,
 							"id": "4241478",
 							"name": "Smith",
 							"lines": [
-								"Bot 10",
-								"3.10"
-							],
-							"strong": false
-						},
-						{
-							"pick": 33,
-							"id": "4567750",
-							"name": "Egbuka",
-							"lines": [
-								"Bot 9",
-								"3.09"
-							],
-							"strong": false
-						},
-						{
-							"pick": 32,
-							"id": "4361307",
-							"name": "McBride",
-							"lines": [
 								"mara",
-								"3.08"
+								"3.07"
 							],
 							"strong": true
 						},
 						{
-							"pick": 31,
-							"id": "4685382",
-							"name": "Hampton",
-							"lines": [
-								"Bot 7",
-								"3.07"
-							],
-							"strong": false
-						},
-						{
 							"pick": 30,
-							"id": "3918298",
-							"name": "Allen",
+							"id": "4430737",
+							"name": "Williams",
 							"lines": [
 								"Bot 6",
 								"3.06"
@@ -6336,18 +6142,18 @@
 						},
 						{
 							"pick": 29,
-							"id": "4432665",
-							"name": "Bowers",
+							"id": "4890973",
+							"name": "Jeanty",
 							"lines": [
-								"jpk88",
+								"Bot 5",
 								"3.05"
 							],
-							"strong": true
+							"strong": false
 						},
 						{
 							"pick": 28,
-							"id": "4685472",
-							"name": "McMillan",
+							"id": "4361307",
+							"name": "McBride",
 							"lines": [
 								"Bot 4",
 								"3.04"
@@ -6356,8 +6162,8 @@
 						},
 						{
 							"pick": 27,
-							"id": "4870808",
-							"name": "Love",
+							"id": "4567048",
+							"name": "Walker",
 							"lines": [
 								"Bot 3",
 								"3.03"
@@ -6366,18 +6172,18 @@
 						},
 						{
 							"pick": 26,
-							"id": "4569618",
-							"name": "Wilson",
+							"id": "4432665",
+							"name": "Bowers",
 							"lines": [
-								"Bot 2",
+								"jpk88",
 								"3.02"
 							],
-							"strong": false
+							"strong": true
 						},
 						{
 							"pick": 25,
-							"id": "4427366",
-							"name": "Hall",
+							"id": "4569618",
+							"name": "Wilson",
 							"lines": [
 								"Bot 1",
 								"3.01"
@@ -6386,58 +6192,88 @@
 						},
 						{
 							"pick": 24,
-							"id": "4429615",
-							"name": "Flowers",
+							"id": "4685382",
+							"name": "Hampton",
 							"lines": [
 								"Bot 1",
 								"2.12"
+							],
+							"strong": false
+						},
+						{
+							"pick": 23,
+							"id": "4428331",
+							"name": "Rice",
+							"lines": [
+								"jpk88",
+								"2.11"
+							],
+							"strong": true
+						},
+						{
+							"pick": 22,
+							"id": "3043078",
+							"name": "Henry",
+							"lines": [
+								"Bot 3",
+								"2.10"
+							],
+							"strong": false
+						},
+						{
+							"pick": 21,
+							"id": "4595348",
+							"name": "Nabers",
+							"lines": [
+								"Bot 4",
+								"2.09"
 							],
 							"strong": false
 						}
 					]
 				},
 				"call": {
-					"tag": "Our call at 3.12",
-					"chanceHead": "Still there 4.01",
+					"tag": "Our call at 3.09",
+					"chanceHead": "Still there 4.04",
 					"verb": "Draft him",
 					"rows": [
 						{
-							"id": "4890973",
-							"chance": ">99%"
+							"id": "3918298",
+							"chance": "30%"
+						},
+						{
+							"id": "4567750",
+							"chance": "29%"
 						},
 						{
 							"id": "4239993",
-							"chance": ">99%"
-						},
-						{
-							"id": "3916387",
-							"chance": ">99%"
+							"chance": "42%"
 						}
 					]
 				},
 				"pool": {
-					"line": "521 left to draft, ranked by points over replacement",
-					"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Still there at 4.01: 200 runs of this room, each seat drafting as it has so far.",
-					"chanceLabel": "still there at 4.01",
+					"line": "527 left to draft, ranked by points over replacement",
+					"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Still there at 4.04: 200 runs of this room, each seat drafting as it has so far.",
+					"chanceLabel": "still there at 4.04",
 					"missing": "not read",
 					"draftShown": true,
 					"filters": [
 						{
 							"filter": "All",
-							"count": 521,
+							"count": 527,
 							"empty": null,
 							"rows": [
 								{
-									"id": "4890973",
-									"value": "+66.2",
-									"chance": ">99%",
+									"id": "3918298",
+									"value": "+55.1",
+									"chance": "30%",
 									"call": true,
 									"queued": false
 								},
 								{
 									"id": "4239993",
 									"value": "+48.8",
-									"chance": ">99%",
+									"chance": "42%",
 									"call": false,
 									"queued": false
 								},
@@ -6449,30 +6285,51 @@
 									"queued": false
 								},
 								{
+									"id": "4427366",
+									"value": "+43.4",
+									"chance": "41%",
+									"call": false,
+									"queued": false
+								},
+								{
 									"id": "4426388",
 									"value": "+42.9",
-									"chance": ">99%",
+									"chance": "96%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4612826",
 									"value": "+42.7",
-									"chance": ">99%",
+									"chance": "58%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4567750",
+									"value": "+41.2",
+									"chance": "29%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4372016",
 									"value": "+38.3",
-									"chance": ">99%",
+									"chance": "91%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4870808",
+									"value": "+36.3",
+									"chance": "39%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4239996",
 									"value": "+34.8",
-									"chance": ">99%",
+									"chance": "45%",
 									"call": false,
 									"queued": false
 								},
@@ -6486,7 +6343,7 @@
 								{
 									"id": "16800",
 									"value": "+30.6",
-									"chance": ">99%",
+									"chance": "65%",
 									"call": false,
 									"queued": false
 								},
@@ -6503,35 +6360,21 @@
 									"chance": ">99%",
 									"call": false,
 									"queued": false
-								},
-								{
-									"id": "3915511",
-									"value": "+25.3",
-									"chance": ">99%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4431459",
-									"value": "+22.5",
-									"chance": ">99%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "2577417",
-									"value": "+22.2",
-									"chance": ">99%",
-									"call": false,
-									"queued": false
 								}
 							]
 						},
 						{
 							"filter": "QB",
-							"count": 69,
+							"count": 72,
 							"empty": null,
 							"rows": [
+								{
+									"id": "3918298",
+									"value": "+55.1",
+									"chance": "30%",
+									"call": true,
+									"queued": false
+								},
 								{
 									"id": "3916387",
 									"value": "+48.1",
@@ -6622,53 +6465,53 @@
 									"chance": ">99%",
 									"call": false,
 									"queued": false
-								},
-								{
-									"id": "4426348",
-									"value": "−19.3",
-									"chance": ">99%",
-									"call": false,
-									"queued": false
 								}
 							]
 						},
 						{
 							"filter": "RB",
-							"count": 131,
+							"count": 132,
 							"empty": null,
 							"rows": [
 								{
-									"id": "4890973",
-									"value": "+66.2",
-									"chance": ">99%",
-									"call": true,
+									"id": "4427366",
+									"value": "+43.4",
+									"chance": "41%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4870808",
+									"value": "+36.3",
+									"chance": "39%",
+									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4239996",
 									"value": "+34.8",
-									"chance": ">99%",
+									"chance": "45%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4259545",
 									"value": "+15.9",
-									"chance": ">99%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4430737",
-									"value": "+15.7",
-									"chance": ">99%",
+									"chance": "85%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4596448",
 									"value": "+13.9",
-									"chance": ">99%",
+									"chance": "98%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4361579",
+									"value": "+13.2",
+									"chance": "32%",
 									"call": false,
 									"queued": false
 								},
@@ -6703,7 +6546,7 @@
 								{
 									"id": "4696981",
 									"value": "+0.0",
-									"chance": ">99%",
+									"chance": "52%",
 									"call": false,
 									"queued": false
 								},
@@ -6727,53 +6570,53 @@
 									"chance": ">99%",
 									"call": false,
 									"queued": false
-								},
-								{
-									"id": "3916148",
-									"value": "−8.5",
-									"chance": ">99%",
-									"call": false,
-									"queued": false
 								}
 							]
 						},
 						{
 							"filter": "WR",
-							"count": 179,
+							"count": 181,
 							"empty": null,
 							"rows": [
 								{
 									"id": "4239993",
 									"value": "+48.8",
-									"chance": ">99%",
+									"chance": "42%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4426388",
 									"value": "+42.9",
-									"chance": ">99%",
+									"chance": "96%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4612826",
 									"value": "+42.7",
-									"chance": ">99%",
+									"chance": "58%",
+									"call": false,
+									"queued": false
+								},
+								{
+									"id": "4567750",
+									"value": "+41.2",
+									"chance": "29%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "4372016",
 									"value": "+38.3",
-									"chance": ">99%",
+									"chance": "91%",
 									"call": false,
 									"queued": false
 								},
 								{
 									"id": "16800",
 									"value": "+30.6",
-									"chance": ">99%",
+									"chance": "65%",
 									"call": false,
 									"queued": false
 								},
@@ -6829,13 +6672,6 @@
 								{
 									"id": "16737",
 									"value": "+5.8",
-									"chance": ">99%",
-									"call": false,
-									"queued": false
-								},
-								{
-									"id": "4569587",
-									"value": "+5.4",
 									"chance": ">99%",
 									"call": false,
 									"queued": false
@@ -7168,59 +7004,59 @@
 				"wall": {
 					"names": [
 						"Bot 1",
-						"Bot 2",
+						"jpk88",
 						"Bot 3",
 						"Bot 4",
-						"jpk88",
+						"Bot 5",
 						"Bot 6",
-						"Bot 7",
 						"mara",
-						"Bot 9",
+						"Bot 8",
+						"You",
 						"Bot 10",
 						"Bot 11",
-						"You"
+						"Bot 12"
 					],
 					"rows": [
 						[
-							"4374302",
-							"3117251",
 							"4430807",
-							"4429795",
-							"4362628",
 							"4426515",
-							"4379399",
-							"4241389",
 							"4429160",
-							"4262921",
-							"3043078",
-							"4430878"
-						],
-						[
-							"4429615",
-							"3929630",
-							"4595348",
-							"4567048",
-							"4258173",
-							"4428331",
-							"4047646",
-							"4426354",
+							"3117251",
 							"4242335",
+							"4362628",
+							"4430878",
+							"4241389",
+							"4429795",
+							"4374302",
 							"4426502",
-							"4362238",
-							"4361370"
+							"4262921"
 						],
 						[
-							"4427366",
-							"4569618",
-							"4870808",
-							"4685472",
-							"4432665",
-							"3918298",
 							"4685382",
+							"4428331",
+							"3043078",
+							"4595348",
+							"4379399",
+							"4047646",
+							"4429615",
+							"4258173",
+							"3929630",
+							"4361370",
+							"4426354",
+							"4362238"
+						],
+						[
+							"4569618",
+							"4432665",
+							"4567048",
 							"4361307",
-							"4567750",
+							"4890973",
+							"4430737",
 							"4241478",
-							"4361579",
+							"4685472",
+							null,
+							null,
+							null,
 							null
 						]
 					]
@@ -7235,23 +7071,23 @@
 						},
 						{
 							"slot": "RB",
-							"id": null,
-							"pick": null
+							"id": "4429795",
+							"pick": "1.09"
 						},
 						{
 							"slot": "RB",
+							"id": "3929630",
+							"pick": "2.04"
+						},
+						{
+							"slot": "WR",
 							"id": null,
 							"pick": null
 						},
 						{
 							"slot": "WR",
-							"id": "4430878",
-							"pick": "1.12"
-						},
-						{
-							"slot": "WR",
-							"id": "4361370",
-							"pick": "2.01"
+							"id": null,
+							"pick": null
 						},
 						{
 							"slot": "TE",
@@ -7294,291 +7130,291 @@
 				"soloPace": false,
 				"queue": [
 					"4362628",
-					"4430878",
-					"4374302"
+					"4374302",
+					"4430878"
 				],
 				"picks": [
 					[
 						1,
 						1,
-						"4374302",
-						"bot"
-					],
-					[
-						2,
-						2,
-						"3117251",
-						"bot"
-					],
-					[
-						3,
-						3,
 						"4430807",
 						"bot"
 					],
 					[
-						4,
-						4,
-						"4429795",
-						"bot"
-					],
-					[
-						5,
-						5,
-						"4362628",
+						2,
+						2,
+						"4426515",
 						"drafter"
 					],
 					[
+						3,
+						3,
+						"4429160",
+						"bot"
+					],
+					[
+						4,
+						4,
+						"3117251",
+						"bot"
+					],
+					[
+						5,
+						5,
+						"4242335",
+						"bot"
+					],
+					[
 						6,
 						6,
-						"4426515",
+						"4362628",
 						"bot"
 					],
 					[
 						7,
 						7,
-						"4379399",
-						"bot"
+						"4430878",
+						"drafter"
 					],
 					[
 						8,
 						8,
 						"4241389",
-						"drafter"
-					],
-					[
-						9,
-						9,
-						"4429160",
 						"bot"
 					],
 					[
+						9,
+						9,
+						"4429795",
+						"drafter"
+					],
+					[
 						10,
 						10,
+						"4374302",
+						"bot"
+					],
+					[
+						11,
+						11,
+						"4426502",
+						"bot"
+					],
+					[
+						12,
+						12,
 						"4262921",
 						"bot"
 					],
 					[
-						11,
-						11,
-						"3043078",
-						"bot"
-					],
-					[
-						12,
-						12,
-						"4430878",
-						"drafter"
-					],
-					[
 						13,
 						12,
-						"4361370",
-						"drafter"
+						"4362238",
+						"bot"
 					],
 					[
 						14,
 						11,
-						"4362238",
+						"4426354",
 						"bot"
 					],
 					[
 						15,
 						10,
-						"4426502",
+						"4361370",
 						"bot"
 					],
 					[
 						16,
 						9,
-						"4242335",
-						"bot"
+						"3929630",
+						"drafter"
 					],
 					[
 						17,
 						8,
-						"4426354",
-						"drafter"
+						"4258173",
+						"bot"
 					],
 					[
 						18,
 						7,
-						"4047646",
-						"bot"
+						"4429615",
+						"drafter"
 					],
 					[
 						19,
 						6,
-						"4428331",
+						"4047646",
 						"bot"
 					],
 					[
 						20,
 						5,
-						"4258173",
-						"drafter"
+						"4379399",
+						"bot"
 					],
 					[
 						21,
 						4,
-						"4567048",
+						"4595348",
 						"bot"
 					],
 					[
 						22,
 						3,
-						"4595348",
+						"3043078",
 						"bot"
 					],
 					[
 						23,
 						2,
-						"3929630",
-						"bot"
+						"4428331",
+						"drafter"
 					],
 					[
 						24,
 						1,
-						"4429615",
+						"4685382",
 						"bot"
 					],
 					[
 						25,
 						1,
-						"4427366",
+						"4569618",
 						"bot"
 					],
 					[
 						26,
 						2,
-						"4569618",
-						"bot"
+						"4432665",
+						"drafter"
 					],
 					[
 						27,
 						3,
-						"4870808",
+						"4567048",
 						"bot"
 					],
 					[
 						28,
 						4,
-						"4685472",
+						"4361307",
 						"bot"
 					],
 					[
 						29,
 						5,
-						"4432665",
-						"drafter"
+						"4890973",
+						"bot"
 					],
 					[
 						30,
 						6,
-						"3918298",
+						"4430737",
 						"bot"
 					],
 					[
 						31,
 						7,
-						"4685382",
-						"bot"
+						"4241478",
+						"drafter"
 					],
 					[
 						32,
 						8,
-						"4361307",
-						"drafter"
+						"4685472",
+						"bot"
 					],
 					[
 						33,
 						9,
-						"4567750",
-						"bot"
+						"3918298",
+						"drafter"
 					],
 					[
 						34,
 						10,
-						"4241478",
+						"4239996",
 						"bot"
 					],
 					[
 						35,
 						11,
-						"4361579",
+						"4696981",
 						"bot"
 					],
 					[
 						36,
 						12,
-						"4890973",
-						"drafter"
+						"4567750",
+						"bot"
 					],
 					[
 						37,
 						12,
-						"3916387",
-						"drafter"
+						"4870808",
+						"bot"
 					],
 					[
 						38,
 						11,
-						"4239993",
+						"4427366",
 						"bot"
 					],
 					[
 						39,
 						10,
-						"4430737",
+						"4361579",
 						"bot"
 					],
 					[
 						40,
 						9,
-						"4239996",
-						"bot"
+						"3916387",
+						"drafter"
 					],
 					[
 						41,
 						8,
-						"4426388",
-						"drafter"
-					],
-					[
-						42,
-						7,
 						"4259545",
 						"bot"
 					],
 					[
+						42,
+						7,
+						"4239993",
+						"drafter"
+					],
+					[
 						43,
 						6,
-						"4696981",
+						"4372016",
 						"bot"
 					],
 					[
 						44,
 						5,
-						"4612826",
-						"drafter"
+						"16800",
+						"bot"
 					],
 					[
 						45,
 						4,
-						"4372016",
+						"4612826",
 						"bot"
 					],
 					[
 						46,
 						3,
-						"16800",
+						"3915416",
 						"bot"
 					],
 					[
 						47,
 						2,
-						"4035538",
-						"bot"
+						"4426388",
+						"drafter"
 					],
 					[
 						48,
@@ -7595,13 +7431,13 @@
 					[
 						50,
 						2,
-						"4685278",
-						"bot"
+						"4723086",
+						"drafter"
 					],
 					[
 						51,
 						3,
-						"3915416",
+						"3915511",
 						"bot"
 					],
 					[
@@ -7613,37 +7449,37 @@
 					[
 						53,
 						5,
-						"4723086",
-						"drafter"
+						"16737",
+						"bot"
 					],
 					[
 						54,
 						6,
-						"4248528",
+						"4035538",
 						"bot"
 					],
 					[
 						55,
 						7,
-						"16737",
-						"bot"
-					],
-					[
-						56,
-						8,
 						"4431459",
 						"drafter"
 					],
 					[
+						56,
+						8,
+						"4685702",
+						"bot"
+					],
+					[
 						57,
 						9,
-						"4432620",
-						"bot"
+						"2577417",
+						"drafter"
 					],
 					[
 						58,
 						10,
-						"4685702",
+						"4685278",
 						"bot"
 					],
 					[
@@ -7655,236 +7491,236 @@
 					[
 						60,
 						12,
-						"3915511",
-						"drafter"
+						"4569173",
+						"bot"
 					],
 					[
 						61,
 						12,
-						"2577417",
-						"drafter"
+						"4431299",
+						"bot"
 					],
 					[
 						62,
 						11,
-						"4431299",
+						"4248528",
 						"bot"
 					],
 					[
 						63,
 						10,
-						"4569173",
+						"4432708",
 						"bot"
 					],
 					[
 						64,
 						9,
-						"4882093",
-						"bot"
-					],
-					[
-						65,
-						8,
 						"4040715",
 						"drafter"
 					],
 					[
+						65,
+						8,
+						"4432620",
+						"bot"
+					],
+					[
 						66,
 						7,
-						"4569987",
-						"bot"
+						"4360248",
+						"drafter"
 					],
 					[
 						67,
 						6,
-						"4685512",
+						"4569987",
 						"bot"
 					],
 					[
 						68,
 						5,
 						"5083076",
-						"drafter"
+						"bot"
 					],
 					[
 						69,
 						4,
-						"4426348",
+						"4047650",
 						"bot"
 					],
 					[
 						70,
 						3,
-						"12483",
+						"4360078",
 						"bot"
 					],
 					[
 						71,
 						2,
-						"4047650",
-						"bot"
+						"12483",
+						"drafter"
 					],
 					[
 						72,
 						1,
-						"3916148",
+						"4685512",
 						"bot"
 					],
 					[
 						73,
 						1,
-						"4432708",
+						"4432773",
 						"bot"
 					],
 					[
 						74,
 						2,
-						"4432773",
-						"bot"
+						"4431611",
+						"drafter"
 					],
 					[
 						75,
 						3,
-						"4038815",
+						"4432710",
 						"bot"
 					],
 					[
 						76,
 						4,
-						"DST-SEA",
+						"4426348",
 						"bot"
 					],
 					[
 						77,
 						5,
-						"4431611",
-						"drafter"
+						"3116165",
+						"bot"
 					],
 					[
 						78,
 						6,
-						"4360248",
+						"DST-SEA",
 						"bot"
 					],
 					[
 						79,
 						7,
-						"4361741",
-						"bot"
+						"4569587",
+						"drafter"
 					],
 					[
 						80,
 						8,
-						"4360078",
-						"drafter"
+						"4361741",
+						"bot"
 					],
 					[
 						81,
 						9,
-						"DST-DEN",
-						"bot"
+						"4360761",
+						"drafter"
 					],
 					[
 						82,
 						10,
-						"4360761",
+						"DST-DEN",
 						"bot"
 					],
 					[
 						83,
 						11,
-						"4432710",
+						"4882093",
 						"bot"
 					],
 					[
 						84,
 						12,
-						"4038941",
-						"drafter"
+						"3916148",
+						"bot"
 					],
 					[
 						85,
 						12,
-						"4569587",
-						"drafter"
+						"4362249",
+						"bot"
 					],
 					[
 						86,
 						11,
-						"4871023",
+						"3040151",
 						"bot"
 					],
 					[
 						87,
 						10,
-						"3040151",
+						"4360310",
 						"bot"
 					],
 					[
 						88,
 						9,
-						"4360310",
-						"bot"
+						"4038941",
+						"drafter"
 					],
 					[
 						89,
 						8,
-						"4572680",
-						"drafter"
+						"4038815",
+						"bot"
 					],
 					[
 						90,
 						7,
-						"4362249",
-						"bot"
+						"3046779",
+						"drafter"
 					],
 					[
 						91,
 						6,
-						"4678008",
+						"4035687",
 						"bot"
 					],
 					[
 						92,
 						5,
-						"4430027",
-						"drafter"
+						"4241416",
+						"bot"
 					],
 					[
 						93,
 						4,
-						"3116165",
+						"4678008",
 						"bot"
 					],
 					[
 						94,
 						3,
-						"4047365",
+						"4871023",
 						"bot"
 					],
 					[
 						95,
 						2,
-						"4241416",
-						"bot"
+						"15847",
+						"drafter"
 					],
 					[
 						96,
 						1,
-						"4688813",
+						"4241985",
 						"bot"
 					],
 					[
 						97,
 						1,
-						"DST-LAR",
+						"3916433",
 						"bot"
 					],
 					[
 						98,
 						2,
-						"4568490",
-						"bot"
+						"4572680",
+						"drafter"
 					],
 					[
 						99,
@@ -7895,92 +7731,92 @@
 					[
 						100,
 						4,
-						"4241985",
+						"4429025",
 						"bot"
 					],
 					[
 						101,
 						5,
-						"15847",
-						"drafter"
+						"DST-LAR",
+						"bot"
 					],
 					[
 						102,
 						6,
-						"4429205",
+						"4430027",
 						"bot"
 					],
 					[
 						103,
 						7,
-						"4429025",
-						"bot"
+						"4361050",
+						"drafter"
 					],
 					[
 						104,
 						8,
-						"3046779",
-						"drafter"
-					],
-					[
-						105,
-						9,
 						"4371733",
 						"bot"
 					],
 					[
+						105,
+						9,
+						"3116365",
+						"drafter"
+					],
+					[
 						106,
 						10,
-						"3139477",
+						"4047365",
 						"bot"
 					],
 					[
 						107,
 						11,
-						"3916433",
+						"3139477",
 						"bot"
 					],
 					[
 						108,
 						12,
-						"4361050",
-						"drafter"
+						"2976212",
+						"bot"
 					],
 					[
 						109,
 						12,
-						"3116365",
-						"drafter"
+						"DST-MIN",
+						"bot"
 					],
 					[
 						110,
 						11,
-						"4689114",
+						"4429205",
 						"bot"
 					],
 					[
 						111,
 						10,
-						"2976212",
+						"4688813",
 						"bot"
 					],
 					[
 						112,
 						9,
-						"4373678",
-						"bot"
-					],
-					[
-						113,
-						8,
 						"3052587",
 						"drafter"
 					],
 					[
+						113,
+						8,
+						"4568490",
+						"bot"
+					],
+					[
 						114,
 						7,
-						"3042519",
-						"bot"
+						"4689114",
+						"drafter"
 					],
 					[
 						115,
@@ -7991,284 +7827,284 @@
 					[
 						116,
 						5,
-						"3929645",
-						"drafter"
+						"4361432",
+						"bot"
 					],
 					[
 						117,
 						4,
-						"4701936",
+						"3042519",
 						"bot"
 					],
 					[
 						118,
 						3,
-						"4035687",
+						"4373678",
 						"bot"
 					],
 					[
 						119,
 						2,
-						"DST-MIN",
-						"bot"
+						"3929645",
+						"drafter"
 					],
 					[
 						120,
 						1,
-						"3121023",
+						"4360569",
 						"bot"
 					],
 					[
 						121,
 						1,
-						"4429023",
+						"3121023",
 						"bot"
 					],
 					[
 						122,
 						2,
-						"3953687",
-						"bot"
+						"4576297",
+						"drafter"
 					],
 					[
 						123,
 						3,
-						"4361432",
+						"4683062",
 						"bot"
 					],
 					[
 						124,
 						4,
-						"4608686",
+						"4701936",
 						"bot"
 					],
 					[
 						125,
 						5,
-						"4576297",
-						"drafter"
+						"4608686",
+						"bot"
 					],
 					[
 						126,
 						6,
-						"3126486",
+						"3953687",
 						"bot"
 					],
 					[
 						127,
 						7,
-						"DST-PHI",
-						"bot"
-					],
-					[
-						128,
-						8,
 						"4385690",
 						"drafter"
 					],
 					[
+						128,
+						8,
+						"DST-NE",
+						"bot"
+					],
+					[
 						129,
 						9,
-						"4032473",
-						"bot"
+						"4428718",
+						"drafter"
 					],
 					[
 						130,
 						10,
-						"DST-NE",
+						"4242355",
 						"bot"
 					],
 					[
 						131,
 						11,
-						"DST-DET",
+						"DST-PHI",
 						"bot"
 					],
 					[
 						132,
 						12,
-						"4242355",
-						"drafter"
+						"3917315",
+						"bot"
 					],
 					[
 						133,
 						12,
-						"3123076",
-						"drafter"
+						"2971573",
+						"bot"
 					],
 					[
 						134,
 						11,
-						"2971573",
+						"2473037",
 						"bot"
 					],
 					[
 						135,
 						10,
-						"3917315",
+						"4360689",
 						"bot"
 					],
 					[
 						136,
 						9,
-						"4683062",
-						"bot"
+						"3123076",
+						"drafter"
 					],
 					[
 						137,
 						8,
-						"3116389",
-						"drafter"
+						"3126486",
+						"bot"
 					],
 					[
 						138,
 						7,
-						"4870653",
-						"bot"
+						"3116389",
+						"drafter"
 					],
 					[
 						139,
 						6,
-						"2473037",
+						"4695883",
 						"bot"
 					],
 					[
 						140,
 						5,
-						"4360516",
-						"drafter"
+						"4036378",
+						"bot"
 					],
 					[
 						141,
 						4,
-						"4695883",
+						"DST-DET",
 						"bot"
 					],
 					[
 						142,
 						3,
-						"4429096",
+						"3912547",
 						"bot"
 					],
 					[
 						143,
 						2,
-						"4036378",
-						"bot"
+						"4697815",
+						"drafter"
 					],
 					[
 						144,
 						1,
-						"4360689",
+						"4032473",
 						"bot"
 					],
 					[
 						145,
 						1,
-						"4575131",
+						"DST-LAC",
 						"bot"
 					],
 					[
 						146,
 						2,
-						"4870795",
-						"bot"
+						"4360516",
+						"drafter"
 					],
 					[
 						147,
 						3,
-						"4574716",
+						"4362081",
 						"bot"
 					],
 					[
 						148,
 						4,
-						"17372",
+						"4575131",
 						"bot"
 					],
 					[
 						149,
 						5,
-						"4362478",
-						"drafter"
+						"4870653",
+						"bot"
 					],
 					[
 						150,
 						6,
-						"DST-PIT",
+						"4429096",
 						"bot"
 					],
 					[
 						151,
 						7,
-						"3055899",
-						"bot"
+						"4362478",
+						"drafter"
 					],
 					[
 						152,
 						8,
-						"5081397",
-						"drafter"
+						"17372",
+						"bot"
 					],
 					[
 						153,
 						9,
-						"4689936",
-						"bot"
+						"4241463",
+						"drafter"
 					],
 					[
 						154,
 						10,
-						"4428557",
+						"4426385",
 						"bot"
 					],
 					[
 						155,
 						11,
-						"4697815",
+						"4832955",
 						"bot"
 					],
 					[
 						156,
 						12,
-						"4360569",
-						"drafter"
+						"4429023",
+						"bot"
 					],
 					[
 						157,
 						12,
-						"DST-LAC",
-						"drafter"
+						"3046439",
+						"bot"
 					],
 					[
 						158,
 						11,
-						"3046439",
+						"4837248",
 						"bot"
 					],
 					[
 						159,
 						10,
-						"4362081",
+						"4574716",
 						"bot"
 					],
 					[
 						160,
 						9,
-						"4430539",
-						"bot"
+						"DST-PIT",
+						"drafter"
 					],
 					[
 						161,
 						8,
-						"DST-JAX",
-						"drafter"
+						"5083315",
+						"bot"
 					],
 					[
 						162,
 						7,
-						"4036133",
-						"bot"
+						"4689936",
+						"drafter"
 					],
 					[
 						163,
@@ -8279,104 +8115,104 @@
 					[
 						164,
 						5,
-						"4686361",
-						"drafter"
+						"4567104",
+						"bot"
 					],
 					[
 						165,
 						4,
-						"5083315",
+						"3150744",
 						"bot"
 					],
 					[
 						166,
 						3,
-						"4367209",
+						"4428557",
 						"bot"
 					],
 					[
 						167,
 						2,
-						"4570037",
-						"bot"
+						"3055899",
+						"drafter"
 					],
 					[
 						168,
 						1,
-						"4567104",
+						"4686361",
 						"bot"
 					],
 					[
 						169,
 						1,
-						"4373626",
+						"4570037",
 						"bot"
 					],
 					[
 						170,
 						2,
-						"4837248",
-						"bot"
+						"DST-JAX",
+						"drafter"
 					],
 					[
 						171,
 						3,
-						"4432577",
+						"4036133",
 						"bot"
 					],
 					[
 						172,
 						4,
-						"3917792",
+						"4367209",
 						"bot"
 					],
 					[
 						173,
 						5,
-						"DST-GB",
-						"drafter"
+						"3917792",
+						"bot"
 					],
 					[
 						174,
 						6,
-						"4426385",
+						"4688380",
 						"bot"
 					],
 					[
 						175,
 						7,
-						"4688380",
-						"bot"
+						"DST-GB",
+						"drafter"
 					],
 					[
 						176,
 						8,
-						"3150744",
-						"drafter"
+						"4432577",
+						"bot"
 					],
 					[
 						177,
 						9,
-						"4595342",
-						"bot"
+						"4034949",
+						"drafter"
 					],
 					[
 						178,
 						10,
-						"4832955",
+						"4373626",
 						"bot"
 					],
 					[
 						179,
 						11,
-						"2578570",
+						"4685397",
 						"bot"
 					],
 					[
 						180,
 						12,
-						"4034949",
-						"drafter"
+						"4430539",
+						"bot"
 					]
 				],
 				"seats": [
@@ -8387,8 +8223,8 @@
 					],
 					[
 						2,
-						null,
-						"bot"
+						"jpk88",
+						"drafter"
 					],
 					[
 						3,
@@ -8402,8 +8238,8 @@
 					],
 					[
 						5,
-						"jpk88",
-						"drafter"
+						null,
+						"bot"
 					],
 					[
 						6,
@@ -8412,18 +8248,18 @@
 					],
 					[
 						7,
-						null,
-						"bot"
-					],
-					[
-						8,
 						"mara",
 						"drafter"
 					],
 					[
-						9,
+						8,
 						null,
 						"bot"
+					],
+					[
+						9,
+						"hunt",
+						"drafter"
 					],
 					[
 						10,
@@ -8437,8 +8273,8 @@
 					],
 					[
 						12,
-						"you",
-						"drafter"
+						null,
+						"bot"
 					]
 				]
 			},
@@ -8453,10 +8289,10 @@
 				},
 				{
 					"seat": 2,
-					"name": "Bot 2",
-					"line": "waiting",
-					"compact": true,
-					"label": "Bot 2"
+					"name": "jpk88",
+					"line": "drafter",
+					"compact": false,
+					"label": "jpk88"
 				},
 				{
 					"seat": 3,
@@ -8474,10 +8310,10 @@
 				},
 				{
 					"seat": 5,
-					"name": "jpk88",
-					"line": "drafter",
-					"compact": false,
-					"label": "jpk88"
+					"name": "Bot 5",
+					"line": "waiting",
+					"compact": true,
+					"label": "Bot 5"
 				},
 				{
 					"seat": 6,
@@ -8488,24 +8324,24 @@
 				},
 				{
 					"seat": 7,
-					"name": "Bot 7",
-					"line": "waiting",
-					"compact": true,
-					"label": "Bot 7"
-				},
-				{
-					"seat": 8,
 					"name": "mara",
 					"line": "drafter",
 					"compact": false,
 					"label": "mara"
 				},
 				{
-					"seat": 9,
-					"name": "Bot 9",
+					"seat": 8,
+					"name": "Bot 8",
 					"line": "waiting",
 					"compact": true,
-					"label": "Bot 9"
+					"label": "Bot 8"
+				},
+				{
+					"seat": 9,
+					"name": "You",
+					"line": "drafter",
+					"compact": false,
+					"label": "You"
 				},
 				{
 					"seat": 10,
@@ -8523,10 +8359,10 @@
 				},
 				{
 					"seat": 12,
-					"name": "You",
-					"line": "drafter",
-					"compact": false,
-					"label": "You"
+					"name": "Bot 12",
+					"line": "waiting",
+					"compact": true,
+					"label": "Bot 12"
 				}
 			],
 			"wait": null,
@@ -8539,18 +8375,18 @@
 				"faces": [
 					{
 						"pick": 180,
-						"id": "4034949",
-						"name": "Pineiro",
+						"id": "4430539",
+						"name": "Strange",
 						"lines": [
-							"you",
+							"Bot 12",
 							"15.12"
 						],
-						"strong": true
+						"strong": false
 					},
 					{
 						"pick": 179,
-						"id": "2578570",
-						"name": "Brissett",
+						"id": "4685397",
+						"name": "James",
 						"lines": [
 							"Bot 11",
 							"15.11"
@@ -8559,8 +8395,8 @@
 					},
 					{
 						"pick": 178,
-						"id": "4832955",
-						"name": "Johnson",
+						"id": "4373626",
+						"name": "Allgeier",
 						"lines": [
 							"Bot 10",
 							"15.10"
@@ -8569,38 +8405,38 @@
 					},
 					{
 						"pick": 177,
-						"id": "4595342",
-						"name": "Gadsden",
+						"id": "4034949",
+						"name": "Pineiro",
 						"lines": [
-							"Bot 9",
+							"you",
 							"15.09"
-						],
-						"strong": false
-					},
-					{
-						"pick": 176,
-						"id": "3150744",
-						"name": "McLaughlin",
-						"lines": [
-							"mara",
-							"15.08"
 						],
 						"strong": true
 					},
 					{
-						"pick": 175,
-						"id": "4688380",
-						"name": "Ward",
+						"pick": 176,
+						"id": "4432577",
+						"name": "Stroud",
 						"lines": [
-							"Bot 7",
-							"15.07"
+							"Bot 8",
+							"15.08"
 						],
 						"strong": false
 					},
 					{
+						"pick": 175,
+						"id": "DST-GB",
+						"name": "Packers",
+						"lines": [
+							"mara",
+							"15.07"
+						],
+						"strong": true
+					},
+					{
 						"pick": 174,
-						"id": "4426385",
-						"name": "Charbonnet",
+						"id": "4688380",
+						"name": "Ward",
 						"lines": [
 							"Bot 6",
 							"15.06"
@@ -8609,18 +8445,18 @@
 					},
 					{
 						"pick": 173,
-						"id": "DST-GB",
-						"name": "Packers",
+						"id": "3917792",
+						"name": "Jones",
 						"lines": [
-							"jpk88",
+							"Bot 5",
 							"15.05"
 						],
-						"strong": true
+						"strong": false
 					},
 					{
 						"pick": 172,
-						"id": "3917792",
-						"name": "Jones",
+						"id": "4367209",
+						"name": "Dulcich",
 						"lines": [
 							"Bot 4",
 							"15.04"
@@ -8629,8 +8465,8 @@
 					},
 					{
 						"pick": 171,
-						"id": "4432577",
-						"name": "Stroud",
+						"id": "4036133",
+						"name": "Hockenson",
 						"lines": [
 							"Bot 3",
 							"15.03"
@@ -8639,18 +8475,18 @@
 					},
 					{
 						"pick": 170,
-						"id": "4837248",
-						"name": "Mendoza",
+						"id": "DST-JAX",
+						"name": "Jaguars",
 						"lines": [
-							"Bot 2",
+							"jpk88",
 							"15.02"
 						],
-						"strong": false
+						"strong": true
 					},
 					{
 						"pick": 169,
-						"id": "4373626",
-						"name": "Allgeier",
+						"id": "4570037",
+						"name": "Ferguson",
 						"lines": [
 							"Bot 1",
 							"15.01"
@@ -8664,228 +8500,228 @@
 			"wall": {
 				"names": [
 					"Bot 1",
-					"Bot 2",
+					"jpk88",
 					"Bot 3",
 					"Bot 4",
-					"jpk88",
+					"Bot 5",
 					"Bot 6",
-					"Bot 7",
 					"mara",
-					"Bot 9",
+					"Bot 8",
+					"You",
 					"Bot 10",
 					"Bot 11",
-					"You"
+					"Bot 12"
 				],
 				"rows": [
 					[
-						"4374302",
-						"3117251",
 						"4430807",
-						"4429795",
-						"4362628",
 						"4426515",
-						"4379399",
-						"4241389",
 						"4429160",
-						"4262921",
-						"3043078",
-						"4430878"
-					],
-					[
-						"4429615",
-						"3929630",
-						"4595348",
-						"4567048",
-						"4258173",
-						"4428331",
-						"4047646",
-						"4426354",
+						"3117251",
 						"4242335",
+						"4362628",
+						"4430878",
+						"4241389",
+						"4429795",
+						"4374302",
 						"4426502",
-						"4362238",
-						"4361370"
+						"4262921"
 					],
 					[
-						"4427366",
-						"4569618",
-						"4870808",
-						"4685472",
-						"4432665",
-						"3918298",
 						"4685382",
+						"4428331",
+						"3043078",
+						"4595348",
+						"4379399",
+						"4047646",
+						"4429615",
+						"4258173",
+						"3929630",
+						"4361370",
+						"4426354",
+						"4362238"
+					],
+					[
+						"4569618",
+						"4432665",
+						"4567048",
 						"4361307",
-						"4567750",
+						"4890973",
+						"4430737",
 						"4241478",
-						"4361579",
-						"4890973"
+						"4685472",
+						"3918298",
+						"4239996",
+						"4696981",
+						"4567750"
 					],
 					[
 						"3121422",
-						"4035538",
+						"4426388",
+						"3915416",
+						"4612826",
 						"16800",
 						"4372016",
-						"4612826",
-						"4696981",
-						"4259545",
-						"4426388",
-						"4239996",
-						"4430737",
 						"4239993",
-						"3916387"
+						"4259545",
+						"3916387",
+						"4361579",
+						"4427366",
+						"4870808"
 					],
 					[
 						"4431452",
-						"4685278",
-						"3915416",
-						"4596448",
 						"4723086",
-						"4248528",
+						"3915511",
+						"4596448",
 						"16737",
+						"4035538",
 						"4431459",
-						"4432620",
 						"4685702",
+						"2577417",
+						"4685278",
 						"3128429",
-						"3915511"
+						"4569173"
 					],
 					[
-						"3916148",
-						"4047650",
-						"12483",
-						"4426348",
-						"5083076",
 						"4685512",
-						"4569987",
-						"4040715",
-						"4882093",
-						"4569173",
-						"4431299",
-						"2577417"
-					],
-					[
-						"4432708",
-						"4432773",
-						"4038815",
-						"DST-SEA",
-						"4431611",
-						"4360248",
-						"4361741",
+						"12483",
 						"4360078",
-						"DST-DEN",
-						"4360761",
+						"4047650",
+						"5083076",
+						"4569987",
+						"4360248",
+						"4432620",
+						"4040715",
+						"4432708",
+						"4248528",
+						"4431299"
+					],
+					[
+						"4432773",
+						"4431611",
 						"4432710",
-						"4038941"
-					],
-					[
-						"4688813",
-						"4241416",
-						"4047365",
+						"4426348",
 						"3116165",
-						"4430027",
-						"4678008",
-						"4362249",
-						"4572680",
-						"4360310",
-						"3040151",
-						"4871023",
-						"4569587"
+						"DST-SEA",
+						"4569587",
+						"4361741",
+						"4360761",
+						"DST-DEN",
+						"4882093",
+						"3916148"
 					],
 					[
-						"DST-LAR",
-						"4568490",
-						"DST-HOU",
 						"4241985",
 						"15847",
-						"4429205",
-						"4429025",
+						"4871023",
+						"4678008",
+						"4241416",
+						"4035687",
 						"3046779",
-						"4371733",
-						"3139477",
+						"4038815",
+						"4038941",
+						"4360310",
+						"3040151",
+						"4362249"
+					],
+					[
 						"3916433",
-						"4361050"
+						"4572680",
+						"DST-HOU",
+						"4429025",
+						"DST-LAR",
+						"4430027",
+						"4361050",
+						"4371733",
+						"3116365",
+						"4047365",
+						"3139477",
+						"2976212"
+					],
+					[
+						"4360569",
+						"3929645",
+						"4373678",
+						"3042519",
+						"4361432",
+						"4426338",
+						"4689114",
+						"4568490",
+						"3052587",
+						"4688813",
+						"4429205",
+						"DST-MIN"
 					],
 					[
 						"3121023",
-						"DST-MIN",
-						"4035687",
-						"4701936",
-						"3929645",
-						"4426338",
-						"3042519",
-						"3052587",
-						"4373678",
-						"2976212",
-						"4689114",
-						"3116365"
-					],
-					[
-						"4429023",
-						"3953687",
-						"4361432",
-						"4608686",
 						"4576297",
-						"3126486",
-						"DST-PHI",
-						"4385690",
-						"4032473",
-						"DST-NE",
-						"DST-DET",
-						"4242355"
-					],
-					[
-						"4360689",
-						"4036378",
-						"4429096",
-						"4695883",
-						"4360516",
-						"2473037",
-						"4870653",
-						"3116389",
 						"4683062",
-						"3917315",
-						"2971573",
-						"3123076"
+						"4701936",
+						"4608686",
+						"3953687",
+						"4385690",
+						"DST-NE",
+						"4428718",
+						"4242355",
+						"DST-PHI",
+						"3917315"
 					],
 					[
-						"4575131",
-						"4870795",
-						"4574716",
-						"17372",
-						"4362478",
-						"DST-PIT",
-						"3055899",
-						"5081397",
-						"4689936",
-						"4428557",
+						"4032473",
 						"4697815",
-						"4360569"
+						"3912547",
+						"DST-DET",
+						"4036378",
+						"4695883",
+						"3116389",
+						"3126486",
+						"3123076",
+						"4360689",
+						"2473037",
+						"2971573"
 					],
 					[
-						"4567104",
-						"4570037",
-						"4367209",
-						"5083315",
-						"4686361",
-						"4429059",
-						"4036133",
-						"DST-JAX",
-						"4430539",
+						"DST-LAC",
+						"4360516",
 						"4362081",
-						"3046439",
-						"DST-LAC"
+						"4575131",
+						"4870653",
+						"4429096",
+						"4362478",
+						"17372",
+						"4241463",
+						"4426385",
+						"4832955",
+						"4429023"
 					],
 					[
-						"4373626",
-						"4837248",
-						"4432577",
-						"3917792",
-						"DST-GB",
-						"4426385",
-						"4688380",
+						"4686361",
+						"3055899",
+						"4428557",
 						"3150744",
-						"4595342",
-						"4832955",
-						"2578570",
-						"4034949"
+						"4567104",
+						"4429059",
+						"4689936",
+						"5083315",
+						"DST-PIT",
+						"4574716",
+						"4837248",
+						"3046439"
+					],
+					[
+						"4570037",
+						"DST-JAX",
+						"4036133",
+						"4367209",
+						"3917792",
+						"4688380",
+						"DST-GB",
+						"4432577",
+						"4034949",
+						"4373626",
+						"4685397",
+						"4430539"
 					]
 				]
 			},
@@ -8894,78 +8730,78 @@
 				"slots": [
 					{
 						"slot": "QB",
-						"id": "3916387",
-						"pick": "4.01"
+						"id": "3918298",
+						"pick": "3.09"
 					},
 					{
 						"slot": "RB",
-						"id": "4890973",
-						"pick": "3.12"
+						"id": "4429795",
+						"pick": "1.09"
 					},
 					{
 						"slot": "RB",
-						"id": "4360569",
-						"pick": "13.12"
+						"id": "3929630",
+						"pick": "2.04"
 					},
 					{
 						"slot": "WR",
-						"id": "4430878",
-						"pick": "1.12"
+						"id": "4360761",
+						"pick": "7.09"
 					},
 					{
 						"slot": "WR",
-						"id": "4361370",
-						"pick": "2.01"
+						"id": "4428718",
+						"pick": "11.09"
 					},
 					{
 						"slot": "TE",
-						"id": "4361050",
-						"pick": "9.12"
+						"id": "3116365",
+						"pick": "9.09"
 					},
 					{
 						"slot": "FLEX",
-						"id": "4569587",
-						"pick": "8.01"
+						"id": "3123076",
+						"pick": "12.04"
 					},
 					{
 						"slot": "K",
 						"id": "4034949",
-						"pick": "15.12"
+						"pick": "15.09"
 					},
 					{
 						"slot": "DST",
-						"id": "DST-LAC",
-						"pick": "14.01"
+						"id": "DST-PIT",
+						"pick": "14.04"
 					},
 					{
 						"slot": "BN",
-						"id": "3915511",
-						"pick": "5.12"
+						"id": "3916387",
+						"pick": "4.04"
 					},
 					{
 						"slot": "BN",
 						"id": "2577417",
-						"pick": "6.01"
+						"pick": "5.09"
+					},
+					{
+						"slot": "BN",
+						"id": "4040715",
+						"pick": "6.04"
 					},
 					{
 						"slot": "BN",
 						"id": "4038941",
-						"pick": "7.12"
+						"pick": "8.04"
 					},
 					{
 						"slot": "BN",
-						"id": "3116365",
-						"pick": "10.01"
+						"id": "3052587",
+						"pick": "10.04"
 					},
 					{
 						"slot": "BN",
-						"id": "4242355",
-						"pick": "11.12"
-					},
-					{
-						"slot": "BN",
-						"id": "3123076",
-						"pick": "12.01"
+						"id": "4241463",
+						"pick": "13.09"
 					}
 				]
 			},
@@ -8980,23 +8816,23 @@
 		"drafting": "Leave? Your queue drafts your seat, then the board, and the report is yours when the draft ends."
 	},
 	"reports": {
-		"you": {
+		"first": {
 			"names": [
 				"Bot 1",
-				"Bot 2",
+				"You",
 				"Bot 3",
 				"Bot 4",
-				"jpk88",
+				"Bot 5",
 				"Bot 6",
-				"Bot 7",
 				"mara",
-				"Bot 9",
+				"Bot 8",
+				"hunt",
 				"Bot 10",
 				"Bot 11",
-				"You"
+				"Bot 12"
 			],
-			"title": "Your draft from slot 12",
-			"points": "1,547",
+			"title": "Your draft from slot 2",
+			"points": "1,521",
 			"caption": "points from your QB, RB, WR and TE starters",
 			"cells": [
 				{
@@ -9006,7 +8842,7 @@
 				},
 				{
 					"label": "2nd",
-					"value": "1,507",
+					"value": "1,506",
 					"mine": false
 				},
 				{
@@ -9032,7 +8868,7 @@
 			],
 			"verbs": [
 				"Join another lobby",
-				"Run it against bots from slot 12"
+				"Run it against bots from slot 2"
 			],
 			"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Picks later: the pick less his ADP, or less his place on our board (no kickers or defenses there), plus is later. Still there: the room's read at that pick, tinted from 60%.",
 			"field": {
@@ -9041,85 +8877,85 @@
 					{
 						"rank": 1,
 						"name": "You",
-						"points": "1,547",
+						"points": "1,521",
 						"share": 1,
 						"you": true
 					},
 					{
 						"rank": 2,
 						"name": "Bot 6",
-						"points": "1,507",
-						"share": 0.9741468459152016,
+						"points": "1,506",
+						"share": 0.9898100059167707,
 						"you": false
 					},
 					{
 						"rank": 3,
-						"name": "Bot 1",
-						"points": "1,500",
-						"share": 0.9696871768355739,
+						"name": "Bot 11",
+						"points": "1,469",
+						"share": 0.9655512458089541,
 						"you": false
 					},
 					{
 						"rank": 4,
-						"name": "Bot 10",
-						"points": "1,496",
-						"share": 0.966778697001034,
+						"name": "Bot 1",
+						"points": "1,468",
+						"share": 0.9648280849385313,
 						"you": false
 					},
 					{
 						"rank": 5,
-						"name": "jpk88",
-						"points": "1,490",
-						"share": 0.9631592554291624,
+						"name": "Bot 4",
+						"points": "1,466",
+						"share": 0.9640391821707975,
 						"you": false
 					},
 					{
 						"rank": 6,
+						"name": "Bot 10",
+						"points": "1,462",
+						"share": 0.9611465386891066,
+						"you": false
+					},
+					{
+						"rank": 7,
+						"name": "hunt",
+						"points": "1,436",
+						"share": 0.9440536453882059,
+						"you": false
+					},
+					{
+						"rank": 8,
+						"name": "Bot 12",
+						"points": "1,435",
+						"share": 0.943199000723161,
+						"you": false
+					},
+					{
+						"rank": 9,
 						"name": "mara",
-						"points": "1,463",
-						"share": 0.9453205791106514,
-						"you": false
-					},
-					{
-						"rank": 7,
-						"name": "Bot 11",
-						"points": "1,427",
-						"share": 0.9223112719751809,
-						"you": false
-					},
-					{
-						"rank": 8,
-						"name": "Bot 4",
-						"points": "1,405",
-						"share": 0.9081566701137538,
-						"you": false
-					},
-					{
-						"rank": 9,
-						"name": "Bot 9",
-						"points": "1,402",
-						"share": 0.906217683557394,
+						"points": "1,431",
+						"share": 0.9409637762145816,
 						"you": false
 					},
 					{
 						"rank": 10,
 						"name": "Bot 3",
-						"points": "1,395",
-						"share": 0.9018872802481903,
+						"points": "1,431",
+						"share": 0.9407665505226481,
 						"you": false
 					},
 					{
 						"rank": 11,
-						"name": "Bot 7",
-						"points": "1,345",
-						"share": 0.8692476732161324,
+						"name": "Bot 8",
+						"points": "1,406",
+						"share": 0.924265334297548,
 						"you": false
 					},
 					{
 						"rank": 12,
-						"name": "Bot 2",
-						"points": "1,337",
-						"share": 0.8640124095139606,
+						"name": "Bot 5",
+						"points": "1,405",
+						"share": 0.9238051410163698,
 						"you": false
 					}
 				]
@@ -9128,634 +8964,19 @@
 				"note": "15 picks, starters by slot",
 				"rows": [
 					{
-						"pick": "1.12",
-						"id": "4430878",
+						"pick": "1.02",
+						"id": "4426515",
 						"slot": "WR",
 						"figure": {
-							"text": "+129.8",
+							"text": "+164.0",
 							"muted": false
 						},
 						"adp": {
-							"text": "+6.3",
-							"tone": "gain"
-						},
-						"ours": {
-							"text": "+9",
-							"tone": "gain"
-						},
-						"still": {
-							"text": ">99%",
-							"wait": true,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "2.01",
-						"id": "4361370",
-						"slot": "WR",
-						"figure": {
-							"text": "+93.7",
-							"muted": false
-						},
-						"adp": {
-							"text": "−7.0",
-							"tone": "loss"
-						},
-						"ours": {
-							"text": "+4",
-							"tone": "gain"
-						},
-						"still": {
-							"text": "2%",
-							"wait": false,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "3.12",
-						"id": "4890973",
-						"slot": "RB",
-						"figure": {
-							"text": "+66.2",
-							"muted": false
-						},
-						"adp": {
-							"text": "+14.8",
-							"tone": "gain"
-						},
-						"ours": {
-							"text": "+10",
-							"tone": "gain"
-						},
-						"still": {
-							"text": ">99%",
-							"wait": true,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "4.01",
-						"id": "3916387",
-						"slot": "QB",
-						"figure": {
-							"text": "+48.1",
-							"muted": false
-						},
-						"adp": {
-							"text": "−18.0",
-							"tone": "loss"
-						},
-						"ours": {
-							"text": "+6",
-							"tone": "gain"
-						},
-						"still": {
-							"text": "8%",
-							"wait": false,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "5.12",
-						"id": "3915511",
-						"slot": "Bench",
-						"figure": {
-							"text": "+25.3",
-							"muted": false
-						},
-						"adp": {
-							"text": "+5.5",
-							"tone": "gain"
-						},
-						"ours": {
-							"text": "+14",
-							"tone": "gain"
-						},
-						"still": {
-							"text": ">99%",
-							"wait": true,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "6.01",
-						"id": "2577417",
-						"slot": "Bench",
-						"figure": {
-							"text": "+22.2",
-							"muted": false
-						},
-						"adp": {
-							"text": "−4.4",
-							"tone": "loss"
-						},
-						"ours": {
-							"text": "+13",
-							"tone": "gain"
-						},
-						"still": {
-							"text": "<1%",
-							"wait": false,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "7.12",
-						"id": "4038941",
-						"slot": "Bench",
-						"figure": {
-							"text": "+8.8",
-							"muted": false
-						},
-						"adp": {
-							"text": "−19.4",
-							"tone": "loss"
-						},
-						"ours": {
-							"text": "+21",
-							"tone": "gain"
-						},
-						"still": {
-							"text": ">99%",
-							"wait": true,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "8.01",
-						"id": "4569587",
-						"slot": "FLEX",
-						"figure": {
-							"text": "+5.4",
-							"muted": false
-						},
-						"adp": {
-							"text": "−2.1",
-							"tone": "loss"
-						},
-						"ours": {
-							"text": "+14",
-							"tone": "gain"
-						},
-						"still": {
-							"text": "16%",
-							"wait": false,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "9.12",
-						"id": "4361050",
-						"slot": "TE",
-						"figure": {
-							"text": "+6.6",
-							"muted": false
-						},
-						"adp": {
-							"text": "−27.9",
-							"tone": "loss"
-						},
-						"ours": {
-							"text": "+36",
-							"tone": "gain"
-						},
-						"still": {
-							"text": ">99%",
-							"wait": true,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "10.01",
-						"id": "3116365",
-						"slot": "Bench",
-						"figure": {
-							"text": "+3.1",
-							"muted": false
-						},
-						"adp": {
-							"text": "−23.5",
-							"tone": "loss"
-						},
-						"ours": {
-							"text": "+30",
-							"tone": "gain"
-						},
-						"still": {
-							"text": "21%",
-							"wait": false,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "11.12",
-						"id": "4242355",
-						"slot": "Bench",
-						"figure": {
-							"text": "−8.6",
-							"muted": false
-						},
-						"adp": {
-							"text": "−3.8",
-							"tone": "loss"
-						},
-						"ours": {
-							"text": "+27",
-							"tone": "gain"
-						},
-						"still": {
-							"text": ">99%",
-							"wait": true,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "12.01",
-						"id": "3123076",
-						"slot": "Bench",
-						"figure": {
-							"text": "−35.6",
-							"muted": false
-						},
-						"adp": null,
-						"ours": {
-							"text": "−2",
-							"tone": "loss"
-						},
-						"still": {
-							"text": ">99%",
-							"wait": true,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "13.12",
-						"id": "4360569",
-						"slot": "RB",
-						"figure": {
-							"text": "−31.2",
-							"muted": false
-						},
-						"adp": {
-							"text": "+45.2",
-							"tone": "gain"
-						},
-						"ours": {
-							"text": "+16",
-							"tone": "gain"
-						},
-						"still": {
-							"text": ">99%",
-							"wait": true,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "14.01",
-						"id": "DST-LAC",
-						"slot": "DST",
-						"figure": {
-							"text": "Draft order 10",
-							"muted": true
-						},
-						"adp": {
-							"text": "+13.7",
-							"tone": "gain"
-						},
-						"ours": null,
-						"still": {
-							"text": "50%",
-							"wait": false,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "15.12",
-						"id": "4034949",
-						"slot": "K",
-						"figure": {
-							"text": "Draft order 12",
-							"muted": true
-						},
-						"adp": {
-							"text": "+19.9",
-							"tone": "gain"
-						},
-						"ours": null,
-						"still": {
-							"text": "last pick",
-							"wait": false,
-							"muted": true
-						},
-						"by": "You"
-					}
-				]
-			},
-			"runs": {
-				"title": "The same draft, 200 more times",
-				"note": "your picks on autopick from the board, the bots reshuffled each run",
-				"bins": [
-					6,
-					17,
-					18,
-					26,
-					25,
-					29,
-					29,
-					20,
-					15,
-					6,
-					5,
-					4
-				],
-				"medianBin": 5,
-				"low": "1,449",
-				"high": "1,641",
-				"median": "1,534",
-				"middle": "1,478 to 1,586",
-				"topShare": "48%",
-				"topWords": "of runs finish top 3 of 12",
-				"ranks": [
-					37,
-					24,
-					35,
-					18,
-					23,
-					10,
-					10,
-					11,
-					12,
-					10,
-					6,
-					4
-				],
-				"rank": 1
-			},
-			"exposure": {
-				"title": "Who you end up with",
-				"aside": "share of 200 runs",
-				"rows": [
-					{
-						"id": "3040151",
-						"share": 0.59
-					},
-					{
-						"id": "3042519",
-						"share": 0.495
-					},
-					{
-						"id": "3918298",
-						"share": 0.43
-					},
-					{
-						"id": "DST-DET",
-						"share": 0.355
-					},
-					{
-						"id": "4379399",
-						"share": 0.35
-					},
-					{
-						"id": "16737",
-						"share": 0.345
-					},
-					{
-						"id": "4248528",
-						"share": 0.315
-					},
-					{
-						"id": "4430737",
-						"share": 0.315
-					}
-				]
-			}
-		},
-		"down": {
-			"names": [
-				"Bot 1",
-				"Bot 2",
-				"Bot 3",
-				"Bot 4",
-				"jpk88",
-				"Bot 6",
-				"Bot 7",
-				"You",
-				"Bot 9",
-				"Bot 10",
-				"Bot 11",
-				"you"
-			],
-			"title": "Your draft from slot 8",
-			"points": "1,463",
-			"caption": "points from your QB, RB, WR and TE starters",
-			"cells": [
-				{
-					"label": "of 12",
-					"value": "6th",
-					"mine": true
-				},
-				{
-					"label": "5th",
-					"value": "1,490",
-					"mine": false
-				},
-				{
-					"label": "Leader",
-					"value": "1,547",
-					"mine": false
-				},
-				{
-					"label": "Teams",
-					"value": "12",
-					"mine": false
-				},
-				{
-					"label": "Scoring",
-					"value": "PPR",
-					"mine": false
-				},
-				{
-					"label": "Rounds",
-					"value": "15",
-					"mine": false
-				},
-				{
-					"label": "Other seats",
-					"value": "3 drafters, 9 bots",
-					"mine": false
-				}
-			],
-			"verbs": [
-				"Join another lobby",
-				"Run it against bots from slot 8"
-			],
-			"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Picks later: the pick less his ADP, or less his place on our board (no kickers or defenses there), plus is later. Still there: the room's read at that pick, tinted from 60%.",
-			"field": {
-				"note": "projected starting points, 12 teams",
-				"rows": [
-					{
-						"rank": 1,
-						"name": "you",
-						"points": "1,547",
-						"share": 1,
-						"you": false
-					},
-					{
-						"rank": 2,
-						"name": "Bot 6",
-						"points": "1,507",
-						"share": 0.9741468459152016,
-						"you": false
-					},
-					{
-						"rank": 3,
-						"name": "Bot 1",
-						"points": "1,500",
-						"share": 0.9696871768355739,
-						"you": false
-					},
-					{
-						"rank": 4,
-						"name": "Bot 10",
-						"points": "1,496",
-						"share": 0.966778697001034,
-						"you": false
-					},
-					{
-						"rank": 5,
-						"name": "jpk88",
-						"points": "1,490",
-						"share": 0.9631592554291624,
-						"you": false
-					},
-					{
-						"rank": 6,
-						"name": "You",
-						"points": "1,463",
-						"share": 0.9453205791106514,
-						"you": true
-					},
-					{
-						"rank": 7,
-						"name": "Bot 11",
-						"points": "1,427",
-						"share": 0.9223112719751809,
-						"you": false
-					},
-					{
-						"rank": 8,
-						"name": "Bot 4",
-						"points": "1,405",
-						"share": 0.9081566701137538,
-						"you": false
-					},
-					{
-						"rank": 9,
-						"name": "Bot 9",
-						"points": "1,402",
-						"share": 0.906217683557394,
-						"you": false
-					},
-					{
-						"rank": 10,
-						"name": "Bot 3",
-						"points": "1,395",
-						"share": 0.9018872802481903,
-						"you": false
-					},
-					{
-						"rank": 11,
-						"name": "Bot 7",
-						"points": "1,345",
-						"share": 0.8692476732161324,
-						"you": false
-					},
-					{
-						"rank": 12,
-						"name": "Bot 2",
-						"points": "1,337",
-						"share": 0.8640124095139606,
-						"you": false
-					}
-				]
-			},
-			"picks": {
-				"note": "15 picks, starters by slot",
-				"rows": [
-					{
-						"pick": "1.08",
-						"id": "4241389",
-						"slot": "WR",
-						"figure": {
-							"text": "+111.1",
-							"muted": false
-						},
-						"adp": {
-							"text": "−2.5",
+							"text": "−0.8",
 							"tone": "loss"
 						},
 						"ours": {
 							"text": "+1",
-							"tone": "gain"
-						},
-						"still": {
-							"text": "17%",
-							"wait": false,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "2.05",
-						"id": "4426354",
-						"slot": "WR",
-						"figure": {
-							"text": "+91.4",
-							"muted": false
-						},
-						"adp": {
-							"text": "−2.9",
-							"tone": "loss"
-						},
-						"ours": {
-							"text": "+5",
-							"tone": "gain"
-						},
-						"still": {
-							"text": "10%",
-							"wait": false,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "3.08",
-						"id": "4361307",
-						"slot": "TE",
-						"figure": {
-							"text": "+75.2",
-							"muted": false
-						},
-						"adp": {
-							"text": "+0.8",
-							"tone": "gain"
-						},
-						"ours": {
-							"text": "+14",
 							"tone": "gain"
 						},
 						"still": {
@@ -9766,176 +8987,38 @@
 						"by": "You"
 					},
 					{
-						"pick": "4.05",
-						"id": "4426388",
-						"slot": "FLEX",
+						"pick": "2.11",
+						"id": "4428331",
+						"slot": "WR",
 						"figure": {
-							"text": "+42.9",
+							"text": "+72.6",
 							"muted": false
 						},
 						"adp": {
-							"text": "−4.6",
-							"tone": "loss"
+							"text": "+5.7",
+							"tone": "gain"
 						},
 						"ours": {
-							"text": "+6",
+							"text": "+1",
 							"tone": "gain"
 						},
 						"still": {
-							"text": "11%",
+							"text": "59%",
 							"wait": false,
 							"muted": false
 						},
 						"by": "You"
 					},
 					{
-						"pick": "5.08",
-						"id": "4431459",
-						"slot": "Bench",
+						"pick": "3.02",
+						"id": "4432665",
+						"slot": "TE",
 						"figure": {
-							"text": "+22.5",
+							"text": "+73.7",
 							"muted": false
 						},
 						"adp": {
-							"text": "−10.0",
-							"tone": "loss"
-						},
-						"ours": {
-							"text": "+9",
-							"tone": "gain"
-						},
-						"still": {
-							"text": "<1%",
-							"wait": false,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "6.05",
-						"id": "4040715",
-						"slot": "QB",
-						"figure": {
-							"text": "+18.2",
-							"muted": false
-						},
-						"adp": {
-							"text": "−11.3",
-							"tone": "loss"
-						},
-						"ours": {
-							"text": "+14",
-							"tone": "gain"
-						},
-						"still": {
-							"text": "<1%",
-							"wait": false,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "7.08",
-						"id": "4360078",
-						"slot": "Bench",
-						"figure": {
-							"text": "+1.4",
-							"muted": false
-						},
-						"adp": {
-							"text": "+10.7",
-							"tone": "gain"
-						},
-						"ours": {
-							"text": "+2",
-							"tone": "gain"
-						},
-						"still": {
-							"text": "20%",
-							"wait": false,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "8.05",
-						"id": "4572680",
-						"slot": "Bench",
-						"figure": {
-							"text": "+1.9",
-							"muted": false
-						},
-						"adp": {
-							"text": "−15.4",
-							"tone": "loss"
-						},
-						"ours": {
-							"text": "+11",
-							"tone": "gain"
-						},
-						"still": {
-							"text": "<1%",
-							"wait": false,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "9.08",
-						"id": "3046779",
-						"slot": "Bench",
-						"figure": {
-							"text": "+4.8",
-							"muted": false
-						},
-						"adp": {
-							"text": "+1.3",
-							"tone": "gain"
-						},
-						"ours": {
-							"text": "+29",
-							"tone": "gain"
-						},
-						"still": {
-							"text": "<1%",
-							"wait": false,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "10.05",
-						"id": "3052587",
-						"slot": "Bench",
-						"figure": {
-							"text": "+0.8",
-							"muted": false
-						},
-						"adp": {
-							"text": "−17.1",
-							"tone": "loss"
-						},
-						"ours": {
-							"text": "+28",
-							"tone": "gain"
-						},
-						"still": {
-							"text": "85%",
-							"wait": true,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "11.08",
-						"id": "4385690",
-						"slot": "Bench",
-						"figure": {
-							"text": "−22.0",
-							"muted": false
-						},
-						"adp": {
-							"text": "−17.8",
+							"text": "−8.5",
 							"tone": "loss"
 						},
 						"ours": {
@@ -9943,6 +9026,121 @@
 							"tone": "gain"
 						},
 						"still": {
+							"text": "<1%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "4.11",
+						"id": "4426388",
+						"slot": "FLEX",
+						"figure": {
+							"text": "+42.9",
+							"muted": false
+						},
+						"adp": {
+							"text": "+1.4",
+							"tone": "gain"
+						},
+						"ours": {
+							"text": "+12",
+							"tone": "gain"
+						},
+						"still": {
+							"text": "54%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "5.02",
+						"id": "4723086",
+						"slot": "Bench",
+						"figure": {
+							"text": "+25.3",
+							"muted": false
+						},
+						"adp": {
+							"text": "−3.8",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "+5",
+							"tone": "gain"
+						},
+						"still": {
+							"text": "<1%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "6.11",
+						"id": "12483",
+						"slot": "Bench",
+						"figure": {
+							"text": "+3.8",
+							"muted": false
+						},
+						"adp": {
+							"text": "−3.8",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "−1",
+							"tone": "loss"
+						},
+						"still": {
+							"text": "88%",
+							"wait": true,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "7.02",
+						"id": "4431611",
+						"slot": "QB",
+						"figure": {
+							"text": "+14.8",
+							"muted": false
+						},
+						"adp": {
+							"text": "−11.4",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "+19",
+							"tone": "gain"
+						},
+						"still": {
+							"text": "<1%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "8.11",
+						"id": "15847",
+						"slot": "Bench",
+						"figure": {
+							"text": "+6.7",
+							"muted": false
+						},
+						"adp": {
+							"text": "−12.5",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "+26",
+							"tone": "gain"
+						},
+						"still": {
 							"text": ">99%",
 							"wait": true,
 							"muted": false
@@ -9950,19 +9148,111 @@
 						"by": "You"
 					},
 					{
-						"pick": "12.05",
-						"id": "3116389",
-						"slot": "RB",
+						"pick": "9.02",
+						"id": "4572680",
+						"slot": "Bench",
 						"figure": {
-							"text": "−45.1",
+							"text": "+1.9",
 							"muted": false
 						},
 						"adp": {
-							"text": "−28.6",
+							"text": "−6.4",
 							"tone": "loss"
 						},
 						"ours": {
-							"text": "−14",
+							"text": "+19",
+							"tone": "gain"
+						},
+						"still": {
+							"text": "<1%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "10.11",
+						"id": "3929645",
+						"slot": "Bench",
+						"figure": {
+							"text": "−2.5",
+							"muted": false
+						},
+						"adp": {
+							"text": "−35.1",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "+25",
+							"tone": "gain"
+						},
+						"still": {
+							"text": ">99%",
+							"wait": true,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "11.02",
+						"id": "4576297",
+						"slot": "Bench",
+						"figure": {
+							"text": "−13.0",
+							"muted": false
+						},
+						"adp": {
+							"text": "−27.8",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "+18",
+							"tone": "gain"
+						},
+						"still": {
+							"text": ">99%",
+							"wait": true,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "12.11",
+						"id": "4697815",
+						"slot": "RB",
+						"figure": {
+							"text": "−28.8",
+							"muted": false
+						},
+						"adp": {
+							"text": "+13.4",
+							"tone": "gain"
+						},
+						"ours": {
+							"text": "+11",
+							"tone": "gain"
+						},
+						"still": {
+							"text": ">99%",
+							"wait": true,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "13.02",
+						"id": "4360516",
+						"slot": "RB",
+						"figure": {
+							"text": "−46.7",
+							"muted": false
+						},
+						"adp": {
+							"text": "−15.6",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "−9",
 							"tone": "loss"
 						},
 						"still": {
@@ -9973,30 +9263,27 @@
 						"by": "You"
 					},
 					{
-						"pick": "13.08",
-						"id": "5081397",
-						"slot": "RB",
+						"pick": "14.11",
+						"id": "3055899",
+						"slot": "K",
 						"figure": {
-							"text": "−59.7",
-							"muted": false
+							"text": "Draft order 8",
+							"muted": true
 						},
 						"adp": {
-							"text": "−7.9",
-							"tone": "loss"
+							"text": "+15.4",
+							"tone": "gain"
 						},
-						"ours": {
-							"text": "−30",
-							"tone": "loss"
-						},
+						"ours": null,
 						"still": {
-							"text": ">99%",
+							"text": "69%",
 							"wait": true,
 							"muted": false
 						},
 						"by": "You"
 					},
 					{
-						"pick": "14.05",
+						"pick": "15.02",
 						"id": "DST-JAX",
 						"slot": "DST",
 						"figure": {
@@ -10004,27 +9291,7 @@
 							"muted": true
 						},
 						"adp": {
-							"text": "+8.4",
-							"tone": "gain"
-						},
-						"ours": null,
-						"still": {
-							"text": "66%",
-							"wait": true,
-							"muted": false
-						},
-						"by": "You"
-					},
-					{
-						"pick": "15.08",
-						"id": "3150744",
-						"slot": "K",
-						"figure": {
-							"text": "Draft order 11",
-							"muted": true
-						},
-						"adp": {
-							"text": "+18.6",
+							"text": "+17.4",
 							"tone": "gain"
 						},
 						"ours": null,
@@ -10041,41 +9308,610 @@
 				"title": "The same draft, 200 more times",
 				"note": "your picks on autopick from the board, the bots reshuffled each run",
 				"bins": [
-					8,
-					11,
-					26,
-					23,
-					24,
-					38,
-					15,
-					18,
-					20,
-					10,
+					1,
 					5,
-					2
+					6,
+					20,
+					22,
+					28,
+					32,
+					30,
+					22,
+					16,
+					13,
+					5
 				],
-				"medianBin": 5,
-				"low": "1,451",
-				"high": "1,657",
-				"median": "1,539",
-				"middle": "1,486 to 1,602",
-				"topShare": "55%",
+				"medianBin": 6,
+				"low": "1,449",
+				"high": "1,610",
+				"median": "1,538",
+				"middle": "1,496 to 1,580",
+				"topShare": "52%",
 				"topWords": "of runs finish top 3 of 12",
 				"ranks": [
-					55,
+					33,
+					40,
 					31,
-					24,
-					12,
-					12,
-					15,
-					13,
-					12,
-					7,
-					13,
-					2,
-					4
+					27,
+					10,
+					22,
+					10,
+					14,
+					3,
+					6,
+					3,
+					1
 				],
-				"rank": 6
+				"rank": 1
+			},
+			"exposure": {
+				"title": "Who you end up with",
+				"aside": "share of 200 runs",
+				"rows": [
+					{
+						"id": "4360248",
+						"share": 0.89
+					},
+					{
+						"id": "4429795",
+						"share": 0.665
+					},
+					{
+						"id": "4040715",
+						"share": 0.385
+					},
+					{
+						"id": "4689114",
+						"share": 0.375
+					},
+					{
+						"id": "4371733",
+						"share": 0.36
+					},
+					{
+						"id": "DST-NE",
+						"share": 0.35
+					},
+					{
+						"id": "4430807",
+						"share": 0.335
+					},
+					{
+						"id": "4567048",
+						"share": 0.29
+					}
+				]
+			}
+		},
+		"down": {
+			"names": [
+				"Bot 1",
+				"jpk88",
+				"Bot 3",
+				"Bot 4",
+				"Bot 5",
+				"Bot 6",
+				"You",
+				"Bot 8",
+				"hunt",
+				"Bot 10",
+				"Bot 11",
+				"Bot 12"
+			],
+			"title": "Your draft from slot 7",
+			"points": "1,431",
+			"caption": "points from your QB, RB, WR and TE starters",
+			"cells": [
+				{
+					"label": "of 12",
+					"value": "9th",
+					"mine": true
+				},
+				{
+					"label": "8th",
+					"value": "1,435",
+					"mine": false
+				},
+				{
+					"label": "Leader",
+					"value": "1,521",
+					"mine": false
+				},
+				{
+					"label": "Teams",
+					"value": "12",
+					"mine": false
+				},
+				{
+					"label": "Scoring",
+					"value": "PPR",
+					"mine": false
+				},
+				{
+					"label": "Rounds",
+					"value": "15",
+					"mine": false
+				},
+				{
+					"label": "Other seats",
+					"value": "3 drafters, 9 bots",
+					"mine": false
+				}
+			],
+			"verbs": [
+				"Join another lobby",
+				"Run it against bots from slot 7"
+			],
+			"basis": "Points are our 2026 PPR projections, over replacement for 12 teams on this roster. Kickers and defenses carry no projection and rank in draft order. Picks later: the pick less his ADP, or less his place on our board (no kickers or defenses there), plus is later. Still there: the room's read at that pick, tinted from 60%.",
+			"field": {
+				"note": "projected starting points, 12 teams",
+				"rows": [
+					{
+						"rank": 1,
+						"name": "jpk88",
+						"points": "1,521",
+						"share": 1,
+						"you": false
+					},
+					{
+						"rank": 2,
+						"name": "Bot 6",
+						"points": "1,506",
+						"share": 0.9898100059167707,
+						"you": false
+					},
+					{
+						"rank": 3,
+						"name": "Bot 11",
+						"points": "1,469",
+						"share": 0.9655512458089541,
+						"you": false
+					},
+					{
+						"rank": 4,
+						"name": "Bot 1",
+						"points": "1,468",
+						"share": 0.9648280849385313,
+						"you": false
+					},
+					{
+						"rank": 5,
+						"name": "Bot 4",
+						"points": "1,466",
+						"share": 0.9640391821707975,
+						"you": false
+					},
+					{
+						"rank": 6,
+						"name": "Bot 10",
+						"points": "1,462",
+						"share": 0.9611465386891066,
+						"you": false
+					},
+					{
+						"rank": 7,
+						"name": "hunt",
+						"points": "1,436",
+						"share": 0.9440536453882059,
+						"you": false
+					},
+					{
+						"rank": 8,
+						"name": "Bot 12",
+						"points": "1,435",
+						"share": 0.943199000723161,
+						"you": false
+					},
+					{
+						"rank": 9,
+						"name": "You",
+						"points": "1,431",
+						"share": 0.9409637762145816,
+						"you": true
+					},
+					{
+						"rank": 10,
+						"name": "Bot 3",
+						"points": "1,431",
+						"share": 0.9407665505226481,
+						"you": false
+					},
+					{
+						"rank": 11,
+						"name": "Bot 8",
+						"points": "1,406",
+						"share": 0.924265334297548,
+						"you": false
+					},
+					{
+						"rank": 12,
+						"name": "Bot 5",
+						"points": "1,405",
+						"share": 0.9238051410163698,
+						"you": false
+					}
+				]
+			},
+			"picks": {
+				"note": "15 picks, starters by slot",
+				"rows": [
+					{
+						"pick": "1.07",
+						"id": "4430878",
+						"slot": "WR",
+						"figure": {
+							"text": "+129.8",
+							"muted": false
+						},
+						"adp": {
+							"text": "+1.3",
+							"tone": "gain"
+						},
+						"ours": {
+							"text": "+4",
+							"tone": "gain"
+						},
+						"still": {
+							"text": "18%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "2.06",
+						"id": "4429615",
+						"slot": "WR",
+						"figure": {
+							"text": "+71.7",
+							"muted": false
+						},
+						"adp": {
+							"text": "−6.6",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "−5",
+							"tone": "loss"
+						},
+						"still": {
+							"text": "10%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "3.07",
+						"id": "4241478",
+						"slot": "FLEX",
+						"figure": {
+							"text": "+68.1",
+							"muted": false
+						},
+						"adp": {
+							"text": "+1.9",
+							"tone": "gain"
+						},
+						"ours": {
+							"text": "+7",
+							"tone": "gain"
+						},
+						"still": {
+							"text": "12%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "4.06",
+						"id": "4239993",
+						"slot": "Bench",
+						"figure": {
+							"text": "+48.8",
+							"muted": false
+						},
+						"adp": {
+							"text": "+5.4",
+							"tone": "gain"
+						},
+						"ours": {
+							"text": "+12",
+							"tone": "gain"
+						},
+						"still": {
+							"text": "2%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "5.07",
+						"id": "4431459",
+						"slot": "TE",
+						"figure": {
+							"text": "+22.5",
+							"muted": false
+						},
+						"adp": {
+							"text": "−11.0",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "+8",
+							"tone": "gain"
+						},
+						"still": {
+							"text": "<1%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "6.06",
+						"id": "4360248",
+						"slot": "Bench",
+						"figure": {
+							"text": "+10.1",
+							"muted": false
+						},
+						"adp": {
+							"text": "−15.3",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "+8",
+							"tone": "gain"
+						},
+						"still": {
+							"text": "14%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "7.07",
+						"id": "4569587",
+						"slot": "Bench",
+						"figure": {
+							"text": "+5.4",
+							"muted": false
+						},
+						"adp": {
+							"text": "−8.1",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "+9",
+							"tone": "gain"
+						},
+						"still": {
+							"text": "66%",
+							"wait": true,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "8.06",
+						"id": "3046779",
+						"slot": "QB",
+						"figure": {
+							"text": "+4.8",
+							"muted": false
+						},
+						"adp": {
+							"text": "−12.7",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "+18",
+							"tone": "gain"
+						},
+						"still": {
+							"text": "5%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "9.07",
+						"id": "4361050",
+						"slot": "Bench",
+						"figure": {
+							"text": "+6.6",
+							"muted": false
+						},
+						"adp": {
+							"text": "−32.9",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "+31",
+							"tone": "gain"
+						},
+						"still": {
+							"text": ">99%",
+							"wait": true,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "10.06",
+						"id": "4689114",
+						"slot": "Bench",
+						"figure": {
+							"text": "+0.0",
+							"muted": false
+						},
+						"adp": {
+							"text": "−4.8",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "+24",
+							"tone": "gain"
+						},
+						"still": {
+							"text": "3%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "11.07",
+						"id": "4385690",
+						"slot": "Bench",
+						"figure": {
+							"text": "−22.0",
+							"muted": false
+						},
+						"adp": {
+							"text": "−18.8",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "+8",
+							"tone": "gain"
+						},
+						"still": {
+							"text": ">99%",
+							"wait": true,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "12.06",
+						"id": "3116389",
+						"slot": "RB",
+						"figure": {
+							"text": "−45.1",
+							"muted": false
+						},
+						"adp": {
+							"text": "−27.6",
+							"tone": "loss"
+						},
+						"ours": {
+							"text": "−12",
+							"tone": "loss"
+						},
+						"still": {
+							"text": ">99%",
+							"wait": true,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "13.07",
+						"id": "4362478",
+						"slot": "RB",
+						"figure": {
+							"text": "−49.2",
+							"muted": false
+						},
+						"adp": null,
+						"ours": {
+							"text": "−9",
+							"tone": "loss"
+						},
+						"still": {
+							"text": ">99%",
+							"wait": true,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "14.06",
+						"id": "4689936",
+						"slot": "K",
+						"figure": {
+							"text": "Draft order 7",
+							"muted": true
+						},
+						"adp": {
+							"text": "+10.5",
+							"tone": "gain"
+						},
+						"ours": null,
+						"still": {
+							"text": "36%",
+							"wait": false,
+							"muted": false
+						},
+						"by": "You"
+					},
+					{
+						"pick": "15.07",
+						"id": "DST-GB",
+						"slot": "DST",
+						"figure": {
+							"text": "Draft order 12",
+							"muted": true
+						},
+						"adp": {
+							"text": "+16.9",
+							"tone": "gain"
+						},
+						"ours": null,
+						"still": {
+							"text": "last pick",
+							"wait": false,
+							"muted": true
+						},
+						"by": "You"
+					}
+				]
+			},
+			"runs": {
+				"title": "The same draft, 200 more times",
+				"note": "your picks on autopick from the board, the bots reshuffled each run",
+				"bins": [
+					6,
+					11,
+					11,
+					22,
+					30,
+					21,
+					33,
+					17,
+					25,
+					14,
+					4,
+					6
+				],
+				"medianBin": 5,
+				"low": "1,446",
+				"high": "1,641",
+				"median": "1,543",
+				"middle": "1,484 to 1,596",
+				"topShare": "56%",
+				"topWords": "of runs finish top 3 of 12",
+				"ranks": [
+					58,
+					32,
+					22,
+					17,
+					18,
+					8,
+					11,
+					12,
+					6,
+					6,
+					9,
+					1
+				],
+				"rank": 9
 			},
 			"exposure": {
 				"title": "Who you end up with",
@@ -10083,35 +9919,35 @@
 				"rows": [
 					{
 						"id": "4361741",
-						"share": 0.36
+						"share": 0.49
 					},
 					{
 						"id": "5083076",
-						"share": 0.36
-					},
-					{
-						"id": "4426338",
-						"share": 0.28
-					},
-					{
-						"id": "3046779",
-						"share": 0.24
-					},
-					{
-						"id": "DST-NE",
-						"share": 0.24
-					},
-					{
-						"id": "DST-LAC",
-						"share": 0.225
-					},
-					{
-						"id": "3040151",
-						"share": 0.22
+						"share": 0.465
 					},
 					{
 						"id": "DST-PHI",
-						"share": 0.215
+						"share": 0.345
+					},
+					{
+						"id": "4426338",
+						"share": 0.34
+					},
+					{
+						"id": "DST-NE",
+						"share": 0.32
+					},
+					{
+						"id": "4568490",
+						"share": 0.21
+					},
+					{
+						"id": "3055899",
+						"share": 0.2
+					},
+					{
+						"id": "3117251",
+						"share": 0.2
 					}
 				]
 			}
