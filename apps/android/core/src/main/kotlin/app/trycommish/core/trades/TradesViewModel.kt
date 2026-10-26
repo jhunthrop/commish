@@ -150,7 +150,7 @@ class TradesViewModel(
         val asks = key != null && !key.startsWith(TradeFinder.UNPLACED)
         mutableUi.update { it.copy(holding = key, problem = null, narrowing = asks) }
         redraw()
-        if (!asks || key == null) return null
+        if (!asks) return null
         return viewModelScope.launch {
             try {
                 val advice = decodeEnvelope<TradeAdvice>(reads.trades(leagueId, key))
