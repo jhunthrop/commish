@@ -9,6 +9,7 @@ import java.time.ZoneId
 /** The order's heads: the # head, the week's ("Wk 6") and the big figure's (Projected). */
 data class RankingsHeads(
     val rank: String,
+    /** Pinned by the parity; drawn as the strip's Wk cell's head on each row, never in the head row. */
     val week: String,
     val total: String,
 )
@@ -41,8 +42,8 @@ fun rankingsModel(
     zone: ZoneId,
     now: Instant,
 ): RankingsModel {
-    val rankBy = RankingsRows.rankBy(advice)
-    val rows = advice.rows.map { RankingsRows.row(it, rankBy, pillRank = chip == null, zone = zone, now = now) }
+    val viewing = OrderViewing(RankingsRows.rankBy(advice), advice.week, pillRank = chip == null)
+    val rows = advice.rows.map { RankingsRows.row(it, viewing, zone, now) }
     val searched = query.trim().length >= OrderQuery.MIN_SEARCH
     return RankingsModel(
         lead = RankingsWords.lead(inSeason, onWeekChip = false, week = advice.week),
