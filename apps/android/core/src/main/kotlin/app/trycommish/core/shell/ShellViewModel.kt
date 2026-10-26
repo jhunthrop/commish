@@ -3,6 +3,7 @@ package app.trycommish.core.shell
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.trycommish.api.Unauthorized
+import app.trycommish.api.models.BoardFormat
 import app.trycommish.api.models.SiteSeason
 import app.trycommish.core.Cache
 import app.trycommish.core.Cached
@@ -28,6 +29,9 @@ sealed interface ShellState {
         val leagues: List<FollowedLeague>,
         val selected: FollowedLeague?,
         val season: SiteSeason.Phase?,
+        /** The account's chosen format with no league, and its features (a mock's setup starts from them). */
+        val format: BoardFormat? = null,
+        val features: Set<String> = emptySet(),
     ) : ShellState
 
     /** No connection and nothing kept. */
@@ -148,7 +152,7 @@ class ShellViewModel(
     ) {
         val league =
             choices.firstNotNullOfOrNull { id -> account.leagues.firstOrNull { it.id == id } } ?: account.leagues.firstOrNull()
-        mutableState.value = ShellState.Ready(account.leagues, league, account.season)
+        mutableState.value = ShellState.Ready(account.leagues, league, account.season, account.format, account.features)
         league?.let { cache.write(ShellKeys.LAST_LEAGUE, Cached(it.id, clock.now())) }
     }
 

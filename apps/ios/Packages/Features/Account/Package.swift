@@ -1,7 +1,7 @@
 // swift-tools-version: 6.0
 // The Account screen (the web's /account): who, the leagues followed with detach and its undo, the
 // plan in the free season, the push switches kept on this phone, the paired devices with this phone
-// marked and unpair, sign out, and the signed-out return. Its snapshots, both themes at two phone
+// marked and unpair, and sign out. Its snapshots, both themes at two phone
 // sizes, are the screen's mock.
 import PackageDescription
 

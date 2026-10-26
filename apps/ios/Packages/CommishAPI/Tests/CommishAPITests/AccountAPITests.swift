@@ -98,7 +98,7 @@ struct AccountAPITests {
 
     @Test func selectingALeagueSendsItsID() async throws {
         let transport = RecordingTransport(status: .ok, body: Self.me(leagues: [], selected: nil))
-        try await Self.client(transport).selectLeague(id: "l-2")
+        #expect(try await Self.client(transport).selectLeague(id: "l-2"))
         let sent = await transport.sent
         #expect(sent.count == 1)
         #expect(sent.first?.path == "/me/league")
@@ -109,10 +109,10 @@ struct AccountAPITests {
     }
 
     @Test(arguments: [HTTPResponse.Status.notFound, .internalServerError, .badGateway])
-    func aSelectionTheAPICannotTakeIsNoChange(status: HTTPResponse.Status) async throws {
+    func aSelectionTheAPICannotTakeIsNotTaken(status: HTTPResponse.Status) async throws {
         let problem = Data(#"{"ok":false,"data":null,"error":{"code":"not_found","message":"No."},"request_id":"r"}"#
             .utf8)
-        try await Self.client(status, problem).selectLeague(id: "gone")
+        #expect(try await !Self.client(status, problem).selectLeague(id: "gone"))
     }
 
     @Test func aSelectionWithARefusedTokenThrows() async {

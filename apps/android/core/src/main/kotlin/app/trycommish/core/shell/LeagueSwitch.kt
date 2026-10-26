@@ -1,5 +1,6 @@
 package app.trycommish.core.shell
 
+import app.trycommish.api.models.LeagueSettings
 import app.trycommish.core.AppWords
 import app.trycommish.design.RailItem
 import app.trycommish.design.Words
@@ -107,6 +108,18 @@ sealed interface ShellRoute {
     /** A followed draft (/companion/<id>). */
     data class Companion(
         val id: String,
+    ) : ShellRoute
+
+    /** A mock draft's setup (/mock/new): on the saved league `league` names (`?league=`), or from a draft's
+     * settings (`from`, the report's Try another slot). */
+    data class MockSetup(
+        val league: String? = null,
+        val from: LeagueSettings? = null,
+    ) : ShellRoute
+
+    /** A shared mock draft by its link's code (/mock/share/<code>). */
+    data class SharedMock(
+        val code: String,
     ) : ShellRoute
 }
 

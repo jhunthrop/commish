@@ -98,10 +98,11 @@ private fun Loaded(
     LeagueHomePage(model, stamp, onOpenLineup, Modifier.fillMaxSize().verticalScroll(rememberScrollState()), onOpenGame, draftDay)
 }
 
-/** The followed league's draft day on its home: the entry the web's SeasonPanel draws, and its verb. */
+/** The followed league's draft before and on its day on its home: the entry the web's SeasonPanel draws, and
+ * its verb (the Advisor on draft day, the mock's setup before it). */
 class DraftDay(
     val entry: DraftDayEntry,
-    val openAdvisor: () -> Unit,
+    val open: () -> Unit,
 )
 
 /** The page itself, every section at its full height: the screen scrolls it, a snapshot draws it whole.
@@ -117,7 +118,7 @@ fun LeagueHomePage(
 ) {
     Column(modifier.background(CommishTheme.colors.bg)) {
         Head(model, stamp)
-        draftDay?.let { DraftDayPanel(it.entry, it.openAdvisor) }
+        draftDay?.let { DraftDayPanel(it.entry, it.open) }
         if (model.games.isNotEmpty()) ScoreBoard(model.week, model.games, onOpenGame)
         Standings(model.standings)
         LineupSummary(model.lineup, onOpenLineup)

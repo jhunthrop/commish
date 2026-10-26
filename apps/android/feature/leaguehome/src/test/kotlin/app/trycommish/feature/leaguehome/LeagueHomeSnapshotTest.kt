@@ -94,8 +94,10 @@ class LeagueHomeSnapshotTest {
         dark: Boolean,
         device: DeviceConfig,
         name: String,
+        phase: LeaguePhase = LeaguePhase.draft_day,
+        at: Instant = DRAFT_AT,
     ) = snap(name, dark, device, RenderingMode.NORMAL) {
-        val entry = requireNotNull(DraftDayEntry.of(LeaguePhase.draft_day, DRAFT_AT, clock, Fixtures.zone))
+        val entry = requireNotNull(DraftDayEntry.of(phase, at, clock, Fixtures.zone))
         LeagueHomeScreen(fresh, Fixtures.zone, refreshing = false, onRefresh = {}, onOpenLineup = {}, draftDay = DraftDay(entry) {})
     }
 
@@ -106,6 +108,21 @@ class LeagueHomeSnapshotTest {
     @Test fun draftDaySmallLight() = draftDay(dark = false, device = SMALL, name = "draft-day-small")
 
     @Test fun draftDaySmallDark() = draftDay(dark = true, device = SMALL, name = "draft-day-small")
+
+    /** Before the draft (Lane 214, the iOS league-home-pre-draft): the same panel, its verb Start a mock draft. */
+    private fun preDraft(
+        dark: Boolean,
+        device: DeviceConfig,
+        name: String,
+    ) = draftDay(dark, device, name, LeaguePhase.pre_draft, PRE_DRAFT_AT)
+
+    @Test fun preDraftPixel8Light() = preDraft(dark = false, device = PIXEL_8, name = "pre-draft-pixel8")
+
+    @Test fun preDraftPixel8Dark() = preDraft(dark = true, device = PIXEL_8, name = "pre-draft-pixel8")
+
+    @Test fun preDraftSmallLight() = preDraft(dark = false, device = SMALL, name = "pre-draft-small")
+
+    @Test fun preDraftSmallDark() = preDraft(dark = true, device = SMALL, name = "pre-draft-small")
 
     @Test fun failedSmallLight() = screen("failed-small", dark = false, state = LeagueHomeState.Failed(AppWords.cannotLoad))
 
@@ -123,6 +140,9 @@ class LeagueHomeSnapshotTest {
 
         /** 7:30 pm Central on the fixture's Sunday. */
         val DRAFT_AT: Instant = Instant.parse("2026-10-19T00:30:00Z")
+
+        /** 7:30 pm Central the Wednesday after: a draft days away. */
+        val PRE_DRAFT_AT: Instant = Instant.parse("2026-10-22T00:30:00Z")
 
         /** A Pixel 8: 1080 by 2400 at 420 dpi, the Pixel 6's screen. */
         val PIXEL_8 = DeviceConfig.PIXEL_6

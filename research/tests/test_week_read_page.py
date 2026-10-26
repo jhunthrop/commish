@@ -65,17 +65,14 @@ def test_a_read_written_against_another_status_is_withheld_behind_its_caption() 
     assert served["status"] == "questionable"
 
 
-def test_a_standing_read_says_the_newer_status_read_it_was_served_against() -> None:
-    """Lane 139 (C13): a status read after the write is named, the read standing on it (a moved status is
-    withheld), and one at or before the write is not."""
+def test_a_standing_reads_caption_names_its_write_alone_whenever_the_run_is_built() -> None:
+    """Lane 222 (B186): the run is built once a night, so a status read stamp baked into the caption was
+    thirteen hours old at the Sunday 1 pm games. The caption names the write; the web names the status read
+    its own build took and the next one (`web/src/lib/player/read-byline.ts`)."""
     later = datetime(2026, 10, 17, 7, 20, tzinfo=UTC)
-    served = week_read_json(_read(), "questionable", kicked_off=False, clock=ReadClock(later, later))
+    served = week_read_json(_read(), "questionable", kicked_off=False, clock=ReadClock(later))
     assert served is not None and served["body"] is not None
-    assert served["caption"] == (
-        "Written Fri Oct 16, 9:00 pm CT, for week 6. Status read again Sat Oct 17, 2:20 am CT, no change"
-    )
-    same = week_read_json(_read(), "questionable", kicked_off=False, clock=ReadClock(later, _WRITTEN))
-    assert same is not None and same["caption"] == "Written Fri Oct 16, 9:00 pm CT, for week 6"
+    assert served["caption"] == "Written Fri Oct 16, 9:00 pm CT, for week 6"
 
 
 def test_a_facts_row_or_a_kicked_off_game_serves_no_read() -> None:

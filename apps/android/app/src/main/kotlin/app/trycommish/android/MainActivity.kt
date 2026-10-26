@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
     private fun handle(intent: Intent?) {
         graph.askReplay(intent?.getBooleanExtra(REPLAY_EXTRA, false) == true)
         graph.signInFlow.returnLink(intent)?.let(graph::completeSignIn)
-        intent?.dataString?.let(SiteLinks::companion)?.let(graph::openLink)
+        intent?.dataString?.let { SiteLinks.companion(it) ?: SiteLinks.mock(it) }?.let(graph::openLink)
     }
 
     private companion object {

@@ -282,9 +282,6 @@ class ServedWeek:
     # Each player's published projection for the board week as the card prints it, by the board's id (None
     # for a player the snapshot leaves out); None when the run read no snapshot for the week (Lane 66v).
     projections: Mapping[str, float] | None = None
-    # When the status read the statuses come from was last read (its check, else its stamp), None without
-    # one: a standing read's caption says it when newer than the write (Lane 139, C13).
-    status_read: datetime | None = None
 
 
 class _Unread:
@@ -296,11 +293,10 @@ UNREAD: Final = _Unread()
 
 @dataclass(frozen=True, slots=True)
 class ReadClock:
-    """What a read is served at: the run's instant, and when the status read it is judged against was last
-    read (Lane 139, C13), None without one."""
+    """What a read is served at: the run's instant. The status read a standing read stands on is named by the
+    web at its own build, never baked into the run (Lane 222, B186: `capsules/week/caption.py`)."""
 
     as_of: datetime
-    status_read: datetime | None = None
 
 
 def week_read_json(
@@ -325,9 +321,7 @@ def week_read_json(
     if stored.status != status:
         caption = status_changed_caption(clock.as_of)
     else:
-        caption = (
-            PROJECTION_MOVED_CAPTION if moved else written_caption(stored.written_at, stored.week, clock.status_read)
-        )
+        caption = PROJECTION_MOVED_CAPTION if moved else written_caption(stored.written_at, stored.week)
     return {
         "week": stored.week,
         "body": stored.body.strip() if standing else None,
@@ -423,8 +417,7 @@ def _week_read(who: Identity, universe_id: str | None, inputs: PageInputs) -> Js
     projections = inputs.week.projections
     projection = UNREAD if projections is None else projections.get(who.id)
     week = inputs.week
-    clock = ReadClock(week.as_of, week.status_read)
-    return week_read_json(stored, week.statuses.get(who.id), kicked_off, clock, projection)
+    return week_read_json(stored, week.statuses.get(who.id), kicked_off, ReadClock(week.as_of), projection)
 
 
 def _index_entry(p: Identity) -> Json:

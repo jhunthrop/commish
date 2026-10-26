@@ -7,6 +7,7 @@ import app.trycommish.api.models.NamedPick
 import app.trycommish.core.companion.CompanionFixtures.Moment
 import app.trycommish.core.companion.CompanionParity.parity
 import app.trycommish.core.leaguehome.DraftDayEntry
+import app.trycommish.design.Words
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
@@ -99,7 +100,10 @@ class CompanionEdgesParityTest {
             assertEquals(web.text("verb"), entry.verb)
             assertEquals(listOfNotNull(web.text("turns"), lines.text("zone")).joinToString(" "), entry.line)
         }
-        assertNull(DraftDayEntry.of(LeaguePhase.pre_draft, null, now, ZoneId.of("America/Chicago")))
+        // Before the draft the same panel carries Start a mock draft (SeasonPanel.svelte pre_draft, Lane 214).
+        val before = requireNotNull(DraftDayEntry.of(LeaguePhase.pre_draft, null, now, ZoneId.of("America/Chicago")))
+        assertEquals(Words.PageVerb.mock, before.verb)
+        assertEquals(DraftDayEntry.Opens.Mock, before.opens)
         assertNull(DraftDayEntry.of(LeaguePhase.in_season, null, now, ZoneId.of("America/Chicago")))
     }
 }
