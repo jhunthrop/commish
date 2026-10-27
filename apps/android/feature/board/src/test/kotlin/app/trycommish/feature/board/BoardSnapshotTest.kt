@@ -25,6 +25,9 @@ import app.trycommish.design.CommishTheme
 import app.trycommish.design.Tokens
 import com.android.ide.common.rendering.api.SessionParams.RenderingMode
 import com.android.resources.Density
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -80,6 +83,12 @@ class BoardSnapshotTest(
 
         /** The same board while the order is unread: the run's rows with the run's stamp in the basis. */
         ClockUnread("clock-unread", null, true),
+
+        /** At the order's clock with a player put on IR after the nightly the run's capture does not list,
+         * as the API answers him (Lane 243, B251, fix round 1): his points and value kept, his row after
+         * every available player with the list's word in his pill, and no count line under the All view's
+         * foot. */
+        ClockMissing("clock-missing", null, true),
     }
 
     enum class Phone(
@@ -113,6 +122,9 @@ class BoardSnapshotTest(
     }
 
     companion object {
+        /** The scenes drawn on the one-value stand-in at the Sunday clock. */
+        val CLOCK_SCENES = setOf(Scene.Clock, Scene.ClockUnread, Scene.ClockMissing)
+
         @JvmStatic
         @Parameterized.Parameters(name = "{0}-{2}-dark={1}")
         fun cases(): List<Array<Any>> =
@@ -139,6 +151,12 @@ class BoardSceneTest {
         val unread = modelOf(BoardSnapshotTest.Scene.ClockUnread)
         assertFalse(unread.atClock)
         assertTrue(unread.basis.last().startsWith("Projected updated"))
+        val missing = modelOf(BoardSnapshotTest.Scene.ClockMissing)
+        assertTrue(missing.atClock)
+        val row = missing.rows.single { it.id == MISSING }
+        assertTrue("the foot draws him", row in missing.rows.takeLast(AROUND))
+        assertTrue(row.pill.endsWith(" IR"))
+        assertFalse(missing.basis.any { it.startsWith("The first") })
     }
 
     @Test
@@ -156,6 +174,17 @@ private const val FIRST_ROWS = 12
 /** The clock scenes' top rows, drawn above the basis so the lead and the stamp are both in the picture. */
 private const val CLOCK_ROWS = 6
 
+/** The one-value stand-in's first player (D'Andre Swift), the one the missing scene puts on IR. */
+private val MISSING: String =
+    OneValueFixture.parity
+        .getValue("players")
+        .jsonArray
+        .first()
+        .jsonObject
+        .getValue("id")
+        .jsonPrimitive
+        .content
+
 /** The rows drawn on each side of a tier's cliff, and above the basis. */
 private const val AROUND = 4
 
@@ -163,8 +192,13 @@ private const val AROUND = 4
 private const val FIRST_MID_LIST = 3
 
 private fun modelOf(scene: BoardSnapshotTest.Scene): BoardModel {
-    if (scene == BoardSnapshotTest.Scene.Clock || scene == BoardSnapshotTest.Scene.ClockUnread) {
-        val order = OneValueFixture.order().takeIf { scene == BoardSnapshotTest.Scene.Clock }
+    if (scene in BoardSnapshotTest.CLOCK_SCENES) {
+        val order =
+            when (scene) {
+                BoardSnapshotTest.Scene.Clock -> OneValueFixture.order()
+                BoardSnapshotTest.Scene.ClockMissing -> OneValueFixture.listing(MISSING)
+                else -> null
+            }
         return BoardModel.of(
             RunFixture.OneValue.read(),
             null,
@@ -224,7 +258,7 @@ private fun Mock(
             Column(bg.fillMaxWidth()) { BoardPage(model, null, firstScreen(model.sections, CLOCK_ROWS)) }
         BoardSnapshotTest.Scene.Cliff ->
             Column(bg.fillMaxWidth().padding(vertical = Tokens.Space.s4.dp)) { BoardTable(model, aroundCliff(model.sections)) }
-        BoardSnapshotTest.Scene.Foot ->
+        BoardSnapshotTest.Scene.Foot, BoardSnapshotTest.Scene.ClockMissing ->
             Column(bg.fillMaxWidth().padding(top = Tokens.Space.s4.dp)) {
                 BoardTable(model, model.sections.takeLast(1).map { it.copy(rows = it.rows.takeLast(AROUND)) })
                 BoardBasis(model.basis, Modifier.padding(vertical = Tokens.Space.s4.dp))

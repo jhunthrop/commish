@@ -2,6 +2,9 @@ package app.trycommish.core.liveorder
 
 import app.trycommish.api.ApiFailure
 import app.trycommish.api.decodeEnvelope
+import app.trycommish.api.models.DesignationStatus
+import app.trycommish.api.models.InjuryDesignation
+import app.trycommish.api.models.OrderRow
 import app.trycommish.api.models.PlayerWeek
 import app.trycommish.core.player.PlayerWeekReads
 import app.trycommish.core.rankings.OrderQuery
@@ -43,6 +46,69 @@ object OneValueFixture {
     fun order(): OrderAtClock {
         val body = RankingsFixtures.order("-all", CLOCK)
         return OrderAtClock(body, decodeEnvelope(body), now)
+    }
+
+    /** The whole read with one player put on injured reserve after the nightly, as the API answers him
+     * (api inseason/order.go): his points and value kept, no place at his position, the list's status the
+     * run's capture does not hold, and his row moved after every available player, the rows numbered
+     * again (Lane 243 fix round 1, M2). */
+    fun listing(id: String): OrderAtClock {
+        val order = order()
+        val rows = order.answer.rows
+        val him = rows.first { it.line.player.boardId == id }
+        val others = rows.filter { it !== him }
+        val at =
+            others
+                .indexOfFirst {
+                    it.line.facts.designation
+                        ?.seasonLong == true
+                }.takeIf { it >= 0 } ?: others.size
+        val moved = others.take(at) + listOf(designated(him, DesignationStatus.injured_reserve)) + others.drop(at)
+        val numbered = moved.mapIndexed { index, row -> row.copy(rank = index + 1, overallRank = index + 1) }
+        return OrderAtClock(order.body, order.answer.copy(rows = numbered), order.landed)
+    }
+
+    /** The whole read with one player's row holding no figure (a player with no projection), with the
+     * week's or the list's `status`, or none. */
+    fun unvalued(
+        id: String,
+        status: DesignationStatus?,
+    ): OrderAtClock {
+        val order = order()
+        val rows =
+            order.answer.rows.map { row ->
+                if (row.line.player.boardId != id) {
+                    row
+                } else {
+                    designated(
+                        row,
+                        status,
+                    ).let { it.copy(restOfSeasonPoints = null, pointsOverReplacement = null, line = it.line.copy(positionRank = null)) }
+                }
+            }
+        return OrderAtClock(order.body, order.answer.copy(rows = rows), order.landed)
+    }
+
+    /** The moment the status is read, after the nightly and before the Sunday clock. */
+    private const val STATUS_READ = "2026-10-18T18:00:00Z"
+
+    private val SEASON_LONG =
+        setOf(DesignationStatus.injured_reserve, DesignationStatus.pup, DesignationStatus.nfi, DesignationStatus.suspended)
+
+    /** His row under `status` (none for null); a season-long status takes his place at his position. */
+    private fun designated(
+        row: OrderRow,
+        status: DesignationStatus?,
+    ): OrderRow {
+        val listed = status in SEASON_LONG
+        val designation = status?.let { InjuryDesignation(it, STATUS_READ, seasonLong = true.takeIf { listed }) }
+        return row.copy(
+            line =
+                row.line.copy(
+                    positionRank = if (listed) null else row.line.positionRank,
+                    facts = row.line.facts.copy(designation = designation),
+                ),
+        )
     }
 
     /** The parity the screens are held to. */

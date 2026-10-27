@@ -51,6 +51,12 @@ enum RowStatuses {
         }
     }
 
+    /// The short word for his status in a rank's place, a week's designation too ("O", "IR"): the
+    /// designation first, else the platform's injured reserve (statusOf's order); nil with neither.
+    static func rankWord(of designation: Designation?, hostIR: Bool) -> String? {
+        (designation?.status.value1 ?? (hostIR ? .injuredReserve : nil)).map(rankWord)
+    }
+
     static func seasonLong(_ status: Status, flagged: Bool) -> Bool {
         flagged || [.injuredReserve, .pup, .nfi, .suspended].contains(status)
     }

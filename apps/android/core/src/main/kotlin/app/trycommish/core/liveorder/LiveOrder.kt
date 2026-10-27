@@ -1,6 +1,7 @@
 package app.trycommish.core.liveorder
 
 import app.trycommish.api.models.OrderAdvice
+import app.trycommish.api.models.OrderRow
 import app.trycommish.api.models.RunBoardRow
 import app.trycommish.api.models.RunFormat
 import app.trycommish.core.player.CardTiles
@@ -80,6 +81,20 @@ object LiveOrder {
                 val vor = row.pointsOverReplacement ?: return@mapNotNull null
                 id to LivePlace(RankingsRows.overall(row), row.line.positionRank, projected, vor)
             }.toMap()
+
+    /** Every row the answer returns, by board id, with figures or without: a row with none (a player put
+     * on a list after the nightly) is still the order's, drawn with its status's word (Lane 243, B251). A
+     * board id the answer repeats keeps its first row, as on iOS. */
+    fun rows(answer: OrderAdvice): Map<String, OrderRow> =
+        buildMap {
+            answer.rows.forEach { row ->
+                row.line.player.boardId
+                    ?.let { putIfAbsent(it, row) }
+            }
+        }
+
+    /** Whether the answer is cut: the view holds more players than the rows it returned (its limit). */
+    fun cut(answer: OrderAdvice): Boolean = answer.total > answer.rows.size
 
     /** Every row with its place, in the order's order, or null when the answer does not place one of
      * them: the screen then keeps the run's rows, never a table half one board and half the other

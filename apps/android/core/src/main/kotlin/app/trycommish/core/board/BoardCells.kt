@@ -1,6 +1,7 @@
 package app.trycommish.core.board
 
 import app.trycommish.api.models.DesignationStatus
+import app.trycommish.api.models.PlayerLine
 import app.trycommish.api.models.RunBoardRow
 import app.trycommish.api.models.RunClub
 import app.trycommish.api.models.RunMarketRow
@@ -158,7 +159,7 @@ internal class BoardCells(
         row: RunBoardRow,
         figures: PlacedFigures,
     ): BoardRow {
-        val label = BoardPosition.of(row.position.value)?.label ?: row.position.value
+        val label = label(row)
         val status = statuses[row.id]?.let { BoardStatus.view(it, zone) }
         val rank = status?.rank ?: figures.positionRank.toString()
         // A player on a season-long list: his rank is the word, so no gap (Row.svelte heldOut).
@@ -183,16 +184,58 @@ internal class BoardCells(
         )
     }
 
-    /** A player on a season-long list at the order's clock: the list's word in his pill and no figure, as
-     * the Rankings draw him (the order values none for him, and the run's are another clock's). */
-    fun listed(row: RunBoardRow): BoardRow =
-        ranked(row).copy(
+    /** A row the order places at its clock, with the order's figures: his status the order's own row's
+     * first (`said`), else the run's (Lane 243 fix round 1, M2), and a season-long list's word in his
+     * rank's place, as the web's Rankings say such a row (order.ts orderView's # cell, `listed ?
+     * box.status.rank`). */
+    fun placed(
+        row: RunBoardRow,
+        figures: PlacedFigures,
+        said: HeldStatus?,
+    ): BoardRow {
+        val drawn = ranked(row, figures)
+        val status = said?.status ?: return drawn
+        val rank = status.rank ?: figures.positionRank.toString()
+        return drawn.copy(
+            pill = "${label(row)} $rank",
+            status = status,
+            gap = if (status.onList) BoardFigures.gap(null) else drawn.gap,
+            gapTone = if (status.onList) null else drawn.gapTone,
+            sheetPlayer = drawn.sheetPlayer?.copy(rank = rank),
+        )
+    }
+
+    /** A player drawn after the order's ranked rows at its clock: one on a season-long list, or one the
+     * order holds with no figure (Lane 243, B251). His status's word in his pill (`said`: the order's own
+     * row's, else the run's; "--" with neither) and no figure, as the Rankings draw him (the order values
+     * none for him, and the run's are another clock's). */
+    fun listed(
+        row: RunBoardRow,
+        said: HeldStatus?,
+    ): BoardRow {
+        val drawn = ranked(row)
+        val word = said?.word ?: Words.Box.none
+        return drawn.copy(
+            pill = "${label(row)} $word",
+            status = said?.status,
             projected = Words.Box.none,
             overReplacement = Words.Box.none,
             heat = Heat.None,
             gap = Words.Box.none,
             gapTone = null,
+            sheetPlayer = drawn.sheetPlayer?.copy(rank = word),
         )
+    }
+
+    /** The run's status for a row drawn after the order's, with its short word; null where the run lists
+     * none. */
+    fun held(id: String): HeldStatus? {
+        val status = statuses[id] ?: return null
+        val view = BoardStatus.view(status, zone) ?: return null
+        return HeldStatus(view, view.rank ?: RowStatuses.rankWord(status.status))
+    }
+
+    private fun label(row: RunBoardRow): String = BoardPosition.of(row.position.value)?.label ?: row.position.value
 
     /** A kicker or a defense: on the board his place is his Draft order column, so his pill is his
      * position alone (Row.svelte pillRank) or his list's word; where no Draft order column is drawn (ADP,
@@ -228,6 +271,26 @@ internal class BoardCells(
     companion object {
         fun byes(clubs: List<RunClub>): Map<String, Int> =
             clubs.mapNotNull { club -> club.bye?.let { club.abbr to it } }.distinctBy { it.first }.toMap()
+    }
+}
+
+/** What a row drawn after the order's ranked rows says of his status: the chip, and the short word his
+ * pill carries in his rank's place ("IR", "O"). */
+internal data class HeldStatus(
+    val status: RowStatus,
+    val word: String,
+) {
+    companion object {
+        /** The status the order's own row carries (box.ts statusOf), null with none. */
+        fun of(
+            line: PlayerLine,
+            zone: ZoneId,
+        ): HeldStatus? {
+            val hostIR = line.player.injuredReserve
+            val status = RowStatuses.of(line.facts.designation, hostIR, zone) ?: return null
+            val word = status.rank ?: RowStatuses.rankWordOf(line.facts.designation, hostIR) ?: return null
+            return HeldStatus(status, word)
+        }
     }
 }
 

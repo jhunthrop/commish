@@ -106,6 +106,7 @@ struct OneValueBoardTests {
         let order = try Reads.order()
         var answer = order.answer
         answer.rows = Array(answer.rows.prefix(40))
+        #expect(LiveOrder.cut(answer), "the view holds more players than the rows it returned")
         let short = try Reads.board(order: OrderAtClock(answer: answer, landed: Reads.now))
         let total = try RunFixture.oneValue.board(format: Reads.ppr).rows.count
         #expect(short.basis.last == LiveOrderWords.reach(shown: short.rows.count, total: total))
@@ -132,21 +133,40 @@ struct OneValueBoardTests {
         #expect(await memo.kept == 1, "the club's read past its window is dropped")
     }
 
-    /// The stand-in's read with one player on injured reserve, the season-long list.
-    static func read(listing id: String) throws -> RunBoardRead {
+    /// The stand-in's read with one player under `status` in the run's capture, injured reserve (the
+    /// season-long list) unless named, and its board with `extra` rows after its own.
+    static func read(
+        listing id: String, status: String = "injured_reserve", seasonLong: Bool = true, extra: [RunBoardRow] = []
+    ) throws -> RunBoardRead {
         let fixture = RunFixture.oneValue
         let json = Data(#"""
         {"readAt":"2026-10-14T02:03:35.613Z","checkedAt":null,"source":"stand-in",
-         "players":{"\#(id)":{"status":"injured_reserve","seasonLong":true,"since":"2026-10-12T19:00:00.000Z"}}}
+         "players":{"\#(id)":{"status":"\#(status)","seasonLong":\#(seasonLong),"since":"2026-10-12T19:00:00.000Z"}}}
         """#.utf8)
         let designations = try APIDecoding.decoder().decode(RunDesignations.self, from: json)
+        var board = try fixture.board(format: Reads.ppr)
+        board.rows += extra
         return try RunBoardRead(
             manifest: Kept(value: fixture.manifest(), tag: nil),
-            board: Kept(value: fixture.board(format: Reads.ppr), tag: nil),
+            board: Kept(value: board, tag: nil),
             sources: Kept(value: fixture.adpSources(), tag: nil),
             designations: Kept(value: designations, tag: nil),
             clubs: Kept(value: fixture.clubs(), tag: nil)
         )
+    }
+}
+
+/// The order's route answering the fixture, counting each read it is asked.
+actor CountedOrder: RankingsAPI {
+    private(set) var reads = 0
+
+    func order(_ query: OrderQuery) async throws -> OrderAdvice {
+        reads += 1
+        return try await StubOrderSearch().order(query)
+    }
+
+    func weekOrder(position: WeekOrderPosition) async throws -> WeekOrderAdvice {
+        try await StubOrderSearch().weekOrder(position: position)
     }
 }
 

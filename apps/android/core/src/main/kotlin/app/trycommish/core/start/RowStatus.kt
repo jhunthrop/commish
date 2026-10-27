@@ -56,6 +56,13 @@ internal object RowStatuses {
             DesignationStatus.unknown_default_open_api -> Words.Box.none
         }
 
+    /** The short word for his status in a rank's place, a week's designation too ("O", "IR"): the
+     * designation first, else the platform's injured reserve (statusOf's order); null with neither. */
+    fun rankWordOf(
+        designation: InjuryDesignation?,
+        hostIR: Boolean,
+    ): String? = (known(designation) ?: DesignationStatus.injured_reserve.takeIf { hostIR })?.let(::rankWord)
+
     private fun known(designation: InjuryDesignation?): DesignationStatus? =
         designation?.status?.takeUnless { it == DesignationStatus.unknown_default_open_api }
 

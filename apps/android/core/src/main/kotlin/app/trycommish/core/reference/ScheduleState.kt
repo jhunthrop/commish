@@ -41,7 +41,7 @@ class StatedWeek(
  * Lane 223, B187), ported: each game's state as the run read it (`RunGame.state`, the nightly's
  * snapshot) in the words the Rankings print (Final, Kicked off, or the kickoff with its day and zone),
  * under one line naming the run's read, so a state is never claimed live. Nothing here reads a clock.
- * Held to shared/fixtures/parity/reference.json's webPending.
+ * Held to shared/fixtures/parity/reference.json's run `current`, `asOf` and `states`.
  */
 object ScheduleState {
     /** currentWeek: the week after the last complete one, while the season is underway, the run carries

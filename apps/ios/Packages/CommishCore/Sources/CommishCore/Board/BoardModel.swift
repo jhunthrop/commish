@@ -173,10 +173,11 @@ public enum BoardColumns: Equatable, Sendable {
 /// format and position chips; the view's rows in the run's order, a position's in its tiers with their
 /// cliffs; and the basis once. In season, once the order the in-season pages read (GET /order)
 /// answers, the view is the order's: the run's rows it places, in its order with its figures (as far as
-/// its read reaches, as the web's Rest of season, which is the order, reaches, the count said once), a
-/// position's with no tiers (they are the run's), the players on a season-long list after them with the
-/// list's word, and the order's lead under the heading and in the board sentence's place; until then the
-/// run's rows stand and the basis says the run's day and time (Lane 224, LiveOrder).
+/// its read reaches, as the web's Rest of season, which is the order, reaches, the count said once when
+/// the answer is cut), a position's with no tiers (they are the run's), the players it does not place
+/// after them (on a season-long list, or returned with no figure) with their status's word, and the
+/// order's lead under the heading and in the board sentence's place; until then the run's rows stand
+/// and the basis says the run's day and time (Lane 224, LiveOrder).
 public struct BoardModel: Equatable, Sendable {
     public let words: BoardWords
     /// "Updated Oct 21": the run every number comes from.
@@ -226,10 +227,9 @@ public struct BoardModel: Equatable, Sendable {
             statuses: statuses, byes: BoardCells.byes(read.clubs.value), fromWeek: format.rosFromWeek, zone: zone
         )
         let ranksRest = inSeason && format.rosFromWeek != nil
-        let places = order.flatMap { ranksRest && LiveOrder.inScoring($0.answer, format: format) ? $0.places : nil }
+        let clock = ranksRest ? order.flatMap { ClockPlaces($0, format: format, zone: zone) } : nil
         let view = ViewRows(
-            board: board, position: position, statuses: statuses, cells: cells, unit: format.unit,
-            at: places.map { (places: $0, teams: format.teams) }
+            board: board, position: position, statuses: statuses, cells: cells, unit: format.unit, at: clock
         )
         sections = view.sections
         atClock = view.atClock
@@ -284,9 +284,12 @@ public struct BoardModel: Equatable, Sendable {
 /// A view's sections over the run's board: All in the run's order, a ranked position in its tiers then
 /// its season-long list, a kicker's or a defense's list in the drafts' order. At the order's clock a
 /// ranked view is the rows the order places, in its order with its figures, a position's as one run with
-/// no tiers, then the view's players on a season-long list with the list's word and no figure (review
-/// M1); the rows its read does not reach are not drawn, so no row of the run's clock stands among them,
-/// and `reach` says how many of the view's rows are drawn when it is fewer than all.
+/// no tiers, then the view's players it does not place, in the run's order with no figure: those on a
+/// season-long list (review M1) and those the order returns with no figure (a player put on a list after
+/// the nightly, Lane 243, B251), each with the word of the order's own row's status, else the run's,
+/// else "--", as the Rankings draw him. The rows its read does not reach are not drawn, so no row of the
+/// run's clock stands among them, and `reach` says how many of the view's rows are drawn only when the
+/// answer is truly cut.
 private struct ViewRows {
     let sections: [BoardSection]
     /// The view's ranked rows carry a Gap (format/gap.ts carriesGap).
@@ -302,20 +305,29 @@ private struct ViewRows {
         statuses: BoardOrder.Statuses,
         cells: BoardCells,
         unit: String,
-        at clock: (places: [String: LivePlace], teams: Int)?
+        at clock: ClockPlaces?
     ) {
         let drawn = position.map { BoardOrder.at(board.rows, position: $0) } ?? board.rows
         let reached = clock.map { clock in drawn.filter { clock.places[$0.id] != nil } } ?? []
         if position?.draftOrder != true, let clock, !reached.isEmpty,
            let placed = LiveOrder.placed(reached, id: \.id, places: clock.places) {
-            let rows = placed.map { cells.ranked($0.row, figures: $0.row.figures.at($0.place, teams: clock.teams)) }
+            let rows = placed.map {
+                cells.placed(
+                    $0.row,
+                    figures: $0.row.figures.at($0.place, teams: clock.teams),
+                    said: clock.said($0.row.id)
+                )
+            }
             let listed = BoardOrder.withStatuses(drawn, statuses)
-                .filter { BoardOrder.heldOut($0, statuses) && clock.places[$0.id] == nil }
-            sections = Self.atClock(rows, listed: listed.map(cells.listed), position: position)
+                .filter { row in
+                    clock.places[row.id] == nil && (BoardOrder.heldOut(row, statuses) || clock.rows[row.id] != nil)
+                }
+                .map { row in cells.listed(row, said: clock.said(row.id) ?? cells.held(row.id)) }
+            sections = Self.atClock(rows, listed: listed, position: position)
             carriesGap = false
             atClock = true
             let shown = rows.count + listed.count
-            reach = shown < drawn.count ? (shown, drawn.count) : nil
+            reach = clock.cut && shown < drawn.count ? (shown, drawn.count) : nil
             return
         }
         atClock = false
@@ -348,13 +360,20 @@ private struct ViewRows {
 
     /// A view at the order's clock: the order's rows, then its players on a season-long list, after
     /// them in All and under the list's head in a position's view, as the run's view draws them.
+    /// A position's held head sits over the rows on a season-long list alone; the other unplaced rows
+    /// follow with no head (Lane 243 fix round 1, M1: a row on no list never sits under it).
     static func atClock(_ rows: [BoardRow], listed: [BoardRow], position: BoardPosition?) -> [BoardSection] {
         guard let position else {
             return [BoardSection(id: "all", head: nil, band: nil, rows: rows + listed)]
         }
+        let held = listed.filter { $0.status?.onList == true }
+        let others = listed.filter { $0.status?.onList != true }
         return [BoardSection(id: position.rawValue, head: nil, band: nil, rows: rows)]
-            + (listed.isEmpty ? [] : [BoardSection(
-                id: "\(position.rawValue)-held", head: Words.Board.heldHead, band: nil, rows: listed
+            + (held.isEmpty ? [] : [BoardSection(
+                id: "\(position.rawValue)-held", head: Words.Board.heldHead, band: nil, rows: held
+            )])
+            + (others.isEmpty ? [] : [BoardSection(
+                id: "\(position.rawValue)-unplaced", head: nil, band: nil, rows: others
             )])
     }
 

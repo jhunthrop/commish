@@ -2,6 +2,7 @@ package app.trycommish.core.liveorder
 
 import app.trycommish.api.decodeEnvelope
 import app.trycommish.api.models.OrderAdvice
+import app.trycommish.api.models.OrderRow
 import app.trycommish.core.Clock
 import app.trycommish.core.instantOrNull
 import app.trycommish.core.rankings.OrderQuery
@@ -27,6 +28,9 @@ class OrderAtClock(
 ) {
     /** Each player it places with both figures, by board id. */
     val places: Map<String, LivePlace> by lazy { LiveOrder.places(answer) }
+
+    /** Every row it returns by board id, placed or not. */
+    val rows: Map<String, OrderRow> by lazy { LiveOrder.rows(answer) }
 
     /** When it was read (live-board.ts answerReadAt): the league's read when it says one, else the
      * screen's clock as it landed. */
@@ -59,7 +63,11 @@ private class ReadAbandoned : Exception("The read was cancelled before it answer
  * are one read). The route answers with no ETag, so an answer is reused for [WINDOW] and never kept past
  * it (one past its window is dropped when the next answer is kept): a saved order would be a third clock,
  * so a screen with no answer keeps the run's figures with the run's stamp. The Rankings read through it
- * too (it is their [RankingsReads]), so the screens they must agree with share their answer.
+ * too (it is their [RankingsReads]), but on their own route: their page numbers the byes last
+ * (`byes=last`, the week's byes section, Lane 163 D06) and reads a hundred rows at a time, while the
+ * screens read the byes in their places and the API's most rows ([OrderReader.query]). Neither query is
+ * a superset of the other, so the Rankings and the screens never share one answer; each keeps its own
+ * clock within the window (Lane 243, B251, the Lane 226 review's L1).
  */
 class OrderShare(
     private val reads: RankingsReads,
