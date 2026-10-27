@@ -12,4 +12,10 @@ const PAINT_HOLDING_OFF = '--disable-features=PaintHolding';
 const PORT = Number(process.env.PORT ?? 4173);
 const ORIGIN = `http://localhost:${String(PORT)}`;
 
-module.exports = { ORIGIN, PAINT_HOLDING_OFF };
+// The script budgets (spec §2.1), bytes on load: a reading page's (the front door, the board, a
+// player, the record and the reference pages) and a tool's (the sheet, the mock room, the account).
+// Lighthouse asserts them on transfer size; scripts/script-bytes.ts holds its gzipped count of the
+// same pages to them on every branch's checks (Lane 252).
+const SCRIPT_BUDGETS = { reading: 73728, tool: 184320 };
+
+module.exports = { ORIGIN, PAINT_HOLDING_OFF, SCRIPT_BUDGETS };
