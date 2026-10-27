@@ -28,7 +28,8 @@ from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
-from research.inseason.season_week import GRADE_AFTER, last_kickoffs_by_week
+from research.inseason.season_week import last_kickoffs_by_week
+from research.inseason.week_complete import grades_from as first_grading_pass
 from research.model.reads.teams import kickoff_instants_by_week
 from research.model.register.freeze import SERVED_SOURCE, SHIPPED_SOURCE
 from research.model.register.grade import ordinal_ranks
@@ -315,7 +316,7 @@ def read_weekly(
     for week in range(start, max([REGULAR_SEASON_WEEKS, *freezes]) + 1):
         kickoff = kickoffs.get(week)
         if week in shipped:
-            grades_from = None if week not in ends else ends[week] + GRADE_AFTER
+            grades_from = None if week not in ends else first_grading_pass(ends[week])
             built, rows = _set_week(conn, season, week, freezes[week], grades_from)
             weeks.append(built)
             rows_by_week[week] = rows

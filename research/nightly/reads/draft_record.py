@@ -3,8 +3,8 @@
 The board a member drafted from is the preseason order the register set before the season's first
 kickoff: the earliest freeze of the served board (`SERVED_SOURCE`), with ADP as it stood then. It is
 graded on each player's season points to date (twelve-team PPR, the register's own scoring,
-`model.register.grade`), over every complete week (its last kickoff `GRADE_AFTER` behind the run, as the
-in-season pass grades a week), refreshed each night with the weekly stats. This is the only record that
+`model.register.grade`), over every complete week (its last kickoff `GRADE_AFTER` behind the run, the
+in-season pass's wait before Lane 244 graded on completeness), refreshed each night with the weekly stats. This is the only record that
 grades against ADP.
 
 Every measure is graded within a position (fix round 1): our board's order among the quarterbacks
@@ -21,12 +21,12 @@ after each counted week, the chart's points.
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
-from research.inseason.season_week import GRADE_AFTER, last_kickoffs_by_week
+from research.inseason.season_week import last_kickoffs_by_week
 from research.model.domain import PPR_SCORING, compute_fantasy_points
 from research.model.reads.observations import ObservationQuery, WeekRange, stat_lines_as_of
 from research.model.register.freeze import SERVED_SOURCE
@@ -80,6 +80,10 @@ join research.players p on p.id = f.player_id
 where f.season = :s and f.board_source = :source and f.adp is not null and p.position = any(:positions)
   and f.frozen_at = (select min(frozen_at) from research.register_freeze_rows where season = :s and board_source = :source)
 """
+
+# A week counts once its last kickoff is this far behind the run (the in-season pass's wait before
+# Lane 244; the draft record keeps it, B254).
+GRADE_AFTER: Final = timedelta(hours=36)
 
 
 def draft_board(conn: Connection, season: int) -> list[Mapping[str, Any]]:
