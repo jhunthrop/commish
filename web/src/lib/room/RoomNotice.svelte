@@ -15,11 +15,13 @@
 		besideVerb?: boolean;
 		/** A read that did not go, read again in place: drawn quiet before the way out. */
 		retry?: NoticeRetry;
+		/** The page did not load (its read failed), so a lobby notice keeps the way back. */
+		read?: boolean;
 	}
 
-	let { error, subject, returnTo, besideVerb = false, retry }: Props = $props();
+	let { error, subject, returnTo, besideVerb = false, retry, read = false }: Props = $props();
 
-	const view = $derived(noticeFor(error, subject, returnTo));
+	const view = $derived(noticeFor(error, subject, returnTo, read));
 </script>
 
 <Panel padding="sm" edge="loss">

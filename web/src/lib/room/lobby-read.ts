@@ -6,14 +6,22 @@ import { isFinalRefusal } from '#lib/api/status.ts';
 
 export type LobbyRead<Room> =
 	| { readonly kind: 'room'; readonly room: Room }
-	| { readonly kind: 'failed'; readonly error: unknown; readonly final: boolean };
+	| { readonly kind: 'failed'; readonly error: unknown; readonly final: boolean }
+	/** The page went while the read was out: nothing is shown and no socket opens. */
+	| { readonly kind: 'left' };
 
-export async function readLobby<Room>(read: () => Promise<Room>): Promise<LobbyRead<Room>> {
+/** `alive` says whether the page is still there when the read answers. */
+export async function readLobby<Room>(
+	read: () => Promise<Room>,
+	alive: () => boolean = () => true
+): Promise<LobbyRead<Room>> {
+	let answer: LobbyRead<Room>;
 	try {
-		return { kind: 'room', room: await read() };
+		answer = { kind: 'room', room: await read() };
 	} catch (error) {
-		return { kind: 'failed', error, final: isFinalRefusal(error) };
+		answer = { kind: 'failed', error, final: isFinalRefusal(error) };
 	}
+	return alive() ? answer : { kind: 'left' };
 }
 
 /** Whether a read's failure offers Try again: only one that was not final. */

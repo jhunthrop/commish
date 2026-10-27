@@ -29,6 +29,10 @@
 	let error = $state<unknown>(null);
 	/** The room's read did not go (no signal, the API's own fault): Try again reads it again in place. */
 	let retryable = $state(false);
+	/** The error on show is the room's read (the page did not load), not a failed Leave or join. */
+	let readFailed = $state(false);
+	/** The page has gone: a read that answers after it opens no socket. */
+	let destroyed = false;
 	let refused = $state<string | null>(null);
 	let status = $state<SocketStatus>('connecting');
 	let offset = $state(0);
@@ -119,10 +123,16 @@
 	async function read(): Promise<void> {
 		error = null;
 		retryable = false;
-		const answer = await readLobby(() => rooms.lobby(id));
+		readFailed = false;
+		const answer = await readLobby(
+			() => rooms.lobby(id),
+			() => !destroyed
+		);
+		if (answer.kind === 'left') return;
 		if (answer.kind === 'failed') {
 			error = answer.error;
 			retryable = canTryAgain(answer);
+			readFailed = true;
 			return;
 		}
 		try {
@@ -136,6 +146,7 @@
 		const ticker = setInterval(() => (now = Date.now() + offset), TICK_MS);
 		void read();
 		return () => {
+			destroyed = true;
 			clearInterval(ticker);
 			socket?.close();
 		};
@@ -174,6 +185,7 @@
 				subject="lobby"
 				returnTo={page.url.pathname}
 				retry={retryable ? { label: LOBBY.tryAgain, run: () => void read() } : undefined}
+				read={readFailed}
 			/>
 		</div>
 	{/if}

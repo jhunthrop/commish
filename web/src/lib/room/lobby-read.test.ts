@@ -50,3 +50,19 @@ void test('signed out, no seat and no such room are final, with no Try again', a
 		assert.equal(canTryAgain(read), false);
 	}
 });
+
+void test('a read that answers after the page went opens nothing (review L2)', async () => {
+	let alive = true;
+	const room = reads('room-1');
+	const left = await readLobby(
+		() => {
+			alive = false;
+			return room.read();
+		},
+		() => alive
+	);
+	assert.deepEqual(left, { kind: 'left' });
+	assert.equal(canTryAgain(left), false);
+	const failedAfter = await readLobby(reads(refused(503)).read, () => false);
+	assert.deepEqual(failedAfter, { kind: 'left' });
+});
