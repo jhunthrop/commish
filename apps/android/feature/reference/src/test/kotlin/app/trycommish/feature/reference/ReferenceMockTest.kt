@@ -126,6 +126,19 @@ class ReferenceMockTest {
     }
 
     @Test
+    fun theClockScenesAreTheOrdersOrTheRunsWhole() {
+        val read = reads(ReferenceScene.ClubClock).club().model()
+        assertTrue(read.atClock)
+        assertEquals("On our rest-of-season order", read.boardHead)
+        val unread = reads(ReferenceScene.ClubClockUnread).club().model()
+        assertTrue(!unread.atClock)
+        assertEquals("On our PPR board", unread.boardHead)
+        assertTrue(unread.basis.last().startsWith("Projected updated"))
+        assertTrue(reads(ReferenceScene.CompareClock).compare().model().atClock)
+        assertTrue(!reads(ReferenceScene.CompareClockUnread).compare().model().atClock)
+    }
+
+    @Test
     fun everyReferenceIsThereAndSmallEnoughToKeep() {
         // The record job draws the references in this same task, so it checks them on the run after.
         assumeFalse(System.getProperty("paparazzi.test.record") == "true")
@@ -136,8 +149,8 @@ class ReferenceMockTest {
     }
 
     private companion object {
-        /** Twelve scenes, two themes, two phones. */
-        const val REFERENCES = 48
+        /** Sixteen scenes, two themes, two phones. */
+        const val REFERENCES = 64
         const val MAX_BYTES = 300 * 1024
     }
 }

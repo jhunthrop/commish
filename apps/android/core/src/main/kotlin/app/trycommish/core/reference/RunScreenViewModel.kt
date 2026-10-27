@@ -10,6 +10,7 @@ import app.trycommish.core.Format
 import app.trycommish.core.SessionEnd
 import app.trycommish.core.board.BoardChip
 import app.trycommish.core.board.RunWords
+import app.trycommish.core.liveorder.OrderReader
 import app.trycommish.core.player.Freshness
 import app.trycommish.core.player.RunFiles
 import app.trycommish.core.player.SavedReason
@@ -58,12 +59,16 @@ typealias ScreenBuild<Model> = suspend (ReferenceReads) -> Built<Model>
  * its stamp and reason; a refused token signs out. What the screen is built from is its build; a chip or a
  * pick builds anew from the newest ask, a build that lands after a newer one is dropped, and one that fails
  * over a shown screen leaves that screen and its build standing with a one-line notice (Lane 199 review M2).
- * The view decides nothing.
+ * In season a screen whose build says it at the order's clock is drawn on the run first, then on the order
+ * the Rankings read once it answers (Lane 226, `orders`); a failed read leaves the run's. The view decides
+ * nothing.
  */
 class RunScreenViewModel<Model>(
     private val reads: ReferenceReads,
     val zone: ZoneId,
     private val sessionEnd: SessionEnd,
+    /** The in-season screens' shared read of the order; null reads none. */
+    private val orders: OrderReader?,
     private var build: ScreenBuild<Model>,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow<RunScreenState<Model>>(RunScreenState.Loading)
@@ -154,7 +159,9 @@ class RunScreenViewModel<Model>(
             mutableAsk.value = null
             mutableNotice.value = null
             manifest = built.manifest
-            mutableState.value = RunScreenState.Loaded(built.model, Freshness.of(built.reads, reads.clock.now()))
+            val freshness = Freshness.of(built.reads, reads.clock.now())
+            mutableState.value = RunScreenState.Loaded(built.model, freshness)
+            place(built, freshness, mine)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Unauthorized) {
@@ -173,6 +180,19 @@ class RunScreenViewModel<Model>(
                 mutableState.value = RunScreenState.Failed(failure(e))
             }
         }
+    }
+
+    /** The screen at the order's clock once the order answers and places every row it draws; a failed
+     * read, a newer build, or an answer that does not place them leaves the run's screen standing. */
+    private suspend fun place(
+        built: Built<Model>,
+        freshness: Freshness,
+        mine: Int,
+    ) {
+        val reader = orders ?: return
+        val atClock = built.atClock ?: return
+        val model = atClock(reader) ?: return
+        if (mine == generation) mutableState.value = RunScreenState.Loaded(model, freshness)
     }
 
     companion object {

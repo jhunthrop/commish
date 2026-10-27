@@ -110,8 +110,9 @@ fun ClubCardView(
     }
 }
 
-/** The clubs index at 390: the heading, its lead, the link to the schedule, every club's card. `still`
- * draws the cards it is given whole (a snapshot's); else a lazy list. */
+/** The clubs index at 390: the heading, its lead, the link to the schedule, every club's card, and in
+ * season the basis once under the cards (the order's lead, or the run's stamp). `still` draws the cards
+ * it is given whole (a snapshot's); else a lazy list. */
 @Composable
 fun ClubsScreen(
     model: ClubsModel,
@@ -129,17 +130,21 @@ fun ClubsScreen(
     val card: @Composable (ClubCard) -> Unit = {
         Column(Modifier.padding(horizontal = Tokens.Space.s3.dp, vertical = Tokens.Space.s2.dp)) { ClubCardView(it, actions) }
     }
+    val foot: @Composable () -> Unit = {
+        Column(Modifier.padding(bottom = Tokens.Space.s4.dp)) { if (model.basis.isNotEmpty()) BasisLines(model.basis) }
+    }
     if (still) {
         Column(Modifier.background(CommishTheme.colors.bg)) {
             top()
             clubs.forEach { card(it) }
+            foot()
         }
         return
     }
     LazyColumn(Modifier.fillMaxSize()) {
         item("top") { top() }
         items(clubs, key = { it.abbr }) { card(it) }
-        item("foot") { Column(Modifier.padding(bottom = Tokens.Space.s4.dp)) {} }
+        item("foot") { foot() }
     }
 }
 

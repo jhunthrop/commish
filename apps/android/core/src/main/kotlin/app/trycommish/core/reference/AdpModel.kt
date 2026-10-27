@@ -199,7 +199,7 @@ data class AdpModel(
             reads: ReferenceReads,
             zone: ZoneId,
             sessionEnd: SessionEnd,
-        ): RunScreenViewModel<AdpModel> = RunScreenViewModel(reads, zone, sessionEnd, build(format, zone))
+        ): RunScreenViewModel<AdpModel> = RunScreenViewModel(reads, zone, sessionEnd, null, build(format, zone))
     }
 }
 

@@ -13,6 +13,7 @@ import app.trycommish.core.Cache
 import app.trycommish.core.Clock
 import app.trycommish.core.board.RunReadFailure
 import app.trycommish.core.board.RunReads
+import app.trycommish.core.liveorder.OrderReader
 import app.trycommish.core.player.PageSource
 import app.trycommish.core.player.PlayerLookup
 import app.trycommish.core.player.PlayerPageReads
@@ -21,12 +22,18 @@ import app.trycommish.core.player.ReadStamp
 import app.trycommish.core.player.RunFiles
 import app.trycommish.core.player.quietly
 
+/** The screen again at the order's clock, read through the order's reader for the players it draws:
+ * null where the read fails or does not place every row it draws, so the run's model stands. */
+typealias AtClock<Model> = suspend (OrderReader) -> Model?
+
 /** A screen built from the run's files: the screen's model, the manifest it is of (its stamp and the
- * offline words), and every read it took. */
+ * offline words), every read it took, and in season the screen again at the order's clock (Lane 226);
+ * null for a screen with no figures on a clock (before the season, the schedule, ADP). */
 class Built<Model>(
     val model: Model,
     val manifest: RunManifest,
     val reads: List<ReadStamp>,
+    val atClock: AtClock<Model>? = null,
 )
 
 /**

@@ -952,6 +952,11 @@ public enum Words {
 
     }
 
+    public enum ClubOrder {
+        public static let onOrder = "On our rest-of-season order"
+        public static let nobody = "Nobody from {city} is in this order"
+    }
+
     public enum Lobby {
         public static let join = "Join"
         public static let yourSeat = "Your seat"

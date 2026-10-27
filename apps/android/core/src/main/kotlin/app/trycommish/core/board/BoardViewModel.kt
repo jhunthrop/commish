@@ -12,6 +12,8 @@ import app.trycommish.core.Cached
 import app.trycommish.core.Clock
 import app.trycommish.core.Format
 import app.trycommish.core.SessionEnd
+import app.trycommish.core.liveorder.OrderAtClock
+import app.trycommish.core.liveorder.OrderReader
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,7 +63,9 @@ sealed interface BoardState {
  * again naming the ETags kept, so an unchanged run costs five 304s and only refreshes the read's stamp.
  * A failed read keeps the saved board, stale with its reason. The chips' choice is held here, so the
  * sheet opened from a row and closed again, or a pull, leaves them as they were. One read runs at a
- * time: a new one cancels the last.
+ * time: a new one cancels the last. In season, once the run's board is shown, the order the Rankings
+ * read is read at the screen's clock (Lane 226, `orders`) and the board drawn again on it; with no
+ * answer, or a read that fails, the run's rows stand with the run's stamp.
  */
 class BoardViewModel(
     private val reads: RunReads,
@@ -73,6 +77,8 @@ class BoardViewModel(
     /** The member follows a league. */
     private val following: Boolean,
     private val sessionEnd: SessionEnd,
+    /** The in-season screens' shared read of the order; null reads none. */
+    private val orders: OrderReader? = null,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow<BoardState>(BoardState.Loading)
     private val mutableFilter = MutableStateFlow(BoardFilter())
@@ -82,6 +88,10 @@ class BoardViewModel(
 
     /** The read shown, so a position chip redraws it without a read and a failed read keeps it. */
     private var shown: Shown? = null
+
+    /** The order as last read at the screen's clock, so a chip redraws on it; null while unread or after
+     * a read that failed. */
+    private var order: OrderAtClock? = null
 
     private class Shown(
         val format: String?,
@@ -129,6 +139,7 @@ class BoardViewModel(
         if (format == (mutableFilter.value.format ?: mutableFormats.value.firstOrNull()?.id)) return null
         mutableFilter.value = mutableFilter.value.copy(format = format)
         shown = null
+        order = null
         mutableState.value = BoardState.Loading
         return load()
     }
@@ -152,12 +163,15 @@ class BoardViewModel(
             if (kept != format) mutableFilter.value = mutableFilter.value.copy(format = kept)
             val stamp = clock.now()
             cache.write(route(kept), Cached(CommishJson.encodeToString(RunBoardBodies.serializer(), fresh.bodies), stamp))
+            // A fresh run is drawn on its own clock; the order is read for it below.
+            order = null
             show(fresh, stamp, stale = null)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Unauthorized) {
             sessionEnd.signedOut()
             mutableState.value = BoardState.SignedOut
+            return
         } catch (
             @Suppress("TooGenericExceptionCaught") e: Exception,
         ) {
@@ -168,6 +182,17 @@ class BoardViewModel(
                 mutableState.value = BoardState.Failed(failure(e))
             }
         }
+        readOrder()
+    }
+
+    /** In season the order at the screen's clock, the board drawn again on it; a read that fails drops any
+     * order held, so the run's rows stand with the run's stamp. The screen is never held for it: the run's
+     * board is drawn first. */
+    private suspend fun readOrder() {
+        val reader = orders?.takeIf { inSeason } ?: return
+        if (shown == null) return
+        order = reader.readOrNull()
+        shown?.let { show(it.read, it.stamp, it.stale) }
     }
 
     private fun show(
@@ -179,7 +204,7 @@ class BoardViewModel(
         mutableFormats.value = read.manifest.formats
         mutableState.value =
             BoardState.Loaded(
-                BoardModel.of(read, mutableFilter.value.position, inSeason, following, clock.now(), zone),
+                BoardModel.of(read, mutableFilter.value.position, inSeason, following, clock.now(), zone, order),
                 stamp,
                 stale,
             )

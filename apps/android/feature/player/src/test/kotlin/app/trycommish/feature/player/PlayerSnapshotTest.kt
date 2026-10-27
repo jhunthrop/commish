@@ -21,11 +21,15 @@ import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
+import app.trycommish.core.SessionEnd
 import app.trycommish.core.board.RunFixture
 import app.trycommish.core.board.StubRunReads
+import app.trycommish.core.liveorder.OneValueFixture
+import app.trycommish.core.liveorder.StubOneValueWeeks
 import app.trycommish.core.player.PageState
 import app.trycommish.core.player.PlayerPageModel
 import app.trycommish.core.player.PlayerPageViewModel
+import app.trycommish.core.player.PlayerReadsGraph
 import app.trycommish.core.player.PlayerSheetViewModel
 import app.trycommish.core.player.SavedReason
 import app.trycommish.core.player.SheetRead
@@ -86,7 +90,17 @@ class PlayerSnapshotTest(
         PageSeason("page-season"),
         PageLog("page-log"),
         PageTier("page-tier"),
+
+        /** In season at the read's clock (Lane 226, the iOS player-page-formats): Swift on the one-value
+         * stand-in at the Sunday clock, the every-format table on the week's figures with its footnote. */
+        PageFormats("page-formats"),
+
+        /** The same page with the week unread: every rank and figure the run's, the run's stamp. */
+        PageFormatsUnread("page-formats-unread"),
         ;
+
+        /** A scene on the one-value stand-in. */
+        val oneValue: Boolean get() = this == PageFormats || this == PageFormatsUnread
 
         val sheet: SheetPlayer?
             get() =
@@ -198,6 +212,12 @@ class PlayerSceneTest {
         assertEquals(null, pageModel(PlayerSnapshotTest.Scene.PageSeason).facts)
         assertEquals(null, pageModel(PlayerSnapshotTest.Scene.PageHeld).read)
         assertTrue(pageModel(PlayerSnapshotTest.Scene.PageTier).tier != null)
+        val read = requireNotNull(pageModel(PlayerSnapshotTest.Scene.PageFormats).formats)
+        assertTrue(read.footnote != null)
+        assertEquals(listOf("RB 15", Words.Box.none, Words.Box.none), read.rows.map { it.rank })
+        val unread = pageModel(PlayerSnapshotTest.Scene.PageFormatsUnread)
+        assertEquals(null, unread.formats?.footnote)
+        assertTrue(unread.basis.any { it.startsWith("Projected updated") })
     }
 
     private fun loaded(scene: PlayerSnapshotTest.Scene): SheetState.Loaded =
@@ -254,6 +274,23 @@ private fun sheetModel(
 /** The page at the scene: before the season the stand-in's, in season the contract run's. */
 private fun pageModel(scene: PlayerSnapshotTest.Scene): PlayerPageModel =
     runBlocking {
+        if (scene.oneValue) {
+            val clock = FixedClock(OneValueFixture.now)
+            val weeks = StubOneValueWeeks(offline = scene == PlayerSnapshotTest.Scene.PageFormatsUnread)
+            val graph =
+                PlayerReadsGraph(
+                    StubRunReads(RunFixture.OneValue),
+                    StubPages(RunFixture.OneValue),
+                    weeks,
+                    MemoryCache(),
+                    clock,
+                    WeekFixture.zone,
+                    SessionEnd {},
+                )
+            val vm = PlayerPageViewModel("d-andre-swift", graph, null)
+            vm.read()
+            return@runBlocking (vm.state.value as PageState.Loaded).model
+        }
         val fixture = if (scene.inSeason) RunFixture.Contract else RunFixture.StandIn
         val held: Map<String, RunFixture?> = if (scene == PlayerSnapshotTest.Scene.PageHeld) mapOf("4431299" to null) else emptyMap()
         val graph =
@@ -319,6 +356,12 @@ private fun PageMock(
     when (scene) {
         PlayerSnapshotTest.Scene.PageProse -> Box(bg.then(pad)) { model.read?.let { PageRead(it) } }
         PlayerSnapshotTest.Scene.PageLog -> Box(bg.then(pad)) { SeasonBlock(model.season) }
+        PlayerSnapshotTest.Scene.PageFormats, PlayerSnapshotTest.Scene.PageFormatsUnread ->
+            Column(bg.then(pad)) {
+                model.formats?.let { FormatsTableView(it) }
+                Box(Modifier.height(Tokens.Space.s5.dp))
+                BasisLines(model.basis + model.stamp)
+            }
         PlayerSnapshotTest.Scene.PageTier ->
             Column(bg.then(pad)) {
                 model.tier?.let { TierBoxView(it) }
