@@ -7,8 +7,8 @@ from typing import Final
 from research.errors import ConfigurationError
 from research.headshots.config import check_player_id
 from research.headshots.images import FetchFailedError, NoImageError, Source
-from research.headshots.sync import CURATED, SyncDeps, copy_from
-from research.headshots.table import LedgerRow, Write, is_provider_player, mark_refresh, write
+from research.headshots.sync import CURATED, SyncDeps, fetch_copy, store_copies
+from research.headshots.table import LedgerRow, Write, is_provider_player, lock_player, mark_refresh, write
 
 _CURATOR_MAX: Final = 80
 
@@ -27,11 +27,13 @@ def curate(deps: SyncDeps, season: int, player_id: str, url: str, by: str) -> No
         if not is_provider_player(conn, player_id):
             raise CurationError(f"{player_id} is not a provider player.")
     try:
-        copy_from(deps, season, player_id, Source(url, None))
+        body = fetch_copy(deps, Source(url, None))
     except (NoImageError, FetchFailedError) as error:
         raise CurationError(f"{url} gave no usable image: {error}") from error
     at = deps.now()
     with deps.engine.begin() as conn:
+        lock_player(conn, season, player_id)  # the sync's writes for him run wholly before or after
+        store_copies(deps.bucket, season, player_id, body)
         write(conn, season, player_id, Write(CURATED, url, None, at, curator, at), at)
 
 

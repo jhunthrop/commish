@@ -25,6 +25,8 @@ FETCH_INTERVAL_SECONDS: Final = 0.5
 # The players a sync works on at once: a fetch's wait on the source host, the eight bucket writes and
 # the ledger write overlap, while the one throttle still spaces the fetches at the interval above.
 SYNC_WORKERS: Final = 4
+# The workers a sync may be given; a value outside is refused, never clamped.
+SYNC_WORKERS_RANGE: Final = (1, 16)
 # The only host a synced source may name (the provider's image host); a curated URL may name any.
 SYNC_SOURCE_HOSTS: Final = frozenset({"a.espncdn.com"})
 # The provider's placeholder for a player it has no photo of: no image, so the player is missing.
