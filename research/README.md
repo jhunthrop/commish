@@ -757,6 +757,15 @@ stat lines as of the pass (Lane 244, `inseason/week_complete.py`); and a missed 
 first kickoff passed with none) or a grade still impossible four days after the games fails the
 pass, so it is never silent.
 
+A game cancelled but kept in games.csv with no result, or dropped from it and left as a stale
+`nflverse_games` row, would hold its week forever; the overdue line names each game with no final and
+the command that voids it. `python -m research.inseason void-game --season S --week W --game ID
+--reason TEXT --by WHO [--lift]` (Lane 249, `inseason/game_voids.py`) checks the game is that week's,
+writes one append-only row to `research.game_voids` (a lift is a later row, the latest at or before the
+pass wins) and prints what it did; the check then skips the game and names it. No schedule runs it;
+with gcloud lapsed, `gh workflow run ops.yml -f job=inseason -f
+args=research.inseason,void-game,--season,<s>,--week,<w>,--game,<id>,--reason,<why>,--by,<who>`.
+
 ### The history rebuild
 
 `research.pipeline history` (`pipeline/history.py`) re-creates, with phase A's ingests, what the

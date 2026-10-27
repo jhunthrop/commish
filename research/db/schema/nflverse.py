@@ -1,4 +1,5 @@
 """THE NFLVERSE WEEKLY ARCHIVES, the draft and the play callers: one row per fact, keyed by the fact.
+Also the game table, its reads, and an operator's voids of its games (`game_voids`, revision 0023).
 
 Each archive table holds one release's weekly rows; the table name says where they came from, so
 no row repeats it in a `source` column.
@@ -7,6 +8,7 @@ no row repeats it in a `source` column.
 from typing import Final
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Column,
     Date,
@@ -196,6 +198,26 @@ NFLVERSE_GAME_READS: Final = Table(
     Column("roof", Text),
     recorded_at(),
     Index("nflverse_game_reads_week_idx", "season", "week", "read_at"),
+)
+
+# An operator's void of one game of the game table (revision 0023, Lane 249, B255): a game cancelled
+# but kept in games.csv with no result, or dropped from it and left as a stale row, never blocks its
+# week's grade once voided. Append-only: a row is never updated or deleted, a void is lifted by a later
+# row with `lifted` true, and the latest row per game at or before the pass is the game's standing.
+GAME_VOIDS: Final = Table(
+    "game_voids",
+    METADATA,
+    Column("game_id", Text, primary_key=True),
+    Column("voided_at", DateTime(True), primary_key=True),
+    Column("season", Integer, nullable=False),
+    Column("week", Integer, nullable=False),
+    Column("voided_by", Text, nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("lifted", Boolean, nullable=False),
+    recorded_at(),
+    CheckConstraint("length(btrim(voided_by)) > 0", name="game_voids_voided_by_ck"),
+    CheckConstraint("length(btrim(reason)) > 0", name="game_voids_reason_ck"),
+    Index("game_voids_week_idx", "season", "week"),
 )
 
 COACHES: Final = Table(

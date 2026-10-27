@@ -46,7 +46,9 @@ any frozen week the store held outcomes for, so a Wednesday pass could grade Thu
 one played game; the register's grade of a week is final (the pass never regrades), so a partial week
 would stand. Since Lane 244 a week is complete on the first pass where every game the game table lists
 for it has both clubs' results and stat lines as of the pass, read from the rows the grade reads
-(`week_complete`); until then the pass names the games it waits on. The `game-table` step runs before
+(`week_complete`); until then the pass names the games it waits on. A game an operator voided
+(`void-game`, Lane 249, `game_voids`) is skipped and named; an overdue week names each game with no
+final and the command that voids it. The `game-table` step runs before
 `grade` on the same pass, so the games checked are the file's as of that pass. Lane 244 replaced a
 thirty-six hour wait after the last kickoff.
 """
@@ -61,9 +63,10 @@ from sqlalchemy import Connection, Engine, text
 
 from research.errors import ConfigurationError
 from research.inseason import usage_steps
+from research.inseason.game_voids import void_command, void_ops_command
 from research.inseason.scoreboard import scoreboard_lines
 from research.inseason.step_result import Status, StepResult
-from research.inseason.week_complete import GRADE_FLOOR, week_state
+from research.inseason.week_complete import GRADE_FLOOR, WeekState, week_state
 from research.model.instants import js_iso, ms_instant
 from research.model.reads.teams import kickoff_instants_by_week
 from research.model.register.espn_fill import fill_empty_espn_yardstick
@@ -323,19 +326,36 @@ def _grade_one(context: SeasonWeekContext, week: int) -> tuple[str, bool, int]:
         return f"{'OVERDUE, ' if stale else ''}waits, no games on file", stale, 0
     last = state.last_kickoff
     overdue = context.now >= last + GRADE_OVERDUE
+    voided = _voided_note(state)
     if state.incomplete:
         waits = f"waits on {_plural(len(state.incomplete), 'game')} of {state.games}, {'; '.join(state.incomplete)}"
-        return f"{'OVERDUE, ' if overdue else ''}{waits}", overdue, 0
+        fix = _void_hint(context.season, week, state) if overdue else ""
+        return f"{'OVERDUE, ' if overdue else ''}{waits}{voided}{fix}", overdue, 0
     if context.now < last + GRADE_FLOOR:
-        return f"waits, its last kickoff {js_iso(last)} is under {GRADE_FLOOR} ago", False, 0
+        return f"waits, its last kickoff {js_iso(last)} is under {GRADE_FLOOR} ago{voided}", False, 0
     try:
         with context.engine.begin() as conn:
             result = grade_week(conn, context.season, week, context.now)
     except ValueError as error:
-        return f"{'OVERDUE, ' if overdue else ''}not graded, {error}", overdue, 0
+        return f"{'OVERDUE, ' if overdue else ''}not graded, {error}{voided}", overdue, 0
     boards = " ".join(f"{board.board_source}={board.population}" for board in result.boards)
     skipped = "".join(f" SKIPPED {board.board_source}" for board in result.skipped)
-    return f"graded {boards}{skipped}", False, 1
+    return f"graded {boards}{skipped}{voided}", False, 1
+
+
+def _voided_note(state: WeekState) -> str:
+    """The games voided as of the pass, which the check skipped (Lane 249)."""
+    return f"; voided, not checked: {', '.join(state.voided)}" if state.voided else ""
+
+
+def _void_hint(season: int, week: int, state: WeekState) -> str:
+    """For an overdue week, each game with no final and the command that voids it if it was cancelled
+    or dropped from games.csv (Lane 249, B255); a game with its finals but no lines is an outage, not this."""
+    return "".join(
+        f"; if {game_id} was cancelled or dropped from games.csv, void it: {void_command(season, week, game_id)}"
+        f" (with gcloud lapsed: {void_ops_command(season, week, game_id)})"
+        for game_id in state.unresulted
+    )
 
 
 def is_final_pass(kickoff: datetime, at: datetime) -> bool:

@@ -13,6 +13,9 @@ What they record depends on when they run (`research/JOBS.md`, `research-ts/src/
   the day after a week's last game, the first pass at or after 06:00 each day also reads the week
   ahead's published projection (Lane 97), so Thursday's 14:00 freeze has that morning's.
 
+`void-game` is the operator's void of one game that will never be whole (Lane 249, `game_voids.py`);
+no schedule runs it.
+
 Each invocation is one pass; Cloud Scheduler owns the cadence (`infra/README.md`). They replace the
 Vercel cron's `season-week` and `capture-harvest` jobs.
 """
