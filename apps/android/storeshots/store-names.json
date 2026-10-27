@@ -1,0 +1,29 @@
+{
+  "why": "The shared fixtures are a recorded public league: its team names and its members' handles are real people's. The store graphics draw a copy of the fixtures with each replaced by a made-up name (and the league read as the platform the app writes to), so no member's data reaches the store. Each pair is applied in order to every JSON file, as plain text.",
+  "replace": [
+    ["S.U.C.K. - Severely Underrated Carolina Keepers", "Sunday Standard"],
+    ["Keeper? I Hardly Know Her", "Hail Mary Club"],
+    ["Aaron Donald Dependent", "Pick Sixers"],
+    ["McConkey Kong Country", "Fourth and Long"],
+    ["Carried by QJs", "Play Action"],
+    ["Bower Rangers", "Goal Line Stand"],
+    ["Ball Snatchers", "Flea Flickers"],
+    ["Nacua Matata", "Red Zone Regulars"],
+    ["Dad Runners", "Blitz Brigade"],
+    ["OnlyFannins", "The Audibles"],
+    ["Muttdogs", "Two Minute Drill"],
+    ["Max_Jensen10", "Sunday Scaries"],
+    ["thatmattkelley", "Long Snappers"],
+    ["\"muttdog\"", "\"manager01\""],
+    ["\"JeffHaseleyFBG\"", "\"manager02\""],
+    ["\"Rad_Thad1\"", "\"manager03\""],
+    ["\"pricej07\"", "\"manager04\""],
+    ["\"PeakedInHighSkool\"", "\"manager05\""],
+    ["\"Quinnifer\"", "\"manager06\""],
+    ["\"jjzachariason\"", "\"manager07\""],
+    ["\"Nowlan\"", "\"manager08\""],
+    ["\"jordanp2323\"", "\"manager09\""],
+    ["\"GMenJay\"", "\"manager12\""],
+    ["\"host\": \"ffpc\"", "\"host\": \"espn\""]
+  ]
+}
