@@ -9,6 +9,7 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { type LobbyRoom, type RoomCard, isFinalRefusal, rooms } from '#lib/room/api.ts';
+	import { canTryAgain, readLobby } from '#lib/room/lobby-read.ts';
 	import { type LobbyState, applyActions, initialLobby } from '#lib/room/lobby.ts';
 	import { LobbySocket, type SocketStatus } from '#lib/room/lobby-socket.ts';
 	import LobbyRoomView from '#lib/room/LobbyRoomView.svelte';
@@ -26,6 +27,8 @@
 	let lobby = $state<LobbyState | null>(null);
 	let card = $state<RoomCard | null>(null);
 	let error = $state<unknown>(null);
+	/** The room's read did not go (no signal, the API's own fault): Try again reads it again in place. */
+	let retryable = $state(false);
 	let refused = $state<string | null>(null);
 	let status = $state<SocketStatus>('connecting');
 	let offset = $state(0);
@@ -86,36 +89,52 @@
 		await goto(resolve('/mock/new'));
 	}
 
+	/** The room's socket, once its read is in: the log's replay from the welcome, every update after. */
+	function connect(loaded: LobbyRoom): void {
+		board = boardOf(loaded.board, loaded.teams);
+		room = loaded;
+		lobby = initialLobby(loaded);
+		socket = new LobbySocket(loaded.socket_url, {
+			onactions: (actions) => {
+				if (!lobby) return;
+				lobby = applyActions(lobby, actions, loaded.you);
+				if (card && card.pick_number !== lobby.pickNumber) card = null;
+				void loadCard(lobby);
+			},
+			onclock: (ms) => (offset = ms),
+			onstatus: (s) => (status = s),
+			onrefused: (message) => (refused = message),
+			probe: () =>
+				rooms.lobby(id).then(
+					() => null,
+					(e: unknown) => (isFinalRefusal(e) ? e : null)
+				),
+			onstopped: (reason) => (error = reason)
+		});
+		socket.connect();
+	}
+
+	/** The room's read, and Try again's: a read that did not go offers Try again beside the way out,
+	 * a refusal for good keeps only the way out. */
+	async function read(): Promise<void> {
+		error = null;
+		retryable = false;
+		const answer = await readLobby(() => rooms.lobby(id));
+		if (answer.kind === 'failed') {
+			error = answer.error;
+			retryable = canTryAgain(answer);
+			return;
+		}
+		try {
+			connect(answer.room);
+		} catch (e) {
+			error = e;
+		}
+	}
+
 	onMount(() => {
 		const ticker = setInterval(() => (now = Date.now() + offset), TICK_MS);
-		void (async () => {
-			try {
-				const loaded = await rooms.lobby(id);
-				board = boardOf(loaded.board, loaded.teams);
-				room = loaded;
-				lobby = initialLobby(loaded);
-				socket = new LobbySocket(loaded.socket_url, {
-					onactions: (actions) => {
-						if (!lobby) return;
-						lobby = applyActions(lobby, actions, loaded.you);
-						if (card && card.pick_number !== lobby.pickNumber) card = null;
-						void loadCard(lobby);
-					},
-					onclock: (ms) => (offset = ms),
-					onstatus: (s) => (status = s),
-					onrefused: (message) => (refused = message),
-					probe: () =>
-						rooms.lobby(id).then(
-							() => null,
-							(e: unknown) => (isFinalRefusal(e) ? e : null)
-						),
-					onstopped: (reason) => (error = reason)
-				});
-				socket.connect();
-			} catch (e) {
-				error = e;
-			}
-		})();
+		void read();
 		return () => {
 			clearInterval(ticker);
 			socket?.close();
@@ -150,7 +169,12 @@
 >
 	{#if error}
 		<div class="notice">
-			<RoomNotice {error} subject="lobby" returnTo={page.url.pathname} />
+			<RoomNotice
+				{error}
+				subject="lobby"
+				returnTo={page.url.pathname}
+				retry={retryable ? { label: LOBBY.tryAgain, run: () => void read() } : undefined}
+			/>
 		</div>
 	{/if}
 	{#if leaving && lobby}

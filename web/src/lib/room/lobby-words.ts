@@ -39,6 +39,9 @@ export const LOBBY = {
 	gone: 'This lobby is gone.',
 	noSeat: 'You do not have a seat in this lobby.',
 	joinLobby: 'Join a lobby',
+	/** A room read that did not go (no signal, the API's own fault) is read again in place; a refusal
+	 * for good keeps only the way out. */
+	tryAgain: 'Try again',
 	/** The score bug's heads (ScoreBug.svelte). */
 	onTheClock: 'On the clock',
 	clock: 'Clock',

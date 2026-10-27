@@ -13,6 +13,12 @@ export interface NoticeLink {
 	href: string;
 }
 
+/** A failure read again in place, beside the notice's way out. */
+export interface NoticeRetry {
+	label: string;
+	run: () => void;
+}
+
 export interface NoticeView {
 	text: string;
 	/** The way forward, as the solid verb. */
@@ -100,7 +106,15 @@ function refused(error: ApiError, subject: NoticeSubject): NoticeView | null {
 	return null;
 }
 
+/** A lobby notice with no way forward of its own (no signal, the API's own fault) keeps the quiet
+ * way back to the lobbies, the apps' Join a lobby beside their Try again. */
 export function noticeFor(error: unknown, subject: NoticeSubject, returnTo: string): NoticeView {
+	const view = noticeOf(error, subject, returnTo);
+	if (subject !== 'lobby' || view.verb !== undefined || view.quiet !== undefined) return view;
+	return { ...view, quiet: joinLobby() };
+}
+
+function noticeOf(error: unknown, subject: NoticeSubject, returnTo: string): NoticeView {
 	if (!(error instanceof ApiError)) return { text: MOCK.unreachable };
 	switch (error.status) {
 		case HTTP.unauthorized:

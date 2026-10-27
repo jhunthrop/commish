@@ -2,7 +2,7 @@
  * (ok, data, error), and every type is the one generated from api/openapi.yaml. */
 import { PUBLIC_API_URL } from '$app/env/public';
 import { ApiError, apiClient, type RequestOptions } from '#lib/api/client.ts';
-import { HTTP_STATUS, hasStatus, isSignedOut } from '#lib/api/status.ts';
+import { HTTP_STATUS, hasStatus, isFinalRefusal, isSignedOut } from '#lib/api/status.ts';
 import type { components } from '#lib/api/types.ts';
 
 type Schemas = components['schemas'];
@@ -34,11 +34,7 @@ function call<T>(method: Method, path: string, body?: unknown): Promise<T> {
 
 export { isSignedOut };
 
-/** Whether an error is the API saying this drafter cannot be in the room at all: signed out, not
- * seated in it, or no such room. A retry never fixes one of these. */
-export function isFinalRefusal(error: unknown): boolean {
-	return hasStatus(error, HTTP_STATUS.unauthorized, HTTP_STATUS.forbidden, HTTP_STATUS.notFound);
-}
+export { isFinalRefusal };
 
 /** Whether an error is the API saying the thing is not there for this drafter at all: no seat in it
  * (403) or no such room (404). Unlike a dropped connection, waiting never brings it back. */
