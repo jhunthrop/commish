@@ -776,11 +776,6 @@ object Words {
         const val comparePair = "Compare two of them"
     }
 
-    object ClubOrder {
-        const val onOrder = "On our rest-of-season order"
-        const val nobody = "Nobody from {city} is in this order"
-    }
-
     object SchedulePage {
         const val heading = "schedule strength"
         const val title = "Schedule strength"
@@ -955,6 +950,11 @@ object Words {
 
     object LiveOrder {
 
+    }
+
+    object ClubOrder {
+        const val onOrder = "On our rest-of-season order"
+        const val nobody = "Nobody from {city} is in this order"
     }
 
     object Lobby {

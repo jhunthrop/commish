@@ -7,6 +7,7 @@ import app.trycommish.api.models.RunMarketRow
 import app.trycommish.api.models.RunPlayerStatus
 import app.trycommish.core.Format
 import app.trycommish.core.instantOrNull
+import app.trycommish.core.liveorder.PlacedFigures
 import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.shell.headshotOf
 import app.trycommish.core.shell.initialsOf
@@ -149,12 +150,19 @@ internal class BoardCells(
      * board ranks from, nothing once it is played (Lane 223, B190). */
     fun bye(club: String): String? = Byes.line(byes[club], fromWeek)
 
-    fun ranked(row: RunBoardRow): BoardRow {
+    fun ranked(row: RunBoardRow): BoardRow = ranked(row, PlacedFigures.of(row))
+
+    /** His row with the figures of one clock: the run's, or the order's put on his run row (LiveOrder),
+     * every figure and his place at his position from the same one. */
+    fun ranked(
+        row: RunBoardRow,
+        figures: PlacedFigures,
+    ): BoardRow {
         val label = BoardPosition.of(row.position.value)?.label ?: row.position.value
         val status = statuses[row.id]?.let { BoardStatus.view(it, zone) }
-        val rank = status?.rank ?: row.positionRank.toString()
+        val rank = status?.rank ?: figures.positionRank.toString()
         // A player on a season-long list: his rank is the word, so no gap (Row.svelte heldOut).
-        val gap = if (status?.onList == true) null else row.gap?.toDouble()
+        val gap = if (status?.onList == true) null else figures.gap
         return BoardRow(
             id = row.id,
             name = row.name,
@@ -164,16 +172,27 @@ internal class BoardCells(
             club = row.team,
             bye = bye(row.team),
             status = status,
-            projected = BoardFigures.projected(row.projected.toDouble()),
-            overReplacement = BoardFigures.signed(row.vor.toDouble()),
-            heat = Heat.of(row.vor.toDouble(), row.vorRound),
+            projected = BoardFigures.projected(figures.projected),
+            overReplacement = BoardFigures.signed(figures.vor),
+            heat = Heat.of(figures.vor, figures.vorRound),
             gap = BoardFigures.gap(gap),
             gapTone = GapTone.of(gap),
-            draftOrder = row.positionRank.toString(),
+            draftOrder = figures.positionRank.toString(),
             adp = row.adp?.let { Format.fixed(it.toDouble()) } ?: Words.Box.none,
             sheetPlayer = SheetPlayer(row.id, row.slug, row.name, label, rank, row.team, headshotOf(row.headshot)),
         )
     }
+
+    /** A player on a season-long list at the order's clock: the list's word in his pill and no figure, as
+     * the Rankings draw him (the order values none for him, and the run's are another clock's). */
+    fun listed(row: RunBoardRow): BoardRow =
+        ranked(row).copy(
+            projected = Words.Box.none,
+            overReplacement = Words.Box.none,
+            heat = Heat.None,
+            gap = Words.Box.none,
+            gapTone = null,
+        )
 
     /** A kicker or a defense: on the board his place is his Draft order column, so his pill is his
      * position alone (Row.svelte pillRank) or his list's word; where no Draft order column is drawn (ADP,

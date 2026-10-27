@@ -300,14 +300,15 @@ fun TierBoxView(box: TierBox) {
     }
 }
 
-/** The every-format table (Table.svelte): each format with our rank, his points, his value over a
- * pickup's and his tier, and why the formats need not line up. */
+/** The every-format table (Table.svelte): each format with his position rank, his points, his value over
+ * a pickup's and his tier, why the formats need not line up, and at the read's clock which formats show no
+ * rank and why. */
 @Composable
 fun FormatsTableView(table: FormatsTable) {
     Column(Modifier.fillMaxWidth()) {
-        val heads = listOf(Words.Box.ourRank, table.head, Words.PlayerPage.overReplacement, Words.PlayerPage.tier)
+        val heads = listOf(table.rankHead, table.head, Words.PlayerPage.overReplacement, Words.PlayerPage.tier)
         LogLine(LogCells(Words.PlayerPage.format, "", heads), head = true, leadWeight = 1f)
         table.rows.forEach { LogLine(LogCells("", it.label, listOf(it.rank, it.points, it.vor, it.tier)), leadWeight = 1f) }
-        table.note?.let { BasisLines(listOf(it)) }
+        BasisLines(listOfNotNull(table.note, table.footnote))
     }
 }

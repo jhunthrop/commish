@@ -29,6 +29,12 @@ enum class RunFixture(
 
     /** The stand-in, shared/fixtures/standin-run: the PPR board of the full season before the draft. */
     StandIn("standin-run"),
+
+    /** The one-value stand-in, shared/fixtures/one-value-run (Lane 224, one-value-parity.ts): in season,
+     * made Thursday before week 6, its PPR board the fixture order's players placed one lower than the
+     * order, its clubs, schedule and ADP the contract run's, and pages for the three players the parity
+     * names. */
+    OneValue("one-value-run"),
     ;
 
     private val root: File get() = File(System.getProperty("fixtures"), folder)

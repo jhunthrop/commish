@@ -44,6 +44,7 @@ import {
 	placedRows,
 	type LivePlace
 } from '../../web/src/lib/run/live-order.ts';
+import { CLUB_ORDER, CLUB_PAGE, filled } from '../../web/src/lib/site/reference-words.ts';
 import { verdict } from '../../web/src/lib/site/verdict.ts';
 import type { BoardFormat } from '../../web/src/lib/sheet/model.ts';
 import { REPOSITORY } from './generated.ts';
@@ -224,9 +225,18 @@ function restFrom(row: OrderRow): number {
 	return state !== null && STARTED.has(state) ? FROM_WEEK + 1 : FROM_WEEK;
 }
 
+/** STAND-IN: each format's position rank as an answer with the per-format ranks gives it (Lane 227's
+ * field, Lane 234's rule): PPR his line's, Half PPR one lower, Standard unplaced, so the table's every
+ * case (a rank, another rank, none with its reason) is drawn. */
+function rankedOf(week: OrderRow): Partial<Record<BoardFormat, number | null>> {
+	const own = week.line.position_rank;
+	return { ppr: own, half_ppr: own === null ? null : own + 1, standard: null };
+}
+
 /** The every-format table for him (player/live-figures.ts): each format's run rank and figures, and
- * at the read the PPR line's rank the head's, the others none with the one footnote. */
-function formatsTable(row: RunRow, week: OrderRow, live: boolean): Json {
+ * at the read the PPR line's rank the head's, the others none with the one footnote; `ranked` reads an
+ * answer carrying each format's rank (`rankedOf`). */
+function formatsTable(row: RunRow, week: OrderRow, live: boolean, ranked = false): Json {
 	const lines = FORMATS.map((format) => ({
 		run: row.positionRank,
 		format: format.api as BoardFormat,
@@ -235,9 +245,9 @@ function formatsTable(row: RunRow, week: OrderRow, live: boolean): Json {
 	const figures = live
 		? {
 				head: 'Rest of season',
-				// The apps' formats table reads no per-format ranks yet (Lanes 226 and 232 port Lane 234's),
-				// so the parity models a read without them: the read's own format carries his place.
-				ranks: null,
+				// The `read` case models an answer from before the per-format ranks (the fixture weeks
+				// carry none): the read's own format carries his place. `ranked` carries them (Lane 226).
+				ranks: ranked ? rankedOf(week) : null,
 				figures: Object.fromEntries(
 					restOfSeason(week).map((figure) => [
 						figure.format,
@@ -254,7 +264,8 @@ function formatsTable(row: RunRow, week: OrderRow, live: boolean): Json {
 			const at = lineFiguresAt(run, format.api, figures);
 			return { format: format.id, rank: ranks.ranks[i], points: at.points, vor: at.vor };
 		}),
-		footnote: ranks.unranked.length === 0 ? null : FORMATS_RANK.unranked(ranks.unranked, ranks.reason)
+		footnote: ranks.unranked.length === 0 ? null : FORMATS_RANK.unranked(ranks.unranked, ranks.reason),
+		...(ranked ? { ranks: rankedOf(week) } : {})
 	};
 }
 
@@ -346,7 +357,11 @@ function playerViews(
 		board: at(board),
 		club: { ids: club.map((candidate) => candidate.id), ...at(club) },
 		compare: shown(placedAt(row, place, TEAMS)),
-		formats: { run: formatsTable(row, week, false), read: formatsTable(row, week, true) },
+		formats: {
+			run: formatsTable(row, week, false),
+			read: formatsTable(row, week, true),
+			ranked: formatsTable(row, week, true, true)
+		},
 		restFromWeek: restFrom(week)
 	};
 }
@@ -433,7 +448,15 @@ function renderParity(
 				FORMATS.map((format) => [format.api, inScoring(sunday, format.api as BoardFormat)])
 			)
 		},
-		basis: bases(sunday)
+		basis: bases(sunday),
+		// A club page's head on each clock (Lane 223's pair, the apps' since Lane 226): the run's board
+		// while its rows are the run's, the order once they are the order's.
+		clubHead: {
+			run: filled(CLUB_PAGE.onBoard, FORMATS[0].label),
+			read: CLUB_ORDER.onOrder,
+			nobodyRun: CLUB_PAGE.nobody,
+			nobodyRead: CLUB_ORDER.nobody
+		}
 	};
 	return `${JSON.stringify(parity, null, '\t')}\n`;
 }

@@ -7,6 +7,10 @@ import app.trycommish.core.MemoryCache
 import app.trycommish.core.SessionEnd
 import app.trycommish.core.board.RunFixture
 import app.trycommish.core.board.StubRunReads
+import app.trycommish.core.liveorder.OneValueFixture
+import app.trycommish.core.liveorder.OrderReader
+import app.trycommish.core.liveorder.OrderShare
+import app.trycommish.core.liveorder.StubOrderSearch
 import app.trycommish.core.player.StubPages
 import app.trycommish.core.reference.AdpModel
 import app.trycommish.core.reference.Built
@@ -57,11 +61,42 @@ enum class ReferenceScene(
      * and zone, the longest word the grid draws (Lane 231 review H1). */
     ScheduleUpcoming("schedule-upcoming", true),
     Stale("stale", true),
+
+    /** In season at the order's clock (Lane 226, the iOS reference-club-clock): CHI on the one-value
+     * stand-in at the Sunday clock, its rows the order's under the order's head and lead. */
+    ClubClock("club-clock", true),
+
+    /** The same club while the order is unread: the run's rows with the run's stamp. */
+    ClubClockUnread("club-clock-unread", true),
+
+    /** In season at the order's clock: Swift and Washington, the pair the order's. */
+    CompareClock("compare-clock", true),
+
+    /** The same pair while the order is unread: both sides the run's, the basis with the run's stamp. */
+    CompareClockUnread("compare-clock-unread", true),
     ;
 
-    val fixture: RunFixture get() = if (inSeason) RunFixture.Contract else RunFixture.StandIn
+    /** The scenes on the one-value stand-in, read at the order's clock or with the order unread. */
+    val clock: Boolean get() = this in setOf(ClubClock, ClubClockUnread, CompareClock, CompareClockUnread)
 
-    val now: Instant get() = if (inSeason) RunFixture.inSeason else RunFixture.preDraft
+    /** A clock scene whose order does not answer. */
+    val unread: Boolean get() = this == ClubClockUnread || this == CompareClockUnread
+
+    val fixture: RunFixture
+        get() =
+            when {
+                clock -> RunFixture.OneValue
+                inSeason -> RunFixture.Contract
+                else -> RunFixture.StandIn
+            }
+
+    val now: Instant
+        get() =
+            when {
+                clock -> OneValueFixture.now
+                inSeason -> RunFixture.inSeason
+                else -> RunFixture.preDraft
+            }
 }
 
 /** A scene's view model read, through the stub at the scene's clock (`offline` with no signal). */
@@ -81,6 +116,11 @@ internal class SceneReads(
         cache,
         FixedClock(at),
     )
+
+    /** A clock scene's order over the fixture's Sunday read, failing every read while the scene is unread;
+     * none for another scene. */
+    private fun orders(): OrderReader? =
+        if (scene.clock) OrderReader(OrderShare(StubOrderSearch(offline = scene.unread), FixedClock(scene.now))) else null
 
     private fun <Model> loaded(vm: RunScreenViewModel<Model>): RunScreenViewModel<Model> {
         vm.load()
@@ -102,20 +142,28 @@ internal class SceneReads(
                 ReferenceScene.CompareTwo -> listOf("ja-marr-chase", "rome-odunze")
                 ReferenceScene.CompareByeAhead -> listOf("josh-allen", "josh-jacobs")
                 ReferenceScene.CompareByePlayed -> listOf("jahmyr-gibbs", "josh-jacobs")
+                ReferenceScene.CompareClock, ReferenceScene.CompareClockUnread -> listOf("d-andre-swift", "parker-washington")
                 else -> listOf("jahmyr-gibbs", "nobody")
             }
-        return loaded(CompareReader.viewModel(slugs, null, reads(), zone, SessionEnd {}))
+        return loaded(CompareReader.viewModel(slugs, null, reads(), zone, SessionEnd {}, orders()))
     }
 
-    fun clubs(): RunScreenViewModel<ClubsModel> = loaded(ClubScreens.clubs(reads(), zone, SessionEnd {}))
+    fun clubs(): RunScreenViewModel<ClubsModel> = loaded(ClubScreens.clubs(reads(), zone, SessionEnd {}, orders()))
 
-    fun club(): RunScreenViewModel<ClubPageModel> =
-        loaded(ClubScreens.club(if (scene == ReferenceScene.ClubInSeason) "kc" else "cin", reads(), zone, SessionEnd {}))
+    fun club(): RunScreenViewModel<ClubPageModel> {
+        val abbr =
+            when (scene) {
+                ReferenceScene.ClubInSeason -> "kc"
+                ReferenceScene.ClubClock, ReferenceScene.ClubClockUnread -> "chi"
+                else -> "cin"
+            }
+        return loaded(ClubScreens.club(abbr, reads(), zone, SessionEnd {}, orders()))
+    }
 
     fun schedule(): RunScreenViewModel<ScheduleModel> {
         if (scene != ReferenceScene.ScheduleUpcoming) return loaded(ClubScreens.schedule(reads(), zone, SessionEnd {}))
         return loaded(
-            RunScreenViewModel(reads(), zone, SessionEnd {}) { r ->
+            RunScreenViewModel(reads(), zone, SessionEnd {}, null) { r ->
                 val files = beforeKickoff(ClubFiles.read(r, sources = false), UPCOMING_WEEK)
                 Built(scheduleModel(files, zone), files.manifest.manifest, files.reads)
             },

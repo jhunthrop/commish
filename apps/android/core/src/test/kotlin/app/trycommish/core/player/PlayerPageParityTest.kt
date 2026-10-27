@@ -263,8 +263,17 @@ class PlayerPageParityTest {
             val table = requireNotNull(model.formats) { name }
             assertEquals(formats.string("head"), table.head, name)
             assertEquals(formats.text("note"), table.note, name)
+            assertNull(table.footnote, "$name: no read, every rank the run's")
             assertEquals(
-                rows.map { listOf(it.string("label"), it.string("rank"), it.string("points"), it.string("vor"), it.string("tier")) },
+                rows.map {
+                    listOf(
+                        it.string("label"),
+                        it.string("positionRank"),
+                        it.string("points"),
+                        it.string("vor"),
+                        it.string("tier"),
+                    )
+                },
                 table.rows.map { listOf(it.label, it.rank, it.points, it.vor, it.tier) },
                 name,
             )

@@ -774,11 +774,6 @@ public enum Words {
         public static let comparePair = "Compare two of them"
     }
 
-    public enum ClubOrder {
-        public static let onOrder = "On our rest-of-season order"
-        public static let nobody = "Nobody from {city} is in this order"
-    }
-
     public enum SchedulePage {
         public static let heading = "schedule strength"
         public static let title = "Schedule strength"
@@ -953,6 +948,11 @@ public enum Words {
 
     public enum LiveOrder {
 
+    }
+
+    public enum ClubOrder {
+        public static let onOrder = "On our rest-of-season order"
+        public static let nobody = "Nobody from {city} is in this order"
     }
 
     public enum Lobby {

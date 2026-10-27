@@ -542,13 +542,6 @@ export const TABLES: readonly TableSource[] = [
     json: "shared/words/reference-club.json",
   },
   {
-    // A club page's head and empty line once its rows are the rest-of-season order (Lane 223, Lane 232).
-    name: "ClubOrder",
-    module: REFERENCE_MODULE,
-    picks: ["CLUB_ORDER"],
-    json: "shared/words/reference-club-order.json",
-  },
-  {
     name: "SchedulePage",
     module: REFERENCE_MODULE,
     picks: ["SCHEDULE_PAGE"],
@@ -640,6 +633,12 @@ export const TABLES: readonly TableSource[] = [
     module: "web/src/lib/run/live-order.ts",
     picks: ["LIVE_ORDER_WORDS"],
     json: "shared/words/live-order.json",
+  },
+  {
+    name: "ClubOrder",
+    module: REFERENCE_MODULE,
+    picks: ["CLUB_ORDER"],
+    json: "shared/words/club-order.json",
   },
   {
     name: "Lobby",

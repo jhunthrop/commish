@@ -1,5 +1,6 @@
 package app.trycommish.core.board
 
+import app.trycommish.core.liveorder.LiveOrderWords
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -128,6 +129,18 @@ class BoardParityTest {
             zone = ZoneId.of(runParity.string("zone")),
         )
 
+    /** In season a ranked view's basis ends with the run's stamp while the order is unread (Lane 226): the
+     * web's page says it after the basis the parity holds (live-order.ts basisAtClock). */
+    private fun stamp(
+        run: JsonObject,
+        position: String?,
+    ): List<String> {
+        val draftOrder = position?.let(BoardPosition::of)?.draftOrder == true
+        if (run.getValue("words").jsonObject.text("verb") == PageVerb.Mock.id || draftOrder) return emptyList()
+        val format = fixtureOf(run).read(run.string("format")).format
+        return listOfNotNull(LiveOrderWords.runStamp(format, ZoneId.of(runParity.string("zone"))))
+    }
+
     @Test
     fun `the run's stamp, heading and rest of season are the web's`() {
         assertEquals(2, runs.size)
@@ -191,7 +204,11 @@ class BoardParityTest {
                     } else {
                         emptyList()
                     }
-                assertEquals(view.getValue("basis").jsonArray.map { it.jsonPrimitive.content } + capture, model.basis, name)
+                assertEquals(
+                    view.getValue("basis").jsonArray.map { it.jsonPrimitive.content } + capture + stamp(run, position),
+                    model.basis,
+                    name,
+                )
             }
         }
     }
@@ -213,7 +230,7 @@ class BoardParityTest {
                     }
                 assertEquals(expected, row.status?.let { Triple(it.rank, it.mark, it.sits) }, row.name)
             }
-            assertEquals(run.text("capture"), model.basis.last())
+            assertEquals(run.text("capture"), model.basis.dropLast(stamp(run, null).size).last())
         }
     }
 

@@ -20,6 +20,7 @@ import app.trycommish.core.board.BoardStatus
 import app.trycommish.core.board.Heat
 import app.trycommish.core.board.RunWords
 import app.trycommish.core.instantOrNull
+import app.trycommish.core.liveorder.LiveOrderWords
 import app.trycommish.core.shell.FollowedLeague
 import app.trycommish.core.shell.headshotOf
 import app.trycommish.core.shell.initialsOf
@@ -179,6 +180,18 @@ object PlayerPages {
         val season = season(input, who, format)
         val card = card(input, format, numbers.projected, status?.rank)
         val player = input.source.page
+        val rankRead = rankRead(input, format)
+        val live = PageSections.liveFormats(input.week, format)
+        val formats =
+            player?.let {
+                PageSections.formats(
+                    PageSections.lines(it, input.manifest.formats),
+                    FormatsFacts(who.position, status?.rank, live, rankRead),
+                )
+            }
+        // The run's stamp while the every-format table shows the run's ranks and figures in season (the
+        // web's Lane 234): on game day the run and the read share a date, so its time says the clock.
+        val runStamp = LiveOrderWords.runStamp(format, input.zone).takeIf { formats != null && live == null }
         return PlayerPageModel(
             hero =
                 PlayerPageModel.Hero(
@@ -186,7 +199,7 @@ object PlayerPages {
                     initials = initialsOf(who.name),
                     headshot = headshotOf(who.headshot),
                     club = PageWords.clubName(who.team, input.clubs),
-                    pill = "${who.position} ${status?.rank ?: numbers.positionRank.toString()}",
+                    pill = "${who.position} ${status?.rank ?: (rankRead?.positionRank ?: numbers.positionRank).toString()}",
                     status = status,
                 ),
             card = card.first,
@@ -197,11 +210,22 @@ object PlayerPages {
             read = player?.let { read(input, it, underway, format, status?.rank) },
             heldTier = listed?.takeIf { it.seasonLong }?.let { PageWords.heldTier(it.status) },
             tier = input.board?.let { PageSections.tier(it, who.id, format, input.manifest.season, input.capture) },
-            formats = player?.let { PageSections.formats(PageSections.lines(it, input.manifest.formats), status?.rank) },
-            basis = card.second + listOfNotNull(season.basis),
+            formats = formats,
+            basis = card.second + listOfNotNull(runStamp, season.basis),
             verb = verb(input),
             stamp = stamp(input),
         )
+    }
+
+    /** His place at his position as his week's read places him once the lead format ranks the rest of the
+     * season: the head's and the every-format table's one rank (Lane 226, the web's head and lineRanksAt);
+     * null before the season or with no read. */
+    private fun rankRead(
+        input: PageInput,
+        format: RunFormat,
+    ): RankRead? {
+        val week = input.week ?: return null
+        return if (format.rosFromWeek == null) null else RankRead(CardTiles.apiFormatOf(format), week.line.positionRank)
     }
 
     /** The footnotes under the card (B165): the club line from his page, then the status note where the

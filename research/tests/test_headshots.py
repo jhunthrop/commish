@@ -4,9 +4,11 @@ PARITY_DATABASE_URL (a server where the harness may create `parity_*` databases)
 and run by CI."""
 
 import io
+import itertools
 import os
+import threading
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -17,8 +19,8 @@ from sqlalchemy import Engine, text
 from research.db.engine import make_engine
 from research.db.url import sqlalchemy_url
 from research.errors import ConfigurationError
-from research.headshots.bucket import R2ImageBucket
-from research.headshots.config import APP_WIDTH, CACHE_CONTROL, WIDTHS, copy_key, face_url
+from research.headshots.bucket import ImageBucket, R2ImageBucket
+from research.headshots.config import APP_WIDTH, CACHE_CONTROL, SYNC_WORKERS, WIDTHS, copy_key, face_url
 from research.headshots.curate import CurationError, curate, curation_lines, refresh
 from research.headshots.faces import our_face
 from research.headshots.images import MAX_BYTES, FetchFailedError, NoImageError, Source, fetch, webp_widths
@@ -31,6 +33,8 @@ _DATABASE = "parity_test_headshots"
 _NOW = datetime(2026, 10, 26, 12, 0, tzinfo=UTC)
 _ESPN = "https://a.espncdn.com/i/headshots/nfl/players/full/{}.png"
 _NO_PHOTO = "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=200&h=146"
+_INTERVAL = 0.5  # the sync's two fetches a second
+_MANY = 24
 
 
 def _png(width: int = 600, height: int = 436) -> bytes:
@@ -228,15 +232,23 @@ def _players(engine: Engine, rows: list[tuple[str, str, str | None]]) -> None:
             )
 
 
-def _deps(engine: Engine, http: httpx.Client, bucket: StubBucket, clock: FakeClock) -> SyncDeps:
+def _deps(
+    engine: Engine,
+    http: httpx.Client,
+    bucket: ImageBucket,
+    clock: FakeClock,
+    *,
+    workers: int = SYNC_WORKERS,
+) -> SyncDeps:
     ticks = iter(range(10_000))
     return SyncDeps(
         engine=engine,
         http=http,
         bucket=bucket,
-        throttle=Throttle(0.5, clock.now, clock.sleep),
+        throttle=Throttle(_INTERVAL, clock.now, clock.sleep),
         now=lambda: _NOW + timedelta(seconds=next(ticks)),
         log=lambda line: None,
+        workers=workers,
     )
 
 
@@ -342,3 +354,59 @@ def test_a_curation_from_a_url_with_no_image_is_refused_and_writes_nothing(engin
             curate(deps, 2026, "1", "https://chosen.example/x.png", "coordinator")
     assert bucket.objects == {}
     assert _rows(engine) == {}
+
+
+class RecordingThrottle(Throttle):
+    """The sync's throttle, recording the time each fetch was let through."""
+
+    def __init__(self, clock: FakeClock) -> None:
+        super().__init__(_INTERVAL, clock.now, clock.sleep)
+        self.granted: list[float] = []
+        self._seen = threading.Lock()
+
+    def wait(self) -> float:
+        at = super().wait()
+        with self._seen:
+            self.granted.append(at)
+        return at
+
+
+def test_a_sync_over_many_players_at_once_starts_at_most_two_fetches_a_second(engine: Engine) -> None:
+    players: list[tuple[str, str, str | None]] = [(str(n), "WR", _ESPN.format(n)) for n in range(1, _MANY + 1)]
+    _players(engine, players)
+    source = StubSource()
+    clock = FakeClock()
+    throttle = RecordingThrottle(clock)
+    with source.client() as http:
+        counts = sync(replace(_deps(engine, http, StubBucket(), clock), throttle=throttle), 2026)
+    assert counts.line() == f"{_MANY} copied, 0 skipped, 0 missing, 0 failed"
+    assert len(source.requests) == len(throttle.granted) == _MANY
+    granted = sorted(throttle.granted)
+    assert all(later - earlier >= _INTERVAL for earlier, later in itertools.pairwise(granted))
+    # No one-second window holds a third fetch.
+    assert all(granted[i + 2] - granted[i] >= 2 * _INTERVAL for i in range(len(granted) - 2))
+    assert clock.at - FakeClock().at == pytest.approx(_INTERVAL * (_MANY - 1))
+
+
+def test_the_syncs_bucket_writes_share_its_one_client_and_run_for_two_players_at_once(engine: Engine) -> None:
+    _players(engine, [("1", "RB", _ESPN.format(1)), ("2", "WR", _ESPN.format(2))])
+    # Every R2 PUT waits for a PUT from another thread: a sync that wrote one player at a time breaks
+    # the barrier (its first PUT waits alone) and fails the pass.
+    paired = threading.Barrier(2, timeout=10)
+    puts: list[str] = []
+    fetches: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "acct.r2.cloudflarestorage.com":
+            paired.wait()
+            puts.append(request.url.path)
+            return httpx.Response(200)
+        fetches.append(str(request.url))
+        return httpx.Response(200, content=_IMAGE, headers={"content-type": "image/png"})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        bucket = R2ImageBucket(R2RunStore(http, "acct", R2Credentials("id", "secret"), "commish-images"))
+        counts = sync(_deps(engine, http, bucket, FakeClock(), workers=2), 2026)
+    assert counts.line() == "2 copied, 0 skipped, 0 missing, 0 failed"
+    assert sorted(fetches) == [_ESPN.format(1), _ESPN.format(2)]
+    assert sorted(puts) == sorted(f"/commish-images/headshots/2026/{p}/{w}.webp" for p in ("1", "2") for w in WIDTHS)

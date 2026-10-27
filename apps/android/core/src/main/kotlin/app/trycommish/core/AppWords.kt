@@ -63,6 +63,10 @@ object AppWords {
     const val mockLeave = "Leave"
     const val mockStay = "Keep drafting"
 
+    /** The lobby room full screen (the iOS AppWords.Lobby): its close keeps the seat (the queue drafts it until the
+     * member comes back, as a closed tab on the web), so it does not ask; Leave asks the web's question. */
+    const val lobbyClose = "Close the room"
+
     /** The bar's name for the mock room's page (web nav.ts), the iOS AppWords.Tab.mock. */
     const val mock = "Mock draft"
 

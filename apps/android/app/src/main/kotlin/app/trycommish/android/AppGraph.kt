@@ -36,6 +36,15 @@ import app.trycommish.core.companion.NewCompanionViewModel
 import app.trycommish.core.leaguehome.ApiLeagueReads
 import app.trycommish.core.leaguehome.LeagueHomeViewModel
 import app.trycommish.core.leaguehome.LeagueReads
+import app.trycommish.core.liveorder.OrderReader
+import app.trycommish.core.liveorder.OrderShare
+import app.trycommish.core.lobby.ApiLobbyReads
+import app.trycommish.core.lobby.LobbyLandingViewModel
+import app.trycommish.core.lobby.LobbyReads
+import app.trycommish.core.lobby.LobbyReportViewModel
+import app.trycommish.core.lobby.LobbySeatMemory
+import app.trycommish.core.lobby.LobbyViewModel
+import app.trycommish.core.lobby.PrefsLobbySeats
 import app.trycommish.core.matchup.ApiMatchupReads
 import app.trycommish.core.matchup.MatchupReads
 import app.trycommish.core.matchup.MatchupViewModel
@@ -64,6 +73,7 @@ import app.trycommish.core.reference.CompareReader
 import app.trycommish.core.reference.ReferenceReads
 import app.trycommish.core.reference.RunScreenViewModel
 import app.trycommish.core.reference.ScheduleModel
+import app.trycommish.core.room.phoneRoomConnector
 import app.trycommish.core.shell.AccountReads
 import app.trycommish.core.shell.ApiAccountReads
 import app.trycommish.core.shell.FollowedLeague
@@ -95,6 +105,7 @@ import java.time.ZoneId
 
 private const val TAG = "Commish"
 private const val CLIP_LABEL = "Lineup"
+private const val LOBBY_PREFS = "commish_lobby"
 
 /**
  * The app's graph, built by hand (no DI framework, spec §6.2): one session, one transport, one cache,
@@ -118,7 +129,12 @@ class AppGraph(
     private val waivers: WaiverReads = ApiWaiverReads(transport)
     private val trades: TradeReads = ApiTradeReads(transport)
     private val runs: RunReads = ApiRunReads(transport)
-    private val rankings: RankingsReads = ApiRankingsReads(transport)
+
+    /** The order's reads, shared by the Rankings and every in-season screen that ranks a player, one read
+     * per route for a minute (Lane 226). */
+    private val orderShare = OrderShare(ApiRankingsReads(transport), clock)
+    private val rankings: RankingsReads = orderShare
+    private val orders = OrderReader(orderShare)
     private val records: RecordReads = ApiRecordReads(transport)
     private val accountScreen: AccountScreenReads = ApiAccountScreenReads(transport)
     private val companions: CompanionReads = ApiCompanionReads(transport)
@@ -194,7 +210,7 @@ class AppGraph(
     fun boardViewModel(
         inSeason: Boolean,
         following: Boolean,
-    ): BoardViewModel = BoardViewModel(runs, cache, clock, zone, inSeason, following, sessionEnd)
+    ): BoardViewModel = BoardViewModel(runs, cache, clock, zone, inSeason, following, sessionEnd, orders)
 
     /** A league's Start screen, the lineup copied to the phone's clipboard. */
     fun startViewModel(league: LeagueHost): StartViewModel = StartViewModel(lineups, cache, clock, zone, league, ::copy, sessionEnd)
@@ -256,6 +272,23 @@ class AppGraph(
     /** A shared mock by its link's code. */
     fun sharedMockViewModel(code: String): SharedMockViewModel = SharedMockViewModel(code, mocks, sessionEnd)
 
+    private val lobbies: LobbyReads by lazy { ApiLobbyReads(transport) }
+
+    /** The rooms the member joined, kept across a relaunch for the paired device. */
+    private val lobbySeats: LobbySeatMemory by lazy { PrefsLobbySeats(appContext.getSharedPreferences(LOBBY_PREFS, Context.MODE_PRIVATE)) }
+
+    /** One socket client for the app's life, so the room's affinity cookie carries across reconnects. */
+    private val roomConnector by lazy { phoneRoomConnector() }
+
+    /** The open house drafts under the setup, with the seats the paired device holds. */
+    fun lobbyLandingViewModel(): LobbyLandingViewModel = LobbyLandingViewModel(lobbies, lobbySeats, { session.deviceId }, sessionEnd)
+
+    /** A lobby room by its id: its read, then the room's socket. */
+    fun lobbyViewModel(id: String): LobbyViewModel = LobbyViewModel(id, lobbies, roomConnector, { session.token }, clock, sessionEnd)
+
+    /** A finished lobby's report. */
+    fun lobbyReportViewModel(id: String): LobbyReportViewModel = LobbyReportViewModel(id, lobbies, mocks, sessionEnd)
+
     /** Our record from the run, with the schedule its weeks are read by. */
     fun recordViewModel(): RecordViewModel = RecordViewModel(records, cache, clock, zone, sessionEnd)
 
@@ -288,11 +321,11 @@ class AppGraph(
     fun compareViewModel(
         slugs: List<String?>,
         league: FollowedLeague?,
-    ): RunScreenViewModel<CompareModel> = CompareReader.viewModel(slugs, league, references, zone, sessionEnd)
+    ): RunScreenViewModel<CompareModel> = CompareReader.viewModel(slugs, league, references, zone, sessionEnd, orders)
 
-    fun clubsViewModel(): RunScreenViewModel<ClubsModel> = ClubScreens.clubs(references, zone, sessionEnd)
+    fun clubsViewModel(): RunScreenViewModel<ClubsModel> = ClubScreens.clubs(references, zone, sessionEnd, orders)
 
-    fun clubViewModel(abbr: String): RunScreenViewModel<ClubPageModel> = ClubScreens.club(abbr, references, zone, sessionEnd)
+    fun clubViewModel(abbr: String): RunScreenViewModel<ClubPageModel> = ClubScreens.club(abbr, references, zone, sessionEnd, orders)
 
     fun scheduleViewModel(): RunScreenViewModel<ScheduleModel> = ClubScreens.schedule(references, zone, sessionEnd)
 

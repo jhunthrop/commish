@@ -17,6 +17,7 @@ import app.trycommish.core.board.GapTone
 import app.trycommish.core.board.RunFixture
 import app.trycommish.core.board.RunWords
 import app.trycommish.core.board.StubRunReads
+import app.trycommish.core.liveorder.LiveOrderWords
 import app.trycommish.core.player.StubPages
 import app.trycommish.core.player.page
 import app.trycommish.design.Words
@@ -97,7 +98,7 @@ class ReferenceParityTest {
     private fun <Model> vm(
         run: JsonObject,
         build: ScreenBuild<Model>,
-    ) = RunScreenViewModel(reads(run), zone, SessionEnd {}, build)
+    ) = RunScreenViewModel(reads(run), zone, SessionEnd {}, null, build)
 
     private fun index(fixture: RunFixture): List<RunIndexEntry> = decodeEnvelope<RunIndexAnswer>(fixture.indexAnswer()).pages
 
@@ -188,18 +189,29 @@ class ReferenceParityTest {
                 val slugs = index(fixture(run)).associate { it.id to it.slug }
                 run.getValue("compare").jsonObject.list("pairs").forEach { want ->
                     val ask = CompareAsk(listOf(slugs[want.string("a")], slugs[want.string("b")]), want.string("format"), null)
-                    val model = loaded(vm(run, CompareReader.build(ask)))
+                    val model = loaded(vm(run, CompareReader.build(ask, zone)))
                     val label = "${run.string("fixture")} ${want.string("a")} ${want.string("b")} ${want.string("format")}"
                     assertNull(model.lead, label)
-                    expect(model.outcome, want, label)
+                    expect(model.outcome, want, label, stampOf(run, model.format))
                 }
             }
         }
+
+    /** In season a screen on the run's figures ends its basis with the run's stamp while the order is
+     * unread (Lane 226): the web's page says it after the basis the parity holds (basisAtClock). */
+    private fun stampOf(
+        run: JsonObject,
+        format: String,
+    ): List<String> {
+        val formats = decodeEnvelope<RunManifestAnswer>(fixture(run).manifestAnswer()).manifest.formats
+        return listOfNotNull(formats.firstOrNull { it.id == format }?.let { LiveOrderWords.runStamp(it, zone) })
+    }
 
     private fun expect(
         outcome: CompareOutcome,
         want: JsonObject,
         label: String,
+        stamp: List<String>,
     ) {
         when (outcome) {
             CompareOutcome.None -> error("no outcome for $label")
@@ -210,7 +222,7 @@ class ReferenceParityTest {
                 assertEquals(want.text("leader"), table.heads.first().id, label)
                 assertEquals(want.text("call"), table.call, label)
                 assertEquals(want.text("evidence"), table.evidence, label)
-                assertEquals(want.strings("basis"), table.basis, label)
+                assertEquals(want.strings("basis") + stamp, table.basis, label)
                 val rows = want.list("rows")
                 assertEquals(rows.map { it.string("label") }, table.rows.map { it.label }, label)
                 table.rows.zip(rows).forEach { (row, wanted) ->
@@ -268,6 +280,7 @@ class ReferenceParityTest {
                                 CompareFound.Player(player(want.string("a"), true)),
                                 CompareFound.Player(player(want.string("b"), false)),
                             ),
+                        zone = zone,
                     )
                 val table = assertInstanceOf(CompareOutcome.Table::class.java, CompareModel.of(input).outcome).table
                 assertEquals(want.text("call"), table.call)
@@ -290,12 +303,12 @@ class ReferenceParityTest {
                 val slugs = index(fixture(run)).take(2).map { it.slug }
                 compare.getValue("basis").jsonObject.forEach { (format, lines) ->
                     val basis = lines.jsonArray.map { it.jsonPrimitive.content }
-                    val model = loaded(vm(run, CompareReader.build(CompareAsk(slugs, format, null))))
+                    val model = loaded(vm(run, CompareReader.build(CompareAsk(slugs, format, null), zone)))
                     val table = assertInstanceOf(CompareOutcome.Table::class.java, model.outcome).table
                     // Exactly the one basis the table prints: the Gap's sentence only beside a Gap row.
                     val gapRow = table.rows.any { it.label == CompareRows.GAP_LABEL }
                     assertEquals(
-                        if (gapRow) basis else basis.filter { it != Words.BoardBasis.gap },
+                        (if (gapRow) basis else basis.filter { it != Words.BoardBasis.gap }) + stampOf(run, format),
                         table.basis,
                         "${run.string("fixture")} $format",
                     )
@@ -368,7 +381,8 @@ class ReferenceParityTest {
                     assertEquals(if (pair.size == 2) pair else emptyList(), model.compare?.ids.orEmpty(), abbr)
                     val basis = want.strings("basis")
                     assertEquals(basis, model.basis.take(basis.size), abbr)
-                    assertEquals(basis.size + capture, model.basis.size, abbr)
+                    assertEquals(basis.size + capture + stampOf(run, files.format.id).size, model.basis.size, abbr)
+                    assertEquals(stampOf(run, files.format.id), model.basis.takeLast(stampOf(run, files.format.id).size), abbr)
                 }
                 assertNull(clubPageModel(files, "zzz", now(run), zone), "a club the run does not carry")
             }
