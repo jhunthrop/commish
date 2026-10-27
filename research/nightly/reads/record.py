@@ -21,7 +21,8 @@ from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
-from research.inseason.season_week import earliest_grade, last_kickoffs_by_week
+from research.inseason.season_week import last_kickoffs_by_week
+from research.inseason.week_complete import grades_from as first_grading_pass
 from research.model.backtest import Observation, mean_or_none, spearman, sum_left
 from research.model.reads.teams import kickoff_instants_by_week
 from research.model.register.freeze import SERVED_SOURCE, SHIPPED_SOURCE
@@ -113,8 +114,9 @@ class Week:
     lines: tuple[Line, ...]
     # The order the week's freeze graded ("preseason" or "rest_of_season"), None for a week with no freeze.
     order: str | None = None
-    # A frozen week waiting on its stats: the earliest instant the in-season pass can grade it (its last
-    # game's lines dated, `earliest_grade`), None when no kickoff is on file and for every other status.
+    # A frozen week waiting on its stats: the pass that grades it when its stats are in on time (the
+    # first at or after its last game's lines are dated, `week_complete.grades_from`), None when no
+    # kickoff is on file and for every other status.
     grades_from: datetime | None = None
     # A graded week's players as the page counts a league's own starters from (Lane 93), else empty.
     placed: tuple["Placed", ...] = ()
@@ -429,7 +431,7 @@ def read_record(
     for week in range(1, last + 1):
         kickoff = kickoffs.get(week)
         if week in freezes:
-            grades_from = None if week not in ends else earliest_grade(ends[week])
+            grades_from = None if week not in ends else first_grading_pass(ends[week])
             built, rows = _frozen_week(conn, season, week, freezes[week], grades_from)
             weeks.append(built)
             rows_by_week[week] = rows

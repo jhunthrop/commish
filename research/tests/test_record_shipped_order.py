@@ -32,8 +32,8 @@ _PUBLISHED_AT: Final = datetime(2026, 10, 22, 10, 0, tzinfo=UTC)
 _SET: Final = datetime(2026, 10, 22, 18, 0, tzinfo=UTC)
 _KICKOFF: Final = datetime(2026, 10, 23, 0, 15, tzinfo=UTC)
 _LAST_KICKOFF: Final = datetime(2026, 10, 27, 0, 15, tzinfo=UTC)
-# Monday night's lines are dated the end of its Eastern day plus a day: Tuesday 20:00 Eastern (Lane 244).
-_LINES_DATED: Final = datetime(2026, 10, 28, 0, 0, tzinfo=UTC)
+# Monday night's lines are dated Tuesday 20:00 Eastern; the first pass after is Tuesday 20:30 (Lane 244).
+_LINES_DATED: Final = datetime(2026, 10, 28, 0, 30, tzinfo=UTC)
 _GRADED: Final = datetime(2026, 10, 28, 22, 0, tzinfo=UTC)
 # Three receivers: ours ranks them a, b, c; the preseason board c, b, a; they finished a, b, c.
 _PLAYERS: Final = (("00-a", "pa", 1, 30.0), ("00-b", "pb", 2, 20.0), ("00-c", "pc", 3, 10.0))
