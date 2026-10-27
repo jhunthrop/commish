@@ -6,6 +6,9 @@
  *   2. upload the bundle (a resumable upload, so a large bundle is one request after the session),
  *   3. set the track to that version code with the release status,
  *   4. commit the edit.
+ * Before the track is set, it is read: when its highest version code is equal to or above this
+ * build's (a newer run finished first), the edit is deleted and the run says so (exit 0), so an older
+ * run never rolls the track back. The build's code is known only from Play's answer to the upload.
  * An app that has not passed its first review takes only draft releases: when Play refuses a
  * completed release for that reason, the track is set again as draft in the same edit and committed,
  * and the run says so (a named outcome, exit 0). On a re-run (--attempt above 1), Play's "version
@@ -35,7 +38,7 @@ const CALL_TIMEOUT_MS = 60_000;
 const BUNDLE_TIMEOUT_MS = 5 * 60_000;
 
 export type ReleaseStatus = 'completed' | 'draft';
-export type Outcome = 'committed' | 'committed-as-draft' | 'already-on-play';
+export type Outcome = 'committed' | 'committed-as-draft' | 'already-on-play' | 'track-already-ahead';
 
 export interface UploadRequest {
 	token: string;
@@ -53,6 +56,8 @@ export interface UploadResult {
 	/** Null when Play refused the bundle as already uploaded (the code is in its message). */
 	versionCode: number | null;
 	status: ReleaseStatus | null;
+	/** Only on a skip: the highest code the track already holds. */
+	trackVersionCode?: number;
 }
 
 export type Fetch = (url: string, init: RequestInit) => Promise<Response>;
@@ -133,6 +138,33 @@ async function uploadBundle(client: Client, editId: string, bundle: Uint8Array):
 	return uploaded.versionCode;
 }
 
+interface TrackAnswer {
+	releases?: { versionCodes?: string[] }[];
+}
+
+/** A track with no release yet answers 404: an empty track. Any other refusal stays an error. */
+async function readTrack(client: Client, editId: string, track: string): Promise<TrackAnswer> {
+	try {
+		return await client.json<TrackAnswer>('read track', `${client.base}/edits/${editId}/tracks/${encodeURIComponent(track)}`);
+	} catch (error) {
+		if (error instanceof PlayError && error.status === 404) return {};
+		throw error;
+	}
+}
+
+/** Every version code on the track's releases; a release without codes contributes none. */
+async function trackVersionCodes(client: Client, editId: string, track: string): Promise<number[]> {
+	const answer = await readTrack(client, editId, track);
+	return (answer.releases ?? []).flatMap((release) => release.versionCodes ?? []).map(Number).filter(Number.isInteger);
+}
+
+export type TrackDecision = 'upload' | 'skip';
+
+/** Upload only a build newer than everything on the track: an equal or higher code there means a newer run got in first. */
+export function decideUpload(trackCodes: readonly number[], buildCode: number): TrackDecision {
+	return trackCodes.length > 0 && Math.max(...trackCodes) >= buildCode ? 'skip' : 'upload';
+}
+
 async function setTrack(client: Client, editId: string, track: string, versionCode: number, status: ReleaseStatus): Promise<void> {
 	await client.call(`set ${track} track`, `${client.base}/edits/${editId}/tracks/${encodeURIComponent(track)}`, {
 		method: 'PUT',
@@ -189,6 +221,11 @@ export async function uploadToTrack(request: UploadRequest, fetch: Fetch, log: L
 	try {
 		const versionCode = await uploadBundle(client, editId, request.bundle);
 		log(`Bundle uploaded as version code ${versionCode}.`);
+		const onTrack = await trackVersionCodes(client, editId, request.track);
+		if (decideUpload(onTrack, versionCode) === 'skip') {
+			await deleteEdit(client, editId, log);
+			return { outcome: 'track-already-ahead', editId, versionCode, status: null, trackVersionCode: Math.max(...onTrack) };
+		}
 		const outcome = await releaseWithFallback(client, editId, request, versionCode, log);
 		const status = outcome === 'committed' ? request.status : 'draft';
 		log(`Edit ${editId} committed: version code ${versionCode} on ${request.track} as ${status}.`);
@@ -240,6 +277,9 @@ async function main(): Promise<void> {
 	const result = await uploadToTrack(request, globalThis.fetch, (line) => console.log(line));
 	if (result.outcome === 'already-on-play') {
 		console.log(`::notice title=Play already has this run::Attempt ${request.attempt} found its version code already on Play, so nothing new was uploaded.`);
+	}
+	if (result.outcome === 'track-already-ahead') {
+		console.log(`::notice title=Play track is ahead::The ${request.track} track holds version code ${result.trackVersionCode}, not below this build's ${result.versionCode}; a newer run got in first, so this run committed nothing.`);
 	}
 	if (result.outcome === 'committed-as-draft') {
 		console.log(`::notice title=Play internal as draft::The app has not passed its first review, so version code ${result.versionCode} is a draft on ${request.track}; promote it in Play Console.`);
