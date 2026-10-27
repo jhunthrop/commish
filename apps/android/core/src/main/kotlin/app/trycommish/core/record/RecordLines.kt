@@ -56,8 +56,7 @@ internal object RecordLines {
 
     /** record.ts gradesWhen: the rule a set week waits on, with the day it usually holds when the run
      * names one: "grades once every game's stats are in, usually Wednesday". */
-    fun gradesWhen(day: String?): String =
-        day?.let { "${Words.Record.gradesRule}, ${Words.Record.usually} $it" } ?: Words.Record.gradesRule
+    fun gradesWhen(day: String?): String = day?.let { "${Words.Record.gradesRule}, ${Words.Record.usually} $it" } ?: Words.Record.gradesRule
 
     /** record.ts recordHeadline: the one figure and its caption. */
     fun headline(book: RecordBook): Pair<String, String> {
