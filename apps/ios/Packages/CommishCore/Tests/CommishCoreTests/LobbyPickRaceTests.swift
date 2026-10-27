@@ -1,0 +1,103 @@
+import CommishAPI
+@testable import CommishCore
+import CommishDesign
+import Foundation
+import RunFixtures
+import Testing
+
+/// The pick race over the recorded lobby: off the clock Draft sends nothing; a pick sent on the clock
+/// that the room overtakes (its clock drafts the seat first) is refused in the room's words, applies no
+/// row of the member's own, and the member's next Draft puts the refusal away.
+@MainActor
+struct LobbyPickRaceTests {
+    static let refusal = "You are not on the clock."
+
+    /// The recorded rows through the frame that puts the drafter (seat 9) on the clock at 1.09, or
+    /// through `pick` when given.
+    static func opening(before pick: Int = 9) throws -> (rows: [RoomRow], next: [[RoomRow]]) {
+        let rows = try LobbySocketTests.rows()
+        let room = try LobbyFixture.room()
+        var state = LobbyState(room: room)
+        var upTo = 0
+        for (index, batch) in rows.enumerated() where state.pickNumber < pick || !state.drafting {
+            state = state.applying(batch, you: room.you)
+            upTo = index
+        }
+        return (rows[0 ... upTo].flatMap(\.self), Array(rows[(upTo + 1)...]))
+    }
+
+    @Test func offTheClockDraftSendsNothing() async throws {
+        // At 1.08 the clock is Bot 8's: the drafter is next, not on it.
+        let (opening, _) = try Self.opening(before: 8)
+        let connector = ScriptedConnector([[
+            LobbySocketTests.welcome(opening), .client(RoomCommand.pick(playerID: "x", pick: 8).text), .end,
+        ]])
+        let viewModel = LobbySocketTests.viewModel(StubLobby(), connector, timer: RecordingTimer())
+        let card = try #require(LobbyFixture.card(9))
+        await connector.drive { command in
+            if case .pick = command {
+                #expect(viewModel.model(at: LobbySocketTests.phone)?.yourTurn == false)
+                await viewModel.draft(card.call)
+            } else {
+                await viewModel.close()
+            }
+        }
+        await viewModel.run()
+        let sent = await connector.sent.first ?? []
+        #expect(sent == [.object(["type": .string("hello"), "last_seq": .number(0)])])
+    }
+
+    @Test func aPickTheRoomOvertakesIsRefusedAndTheNextDraftPutsItAway() async throws {
+        let (opening, _) = try Self.opening()
+        let last = try #require(opening.last?.seq)
+        let card = try #require(LobbyFixture.card(9))
+        // The room's clock drafts seat 9 before the member's pick lands: 1.09 by the clock, someone else.
+        let clockPick = RoomRow(
+            seq: last + 1, kind: "TIMER_EXPIRE", seat: 9,
+            payload: .object([
+                "pick": .object([
+                    "pick": .number(9), "round": .number(1), "seat": .number(9),
+                    "player_id": .string("4241389"), "auto": .bool(true), "by": .string("clock"),
+                ]),
+                "deadline": .string("2026-10-26T08:20:00Z"),
+            ]),
+            written: "2026-10-26T08:19:30Z"
+        )
+        let connector = ScriptedConnector([[
+            LobbySocketTests.welcome(opening),
+            .client(RoomCommand.pick(playerID: "x", pick: 9).text),
+            LobbySocketTests.update([clockPick]),
+            .server(#"{"type":"error","code":"conflict","message":"\#(Self.refusal)"}"#),
+            .client(RoomCommand.queue([]).text),
+            .end,
+        ]])
+        let viewModel = LobbySocketTests.viewModel(StubLobby(), connector, timer: RecordingTimer())
+        var noticeAfterRefusal: String?
+        var noticeAfterNextDraft: String?
+        await connector.drive { command in
+            switch command {
+            case .pick:
+                await viewModel.draft(card.call)
+            case .queue:
+                noticeAfterRefusal = viewModel.notice
+                await viewModel.draft(card.call)
+                noticeAfterNextDraft = viewModel.notice
+            case .leave:
+                await viewModel.close()
+            }
+        }
+        await viewModel.run()
+        #expect(noticeAfterRefusal == Self.refusal)
+        #expect(noticeAfterNextDraft == nil)
+        let picks = viewModel.lobby?.picks ?? []
+        #expect(picks.last?.pick == 9)
+        #expect(picks.last?.madeBy == .clock)
+        #expect(!picks.contains { $0.playerID == card.call })
+        // One pick went out, at the pick on the clock when it was sent; the second Draft, off the clock
+        // now, sent nothing.
+        let sent = await connector.sent.first ?? []
+        #expect(sent.filter { $0["type"] == .string("pick") } == [.object([
+            "type": .string("pick"), "player_id": .string(card.call), "pick": .number(9),
+        ])])
+    }
+}

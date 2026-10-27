@@ -2,6 +2,7 @@
  * batch after it, and a reconnect that picks up exactly where it left off. */
 import type { components } from '#lib/api/types.ts';
 import type { RoomAction } from './api.ts';
+import { LOBBY } from './lobby-words.ts';
 
 type Command = components['schemas']['RoomCommand'];
 
@@ -100,7 +101,7 @@ export class LobbySocket {
 
 	private receive(frame: Frame): void {
 		if (frame.type === 'error') {
-			this.handlers.onrefused(frame.message ?? 'The room refused that.');
+			this.handlers.onrefused(frame.message ?? LOBBY.refused);
 			return;
 		}
 		if (frame.type === 'welcome') {
