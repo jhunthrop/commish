@@ -160,7 +160,7 @@ jobs:
         env:
           SNAPSHOT_RECORD: "1"
           SNAPSHOT_SHOTS: ${{ runner.temp }}/persona-shots
-        run: scripts/test-packages.sh CommishDesign Features/LeagueHome Features/Shell Features/Start Features/Matchup Features/Board Features/Waivers Features/Player Features/Trades Features/Rankings Features/Record Features/Account Features/Reference Features/Companion Features/MockRoom
+        run: scripts/test-packages.sh CommishDesign Features/LeagueHome Features/Shell Features/Start Features/Matchup Features/Board Features/Waivers Features/Player Features/Trades Features/Rankings Features/Record Features/Account Features/Reference Features/Companion Features/MockRoom Features/Sheet
       - name: Recorded references
         if: ${{ inputs.record_snapshots }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

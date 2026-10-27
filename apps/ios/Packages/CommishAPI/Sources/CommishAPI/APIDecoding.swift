@@ -39,7 +39,7 @@ public enum APIDecoding {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .custom { date, encoder in
             var container = encoder.singleValueContainer()
-            try container.encode(date.formatted(fractional))
+            try container.encode(text(date))
         }
         encoder.outputFormatting = [.sortedKeys]
         return encoder
@@ -59,6 +59,20 @@ public enum APIDecoding {
 
     static let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
     static let whole = Date.ISO8601FormatStyle()
+
+    /// An instant as the API wrote it: to the millisecond, or to the microsecond where Postgres stamped
+    /// it finer (a sheet's updated_at, which a guarded write sends back and the API compares exactly, so
+    /// a stamp cut to milliseconds would be refused as changed). A millisecond instant reads as before.
+    public static func text(_ date: Date) -> String {
+        let micros = (date.timeIntervalSince1970 * 1_000_000).rounded()
+        guard micros.truncatingRemainder(dividingBy: 1000) != 0 else {
+            return date.formatted(fractional)
+        }
+        let seconds = (micros / 1_000_000).rounded(.down)
+        let fraction = Int(micros - seconds * 1_000_000)
+        let stamp = Date(timeIntervalSince1970: seconds).formatted(whole)
+        return "\(stamp.dropLast()).\(String(format: "%06d", fraction))Z"
+    }
 
     public static func parseDate(_ text: String) -> Date? {
         (try? fractional.parse(text)) ?? (try? whole.parse(text))
