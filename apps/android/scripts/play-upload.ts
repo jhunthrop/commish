@@ -56,6 +56,8 @@ export interface UploadResult {
 	/** Null when Play refused the bundle as already uploaded (the code is in its message). */
 	versionCode: number | null;
 	status: ReleaseStatus | null;
+	/** Only on a skip: the highest code the track already holds. */
+	trackVersionCode?: number;
 }
 
 export type Fetch = (url: string, init: RequestInit) => Promise<Response>;
@@ -222,8 +224,7 @@ export async function uploadToTrack(request: UploadRequest, fetch: Fetch, log: L
 		const onTrack = await trackVersionCodes(client, editId, request.track);
 		if (decideUpload(onTrack, versionCode) === 'skip') {
 			await deleteEdit(client, editId, log);
-			log(`Skipping: the ${request.track} track already holds version code ${Math.max(...onTrack)}, not below this build's ${versionCode}; a newer run got in first, so nothing is committed.`);
-			return { outcome: 'track-already-ahead', editId, versionCode, status: null };
+			return { outcome: 'track-already-ahead', editId, versionCode, status: null, trackVersionCode: Math.max(...onTrack) };
 		}
 		const outcome = await releaseWithFallback(client, editId, request, versionCode, log);
 		const status = outcome === 'committed' ? request.status : 'draft';
@@ -278,7 +279,7 @@ async function main(): Promise<void> {
 		console.log(`::notice title=Play already has this run::Attempt ${request.attempt} found its version code already on Play, so nothing new was uploaded.`);
 	}
 	if (result.outcome === 'track-already-ahead') {
-		console.log(`::notice title=Play track is ahead::Version code ${result.versionCode} is not above what ${request.track} already holds, so this older run committed nothing.`);
+		console.log(`::notice title=Play track is ahead::The ${request.track} track holds version code ${result.trackVersionCode}, not below this build's ${result.versionCode}; a newer run got in first, so this run committed nothing.`);
 	}
 	if (result.outcome === 'committed-as-draft') {
 		console.log(`::notice title=Play internal as draft::The app has not passed its first review, so version code ${result.versionCode} is a draft on ${request.track}; promote it in Play Console.`);

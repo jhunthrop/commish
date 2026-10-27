@@ -149,6 +149,8 @@ test('decideUpload: empty uploads, lower uploads, equal and higher skip, codeles
 	assert.equal(decideUpload([1219], 1219), 'skip');
 	assert.equal(decideUpload([1100, 1300], 1219), 'skip');
 	assert.equal(decideUpload([], 0), 'upload');
+	assert.equal(decideUpload([99], 100), 'upload');
+	assert.equal(decideUpload([100], 99), 'skip');
 });
 
 const trackHolding = (releases: unknown): Answer => (s) => (s.method === 'GET' && s.url.endsWith('/tracks/internal') ? json({ track: 'internal', releases }) : undefined);
@@ -157,11 +159,11 @@ test('a track already at a higher code: the edit is deleted, nothing set or comm
 	const { fetch, seen } = stub(trackHolding([{ versionCodes: ['1300'], status: 'completed' }]));
 	const lines: string[] = [];
 	const result = await uploadToTrack(request('completed'), fetch, (line) => lines.push(line));
-	assert.deepEqual(result, { outcome: 'track-already-ahead', editId: 'edit-1', versionCode: VERSION_CODE, status: null });
+	assert.deepEqual(result, { outcome: 'track-already-ahead', editId: 'edit-1', versionCode: VERSION_CODE, status: null, trackVersionCode: 1300 });
 	assert.equal(seen.at(-1)?.method, 'DELETE');
 	assert.equal(seen.filter((s) => s.method === 'PUT' && s.url.endsWith('/tracks/internal')).length, 0);
 	assert.equal(seen.filter((s) => s.url.endsWith(':commit')).length, 0);
-	assert.ok(lines.some((line) => line.includes('1300') && line.includes(String(VERSION_CODE))));
+	assert.ok(!lines.some((line) => line.includes('Skipping')));
 });
 
 test('a track at the same code skips too', async () => {
@@ -185,4 +187,29 @@ test('a failing track read is a real error: the edit is deleted and the run fail
 test('a 404 reading a track with no release yet is an empty track: the upload commits', async () => {
 	const { fetch } = stub((s) => (s.method === 'GET' ? refusal('Track not found', 404) : undefined));
 	assert.equal((await uploadToTrack(request('completed'), fetch, quiet)).outcome, 'committed');
+});
+
+test('a higher code in any release state skips, and the track reads as numbers not strings', async () => {
+	for (const status of ['draft', 'halted', 'inProgress']) {
+		const { fetch } = stub(trackHolding([{ versionCodes: ['1300'], status }]));
+		assert.equal((await uploadToTrack(request('completed'), fetch, quiet)).outcome, 'track-already-ahead');
+	}
+	const { fetch } = stub(trackHolding([{ versionCodes: ['99'] }]));
+	assert.equal((await uploadToTrack(request('completed'), fetch, quiet)).outcome, 'committed');
+});
+
+const deleteFails: Answer = (s) => (s.method === 'DELETE' ? refusal('gone', 500) : undefined);
+
+test('a failing edit delete leaves the skip outcome intact', async () => {
+	const ahead = trackHolding([{ versionCodes: ['1300'] }]);
+	const { fetch } = stub((s) => deleteFails(s) ?? ahead(s));
+	const lines: string[] = [];
+	const result = await uploadToTrack(request('completed'), fetch, (line) => lines.push(line));
+	assert.equal(result.outcome, 'track-already-ahead');
+	assert.ok(lines.some((line) => line.includes('was not deleted')));
+});
+
+test('a failing edit delete leaves the original error intact', async () => {
+	const { fetch } = stub((s) => deleteFails(s) ?? (s.url === SESSION ? refusal('All uploaded bundles must be signed.', 403) : undefined));
+	await assert.rejects(uploadToTrack(request('completed'), fetch, quiet), (error: unknown) => error instanceof PlayError && error.status === 403 && error.step === 'upload bundle');
 });
