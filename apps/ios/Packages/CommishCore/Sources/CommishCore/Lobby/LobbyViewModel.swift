@@ -277,13 +277,15 @@ public final class LobbyViewModel {
 
     /// Draft a player: the pick on the clock, as a command; it lands when its row comes back.
     public func draft(_ player: String?) async {
-        // The room's last refusal goes with the member's next pick (the page's `refused = null`).
-        dismissed = socket?.refusal
         guard let player, let lobby, let room, open,
               RoomDraft.seatAt(lobby.pickNumber, teams: room.teams) == room.you, lobby.drafting
         else {
+            // Off the clock nothing is sent, so the refusal stays: a dismissal never outlives the pick
+            // it answered (B252; the page clears `refused` only in onpick).
             return
         }
+        // The room's last refusal goes with the member's pick (the page's `refused = null`).
+        dismissed = socket?.refusal
         marked = nil
         if await socket?.send(.pick(playerID: player, pick: lobby.pickNumber)) == true {
             dismissed = nil

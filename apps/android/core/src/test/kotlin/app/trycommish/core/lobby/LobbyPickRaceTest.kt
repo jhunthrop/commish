@@ -10,7 +10,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -33,7 +32,8 @@ object PickRace {
 /**
  * The pick race over the recorded lobby, as the iOS LobbyPickRaceTests: off the clock Draft sends nothing; a
  * pick sent on the clock that the room overtakes (its clock drafts the seat first) is refused in the room's
- * words, applies no row of the member's own, and the member's next Draft puts the refusal away.
+ * words, applies no row of the member's own, and only a pick that goes out puts the refusal away (an off-clock
+ * Draft leaves it, B252).
  */
 class LobbyPickRaceTest {
     @Test
@@ -60,8 +60,37 @@ class LobbyPickRaceTest {
             assertEquals(listOf(LobbySocketTest.hello(0)), connector.sent.first())
         }
 
+    /** B252: an off-clock Draft sends nothing, so it puts no refusal away; the same refusal again shows. */
     @Test
-    fun `a pick the room overtakes is refused and the next Draft puts it away`() =
+    fun `an off-clock Draft leaves the refusal and the same refusal again shows`() =
+        runTest {
+            val (opening, _) = PickRace.opening(before = 8)
+            val refused = Scripted.Server("""{"type":"error","code":"conflict","message":"$QUEUED"}""")
+            val queueStep = Scripted.Client(Json.parseToJsonElement(RoomCommand.Queue(emptyList()).text).jsonObject)
+            val connector =
+                ScriptedConnector(
+                    listOf(listOf(LobbySocketTest.welcome(opening), refused, queueStep, refused, queueStep, Scripted.End)),
+                )
+            val vm = LobbySocketTest.viewModel(StubLobby(), connector)
+            val card = requireNotNull(LobbyFixtures.card(LobbyFixtures.YOU))
+            val notices = mutableListOf<String?>()
+            connector.drive = { command ->
+                if (command is RoomCommand.Queue) {
+                    if (notices.isEmpty()) {
+                        // Refused, then the member taps Draft off the clock: nothing goes, the refusal stays.
+                        assertEquals(QUEUED, vm.notice())
+                        vm.draft(card.call)
+                    }
+                    notices += vm.notice()
+                }
+            }
+            vm.run()
+            assertEquals(listOf(QUEUED, QUEUED), notices)
+            assertFalse(connector.sent.first().any { (it.jsonObject["type"] as? JsonPrimitive)?.content == "pick" })
+        }
+
+    @Test
+    fun `a pick the room overtakes is refused and only a sent pick puts it away`() =
         runTest {
             val (opening, _) = PickRace.opening()
             val last = opening.last().seq
@@ -109,7 +138,8 @@ class LobbyPickRaceTest {
             }
             vm.run()
             assertEquals(REFUSAL, afterRefusal)
-            assertNull(afterNextDraft)
+            // The next Draft is off the clock now: nothing is sent, so the refusal stays (B252).
+            assertEquals(REFUSAL, afterNextDraft)
             val picks =
                 vm.lobby.value
                     ?.picks
@@ -125,5 +155,6 @@ class LobbyPickRaceTest {
 
     private companion object {
         const val REFUSAL = "You are not on the clock."
+        const val QUEUED = "That player is drafted."
     }
 }

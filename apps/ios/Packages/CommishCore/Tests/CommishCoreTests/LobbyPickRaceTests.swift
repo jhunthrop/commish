@@ -7,7 +7,8 @@ import Testing
 
 /// The pick race over the recorded lobby: off the clock Draft sends nothing; a pick sent on the clock
 /// that the room overtakes (its clock drafts the seat first) is refused in the room's words, applies no
-/// row of the member's own, and the member's next Draft puts the refusal away.
+/// row of the member's own, and only a pick that goes out puts the refusal away (an off-clock Draft
+/// leaves it, B252).
 @MainActor
 struct LobbyPickRaceTests {
     static let refusal = "You are not on the clock."
@@ -47,7 +48,38 @@ struct LobbyPickRaceTests {
         #expect(sent == [.object(["type": .string("hello"), "last_seq": .number(0)])])
     }
 
-    @Test func aPickTheRoomOvertakesIsRefusedAndTheNextDraftPutsItAway() async throws {
+    /// B252: an off-clock Draft sends nothing, so it puts no refusal away; the same refusal again shows.
+    @Test func anOffClockDraftLeavesTheRefusalAndTheSameRefusalAgainShows() async throws {
+        let (opening, _) = try Self.opening(before: 8)
+        let queued = "That player is drafted."
+        let refused = ScriptedStep.server(#"{"type":"error","code":"conflict","message":"\#(queued)"}"#)
+        let connector = ScriptedConnector([[
+            LobbySocketTests.welcome(opening),
+            refused, .client(RoomCommand.queue([]).text),
+            refused, .client(RoomCommand.queue([]).text),
+            .end,
+        ]])
+        let viewModel = LobbySocketTests.viewModel(StubLobby(), connector, timer: RecordingTimer())
+        let card = try #require(LobbyFixture.card(9))
+        var notices: [String?] = []
+        await connector.drive { command in
+            guard case .queue = command else {
+                return
+            }
+            if notices.isEmpty {
+                // Refused, then the member taps Draft off the clock: nothing goes, the refusal stays.
+                #expect(viewModel.notice == queued)
+                await viewModel.draft(card.call)
+            }
+            notices.append(viewModel.notice)
+        }
+        await viewModel.run()
+        #expect(notices == [queued, queued])
+        let sent = await connector.sent.first ?? []
+        #expect(!sent.contains { $0["type"] == .string("pick") })
+    }
+
+    @Test func aPickTheRoomOvertakesIsRefusedAndOnlyASentPickPutsItAway() async throws {
         let (opening, _) = try Self.opening()
         let last = try #require(opening.last?.seq)
         let card = try #require(LobbyFixture.card(9))
@@ -88,7 +120,8 @@ struct LobbyPickRaceTests {
         }
         await viewModel.run()
         #expect(noticeAfterRefusal == Self.refusal)
-        #expect(noticeAfterNextDraft == nil)
+        // The next Draft is off the clock now: nothing is sent, so the refusal stays (B252).
+        #expect(noticeAfterNextDraft == Self.refusal)
         let picks = viewModel.lobby?.picks ?? []
         #expect(picks.last?.pick == 9)
         #expect(picks.last?.madeBy == .clock)

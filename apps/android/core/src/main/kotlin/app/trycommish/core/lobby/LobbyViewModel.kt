@@ -305,11 +305,13 @@ class LobbyViewModel(
     /** Draft a player: the pick on the clock, as a command; it lands when its row comes back. */
     suspend fun draft(player: String?) {
         val socket = mutableSocket.value
-        // The room's last refusal goes with the member's next pick (the page's `refused = null`).
-        mutableDismissed.value = socket?.refusal?.value
         val lobby = mutableLobby.value ?: return
         val room = room ?: return
+        // Off the clock nothing is sent, so the refusal stays: a dismissal never outlives the pick it answered
+        // (B252; the page clears `refused` only in onpick).
         if (player == null || !open || !lobby.drafting || RoomDraft.seatAt(lobby.pickNumber, room.teams) != room.you) return
+        // The room's last refusal goes with the member's pick (the page's `refused = null`).
+        mutableDismissed.value = socket?.refusal?.value
         marked = null
         redraw()
         if (socket?.send(RoomCommand.Pick(player, lobby.pickNumber)) == true) mutableDismissed.value = null

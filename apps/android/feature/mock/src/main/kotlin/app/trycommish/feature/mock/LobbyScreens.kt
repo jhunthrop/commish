@@ -247,7 +247,7 @@ private fun Failed(
     ) {
         BasisText(sentence)
         // A read that did not go (no signal, the API's own fault) can be tried again; a refusal for good cannot.
-        retry?.let { QuietButton(AppWords.tryAgain, onClick = it) }
+        retry?.let { QuietButton(Words.Lobby.tryAgain, onClick = it) }
         QuietButton(Words.Lobby.joinLobby, onClick = back)
     }
 }
