@@ -12,8 +12,9 @@ replaces one player's copy from the URL a person chose and marks it curated; `cu
 local directory laid out as the bucket instead of `commish-images`.
 
 RESEARCH_DATABASE_URL names the database; CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID the bucket.
-Exit status 1 when the pass could not run or a curation was refused; a player's failed fetch is a row
-on the curation list, not a failure of the pass.
+Exit status 1 when the pass could not run, every player died of a bucket or database error, or a
+curation was refused; a player's failed fetch or error is a row on the curation list, not a failure
+of the pass.
 """
 
 import argparse
@@ -93,6 +94,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.command == "sync":
                 counts = sync(deps, args.season, args.limit)
                 log_line(f"headshots: {args.season}, {counts.line()}")
+                if counts.systemic:
+                    log_line("headshots: FAILED, every player died of a bucket or database error")
+                    return 1
             else:
                 _curate(args, deps)
     except ResearchError as error:

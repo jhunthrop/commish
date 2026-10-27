@@ -25,7 +25,7 @@ from research.headshots.curate import CurationError, curate, curation_lines, ref
 from research.headshots.faces import our_face
 from research.headshots.images import MAX_BYTES, FetchFailedError, NoImageError, Source, fetch, webp_widths
 from research.headshots.sync import SyncDeps, Throttle, due, sync
-from research.headshots.table import Candidate, curation_list, faced_ids
+from research.headshots.table import Candidate, Write, curation_list, faced_ids, write, write_unless_curated
 from research.nightly.r2 import R2Credentials, R2RunStore
 from research.parity import databases
 
@@ -410,3 +410,99 @@ def test_the_syncs_bucket_writes_share_its_one_client_and_run_for_two_players_at
     assert counts.line() == "2 copied, 0 skipped, 0 missing, 0 failed"
     assert sorted(fetches) == [_ESPN.format(1), _ESPN.format(2)]
     assert sorted(puts) == sorted(f"/commish-images/headshots/2026/{p}/{w}.webp" for p in ("1", "2") for w in WIDTHS)
+
+
+# One worker's failure, the worker count, and a curation that lands mid-sync --------------------------
+
+
+@dataclass
+class ExplodingBucket(StubBucket):
+    """A bucket that raises an unmapped error for the named players."""
+
+    bad: frozenset[str] = frozenset()
+
+    def put(self, key: str, body: bytes, content_type: str) -> None:
+        if key.split("/")[2] in self.bad:
+            raise RuntimeError("R2 refused https://acct.example/x?X-Amz-Signature=abc123 for the write")
+        super().put(key, body, content_type)
+
+
+def test_one_worker_raising_an_unmapped_error_fails_only_his_row(engine: Engine) -> None:
+    _players(engine, [("1", "RB", _ESPN.format(1)), ("2", "WR", _ESPN.format(2)), ("3", "TE", _ESPN.format(3))])
+    bucket = ExplodingBucket(bad=frozenset({"2"}))
+    lines: list[str] = []
+    source = StubSource()
+    with source.client() as http:
+        deps = replace(_deps(engine, http, bucket, FakeClock()), log=lines.append)
+        counts = sync(deps, 2026)
+    assert counts.line() == "2 copied, 0 skipped, 0 missing, 1 failed"
+    assert not counts.systemic
+    assert {pid: status for pid, (status, _, _) in _rows(engine).items()} == {
+        "1": "copied",
+        "2": "failed",
+        "3": "copied",
+    }
+    assert len(lines) == 1
+    assert lines[0].startswith("headshots: 2 failed, RuntimeError: R2 refused https://acct.example/x")
+    assert "abc123" not in lines[0]
+    with engine.connect() as conn:
+        reason = conn.execute(text("select reason from research.headshot_copies where player_id = '2'")).scalar()
+    assert reason is not None
+    assert "abc123" not in reason
+    assert reason.startswith("RuntimeError")
+
+
+def test_a_pass_where_every_player_dies_unmapped_is_systemic(engine: Engine) -> None:
+    _players(engine, [("1", "RB", _ESPN.format(1)), ("2", "WR", _ESPN.format(2))])
+    bucket = ExplodingBucket(bad=frozenset({"1", "2"}))
+    source = StubSource()
+    with source.client() as http:
+        counts = sync(_deps(engine, http, bucket, FakeClock()), 2026)
+    assert counts.line() == "0 copied, 0 skipped, 0 missing, 2 failed"
+    assert counts.systemic
+
+
+@pytest.mark.parametrize("workers", [0, -1, 17, 2.5, True, "4"])
+def test_a_bad_worker_count_is_refused_not_clamped(engine: Engine, workers: object) -> None:
+    _players(engine, [("1", "RB", _ESPN.format(1))])
+    source = StubSource()
+    with source.client() as http:
+        deps = replace(_deps(engine, http, StubBucket(), FakeClock()), workers=workers)  # type: ignore[arg-type]
+        with pytest.raises(ConfigurationError, match="SYNC_WORKERS"):
+            sync(deps, 2026)
+    assert source.requests == []
+
+
+def test_a_curation_landing_during_the_sync_is_not_overwritten(engine: Engine) -> None:
+    _players(engine, [("1", "RB", _ESPN.format(1)), ("2", "WR", _ESPN.format(2))])
+    bucket = StubBucket()
+    curated_once = threading.Event()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.rsplit("/", 1)[-1].startswith("1.") and not curated_once.is_set():
+            curated_once.set()
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "insert into research.headshot_copies (season, player_id, status, curated_by, updated_at) "
+                        "values (2026, '1', 'curated', 'coordinator', now())"
+                    )
+                )
+        return httpx.Response(200, content=_IMAGE, headers={"content-type": "image/png"})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        counts = sync(_deps(engine, http, bucket, FakeClock(), workers=1), 2026)
+    assert counts.line() == "1 copied, 1 skipped, 0 missing, 0 failed"
+    assert _rows(engine)["1"] == ("curated", None, "coordinator")
+    assert _keys(bucket, "1") == set()
+    assert _keys(bucket, "2")
+
+
+def test_the_ledger_write_leaves_a_curated_row_alone(engine: Engine) -> None:
+    _players(engine, [("1", "RB", _ESPN.format(1))])
+    at = _NOW
+    with engine.begin() as conn:
+        assert write_unless_curated(conn, 2026, "1", Write("copied", "a", None, at), at)
+        write(conn, 2026, "1", Write("curated", "b", None, at, "coordinator", at), at)
+        assert not write_unless_curated(conn, 2026, "1", Write("failed", "a", "x", at), at)
+    assert _rows(engine)["1"] == ("curated", "b", "coordinator")
