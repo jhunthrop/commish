@@ -981,6 +981,7 @@ public enum Words {
         public static let gone = "This lobby is gone."
         public static let noSeat = "You do not have a seat in this lobby."
         public static let joinLobby = "Join a lobby"
+        public static let tryAgain = "Try again"
         public static let onTheClock = "On the clock"
         public static let clock = "Clock"
         public static let yourPick = "Your pick"

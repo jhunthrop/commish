@@ -4,6 +4,7 @@ import { resolve } from '$app/paths';
 import { ApiError, signInHref } from './api.ts';
 import { MOCK } from './mock-words.ts';
 import { LOBBY } from './lobby-words.ts';
+import { keepsWayOut } from './notice-way-out.ts';
 
 /** The page that hit the error: the reader's own mock or its report, a shared link, a lobby, setup. */
 export type NoticeSubject = 'mock' | 'share' | 'lobby' | 'setup';
@@ -11,6 +12,12 @@ export type NoticeSubject = 'mock' | 'share' | 'lobby' | 'setup';
 export interface NoticeLink {
 	label: string;
 	href: string;
+}
+
+/** A failure read again in place, beside the notice's way out. */
+export interface NoticeRetry {
+	label: string;
+	run: () => void;
 }
 
 export interface NoticeView {
@@ -100,7 +107,21 @@ function refused(error: ApiError, subject: NoticeSubject): NoticeView | null {
 	return null;
 }
 
-export function noticeFor(error: unknown, subject: NoticeSubject, returnTo: string): NoticeView {
+/** A lobby page that did not load (`read`: its room or report read failed) with no way forward of
+ * its own (no signal, the API's own fault) keeps the quiet way back to the lobbies, the apps' Join a
+ * lobby beside their Try again. A failed action on a loaded page (Leave, Join another lobby, the
+ * draft against bots) already draws its own verb, so it gets none. */
+export function noticeFor(
+	error: unknown,
+	subject: NoticeSubject,
+	returnTo: string,
+	read = false
+): NoticeView {
+	const view = noticeOf(error, subject, returnTo);
+	return keepsWayOut(view, subject, read) ? { ...view, quiet: joinLobby() } : view;
+}
+
+function noticeOf(error: unknown, subject: NoticeSubject, returnTo: string): NoticeView {
 	if (!(error instanceof ApiError)) return { text: MOCK.unreachable };
 	switch (error.status) {
 		case HTTP.unauthorized:

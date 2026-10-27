@@ -89,8 +89,6 @@ public final class LobbyViewModel {
     public private(set) var leaving = false
     /// A leave the API refused, in its words, over the room.
     public private(set) var problem: String?
-    /// The room's refusal the member's last pick put away, so the notice stops showing it.
-    private var dismissed: String?
 
     public let id: String
     private let api: any LobbyAPI
@@ -118,8 +116,16 @@ public final class LobbyViewModel {
     }
 
     /// The room for the screen's whole life: read it, then hold its socket until the screen goes (the
-    /// calling task's cancellation closes the socket with 1000).
+    /// calling task's cancellation closes the socket with 1000). Run again after a read that did not go
+    /// (Try again) it reads the room afresh; a room refused for good or a socket stopped for good is
+    /// never tried again (B208, B252).
     public func run() async {
+        if stopped != nil {
+            return
+        }
+        if case .failed(_, final: true) = state {
+            return
+        }
         guard await load(), let socket else {
             return
         }
@@ -130,8 +136,15 @@ public final class LobbyViewModel {
     /// The room's read; false when it failed.
     @discardableResult
     func load() async -> Bool {
+        // Loading only from a failure or the first read: a task that fires again on a reappearing screen
+        // never draws Loading over a live room.
+        if state != .room {
+            state = .loading
+        }
         do {
             let read = try await api.lobby(id: id)
+            // A run the screen cancelled (it went, or Try again started another) shows nothing.
+            try Task.checkCancellation()
             guard let url = URL(string: read.socketUrl) else {
                 throw APIError.emptyEnvelope
             }
@@ -143,6 +156,9 @@ public final class LobbyViewModel {
                 onGap: { [weak self] in await self?.resync() ?? false }
             )
             return true
+        } catch where error is CancellationError || Task.isCancelled {
+            // A cancelled read is not a failure (Android rethrows CancellationException): no failed screen.
+            return false
         } catch {
             fail(error)
             return false
@@ -222,18 +238,14 @@ public final class LobbyViewModel {
         socket?.status ?? .connecting
     }
 
-    /// The room's notice line: reconnecting, or the last command the room refused in its words.
+    /// The room's notice line: reconnecting, or the last command the room refused in its words. The
+    /// refusal is the socket's own: a pick that goes out puts it away, every new error frame shows
+    /// it again, and a welcome clears it, so no dismissal can outlive the action it answered (B252).
     public var notice: String? {
         if status == .reconnecting {
             return Words.Lobby.reconnecting
         }
-        if let problem {
-            return problem
-        }
-        guard let refusal = socket?.refusal, refusal != dismissed else {
-            return nil
-        }
-        return refusal
+        return problem ?? socket?.refusal
     }
 
     /// The room's clock: the phone's plus the latest welcome's offset.
@@ -268,17 +280,17 @@ public final class LobbyViewModel {
 
     /// Draft a player: the pick on the clock, as a command; it lands when its row comes back.
     public func draft(_ player: String?) async {
-        // The room's last refusal goes with the member's next pick (the page's `refused = null`).
-        dismissed = socket?.refusal
         guard let player, let lobby, let room, open,
               RoomDraft.seatAt(lobby.pickNumber, teams: room.teams) == room.you, lobby.drafting
         else {
+            // Off the clock nothing is sent, so the refusal stays (B252; the page clears `refused`
+            // only in onpick).
             return
         }
         marked = nil
-        if await socket?.send(.pick(playerID: player, pick: lobby.pickNumber)) == true {
-            dismissed = nil
-        }
+        // A pick that goes out puts the room's last refusal away (the socket's send clears it, the
+        // page's `refused = null`); one that cannot go (reconnecting) leaves it for the welcome.
+        await socket?.send(.pick(playerID: player, pick: lobby.pickNumber))
     }
 
     /// Queue or unqueue a player: the whole queue as a command.

@@ -78,6 +78,7 @@ public actor StubLobby: LobbyAPI {
     private var needsHandle: Bool
     private var complete = false
     private var cardPick = 9
+    private var hangs = false
 
     public init(needsHandle: Bool = false) {
         self.needsHandle = needsHandle
@@ -91,6 +92,11 @@ public actor StubLobby: LobbyAPI {
 
     public func setComplete(_ complete: Bool) {
         self.complete = complete
+    }
+
+    /// The room's read waits until its task is cancelled (a screen that goes mid-read).
+    public func setHangs(_ hangs: Bool) {
+        self.hangs = hangs
     }
 
     /// The pick whose recorded card the card route answers.
@@ -112,6 +118,9 @@ public actor StubLobby: LobbyAPI {
 
     public func lobby(id _: String) async throws -> LobbyRoom {
         reads += 1
+        if hangs {
+            try await Task.sleep(nanoseconds: UInt64.max)
+        }
         if let refusal, reads >= refusalFrom {
             throw APIError.status(refusal)
         }
