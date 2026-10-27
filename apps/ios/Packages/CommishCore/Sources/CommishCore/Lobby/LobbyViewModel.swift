@@ -136,7 +136,11 @@ public final class LobbyViewModel {
     /// The room's read; false when it failed.
     @discardableResult
     func load() async -> Bool {
-        state = .loading
+        // Loading only from a failure or the first read: a task that fires again on a reappearing screen
+        // never draws Loading over a live room.
+        if state != .room {
+            state = .loading
+        }
         do {
             let read = try await api.lobby(id: id)
             // A run the screen cancelled (it went, or Try again started another) shows nothing.

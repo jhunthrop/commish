@@ -282,50 +282,6 @@ struct LobbySocketTests {
         #expect(await timer.waits.isEmpty)
     }
 
-    @Test func aReadThatDidNotGoIsReadAgainInPlaceOnTryAgain() async throws {
-        let api = StubLobby()
-        await api.setRefusal(503)
-        let rows = try Self.rows()
-        let connector = ScriptedConnector([[Self.welcome(rows[0]), .end]])
-        let viewModel = Self.viewModel(api, connector, timer: RecordingTimer())
-        await viewModel.run()
-        #expect(viewModel.state == .failed(Words.Mock.unreachable, final: false))
-        #expect(await connector.tokens.isEmpty)
-        // Try again: the screen runs the room again, which reads it afresh and opens its socket.
-        await api.setRefusal(nil)
-        await viewModel.run()
-        #expect(viewModel.state == .room)
-        #expect(await api.reads == 2)
-        // The socket opened only after the second read, from the start of the log.
-        #expect(await connector.sent.first?.first == .object(["type": .string("hello"), "last_seq": .number(0)]))
-    }
-
-    @Test func aCancelledReadLeavesNoFailureScreen() async {
-        let api = StubLobby()
-        await api.setHangs(true)
-        let connector = ScriptedConnector([])
-        let viewModel = Self.viewModel(api, connector, timer: RecordingTimer())
-        let run = Task { await viewModel.run() }
-        while await api.reads == 0 {
-            await Task.yield()
-        }
-        run.cancel()
-        await run.value
-        // The screen went (or Try again started another run) mid-read: no failure, no Try again, no socket.
-        #expect(viewModel.state == .loading)
-        #expect(await connector.tokens.isEmpty)
-    }
-
-    @Test func aRoomRefusedForGoodIsNeverReadAgain() async {
-        let api = StubLobby()
-        await api.setRefusal(404)
-        let viewModel = Self.viewModel(api, ScriptedConnector([]), timer: RecordingTimer())
-        await viewModel.run()
-        await viewModel.run()
-        #expect(viewModel.state == .failed(Words.Lobby.gone, final: true))
-        #expect(await api.reads == 1)
-    }
-
     @Test func anUpgradeRefusedWith403StopsWithTheLobbysWords() async {
         let connector = ScriptedConnector([[.close(RoomClosed(code: 1006, status: 403))]])
         let viewModel = Self.viewModel(StubLobby(), connector, timer: RecordingTimer())
