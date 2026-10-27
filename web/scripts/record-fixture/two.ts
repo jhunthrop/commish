@@ -11,15 +11,20 @@
 //   142): its figures are week 1's ADP lines relabelled, so the front card's two yardsticks can be
 //   shot. They are not a grade of anything either. The graded week 7 carries the run's ESPN sentence
 //   (Lane 147), its yardstick read after the set as the week's real one was.
+//   `set` is week 7 set and played, waiting on its stats (Lane 250): its grading day is what
+//   research's `week_complete.grades_from` writes for its last kickoff (Mon Oct 26 night), Tuesday
+//   20:30 Eastern, held to that by research/tests/test_lane250_record_fixtures.py.
 import { readFile } from 'node:fs/promises';
 import { RECORDS_WORDS } from '../../src/lib/run/records.ts';
 import type { RecordLine, RecordWeek, RunRecord } from '../../src/lib/run/schema.ts';
 
-export type TwoMode = 'upcoming' | 'graded' | 'published';
+export type TwoMode = 'upcoming' | 'set' | 'graded' | 'published';
 
 const FROM_WEEK = 7;
 const SET_AT = '2026-10-22T18:00:00.000Z';
 const GRADED_AT = '2026-10-28T22:00:00.000Z';
+/** Week 7's first grading pass, `grades_from` of its last kickoff (2026-10-27T00:15Z). */
+const SEVEN_GRADES_FROM = '2026-10-28T00:30:00.000Z';
 /** The run's weekly record writer, whose word table holds the method sentence (Lane 235, B222). */
 const WRITER = new URL('../../../research/nightly/reads/weekly_record.py', import.meta.url);
 
@@ -85,6 +90,22 @@ function gradedStandIn(source: RecordWeek, published: readonly RecordLine[] | nu
 	};
 }
 
+/** Week 7 set before its first kickoff with the shipped order, played, its stats not in. */
+function setWaiting(seven: RecordWeek): RecordWeek {
+	return {
+		...seven,
+		status: 'frozen',
+		frozenAt: SET_AT,
+		frozenBy: '2026-10-22T18-live',
+		order: 'rest_of_season',
+		orderAsOf: '2026-10-22T09:00:00.000Z',
+		gradedAt: null,
+		population: 0,
+		lines: [],
+		gradesFrom: SEVEN_GRADES_FROM
+	};
+}
+
 /** The record with its two records, in the nightly's shape. */
 export async function withTwoRecords(record: RunRecord, mode: TwoMode): Promise<unknown> {
 	const draft = await json(new URL('draft-live.json', import.meta.url));
@@ -94,8 +115,12 @@ export async function withTwoRecords(record: RunRecord, mode: TwoMode): Promise<
 	const two = record.weeks.find((week) => week.week === 2);
 	if (seven === undefined || one === undefined || two === undefined)
 		throw new Error('the live record lacks week 1, 2 or 7');
-	const graded = mode !== 'upcoming';
-	const first = graded ? gradedStandIn(two, mode === 'published' ? one.lines : null) : seven;
+	const graded = mode === 'graded' || mode === 'published';
+	const first = graded
+		? gradedStandIn(two, mode === 'published' ? one.lines : null)
+		: mode === 'set'
+			? setWaiting(seven)
+			: seven;
 	const toDate = graded ? first.lines : [];
 	return {
 		...record,

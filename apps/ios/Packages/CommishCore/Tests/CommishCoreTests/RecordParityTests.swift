@@ -20,7 +20,7 @@ struct RecordParityTests {
         }
     }()
 
-    static let cases = ["own-sunday", "own", "waiting", "upcoming", "graded", "published"]
+    static let cases = ["own-sunday", "own", "waiting", "upcoming", "set", "graded", "published"]
 
     static func fixture(_ file: String) -> RecordFixture {
         file.hasPrefix("shared/fixtures/record/")
@@ -80,6 +80,14 @@ struct RecordParityTests {
         #expect(draft.rows.map(RecordParity.DraftRow.init) == web.draft.rows)
         #expect(draft.all.map(RecordParity.DraftRow.init) == web.draft.all)
         #expect(draft.basis == web.draft.basis)
+    }
+
+    @Test
+    func theGradingWordsAreTheWebsAtEveryReach() {
+        for said in Self.parity.pendingWhen {
+            #expect(RecordLines.pendingWhen(day: said.day, game: said.game) == said.when)
+        }
+        #expect(Self.parity.pendingWhen.count == 4)
     }
 
     @Test(arguments: cases)
@@ -322,5 +330,12 @@ struct RecordParity: Decodable, Sendable {
         let draft: Draft
     }
 
+    struct PendingWhen: Decodable, Sendable {
+        let day: String?
+        let game: String?
+        let when: String
+    }
+
+    let pendingWhen: [PendingWhen]
     let cases: [String: Case]
 }

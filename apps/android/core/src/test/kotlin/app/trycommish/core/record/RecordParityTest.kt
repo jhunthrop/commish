@@ -21,6 +21,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.time.Instant
@@ -51,7 +52,7 @@ class RecordParityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "graded", "published"])
+    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "set", "graded", "published"])
     fun `the lead and the summary are the web's`(name: String) {
         val (web, model) = model(name)
         val weekly = web.getValue("weekly").jsonObject
@@ -63,7 +64,7 @@ class RecordParityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "graded", "published"])
+    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "set", "graded", "published"])
     fun `the weeks are the web's with their status words`(name: String) {
         val (web, model) = model(name)
         val weekly = web.getValue("weekly").jsonObject
@@ -79,7 +80,7 @@ class RecordParityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "graded", "published"])
+    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "set", "graded", "published"])
     fun `the draft record is the web's`(name: String) {
         val (web, model) = model(name)
         val theirs = web.getValue("draft").jsonObject
@@ -107,11 +108,18 @@ class RecordParityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "graded", "published"])
+    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "set", "graded", "published"])
     fun `the record never claims a weekly model`(name: String) {
         val (_, model) = model(name)
         val said = listOf(model.lead, model.weekly.basis, model.draft.basis) + model.weekly.rows.map { it.text }
         assertFalse(said.any { it.contains("model", ignoreCase = true) })
+    }
+
+    @Test
+    fun `the grading words are the web's at every reach`() {
+        val said = parity.getValue("pendingWhen").jsonArray.map { it.jsonObject }
+        assertEquals(4, said.size)
+        said.forEach { assertEquals(it.text("when"), RecordLines.pendingWhen(it.text("day"), it.text("game"))) }
     }
 
     // The parity file's shapes, and the port's in the same shapes.

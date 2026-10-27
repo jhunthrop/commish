@@ -80,6 +80,7 @@ enum class RecordFixture(
     Own("run/runs/2026-10-21T12-ros/record.json"),
     Waiting("record/waiting.json"),
     Upcoming("record/upcoming.json"),
+    Set("record/set.json"),
     Graded("record/graded.json"),
     Published("record/published.json"),
     ;

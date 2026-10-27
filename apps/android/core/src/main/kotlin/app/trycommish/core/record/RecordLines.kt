@@ -174,14 +174,20 @@ internal object RecordLines {
                 ?.gradesFrom
                 ?.let(RecordWords::weekdayDay)
         val game = next.lastKickoff?.let(RecordWords::weekdayWord)
-        val whenSaid =
-            if (day == null && game != null) {
-                "${RecordWords.capitalized(Words.Record.gradesRule)}, after $game's game."
-            } else {
-                "${RecordWords.capitalized(gradesWhen(day))}."
-            }
-        return "Week ${next.week} not graded yet" to whenSaid
+        return "Week ${next.week} not graded yet" to pendingWhen(day, game)
     }
+
+    /** records.ts pendingWhen: the grading day when the run names one, else the week's last game, else the
+     * rule alone. */
+    fun pendingWhen(
+        day: String?,
+        game: String?,
+    ): String =
+        if (day == null && game != null) {
+            "${RecordWords.capitalized(Words.Record.gradesRule)}, after $game's game."
+        } else {
+            "${RecordWords.capitalized(gradesWhen(day))}."
+        }
 
     /** record.ts gradedOrders: "Our preseason order, then our rest-of-season order". */
     fun gradedOrders(book: RecordBook): String =

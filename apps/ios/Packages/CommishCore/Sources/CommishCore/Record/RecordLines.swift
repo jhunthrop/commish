@@ -171,11 +171,16 @@ enum RecordLines {
         }
         let day = book.weeks.first { $0.week == next.week }?.gradesFrom.map(RecordWords.weekdayDay)
         let game = next.lastKickoff.map(RecordWords.weekdayWord)
-        let when = switch (day, game) {
+        return ("Week \(next.week) not graded yet", pendingWhen(day: day, game: game))
+    }
+
+    /// records.ts pendingWhen: the grading day when the run names one, else the week's last game, else
+    /// the rule alone.
+    static func pendingWhen(day: String?, game: String?) -> String {
+        switch (day, game) {
         case let (nil, game?): "\(RecordWords.capitalized(Words.Record.gradesRule)), after \(game)'s game."
         default: "\(RecordWords.capitalized(gradesWhen(day)))."
         }
-        return ("Week \(next.week) not graded yet", when)
     }
 
     /// record.ts gradedOrders: "Our preseason order, then our rest-of-season order".
