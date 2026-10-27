@@ -12,6 +12,7 @@ import app.trycommish.core.lobby.LobbyLandingViewModel
 import app.trycommish.core.lobby.LobbyReportViewModel
 import app.trycommish.core.lobby.LobbyViewModel
 import app.trycommish.core.shell.SheetPlayer
+import app.trycommish.feature.mock.FullScreenCover
 import app.trycommish.feature.mock.LobbyExits
 import app.trycommish.feature.mock.LobbyReportView
 import app.trycommish.feature.mock.LobbyRoomView
@@ -45,7 +46,7 @@ internal fun lobbySetup(
             cards = landing.cards,
             problem = problem,
             enabled = !busy,
-            asking = asking != null,
+            askingFor = asking,
             handleProblem = handleProblem,
             join = { join(it.format) },
             joinNearest = { join(LobbyLandingViewModel.nearest(settings)) },
@@ -73,9 +74,23 @@ internal fun LobbyCover(
     open: OpenLobby,
     landing: LobbyLandingViewModel,
     exits: LobbyCoverExits,
+    generation: Int,
+) {
+    FullScreenCover { LobbyCoverBody(graph, open, landing, exits, generation) }
+}
+
+/** The cover's room or report, each view model kept per account generation as the landing's is (Lane 230
+ * review L1), so the next member on the phone never opens the last member's room. */
+@Composable
+private fun LobbyCoverBody(
+    graph: AppGraph,
+    open: OpenLobby,
+    landing: LobbyLandingViewModel,
+    exits: LobbyCoverExits,
+    generation: Int,
 ) {
     if (open.report) {
-        val vm: LobbyReportViewModel = viewModel(key = "lobby-report-${open.id}") { graph.lobbyReportViewModel(open.id) }
+        val vm: LobbyReportViewModel = viewModel(key = "lobby-report-$generation-${open.id}") { graph.lobbyReportViewModel(open.id) }
         LobbyReportView(
             vm,
             lobbies = {
@@ -87,7 +102,7 @@ internal fun LobbyCover(
         )
         return
     }
-    val vm: LobbyViewModel = viewModel(key = "lobby-room-${open.id}") { graph.lobbyViewModel(open.id) }
+    val vm: LobbyViewModel = viewModel(key = "lobby-room-$generation-${open.id}") { graph.lobbyViewModel(open.id) }
     val state by vm.lobby.collectAsStateWithLifecycle()
     LaunchedEffect(state?.complete) { if (state?.complete == true) landing.forget(open.id) }
     LobbyRoomView(

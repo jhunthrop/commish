@@ -330,6 +330,7 @@ fun Shell(
                     },
                     open = { sheet.open(it) },
                 ),
+                generation,
             )
         }
         // Over a draft in progress the sheet has no Full page: one verb per screen, and the room has no page
