@@ -3,6 +3,12 @@
     uv run python -m research.inseason --task season-week [--season 2026] [--skip props-snapshot]
     uv run python -m research.inseason --task usage-backfill [--season 2026]
     uv run python -m research.inseason --task capture-harvest
+    uv run python -m research.inseason void-game --season S --week W --game ID --reason TEXT --by WHO [--lift]
+
+`void-game` is the operator's void of one game of the game table, so a game cancelled or dropped from
+games.csv never blocks its week's grade (Lane 249, B255, `inseason/game_voids.py`): checked against the
+week's games, one append-only row, one line saying what it did. Never scheduled; with gcloud lapsed,
+`ops.yml` runs it on the `inseason` job.
 
 `capture-harvest` takes the hourly provider capture, dates the newest injury capture for the API into
 `app.designation_datings` (Lane 134, `nightly/designation_dating.py`) in the capture's transaction, in a
@@ -55,6 +61,7 @@ from research.db.engine import make_engine
 from research.db.url import database_url_from_env
 from research.errors import ResearchError
 from research.inseason import usage_steps
+from research.inseason.game_voids import VOID_COMMAND, VoidRequest, record_void
 from research.inseason.season_of import (
     calendar_season,
     out_of_window_reason,
@@ -421,7 +428,41 @@ def _touchdown_market(now: datetime, season: int) -> bool:
     return True
 
 
+def _void_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=f"research.inseason {VOID_COMMAND}", description="void one game of the game table, or lift its void"
+    )
+    parser.add_argument("--season", type=int, required=True)
+    parser.add_argument("--week", type=int, required=True)
+    parser.add_argument("--game", required=True, help="the nflverse game id, as nflverse_games holds it")
+    parser.add_argument("--reason", required=True, help="why, in a few words")
+    parser.add_argument("--by", required=True, help="who voids it")
+    parser.add_argument("--lift", action="store_true", help="lift the game's standing void instead")
+    return parser
+
+
+def void_game(argv: Sequence[str], now: datetime) -> int:
+    """One void or lift written and its line printed; a refusal is its own line and exit status 1."""
+    args = _void_parser().parse_args(argv)
+    request = VoidRequest(args.season, args.week, args.game, args.reason, args.by, args.lift)
+    engine = make_engine(database_url_from_env())
+    try:
+        with engine.begin() as conn:
+            line = record_void(conn, request, now)
+    except ResearchError as error:
+        _line(f"{VOID_COMMAND}: REFUSED, {error}")
+        return 1
+    finally:
+        engine.dispose()
+    _line(line)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    given = list(sys.argv[1:] if argv is None else argv)
+    if given[:1] == [VOID_COMMAND]:
+        configure_logging(logging.INFO)
+        return void_game(given[1:], now_ms())
     parser = argparse.ArgumentParser(prog="research.inseason", description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--task", required=True, choices=TASKS)
     parser.add_argument(
@@ -432,7 +473,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--skip", default="", help=f"season-week: steps to skip, of {', '.join(STEPS)}")
     parser.add_argument("--out", default=None, help="season-week: a local directory for the register's trail, not R2")
-    args = parser.parse_args(argv)
+    args = parser.parse_args(given)
     configure_logging(logging.INFO)
     now = now_ms()
     tasks = {"season-week": _season_week, "usage-backfill": _usage_backfill}

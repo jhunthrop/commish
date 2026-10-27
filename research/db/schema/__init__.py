@@ -3,7 +3,8 @@
 Every table lives in the `research` Postgres schema and is defined once here, by group:
 
     identity      players (the one universe), provider_players, player_crosswalk, props_player_map
-    nflverse      the weekly archives, nflverse_games and nflverse_game_reads (revision 0010), nfl_draft_picks, coaches
+    nflverse      the weekly archives, nflverse_games and nflverse_game_reads (revision 0010), game_voids (revision
+                  0023), nfl_draft_picks, coaches
     observations  player_week_observations, team_week_observations, player_week_teams
     provider      the Tank01 current-season store, the capture and odds archives, ESPN's weekly projection (revision 0017)
     market        preseason_rosters, preseason_rankings, adp_snapshots
@@ -40,6 +41,7 @@ from research.db.schema.images import HEADSHOT_COPIES
 from research.db.schema.market import ADP_SNAPSHOTS, PRESEASON_RANKINGS, PRESEASON_ROSTERS
 from research.db.schema.nflverse import (
     COACHES,
+    GAME_VOIDS,
     NFL_DRAFT_PICKS,
     NFLVERSE_GAME_READS,
     NFLVERSE_GAMES,
@@ -74,6 +76,7 @@ __all__ = [
     "CUSTOM_BOARDS",
     "ESPN_KDEF_ARCHIVE_ROWS",
     "ESPN_PROJECTION_ROWS",
+    "GAME_VOIDS",
     "GAME_WEATHER",
     "HEADSHOT_COPIES",
     "METADATA",

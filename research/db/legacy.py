@@ -391,6 +391,7 @@ NEW_IN_RESEARCH: Final[Mapping[str, str]] = MappingProxyType(
         "published_boards": "the published run's board rows (revision 0006), rewritten by every publish",
         "nflverse_games": "nflverse's game table (revision 0010), one row per game, updated as a game's facts move",
         "nflverse_game_reads": "each game-table pass's read of a game's venue and kickoff (revision 0010), append-only",
+        "game_voids": "an operator's void of one game so it never blocks its week's grade (revision 0023), append-only",
         "stadiums": "the venues from the reviewed Wikidata seed (revision 0010), rewritten by its validating ingest",
         "nws_grid_points": "the weather service's grid cell per stadium and season (revision 0010), the forecast job's cache",
         "nflverse_pbp_plays": "the play-level play-by-play the weekly round 4 fits on (revision 0009), from nflverse",
