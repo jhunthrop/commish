@@ -16,6 +16,10 @@ _OK: Final = 200
 _GONE: Final = frozenset({404, 410})
 _FORMATS: Final = frozenset({"PNG", "JPEG", "WEBP"})
 _QUALITY: Final = 82
+# libwebp's effort, 0 to 6. Measured (Lane 242, twenty real 600 x 436 sources, the eight widths): 6
+# took 2.9 s a player and was the sync's whole cost (9 s on the job's CPU); 5 takes 30 ms for 1.4%
+# more bytes (43.2 KB a player against 42.6).
+_METHOD: Final = 5
 
 
 class NoImageError(Exception):
@@ -82,6 +86,6 @@ def webp_widths(body: bytes) -> dict[int, bytes]:
     for width in WIDTHS:
         height = max(1, round(image.height * width / image.width))
         buffer = io.BytesIO()
-        image.resize((width, height), Image.Resampling.LANCZOS).save(buffer, "WEBP", quality=_QUALITY, method=6)
+        image.resize((width, height), Image.Resampling.LANCZOS).save(buffer, "WEBP", quality=_QUALITY, method=_METHOD)
         out[width] = buffer.getvalue()
     return out
