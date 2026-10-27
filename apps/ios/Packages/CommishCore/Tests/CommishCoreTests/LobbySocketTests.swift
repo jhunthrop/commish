@@ -73,7 +73,7 @@ struct LobbySocketTests {
     }
 
     static func viewModel(
-        _ api: StubLobby, _ connector: ScriptedConnector, timer: RecordingTimer,
+        _ api: StubLobby, _ connector: ScriptedConnector, timer: any PollTimer,
         signedOut: @escaping @MainActor () -> Void = {}
     ) -> LobbyViewModel {
         LobbyViewModel(

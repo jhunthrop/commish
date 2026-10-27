@@ -281,6 +281,7 @@ class LobbySocketTest {
             connector: ScriptedConnector,
             waits: MutableList<Long> = mutableListOf(),
             signedOut: () -> Unit = {},
+            onWait: suspend () -> Unit = {},
         ): LobbyViewModel =
             LobbyViewModel(
                 LobbyFixtures.ID,
@@ -289,7 +290,10 @@ class LobbySocketTest {
                 { TOKEN },
                 FixedClock(LobbyFixtures.phone),
                 SessionEnd(signedOut),
-                wait = { waits += it },
+                wait = {
+                    waits += it
+                    onWait()
+                },
             )
 
         fun rowsOf(text: String): List<RoomRow>? =

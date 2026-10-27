@@ -18,6 +18,8 @@
 	let room = $state<LobbyRoom | null>(null);
 	let error = $state<unknown>(null);
 	let starting = $state(false);
+	/** The error on show is the report's read (the page did not load), not a failed bots draft. */
+	let readFailed = $state(false);
 
 	const names = $derived(
 		room
@@ -45,6 +47,7 @@
 			[room, report] = await Promise.all([rooms.lobby(id), rooms.lobbyReport(id)]);
 		} catch (e) {
 			error = e;
+			readFailed = true;
 		}
 	});
 </script>
@@ -56,7 +59,7 @@
 <Shell title="Mock draft" active="mock">
 	{#if error}
 		<div class="notice">
-			<RoomNotice {error} subject="lobby" returnTo={page.url.pathname} />
+			<RoomNotice {error} subject="lobby" returnTo={page.url.pathname} read={readFailed} />
 		</div>
 	{/if}
 	{#if report}

@@ -985,6 +985,7 @@ object Words {
         const val gone = "This lobby is gone."
         const val noSeat = "You do not have a seat in this lobby."
         const val joinLobby = "Join a lobby"
+        const val tryAgain = "Try again"
         const val onTheClock = "On the clock"
         const val clock = "Clock"
         const val yourPick = "Your pick"

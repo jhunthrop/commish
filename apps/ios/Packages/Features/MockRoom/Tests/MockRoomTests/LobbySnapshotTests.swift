@@ -11,7 +11,8 @@ import Testing
 /// The lobby's mock, over the recorded lobby (shared/fixtures/lobby-room) replayed to each state on the
 /// parity's clock, both themes, iPhone 17 Pro and iPhone SE, at 1x: the landing with three cards, one
 /// your seat; the room before the start; the room on your turn; the room between your turns with a
-/// notice; the report at 1st and well down the table.
+/// notice; the report at 1st and well down the table; a room read that did not go, with Try again beside
+/// the way out (B252).
 @MainActor
 struct LobbySnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -24,6 +25,7 @@ struct LobbySnapshotTests {
         case between
         case reportFirst = "report-first"
         case reportDown = "report-down"
+        case failed
     }
 
     struct Case: Sendable {
@@ -79,6 +81,12 @@ struct LobbySnapshotTests {
                     .padding(.vertical, Tokens.Space.s4),
                 item
             )
+        case .failed:
+            let height = MockRoomSnapshotTests.room(item.device)
+            return framed(
+                LobbyFailedView(sentence: Words.Mock.unreachable, retry: {}, back: {}).frame(height: height),
+                item
+            )
         case .reportFirst, .reportDown:
             let report = try LobbyFixture.report(item.scene == .reportFirst ? "jpk88" : "mara")
             let room = try LobbyFixture.room(complete: true)
@@ -119,7 +127,7 @@ struct LobbySnapshotTests {
         return AnyView(
             VStack(spacing: 0) {
                 LobbyTopBar(
-                    open: item.scene != .landing && !item.scene.rawValue.hasPrefix("report"),
+                    open: [.filling, .yourTurn, .between].contains(item.scene),
                     close: {},
                     leave: {}
                 )

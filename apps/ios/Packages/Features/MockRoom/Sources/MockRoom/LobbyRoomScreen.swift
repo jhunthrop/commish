@@ -168,6 +168,8 @@ public struct LobbyRoomView: View {
     private let opened: (String) -> Void
     @State private var shown = PoolModel.firstRows
     @State private var asking = false
+    /// Try again's count: a new one runs the room again (a read that did not go is read afresh).
+    @State private var attempt = 0
 
     /// `left` is the seat given up; `report` opens the report; `opened` is another lobby joined from a
     /// closed one.
@@ -192,7 +194,7 @@ public struct LobbyRoomView: View {
             content
         }
         .background(theme.color(Tokens.Color.bg))
-        .task { await viewModel.run() }
+        .task(id: attempt) { await viewModel.run() }
         .alert(viewModel.leaveQuestion, isPresented: $asking) {
             Button(Words.Lobby.leaveVerb, role: .destructive) {
                 Task {
@@ -220,13 +222,8 @@ public struct LobbyRoomView: View {
                     .with(shown: shown, more: { shown += PoolModel.moreRows }, roomNow: viewModel.roomNow)
                 }
             }
-        case let .failed(sentence, _):
-            VStack(spacing: Tokens.Space.s4) {
-                BasisText(sentence)
-                QuietButton(Words.Lobby.joinLobby, action: close)
-            }
-            .padding(Tokens.Space.s5)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case let .failed(sentence, final):
+            LobbyFailedView(sentence: sentence, retry: final ? nil : { attempt += 1 }, back: close)
         }
     }
 
@@ -253,6 +250,27 @@ public struct LobbyRoomView: View {
                 }
             }
         )
+    }
+}
+
+/// A room or a report that cannot be read: why, Try again when the read did not go (no signal, the API's
+/// own fault), and the quiet way back to the lobbies; a refusal for good keeps only the way back (B252,
+/// the Android lobby's Failed).
+struct LobbyFailedView: View {
+    let sentence: String
+    var retry: (() -> Void)?
+    let back: () -> Void
+
+    var body: some View {
+        VStack(spacing: Tokens.Space.s4) {
+            BasisText(sentence)
+            if let retry {
+                QuietButton(Words.Lobby.tryAgain, action: retry)
+            }
+            QuietButton(Words.Lobby.joinLobby, action: back)
+        }
+        .padding(Tokens.Space.s5)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -317,12 +335,7 @@ public struct LobbyReportView: View {
                     MockReportScreen(report: report, verbs: Self.verbs(viewModel, lobbies: lobbies, opened: opened))
                 }
             case let .failed(sentence):
-                VStack(spacing: Tokens.Space.s4) {
-                    BasisText(sentence)
-                    QuietButton(Words.Lobby.joinLobby, action: lobbies)
-                }
-                .padding(Tokens.Space.s5)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                LobbyFailedView(sentence: sentence, back: lobbies)
             }
         }
         .background(theme.color(Tokens.Color.bg))
