@@ -12,6 +12,7 @@ from research.headshots.config import FACE_STATUSES
 
 # A defense's face is its club's mark, never a copy.
 _NO_COPY_POSITIONS: Final = ("DEF",)
+CURATED_STATUS: Final = "curated"
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,9 +67,8 @@ def is_provider_player(conn: Connection, player_id: str) -> bool:
     return found.first() is not None
 
 
-def write(conn: Connection, season: int, player_id: str, row: Write, now: datetime) -> None:
-    """The row for (season, player), inserted or replaced whole."""
-    values = {
+def _values(row: Write, now: datetime) -> dict[str, object]:
+    return {
         "status": row.status,
         "source_url": row.source_url,
         "reason": row.reason,
@@ -77,8 +77,42 @@ def write(conn: Connection, season: int, player_id: str, row: Write, now: dateti
         "curated_at": row.curated_at,
         "updated_at": now,
     }
+
+
+def write(conn: Connection, season: int, player_id: str, row: Write, now: datetime) -> None:
+    """The row for (season, player), inserted or replaced whole."""
+    values = _values(row, now)
     statement = insert(HEADSHOT_COPIES).values(season=season, player_id=player_id, **values)
     conn.execute(statement.on_conflict_do_update(index_elements=["season", "player_id"], set_=values))
+
+
+def write_unless_curated(conn: Connection, season: int, player_id: str, row: Write, now: datetime) -> bool:
+    """The sync's write: `write`, as one statement that leaves a curated row alone, so a curation that
+    lands while the sync is working wins. False when it did."""
+    values = _values(row, now)
+    statement = insert(HEADSHOT_COPIES).values(season=season, player_id=player_id, **values)
+    upsert = statement.on_conflict_do_update(
+        index_elements=["season", "player_id"], set_=values, where=HEADSHOT_COPIES.c.status != CURATED_STATUS
+    )
+    return conn.execute(upsert.returning(HEADSHOT_COPIES.c.player_id)).first() is not None
+
+
+def lock_player(conn: Connection, season: int, player_id: str) -> None:
+    """Holds the player's season lock until the transaction ends. The sync and a curation each take
+    it around their bucket write and row write, so one runs wholly before the other."""
+    conn.execute(
+        text("select pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+        {"key": f"headshots:{season}:{player_id}"},
+    )
+
+
+def row_status(conn: Connection, season: int, player_id: str) -> str | None:
+    """His row's status for the season, None when he has no row."""
+    return conn.execute(
+        select(HEADSHOT_COPIES.c.status).where(
+            HEADSHOT_COPIES.c.season == season, HEADSHOT_COPIES.c.player_id == player_id
+        )
+    ).scalar()
 
 
 def mark_refresh(conn: Connection, season: int, player_id: str, now: datetime) -> bool:
