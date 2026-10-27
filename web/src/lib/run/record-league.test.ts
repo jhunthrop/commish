@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import {
 	honestWords,
 	leagueBasis,
+	leagueView,
 	pageLineup,
 	shownRecord,
 	weekSentence,
@@ -70,6 +71,24 @@ void test("the league's basis names its lineup across its teams and its own benc
 		/^In your ESPN league, from week 7 each graded week also grades our order and ESPN's/u
 	);
 	assert.equal(leagueBasis(espn, pageLineup(live, espn, {})).starters, null);
+});
+
+void test("the page's league view says the record, honest sentence and basis in the league's lineup", () => {
+	const view = leagueView(live, espn, players);
+	const lineup = pageLineup(live, espn, players);
+	const shown = shownRecord(live, players, lineup);
+	assert.deepEqual(view.record, shown);
+	assert.equal(view.honest, honestWords(live, shown, lineup));
+	assert.deepEqual(view.basis, leagueBasis(espn, lineup));
+	assert.equal(view.host, 'espn');
+	const uncounted = leagueView(live, espn, {});
+	assert.equal(uncounted.record, live, 'no players, the run record as written');
+	assert.equal(uncounted.honest, live.honest);
+	const week = { week: 7, benchmark: 'published' as const, ours: 97, theirs: 88.6, margin: 8.4 };
+	const withWeek = leagueView(live, { ...espn, weeks: [week] }, players);
+	assert.deepEqual(withWeek.rows, []);
+	assert.deepEqual(withWeek.sentences, [{ week: 7, text: weekSentence(week) }]);
+	assert.equal(withWeek.said, null);
 });
 
 void test('a week reads who won by how much, in either direction', () => {

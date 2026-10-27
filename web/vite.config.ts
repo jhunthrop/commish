@@ -70,6 +70,10 @@ const PILL_PARTS = /[\\/]src[\\/]lib[\\/]ui[\\/](StatusPill|StatusChip)\./;
  * member's clock: a few lines with no import but the words' own lazy one, in a file of its own, so
  * neither the shared chunk nor a page's group carries it for the others. */
 const LIVE_STATUS = /[\\/]src[\\/]lib[\\/]run[\\/]live-status\./;
+/** The list joiner (format/list.ts), five lines the board's absent format, the record's league
+ * lineup, the league pages and the user pages say lists with: a file of its own, so the record's
+ * league code never loads the board's chunk for it (Lane 253). */
+const LIST_WORDS = /[\\/]src[\\/]lib[\\/]format[\\/]list\./;
 /** The site's one word per figure (format/figure-words.ts, the sweep's X1 and X2): the board row's
  * heads, the order's, the box score's and the player card's read it (with its table, the API's
  * words.json), and no shell part does. It rides
@@ -164,7 +168,8 @@ export default defineConfig({
 						{ name: 'player', test: PLAYER_PARTS, minShareCount: 2, priority: 1 },
 						{ name: 'figure', test: FIGURE_PARTS, minShareCount: 2, priority: 1 },
 						{ name: 'forms', test: FORM_PARTS, minShareCount: 2, priority: 1 },
-						{ name: 'live', test: LIVE_STATUS, minShareCount: 2, priority: 2 }
+						{ name: 'live', test: LIVE_STATUS, minShareCount: 2, priority: 2 },
+						{ name: 'list', test: LIST_WORDS, minShareCount: 2, priority: 2 }
 					]
 				}
 			}
