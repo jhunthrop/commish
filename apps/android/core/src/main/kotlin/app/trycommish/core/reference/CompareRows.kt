@@ -7,6 +7,7 @@ import app.trycommish.api.models.RunPlayerStatus
 import app.trycommish.api.models.RunPriorSeason
 import app.trycommish.core.Format
 import app.trycommish.core.board.BoardFigures
+import app.trycommish.core.board.Byes
 import app.trycommish.core.board.GapTone
 import app.trycommish.core.start.RowStatuses
 import app.trycommish.core.start.StartRows
@@ -178,6 +179,8 @@ object CompareRows {
         second: CompareSide,
         season: Int,
         underway: Boolean,
+        /** The week a rest-of-season board ranks from, a bye before it played; null on a full season's. */
+        byesFrom: Int? = null,
     ): List<CompareRow> {
         fun <T> pair(read: (CompareSide) -> T): Pair<T, T> = read(first) to read(second)
         val held = pair { it.player.heldRank }
@@ -198,7 +201,7 @@ object CompareRows {
         rows += rangeRow(pair { it.numbers.range != null })
         rows += figures(Words.Board.adp, pair { it.numbers.adp }, fixed, null)
         rows += gapRow(pair { if (it.player.heldRank == null) it.numbers.gap else null })
-        rows += figures(Words.Board.bye, pair { it.bye?.toDouble() }, whole, null)
+        rows += byeRow(pair { it.bye }, byesFrom)
         if (underway) {
             rows += figures(Words.Figure.avg, pair { it.player.seasonSoFar?.pointsPerGame }, fixed, Better.Higher)
             rows +=
@@ -222,6 +225,17 @@ object CompareRows {
         if (gaps.first == null && gaps.second == null) return emptyList()
         val cell = { value: Double? -> CompareCell(BoardFigures.gap(value), null, GapTone.of(value)) }
         return listOf(CompareRow(GAP_LABEL, listOf(cell(gaps.first), cell(gaps.second)), range = false))
+    }
+
+    /** The Bye row as the Board's Bye cell draws it (compare-rows.ts, Lane 223): the week while ahead,
+     * blank once played, the empty figure where the run names none; dropped only when both are played. */
+    internal fun byeRow(
+        byes: Pair<Int?, Int?>,
+        byesFrom: Int?,
+    ): List<CompareRow> {
+        if (Byes.played(byes.first, byesFrom) && Byes.played(byes.second, byesFrom)) return emptyList()
+        val cells = listOf(byes.first, byes.second).map { CompareCell(Byes.cell(it, byesFrom), null, null) }
+        return listOf(CompareRow(Words.Board.bye, cells, range = false))
     }
 
     /** The Floor to ceiling row, only when one of the pair carries a range: bars, or the empty mark. */

@@ -88,6 +88,18 @@ class StubAccountScreen(
 
     override suspend fun freeSeasonFlag(): Boolean? = flag.also { check() }
 
+    /** What a delete throws instead of its 204 (the API's refusal), if anything. */
+    var deleteRefusal: Exception? = null
+
+    /** Each email a delete was sent with. */
+    var deletions: List<String> = emptyList()
+
+    override suspend fun deleteAccount(email: String) {
+        deletions = deletions + email
+        check()
+        deleteRefusal?.let { throw it }
+    }
+
     private companion object {
         const val FORBIDDEN = 403
     }

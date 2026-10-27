@@ -194,7 +194,7 @@ struct BoardParityTests {
             }
             #expect(tiers == view.tiers, "\(name)")
             let capture = view.capture ? [run.capture].compactMap(\.self) : []
-            #expect(model.basis == view.basis + capture, "\(name)")
+            #expect(try model.basis == view.basis + capture + (Self.stamp(run, position: view.position)), "\(name)")
         }
     }
 
@@ -209,7 +209,19 @@ struct BoardParityTests {
             let said = row.status.map { RunParity.Status(rank: $0.rank, mark: $0.mark, sits: $0.sits) }
             #expect(said == run.statuses[row.id], "\(row.name)")
         }
-        #expect(model.basis.last == run.capture)
+        #expect(try model.basis.dropLast(Self.stamp(run, position: nil).count).last == run.capture)
+    }
+
+    /// In season a ranked view's basis ends with the run's stamp while the order is unread (Lane 224):
+    /// the web's page says it after the basis the parity holds (live-order.ts basisAtClock).
+    static func stamp(_ run: RunParity.Run, position: String?) throws -> [String] {
+        let draftOrder = position.flatMap(BoardPosition.init(rawValue:))?.draftOrder == true
+        guard run.words.verb != PageVerb.mock.rawValue, !draftOrder else {
+            return []
+        }
+        let zone = try #require(TimeZone(identifier: runParity.zone))
+        let format = try #require(fixture(run).manifest().formats.first { $0.id == run.format })
+        return [LiveOrderWords.runStamp(format, zone: zone)].compactMap(\.self)
     }
 }
 

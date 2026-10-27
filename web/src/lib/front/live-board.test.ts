@@ -90,6 +90,7 @@ const liveRow = (id: string, rank: number, total: number, over: number): OrderRo
 		}
 	},
 	rank,
+	overall_rank: rank,
 	rest_of_season_points: total,
 	points_over_replacement: over,
 	roster: null,

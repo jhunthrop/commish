@@ -717,8 +717,6 @@ public enum Words {
 
     public enum AccountFoot {
         public static let label = "Your data"
-        public static let before = "To delete your account, write to "
-        public static let after = " from the email you sign in with. What we keep is in the "
         public static let privacy = "Privacy Policy"
         public static let joint = " and the "
         public static let terms = "Terms of Service"
@@ -939,5 +937,95 @@ public enum Words {
         public static let none = "None"
         public static let lobbyClock = "Clock in a lobby"
         public static let lobbyStarts = "A lobby starts"
+    }
+
+    public enum FormatsRank {
+        public static let head = "Position rank"
+    }
+
+    public enum LiveStrip {
+        public static let yourLeague = "your league"
+        public static let leagueAvg = "Avg in your league's scoring."
+    }
+
+    public enum LiveOrder {
+
+    }
+
+    public enum Lobby {
+        public static let join = "Join"
+        public static let yourSeat = "Your seat"
+        public static let joinWithPeople = "Join a lobby with people"
+        public static let signInToJoin = "Sign in to join a lobby"
+        public static let handleAsk = "The name the room shows the other drafters"
+        public static let handleLabel = "Handle"
+        public static let handlePlaceholder = "3 to 20 letters, digits or _"
+        public static let saveAndJoin = "Save and join"
+        public static let handleFailed = "That handle did not save."
+        public static let searchPool = "Search the pool"
+        public static let leave = "Leave"
+        public static let leaveFilling = "Leave? Your seat opens for someone else."
+        public static let leaveDrafting = "Leave? Your queue drafts your seat, then the board, and the report is yours when the draft ends."
+        public static let leaveVerb = "Leave the lobby"
+        public static let stay = "Stay"
+        public static let reconnecting = "Reconnecting to the room."
+        public static let refused = "The room refused that."
+        public static let over = "The draft is over."
+        public static let readReport = "Read the report"
+        public static let abandoned = "This lobby closed because nobody was here when it filled."
+        public static let joinAnother = "Join another lobby"
+        public static let signedOut = "Sign in to draft in a lobby. The other drafters see your handle."
+        public static let gone = "This lobby is gone."
+        public static let noSeat = "You do not have a seat in this lobby."
+        public static let joinLobby = "Join a lobby"
+        public static let onTheClock = "On the clock"
+        public static let clock = "Clock"
+        public static let yourPick = "Your pick"
+        public static let now = "Now"
+        public static let yourPickIsNow = "Your pick is now"
+        public static let seatOnClock = "on the clock"
+        public static let seatLeft = "left, queue drafts"
+        public static let seatDrafter = "drafter"
+        public static let seatWaiting = "waiting"
+        public static let seatOpen = "open"
+        public static let seats = "Seats"
+        public static let standInWeb = "a bot takes any seat that closes the tab"
+        public static let standInApp = "a bot takes any seat that closes the app"
+        public static let justTaken = "just taken, newest first"
+        public static let leftTitle = "You left a lobby"
+        public static let leftOver = "The draft is over and your report is ready."
+        public static let leftDrafting = "Your queue drafts your seat, then the board. Return and the seat is yours again."
+        public static let returnVerb = "Return to the lobby"
+    }
+
+    public enum DeleteAccount {
+        public static let title = "Delete account"
+        public static let heading = "Delete your account"
+        public static let lead = "Your account and everything kept with it go for good. This cannot be undone."
+        public static let deletedHead = "Deleted"
+        public static let keptHead = "Kept"
+        public static let signedInAs = "Signed in as"
+        public static let confirm = "Type your email to confirm"
+        public static let verb = "Delete account"
+        public static let sheetVerb = "Delete my account"
+        public static let failed = "Your account was not deleted. Try again."
+        public static let doneTitle = "Your account is deleted"
+        public static let doneLine = "Everything kept with it is gone, and you are signed out on every device."
+        public static let home = "Back to Commish"
+        public static let signedOutTitle = "Sign in to delete your account"
+        public static let signedOutLine = "Sign in with the account to delete, and you come back to this page."
+        public static let signIn = "Sign in"
+        public static let offlineTitle = "You're offline"
+        public static let offlineLine = "This page loads your account as soon as you are back online."
+        public static let unreachableTitle = "Your account can't be reached right now"
+        public static let unreachableLine = "Nothing was deleted."
+        public static let tryAgain = "Try again"
+        public static let deleted: [String] = ["Your sign-in, email, name and handle", "Your cheat sheets and their exports", "Your mock drafts and their reports", "The leagues you follow and your platform connections", "Every browser and phone paired with your account", "Your passes and your membership"]
+        public static let kept: [String] = ["Your seats and picks in lobby drafts, under the name Former member", "A group pass you bought, for the people who claimed it"]
+    }
+
+    public enum AccountDeleteFoot {
+        public static let verb = "Delete account"
+        public static let keep = "What we keep is in the "
     }
 }

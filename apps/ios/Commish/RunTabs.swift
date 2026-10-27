@@ -10,7 +10,7 @@ struct RankingsTab: View {
     init(environment: AppEnvironment, inSeason: Bool, query: String, expired: @escaping @MainActor () -> Void) {
         _viewModel = State(initialValue: RankingsViewModel(
             api: environment.api, cache: environment.cache, clock: environment.clock, inSeason: inSeason,
-            query: query, onSignedOut: expired
+            query: query, memo: environment.orderMemo, onSignedOut: expired
         ))
     }
 

@@ -26,8 +26,9 @@ public struct TierBox: Equatable, Sendable {
     public let basis: String
 }
 
-/// The every-format table (player-words.ts formatTable, the page's table): its points head, each format's
-/// row, and why the formats need not line up.
+/// The every-format table (player-words.ts formatTable, the page's table): its rank and points heads,
+/// each format's row, why the formats need not line up, and at the read's clock which formats show no
+/// position rank (Lane 224, the web's lineRanksAt).
 public struct FormatsTable: Equatable, Sendable {
     public struct Row: Equatable, Sendable, Identifiable {
         public let label: String
@@ -41,9 +42,33 @@ public struct FormatsTable: Equatable, Sendable {
         }
     }
 
+    /// "Position rank": his place at his position, the head's own figure.
+    public let rankHead: String
     public let head: String
     public let rows: [Row]
     public let note: String?
+    /// Under the table when a format's rank reads "--": "Half PPR and Standard show no position rank at
+    /// this read; their points are."
+    public let footnote: String?
+}
+
+/// The every-format table at the read's clock (week-words.ts LiveFormats): its points head and each
+/// format's figures by the API's name for it.
+struct LiveFormats: Equatable {
+    struct Figure: Equatable {
+        let points: Double
+        let vor: Double?
+    }
+
+    let head: String
+    let figures: [String: Figure]
+}
+
+/// The read's rank for the every-format table (live-figures.ts RankRead): his place at his position in
+/// the format the read is in.
+struct RankRead: Equatable {
+    let format: String?
+    let positionRank: Int?
 }
 
 /// A fact the written read will be built from (run/unwritten-words.ts UnwrittenLine).
@@ -75,6 +100,11 @@ enum PageSections {
     /// rest-from.ts playerRestWords: "from week 7", "with no game left".
     static func restWords(_ week: Int?) -> String {
         week.map { RunWords.restFrom(week: $0, partial: false) } ?? "with no game left"
+    }
+
+    /// rest-from.ts restOfSeasonHead: the every-format table's points head, "Rest of season from week 7".
+    static func restHead(_ week: Int?) -> String {
+        "Rest of season \(restWords(week))"
     }
 
     /// The tier box over the leading board, nil where he is not on it.
@@ -122,6 +152,54 @@ enum PageSections {
         let rest: Bool
     }
 
+    /// week-words.ts formatsOf over restNow: the read's every-format figures, only when it carries one
+    /// for the page's lead format (its rest tile's); nil before the season, with no read, or on a read
+    /// with none, so the run's figures and their head stand together.
+    static func liveFormats(_ week: PlayerWeek?, lead: RunFormat) -> LiveFormats? {
+        let api = { (figure: Components.Schemas.RestOfSeasonFigure) in
+            figure.format.value1?.rawValue ?? figure.format.value2
+        }
+        guard let week, lead.rosFromWeek != nil, let board = lead.apiFormat, let all = week.restOfSeason,
+              all.contains(where: { api($0) == board })
+        else {
+            return nil
+        }
+        return LiveFormats(
+            head: restHead(week.restFromWeek),
+            figures: Dictionary(
+                all.compactMap { figure in api(figure).map { (
+                    $0,
+                    LiveFormats.Figure(points: figure.points, vor: figure.pointsOverReplacement)
+                ) } },
+                uniquingKeysWith: { first, _ in first }
+            )
+        )
+    }
+
+    /// live-figures.ts lineFiguresAt: one format line's points and Over repl., the read's once its
+    /// figures stand (a figure it lacks the empty one).
+    static func lineFigures(_ line: Line, live: LiveFormats?) -> (points: Double?, vor: Double?) {
+        guard let live else {
+            return (line.numbers.projected, line.numbers.vor)
+        }
+        let read = line.format.apiFormat.flatMap { live.figures[$0] }
+        return (read?.points, read?.vor)
+    }
+
+    /// live-figures.ts lineRanksAt: while the figures are the run's every rank is the run's; once the
+    /// read's figures stand, the read's format takes the head's rank and every other shows none, as the
+    /// read places him in its own format alone (the per-format rank is an API field still to come,
+    /// B206). `unranked` is the labels of the lines that show none, for the table's one footnote.
+    static func lineRanks(_ lines: [Line], live: LiveFormats?, read: RankRead?) -> (ranks: [Int?], unranked: [String]) {
+        guard live != nil, let read else {
+            return (lines.map(\.numbers.positionRank), [])
+        }
+        let ranks = lines.map { line in
+            line.format.apiFormat != nil && line.format.apiFormat == read.format ? read.positionRank : nil
+        }
+        return (ranks, zip(lines, ranks).filter { $0.1 == nil }.map(\.0.format.label))
+    }
+
     static func lines(_ player: RunPlayer, formats: [RunFormat]) -> [Line] {
         formats.compactMap { format in
             player.formats.additionalProperties[format.id].map {
@@ -130,14 +208,26 @@ enum PageSections {
         }
     }
 
-    /// player-words.ts formatTable, with the page's rows; nil with one format, which the page draws none of.
-    static func formats(_ lines: [Line], held: String?) -> FormatsTable? {
+    /// What the every-format table is drawn over: his position, the word his ranks show as on a
+    /// season-long list, and at the read's clock its figures and its rank.
+    struct FormatsFacts {
+        let position: String
+        let held: String?
+        let live: LiveFormats?
+        let read: RankRead?
+    }
+
+    /// player-words.ts formatTable, with the page's rows on one clock (Lane 224, the web's Lane 220):
+    /// his position rank in each format ("RB 15") beside its points and Over repl., the run's or the
+    /// read's; nil with one format, which the page draws none of.
+    static func formats(_ lines: [Line], facts: FormatsFacts) -> FormatsTable? {
+        let held = facts.held
         guard lines.count > 1 else {
             return nil
         }
         let from = { (entry: Line) in
             let week = entry.format.rosFromWeek == nil ? nil : (entry.numbers.restFromWeek ?? entry.format.rosFromWeek)
-            return "Rest of season \(restWords(week))"
+            return restHead(week)
         }
         let rest = lines.filter(\.rest)
         let note = rest.count > 1 ? fittedApart : nil
@@ -151,16 +241,21 @@ enum PageSections {
             head = Words.Figure.projected
             labels = lines.map { $0.rest ? "\($0.format.label), \(from($0).lowercased())" : $0.format.label }
         }
+        let ranks = lineRanks(lines, live: facts.live, read: facts.read)
+        let rows = zip(lines, labels).enumerated().map { index, pair in
+            let (line, label) = pair
+            let figures = lineFigures(line, live: facts.live)
+            return FormatsTable.Row(
+                label: label,
+                rank: held ?? ranks.ranks[index].map { "\(facts.position) \($0)" } ?? Words.Box.none,
+                points: figures.points.map { Formatting.fixed($0) } ?? Words.Box.none,
+                vor: figures.vor.map { BoardFigures.signed($0) } ?? Words.Box.none,
+                tier: held ?? String(line.numbers.tier)
+            )
+        }
         return FormatsTable(
-            head: head,
-            rows: zip(lines, labels).map { line, label in
-                FormatsTable.Row(
-                    label: label, rank: held ?? String(line.numbers.ourRank),
-                    points: Formatting.fixed(line.numbers.projected), vor: BoardFigures.signed(line.numbers.vor),
-                    tier: held ?? String(line.numbers.tier)
-                )
-            },
-            note: note
+            rankHead: Words.FormatsRank.head, head: facts.live?.head ?? head, rows: rows, note: note,
+            footnote: ranks.unranked.isEmpty ? nil : LiveOrderWords.unranked(ranks.unranked)
         )
     }
 

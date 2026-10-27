@@ -39,6 +39,24 @@ struct CompareNumbers: Equatable, Sendable {
         ceiling = row.ceiling
     }
 
+    private init(_ numbers: CompareNumbers, figures: PlacedFigures) {
+        ourRank = figures.ourRank
+        positionRank = figures.positionRank
+        projected = figures.projected
+        vor = figures.vor
+        adp = numbers.adp
+        gap = figures.gap
+        floor = numbers.floor
+        median = numbers.median
+        ceiling = numbers.ceiling
+    }
+
+    /// His numbers at the order's clock (live-order.ts placedAt): the order's rank, place, points and
+    /// value, the run's Gap unsaid; his ADP and range as the run gives them.
+    func at(_ place: LivePlace, teams: Int) -> CompareNumbers {
+        CompareNumbers(self, figures: place.figures(teams: teams, runPositionRank: positionRank))
+    }
+
     /// compare-rows.ts sideRange: all three, or none.
     var range: CompareRange? {
         guard let floor, let median, let ceiling else {

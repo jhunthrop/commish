@@ -163,10 +163,13 @@ export interface LiveRest {
 	from: string;
 }
 
-/** The every-format table at the read's clock: its points head and each format's figures. */
+/** The every-format table at the read's clock: its points head, each format's figures and each
+ * format's position rank from the same answer (Lane 227, B206), null for a format the order does not
+ * place him in; `ranks` is null on an answer older than those ranks, where none carries one. */
 export interface LiveFormats {
 	head: string;
 	figures: Partial<Record<BoardFormat, { points: number; vor: number | null }>>;
+	ranks: Partial<Record<BoardFormat, number | null>> | null;
 }
 
 /** The tier box at the read's clock: each listed player's points, his rank as the read ranks him and
@@ -191,7 +194,13 @@ function formatsOf(week: PlayerWeek, now: LiveRest | null): LiveFormats | null {
 	const figures = Object.fromEntries(
 		week.rest_of_season.map((f) => [f.format, { points: f.points, vor: f.points_over_replacement }])
 	);
-	return { head: restOfSeasonHead(now.from), figures };
+	// The API leaves a null rank out of the answer, so a read whose figures carry none at all is read
+	// as an older answer: the table then keeps the older rule (live-figures.ts lineRanksAt).
+	const ranked = week.rest_of_season.some((f) => f.position_rank != null);
+	const ranks = ranked
+		? Object.fromEntries(week.rest_of_season.map((f) => [f.format, f.position_rank ?? null]))
+		: null;
+	return { head: restOfSeasonHead(now.from), figures, ranks };
 }
 
 /** The tier box at the read's clock. Its basis names the weeks his own figure counts, the span his rest

@@ -8,6 +8,8 @@ import SwiftUI
 public struct AccountView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var editing: QuietEnd?
+    /// The confirmation sheet Delete account opened, while it is up.
+    @State private var deletion: DeleteAccountViewModel?
     private let viewModel: AccountViewModel
     private let openLeague: (String) -> Void
     private let openLink: (URL) -> Void
@@ -53,6 +55,22 @@ public struct AccountView: View {
             }
             .presentationDetents([.medium])
         }
+        .sheet(isPresented: deleting) {
+            if let deletion {
+                ScrollView { DeleteAccountSheet(viewModel: deletion) }
+                    .background(theme.color(Tokens.Color.bg))
+                    .interactiveDismissDisabled(deletion.busy)
+            }
+        }
+    }
+
+    /// Whether the delete sheet is up; a swipe down lets it go.
+    private var deleting: Binding<Bool> {
+        Binding(get: { deletion != nil }, set: { isUp in
+            if !isUp {
+                deletion = nil
+            }
+        })
     }
 
     private var screenState: AccountScreenState {
@@ -70,6 +88,7 @@ public struct AccountView: View {
             toggle: { kind, isOn in viewModel.set(kind, isOn: isOn) },
             editQuiet: { editing = $0 },
             signOut: { Task { await viewModel.signOut() } },
+            deleteAccount: { deletion = viewModel.deletion() },
             openLink: openLink
         )
     }

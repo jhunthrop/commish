@@ -111,9 +111,7 @@ enum CardTiles {
         guard let format = input.format, format.rosFromWeek != nil else {
             return fallback
         }
-        let board = format.teams == defaultTeams && format.id.hasSuffix("-\(defaultTeams)")
-            ? String(format.id.dropLast("-\(defaultTeams)".count)).replacingOccurrences(of: "-", with: "_")
-            : nil
+        let board = format.apiFormat
         let figure = week.restOfSeason?.first { ($0.format.value1?.rawValue ?? $0.format.value2) == board }
         return figure.map { fallback.with(value: tenth($0.points)) } ?? fallback
     }

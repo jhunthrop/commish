@@ -1,5 +1,6 @@
 package app.trycommish.core
 
+import app.trycommish.design.Words
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +34,7 @@ class SignInState(
 ) : AccountGeneration {
     private val signedInState = MutableStateFlow(session.token != null)
     private val messageState = MutableStateFlow<String?>(null)
+    private val noticeState = MutableStateFlow<String?>(null)
     private val generationState = MutableStateFlow(0)
     private val hooks = CopyOnWriteArrayList<() -> Unit>()
 
@@ -41,6 +43,10 @@ class SignInState(
 
     /** What the sign-in screen says about the last attempt or the last sign-out, if anything. */
     val message: StateFlow<String?> = messageState.asStateFlow()
+
+    /** The sign-in screen's quiet line, news that is not a refusal ("Your account is deleted"), drawn in the
+     * basis ink as iOS's BasisText, never the refusal red. */
+    val notice: StateFlow<String?> = noticeState.asStateFlow()
 
     /** Which account the shell shows, so it rebuilds every tab per account and no screen's state passes
      * from one member to the next on a shared phone. */
@@ -63,6 +69,7 @@ class SignInState(
             session.signOut()
             cache.clear()
             messageState.value = AppWords.signedOut
+            noticeState.value = null
             signedOutNow()
         }
 
@@ -75,14 +82,30 @@ class SignInState(
                 signOutSession()
             } finally {
                 messageState.value = null
+                noticeState.value = null
                 signedOutNow()
             }
         logout?.let(openLogout)
     }
 
+    /** The account was deleted (POST /me/delete answered 204): the phone forgets its token and every kept
+     * answer as a sign-out does, with nothing to revoke (the API deleted every device) and no sign-in
+     * provider's logout (the API deleted the user), and the sign-in screen says so, as a quiet notice, until the next sign-in.
+     * The account is let go in the sign-out's order: the token and the kept answers, then the signed-in flag,
+     * the generation and every sign-out hook (the shell forgets the account). The line is held in memory
+     * only, so it does not outlast this launch. */
+    fun deleted() {
+        session.signOut()
+        cache.clear()
+        messageState.value = null
+        noticeState.value = Words.DeleteAccount.doneTitle
+        signedOutNow()
+    }
+
     /** A sign-in finished: the tabs read the account. */
     fun signedInNow() {
         messageState.value = null
+        noticeState.value = null
         if (!signedInState.value) generationState.value++
         signedInState.value = true
     }
@@ -100,5 +123,6 @@ class SignInState(
     /** A sign-in did not finish: the screen says why. */
     fun refused(message: String) {
         messageState.value = message
+        noticeState.value = null
     }
 }

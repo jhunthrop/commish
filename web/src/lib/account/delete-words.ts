@@ -30,6 +30,9 @@ export const DELETE_WORDS = {
 	signedInAs: 'Signed in as',
 	confirm: 'Type your email to confirm',
 	verb: 'Delete account',
+	/** The apps' confirmation sheet's one verb (Lane 237): their Account screen's foot already says
+	 * Delete account, and opens the sheet. */
+	sheetVerb: 'Delete my account',
 	failed: 'Your account was not deleted. Try again.',
 	doneTitle: 'Your account is deleted',
 	doneLine: 'Everything kept with it is gone, and you are signed out on every device.',
@@ -45,7 +48,7 @@ export const DELETE_WORDS = {
 } as const;
 
 /** The account room's foot (Lane 233): the verb that opens this page, then the legal pages. The
- * apps still print ACCOUNT_FOOT (foot-words.ts) until their own verb lands. */
+ * apps' Account screens print the same foot, their verb opening the confirmation sheet (Lane 237). */
 export const ACCOUNT_DELETE_FOOT = {
 	verb: 'Delete account',
 	keep: 'What we keep is in the '

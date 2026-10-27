@@ -25,6 +25,8 @@ SCHEDULE=(
   "research-season-week-wed|0 18 * 1,2,9-12 3|America/New_York|inseason|The register's weekly pass, Wednesday 18:00 ET"
   "research-season-week-thu|0 14 * 1,2,9-12 4|America/New_York|inseason|The register's weekly pass and freeze, Thursday 14:00 ET"
   "research-capture-harvest|0 0,2,6-23 * * *|America/New_York|inseason-capture|The hourly provider capture, 06:00-23:00, 00:00 and 02:00 ET (00:00 reads a Monday or Thursday night final before the nightly)"
+  "research-headshots-august|0 4 * 8 *|America/New_York|headshots|Our headshot copies (research.headshots sync), daily in August, 04:00 ET"
+  "research-headshots-weekly|0 4 * 1,2,9-12 3|America/New_York|headshots|Our headshot copies (research.headshots sync), weekly in season, Wednesday 04:00 ET"
 )
 
 target_uri() {

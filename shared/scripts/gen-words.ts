@@ -1,7 +1,8 @@
 /** The word tables' generator: the web's word tables, which every screen's words live in, into JSON
  * under shared/words and the apps' `Words` enum (iOS) and object (Android), so the apps print the
  * web's words. A function-valued member builds its words from data and cannot be copied: the JSON
- * names it under `functions`, so an app knows to port it, and the apps get no constant for it.
+ * names it under `functions`, so an app knows to port it, and the apps get no constant for it. A list
+ * of strings (the delete page's Deleted and Kept lines) is copied as a list, in its order.
  *
  *   node shared/scripts/gen-words.ts
  *
@@ -29,12 +30,19 @@ export interface NamedTable {
  * functions rather than in a table. */
 export type Pick = string | readonly [key: string, exportName: string];
 
-/** One table the generator writes: its module, what it takes from it and the JSON it writes. */
-interface TableSource {
-  name: string;
+/** Where a table's words are taken from: a module and what it takes from it. */
+interface TableFrom {
   module: string;
   picks: readonly Pick[];
+}
+
+/** One table the generator writes: its module, what it takes from it and the JSON it writes; `ios`
+ * where iOS still draws the apps' older words from the pending seam (apps-pending-words.ts) while the
+ * JSON and Android draw the web's (Lane 231, B224; Lane 232 drops it). */
+interface TableSource extends TableFrom {
+  name: string;
   json: string;
+  ios?: TableFrom;
 }
 
 const SCRIPT = "shared/scripts/gen-words.ts";
@@ -52,6 +60,9 @@ const ACCOUNT_MODULE = "web/src/lib/account/words.ts";
 const REFERENCE_MODULE = "web/src/lib/site/reference-words.ts";
 const STRENGTH_MODULE = "web/src/lib/run/strength-words.ts";
 const COMPANION_MODULE = "web/src/lib/companion/words.ts";
+/** The words iOS still draws where the web has moved on (Lane 223), until Lane 232 follows. */
+const PENDING_MODULE = "shared/scripts/apps-pending-words.ts";
+const DELETE_MODULE = "web/src/lib/account/delete-words.ts";
 
 /** Every table the apps print from, the League home's first, then the box score's: its heads, the
  * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
@@ -75,7 +86,12 @@ const COMPANION_MODULE = "web/src/lib/companion/words.ts";
  * companion's (Lane 210): the followed draft's page, its start page and its signed-out words, the
  * rooms' call, pool, team and wall words it draws, the report's, and the League home's draft-day
  * entry; then the mock room's (Lane 213): its bar, the pool's row verbs, the setup's form, chips and
- * clocks, the report's verbs and a shared draft's. */
+ * clocks, the report's verbs and a shared draft's; then the lobby's (Lane 229): the landing's cards,
+ * the room's notices and leave question, the score bug, the seats strip and the report's verbs; then
+ * one value at the order's clock (Lane 224, from Lane 220): the every-format table's rank head and
+ * footnote, and the run's stamp on an in-season page that shows the run's rows, and how many of the
+ * board's players one read of the order reaches; then the delete account's (Lane 237): the
+ * page's words with what goes and what stays, and the account foot's verb. */
 export const TABLES: readonly TableSource[] = [
   {
     name: "LeagueHome",
@@ -284,10 +300,11 @@ export const TABLES: readonly TableSource[] = [
   },
   {
     name: "Bye",
-    // The apps' bye words until their lane follows the web's (Lane 223, apps-pending-words.ts).
-    module: "shared/scripts/apps-pending-words.ts",
+    module: "web/src/lib/format/bye.ts",
     picks: ["BYE_WORDS"],
     json: "shared/words/bye.json",
+    // iOS's bye words until its lane follows the web's (Lane 223, apps-pending-words.ts).
+    ios: { module: PENDING_MODULE, picks: ["BYE_WORDS"] },
   },
   {
     name: "Waivers",
@@ -442,10 +459,11 @@ export const TABLES: readonly TableSource[] = [
   },
   {
     name: "Records",
-    // The apps' record words until their lane follows the web's (Lane 223, apps-pending-words.ts).
-    module: "shared/scripts/apps-pending-words.ts",
+    module: "web/src/lib/run/records.ts",
     picks: ["RECORDS_WORDS"],
     json: "shared/words/records.json",
+    // iOS's record words until its lane follows the web's (Lane 223, apps-pending-words.ts).
+    ios: { module: PENDING_MODULE, picks: ["RECORDS_WORDS"] },
   },
   {
     name: "Pair",
@@ -606,6 +624,42 @@ export const TABLES: readonly TableSource[] = [
     picks: ["SETUP_CELLS"],
     json: "shared/words/mock-clocks.json",
   },
+  {
+    name: "FormatsRank",
+    module: "web/src/lib/player/formats-words.ts",
+    picks: ["FORMATS_RANK"],
+    json: "shared/words/formats-rank.json",
+  },
+  {
+    name: "LiveStrip",
+    module: "web/src/lib/front/live-board.ts",
+    picks: ["STRIP_WORDS"],
+    json: "shared/words/live-strip.json",
+  },
+  {
+    name: "LiveOrder",
+    module: "web/src/lib/run/live-order.ts",
+    picks: ["LIVE_ORDER_WORDS"],
+    json: "shared/words/live-order.json",
+  },
+  {
+    name: "Lobby",
+    module: "web/src/lib/room/lobby-words.ts",
+    picks: ["LOBBY"],
+    json: "shared/words/lobby.json",
+  },
+  {
+    name: "DeleteAccount",
+    module: DELETE_MODULE,
+    picks: ["DELETE_WORDS"],
+    json: "shared/words/account-delete.json",
+  },
+  {
+    name: "AccountDeleteFoot",
+    module: DELETE_MODULE,
+    picks: ["ACCOUNT_DELETE_FOOT"],
+    json: "shared/words/account-delete-foot.json",
+  },
 ];
 export const OUTPUT = {
   swift:
@@ -629,31 +683,42 @@ const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 interface Split {
   strings: [string, string][];
+  lists: [string, readonly string[]][];
   functions: string[];
 }
 
-/** The table's strings and its functions' names, or an error naming the member that is neither. */
+const isStringList = (value: unknown): value is readonly string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "string");
+
+/** The table's strings, its lists of strings and its functions' names, or an error naming the member
+ * that is none of them. */
 function split(table: WordTable, name: string): Split {
   const strings: [string, string][] = [];
+  const lists: [string, readonly string[]][] = [];
   const functions: string[] = [];
   for (const [key, value] of Object.entries(table)) {
     if (!IDENTIFIER.test(key))
       throw new Error(`${name}.${key} is not an identifier the apps can use.`);
     if (typeof value === "string") strings.push([key, value]);
+    else if (isStringList(value)) lists.push([key, value]);
     else if (typeof value === "function") functions.push(key);
     else
       throw new Error(
-        `${name}.${key} is a ${typeof value}, not a string or a function.`,
+        `${name}.${key} is a ${typeof value}, not a string, a list of strings or a function.`,
       );
   }
-  return { strings, functions };
+  return { strings, lists, functions };
 }
 
-/** One table's JSON: each string by its key, then the function members' names. */
+/** One table's JSON: each string and each list by its key, in the table's order, then the function
+ * members' names. */
 export function renderTable(table: WordTable, name: string): { json: string } {
-  const { strings, functions } = split(table, name);
+  const { functions } = split(table, name);
+  const copied = Object.entries(table).filter(
+    ([, value]) => typeof value !== "function",
+  );
   return {
-    json: `${JSON.stringify({ ...Object.fromEntries(strings), functions }, null, "\t")}\n`,
+    json: `${JSON.stringify({ ...Object.fromEntries(copied), functions }, null, "\t")}\n`,
   };
 }
 
@@ -673,24 +738,32 @@ export function renderWords(tables: readonly NamedTable[]): {
   }));
   const swift = parts
     .map(
-      ({ name, strings }) =>
-        `    public enum ${name} {\n${strings
-          .map(
+      ({ name, strings, lists }) =>
+        `    public enum ${name} {\n${[
+          ...strings.map(
             ([key, text]) =>
               `        public static let ${swiftKey(key)} = ${stringLiteral(text, "swift")}`,
-          )
-          .join("\n")}\n    }`,
+          ),
+          ...lists.map(
+            ([key, items]) =>
+              `        public static let ${swiftKey(key)}: [String] = [${items.map((text) => stringLiteral(text, "swift")).join(", ")}]`,
+          ),
+        ].join("\n")}\n    }`,
     )
     .join("\n\n");
   const kotlin = parts
     .map(
-      ({ name, strings }) =>
-        `    object ${name} {\n${strings
-          .map(
+      ({ name, strings, lists }) =>
+        `    object ${name} {\n${[
+          ...strings.map(
             ([key, text]) =>
               `        const val ${kotlinKey(key)} = ${stringLiteral(text, "kotlin")}`,
-          )
-          .join("\n")}\n    }`,
+          ),
+          ...lists.map(
+            ([key, items]) =>
+              `        val ${kotlinKey(key)}: List<String> = listOf(${items.map((text) => stringLiteral(text, "kotlin")).join(", ")})`,
+          ),
+        ].join("\n")}\n    }`,
     )
     .join("\n\n");
   const source =
@@ -751,20 +824,24 @@ export function gather(
   return Object.fromEntries(entries);
 }
 
-async function readTable(source: TableSource): Promise<NamedTable> {
-  const module = (await import(join(REPOSITORY, source.module))) as Record<
+async function readTable(name: string, from: TableFrom): Promise<NamedTable> {
+  const module = (await import(join(REPOSITORY, from.module))) as Record<
     string,
     unknown
   >;
-  return {
-    name: source.name,
-    table: gather(module, source.picks, source.module),
-  };
+  return { name, table: gather(module, from.picks, from.module) };
 }
 
 export async function generate(): Promise<Outputs> {
-  const tables = await Promise.all(TABLES.map(readTable));
-  const { swift, kotlin } = renderWords(tables);
+  const tables = await Promise.all(
+    TABLES.map((source) => readTable(source.name, source)),
+  );
+  // iOS's tables: the web's, but where it still draws the pending seam's words.
+  const iosTables = await Promise.all(
+    TABLES.map((source) => readTable(source.name, source.ios ?? source)),
+  );
+  const { kotlin } = renderWords(tables);
+  const { swift } = renderWords(iosTables);
   return new Map([
     ...TABLES.map((source, i): [string, string] => [
       source.json,

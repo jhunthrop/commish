@@ -116,8 +116,8 @@ data class BoardRow(
     /** "WR 4", "RB IR", "DST". */
     val pill: String,
     val club: String,
-    /** "Bye 11", "Bye Done" once it is before the week a rest-of-season board ranks from; null when the
-     * run names no bye for his club. */
+    /** "Bye week 11" while it is ahead of the week a rest-of-season board ranks from; null once it is
+     * played or when the run names no bye for his club. */
     val bye: String?,
     val status: RowStatus?,
     /** His projected points, the row's one big number; the empty figure for a kicker or a defense. */
@@ -145,13 +145,9 @@ internal class BoardCells(
     private val fromWeek: Int?,
     private val zone: ZoneId,
 ) {
-    /** Row.svelte's phone bye with format/bye.ts byeCell: "Bye 11", "Bye Done" for a bye before the week
-     * the board ranks from. */
-    fun bye(club: String): String? =
-        byes[club]?.let { week ->
-            val done = fromWeek != null && week < fromWeek
-            "${Words.Board.bye} ${if (done) Words.Bye.done else week.toString()}"
-        }
+    /** Row.svelte's phone bye with format/bye.ts byeLine: "Bye week 11" while it is ahead of the week the
+     * board ranks from, nothing once it is played (Lane 223, B190). */
+    fun bye(club: String): String? = Byes.line(byes[club], fromWeek)
 
     fun ranked(row: RunBoardRow): BoardRow {
         val label = BoardPosition.of(row.position.value)?.label ?: row.position.value

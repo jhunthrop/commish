@@ -201,7 +201,13 @@ class BoardParityTest {
         runs.forEach { run ->
             val model = model(run, null)
             val heats = run.getValue("heats").jsonObject
-            val byes = run.getValue("byes").jsonObject
+            // The web's phone bye (byeLine), held under webPending while `byes` stays iOS's (Lane 231).
+            val byes =
+                run
+                    .getValue("webPending")
+                    .jsonObject
+                    .getValue("byes")
+                    .jsonObject
             val statuses = run.getValue("statuses").jsonObject
             assertEquals(heats.size, model.rows.size)
             model.rows.forEach { row ->

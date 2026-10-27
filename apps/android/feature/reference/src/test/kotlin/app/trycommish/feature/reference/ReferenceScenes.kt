@@ -1,5 +1,6 @@
 package app.trycommish.feature.reference
 
+import app.trycommish.api.models.RunGameState
 import app.trycommish.core.Cache
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
@@ -8,6 +9,8 @@ import app.trycommish.core.board.RunFixture
 import app.trycommish.core.board.StubRunReads
 import app.trycommish.core.player.StubPages
 import app.trycommish.core.reference.AdpModel
+import app.trycommish.core.reference.Built
+import app.trycommish.core.reference.ClubFiles
 import app.trycommish.core.reference.ClubPageModel
 import app.trycommish.core.reference.ClubScreens
 import app.trycommish.core.reference.ClubsModel
@@ -17,6 +20,7 @@ import app.trycommish.core.reference.ReferenceReads
 import app.trycommish.core.reference.RunScreenState
 import app.trycommish.core.reference.RunScreenViewModel
 import app.trycommish.core.reference.ScheduleModel
+import app.trycommish.core.reference.scheduleModel
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import java.time.Instant
 
@@ -38,7 +42,20 @@ enum class ReferenceScene(
     CompareAbsent("compare-absent", true),
     Clubs("clubs", false),
     Club("club", false),
+
+    /** In season: a club whose bye is played (KC, week 5), its schedule saying week 6's games as the run read them. */
+    ClubInSeason("club-inseason", true),
+
+    /** In season, the Bye row with both byes ahead (BUF 7, GB 11 before the week 7 board). */
+    CompareByeAhead("compare-bye-ahead", true),
+
+    /** In season, the Bye row with one bye played (DET 6), its cell blank. */
+    CompareByePlayed("compare-bye-played", true),
     Schedule("schedule", true),
+
+    /** In season, the run read on week 6's Sunday morning: each game still to come says its kickoff with its day
+     * and zone, the longest word the grid draws (Lane 231 review H1). */
+    ScheduleUpcoming("schedule-upcoming", true),
     Stale("stale", true),
     ;
 
@@ -80,15 +97,30 @@ internal class SceneReads(
     }
 
     fun compare(): RunScreenViewModel<CompareModel> {
-        val slugs = if (scene == ReferenceScene.CompareTwo) listOf("ja-marr-chase", "rome-odunze") else listOf("jahmyr-gibbs", "nobody")
+        val slugs =
+            when (scene) {
+                ReferenceScene.CompareTwo -> listOf("ja-marr-chase", "rome-odunze")
+                ReferenceScene.CompareByeAhead -> listOf("josh-allen", "josh-jacobs")
+                ReferenceScene.CompareByePlayed -> listOf("jahmyr-gibbs", "josh-jacobs")
+                else -> listOf("jahmyr-gibbs", "nobody")
+            }
         return loaded(CompareReader.viewModel(slugs, null, reads(), zone, SessionEnd {}))
     }
 
     fun clubs(): RunScreenViewModel<ClubsModel> = loaded(ClubScreens.clubs(reads(), zone, SessionEnd {}))
 
-    fun club(): RunScreenViewModel<ClubPageModel> = loaded(ClubScreens.club("cin", reads(), zone, SessionEnd {}))
+    fun club(): RunScreenViewModel<ClubPageModel> =
+        loaded(ClubScreens.club(if (scene == ReferenceScene.ClubInSeason) "kc" else "cin", reads(), zone, SessionEnd {}))
 
-    fun schedule(): RunScreenViewModel<ScheduleModel> = loaded(ClubScreens.schedule(reads(), zone, SessionEnd {}))
+    fun schedule(): RunScreenViewModel<ScheduleModel> {
+        if (scene != ReferenceScene.ScheduleUpcoming) return loaded(ClubScreens.schedule(reads(), zone, SessionEnd {}))
+        return loaded(
+            RunScreenViewModel(reads(), zone, SessionEnd {}) { r ->
+                val files = beforeKickoff(ClubFiles.read(r, sources = false), UPCOMING_WEEK)
+                Built(scheduleModel(files, zone), files.manifest.manifest, files.reads)
+            },
+        )
+    }
 
     private companion object {
         const val HALF_HOUR = 1800L
@@ -100,4 +132,42 @@ internal fun <Model> RunScreenViewModel<Model>.model(): Model {
     val loaded = state.value
     check(loaded is RunScreenState.Loaded) { "$loaded" }
     return loaded.model
+}
+
+/** The week the upcoming scene reads before its games. */
+internal const val UPCOMING_WEEK = 6
+
+/** The run's files as a read on the Sunday morning of `week` would hold them: the Thursday game final, every
+ * other game of that week still to kick off, so its cell says its kickoff (a scene-local override of the
+ * fixture's schedule, which read every one as kicked off). */
+internal fun beforeKickoff(
+    files: ClubFiles,
+    week: Int,
+): ClubFiles {
+    val slates =
+        files.schedule.slates.map { slate ->
+            slate.copy(
+                games =
+                    slate.games.map {
+                        if (it.week == week &&
+                            it.state == RunGameState.kicked_off
+                        ) {
+                            it.copy(state = RunGameState.upcoming)
+                        } else {
+                            it
+                        }
+                    },
+            )
+        }
+    return ClubFiles(
+        files.manifest,
+        files.clubs,
+        files.schedule.copy(slates = slates),
+        files.board,
+        files.capture,
+        files.sources,
+        files.underway,
+        files.played,
+        files.reads,
+    )
 }

@@ -398,8 +398,9 @@ async function recordCase(file: string, now: string): Promise<unknown> {
 	};
 }
 
-/** The web's own record sentences, which the apps do not check yet (Lane 223 review M4): B224 holds
- * the apps to them when it drops apps-pending-words.ts. Null on a run with no weekly record. */
+/** The web's own record sentences (Lane 223 review M4), which Android's parity holds it to since Lane
+ * 231 while the live values above stay iOS's (apps-pending-words.ts) until Lane 232. Null on a run
+ * with no weekly record. */
 function webPending(run: RunRecord): unknown {
 	const weekly = weeklyAsRecord(run);
 	if (weekly === null || run.weekly === undefined) return null;
@@ -409,9 +410,15 @@ function webPending(run: RunRecord): unknown {
 		weeklyWhat: WEB_RECORDS_WORDS.weeklyWhat,
 		before: beforeLine(run.weekly.fromWeek)?.text ?? null,
 		setRulePhone: WEB_RECORDS_WORDS.setRulePhone,
+		// Each set week's order words and, graded, its phone caption with them (captionOf's words).
 		orders: weekly.weeks.flatMap((week) => {
 			const words = weeklyOrderWords(week);
-			return words === null ? [] : [{ week: week.week, order: words }];
+			if (words === null) return [];
+			const caption =
+				week.gradedAt === null
+					? null
+					: `${words}, ${WEB_RECORDS_WORDS.gradedOn(weekdayLabel(week.gradedAt))}`;
+			return [{ week: week.week, order: words, caption }];
 		}),
 		front: front === null ? null : { caption: front.caption, note: front.note }
 	};

@@ -3,7 +3,8 @@
 // the run's beside the read's. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cliffAt, lineFiguresAt, matesAt } from './live-figures.ts';
+import { FORMATS_RANK } from './formats-words.ts';
+import { cliffAt, lineFiguresAt, lineRanksAt, matesAt } from './live-figures.ts';
 
 const MATES = [
 	{ id: 'chase', projected: 182.2, positionRank: 1, span: null },
@@ -40,7 +41,8 @@ void test("once it has, a mate missing from the live board is the empty figure, 
 void test("a format the read carries no figure for is empty under the read's head", () => {
 	const formats = {
 		head: 'Rest of season from week 8',
-		figures: { ppr: { points: 195.3, vor: 52.3 } }
+		figures: { ppr: { points: 195.3, vor: 52.3 } },
+		ranks: null
 	};
 	assert.deepEqual(lineFiguresAt({ points: 214.8, vor: 71.8 }, 'ppr', formats), {
 		points: 195.3,
@@ -92,4 +94,56 @@ void test("with an answer that ranks them, the box draws the read's ranks in the
 			['lamb', 3]
 		]
 	);
+});
+
+/** The every-format table's three lines, the run's ranks first (Lane 234). */
+const LINES = [
+	{ run: 3, format: 'ppr' as const, label: 'PPR' },
+	{ run: 4, format: 'half_ppr' as const, label: 'Half PPR' },
+	{ run: 2, format: 'standard' as const, label: 'Standard' }
+];
+const READ = { format: 'ppr' as const, positionRank: 5 };
+const figures = (
+	ranks: Partial<Record<'ppr' | 'half_ppr' | 'standard', number | null>> | null
+) => ({
+	head: 'Rest of season from week 8',
+	figures: {},
+	ranks
+});
+
+void test("each format's rank is the read's in that format, from the answer its figures come from (Lane 234, B206)", () => {
+	assert.deepEqual(lineRanksAt(LINES, figures({ ppr: 5, half_ppr: 6, standard: 4 }), READ, false), {
+		ranks: [5, 6, 4],
+		unranked: [],
+		reason: 'unplaced'
+	});
+	// Never the run's rank beside the read's figures (no half-and-half): the run's 4 and 2 are gone.
+	const unplaced = lineRanksAt(LINES, figures({ ppr: 5, half_ppr: null }), READ, false);
+	assert.deepEqual(unplaced, {
+		ranks: [5, null, null],
+		unranked: ['Half PPR', 'Standard'],
+		reason: 'unplaced'
+	});
+	assert.equal(
+		FORMATS_RANK.unranked(unplaced.unranked, unplaced.reason),
+		'Our order in Half PPR and Standard does not place him at his position.'
+	);
+	// Before the read's figures stand, the run's ranks and figures together.
+	assert.deepEqual(lineRanksAt(LINES, null, READ, false).ranks, [3, 4, 2]);
+});
+
+void test("the footnote never names the read's own format, nor any for a listed player (B211)", () => {
+	const unread = { ...READ, positionRank: null };
+	// The read's own format unranked: the head says why, so the note names the others alone.
+	const own = lineRanksAt(LINES, figures({ ppr: null, half_ppr: 6 }), unread, false);
+	assert.deepEqual(own.ranks, [null, 6, null]);
+	assert.deepEqual(own.unranked, ['Standard']);
+	// A player on a season-long list: every rank none, his cells say his list, no note.
+	assert.deepEqual(lineRanksAt(LINES, figures({ ppr: null }), unread, true).unranked, []);
+	// The older answer's rule keeps the read's own format out of the note too.
+	assert.deepEqual(lineRanksAt(LINES, figures(null), unread, false), {
+		ranks: [null, null, null],
+		unranked: ['Half PPR', 'Standard'],
+		reason: 'unread'
+	});
 });

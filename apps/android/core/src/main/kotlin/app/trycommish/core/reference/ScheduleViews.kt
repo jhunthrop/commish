@@ -21,6 +21,9 @@ data class ScheduleCell(
     val value: String,
     val hard: Boolean,
     val played: Boolean,
+    /** The current week's game as the run read it: "Final", "Kicked off", "Sun 12:00 pm CT"; null on any
+     * other week (schedule-state.ts, Lane 223). */
+    val state: String? = null,
 )
 
 /** A club's row of the grid: its rank and strength pinned, its lead player's face and name, its weeks. */
@@ -46,6 +49,8 @@ data class ClubGame(
     val club: String,
     val value: String,
     val played: Boolean,
+    /** The current week's game as the run read it, after the opponent; null on any other week. */
+    val state: String? = null,
 )
 
 /** A club's hero figures (schedule-view.ts ClubHero): its strength headed and read, and its rank. */
@@ -62,6 +67,8 @@ class ClubSchedule(
     val hero: ClubHero?,
     val games: List<ClubGame>,
     val caption: String,
+    /** The line under the games naming the run's read, null without a current week. */
+    val asOf: String?,
 )
 
 /** The strength of schedule grid (schedule-view.ts scheduleGrid): every club by week, hardest first, the
@@ -74,6 +81,10 @@ data class ScheduleGridModel(
     /** The last complete week: its heads are set back. */
     val played: Int,
     val rows: List<ScheduleGridRow>,
+    /** The week whose cells say the run's game state, the one the grid opens on; null without one. */
+    val current: Int? = null,
+    /** "Week 6's games as of Wed Oct 21, 7:00 am Central.", under the grid; null without a current week. */
+    val asOf: String? = null,
 )
 
 /** The opponents counted strongest and the value they start at. */
@@ -144,6 +155,7 @@ object ScheduleViews {
         clubs: List<RunClub>,
         played: Reach,
         underway: Boolean,
+        states: StatedWeek,
     ): ClubSchedule {
         val views = views(schedule, underway)
         val hero =
@@ -161,10 +173,11 @@ object ScheduleViews {
                     club = game.opponent,
                     value = Format.fixed(value(schedule, game.opponent)),
                     played = played(game, played),
+                    state = states.word(game),
                 )
             }
         val faded = StrengthWords.played(played)
-        return ClubSchedule(hero, games, "${schedule.season} schedule${if (faded.isEmpty()) "" else ", $faded"}")
+        return ClubSchedule(hero, games, "${schedule.season} schedule${if (faded.isEmpty()) "" else ", $faded"}", states.asOf)
     }
 
     /** The grid's slates: hardest first by the strength shown, else in the clubs' order. */
@@ -183,6 +196,7 @@ object ScheduleViews {
         rows: List<RunBoardRow>,
         played: Reach,
         underway: Boolean,
+        states: StatedWeek,
     ): ScheduleGridModel {
         val lastWeek = schedule.slates.flatMap { it.games }.maxOfOrNull { it.week } ?: 0
         val weeks = (1..lastWeek).toList()
@@ -208,9 +222,11 @@ object ScheduleViews {
                         faceName = lead?.name,
                         rank = view?.rank,
                         strength = view?.let { StrengthWords.figure(it.strength) },
-                        cells = weeks.map { week -> cell(slate, week, schedule, strong.floor, played) },
+                        cells = weeks.map { week -> cell(slate, week, schedule, strong.floor, played, states) },
                     )
                 },
+            current = states.current?.week,
+            asOf = states.asOf,
         )
     }
 
@@ -220,6 +236,7 @@ object ScheduleViews {
         schedule: RunSchedule,
         strong: Double,
         played: Reach,
+        states: StatedWeek,
     ): ScheduleCell {
         val game =
             slate.games.firstOrNull { it.week == week }
@@ -232,6 +249,7 @@ object ScheduleViews {
             value = Format.fixed(value),
             hard = value >= strong,
             played = played(game, played),
+            state = states.word(game),
         )
     }
 }

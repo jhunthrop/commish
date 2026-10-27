@@ -19,6 +19,7 @@ import { SUPPORT_EMAIL } from '../src/lib/legal/contact.ts';
 import { DRAFT_NOTE } from '../src/lib/legal/legal-doc.ts';
 import { FOOT } from '../src/lib/legal/foot-words.ts';
 import { ACCOUNT_FOOT } from '../src/lib/account/foot-words.ts';
+import { ACCOUNT_DELETE_FOOT } from '../src/lib/account/delete-words.ts';
 import { ERROR_WORDS } from '../src/lib/site/error-words.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { basisLines } from './basis-lines.ts';
@@ -74,7 +75,7 @@ const CLOSED: readonly Closed[] = [
 	{ name: 'player', path: '/players/puka-nacua', ready: 'Puka Nacua', who: ['signed-out'] },
 	{ name: 'record', path: '/record', ready: 'Commish LLC', who: ['signed-out'] },
 	{ name: 'board', path: '/board', ready: 'Commish LLC', who: ['signed-out'] },
-	{ name: 'account', path: '/account', ready: ACCOUNT_FOOT.before.trim(), who: BOTH },
+	{ name: 'account', path: '/account', ready: ACCOUNT_DELETE_FOOT.keep.trim(), who: BOTH },
 	{
 		name: 'league',
 		path: `/league/${FIXTURE_IDS.league}`,
@@ -224,8 +225,8 @@ async function shootClosed(theme: Theme, width: number, who: Who, closed: Closed
 	if (closed.name === 'account') {
 		const foot = await page.locator(`section[aria-label="${ACCOUNT_FOOT.label}"]`).innerText();
 		for (const want of [
-			ACCOUNT_FOOT.before.trim(),
-			SUPPORT_EMAIL,
+			ACCOUNT_DELETE_FOOT.verb,
+			ACCOUNT_DELETE_FOOT.keep.trim(),
 			ACCOUNT_FOOT.privacy,
 			ACCOUNT_FOOT.terms
 		]) {

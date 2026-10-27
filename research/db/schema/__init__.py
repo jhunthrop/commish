@@ -13,6 +13,7 @@ Every table lives in the `research` Postgres schema and is defined once here, by
     published     published_boards, the published run's board rows (revision 0006)
     venues        stadiums and nws_grid_points, the game's place and its forecast grid (revision 0010)
     game_history  nflverse_pbp_plays, nflverse_depth_chart_weeks, game_weather (revision 0009)
+    images        headshot_copies, our headshot copies per player and season (revision 0022)
     views         club_week_finals, the one "final held" rule (revision 0014, Lane 80)
 
 `alembic/versions/0001_research_schema.py` creates exactly this, and the schema gate checks the
@@ -35,6 +36,7 @@ from research.db.schema.boards import (
 from research.db.schema.custom import CUSTOM_BOARDS, PRESEASON_CANDIDATES
 from research.db.schema.game_history import GAME_WEATHER, NFLVERSE_DEPTH_CHART_WEEKS, NFLVERSE_PBP_PLAYS
 from research.db.schema.identity import PLAYER_CROSSWALK, PLAYERS, PROPS_PLAYER_MAP, PROVIDER_PLAYERS
+from research.db.schema.images import HEADSHOT_COPIES
 from research.db.schema.market import ADP_SNAPSHOTS, PRESEASON_RANKINGS, PRESEASON_ROSTERS
 from research.db.schema.nflverse import (
     COACHES,
@@ -73,6 +75,7 @@ __all__ = [
     "ESPN_KDEF_ARCHIVE_ROWS",
     "ESPN_PROJECTION_ROWS",
     "GAME_WEATHER",
+    "HEADSHOT_COPIES",
     "METADATA",
     "MODEL_ARTIFACTS",
     "NFLVERSE_DEPTH_CHART_WEEKS",

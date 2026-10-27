@@ -56,7 +56,7 @@ class RecordViewModelTest {
             val loaded = vm.ui.value.state as RecordState.Loaded
             assertFalse(loaded.stale)
             assertEquals(
-                "Weekly record" to "Our weekly rankings against ESPN and the week's published projection",
+                "Weekly record" to "Our rest-of-season order, graded week by week against ESPN and the week's published projection",
                 loaded.model.weekly.head,
             )
             val saved = CommishJson.decodeFromString(RecordBodies.serializer(), requireNotNull(cache.read(RecordViewModel.ROUTE)).body)

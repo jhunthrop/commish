@@ -42,7 +42,9 @@ struct CommishApp: App {
             RootTabs(
                 environment: environment,
                 session: session,
-                signIn: SignInView(working: signIn.working, problem: signIn.problem, signIn: beginSignIn),
+                signIn: SignInView(
+                    working: signIn.working, problem: signIn.problem ?? session.notice, signIn: beginSignIn
+                ),
                 linked: $linked,
                 expired: { Task { await session.expire() } }
             )

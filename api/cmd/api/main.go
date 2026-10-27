@@ -142,7 +142,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	}
 	gate := &leagues.Gate{Entitlements: ents, Now: now, Log: log}
 	leagueStore := &leagues.Store{Pool: pool}
-	sheetStore := &sheets.Store{Pool: pool}
+	sheetStore := &sheets.Store{Pool: pool, Season: cfg.Board.Season}
 
 	idp := auth.NewWorkOS(cfg.WorkOS.APIKey, cfg.WorkOS.ClientID, cfg.WorkOS.RedirectURI)
 	deviceService := &devices.Service{

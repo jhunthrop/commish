@@ -9,13 +9,22 @@
 import type { components } from '#lib/api/types.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
 import type { BasisPart } from './board-basis.ts';
+import { overallOf } from '#lib/order/overall.ts';
 import { leadOf } from './held-places.ts';
 import type { PlayerFormat, PlayerStatus } from './schema.ts';
 
 type OrderAdvice = components['schemas']['OrderAdvice'];
+type OrderRow = components['schemas']['OrderRow'];
 
 /** The largest view of the order the API answers (api inseason MaxOrderRows). */
 export const ORDER_MAX_ROWS = 400;
+
+/** A page's words about the order it draws (Lane 224 review M2): when one read of the order reaches
+ * fewer players than the board ranks, how many of them the page draws. */
+export const LIVE_ORDER_WORDS = {
+	reach: (shown: number, total: number): string =>
+		`The first ${String(shown)} of the ${String(total)} players on our board, in our order.`
+} as const;
 
 /** A player's place in the order at the read's clock. */
 export interface LivePlace {
@@ -26,15 +35,22 @@ export interface LivePlace {
 	vor: number;
 }
 
+/** One row's place with both figures, his rank his number in the full order (overallOf, Lane 234);
+ * null for a row the answer gives no figure. */
+export function livePlace(row: OrderRow): LivePlace | null {
+	const projected = row.rest_of_season_points;
+	const vor = row.points_over_replacement;
+	if (projected === null || vor === null) return null;
+	return { rank: overallOf(row), positionRank: row.line.position_rank, projected, vor };
+}
+
 /** Each player the answer places with both figures, by board id. */
 export function livePlaces(answer: Pick<OrderAdvice, 'rows'>): ReadonlyMap<string, LivePlace> {
 	const places = new Map<string, LivePlace>();
 	for (const row of answer.rows) {
 		const id = row.line.player.board_id;
-		const projected = row.rest_of_season_points;
-		const vor = row.points_over_replacement;
-		if (id === null || projected === null || vor === null) continue;
-		places.set(id, { rank: row.rank, positionRank: row.line.position_rank, projected, vor });
+		const place = livePlace(row);
+		if (id !== null && place !== null) places.set(id, place);
 	}
 	return places;
 }

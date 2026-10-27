@@ -18,6 +18,7 @@ filter:
     - revokeDevice
     - pairDevice
     - getMe
+    - deleteMe
     - selectLeague
     - leagueLineup
     - planHostMove
@@ -57,3 +58,10 @@ filter:
     - sharedMock
     - sharedMockReport
     - listLeagues
+    - listLobbies
+    - joinLobby
+    - getLobby
+    - leaveLobby
+    - lobbyCard
+    - lobbyReport
+    - updateMe

@@ -174,6 +174,9 @@ class AppGraph(
     /** What the sign-in screen says about the last attempt or the last sign-out, if anything. */
     val signInMessage: StateFlow<String?> = signInState.message
 
+    /** The sign-in screen's quiet line, if any ("Your account is deleted"). */
+    val signInNotice: StateFlow<String?> = signInState.notice
+
     private val signIn = SignIn(apiBaseUrl, returnTo, Build.MODEL, ApiPairing(transport), session, SecureRandom())
     val signInFlow = SignInFlow(signIn, returnTo) { Log.w(TAG, "open the sign-in", it) }
 
@@ -314,7 +317,7 @@ class AppGraph(
             zone,
             push,
             { session.deviceId },
-            AccountHooks(::signOut, sessionEnd, leaguesChanged, signInState::holdsToken),
+            AccountHooks(::signOut, sessionEnd, leaguesChanged, signInState::holdsToken, signInState::deleted),
         )
 
     fun shellViewModel(): ShellViewModel = ShellViewModel(account, cache, clock, zone, sessionEnd, signInState)
