@@ -752,7 +752,8 @@ uv run python -m research.model.fit_inputs
 `research.inseason` (`inseason/`) replaces the Vercel cron's `season-week` and `capture-harvest`.
 Three changes from the oracle: weekly stats are read from nflverse's `stats_player` release, where
 they are published from 2025 (the oracle's `player_stats` tag answers 404, so it never saw a 2026
-outcome); a week is graded only 36 hours after its last kickoff; and a missed freeze (a week whose
+outcome); a week is graded only once every game the game table lists for it holds both clubs' results and
+stat lines as of the pass (Lane 244, `inseason/week_complete.py`); and a missed freeze (a week whose
 first kickoff passed with none) or a grade still impossible four days after the games fails the
 pass, so it is never silent.
 

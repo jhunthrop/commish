@@ -26,7 +26,7 @@ from research.db.schema import (
 from research.db.url import sqlalchemy_url
 from research.errors import SchemaDriftError
 from research.inseason import season_week
-from research.inseason.season_week import GRADE_AFTER, SeasonWeekContext
+from research.inseason.season_week import SeasonWeekContext
 from research.model.register.freeze import SERVED_SOURCE, SHIPPED_SOURCE, week_espn_read
 from research.nightly.build.season import draft_json, weekly_json
 from research.nightly.reads import draft_record, weekly_record
@@ -237,7 +237,9 @@ def test_before_any_shipped_week_the_weekly_record_starts_at_the_next_week_to_se
 
 def test_the_draft_record_grades_the_first_freeze_on_the_complete_weeks(engine: Engine) -> None:
     with engine.connect() as conn:
-        mid_week_two = draft_record.read_draft(conn, _SEASON, _LAST[2] + GRADE_AFTER - timedelta(minutes=1))
+        mid_week_two = draft_record.read_draft(
+            conn, _SEASON, _LAST[2] + draft_record.GRADE_AFTER - timedelta(minutes=1)
+        )
         draft = draft_record.read_draft(conn, _SEASON, _RUN)
     assert mid_week_two is not None
     assert draft is not None
