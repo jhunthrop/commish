@@ -57,7 +57,14 @@ class ShellRebuildTest {
         }
 
     private fun chrome() =
-        ShellChrome(mutableStateOf(MATCHUP), mutableStateOf(true), mutableStateOf("puka"), mutableStateOf("room-1"), PlayerSheetHost())
+        ShellChrome(
+            mutableStateOf(MATCHUP),
+            mutableStateOf(true),
+            mutableStateOf("puka"),
+            mutableStateOf("room-1"),
+            mutableStateOf("lobby-1/report"),
+            PlayerSheetHost(),
+        )
 
     private val player = SheetPlayer("p1", "puka-nacua", "Puka Nacua", "WR", "WR1", "LAR", null)
 
@@ -100,6 +107,7 @@ class ShellRebuildTest {
         assertFalse(chrome.switchOpen)
         assertEquals("", chrome.query)
         assertNull(chrome.mockRoom)
+        assertNull(chrome.lobby)
         assertNull(chrome.sheet.shown.value)
 
         // Still signed out: the companion waits, a shared mock opens.
