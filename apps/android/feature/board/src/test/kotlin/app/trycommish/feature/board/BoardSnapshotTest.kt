@@ -84,9 +84,10 @@ class BoardSnapshotTest(
         /** The same board while the order is unread: the run's rows with the run's stamp in the basis. */
         ClockUnread("clock-unread", null, true),
 
-        /** At the order's clock with a player the order returns with no points, put on IR after the
-         * nightly the run's capture does not list (Lane 243, B251): the All view's foot, his row after the
-         * order's ranked rows with IR and no figure, and no count line under them. */
+        /** At the order's clock with a player put on IR after the nightly the run's capture does not list,
+         * as the API answers him (Lane 243, B251, fix round 1): his points and value kept, his row after
+         * every available player with the list's word in his pill, and no count line under the All view's
+         * foot. */
         ClockMissing("clock-missing", null, true),
     }
 
@@ -152,7 +153,9 @@ class BoardSceneTest {
         assertTrue(unread.basis.last().startsWith("Projected updated"))
         val missing = modelOf(BoardSnapshotTest.Scene.ClockMissing)
         assertTrue(missing.atClock)
-        assertEquals(MISSING, missing.rows.last().id)
+        val row = missing.rows.single { it.id == MISSING }
+        assertTrue("the foot draws him", row in missing.rows.takeLast(AROUND))
+        assertTrue(row.pill.endsWith(" IR"))
         assertFalse(missing.basis.any { it.startsWith("The first") })
     }
 
@@ -193,7 +196,7 @@ private fun modelOf(scene: BoardSnapshotTest.Scene): BoardModel {
         val order =
             when (scene) {
                 BoardSnapshotTest.Scene.Clock -> OneValueFixture.order()
-                BoardSnapshotTest.Scene.ClockMissing -> OneValueFixture.missing(MISSING)
+                BoardSnapshotTest.Scene.ClockMissing -> OneValueFixture.listing(MISSING)
                 else -> null
             }
         return BoardModel.of(
@@ -253,14 +256,9 @@ private fun Mock(
     when (scene) {
         BoardSnapshotTest.Scene.Clock, BoardSnapshotTest.Scene.ClockUnread ->
             Column(bg.fillMaxWidth()) { BoardPage(model, null, firstScreen(model.sections, CLOCK_ROWS)) }
-        BoardSnapshotTest.Scene.ClockMissing ->
-            Column(bg.fillMaxWidth().padding(top = Tokens.Space.s4.dp)) {
-                BoardTable(model, model.sections.takeLast(1).map { it.copy(rows = it.rows.takeLast(AROUND)) })
-                BoardBasis(model.basis, Modifier.padding(vertical = Tokens.Space.s4.dp))
-            }
         BoardSnapshotTest.Scene.Cliff ->
             Column(bg.fillMaxWidth().padding(vertical = Tokens.Space.s4.dp)) { BoardTable(model, aroundCliff(model.sections)) }
-        BoardSnapshotTest.Scene.Foot ->
+        BoardSnapshotTest.Scene.Foot, BoardSnapshotTest.Scene.ClockMissing ->
             Column(bg.fillMaxWidth().padding(top = Tokens.Space.s4.dp)) {
                 BoardTable(model, model.sections.takeLast(1).map { it.copy(rows = it.rows.takeLast(AROUND)) })
                 BoardBasis(model.basis, Modifier.padding(vertical = Tokens.Space.s4.dp))

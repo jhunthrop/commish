@@ -83,13 +83,15 @@ object LiveOrder {
             }.toMap()
 
     /** Every row the answer returns, by board id, with figures or without: a row with none (a player put
-     * on a list after the nightly) is still the order's, drawn with its status's word (Lane 243, B251). */
+     * on a list after the nightly) is still the order's, drawn with its status's word (Lane 243, B251). A
+     * board id the answer repeats keeps its first row, as on iOS. */
     fun rows(answer: OrderAdvice): Map<String, OrderRow> =
-        answer.rows
-            .mapNotNull { row ->
+        buildMap {
+            answer.rows.forEach { row ->
                 row.line.player.boardId
-                    ?.let { it to row }
-            }.toMap()
+                    ?.let { putIfAbsent(it, row) }
+            }
+        }
 
     /** Whether the answer is cut: the view holds more players than the rows it returned (its limit). */
     fun cut(answer: OrderAdvice): Boolean = answer.total > answer.rows.size

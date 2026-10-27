@@ -197,7 +197,10 @@ private class ClockPlaces(
     val rows: Map<String, OrderRow>,
     val cut: Boolean,
     val zone: ZoneId,
-)
+) {
+    /** The status the order's own row carries for a board id, null with none or no row. */
+    fun said(id: String): HeldStatus? = rows[id]?.let { HeldStatus.of(it.line, zone) }
+}
 
 /** A ranked view at the order's clock: the rows the order places, in its order with its figures, a
  * position's as one run with no tiers, then the view's players it does not place, in the run's order with
@@ -215,23 +218,33 @@ private fun atClock(
 ): ViewRows? {
     val reached = drawn.map { it.row }.filter { it.id in clock.places }
     val placed = LiveOrder.placed(reached, { it.id }, clock.places)?.takeIf { it.isNotEmpty() } ?: return null
-    val rows = placed.map { cells.ranked(it.row, PlacedFigures.of(it.row).at(it.place, clock.teams)) }
+    val rows = placed.map { cells.placed(it.row, PlacedFigures.of(it.row).at(it.place, clock.teams), clock.said(it.row.id)) }
     val listed =
         BoardOrder
             .withStatuses(drawn, statuses)
             .map { it.row }
             .filter { it.id !in clock.places && (BoardOrder.heldOut(it.id, statuses) || it.id in clock.rows) }
-            .map { row -> cells.listed(row, clock.rows[row.id]?.let { HeldStatus.of(it.line, clock.zone) } ?: cells.held(row.id)) }
-    val sections =
-        if (position == null) {
-            listOf(BoardSection("all", null, null, rows + listed))
-        } else {
-            listOf(BoardSection(position.id, null, null, rows)) +
-                listOfNotNull(BoardSection("${position.id}-held", Words.Board.heldHead, null, listed).takeIf { listed.isNotEmpty() })
-        }
+            .map { row -> cells.listed(row, clock.said(row.id) ?: cells.held(row.id)) }
     val shown = rows.size + listed.size
     val reach = (shown to drawn.size).takeIf { clock.cut && shown < drawn.size }
-    return ViewRows(sections, carriesGap = false, atClock = true, reach = reach)
+    return ViewRows(clockSections(rows, listed, position), carriesGap = false, atClock = true, reach = reach)
+}
+
+/** A view's sections at the order's clock: All as one run, the order's rows then the rows it does not
+ * place; a position's order rows, then under the list's head only the rows on a season-long list, then the
+ * other unplaced rows with no head (Lane 243 fix round 1, M1: a row on no list never sits under it). */
+private fun clockSections(
+    rows: List<BoardRow>,
+    listed: List<BoardRow>,
+    position: BoardPosition?,
+): List<BoardSection> {
+    if (position == null) return listOf(BoardSection("all", null, null, rows + listed))
+    val (held, others) = listed.partition { it.status?.onList == true }
+    return listOfNotNull(
+        BoardSection(position.id, null, null, rows),
+        BoardSection("${position.id}-held", Words.Board.heldHead, null, held).takeIf { held.isNotEmpty() },
+        BoardSection("${position.id}-unplaced", null, null, others).takeIf { others.isNotEmpty() },
+    )
 }
 
 /** All in the run's order, a ranked position in its tiers then its season-long list, a kicker's or a

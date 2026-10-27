@@ -184,13 +184,34 @@ internal class BoardCells(
         )
     }
 
+    /** A row the order places at its clock, with the order's figures: his status the order's own row's
+     * first (`said`), else the run's (Lane 243 fix round 1, M2), and a season-long list's word in his
+     * rank's place, as the web's Rankings say such a row (order.ts orderView's # cell, `listed ?
+     * box.status.rank`). */
+    fun placed(
+        row: RunBoardRow,
+        figures: PlacedFigures,
+        said: HeldStatus?,
+    ): BoardRow {
+        val drawn = ranked(row, figures)
+        val status = said?.status ?: return drawn
+        val rank = status.rank ?: figures.positionRank.toString()
+        return drawn.copy(
+            pill = "${label(row)} $rank",
+            status = status,
+            gap = if (status.onList) BoardFigures.gap(null) else drawn.gap,
+            gapTone = if (status.onList) null else drawn.gapTone,
+            sheetPlayer = drawn.sheetPlayer?.copy(rank = rank),
+        )
+    }
+
     /** A player drawn after the order's ranked rows at its clock: one on a season-long list, or one the
      * order holds with no figure (Lane 243, B251). His status's word in his pill (`said`: the order's own
      * row's, else the run's; "--" with neither) and no figure, as the Rankings draw him (the order values
      * none for him, and the run's are another clock's). */
     fun listed(
         row: RunBoardRow,
-        said: HeldStatus? = held(row.id),
+        said: HeldStatus?,
     ): BoardRow {
         val drawn = ranked(row)
         val word = said?.word ?: Words.Box.none
