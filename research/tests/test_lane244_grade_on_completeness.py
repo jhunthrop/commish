@@ -35,6 +35,7 @@ from research.inseason.week_complete import (
     WeekState,
     earliest_grade,
     grades_from,
+    is_complete,
 )
 from research.model.register.freeze import SERVED_SOURCE
 from research.parity import databases
@@ -124,6 +125,52 @@ def test_an_incomplete_week_is_overdue_four_days_on(monkeypatch: pytest.MonkeyPa
     late = _step(monkeypatch, _MONDAY + GRADE_OVERDUE, state)
     assert early.status == "skipped"
     assert (late.status, late.detail) == ("failed", ("week 7: OVERDUE, waits on 1 game of 3, DET at TB (TB no final)",))
+
+
+# One rule (Lane 250, review M1 and L4): `is_complete` is the grade's decision and the draft record's.
+
+_INCOMPLETE: Final = WeekState(_MONDAY, 3, ("DET at TB (TB no final)",))
+_WHOLE: Final = WeekState(_MONDAY, 3, ())
+_FLOOR_MINUS: Final = _MONDAY + GRADE_FLOOR - timedelta(minutes=1)
+_FLOOR: Final = _MONDAY + GRADE_FLOOR
+# Each state and clock, and whether the week is complete then.
+_GRID: Final = (
+    (None, _FLOOR, False),
+    (_INCOMPLETE, _FLOOR, False),
+    (_INCOMPLETE, _MONDAY + timedelta(days=2), False),
+    (_WHOLE, _MONDAY, False),
+    (_WHOLE, _FLOOR_MINUS, False),
+    (_WHOLE, _FLOOR, True),
+    (_WHOLE, _MONDAY + timedelta(days=2), True),
+    (WeekState(_MONDAY, 3, (), voided=("DET at TB (2026_07_DET_TB)",)), _FLOOR, True),
+)
+
+
+@pytest.mark.parametrize(("state", "now", "complete"), _GRID)
+def test_is_complete_holds_the_six_hour_floor_and_every_game(
+    state: WeekState | None, now: datetime, complete: bool
+) -> None:
+    assert is_complete(state, now) is complete
+
+
+class _Graded:
+    boards = ()
+    skipped = ()
+
+
+@pytest.mark.parametrize(("state", "now", "complete"), [g for g in _GRID if g[0] is not None])
+def test_the_grade_grades_exactly_the_weeks_the_draft_record_counts(
+    monkeypatch: pytest.MonkeyPatch, state: WeekState, now: datetime, complete: bool
+) -> None:
+    graded: list[int] = []
+
+    def grade_week(conn: Connection, season: int, week: int, at: datetime) -> _Graded:
+        graded.append(week)
+        return _Graded()
+
+    monkeypatch.setattr(season_week, "grade_week", grade_week)
+    _step(monkeypatch, now, state)
+    assert (graded == [_WEEK]) is complete
 
 
 # End to end: the store as the ingest dates it, the check and the grade read for real.

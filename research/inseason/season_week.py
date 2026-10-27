@@ -66,7 +66,7 @@ from research.inseason import usage_steps
 from research.inseason.game_voids import void_command, void_ops_command
 from research.inseason.scoreboard import scoreboard_lines
 from research.inseason.step_result import Status, StepResult
-from research.inseason.week_complete import GRADE_FLOOR, WeekState, week_state
+from research.inseason.week_complete import GRADE_FLOOR, WeekState, is_complete, week_state
 from research.model.instants import js_iso, ms_instant
 from research.model.reads.teams import kickoff_instants_by_week
 from research.model.register.espn_fill import fill_empty_espn_yardstick
@@ -331,7 +331,8 @@ def _grade_one(context: SeasonWeekContext, week: int) -> tuple[str, bool, int]:
         waits = f"waits on {_plural(len(state.incomplete), 'game')} of {state.games}, {'; '.join(state.incomplete)}"
         fix = _void_hint(context.season, week, state) if overdue else ""
         return f"{'OVERDUE, ' if overdue else ''}{waits}{voided}{fix}", overdue, 0
-    if context.now < last + GRADE_FLOOR:
+    if not is_complete(state, context.now):
+        # The games are whole, so only the floor holds it (`is_complete`, which the draft record shares).
         return f"waits, its last kickoff {js_iso(last)} is under {GRADE_FLOOR} ago{voided}", False, 0
     try:
         with context.engine.begin() as conn:

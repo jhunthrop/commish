@@ -125,7 +125,9 @@ def week_state(conn: Connection, season: int, week: int, now: datetime) -> WeekS
         label = f"{game.away_team} at {game.home_team}"
         if game.game_id in voids:
             void = voids[game.game_id]
-            LOG.info(
+            # Debug: every nightly reads each played week's state for the draft record, and the grade
+            # step names the voided games in its own detail line (Lane 250 review L3).
+            LOG.debug(
                 "week %s of %s: %s (%s) is voided, not checked: %s", week, season, label, game.game_id, void.reason
             )
             voided.append(f"{label} ({game.game_id})")
