@@ -90,7 +90,7 @@ class RankingsViewModelTest {
             val (model, _) = vm.order()
             assertEquals("wa", reads.queries.first().search)
             assertEquals("12 matches", model.hits)
-            assertEquals(listOf("7", "9", "15"), model.rows.take(3).map { it.place })
+            assertEquals(listOf("8", "10", "20"), model.rows.take(3).map { it.place })
         }
 
     @Test

@@ -61,6 +61,19 @@ void test('the places skip a row with no board id or no figure', () => {
 	assert.deepEqual([...places.keys()], ['a']);
 });
 
+void test("a place's rank is his full-order number, his rank on an answer from before it (Lane 234)", () => {
+	const row = (rank: number, overall?: number) =>
+		({
+			rank,
+			...(overall === undefined ? {} : { overall_rank: overall }),
+			rest_of_season_points: 100,
+			points_over_replacement: 10,
+			line: { player: { board_id: 'a' }, position_rank: 4 }
+		}) as unknown as Parameters<typeof livePlaces>[0]['rows'][number];
+	assert.equal(livePlaces({ rows: [row(3, 7)] }).get('a')?.rank, 7);
+	assert.equal(livePlaces({ rows: [row(3)] }).get('a')?.rank, 3);
+});
+
 void test("compare draws the order's pair only in the board's format and only with both placed", () => {
 	const place = { rank: 2, positionRank: 15, projected: 103, vor: 52.8 };
 	const places = new Map([

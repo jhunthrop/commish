@@ -17,6 +17,7 @@ import {
 import {
 	CONTRACT_RUN_ID,
 	clubRunId,
+	FORMATS_RUN_ID,
 	ONE_BOARD_RUN_ID,
 	RECORD_LIVE_RUN_ID,
 	recordTwoRunId,
@@ -35,6 +36,7 @@ export type RunKey =
 	| 'free-agent'
 	| 'special-teams'
 	| 'oneboard'
+	| 'formats'
 	| 'record-live'
 	| 'two-upcoming'
 	| 'two-graded'
@@ -94,6 +96,15 @@ export const SHOT_RUNS: Readonly<Record<RunKey, ShotRun>> = {
 	oneboard: {
 		id: ONE_BOARD_RUN_ID,
 		write: [{ args: ['scripts/inseason-fixture/one-board-run.ts'] }],
+		fixtureRun: true
+	},
+	formats: {
+		id: FORMATS_RUN_ID,
+		write: [
+			{ args: ['scripts/inseason-fixture/one-board-run.ts'] },
+			{ args: ['scripts/inseason-fixture/one-value-run.ts'] },
+			{ args: ['scripts/inseason-fixture/formats-run.ts'] }
+		],
 		fixtureRun: true
 	},
 	'record-live': {
@@ -325,6 +336,9 @@ export const SHOT_CASES: readonly ShotCase[] = [
 	// The in-season Rankings row as a box score on a phone (Lane 209), on the graded two records' run
 	// so /record draws its weekly record, at the Sunday clock.
 	once('rankings-row-shots', 'two-graded', FIXTURE_SUNDAY_CLOCK),
+	// One number for a player everywhere (Lane 234, B233): the Rankings' full-order number with the
+	// byes last, the every-format table's rank in each scoring, and compare, at the Sunday clock.
+	once('one-number-shots', 'formats', FIXTURE_SUNDAY_CLOCK),
 	once('week-order-shots', 'standin', FIXTURE_WEEK_CLOCK, {
 		ownFixture: true,
 		args: (o) => [o.web, String(o.apiPort), o.out]

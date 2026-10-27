@@ -235,6 +235,9 @@ function formatsTable(row: RunRow, week: OrderRow, live: boolean): Json {
 	const figures = live
 		? {
 				head: 'Rest of season',
+				// The apps' formats table reads no per-format ranks yet (Lanes 226 and 232 port Lane 234's),
+				// so the parity models a read without them: the read's own format carries his place.
+				ranks: null,
 				figures: Object.fromEntries(
 					restOfSeason(week).map((figure) => [
 						figure.format,
@@ -244,14 +247,14 @@ function formatsTable(row: RunRow, week: OrderRow, live: boolean): Json {
 			}
 		: null;
 	const read = live ? { format: 'ppr' as BoardFormat, positionRank: week.line.position_rank } : null;
-	const ranks = lineRanksAt(lines, figures, read);
+	const ranks = lineRanksAt(lines, figures, read, false);
 	return {
 		rows: FORMATS.map((format, i) => {
 			const run = { points: scaled(row, format.id).projected, vor: scaled(row, format.id).vor };
 			const at = lineFiguresAt(run, format.api, figures);
 			return { format: format.id, rank: ranks.ranks[i], points: at.points, vor: at.vor };
 		}),
-		footnote: ranks.unranked.length === 0 ? null : FORMATS_RANK.unranked(ranks.unranked)
+		footnote: ranks.unranked.length === 0 ? null : FORMATS_RANK.unranked(ranks.unranked, ranks.reason)
 	};
 }
 

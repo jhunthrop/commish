@@ -72,6 +72,7 @@ const line = (name: string, position: string, over: Partial<PlayerLine> = {}): P
 const row = (name: string, over: Partial<OrderRow> = {}): OrderRow => ({
 	line: line(name, 'RB'),
 	rank: 4,
+	overall_rank: 4,
 	rest_of_season_points: 156.2,
 	points_over_replacement: 41.3,
 	roster: null,
@@ -181,7 +182,7 @@ void test('a row prints the API figures as they come', () => {
 	const view = orderView(row('Swift'), ZONE, true, NOW);
 	assert.equal(view.key, 'b-Swift');
 	assert.equal(view.box.key, 'b-Swift');
-	assert.equal(view.rank, 4);
+	assert.equal(view.place, '4');
 	assert.deepEqual(view.figures, { por: 41.3, total: 156.2, perGame: 14.2 });
 	assert.equal(view.box.proj, 16.4);
 	assert.equal(view.roster, null);

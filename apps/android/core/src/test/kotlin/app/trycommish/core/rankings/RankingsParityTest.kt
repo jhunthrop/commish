@@ -19,6 +19,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -98,15 +99,29 @@ class RankingsParityTest {
         }
     }
 
-    /** Review Focus 4: the # cell is the API's rank under every filter, a search and a position among
-     * them, never a place numbered again on the phone. */
+    /** Review Focus 4: the # cell is the API's number under every filter, a search and a position among
+     * them, never a place numbered again on the phone: his full-order number (overall_rank), a bye's too,
+     * so with the byes last the numbers skip (Lane 234). */
     @ParameterizedTest
     @ValueSource(strings = ["all", "QB", "RB", "WR", "TE", "search", "WR-search", "all-sunday"])
-    fun `every place is the API's rank under every filter`(name: String) {
+    fun `every place is the API's number under every filter`(name: String) {
         val (web, model) = order(name)
         val advice = decodeEnvelope<OrderAdvice>(body(web))
         assertEquals(advice.rows.map { it.rank }, model.rows.map { it.rank })
-        model.rows.filter { !it.bye && it.player.status?.onList != true }.forEach { assertEquals(it.rank.toString(), it.place) }
+        model.rows.zip(advice.rows).filter { (row, _) -> row.player.status?.onList != true }.forEach { (row, api) ->
+            assertEquals((api.overallRank ?: api.rank).toString(), row.place)
+        }
+    }
+
+    /** An answer from before overall_rank (the deploy window) draws each row's rank (Lane 234). */
+    @Test
+    fun `an answer without overall_rank draws its rank`() {
+        val file = File(System.getProperty("fixtures"), "inseason/order-2026-10-18T18-56-00Z.json")
+        val advice = decodeEnvelope<OrderAdvice>(file.readText())
+        val row = advice.rows.first()
+        assertEquals(row.rank, RankingsRows.overall(row.copy(overallRank = null)))
+        assertEquals(row.overallRank, RankingsRows.overall(row))
+        assertNotEquals(row.rank, row.overallRank)
     }
 
     @ParameterizedTest

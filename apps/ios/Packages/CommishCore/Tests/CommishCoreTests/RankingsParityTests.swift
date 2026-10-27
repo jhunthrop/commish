@@ -83,19 +83,35 @@ struct RankingsParityTests {
         }
     }
 
-    /// Review Focus 4: the # cell is the API's rank under every filter, a search and a position among
-    /// them, never a place numbered again on the phone.
+    /// Review Focus 4: the # cell is the API's number under every filter, a search and a position
+    /// among them, never a place numbered again on the phone: his full-order number (overall_rank), a
+    /// bye's too, so with the byes last the numbers skip (Lane 234).
     @Test(arguments: orderCases)
-    func everyPlaceIsTheAPIsRankUnderEveryFilter(name: String) throws {
+    func everyPlaceIsTheAPIsNumberUnderEveryFilter(name: String) throws {
         let (web, model) = try Self.order(name)
         let advice = try APIDecoding.envelopeData(
             OrderAdvice.self,
             from: Fixtures.data("fixtures/inseason/\(web.file)")
         )
         #expect(model.rows.map(\.rank) == advice.rows.map(\.rank))
-        for row in model.rows where !row.bye && row.player.status?.onList != true {
-            #expect(row.place == String(row.rank))
+        let overall = advice.rows.map { $0.overallRank ?? $0.rank }
+        for (row, number) in zip(model.rows, overall) where row.player.status?.onList != true {
+            #expect(row.place == String(number))
         }
+    }
+
+    /// An answer from before overall_rank (the deploy window) draws each row's rank (Lane 234).
+    @Test func anAnswerWithoutOverallRankDrawsItsRank() throws {
+        let advice = try APIDecoding.envelopeData(
+            OrderAdvice.self,
+            from: Fixtures.data("fixtures/inseason/order-2026-10-18T18-56-00Z.json")
+        )
+        let row = try #require(advice.rows.first)
+        var older = row
+        older.overallRank = nil
+        #expect(RankingsRows.overall(older) == row.rank)
+        #expect(RankingsRows.overall(row) == row.overallRank)
+        #expect(row.overallRank != row.rank)
     }
 
     @Test(arguments: weekCases)

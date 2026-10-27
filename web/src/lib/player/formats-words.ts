@@ -3,10 +3,14 @@
 export const FORMATS_RANK = {
 	/** The column's head. */
 	head: 'Position rank',
-	/** Under the table when a format's rank cell reads "--": the read places him in its own format
-	 * alone, so another format shows its points at the read with no place at his position yet. */
-	unranked: (labels: readonly string[]): string =>
-		`${joinLabels(labels)} ${labels.length === 1 ? 'shows' : 'show'} no position rank at this read, only ${labels.length === 1 ? 'its' : 'their'} points.`
+	/** Under the table when a format's rank cell reads "--", the reason for those formats alone
+	 * (Lane 234, B211): on an answer from before the per-format ranks the read places him in its own
+	 * format alone, so another shows its points with no place; else our order in that format does not
+	 * place him. The unread sentence is the apps' too (Lane 224's port), held to parity. */
+	unranked: (labels: readonly string[], reason: 'unread' | 'unplaced'): string =>
+		reason === 'unread'
+			? `${joinLabels(labels)} ${labels.length === 1 ? 'shows' : 'show'} no position rank at this read, only ${labels.length === 1 ? 'its' : 'their'} points.`
+			: `Our order in ${joinLabels(labels)} does not place him at his position.`
 } as const;
 
 /** "Half PPR", "Half PPR and Standard", "Half PPR, Standard and Superflex". */

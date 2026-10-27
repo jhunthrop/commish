@@ -63,7 +63,7 @@ struct RankingsViewModelTests {
         let (model, _) = try #require(order(viewModel))
         #expect(await api.queries.first?.search == "wa")
         #expect(model.hits == "12 matches")
-        #expect(model.rows.prefix(3).map(\.place) == ["7", "9", "15"])
+        #expect(model.rows.prefix(3).map(\.place) == ["8", "10", "20"])
     }
 
     @Test func aPositionChipReadsItsViewAndTheWeeksChipsReadTheWeek() async throws {
