@@ -100,6 +100,34 @@
 						}
 					],
 					"footnote": "Half PPR and Standard show no position rank at this read, only their points."
+				},
+				"ranked": {
+					"rows": [
+						{
+							"format": "ppr-12",
+							"rank": 15,
+							"points": 103,
+							"vor": 52.8
+						},
+						{
+							"format": "half-ppr-12",
+							"rank": 16,
+							"points": 95,
+							"vor": 48.7
+						},
+						{
+							"format": "standard-12",
+							"rank": null,
+							"points": 82.3,
+							"vor": 42.2
+						}
+					],
+					"footnote": "Our order in Standard does not place him at his position.",
+					"ranks": {
+						"ppr": 15,
+						"half_ppr": 16,
+						"standard": null
+					}
 				}
 			},
 			"restFromWeek": 7
@@ -198,6 +226,34 @@
 						}
 					],
 					"footnote": "Half PPR and Standard show no position rank at this read, only their points."
+				},
+				"ranked": {
+					"rows": [
+						{
+							"format": "ppr-12",
+							"rank": 27,
+							"points": 118,
+							"vor": 27.6
+						},
+						{
+							"format": "half-ppr-12",
+							"rank": 28,
+							"points": 108.9,
+							"vor": 25.5
+						},
+						{
+							"format": "standard-12",
+							"rank": null,
+							"points": 94.2,
+							"vor": 22
+						}
+					],
+					"footnote": "Our order in Standard does not place him at his position.",
+					"ranks": {
+						"ppr": 27,
+						"half_ppr": 28,
+						"standard": null
+					}
 				}
 			},
 			"restFromWeek": 7
@@ -295,6 +351,34 @@
 						}
 					],
 					"footnote": "Half PPR and Standard show no position rank at this read, only their points."
+				},
+				"ranked": {
+					"rows": [
+						{
+							"format": "ppr-12",
+							"rank": 4,
+							"points": 190.3,
+							"vor": 18
+						},
+						{
+							"format": "half-ppr-12",
+							"rank": 5,
+							"points": 175.6,
+							"vor": 16.6
+						},
+						{
+							"format": "standard-12",
+							"rank": null,
+							"points": 152,
+							"vor": 14.4
+						}
+					],
+					"footnote": "Our order in Standard does not place him at his position.",
+					"ranks": {
+						"ppr": 4,
+						"half_ppr": 5,
+						"standard": null
+					}
 				}
 			},
 			"restFromWeek": 6
@@ -1220,5 +1304,11 @@
 				"Our rest-of-season order from week 6's games left, by points over replacement for 12 teams, read 1:56 pm Central."
 			]
 		}
+	},
+	"clubHead": {
+		"run": "On our PPR board",
+		"read": "On our rest-of-season order",
+		"nobodyRun": "Nobody from {city} is on this board",
+		"nobodyRead": "Nobody from {city} is in this order"
 	}
 }

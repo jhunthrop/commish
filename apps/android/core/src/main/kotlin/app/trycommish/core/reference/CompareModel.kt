@@ -9,10 +9,15 @@ import app.trycommish.core.board.BoardBasis
 import app.trycommish.core.board.BoardCells
 import app.trycommish.core.board.BoardChip
 import app.trycommish.core.board.RunWords
+import app.trycommish.core.liveorder.LiveOrder
+import app.trycommish.core.liveorder.LiveOrderWords
+import app.trycommish.core.liveorder.LivePlace
+import app.trycommish.core.liveorder.OrderAtClock
 import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.shell.initialsOf
 import app.trycommish.design.Words
 import java.text.Normalizer
+import java.time.ZoneId
 
 /** A player the compare's search can set on a side: who he is, as the run's index names him. */
 data class CompareCandidate(
@@ -98,7 +103,7 @@ sealed interface CompareFound {
 }
 
 /** Everything Compare is built from. */
-class CompareInput(
+data class CompareInput(
     val manifest: RunManifest,
     val format: RunFormat,
     val sources: List<RunAdpSource>,
@@ -109,14 +114,31 @@ class CompareInput(
     val scoring: String,
     val index: List<RunIndexEntry>,
     val sides: List<CompareFound>,
-)
+    /** The member's zone, the clock the basis says its stamps on. */
+    val zone: ZoneId,
+    /** The order at the screen's clock, null while unread. */
+    val order: OrderAtClock? = null,
+) {
+    /** The players set on the sides, by name, whose order a pair reads. */
+    val names: List<String> get() = sides.mapNotNull { (it as? CompareFound.Player)?.player?.name }
+
+    /** The order's places for the pair when the run ranks the rest of the season, the answer is in the
+     * board's scoring and it places both in the board's own format, else none. */
+    fun pairPlaces(ids: List<String>): Map<String, LivePlace>? {
+        val board = manifest.formats.firstOrNull() ?: return null
+        val read = order?.takeIf { format.rosFromWeek != null && LiveOrder.inScoring(it.answer, board) } ?: return null
+        return LiveOrder.pair(ids, read.places, format.id, board.id)
+    }
+}
 
 /**
  * Compare as the web's /compare says it at 390 (routes/(run)/compare): two players side by side in a
  * format, the leader's column first, from their pages (GET /run/players/{id}, a held page's copy or the
  * board's row as the web's reader falls back), the Bye row from the clubs, the basis under the table with
  * the last season's line; the format the followed league's where the run carries it, else the run's
- * default.
+ * default. In season the pair's rank, place, points and value are the order's once it places both in the
+ * board's own format (Lane 226, placedPair), the order's lead in the board sentence's place; until then
+ * both sides are the run's, the basis with the run's stamp.
  */
 data class CompareModel(
     val title: String,
@@ -131,6 +153,8 @@ data class CompareModel(
     val candidates: List<CompareCandidate>,
     /** The slugs set on each side, as the screen's address names them. */
     val slugs: List<String?>,
+    /** Whether the pair's figures are the order's. */
+    val atClock: Boolean = false,
 ) {
     /** search.ts searchPlayers: names starting with the query first, then a later word starting with it,
      * then anywhere in a word, each in the index's order (our rank); eight at most. */
@@ -170,15 +194,30 @@ data class CompareModel(
                 else -> null
             }
 
-        fun of(input: CompareInput): CompareModel {
+        /** Each side in the compared format with his club's bye, null for one not set; at the order's clock
+         * both with the order's figures once it places the pair (placedPair), and whether it does. */
+        private fun sides(input: CompareInput): Pair<List<CompareSide?>, Boolean> {
             val format = input.format
             val byes = BoardCells.byes(input.clubs)
-            val sides =
+            val run =
                 input.sides.map { found ->
                     val player = (found as? CompareFound.Player)?.player ?: return@map null
                     val numbers = player.formats[format.id] ?: return@map null
                     CompareSide(player, numbers, byes[player.team])
                 }
+            val picked = run.filterNotNull()
+            if (picked.size != 2) return run to false
+            val places = input.pairPlaces(picked.map { it.player.id }) ?: return run to false
+            val placed =
+                run.map { side ->
+                    side?.let { places[it.player.id]?.let { place -> it.copy(numbers = it.numbers.at(place, format.teams)) } ?: it }
+                }
+            return placed to true
+        }
+
+        fun of(input: CompareInput): CompareModel {
+            val format = input.format
+            val (sides, atClock) = sides(input)
             val both = sides.filterNotNull()
             return CompareModel(
                 title = Words.ComparePage.title,
@@ -194,7 +233,8 @@ data class CompareModel(
                         }
                     },
                 slotLabels = listOf(Words.ComparePage.firstPlayer, Words.ComparePage.secondPlayer),
-                outcome = outcome(both, input),
+                outcome = outcome(both, input, atClock),
+                atClock = atClock,
                 candidates =
                     input.index.map { entry ->
                         CompareCandidate(entry.id, entry.slug, entry.name, "${entry.position.value} · ${entry.team}", folded(entry.name))
@@ -206,6 +246,7 @@ data class CompareModel(
         private fun outcome(
             both: List<CompareSide>,
             input: CompareInput,
+            atClock: Boolean,
         ): CompareOutcome {
             if (both.size != 2) return CompareOutcome.None
             return when (val verdict = Verdict.between(both[0], both[1], input.format.label)) {
@@ -228,7 +269,7 @@ data class CompareModel(
                             heads = listOf(verdict.leader, verdict.other).map(::head),
                             rows = rows,
                             scale = if (ranges.isEmpty()) null else CompareScale(ranges.minOf { it.floor }, ranges.maxOf { it.ceiling }),
-                            basis = basis(input).filter { gapRow || !it.second }.map { it.first },
+                            basis = clocked(basis(input).filter { gapRow || !it.second }.map { it.first }, input, atClock),
                         ),
                     )
                 }
@@ -257,6 +298,23 @@ data class CompareModel(
                         player.id,
                     ),
                 range = side.numbers.range,
+            )
+        }
+
+        /** The basis on the pair's clock: the order's lead in the board sentence's place, or in season the
+         * compared format's run stamp after the whole basis (basisAtClock). */
+        private fun clocked(
+            run: List<String>,
+            input: CompareInput,
+            atClock: Boolean,
+        ): List<String> {
+            val format = input.format
+            if (format.rosFromWeek == null) return run
+            return LiveOrder.basis(
+                run,
+                BoardBasis.ourBoard(format, input.manifest.season),
+                input.order?.takeIf { atClock }?.lead(format.teams, input.zone),
+                LiveOrderWords.runStamp(format, input.zone),
             )
         }
 

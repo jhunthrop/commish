@@ -118,7 +118,9 @@ internal fun screenOf(
             val stale = vm.staleWords()
             ({ AdpScreen(model, stale, model.formats, AdpActions(), model.rows.take(ADP_ROWS), still = true) })
         }
-        ReferenceScene.CompareTwo, ReferenceScene.CompareAbsent, ReferenceScene.CompareByeAhead, ReferenceScene.CompareByePlayed -> {
+        ReferenceScene.CompareTwo, ReferenceScene.CompareAbsent, ReferenceScene.CompareByeAhead, ReferenceScene.CompareByePlayed,
+        ReferenceScene.CompareClock, ReferenceScene.CompareClockUnread,
+        -> {
             val model = reads.compare().model()
             ({ CompareScreen(model, null, model.formats, CompareActions(), still = true) })
         }
@@ -126,7 +128,7 @@ internal fun screenOf(
             val model = reads.clubs().model()
             ({ ClubsScreen(model, null, ReferenceActions(), model.clubs.take(CLUB_CARDS), still = true) })
         }
-        ReferenceScene.Club, ReferenceScene.ClubInSeason -> {
+        ReferenceScene.Club, ReferenceScene.ClubInSeason, ReferenceScene.ClubClock, ReferenceScene.ClubClockUnread -> {
             val model = reads.club().model()
             ({ ClubScreen(model, null, ReferenceActions(), still = true) })
         }

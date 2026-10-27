@@ -222,6 +222,7 @@ void test("the tables: the League home's, the box score's, then the shell's and 
       "FormatsRank",
       "LiveStrip",
       "LiveOrder",
+      "ClubOrder",
       "Lobby",
       "DeleteAccount",
       "AccountDeleteFoot",

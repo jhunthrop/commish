@@ -8,6 +8,8 @@ import app.trycommish.api.models.RunPlayer
 import app.trycommish.core.SessionEnd
 import app.trycommish.core.board.RunReadFailure
 import app.trycommish.core.board.RunWords
+import app.trycommish.core.liveorder.OrderAtClock
+import app.trycommish.core.liveorder.OrderReader
 import app.trycommish.core.player.PageSource
 import app.trycommish.core.player.ReadStamp
 import app.trycommish.core.shell.FollowedLeague
@@ -50,7 +52,10 @@ object CompareReader {
         val reads: List<ReadStamp>,
     )
 
-    fun build(ask: CompareAsk): ScreenBuild<CompareModel> =
+    fun build(
+        ask: CompareAsk,
+        zone: ZoneId,
+    ): ScreenBuild<CompareModel> =
         { reads ->
             coroutineScope {
                 val manifest = reads.manifest()
@@ -82,13 +87,26 @@ object CompareReader {
                         scoring = scoring,
                         index = indexRead.value,
                         sides = found(sides, captureRead?.value, season),
+                        zone = zone,
                     )
                 val stamps =
                     listOf(manifest.at, indexRead.at, sources.await().at, clubs.await().at, scheduleRead.at) +
                         listOfNotNull(captureRead?.at) + sides.flatMap { it.reads } + completeReads
-                Built(CompareModel.of(input), manifest.value.manifest, stamps)
+                Built(CompareModel.of(input), manifest.value.manifest, stamps) { reader -> atClock(input, reader) }
             }
         }
+
+    /** The pair at the order's clock: each side read by his name, as the web's Compare reads the pair;
+     * null before the season, where a read fails or the order does not place both. */
+    private suspend fun atClock(
+        input: CompareInput,
+        reader: OrderReader,
+    ): CompareModel? {
+        if (input.format.rosFromWeek == null || input.names.size != 2) return null
+        val reads = input.names.map { reader.readOrNull(search = it) ?: return null }
+        val order = OrderAtClock.merged(reads) ?: return null
+        return CompareModel.of(input.copy(order = order)).takeIf { it.atClock }
+    }
 
     /** Each side found, a player with his status on the capture and last season's line. */
     private fun found(
@@ -187,15 +205,17 @@ object CompareReader {
         )
 
     /** Compare with the sides the address sets (its ?a= and ?b=, the pages' slugs), in the followed league's
-     * format where the run carries it. */
+     * format where the run carries it; `orders` reads the order in season, the pair drawn again at its
+     * clock. */
     fun viewModel(
         slugs: List<String?>,
         league: FollowedLeague?,
         reads: ReferenceReads,
         zone: ZoneId,
         sessionEnd: SessionEnd,
+        orders: OrderReader? = null,
     ): RunScreenViewModel<CompareModel> =
-        RunScreenViewModel(reads, zone, sessionEnd, build(CompareAsk(slugs, null, CompareAsk.runFormat(league))))
+        RunScreenViewModel(reads, zone, sessionEnd, orders, build(CompareAsk(slugs, null, CompareAsk.runFormat(league)), zone))
 }
 
 /** The member's newest ask: the one in flight, else the screen shown's. */
@@ -212,7 +232,7 @@ fun RunScreenViewModel<CompareModel>.choose(
 ): Job? {
     val current = compareAsk()?.takeIf { slot in it.slugs.indices } ?: return null
     val wanted = current.with(slot, slug)
-    return rebuild(CompareReader.build(wanted), ScreenAsk.Compare(wanted))
+    return rebuild(CompareReader.build(wanted, zone), ScreenAsk.Compare(wanted))
 }
 
 /** A format chip: the same two in that format. */
@@ -221,7 +241,7 @@ fun RunScreenViewModel<CompareModel>.chooseFormat(format: String): Job? {
     val model = (state.value as? RunScreenState.Loaded)?.model ?: return null
     val wanted = current.with(format)
     val label = model.formats.firstOrNull { it.value == format }?.label ?: format
-    return rebuild(CompareReader.build(wanted), ScreenAsk.Compare(wanted), RunWords.absent(label))
+    return rebuild(CompareReader.build(wanted, zone), ScreenAsk.Compare(wanted), RunWords.absent(label))
 }
 
 /** The format the member last chose, pressed on the chips while its read is in flight. */
