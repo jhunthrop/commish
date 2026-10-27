@@ -1,7 +1,6 @@
-/** The headshot provider's addresses, in one place (spec §2.5): a player's headshot by his board id
- * (the provider's id), and the provider's image at a drawn width, which the image route fetches. A
- * provider change touches this module and headshot.ts's matcher. Kept apart from headshot.ts, which
- * every page loads, so the pages that build no address carry none of it. */
+/** The provider's image addresses the request-time image routes fetch, in one place (spec §2.5): a
+ * club's mark at a width, and a headshot at a width for the previous web's headshot route, kept one
+ * deploy after our own copies (headshot.ts). No page builds a provider address. */
 import type { HeadshotLeague } from './headshot.ts';
 
 const ESPN_IMAGES = 'https://a.espncdn.com';
@@ -9,11 +8,6 @@ const HEADSHOT_ASPECT = 436 / 600;
 
 const headshotPath = (league: HeadshotLeague, id: string): string =>
 	`/i/headshots/${league}/players/full/${id}.png`;
-
-/** A player's headshot by his board id, as a face asks for it (the face routes it to our origin). */
-export function headshotUrlFor(boardId: string, league: HeadshotLeague = 'nfl'): string {
-	return `${ESPN_IMAGES}${headshotPath(league, boardId)}`;
-}
 
 /** A club's mark from the provider at a width, square (the club mark route's upstream, Lane 66w). */
 export function upstreamClubMarkUrl(league: string, club: string, width: number): string {

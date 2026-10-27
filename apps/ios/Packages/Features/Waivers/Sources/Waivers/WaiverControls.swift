@@ -84,7 +84,7 @@ struct FiltersView: View {
                         .foregroundStyle(theme.color(query.isEmpty ? Tokens.Color.ink3 : Tokens.Color.ink))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    TextField(Words.Waivers.find, text: Binding(get: { query }, set: find))
+                    TextField(Words.Waivers.find, text: Binding(get: { query }, set: { find($0) }))
                     #if os(iOS)
                         .textInputAutocapitalization(.never)
                     #endif

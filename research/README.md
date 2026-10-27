@@ -65,6 +65,7 @@ development the `research` schema sits beside the legacy `public` tables in the 
 | `pipeline/preseason/` | week-one rosters and depth charts, the published boards and their thin-run gate, the nightly ADP capture |
 | `pipeline/commands.py`, `pipeline/__main__.py` | the command line: every ingest, its transaction, its exit status |
 | `parity/` | the harness: scratch databases, replay, recording, the passes, the row diff, the cases, the TypeScript driver in `parity/ts/` |
+| `headshots/` | our headshot copies (Lane 241): the `headshots` job's sync, the curation command, the run's faces |
 | `JOBS.md` | every job and operator ingest, its schedule today, its transaction, its Python destination |
 
 ## The research schema
@@ -663,7 +664,7 @@ correction quotes the exact banned phrases the read was caught with. The fact sh
 ```sh
 # the nightly run, into a local directory laid out as the bucket (the web builds from it with
 # PUBLIC_RUN_BASE_URL=DIR); without --out it writes R2 (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID)
-uv run python -m research.nightly run --out DIR [--skip ingest,fit,capsules,headshots] [--regenerate-all] [--mend-only]
+uv run python -m research.nightly run --out DIR [--skip ingest,fit,capsules,week-reads] [--regenerate-all] [--mend-only]
 uv run python -m research.nightly publish --out DIR [--at ISO] [--no-dispatch]
 
 # the in-season jobs, one pass each
@@ -712,8 +713,9 @@ uv run python -m research.model.fit_inputs
    and the writer-made cases of `tests/test_season_contract.py`; the nightly's own gate run is the run over
    real pages, every night, and the held page is its safety net. No recorded night is kept in the
    repository or fetched in CI.
-6. **headshots** (`nightly/headshots.py`): every face mirrored into R2 by content
-   (`headshots/<sha256>.<ext>`), fetched conditionally, with the run's map `headshots.json`.
+6. **faces**: every `headshot` the run carries is our copy's address,
+   `https://images.trycommish.app/headshots/<season>/<player_id>/320.webp` (`headshots/faces.py`); the
+   copies are the `headshots` job's (below, "Our headshot copies"), never fetched by the nightly.
 7. **write**: every artifact, `report.json` (steps, gates and their reasons, the held-out scores,
    the capsule spend, every file's bytes and SHA-256), `manifest.json` last. A run id is claimed
    with a conditional write, so it is never reused (`2026-10-13T05`, then `2026-10-13T05-2`).
@@ -773,3 +775,30 @@ in `register/last-pass.json`, which the nightly copies into its manifest (`regis
 `frozenBy` names those ids; a week frozen before the trail is named by the first passed run that
 carries it, with a note in that run's manifest. The product season is named once,
 `research/season.py`, with the rule for moving it.
+
+### Our headshot copies (Lane 241)
+
+Every face the site and the apps draw is a copy we hold in the R2 bucket `commish-images`, public at
+`https://images.trycommish.app` (a custom domain on the site's zone; the runs bucket stays private),
+keyed `headshots/<season>/<player_id>/<width>.webp` at the widths 48, 64, 96, 128, 160, 240, 320 and
+480, each `Cache-Control: public, max-age=31536000, immutable`. The ledger is
+`research.headshot_copies` (revision 0022): one row per player and season, `copied`, `curated`,
+`refresh`, `missing` or `failed`. The API answers `.../320.webp` for a `copied` or `curated` row and
+null otherwise; the run answers the same address for every player with a copy or a provider image
+(`headshots/faces.py`); the web reads either and asks for the width it draws.
+
+    uv run python -m research.headshots sync [--season 2026] [--limit N] [--out DIR]
+    uv run python -m research.headshots curate --missing
+    uv run python -m research.headshots curate --player <id> --url <https url> --by <who>
+    uv run python -m research.headshots curate --refresh --player <id>
+
+`sync` is the Cloud Run Job `headshots` (weekly in season, daily in August, `infra/research-schedule.sh`):
+every provider player but the defenses, in ADP order; a `copied` row from the same source and every
+`curated` row are skipped with no request; at most two fetches a second, from the provider's image host
+only, no redirects, 2 MiB at most; each player's row committed on its own. `curate` takes any https
+image a person chose, writes the copy and marks the row `curated` with who and when; the sync never
+touches it again. With gcloud lapsed, `gh workflow run ops.yml -f job=headshots -f
+args=research.headshots,curate,--player,<id>,--url,<url>,--by,<who>`. A replaced copy keeps its
+address, so a browser that cached the old one keeps it up to a year; purge its eight URLs at the edge
+when a wrong face is replaced.
+

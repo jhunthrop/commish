@@ -2,7 +2,6 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { plural } from '#lib/format/number.ts';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
@@ -11,6 +10,7 @@
 	import { type LobbyRoom, type MockReport, rooms } from '#lib/room/api.ts';
 	import { seatName, seatedPeople } from '#lib/room/lobby.ts';
 	import Report from '#lib/room/report/Report.svelte';
+	import { LOBBY, seatsWords, soloAgainWords } from '#lib/room/lobby-words.ts';
 	import RoomNotice from '#lib/room/RoomNotice.svelte';
 
 	const id = $derived(page.params.id ?? '');
@@ -61,14 +61,10 @@
 	{/if}
 	{#if report}
 		{@const r = report}
-		<Report
-			report={r}
-			{names}
-			seats="{plural(people, 'drafter')}, {plural(r.teams - people, 'bot')}"
-		>
+		<Report report={r} {names} seats={seatsWords(people, r.teams)}>
 			{#snippet verbs()}
-				<Verb href={resolve('/mock/new')}>Join another lobby</Verb>
-				<Quiet onclick={solo} disabled={starting}>Run it against bots from slot {r.slot}</Quiet>
+				<Verb href={resolve('/mock/new')}>{LOBBY.joinAnother}</Verb>
+				<Quiet onclick={solo} disabled={starting}>{soloAgainWords(r.slot)}</Quiet>
 			{/snippet}
 		</Report>
 	{/if}

@@ -72,12 +72,13 @@ order by p.`+column+`, c.provider_player_id limit `+fmt.Sprint(maxHostIDs+1))
 
 // directoryQuery is the provider's roster (the ids the product names
 // players by) in ADP order, each with the universe id the boards key on
-// through the crosswalk, empty where the crosswalk has none. A free
+// through the crosswalk, empty where the crosswalk has none, and whether
+// he has a face (faceRead). A free
 // agent's club is NULL (revision 0018, Lane 123) and reads as no club,
 // "" (WireClub).
-func (s *PGSource) directoryQuery() string {
-	return `select pp.id, pp.name, pp.position, coalesce(pp.team, ''), coalesce(pp.headshot_url, ''), pp.adp, coalesce(c.player_id, '')
-from ` + s.table("provider_players") + ` pp left join ` + s.table("player_crosswalk") + ` c on c.provider_player_id = pp.id
+func (s *PGSource) directoryQuery(fr faceRead) string {
+	return `select pp.id, pp.name, pp.position, coalesce(pp.team, ''), ` + fr.column() + `, pp.adp, coalesce(c.player_id, '')
+from ` + s.table("provider_players") + ` pp left join ` + s.table("player_crosswalk") + ` c on c.provider_player_id = pp.id` + fr.join(s) + `
 order by pp.adp asc nulls last, pp.id collate "C"`
 }
 
@@ -88,7 +89,11 @@ func (s *PGSource) LoadScored(ctx context.Context, f Format, source string, asOf
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.Pool.Query(ctx, s.directoryQuery())
+	fr, err := s.faces(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.Pool.Query(ctx, s.directoryQuery(fr))
 	if err != nil {
 		return nil, fmt.Errorf("boards: read the directory: %w", err)
 	}
@@ -97,9 +102,11 @@ func (s *PGSource) LoadScored(ctx context.Context, f Format, source string, asOf
 	for rows.Next() {
 		var p Player
 		var position, universe string
-		if err := rows.Scan(&p.ID, &p.Name, &position, &p.Team, &p.Headshot, &p.ADP, &universe); err != nil {
+		var hasFace bool
+		if err := rows.Scan(&p.ID, &p.Name, &position, &p.Team, &hasFace, &p.ADP, &universe); err != nil {
 			return nil, fmt.Errorf("boards: scan the directory: %w", err)
 		}
+		p.Headshot = fr.face(p.ID, hasFace)
 		if !directoryPlayer(&p, position, byes) {
 			continue
 		}

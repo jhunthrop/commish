@@ -96,12 +96,12 @@ func (s *PGSource) Load(ctx context.Context, f Format) (*Raw, error) {
 	if err != nil {
 		return nil, err
 	}
-	query, args, err := s.boardRead(ctx, f)
+	read, err := s.boardRead(ctx, f)
 	if err != nil {
 		return nil, err
 	}
 	source := s.sourceFor(f)
-	rows, err := s.Pool.Query(ctx, query, args...)
+	rows, err := s.Pool.Query(ctx, read.sql, read.args...)
 	if err != nil {
 		return nil, fmt.Errorf("boards: read %s: %w", source, err)
 	}
@@ -109,7 +109,7 @@ func (s *PGSource) Load(ctx context.Context, f Format) (*Raw, error) {
 	raw := &Raw{Format: f, Season: s.Season, Source: source}
 	var stamp boardStamp
 	for rows.Next() {
-		p, position, err := scanBoardRow(rows, &stamp)
+		p, position, err := scanBoardRow(rows, &stamp, read.faces)
 		if err != nil {
 			return nil, fmt.Errorf("boards: scan %s: %w", source, err)
 		}
@@ -141,15 +141,17 @@ type boardStamp struct {
 }
 
 // scanBoardRow reads one directory row with its points, and the board's
-// stamp into stamp.
-func scanBoardRow(rows pgx.Rows, stamp *boardStamp) (Player, string, error) {
+// stamp into stamp; his face is our copy's address (fr).
+func scanBoardRow(rows pgx.Rows, stamp *boardStamp, fr faceRead) (Player, string, error) {
 	var p Player
 	var position string
+	var hasFace bool
 	var floor, median, ceiling *float64
-	if err := rows.Scan(&p.ID, &p.Name, &position, &p.Team, &p.Headshot, &p.ADP, &p.Points, &floor, &median, &ceiling,
+	if err := rows.Scan(&p.ID, &p.Name, &position, &p.Team, &hasFace, &p.ADP, &p.Points, &floor, &median, &ceiling,
 		&stamp.asOf, &stamp.order, &stamp.run, &stamp.fromWeek, &p.GamePoints); err != nil {
 		return Player{}, "", err
 	}
+	p.Headshot = fr.face(p.ID, hasFace)
 	if floor != nil && median != nil && ceiling != nil {
 		p.Range = &Range{Floor: *floor, Median: *median, Ceiling: *ceiling}
 	}
@@ -161,15 +163,15 @@ func scanBoardRow(rows pgx.Rows, stamp *boardStamp) (Player, string, error) {
 // order: 65 bytes over the wire where Load moves about 260 KB. A publish
 // moves it: the rows carry the published run, its points and its refresh.
 func (s *PGSource) Version(ctx context.Context, f Format) (string, error) {
-	board, args, err := s.boardRead(ctx, f)
+	read, err := s.boardRead(ctx, f)
 	if err != nil {
 		return "", err
 	}
 	query := `select md5(coalesce(string_agg(b::text, '|' order by b::text), '')) || ':' ||
   (select md5(coalesce(string_agg(y::text, '|' order by y::text), '')) from (` + s.byeQuery() + `) y)
-from (` + board + `) b`
+from (` + read.sql + `) b`
 	var version string
-	if err := s.Pool.QueryRow(ctx, query, args...).Scan(&version); err != nil {
+	if err := s.Pool.QueryRow(ctx, query, read.args...).Scan(&version); err != nil {
 		return "", fmt.Errorf("boards: version of %s: %w", s.sourceFor(f), err)
 	}
 	return version, nil

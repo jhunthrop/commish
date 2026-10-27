@@ -1,5 +1,5 @@
 """THE NIGHTLY RUN (spec §4): ingest, fit, capsules, then every artifact of spec §2.1 under one run id,
-the validation gates, the headshots, the report, and the manifest last.
+the validation gates, the report, and the manifest last. The faces are our copies (`research.headshots`).
 
 The run is first written to a local staging directory, where the web's own reader checks it (the
 `schema` gate); only then is it copied to the store, artifacts first, `report.json` and
@@ -18,7 +18,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import httpx
 from sqlalchemy import Engine
 
 from research.model.backtest import HeldOutScore
@@ -36,7 +35,6 @@ from research.nightly.run_parts import (
     StepOutcome,
     held_out,
     manifest_of,
-    mirror_faces,
     ros_setup,
     run_steps,
 )
@@ -47,7 +45,7 @@ from research.pipeline.http import Fetcher
 from research.season import PRODUCT_SEASON
 from research.web_contract import contract_dir
 
-STEPS = ("ingest", "fit", "capsules", WEEK_READS, "headshots")
+STEPS = ("ingest", "fit", "capsules", WEEK_READS)
 Json = dict[str, Any]
 
 
@@ -61,7 +59,6 @@ class RunOptions:
 class RunDeps:
     engine: Engine
     store: RunStore
-    http: httpx.Client
     fetcher: Fetcher
     environ: Mapping[str, str]
     clock: Callable[[], datetime]
@@ -189,7 +186,7 @@ def run_nightly(deps: RunDeps, options: RunOptions) -> RunOutcome:
         with tempfile.TemporaryDirectory(prefix="nightly-") as root:
             return _finish(deps, options, run_id, started, steps, assembled, frozen_by, Path(root))
     except Exception as error:
-        # Review N11: a held-out read, the face mirror or the copy to the bucket that raises fails the
+        # Review N11: a held-out read or the copy to the bucket that raises fails the
         # run with its report, as an assembly error does; no pointer has moved.
         return _failed(deps, run_id, steps, error)
 
@@ -207,9 +204,7 @@ def _finish(  # noqa: PLR0913, PLR0917 - the run's parts, handed on from `run_ni
     staging = LocalRunStore(root)
     finished = deps.clock()
     judged = _judge(deps, assembled, steps, manifest_of(run_id, finished, assembled, "pending", deps.store, frozen_by))
-    headshots, headshot_line = mirror_faces(deps.http, deps.store, assembled, "headshots" in options.skip)
-    deps.log(f"headshots: {headshot_line}")
-    writer = _stage(run_id, {**assembled.files, "headshots.json": headshots}, staging)
+    writer = _stage(run_id, assembled.files, staging)
     staging.put(
         run_key(run_id, "manifest.json"),
         encode(manifest_of(run_id, finished, assembled, "pending", deps.store, frozen_by)),
@@ -240,7 +235,6 @@ def _finish(  # noqa: PLR0913, PLR0917 - the run's parts, handed on from `run_ni
         "gates": [g.json() for g in judged.gates],
         "heldOut": [{"season": s.season, "rankCorrelation": s.rank_correlation, "sampleSize": s.sample_size} for s in judged.held_out],
         "capsuleSpend": next((asdict(s.spend) for s in steps if isinstance(s.spend, CapsuleSpend)), None),
-        "headshots": headshot_line,
         "formatsNotCarried": list(assembled.dropped),
         "restOfSeason": assembled.rest_status,
         "held": [h.json() for h in judged.held],

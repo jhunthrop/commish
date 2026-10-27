@@ -107,6 +107,5 @@ RUNS_PREFIX: Final = "runs"
 LATEST_KEY: Final = f"{RUNS_PREFIX}/latest.json"
 EARLY_KEY: Final = f"{RUNS_PREFIX}/early.json"
 HELD_OUT_BASELINE_KEY: Final = f"{RUNS_PREFIX}/held-out-baseline.json"
-HEADSHOT_REGISTRY_KEY: Final = "headshots/index.json"
 # Spec §4: a member reads a run an hour before the public build.
 EARLY_ACCESS: Final = timedelta(hours=1)

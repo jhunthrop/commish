@@ -88,7 +88,9 @@ type Player struct {
 	// Team is his club's code, "" for a free agent (Lane 123): no club,
 	// so no bye, no game and no opponent; WireClub is how an answer
 	// names it.
-	Team     string
+	Team string
+	// Headshot is our copy of his headshot (faces.go, Lane 241), "" when
+	// the season has none.
 	Headshot string
 	// ADP is where drafters take him, nil when no source has him.
 	ADP *float64

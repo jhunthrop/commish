@@ -33,10 +33,10 @@ func (s *PGSource) preseasonCTEs(gate string) string {
 // preseasonQuery is the provider's roster (the ids the product names
 // players by) in ADP order, each with the stored board's points: the read
 // for a schema the 0006 migration has not reached.
-func (s *PGSource) preseasonQuery(m marketRead) string {
+func (s *PGSource) preseasonQuery(m marketRead, fr faceRead) string {
 	return `with ` + s.preseasonCTEs("") + m.cte(s) + `
-select ` + m.columns() + `, (select as_of from latest), '` + string(OrderPreseason) + `'::text, ''::text, 0, null::double precision
-from ` + s.table("provider_players") + ` pp left join proj board on board.player_id = pp.id` + m.join() + m.order()
+select ` + m.columns(fr) + `, (select as_of from latest), '` + string(OrderPreseason) + `'::text, ''::text, 0, null::double precision
+from ` + s.table("provider_players") + ` pp left join proj board on board.player_id = pp.id` + m.join() + fr.join(s) + m.order()
 }
 
 // publishedQuery is the same roster with the published run's rows for
@@ -46,7 +46,7 @@ from ` + s.table("provider_players") + ` pp left join proj board on board.player
 // table holds: without from_week (research revision 0007) the run's first
 // week reads as 0, without game_points (revision 0015, Lane 96) each
 // player's points for one more club game read as null.
-func (s *PGSource) publishedQuery(cols publishedColumns, m marketRead) string {
+func (s *PGSource) publishedQuery(cols publishedColumns, m marketRead, fr faceRead) string {
 	week, game := "0", "null::double precision"
 	if cols.fromWeek {
 		week = "from_week"
@@ -62,40 +62,52 @@ func (s *PGSource) publishedQuery(cols publishedColumns, m marketRead) string {
   select player_id, points, floor_points, median_points, ceiling_points, game_points from pub
   union all select player_id, points, floor_points, median_points, ceiling_points, null::double precision from proj
 )` + m.cte(s) + `
-select ` + m.columns() + `,
+select ` + m.columns(fr) + `,
   coalesce((select max(refreshed) from pub), (select as_of from latest)),
   coalesce((select min(order_basis) from pub), '` + string(OrderPreseason) + `'),
   coalesce((select min(run_id) from pub), ''),
   coalesce((select min(from_week) from pub), 0),
   board.game_points
-from ` + s.table("provider_players") + ` pp left join board on board.player_id = pp.id` + m.join() + m.order()
+from ` + s.table("provider_players") + ` pp left join board on board.player_id = pp.id` + m.join() + fr.join(s) + m.order()
 }
 
-// boardRead is the statement Load and Version read f's board with, and
-// its arguments.
-func (s *PGSource) boardRead(ctx context.Context, f Format) (string, []any, error) {
+// boardQuery is the statement Load and Version read a board with, its
+// arguments, and the face read whose column it carries.
+type boardQuery struct {
+	sql   string
+	args  []any
+	faces faceRead
+}
+
+// boardRead is the statement Load and Version read f's board with.
+func (s *PGSource) boardRead(ctx context.Context, f Format) (boardQuery, error) {
 	market, marketArgs, err := s.marketArgs(ctx, f)
 	if err != nil {
-		return "", nil, err
+		return boardQuery{}, err
+	}
+	fr, err := s.faces(ctx)
+	if err != nil {
+		return boardQuery{}, err
 	}
 	published, err := s.hasPublished(ctx)
 	if err != nil {
-		return "", nil, err
+		return boardQuery{}, err
 	}
 	if !published {
 		args := []any{s.Season, s.sourceFor(f)}
-		return s.preseasonQuery(marketRead{on: market, first: len(args) + 1}), append(args, marketArgs...), nil
+		return boardQuery{s.preseasonQuery(marketRead{on: market, first: len(args) + 1}, fr), append(args, marketArgs...), fr}, nil
 	}
 	fromWeek, err := s.hasColumn(ctx, "from_week")
 	if err != nil {
-		return "", nil, err
+		return boardQuery{}, err
 	}
 	gamePoints, err := s.hasColumn(ctx, "game_points")
 	if err != nil {
-		return "", nil, err
+		return boardQuery{}, err
 	}
 	args := []any{s.Season, s.sourceFor(f), string(f)}
-	return s.publishedQuery(publishedColumns{fromWeek: fromWeek, gamePoints: gamePoints}, marketRead{on: market, first: len(args) + 1}), append(args, marketArgs...), nil
+	cols := publishedColumns{fromWeek: fromWeek, gamePoints: gamePoints}
+	return boardQuery{s.publishedQuery(cols, marketRead{on: market, first: len(args) + 1}, fr), append(args, marketArgs...), fr}, nil
 }
 
 // publishedColumns is which of published_boards' later columns the table

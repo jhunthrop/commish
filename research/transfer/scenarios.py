@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-import httpx
 from sqlalchemy import Engine, text
 
 from research.boards.custom import CandidateMemo, candidate_format
@@ -92,8 +91,8 @@ def nightly(engine: Engine, skip: frozenset[str]) -> str:
         os.environ.pop(name, None)
     fetcher = LiveFetcher()
     try:
-        with tempfile.TemporaryDirectory(prefix="transfer-") as root, httpx.Client(timeout=60.0) as http:
-            deps = RunDeps(engine, LocalRunStore(Path(root)), http, fetcher, _environ(), now_ms, log_line)
+        with tempfile.TemporaryDirectory(prefix="transfer-") as root:
+            deps = RunDeps(engine, LocalRunStore(Path(root)), fetcher, _environ(), now_ms, log_line)
             return run_nightly(deps, RunOptions(skip, CapsuleStepPlan())).summary
     finally:
         fetcher.close()

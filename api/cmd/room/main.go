@@ -92,7 +92,7 @@ func run(ctx context.Context, log *slog.Logger) error {
 	store := &lobby.Store{Pool: pool, Now: time.Now, OnWrite: hub.Signal}
 	owners := &rooms.Owners{
 		Pool: pool, Store: store, Hub: hub, Instance: instanceName(cfg.Instance), Now: time.Now, Log: log,
-		Clock: &lobby.Clock{Store: store, Boards: draftBoards, Sheets: &sheets.Store{Pool: pool}},
+		Clock: &lobby.Clock{Store: store, Boards: draftBoards, Sheets: &sheets.Store{Pool: pool, Season: cfg.Board.Season}},
 		Lease: rooms.DefaultLease, Renew: rooms.DefaultRenew, Sweep: rooms.DefaultSweep,
 	}
 	socket := &rooms.Socket{Lobby: store, Hub: hub, Adopt: owners.Adopt, OriginHosts: rooms.OriginHosts(cfg.HTTP.CORSOrigins), Devices: bearer, Now: time.Now, Log: log}

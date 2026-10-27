@@ -3,6 +3,9 @@
 # SwiftLint finds SourceKit in the tools' own lib folder.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# SwiftLint's SourceKit comes from the selected Xcode: the pinned one when this Mac has it, named.
+# shellcheck source=toolchain.sh
+source scripts/toolchain.sh
 swiftformat --lint .
 developer_dir="$(xcode-select -p)"
 if [[ "$developer_dir" == *CommandLineTools* ]]; then

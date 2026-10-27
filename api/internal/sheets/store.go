@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/headshots"
 )
 
 // Store errors.
@@ -21,8 +22,12 @@ var (
 )
 
 // Store reads and writes app.sheets and app.sheet_rows, every query
-// scoped by account.
-type Store struct{ Pool *pgxpool.Pool }
+// scoped by account. Season names the copies a row's face is read as
+// (headshots.Stored).
+type Store struct {
+	Pool   *pgxpool.Pool
+	Season int
+}
 
 const sheetColumns = `s.id, s.name, s.format, (select count(*) from app.sheet_rows r where r.sheet_id = s.id), s.created_at, s.updated_at`
 
@@ -34,9 +39,12 @@ func scanSheet(row pgx.Row) (apitypes.Sheet, error) {
 
 const rowColumns = `player_id, name, position, team, headshot, rank, tier, tags, note`
 
-func scanRow(row pgx.Row) (apitypes.SheetRow, error) {
+// scanRow reads one row; its face is our copy's address for the season,
+// never a third party's (headshots.Stored).
+func scanRow(row pgx.Row, season int) (apitypes.SheetRow, error) {
 	var x apitypes.SheetRow
 	err := row.Scan(&x.PlayerId, &x.Name, &x.Position, &x.Team, &x.Headshot, &x.Rank, &x.Tier, &x.Tags, &x.Note)
+	x.Headshot = headshots.Stored(season, x.Headshot)
 	if x.Tags == nil {
 		x.Tags = apitypes.SheetTags{}
 	}
@@ -67,7 +75,7 @@ func (s *Store) List(ctx context.Context, accountID uuid.UUID, limit, offset int
 	return out, total, nil
 }
 
-func detail(ctx context.Context, q querier, accountID, id uuid.UUID) (apitypes.SheetDetail, error) {
+func detail(ctx context.Context, q querier, accountID, id uuid.UUID, season int) (apitypes.SheetDetail, error) {
 	s, err := scanSheet(q.QueryRow(ctx, `select `+sheetColumns+` from app.sheets s where s.id = $1 and s.account_id = $2`, id, accountID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return apitypes.SheetDetail{}, ErrNotFound
@@ -80,7 +88,7 @@ func detail(ctx context.Context, q querier, accountID, id uuid.UUID) (apitypes.S
 	if err != nil {
 		return apitypes.SheetDetail{}, err
 	}
-	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (apitypes.SheetRow, error) { return scanRow(r) })
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (apitypes.SheetRow, error) { return scanRow(r, season) })
 	if err != nil {
 		return apitypes.SheetDetail{}, err
 	}
@@ -92,7 +100,7 @@ func detail(ctx context.Context, q querier, accountID, id uuid.UUID) (apitypes.S
 
 // Get is one of the account's sheets with every row in rank order.
 func (s *Store) Get(ctx context.Context, accountID, id uuid.UUID) (apitypes.SheetDetail, error) {
-	d, err := detail(ctx, s.Pool, accountID, id)
+	d, err := detail(ctx, s.Pool, accountID, id, s.Season)
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return d, fmt.Errorf("sheets: get %s: %w", id, err)
 	}
@@ -124,7 +132,7 @@ func (s *Store) Create(ctx context.Context, accountID uuid.UUID, in apitypes.She
 				return err
 			}
 		}
-		d, err := detail(ctx, tx, accountID, id)
+		d, err := detail(ctx, tx, accountID, id, s.Season)
 		out = d
 		return err
 	})
@@ -214,7 +222,7 @@ func (s *Store) ReplaceRows(ctx context.Context, accountID, id uuid.UUID, rows [
 		if err := insertRows(ctx, tx, id, rows); err != nil {
 			return err
 		}
-		d, err := detail(ctx, tx, accountID, id)
+		d, err := detail(ctx, tx, accountID, id, s.Season)
 		out = d
 		return err
 	})
@@ -233,7 +241,7 @@ func (s *Store) UpdateRow(ctx context.Context, accountID, id uuid.UUID, playerID
 		}
 		row, err := scanRow(tx.QueryRow(ctx, `update app.sheet_rows set tier = $3, tags = $4, note = $5
 			where sheet_id = $1 and player_id = $2
-			returning `+rowColumns, id, playerID, in.Tier, normalizeTags(&in.Tags), in.Note))
+			returning `+rowColumns, id, playerID, in.Tier, normalizeTags(&in.Tags), in.Note), s.Season)
 		out = row
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound

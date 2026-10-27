@@ -3,6 +3,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import type { LobbyFilling, LobbyFormat } from '../api.ts';
 	import { lobbyFillWords, lobbyListHead, lobbyTitle } from './setup.ts';
+	import { LOBBY, pickClockWords } from '../lobby-words.ts';
 
 	interface Props {
 		lobbies: readonly LobbyFilling[];
@@ -25,14 +26,14 @@
 				{@const fill = lobbyFillWords(lobby.filling)}
 				<span class="what">
 					<b>{lobbyTitle(lobby.teams, lobby.scoring, lobby.lineup)}</b>
-					<span>{lobby.clock_seconds} s a pick</span>
+					<span>{pickClockWords(lobby.clock_seconds)}</span>
 				</span>
 				<span class="fill" class:none={fill.empty}>{fill.words}</span>
 			{/snippet}
 			<li>
 				{#if joinable}
 					<button type="button" class="card" onclick={() => onjoin(lobby.format)}>
-						{@render body()}<span class="join">Join</span>
+						{@render body()}<span class="join">{LOBBY.join}</span>
 					</button>
 				{:else}
 					<div class="card">{@render body()}</div>
@@ -42,7 +43,7 @@
 	</ul>
 	{#if signInHref}
 		<div class="sign">
-			<Quiet size="sm" href={signInHref}>Sign in to join a lobby</Quiet>
+			<Quiet size="sm" href={signInHref}>{LOBBY.signInToJoin}</Quiet>
 		</div>
 	{/if}
 </Panel>

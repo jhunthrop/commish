@@ -81,7 +81,7 @@ struct BidFieldView: View {
                     Text(field.typed)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    TextField(field.label, text: Binding(get: { field.typed }, set: change))
+                    TextField(field.label, text: Binding(get: { field.typed }, set: { change($0) }))
                         .labelsHidden()
                         .focused($typing)
                     #if os(iOS)

@@ -20,6 +20,33 @@ export type TwoMode = 'upcoming' | 'graded' | 'published';
 const FROM_WEEK = 7;
 const SET_AT = '2026-10-22T18:00:00.000Z';
 const GRADED_AT = '2026-10-28T22:00:00.000Z';
+/** The run's weekly record writer, whose word table holds the method sentence (Lane 235, B222). */
+const WRITER = new URL('../../../research/nightly/reads/weekly_record.py', import.meta.url);
+
+/** A string constant of the writer's word table as written: one literal, or a parenthesised run of
+ * adjacent literals, joined. */
+function pythonConstant(source: string, name: string): string {
+	const found = new RegExp(
+		`^${name}: Final = (?:\\(\\n([\\s\\S]*?)\\n\\)|("[^"\\n]*")$)`,
+		'mu'
+	).exec(source);
+	const literals = found?.[1] ?? found?.[2];
+	if (literals === undefined) throw new Error(`${name} is not in the run's word table`);
+	return [...literals.matchAll(/"([^"]*)"/gu)].map((match) => match[1]).join('');
+}
+
+/** The weekly record's method as the run writes it (weekly_record.py `method`), built from the
+ * writer's own word table so the fixtures never carry a sentence the run no longer writes. */
+async function runMethod(beside: readonly string[]): Promise<string> {
+	const source = await readFile(WRITER, 'utf8');
+	const clause =
+		beside.length === 0
+			? ''
+			: pythonConstant(source, '_BESIDE').replace('{names}', beside.join(' and '));
+	return pythonConstant(source, '_METHOD')
+		.replace('{week}', String(FROM_WEEK))
+		.replace('{beside}', clause);
+}
 
 async function json(url: URL): Promise<unknown> {
 	return JSON.parse(await readFile(url, 'utf8')) as unknown;
@@ -78,9 +105,7 @@ export async function withTwoRecords(record: RunRecord, mode: TwoMode): Promise<
 			statistic: record.statistic,
 			scale: record.scale,
 			startersBasis: graded ? record.startersBasis : null,
-			method: graded
-				? "From week 7 we set our weekly rankings before each week's first kickoff and graded them on the week's points, beside ESPN's projection on the same players."
-				: "From week 7 we set our weekly rankings before each week's first kickoff and graded them on the week's points.",
+			method: await runMethod(graded ? ["ESPN's projection"] : []),
 			honest: null,
 			weeks: [first, ...later],
 			toDate
