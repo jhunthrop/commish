@@ -75,6 +75,8 @@ import { HOLDING_PLAYER, OTHER_GAME_ROSTER } from './export-fixtures.ts';
 import { ACCOUNT_OUTPUT, renderAccount } from './account-parity.ts';
 import { COMPANION_OUTPUT, renderCompanion } from './companion-parity.ts';
 import { MOCK_OUTPUT, renderMock } from './mock-parity.ts';
+import { renderOneValue } from './one-value-parity.ts';
+import { LOBBY_OUTPUT, renderLobby } from './lobby-parity.ts';
 import type { Account } from '../../web/src/lib/account/account-api.ts';
 import type { AttachedLeague } from '../../web/src/lib/league/api.ts';
 import type { Device } from '../../web/src/lib/hosts/api.ts';
@@ -708,6 +710,21 @@ export async function generate(): Promise<Outputs> {
 				generatedBy(
 					SCRIPT,
 					'web/src/lib/room (SoloRoom with call.ts, model.ts, words.ts and mock-words.ts, setup/setup.ts, report/headline.ts) over the recorded draft in shared/fixtures/mock-room'
+				)
+			)
+		],
+		...(await renderOneValue(
+			generatedBy(
+				SCRIPT,
+				'web/src/lib/run/live-order.ts, front/live-board.ts, player/live-figures.ts and formats-words.ts over the fixture order and a stand-in run made from it'
+			)
+		)),
+		[
+			LOBBY_OUTPUT,
+			await renderLobby(
+				generatedBy(
+					SCRIPT,
+					'web/src/lib/room (LobbyRoomView with lobby.ts, lobby-words.ts, call.ts, model.ts, words.ts, setup/setup.ts, report/headline.ts) over the recorded lobby in shared/fixtures/lobby-room'
 				)
 			)
 		]

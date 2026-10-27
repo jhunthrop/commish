@@ -14,8 +14,11 @@ import Testing
 /// The sheet in the frame at both heights with a written read standing from kickoff (Odunze, Sunday),
 /// no read written (Mahomes, Saturday) and a read held for his status (Etienne, Saturday), and once
 /// saved and read with no signal; the page's hero and number, its prose, a held page with no copy, and
-/// in season (the contract run) the week's read in the capsule's place. A face draws its initials here.
-/// With SNAPSHOT_SHOTS set each is also written at its phone's own scale for the persona panel.
+/// in season (the contract run) the week's read in the capsule's place; and at the order's clock (Lane
+/// 224, the one-value stand-in at the fixture's Sunday) the hero and the every-format table once his
+/// week has answered (the read's figures and its rank, the footnote naming the formats it does not
+/// rank) and while it is unread (the run's). A face draws its initials here. With SNAPSHOT_SHOTS set
+/// each is also written at its phone's own scale for the persona panel.
 @MainActor
 struct PlayerSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -42,6 +45,9 @@ struct PlayerSnapshotTests {
         case pageSeason = "page-season"
         case pageLog = "page-log"
         case pageTier = "page-tier"
+        /// The hero and the every-format table at the read's clock, and unread.
+        case pageFormats = "page-formats"
+        case pageFormatsUnread = "page-formats-unread"
 
         var sheet: SheetPlayer? {
             switch self {
@@ -68,7 +74,8 @@ struct PlayerSnapshotTests {
                     id: "4239996", slug: "travis-etienne-jr", name: "Travis Etienne Jr.", position: "RB", rank: "14",
                     club: "NO"
                 )
-            case .pageHero, .pageProse, .pageHeld, .pageSeason, .pageLog, .pageTier:
+            case .pageHero, .pageProse, .pageHeld, .pageSeason, .pageLog, .pageTier, .pageFormats,
+                 .pageFormatsUnread:
                 nil
             }
         }
@@ -152,6 +159,15 @@ struct PlayerSnapshotTests {
     }
 
     static func page(_ scene: Scene) async -> PlayerPageViewModel {
+        if scene == .pageFormats || scene == .pageFormatsUnread {
+            let viewModel = PlayerPageViewModel(
+                slug: "d-andre-swift", run: StubRun(.oneValue), pages: StubPages(.oneValue),
+                weeks: StubOneValueWeeks(offline: scene == .pageFormatsUnread), cache: cache(),
+                clock: FixedClock(OneValueFixture.now), league: nil, zone: zone
+            )
+            await viewModel.load()
+            return viewModel
+        }
         let season = scene.inSeason
         let fixture: RunFixture = season ? .contract : .standIn
         let held: [String: RunFixture?] = scene == .pageHeld ? ["4431299": nil] : [:]
@@ -218,6 +234,17 @@ struct PlayerSnapshotTests {
                 #expect(freshness.saved == .offline)
                 #expect(viewModel.stampWords == "Last read Sat 12:00 pm")
             }
+        }
+    }
+
+    @Test func theFormatsScenesAreTheStatesTheyName() async throws {
+        for scene in [Scene.pageFormats, .pageFormatsUnread] {
+            let viewModel = await Self.page(scene)
+            guard case let .loaded(model, _) = viewModel.state else {
+                throw SceneError.notLoaded(scene.rawValue)
+            }
+            let table = try #require(model.formats)
+            #expect((table.footnote != nil) == (scene == .pageFormats), "\(scene)")
         }
     }
 
@@ -291,6 +318,14 @@ struct PageMock: View {
             model.read.map { PageRead(read: $0).padding(Tokens.Space.s4) }
         case .pageLog:
             SeasonBlock(season: model.season).padding(Tokens.Space.s4)
+        case .pageFormats, .pageFormatsUnread:
+            VStack(alignment: .leading, spacing: Tokens.Space.s5) {
+                PageHero(hero: model.hero, stamp: nil)
+                if let formats = model.formats {
+                    FormatsTableView(table: formats)
+                }
+            }
+            .padding(Tokens.Space.s4)
         case .pageTier:
             VStack(alignment: .leading, spacing: Tokens.Space.s5) {
                 if let tier = model.tier {

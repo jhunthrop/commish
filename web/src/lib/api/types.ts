@@ -3990,7 +3990,7 @@ export interface components {
 		};
 		PlayerLine: {
 			player: components['schemas']['LeaguePlayer'];
-			/** @description his face from our player directory, null without one */
+			/** @description our copy of his headshot, null without one */
 			headshot: string | null;
 			/** @description his page on the site (/players/{slug}): set for a quarterback, running back, receiver or tight end our order ranks whose name no other player in our directory shares, null otherwise (a kicker or defense has no page) (a shared name's page is named by the run, which the API does not read) */
 			slug: string | null;
@@ -7147,7 +7147,7 @@ export interface operations {
 					 *             "position": "RB",
 					 *             "positionRank": 1,
 					 *             "team": "DET",
-					 *             "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png",
+					 *             "headshot": "https://images.trycommish.app/headshots/2026/4429795/320.webp",
 					 *             "orderBasis": "projection",
 					 *             "ourRank": 1,
 					 *             "vorRound": 1,
@@ -7243,7 +7243,7 @@ export interface operations {
 					 *             "name": "Jahmyr Gibbs",
 					 *             "team": "DET",
 					 *             "position": "RB",
-					 *             "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png",
+					 *             "headshot": "https://images.trycommish.app/headshots/2026/4429795/320.webp",
 					 *             "orderBasis": "projection",
 					 *             "season": {
 					 *               "games": 5,
@@ -7425,7 +7425,7 @@ export interface operations {
 					 *           "name": "Jahmyr Gibbs",
 					 *           "position": "RB",
 					 *           "team": "DET",
-					 *           "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png",
+					 *           "headshot": "https://images.trycommish.app/headshots/2026/4429795/320.webp",
 					 *           "formats": {
 					 *             "ppr-12": {
 					 *               "positionRank": 1,

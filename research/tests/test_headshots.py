@@ -1,0 +1,344 @@
+"""Our headshot copies (Lane 241): the addresses, the fetch, the conversion, the throttle, the run's faces,
+and the sync and the curation against a stub source and a stub bucket. The ledger tests need
+PARITY_DATABASE_URL (a server where the harness may create `parity_*` databases); skipped without it,
+and run by CI."""
+
+import io
+import os
+from collections.abc import Iterator
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+
+import httpx
+import pytest
+from PIL import Image
+from sqlalchemy import Engine, text
+
+from research.db.engine import make_engine
+from research.db.url import sqlalchemy_url
+from research.errors import ConfigurationError
+from research.headshots.bucket import R2ImageBucket
+from research.headshots.config import APP_WIDTH, CACHE_CONTROL, WIDTHS, copy_key, face_url
+from research.headshots.curate import CurationError, curate, curation_lines, refresh
+from research.headshots.faces import our_face
+from research.headshots.images import MAX_BYTES, FetchFailedError, NoImageError, Source, fetch, webp_widths
+from research.headshots.sync import SyncDeps, Throttle, due, sync
+from research.headshots.table import Candidate, curation_list, faced_ids
+from research.nightly.r2 import R2Credentials, R2RunStore
+from research.parity import databases
+
+_DATABASE = "parity_test_headshots"
+_NOW = datetime(2026, 10, 26, 12, 0, tzinfo=UTC)
+_ESPN = "https://a.espncdn.com/i/headshots/nfl/players/full/{}.png"
+_NO_PHOTO = "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=200&h=146"
+
+
+def _png(width: int = 600, height: int = 436) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGBA", (width, height), (200, 30, 30, 255)).save(buffer, "PNG")
+    return buffer.getvalue()
+
+
+_IMAGE = _png()
+
+
+@dataclass
+class StubBucket:
+    objects: dict[str, tuple[bytes, str]] = field(default_factory=dict)
+
+    def put(self, key: str, body: bytes, content_type: str) -> None:
+        self.objects[key] = (body, content_type)
+
+    def locate(self, key: str) -> str:
+        return f"stub://{key}"
+
+
+@dataclass
+class StubSource:
+    """The provider's image host: an image for most ids, a 404 or a 500 for the named ones."""
+
+    gone: frozenset[str] = frozenset()
+    broken: frozenset[str] = frozenset()
+    requests: list[str] = field(default_factory=list)
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(str(request.url))
+        name = request.url.path.rsplit("/", 1)[-1]
+        if any(name.startswith(g + ".") for g in self.gone):
+            return httpx.Response(404)
+        if any(name.startswith(b + ".") for b in self.broken):
+            return httpx.Response(500)
+        return httpx.Response(200, content=_IMAGE, headers={"content-type": "image/png"})
+
+    def client(self) -> httpx.Client:
+        return httpx.Client(transport=httpx.MockTransport(self.handler))
+
+
+@dataclass
+class FakeClock:
+    at: float = 1000.0
+    slept: list[float] = field(default_factory=list)
+
+    def now(self) -> float:
+        return self.at
+
+    def sleep(self, seconds: float) -> None:
+        self.slept.append(seconds)
+        self.at += seconds
+
+
+# The addresses ---------------------------------------------------------------------------------------
+
+
+def test_a_copy_is_keyed_by_season_player_and_width_on_our_host() -> None:
+    # The web (headshot.test.ts) and the API (headshots_test.go) pin this same URL.
+    assert face_url(2026, "4429795") == "https://images.trycommish.app/headshots/2026/4429795/320.webp"
+    assert APP_WIDTH in WIDTHS
+    assert copy_key(2026, "4429795", 48) == "headshots/2026/4429795/48.webp"
+    with pytest.raises(ConfigurationError):
+        copy_key(2026, "team-def:KC", 48)
+    with pytest.raises(ConfigurationError):
+        copy_key(2026, "4429795", 50)
+
+
+# The fetch and the conversion ------------------------------------------------------------------------
+
+
+def test_the_fetch_reads_an_image_and_names_a_missing_or_failed_one() -> None:
+    source = StubSource(gone=frozenset({"2"}), broken=frozenset({"3"}))
+    hosts = frozenset({"a.espncdn.com"})
+    with source.client() as http:
+        assert fetch(http, Source(_ESPN.format(1), hosts)) == _IMAGE
+        with pytest.raises(NoImageError):
+            fetch(http, Source(_ESPN.format(2), hosts))
+        with pytest.raises(FetchFailedError):
+            fetch(http, Source(_ESPN.format(3), hosts))
+        with pytest.raises(NoImageError):
+            fetch(http, Source(_NO_PHOTO, hosts))
+        with pytest.raises(NoImageError):
+            fetch(http, Source(None, hosts))
+        with pytest.raises(FetchFailedError, match="not the provider's image host"):
+            fetch(http, Source("https://example.com/1.png", hosts))
+        with pytest.raises(FetchFailedError, match="https"):
+            fetch(http, Source("http://a.espncdn.com/1.png", None))
+    assert source.requests == [_ESPN.format(1), _ESPN.format(2), _ESPN.format(3)]
+
+
+def test_the_fetch_follows_no_redirect_and_stops_past_its_bound() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("moved.png"):
+            return httpx.Response(302, headers={"location": "https://elsewhere.example/x.png"})
+        return httpx.Response(200, content=b"x" * (MAX_BYTES + 1))
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        with pytest.raises(FetchFailedError, match="HTTP 302"):
+            fetch(http, Source("https://a.espncdn.com/moved.png", None))
+        with pytest.raises(FetchFailedError, match="passed"):
+            fetch(http, Source("https://a.espncdn.com/big.png", None))
+
+
+def test_every_kept_width_is_webp_at_the_sources_aspect() -> None:
+    copies = webp_widths(_IMAGE)
+    assert sorted(copies) == list(WIDTHS)
+    for width, body in copies.items():
+        with Image.open(io.BytesIO(body)) as image:
+            assert image.format == "WEBP"
+            assert image.size == (width, round(436 * width / 600))
+    with pytest.raises(FetchFailedError):
+        webp_widths(b"<html>not an image</html>")
+
+
+# The throttle and the rules --------------------------------------------------------------------------
+
+
+def test_the_throttle_lets_two_fetches_a_second() -> None:
+    clock = FakeClock()
+    throttle = Throttle(0.5, clock.now, clock.sleep)
+    throttle.wait()
+    throttle.wait()
+    clock.at += 0.2
+    throttle.wait()
+    clock.at += 1.0
+    throttle.wait()
+    assert clock.slept == [0.5, pytest.approx(0.3)]
+
+
+def test_a_copy_from_the_same_source_and_a_curated_one_are_never_fetched() -> None:
+    url = _ESPN.format(1)
+    assert due(Candidate("1", url, None, None))
+    assert not due(Candidate("1", url, "copied", url))
+    assert due(Candidate("1", _ESPN.format(2), "copied", url))  # the source moved
+    assert not due(Candidate("1", url, "curated", "https://chosen.example/1.png"))
+    assert due(Candidate("1", url, "refresh", url))
+    assert due(Candidate("1", url, "failed", url))
+    assert due(Candidate("1", url, "missing", url))  # a 404 is asked again
+    assert not due(Candidate("1", None, "missing", None))  # no source: once, until it changes
+
+
+def test_the_runs_face_is_our_address_never_the_providers() -> None:
+    faced = frozenset({"7"})
+    assert our_face(2026, "1", _ESPN.format(1), frozenset()) == face_url(2026, "1")
+    assert our_face(2026, "7", None, faced) == face_url(2026, "7")  # curated with no provider image
+    assert our_face(2026, "8", None, faced) is None
+    assert our_face(2026, "team-def:KC", None, faced) is None
+
+
+def test_the_r2_bucket_writes_the_year_long_cache_rule() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        store = R2RunStore(http, "acct", R2Credentials("id", "secret"), "commish-images")
+        R2ImageBucket(store, "headshots-lane241/").put("headshots/2026/1/48.webp", b"w", "image/webp")
+    assert seen[0].url.path == "/commish-images/headshots-lane241/headshots/2026/1/48.webp"
+    assert seen[0].headers["cache-control"] == CACHE_CONTROL == "public, max-age=31536000, immutable"
+    assert seen[0].headers["content-type"] == "image/webp"
+
+
+# The sync and the curation against the ledger --------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def engine() -> Iterator[Engine]:
+    if "PARITY_DATABASE_URL" not in os.environ:
+        pytest.skip("needs a Postgres for scratch databases")
+    url = databases.build_with_alembic(_DATABASE)
+    built = make_engine(sqlalchemy_url(url))
+    try:
+        yield built
+    finally:
+        built.dispose()
+        databases.drop(_DATABASE)
+
+
+def _players(engine: Engine, rows: list[tuple[str, str, str | None]]) -> None:
+    with engine.begin() as conn:
+        conn.execute(text("delete from research.headshot_copies"))
+        conn.execute(text("delete from research.provider_players"))
+        for adp, (pid, position, url) in enumerate(rows, start=1):
+            conn.execute(
+                text(
+                    "insert into research.provider_players (id, name, position, adp, headshot_url) "
+                    "values (:id, :name, :position, :adp, :url)"
+                ),
+                {"id": pid, "name": f"Player {pid}", "position": position, "adp": float(adp), "url": url},
+            )
+
+
+def _deps(engine: Engine, http: httpx.Client, bucket: StubBucket, clock: FakeClock) -> SyncDeps:
+    ticks = iter(range(10_000))
+    return SyncDeps(
+        engine=engine,
+        http=http,
+        bucket=bucket,
+        throttle=Throttle(0.5, clock.now, clock.sleep),
+        now=lambda: _NOW + timedelta(seconds=next(ticks)),
+        log=lambda line: None,
+    )
+
+
+def _rows(engine: Engine) -> dict[str, tuple[str, str | None, str | None]]:
+    with engine.connect() as conn:
+        found = conn.execute(text("select player_id, status, source_url, curated_by from research.headshot_copies"))
+        return {r.player_id: (r.status, r.source_url, r.curated_by) for r in found}
+
+
+def _keys(bucket: StubBucket, pid: str) -> set[str]:
+    return {k for k in bucket.objects if k.startswith(f"headshots/2026/{pid}/")}
+
+
+def test_the_sync_copies_lists_and_never_refetches(engine: Engine) -> None:
+    _players(
+        engine,
+        [
+            ("1", "RB", _ESPN.format(1)),
+            ("2", "WR", _NO_PHOTO),
+            ("3", "TE", _ESPN.format(3)),  # 404
+            ("4", "QB", _ESPN.format(4)),  # 500
+            ("5", "K", None),
+            ("6", "DEF", None),  # a defense: never a copy
+        ],
+    )
+    source = StubSource(gone=frozenset({"3"}), broken=frozenset({"4"}))
+    bucket = StubBucket()
+    clock = FakeClock()
+    with source.client() as http:
+        counts = sync(_deps(engine, http, bucket, clock), 2026)
+    assert counts.line() == "1 copied, 0 skipped, 3 missing, 1 failed"
+    # 1, 3 and 4; no request for the placeholder or the empty source.
+    assert sorted(source.requests) == [_ESPN.format(1), _ESPN.format(3), _ESPN.format(4)]
+    assert clock.slept == [0.5, 0.5]  # two fetches a second
+    assert _keys(bucket, "1") == {f"headshots/2026/1/{w}.webp" for w in WIDTHS}
+    assert all(content_type == "image/webp" for _, content_type in bucket.objects.values())
+    rows = _rows(engine)
+    assert {pid: status for pid, (status, _, _) in rows.items()} == {
+        "1": "copied",
+        "2": "missing",
+        "3": "missing",
+        "4": "failed",
+        "5": "missing",
+    }
+    with engine.connect() as conn:
+        assert faced_ids(conn, 2026) == {"1"}
+        listed = curation_list(conn, 2026)
+    assert [r.player_id for r in listed] == ["2", "3", "4", "5"]
+    assert curation_lines(listed)[2].startswith("4\tPlayer 4\tQB\tfailed\tHTTP 500")
+
+    # Again: the copy is not fetched, the empty and placeholder sources are not either; the 404 and
+    # the failure are asked again.
+    source.requests.clear()
+    with source.client() as http:
+        again = sync(_deps(engine, http, bucket, FakeClock()), 2026)
+    assert again.line() == "0 copied, 3 skipped, 1 missing, 1 failed"
+    assert sorted(source.requests) == [_ESPN.format(3), _ESPN.format(4)]
+
+
+def test_a_curated_copy_is_never_overwritten_and_a_refresh_is_fetched(engine: Engine) -> None:
+    _players(engine, [("1", "RB", _ESPN.format(1)), ("9", "WR", None)])
+    bucket = StubBucket()
+    source = StubSource()
+    with source.client() as http:
+        deps = _deps(engine, http, bucket, FakeClock())
+        curate(deps, 2026, "9", "https://chosen.example/9.jpg", " coordinator ")
+        assert _rows(engine)["9"] == ("curated", "https://chosen.example/9.jpg", "coordinator")
+        assert _keys(bucket, "9") == {f"headshots/2026/9/{w}.webp" for w in WIDTHS}
+
+        # A curated row is never overwritten, even when the provider's source changes.
+        with engine.begin() as conn:
+            conn.execute(
+                text("update research.provider_players set headshot_url = :u where id = '9'"), {"u": _ESPN.format(9)}
+            )
+        source.requests.clear()
+        counts = sync(deps, 2026)
+        assert counts.line() == "1 copied, 1 skipped, 0 missing, 0 failed"
+        assert source.requests == [_ESPN.format(1)]
+        assert _rows(engine)["9"][0] == "curated"
+
+        # A refresh mark is fetched by the next sync, and the row becomes a copy again.
+        refresh(deps, 2026, "1")
+        assert _rows(engine)["1"][0] == "refresh"
+        source.requests.clear()
+        sync(deps, 2026)
+        assert source.requests == [_ESPN.format(1)]
+        assert _rows(engine)["1"][0] == "copied"
+
+        with pytest.raises(CurationError, match="not a provider player"):
+            curate(deps, 2026, "404", "https://chosen.example/x.png", "coordinator")
+        with pytest.raises(CurationError, match="--by"):
+            curate(deps, 2026, "9", "https://chosen.example/x.png", " ")
+        with pytest.raises(CurationError, match="no row"):
+            refresh(deps, 2026, "12345")
+
+
+def test_a_curation_from_a_url_with_no_image_is_refused_and_writes_nothing(engine: Engine) -> None:
+    _players(engine, [("1", "RB", None)])
+    bucket = StubBucket()
+    with StubSource(gone=frozenset({"x"})).client() as http:
+        deps = _deps(engine, http, bucket, FakeClock())
+        with pytest.raises(CurationError, match="no usable image"):
+            curate(deps, 2026, "1", "https://chosen.example/x.png", "coordinator")
+    assert bucket.objects == {}
+    assert _rows(engine) == {}

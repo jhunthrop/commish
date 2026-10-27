@@ -3,6 +3,7 @@
 import { resolve } from '$app/paths';
 import { ApiError, signInHref } from './api.ts';
 import { MOCK } from './mock-words.ts';
+import { LOBBY } from './lobby-words.ts';
 
 /** The page that hit the error: the reader's own mock or its report, a shared link, a lobby, setup. */
 export type NoticeSubject = 'mock' | 'share' | 'lobby' | 'setup';
@@ -39,7 +40,7 @@ function newMock(): NoticeLink {
 }
 
 function joinLobby(): NoticeLink {
-	return { label: 'Join a lobby', href: resolve('/mock/new') };
+	return { label: LOBBY.joinLobby, href: resolve('/mock/new') };
 }
 
 function signIn(returnTo: string, label = 'Sign in'): NoticeLink {
@@ -50,7 +51,7 @@ function signedOut(subject: NoticeSubject, returnTo: string): NoticeView {
 	switch (subject) {
 		case 'lobby':
 			return {
-				text: 'Sign in to draft in a lobby. The other drafters see your handle.',
+				text: LOBBY.signedOut,
 				verb: signIn(returnTo)
 			};
 		case 'setup':
@@ -72,7 +73,7 @@ function gone(subject: NoticeSubject): NoticeView | null {
 		case 'mock':
 			return { text: 'This mock is gone. It was deleted, or the link is wrong.', verb: newMock() };
 		case 'lobby':
-			return { text: 'This lobby is gone.', verb: joinLobby() };
+			return { text: LOBBY.gone, verb: joinLobby() };
 		default:
 			return null;
 	}
@@ -95,8 +96,7 @@ function refused(error: ApiError, subject: NoticeSubject): NoticeView | null {
 			...(setup ? { verb: { label: `Open ${setup.host}`, href: setup.href } } : {})
 		};
 	}
-	if (subject === 'lobby')
-		return { text: 'You do not have a seat in this lobby.', verb: joinLobby() };
+	if (subject === 'lobby') return { text: LOBBY.noSeat, verb: joinLobby() };
 	return null;
 }
 

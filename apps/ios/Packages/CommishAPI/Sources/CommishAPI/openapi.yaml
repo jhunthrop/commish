@@ -1843,7 +1843,7 @@ paths:
                       position: RB
                       positionRank: 1
                       team: DET
-                      headshot: https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png
+                      headshot: https://images.trycommish.app/headshots/2026/4429795/320.webp
                       orderBasis: projection
                       ourRank: 1
                       vorRound: 1
@@ -1930,7 +1930,7 @@ paths:
                       name: Jahmyr Gibbs
                       team: DET
                       position: RB
-                      headshot: https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png
+                      headshot: https://images.trycommish.app/headshots/2026/4429795/320.webp
                       orderBasis: projection
                       season:
                         games: 5
@@ -2083,7 +2083,7 @@ paths:
                     name: Jahmyr Gibbs
                     position: RB
                     team: DET
-                    headshot: https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png
+                    headshot: https://images.trycommish.app/headshots/2026/4429795/320.webp
                     formats:
                       ppr-12:
                         positionRank: 1
@@ -8934,7 +8934,7 @@ components:
         headshot:
           type: string
           nullable: true
-          description: his face from our player directory, null without one
+          description: our copy of his headshot, null without one
         slug:
           type: string
           nullable: true

@@ -2,6 +2,7 @@
 	import Panel from '#lib/ui/Panel.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
+	import { LOBBY } from '../lobby-words.ts';
 
 	interface Props {
 		/** The API's word on the last try, when it refused the handle. */
@@ -23,16 +24,16 @@
 			onsave(handle.trim());
 		}}
 	>
-		<p class="ask">The name the room shows the other drafters</p>
+		<p class="ask">{LOBBY.handleAsk}</p>
 		<div class="row">
 			<Field
 				hideLabel
 				bind:value={handle}
 				maxlength={20}
-				label="Handle"
-				placeholder="3 to 20 letters, digits or _"
+				label={LOBBY.handleLabel}
+				placeholder={LOBBY.handlePlaceholder}
 			/>
-			<Verb type="submit" disabled={busy || handle.trim().length < 3}>Save and join</Verb>
+			<Verb type="submit" disabled={busy || handle.trim().length < 3}>{LOBBY.saveAndJoin}</Verb>
 		</div>
 		{#if problem}<p class="problem">{problem}</p>{/if}
 	</form>

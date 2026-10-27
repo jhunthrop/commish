@@ -942,4 +942,63 @@ object Words {
         const val lobbyClock = "Clock in a lobby"
         const val lobbyStarts = "A lobby starts"
     }
+
+    object FormatsRank {
+        const val head = "Position rank"
+    }
+
+    object LiveStrip {
+        const val yourLeague = "your league"
+        const val leagueAvg = "Avg in your league's scoring."
+    }
+
+    object LiveOrder {
+
+    }
+
+    object Lobby {
+        const val join = "Join"
+        const val yourSeat = "Your seat"
+        const val joinWithPeople = "Join a lobby with people"
+        const val signInToJoin = "Sign in to join a lobby"
+        const val handleAsk = "The name the room shows the other drafters"
+        const val handleLabel = "Handle"
+        const val handlePlaceholder = "3 to 20 letters, digits or _"
+        const val saveAndJoin = "Save and join"
+        const val handleFailed = "That handle did not save."
+        const val searchPool = "Search the pool"
+        const val leave = "Leave"
+        const val leaveFilling = "Leave? Your seat opens for someone else."
+        const val leaveDrafting = "Leave? Your queue drafts your seat, then the board, and the report is yours when the draft ends."
+        const val leaveVerb = "Leave the lobby"
+        const val stay = "Stay"
+        const val reconnecting = "Reconnecting to the room."
+        const val refused = "The room refused that."
+        const val over = "The draft is over."
+        const val readReport = "Read the report"
+        const val abandoned = "This lobby closed because nobody was here when it filled."
+        const val joinAnother = "Join another lobby"
+        const val signedOut = "Sign in to draft in a lobby. The other drafters see your handle."
+        const val gone = "This lobby is gone."
+        const val noSeat = "You do not have a seat in this lobby."
+        const val joinLobby = "Join a lobby"
+        const val onTheClock = "On the clock"
+        const val clock = "Clock"
+        const val yourPick = "Your pick"
+        const val now = "Now"
+        const val yourPickIsNow = "Your pick is now"
+        const val seatOnClock = "on the clock"
+        const val seatLeft = "left, queue drafts"
+        const val seatDrafter = "drafter"
+        const val seatWaiting = "waiting"
+        const val seatOpen = "open"
+        const val seats = "Seats"
+        const val standInWeb = "a bot takes any seat that closes the tab"
+        const val standInApp = "a bot takes any seat that closes the app"
+        const val justTaken = "just taken, newest first"
+        const val leftTitle = "You left a lobby"
+        const val leftOver = "The draft is over and your report is ready."
+        const val leftDrafting = "Your queue drafts your seat, then the board. Return and the seat is yours again."
+        const val returnVerb = "Return to the lobby"
+    }
 }

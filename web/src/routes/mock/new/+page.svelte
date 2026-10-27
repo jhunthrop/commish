@@ -35,6 +35,7 @@
 	import LeftLobby from '#lib/room/setup/LeftLobby.svelte';
 	import { forgetLeft, leftLobby } from '#lib/room/setup/left.ts';
 	import LobbyList from '#lib/room/setup/LobbyList.svelte';
+	import { LOBBY } from '#lib/room/lobby-words.ts';
 	import SavedLeagues from '#lib/room/setup/SavedLeagues.svelte';
 	import { rerunOf } from '#lib/room/setup/scoring.ts';
 	import { hasFeature } from '#lib/account/features.ts';
@@ -134,8 +135,7 @@
 			handleProblem = null;
 			await join(format);
 		} catch (e) {
-			handleProblem =
-				e instanceof ApiError ? (e.fields.handle ?? e.message) : 'That handle did not save.';
+			handleProblem = e instanceof ApiError ? (e.fields.handle ?? e.message) : LOBBY.handleFailed;
 		}
 	}
 
@@ -323,7 +323,7 @@
 				>{MOCK.start}</Verb
 			>
 			<Quiet disabled={busy} onclick={() => join(nearestLobby(settings))}
-				>Join a lobby with people</Quiet
+				>{LOBBY.joinWithPeople}</Quiet
 			>
 		</ActionBar>
 		{#snippet dock()}

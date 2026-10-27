@@ -15,8 +15,10 @@ enum ScreenAsk: Equatable, Sendable {
 /// keeping the copy; with no answer the saved files stand, the screen stale with its stamp and reason;
 /// a refused token signs out. What the screen is built from is its `build`; a chip or a pick builds
 /// anew from the newest ask, a build that lands after a newer one is dropped, and one that fails over
-/// a shown screen leaves that screen and its build standing with a one-line notice (review M2). The
-/// view decides nothing.
+/// a shown screen leaves that screen and its build standing with a one-line notice (review M2). In
+/// season a screen whose build says it at the order's clock is drawn on the run first, then on the order
+/// the Rankings read once it answers (Lane 224, `orders`); a failed read leaves the run's. The view
+/// decides nothing.
 @MainActor
 @Observable
 public final class RunScreenViewModel<Model: Equatable & Sendable> {
@@ -42,13 +44,19 @@ public final class RunScreenViewModel<Model: Equatable & Sendable> {
     }
 
     private let onSignedOut: @MainActor () -> Void
+    /// The in-season screens' shared read of the order; nil reads none.
+    private let orders: OrderReader?
     /// The manifest of the screen shown: its day for the offline words.
     private var manifest: RunManifest?
     /// The newest build asked for; an older one's answer is not shown.
     private var generation = 0
 
-    init(reads: RunReads, zone: TimeZone, onSignedOut: @escaping @MainActor () -> Void, build: @escaping Build) {
+    init(
+        reads: RunReads, zone: TimeZone, orders: OrderReader? = nil, onSignedOut: @escaping @MainActor () -> Void,
+        build: @escaping Build
+    ) {
         self.reads = reads
+        self.orders = orders
         self.zone = zone
         self.onSignedOut = onSignedOut
         self.build = build
@@ -97,7 +105,9 @@ public final class RunScreenViewModel<Model: Equatable & Sendable> {
             ask = nil
             notice = nil
             manifest = built.manifest
-            state = .loaded(built.model, Freshness.of(built.reads) ?? Freshness(stamp: .distantPast, saved: nil))
+            let freshness = Freshness.of(built.reads) ?? Freshness(stamp: .distantPast, saved: nil)
+            state = .loaded(built.model, freshness)
+            await place(built, freshness: freshness, generation: mine)
         } catch where APIError.signsOut(error) {
             state = .failed(AppWords.Failure.signedOut)
             onSignedOut()
@@ -114,6 +124,21 @@ public final class RunScreenViewModel<Model: Equatable & Sendable> {
                 state = .failed(LeagueHomeViewModel.sentence(for: error))
             }
         }
+    }
+}
+
+extension RunScreenViewModel {
+    /// The screen at the order's clock once the order answers and places every row it draws; a failed
+    /// read, a newer build, or an answer that does not place them leaves the run's screen standing.
+    private func place(_ built: BuiltScreen<Model>, freshness: Freshness, generation mine: Int) async {
+        guard let orders, let atClock = built.atClock else {
+            return
+        }
+        let model = await atClock(orders)
+        guard mine == generation, let model else {
+            return
+        }
+        state = .loaded(model, freshness)
     }
 }
 

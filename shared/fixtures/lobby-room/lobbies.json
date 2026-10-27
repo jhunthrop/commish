@@ -1,0 +1,31 @@
+{
+	"data": [
+		{
+			"clock_seconds": 30,
+			"filling": 3,
+			"format": "12_ppr",
+			"lineup": "standard",
+			"scoring": "ppr",
+			"teams": 12
+		},
+		{
+			"clock_seconds": 30,
+			"filling": 0,
+			"format": "12_half_superflex",
+			"lineup": "superflex",
+			"scoring": "half_ppr",
+			"teams": 12
+		},
+		{
+			"clock_seconds": 45,
+			"filling": 0,
+			"format": "10_ppr",
+			"lineup": "standard",
+			"scoring": "ppr",
+			"teams": 10
+		}
+	],
+	"error": null,
+	"ok": true,
+	"request_id": "6d5798aafe2523d3"
+}

@@ -71,9 +71,9 @@ func (m marketRead) join() string {
 
 // columns is one directory row with its board points, the columns Load
 // scans ahead of the board's stamp, order and run; a free agent's NULL
-// club reads as no club, "" (WireClub).
-func (m marketRead) columns() string {
-	return `pp.id, pp.name, pp.position, coalesce(pp.team, ''), coalesce(pp.headshot_url, ''), ` + m.adp() + `,
+// club reads as no club, "" (WireClub); fr says whether he has a face.
+func (m marketRead) columns(fr faceRead) string {
+	return `pp.id, pp.name, pp.position, coalesce(pp.team, ''), ` + fr.column() + `, ` + m.adp() + `,
   board.points, board.floor_points, board.median_points, board.ceiling_points`
 }
 

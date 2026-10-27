@@ -21,6 +21,8 @@ public struct OrderQuery: Equatable, Hashable, Sendable {
 
     /// The fewest letters a search sends (the API's minimum).
     public static let minSearch = 2
+    /// The most rows one read gives (the API's MaxOrderRows).
+    public static let maxLimit = 400
 
     public init(position: OrderPosition?, search: String?, limit: Int, byesLast: Bool = true) {
         self.position = position
